@@ -9,15 +9,19 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const upstreamVersion = '4.2.0'
 
 const packages = [
-    ['@tarojs/react', 'packages/taro-react'],
-    ['@tarojs/plugin-framework-react', 'packages/taro-plugin-framework-react']
+    ['@tarojs/react', 'packages/taro-react', 'scripts/readme-templates/taro-react.md'],
+    [
+        '@tarojs/plugin-framework-react',
+        'packages/taro-plugin-framework-react',
+        'scripts/readme-templates/taro-plugin-framework-react.md'
+    ]
 ]
 
-for (const [upstreamName, targetDir] of packages) {
-    buildPackage(upstreamName, targetDir)
+for (const [upstreamName, targetDir, readmeTemplate] of packages) {
+    buildPackage(upstreamName, targetDir, readmeTemplate)
 }
 
-function buildPackage(upstreamName, targetDir) {
+function buildPackage(upstreamName, targetDir, readmeTemplate) {
     const absoluteTargetDir = path.resolve(repoRoot, targetDir)
     const localPackageJson = readLocalPackageJson(absoluteTargetDir)
     const patchFile = getPatchFile(upstreamName)
@@ -28,7 +32,7 @@ function buildPackage(upstreamName, targetDir) {
 
         applyPatch(packageDir, patchFile)
         writeFileSync(path.join(packageDir, 'package.json'), localPackageJson.text)
-        writeFileSync(path.join(packageDir, 'README.md'), createReadme(upstreamName, localPackageJson.value.name))
+        writeFileSync(path.join(packageDir, 'README.md'), readStaticReadme(readmeTemplate))
         replaceGeneratedPackage(absoluteTargetDir, packageDir, workingDir)
 
         console.log(`Generated ${localPackageJson.value.name}@${localPackageJson.value.version}`)
@@ -77,15 +81,9 @@ function readLocalPackageJson(targetDir) {
     }
 }
 
-function createReadme(upstreamName, packageName) {
-    return `# ${packageName}
-
-React 19-compatible package generated from \`${upstreamName}@${upstreamVersion}\` plus vite-plugin-taro's React 19 patch.
-
-This package is published so \`vite-plugin-taro\` can depend on it through an npm alias as \`${upstreamName}\`. It is not intended for direct application imports.
-
-Upstream Taro is MIT licensed by O2Team. See \`LICENSE\`.
-`
+function readStaticReadme(readmeTemplate) {
+    const text = readFileSync(path.resolve(repoRoot, readmeTemplate), 'utf8')
+    return text.endsWith('\n') ? text : `${text}\n`
 }
 
 function getPatchFile(upstreamName) {
