@@ -26,14 +26,6 @@
         "./client": {
             "types": "./client.d.ts"
         },
-        "./shim/h5": {
-            "import": "./dist/shim/h5.js",
-            "default": "./dist/shim/h5.js"
-        },
-        "./shim/wx": {
-            "import": "./dist/shim/wx.js",
-            "default": "./dist/shim/wx.js"
-        },
         "./package.json": "./package.json"
     },
     "files": [

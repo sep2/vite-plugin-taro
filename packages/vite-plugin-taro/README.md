@@ -138,8 +138,6 @@ interface TaroPluginOptions {
 | `vite-plugin-taro` | Default Vite plugin entry. |
 | `vite-plugin-taro/vite` | Default Vite plugin entry. |
 | `vite-plugin-taro/client` | Type declarations for `virtual:taro` and `virtual:taro/components`. |
-| `vite-plugin-taro/shim/h5` | H5 runtime shim used by generated entries. |
-| `vite-plugin-taro/shim/wx` | WeChat runtime shim used by generated entries. |
 
 ## Conditional compilation
 

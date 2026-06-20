@@ -1,11 +1,17 @@
+import { readFileSync } from 'node:fs'
 import babel from '@rolldown/plugin-babel'
 import react from '@vitejs/plugin-react'
 import type { HtmlTagDescriptor, PluginOption, UserConfig } from 'vite'
 import { isProd, nodeRequire } from '../constants.ts'
 import type { JsonObject, TaroBuildContext, TaroPageOption } from '../types.ts'
-import { createPageComponentImport } from '../utils.ts'
+import { createPageComponentImport, normalizeModuleId } from '../utils.ts'
 
 const virtualH5Id = 'virtual:vite-plugin-taro/h5'
+const taroComponentsGlobalCss = readFileSync(nodeRequire.resolve('@tarojs/components/global.css'), 'utf8')
+const taroH5RuntimePath = createResolvedImport('@tarojs/plugin-platform-h5/dist/runtime')
+const taroReactRuntimePath = createResolvedImport('@tarojs/plugin-framework-react/dist/runtime')
+const taroRouterPath = createResolvedImport('@tarojs/router')
+const taroRuntimePath = createResolvedImport('@tarojs/runtime')
 
 /**
  * Checks whether an id belongs to an H5 virtual module.
@@ -75,6 +81,10 @@ export function createH5SupportPlugins(): PluginOption[] {
     ]
 }
 
+function createResolvedImport(id: string): string {
+    return JSON.stringify(normalizeModuleId(nodeRequire.resolve(id)))
+}
+
 /**
  * Creates compile-time constants expected by Taro's Web runtime packages.
  *
@@ -100,6 +110,12 @@ export function createWebIndexHtmlTags(context: TaroBuildContext): HtmlTagDescri
     if (context.target !== 'h5') return
 
     const tags: HtmlTagDescriptor[] = []
+    // Keep Taro's H5 document sizing identical in dev and production.
+    tags.push({
+        tag: 'style',
+        children: taroComponentsGlobalCss,
+        injectTo: 'head'
+    })
     tags.push({
         tag: 'script',
         attrs: { type: 'module' },
@@ -119,13 +135,14 @@ export function createWebEntry(context: TaroBuildContext): string {
     const webAppConfigCode = JSON.stringify(createWebAppConfig(context.appConfig))
     const webRoutesConfigCode = createWebRoutesConfig(context.pages)
 
-    return `import {
+    return `import ${taroH5RuntimePath}
+import { createReactApp } from ${taroReactRuntimePath}
+import {
     createHashHistory,
-    createReactApp,
     createRouter,
-    handleAppMount,
-    window
-} from 'vite-plugin-taro/shim/h5'
+    handleAppMount
+} from ${taroRouterPath}
+import { window } from ${taroRuntimePath}
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import AppComponent from '${context.appComponentImport}'

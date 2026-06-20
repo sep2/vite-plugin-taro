@@ -1,4 +1,3 @@
-
 import type { Plugin, PluginOption, UserConfig } from 'vite'
 import { createTaroConditionalDirectivePlugin } from './plugins.ts'
 import {
@@ -54,7 +53,7 @@ function createTaroPlugin(context: TaroBuildContext): Plugin {
         config: {
             order: 'pre',
             handler: (): UserConfig => {
-                return context.target === 'wx' ? createWxViteConfig(context) : createH5ViteConfig()
+                return context.target === 'wx' ? createWxViteConfig() : createH5ViteConfig()
             }
         },
 
