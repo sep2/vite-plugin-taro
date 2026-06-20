@@ -36,7 +36,10 @@ From the repository root:
 ```sh
 pnpm install
 pnpm prepare:taro
+pnpm build:plugin
 ```
+
+This app consumes the workspace plugin through its built `dist` entry. Re-run `pnpm build:plugin` after changing `packages/vite-plugin-taro`.
 
 This app owns its styling pipeline and installs `tailwindcss` plus `weapp-tailwindcss` directly.
 
@@ -57,11 +60,12 @@ pnpm dev:sample:wx
 From the repository root:
 
 ```sh
+pnpm build:plugin
 pnpm build:sample:h5
 pnpm build:sample:wx
 ```
 
-Or from this package:
+Or from this package after building the plugin:
 
 ```sh
 pnpm build-h5

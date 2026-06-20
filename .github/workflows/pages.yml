@@ -36,6 +36,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build plugin
+        run: pnpm build:plugin
+
       - name: Build sample H5
         run: pnpm build:sample:h5
 

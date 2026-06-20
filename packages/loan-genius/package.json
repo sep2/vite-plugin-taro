@@ -4,15 +4,10 @@
     "version": "0.0.0",
     "type": "module",
     "scripts": {
-        "prebuild-wx": "pnpm --filter vite-plugin-taro build",
         "build-wx": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=wx vite build",
-        "prebuild-h5": "pnpm --filter vite-plugin-taro build",
         "build-h5": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite build",
-        "predev-wx": "pnpm --filter vite-plugin-taro build",
         "dev-wx": "NODE_ENV=development VITE_PLUGIN_TARO_TARGET=wx vite build --watch",
-        "predev-h5": "pnpm --filter vite-plugin-taro build",
         "dev-h5": "NODE_ENV=development VITE_PLUGIN_TARO_TARGET=h5 vite",
-        "pretypecheck": "pnpm --filter vite-plugin-taro build",
         "typecheck": "tsgo"
     },
     "dependencies": {

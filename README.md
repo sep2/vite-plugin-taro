@@ -81,6 +81,7 @@ Add the virtual module declarations to the app `tsconfig.json`:
 pnpm install
 pnpm prepare:taro
 pnpm typecheck
+pnpm build:plugin
 pnpm build:sample:h5
 pnpm build:sample:wx
 ```
@@ -91,8 +92,8 @@ Useful scripts:
 | --- | --- |
 | `pnpm prepare:taro` | Prepare workspace Taro runtime dependencies. |
 | `pnpm build:plugin` | Build `vite-plugin-taro`. |
-| `pnpm build:sample:h5` | Build the sample H5 app to `packages/loan-genius/dist/h5`. |
-| `pnpm build:sample:wx` | Build the sample WeChat Mini Program to `packages/loan-genius/dist/wx`. |
+| `pnpm build:sample:h5` | Build the sample H5 app to `packages/loan-genius/dist/h5` after the plugin has been built. |
+| `pnpm build:sample:wx` | Build the sample WeChat Mini Program to `packages/loan-genius/dist/wx` after the plugin has been built. |
 | `pnpm publish:dry` | Dry-run publishing all public packages in order. |
 | `pnpm publish:all` | Publish the public packages in the required order. |
 
@@ -103,6 +104,7 @@ The sample H5 app is deployed by `.github/workflows/pages.yml` on every push to 
 Manual local build:
 
 ```sh
+pnpm build:plugin
 pnpm build:sample:h5
 ```
 
