@@ -22,6 +22,7 @@ export default defineConfig(({ mode }) => {
     const wechatAppId = env.VITE_PLUGIN_TARO_WECHAT_APP_ID || 'touristappid'
 
     return {
+        base: target === 'h5' ? './' : undefined,
         resolve: {
             alias: [
                 { find: '@components', replacement: fromRoot('src/components') },

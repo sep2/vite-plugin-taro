@@ -28,6 +28,18 @@ pnpm --filter loan-genius build-h5
 pnpm --filter loan-genius build-wx
 ```
 
+## GitHub Pages sample
+
+The sample H5 app is deployed from `packages/loan-genius/dist/h5` by `.github/workflows/pages.yml` on every push to `main`.
+
+Manual local build:
+
+```sh
+pnpm build:sample:h5
+```
+
+Enable Pages in the GitHub repository settings with **Source: GitHub Actions**.
+
 ## Publishing
 
 The patched runtime packages must be published before the main plugin. Use the one-command release script:
