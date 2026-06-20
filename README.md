@@ -1,34 +1,68 @@
 # vite-plugin-taro
 
-Vite 8 + React 19 plugin for building one React/Taro codebase for both WeChat Mini Program (`wx`) and Web (`h5`) targets.
+[![npm version](https://img.shields.io/npm/v/vite-plugin-taro.svg)](https://www.npmjs.com/package/vite-plugin-taro)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+Build one React 19 + Taro 4 codebase with Vite 8 for both Web (`h5`) and WeChat Mini Program (`wx`) targets.
 
 - npm: [`vite-plugin-taro`](https://www.npmjs.com/package/vite-plugin-taro)
-- Sample H5 demo: <https://sep2.github.io/vite-plugin-taro/>
+- H5 sample: <https://sep2.github.io/vite-plugin-taro/>
+- Issues: <https://github.com/sep2/vite-plugin-taro/issues>
+
+## Why this exists
+
+Taro already provides the cross-platform runtime and component model. This project adds a Vite-first build layer for React 19 apps that need the same source tree to produce:
+
+| Target | Output |
+| --- | --- |
+| `h5` | A Web app powered by Taro's H5 runtime and hash router. |
+| `wx` | WeChat Mini Program assets that can be opened in WeChat DevTools. |
+
+The plugin generates the app/page entries normally produced by Taro's webpack runner, configures Vite/Rolldown for each target, and exposes stable app-facing import paths.
+
+## Packages
+
+| Package | Purpose | Published |
+| --- | --- | --- |
+| [`packages/vite-plugin-taro`](packages/vite-plugin-taro) | Public Vite plugin and app-facing Taro facades. | `vite-plugin-taro` |
+| [`packages/taro-react`](packages/taro-react) | Generated React 19-compatible build of `@tarojs/react@4.2.0`. | `vite-plugin-taro-react` |
+| [`packages/taro-plugin-framework-react`](packages/taro-plugin-framework-react) | Generated React 19-compatible build of `@tarojs/plugin-framework-react@4.2.0`. | `vite-plugin-taro-plugin-framework-react` |
+| [`packages/loan-genius`](packages/loan-genius) | Sample loan calculator app used to verify `h5` and `wx` builds. | Private sample |
 
 ## Features
 
-- Build the same React/Taro app as either:
-  - `wx`: WeChat Mini Program assets.
-  - `h5`: Web app powered by the Taro H5 runtime/router.
-- React 19 support out of the box.
-- No app-side Taro runtime patching required.
+- One React/Taro source tree for `h5` and `wx` builds.
+- React 19 support through patched Taro React runtime packages.
+- Vite 8 plugin API with target-specific Vite/Rolldown configuration.
+- Generated Taro-style app and page entries for both targets.
+- WeChat Mini Program asset emission: JSON, WXML, WXS, WXSS, and CommonJS chunks.
+- H5 runtime bootstrapping with Taro's router and component styles.
 - Taro-style conditional compilation comments before Vite parses source.
-- Vite/Rolldown output setup for target-specific generated app/page entries.
-- Built-in Tailwind CSS and WeChat Tailwind processing for the selected target.
-- WeChat Mini Program output integration.
+- Tailwind CSS v4 integration for H5 and WeChat-compatible Tailwind processing for Mini Programs.
+- App-facing facades for Taro APIs and components so application code does not depend on target internals.
 
-## Install
+## Requirements
+
+| Tool | Version |
+| --- | --- |
+| Node.js | `^20.19.0` or `>=22.12.0` for the published plugin; this repository is developed with Node.js 26+. |
+| pnpm | `11.x` for the monorepo. |
+| Vite | `^8.0.0` peer dependency. |
+| React / React DOM | `^19.0.0` peer dependencies. |
+| WeChat DevTools | Required only for testing the `wx` output. |
+
+## Install in an app
 
 ```sh
-pnpm add -D vite-plugin-taro vite
+pnpm add -D vite vite-plugin-taro
 pnpm add react react-dom
 ```
 
-## Basic Vite config
+Create a Vite config that selects a target and passes the app/page metadata to the plugin:
 
 ```ts
-import vitePluginTaro, { type VitePluginTaroTarget } from 'vite-plugin-taro/vite'
 import { defineConfig, loadEnv } from 'vite'
+import vitePluginTaro, { type VitePluginTaroTarget } from 'vite-plugin-taro/vite'
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), 'VITE_PLUGIN_TARO_')
@@ -42,7 +76,9 @@ export default defineConfig(({ mode }) => {
                 app: 'src/app.ts',
                 pages: [{ path: 'pages/index/index', config: {} }],
                 appJson: {},
-                projectConfigJson: { appid: env.VITE_PLUGIN_TARO_WECHAT_APP_ID || 'touristappid' },
+                projectConfigJson: {
+                    appid: env.VITE_PLUGIN_TARO_WECHAT_APP_ID || 'touristappid'
+                },
                 sitemapJson: { rules: [{ action: 'allow', page: '*' }] }
             })
         ]
@@ -50,60 +86,74 @@ export default defineConfig(({ mode }) => {
 })
 ```
 
-Application code should import Taro APIs/components through the package facades.
+Application code should import Taro APIs and components through the package facades:
 
-```ts
-import { View, Text } from 'vite-plugin-taro/components'
+```tsx
+import { Text, View } from 'vite-plugin-taro/components'
 import Taro from 'vite-plugin-taro/taro'
 
-Taro.getWindowInfo()
+export default function Page() {
+    Taro.getWindowInfo()
+
+    return (
+        <View>
+            <Text>Hello Taro</Text>
+        </View>
+    )
+}
 ```
 
-## Development
+See the full plugin API in [`packages/vite-plugin-taro/README.md`](packages/vite-plugin-taro/README.md).
+
+## Develop this repository
 
 ```sh
 pnpm install
 pnpm prepare:taro
-pnpm typecheck
 pnpm build:plugin
-pnpm build:sample:h5
-pnpm build:sample:wx
+pnpm typecheck
 ```
 
-Useful scripts:
+Common scripts:
 
 | Script | Description |
 | --- | --- |
-| `pnpm prepare:taro` | Prepare workspace Taro runtime dependencies. |
-| `pnpm build:plugin` | Build `vite-plugin-taro`. |
-| `pnpm dev:sample:h5` | Run the sample H5 app in Vite dev mode after the plugin has been built. |
-| `pnpm dev:sample:wx` | Build the sample WeChat Mini Program in watch mode after the plugin has been built. |
-| `pnpm build:sample:h5` | Build the sample H5 app to `packages/loan-genius/dist/h5` after the plugin has been built. |
-| `pnpm preview:sample:h5` | Serve the built sample H5 bundle with Vite preview. |
-| `pnpm build:sample:wx` | Build the sample WeChat Mini Program to `packages/loan-genius/dist/wx` after the plugin has been built. |
-| `pnpm publish:dry` | Dry-run publishing all public packages in order. |
-| `pnpm publish:all` | Publish the public packages in the required order. |
+| `pnpm prepare:taro` | Regenerate the patched React 19 Taro packages from upstream npm tarballs and local patch files. |
+| `pnpm build:plugin` | Build `packages/vite-plugin-taro` into `dist`. |
+| `pnpm typecheck` | Typecheck the plugin and sample app with `tsgo`. |
+| `pnpm lint` | Run Biome checks. |
+| `pnpm format` | Apply Biome formatting. |
+| `pnpm dev:sample:h5` | Start the sample H5 app in Vite dev mode. Build the plugin first. |
+| `pnpm dev:sample:wx` | Build the sample WeChat Mini Program in watch mode. Build the plugin first. |
+| `pnpm build:sample:h5` | Build the sample H5 app to `packages/loan-genius/dist/h5`. |
+| `pnpm preview:sample:h5` | Preview the built H5 sample. |
+| `pnpm build:sample:wx` | Build the sample WeChat Mini Program to `packages/loan-genius/dist/wx`. |
+| `pnpm publish:dry` | Dry-run package validation and publishing. |
+| `pnpm publish:all` | Publish the public packages in dependency order. |
 
-## GitHub Pages sample
+## Sample app
 
-The sample H5 app is deployed by `.github/workflows/pages.yml` on every push to `main`.
-
-Manual local build:
+The sample app lives in [`packages/loan-genius`](packages/loan-genius). It demonstrates the page convention, target selection, H5 routing, and WeChat output.
 
 ```sh
 pnpm build:plugin
-pnpm build:sample:h5
-pnpm preview:sample:h5
+pnpm dev:sample:h5
+pnpm build:sample:wx
 ```
 
-Enable Pages in the GitHub repository settings with **Source: GitHub Actions**.
+Open `packages/loan-genius/dist/wx` with WeChat DevTools to test the Mini Program output.
 
-## Publishing
+## Release workflow
 
-Validate, then publish the bumped packages:
+Validate the publishable packages before publishing:
 
 ```sh
 pnpm publish:dry
+```
+
+Publish all public packages in the required order:
+
+```sh
 pnpm publish:all
 ```
 
@@ -113,6 +163,10 @@ For npm accounts with 2FA:
 pnpm publish:all -- --otp 123456
 ```
 
+## Project status
+
+This is an early `0.x` package. The plugin API is intentionally small, but breaking changes can still happen before a stable `1.0` release.
+
 ## License
 
-MIT.
+MIT. See [`LICENSE`](LICENSE).
