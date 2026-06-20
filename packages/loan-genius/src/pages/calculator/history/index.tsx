@@ -32,7 +32,7 @@ export default class LoanGeniusHistory extends Component<any, any> {
                 <NavigationBar>
                     <Text>计算历史</Text>
                 </NavigationBar>
-                <ScrollView scrollY className="flex flex-col flex-1 overflow-hidden">
+                <ScrollView scrollY className="flex flex-col flex-1 overflow-x-hidden overflow-y-scroll">
                     {historyList.map((item: any, index: number) => {
                         return (
                             <View

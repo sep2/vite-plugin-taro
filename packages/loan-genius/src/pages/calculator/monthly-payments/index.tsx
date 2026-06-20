@@ -89,7 +89,7 @@ export default class LoanGeniusMonthlyPayments extends Component<any, any> {
                     <Text>对比月供</Text>
                 </NavigationBar>
                 <ScrollView
-                    className="flex flex-col flex-1 overflow-hidden"
+                    className="flex flex-col flex-1 overflow-x-hidden overflow-y-scroll"
                     scrollY
                     enableBackToTop
                     onScrollToLower={this.onScrollToLower}
