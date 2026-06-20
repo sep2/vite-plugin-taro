@@ -3,6 +3,15 @@
     "version": "0.0.1",
     "description": "Vite 8 plugin for building one React/Taro codebase for WeChat Mini Program and H5 targets.",
     "type": "module",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/sep2/vite-plugin-taro.git",
+        "directory": "packages/vite-plugin-taro"
+    },
+    "bugs": {
+        "url": "https://github.com/sep2/vite-plugin-taro/issues"
+    },
+    "homepage": "https://github.com/sep2/vite-plugin-taro/tree/main/packages/vite-plugin-taro#readme",
     "main": "./dist/vite.js",
     "module": "./dist/vite.js",
     "types": "./dist/vite.d.ts",

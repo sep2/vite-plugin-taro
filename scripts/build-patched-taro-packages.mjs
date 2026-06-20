@@ -26,12 +26,13 @@ const packageDefinitions = [
             files: ['dist', 'LICENSE', 'README.md'],
             repository: {
                 type: 'git',
-                url: 'git+https://github.com/NervJS/taro.git',
+                url: 'git+https://github.com/sep2/vite-plugin-taro.git',
                 directory: 'packages/taro-react'
             },
             bugs: {
-                url: 'https://github.com/NervJS/taro/issues'
+                url: 'https://github.com/sep2/vite-plugin-taro/issues'
             },
+            homepage: 'https://github.com/sep2/vite-plugin-taro/tree/main/packages/taro-react#readme',
             engines: {
                 node: '>=20.19.0'
             },
@@ -70,12 +71,13 @@ Upstream Taro is MIT licensed by O2Team. See \`LICENSE\`.
             files: ['dist', 'index.js', 'LICENSE', 'README.md'],
             repository: {
                 type: 'git',
-                url: 'git+https://github.com/NervJS/taro.git',
-                directory: 'packages/taro-framework-react'
+                url: 'git+https://github.com/sep2/vite-plugin-taro.git',
+                directory: 'packages/taro-plugin-framework-react'
             },
             bugs: {
-                url: 'https://github.com/NervJS/taro/issues'
+                url: 'https://github.com/sep2/vite-plugin-taro/issues'
             },
+            homepage: 'https://github.com/sep2/vite-plugin-taro/tree/main/packages/taro-plugin-framework-react#readme',
             engines: {
                 node: '>=20.19.0'
             },

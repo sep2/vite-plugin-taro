@@ -3,6 +3,14 @@
     "version": "0.0.1",
     "private": true,
     "type": "module",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/sep2/vite-plugin-taro.git"
+    },
+    "bugs": {
+        "url": "https://github.com/sep2/vite-plugin-taro/issues"
+    },
+    "homepage": "https://github.com/sep2/vite-plugin-taro#readme",
     "scripts": {
         "prepare:taro": "node scripts/build-patched-taro-packages.mjs",
         "build": "pnpm --filter vite-plugin-taro build",
