@@ -45,7 +45,7 @@
     "scripts": {
         "clean": "rm -rf dist",
         "build": "pnpm -w prepare:taro && pnpm clean && tsgo --project tsconfig.json",
-        "typecheck": "pnpm -w prepare:taro && tsgo --project tsconfig.json --noEmit",
+        "typecheck": "tsgo --project tsconfig.json --noEmit",
         "prepack": "pnpm build",
         "pack:dry": "pnpm pack --dry-run"
     },
