@@ -30,13 +30,22 @@ pnpm --filter loan-genius build-wx
 
 ## Publishing
 
-The patched runtime packages must be published before the main plugin:
+The patched runtime packages must be published before the main plugin. Use the one-command release script:
 
 ```sh
-pnpm prepare:taro
-pnpm --filter vite-plugin-taro-react publish --access public
-pnpm --filter vite-plugin-taro-plugin-framework-react publish --access public
-pnpm --filter vite-plugin-taro publish --access public
+pnpm publish:all
+```
+
+For npm accounts with 2FA:
+
+```sh
+pnpm publish:all -- --otp 123456
+```
+
+Dry run:
+
+```sh
+pnpm publish:dry
 ```
 
 ## License

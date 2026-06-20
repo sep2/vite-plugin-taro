@@ -115,12 +115,11 @@ Run `pnpm prepare:taro` to regenerate the patched packages from upstream tarball
 
 ```sh
 pnpm install
-pnpm prepare:taro
-pnpm --filter vite-plugin-taro-react pack --dry-run
-pnpm --filter vite-plugin-taro-plugin-framework-react pack --dry-run
-pnpm --filter vite-plugin-taro typecheck
-pnpm --filter vite-plugin-taro build
-pnpm --filter vite-plugin-taro pack:dry
+pnpm publish:dry
+pnpm publish:all
+
+# If npm 2FA is enabled:
+pnpm publish:all -- --otp 123456
 ```
 
 The package publishes built ESM JavaScript and `.d.ts` files from `dist`.

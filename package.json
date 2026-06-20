@@ -22,7 +22,9 @@
         "typecheck": "pnpm --filter vite-plugin-taro typecheck && pnpm --filter loan-genius typecheck",
         "lint": "biome check .",
         "format": "biome check --write .",
-        "pack:dry": "pnpm prepare:taro && pnpm --filter vite-plugin-taro-react pack --dry-run && pnpm --filter vite-plugin-taro-plugin-framework-react pack --dry-run && pnpm --filter vite-plugin-taro pack:dry"
+        "pack:dry": "pnpm prepare:taro && pnpm --filter vite-plugin-taro-react pack --dry-run && pnpm --filter vite-plugin-taro-plugin-framework-react pack --dry-run && pnpm --filter vite-plugin-taro pack:dry",
+        "publish:all": "node scripts/publish-packages.mjs",
+        "publish:dry": "node scripts/publish-packages.mjs --dry-run"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.5.0",
