@@ -199,8 +199,8 @@ When packed/published by pnpm, workspace aliases become npm aliases to these pat
 
 ```json
 {
-    "@tarojs/react": "npm:vite-plugin-taro-react@4.2.0-react19.1",
-    "@tarojs/plugin-framework-react": "npm:vite-plugin-taro-plugin-framework-react@4.2.0-react19.1"
+    "@tarojs/react": "npm:vite-plugin-taro-react@4.2.0-react19.2",
+    "@tarojs/plugin-framework-react": "npm:vite-plugin-taro-plugin-framework-react@4.2.0-react19.2"
 }
 ```
 

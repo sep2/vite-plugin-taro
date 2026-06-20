@@ -1,5 +1,5 @@
 diff --git a/dist/react.esm.js b/dist/react.esm.js
-index ad8a51f..32a60c7 100644
+index ad8a51f..57cdf0c 100644
 --- a/dist/react.esm.js
 +++ b/dist/react.esm.js
 @@ -1,7 +1,12 @@
@@ -120,3 +120,54 @@ index ad8a51f..32a60c7 100644
  if (process.env.NODE_ENV !== 'production') {
      const foundDevTools = TaroReconciler.injectIntoDevTools({
          bundleType: 1,
+@@ -847,22 +904,32 @@ class Root {
+             const concurrentUpdatesByDefaultOverride = false;
+             let isStrictMode = false;
+             let identifierPrefix = '';
++            let onUncaughtError = (error) => console.error(error);
++            let onCaughtError = (error, errorInfo) => {
++                console.error(error);
++                if (errorInfo === null || errorInfo === void 0 ? void 0 : errorInfo.componentStack) {
++                    console.error(errorInfo.componentStack);
++                }
++            };
+             let onRecoverableError = (error) => console.error(error);
+-            let transitionCallbacks = null;
++            const onDefaultTransitionIndicator = null;
+             if (options.unstable_strictMode === true) {
+                 isStrictMode = true;
+             }
+             if (options.identifierPrefix !== undefined) {
+                 identifierPrefix = options.identifierPrefix;
+             }
++            if (options.onUncaughtError !== undefined) {
++                onUncaughtError = options.onUncaughtError;
++            }
++            if (options.onCaughtError !== undefined) {
++                onCaughtError = options.onCaughtError;
++            }
+             if (options.onRecoverableError !== undefined) {
+                 onRecoverableError = options.onRecoverableError;
+             }
+-            if (options.unstable_transitionCallbacks !== undefined) {
+-                transitionCallbacks = options.unstable_transitionCallbacks;
+-            }
+             this.internalRoot = renderer.createContainer(containerInfo, tag, null, // hydrationCallbacks
+-            isStrictMode, concurrentUpdatesByDefaultOverride, identifierPrefix, onRecoverableError, transitionCallbacks);
++            isStrictMode, concurrentUpdatesByDefaultOverride, identifierPrefix, onUncaughtError, onCaughtError, onRecoverableError, onDefaultTransitionIndicator);
+         }
+         else {
+             const tag = 0; // LegacyRoot
+@@ -870,8 +937,10 @@ class Root {
+             false, // isStrictMode
+             false, // concurrentUpdatesByDefaultOverride,
+             '', // identifierPrefix
+-            () => { }, // onRecoverableError, this isn't reachable because onRecoverableError isn't called in the legacy API.
+-            null // transitionCallbacks
++            (error) => console.error(error), // onUncaughtError
++            (error) => console.error(error), // onCaughtError
++            (error) => console.error(error), // onRecoverableError
++            null // onDefaultTransitionIndicator
+             );
+         }
+     }
