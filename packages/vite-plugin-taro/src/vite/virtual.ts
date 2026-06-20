@@ -16,10 +16,7 @@ export function loadPublicVirtualModule(id: string, context: TaroBuildContext): 
 
 function createVirtualTaroModule(context: TaroBuildContext): string {
     if (context.target === 'h5') {
-        const h5ApisPath = createResolvedImport('@tarojs/plugin-platform-h5/dist/runtime/apis')
-        return `export * from ${h5ApisPath}
-export { default } from ${h5ApisPath}
-`
+        return "export * from '@tarojs/taro'\nexport { default } from '@tarojs/taro'\n"
     }
 
     const taroPath = createResolvedImport('@tarojs/taro')
