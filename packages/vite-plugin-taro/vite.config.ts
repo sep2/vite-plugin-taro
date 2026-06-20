@@ -24,7 +24,7 @@ function rewriteDeclarationImportExtensions(content: string): string {
 
 function transformDeclarationContent(filePath: string, content: string): string {
     if (filePath.endsWith('public/taro.d.ts')) {
-        return "import Taro = require('@tarojs/taro')\nexport = Taro\n"
+        return "import Taro = require('@tarojs/taro')\ndeclare const taro: typeof Taro\nexport default taro\n"
     }
     return rewriteDeclarationImportExtensions(content)
 }
@@ -33,7 +33,7 @@ export default defineConfig({
     plugins: [
         dts({
             entryRoot: 'src',
-            outDir: 'dist',
+            outDirs: 'dist',
             tsconfigPath: './tsconfig.build.json',
             beforeWriteFile(filePath, content) {
                 if (!filePath.endsWith('.d.ts')) return

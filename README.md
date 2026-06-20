@@ -56,11 +56,13 @@ export default defineConfig(({ mode }) => {
 })
 ```
 
-Application code should import Taro APIs/components through the plugin facades:
+Application code should import Taro APIs/components through the plugin facades. `vite-plugin-taro/taro` is default-export only, so use `Taro.xxx` APIs.
 
 ```ts
 import Taro from 'vite-plugin-taro/taro'
 import { View, Text } from 'vite-plugin-taro/components'
+
+Taro.getWindowInfo()
 ```
 
 ## Development

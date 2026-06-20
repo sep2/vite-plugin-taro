@@ -6,7 +6,6 @@ import type { JsonObject, TaroBuildContext, TaroPageOption } from '../types.ts'
 import { createPageComponentImport } from '../utils.ts'
 
 const virtualH5Id = 'virtual:vite-plugin-taro/h5'
-const pluginTaroImport = 'vite-plugin-taro/taro'
 
 /**
  * Checks whether an id belongs to an H5 virtual module.
@@ -61,13 +60,13 @@ export function createH5ViteConfig(): UserConfig {
 export function createH5SupportPlugins(): PluginOption[] {
     return [
         ...react(),
-        // Mirrors Taro H5: rewrite default Taro.xxx calls from vite-plugin-taro/taro to named H5 API imports.
+        // Mirrors Taro H5 API transforms while leaving vite-plugin-taro/taro as a default-only facade.
         babel({
             plugins: [
                 [
                     nodeRequire.resolve('babel-plugin-transform-taroapi'),
                     {
-                        packageName: pluginTaroImport,
+                        packageName: '@tarojs/taro',
                         definition: nodeRequire(nodeRequire.resolve('@tarojs/plugin-platform-h5/dist/definition.json'))
                     }
                 ]

@@ -9,7 +9,9 @@ import { isArray } from '@utils'
 import clsx from 'clsx'
 import type { CSSProperties, FunctionComponent, PropsWithChildren } from 'react'
 import { View } from 'vite-plugin-taro/components'
-import type { Color } from 'vite-plugin-taro/taro'
+import type Taro from 'vite-plugin-taro/taro'
+
+type Color = Taro.Color
 
 interface ShadowOffset {
     width: number

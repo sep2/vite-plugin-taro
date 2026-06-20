@@ -63,11 +63,22 @@ Example scripts:
 }
 ```
 
-Application code should usually import only from the plugin facades:
+Application code should usually import only from the plugin facades. `vite-plugin-taro/taro` is default-export only; call APIs as `Taro.xxx`.
 
 ```ts
 import Taro from 'vite-plugin-taro/taro'
 import { Text, View } from 'vite-plugin-taro/components'
+
+Taro.useLaunch(() => {})
+Taro.getWindowInfo()
+```
+
+For Taro namespace types:
+
+```ts
+import type Taro from 'vite-plugin-taro/taro'
+
+type Color = Taro.Color
 ```
 
 ## Styling
@@ -110,7 +121,7 @@ interface TaroPluginOptions {
 | `vite-plugin-taro` | Default Vite plugin and public plugin types. |
 | `vite-plugin-taro/vite` | Default Vite plugin and `TaroTarget`, `TaroPluginOptions`, `TaroPageOption` types. |
 | `vite-plugin-taro/components` | Re-export of `@tarojs/components`. Use this in app code. |
-| `vite-plugin-taro/taro` | Taro API facade. Use this instead of importing `@tarojs/taro` directly. |
+| `vite-plugin-taro/taro` | Default-only Taro API facade. Use this instead of importing `@tarojs/taro` directly. |
 | `vite-plugin-taro/shim/h5` | H5 runtime shim used by generated entries. |
 | `vite-plugin-taro/shim/wx` | WeChat runtime shim used by generated entries. |
 
