@@ -10,7 +10,9 @@ const virtualH5Id = 'virtual:vite-plugin-taro/h5'
 const taroComponentsGlobalCss = readFileSync(nodeRequire.resolve('@tarojs/components/global.css'), 'utf8')
 const taroH5RuntimePath = createResolvedImport('@tarojs/plugin-platform-h5/dist/runtime')
 const taroReactRuntimePath = createResolvedImport('@tarojs/plugin-framework-react/dist/runtime')
-const taroRouterPath = createResolvedImport('@tarojs/router')
+const taroRouterH5Path = nodeRequire.resolve('@tarojs/router/dist/index.esm.js')
+// Keep the generated H5 entry bare so Vite shares one RouterConfig singleton.
+const taroRouterPath = JSON.stringify('@tarojs/router')
 const taroRuntimePath = createResolvedImport('@tarojs/runtime')
 
 /**
@@ -48,7 +50,10 @@ export function createH5ViteConfig(): UserConfig {
                 {
                     find: /^@tarojs\/taro$/,
                     replacement: nodeRequire.resolve('@tarojs/plugin-platform-h5/dist/runtime/apis')
-                }
+                },
+                // H5 APIs import @tarojs/router too; pin it to Taro's H5 ESM entry so
+                // getCurrentPages sees the RouterConfig initialized by createRouter.
+                { find: /^@tarojs\/router$/, replacement: taroRouterH5Path }
             ]
         },
         build: {
