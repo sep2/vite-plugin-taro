@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const upstreamVersion = '4.2.0'
-const patchedVersion = '4.2.0-react19.0'
+const patchedVersion = '4.2.0-react19.1'
 
 const packageDefinitions = [
     {
