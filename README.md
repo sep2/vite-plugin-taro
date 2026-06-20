@@ -4,7 +4,6 @@ Vite 8 + React 19 plugin for building one React/Taro codebase for both WeChat Mi
 
 - npm: [`vite-plugin-taro`](https://www.npmjs.com/package/vite-plugin-taro)
 - Sample H5 demo: <https://sep2.github.io/vite-plugin-taro/>
-- Repository: <https://github.com/sep2/vite-plugin-taro>
 
 ## Features
 
