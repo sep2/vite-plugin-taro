@@ -60,6 +60,7 @@ if (!dryRun) {
 }
 
 run(pnpm, ['prepare:taro'])
+run(pnpm, ['build:plugin'])
 
 if (!skipChecks) {
     run(pnpm, ['typecheck'])

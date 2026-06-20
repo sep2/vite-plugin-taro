@@ -54,11 +54,8 @@
         "README.md"
     ],
     "scripts": {
-        "clean": "rm -rf dist",
-        "build": "pnpm clean && tsgo --project tsconfig.json",
-        "typecheck": "tsgo --project tsconfig.json --noEmit",
-        "prepack": "pnpm build",
-        "pack:dry": "pnpm pack --dry-run"
+        "build": "rm -rf dist && tsgo --project tsconfig.json",
+        "typecheck": "tsgo --project tsconfig.json --noEmit"
     },
     "keywords": [
         "vite",
