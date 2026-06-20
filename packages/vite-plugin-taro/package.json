@@ -100,7 +100,6 @@
     "devDependencies": {
         "@types/node": "^24.10.1",
         "@typescript/native-preview": "latest",
-        "typescript": "^5.9.3",
         "vite": "^8.0.16",
         "vite-plugin-dts": "^5.0.2"
     }
