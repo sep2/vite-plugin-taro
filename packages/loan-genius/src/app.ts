@@ -1,19 +1,13 @@
-import { Component, type PropsWithChildren } from 'react'
+import Taro from 'virtual:taro'
+import type { PropsWithChildren } from 'react'
 import './app.css'
 
-class App extends Component<PropsWithChildren> {
-    componentDidMount() {}
+function App({ children }: PropsWithChildren) {
+    Taro.useLaunch(() => {
+        console.log('App Launch')
+    })
 
-    componentDidShow() {}
-
-    componentDidHide() {}
-
-    componentDidCatchError() {}
-
-    // this.props.children 是将要会渲染的页面
-    render() {
-        return this.props.children
-    }
+    return children
 }
 
 export default App

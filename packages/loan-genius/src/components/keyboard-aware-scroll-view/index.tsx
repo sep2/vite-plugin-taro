@@ -11,7 +11,7 @@ import clsx from 'clsx'
 function TaroKeyboardAwareScrollView(props: any) {
     const { className = '', children } = props
     return (
-        <ScrollView scrollY className={clsx('flex-1', className)}>
+        <ScrollView scrollY className={clsx('flex-1 overflow-hidden', className)}>
             {children}
         </ScrollView>
     )
