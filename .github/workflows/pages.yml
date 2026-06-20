@@ -36,6 +36,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare Taro packages
+        run: pnpm prepare:taro
+
       - name: Build plugin
         run: pnpm build:plugin
 
