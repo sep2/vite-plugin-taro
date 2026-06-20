@@ -11,6 +11,12 @@ pnpm build:plugin
 pnpm dev:sample:h5
 ```
 
+WeChat Mini Program watch build:
+
+```sh
+pnpm dev:sample:wx
+```
+
 Build both targets:
 
 ```sh

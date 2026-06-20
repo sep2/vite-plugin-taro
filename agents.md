@@ -16,6 +16,8 @@ Node.js v26+ is available and can execute TypeScript natively.
 - `pnpm typecheck`: typecheck plugin and sample app.
 - `pnpm build:sample:h5`: build the sample H5 target.
 - `pnpm build:sample:wx`: build the sample WeChat target.
+- `pnpm publish:dry`: validate the release without publishing.
+- `pnpm publish:all`: publish the public packages in order.
 
 # Code style
 
