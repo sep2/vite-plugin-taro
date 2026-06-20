@@ -13,7 +13,7 @@ Vite 8 + React 19 plugin for building one React/Taro codebase for both WeChat Mi
 - React 19 support via patched Taro runtime packages published as npm aliases.
 - No app-side `patchedDependencies` required.
 - Taro-style conditional compilation comments for TS/JS/JSX/TSX and style files.
-- Target-specific Vite/Rolldown, Tailwind CSS, and WeChat output setup.
+- Target-specific Vite/Rolldown and WeChat output setup.
 
 ## Install
 
@@ -69,6 +69,10 @@ Application code should usually import only from the plugin facades:
 import Taro from 'vite-plugin-taro/taro'
 import { Text, View } from 'vite-plugin-taro/components'
 ```
+
+## Styling
+
+`vite-plugin-taro` does not bundle a Tailwind or `weapp-tailwindcss` pipeline. Add styling plugins directly in the app's Vite config when needed. See [`loan-genius`](../loan-genius) for an example using Tailwind v4 and `weapp-tailwindcss`.
 
 ## Options
 

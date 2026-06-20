@@ -14,7 +14,7 @@ Vite 8 + React 19 plugin for building one React/Taro codebase for both WeChat Mi
 - No app-side Taro runtime patching required.
 - Taro-style conditional compilation comments before Vite parses source.
 - Vite/Rolldown output setup for target-specific generated app/page entries.
-- Tailwind CSS and WeChat output integration.
+- WeChat Mini Program output integration.
 
 ## Repository layout
 

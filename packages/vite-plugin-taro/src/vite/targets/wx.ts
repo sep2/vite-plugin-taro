@@ -203,7 +203,7 @@ export function emitWechatImplicitChunksForVirtualApp(
 
 /**
  * Builds the generated WeChat app entry that registers Taro's React App config.
- * vite-plugin-taro omits Taro's generated pxTransform initialization because styles are handled by Tailwind.
+ * vite-plugin-taro omits Taro's generated pxTransform initialization; apps should handle style transforms in their own Vite pipeline.
  *
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-loader/src/app.ts#L54-L63
  */

@@ -112,7 +112,7 @@ export function createWebIndexHtmlTags(context: TaroBuildContext): HtmlTagDescri
 
 /**
  * Builds the generated Web entry around Taro's official Web router/runtime APIs.
- * vite-plugin-taro omits Taro's generated pxTransform initialization because styles are handled by Tailwind.
+ * vite-plugin-taro omits Taro's generated pxTransform initialization; apps should handle style transforms in their own Vite pipeline.
  *
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-loader/src/h5.ts#L120-L150
  */

@@ -17,7 +17,7 @@ Loan Genius is forked/adapted from Wuba's [`Taro-Mortgage-Calculator`](https://g
   - `vite-plugin-taro/taro`
 - Taro-style page routing generated from `vite.config.ts`.
 - Conditional source blocks such as `// #ifdef wx` / `// #ifdef h5`.
-- Tailwind/CSS output through the plugin pipeline.
+- Tailwind v4 and `weapp-tailwindcss` configured directly in this app's Vite config.
 
 ## Pages
 
@@ -37,6 +37,8 @@ From the repository root:
 pnpm install
 pnpm prepare:taro
 ```
+
+This app owns its styling pipeline and installs `tailwindcss` plus `weapp-tailwindcss` directly.
 
 Run H5 dev server:
 

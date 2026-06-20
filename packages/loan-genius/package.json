@@ -17,13 +17,15 @@
     },
     "dependencies": {
         "clsx": "^2.1.1",
-        "vite-plugin-taro": "workspace:*",
         "react": "^19.2.7",
-        "react-dom": "^19.2.7"
+        "react-dom": "^19.2.7",
+        "vite-plugin-taro": "workspace:*"
     },
     "devDependencies": {
         "@types/react": "^19.2.17",
         "@typescript/native-preview": "latest",
-        "vite": "^8.0.16"
+        "tailwindcss": "^4.3.1",
+        "vite": "^8.0.16",
+        "weapp-tailwindcss": "^5.0.13"
     }
 }

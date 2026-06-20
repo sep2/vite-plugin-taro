@@ -41,9 +41,15 @@ importers:
       '@typescript/native-preview':
         specifier: latest
         version: 7.0.0-dev.20260618.1
+      tailwindcss:
+        specifier: ^4.3.1
+        version: 4.3.1
       vite:
         specifier: ^8.0.16
-        version: 8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)
+      weapp-tailwindcss:
+        specifier: ^5.0.13
+        version: 5.0.13(jiti@2.7.0)(tailwindcss@4.3.1)
 
   packages/taro-plugin-framework-react:
     dependencies:
@@ -58,7 +64,7 @@ importers:
         version: 4.2.0
       '@vitejs/plugin-react':
         specifier: ^6.0.0
-        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))
       acorn:
         specifier: ^8.11.3
         version: 8.17.0
@@ -76,7 +82,7 @@ importers:
         version: 2.8.1
       vite:
         specifier: ^8.0.0
-        version: 8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)
 
   packages/taro-react:
     dependencies:
@@ -97,7 +103,7 @@ importers:
     dependencies:
       '@rolldown/plugin-babel':
         specifier: ^0.2.3
-        version: 0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))
+        version: 0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))
       '@tarojs/components':
         specifier: ^4.2.0
         version: 4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15)
@@ -127,7 +133,7 @@ importers:
         version: 4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(postcss@8.5.15)
       '@vitejs/plugin-react':
         specifier: ^6.0.2
-        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))
       babel-plugin-transform-taroapi:
         specifier: ^4.2.0
         version: 4.2.0(@babel/core@7.29.7)
@@ -137,25 +143,19 @@ importers:
       react-dom:
         specifier: ^19.2.7
         version: 19.2.7(react@19.2.7)
-      tailwindcss:
-        specifier: ^4.3.0
-        version: 4.3.1
-      weapp-tailwindcss:
-        specifier: ^5.0.5
-        version: 5.0.13(jiti@2.7.0)(tailwindcss@4.3.1)
     devDependencies:
       '@types/node':
-        specifier: ^24.10.1
-        version: 24.13.2
+        specifier: ^25.9.3
+        version: 25.9.3
       '@typescript/native-preview':
         specifier: latest
         version: 7.0.0-dev.20260618.1
       vite:
         specifier: ^8.0.16
-        version: 8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)
       vite-plugin-dts:
         specifier: ^5.0.2
-        version: 5.0.2(rolldown@1.0.3)(typescript@5.9.3)(vite@8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))
+        version: 5.0.2(rolldown@1.0.3)(typescript@5.9.3)(vite@8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))
 
 packages:
 
@@ -1158,8 +1158,8 @@ packages:
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
 
-  '@types/node@24.13.2':
-    resolution: {integrity: sha512-fRa09kZTgu8o71KFcDjUFuc7F+dEbZYZmkI0mg5YBTRs0yMKjYHsq/c0urDKeDb+D5qVgXOdFcuu+DZPKOITwA==}
+  '@types/node@25.9.3':
+    resolution: {integrity: sha512-603BddQMv3pUcr4U2dhujk83N2tTDVr/34wII2B6bJy6g+8WD6yUb11jszNs0gdi4PesVWl7ABt8nYMVpnLUcg==}
 
   '@types/postcss-url@10.0.4':
     resolution: {integrity: sha512-5QIO9NgbWmAkle65haRqkdgYPCOXheNsaFdbTJJQjT302yK3H49ql4t9a4y0NfpuPtU/UBo15VcV64WCSIMJKg==}
@@ -2297,8 +2297,8 @@ packages:
   ufo@1.6.4:
     resolution: {integrity: sha512-JFNbkD1Svwe0KvGi8GOeLcP4kAWQ609twvCdcHxq1oSL8svv39ZuSvajcD8B+5D0eL4+s1Is2D/O6KN3qcTeRA==}
 
-  undici-types@7.18.2:
-    resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
+  undici-types@7.24.6:
+    resolution: {integrity: sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==}
 
   universal-router@9.2.1:
     resolution: {integrity: sha512-i3XDhyfg0znwCu2Ue1zwWIWgfed+XYDqlUYXgriGnS58tzO3RgKHe4KWtq9HLQOl/Tknnh0C6jEH0+FLTrrBiQ==}
@@ -2842,14 +2842,14 @@ snapshots:
   '@rolldown/binding-win32-x64-msvc@1.0.3':
     optional: true
 
-  '@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))':
+  '@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))':
     dependencies:
       '@babel/core': 7.29.7
       picomatch: 4.0.4
       rolldown: 1.0.3
     optionalDependencies:
       '@babel/runtime': 7.29.7
-      vite: 8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)
+      vite: 8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)
 
   '@rolldown/pluginutils@1.0.1': {}
 
@@ -3276,12 +3276,12 @@ snapshots:
 
   '@types/fs-extra@8.1.5':
     dependencies:
-      '@types/node': 24.13.2
+      '@types/node': 25.9.3
 
   '@types/glob@7.2.0':
     dependencies:
       '@types/minimatch': 6.0.0
-      '@types/node': 24.13.2
+      '@types/node': 25.9.3
 
   '@types/lodash.debounce@4.0.9':
     dependencies:
@@ -3295,13 +3295,13 @@ snapshots:
 
   '@types/ms@2.1.0': {}
 
-  '@types/node@24.13.2':
+  '@types/node@25.9.3':
     dependencies:
-      undici-types: 7.18.2
+      undici-types: 7.24.6
 
   '@types/postcss-url@10.0.4':
     dependencies:
-      '@types/node': 24.13.2
+      '@types/node': 25.9.3
       postcss: 8.5.15
 
   '@types/react@19.2.17':
@@ -3343,12 +3343,12 @@ snapshots:
       '@typescript/native-preview-win32-arm64': 7.0.0-dev.20260618.1
       '@typescript/native-preview-win32-x64': 7.0.0-dev.20260618.1
 
-  '@vitejs/plugin-react@6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))':
+  '@vitejs/plugin-react@6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))':
     dependencies:
       '@rolldown/pluginutils': 1.0.1
-      vite: 8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)
+      vite: 8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)
     optionalDependencies:
-      '@rolldown/plugin-babel': 0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))
+      '@rolldown/plugin-babel': 0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))
 
   '@volar/language-core@2.4.28':
     dependencies:
@@ -4433,7 +4433,7 @@ snapshots:
 
   ufo@1.6.4: {}
 
-  undici-types@7.18.2: {}
+  undici-types@7.24.6: {}
 
   universal-router@9.2.1:
     dependencies:
@@ -4443,7 +4443,7 @@ snapshots:
 
   universalify@2.0.1: {}
 
-  unplugin-dts@1.0.2(rolldown@1.0.3)(typescript@5.9.3)(vite@8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)):
+  unplugin-dts@1.0.2(rolldown@1.0.3)(typescript@5.9.3)(vite@8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)):
     dependencies:
       '@rollup/pluginutils': 5.4.0
       '@volar/typescript': 2.4.28
@@ -4456,7 +4456,7 @@ snapshots:
       unplugin: 2.3.11
     optionalDependencies:
       rolldown: 1.0.3
-      vite: 8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)
+      vite: 8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -4483,11 +4483,11 @@ snapshots:
 
   util-deprecate@1.0.2: {}
 
-  vite-plugin-dts@5.0.2(rolldown@1.0.3)(typescript@5.9.3)(vite@8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)):
+  vite-plugin-dts@5.0.2(rolldown@1.0.3)(typescript@5.9.3)(vite@8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)):
     dependencies:
-      unplugin-dts: 1.0.2(rolldown@1.0.3)(typescript@5.9.3)(vite@8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))
+      unplugin-dts: 1.0.2(rolldown@1.0.3)(typescript@5.9.3)(vite@8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))
     optionalDependencies:
-      vite: 8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)
+      vite: 8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)
     transitivePeerDependencies:
       - '@rspack/core'
       - '@vue/language-core'
@@ -4497,7 +4497,7 @@ snapshots:
       - typescript
       - webpack
 
-  vite@8.0.16(@types/node@24.13.2)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0):
+  vite@8.0.16(@types/node@25.9.3)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0):
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
@@ -4505,7 +4505,7 @@ snapshots:
       rolldown: 1.0.3
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@types/node': 24.13.2
+      '@types/node': 25.9.3
       fsevents: 2.3.3
       jiti: 2.7.0
       sass: 1.101.0

@@ -1,6 +1,6 @@
+
 import type { Plugin, PluginOption, UserConfig } from 'vite'
 import { createTaroConditionalDirectivePlugin } from './plugins.ts'
-import { createTailwindcssPlugins } from './tailwindcss.ts'
 import {
     createH5SupportPlugins,
     createH5ViteConfig,
@@ -28,7 +28,6 @@ export default function taro(options: TaroPluginOptions): PluginOption[] {
     return [
         createTaroConditionalDirectivePlugin(context),
         ...createTargetSupportPlugins(context),
-        ...createTailwindcssPlugins(context),
         createTaroPlugin(context)
     ]
 }

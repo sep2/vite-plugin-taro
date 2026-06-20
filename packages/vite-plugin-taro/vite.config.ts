@@ -11,9 +11,7 @@ const externalPatterns = [
     /^babel-plugin-transform-taroapi(?:\/.*)?$/,
     /^react(?:\/.*)?$/,
     /^react-dom(?:\/.*)?$/,
-    /^tailwindcss(?:\/.*)?$/,
-    /^vite$/,
-    /^weapp-tailwindcss(?:\/.*)?$/
+    /^vite$/
 ]
 
 function isExternal(id: string): boolean {
