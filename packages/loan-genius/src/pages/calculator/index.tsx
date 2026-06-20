@@ -633,7 +633,7 @@ export default class LoanGenius extends Component<any, any> {
         return (
             <View className="relative flex flex-col flex-1 bg-white h-screen w-full overflow-hidden">
                 <NavigationBar backgroundColor={backgroundColor} color={navigationBarColor}>
-                    <Text>Loan Genius</Text>
+                    <Text>房贷计算器</Text>
                 </NavigationBar>
                 {keyboardHeight >= 0 && (
                     <View className="fixed bottom-0 left-0 right-0 top-0 z-9999 size-full">

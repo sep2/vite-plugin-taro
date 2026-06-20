@@ -63,7 +63,7 @@ export default defineConfig(({ mode }) => {
                 },
                 projectConfigJson: {
                     appid: wechatAppId,
-                    projectname: 'Loan Genius',
+                    projectname: '房贷计算器',
                     description: '',
                     compileType: 'miniprogram',
                     // simulatorType: 'wechat',
