@@ -17,13 +17,6 @@ Vite 8 + React 19 plugin for building one React/Taro codebase for both WeChat Mi
 - Built-in Tailwind CSS and WeChat Tailwind processing for the selected target.
 - WeChat Mini Program output integration.
 
-## Repository layout
-
-| Package | Purpose |
-| --- | --- |
-| [`vite-plugin-taro`](packages/vite-plugin-taro) | Published Vite plugin. |
-| [`loan-genius`](packages/loan-genius) | Sample mortgage/loan calculator app, forked/adapted from [`wuba/Taro-Mortgage-Calculator`](https://github.com/wuba/Taro-Mortgage-Calculator), used to verify H5 and WeChat builds. |
-
 ## Install
 
 ```sh
@@ -83,6 +76,8 @@ Useful scripts:
 | --- | --- |
 | `pnpm prepare:taro` | Prepare workspace Taro runtime dependencies. |
 | `pnpm build:plugin` | Build `vite-plugin-taro`. |
+| `pnpm dev:sample:h5` | Run the sample H5 app in Vite dev mode after the plugin has been built. |
+| `pnpm dev:sample:wx` | Build the sample WeChat Mini Program in watch mode after the plugin has been built. |
 | `pnpm build:sample:h5` | Build the sample H5 app to `packages/loan-genius/dist/h5` after the plugin has been built. |
 | `pnpm preview:sample:h5` | Serve the built sample H5 bundle with Vite preview. |
 | `pnpm build:sample:wx` | Build the sample WeChat Mini Program to `packages/loan-genius/dist/wx` after the plugin has been built. |
@@ -105,9 +100,10 @@ Enable Pages in the GitHub repository settings with **Source: GitHub Actions**.
 
 ## Publishing
 
-Use the one-command release script:
+Validate, then publish the bumped packages:
 
 ```sh
+pnpm publish:dry
 pnpm publish:all
 ```
 
@@ -115,12 +111,6 @@ For npm accounts with 2FA:
 
 ```sh
 pnpm publish:all -- --otp 123456
-```
-
-Dry run:
-
-```sh
-pnpm publish:dry
 ```
 
 ## License
