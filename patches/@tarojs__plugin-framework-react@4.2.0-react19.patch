@@ -1,0 +1,13 @@
+diff --git a/dist/runtime.js b/dist/runtime.js
+index 6dd32f8612b52081d33e913ced090f98ea49d239..c6d26c8a8ca90ccf63763df563608e51ac9e89de 100644
+--- a/dist/runtime.js
++++ b/dist/runtime.js
+@@ -300,7 +300,7 @@ function createReactApp(App, react, dom, config) {
+             container.id = appId;
+             appContainer === null || appContainer === void 0 ? void 0 : appContainer.appendChild(container);
+         }
+-        if ((react.version || '').startsWith('18')) {
++        if (typeof ReactDOM$1.createRoot === 'function') {
+             const root = ReactDOM$1.createRoot(container);
+             (_a = root.render) === null || _a === void 0 ? void 0 : _a.call(root, h$1(AppWrapper));
+         }

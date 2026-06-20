@@ -1,0 +1,53 @@
+{
+    "name": "vite-plugin-taro-plugin-framework-react",
+    "version": "4.2.0-react19.0",
+    "description": "React 19 compatible fork of @tarojs/plugin-framework-react for vite-plugin-taro.",
+    "author": "O2Team, felix",
+    "license": "MIT",
+    "main": "index.js",
+    "files": [
+        "dist",
+        "index.js",
+        "LICENSE",
+        "README.md"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/NervJS/taro.git",
+        "directory": "packages/taro-framework-react"
+    },
+    "bugs": {
+        "url": "https://github.com/NervJS/taro/issues"
+    },
+    "engines": {
+        "node": ">=20.19.0"
+    },
+    "dependencies": {
+        "@tarojs/helper": "4.2.0",
+        "@tarojs/runtime": "4.2.0",
+        "@tarojs/shared": "4.2.0",
+        "acorn": "^8.11.3",
+        "acorn-walk": "^8.3.2",
+        "lodash": "^4.17.21",
+        "tslib": "^2.6.2"
+    },
+    "peerDependencies": {
+        "@vitejs/plugin-react": "^6.0.0",
+        "react": "^19.0.0",
+        "vite": "^8.0.0"
+    },
+    "peerDependenciesMeta": {
+        "@vitejs/plugin-react": {
+            "optional": true
+        },
+        "react": {
+            "optional": true
+        },
+        "vite": {
+            "optional": true
+        }
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}

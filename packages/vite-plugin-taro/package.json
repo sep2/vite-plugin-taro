@@ -1,0 +1,98 @@
+{
+    "name": "vite-plugin-taro",
+    "version": "0.0.1",
+    "description": "Vite 8 plugin for building one React/Taro codebase for WeChat Mini Program and H5 targets.",
+    "type": "module",
+    "main": "./dist/vite.js",
+    "module": "./dist/vite.js",
+    "types": "./dist/vite.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/vite.d.ts",
+            "import": "./dist/vite.js",
+            "default": "./dist/vite.js"
+        },
+        "./vite": {
+            "types": "./dist/vite.d.ts",
+            "import": "./dist/vite.js",
+            "default": "./dist/vite.js"
+        },
+        "./components": {
+            "types": "./dist/public/components.d.ts",
+            "import": "./dist/public/components.js",
+            "default": "./dist/public/components.js"
+        },
+        "./taro": {
+            "types": "./dist/public/taro.d.ts",
+            "import": "./dist/public/taro.js",
+            "default": "./dist/public/taro.js"
+        },
+        "./shim/h5": {
+            "types": "./dist/shim/h5.d.ts",
+            "import": "./dist/shim/h5.js",
+            "default": "./dist/shim/h5.js"
+        },
+        "./shim/wx": {
+            "types": "./dist/shim/wx.d.ts",
+            "import": "./dist/shim/wx.js",
+            "default": "./dist/shim/wx.js"
+        },
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "dist",
+        "LICENSE",
+        "README.md"
+    ],
+    "scripts": {
+        "clean": "rm -rf dist",
+        "build": "pnpm -w prepare:taro && pnpm clean && vite build",
+        "typecheck": "pnpm -w prepare:taro && tsgo --project tsconfig.json",
+        "prepack": "pnpm build",
+        "pack:dry": "pnpm pack --dry-run"
+    },
+    "keywords": [
+        "vite",
+        "vite-plugin",
+        "taro",
+        "wechat",
+        "mini-program",
+        "react"
+    ],
+    "author": "felix",
+    "license": "MIT",
+    "publishConfig": {
+        "access": "public"
+    },
+    "engines": {
+        "node": "^20.19.0 || >=22.12.0"
+    },
+    "dependencies": {
+        "@rolldown/plugin-babel": "^0.2.3",
+        "@tarojs/components": "^4.2.0",
+        "@tarojs/helper": "^4.2.0",
+        "@tarojs/plugin-framework-react": "workspace:vite-plugin-taro-plugin-framework-react@*",
+        "@tarojs/plugin-platform-h5": "^4.2.0",
+        "@tarojs/plugin-platform-weapp": "^4.2.0",
+        "@tarojs/react": "workspace:vite-plugin-taro-react@*",
+        "@tarojs/router": "^4.2.0",
+        "@tarojs/runtime": "^4.2.0",
+        "@tarojs/taro": "^4.2.0",
+        "@vitejs/plugin-react": "^6.0.2",
+        "babel-plugin-transform-taroapi": "^4.2.0",
+        "tailwindcss": "^4.3.0",
+        "weapp-tailwindcss": "^5.0.5"
+    },
+    "peerDependencies": {
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "vite": "^8.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^24.10.1",
+        "@typescript/native-preview": "latest",
+        "typescript": "^5.9.3",
+        "vite": "^8.0.16",
+        "vite-plugin-dts": "^5.0.2"
+    }
+}

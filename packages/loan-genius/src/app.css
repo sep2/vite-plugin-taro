@@ -1,0 +1,17 @@
+@import "tailwindcss/theme.css";
+@import "tailwindcss/preflight.css";
+@import "tailwindcss/utilities.css";
+
+@source "./";
+
+@theme {
+    --font-pingfang-regular: PingFangSC-Regular;
+    --font-pingfang-medium: PingFangSC-Medium;
+    --font-pingfang-semibold: PingFangSC-Semibold;
+    --font-avenir-black: Avenir-Black;
+    --text-22: 1.375rem;
+}
+
+.pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+}

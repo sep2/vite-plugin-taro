@@ -1,0 +1,15 @@
+packages:
+  - packages/*
+
+overrides:
+  react: '^19.2.7'
+  react-dom: '^19.2.7'
+  '@tarojs/runner-utils>rollup': 4.60.3
+
+allowBuilds:
+  '@biomejs/biome': false
+  '@parcel/watcher': false
+  '@swc/core': false
+  esbuild: true
+
+

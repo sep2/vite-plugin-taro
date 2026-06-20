@@ -1,0 +1,24 @@
+{
+    "name": "vite-plugin-taro-monorepo",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "prepare:taro": "node scripts/build-patched-taro-packages.mjs",
+        "build": "pnpm --filter vite-plugin-taro build",
+        "build:plugin": "pnpm --filter vite-plugin-taro build",
+        "build:sample:h5": "pnpm --filter loan-genius build-h5",
+        "build:sample:wx": "pnpm --filter loan-genius build-wx",
+        "dev:sample:h5": "pnpm --filter loan-genius dev-h5",
+        "dev:sample:wx": "pnpm --filter loan-genius dev-wx",
+        "typecheck": "pnpm --filter vite-plugin-taro typecheck && pnpm --filter loan-genius typecheck",
+        "lint": "biome check .",
+        "format": "biome check --write .",
+        "pack:dry": "pnpm prepare:taro && pnpm --filter vite-plugin-taro-react pack --dry-run && pnpm --filter vite-plugin-taro-plugin-framework-react pack --dry-run && pnpm --filter vite-plugin-taro pack:dry"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.5.0",
+        "@typescript/native-preview": "latest"
+    },
+    "packageManager": "pnpm@11.6.0"
+}

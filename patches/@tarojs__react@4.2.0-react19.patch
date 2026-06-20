@@ -1,0 +1,122 @@
+diff --git a/dist/react.esm.js b/dist/react.esm.js
+index ad8a51f..32a60c7 100644
+--- a/dist/react.esm.js
++++ b/dist/react.esm.js
+@@ -1,7 +1,12 @@
+ import { PLATFORM_TYPE, isObject, isEnableTTDom, isString, isFunction, toCamelCase, UNITLESS_PROPERTIES_SET, isNumber, capitalize, internalComponents, isUndefined, noop, isBoolean, hooks, ensure } from '@tarojs/shared';
+ import { setInnerHTML, FormElement, convertNumber2PX, eventHandlerTTDom, document } from '@tarojs/runtime';
+ import Reconciler from 'react-reconciler';
+-import { DefaultEventPriority as DefaultEventPriority$1 } from 'react-reconciler/constants';
++import {
++    ContinuousEventPriority,
++    DefaultEventPriority,
++    DiscreteEventPriority,
++    NoEventPriority
++} from 'react-reconciler/constants';
+ 
+ const supportedInputTypes = {
+     color: true,
+@@ -20,12 +25,6 @@ const supportedInputTypes = {
+     url: true,
+     week: true,
+ };
+-const SyncLane = 1;
+-const InputContinuousLane = 4;
+-const DefaultLane = 16;
+-const DiscreteEventPriority = SyncLane;
+-const ContinuousEventPriority = InputContinuousLane;
+-const DefaultEventPriority = DefaultLane;
+ function getEventPriority(domEventName) {
+     switch (domEventName) {
+         case 'cancel':
+@@ -600,7 +599,50 @@ function styleObjectToCss(style) {
+ }
+ 
+ /* eslint-disable @typescript-eslint/indent */
++let taroCurrentUpdatePriority = NoEventPriority;
++const taroNotPendingTransition = null;
++const taroHostTransitionContext = {
++    $$typeof: Symbol.for('react.context'),
++    _currentValue: taroNotPendingTransition,
++    _currentValue2: taroNotPendingTransition,
++    _threadCount: 0,
++    Provider: null,
++    Consumer: null
++};
++taroHostTransitionContext.Provider = taroHostTransitionContext;
++taroHostTransitionContext.Consumer = taroHostTransitionContext;
+ const hostConfig = {
++    // React 19 react-reconciler host config additions.
++    setCurrentUpdatePriority(priority) {
++        taroCurrentUpdatePriority = priority;
++    },
++    getCurrentUpdatePriority() {
++        return taroCurrentUpdatePriority;
++    },
++    resolveUpdatePriority() {
++        return taroCurrentUpdatePriority === NoEventPriority ? DefaultEventPriority : taroCurrentUpdatePriority;
++    },
++    trackSchedulerEvent: noop,
++    resolveEventType: () => null,
++    resolveEventTimeStamp: () => -1.1,
++    requestPostPaintCallback: noop,
++    NotPendingTransition: taroNotPendingTransition,
++    HostTransitionContext: taroHostTransitionContext,
++    resetFormInstance: noop,
++    bindToConsole(methodName, args) {
++        const consoleMethod = console[methodName];
++        return typeof consoleMethod === 'function' ? consoleMethod.bind(console, ...args) : noop;
++    },
++    shouldAttemptEagerTransition: () => false,
++    maySuspendCommit: () => false,
++    maySuspendCommitOnUpdate: () => false,
++    maySuspendCommitInSyncRender: () => false,
++    preloadInstance: () => true,
++    startSuspendingCommit: noop,
++    suspendInstance: noop,
++    suspendOnActiveViewTransition: noop,
++    waitForCommitToBeReady: () => null,
++    getSuspendedCommitReason: () => null,
+     // below keys order by {React ReactFiberHostConfig.custom.js}, convenient for comparing each other.
+     // -------------------
+     // required by @types/react-reconciler
+@@ -668,7 +710,7 @@ const hostConfig = {
+     prepareScopeUpdate: noop,
+     getInstanceFromScope: () => null,
+     getCurrentEventPriority() {
+-        return DefaultEventPriority$1;
++        return DefaultEventPriority;
+     },
+     detachDeletedInstance: noop,
+     // -------------------
+@@ -699,7 +741,11 @@ const hostConfig = {
+         textInst.nodeValue = newText;
+     },
+     commitMount: noop,
+-    commitUpdate(dom, updatePayload, _, oldProps, newProps) {
++    commitUpdate(dom, updatePayloadOrType, maybeOldProps, maybeNewProps, maybeFiber) {
++        const isReact19Signature = typeof updatePayloadOrType === 'string';
++        const oldProps = isReact19Signature ? maybeOldProps : maybeNewProps;
++        const newProps = isReact19Signature ? maybeNewProps : maybeFiber;
++        const updatePayload = isReact19Signature ? getUpdatePayload(dom, oldProps, newProps) : updatePayloadOrType;
+         if (!updatePayload)
+             return;
+         // payload 只包含 children 的时候，不应该再继续触发后续的属性比较和更新的逻辑了
+@@ -745,6 +791,17 @@ const hostConfig = {
+     }
+ };
+ const TaroReconciler = Reconciler(hostConfig);
++TaroReconciler.flushSync = TaroReconciler.flushSync || TaroReconciler.flushSyncFromReconciler || TaroReconciler.flushSyncWork;
++TaroReconciler.runWithPriority = TaroReconciler.runWithPriority || ((priority, fn) => {
++    const previousPriority = hostConfig.getCurrentUpdatePriority();
++    try {
++        hostConfig.setCurrentUpdatePriority(priority);
++        return fn();
++    }
++    finally {
++        hostConfig.setCurrentUpdatePriority(previousPriority);
++    }
++});
+ if (process.env.NODE_ENV !== 'production') {
+     const foundDevTools = TaroReconciler.injectIntoDevTools({
+         bundleType: 1,

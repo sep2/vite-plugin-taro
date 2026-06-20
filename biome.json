@@ -1,0 +1,74 @@
+{
+    "$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
+    "vcs": {
+        "enabled": true,
+        "clientKind": "git",
+        "useIgnoreFile": true,
+        "defaultBranch": "main"
+    },
+    "files": {
+        "includes": ["**", "!packages/loan-genius/src/index.html"]
+    },
+    "formatter": {
+        "enabled": true,
+        "indentStyle": "space",
+        "indentWidth": 4,
+        "lineWidth": 120
+    },
+    "linter": {
+        "enabled": true,
+        "rules": {
+            "preset": "recommended",
+            "style": {
+                "noNonNullAssertion": "off",
+                "noUselessElse": "off",
+                "noUnusedTemplateLiteral": "off"
+            },
+            "complexity": {
+                "noForEach": "off"
+            },
+            "a11y": "warn",
+            "correctness": {
+                "noUnknownTypeSelector": {
+                    "level": "info"
+                },
+                "noUnusedImports": {
+                    "level": "error",
+                    "fix": "safe"
+                },
+                "noUnusedFunctionParameters": {
+                    "level": "warn",
+                    "fix": "none"
+                },
+                "noUnusedVariables": {
+                    "level": "warn",
+                    "fix": "none",
+                    "options": {
+                        "ignoreRestSiblings": true
+                    }
+                },
+                "noUnusedLabels": {
+                    "level": "warn",
+                    "fix": "none"
+                },
+                "noUnusedPrivateClassMembers": {
+                    "level": "warn",
+                    "fix": "none"
+                }
+            }
+        }
+    },
+    "javascript": {
+        "formatter": {
+            "semicolons": "asNeeded",
+            "quoteStyle": "single",
+            "trailingCommas": "none"
+        }
+    },
+    "css": {
+        "parser": {
+            "cssModules": true,
+            "tailwindDirectives": true
+        }
+    }
+}
