@@ -5,10 +5,10 @@
  * @Last Modified by: qiuz
  */
 
+import { ScrollView, Text, View } from 'virtual:taro/components'
 import { NavigationBar, SafeAreaView } from '@components'
 import { getStorageData } from '@utils'
 import { Component } from 'react'
-import { ScrollView, Text, View } from 'virtual:taro/components'
 
 export default class LoanGeniusHistory extends Component<any, any> {
     constructor(props: any) {
@@ -38,7 +38,7 @@ export default class LoanGeniusHistory extends Component<any, any> {
                             <View
                                 // biome-ignore lint/suspicious/noArrayIndexKey: history entries do not have stable ids
                                 key={index}
-                                className="flex flex-row items-center justify-between border-0 border-b border-solid border-[#E7EBEE] py-5 px-5"
+                                className="flex flex-row items-center justify-between border-b border-solid border-[#E7EBEE] py-5 px-5"
                             >
                                 <View className="flex flex-col">
                                     <Text className="font-pingfang-regular text-xs text-[rgba(71,75,78,1)]">
