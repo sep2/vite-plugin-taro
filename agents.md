@@ -12,11 +12,10 @@ Node.js v26+ is available and can execute TypeScript natively.
 # Commands
 
 - `pnpm prepare:taro`: regenerate patched Taro packages from upstream npm tarballs and local patch files.
-- `pnpm build`: build the plugin.
+- `pnpm build:plugin`: build the plugin.
 - `pnpm typecheck`: typecheck plugin and sample app.
 - `pnpm build:sample:h5`: build the sample H5 target.
 - `pnpm build:sample:wx`: build the sample WeChat target.
-- `pnpm pack:dry`: verify the publish tarball contents for vite-plugin-taro and its React 19 Taro runtime packages.
 
 # Code style
 

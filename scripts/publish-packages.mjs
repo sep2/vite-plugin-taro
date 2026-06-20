@@ -15,7 +15,7 @@ Options:
   --dry-run       Run pnpm publish --dry-run for every package.
   --otp <code>    npm 2FA one-time password. You can also use NPM_CONFIG_OTP.
   --tag <tag>     npm dist-tag to publish with, for example next.
-  --skip-checks   Skip typecheck and pack dry-run before publish.
+  --skip-checks   Skip typecheck and package validation before publish.
   --no-git-check  Do not require a clean git working tree.
   --help          Show this help.
 `
@@ -43,6 +43,7 @@ const packages = [
     packageInfo('packages/taro-plugin-framework-react/package.json'),
     packageInfo('packages/vite-plugin-taro/package.json')
 ]
+const packageFilters = packages.flatMap((pkg) => ['--filter', pkg.name])
 
 console.log(dryRun ? 'Publishing dry run for:' : 'Publishing packages:')
 for (const pkg of packages) {
@@ -62,7 +63,7 @@ run(pnpm, ['prepare:taro'])
 
 if (!skipChecks) {
     run(pnpm, ['typecheck'])
-    run(pnpm, ['pack:dry'])
+    run(pnpm, ['-r', ...packageFilters, 'pack', '--dry-run'])
 }
 
 const publishArgs = ['publish', '--access', 'public', '--no-git-checks']
