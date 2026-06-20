@@ -3,7 +3,7 @@ import { recursiveMerge } from '@tarojs/helper'
 import { Weapp as WechatPlatform } from '@tarojs/plugin-platform-weapp'
 import type { UserConfig } from 'vite'
 import { isProd, nodeRequire } from '../constants.ts'
-import type { JsonObject, TaroBuildContext, TaroPageOption } from '../types.ts'
+import type { JsonObject, VitePluginTaroBuildContext, VitePluginTaroPageOption } from '../types.ts'
 import { createPageComponentImport, normalizeModuleId } from '../utils.ts'
 
 const virtualWxAppId = 'virtual:vite-plugin-taro/wx/app'
@@ -17,7 +17,7 @@ export function isWxVirtualModuleId(id: string): boolean {
     return id === virtualWxAppId || id === virtualWxCompId || id.startsWith(virtualWxPagePrefix)
 }
 
-export function loadWxVirtualModule(cleanId: string, context: TaroBuildContext): string | undefined {
+export function loadWxVirtualModule(cleanId: string, context: VitePluginTaroBuildContext): string | undefined {
     if (cleanId === virtualWxAppId) {
         return createWxAppEntry(context)
     }
@@ -38,22 +38,13 @@ export function loadWxVirtualModule(cleanId: string, context: TaroBuildContext):
 }
 
 const taroWechatComponentsReactPath = nodeRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
-const taroWechatRuntimePath = createResolvedImport('@tarojs/plugin-platform-weapp/dist/runtime.js')
-const taroReactRuntimePath = createResolvedImport('@tarojs/plugin-framework-react/dist/runtime')
-const taroReactPath = createResolvedImport('@tarojs/react')
-// Match Vite's browser-field resolution used by Taro's React runtime so Current.app is shared.
-const taroRuntimePath = createResolvedImport('@tarojs/runtime/dist/index.js')
-const pluginSourcePath = normalizeModuleId(path.dirname(nodeRequire.resolve('vite-plugin-taro/vite')))
-const taroReactSourcePath = normalizeModuleId(path.dirname(path.dirname(nodeRequire.resolve('@tarojs/react'))))
-const taroReactFrameworkSourcePath = normalizeModuleId(
-    path.dirname(path.dirname(nodeRequire.resolve('@tarojs/plugin-framework-react/dist/runtime')))
-)
+const vitePluginTaroSourcePath = normalizeModuleId(path.dirname(nodeRequire.resolve('vite-plugin-taro/vite')))
 const taroVersion = String(nodeRequire('@tarojs/runtime/package.json').version)
 
 /**
  * Configures wx target entry, output, and chunk layout.
  */
-export function createWxViteConfig(): UserConfig {
+export function createWxViteConfig(context: VitePluginTaroBuildContext): UserConfig {
     return {
         define: createWechatTaroDefines(),
         // https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-webpack5-runner/src/webpack/MiniCombination.ts#L22-L84
@@ -128,13 +119,7 @@ function createWechatTaroDefines(): Record<string, string> {
  */
 function isWxTaroChunkModule(id: string): boolean {
     const normalizedId = normalizeModuleId(id)
-    return (
-        normalizedId.includes('/node_modules/@tarojs/') ||
-        normalizedId.startsWith(`${pluginSourcePath}/`) ||
-        normalizedId.startsWith(`${taroReactSourcePath}/`) ||
-        normalizedId.startsWith(`${taroReactFrameworkSourcePath}/`) ||
-        normalizedId.includes('virtual:taro')
-    )
+    return normalizedId.includes('/node_modules/@tarojs/') || normalizedId.startsWith(`${vitePluginTaroSourcePath}/`)
 }
 
 /**
@@ -155,10 +140,6 @@ function createWechatChunkFileName(chunkInfo: { name: string }): string {
  */
 function isNodeModule(id: string): boolean {
     return normalizeModuleId(id).includes('/node_modules/')
-}
-
-function createResolvedImport(id: string): string {
-    return JSON.stringify(normalizeModuleId(nodeRequire.resolve(id)))
 }
 
 type WechatAssetSource = string | Uint8Array
@@ -199,7 +180,7 @@ type WechatAssetEmitter = {
  */
 export function emitWechatImplicitChunksForVirtualApp(
     emitter: WechatChunkEmitter,
-    context: TaroBuildContext,
+    context: VitePluginTaroBuildContext,
     cleanId: string
 ): void {
     if (context.target !== 'wx' || cleanId !== virtualWxAppId) return
@@ -222,16 +203,14 @@ export function emitWechatImplicitChunksForVirtualApp(
 
 /**
  * Builds the generated WeChat app entry that registers Taro's React App config.
- * vite-plugin-taro omits Taro's generated pxTransform initialization; apps should handle style transforms in their own Vite pipeline.
+ * vite-plugin-taro omits Taro's generated pxTransform initialization because styles are handled by Tailwind.
  *
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-loader/src/app.ts#L54-L63
  */
-export function createWxAppEntry(context: TaroBuildContext): string {
+export function createWxAppEntry(context: VitePluginTaroBuildContext): string {
     const wechatAppConfigCode = JSON.stringify(context.appConfig)
 
-    return `import ${taroWechatRuntimePath}
-import { createReactApp } from ${taroReactRuntimePath}
-import ReactDOM from ${taroReactPath}
+    return `import { createReactApp, ReactDOM } from 'vite-plugin-taro/shim/wx'
 import React from 'react'
 import AppComponent from '${context.appComponentImport}'
 
@@ -245,11 +224,10 @@ App(createReactApp(AppComponent, React, ReactDOM, appConfig))
  *
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-loader/src/page.ts#L52-L78
  */
-export function createWxPageEntry(pageOption: TaroPageOption): string {
+export function createWxPageEntry(pageOption: VitePluginTaroPageOption): string {
     const wechatPageConfigCode = JSON.stringify(pageOption.config)
     const pageComponentImport = createPageComponentImport(pageOption.path)
-    return `import ${taroWechatRuntimePath}
-import { createPageConfig } from ${taroRuntimePath}
+    return `import { createPageConfig } from 'vite-plugin-taro/shim/wx'
 import PageComponent from '${pageComponentImport}'
 
 const pageConfig = ${wechatPageConfigCode}
@@ -269,8 +247,7 @@ Page(taroPageConfig)
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-webpack5-runner/src/template/comp.ts#L1-L4
  */
 export function createWxCompEntry(): string {
-    return `import ${taroWechatRuntimePath}
-import { createRecursiveComponentConfig } from ${taroRuntimePath}
+    return `import { createRecursiveComponentConfig } from 'vite-plugin-taro/shim/wx'
 
 Component(createRecursiveComponentConfig())
 `
@@ -283,7 +260,11 @@ Component(createRecursiveComponentConfig())
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-webpack5-runner/src/plugins/MiniPlugin.ts#L1198-L1311
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-webpack5-runner/src/plugins/MiniPlugin.ts#L1346-L1390
  */
-export function emitWechatAssets(emitter: WechatAssetEmitter, bundle: WechatBundle, context: TaroBuildContext): void {
+export function emitWechatAssets(
+    emitter: WechatAssetEmitter,
+    bundle: WechatBundle,
+    context: VitePluginTaroBuildContext
+): void {
     if (context.target !== 'wx') return
     for (const asset of createWechatAssets(bundle, context)) {
         emitter.emitFile({ type: 'asset', fileName: asset.fileName, source: asset.source })
@@ -292,7 +273,7 @@ export function emitWechatAssets(emitter: WechatAssetEmitter, bundle: WechatBund
 
 function createWechatAssets(
     bundle: WechatBundle,
-    context: TaroBuildContext
+    context: VitePluginTaroBuildContext
 ): { fileName: string; source: WechatAssetSource }[] {
     const builder = createWechatTemplateBuilder()
 

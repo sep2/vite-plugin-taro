@@ -1,5 +1,6 @@
 import type { Plugin, PluginOption, UserConfig } from 'vite'
-import { createTaroConditionalDirectivePlugin } from './plugins.ts'
+import { createVitePluginTaroConditionalDirectivePlugin } from './plugins.ts'
+import { createTailwindcssPlugins } from './tailwindcss.ts'
 import {
     createH5SupportPlugins,
     createH5ViteConfig,
@@ -14,25 +15,25 @@ import {
     isWxVirtualModuleId,
     loadWxVirtualModule
 } from './targets/wx.ts'
-import type { TaroBuildContext, TaroPluginOptions } from './types.ts'
+import type { VitePluginTaroBuildContext, VitePluginTaroOptions } from './types.ts'
 import { stripVirtualPrefix, toImportPath } from './utils.ts'
-import { isPublicVirtualModuleId, loadPublicVirtualModule } from './virtual.ts'
 
 /**
  * Creates the Vite/Rolldown plugin that emits either WeChat Mini Program files
  * or a Taro Web app using the official Taro runtime packages.
  */
-export default function taro(options: TaroPluginOptions): PluginOption[] {
-    const context = createTaroBuildContext(options)
+export default function vitePluginTaro(options: VitePluginTaroOptions): PluginOption[] {
+    const context = createVitePluginTaroBuildContext(options)
 
     return [
-        createTaroConditionalDirectivePlugin(context),
+        createVitePluginTaroConditionalDirectivePlugin(context),
         ...createTargetSupportPlugins(context),
-        createTaroPlugin(context)
+        ...createTailwindcssPlugins(context),
+        createVitePluginTaroPlugin(context)
     ]
 }
 
-function createTargetSupportPlugins(context: TaroBuildContext): PluginOption[] {
+function createTargetSupportPlugins(context: VitePluginTaroBuildContext): PluginOption[] {
     switch (context.target) {
         case 'h5':
             return createH5SupportPlugins()
@@ -44,7 +45,7 @@ function createTargetSupportPlugins(context: TaroBuildContext): PluginOption[] {
 /**
  * Creates the vite-plugin-taro plugin that emits H5 or Wx outputs.
  */
-function createTaroPlugin(context: TaroBuildContext): Plugin {
+function createVitePluginTaroPlugin(context: VitePluginTaroBuildContext): Plugin {
     return {
         name: 'vite-plugin-taro',
         enforce: 'post',
@@ -53,13 +54,13 @@ function createTaroPlugin(context: TaroBuildContext): Plugin {
         config: {
             order: 'pre',
             handler: (): UserConfig => {
-                return context.target === 'wx' ? createWxViteConfig() : createH5ViteConfig()
+                return context.target === 'wx' ? createWxViteConfig(context) : createH5ViteConfig()
             }
         },
 
         /** Marks generated app/page/component entries as virtual modules. */
         resolveId(id) {
-            if (isPublicVirtualModuleId(id) || isWxVirtualModuleId(id) || isH5VirtualModuleId(id)) return `\0${id}`
+            if (isWxVirtualModuleId(id) || isH5VirtualModuleId(id)) return `\0${id}`
         },
 
         /** Supplies source code for each virtual entry module. */
@@ -68,11 +69,7 @@ function createTaroPlugin(context: TaroBuildContext): Plugin {
 
             emitWechatImplicitChunksForVirtualApp(this, context, cleanId)
 
-            return (
-                loadPublicVirtualModule(cleanId, context) ??
-                loadWxVirtualModule(cleanId, context) ??
-                loadH5VirtualModule(cleanId, context)
-            )
+            return loadWxVirtualModule(cleanId, context) ?? loadH5VirtualModule(cleanId, context)
         },
 
         /** Injects the generated Web entry into the app shell before Vite scans HTML imports. */
@@ -93,7 +90,7 @@ function createTaroPlugin(context: TaroBuildContext): Plugin {
 /**
  * Normalizes user options into the shared data used by both target builders.
  */
-function createTaroBuildContext(options: TaroPluginOptions): TaroBuildContext {
+function createVitePluginTaroBuildContext(options: VitePluginTaroOptions): VitePluginTaroBuildContext {
     return {
         target: options.target,
         appComponentImport: toImportPath(options.app),

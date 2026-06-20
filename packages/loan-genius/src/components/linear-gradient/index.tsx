@@ -8,8 +8,8 @@
 
 import clsx from 'clsx'
 import type { FunctionComponent, PropsWithChildren } from 'react'
-import type { ITouchEvent } from 'virtual:taro/components'
-import { Image, View } from 'virtual:taro/components'
+import type { ITouchEvent } from 'vite-plugin-taro/components'
+import { Image, View } from 'vite-plugin-taro/components'
 
 interface TaroLinearGradientProps {
     style?: object

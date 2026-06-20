@@ -1,5 +1,5 @@
 import type { Plugin } from 'vite'
-import type { TaroBuildContext, TaroTarget } from './types.ts'
+import type { VitePluginTaroBuildContext, VitePluginTaroTarget } from './types.ts'
 import { normalizeModuleId } from './utils.ts'
 
 /**
@@ -7,7 +7,7 @@ import { normalizeModuleId } from './utils.ts'
  *
  * Mirrors Taro's CSS #ifdef/#ifndef handling, generalized before Vite parses code.
  */
-export function createTaroConditionalDirectivePlugin(context: TaroBuildContext): Plugin {
+export function createVitePluginTaroConditionalDirectivePlugin(context: VitePluginTaroBuildContext): Plugin {
     const target = context.target
     return {
         name: 'vite-plugin-taro-conditional-directives',
@@ -22,7 +22,7 @@ export function createTaroConditionalDirectivePlugin(context: TaroBuildContext):
 /**
  * Filters files where Taro's conditional comments are meaningful.
  *
- * vite-plugin-taro-only: source filter for vite-plugin-taro's generalized conditional-directive transform.
+ * Plugin-only: source filter for generalized conditional-directive transform.
  */
 function isConditionalDirectiveSource(id: string): boolean {
     const normalizedId = normalizeModuleId(id)
@@ -48,7 +48,7 @@ type ConditionalDirectiveFrame = {
  *
  * Mirrors Taro's CSS #ifdef/#ifndef handling.
  */
-function transformConditionalDirectives(code: string, target: TaroTarget): string {
+function transformConditionalDirectives(code: string, target: VitePluginTaroTarget): string {
     const lines = code.match(/[^\n]*(?:\n|$)/g) ?? []
     const frames: ConditionalDirectiveFrame[] = []
     let transformed = ''
@@ -105,12 +105,12 @@ function toConditionalDirectiveName(value: string): ConditionalDirectiveName | u
 /**
  * Updates the active conditional stack using Taro-style #ifdef/#ifndef/#else/#endif semantics.
  *
- * vite-plugin-taro-only: stack-based #if/#elif/#else support has no Taro webpack counterpart.
+ * Plugin-only: stack-based #if/#elif/#else support has no Taro webpack counterpart.
  */
 function updateConditionalDirectiveFrames(
     frames: ConditionalDirectiveFrame[],
     directive: ConditionalDirective,
-    target: TaroTarget
+    target: VitePluginTaroTarget
 ): void {
     if (directive.name === 'ifdef' || directive.name === 'ifndef' || directive.name === 'if') {
         const conditionMatched = evaluateConditionalDirective(directive, target)
@@ -147,18 +147,18 @@ function updateConditionalDirectiveFrames(
  *
  * Mirrors Taro's simple CSS platform membership checks.
  */
-function evaluateConditionalDirective(directive: ConditionalDirective, target: TaroTarget): boolean {
+function evaluateConditionalDirective(directive: ConditionalDirective, target: VitePluginTaroTarget): boolean {
     if (directive.name === 'ifndef') return !matchesDirectiveTarget(directive.expression, target)
     if (directive.name === 'ifdef') return matchesDirectiveTarget(directive.expression, target)
     return evaluateConditionalExpression(directive.expression, target)
 }
 
 /**
- * Supports simple #if expressions with !, &&, and || over vite-plugin-taro target tokens.
+ * Supports simple #if expressions with !, &&, and || over the configured target token.
  *
- * vite-plugin-taro-only: #if expressions with && and || have no Taro webpack counterpart.
+ * Plugin-only: #if expressions with && and || have no Taro webpack counterpart.
  */
-function evaluateConditionalExpression(expression: string, target: TaroTarget): boolean {
+function evaluateConditionalExpression(expression: string, target: VitePluginTaroTarget): boolean {
     const orTerms = expression.split('||')
     return orTerms.some((term) =>
         term
@@ -170,11 +170,11 @@ function evaluateConditionalExpression(expression: string, target: TaroTarget): 
 }
 
 /**
- * Evaluates one vite-plugin-taro target token, optionally negated.
+ * Evaluates one target token, optionally negated.
  *
- * vite-plugin-taro-only: negated #if factors have no Taro webpack counterpart.
+ * Plugin-only: negated #if factors have no Taro webpack counterpart.
  */
-function evaluateConditionalFactor(factor: string, target: TaroTarget): boolean {
+function evaluateConditionalFactor(factor: string, target: VitePluginTaroTarget): boolean {
     let token = factor.replace(/[()]/g, '').trim()
     let negated = false
     while (token.startsWith('!')) {
@@ -186,11 +186,11 @@ function evaluateConditionalFactor(factor: string, target: TaroTarget): boolean 
 }
 
 /**
- * Checks whether a directive target list includes the current vite-plugin-taro target.
+ * Checks whether a directive target list includes the current target.
  *
  * Mirrors Taro's simple CSS platform membership checks.
  */
-function matchesDirectiveTarget(expression: string, target: TaroTarget): boolean {
+function matchesDirectiveTarget(expression: string, target: VitePluginTaroTarget): boolean {
     const tokens = expression
         .split(/[\s,|&()!]+/)
         .map((token) => token.trim().toLowerCase())
@@ -201,7 +201,7 @@ function matchesDirectiveTarget(expression: string, target: TaroTarget): boolean
 /**
  * Preserves source line counts when conditional blocks are stripped.
  *
- * vite-plugin-taro-only: preserves Vite source-map line counts while stripping conditional blocks.
+ * Plugin-only: preserves Vite source-map line counts while stripping conditional blocks.
  */
 function getLineEnding(line: string): string {
     const match = line.match(/\r?\n$/)
@@ -211,7 +211,7 @@ function getLineEnding(line: string): string {
 /**
  * Returns whether all active nested conditional frames include the current line.
  *
- * vite-plugin-taro-only: stack activity helper for generalized conditional directives.
+ * Plugin-only: stack activity helper for generalized conditional directives.
  */
 function isDirectiveStackActive(frames: ConditionalDirectiveFrame[]): boolean {
     return frames.every((frame) => frame.active)

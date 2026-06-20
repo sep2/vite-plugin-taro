@@ -8,7 +8,7 @@
 import { isArray } from '@utils'
 import clsx from 'clsx'
 import { Component, type ComponentType, type PropsWithChildren } from 'react'
-import { Picker, PickerView, PickerViewColumn, Text, View } from 'virtual:taro/components'
+import { Picker, PickerView, PickerViewColumn, Text, View } from 'vite-plugin-taro/components'
 import styles from './index.module.css'
 import type { RangeItem, TaroPickerSelectorProps } from './type'
 
@@ -186,7 +186,7 @@ class TaroPickerSelectorWx extends Component<TaroPickerSelectorProps, any> {
     renderMultiPicker = (data: any) => {
         return data.map((item: any, index: number) => {
             return (
-                // biome-ignore lint/suspicious/noArrayIndexKey: picker columns do not have stable ids
+                // biome-ignore lint/suspicious/noArrayIndexKey: columns are static and only identified by position
                 <PickerViewColumn key={`${index}`}>
                     {item.map((i: any) => {
                         return (

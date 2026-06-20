@@ -5,7 +5,7 @@
  * @Last Modified by: qiuz
  */
 
-import Taro from 'virtual:taro'
+import Taro from 'vite-plugin-taro/taro'
 
 export const getStorageData = async (key: string) => {
     let result: any

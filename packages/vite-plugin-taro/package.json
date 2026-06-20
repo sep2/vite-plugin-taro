@@ -16,21 +16,40 @@
     "module": "./dist/vite.js",
     "exports": {
         ".": {
+            "types": "./src/vite.ts",
             "import": "./dist/vite.js",
             "default": "./dist/vite.js"
+        },
+        "./components": {
+            "types": "./src/public/components.ts",
+            "import": "./dist/public/components.js",
+            "default": "./dist/public/components.js"
+        },
+        "./taro": {
+            "types": "./src/public/taro.d.ts",
+            "import": "./dist/public/taro.js",
+            "default": "./dist/public/taro.js"
+        },
+        "./shim/h5": {
+            "types": "./src/shim/h5.ts",
+            "import": "./dist/shim/h5.js",
+            "default": "./dist/shim/h5.js"
+        },
+        "./shim/wx": {
+            "types": "./src/shim/wx.ts",
+            "import": "./dist/shim/wx.js",
+            "default": "./dist/shim/wx.js"
         },
         "./vite": {
+            "types": "./src/vite.ts",
             "import": "./dist/vite.js",
             "default": "./dist/vite.js"
-        },
-        "./client": {
-            "types": "./client.d.ts"
         },
         "./package.json": "./package.json"
     },
     "files": [
         "dist",
-        "client.d.ts",
+        "src",
         "LICENSE",
         "README.md"
     ],
@@ -58,7 +77,9 @@
         "node": "^20.19.0 || >=22.12.0"
     },
     "dependencies": {
+        "@babel/core": "^7.29.7",
         "@rolldown/plugin-babel": "^0.2.3",
+        "@tailwindcss/vite": "^4.3.1",
         "@tarojs/components": "^4.2.0",
         "@tarojs/helper": "^4.2.0",
         "@tarojs/plugin-framework-react": "workspace:vite-plugin-taro-plugin-framework-react@*",
@@ -69,7 +90,9 @@
         "@tarojs/runtime": "^4.2.0",
         "@tarojs/taro": "^4.2.0",
         "@vitejs/plugin-react": "^6.0.2",
-        "babel-plugin-transform-taroapi": "^4.2.0"
+        "babel-plugin-transform-taroapi": "^4.2.0",
+        "tailwindcss": "^4.3.1",
+        "weapp-tailwindcss": "^5.0.13"
     },
     "peerDependencies": {
         "react": "^19.0.0",
@@ -77,6 +100,7 @@
         "vite": "^8.0.0"
     },
     "devDependencies": {
+        "@types/babel__core": "^7.20.5",
         "@types/node": "^26.0.0",
         "@typescript/native-preview": "latest",
         "vite": "^8.0.16"

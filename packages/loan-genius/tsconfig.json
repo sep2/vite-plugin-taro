@@ -3,7 +3,7 @@
         "target": "es2023",
         "module": "esnext",
         "lib": ["ES2023", "DOM"],
-        "types": ["vite/client", "vite-plugin-taro/client"],
+        "types": ["vite/client"],
         "jsx": "react-jsx",
         "skipLibCheck": true,
 

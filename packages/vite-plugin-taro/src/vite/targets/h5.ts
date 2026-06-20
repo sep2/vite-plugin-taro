@@ -1,19 +1,13 @@
-import { readFileSync } from 'node:fs'
+import type { types as BabelTypes, NodePath, PluginObj } from '@babel/core'
 import babel from '@rolldown/plugin-babel'
 import react from '@vitejs/plugin-react'
 import type { HtmlTagDescriptor, PluginOption, UserConfig } from 'vite'
 import { isProd, nodeRequire } from '../constants.ts'
-import type { JsonObject, TaroBuildContext, TaroPageOption } from '../types.ts'
-import { createPageComponentImport, normalizeModuleId } from '../utils.ts'
+import type { JsonObject, VitePluginTaroBuildContext, VitePluginTaroPageOption } from '../types.ts'
+import { createPageComponentImport } from '../utils.ts'
 
 const virtualH5Id = 'virtual:vite-plugin-taro/h5'
-const taroComponentsGlobalCss = readFileSync(nodeRequire.resolve('@tarojs/components/global.css'), 'utf8')
-const taroH5RuntimePath = createResolvedImport('@tarojs/plugin-platform-h5/dist/runtime')
-const taroReactRuntimePath = createResolvedImport('@tarojs/plugin-framework-react/dist/runtime')
-const taroRouterH5Path = nodeRequire.resolve('@tarojs/router/dist/index.esm.js')
-// Keep the generated H5 entry bare so Vite shares one RouterConfig singleton.
-const taroRouterPath = JSON.stringify('@tarojs/router')
-const taroRuntimePath = createResolvedImport('@tarojs/runtime')
+const patchStencilCssOrder = true
 
 /**
  * Checks whether an id belongs to an H5 virtual module.
@@ -25,7 +19,7 @@ export function isH5VirtualModuleId(id: string): boolean {
 /**
  * Loads generated source for H5 virtual modules.
  */
-export function loadH5VirtualModule(cleanId: string, context: TaroBuildContext): string | undefined {
+export function loadH5VirtualModule(cleanId: string, context: VitePluginTaroBuildContext): string | undefined {
     if (cleanId !== virtualH5Id) return
     return createWebEntry(context)
 }
@@ -39,6 +33,17 @@ export function createH5ViteConfig(): UserConfig {
         resolve: {
             mainFields: ['main:h5', 'browser', 'module', 'jsnext:main', 'jsnext'],
             alias: [
+                // Resolve Stencil's transitive runtime import after Taro components are optimized separately.
+                ...(patchStencilCssOrder
+                    ? [
+                          {
+                              find: /^@stencil\/core\/internal\/client$/,
+                              replacement: nodeRequire.resolve('@stencil/core/internal/client', {
+                                  paths: [nodeRequire.resolve('@tarojs/components/package.json')]
+                              })
+                          }
+                      ]
+                    : []),
                 // H5 React code must use Taro's React component wrappers, not the raw custom-element entry.
                 { find: /^@tarojs\/components$/, replacement: nodeRequire.resolve('@tarojs/components/lib/react') },
                 // Taro's H5 router/components deep-import this custom-element loader; make it resolvable under pnpm.
@@ -50,11 +55,12 @@ export function createH5ViteConfig(): UserConfig {
                 {
                     find: /^@tarojs\/taro$/,
                     replacement: nodeRequire.resolve('@tarojs/plugin-platform-h5/dist/runtime/apis')
-                },
-                // H5 APIs import @tarojs/router too; pin it to Taro's H5 ESM entry so
-                // getCurrentPages sees the RouterConfig initialized by createRouter.
-                { find: /^@tarojs\/router$/, replacement: taroRouterH5Path }
+                }
             ]
+        },
+        optimizeDeps: {
+            // Keep the Stencil runtime in Vite's transform pipeline so rewriteStencilStyleInsertion can patch it.
+            exclude: [patchStencilCssOrder ? '@stencil/core/internal/client' : ''].filter(Boolean)
         },
         build: {
             target: 'es2018',
@@ -69,25 +75,57 @@ export function createH5ViteConfig(): UserConfig {
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-platform-h5/src/program.ts#L219-L249
  */
 export function createH5SupportPlugins(): PluginOption[] {
-    return [
-        ...react(),
-        // Mirrors Taro H5: rewrite default Taro.xxx calls from virtual:taro to named H5 API imports.
+    const plugins: PluginOption[] = [...react()]
+
+    if (patchStencilCssOrder) {
+        plugins.push(
+            babel({
+                include: /[\\/]@stencil[\\/]core[\\/]internal[\\/]client[\\/]index\.js(?:\?.*)?$/,
+                exclude: [],
+                plugins: [rewriteStencilStyleInsertion]
+            })
+        )
+    }
+
+    // Mirrors Taro H5: rewrite default Taro.xxx calls from vite-plugin-taro/taro to named H5 API imports.
+    plugins.push(
         babel({
             plugins: [
                 [
                     nodeRequire.resolve('babel-plugin-transform-taroapi'),
                     {
-                        packageName: 'virtual:taro',
+                        packageName: 'vite-plugin-taro/taro',
                         definition: nodeRequire(nodeRequire.resolve('@tarojs/plugin-platform-h5/dist/definition.json'))
                     }
                 ]
             ]
         })
-    ]
+    )
+
+    return plugins
 }
 
-function createResolvedImport(id: string): string {
-    return JSON.stringify(normalizeModuleId(nodeRequire.resolve(id)))
+function rewriteStencilStyleInsertion(): PluginObj {
+    return {
+        name: 'rewrite-stencil-style-insertion',
+        visitor: {
+            CallExpression(path: NodePath<BabelTypes.CallExpression>) {
+                if (!isStencilStyleInsertBeforeCall(path)) return
+
+                path.get('arguments.1').replaceWithSourceString(
+                    `scopeId.startsWith('sc-taro-') ? styleContainerNode.querySelector('style,link[rel="stylesheet"]') : styleContainerNode.querySelector('link')`
+                )
+            }
+        }
+    }
+}
+
+function isStencilStyleInsertBeforeCall(path: NodePath<BabelTypes.CallExpression>): boolean {
+    return (
+        path.get('callee').matchesPattern('styleContainerNode.insertBefore') &&
+        path.get('arguments.0').toString() === 'styleElm' &&
+        path.get('arguments.1').toString() === "styleContainerNode.querySelector('link')"
+    )
 }
 
 /**
@@ -111,16 +149,10 @@ function createH5TaroDefines(): Record<string, string> {
 /**
  * Injects vite-plugin-taro's generated Web entry into Vite's HTML shell.
  */
-export function createWebIndexHtmlTags(context: TaroBuildContext): HtmlTagDescriptor[] | undefined {
+export function createWebIndexHtmlTags(context: VitePluginTaroBuildContext): HtmlTagDescriptor[] | undefined {
     if (context.target !== 'h5') return
 
     const tags: HtmlTagDescriptor[] = []
-    // Keep Taro's H5 document sizing identical in dev and production.
-    tags.push({
-        tag: 'style',
-        children: taroComponentsGlobalCss,
-        injectTo: 'head'
-    })
     tags.push({
         tag: 'script',
         attrs: { type: 'module' },
@@ -132,22 +164,23 @@ export function createWebIndexHtmlTags(context: TaroBuildContext): HtmlTagDescri
 
 /**
  * Builds the generated Web entry around Taro's official Web router/runtime APIs.
- * vite-plugin-taro omits Taro's generated pxTransform initialization; apps should handle style transforms in their own Vite pipeline.
+ * Base Taro CSS is imported before the app; component CSS order is handled by rewriteStencilStyleInsertion.
  *
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-loader/src/h5.ts#L120-L150
  */
-export function createWebEntry(context: TaroBuildContext): string {
+export function createWebEntry(context: VitePluginTaroBuildContext): string {
     const webAppConfigCode = JSON.stringify(createWebAppConfig(context.appConfig))
     const webRoutesConfigCode = createWebRoutesConfig(context.pages)
 
-    return `import ${taroH5RuntimePath}
-import { createReactApp } from ${taroReactRuntimePath}
+    return `import ${JSON.stringify(nodeRequire.resolve('@tarojs/components/global.css'))}
+import ${JSON.stringify(nodeRequire.resolve('@tarojs/components/dist/taro-components/taro-components.css'))}
 import {
     createHashHistory,
+    createReactApp,
     createRouter,
-    handleAppMount
-} from ${taroRouterPath}
-import { window } from ${taroRuntimePath}
+    handleAppMount,
+    window
+} from 'vite-plugin-taro/shim/h5'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import AppComponent from '${context.appComponentImport}'
@@ -181,7 +214,7 @@ function createWebAppConfig(sharedAppConfig: JsonObject): JsonObject {
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-loader/src/h5.ts#L12-L21
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-loader/src/h5.ts#L108-L114
  */
-function createWebRoutesConfig(webPages: TaroPageOption[]): string {
+function createWebRoutesConfig(webPages: VitePluginTaroPageOption[]): string {
     const webRoutes = webPages.map((page) =>
         [
             'Object.assign({',

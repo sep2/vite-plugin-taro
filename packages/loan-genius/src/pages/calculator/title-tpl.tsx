@@ -7,7 +7,7 @@
 
 import clsx from 'clsx'
 import type { FunctionComponent } from 'react'
-import { Text, View } from 'virtual:taro/components'
+import { Text, View } from 'vite-plugin-taro/components'
 
 interface TitleTplProps {
     title: string

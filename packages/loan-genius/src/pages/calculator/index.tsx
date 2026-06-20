@@ -5,11 +5,11 @@
  * @Last Modified by: qiuz
  */
 
-import Taro from 'virtual:taro'
-import { Button, Input, Text, View } from 'virtual:taro/components'
-import { BoxShadow, KeyboardAwareScrollView, NavigationBar } from '@components'
+import { BoxShadow, NavigationBar } from '@components'
 import { formatFloat, getStorageData, isAndroid, setGlobalData } from '@utils'
 import { Component } from 'react'
+import { Button, Input, ScrollView, Text, View } from 'vite-plugin-taro/components'
+import Taro from 'vite-plugin-taro/taro'
 import LoanGeniusHeader from './compute-header'
 import { COMPUTE_WAY, COMPUTE_WAY_TITLE, getRenderList, LIST_TYPE, LOAN_WAY_TITLE, OPTION } from './constants'
 import { equalInterestCalc } from './helper'
@@ -648,12 +648,13 @@ export default class LoanGenius extends Component<any, any> {
                             <Text className="ml-5 flex h-6.75 shrink-0 items-center font-pingfang-regular text-base font-normal leading-6.75 text-[rgba(171,175,177,1)]">
                                 请输入
                             </Text>
-                            <KeyboardAwareScrollView
-                                keyboardShouldPersistTaps="always"
-                                enableAutomaticScroll={false}
-                                onKeyboardDidShow={this.onKeyboardDidShow}
-                                className="ml-6.75 flex-1 rounded-xs bg-[rgba(240,240,240,1)] px-1.25"
-                                onKeyboardDidHide={this.onKeyboardDidHide}
+                            <ScrollView
+                                scrollY
+                                // keyboardShouldPersistTaps="always"
+                                // enableAutomaticScroll={false}
+                                // onKeyboardDidShow={this.onKeyboardDidShow}
+                                className="ml-6.75 flex-1 overflow-hidden rounded-xs bg-[rgba(240,240,240,1)] px-1.25"
+                                // onKeyboardDidHide={this.onKeyboardDidHide}
                             >
                                 <Input
                                     keyboardType="number-pad"
@@ -670,7 +671,7 @@ export default class LoanGenius extends Component<any, any> {
                                     onBlur={this.downPayRateConfirm}
                                     holdKeyboard
                                 />
-                            </KeyboardAwareScrollView>
+                            </ScrollView>
 
                             <Text
                                 className="mx-4 shrink-0 font-pingfang-regular text-base font-normal text-[rgba(31,176,129,1)]"
@@ -682,11 +683,12 @@ export default class LoanGenius extends Component<any, any> {
                     </View>
                 )}
 
-                <KeyboardAwareScrollView
-                    innerRef={(ref: any) => {
+                <ScrollView
+                    scrollY
+                    ref={(ref) => {
                         this.scroll = ref
                     }}
-                    className={'flex flex-col h-full'}
+                    className={'flex-1 overflow-x-hidden overflow-y-scroll flex flex-col'}
                 >
                     {showResult && (
                         <LoanGeniusHeader
@@ -730,7 +732,7 @@ export default class LoanGenius extends Component<any, any> {
                             onInputChange={this.onInputChange}
                         />
                     </View>
-                </KeyboardAwareScrollView>
+                </ScrollView>
 
                 <BoxShadow
                     shadowColor="#000"

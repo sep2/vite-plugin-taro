@@ -2,10 +2,10 @@
 export type JsonObject = Record<string, unknown>
 
 /** Build target handled by this plugin. */
-export type TaroTarget = 'wx' | 'h5'
+export type VitePluginTaroTarget = 'wx' | 'h5'
 
 /** Describes one React-backed page shared by WeChat Mini Program and Web builds. */
-export type TaroPageOption = {
+export type VitePluginTaroPageOption = {
     /**
      * Page route and output path, without file extension.
      * Example: "pages/index/index" emits pages/index/index.{js,json,wxml,wxss}
@@ -18,15 +18,15 @@ export type TaroPageOption = {
 }
 
 /** Required build inputs for the custom Vite/Rolldown Taro renderer plugin. */
-export interface TaroPluginOptions {
+export interface VitePluginTaroOptions {
     /** Active target for this Vite invocation. */
-    target: TaroTarget
+    target: VitePluginTaroTarget
 
     /** Source file that default-exports the root React app component. */
     app: string
 
     /** Ordered page list; also becomes app.json.pages and Web route order. */
-    pages: TaroPageOption[]
+    pages: VitePluginTaroPageOption[]
 
     /** Base app.json content. Its pages field is overwritten from options.pages. */
     appJson: JsonObject
@@ -38,10 +38,10 @@ export interface TaroPluginOptions {
     sitemapJson: JsonObject
 }
 
-export type TaroBuildContext = {
-    target: TaroTarget
+export type VitePluginTaroBuildContext = {
+    target: VitePluginTaroTarget
     appComponentImport: string
-    pages: TaroPageOption[]
+    pages: VitePluginTaroPageOption[]
     appConfig: JsonObject
     projectConfigJson: JsonObject
     sitemapJson: JsonObject

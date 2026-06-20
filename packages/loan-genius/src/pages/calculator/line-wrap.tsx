@@ -6,9 +6,9 @@
  * @Last Modified time: 2021-01-04 22:04:16
  */
 
-import { Button, Image, Input, Text, View } from 'virtual:taro/components'
 import { Modal, Pciker } from '@components'
 import { Component } from 'react'
+import { Button, Image, Input, Text, View } from 'vite-plugin-taro/components'
 import { RIGHT_ARROW } from './constants'
 
 interface LineWrapProps {

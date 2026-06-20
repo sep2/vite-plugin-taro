@@ -1,13 +1,12 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
-import taro, { type TaroTarget } from 'vite-plugin-taro/vite'
-import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
+import vitePluginTaro, { type VitePluginTaroTarget } from 'vite-plugin-taro/vite'
 
 const targetEnvName = 'VITE_PLUGIN_TARO_TARGET'
 const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 
-function getTarget(env: Record<string, string>): TaroTarget {
+function getTarget(env: Record<string, string>): VitePluginTaroTarget {
     const target = env[targetEnvName]
     if (target === 'wx' || target === 'h5') return target
     throw new Error(`${targetEnvName} must be "wx" or "h5".`)
@@ -34,26 +33,7 @@ export default defineConfig(({ mode }) => {
             outDir: fromRoot('dist', target)
         },
         plugins: [
-            WeappTailwindcss({
-                appType: 'taro',
-                generator: {
-                    target: target === 'h5' ? 'web' : 'weapp'
-                },
-                tailwindcss: {
-                    version: 4,
-                    packageName: 'tailwindcss'
-                },
-                cssCalc: false,
-                // skyline does not support -webkit prefix.
-                autoprefixer: target === 'h5',
-                postcssOptions: {
-                    // Tailwind v4 emits legacy :before/:after selectors; skyline requires ::before/::after.
-                    plugins: [createWechatPseudoElementPlugin()]
-                },
-                rem2rpx: true,
-                px2rpx: true
-            }),
-            taro({
+            vitePluginTaro({
                 target,
                 app: 'src/app.ts',
                 pages: [
@@ -114,14 +94,3 @@ export default defineConfig(({ mode }) => {
         ]
     }
 })
-
-function createWechatPseudoElementPlugin() {
-    const legacyPseudoElementPattern = /(?<!:):(before|after)\b/g
-
-    return {
-        postcssPlugin: 'loan-genius-wechat-pseudo-elements',
-        Rule(rule: { selector: string }) {
-            rule.selector = rule.selector.replace(legacyPseudoElementPattern, '::$1')
-        }
-    }
-}

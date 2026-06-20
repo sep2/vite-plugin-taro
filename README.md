@@ -14,6 +14,7 @@ Vite 8 + React 19 plugin for building one React/Taro codebase for both WeChat Mi
 - No app-side Taro runtime patching required.
 - Taro-style conditional compilation comments before Vite parses source.
 - Vite/Rolldown output setup for target-specific generated app/page entries.
+- Built-in Tailwind CSS and WeChat Tailwind processing for the selected target.
 - WeChat Mini Program output integration.
 
 ## Repository layout
@@ -33,17 +34,17 @@ pnpm add react react-dom
 ## Basic Vite config
 
 ```ts
-import taro from 'vite-plugin-taro/vite'
+import vitePluginTaro, { type VitePluginTaroTarget } from 'vite-plugin-taro/vite'
 import { defineConfig, loadEnv } from 'vite'
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), 'VITE_PLUGIN_TARO_')
-    const target = env.VITE_PLUGIN_TARO_TARGET as 'wx' | 'h5'
+    const target = env.VITE_PLUGIN_TARO_TARGET as VitePluginTaroTarget
 
     return {
         base: target === 'h5' ? './' : undefined,
         plugins: [
-            taro({
+            vitePluginTaro({
                 target,
                 app: 'src/app.ts',
                 pages: [{ path: 'pages/index/index', config: {} }],
@@ -56,23 +57,13 @@ export default defineConfig(({ mode }) => {
 })
 ```
 
-Application code should import Taro APIs/components through the plugin virtual modules. `virtual:taro` is default-export only, so use `Taro.xxx` APIs.
+Application code should import Taro APIs/components through the package facades.
 
 ```ts
-import Taro from 'virtual:taro'
-import { View, Text } from 'virtual:taro/components'
+import { View, Text } from 'vite-plugin-taro/components'
+import Taro from 'vite-plugin-taro/taro'
 
 Taro.getWindowInfo()
-```
-
-Add the virtual module declarations to the app `tsconfig.json`:
-
-```json
-{
-    "compilerOptions": {
-        "types": ["vite/client", "vite-plugin-taro/client"]
-    }
-}
 ```
 
 ## Development
