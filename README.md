@@ -11,19 +11,17 @@ Vite 8 + React 19 plugin for building one React/Taro codebase for both WeChat Mi
 - Build the same React/Taro app as either:
   - `wx`: WeChat Mini Program assets.
   - `h5`: Web app powered by the Taro H5 runtime/router.
-- React 19 support via published patched Taro runtime packages.
-- No consumer-side `patchedDependencies` required.
+- React 19 support out of the box.
+- No app-side Taro runtime patching required.
 - Taro-style conditional compilation comments before Vite parses source.
 - Vite/Rolldown output setup for target-specific generated app/page entries.
 - Tailwind CSS and WeChat output integration.
 
-## Packages
+## Repository layout
 
 | Package | Purpose |
 | --- | --- |
 | [`vite-plugin-taro`](packages/vite-plugin-taro) | Published Vite plugin. |
-| [`vite-plugin-taro-react`](packages/taro-react) | React 19-compatible package generated from `@tarojs/react@4.2.0`. |
-| [`vite-plugin-taro-plugin-framework-react`](packages/taro-plugin-framework-react) | React 19-compatible package generated from `@tarojs/plugin-framework-react@4.2.0`. |
 | [`loan-genius`](packages/loan-genius) | Sample mortgage/loan calculator app, forked/adapted from [`wuba/Taro-Mortgage-Calculator`](https://github.com/wuba/Taro-Mortgage-Calculator), used to verify H5 and WeChat builds. |
 
 ## Install
@@ -80,12 +78,12 @@ Useful scripts:
 
 | Script | Description |
 | --- | --- |
-| `pnpm prepare:taro` | Regenerate patched Taro runtime packages from npm tarballs. |
+| `pnpm prepare:taro` | Prepare workspace Taro runtime dependencies. |
 | `pnpm build:plugin` | Build `vite-plugin-taro`. |
 | `pnpm build:sample:h5` | Build the sample H5 app to `packages/loan-genius/dist/h5`. |
 | `pnpm build:sample:wx` | Build the sample WeChat Mini Program to `packages/loan-genius/dist/wx`. |
 | `pnpm publish:dry` | Dry-run publishing all public packages in order. |
-| `pnpm publish:all` | Publish patched runtimes first, then `vite-plugin-taro`. |
+| `pnpm publish:all` | Publish the public packages in the required order. |
 
 ## GitHub Pages sample
 
@@ -101,7 +99,7 @@ Enable Pages in the GitHub repository settings with **Source: GitHub Actions**.
 
 ## Publishing
 
-The patched runtime packages must be published before the main plugin. Use the one-command release script:
+Use the one-command release script:
 
 ```sh
 pnpm publish:all
@@ -119,15 +117,6 @@ Dry run:
 pnpm publish:dry
 ```
 
-## React 19 runtime packages
-
-Taro 4.2's official React runtime targets React 18. This repo generates and publishes React 19-compatible packages from official Taro npm tarballs plus local patches:
-
-- `vite-plugin-taro-react`
-- `vite-plugin-taro-plugin-framework-react`
-
-`vite-plugin-taro` depends on them through npm aliases for the upstream Taro specifiers, so consumers keep normal imports and do not need local patches.
-
 ## License
 
-MIT for `vite-plugin-taro`. Generated Taro runtime packages include upstream Taro MIT license files.
+MIT.
