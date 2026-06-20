@@ -1,11 +1,19 @@
 # vite-plugin-taro
 
-Vite 8 + React 19 plugin for building one React/Taro codebase for both:
+Vite 8 + React 19 plugin for building one React/Taro codebase for both WeChat Mini Program (`wx`) and Web (`h5`) targets.
 
-- `wx`: WeChat Mini Program output.
-- `h5`: Web output powered by Taro H5 runtime and router.
+- npm: <https://www.npmjs.com/package/vite-plugin-taro>
+- Sample H5 demo: <https://sep2.github.io/vite-plugin-taro/>
+- Repository: <https://github.com/sep2/vite-plugin-taro>
 
-It wraps React 19-compatible Taro runtime packages, emits the generated app/page entries that Taro normally creates, and configures Vite/Rolldown, Tailwind CSS, and target-specific aliases for the selected target.
+## Features
+
+- `wx` target: emits WeChat Mini Program JS/JSON/WXML/WXSS assets.
+- `h5` target: emits a Web app using the Taro H5 runtime and router.
+- React 19 support via patched Taro runtime packages published as npm aliases.
+- No app-side `patchedDependencies` required.
+- Taro-style conditional compilation comments for TS/JS/JSX/TSX and style files.
+- Target-specific Vite/Rolldown, Tailwind CSS, and WeChat output setup.
 
 ## Install
 
@@ -25,13 +33,16 @@ export default defineConfig(({ mode }) => {
     const target = env.VITE_PLUGIN_TARO_TARGET as TaroTarget
 
     return {
+        base: target === 'h5' ? './' : undefined,
         plugins: [
             taro({
                 target,
                 app: 'src/app.ts',
                 pages: [{ path: 'pages/index/index', config: {} }],
                 appJson: {},
-                projectConfigJson: { appid: 'touristappid' },
+                projectConfigJson: {
+                    appid: env.VITE_PLUGIN_TARO_WECHAT_APP_ID || 'touristappid'
+                },
                 sitemapJson: { rules: [{ action: 'allow', page: '*' }] }
             })
         ]
@@ -39,7 +50,54 @@ export default defineConfig(({ mode }) => {
 })
 ```
 
-Application code should usually import only `vite-plugin-taro/components` and `vite-plugin-taro/taro`.
+Example scripts:
+
+```json
+{
+    "scripts": {
+        "build:h5": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite build",
+        "build:wx": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=wx vite build",
+        "dev:h5": "NODE_ENV=development VITE_PLUGIN_TARO_TARGET=h5 vite",
+        "dev:wx": "NODE_ENV=development VITE_PLUGIN_TARO_TARGET=wx vite build --watch"
+    }
+}
+```
+
+Application code should usually import only from the plugin facades:
+
+```ts
+import Taro from 'vite-plugin-taro/taro'
+import { Text, View } from 'vite-plugin-taro/components'
+```
+
+## Options
+
+```ts
+type TaroTarget = 'wx' | 'h5'
+
+type TaroPageOption = {
+    path: string
+    config: Record<string, unknown>
+}
+
+interface TaroPluginOptions {
+    target: TaroTarget
+    app: string
+    pages: TaroPageOption[]
+    appJson: Record<string, unknown>
+    projectConfigJson: Record<string, unknown>
+    sitemapJson: Record<string, unknown>
+}
+```
+
+| Option | Description |
+| --- | --- |
+| `target` | Active build target: `wx` or `h5`. |
+| `app` | Source file that default-exports the root React app component. |
+| `pages` | Ordered page list. Also becomes `app.json.pages` and H5 route order. |
+| `appJson` | Base `app.json` content. `pages` is overwritten from `pages`. |
+| `projectConfigJson` | `project.config.json` emitted for WeChat builds. |
+| `sitemapJson` | `sitemap.json` emitted for WeChat builds. |
 
 ## Package exports
 
@@ -91,27 +149,33 @@ vite-plugin-taro configures Rolldown for WeChat-compatible CommonJS chunks and e
 
 vite-plugin-taro injects a virtual module into `index.html`, creates Taro H5 route records from `pages`, and mounts the app with Taro's hash-history router.
 
+For GitHub Pages or any subpath deployment, set a relative/base path in Vite, for example:
+
+```ts
+export default defineConfig({
+    base: './'
+})
+```
+
 ## React 19 compatibility
 
-Taro 4.2's official React runtime targets React 18. vite-plugin-taro depends on two small React 19-compatible runtime packages generated from the official Taro npm tarballs plus vite-plugin-taro's local patch files:
+Taro 4.2's official React runtime targets React 18. vite-plugin-taro depends on two small React 19-compatible runtime packages generated from the official Taro npm tarballs plus local patch files:
 
 - `vite-plugin-taro-react`
 - `vite-plugin-taro-plugin-framework-react`
 
-In the workspace these are referenced with pnpm workspace aliases:
+When packed/published by pnpm, workspace aliases become npm aliases to these patched packages:
 
 ```json
 {
-    "@tarojs/react": "workspace:vite-plugin-taro-react@*",
-    "@tarojs/plugin-framework-react": "workspace:vite-plugin-taro-plugin-framework-react@*"
+    "@tarojs/react": "npm:vite-plugin-taro-react@4.2.0-react19.1",
+    "@tarojs/plugin-framework-react": "npm:vite-plugin-taro-plugin-framework-react@4.2.0-react19.1"
 }
 ```
 
-When packed/published by pnpm, those become npm aliases to the published patched packages. vite-plugin-taro source can keep importing the upstream Taro specifiers while users receive the patched React 19-compatible packages automatically.
+That means app users get React 19-compatible Taro runtime packages automatically and do not need local patches.
 
-Run `pnpm prepare:taro` to regenerate the patched packages from upstream tarballs. Publish those runtime packages before publishing `vite-plugin-taro`.
-
-## Publishing
+## Publishing from this repository
 
 ```sh
 pnpm install
@@ -123,3 +187,7 @@ pnpm publish:all -- --otp 123456
 ```
 
 The package publishes built ESM JavaScript and `.d.ts` files from `dist`.
+
+## License
+
+MIT.
