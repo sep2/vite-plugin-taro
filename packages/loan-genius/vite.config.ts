@@ -39,8 +39,6 @@ export default defineConfig(({ mode }) => {
                 generator: {
                     target: target === 'h5' ? 'web' : 'weapp'
                 },
-                tailwindcssBasedir: projectRoot,
-                cssEntries: [fromRoot('src/app.css')],
                 tailwindcss: {
                     version: 4,
                     packageName: 'tailwindcss'
