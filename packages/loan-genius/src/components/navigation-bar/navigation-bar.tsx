@@ -1,8 +1,8 @@
 import clsx from 'clsx'
 import type { CSSProperties, PropsWithChildren, ReactNode } from 'react'
 import { useMemo } from 'react'
-import { View } from 'vite-plugin-taro/components'
-import Taro from 'vite-plugin-taro/taro'
+import { View } from 'virtual:taro/components'
+import Taro from 'virtual:taro'
 
 interface NavigationBarMetrics {
     height: number

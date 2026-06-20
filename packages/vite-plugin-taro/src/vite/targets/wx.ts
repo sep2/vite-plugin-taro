@@ -119,7 +119,11 @@ function createWechatTaroDefines(): Record<string, string> {
  */
 function isWxTaroChunkModule(id: string): boolean {
     const normalizedId = normalizeModuleId(id)
-    return normalizedId.includes('/node_modules/@tarojs/') || normalizedId.startsWith(`${pluginSourcePath}/`)
+    return (
+        normalizedId.includes('/node_modules/@tarojs/') ||
+        normalizedId.startsWith(`${pluginSourcePath}/`) ||
+        normalizedId.includes('virtual:taro')
+    )
 }
 
 /**

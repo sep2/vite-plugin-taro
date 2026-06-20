@@ -8,7 +8,7 @@
 import { NavigationBar, SafeAreaView } from '@components'
 import { getStorageData } from '@utils'
 import { Component } from 'react'
-import { ScrollView, Text, View } from 'vite-plugin-taro/components'
+import { ScrollView, Text, View } from 'virtual:taro/components'
 
 export default class LoanGeniusHistory extends Component<any, any> {
     constructor(props: any) {

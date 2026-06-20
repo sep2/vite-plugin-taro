@@ -8,7 +8,7 @@
 import { isArray } from '@utils'
 import clsx from 'clsx'
 import { Component, type ComponentType, type PropsWithChildren } from 'react'
-import { Picker, PickerView, PickerViewColumn, Text, View } from 'vite-plugin-taro/components'
+import { Picker, PickerView, PickerViewColumn, Text, View } from 'virtual:taro/components'
 import styles from './index.module.css'
 import type { RangeItem, TaroPickerSelectorProps } from './type'
 

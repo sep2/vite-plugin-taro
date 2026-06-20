@@ -33,12 +33,12 @@ pnpm add react react-dom
 ## Basic Vite config
 
 ```ts
-import taro, { type TaroTarget } from 'vite-plugin-taro/vite'
+import taro from 'vite-plugin-taro/vite'
 import { defineConfig, loadEnv } from 'vite'
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), 'VITE_PLUGIN_TARO_')
-    const target = env.VITE_PLUGIN_TARO_TARGET as TaroTarget
+    const target = env.VITE_PLUGIN_TARO_TARGET as 'wx' | 'h5'
 
     return {
         base: target === 'h5' ? './' : undefined,
@@ -56,13 +56,23 @@ export default defineConfig(({ mode }) => {
 })
 ```
 
-Application code should import Taro APIs/components through the plugin facades. `vite-plugin-taro/taro` is default-export only, so use `Taro.xxx` APIs.
+Application code should import Taro APIs/components through the plugin virtual modules. `virtual:taro` is default-export only, so use `Taro.xxx` APIs.
 
 ```ts
-import Taro from 'vite-plugin-taro/taro'
-import { View, Text } from 'vite-plugin-taro/components'
+import Taro from 'virtual:taro'
+import { View, Text } from 'virtual:taro/components'
 
 Taro.getWindowInfo()
+```
+
+Add the virtual module declarations to the app `tsconfig.json`:
+
+```json
+{
+    "compilerOptions": {
+        "types": ["vite/client", "vite-plugin-taro/client"]
+    }
+}
 ```
 
 ## Development

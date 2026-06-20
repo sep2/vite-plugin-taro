@@ -17,6 +17,7 @@ import {
 } from './targets/wx.ts'
 import type { TaroBuildContext, TaroPluginOptions } from './types.ts'
 import { stripVirtualPrefix, toImportPath } from './utils.ts'
+import { isPublicVirtualModuleId, loadPublicVirtualModule } from './virtual.ts'
 
 /**
  * Creates the Vite/Rolldown plugin that emits either WeChat Mini Program files
@@ -59,7 +60,7 @@ function createTaroPlugin(context: TaroBuildContext): Plugin {
 
         /** Marks generated app/page/component entries as virtual modules. */
         resolveId(id) {
-            if (isWxVirtualModuleId(id) || isH5VirtualModuleId(id)) return `\0${id}`
+            if (isPublicVirtualModuleId(id) || isWxVirtualModuleId(id) || isH5VirtualModuleId(id)) return `\0${id}`
         },
 
         /** Supplies source code for each virtual entry module. */
@@ -68,7 +69,11 @@ function createTaroPlugin(context: TaroBuildContext): Plugin {
 
             emitWechatImplicitChunksForVirtualApp(this, context, cleanId)
 
-            return loadWxVirtualModule(cleanId, context) ?? loadH5VirtualModule(cleanId, context)
+            return (
+                loadPublicVirtualModule(cleanId, context) ??
+                loadWxVirtualModule(cleanId, context) ??
+                loadH5VirtualModule(cleanId, context)
+            )
         },
 
         /** Injects the generated Web entry into the app shell before Vite scans HTML imports. */

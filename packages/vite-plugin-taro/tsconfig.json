@@ -8,9 +8,11 @@
 
         "moduleResolution": "Bundler",
         "allowImportingTsExtensions": true,
+        "rewriteRelativeImportExtensions": true,
         "resolveJsonModule": true,
         "isolatedModules": true,
-        "noEmit": true,
+        "rootDir": "src",
+        "outDir": "dist",
         "jsx": "react-jsx",
 
         "strict": true,

@@ -25,12 +25,12 @@ pnpm add react react-dom
 ## Vite usage
 
 ```ts
-import taro, { type TaroTarget } from 'vite-plugin-taro/vite'
+import taro from 'vite-plugin-taro/vite'
 import { defineConfig, loadEnv } from 'vite'
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), 'VITE_PLUGIN_TARO_')
-    const target = env.VITE_PLUGIN_TARO_TARGET as TaroTarget
+    const target = env.VITE_PLUGIN_TARO_TARGET as 'wx' | 'h5'
 
     return {
         base: target === 'h5' ? './' : undefined,
@@ -63,11 +63,11 @@ Example scripts:
 }
 ```
 
-Application code should usually import only from the plugin facades. `vite-plugin-taro/taro` is default-export only; call APIs as `Taro.xxx`.
+Application code should usually import only from the plugin virtual modules. `virtual:taro` is default-export only; call APIs as `Taro.xxx`.
 
 ```ts
-import Taro from 'vite-plugin-taro/taro'
-import { Text, View } from 'vite-plugin-taro/components'
+import Taro from 'virtual:taro'
+import { Text, View } from 'virtual:taro/components'
 
 Taro.useLaunch(() => {})
 Taro.getWindowInfo()
@@ -76,9 +76,19 @@ Taro.getWindowInfo()
 For Taro namespace types:
 
 ```ts
-import type Taro from 'vite-plugin-taro/taro'
+import type Taro from 'virtual:taro'
 
 type Color = Taro.Color
+```
+
+Add the virtual module declarations to the app `tsconfig.json`:
+
+```json
+{
+    "compilerOptions": {
+        "types": ["vite/client", "vite-plugin-taro/client"]
+    }
+}
 ```
 
 ## Styling
@@ -114,14 +124,20 @@ interface TaroPluginOptions {
 | `projectConfigJson` | `project.config.json` emitted for WeChat builds. |
 | `sitemapJson` | `sitemap.json` emitted for WeChat builds. |
 
+## App virtual modules
+
+| Import | Purpose |
+| --- | --- |
+| `virtual:taro` | Default-only Taro API facade. Use this instead of importing `@tarojs/taro` directly. |
+| `virtual:taro/components` | Re-export of `@tarojs/components`. Use this in app code. |
+
 ## Package exports
 
 | Import | Purpose |
 | --- | --- |
-| `vite-plugin-taro` | Default Vite plugin and public plugin types. |
-| `vite-plugin-taro/vite` | Default Vite plugin and `TaroTarget`, `TaroPluginOptions`, `TaroPageOption` types. |
-| `vite-plugin-taro/components` | Re-export of `@tarojs/components`. Use this in app code. |
-| `vite-plugin-taro/taro` | Default-only Taro API facade. Use this instead of importing `@tarojs/taro` directly. |
+| `vite-plugin-taro` | Default Vite plugin entry. |
+| `vite-plugin-taro/vite` | Default Vite plugin entry. |
+| `vite-plugin-taro/client` | Type declarations for `virtual:taro` and `virtual:taro/components`. |
 | `vite-plugin-taro/shim/h5` | H5 runtime shim used by generated entries. |
 | `vite-plugin-taro/shim/wx` | WeChat runtime shim used by generated entries. |
 

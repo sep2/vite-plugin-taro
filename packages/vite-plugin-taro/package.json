@@ -14,35 +14,23 @@
     "homepage": "https://github.com/sep2/vite-plugin-taro/tree/main/packages/vite-plugin-taro#readme",
     "main": "./dist/vite.js",
     "module": "./dist/vite.js",
-    "types": "./dist/vite.d.ts",
     "exports": {
         ".": {
-            "types": "./dist/vite.d.ts",
             "import": "./dist/vite.js",
             "default": "./dist/vite.js"
         },
         "./vite": {
-            "types": "./dist/vite.d.ts",
             "import": "./dist/vite.js",
             "default": "./dist/vite.js"
         },
-        "./components": {
-            "types": "./dist/public/components.d.ts",
-            "import": "./dist/public/components.js",
-            "default": "./dist/public/components.js"
-        },
-        "./taro": {
-            "types": "./dist/public/taro.d.ts",
-            "import": "./dist/public/taro.js",
-            "default": "./dist/public/taro.js"
+        "./client": {
+            "types": "./client.d.ts"
         },
         "./shim/h5": {
-            "types": "./dist/shim/h5.d.ts",
             "import": "./dist/shim/h5.js",
             "default": "./dist/shim/h5.js"
         },
         "./shim/wx": {
-            "types": "./dist/shim/wx.d.ts",
             "import": "./dist/shim/wx.js",
             "default": "./dist/shim/wx.js"
         },
@@ -50,13 +38,14 @@
     },
     "files": [
         "dist",
+        "client.d.ts",
         "LICENSE",
         "README.md"
     ],
     "scripts": {
         "clean": "rm -rf dist",
-        "build": "pnpm -w prepare:taro && pnpm clean && vite build",
-        "typecheck": "pnpm -w prepare:taro && tsgo --project tsconfig.json",
+        "build": "pnpm -w prepare:taro && pnpm clean && tsgo --project tsconfig.json",
+        "typecheck": "pnpm -w prepare:taro && tsgo --project tsconfig.json --noEmit",
         "prepack": "pnpm build",
         "pack:dry": "pnpm pack --dry-run"
     },
@@ -98,7 +87,6 @@
     "devDependencies": {
         "@types/node": "^26.0.0",
         "@typescript/native-preview": "latest",
-        "vite": "^8.0.16",
-        "vite-plugin-dts": "^5.0.2"
+        "vite": "^8.0.16"
     }
 }

@@ -60,13 +60,13 @@ export function createH5ViteConfig(): UserConfig {
 export function createH5SupportPlugins(): PluginOption[] {
     return [
         ...react(),
-        // Mirrors Taro H5 API transforms while leaving vite-plugin-taro/taro as a default-only facade.
+        // Mirrors Taro H5: rewrite default Taro.xxx calls from virtual:taro to named H5 API imports.
         babel({
             plugins: [
                 [
                     nodeRequire.resolve('babel-plugin-transform-taroapi'),
                     {
-                        packageName: '@tarojs/taro',
+                        packageName: 'virtual:taro',
                         definition: nodeRequire(nodeRequire.resolve('@tarojs/plugin-platform-h5/dist/definition.json'))
                     }
                 ]

@@ -5,7 +5,7 @@
  * @Last Modified by: qiuz
  */
 
-import { View } from 'vite-plugin-taro/components'
+import { View } from 'virtual:taro/components'
 
 export default function TaroStatusBar() {
     return <View style={{ display: 'none' }} />

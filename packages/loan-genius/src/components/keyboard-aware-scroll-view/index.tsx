@@ -6,7 +6,7 @@
  */
 
 import clsx from 'clsx'
-import { ScrollView } from 'vite-plugin-taro/components'
+import { ScrollView } from 'virtual:taro/components'
 
 function TaroKeyboardAwareScrollView(props: any) {
     const { className = '', children } = props

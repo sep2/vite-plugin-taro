@@ -12,9 +12,9 @@ Loan Genius is forked/adapted from Wuba's [`Taro-Mortgage-Calculator`](https://g
 - One React/Taro codebase targeting both:
   - `h5`: Web output.
   - `wx`: WeChat Mini Program output.
-- App code importing through plugin facades:
-  - `vite-plugin-taro/components`
-  - `vite-plugin-taro/taro`
+- App code importing through plugin virtual modules:
+  - `virtual:taro/components`
+  - `virtual:taro`
 - Taro-style page routing generated from `vite.config.ts`.
 - Conditional source blocks such as `// #ifdef wx` / `// #ifdef h5`.
 - Tailwind v4 and `weapp-tailwindcss` configured directly in this app's Vite config.
