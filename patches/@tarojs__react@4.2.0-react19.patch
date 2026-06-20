@@ -13,7 +13,7 @@ index ad8a51f..57cdf0c 100644
 +    DiscreteEventPriority,
 +    NoEventPriority
 +} from 'react-reconciler/constants';
- 
+
  const supportedInputTypes = {
      color: true,
 @@ -20,12 +25,6 @@ const supportedInputTypes = {
@@ -31,7 +31,7 @@ index ad8a51f..57cdf0c 100644
          case 'cancel':
 @@ -600,7 +599,50 @@ function styleObjectToCss(style) {
  }
- 
+
  /* eslint-disable @typescript-eslint/indent */
 +let taroCurrentUpdatePriority = NoEventPriority;
 +const taroNotPendingTransition = null;
