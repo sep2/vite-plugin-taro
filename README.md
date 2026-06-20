@@ -93,6 +93,7 @@ Useful scripts:
 | `pnpm prepare:taro` | Prepare workspace Taro runtime dependencies. |
 | `pnpm build:plugin` | Build `vite-plugin-taro`. |
 | `pnpm build:sample:h5` | Build the sample H5 app to `packages/loan-genius/dist/h5` after the plugin has been built. |
+| `pnpm preview:sample:h5` | Serve the built sample H5 bundle with Vite preview. |
 | `pnpm build:sample:wx` | Build the sample WeChat Mini Program to `packages/loan-genius/dist/wx` after the plugin has been built. |
 | `pnpm publish:dry` | Dry-run publishing all public packages in order. |
 | `pnpm publish:all` | Publish the public packages in the required order. |
@@ -106,6 +107,7 @@ Manual local build:
 ```sh
 pnpm build:plugin
 pnpm build:sample:h5
+pnpm preview:sample:h5
 ```
 
 Enable Pages in the GitHub repository settings with **Source: GitHub Actions**.

@@ -72,6 +72,18 @@ pnpm build-h5
 pnpm build-wx
 ```
 
+Serve the production H5 bundle locally:
+
+```sh
+pnpm preview:sample:h5
+```
+
+Or from this package:
+
+```sh
+pnpm preview-h5
+```
+
 Outputs:
 
 | Target | Output directory |

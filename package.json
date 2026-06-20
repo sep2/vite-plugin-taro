@@ -19,6 +19,7 @@
         "build:sample:wx": "pnpm --filter loan-genius build-wx",
         "dev:sample:h5": "pnpm --filter loan-genius dev-h5",
         "dev:sample:wx": "pnpm --filter loan-genius dev-wx",
+        "preview:sample:h5": "pnpm --filter loan-genius preview-h5",
         "typecheck": "pnpm --filter vite-plugin-taro typecheck && pnpm --filter loan-genius typecheck",
         "lint": "biome check .",
         "format": "biome check --write .",
