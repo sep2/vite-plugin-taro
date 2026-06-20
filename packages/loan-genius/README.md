@@ -2,6 +2,8 @@
 
 Sample React/Taro loan calculator app used to verify `vite-plugin-taro` H5 and WeChat Mini Program builds.
 
+Loan Genius is forked/adapted from Wuba's [`Taro-Mortgage-Calculator`](https://github.com/wuba/Taro-Mortgage-Calculator).
+
 - H5 demo: <https://sep2.github.io/vite-plugin-taro/>
 - Plugin package: [`vite-plugin-taro`](../vite-plugin-taro)
 
@@ -99,6 +101,10 @@ packages/loan-genius/dist/h5
 ```
 
 The sample config uses a relative H5 base path so it works under the GitHub Pages project URL.
+
+## Attribution
+
+This sample is forked/adapted from [`wuba/Taro-Mortgage-Calculator`](https://github.com/wuba/Taro-Mortgage-Calculator).
 
 ## Notes
 

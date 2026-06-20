@@ -24,7 +24,7 @@ Vite 8 + React 19 plugin for building one React/Taro codebase for both WeChat Mi
 | [`vite-plugin-taro`](packages/vite-plugin-taro) | Published Vite plugin. |
 | [`vite-plugin-taro-react`](packages/taro-react) | React 19-compatible package generated from `@tarojs/react@4.2.0`. |
 | [`vite-plugin-taro-plugin-framework-react`](packages/taro-plugin-framework-react) | React 19-compatible package generated from `@tarojs/plugin-framework-react@4.2.0`. |
-| [`loan-genius`](packages/loan-genius) | Sample mortgage/loan calculator app used to verify H5 and WeChat builds. |
+| [`loan-genius`](packages/loan-genius) | Sample mortgage/loan calculator app, forked/adapted from [`wuba/Taro-Mortgage-Calculator`](https://github.com/wuba/Taro-Mortgage-Calculator), used to verify H5 and WeChat builds. |
 
 ## Install
 
