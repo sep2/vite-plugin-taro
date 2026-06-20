@@ -6,9 +6,9 @@
  * @Last Modified time: 2021-01-04 22:04:16
  */
 
+import { Button, Image, Input, Text, View } from 'virtual:taro/components'
 import { Modal, Pciker } from '@components'
 import { Component } from 'react'
-import { Button, Image, Input, Text, View } from 'virtual:taro/components'
 import { RIGHT_ARROW } from './constants'
 
 interface LineWrapProps {
@@ -161,7 +161,7 @@ export class LineWrap extends Component<LineWrapProps, any> {
                                         keyboardType={loan.keyboardType}
                                         type={loan.inputType || 'text'}
                                         maxLength={loan.maxLength}
-                                        className="flex-1 border-0 bg-transparent p-0 font-pingfang-regular text-base text-[#0B0F12]"
+                                        className="flex-1 bg-transparent p-0 font-pingfang-regular text-base text-[#0B0F12]"
                                         style={loan.valueStyle || {}}
                                         disabled={!IS_H5 ? loan.readOnly : false}
                                         readOnly={IS_H5 ? loan.readOnly : false}
