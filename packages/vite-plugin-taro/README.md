@@ -128,17 +128,19 @@ Important conventions:
 `src/app.ts` is the shared application wrapper. It receives the current page as `children`.
 
 ```tsx
-import type { PropsWithChildren } from 'react'
 import Taro from 'virtual:taro/api'
+import type { PropsWithChildren } from 'react'
 import './app.css'
 
-export default function App({ children }: PropsWithChildren) {
+function App({ children }: PropsWithChildren) {
     Taro.useLaunch(() => {
         console.log('App launched')
     })
 
     return children
 }
+
+export default App
 ```
 
 Import global styles from the app component. They are included in H5 output and collected into `app.wxss` for WeChat builds.
