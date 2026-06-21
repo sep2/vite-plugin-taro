@@ -7,22 +7,22 @@
 
 Build WeChat Mini Apps with the latest standards-based frontend stack: Vite 8, React 19, and Tailwind CSS v4.
 
-`vite-plugin-taro` is for applications that want Taro's cross-platform React components and APIs, but prefer Vite instead of Taro webpack. The plugin generates app/page entries, target runtime aliases, WeChat companion files, H5 router bootstrap, Tailwind processing, and conditional compilation for you.
+`vite-plugin-taro` is for applications that want Taro's cross-platform React components and APIs, but prefer Vite instead of Taro webpack. You only need this plugin to build a complete WeChat Mini Program.
 
 Live demo: <https://sep2.github.io/vite-plugin-taro>. See [Sample app](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.en.md) how to run it locally.
 
-- **One codebase, two targets** Build WeChat Mini Program and H5 outputs from shared React/Taro pages.
 - **Native Vite builds** Use standard Vite 8 config instead of legacy webpack configuration, with support for all Vite plugins.
 - **Hot reload** Both WeChat Mini Program and H5 support dev-mode watch, with Vite 8 HMR/rebuilds for fast feedback.
 - **Battle-tested Taro foundation** Use the full set of Taro APIs and components instead of reinventing cross-platform primitives.
 - **Tailwind ready** Built-in Tailwind CSS v4 support for both WeChat Mini Program and H5 styles.
-- **Conditional compilation** Use Taro-style `#ifdef` / `#ifndef` / `#if` blocks to split code and styles by `wx` / `h5` target.
+- **Conditional compilation** Use Taro-style `#ifdef` / `#ifndef` / `#if` blocks to split code and styles by WeChat / web target.
+- **Workspace friendly** Supports standalone apps and monorepos, with npm, pnpm, Yarn, Bun, and other package managers.
 - **Type-friendly** The project supports TypeScript all the way.
 - **WeChat Skyline** Support WeChat Mini Program output with Skyline rendering mode.
 
 ## Quick start
 
-Use `create-vite-taro` for new apps. It generates a Vite 8 + React 19 + Taro project with WeChat Mini Program and H5 scripts already wired.
+Use `create-vite-taro` for new apps. It scaffolds a Vite 8 + React 19 + Tailwind CSS v4 + Taro 4 project.
 
 ### 1. Create and install
 
@@ -35,9 +35,9 @@ cd my-app
 npm install
 ```
 
-### 2. Configure WeChat App ID
+### 2. Configure WeChat Mini Program App ID
 
-The template creates `.env.local`. Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` to your WeChat App ID.
+The template creates `.env.local`. Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` to your WeChat Mini Program App ID.
 
 ### 3. Run in development
 

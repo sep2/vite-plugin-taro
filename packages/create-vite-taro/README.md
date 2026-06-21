@@ -26,7 +26,7 @@ You can keep `npm run dev:wx` and `npm run dev:h5` running at the same time in s
 
 Note: Because of WeChat DevTools and Mini Program runtime limitations, hot reload/fast rebuilds for the WeChat target may not always apply cleanly. For day-to-day iteration, prefer the H5 Vite dev server for fast feedback, and periodically verify the Mini Program result in WeChat DevTools.
 
-Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` in the generated `.env.local` to your WeChat App ID, then open `dist/wx` with WeChat DevTools for Mini Program development.
+Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` in the generated `.env.local` to your WeChat Mini Program App ID, then open `dist/wx` with WeChat DevTools for Mini Program development.
 
 ## Other package managers
 
