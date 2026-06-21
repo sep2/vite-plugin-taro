@@ -1,6 +1,7 @@
 # vite-plugin-taro
 
 [![npm version](https://img.shields.io/npm/v/vite-plugin-taro.svg)](https://www.npmjs.com/package/vite-plugin-taro)
+![Vite compatibility](https://registry.vite.dev/api/badges?package=vite-plugin-taro&tool=vite)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 简体中文 | [English](README.en.md)
