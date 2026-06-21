@@ -36,7 +36,7 @@ When updating the upstream Taro version:
 1. Update `upstreamVersion` in `scripts/build-patched-taro-packages.mjs`.
 2. Refresh the matching patch file in `patches/`.
 3. Update this package version in `package.json`.
-4. Update this README template.
+4. Update this package README.
 5. Run `pnpm prepare:taro`.
 6. Run `pnpm build:plugin`, `pnpm typecheck`, `pnpm build:sample:h5`, and `pnpm build:sample:wx`.
 

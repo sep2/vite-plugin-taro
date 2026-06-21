@@ -9,21 +9,18 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const upstreamVersion = '4.2.0'
 
 const packages = [
-    ['@tarojs/react', 'packages/taro-react', 'scripts/readme-templates/taro-react.md'],
-    [
-        '@tarojs/plugin-framework-react',
-        'packages/taro-plugin-framework-react',
-        'scripts/readme-templates/taro-plugin-framework-react.md'
-    ]
+    ['@tarojs/react', 'packages/taro-react'],
+    ['@tarojs/plugin-framework-react', 'packages/taro-plugin-framework-react']
 ]
 
-for (const [upstreamName, targetDir, readmeTemplate] of packages) {
-    buildPackage(upstreamName, targetDir, readmeTemplate)
+for (const [upstreamName, targetDir] of packages) {
+    buildPackage(upstreamName, targetDir)
 }
 
-function buildPackage(upstreamName, targetDir, readmeTemplate) {
+function buildPackage(upstreamName, targetDir) {
     const absoluteTargetDir = path.resolve(repoRoot, targetDir)
     const localPackageJson = readLocalPackageJson(absoluteTargetDir)
+    const localReadme = readLocalReadme(absoluteTargetDir)
     const patchFile = getPatchFile(upstreamName)
     const workingDir = mkdtempSync(path.join(tmpdir(), 'vite-plugin-taro-'))
 
@@ -32,7 +29,7 @@ function buildPackage(upstreamName, targetDir, readmeTemplate) {
 
         applyPatch(packageDir, patchFile)
         writeFileSync(path.join(packageDir, 'package.json'), localPackageJson.text)
-        writeFileSync(path.join(packageDir, 'README.md'), readStaticReadme(readmeTemplate))
+        writeFileSync(path.join(packageDir, 'README.md'), localReadme)
         replaceGeneratedPackage(absoluteTargetDir, packageDir, workingDir)
 
         console.log(`Generated ${localPackageJson.value.name}@${localPackageJson.value.version}`)
@@ -72,17 +69,20 @@ function replaceGeneratedPackage(targetDir, packageDir, workingDir) {
 }
 
 function readLocalPackageJson(targetDir) {
-    const packageJsonPath = path.join(targetDir, 'package.json')
-    const text = readFileSync(packageJsonPath, 'utf8')
+    const text = readLocalTextFile(path.join(targetDir, 'package.json'))
 
     return {
-        text: text.endsWith('\n') ? text : `${text}\n`,
+        text,
         value: JSON.parse(text)
     }
 }
 
-function readStaticReadme(readmeTemplate) {
-    const text = readFileSync(path.resolve(repoRoot, readmeTemplate), 'utf8')
+function readLocalReadme(targetDir) {
+    return readLocalTextFile(path.join(targetDir, 'README.md'))
+}
+
+function readLocalTextFile(filePath) {
+    const text = readFileSync(filePath, 'utf8')
     return text.endsWith('\n') ? text : `${text}\n`
 }
 
