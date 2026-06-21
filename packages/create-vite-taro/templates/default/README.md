@@ -17,7 +17,7 @@ pnpm dev:h5
 
 You can keep `pnpm dev:wx` and `pnpm dev:h5` running at the same time in separate terminals.
 
-Open `dist/wx` with WeChat DevTools for Mini Program development. The generated `.env.local` contains a random `VITE_PLUGIN_TARO_WECHAT_APP_ID`; replace it with your real WeChat App ID when needed.
+Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` in `.env.local` to your WeChat App ID, then open `dist/wx` with WeChat DevTools for Mini Program development.
 
 ## Scripts
 

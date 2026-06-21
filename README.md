@@ -37,12 +37,7 @@ pnpm install
 
 ### 2. 配置微信 App ID
 
-模板会创建 `.env.local`，并写入随机的 `VITE_PLUGIN_TARO_WECHAT_APP_ID`。你可以直接用于游客模式测试，也可以替换为真实微信 App ID：
-
-```sh
-# 可选：在微信开发者工具打开项目前编辑该文件
-$EDITOR .env.local
-```
+模板会创建 `.env.local`。请将 `VITE_PLUGIN_TARO_WECHAT_APP_ID` 设置为你的微信 App ID。
 
 ### 3. 开发模式运行
 

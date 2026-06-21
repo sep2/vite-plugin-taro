@@ -37,12 +37,7 @@ pnpm install
 
 ### 2. Configure WeChat App ID
 
-The template creates `.env.local` with a random `VITE_PLUGIN_TARO_WECHAT_APP_ID`. You can keep it for tourist-mode testing or replace it with your real WeChat App ID:
-
-```sh
-# Optional: edit this file before opening the project in WeChat DevTools
-$EDITOR .env.local
-```
+The template creates `.env.local`. Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` to your WeChat App ID.
 
 ### 3. Run in development
 
