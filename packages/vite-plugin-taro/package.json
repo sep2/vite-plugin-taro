@@ -30,7 +30,8 @@
         "src",
         "client.d.ts",
         "LICENSE",
-        "README.md"
+        "README.md",
+        "README.en.md"
     ],
     "scripts": {
         "build": "node ../../scripts/sync-plugin-readme.mjs && rm -rf dist && tsgo --project tsconfig.json",
