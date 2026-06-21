@@ -56,6 +56,8 @@ pnpm dev:wx
 pnpm dev:h5
 ```
 
+You can keep `pnpm dev:wx` and `pnpm dev:h5` running at the same time in separate terminals.
+
 ### 4. Build, preview, and typecheck
 
 ```sh

@@ -56,6 +56,8 @@ pnpm dev:wx
 pnpm dev:h5
 ```
 
+你可以在两个终端中同时运行 `pnpm dev:wx` 和 `pnpm dev:h5`。
+
 ### 4. 构建、预览和类型检查
 
 ```sh

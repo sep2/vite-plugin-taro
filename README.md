@@ -22,17 +22,59 @@
 
 ## 快速开始
 
-新应用推荐使用 `create-vite-taro`：
+新应用推荐使用 `create-vite-taro`。它会生成已接好微信小程序与 H5 脚本的 Vite 8 + React 19 + Taro 项目。
+
+### 1. 创建并安装
 
 ```sh
+# 使用默认模板创建新应用
 pnpm create vite-taro my-app
+
+# 进入项目并安装依赖
 cd my-app
 pnpm install
+```
+
+### 2. 配置微信 App ID
+
+模板会创建 `.env.local`，并写入随机的 `VITE_PLUGIN_TARO_WECHAT_APP_ID`。你可以直接用于游客模式测试，也可以替换为真实微信 App ID：
+
+```sh
+# 可选：在微信开发者工具打开项目前编辑该文件
+$EDITOR .env.local
+```
+
+### 3. 开发模式运行
+
+```sh
+# 微信小程序：以 watch 模式重新构建 dist/wx
 pnpm dev:wx
+
+# 然后在微信开发者工具中打开 dist/wx
+
+# H5：启动 Vite 开发服务器
 pnpm dev:h5
 ```
 
-使用 `pnpm dev:wx` 可以以 watch 模式构建微信小程序，然后在微信开发者工具中打开 `dist/wx`。使用 `pnpm dev:h5` 可以启动 H5 开发服务器。模板会生成 `.env.local` 并写入随机的 `VITE_PLUGIN_TARO_WECHAT_APP_ID`，需要时请替换为真实微信 App ID。
+你可以在两个终端中同时运行 `pnpm dev:wx` 和 `pnpm dev:h5`。
+
+### 4. 构建、预览和类型检查
+
+```sh
+# 生产微信小程序产物
+pnpm build:wx
+
+# 生产 H5 产物
+pnpm build:h5
+
+# 预览构建后的 H5 应用
+pnpm preview:h5
+
+# 使用 tsgo 进行类型检查
+pnpm typecheck
+```
+
+已有应用或自定义项目结构，请继续阅读下面的手动接入步骤。
 
 ## 手动接入已有应用
 
