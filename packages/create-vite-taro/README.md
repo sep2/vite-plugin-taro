@@ -34,7 +34,7 @@ yarn create vite-taro my-app
 bun create vite-taro my-app
 ```
 
-## Generated scripts
+## Scripts
 
 | Script | Description |
 | --- | --- |
@@ -51,18 +51,3 @@ bun create vite-taro my-app
 | --- | --- |
 | `pnpm install` says dependency build scripts were ignored | Run `pnpm approve-builds`, approve the requested dependency build scripts, then rerun `pnpm install` if needed. |
 
-## Common commands
-
-```sh
-# Production WeChat Mini Program output
-pnpm build:wx
-
-# Production H5 output
-pnpm build:h5
-
-# Preview the built H5 app
-pnpm preview:h5
-
-# Typecheck with tsgo
-pnpm typecheck
-```
