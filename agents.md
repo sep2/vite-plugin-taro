@@ -25,9 +25,11 @@ Node.js v26+ is available and can execute TypeScript natively. Packages declare 
 - `pnpm preview:sample:h5`: preview the built sample H5 target.
 - `pnpm publish:dry`: validate the release without publishing.
 - `pnpm publish:all`: publish public packages in dependency order.
+- `pnpm version:bump <version|major|minor|patch|premajor|preminor|prepatch|prerelease>`: bump every package version and the generated template's `vite-plugin-taro` dependency. Use `--dry-run` to preview changes and `--preid <id>` for prerelease bumps.
 
 # Generated files and packages
 
+- User-facing documentation should show npm commands by default. Keep repository contributor/development instructions on pnpm.
 - Do not manually edit `packages/vite-plugin-taro/dist`; rebuild it with `pnpm build:plugin`.
 - Do not manually edit generated Taro package implementation files under `packages/taro-react` or `packages/taro-plugin-framework-react`. Change the relevant file in `patches/*@4.2.0-react19.patch`, then run `pnpm prepare:taro`.
 - The generated Taro package `package.json` and `README.md` files are local metadata and are preserved by `pnpm prepare:taro`.
