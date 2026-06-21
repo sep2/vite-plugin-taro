@@ -33,7 +33,7 @@
         "README.md"
     ],
     "scripts": {
-        "build": "rm -rf dist && tsgo --project tsconfig.json",
+        "build": "node ../../scripts/sync-plugin-readme.mjs && rm -rf dist && tsgo --project tsconfig.json",
         "typecheck": "tsgo --project tsconfig.json --noEmit"
     },
     "keywords": [
@@ -50,7 +50,7 @@
         "access": "public"
     },
     "engines": {
-        "node": "^20.19.0 || >=22.12.0"
+        "node": ">=22"
     },
     "dependencies": {
         "@babel/core": "^7.29.7",

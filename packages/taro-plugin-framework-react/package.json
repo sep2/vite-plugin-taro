@@ -21,7 +21,7 @@
     },
     "homepage": "https://github.com/sep2/vite-plugin-taro/tree/main/packages/taro-plugin-framework-react#readme",
     "engines": {
-        "node": ">=20.19.0"
+        "node": ">=22"
     },
     "dependencies": {
         "@tarojs/helper": "4.2.0",

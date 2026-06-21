@@ -5,9 +5,7 @@
 *.log
 *.tgz
 /packages/taro-react/LICENSE
-/packages/taro-react/README.md
 /packages/taro-plugin-framework-react/LICENSE
-/packages/taro-plugin-framework-react/README.md
 /packages/taro-plugin-framework-react/index.js
 /.vscode/
 dist
