@@ -6,8 +6,8 @@ Loan Genius 是 `vite-plugin-taro` 的示例应用。它是一个基于 React 19
 
 该应用改造自 [`wuba/Taro-Mortgage-Calculator`](https://github.com/wuba/Taro-Mortgage-Calculator)，用于演示 `vite-plugin-taro` 的用法。
 
-- H5 在线演示：<https://sep2.github.io/vite-plugin-taro/>
 - 源码：[`packages/loan-genius`](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius)
+- H5 在线演示：<https://sep2.github.io/vite-plugin-taro/>
 
 ## 环境要求
 
@@ -28,27 +28,6 @@ pnpm build:plugin
 ```
 
 全新克隆后必须运行 `pnpm prepare:taro`，因为打过补丁的 Taro workspace 包产物是生成文件，不会提交到仓库。
-
-## H5
-
-启动 H5 开发服务器：
-
-```sh
-pnpm dev:sample:h5
-```
-
-构建并预览 H5 应用：
-
-```sh
-pnpm build:sample:h5
-pnpm preview:sample:h5
-```
-
-H5 产物会写入：
-
-```text
-packages/loan-genius/dist/h5
-```
 
 ## 微信小程序
 
@@ -72,12 +51,33 @@ packages/loan-genius/dist/wx
 
 请在微信开发者工具中打开 `packages/loan-genius/dist/wx`，不要打开源码包目录。
 
+## H5
+
+启动 H5 开发服务器：
+
+```sh
+pnpm dev:sample:h5
+```
+
+构建并预览 H5 应用：
+
+```sh
+pnpm build:sample:h5
+pnpm preview:sample:h5
+```
+
+H5 产物会写入：
+
+```text
+packages/loan-genius/dist/h5
+```
+
 ## 本示例演示的内容
 
-- 使用同一套 React 19 + Taro 源码同时支持 `h5` 和 `wx`。
+- 使用同一套 React 19 + Taro 源码同时支持 `wx` 和 `h5`。
 - 通过 `VITE_PLUGIN_TARO_TARGET` 进行 `vite-plugin-taro` 目标选择。
 - 在 `vite.config.ts` 中声明应用和页面元数据。
-- H5 开发服务器、H5 构建，以及微信小程序构建产物。
+- 微信小程序构建产物、H5 开发服务器和 H5 构建产物。
 - 从 `src/app.css` 引入 Tailwind CSS v4。
 - 应用侧通过 `virtual:taro/api` 和 `virtual:taro/components` 导入能力。
 - 生成微信 `project.config.json`、`sitemap.json`、WXML、WXS、WXSS 和 CommonJS chunk。
@@ -93,7 +93,7 @@ import { Text, View } from 'virtual:taro/components'
 
 | 变量 | 是否必需 | 说明 |
 | --- | --- | --- |
-| `VITE_PLUGIN_TARO_TARGET` | 是 | 由根目录脚本设置为 `h5` 或 `wx`。 |
+| `VITE_PLUGIN_TARO_TARGET` | 是 | 由根目录脚本设置为 `wx` 或 `h5`。 |
 | `VITE_PLUGIN_TARO_WECHAT_APP_ID` | 否 | 微信小程序 app id。默认值为 `touristappid`。 |
 
 如需在本地测试微信小程序，请将你的 app id 写入 `packages/loan-genius/.env.local`：
