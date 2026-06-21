@@ -12,7 +12,7 @@
     },
     "homepage": "https://github.com/sep2/vite-plugin-taro#readme",
     "scripts": {
-        "prepare:taro": "node scripts/build-patched-taro-packages.mjs",
+        "prepare:taro": "node scripts/build-patched-taro-packages.ts",
         "build:plugin": "pnpm --filter vite-plugin-taro build",
         "build:sample:h5": "pnpm --filter loan-genius build-h5",
         "build:sample:wx": "pnpm --filter loan-genius build-wx",
@@ -22,9 +22,9 @@
         "typecheck": "pnpm --filter vite-plugin-taro typecheck && pnpm --filter loan-genius typecheck",
         "lint": "biome check .",
         "format": "biome check --write .",
-        "version:bump": "node scripts/bump-package-versions.mjs",
-        "publish:all": "node scripts/publish-packages.mjs",
-        "publish:dry": "node scripts/publish-packages.mjs --dry-run"
+        "version:bump": "node scripts/bump-package-versions.ts",
+        "publish:all": "node scripts/publish-packages.ts",
+        "publish:dry": "node scripts/publish-packages.ts --dry-run"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.5.0",

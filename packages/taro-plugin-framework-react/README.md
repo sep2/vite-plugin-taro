@@ -19,7 +19,7 @@ import Taro from 'virtual:taro/api'
 
 ## Generated source
 
-- Generator: [`scripts/build-patched-taro-packages.mjs`](../../scripts/build-patched-taro-packages.mjs)
+- Generator: [`scripts/build-patched-taro-packages.ts`](../../scripts/build-patched-taro-packages.ts)
 - Patch: [`patches/@tarojs__plugin-framework-react@4.2.0-react19.patch`](../../patches/@tarojs__plugin-framework-react@4.2.0-react19.patch)
 - Output package directory: [`packages/taro-plugin-framework-react`](.)
 
@@ -33,7 +33,7 @@ pnpm prepare:taro
 
 When updating the upstream Taro version:
 
-1. Update `upstreamVersion` in `scripts/build-patched-taro-packages.mjs`.
+1. Update `upstreamVersion` in `scripts/build-patched-taro-packages.ts`.
 2. Refresh the matching patch file in `patches/`.
 3. Update this package version in `package.json`.
 4. Update this package README.

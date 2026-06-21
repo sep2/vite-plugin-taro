@@ -4,6 +4,11 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+type PackageInfo = {
+    name: string
+    version: string
+}
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 
@@ -79,23 +84,28 @@ for (const pkg of packages) {
 
 console.log(dryRun ? '\nPublish dry run completed.' : '\nPublish completed.')
 
-function packageInfo(packageJsonPath) {
+function packageInfo(packageJsonPath: string): PackageInfo {
     const absolutePath = path.join(repoRoot, packageJsonPath)
-    const packageJson = JSON.parse(readFileSync(absolutePath, 'utf8'))
+    const packageJson: unknown = JSON.parse(readFileSync(absolutePath, 'utf8'))
+
+    if (!isPackageInfo(packageJson)) {
+        fail(`${packageJsonPath} must contain string name and version fields.`)
+    }
+
     return {
         name: packageJson.name,
         version: packageJson.version
     }
 }
 
-function takeFlag(name) {
+function takeFlag(name: string): boolean {
     const index = args.indexOf(name)
     if (index === -1) return false
     args.splice(index, 1)
     return true
 }
 
-function takeOption(name) {
+function takeOption(name: string): string | undefined {
     const equalsIndex = args.findIndex((arg) => arg.startsWith(`${name}=`))
     if (equalsIndex !== -1) {
         const [value] = args.splice(equalsIndex, 1)
@@ -114,7 +124,7 @@ function takeOption(name) {
     return value
 }
 
-function assertCleanGitTree() {
+function assertCleanGitTree(): void {
     const insideGitTree = spawnSync('git', ['rev-parse', '--is-inside-work-tree'], {
         cwd: repoRoot,
         encoding: 'utf8',
@@ -140,7 +150,7 @@ function assertCleanGitTree() {
     }
 }
 
-function run(command, commandArgs) {
+function run(command: string, commandArgs: string[]): void {
     console.log(`$ ${[command, ...commandArgs].join(' ')}`)
     const result = spawnSync(command, commandArgs, {
         cwd: repoRoot,
@@ -157,7 +167,19 @@ function run(command, commandArgs) {
     }
 }
 
-function fail(message) {
+function fail(message: string): never {
     console.error(message)
     process.exit(1)
+}
+
+function isPackageInfo(value: unknown): value is PackageInfo {
+    return (
+        typeof value === 'object' &&
+        value !== null &&
+        !Array.isArray(value) &&
+        'name' in value &&
+        'version' in value &&
+        typeof value.name === 'string' &&
+        typeof value.version === 'string'
+    )
 }
