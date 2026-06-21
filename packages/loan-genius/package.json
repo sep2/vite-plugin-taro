@@ -1,7 +1,7 @@
 {
     "name": "loan-genius",
     "private": true,
-    "version": "0.0.0",
+    "version": "0.0.1",
     "type": "module",
     "scripts": {
         "build-wx": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=wx vite build",
