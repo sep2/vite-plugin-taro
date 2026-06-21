@@ -5,7 +5,7 @@
  * @Last Modified by: qiuz
  */
 
-import Taro from 'vite-plugin-taro/taro'
+import Taro from 'virtual:taro/api'
 
 export const isAndroid = () => {
     const { platform, system } = Taro.getDeviceInfo()

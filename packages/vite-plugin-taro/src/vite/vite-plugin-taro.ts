@@ -17,6 +17,7 @@ import {
 } from './targets/wx.ts'
 import type { VitePluginTaroBuildContext, VitePluginTaroOptions } from './types.ts'
 import { stripVirtualPrefix, toImportPath } from './utils.ts'
+import { resolvePublicVirtualModuleId } from './virtual-modules.ts'
 
 /**
  * Creates the Vite/Rolldown plugin that emits either WeChat Mini Program files
@@ -58,9 +59,9 @@ function createVitePluginTaroPlugin(context: VitePluginTaroBuildContext): Plugin
             }
         },
 
-        /** Marks generated app/page/component entries as virtual modules. */
+        /** Maps public virtual modules to real proxy files and marks generated entries as virtual modules. */
         resolveId(id) {
-            if (isWxVirtualModuleId(id) || isH5VirtualModuleId(id)) return `\0${id}`
+            return resolvePublicVirtualModuleId(id) ?? (isWxVirtualModuleId(id) || isH5VirtualModuleId(id) ? `\0${id}` : undefined)
         },
 
         /** Supplies source code for each virtual entry module. */

@@ -20,15 +20,8 @@
             "import": "./dist/vite.js",
             "default": "./dist/vite.js"
         },
-        "./components": {
-            "types": "./src/public/components.ts",
-            "import": "./dist/public/components.js",
-            "default": "./dist/public/components.js"
-        },
-        "./taro": {
-            "types": "./src/public/taro.d.ts",
-            "import": "./dist/public/taro.js",
-            "default": "./dist/public/taro.js"
+        "./client": {
+            "types": "./client.d.ts"
         },
         "./shim/h5": {
             "types": "./src/shim/h5.ts",
@@ -50,6 +43,7 @@
     "files": [
         "dist",
         "src",
+        "client.d.ts",
         "LICENSE",
         "README.md"
     ],

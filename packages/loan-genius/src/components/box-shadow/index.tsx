@@ -8,8 +8,8 @@
 import { isArray } from '@utils'
 import clsx from 'clsx'
 import type { CSSProperties, FunctionComponent, PropsWithChildren } from 'react'
-import { View } from 'vite-plugin-taro/components'
-import type { Color } from 'vite-plugin-taro/taro'
+import { View } from 'virtual:taro/components'
+import type { Color } from 'virtual:taro/api'
 
 interface ShadowOffset {
     width: number

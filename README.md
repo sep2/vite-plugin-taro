@@ -86,11 +86,19 @@ export default defineConfig(({ mode }) => {
 })
 ```
 
-Application code should import Taro APIs and components through the package facades:
+Application code should import Taro APIs and components through the plugin virtual modules. Add `vite-plugin-taro/client` to `compilerOptions.types` for TypeScript support:
+
+```json
+{
+    "compilerOptions": {
+        "types": ["vite/client", "vite-plugin-taro/client"]
+    }
+}
+```
 
 ```tsx
-import { Text, View } from 'vite-plugin-taro/components'
-import Taro from 'vite-plugin-taro/taro'
+import { Text, View } from 'virtual:taro/components'
+import Taro from 'virtual:taro/api'
 
 export default function Page() {
     Taro.getWindowInfo()

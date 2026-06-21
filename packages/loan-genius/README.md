@@ -14,7 +14,7 @@ Live H5 demo: <https://sep2.github.io/vite-plugin-taro/>
 - A shared React 19 app rendered by Taro for H5 and WeChat Mini Program.
 - `vite-plugin-taro` target selection through `VITE_PLUGIN_TARO_TARGET`.
 - Taro app/page metadata declared in `vite.config.ts`.
-- App-facing imports from `vite-plugin-taro/components` and `vite-plugin-taro/taro`.
+- App-facing imports from `virtual:taro/components` and `virtual:taro/api`.
 - WeChat-specific `project.config.json` and `sitemap.json` emission.
 - H5 output suitable for GitHub Pages.
 
@@ -106,11 +106,11 @@ Important files:
 }
 ```
 
-3. Import Taro APIs and components through the plugin facades:
+3. Import Taro APIs and components through the plugin virtual modules:
 
 ```tsx
-import { Text, View } from 'vite-plugin-taro/components'
-import Taro from 'vite-plugin-taro/taro'
+import { Text, View } from 'virtual:taro/components'
+import Taro from 'virtual:taro/api'
 ```
 
 ## Troubleshooting

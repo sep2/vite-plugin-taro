@@ -5,6 +5,7 @@ import type { HtmlTagDescriptor, PluginOption, UserConfig } from 'vite'
 import { isProd, nodeRequire } from '../constants.ts'
 import type { JsonObject, VitePluginTaroBuildContext, VitePluginTaroPageOption } from '../types.ts'
 import { createPageComponentImport } from '../utils.ts'
+import { virtualTaroApiId } from '../virtual-modules.ts'
 
 const virtualH5Id = 'virtual:vite-plugin-taro/h5'
 const patchStencilCssOrder = true
@@ -87,14 +88,14 @@ export function createH5SupportPlugins(): PluginOption[] {
         )
     }
 
-    // Mirrors Taro H5: rewrite default Taro.xxx calls from vite-plugin-taro/taro to named H5 API imports.
+    // Mirrors Taro H5: rewrite default Taro.xxx calls from virtual:taro/api to named H5 API imports.
     plugins.push(
         babel({
             plugins: [
                 [
                     nodeRequire.resolve('babel-plugin-transform-taroapi'),
                     {
-                        packageName: 'vite-plugin-taro/taro',
+                        packageName: virtualTaroApiId,
                         definition: nodeRequire(nodeRequire.resolve('@tarojs/plugin-platform-h5/dist/definition.json'))
                     }
                 ]

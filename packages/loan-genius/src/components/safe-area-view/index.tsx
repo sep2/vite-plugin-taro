@@ -6,7 +6,7 @@
  */
 
 import clsx from 'clsx'
-import { View } from 'vite-plugin-taro/components'
+import { View } from 'virtual:taro/components'
 import type { TaroSafeAreaViewType } from './type'
 
 const TaroSafeAreaView: TaroSafeAreaViewType = (props) => {

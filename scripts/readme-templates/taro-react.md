@@ -9,8 +9,8 @@ This is a generated support package. It is published so `vite-plugin-taro` can d
 Most apps should install and import from `vite-plugin-taro` instead:
 
 ```tsx
-import { View } from 'vite-plugin-taro/components'
-import Taro from 'vite-plugin-taro/taro'
+import { View } from 'virtual:taro/components'
+import Taro from 'virtual:taro/api'
 ```
 
 ## Why this package exists
