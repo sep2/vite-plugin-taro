@@ -1,6 +1,6 @@
 {
     "name": "vite-plugin-taro-plugin-framework-react",
-    "version": "0.1.5",
+    "version": "0.1.6",
     "description": "React 19 compatible fork of @tarojs/plugin-framework-react for vite-plugin-taro.",
     "author": "sep2",
     "license": "MIT",
