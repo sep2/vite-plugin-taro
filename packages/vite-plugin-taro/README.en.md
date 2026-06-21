@@ -28,11 +28,11 @@ Use `create-vite-taro` for new apps. It generates a Vite 8 + React 19 + Taro pro
 
 ```sh
 # Create a new app from the default template
-pnpm create vite-taro my-app
+npm create vite-taro@latest my-app
 
 # Enter the project and install dependencies
 cd my-app
-pnpm install
+npm install
 ```
 
 ### 2. Configure WeChat App ID
@@ -43,18 +43,18 @@ The template creates `.env.local`. Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` to your 
 
 ```sh
 # WeChat Mini Program: rebuild dist/wx in watch mode
-pnpm dev:wx
+npm run dev:wx
 
 # Then open dist/wx in WeChat DevTools
 
 # H5: start the Vite dev server
-pnpm dev:h5
+npm run dev:h5
 
 # Then open the standard Vite dev URL in your browser
 # http://localhost:5173
 ```
 
-You can keep `pnpm dev:wx` and `pnpm dev:h5` running at the same time in separate terminals.
+You can keep `npm run dev:wx` and `npm run dev:h5` running at the same time in separate terminals.
 
 Note: Because of WeChat DevTools and Mini Program runtime limitations, hot reload/fast rebuilds for the WeChat target may not always apply cleanly. For day-to-day iteration, prefer the H5 Vite dev server for fast feedback, and periodically verify the Mini Program result in WeChat DevTools.
 
@@ -62,16 +62,16 @@ Note: Because of WeChat DevTools and Mini Program runtime limitations, hot reloa
 
 ```sh
 # Production WeChat Mini Program output
-pnpm build:wx
+npm run build:wx
 
 # Production H5 output
-pnpm build:h5
+npm run build:h5
 
 # Preview the built H5 app
-pnpm preview:h5
+npm run preview:h5
 
 # Typecheck with tsgo
-pnpm typecheck
+npm run typecheck
 ```
 
 For existing apps or custom project layouts, follow the manual setup below.
@@ -81,14 +81,14 @@ For existing apps or custom project layouts, follow the manual setup below.
 For existing apps or custom project layouts, follow the steps below to wire the plugin manually. First, install the plugin:
 
 ```sh
-pnpm add -D vite-plugin-taro
+npm install -D vite-plugin-taro
 ```
 
 Your app must also provide Vite 8, React 19, React DOM 19, a TypeScript checker, and Node/React type packages. If your app does not already have them, install the missing packages:
 
 ```sh
-pnpm add react react-dom
-pnpm add -D vite @typescript/native-preview @types/node @types/react @types/react-dom
+npm install react react-dom
+npm install -D vite @typescript/native-preview @types/node @types/react @types/react-dom
 ```
 
 You should NOT have direct dependencies on `@tarojs/*` packages anymore. Remove them if you have.
@@ -287,12 +287,12 @@ On Windows shells, use `cross-env`.
 ### 7. Run each target
 
 ```sh
-pnpm dev:wx       # Rebuild dist/wx in watch mode
-pnpm dev:h5       # Start the H5 dev server
-pnpm build:wx     # Build dist/wx
-pnpm build:h5     # Build dist/h5
-pnpm preview:h5   # Preview dist/h5
-pnpm typecheck    # Typecheck with tsgo
+npm run dev:wx       # Rebuild dist/wx in watch mode
+npm run dev:h5       # Start the H5 dev server
+npm run build:wx     # Build dist/wx
+npm run build:h5     # Build dist/h5
+npm run preview:h5   # Preview dist/h5
+npm run typecheck    # Typecheck with tsgo
 ```
 
 Open the generated `dist/wx` directory in WeChat DevTools.
@@ -499,7 +499,7 @@ Common scripts:
 | Problem | Check |
 | --- | --- |
 | `VITE_PLUGIN_TARO_TARGET must be "wx" or "h5"` | Set the target environment variable in your script or `.env` file. |
-| `pnpm install` says dependency build scripts were ignored | Run `pnpm approve-builds`, approve the requested dependency build scripts, then rerun `pnpm install` if needed. |
+| `pnpm install` says dependency build scripts were ignored | Run `pnpm approve-builds` and approve the requested dependency build scripts. |
 | A page cannot be resolved | Confirm that `pages[].path` has a matching `src/${path}.tsx` file. |
 | WeChat DevTools cannot open the app | Open the generated `dist/wx` folder and check `projectConfigJson.appid`. |
 | H5 shows a blank page | Keep `<div id="app"></div>` in `index.html`, register the plugin, and avoid adding a separate default Vite `main.tsx` entry. |

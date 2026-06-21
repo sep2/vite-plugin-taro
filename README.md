@@ -28,11 +28,11 @@
 
 ```sh
 # 使用默认模板创建新应用
-pnpm create vite-taro my-app
+npm create vite-taro@latest my-app
 
 # 进入项目并安装依赖
 cd my-app
-pnpm install
+npm install
 ```
 
 ### 2. 配置微信 App ID
@@ -43,18 +43,18 @@ pnpm install
 
 ```sh
 # 微信小程序：以 watch 模式重新构建 dist/wx
-pnpm dev:wx
+npm run dev:wx
 
 # 然后在微信开发者工具中打开 dist/wx
 
 # H5：启动 Vite 开发服务器
-pnpm dev:h5
+npm run dev:h5
 
 # 然后在浏览器中打开标准 Vite 地址
 # http://localhost:5173
 ```
 
-你可以在两个终端中同时运行 `pnpm dev:wx` 和 `pnpm dev:h5`。
+你可以在两个终端中同时运行 `npm run dev:wx` 和 `npm run dev:h5`。
 
 提示：受微信限制，开发者工具热重载有时不会完整生效。建议日常优先使用 H5 的 Vite 热更新快速调试，并定期在微信开发者工具中验证小程序端效果。
 
@@ -62,16 +62,16 @@ pnpm dev:h5
 
 ```sh
 # 生产微信小程序产物
-pnpm build:wx
+npm run build:wx
 
 # 生产 H5 产物
-pnpm build:h5
+npm run build:h5
 
 # 预览构建后的 H5 应用
-pnpm preview:h5
+npm run preview:h5
 
 # 使用 tsgo 进行类型检查
-pnpm typecheck
+npm run typecheck
 ```
 
 已有应用或自定义项目结构，请继续阅读下面的手动接入步骤。
@@ -81,14 +81,14 @@ pnpm typecheck
 已有应用或自定义项目结构，可以按下面的步骤手动接入插件。先安装插件：
 
 ```sh
-pnpm add -D vite-plugin-taro
+npm install -D vite-plugin-taro
 ```
 
 你的应用还必须提供 Vite 8、React 19、React DOM 19、TypeScript 检查器，以及 Node/React 类型包。如果应用尚未安装它们，请安装缺失的包：
 
 ```sh
-pnpm add react react-dom
-pnpm add -D vite @typescript/native-preview @types/node @types/react @types/react-dom
+npm install react react-dom
+npm install -D vite @typescript/native-preview @types/node @types/react @types/react-dom
 ```
 
 你不应再直接依赖任何 `@tarojs/*` 包。如果已经依赖，请将它们移除。
@@ -287,12 +287,12 @@ export default function IndexPage() {
 ### 7. 运行每个目标
 
 ```sh
-pnpm dev:wx       # 以 watch 模式重新构建 dist/wx
-pnpm dev:h5       # 启动 H5 开发服务器
-pnpm build:wx     # 构建 dist/wx
-pnpm build:h5     # 构建 dist/h5
-pnpm preview:h5   # 预览 dist/h5
-pnpm typecheck    # 使用 tsgo 进行类型检查
+npm run dev:wx       # 以 watch 模式重新构建 dist/wx
+npm run dev:h5       # 启动 H5 开发服务器
+npm run build:wx     # 构建 dist/wx
+npm run build:h5     # 构建 dist/h5
+npm run preview:h5   # 预览 dist/h5
+npm run typecheck    # 使用 tsgo 进行类型检查
 ```
 
 在微信开发者工具中打开生成的 `dist/wx` 目录。
@@ -499,7 +499,7 @@ pnpm typecheck
 | 问题 | 检查项 |
 | --- | --- |
 | `VITE_PLUGIN_TARO_TARGET must be "wx" or "h5"` | 在脚本或 `.env` 文件中设置目标环境变量。 |
-| `pnpm install` 提示忽略了依赖构建脚本 | 运行 `pnpm approve-builds`，按提示批准需要构建的依赖；如有需要再重新执行 `pnpm install`。 |
+| `pnpm install` 提示忽略了依赖构建脚本 | 运行 `pnpm approve-builds`，按提示批准需要构建的依赖。 |
 | 页面无法解析 | 确认 `pages[].path` 有匹配的 `src/${path}.tsx` 文件。 |
 | 微信开发者工具无法打开应用 | 打开生成的 `dist/wx` 文件夹，并检查 `projectConfigJson.appid`。 |
 | H5 显示空白页 | 确保 `index.html` 中保留 `<div id="app"></div>`，已注册插件，并避免添加单独的默认 Vite `main.tsx` 入口。 |

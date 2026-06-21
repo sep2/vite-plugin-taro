@@ -15,8 +15,8 @@ const renamedFiles = {
     _gitignore: '.gitignore'
 }
 const helpText = `Usage:
-  pnpm create vite-taro [project-name]
   npm create vite-taro@latest [project-name]
+  pnpm create vite-taro [project-name]
   yarn create vite-taro [project-name]
   bun create vite-taro [project-name]
 
@@ -50,8 +50,8 @@ console.log(`\nCreated ${projectName} in ${projectPath}\n`)
 console.log('Next steps:')
 if (cdCommand) console.log(`  ${cdCommand}`)
 console.log(`  ${packageManager} install`)
-console.log(`  ${packageManager} dev:wx`)
-console.log(`  ${packageManager} dev:h5`)
+console.log(`  ${getScriptCommand(packageManager, 'dev:wx')}`)
+console.log(`  ${getScriptCommand(packageManager, 'dev:h5')}`)
 
 function parseArgs(args) {
     const options = {
@@ -178,7 +178,12 @@ function getPackageManager() {
     if (userAgent.startsWith('yarn')) return 'yarn'
     if (userAgent.startsWith('bun')) return 'bun'
     if (userAgent.startsWith('npm')) return 'npm'
-    return 'pnpm'
+    return 'npm'
+}
+
+function getScriptCommand(packageManager, scriptName) {
+    if (packageManager === 'npm' || packageManager === 'bun') return `${packageManager} run ${scriptName}`
+    return `${packageManager} ${scriptName}`
 }
 
 function getDisplayProjectPath(projectPath) {
