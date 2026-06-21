@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -11,13 +12,14 @@ type PackageInfo = {
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
 const usage = `Usage:
   pnpm publish:all [-- --otp 123456] [-- --tag latest] [-- --skip-checks] [-- --no-git-check]
   pnpm publish:dry
 
 Options:
-  --dry-run       Run pnpm publish --dry-run for every package.
+  --dry-run       Run npm publish --dry-run for every packed package.
   --otp <code>    npm 2FA one-time password. You can also use NPM_CONFIG_OTP.
   --tag <tag>     npm dist-tag to publish with, for example next.
   --skip-checks   Skip typecheck and package validation before publish.
@@ -49,20 +51,23 @@ const packages = [
     packageInfo('packages/vite-plugin-taro/package.json'),
     packageInfo('packages/create-vite-taro/package.json')
 ]
-const packageFilters = packages.flatMap((pkg) => ['--filter', pkg.name])
-
 console.log(dryRun ? 'Publishing dry run for:' : 'Publishing packages:')
 for (const pkg of packages) {
     console.log(`- ${pkg.name}@${pkg.version}`)
 }
 console.log('')
 
-if (!noGitCheck) {
-    assertCleanGitTree()
+const publishTargets = dryRun ? packages : packages.filter((pkg) => !isPackageVersionPublished(pkg))
+
+if (!dryRun && publishTargets.length === 0) {
+    console.log('All package versions already exist on npm. Nothing to publish.')
+    process.exit(0)
 }
 
-if (!dryRun) {
-    run(pnpm, ['whoami'])
+const packageFilters = publishTargets.flatMap((pkg) => ['--filter', pkg.name])
+
+if (!noGitCheck) {
+    assertCleanGitTree()
 }
 
 run(pnpm, ['prepare:taro'])
@@ -73,13 +78,15 @@ if (!skipChecks) {
     run(pnpm, ['-r', ...packageFilters, 'pack', '--dry-run'])
 }
 
-const publishArgs = ['publish', '--access', 'public', '--no-git-checks']
-if (dryRun) publishArgs.push('--dry-run')
-if (tag) publishArgs.push('--tag', tag)
-if (otp) publishArgs.push('--otp', otp)
+const packRoot = mkdtempSync(path.join(tmpdir(), 'vite-plugin-taro-publish-'))
 
-for (const pkg of packages) {
-    run(pnpm, ['--filter', pkg.name, ...publishArgs])
+try {
+    for (const pkg of publishTargets) {
+        const tarballPath = packPackage(pkg, packRoot)
+        publishPackage(tarballPath)
+    }
+} finally {
+    rmSync(packRoot, { recursive: true, force: true })
 }
 
 console.log(dryRun ? '\nPublish dry run completed.' : '\nPublish completed.')
@@ -96,6 +103,54 @@ function packageInfo(packageJsonPath: string): PackageInfo {
         name: packageJson.name,
         version: packageJson.version
     }
+}
+
+function packPackage(pkg: PackageInfo, packRoot: string): string {
+    const packDir = path.join(packRoot, pkg.name.replace(/[^a-zA-Z0-9._-]/g, '_'))
+    mkdirSync(packDir, { recursive: true })
+    run(pnpm, ['--filter', pkg.name, 'pack', '--pack-destination', packDir])
+
+    const tarballs = readdirSync(packDir).filter((fileName) => fileName.endsWith('.tgz'))
+    if (tarballs.length !== 1) {
+        fail(`Expected one tarball for ${pkg.name}, found ${tarballs.length} in ${packDir}.`)
+    }
+
+    return path.join(packDir, tarballs[0])
+}
+
+function publishPackage(tarballPath: string): void {
+    const publishArgs = ['publish', tarballPath, '--access', 'public']
+    if (dryRun) publishArgs.push('--dry-run', '--force')
+    if (tag) publishArgs.push('--tag', tag)
+    if (otp) publishArgs.push('--otp', otp)
+
+    run(npm, publishArgs)
+}
+
+function isPackageVersionPublished(pkg: PackageInfo): boolean {
+    const packageSpecifier = `${pkg.name}@${pkg.version}`
+    const result = spawnSync(npm, ['view', packageSpecifier, 'version'], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: process.env
+    })
+
+    if (result.error) {
+        throw result.error
+    }
+
+    if (result.status === 0) {
+        console.log(`Skipping ${packageSpecifier}; already published.`)
+        return true
+    }
+
+    const output = `${result.stdout}\n${result.stderr}`
+    if (output.includes('E404') || output.includes('404')) {
+        return false
+    }
+
+    fail(`Could not check whether ${packageSpecifier} is already published.\n\n${output}`)
 }
 
 function takeFlag(name: string): boolean {
