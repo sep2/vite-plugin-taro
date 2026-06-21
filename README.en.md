@@ -5,11 +5,17 @@
 
 [简体中文](README.md) | English
 
-Build WeChat Mini Apps with the latest standard frontend stack: Vite 8, React 19, and Tailwind CSS v4.
+Build WeChat Mini Apps with the latest standards-based frontend stack: Vite 8, React 19, and Tailwind CSS v4.
 
-`vite-plugin-taro` is for applications that want Taro's cross-platform React components and APIs, but prefer Vite/Rolldown instead of Taro's webpack runner. The plugin generates app/page entries, target runtime aliases, H5 router bootstrap, WeChat companion files, Tailwind processing, and conditional compilation for you.
+`vite-plugin-taro` is for applications that want Taro's cross-platform React components and APIs, but prefer Vite/Rolldown instead of Taro webpack. The plugin generates app/page entries, target runtime aliases, H5 router bootstrap, WeChat companion files, Tailwind processing, and conditional compilation for you.
 
 Live demo: <https://sep2.github.io/vite-plugin-taro>. See [Sample app](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.en.md) how to run it locally.
+
+- **One codebase, two targets:** Build H5 and WeChat Mini Program outputs from shared React/Taro pages.
+- **Native Vite/Rolldown builds:** Use standard Vite config instead of Taro webpack or Taro CLI config files.
+- **Battle-tested Taro foundation:** Use the full set of Taro APIs and components instead of reinventing cross-platform primitives.
+- **Tailwind ready:** Built-in Tailwind CSS v4 support for both H5 and WeChat Mini Program styles.
+- **WeChat Skyline ready:** Support WeChat Mini Program output with Skyline rendering mode.
 
 ## Install
 
