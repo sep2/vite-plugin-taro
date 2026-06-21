@@ -62,7 +62,7 @@ Create a Vite config that selects a target and passes the app/page metadata to t
 
 ```ts
 import { defineConfig, loadEnv } from 'vite'
-import vitePluginTaro, { type VitePluginTaroTarget } from 'vite-plugin-taro/vite'
+import vitePluginTaro, { type VitePluginTaroTarget } from 'vite-plugin-taro'
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), 'VITE_PLUGIN_TARO_')

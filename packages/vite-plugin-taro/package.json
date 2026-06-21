@@ -33,11 +33,6 @@
             "import": "./dist/shim/wx.js",
             "default": "./dist/shim/wx.js"
         },
-        "./vite": {
-            "types": "./src/vite.ts",
-            "import": "./dist/vite.js",
-            "default": "./dist/vite.js"
-        },
         "./package.json": "./package.json"
     },
     "files": [

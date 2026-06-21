@@ -38,7 +38,7 @@ export function loadWxVirtualModule(cleanId: string, context: VitePluginTaroBuil
 }
 
 const taroWechatComponentsReactPath = nodeRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
-const vitePluginTaroSourcePath = normalizeModuleId(path.dirname(nodeRequire.resolve('vite-plugin-taro/vite')))
+const vitePluginTaroSourcePath = normalizeModuleId(path.dirname(nodeRequire.resolve('vite-plugin-taro')))
 const taroVersion = String(nodeRequire('@tarojs/runtime/package.json').version)
 
 /**

@@ -37,8 +37,7 @@ pnpm add react react-dom
 
 | Import | Use |
 | --- | --- |
-| `vite-plugin-taro/vite` | Recommended Vite plugin entry. Exports the default plugin plus option/target types. |
-| `vite-plugin-taro` | Same plugin entry as `vite-plugin-taro/vite`. |
+| `vite-plugin-taro` | Plugin entry. Exports the default plugin plus option/target types. |
 | `vite-plugin-taro/client` | TypeScript declarations for the app-facing virtual modules. |
 | `virtual:taro/components` | Virtual re-export of Taro React components. Use this in application code. |
 | `virtual:taro/api` | Virtual Taro API facade. Use this instead of importing `@tarojs/taro` directly. |
@@ -65,7 +64,7 @@ Add the virtual module declarations to `tsconfig.json`:
 
 ```ts
 import { defineConfig, loadEnv } from 'vite'
-import vitePluginTaro, { type VitePluginTaroTarget } from 'vite-plugin-taro/vite'
+import vitePluginTaro, { type VitePluginTaroTarget } from 'vite-plugin-taro'
 
 function getTarget(value: string | undefined): VitePluginTaroTarget {
     if (value === 'h5' || value === 'wx') return value
