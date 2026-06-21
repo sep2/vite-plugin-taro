@@ -1,10 +1,12 @@
-import Taro from 'virtual:taro/api'
+import { useLaunch } from 'virtual:taro/api'
 import type { PropsWithChildren } from 'react'
 import './app.css'
+import { initNavigationBar } from './components/navigation-bar/use-navigation-bar.ts'
 
 function App({ children }: PropsWithChildren) {
-    Taro.useLaunch(() => {
+    useLaunch(() => {
         console.log('App launched')
+        initNavigationBar()
     })
 
     return children
