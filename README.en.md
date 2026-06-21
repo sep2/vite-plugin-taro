@@ -22,17 +22,57 @@ Live demo: <https://sep2.github.io/vite-plugin-taro>. See [Sample app](https://g
 
 ## Quick start
 
-For new apps, use `create-vite-taro`:
+Use `create-vite-taro` for new apps. It generates a Vite 8 + React 19 + Taro project with WeChat Mini Program and H5 scripts already wired.
+
+### 1. Create and install
 
 ```sh
+# Create a new app from the default template
 pnpm create vite-taro my-app
+
+# Enter the project and install dependencies
 cd my-app
 pnpm install
+```
+
+### 2. Configure WeChat App ID
+
+The template creates `.env.local` with a random `VITE_PLUGIN_TARO_WECHAT_APP_ID`. You can keep it for tourist-mode testing or replace it with your real WeChat App ID:
+
+```sh
+# Optional: edit this file before opening the project in WeChat DevTools
+$EDITOR .env.local
+```
+
+### 3. Run in development
+
+```sh
+# WeChat Mini Program: rebuild dist/wx in watch mode
 pnpm dev:wx
+
+# Then open dist/wx in WeChat DevTools
+
+# H5: start the Vite dev server
 pnpm dev:h5
 ```
 
-Use `pnpm dev:wx` to build the WeChat Mini Program in watch mode, then open `dist/wx` in WeChat DevTools. Use `pnpm dev:h5` to start the H5 dev server. The template generates `.env.local` with a random `VITE_PLUGIN_TARO_WECHAT_APP_ID`; replace it with your real WeChat App ID when needed.
+### 4. Build, preview, and typecheck
+
+```sh
+# Production WeChat Mini Program output
+pnpm build:wx
+
+# Production H5 output
+pnpm build:h5
+
+# Preview the built H5 app
+pnpm preview:h5
+
+# Typecheck with tsgo
+pnpm typecheck
+```
+
+For existing apps or custom project layouts, follow the manual setup below.
 
 ## Manual setup for existing apps
 
