@@ -9,7 +9,7 @@ Build WeChat Mini Apps with the latest standard frontend stack: Vite 8, React 19
 
 `vite-plugin-taro` is for applications that want Taro's cross-platform React components and APIs, but prefer Vite/Rolldown instead of Taro's webpack runner. The plugin generates app/page entries, target runtime aliases, H5 router bootstrap, WeChat companion files, Tailwind processing, and conditional compilation for you.
 
-Live demo: <https://sep2.github.io/vite-plugin-taro>. See [Sample app](packages/loan-genius/README.en.md) how to run it locally.
+Live demo: <https://sep2.github.io/vite-plugin-taro>. See [Sample app](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.en.md) how to run it locally.
 
 ## Install
 
