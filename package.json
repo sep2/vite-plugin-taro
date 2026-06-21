@@ -1,7 +1,7 @@
 {
     "name": "vite-plugin-taro-monorepo",
-    "version": "0.1.0",
-    "private": true,
+    "version": "0.1.1",
+    "author": "sep2",
     "type": "module",
     "repository": {
         "type": "git",

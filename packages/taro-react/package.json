@@ -1,8 +1,8 @@
 {
     "name": "vite-plugin-taro-react",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "React 19 compatible fork of @tarojs/react for vite-plugin-taro.",
-    "author": "O2Team, felix",
+    "author": "sep2",
     "license": "MIT",
     "main": "dist/react.esm.js",
     "module": "dist/react.esm.js",
