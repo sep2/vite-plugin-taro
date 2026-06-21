@@ -49,6 +49,9 @@ pnpm dev:wx
 
 # H5：启动 Vite 开发服务器
 pnpm dev:h5
+
+# 然后在浏览器中打开标准 Vite 地址
+# http://localhost:5173
 ```
 
 你可以在两个终端中同时运行 `pnpm dev:wx` 和 `pnpm dev:h5`。
@@ -494,6 +497,7 @@ pnpm typecheck
 | 问题 | 检查项 |
 | --- | --- |
 | `VITE_PLUGIN_TARO_TARGET must be "wx" or "h5"` | 在脚本或 `.env` 文件中设置目标环境变量。 |
+| `pnpm install` 提示忽略了依赖构建脚本 | 运行 `pnpm approve-builds`，按提示批准需要构建的依赖；如有需要再重新执行 `pnpm install`。 |
 | 页面无法解析 | 确认 `pages[].path` 有匹配的 `src/${path}.tsx` 文件。 |
 | 微信开发者工具无法打开应用 | 打开生成的 `dist/wx` 文件夹，并检查 `projectConfigJson.appid`。 |
 | H5 显示空白页 | 确保 `index.html` 中保留 `<div id="app"></div>`，已注册插件，并避免添加单独的默认 Vite `main.tsx` 入口。 |

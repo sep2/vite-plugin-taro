@@ -17,6 +17,9 @@ pnpm dev:wx
 
 # H5: start the Vite dev server
 pnpm dev:h5
+
+# Then open the standard Vite dev URL in your browser
+# http://localhost:5173
 ```
 
 You can keep `pnpm dev:wx` and `pnpm dev:h5` running at the same time in separate terminals.
@@ -41,6 +44,12 @@ bun create vite-taro my-app
 | `pnpm build:h5` | Build the H5 output into `dist/h5`. |
 | `pnpm preview:h5` | Preview the built H5 output. |
 | `pnpm typecheck` | Typecheck with `tsgo`. |
+
+## Troubleshooting
+
+| Problem | Check |
+| --- | --- |
+| `pnpm install` says dependency build scripts were ignored | Run `pnpm approve-builds`, approve the requested dependency build scripts, then rerun `pnpm install` if needed. |
 
 ## Common commands
 

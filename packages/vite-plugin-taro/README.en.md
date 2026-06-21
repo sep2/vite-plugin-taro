@@ -49,6 +49,9 @@ pnpm dev:wx
 
 # H5: start the Vite dev server
 pnpm dev:h5
+
+# Then open the standard Vite dev URL in your browser
+# http://localhost:5173
 ```
 
 You can keep `pnpm dev:wx` and `pnpm dev:h5` running at the same time in separate terminals.
@@ -494,6 +497,7 @@ Common scripts:
 | Problem | Check |
 | --- | --- |
 | `VITE_PLUGIN_TARO_TARGET must be "wx" or "h5"` | Set the target environment variable in your script or `.env` file. |
+| `pnpm install` says dependency build scripts were ignored | Run `pnpm approve-builds`, approve the requested dependency build scripts, then rerun `pnpm install` if needed. |
 | A page cannot be resolved | Confirm that `pages[].path` has a matching `src/${path}.tsx` file. |
 | WeChat DevTools cannot open the app | Open the generated `dist/wx` folder and check `projectConfigJson.appid`. |
 | H5 shows a blank page | Keep `<div id="app"></div>` in `index.html`, register the plugin, and avoid adding a separate default Vite `main.tsx` entry. |

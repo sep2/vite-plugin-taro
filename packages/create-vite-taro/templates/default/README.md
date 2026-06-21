@@ -13,6 +13,9 @@ pnpm dev:wx
 
 # H5: start the Vite dev server
 pnpm dev:h5
+
+# Then open the standard Vite dev URL in your browser
+# http://localhost:5173
 ```
 
 You can keep `pnpm dev:wx` and `pnpm dev:h5` running at the same time in separate terminals.
