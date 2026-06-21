@@ -20,6 +20,8 @@ importers:
         specifier: latest
         version: 7.0.0-dev.20260619.1
 
+  packages/create-vite-taro: {}
+
   packages/loan-genius:
     dependencies:
       clsx:

@@ -1,0 +1,26 @@
+{
+    "name": "vite-taro-app",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "dev:h5": "NODE_ENV=development VITE_PLUGIN_TARO_TARGET=h5 vite",
+        "dev:wx": "NODE_ENV=development VITE_PLUGIN_TARO_TARGET=wx vite build --watch",
+        "build:h5": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite build",
+        "build:wx": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=wx vite build",
+        "preview:h5": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite preview --outDir dist/h5",
+        "typecheck": "tsgo -b"
+    },
+    "dependencies": {
+        "react": "^19.2.7",
+        "react-dom": "^19.2.7"
+    },
+    "devDependencies": {
+        "@types/node": "^26.0.0",
+        "@types/react": "^19.2.17",
+        "@types/react-dom": "^19.2.3",
+        "@typescript/native-preview": "latest",
+        "vite": "^8.0.16",
+        "vite-plugin-taro": "^0.1.1"
+    }
+}

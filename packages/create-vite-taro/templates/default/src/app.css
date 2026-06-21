@@ -1,0 +1,11 @@
+@import "tailwindcss/theme.css";
+@import "tailwindcss/preflight.css";
+@import "tailwindcss/utilities.css";
+
+@source "./";
+
+body {
+    margin: 0;
+    background: #f8fafc;
+    color: #0f172a;
+}

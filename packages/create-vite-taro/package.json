@@ -1,0 +1,40 @@
+{
+    "name": "create-vite-taro",
+    "version": "0.1.1",
+    "description": "Create Vite 8 + React 19 + Taro apps for H5 and WeChat Mini Program targets.",
+    "type": "module",
+    "bin": {
+        "create-vite-taro": "./index.js"
+    },
+    "files": [
+        "index.js",
+        "templates",
+        "LICENSE",
+        "README.md"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/sep2/vite-plugin-taro.git",
+        "directory": "packages/create-vite-taro"
+    },
+    "bugs": {
+        "url": "https://github.com/sep2/vite-plugin-taro/issues"
+    },
+    "homepage": "https://github.com/sep2/vite-plugin-taro/tree/main/packages/create-vite-taro#readme",
+    "keywords": [
+        "vite",
+        "taro",
+        "create",
+        "react",
+        "wechat",
+        "mini-program"
+    ],
+    "author": "sep2",
+    "license": "MIT",
+    "publishConfig": {
+        "access": "public"
+    },
+    "engines": {
+        "node": ">=22"
+    }
+}

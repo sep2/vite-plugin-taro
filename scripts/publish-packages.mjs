@@ -41,7 +41,8 @@ if (args.length > 0) {
 const packages = [
     packageInfo('packages/taro-react/package.json'),
     packageInfo('packages/taro-plugin-framework-react/package.json'),
-    packageInfo('packages/vite-plugin-taro/package.json')
+    packageInfo('packages/vite-plugin-taro/package.json'),
+    packageInfo('packages/create-vite-taro/package.json')
 ]
 const packageFilters = packages.flatMap((pkg) => ['--filter', pkg.name])
 
