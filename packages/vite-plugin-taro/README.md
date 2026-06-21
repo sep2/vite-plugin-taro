@@ -7,15 +7,18 @@
 
 使用最新标准化前端技术栈 Vite 8、React 19 和 Tailwind CSS v4 构建微信小程序。
 
-`vite-plugin-taro` 适用于希望使用 Taro 跨平台 React 组件和 API，但更偏好 Vite/Rolldown 而非 Taro webpack 的应用。插件会为你生成应用/页面入口、目标运行时别名、H5 路由启动代码、微信端配套文件、Tailwind 处理，以及条件编译。
+`vite-plugin-taro` 适用于希望使用 Taro 跨平台 React 组件和 API，但更偏好 Vite 而非 Taro webpack 的应用。插件会为你生成应用/页面入口、目标运行时别名、H5 路由启动代码、微信端配套文件、Tailwind 处理，以及条件编译。
 
 在线演示：<https://sep2.github.io/vite-plugin-taro>。如何在本地运行，请参见[示例应用](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.md)。
 
-- **一套代码，双端输出：** 同一套 React/Taro 页面构建 H5 与微信小程序。
-- **原生 Vite/Rolldown 构建：** 使用标准 Vite 配置，不再依赖 Taro webpack 或 Taro CLI 配置文件。
-- **依托成熟 Taro 能力：** 复用久经实战检验的 Taro API 和组件，完整使用 Taro 跨端能力。
-- **Tailwind 就绪：** 内置 Tailwind CSS v4 支持，H5 与微信小程序样式开箱即用。
-- **微信 Skyline 就绪：** 支持微信小程序 Skyline 渲染模式输出。
+- **一套代码，双端输出** 同一套 React/Taro 页面构建 H5 与微信小程序。
+- **原生 Vite 构建** 使用标准 Vite 8 配置，无需维护老旧的 webpack 配置，并支持所有 Vite 插件。
+- **热更新** H5 与微信小程序都支持开发模式 watch，基于 Vite 8 热更新/快速重建即时预览。
+- **依托成熟 Taro 能力** 复用久经实战检验的 Taro API 和组件，完整使用 Taro 跨端能力。
+- **Tailwind 就绪** 内置 Tailwind CSS v4 支持，H5 与微信小程序样式开箱即用。
+- **条件编译** 支持 Taro 风格 `#ifdef` / `#ifndef` / `#if`，可按 `h5` / `wx` 裁剪代码和样式。
+- **类型友好** 通过 `virtual:taro/api` 和 `virtual:taro/components` 统一导入 Taro 能力，并提供 TypeScript 类型支持。
+- **微信 Skyline** 支持微信小程序 Skyline 渲染模式输出。
 
 ## 安装
 
@@ -316,7 +319,7 @@ console.log('fallback')
 
 ### 微信小程序
 
-对于 `target: 'wx'`，插件会配置 Vite/Rolldown，输出微信兼容的 CommonJS chunk 和小程序配套文件。
+对于 `target: 'wx'`，插件会配置 Vite，输出微信兼容的 CommonJS chunk 和小程序配套文件。
 
 典型输出：
 

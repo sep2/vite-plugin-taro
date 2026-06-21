@@ -7,15 +7,18 @@
 
 Build WeChat Mini Apps with the latest standards-based frontend stack: Vite 8, React 19, and Tailwind CSS v4.
 
-`vite-plugin-taro` is for applications that want Taro's cross-platform React components and APIs, but prefer Vite/Rolldown instead of Taro webpack. The plugin generates app/page entries, target runtime aliases, H5 router bootstrap, WeChat companion files, Tailwind processing, and conditional compilation for you.
+`vite-plugin-taro` is for applications that want Taro's cross-platform React components and APIs, but prefer Vite instead of Taro webpack. The plugin generates app/page entries, target runtime aliases, H5 router bootstrap, WeChat companion files, Tailwind processing, and conditional compilation for you.
 
 Live demo: <https://sep2.github.io/vite-plugin-taro>. See [Sample app](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.en.md) how to run it locally.
 
-- **One codebase, two targets:** Build H5 and WeChat Mini Program outputs from shared React/Taro pages.
-- **Native Vite/Rolldown builds:** Use standard Vite config instead of Taro webpack or Taro CLI config files.
-- **Battle-tested Taro foundation:** Use the full set of Taro APIs and components instead of reinventing cross-platform primitives.
-- **Tailwind ready:** Built-in Tailwind CSS v4 support for both H5 and WeChat Mini Program styles.
-- **WeChat Skyline ready:** Support WeChat Mini Program output with Skyline rendering mode.
+- **One codebase, two targets** Build H5 and WeChat Mini Program outputs from shared React/Taro pages.
+- **Native Vite builds** Use standard Vite 8 config instead of legacy webpack configuration, with support for all Vite plugins.
+- **Hot reload** Both H5 and WeChat Mini Program support dev-mode watch, with Vite 8 HMR/rebuilds for fast feedback.
+- **Battle-tested Taro foundation** Use the full set of Taro APIs and components instead of reinventing cross-platform primitives.
+- **Tailwind ready** Built-in Tailwind CSS v4 support for both H5 and WeChat Mini Program styles.
+- **Conditional compilation** Use Taro-style `#ifdef` / `#ifndef` / `#if` blocks to split code and styles by `h5` / `wx` target.
+- **Type-friendly** Import Taro capabilities consistently through `virtual:taro/api` and `virtual:taro/components`, with TypeScript type support.
+- **WeChat Skyline** Support WeChat Mini Program output with Skyline rendering mode.
 
 ## Install
 
@@ -316,7 +319,7 @@ For `target: 'h5'`, the plugin injects a generated module into `index.html`, imp
 
 ### WeChat Mini Program
 
-For `target: 'wx'`, the plugin configures Vite/Rolldown to emit WeChat-compatible CommonJS chunks and Mini Program companion files.
+For `target: 'wx'`, the plugin configures Vite to emit WeChat-compatible CommonJS chunks and Mini Program companion files.
 
 Typical output:
 
