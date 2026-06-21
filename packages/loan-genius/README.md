@@ -1,23 +1,25 @@
 # Loan Genius
 
-Loan Genius is the sample app for `vite-plugin-taro`. It is a React 19 + Taro loan calculator built with the same latest standard frontend stack promoted by this repository: Vite 8, React 19, and Tailwind CSS v4.
+简体中文 | [English](README.en.md)
 
-The app is forked from [`wuba/Taro-Mortgage-Calculator`](https://github.com/wuba/Taro-Mortgage-Calculator) and adapted to demonstrate `vite-plugin-taro`.
+Loan Genius 是 `vite-plugin-taro` 的示例应用。它是一个基于 React 19 + Taro 的贷款计算器，使用本仓库推荐的最新标准前端技术栈构建：Vite 8、React 19 和 Tailwind CSS v4。
 
-- Live H5 demo: <https://sep2.github.io/vite-plugin-taro/>
-- Source: [`packages/loan-genius`](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius)
+该应用改造自 [`wuba/Taro-Mortgage-Calculator`](https://github.com/wuba/Taro-Mortgage-Calculator)，用于演示 `vite-plugin-taro` 的用法。
 
-## Requirements
+- H5 在线演示：<https://sep2.github.io/vite-plugin-taro/>
+- 源码：[`packages/loan-genius`](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius)
 
-| Tool | Version / use |
+## 环境要求
+
+| 工具 | 版本 / 用途 |
 | --- | --- |
 | Node.js | `>=22` |
 | pnpm | `11.x` |
-| WeChat DevTools | Needed only for opening `dist/wx`. |
+| 微信开发者工具 | 仅在打开 `dist/wx` 时需要。 |
 
-## Run from a fresh clone
+## 从全新克隆运行
 
-Run these commands from the repository root:
+请在仓库根目录运行以下命令：
 
 ```sh
 pnpm install
@@ -25,82 +27,82 @@ pnpm prepare:taro
 pnpm build:plugin
 ```
 
-`pnpm prepare:taro` is required in a fresh clone because the patched Taro workspace package outputs are generated files and are not committed.
+全新克隆后必须运行 `pnpm prepare:taro`，因为打过补丁的 Taro workspace 包产物是生成文件，不会提交到仓库。
 
 ## H5
 
-Start the H5 dev server:
+启动 H5 开发服务器：
 
 ```sh
 pnpm dev:sample:h5
 ```
 
-Build and preview the H5 app:
+构建并预览 H5 应用：
 
 ```sh
 pnpm build:sample:h5
 pnpm preview:sample:h5
 ```
 
-H5 output is written to:
+H5 产物会写入：
 
 ```text
 packages/loan-genius/dist/h5
 ```
 
-## WeChat Mini Program
+## 微信小程序
 
-Build the WeChat Mini Program once:
+构建一次微信小程序：
 
 ```sh
 pnpm build:sample:wx
 ```
 
-Or rebuild it in watch mode:
+或以 watch 模式重新构建：
 
 ```sh
 pnpm dev:sample:wx
 ```
 
-WeChat output is written to:
+微信小程序产物会写入：
 
 ```text
 packages/loan-genius/dist/wx
 ```
 
-Open `packages/loan-genius/dist/wx` in WeChat DevTools. Do not open the source package directory.
+请在微信开发者工具中打开 `packages/loan-genius/dist/wx`，不要打开源码包目录。
 
-## What this sample demonstrates
+## 本示例演示的内容
 
-- One React 19 + Taro source tree for both `h5` and `wx`.
-- `vite-plugin-taro` target selection with `VITE_PLUGIN_TARO_TARGET`.
-- App and page metadata declared in `vite.config.ts`.
-- H5 dev server, H5 build, and WeChat Mini Program build output.
-- Tailwind CSS v4 imported from `src/app.css`.
-- App-facing imports from `virtual:taro/api` and `virtual:taro/components`.
-- WeChat `project.config.json`, `sitemap.json`, WXML, WXS, WXSS, and CommonJS chunk emission.
+- 使用同一套 React 19 + Taro 源码同时支持 `h5` 和 `wx`。
+- 通过 `VITE_PLUGIN_TARO_TARGET` 进行 `vite-plugin-taro` 目标选择。
+- 在 `vite.config.ts` 中声明应用和页面元数据。
+- H5 开发服务器、H5 构建，以及微信小程序构建产物。
+- 从 `src/app.css` 引入 Tailwind CSS v4。
+- 应用侧通过 `virtual:taro/api` 和 `virtual:taro/components` 导入能力。
+- 生成微信 `project.config.json`、`sitemap.json`、WXML、WXS、WXSS 和 CommonJS chunk。
 
-Application code must not import or install `@tarojs/*` packages directly. Use the plugin virtual modules instead:
+应用代码不要直接导入或安装 `@tarojs/*` 包。请改用插件提供的虚拟模块：
 
 ```tsx
 import Taro from 'virtual:taro/api'
 import { Text, View } from 'virtual:taro/components'
 ```
 
-## Environment variables
+## 环境变量
 
-| Variable | Required | Description |
+| 变量 | 是否必需 | 说明 |
 | --- | --- | --- |
-| `VITE_PLUGIN_TARO_TARGET` | Yes | Set by the root scripts to `h5` or `wx`. |
-| `VITE_PLUGIN_TARO_WECHAT_APP_ID` | No | WeChat Mini Program app id. Defaults to `touristappid`. |
+| `VITE_PLUGIN_TARO_TARGET` | 是 | 由根目录脚本设置为 `h5` 或 `wx`。 |
+| `VITE_PLUGIN_TARO_WECHAT_APP_ID` | 否 | 微信小程序 app id。默认值为 `touristappid`。 |
 
-For local WeChat testing, put your app id in `packages/loan-genius/.env.local`:
+如需在本地测试微信小程序，请将你的 app id 写入 `packages/loan-genius/.env.local`：
 
 ```env
 VITE_PLUGIN_TARO_WECHAT_APP_ID=your_app_id
 ```
 
-## Project structure
+## 项目结构
 
 ```text
 packages/loan-genius/
@@ -115,21 +117,21 @@ packages/loan-genius/
     └── utils/
 ```
 
-Important files:
+重要文件：
 
-| File | Purpose |
+| 文件 | 用途 |
 | --- | --- |
-| `vite.config.ts` | Selects the target, configures aliases, output directory, pages, app config, and WeChat project metadata. |
-| `src/app.ts` | Root React app component passed to `vite-plugin-taro`. |
-| `src/app.css` | Global Tailwind CSS v4 imports and app styles. |
-| `src/pages/calculator/index.tsx` | First page and default route. |
-| `src/pages/calculator/monthly-payments/index.tsx` | Monthly payment detail page. |
-| `src/pages/calculator/history/index.tsx` | Calculator history page. |
+| `vite.config.ts` | 选择目标，配置别名、输出目录、页面、应用配置和微信项目元数据。 |
+| `src/app.ts` | 传给 `vite-plugin-taro` 的 React 根应用组件。 |
+| `src/app.css` | 全局 Tailwind CSS v4 引入和应用样式。 |
+| `src/pages/calculator/index.tsx` | 首页和默认路由。 |
+| `src/pages/calculator/monthly-payments/index.tsx` | 月供明细页面。 |
+| `src/pages/calculator/history/index.tsx` | 计算历史页面。 |
 
-## Adding a page
+## 添加页面
 
-1. Create a page component under `src/pages`, for example `src/pages/about/index.tsx`.
-2. Add the route to `pages` in `vite.config.ts`:
+1. 在 `src/pages` 下创建页面组件，例如 `src/pages/about/index.tsx`。
+2. 在 `vite.config.ts` 的 `pages` 中添加路由：
 
 ```ts
 {
@@ -140,13 +142,13 @@ Important files:
 }
 ```
 
-3. Import Taro APIs and components through the plugin virtual modules:
+3. 通过插件虚拟模块导入 Taro API 和组件：
 
 ```tsx
 import Taro from 'virtual:taro/api'
 import { Text, View } from 'virtual:taro/components'
 ```
 
-## License
+## 许可证
 
-MIT.
+MIT

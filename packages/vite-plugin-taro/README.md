@@ -9,7 +9,7 @@
 
 `vite-plugin-taro` 适用于希望使用 Taro 跨平台 React 组件和 API，但更偏好 Vite/Rolldown 而非 Taro webpack 构建器的应用。插件会为你生成应用/页面入口、目标运行时别名、H5 路由启动代码、微信端配套文件、Tailwind 处理，以及条件编译。
 
-在线演示：<https://sep2.github.io/vite-plugin-taro>。如何在本地运行，请参见[示例应用](#示例应用)。
+在线演示：<https://sep2.github.io/vite-plugin-taro>。如何在本地运行，请参见[示例应用](packages/loan-genius/README.md)。
 
 ## 安装
 
