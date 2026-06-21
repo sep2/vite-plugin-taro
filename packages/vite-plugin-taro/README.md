@@ -409,7 +409,7 @@ dist/wx/
 迁移清单：
 
 1. 安装 `vite-plugin-taro`，并创建包含 `vitePluginTaro(...)` 的 `vite.config.ts`。
-2. 将应用配置和页面配置移到插件选项中。插件不会读取 `config/index.ts`、`app.config.ts` 或页面 `config.ts` 等 Taro CLI 文件。
+2. 将应用配置和页面配置移到 `vite.config.ts` 中。插件不会读取 `config/index.ts`、`app.config.ts` 或页面 `config.ts` 等 Taro 文件。
 3. 在 `pages` 中注册每个页面。每个页面路径都必须匹配 `src/${path}.tsx`。
 4. 将 Taro 脚本替换为设置 `VITE_PLUGIN_TARO_TARGET=wx` 或 `VITE_PLUGIN_TARO_TARGET=h5` 的 Vite 脚本。
 5. 对于 H5，添加普通 Vite `index.html`，其中包含 `<div id="app"></div>`，且不要添加单独的 `src/main.tsx` 入口。
