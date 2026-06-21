@@ -496,6 +496,7 @@ pnpm typecheck
 | `pnpm build:sample:h5` | 将 H5 示例应用构建到 `packages/loan-genius/dist/h5`。 |
 | `pnpm preview:sample:h5` | 预览构建后的 H5 示例。 |
 | `pnpm publish:dry` | 干运行包校验和发布流程。 |
+| `pnpm release <version\|bump>` | 验证发布、更新版本、创建 release commit 和 tag，并推送触发 CI 发布。 |
 | `pnpm publish:all` | 按依赖顺序发布公开包；主要由基于 tag 的 Trusted Publishing 工作流调用。 |
 
 ## 限制
@@ -520,21 +521,19 @@ pnpm typecheck
 
 本仓库使用 npm Trusted Publishing 和 GitHub Actions 自动发布。普通推送到 `main` 不会发布；只有推送匹配 `v*.*.*` 的 tag 才会触发 `.github/workflows/publish.yml`。
 
-发布前先在本地验证可发布包：
-
-```sh
-pnpm publish:dry
-```
-
 创建发布：
 
 ```sh
-pnpm version:bump patch
+pnpm release patch
+```
 
-git add .
-git commit -m "chore: release v0.1.6"
-git tag v0.1.6
-git push origin main --tags
+`pnpm release` 会要求干净的 `main` 工作区，运行 `pnpm version:bump`，执行 `pnpm publish:dry -- --no-git-check` 验证，创建 `chore: release vX.Y.Z` commit 和 `vX.Y.Z` tag，然后推送 branch 与 tag 触发 CI。也可以发布精确版本或预发布版本：
+
+```sh
+pnpm release 0.2.0
+pnpm release prerelease --preid beta
+pnpm release patch --dry-run
+pnpm release patch --no-push
 ```
 
 CI 会运行 `pnpm publish:all -- --no-git-check`，按依赖顺序打包并通过 npm OIDC 发布公开包。不要为发布工作流配置 `NPM_TOKEN`；每个 npm 包的 Trusted Publisher 应指向 `publish.yml`。

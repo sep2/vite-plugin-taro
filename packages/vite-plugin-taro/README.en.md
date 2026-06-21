@@ -496,6 +496,7 @@ Common scripts:
 | `pnpm build:sample:h5` | Build the H5 sample app to `packages/loan-genius/dist/h5`. |
 | `pnpm preview:sample:h5` | Preview the built H5 sample. |
 | `pnpm publish:dry` | Dry-run package validation and publishing. |
+| `pnpm release <version\|bump>` | Validate, bump versions, create the release commit and tag, and push to trigger CI publishing. |
 | `pnpm publish:all` | Publish the public packages in dependency order; mainly used by the tag-based Trusted Publishing workflow. |
 
 ## Limitations
@@ -520,21 +521,19 @@ Common scripts:
 
 This repository publishes automatically with npm Trusted Publishing and GitHub Actions. Normal pushes to `main` do not publish; only tags matching `v*.*.*` trigger `.github/workflows/publish.yml`.
 
-Validate the publishable packages locally before releasing:
-
-```sh
-pnpm publish:dry
-```
-
 Create a release:
 
 ```sh
-pnpm version:bump patch
+pnpm release patch
+```
 
-git add .
-git commit -m "chore: release v0.1.6"
-git tag v0.1.6
-git push origin main --tags
+`pnpm release` requires a clean `main` working tree, runs `pnpm version:bump`, validates with `pnpm publish:dry -- --no-git-check`, creates the `chore: release vX.Y.Z` commit and `vX.Y.Z` tag, then pushes the branch and tag to trigger CI. You can also release an exact version or prerelease:
+
+```sh
+pnpm release 0.2.0
+pnpm release prerelease --preid beta
+pnpm release patch --dry-run
+pnpm release patch --no-push
 ```
 
 CI runs `pnpm publish:all -- --no-git-check`, packs packages in dependency order, and publishes public packages through npm OIDC. Do not configure `NPM_TOKEN` for the publish workflow; each npm package's Trusted Publisher should point to `publish.yml`.
