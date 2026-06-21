@@ -496,7 +496,7 @@ Common scripts:
 | `pnpm build:sample:h5` | Build the H5 sample app to `packages/loan-genius/dist/h5`. |
 | `pnpm preview:sample:h5` | Preview the built H5 sample. |
 | `pnpm publish:dry` | Dry-run package validation and publishing. |
-| `pnpm publish:all` | Publish the public packages in dependency order. |
+| `pnpm publish:all` | Publish the public packages in dependency order; mainly used by the tag-based Trusted Publishing workflow. |
 
 ## Limitations
 
@@ -518,17 +518,26 @@ Common scripts:
 
 ## Release workflow
 
-Validate the publishable packages before publishing:
+This repository publishes automatically with npm Trusted Publishing and GitHub Actions. Normal pushes to `main` do not publish; only tags matching `v*.*.*` trigger `.github/workflows/publish.yml`.
+
+Validate the publishable packages locally before releasing:
 
 ```sh
 pnpm publish:dry
 ```
 
-Publish all public packages in the required order:
+Create a release:
 
 ```sh
-pnpm publish:all
+pnpm version:bump patch
+
+git add .
+git commit -m "chore: release v0.1.6"
+git tag v0.1.6
+git push origin main --tags
 ```
+
+CI runs `pnpm publish:all -- --no-git-check`, packs packages in dependency order, and publishes public packages through npm OIDC. Do not configure `NPM_TOKEN` for the publish workflow; each npm package's Trusted Publisher should point to `publish.yml`.
 
 ## License
 
