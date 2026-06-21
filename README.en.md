@@ -17,7 +17,7 @@ Live demo: <https://sep2.github.io/vite-plugin-taro>. See [Sample app](https://g
 - **Battle-tested Taro foundation** Use the full set of Taro APIs and components instead of reinventing cross-platform primitives.
 - **Tailwind ready** Built-in Tailwind CSS v4 support for both WeChat Mini Program and H5 styles.
 - **Conditional compilation** Use Taro-style `#ifdef` / `#ifndef` / `#if` blocks to split code and styles by `wx` / `h5` target.
-- **Type-friendly** Import Taro capabilities consistently through `virtual:taro/api` and `virtual:taro/components`, with TypeScript type support.
+- **Type-friendly** The project supports TypeScript all the way.
 - **WeChat Skyline** Support WeChat Mini Program output with Skyline rendering mode.
 
 ## Quick start
@@ -74,7 +74,24 @@ npm run preview:h5
 npm run typecheck
 ```
 
-For existing apps or custom project layouts, follow the manual setup below.
+### 5. Use Taro virtual modules
+
+Use these imports in app code:
+
+```tsx
+import Taro from 'virtual:taro/api'
+import { Text, View } from 'virtual:taro/components'
+```
+
+| Import | Use |
+| --- | --- |
+| `virtual:taro/components` | Taro React components such as `View`, `Text`, `Button`, `Image`, and `ScrollView`. |
+| `virtual:taro/api` | Taro APIs and hooks such as `Taro.navigateTo`, `Taro.getWindowInfo`, and `Taro.useLaunch`. |
+
+Usage is the same as Taro itself; see the [Taro website](https://docs.taro.zone) for component and API details.
+
+You no longer need to install `@tarojs/*` packages; application code should not import from `@tarojs/*`.
+
 
 ## Manual setup for existing apps
 
@@ -237,15 +254,6 @@ export default function IndexPage() {
     )
 }
 ```
-
-Use these imports in app code:
-
-| Import | Use |
-| --- | --- |
-| `virtual:taro/components` | Taro React components such as `View`, `Text`, `Button`, `Image`, and `ScrollView`. |
-| `virtual:taro/api` | Taro APIs and hooks such as `Taro.navigateTo`, `Taro.getWindowInfo`, and `Taro.useLaunch`. |
-
-Do not import `@tarojs/*` packages directly in application code. Direct `@tarojs/*` usage is forbidden and unsupported by this plugin because it can bypass target-specific runtime aliases and H5 API transforms. Use `virtual:taro/api` and `virtual:taro/components` only.
 
 ### 5. Add the H5 HTML shell
 

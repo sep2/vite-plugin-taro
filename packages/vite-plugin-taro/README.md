@@ -17,7 +17,7 @@
 - **依托成熟 Taro 能力** 复用久经实战检验的 Taro API 和组件，完整使用 Taro 跨端能力。
 - **Tailwind 就绪** 内置 Tailwind CSS v4 支持，微信小程序与 H5 样式开箱即用。
 - **条件编译** 支持 Taro 风格 `#ifdef` / `#ifndef` / `#if`，可按 `wx` / `h5` 裁剪代码和样式。
-- **类型友好** 通过 `virtual:taro/api` 和 `virtual:taro/components` 统一导入 Taro 能力，并提供 TypeScript 类型支持。
+- **类型友好** 项目全链路支持 TypeScript。
 - **微信 Skyline** 支持微信小程序 Skyline 渲染模式输出。
 
 ## 快速开始
@@ -74,7 +74,24 @@ npm run preview:h5
 npm run typecheck
 ```
 
-已有应用或自定义项目结构，请继续阅读下面的手动接入步骤。
+### 5. 使用 Taro 虚拟模块
+
+应用代码请使用这些导入：
+
+```tsx
+import Taro from 'virtual:taro/api'
+import { Text, View } from 'virtual:taro/components'
+```
+
+| 导入 | 用途 |
+| --- | --- |
+| `virtual:taro/components` | Taro React 组件，例如 `View`、`Text`、`Button`、`Image` 和 `ScrollView`。 |
+| `virtual:taro/api` | Taro API 和 hooks，例如 `Taro.navigateTo`、`Taro.getWindowInfo` 和 `Taro.useLaunch`。 |
+
+用法与 Taro 本身一致；组件和 API 的具体用法请参考 [Taro 官网](https://docs.taro.zone)。
+
+你不再需要安装 `@tarojs/*` 包；应用代码也不要从 `@tarojs/*` 导入。
+
 
 ## 手动接入已有应用
 
@@ -237,15 +254,6 @@ export default function IndexPage() {
     )
 }
 ```
-
-应用代码请使用这些导入：
-
-| 导入 | 用途 |
-| --- | --- |
-| `virtual:taro/components` | Taro React 组件，例如 `View`、`Text`、`Button`、`Image` 和 `ScrollView`。 |
-| `virtual:taro/api` | Taro API 和 hooks，例如 `Taro.navigateTo`、`Taro.getWindowInfo` 和 `Taro.useLaunch`。 |
-
-不要在应用代码中直接导入 `@tarojs/*` 包。此插件禁止且不支持直接使用 `@tarojs/*`，因为这可能绕过目标特定的运行时别名和 H5 API 转换。请只使用 `virtual:taro/api` 和 `virtual:taro/components`。
 
 ### 5. 添加 H5 HTML 外壳
 
