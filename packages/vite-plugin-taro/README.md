@@ -41,8 +41,6 @@ pnpm add react react-dom
 | `vite-plugin-taro/client` | TypeScript declarations for the app-facing virtual modules. |
 | `virtual:taro/components` | Virtual re-export of Taro React components. Use this in application code. |
 | `virtual:taro/api` | Virtual Taro API facade. Use this instead of importing `@tarojs/taro` directly. |
-| `vite-plugin-taro/shim/h5` | Internal H5 runtime shim used by generated entries. |
-| `vite-plugin-taro/shim/wx` | Internal WeChat runtime shim used by generated entries. |
 
 Application code should normally use only `virtual:taro/components` and `virtual:taro/api`.
 

@@ -2,7 +2,7 @@ import type { types as BabelTypes, NodePath, PluginObj } from '@babel/core'
 import babel from '@rolldown/plugin-babel'
 import react from '@vitejs/plugin-react'
 import type { HtmlTagDescriptor, PluginOption, UserConfig } from 'vite'
-import { isProd, nodeRequire } from '../constants.ts'
+import { h5ShimImportPath, isProd, nodeRequire } from '../constants.ts'
 import type { JsonObject, VitePluginTaroBuildContext, VitePluginTaroPageOption } from '../types.ts'
 import { createPageComponentImport } from '../utils.ts'
 import { virtualTaroApiId } from '../virtual-modules.ts'
@@ -181,7 +181,7 @@ import {
     createRouter,
     handleAppMount,
     window
-} from 'vite-plugin-taro/shim/h5'
+} from ${JSON.stringify(h5ShimImportPath)}
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import AppComponent from '${context.appComponentImport}'

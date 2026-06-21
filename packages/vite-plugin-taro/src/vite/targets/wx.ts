@@ -2,7 +2,7 @@ import path from 'node:path'
 import { recursiveMerge } from '@tarojs/helper'
 import { Weapp as WechatPlatform } from '@tarojs/plugin-platform-weapp'
 import type { UserConfig } from 'vite'
-import { isProd, nodeRequire } from '../constants.ts'
+import { isProd, nodeRequire, wxShimImportPath } from '../constants.ts'
 import type { JsonObject, VitePluginTaroBuildContext, VitePluginTaroPageOption } from '../types.ts'
 import { createPageComponentImport, normalizeModuleId } from '../utils.ts'
 
@@ -210,7 +210,7 @@ export function emitWechatImplicitChunksForVirtualApp(
 export function createWxAppEntry(context: VitePluginTaroBuildContext): string {
     const wechatAppConfigCode = JSON.stringify(context.appConfig)
 
-    return `import { createReactApp, ReactDOM } from 'vite-plugin-taro/shim/wx'
+    return `import { createReactApp, ReactDOM } from ${JSON.stringify(wxShimImportPath)}
 import React from 'react'
 import AppComponent from '${context.appComponentImport}'
 
@@ -227,7 +227,7 @@ App(createReactApp(AppComponent, React, ReactDOM, appConfig))
 export function createWxPageEntry(pageOption: VitePluginTaroPageOption): string {
     const wechatPageConfigCode = JSON.stringify(pageOption.config)
     const pageComponentImport = createPageComponentImport(pageOption.path)
-    return `import { createPageConfig } from 'vite-plugin-taro/shim/wx'
+    return `import { createPageConfig } from ${JSON.stringify(wxShimImportPath)}
 import PageComponent from '${pageComponentImport}'
 
 const pageConfig = ${wechatPageConfigCode}
@@ -247,7 +247,7 @@ Page(taroPageConfig)
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-webpack5-runner/src/template/comp.ts#L1-L4
  */
 export function createWxCompEntry(): string {
-    return `import { createRecursiveComponentConfig } from 'vite-plugin-taro/shim/wx'
+    return `import { createRecursiveComponentConfig } from ${JSON.stringify(wxShimImportPath)}
 
 Component(createRecursiveComponentConfig())
 `
