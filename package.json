@@ -22,6 +22,7 @@
         "typecheck": "pnpm --filter vite-plugin-taro typecheck && pnpm --filter loan-genius typecheck",
         "lint": "biome check .",
         "format": "biome check --write .",
+        "version:bump": "node scripts/bump-package-versions.mjs",
         "publish:all": "node scripts/publish-packages.mjs",
         "publish:dry": "node scripts/publish-packages.mjs --dry-run"
     },
