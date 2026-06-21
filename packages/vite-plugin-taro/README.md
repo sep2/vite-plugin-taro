@@ -20,7 +20,9 @@
 - **类型友好** 通过 `virtual:taro/api` 和 `virtual:taro/components` 统一导入 Taro 能力，并提供 TypeScript 类型支持。
 - **微信 Skyline** 支持微信小程序 Skyline 渲染模式输出。
 
-## 创建新应用
+## 快速开始
+
+新应用推荐使用 `create-vite-taro`：
 
 ```sh
 pnpm create vite-taro my-app
@@ -29,26 +31,26 @@ pnpm install
 pnpm dev:h5
 ```
 
-使用 `pnpm dev:wx` 可以以 watch 模式构建微信小程序，然后在微信开发者工具中打开 `dist/wx`。
+使用 `pnpm dev:wx` 可以以 watch 模式构建微信小程序，然后在微信开发者工具中打开 `dist/wx`。模板会生成 `.env.local` 并写入随机的 `VITE_PLUGIN_TARO_WECHAT_APP_ID`，需要时请替换为真实微信 App ID。
 
-## 安装到已有应用
+## 手动接入已有应用
+
+已有应用或自定义项目结构，可以按下面的步骤手动接入插件。先安装插件：
 
 ```sh
 pnpm add -D vite-plugin-taro
 ```
 
-你的应用还必须提供 Vite 8、React 19、React DOM 19、TypeScript 以及 React 类型包。如果应用尚未安装它们，请安装缺失的包：
+你的应用还必须提供 Vite 8、React 19、React DOM 19、TypeScript 检查器，以及 Node/React 类型包。如果应用尚未安装它们，请安装缺失的包：
 
 ```sh
 pnpm add react react-dom
-pnpm add -D vite typescript @types/react @types/react-dom
+pnpm add -D vite @typescript/native-preview @types/node @types/react @types/react-dom
 ```
 
 你不应再直接依赖任何 `@tarojs/*` 包。如果已经依赖，请将它们移除。
 
-## 快速开始
-
-下面的示例会创建如下源码结构：
+下面的步骤会创建如下源码结构：
 
 ```text
 my-app/
@@ -222,13 +224,17 @@ export default function IndexPage() {
 
 ### 6. 添加脚本
 
+使用与 `create-vite-taro` 生成项目一致的脚本：
+
 ```json
 {
     "scripts": {
         "dev:h5": "NODE_ENV=development VITE_PLUGIN_TARO_TARGET=h5 vite",
-        "build:h5": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite build",
         "dev:wx": "NODE_ENV=development VITE_PLUGIN_TARO_TARGET=wx vite build --watch",
-        "build:wx": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=wx vite build"
+        "build:h5": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite build",
+        "build:wx": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=wx vite build",
+        "preview:h5": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite preview --outDir dist/h5",
+        "typecheck": "tsgo -b"
     }
 }
 ```
@@ -239,9 +245,11 @@ export default function IndexPage() {
 
 ```sh
 pnpm dev:h5       # 启动 H5 开发服务器
+pnpm dev:wx       # 以 watch 模式重新构建 dist/wx
 pnpm build:h5     # 构建 dist/h5
 pnpm build:wx     # 构建 dist/wx
-pnpm dev:wx       # 以 watch 模式重新构建 dist/wx
+pnpm preview:h5   # 预览 dist/h5
+pnpm typecheck    # 使用 tsgo 进行类型检查
 ```
 
 在微信开发者工具中打开生成的 `dist/wx` 目录。
