@@ -28,4 +28,4 @@ bun create vite-taro my-app
 | `pnpm preview:h5` | Preview the built H5 output. |
 | `pnpm typecheck` | Typecheck with `tsgo`. |
 
-Open `dist/wx` with WeChat DevTools for Mini Program development.
+Open `dist/wx` with WeChat DevTools for Mini Program development. The generated `.env.local` contains a random `VITE_PLUGIN_TARO_WECHAT_APP_ID`; replace it with your real WeChat App ID when needed.

@@ -20,7 +20,18 @@
 - **类型友好** 通过 `virtual:taro/api` 和 `virtual:taro/components` 统一导入 Taro 能力，并提供 TypeScript 类型支持。
 - **微信 Skyline** 支持微信小程序 Skyline 渲染模式输出。
 
-## 安装
+## 创建新应用
+
+```sh
+pnpm create vite-taro my-app
+cd my-app
+pnpm install
+pnpm dev:h5
+```
+
+使用 `pnpm dev:wx` 可以以 watch 模式构建微信小程序，然后在微信开发者工具中打开 `dist/wx`。
+
+## 安装到已有应用
 
 ```sh
 pnpm add -D vite-plugin-taro

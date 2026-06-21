@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
@@ -8,7 +9,9 @@ import { fileURLToPath } from 'node:url'
 const packageRoot = path.dirname(fileURLToPath(import.meta.url))
 const defaultProjectName = 'vite-taro-app'
 const defaultProjectTitle = 'Vite Taro App'
+const defaultWechatAppId = 'wx0000000000000000'
 const renamedFiles = {
+    '_env.local': '.env.local',
     _gitignore: '.gitignore'
 }
 const helpText = `Usage:
@@ -33,10 +36,11 @@ const targetDirectory = options.targetDirectory ?? (await promptProjectName())
 const projectPath = path.resolve(targetDirectory)
 const projectName = toValidPackageName(path.basename(projectPath))
 const projectTitle = toTitle(projectName)
+const wechatAppId = createWechatAppId()
 
 assertCanCreateProject(projectPath, options.force)
 mkdirSync(projectPath, { recursive: true })
-copyTemplate(path.join(packageRoot, 'templates/default'), projectPath, projectName, projectTitle)
+copyTemplate(path.join(packageRoot, 'templates/default'), projectPath, projectName, projectTitle, wechatAppId)
 
 const packageManager = getPackageManager()
 const displayProjectPath = getDisplayProjectPath(projectPath)
@@ -106,7 +110,7 @@ function assertCanCreateProject(projectPath, force) {
     }
 }
 
-function copyTemplate(sourceDirectory, targetDirectory, projectName, projectTitle) {
+function copyTemplate(sourceDirectory, targetDirectory, projectName, projectTitle, wechatAppId) {
     for (const entry of readdirSync(sourceDirectory, { withFileTypes: true })) {
         const sourcePath = path.join(sourceDirectory, entry.name)
         const targetName = renamedFiles[entry.name] ?? entry.name
@@ -114,16 +118,16 @@ function copyTemplate(sourceDirectory, targetDirectory, projectName, projectTitl
 
         if (entry.isDirectory()) {
             mkdirSync(targetPath, { recursive: true })
-            copyTemplate(sourcePath, targetPath, projectName, projectTitle)
+            copyTemplate(sourcePath, targetPath, projectName, projectTitle, wechatAppId)
             continue
         }
 
         const source = readFileSync(sourcePath, 'utf8')
-        writeFileSync(targetPath, transformTemplateFile(targetName, source, projectName, projectTitle))
+        writeFileSync(targetPath, transformTemplateFile(targetName, source, projectName, projectTitle, wechatAppId))
     }
 }
 
-function transformTemplateFile(fileName, source, projectName, projectTitle) {
+function transformTemplateFile(fileName, source, projectName, projectTitle, wechatAppId) {
     if (fileName === 'package.json') {
         const packageJson = JSON.parse(source)
         packageJson.name = projectName
@@ -134,7 +138,14 @@ function transformTemplateFile(fileName, source, projectName, projectTitle) {
         return source.replace(/<title>.*?<\/title>/, `<title>${projectTitle}</title>`)
     }
 
-    return source.replaceAll(defaultProjectName, projectName).replaceAll(defaultProjectTitle, projectTitle)
+    return source
+        .replaceAll(defaultProjectName, projectName)
+        .replaceAll(defaultProjectTitle, projectTitle)
+        .replaceAll(defaultWechatAppId, wechatAppId)
+}
+
+function createWechatAppId() {
+    return `wx${randomBytes(8).toString('hex')}`
 }
 
 function toValidPackageName(name) {

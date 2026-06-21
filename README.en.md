@@ -20,7 +20,18 @@ Live demo: <https://sep2.github.io/vite-plugin-taro>. See [Sample app](https://g
 - **Type-friendly** Import Taro capabilities consistently through `virtual:taro/api` and `virtual:taro/components`, with TypeScript type support.
 - **WeChat Skyline** Support WeChat Mini Program output with Skyline rendering mode.
 
-## Install
+## Create a new app
+
+```sh
+pnpm create vite-taro my-app
+cd my-app
+pnpm install
+pnpm dev:h5
+```
+
+Use `pnpm dev:wx` to build the WeChat Mini Program in watch mode, then open `dist/wx` in WeChat DevTools.
+
+## Install in an existing app
 
 ```sh
 pnpm add -D vite-plugin-taro
