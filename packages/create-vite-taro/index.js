@@ -50,8 +50,8 @@ console.log(`\nCreated ${projectName} in ${projectPath}\n`)
 console.log('Next steps:')
 if (cdCommand) console.log(`  ${cdCommand}`)
 console.log(`  ${packageManager} install`)
-console.log(`  ${packageManager} dev:h5`)
 console.log(`  ${packageManager} dev:wx`)
+console.log(`  ${packageManager} dev:h5`)
 
 function parseArgs(args) {
     const options = {
