@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const pluginRoot = path.join(repoRoot, 'packages/vite-plugin-taro')
-const readmeFiles = ['README.md', 'README.en.md', 'README.zh.md']
+const readmeFiles = ['README.md', 'README.zh.md']
 
 let copiedCount = 0
 
