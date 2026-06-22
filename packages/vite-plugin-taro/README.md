@@ -4,114 +4,114 @@
 ![Vite compatibility](https://registry.vite.dev/api/badges?package=vite-plugin-taro&tool=vite)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-简体中文 | [English](README.en.md)
+[简体中文](README.zh.md) | English
 
-使用最新标准化前端技术栈 Vite 8、React 19 和 Tailwind CSS v4 构建微信小程序。
+Build WeChat Mini Apps with the latest standards-based frontend stack: Vite 8, React 19, and Tailwind CSS v4.
 
-`vite-plugin-taro` 适用于希望使用 Taro 跨平台 React 组件和 API，但更偏好 Vite 而非 Taro webpack 的应用。你只需要这个插件，就能构建完整的微信小程序。
+`vite-plugin-taro` is for applications that want Taro's cross-platform React components and APIs, but prefer Vite instead of Taro webpack. You only need this plugin to build a complete WeChat Mini Program.
 
-在线演示：<https://sep2.github.io/vite-plugin-taro>。如何在本地运行，请参见[示例应用](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.md)。
+Live demo: <https://sep2.github.io/vite-plugin-taro>. See [Sample app](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.md) how to run it locally.
 
-- **原生 Vite 构建** 使用标准 Vite 8 配置，无需维护老旧的 webpack 配置，并支持所有 Vite 插件。
-- **热更新** 微信小程序与 H5 都支持开发模式 watch，基于 Vite 8 热更新/快速重建即时预览。
-- **依托成熟 Taro 能力** 复用久经实战检验的 Taro API 和组件，完整使用 Taro 跨端能力。
-- **Tailwind 就绪** 内置 Tailwind CSS v4 支持，微信小程序与 H5 样式开箱即用。
-- **条件编译** 支持 Taro 风格 `#ifdef` / `#ifndef` / `#if`，可按微信 / Web 裁剪代码和样式。
-- **工作区友好** 支持普通项目与 monorepo，兼容 npm、pnpm、Yarn、Bun 等包管理器。
-- **类型友好** 项目全链路支持 TypeScript。
-- **微信 Skyline** 支持微信小程序 Skyline 渲染模式输出。
+- **Native Vite builds** Use standard Vite 8 config instead of legacy webpack configuration, with support for all Vite plugins.
+- **Hot reload** Both WeChat Mini Program and H5 support dev-mode watch, with Vite 8 HMR/rebuilds for fast feedback.
+- **Battle-tested Taro foundation** Use the full set of Taro APIs and components instead of reinventing cross-platform primitives.
+- **Tailwind ready** Built-in Tailwind CSS v4 support for both WeChat Mini Program and H5 styles.
+- **Conditional compilation** Use Taro-style `#ifdef` / `#ifndef` / `#if` blocks to split code and styles by WeChat / web target.
+- **Workspace friendly** Supports standalone apps and monorepos, with npm, pnpm, Yarn, Bun, and other package managers.
+- **Type-friendly** The project supports TypeScript all the way.
+- **WeChat Skyline** Support WeChat Mini Program output with Skyline rendering mode.
 
-## 快速开始
+## Quick start
 
-新应用推荐使用 `create-vite-taro`。它会生成 Vite 8 + React 19 + Tailwind CSS v4 + Taro 4 项目。
+Use `create-vite-taro` for new apps. It scaffolds a Vite 8 + React 19 + Tailwind CSS v4 + Taro 4 project.
 
-### 1. 创建并安装
+### 1. Create and install
 
 ```sh
-# 使用默认模板创建新应用
+# Create a new app from the default template
 npm create vite-taro@latest my-app
 
-# 进入项目并安装依赖
+# Enter the project and install dependencies
 cd my-app
 npm install
 ```
 
-### 2. 配置微信小程序 App Id
+### 2. Configure WeChat Mini Program App ID
 
-模板会创建 `.env.local`。请将 `VITE_PLUGIN_TARO_WECHAT_APP_ID` 设置为你的微信小程序 App Id。
+The template creates `.env.local`. Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` to your WeChat Mini Program App ID.
 
-### 3. 开发模式运行
+### 3. Run in development
 
 ```sh
-# 微信小程序：以 watch 模式重新构建 dist/wx
+# WeChat Mini Program: rebuild dist/wx in watch mode
 npm run dev:wx
 
-# 然后在微信开发者工具中打开 dist/wx
+# Then open dist/wx in WeChat DevTools
 
-# H5：启动 Vite 开发服务器
+# H5: start the Vite dev server
 npm run dev:h5
 
-# 然后在浏览器中打开标准 Vite 地址
+# Then open the standard Vite dev URL in your browser
 # http://localhost:5173
 ```
 
-你可以在两个终端中同时运行 `npm run dev:wx` 和 `npm run dev:h5`。
+You can keep `npm run dev:wx` and `npm run dev:h5` running at the same time in separate terminals.
 
-提示：受微信限制，开发者工具热重载有时不会完整生效。建议日常优先使用 H5 的 Vite 热更新快速调试，并定期在微信开发者工具中验证小程序端效果。
+Note: Because of WeChat DevTools and Mini Program runtime limitations, hot reload/fast rebuilds for the WeChat target may not always apply cleanly. For day-to-day iteration, prefer the H5 Vite dev server for fast feedback, and periodically verify the Mini Program result in WeChat DevTools.
 
-### 4. 构建、预览和类型检查
+### 4. Build, preview, and typecheck
 
 ```sh
-# 生产微信小程序产物
+# Production WeChat Mini Program output
 npm run build:wx
 
-# 生产 H5 产物
+# Production H5 output
 npm run build:h5
 
-# 预览构建后的 H5 应用
+# Preview the built H5 app
 npm run preview:h5
 
-# 使用 tsgo 进行类型检查
+# Typecheck with tsgo
 npm run typecheck
 ```
 
-### 5. 使用 Taro 虚拟模块
+### 5. Use Taro virtual modules
 
-应用代码请使用这些导入：
+Use these imports in app code:
 
 ```tsx
 import Taro from 'virtual:taro/api'
 import { Text, View } from 'virtual:taro/components'
 ```
 
-| 导入 | 用途 |
+| Import | Use |
 | --- | --- |
-| `virtual:taro/components` | Taro React 组件，例如 `View`、`Text`、`Button`、`Image` 和 `ScrollView`。 |
-| `virtual:taro/api` | Taro API 和 hooks，例如 `Taro.navigateTo`、`Taro.getWindowInfo` 和 `Taro.useLaunch`。 |
+| `virtual:taro/components` | Taro React components such as `View`, `Text`, `Button`, `Image`, and `ScrollView`. |
+| `virtual:taro/api` | Taro APIs and hooks such as `Taro.navigateTo`, `Taro.getWindowInfo`, and `Taro.useLaunch`. |
 
-用法与 Taro 本身一致；组件和 API 的具体用法请参考 [Taro 官网](https://docs.taro.zone)。
+Usage is the same as Taro itself; see the [Taro website](https://docs.taro.zone) for component and API details.
 
-你不再需要安装 `@tarojs/*` 包；应用代码也不要从 `@tarojs/*` 导入。
+You no longer need to install `@tarojs/*` packages; application code should not import from `@tarojs/*`.
 
 
-## 手动接入已有应用
+## Manual setup for existing apps
 
-已有应用或自定义项目结构，可以按下面的步骤手动接入插件。先安装插件：
+For existing apps or custom project layouts, follow the steps below to wire the plugin manually. First, install the plugin:
 
 ```sh
 npm install -D vite-plugin-taro
 ```
 
-你的应用还必须提供 Vite 8、React 19、React DOM 19、TypeScript 检查器，以及 Node/React 类型包。如果应用尚未安装它们，请安装缺失的包：
+Your app must also provide Vite 8, React 19, React DOM 19, a TypeScript checker, and Node/React type packages. If your app does not already have them, install the missing packages:
 
 ```sh
 npm install react react-dom
 npm install -D vite @typescript/native-preview @types/node @types/react @types/react-dom
 ```
 
-你不应再直接依赖任何 `@tarojs/*` 包。如果已经依赖，请将它们移除。
+You should NOT have direct dependencies on `@tarojs/*` packages anymore. Remove them if you have.
 
-下面的步骤会创建如下源码结构：
+The steps below create this source shape:
 
 ```text
 my-app/
@@ -127,11 +127,11 @@ my-app/
             └── index.tsx
 ```
 
-你也可以参考 [packages/loan-genius](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius) 中的示例布局。
+You can also see a sample layout at [packages/loan-genius](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius).
 
-### 1. 添加 TypeScript 声明
+### 1. Add TypeScript declarations
 
-将插件客户端类型添加到 `tsconfig.json`，让 TypeScript 识别虚拟模块：
+Add the plugin client types to `tsconfig.json` so TypeScript knows about the virtual modules:
 
 ```json
 {
@@ -144,9 +144,9 @@ my-app/
 }
 ```
 
-### 2. 配置 Vite
+### 2. Configure Vite
 
-创建 `vite.config.ts`，并从环境变量中选择插件目标：
+Create `vite.config.ts` and choose the plugin target from an environment variable:
 
 ```ts
 import { defineConfig, loadEnv } from 'vite'
@@ -200,17 +200,17 @@ export default defineConfig(({ mode }) => {
 })
 ```
 
-重要约定：
+Important conventions:
 
-- 每次 Vite 运行时，`target` 必须是 `wx` 或 `h5`。
-- `app` 是 React 根应用组件模块，应默认导出应用组件。
-- 每个 `pages[].path` 都会映射到 `src/${path}.tsx` 文件。例如，`pages/index/index` 需要 `src/pages/index/index.tsx`。
-- `appJson.pages` 会根据 `pages` 自动生成；你在 `appJson` 中传入的任何 `pages` 字段都会被覆盖。
-- 插件不会读取 Taro CLI 配置文件，例如 `config/index.ts`、`app.config.ts` 或页面 `config.ts` 文件。请通过插件选项传入应用和页面配置。
+- `target` must be `wx` or `h5` for each Vite run.
+- `app` is the root React app component module. It should default-export the app component.
+- Every `pages[].path` maps to a file at `src/${path}.tsx`. For example, `pages/index/index` requires `src/pages/index/index.tsx`.
+- `appJson.pages` is generated from `pages`; any `pages` field you put in `appJson` is overwritten.
+- The plugin does not read Taro CLI config files such as `config/index.ts`, `app.config.ts`, or page `config.ts` files. Pass app and page config through the plugin options.
 
-### 3. 创建应用组件
+### 3. Create the app component
 
-`src/app.ts` 是共享应用包装组件。它会通过 `children` 接收当前页面。
+`src/app.ts` is the shared application wrapper. It receives the current page as `children`.
 
 ```tsx
 import Taro from 'virtual:taro/api'
@@ -228,11 +228,11 @@ function App({ children }: PropsWithChildren) {
 export default App
 ```
 
-请在应用组件中导入全局样式。微信构建会将它们收集到 `app.wxss`，H5 输出也会包含它们。
+Import global styles from the app component. They are collected into `app.wxss` for WeChat builds and included in H5 output.
 
-### 4. 创建页面组件
+### 4. Create a page component
 
-`src/pages/index/index.tsx` 是 `pages/index/index` 对应的 React 页面组件。
+`src/pages/index/index.tsx` is the React component for `pages/index/index`.
 
 ```tsx
 import Taro from 'virtual:taro/api'
@@ -256,9 +256,9 @@ export default function IndexPage() {
 }
 ```
 
-### 5. 添加 H5 HTML 外壳
+### 5. Add the H5 HTML shell
 
-对于 H5，请保留一个普通的 Vite `index.html`，并包含 `#app` 挂载节点。插件会自动注入生成的 Taro H5 入口，因此你不需要普通 Vite 的 `src/main.tsx` 脚本。
+For H5, keep a normal Vite `index.html` with an `#app` mount node. The plugin injects the generated Taro H5 entry automatically, so you do not need a normal Vite `src/main.tsx` script.
 
 ```html
 <!doctype html>
@@ -274,9 +274,9 @@ export default function IndexPage() {
 </html>
 ```
 
-### 6. 添加脚本
+### 6. Add scripts
 
-使用与 `create-vite-taro` 生成项目一致的脚本：
+Use the same scripts generated by `create-vite-taro`:
 
 ```json
 {
@@ -291,27 +291,27 @@ export default function IndexPage() {
 }
 ```
 
-在 Windows shell 中，请使用 `cross-env`。
+On Windows shells, use `cross-env`.
 
-### 7. 运行每个目标
+### 7. Run each target
 
 ```sh
-npm run dev:wx       # 以 watch 模式重新构建 dist/wx
-npm run dev:h5       # 启动 H5 开发服务器
-npm run build:wx     # 构建 dist/wx
-npm run build:h5     # 构建 dist/h5
-npm run preview:h5   # 预览 dist/h5
-npm run typecheck    # 使用 tsgo 进行类型检查
+npm run dev:wx       # Rebuild dist/wx in watch mode
+npm run dev:h5       # Start the H5 dev server
+npm run build:wx     # Build dist/wx
+npm run build:h5     # Build dist/h5
+npm run preview:h5   # Preview dist/h5
+npm run typecheck    # Typecheck with tsgo
 ```
 
-在微信开发者工具中打开生成的 `dist/wx` 目录。
+Open the generated `dist/wx` directory in WeChat DevTools.
 
-| 目标 | 含义 | 输出目录 |
+| Target | Meaning | Output dir |
 | --- | --- | --- |
-| `wx` | 开发/生产模式下的微信小程序。 | `dist/wx` |
-| `h5` | H5 生产输出。 | `dist/h5` |
+| `wx` | WeChat Mini Program in both dev/prod mode. | `dist/wx` |
+| `h5` | H5 production output. | `dist/h5` |
 
-## 选项
+## Options
 
 ```ts
 type VitePluginTaroTarget = 'wx' | 'h5'
@@ -331,22 +331,22 @@ type VitePluginTaroOptions = {
 }
 ```
 
-| 选项 | 描述 |
+| Option | Description |
 | --- | --- |
-| `target` | 本次 Vite 调用的活动目标。微信小程序使用 `wx`，Web 使用 `h5`。 |
-| `app` | 默认导出根 React 应用组件的源码文件，例如 `src/app.ts` 或 `src/app.tsx`。 |
-| `pages` | 有序页面列表。该顺序会成为 `app.json.pages` 和 H5 路由顺序。 |
-| `pages[].path` | 不带扩展名的 Taro 风格路由和输出路径，例如 `pages/index/index`。页面组件必须存在于 `src/${path}.tsx`。 |
-| `pages[].config` | 合并到生成的微信页面 JSON 和 H5 路由配置中的页面配置。 |
-| `appJson` | 基础应用配置。插件会用 `options.pages` 覆盖其中的 `pages` 字段。 |
-| `projectConfigJson` | `wx` 构建时输出的微信 `project.config.json` 内容。即使当前目标是 `h5`，选项类型也要求提供它。 |
-| `sitemapJson` | `wx` 构建时输出的微信 `sitemap.json` 内容。即使当前目标是 `h5`，选项类型也要求提供它。 |
+| `target` | Active target for this Vite invocation. Use `wx` for WeChat Mini Program and `h5` for Web. |
+| `app` | Source file that default-exports the root React app component, for example `src/app.ts` or `src/app.tsx`. |
+| `pages` | Ordered page list. The order becomes `app.json.pages` and the H5 route order. |
+| `pages[].path` | Taro-style route and output path without extension, for example `pages/index/index`. The page component must exist at `src/${path}.tsx`. |
+| `pages[].config` | Page config merged into the generated WeChat page JSON and H5 route config. |
+| `appJson` | Base app config. The plugin overwrites the `pages` field from `options.pages`. |
+| `projectConfigJson` | WeChat `project.config.json` content emitted for `wx` builds. It is required by the option type even when the current target is `h5`. |
+| `sitemapJson` | WeChat `sitemap.json` content emitted for `wx` builds. It is required by the option type even when the current target is `h5`. |
 
-## 样式
+## Styling
 
-你可以使用普通 CSS、CSS Modules 或 Tailwind CSS v4。
+You can use plain CSS, CSS modules, or Tailwind CSS v4.
 
-对于 Tailwind CSS v4，请从全局 CSS 文件（例如 `src/app.css`）导入 Tailwind：
+For Tailwind CSS v4, import Tailwind from a global CSS file such as `src/app.css`:
 
 ```css
 @import "tailwindcss/theme.css";
@@ -356,11 +356,11 @@ type VitePluginTaroOptions = {
 @source "./";
 ```
 
-插件会为 `wx` 构建注册 `weapp-tailwindcss`，并为 `h5` 构建注册 `@tailwindcss/vite`。对于 `wx`，Vite 输出的 CSS 会被收集到 `app.wxss`，并为每个页面生成配套的 `.wxss` 文件。
+The plugin registers `weapp-tailwindcss` for `wx` builds and `@tailwindcss/vite` for `h5` builds. For `wx`, CSS emitted by Vite is collected into `app.wxss`, and page `.wxss` companion files are emitted for each page.
 
-## 条件编译
+## Conditional compilation
 
-插件会在 Vite 解析源码前移除未激活的 Taro 风格条件注释块。它适用于 `node_modules` 之外的 TypeScript、JavaScript、JSX/TSX、CSS、Sass、Less 和 Stylus 文件。
+The plugin strips inactive Taro-style conditional comment blocks before Vite parses source. This works in TypeScript, JavaScript, JSX/TSX, CSS, Sass, Less, and Stylus files outside `node_modules`.
 
 ```ts
 // #ifdef wx
@@ -380,15 +380,15 @@ console.log('fallback')
 // #endif
 ```
 
-支持的指令包括 `#ifdef`、`#ifndef`、`#if`、`#elif`、`#else` 和 `#endif`。条件使用插件目标标记 `wx` 和 `h5`；`#if` 表达式支持 `!`、`&&` 和 `||`。
+Supported directives are `#ifdef`, `#ifndef`, `#if`, `#elif`, `#else`, and `#endif`. Conditions use the plugin target tokens `wx` and `h5`; `#if` expressions support `!`, `&&`, and `||`.
 
-## 按目标输出
+## Output by target
 
-### 微信小程序
+### WeChat Mini Program
 
-对于 `target: 'wx'`，插件会配置 Vite，输出微信兼容的 CommonJS chunk 和小程序配套文件。
+For `target: 'wx'`, the plugin configures Vite to emit WeChat-compatible CommonJS chunks and Mini Program companion files.
 
-典型输出：
+Typical output:
 
 ```text
 dist/wx/
@@ -405,74 +405,74 @@ dist/wx/
 └── pages/**
 ```
 
-请使用微信开发者工具打开 `dist/wx`；不要打开源码项目目录。
+Open `dist/wx` with WeChat DevTools; do not open the source project directory.
 
 ### H5
 
-对于 `target: 'h5'`，插件会向 `index.html` 注入生成模块，导入 Taro 的 H5 组件样式，根据 `pages` 构建路由记录，并使用 Taro 的 hash-history 路由挂载应用。路由使用配置中的页面路径，例如 `#/pages/index/index`。
+For `target: 'h5'`, the plugin injects a generated module into `index.html`, imports Taro's H5 component styles, builds route records from `pages`, and mounts the app with Taro's hash-history router. Routes use the page paths from your config, for example `#/pages/index/index`.
 
-## 从 Taro 迁移
+## Migrating from Taro
 
-你可以保留大多数 React 页面组件、业务逻辑、资源和样式，但构建入口会从 Taro CLI 配置迁移到 Vite 配置。
+You can keep most React page components, business logic, assets, and styles, but the build entry moves from Taro CLI config to Vite config.
 
-迁移清单：
+Migration checklist:
 
-1. 安装 `vite-plugin-taro`，并创建包含 `vitePluginTaro(...)` 的 `vite.config.ts`。
-2. 将应用配置和页面配置移到 `vite.config.ts` 中。插件不会读取 `config/index.ts`、`app.config.ts` 或页面 `config.ts` 等 Taro 文件。
-3. 在 `pages` 中注册每个页面。每个页面路径都必须匹配 `src/${path}.tsx`。
-4. 将 Taro 脚本替换为设置 `VITE_PLUGIN_TARO_TARGET=wx` 或 `VITE_PLUGIN_TARO_TARGET=h5` 的 Vite 脚本。
-5. 对于 H5，添加普通 Vite `index.html`，其中包含 `<div id="app"></div>`，且不要添加单独的 `src/main.tsx` 入口。
-6. 将应用代码中的 `@tarojs/*` 导入替换为插件虚拟模块。
+1. Install `vite-plugin-taro` and create `vite.config.ts` with `vitePluginTaro(...)`.
+2. Move app config and page config into the plugin options. The plugin does not read Taro CLI files such as `config/index.ts`, `app.config.ts`, or page `config.ts` files.
+3. Register every page in `pages`. Each page path must match `src/${path}.tsx`.
+4. Replace Taro scripts with Vite scripts that set `VITE_PLUGIN_TARO_TARGET=wx` or `VITE_PLUGIN_TARO_TARGET=h5`.
+5. For H5, add a normal Vite `index.html` with `<div id="app"></div>` and no separate `src/main.tsx` entry.
+6. Replace application imports from `@tarojs/*` with the plugin virtual modules.
 
-迁移前：
+Before:
 
 ```tsx
 import Taro from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 ```
 
-迁移后：
+After:
 
 ```tsx
 import Taro from 'virtual:taro/api'
 import { Text, View } from 'virtual:taro/components'
 ```
 
-应用代码中禁止直接导入 `@tarojs/*`。请让插件负责 Taro 运行时解析，使微信和 H5 构建都获得正确的目标特定别名。
+Direct `@tarojs/*` imports in application code are forbidden. Let the plugin own Taro runtime resolution so WeChat and H5 builds receive the correct target-specific aliases.
 
-## 示例应用
+## Sample app
 
-示例应用位于 [`packages/loan-genius`](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius)。它展示了页面约定、目标选择、微信输出、H5 路由和 Tailwind 样式。
+The sample app lives in [`packages/loan-genius`](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius). It demonstrates the page convention, target selection, WeChat output, H5 routing, and Tailwind styling.
 
 ```sh
 git clone https://github.com/sep2/vite-plugin-taro.git
 
-# 安装依赖
+# Install dependencies
 pnpm install
 
-# 首次运行，生成打过补丁的 Taro 包
+# Run once, it generates the patched Taro packages
 pnpm prepare:taro
 
-# 构建插件，供示例应用使用
+# Build the plugin for sample app to use
 pnpm build:plugin
 
-# 运行微信示例应用
+# Run the sample app in WeChat
 pnpm dev:sample:wx
 
-# 将示例应用构建为微信输出
+# Build the sample app to WeChat output
 pnpm build:sample:wx
 
-# 以开发模式运行 H5 示例应用
+# Run the sample app in H5 dev mode
 pnpm dev:sample:h5
 
-# 将示例应用构建为 H5 输出并预览
+# Build the sample app to H5 output and preview it
 pnpm build:sample:h5
 pnpm preview:sample:h5
 ```
 
-使用微信开发者工具打开 `packages/loan-genius/dist/wx`，以测试小程序输出。
+Open `packages/loan-genius/dist/wx` with WeChat DevTools to test the Mini Program output.
 
-## 开发本仓库
+## Develop this repository
 
 ```sh
 pnpm install
@@ -481,53 +481,53 @@ pnpm build:plugin
 pnpm typecheck
 ```
 
-常用脚本：
+Common scripts:
 
-| 脚本 | 描述 |
+| Script | Description |
 | --- | --- |
-| `pnpm prepare:taro` | 从上游 npm tarball 和本地 patch 文件重新生成打过补丁的 React 19 Taro 包。 |
-| `pnpm build:plugin` | 将 `packages/vite-plugin-taro` 构建到 `dist`。 |
-| `pnpm typecheck` | 使用 `tsgo` 对插件和示例应用进行类型检查。 |
-| `pnpm lint` | 运行 Biome 检查。 |
-| `pnpm format` | 应用 Biome 格式化。 |
-| `pnpm dev:sample:wx` | 以 watch 模式构建微信小程序示例。请先构建插件。 |
-| `pnpm dev:sample:h5` | 以 Vite 开发模式启动 H5 示例应用。请先构建插件。 |
-| `pnpm build:sample:wx` | 将微信小程序示例构建到 `packages/loan-genius/dist/wx`。 |
-| `pnpm build:sample:h5` | 将 H5 示例应用构建到 `packages/loan-genius/dist/h5`。 |
-| `pnpm preview:sample:h5` | 预览构建后的 H5 示例。 |
-| `pnpm publish:dry` | 干运行包校验和发布流程。 |
-| `pnpm release <version\|bump>` | 验证发布、更新版本、创建 release commit 和 tag，并推送触发 CI 发布。 |
-| `pnpm publish:all` | 按依赖顺序发布公开包；主要由基于 tag 的 Trusted Publishing 工作流调用。 |
+| `pnpm prepare:taro` | Regenerate the patched React 19 Taro packages from upstream npm tarballs and local patch files. |
+| `pnpm build:plugin` | Build `packages/vite-plugin-taro` into `dist`. |
+| `pnpm typecheck` | Typecheck the plugin and sample app with `tsgo`. |
+| `pnpm lint` | Run Biome checks. |
+| `pnpm format` | Apply Biome formatting. |
+| `pnpm dev:sample:wx` | Build the sample WeChat Mini Program in watch mode. Build the plugin first. |
+| `pnpm dev:sample:h5` | Start the sample H5 app in Vite dev mode. Build the plugin first. |
+| `pnpm build:sample:wx` | Build the WeChat Mini Program sample to `packages/loan-genius/dist/wx`. |
+| `pnpm build:sample:h5` | Build the H5 sample app to `packages/loan-genius/dist/h5`. |
+| `pnpm preview:sample:h5` | Preview the built H5 sample. |
+| `pnpm publish:dry` | Dry-run package validation and publishing. |
+| `pnpm release <version\|bump>` | Validate, bump versions, create the release commit and tag, and push to trigger CI publishing. |
+| `pnpm publish:all` | Publish the public packages in dependency order; mainly used by the tag-based Trusted Publishing workflow. |
 
-## 限制
+## Limitations
 
-- 目前只生成 `wx` 和 `h5` 目标。
-- 应用代码不能直接导入 `@tarojs/*` 包。
+- Only `wx` and `h5` targets are generated today.
+- Application code must not import `@tarojs/*` packages directly.
 
-## 排查问题
+## Troubleshooting
 
-| 问题 | 检查项 |
+| Problem | Check |
 | --- | --- |
-| `VITE_PLUGIN_TARO_TARGET must be "wx" or "h5"` | 在脚本或 `.env` 文件中设置目标环境变量。 |
-| `pnpm install` 提示忽略了依赖构建脚本 | 运行 `pnpm approve-builds`，按提示批准需要构建的依赖。 |
-| 页面无法解析 | 确认 `pages[].path` 有匹配的 `src/${path}.tsx` 文件。 |
-| 微信开发者工具无法打开应用 | 打开生成的 `dist/wx` 文件夹，并检查 `projectConfigJson.appid`。 |
-| H5 显示空白页 | 确保 `index.html` 中保留 `<div id="app"></div>`，已注册插件，并避免添加单独的默认 Vite `main.tsx` 入口。 |
-| Taro API 缺失或行为不同 | 移除应用代码中直接导入的 `@tarojs/*`，并从 `virtual:taro/api` 导入 Taro。 |
-| 组件在 H5 上渲染时缺少预期样式 | 从 `virtual:taro/components` 导入组件，并确保 `h5` 目标启用了插件。 |
-| Tailwind 类没有生效 | 确保全局 CSS 导入 Tailwind，并包含覆盖源码文件的 `@source` 路径。 |
+| `VITE_PLUGIN_TARO_TARGET must be "wx" or "h5"` | Set the target environment variable in your script or `.env` file. |
+| `pnpm install` says dependency build scripts were ignored | Run `pnpm approve-builds` and approve the requested dependency build scripts. |
+| A page cannot be resolved | Confirm that `pages[].path` has a matching `src/${path}.tsx` file. |
+| WeChat DevTools cannot open the app | Open the generated `dist/wx` folder and check `projectConfigJson.appid`. |
+| H5 shows a blank page | Keep `<div id="app"></div>` in `index.html`, register the plugin, and avoid adding a separate default Vite `main.tsx` entry. |
+| Taro APIs are missing or behave differently | Remove direct `@tarojs/*` imports from application code and import Taro from `virtual:taro/api`. |
+| Components render without expected styles on H5 | Import components from `virtual:taro/components` and keep the plugin enabled for the `h5` target. |
+| Tailwind classes do not appear | Ensure your global CSS imports Tailwind and includes an `@source` path that covers your source files. |
 
-## 发布流程
+## Release workflow
 
-本仓库使用 npm Trusted Publishing 和 GitHub Actions 自动发布。普通推送到 `main` 不会发布；只有推送匹配 `v*.*.*` 的 tag 才会触发 `.github/workflows/publish.yml`。
+This repository publishes automatically with npm Trusted Publishing and GitHub Actions. Normal pushes to `main` do not publish; only tags matching `v*.*.*` trigger `.github/workflows/publish.yml`.
 
-创建发布：
+Create a release:
 
 ```sh
 pnpm release patch
 ```
 
-`pnpm release` 会要求干净的 `main` 工作区，运行 `pnpm version:bump`，执行 `pnpm publish:dry -- --no-git-check` 验证，创建 `chore: release vX.Y.Z` commit 和 `vX.Y.Z` tag，然后推送 branch 与 tag 触发 CI。也可以发布精确版本或预发布版本：
+`pnpm release` requires a clean `main` working tree, runs `pnpm version:bump`, validates with `pnpm publish:dry -- --no-git-check`, creates the `chore: release vX.Y.Z` commit and `vX.Y.Z` tag, then pushes the branch and tag to trigger CI. You can also release an exact version or prerelease:
 
 ```sh
 pnpm release 0.2.0
@@ -536,8 +536,8 @@ pnpm release patch --dry-run
 pnpm release patch --no-push
 ```
 
-CI 会运行 `pnpm publish:all -- --no-git-check`，按依赖顺序打包并通过 npm OIDC 发布公开包。不要为发布工作流配置 `NPM_TOKEN`；每个 npm 包的 Trusted Publisher 应指向 `publish.yml`。
+CI runs `pnpm publish:all -- --no-git-check`, packs packages in dependency order, and publishes public packages through npm OIDC. Do not configure `NPM_TOKEN` for the publish workflow; each npm package's Trusted Publisher should point to `publish.yml`.
 
-## 许可证
+## License
 
 MIT

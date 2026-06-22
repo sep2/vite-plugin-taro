@@ -1,6 +1,6 @@
 # Loan Genius
 
-[简体中文](README.md) | English
+[简体中文](README.zh.md) | English
 
 Loan Genius is the sample app for `vite-plugin-taro`. It is a React 19 + Taro loan calculator built with the same latest standard frontend stack promoted by this repository: Vite 8, React 19, and Tailwind CSS v4.
 
