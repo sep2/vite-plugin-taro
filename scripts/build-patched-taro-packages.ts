@@ -110,11 +110,15 @@ function applyPatch(packageDir: string, patchFile: string): void {
 }
 
 function npmPack(specifier: string, destination: string): string {
-    const output = run('npm', ['pack', specifier, '--pack-destination', destination, '--silent'])
+    const output = run(getNpmCommand(), ['pack', specifier, '--pack-destination', destination, '--silent'])
     const fileName = output.trim().split('\n').filter(Boolean).at(-1)
 
     if (!fileName) throw new Error(`npm pack did not return a tarball name for ${specifier}`)
     return path.resolve(destination, fileName)
+}
+
+function getNpmCommand(): string {
+    return process.platform === 'win32' ? 'npm.cmd' : 'npm'
 }
 
 function run(command: string, args: string[], options: RunOptions = {}): string {

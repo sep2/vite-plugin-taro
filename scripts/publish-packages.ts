@@ -13,6 +13,7 @@ type PackageInfo = {
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+const git = process.platform === 'win32' ? 'git.exe' : 'git'
 
 const usage = `Usage:
   pnpm publish:all [-- --otp 123456] [-- --tag latest] [-- --skip-checks] [-- --no-git-check]
@@ -180,7 +181,7 @@ function takeOption(name: string): string | undefined {
 }
 
 function assertCleanGitTree(): void {
-    const insideGitTree = spawnSync('git', ['rev-parse', '--is-inside-work-tree'], {
+    const insideGitTree = spawnSync(git, ['rev-parse', '--is-inside-work-tree'], {
         cwd: repoRoot,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore']
@@ -188,7 +189,7 @@ function assertCleanGitTree(): void {
 
     if (insideGitTree.status !== 0 || insideGitTree.stdout.trim() !== 'true') return
 
-    const status = spawnSync('git', ['status', '--porcelain'], {
+    const status = spawnSync(git, ['status', '--porcelain'], {
         cwd: repoRoot,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'inherit']
