@@ -34,7 +34,7 @@ npm run dev:h5      # Start the H5 dev server
 npm run build:wx    # Build dist/wx
 npm run build:h5    # Build dist/h5
 npm run preview:h5  # Preview dist/h5
-npm run typecheck   # Typecheck with tsgo
+npm run typecheck   # Typecheck with tsc
 ```
 
 ## Troubleshooting

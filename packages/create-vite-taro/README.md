@@ -45,7 +45,7 @@ bun create vite-taro my-app
 | `npm run build:wx` | Build the WeChat Mini Program output into `dist/wx`. |
 | `npm run build:h5` | Build the H5 output into `dist/h5`. |
 | `npm run preview:h5` | Preview the built H5 output. |
-| `npm run typecheck` | Typecheck with `tsgo`. |
+| `npm run typecheck` | Typecheck with `tsc`. |
 
 ## Troubleshooting
 

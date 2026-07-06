@@ -35,8 +35,8 @@
         "README.zh.md"
     ],
     "scripts": {
-        "build": "node ../../scripts/sync-plugin-readme.ts && node ../../scripts/clean-directory.ts dist && tsgo --project tsconfig.json",
-        "typecheck": "tsgo --project tsconfig.json --noEmit"
+        "build": "node ../../scripts/sync-plugin-readme.ts && node ../../scripts/clean-directory.ts dist && tsc --project tsconfig.json",
+        "typecheck": "tsc --project tsconfig.json --noEmit"
     },
     "keywords": [
         "vite",
@@ -79,7 +79,7 @@
     "devDependencies": {
         "@types/babel__core": "^7.20.5",
         "@types/node": "^26.0.0",
-        "@typescript/native-preview": "latest",
+        "typescript": "^7.0.1-rc",
         "vite": "^8.0.16"
     }
 }

@@ -71,7 +71,7 @@ npm run build:h5
 # 预览构建后的 H5 应用
 npm run preview:h5
 
-# 使用 tsgo 进行类型检查
+# 使用 tsc 进行类型检查
 npm run typecheck
 ```
 
@@ -102,11 +102,11 @@ import { Text, View } from 'virtual:taro/components'
 npm install -D vite-plugin-taro
 ```
 
-你的应用还必须提供 Vite 8、React 19、React DOM 19、TypeScript 检查器，以及 Node/React 类型包。如果应用尚未安装它们，请安装缺失的包：
+你的应用还必须提供 Vite 8、React 19、React DOM 19、TypeScript 7，以及 Node/React 类型包。如果应用尚未安装它们，请安装缺失的包：
 
 ```sh
 npm install react react-dom
-npm install -D vite @typescript/native-preview @types/node @types/react @types/react-dom cross-env
+npm install -D vite typescript@rc @types/node @types/react @types/react-dom cross-env
 ```
 
 你不应再直接依赖任何 `@tarojs/*` 包。如果已经依赖，请将它们移除。
@@ -286,7 +286,7 @@ export default function IndexPage() {
         "build:wx": "cross-env NODE_ENV=production VITE_PLUGIN_TARO_TARGET=wx vite build",
         "build:h5": "cross-env NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite build",
         "preview:h5": "cross-env NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite preview --outDir dist/h5",
-        "typecheck": "tsgo -b"
+        "typecheck": "tsc -b"
     }
 }
 ```
@@ -299,7 +299,7 @@ npm run dev:h5       # 启动 H5 开发服务器
 npm run build:wx     # 构建 dist/wx
 npm run build:h5     # 构建 dist/h5
 npm run preview:h5   # 预览 dist/h5
-npm run typecheck    # 使用 tsgo 进行类型检查
+npm run typecheck    # 使用 tsc 进行类型检查
 ```
 
 在微信开发者工具中打开生成的 `dist/wx` 目录。
@@ -485,7 +485,7 @@ pnpm typecheck
 | --- | --- |
 | `pnpm prepare:taro` | 从上游 npm tarball 和本地 patch 文件重新生成打过补丁的 React 19 Taro 包。 |
 | `pnpm build:plugin` | 将 `packages/vite-plugin-taro` 构建到 `dist`。 |
-| `pnpm typecheck` | 使用 `tsgo` 对插件和示例应用进行类型检查。 |
+| `pnpm typecheck` | 使用 `tsc` 对插件和示例应用进行类型检查。 |
 | `pnpm lint` | 运行 Biome 检查。 |
 | `pnpm format` | 应用 Biome 格式化。 |
 | `pnpm dev:sample:wx` | 以 watch 模式构建微信小程序示例。请先构建插件。 |

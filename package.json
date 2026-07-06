@@ -30,7 +30,7 @@
     },
     "devDependencies": {
         "@biomejs/biome": "^2.5.0",
-        "@typescript/native-preview": "latest"
+        "typescript": "^7.0.1-rc"
     },
     "packageManager": "pnpm@11.6.0"
 }

@@ -9,7 +9,7 @@ This repository is a pnpm v11 workspace for `vite-plugin-taro`, a Vite 8 / React
 - `packages/loan-genius`: sample app used to test the plugin against `h5` and `wx` targets.
 - `patches`: local patches applied to upstream Taro 4.2.0 packages when regenerating the generated packages.
 
-Node.js v26+ is available and can execute TypeScript natively. Packages declare `node >=22`. TypeScript checking uses `@typescript/native-preview` / `tsgo`.
+Node.js v26+ is available and can execute TypeScript natively.
 
 # Commands
 
@@ -39,7 +39,7 @@ Node.js v26+ is available and can execute TypeScript natively. Packages declare 
 
 # Code style
 
-- TypeScript strict mode. Use `tsgo` for typechecking.
+- TypeScript v7 strict mode. Use `tsc` for typechecking.
 - Prefer `import type` for type-only imports.
 - 4 spaces, line width 120, single quotes, semicolons as needed, no trailing commas. Use Biome to format files.
 - File names are kebab-case.

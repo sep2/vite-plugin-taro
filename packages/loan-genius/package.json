@@ -9,7 +9,7 @@
         "preview-h5": "cross-env NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite preview --outDir dist/h5",
         "dev-wx": "cross-env NODE_ENV=development VITE_PLUGIN_TARO_TARGET=wx vite build --watch",
         "dev-h5": "cross-env NODE_ENV=development VITE_PLUGIN_TARO_TARGET=h5 vite",
-        "typecheck": "tsgo"
+        "typecheck": "tsc --project tsconfig.json"
     },
     "dependencies": {
         "clsx": "^2.1.1",
@@ -19,7 +19,7 @@
     },
     "devDependencies": {
         "@types/react": "^19.2.17",
-        "@typescript/native-preview": "latest",
+        "typescript": "^7.0.1-rc",
         "cross-env": "^10.1.0",
         "vite": "^8.0.16"
     }
