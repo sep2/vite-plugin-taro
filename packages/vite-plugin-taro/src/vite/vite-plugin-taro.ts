@@ -61,7 +61,10 @@ function createVitePluginTaroPlugin(context: VitePluginTaroBuildContext): Plugin
 
         /** Maps public virtual modules to real proxy files and marks generated entries as virtual modules. */
         resolveId(id) {
-            return resolvePublicVirtualModuleId(id) ?? (isWxVirtualModuleId(id) || isH5VirtualModuleId(id) ? `\0${id}` : undefined)
+            return (
+                resolvePublicVirtualModuleId(id) ??
+                (isWxVirtualModuleId(id) || isH5VirtualModuleId(id) ? `\0${id}` : undefined)
+            )
         },
 
         /** Supplies source code for each virtual entry module. */
