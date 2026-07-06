@@ -43,6 +43,9 @@ importers:
       cross-env:
         specifier: ^10.1.0
         version: 10.1.0
+      tailwindcss:
+        specifier: ^4.3.1
+        version: 4.3.1
       typescript:
         specifier: ^7.0.1-rc
         version: 7.0.1-rc
