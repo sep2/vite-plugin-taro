@@ -89,6 +89,7 @@ export class LineWrap extends Component<LineWrapProps, any> {
         const { data, type } = this.props
         const { visible, explainData, focus } = this.state
         const list = data.filter((_item) => type.indexOf(_item && _item.renderType) > -1)
+        const isH5Target = import.meta.env.VITE_PLUGIN_TARO_TARGET === 'h5'
         return (
             <View>
                 {explainData.title && (
@@ -163,8 +164,8 @@ export class LineWrap extends Component<LineWrapProps, any> {
                                         maxLength={loan.maxLength}
                                         className="flex-1 bg-transparent p-0 font-pingfang-regular text-base text-[#0B0F12]"
                                         style={loan.valueStyle || {}}
-                                        disabled={!IS_H5 ? loan.readOnly : false}
-                                        readOnly={IS_H5 ? loan.readOnly : false}
+                                        disabled={!isH5Target ? loan.readOnly : false}
+                                        readOnly={isH5Target ? loan.readOnly : false}
                                         onBlur={this.onBlur(loan, index)}
                                         onFocus={this.onFocus(index)}
                                         onInput={this.handleInputChange(loan, index)}

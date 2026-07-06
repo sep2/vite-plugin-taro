@@ -1,6 +1,8 @@
 import Taro from 'virtual:taro/api'
 import { useState } from 'react'
 
+const isWechatTarget = import.meta.env.VITE_PLUGIN_TARO_TARGET === 'wx'
+
 interface NavigationBarNavInfo {
     height: number
     top: number
@@ -44,7 +46,7 @@ function createFallbackMenuInfo(screenWidth: number): NavigationBarMenuInfo {
 }
 
 function getMenuInfo(screenWidth: number): NavigationBarMenuInfo {
-    if (IS_WEAPP) {
+    if (isWechatTarget) {
         const menuButtonInfo = Taro.getMenuButtonBoundingClientRect()
         if (menuButtonInfo.width > 0 && menuButtonInfo.height > 0) return menuButtonInfo
     }
@@ -55,7 +57,7 @@ function getMenuInfo(screenWidth: number): NavigationBarMenuInfo {
 export function initNavigationBar(): NavigationBarInfo {
     const windowInfo = Taro.getWindowInfo()
     const screenWidth = windowInfo.screenWidth || 375
-    const statusBarHeight = IS_WEAPP ? (windowInfo.statusBarHeight ?? 44) : 0
+    const statusBarHeight = isWechatTarget ? (windowInfo.statusBarHeight ?? 44) : 0
     const menuInfo = getMenuInfo(screenWidth)
     const menuButtonStatusBarGap = Math.max(0, menuInfo.top - statusBarHeight)
     const navBarHeight = menuButtonStatusBarGap * 2 + menuInfo.height + statusBarHeight

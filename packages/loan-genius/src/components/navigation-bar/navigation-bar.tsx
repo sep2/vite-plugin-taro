@@ -1,8 +1,8 @@
+import Taro from 'virtual:taro/api'
+import { View } from 'virtual:taro/components'
 import clsx from 'clsx'
 import type { CSSProperties, PropsWithChildren, ReactNode } from 'react'
 import { useMemo } from 'react'
-import { View } from 'virtual:taro/components'
-import Taro from 'virtual:taro/api'
 
 interface NavigationBarMetrics {
     height: number
@@ -30,10 +30,12 @@ function px(value: number): string {
     return `${Math.round(value)}px`
 }
 
+const isWechatTarget = import.meta.env.VITE_PLUGIN_TARO_TARGET === 'wx'
+
 function getNavigationBarMetrics(): NavigationBarMetrics {
     const windowInfo = Taro.getWindowInfo()
-    const statusBarHeight = IS_WEAPP ? (windowInfo.statusBarHeight ?? 44) : 0
-    const menuButtonInfo = IS_WEAPP
+    const statusBarHeight = isWechatTarget ? (windowInfo.statusBarHeight ?? 44) : 0
+    const menuButtonInfo = isWechatTarget
         ? Taro.getMenuButtonBoundingClientRect()
         : {
               top: 6,
