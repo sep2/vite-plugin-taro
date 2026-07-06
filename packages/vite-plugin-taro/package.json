@@ -15,9 +15,10 @@
     "homepage": "https://github.com/sep2/vite-plugin-taro/tree/main/packages/vite-plugin-taro#readme",
     "main": "./dist/vite.js",
     "module": "./dist/vite.js",
+    "types": "./dist/vite.d.ts",
     "exports": {
         ".": {
-            "types": "./src/vite.ts",
+            "types": "./dist/vite.d.ts",
             "import": "./dist/vite.js",
             "default": "./dist/vite.js"
         },

@@ -13,6 +13,7 @@
         "isolatedModules": true,
         "rootDir": "src",
         "outDir": "dist",
+        "declaration": true,
         "jsx": "react-jsx",
 
         "strict": true,
