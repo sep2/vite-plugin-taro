@@ -106,7 +106,7 @@ npm install -D vite-plugin-taro
 
 ```sh
 npm install react react-dom
-npm install -D vite @typescript/native-preview @types/node @types/react @types/react-dom
+npm install -D vite @typescript/native-preview @types/node @types/react @types/react-dom cross-env
 ```
 
 你不应再直接依赖任何 `@tarojs/*` 包。如果已经依赖，请将它们移除。
@@ -281,17 +281,15 @@ export default function IndexPage() {
 ```json
 {
     "scripts": {
-        "dev:wx": "NODE_ENV=development VITE_PLUGIN_TARO_TARGET=wx vite build --watch",
-        "dev:h5": "NODE_ENV=development VITE_PLUGIN_TARO_TARGET=h5 vite",
-        "build:wx": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=wx vite build",
-        "build:h5": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite build",
-        "preview:h5": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite preview --outDir dist/h5",
+        "dev:wx": "cross-env NODE_ENV=development VITE_PLUGIN_TARO_TARGET=wx vite build --watch",
+        "dev:h5": "cross-env NODE_ENV=development VITE_PLUGIN_TARO_TARGET=h5 vite",
+        "build:wx": "cross-env NODE_ENV=production VITE_PLUGIN_TARO_TARGET=wx vite build",
+        "build:h5": "cross-env NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite build",
+        "preview:h5": "cross-env NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite preview --outDir dist/h5",
         "typecheck": "tsgo -b"
     }
 }
 ```
-
-在 Windows shell 中，请使用 `cross-env`。
 
 ### 7. 运行每个目标
 

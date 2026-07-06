@@ -4,11 +4,11 @@
     "author": "sep2",
     "type": "module",
     "scripts": {
-        "build-wx": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=wx vite build",
-        "build-h5": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite build",
-        "preview-h5": "NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite preview --outDir dist/h5",
-        "dev-wx": "NODE_ENV=development VITE_PLUGIN_TARO_TARGET=wx vite build --watch",
-        "dev-h5": "NODE_ENV=development VITE_PLUGIN_TARO_TARGET=h5 vite",
+        "build-wx": "cross-env NODE_ENV=production VITE_PLUGIN_TARO_TARGET=wx vite build",
+        "build-h5": "cross-env NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite build",
+        "preview-h5": "cross-env NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite preview --outDir dist/h5",
+        "dev-wx": "cross-env NODE_ENV=development VITE_PLUGIN_TARO_TARGET=wx vite build --watch",
+        "dev-h5": "cross-env NODE_ENV=development VITE_PLUGIN_TARO_TARGET=h5 vite",
         "typecheck": "tsgo"
     },
     "dependencies": {
@@ -20,6 +20,7 @@
     "devDependencies": {
         "@types/react": "^19.2.17",
         "@typescript/native-preview": "latest",
+        "cross-env": "^10.1.0",
         "vite": "^8.0.16"
     }
 }

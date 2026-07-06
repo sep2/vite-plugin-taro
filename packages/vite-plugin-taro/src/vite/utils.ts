@@ -12,10 +12,13 @@ export function createPageComponentImport(pagePath: string): string {
 }
 
 /**
- * Converts a local file path into an absolute ESM import path for Vite.
+ * Converts a local file path into a Vite file-system import specifier.
+ *
+ * Rolldown does not reliably resolve raw Windows absolute paths from virtual
+ * module source, so generated imports use Vite's /@fs/ prefix instead.
  */
 export function toImportPath(filePath: string): string {
-    return path.resolve(filePath)
+    return `/@fs/${normalizeModuleId(path.resolve(filePath))}`
 }
 
 /**

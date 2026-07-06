@@ -106,7 +106,7 @@ function getPatchFile(upstreamName: string): string {
 
 function applyPatch(packageDir: string, patchFile: string): void {
     if (!existsSync(patchFile)) throw new Error(`Missing patch file: ${patchFile}`)
-    run('patch', ['-p1', '--input', patchFile], { cwd: packageDir })
+    run('git', ['apply', '-p1', patchFile], { cwd: packageDir })
 }
 
 function npmPack(specifier: string, destination: string): string {

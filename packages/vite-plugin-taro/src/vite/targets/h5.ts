@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 import type { HtmlTagDescriptor, PluginOption, UserConfig } from 'vite'
 import { h5ShimImportPath, isProd, nodeRequire } from '../constants.ts'
 import type { JsonObject, VitePluginTaroBuildContext, VitePluginTaroPageOption } from '../types.ts'
-import { createPageComponentImport } from '../utils.ts'
+import { createPageComponentImport, toImportPath } from '../utils.ts'
 import { virtualTaroApiId } from '../virtual-modules.ts'
 
 const virtualH5Id = 'virtual:vite-plugin-taro/h5'
@@ -173,8 +173,8 @@ export function createWebEntry(context: VitePluginTaroBuildContext): string {
     const webAppConfigCode = JSON.stringify(createWebAppConfig(context.appConfig))
     const webRoutesConfigCode = createWebRoutesConfig(context.pages)
 
-    return `import ${JSON.stringify(nodeRequire.resolve('@tarojs/components/global.css'))}
-import ${JSON.stringify(nodeRequire.resolve('@tarojs/components/dist/taro-components/taro-components.css'))}
+    return `import ${JSON.stringify(toImportPath(nodeRequire.resolve('@tarojs/components/global.css')))}
+import ${JSON.stringify(toImportPath(nodeRequire.resolve('@tarojs/components/dist/taro-components/taro-components.css')))}
 import {
     createHashHistory,
     createReactApp,
@@ -184,7 +184,7 @@ import {
 } from ${JSON.stringify(h5ShimImportPath)}
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import AppComponent from '${context.appComponentImport}'
+import AppComponent from ${JSON.stringify(context.appComponentImport)}
 
 const config = window.__taroAppConfig = ${webAppConfigCode}
 config.routes = ${webRoutesConfigCode}

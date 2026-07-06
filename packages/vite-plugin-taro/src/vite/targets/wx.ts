@@ -212,7 +212,7 @@ export function createWxAppEntry(context: VitePluginTaroBuildContext): string {
 
     return `import { createReactApp, ReactDOM } from ${JSON.stringify(wxShimImportPath)}
 import React from 'react'
-import AppComponent from '${context.appComponentImport}'
+import AppComponent from ${JSON.stringify(context.appComponentImport)}
 
 const appConfig = ${wechatAppConfigCode}
 App(createReactApp(AppComponent, React, ReactDOM, appConfig))
@@ -228,7 +228,7 @@ export function createWxPageEntry(pageOption: VitePluginTaroPageOption): string 
     const wechatPageConfigCode = JSON.stringify(pageOption.config)
     const pageComponentImport = createPageComponentImport(pageOption.path)
     return `import { createPageConfig } from ${JSON.stringify(wxShimImportPath)}
-import PageComponent from '${pageComponentImport}'
+import PageComponent from ${JSON.stringify(pageComponentImport)}
 
 const pageConfig = ${wechatPageConfigCode}
 const taroPageConfig = createPageConfig(PageComponent, '${pageOption.path}', { root: { cn: [] } }, pageConfig)

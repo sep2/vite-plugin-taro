@@ -1,0 +1,45 @@
+name: Windows CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare Taro packages
+        run: pnpm prepare:taro
+
+      - name: Build plugin
+        run: pnpm build:plugin
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build sample WeChat Mini Program
+        run: pnpm build:sample:wx
+
+      - name: Build sample H5
+        run: pnpm build:sample:h5
