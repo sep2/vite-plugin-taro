@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 import type { HtmlTagDescriptor, PluginOption, UserConfig } from 'vite'
 import { h5ShimImportPath, isProd, nodeRequire } from '../constants.ts'
 import type { JsonObject, VitePluginTaroBuildContext, VitePluginTaroPageOption } from '../types.ts'
-import { createPageComponentImport, toImportPath } from '../utils.ts'
+import { createPageComponentImport } from '../utils.ts'
 import { virtualTaroApiId } from '../virtual-modules.ts'
 
 const virtualH5Id = 'virtual:vite-plugin-taro/h5'
@@ -163,7 +163,7 @@ export function createWebIndexHtmlTags(context: VitePluginTaroBuildContext): Htm
 
 /**
  * Builds the generated Web entry around Taro's official Web router/runtime APIs.
- * Base Taro CSS is imported before the app; component CSS order is handled by rewriteStencilStyleInsertion.
+ * H5 component CSS is exposed through vite-plugin-taro/taro.css so app CSS can choose cascade order/layers.
  *
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-loader/src/h5.ts#L120-L150
  */
@@ -171,9 +171,7 @@ export function createWebEntry(context: VitePluginTaroBuildContext): string {
     const webAppConfigCode = JSON.stringify(createWebAppConfig(context.appConfig))
     const webRoutesConfigCode = createWebRoutesConfig(context.pages)
 
-    return `import ${JSON.stringify(toImportPath(nodeRequire.resolve('@tarojs/components/global.css')))}
-import ${JSON.stringify(toImportPath(nodeRequire.resolve('@tarojs/components/dist/taro-components/taro-components.css')))}
-import {
+    return `import {
     createHashHistory,
     createReactApp,
     createRouter,

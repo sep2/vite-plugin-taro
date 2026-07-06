@@ -25,12 +25,14 @@
         "./client": {
             "types": "./client.d.ts"
         },
+        "./taro.css": "./taro.css",
         "./package.json": "./package.json"
     },
     "files": [
         "dist",
         "src",
         "client.d.ts",
+        "taro.css",
         "LICENSE",
         "README.md",
         "README.zh.md"
@@ -57,7 +59,6 @@
     "dependencies": {
         "@babel/core": "^7.29.7",
         "@rolldown/plugin-babel": "^0.2.3",
-        "@tailwindcss/vite": "^4.3.1",
         "@tarojs/components": "^4.2.0",
         "@tarojs/helper": "^4.2.0",
         "@tarojs/plugin-framework-react": "workspace:vite-plugin-taro-plugin-framework-react@*",
@@ -70,7 +71,7 @@
         "@vitejs/plugin-react": "^6.0.2",
         "babel-plugin-transform-taroapi": "^4.2.0",
         "tailwindcss": "^4.3.1",
-        "weapp-tailwindcss": "^5.0.13"
+        "weapp-tailwindcss": "^5.1.9"
     },
     "peerDependencies": {
         "react": "^19.0.0",

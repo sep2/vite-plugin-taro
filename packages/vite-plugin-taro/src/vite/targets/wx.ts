@@ -44,7 +44,7 @@ const taroVersion = String(nodeRequire('@tarojs/runtime/package.json').version)
 /**
  * Configures wx target entry, output, and chunk layout.
  */
-export function createWxViteConfig(context: VitePluginTaroBuildContext): UserConfig {
+export function createWxViteConfig(_context: VitePluginTaroBuildContext): UserConfig {
     return {
         define: createWechatTaroDefines(),
         // https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-webpack5-runner/src/webpack/MiniCombination.ts#L22-L84

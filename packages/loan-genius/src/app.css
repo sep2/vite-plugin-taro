@@ -1,6 +1,8 @@
-@import "tailwindcss/theme.css";
-@import "tailwindcss/preflight.css";
-@import "tailwindcss/utilities.css";
+@import "tailwindcss";
+
+/* #ifdef h5 */
+@import "vite-plugin-taro/taro.css";
+/* #endif */
 
 @source "./";
 
