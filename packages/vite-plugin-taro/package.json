@@ -25,14 +25,13 @@
         "./client": {
             "types": "./client.d.ts"
         },
-        "./taro.css": "./taro.css",
+        "./taro.css": "./src/css/taro.css",
         "./package.json": "./package.json"
     },
     "files": [
         "dist",
         "src",
         "client.d.ts",
-        "taro.css",
         "LICENSE",
         "README.md",
         "README.zh.md"
