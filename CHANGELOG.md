@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.2.1] - 2026-07-06
+
+### Changed
+
+- replace `tsgo` with `tsc` for type checking and upgrade to TypeScript 7 (aa2f598)
+
 ## [0.2.0] - 2026-07-06
 
 ### Added
