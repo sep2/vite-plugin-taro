@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.2.2] - 2026-07-06
+
+### Changed
+
+- add TailwindCSS v4.3.1 to dependencies in loan-genius and default template (a8d66d6)
+- enable type declarations and update `exports` field in package.json (e045644)
+- replace `IS_WEAPP` and `IS_H5` with `import.meta.env.VITE_PLUGIN_TARO_TARGET` (c858b5c)
+- adjust formatting for consistent code style in `index.tsx` (df0203b)
+
 ## [0.2.1] - 2026-07-06
 
 ### Changed

@@ -1,6 +1,6 @@
 {
     "name": "vite-plugin-taro",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "author": "sep2",
     "description": "Vite 8 plugin for building one React/Taro codebase for WeChat Mini Program and H5 targets.",
     "type": "module",

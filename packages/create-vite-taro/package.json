@@ -1,6 +1,6 @@
 {
     "name": "create-vite-taro",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "description": "Create Vite 8 + React 19 + Taro apps for H5 and WeChat Mini Program targets.",
     "type": "module",
     "bin": {
