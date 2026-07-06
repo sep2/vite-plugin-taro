@@ -26,10 +26,10 @@ const packages: PackageSpec[] = [
 ]
 
 for (const [upstreamName, targetDir] of packages) {
-    buildPackage(upstreamName, targetDir)
+    await buildPackage(upstreamName, targetDir)
 }
 
-function buildPackage(upstreamName: string, targetDir: string): void {
+async function buildPackage(upstreamName: string, targetDir: string): Promise<void> {
     const absoluteTargetDir = path.resolve(repoRoot, targetDir)
     const localPackageJson = readLocalPackageJson(absoluteTargetDir)
     const localReadme = readLocalReadme(absoluteTargetDir)
@@ -37,7 +37,7 @@ function buildPackage(upstreamName: string, targetDir: string): void {
     const workingDir = mkdtempSync(path.join(tmpdir(), 'vite-plugin-taro-'))
 
     try {
-        const packageDir = extractUpstreamPackage(upstreamName, workingDir)
+        const packageDir = await extractUpstreamPackage(upstreamName, workingDir)
 
         applyPatch(packageDir, patchFile)
         writeFileSync(path.join(packageDir, 'package.json'), localPackageJson.text)
@@ -50,15 +50,14 @@ function buildPackage(upstreamName: string, targetDir: string): void {
     }
 }
 
-function extractUpstreamPackage(upstreamName: string, workingDir: string): string {
+async function extractUpstreamPackage(upstreamName: string, workingDir: string): Promise<string> {
     const tarballDir = path.join(workingDir, 'tarballs')
     const extractDir = path.join(workingDir, 'extract')
     mkdirSync(tarballDir, { recursive: true })
     mkdirSync(extractDir, { recursive: true })
 
-    const specifier = `${upstreamName}@${upstreamVersion}`
-    console.log(`Packing ${specifier}`)
-    const tarballPath = npmPack(specifier, tarballDir)
+    console.log(`Fetching ${upstreamName}@${upstreamVersion}`)
+    const tarballPath = await fetchUpstreamTarball(upstreamName, tarballDir)
     run(getTarCommand(), ['-xzf', tarballPath, '-C', extractDir])
 
     return path.join(extractDir, 'package')
@@ -105,30 +104,26 @@ function applyPatch(packageDir: string, patchFile: string): void {
     run(getGitCommand(), ['apply', '-p1', patchFile], { cwd: packageDir })
 }
 
-function npmPack(specifier: string, destination: string): string {
-    const output = runNpm(['pack', specifier, '--pack-destination', destination, '--silent'])
-    const fileName = output.trim().split('\n').filter(Boolean).at(-1)
+async function fetchUpstreamTarball(upstreamName: string, destination: string): Promise<string> {
+    const packageFileName = upstreamName.split('/').at(-1)
+    if (!packageFileName) throw new Error(`Invalid package name: ${upstreamName}`)
 
-    if (!fileName) throw new Error(`npm pack did not return a tarball name for ${specifier}`)
-    return path.resolve(destination, fileName)
+    const tarballFileName = `${packageFileName}-${upstreamVersion}.tgz`
+    const tarballUrl = new URL(`${upstreamName}/-/${tarballFileName}`, getNpmRegistryUrl())
+    const response = await fetch(tarballUrl)
+
+    if (!response.ok) {
+        throw new Error(`Failed to fetch ${tarballUrl}: ${response.status} ${response.statusText}`)
+    }
+
+    const tarballPath = path.join(destination, tarballFileName)
+    writeFileSync(tarballPath, new Uint8Array(await response.arrayBuffer()))
+    return tarballPath
 }
 
-function runNpm(args: string[]): string {
-    const npmCliPath = findNpmCliPath()
-    if (npmCliPath) return run(process.execPath, [npmCliPath, ...args])
-    if (process.platform !== 'win32') return run('npm', args)
-    throw new Error(`Could not locate npm CLI for ${process.execPath}`)
-}
-
-function findNpmCliPath(): string | undefined {
-    const nodeBinDir = path.dirname(process.execPath)
-    const npmExecPath = process.env.npm_execpath
-    const candidates = [
-        npmExecPath && path.basename(npmExecPath).toLowerCase() === 'npm-cli.js' ? npmExecPath : undefined,
-        path.join(nodeBinDir, 'node_modules/npm/bin/npm-cli.js'),
-        path.resolve(nodeBinDir, '../lib/node_modules/npm/bin/npm-cli.js')
-    ].filter((candidate): candidate is string => Boolean(candidate))
-    return candidates.find((candidate) => existsSync(candidate))
+function getNpmRegistryUrl(): string {
+    const registry = process.env.npm_config_registry || 'https://registry.npmjs.org/'
+    return registry.endsWith('/') ? registry : `${registry}/`
 }
 
 function getGitCommand(): string {
