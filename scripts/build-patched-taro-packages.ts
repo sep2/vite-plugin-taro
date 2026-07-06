@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -42,7 +42,7 @@ function buildPackage(upstreamName: string, targetDir: string): void {
         applyPatch(packageDir, patchFile)
         writeFileSync(path.join(packageDir, 'package.json'), localPackageJson.text)
         writeFileSync(path.join(packageDir, 'README.md'), localReadme)
-        replaceGeneratedPackage(absoluteTargetDir, packageDir, workingDir)
+        replaceGeneratedPackage(absoluteTargetDir, packageDir)
 
         console.log(`Generated ${String(localPackageJson.value.name)}@${String(localPackageJson.value.version)}`)
     } finally {
@@ -59,25 +59,21 @@ function extractUpstreamPackage(upstreamName: string, workingDir: string): strin
     const specifier = `${upstreamName}@${upstreamVersion}`
     console.log(`Packing ${specifier}`)
     const tarballPath = npmPack(specifier, tarballDir)
-    run('tar', ['-xzf', tarballPath, '-C', extractDir])
+    run(getTarCommand(), ['-xzf', tarballPath, '-C', extractDir])
 
     return path.join(extractDir, 'package')
 }
 
-function replaceGeneratedPackage(targetDir: string, packageDir: string, workingDir: string): void {
-    const targetNodeModules = path.join(targetDir, 'node_modules')
-    const preservedNodeModules = path.join(workingDir, 'node_modules')
-
-    if (existsSync(targetNodeModules)) {
-        renameSync(targetNodeModules, preservedNodeModules)
+function replaceGeneratedPackage(targetDir: string, packageDir: string): void {
+    if (existsSync(targetDir)) {
+        for (const entryName of readdirSync(targetDir)) {
+            if (entryName === 'node_modules') continue
+            rmSync(path.join(targetDir, entryName), { recursive: true, force: true })
+        }
     }
 
-    rmSync(targetDir, { recursive: true, force: true })
-    cpSync(packageDir, targetDir, { recursive: true })
-
-    if (existsSync(preservedNodeModules)) {
-        renameSync(preservedNodeModules, targetNodeModules)
-    }
+    mkdirSync(targetDir, { recursive: true })
+    cpSync(packageDir, targetDir, { recursive: true, force: true })
 }
 
 function readLocalPackageJson(targetDir: string): LocalPackageJson {
@@ -106,7 +102,7 @@ function getPatchFile(upstreamName: string): string {
 
 function applyPatch(packageDir: string, patchFile: string): void {
     if (!existsSync(patchFile)) throw new Error(`Missing patch file: ${patchFile}`)
-    run('git', ['apply', '-p1', patchFile], { cwd: packageDir })
+    run(getGitCommand(), ['apply', '-p1', patchFile], { cwd: packageDir })
 }
 
 function npmPack(specifier: string, destination: string): string {
@@ -119,6 +115,14 @@ function npmPack(specifier: string, destination: string): string {
 
 function getNpmCommand(): string {
     return process.platform === 'win32' ? 'npm.cmd' : 'npm'
+}
+
+function getGitCommand(): string {
+    return process.platform === 'win32' ? 'git.exe' : 'git'
+}
+
+function getTarCommand(): string {
+    return process.platform === 'win32' ? 'tar.exe' : 'tar'
 }
 
 function run(command: string, args: string[], options: RunOptions = {}): string {
