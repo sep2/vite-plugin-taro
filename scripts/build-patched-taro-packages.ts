@@ -106,15 +106,29 @@ function applyPatch(packageDir: string, patchFile: string): void {
 }
 
 function npmPack(specifier: string, destination: string): string {
-    const output = run(getNpmCommand(), ['pack', specifier, '--pack-destination', destination, '--silent'])
+    const output = runNpm(['pack', specifier, '--pack-destination', destination, '--silent'])
     const fileName = output.trim().split('\n').filter(Boolean).at(-1)
 
     if (!fileName) throw new Error(`npm pack did not return a tarball name for ${specifier}`)
     return path.resolve(destination, fileName)
 }
 
-function getNpmCommand(): string {
-    return process.platform === 'win32' ? 'npm.cmd' : 'npm'
+function runNpm(args: string[]): string {
+    const npmCliPath = findNpmCliPath()
+    if (npmCliPath) return run(process.execPath, [npmCliPath, ...args])
+    if (process.platform !== 'win32') return run('npm', args)
+    throw new Error(`Could not locate npm CLI for ${process.execPath}`)
+}
+
+function findNpmCliPath(): string | undefined {
+    const nodeBinDir = path.dirname(process.execPath)
+    const npmExecPath = process.env.npm_execpath
+    const candidates = [
+        npmExecPath && path.basename(npmExecPath).toLowerCase() === 'npm-cli.js' ? npmExecPath : undefined,
+        path.join(nodeBinDir, 'node_modules/npm/bin/npm-cli.js'),
+        path.resolve(nodeBinDir, '../lib/node_modules/npm/bin/npm-cli.js')
+    ].filter((candidate): candidate is string => Boolean(candidate))
+    return candidates.find((candidate) => existsSync(candidate))
 }
 
 function getGitCommand(): string {
