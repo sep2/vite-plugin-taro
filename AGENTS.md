@@ -23,14 +23,17 @@ Node.js v26+ is available and can execute TypeScript natively. Packages declare 
 - `pnpm dev:sample:h5`: run the sample H5 dev server.
 - `pnpm dev:sample:wx`: rebuild the sample WeChat Mini Program target in watch mode.
 - `pnpm preview:sample:h5`: preview the built sample H5 target.
+- `pnpm changelog`: regenerate `CHANGELOG.md` from git release tags.
 - `pnpm publish:dry`: validate the release without publishing.
 - `pnpm publish:all`: publish public packages in dependency order.
 - `pnpm version:bump <version|major|minor|patch|premajor|preminor|prepatch|prerelease>`: bump every package version and the generated template's `vite-plugin-taro` dependency. Use `--dry-run` to preview changes and `--preid <id>` for prerelease bumps.
+- `pnpm release <version|major|minor|patch|premajor|preminor|prepatch|prerelease>`: bump versions, regenerate `CHANGELOG.md` for the release, validate publishable packages, create the release commit/tag, and push unless `--no-push` is used. Use `--dry-run` to preview and `--preid <id>` for prerelease bumps.
 
 # Generated files and packages
 
 - User-facing documentation should show npm commands by default. Keep repository contributor/development instructions on pnpm.
 - Do not manually edit `packages/vite-plugin-taro/dist`; rebuild it with `pnpm build:plugin`.
+- Do not manually edit `CHANGELOG.md`; regenerate it with `pnpm changelog`, or let `pnpm release ...` update it for a release.
 - Do not manually edit generated Taro package implementation files under `packages/taro-react` or `packages/taro-plugin-framework-react`. Change the relevant file in `patches/*@4.2.0-react19.patch`, then run `pnpm prepare:taro`.
 - The generated Taro package `package.json` and `README.md` files are local metadata and are preserved by `pnpm prepare:taro`.
 

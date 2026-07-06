@@ -23,6 +23,7 @@
         "lint": "biome check .",
         "format": "biome check --write .",
         "version:bump": "node scripts/bump-package-versions.ts",
+        "changelog": "node scripts/update-changelog.ts",
         "release": "node scripts/release.ts",
         "publish:all": "node scripts/publish-packages.ts",
         "publish:dry": "node scripts/publish-packages.ts --dry-run"

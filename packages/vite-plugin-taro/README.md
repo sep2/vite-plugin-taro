@@ -493,8 +493,9 @@ Common scripts:
 | `pnpm build:sample:wx` | Build the WeChat Mini Program sample to `packages/loan-genius/dist/wx`. |
 | `pnpm build:sample:h5` | Build the H5 sample app to `packages/loan-genius/dist/h5`. |
 | `pnpm preview:sample:h5` | Preview the built H5 sample. |
+| `pnpm changelog` | Regenerate `CHANGELOG.md` from git release tags. |
 | `pnpm publish:dry` | Dry-run package validation and publishing. |
-| `pnpm release <version\|bump>` | Validate, bump versions, create the release commit and tag, and push to trigger CI publishing. |
+| `pnpm release <version\|bump>` | Validate, bump versions, update the changelog, create the release commit and tag, and push to trigger CI publishing. |
 | `pnpm publish:all` | Publish the public packages in dependency order; mainly used by the tag-based Trusted Publishing workflow. |
 
 ## Limitations

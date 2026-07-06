@@ -493,8 +493,9 @@ pnpm typecheck
 | `pnpm build:sample:wx` | 将微信小程序示例构建到 `packages/loan-genius/dist/wx`。 |
 | `pnpm build:sample:h5` | 将 H5 示例应用构建到 `packages/loan-genius/dist/h5`。 |
 | `pnpm preview:sample:h5` | 预览构建后的 H5 示例。 |
+| `pnpm changelog` | 从 git release tag 重新生成 `CHANGELOG.md`。 |
 | `pnpm publish:dry` | 干运行包校验和发布流程。 |
-| `pnpm release <version\|bump>` | 验证发布、更新版本、创建 release commit 和 tag，并推送触发 CI 发布。 |
+| `pnpm release <version\|bump>` | 验证发布、更新版本、更新 changelog、创建 release commit 和 tag，并推送触发 CI 发布。 |
 | `pnpm publish:all` | 按依赖顺序发布公开包；主要由基于 tag 的 Trusted Publishing 工作流调用。 |
 
 ## 限制

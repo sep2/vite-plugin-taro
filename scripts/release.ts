@@ -17,8 +17,10 @@ type CommandResult = {
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 const git = process.platform === 'win32' ? 'git.exe' : 'git'
+const node = process.execPath
 
 const releaseFiles = [
+    'CHANGELOG.md',
     'package.json',
     'packages/create-vite-taro/package.json',
     'packages/create-vite-taro/templates/default/package.json',
@@ -82,6 +84,7 @@ if (dryRun) {
     const tagName = `v${nextVersion}`
 
     console.log('\nRelease dry run:')
+    console.log(`- Would update CHANGELOG.md for ${nextVersion}`)
     console.log(`- Would validate publishable packages: pnpm publish:dry -- --no-git-check`)
     console.log(`- Would create commit: chore: release ${tagName}`)
     console.log(`- Would create tag: ${tagName}`)
@@ -101,6 +104,7 @@ const tagName = `v${nextVersion}`
 assertTagIsAvailable(tagName, remote)
 
 run(pnpm, ['version:bump', ...versionBumpArgs])
+run(node, ['scripts/update-changelog.ts', '--version', nextVersion])
 
 const actualVersion = readRootPackageVersion()
 if (actualVersion !== nextVersion) {
