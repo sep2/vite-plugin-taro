@@ -16,7 +16,7 @@
 - **Taro 能力，无需 webpack** 使用 Taro 组件和 API，摆脱旧式 webpack 链路。
 - **Tailwind CSS v4 开箱即用** 直接书写工具类，微信与 Web 样式自动适配。
 - **Skyline 就绪** 支持微信 Skyline 渲染模式。
-- **热更新** Web 与小程序开发都能快速查看改动。
+- **热更新** 依托于 Vite 标准的热更新支持，Web 与小程序开发都能快速查看改动。
 - **条件编译** 用 Taro 风格 `#ifdef` / `#ifndef` / `#if` 拆分代码和样式。
 - **工作区友好** 支持普通项目与 monorepo，兼容 `npm`、`pnpm`、`Yarn`、`Bun`。
 - **TypeScript 友好** 从配置到应用代码都有类型支持。
@@ -247,10 +247,6 @@ export default App
 @import "tailwindcss";
 
 @source "./";
-
-@theme {
-    --text-22: 1.375rem;
-}
 ```
 
 请保留 `@source "./";`，让 Tailwind 扫描源码目录。
