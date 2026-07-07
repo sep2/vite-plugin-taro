@@ -6,7 +6,7 @@
 
 简体中文 | [English](README.md)
 
-使用最新标准化前端技术栈 Vite 8、React 19 和 Tailwind CSS v4 构建微信小程序。
+使用最新标准化前端技术栈 Vite 8、React 19、Taro 4 和 Tailwind CSS v4 构建微信小程序与 Web 应用。
 
 `vite-plugin-taro` 面向希望用 Vite 构建 Taro React 应用的团队：保留 Taro 跨平台组件和 API，告别 Taro webpack，并修复/规避官方 Taro Vite 的常见坑。一个插件即可构建微信小程序与 Web。
 
@@ -16,7 +16,7 @@
 - **Taro 能力，无需 webpack** 使用 Taro 组件和 API，摆脱旧式 webpack 链路。
 - **Tailwind CSS v4 开箱即用** 直接书写工具类，微信与 Web 样式自动适配。
 - **Skyline 就绪** 支持微信 Skyline 渲染模式。
-- **热更新** Web 与小程序都能快速查看改动，便于开发者工具和真机验证。
+- **热更新** 依托于 Vite 标准的热更新支持，Web 与小程序开发都能快速查看改动。
 - **条件编译** 用 Taro 风格 `#ifdef` / `#ifndef` / `#if` 拆分代码和样式。
 - **工作区友好** 支持普通项目与 monorepo，兼容 `npm`、`pnpm`、`Yarn`、`Bun`。
 - **TypeScript 友好** 从配置到应用代码都有类型支持。
@@ -60,7 +60,7 @@ npm run dev:h5
 
 你可以在两个终端中同时运行 `npm run dev:wx` 和 `npm run dev:h5`。
 
-提示：受微信限制，开发者工具热重载有时不会完整生效。建议日常优先使用 H5 的 Vite 热更新快速调试，并定期在微信开发者工具中验证小程序端效果。
+提示：受微信限制，开发者工具热重载有时不会完整生效。建议日常优先使用 Web 的 Vite 热更新快速调试，并定期在微信开发者工具中验证小程序端效果。
 
 ### 4. 构建、预览和类型检查
 
@@ -175,19 +175,9 @@ export default defineConfig(({ mode }) => {
             vitePluginTaro({
                 target,
                 app: 'src/app.ts',
-                pages: [
-                    {
-                        path: 'pages/index/index',
-                        config: {
-                            navigationBarTitleText: 'Home'
-                        }
-                    }
-                ],
+                pages: [{ path: 'pages/index/index', config: { navigationBarTitleText: 'Home' } }],
                 appJson: {
-                    window: {
-                        navigationBarTitleText: 'Demo',
-                        navigationBarBackgroundColor: '#ffffff'
-                    }
+                    window: { navigationBarTitleText: 'Demo' }
                 },
                 projectConfigJson: {
                     appid: env.VITE_PLUGIN_TARO_WECHAT_APP_ID || 'touristappid',
@@ -209,6 +199,7 @@ export default defineConfig(({ mode }) => {
 - `app` 是 React 根应用组件模块，应默认导出应用组件。
 - 每个 `pages[].path` 都会映射到 `src/${path}.tsx` 文件。例如，`pages/index/index` 需要 `src/pages/index/index.tsx`。
 - `appJson.pages` 会根据 `pages` 自动生成；你在 `appJson` 中传入的任何 `pages` 字段都会被覆盖。
+- 如果应用使用 Skyline，请保留模板里的相关 `appJson` 和 `projectConfigJson` 配置。
 - 插件不会读取 Taro CLI 配置文件，例如 `config/index.ts`、`app.config.ts` 或页面 `config.ts` 文件。请通过插件选项传入应用和页面配置。
 
 ### 3. 创建应用组件
@@ -216,19 +207,12 @@ export default defineConfig(({ mode }) => {
 `src/app.ts` 是共享应用包装组件。它会通过 `children` 接收当前页面。
 
 ```tsx
-import Taro from 'virtual:taro/api'
 import type { PropsWithChildren } from 'react'
 import './app.css'
 
-function App({ children }: PropsWithChildren) {
-    Taro.useLaunch(() => {
-        console.log('App launched')
-    })
-
+export default function App({ children }: PropsWithChildren) {
     return children
 }
-
-export default App
 ```
 
 请在应用组件中导入全局样式。下一步会创建 `src/app.css`。
@@ -246,10 +230,6 @@ export default App
 @import "tailwindcss";
 
 @source "./";
-
-@theme {
-    --text-22: 1.375rem;
-}
 ```
 
 请保留 `@source "./";`，让 Tailwind 扫描源码目录。
@@ -259,22 +239,12 @@ export default App
 `src/pages/index/index.tsx` 是 `pages/index/index` 对应的 React 页面组件。
 
 ```tsx
-import Taro from 'virtual:taro/api'
-import { Button, Text, View } from 'virtual:taro/components'
+import { Text, View } from 'virtual:taro/components'
 
 export default function IndexPage() {
-    const windowInfo = Taro.getWindowInfo()
-
     return (
         <View className="p-4">
-            <Text>Viewport width: {windowInfo.windowWidth}</Text>
-            <Button
-                onClick={() => {
-                    Taro.showToast({ title: 'Hello from Taro' })
-                }}
-            >
-                Show toast
-            </Button>
+            <Text>Hello Taro</Text>
         </View>
     )
 }
@@ -285,17 +255,7 @@ export default function IndexPage() {
 对于 H5，请保留一个普通的 Vite `index.html`，并包含 `#app` 挂载节点。插件会自动注入生成的 Taro H5 入口，因此你不需要普通 Vite 的 `src/main.tsx` 脚本。
 
 ```html
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Taro Vite App</title>
-  </head>
-  <body>
-    <div id="app"></div>
-  </body>
-</html>
+<div id="app"></div>
 ```
 
 ### 7. 添加脚本
@@ -357,10 +317,10 @@ type VitePluginTaroOptions = {
 | --- | --- |
 | `target` | 本次 Vite 调用的活动目标。微信小程序使用 `wx`，Web 使用 `h5`。 |
 | `app` | 默认导出根 React 应用组件的源码文件，例如 `src/app.ts` 或 `src/app.tsx`。 |
-| `pages` | 有序页面列表。该顺序会成为 `app.json.pages` 和 H5 路由顺序。 |
+| `pages` | 有序页面列表。该顺序会成为 `app.json.pages` 和 Web 路由顺序。 |
 | `pages[].path` | 不带扩展名的 Taro 风格路由和输出路径，例如 `pages/index/index`。页面组件必须存在于 `src/${path}.tsx`。 |
-| `pages[].config` | 合并到生成的微信页面 JSON 和 H5 路由配置中的页面配置。 |
-| `appJson` | 基础应用配置。插件会用 `options.pages` 覆盖其中的 `pages` 字段。 |
+| `pages[].config` | 合并到生成的微信页面 JSON 和 Web 路由配置中的页面配置。 |
+| `appJson` | 两个目标共享的基础应用配置。插件会用 `options.pages` 覆盖其中的 `pages` 字段。 |
 | `projectConfigJson` | `wx` 构建时输出的微信 `project.config.json` 内容。即使当前目标是 `h5`，选项类型也要求提供它。 |
 | `sitemapJson` | `wx` 构建时输出的微信 `sitemap.json` 内容。即使当前目标是 `h5`，选项类型也要求提供它。 |
 
@@ -413,7 +373,7 @@ dist/wx/
 
 请使用微信开发者工具打开 `dist/wx`；不要打开源码项目目录。
 
-### H5
+### H5 / Web
 
 对于 `target: 'h5'`，插件会向 `index.html` 注入生成模块，根据 `pages` 构建路由记录，并使用 Taro 的 hash-history 路由挂载应用。请在应用 CSS 中导入 `virtual:taro/css` 以包含 Taro H5 组件样式。路由使用配置中的页面路径，例如 `#/pages/index/index`。
 
@@ -523,6 +483,7 @@ pnpm typecheck
 
 ## 限制
 
+- 目前只支持 React 应用。
 - 目前只生成 `wx` 和 `h5` 目标。
 - 应用代码不能直接导入 `@tarojs/*` 包。
 
@@ -536,8 +497,8 @@ pnpm typecheck
 | 微信开发者工具无法打开应用 | 打开生成的 `dist/wx` 文件夹，并检查 `projectConfigJson.appid`。 |
 | H5 显示空白页 | 确保 `index.html` 中保留 `<div id="app"></div>`，已注册插件，并避免添加单独的默认 Vite `main.tsx` 入口。 |
 | Taro API 缺失或行为不同 | 移除应用代码中直接导入的 `@tarojs/*`，并从 `virtual:taro/api` 导入 Taro。 |
-| 组件在 H5 上渲染时缺少预期样式 | 从 `virtual:taro/components` 导入组件，并确保 `h5` 目标启用了插件。 |
-| Tailwind 类没有生效 | 确保 `src/app.css` 导入了 `tailwindcss`，`@source` 指向源码目录，并且类名可以被静态扫描到。移动文件后请重启开发服务。 |
+| 组件在 H5 上渲染时缺少预期样式 | 确保 `src/app.css` 导入了 `virtual:taro/css`，并且 app 入口导入了 `./app.css`。 |
+| Tailwind 类没有生效 | 确保 `src/app.css` 导入了 `tailwindcss`，保留 `@source "./";`，并且类名可以被静态扫描到。移动文件后请重启开发服务。 |
 
 ## 发布流程
 

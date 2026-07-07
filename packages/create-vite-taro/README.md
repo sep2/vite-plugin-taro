@@ -1,6 +1,6 @@
 # create-vite-taro
 
-Create a Vite 8 + React 19 + Taro app for WeChat Mini Program and H5 targets.
+Create a Vite 8 + React 19 + Taro app for WeChat Mini Program and Web/H5 targets.
 
 ## Quick start
 
@@ -18,7 +18,7 @@ npm install
 # WeChat Mini Program: rebuild dist/wx in watch mode
 npm run dev:wx
 
-# H5: start the Vite dev server
+# Web/H5: start the Vite dev server
 npm run dev:h5
 
 # Then open the standard Vite dev URL in your browser
@@ -27,9 +27,11 @@ npm run dev:h5
 
 You can keep `npm run dev:wx` and `npm run dev:h5` running at the same time in separate terminals.
 
-Note: Because of WeChat DevTools and Mini Program runtime limitations, hot reload/fast rebuilds for the WeChat target may not always apply cleanly. For day-to-day iteration, prefer the H5 Vite dev server for fast feedback, and periodically verify the Mini Program result in WeChat DevTools.
+Note: Because of WeChat DevTools and Mini Program runtime limitations, hot reload/fast rebuilds for the WeChat target may not always apply cleanly. For day-to-day iteration, prefer the Web/H5 Vite dev server for fast feedback, and periodically verify the Mini Program result in WeChat DevTools.
 
 Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` in the generated `.env.local` to your WeChat Mini Program App ID, then open `dist/wx` with WeChat DevTools for Mini Program development.
+
+The generated app keeps global styles in `src/app.css` and includes Tailwind CSS v4 plus Taro component styles out of the box.
 
 ## Other package managers
 
@@ -44,10 +46,10 @@ bun create vite-taro my-app
 | Command | Description |
 | --- | --- |
 | `npm run dev:wx` | Build the WeChat Mini Program in watch mode. |
-| `npm run dev:h5` | Start the H5 dev server with Vite 8 hot reload. |
+| `npm run dev:h5` | Start the Web/H5 dev server. |
 | `npm run build:wx` | Build the WeChat Mini Program output into `dist/wx`. |
-| `npm run build:h5` | Build the H5 output into `dist/h5`. |
-| `npm run preview:h5` | Preview the built H5 output. |
+| `npm run build:h5` | Build the Web/H5 output into `dist/h5`. |
+| `npm run preview:h5` | Preview the built Web/H5 output. |
 | `npm run typecheck` | Typecheck with `tsc`. |
 
 ## Troubleshooting

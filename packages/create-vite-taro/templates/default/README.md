@@ -13,7 +13,7 @@ npm install
 # WeChat Mini Program: rebuild dist/wx in watch mode
 npm run dev:wx
 
-# H5: start the Vite dev server
+# Web/H5: start the Vite dev server
 npm run dev:h5
 
 # Then open the standard Vite dev URL in your browser
@@ -22,15 +22,19 @@ npm run dev:h5
 
 You can keep `npm run dev:wx` and `npm run dev:h5` running at the same time in separate terminals.
 
-Note: Because of WeChat DevTools and Mini Program runtime limitations, hot reload/fast rebuilds for the WeChat target may not always apply cleanly. For day-to-day iteration, prefer the H5 Vite dev server for fast feedback, and periodically verify the Mini Program result in WeChat DevTools.
+Note: Because of WeChat DevTools and Mini Program runtime limitations, hot reload/fast rebuilds for the WeChat target may not always apply cleanly. For day-to-day iteration, prefer the Web/H5 Vite dev server for fast feedback, and periodically verify the Mini Program result in WeChat DevTools.
 
 Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` in `.env.local` to your WeChat App ID, then open `dist/wx` with WeChat DevTools for Mini Program development.
+
+## Styles
+
+Global styles live in `src/app.css`. Keep the `virtual:taro/css`, `tailwindcss`, and `@source "./";` lines so Taro component styles and Tailwind CSS v4 work for both targets.
 
 ## Scripts
 
 ```sh
 npm run dev:wx      # Build the WeChat Mini Program in watch mode
-npm run dev:h5      # Start the H5 dev server
+npm run dev:h5      # Start the Web/H5 dev server
 npm run build:wx    # Build dist/wx
 npm run build:h5    # Build dist/h5
 npm run preview:h5  # Preview dist/h5

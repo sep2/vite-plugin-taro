@@ -175,19 +175,9 @@ export default defineConfig(({ mode }) => {
             vitePluginTaro({
                 target,
                 app: 'src/app.ts',
-                pages: [
-                    {
-                        path: 'pages/index/index',
-                        config: {
-                            navigationBarTitleText: 'Home'
-                        }
-                    }
-                ],
+                pages: [{ path: 'pages/index/index', config: { navigationBarTitleText: 'Home' } }],
                 appJson: {
-                    window: {
-                        navigationBarTitleText: 'Demo',
-                        navigationBarBackgroundColor: '#ffffff'
-                    }
+                    window: { navigationBarTitleText: 'Demo' }
                 },
                 projectConfigJson: {
                     appid: env.VITE_PLUGIN_TARO_WECHAT_APP_ID || 'touristappid',
@@ -209,7 +199,7 @@ export default defineConfig(({ mode }) => {
 - `app` 是 React 根应用组件模块，应默认导出应用组件。
 - 每个 `pages[].path` 都会映射到 `src/${path}.tsx` 文件。例如，`pages/index/index` 需要 `src/pages/index/index.tsx`。
 - `appJson.pages` 会根据 `pages` 自动生成；你在 `appJson` 中传入的任何 `pages` 字段都会被覆盖。
-- 示例配置启用了微信 Skyline。请根据自己的小程序调整 `appJson` 和 `projectConfigJson`。
+- 如果应用使用 Skyline，请保留模板里的相关 `appJson` 和 `projectConfigJson` 配置。
 - 插件不会读取 Taro CLI 配置文件，例如 `config/index.ts`、`app.config.ts` 或页面 `config.ts` 文件。请通过插件选项传入应用和页面配置。
 
 ### 3. 创建应用组件
@@ -217,19 +207,12 @@ export default defineConfig(({ mode }) => {
 `src/app.ts` 是共享应用包装组件。它会通过 `children` 接收当前页面。
 
 ```tsx
-import Taro from 'virtual:taro/api'
 import type { PropsWithChildren } from 'react'
 import './app.css'
 
-function App({ children }: PropsWithChildren) {
-    Taro.useLaunch(() => {
-        console.log('App launched')
-    })
-
+export default function App({ children }: PropsWithChildren) {
     return children
 }
-
-export default App
 ```
 
 请在应用组件中导入全局样式。下一步会创建 `src/app.css`。
@@ -256,22 +239,12 @@ export default App
 `src/pages/index/index.tsx` 是 `pages/index/index` 对应的 React 页面组件。
 
 ```tsx
-import Taro from 'virtual:taro/api'
-import { Button, Text, View } from 'virtual:taro/components'
+import { Text, View } from 'virtual:taro/components'
 
 export default function IndexPage() {
-    const windowInfo = Taro.getWindowInfo()
-
     return (
         <View className="p-4">
-            <Text>Viewport width: {windowInfo.windowWidth}</Text>
-            <Button
-                onClick={() => {
-                    Taro.showToast({ title: 'Hello from Taro' })
-                }}
-            >
-                Show toast
-            </Button>
+            <Text>Hello Taro</Text>
         </View>
     )
 }
@@ -282,17 +255,7 @@ export default function IndexPage() {
 对于 H5，请保留一个普通的 Vite `index.html`，并包含 `#app` 挂载节点。插件会自动注入生成的 Taro H5 入口，因此你不需要普通 Vite 的 `src/main.tsx` 脚本。
 
 ```html
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Taro Vite App</title>
-  </head>
-  <body>
-    <div id="app"></div>
-  </body>
-</html>
+<div id="app"></div>
 ```
 
 ### 7. 添加脚本
