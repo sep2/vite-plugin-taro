@@ -47,6 +47,29 @@ const taroVersion = String(nodeRequire('@tarojs/runtime/package.json').version)
 export function createWxViteConfig(_context: VitePluginTaroBuildContext): UserConfig {
     return {
         define: createWechatTaroDefines(),
+        css: {
+            lightningcss: {
+                // Vite 8's CSS minifier uses Lightning CSS. Keep pseudo-elements in CSS3 form so Skyline does not warn.
+                visitor: {
+                    Selector(selector) {
+                        return selector.map((component) => {
+                            if (
+                                component.type === 'pseudo-element' &&
+                                (component.kind === 'before' || component.kind === 'after')
+                            ) {
+                                return {
+                                    type: 'pseudo-element' as const,
+                                    kind: 'custom' as const,
+                                    name: component.kind
+                                }
+                            }
+
+                            return component
+                        })
+                    }
+                }
+            }
+        },
         // https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-webpack5-runner/src/webpack/MiniCombination.ts#L22-L84
         resolve: {
             // https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-webpack5-runner/src/webpack/MiniBaseConfig.ts#L44-L73
@@ -56,6 +79,7 @@ export function createWxViteConfig(_context: VitePluginTaroBuildContext): UserCo
             target: 'es2018',
             assetsInlineLimit: 1024,
             cssCodeSplit: false,
+            cssMinify: isProd ? 'lightningcss' : false,
             minify: isProd,
             rolldownOptions: {
                 // Start from app; page/component chunks below mirror Taro Webpack's generated entries.
