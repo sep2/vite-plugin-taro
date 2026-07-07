@@ -5,11 +5,11 @@
  * @Last Modified by: qiuz
  */
 
+import Taro from 'virtual:taro/api'
+import { Button, Input, ScrollView, Text, View } from 'virtual:taro/components'
 import { BoxShadow, NavigationBar } from '@components'
 import { formatFloat, getStorageData, isAndroid, setGlobalData } from '@utils'
 import { Component } from 'react'
-import { Button, Input, ScrollView, Text, View } from 'virtual:taro/components'
-import Taro from 'virtual:taro/api'
 import LoanGeniusHeader from './compute-header'
 import { COMPUTE_WAY, COMPUTE_WAY_TITLE, getRenderList, LIST_TYPE, LOAN_WAY_TITLE, OPTION } from './constants'
 import { equalInterestCalc } from './helper'
