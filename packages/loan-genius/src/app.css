@@ -1,5 +1,7 @@
+@layer theme, base, taro, components, utilities;
+
+@import "virtual:taro/css";
 @import "tailwindcss";
-@import "vite-plugin-taro/taro.css";
 
 @source "./";
 

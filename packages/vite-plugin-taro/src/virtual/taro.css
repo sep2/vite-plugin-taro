@@ -1,0 +1,2 @@
+@import "@tarojs/components/global.css" layer(taro);
+@import "@tarojs/components/dist/taro-components/taro-components.css" layer(taro);

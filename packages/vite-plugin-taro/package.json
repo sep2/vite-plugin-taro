@@ -25,7 +25,6 @@
         "./client": {
             "types": "./client.d.ts"
         },
-        "./taro.css": "./src/css/taro.css",
         "./package.json": "./package.json"
     },
     "files": [
@@ -69,7 +68,7 @@
         "@tarojs/taro": "^4.2.0",
         "@vitejs/plugin-react": "^6.0.2",
         "babel-plugin-transform-taroapi": "^4.2.0",
-        "tailwindcss": "^4.3.1",
+        "tailwindcss": "^4.3.2",
         "weapp-tailwindcss": "^5.1.9"
     },
     "peerDependencies": {

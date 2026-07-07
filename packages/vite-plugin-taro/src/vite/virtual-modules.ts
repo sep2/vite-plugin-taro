@@ -1,10 +1,10 @@
 import path from 'node:path'
-import { nodeRequire } from './constants.ts'
+import { packageRoot } from './constants.ts'
 
 export const virtualTaroApiId = 'virtual:taro/api'
 export const virtualTaroComponentsId = 'virtual:taro/components'
+export const virtualTaroCssId = 'virtual:taro/css'
 
-const packageRoot = path.dirname(nodeRequire.resolve('vite-plugin-taro/package.json'))
 const virtualTaroApiResolvedId = path.join(packageRoot, 'dist/virtual/api.js')
 const virtualTaroComponentsResolvedId = path.join(packageRoot, 'dist/virtual/components.js')
 

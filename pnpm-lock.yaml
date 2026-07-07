@@ -146,11 +146,11 @@ importers:
         specifier: ^19.2.7
         version: 19.2.7(react@19.2.7)
       tailwindcss:
-        specifier: ^4.3.1
-        version: 4.3.1
+        specifier: ^4.3.2
+        version: 4.3.2
       weapp-tailwindcss:
         specifier: ^5.1.9
-        version: 5.1.9(jiti@2.7.0)(tailwindcss@4.3.1)
+        version: 5.1.9(jiti@2.7.0)(tailwindcss@4.3.2)
     devDependencies:
       '@types/babel__core':
         specifier: ^7.20.5
@@ -2409,9 +2409,6 @@ packages:
     resolution: {integrity: sha512-FSdvTNxlO51+yK/kVV6PwYsJAwxHEV7+3bnojq2/kUUyAL8ZxfVqwmasuYFSWhFq8o9vijYky8yuiHQXYQaoVA==}
     engines: {node: ^20.19.0 || >=22.12.0}
 
-  tailwindcss@4.3.1:
-    resolution: {integrity: sha512-hk+TB1m+K8CYNrP6rjQaq/Y+4Zylwpa87mLYBKCunwnnQ9p+fHb7kmSfGqyEJoxF/O6CDyABWVFEafNSYKll+Q==}
-
   tailwindcss@4.3.2:
     resolution: {integrity: sha512-WtctNNSH8A9jlMIqxzuYumOHU5uGZyRv0Q5svQl+oEPy5w84YpBxdb7MdqyiSPQge5jTJ6zFQLq0PFygdccSBA==}
 
@@ -3235,7 +3232,7 @@ snapshots:
     dependencies:
       '@swc/counter': 0.1.3
 
-  '@tailwindcss-mangle/engine@0.1.2(tailwindcss@4.3.1)':
+  '@tailwindcss-mangle/engine@0.1.2(tailwindcss@4.3.2)':
     dependencies:
       '@tailwindcss/node': 4.3.2
       '@tailwindcss/oxide': 4.3.2
@@ -3243,7 +3240,7 @@ snapshots:
       pathe: 2.0.3
       postcss: 8.5.16
     optionalDependencies:
-      tailwindcss: 4.3.1
+      tailwindcss: 4.3.2
 
   '@tailwindcss/node@4.3.2':
     dependencies:
@@ -3700,9 +3697,9 @@ snapshots:
       postcss-selector-parser: 7.1.4
       postcss-value-parser: 4.2.0
 
-  '@weapp-tailwindcss/postcss@3.1.8(jiti@2.7.0)(tailwindcss@4.3.1)(yaml@2.9.0)':
+  '@weapp-tailwindcss/postcss@3.1.8(jiti@2.7.0)(tailwindcss@4.3.2)(yaml@2.9.0)':
     dependencies:
-      '@tailwindcss-mangle/engine': 0.1.2(tailwindcss@4.3.1)
+      '@tailwindcss-mangle/engine': 0.1.2(tailwindcss@4.3.2)
       '@weapp-core/escape': 8.0.0
       '@weapp-tailwindcss/postcss-calc': 1.0.2(postcss@8.5.16)
       '@weapp-tailwindcss/shared': 2.0.0
@@ -3723,9 +3720,9 @@ snapshots:
       - tsx
       - yaml
 
-  '@weapp-tailwindcss/reset@0.1.1(tailwindcss@4.3.1)':
+  '@weapp-tailwindcss/reset@0.1.1(tailwindcss@4.3.2)':
     dependencies:
-      tailwindcss: 4.3.1
+      tailwindcss: 4.3.2
 
   '@weapp-tailwindcss/shared@2.0.0':
     dependencies:
@@ -4689,8 +4686,6 @@ snapshots:
       '@weapp-tailwindcss/shared': 2.0.0
       jiti: 2.7.0
 
-  tailwindcss@4.3.1: {}
-
   tailwindcss@4.3.2: {}
 
   tapable@2.3.3: {}
@@ -4812,17 +4807,17 @@ snapshots:
       '@weapp-tailwindcss/shared': 2.0.0
       micromatch: 4.0.8
 
-  weapp-tailwindcss@5.1.9(jiti@2.7.0)(tailwindcss@4.3.1):
+  weapp-tailwindcss@5.1.9(jiti@2.7.0)(tailwindcss@4.3.2):
     dependencies:
       '@babel/parser': 7.29.7
       '@babel/traverse': 7.29.7
       '@babel/types': 7.29.7
-      '@tailwindcss-mangle/engine': 0.1.2(tailwindcss@4.3.1)
+      '@tailwindcss-mangle/engine': 0.1.2(tailwindcss@4.3.2)
       '@vue/compiler-dom': 3.5.39
       '@weapp-core/escape': 8.0.0
       '@weapp-tailwindcss/logger': 2.0.0
-      '@weapp-tailwindcss/postcss': 3.1.8(jiti@2.7.0)(tailwindcss@4.3.1)(yaml@2.9.0)
-      '@weapp-tailwindcss/reset': 0.1.1(tailwindcss@4.3.1)
+      '@weapp-tailwindcss/postcss': 3.1.8(jiti@2.7.0)(tailwindcss@4.3.2)(yaml@2.9.0)
+      '@weapp-tailwindcss/reset': 0.1.1(tailwindcss@4.3.2)
       '@weapp-tailwindcss/shared': 2.0.0
       comment-json: 5.0.0
       debug: 4.4.3

@@ -1,6 +1,5 @@
 import type { Plugin, PluginOption, UserConfig } from 'vite'
 import { createVitePluginTaroConditionalDirectivePlugin } from './plugins.ts'
-import { createTailwindcssPlugins } from './tailwindcss.ts'
 import {
     createH5SupportPlugins,
     createH5ViteConfig,
@@ -15,6 +14,7 @@ import {
     isWxVirtualModuleId,
     loadWxVirtualModule
 } from './targets/wx.ts'
+import { createTaroCssPlugin } from './taro-css.ts'
 import type { VitePluginTaroBuildContext, VitePluginTaroOptions } from './types.ts'
 import { stripVirtualPrefix, toImportPath } from './utils.ts'
 import { resolvePublicVirtualModuleId } from './virtual-modules.ts'
@@ -28,8 +28,8 @@ export default function vitePluginTaro(options: VitePluginTaroOptions): PluginOp
 
     return [
         createVitePluginTaroConditionalDirectivePlugin(context),
+        createTaroCssPlugin(context),
         ...createTargetSupportPlugins(context),
-        ...createTailwindcssPlugins(context),
         createVitePluginTaroPlugin(context)
     ]
 }

@@ -1,4 +1,5 @@
 import type { types as BabelTypes, NodePath, PluginObj } from '@babel/core'
+import { template } from '@babel/core'
 import babel from '@rolldown/plugin-babel'
 import react from '@vitejs/plugin-react'
 import type { HtmlTagDescriptor, PluginOption, UserConfig } from 'vite'
@@ -8,7 +9,6 @@ import { createPageComponentImport } from '../utils.ts'
 import { virtualTaroApiId } from '../virtual-modules.ts'
 
 const virtualH5Id = 'virtual:vite-plugin-taro/h5'
-const patchStencilCssOrder = true
 
 /**
  * Checks whether an id belongs to an H5 virtual module.
@@ -21,8 +21,9 @@ export function isH5VirtualModuleId(id: string): boolean {
  * Loads generated source for H5 virtual modules.
  */
 export function loadH5VirtualModule(cleanId: string, context: VitePluginTaroBuildContext): string | undefined {
-    if (cleanId !== virtualH5Id) return
-    return createWebEntry(context)
+    if (cleanId === virtualH5Id) {
+        return createWebEntry(context)
+    }
 }
 
 /**
@@ -35,16 +36,12 @@ export function createH5ViteConfig(): UserConfig {
             mainFields: ['main:h5', 'browser', 'module', 'jsnext:main', 'jsnext'],
             alias: [
                 // Resolve Stencil's transitive runtime import after Taro components are optimized separately.
-                ...(patchStencilCssOrder
-                    ? [
-                          {
-                              find: /^@stencil\/core\/internal\/client$/,
-                              replacement: nodeRequire.resolve('@stencil/core/internal/client', {
-                                  paths: [nodeRequire.resolve('@tarojs/components/package.json')]
-                              })
-                          }
-                      ]
-                    : []),
+                {
+                    find: /^@stencil\/core\/internal\/client$/,
+                    replacement: nodeRequire.resolve('@stencil/core/internal/client', {
+                        paths: [nodeRequire.resolve('@tarojs/components/package.json')]
+                    })
+                },
                 // H5 React code must use Taro's React component wrappers, not the raw custom-element entry.
                 { find: /^@tarojs\/components$/, replacement: nodeRequire.resolve('@tarojs/components/lib/react') },
                 // Taro's H5 router/components deep-import this custom-element loader; make it resolvable under pnpm.
@@ -61,7 +58,7 @@ export function createH5ViteConfig(): UserConfig {
         },
         optimizeDeps: {
             // Keep the Stencil runtime in Vite's transform pipeline so rewriteStencilStyleInsertion can patch it.
-            exclude: [patchStencilCssOrder ? '@stencil/core/internal/client' : ''].filter(Boolean)
+            exclude: ['@stencil/core/internal/client']
         },
         build: {
             target: 'es2018',
@@ -78,15 +75,13 @@ export function createH5ViteConfig(): UserConfig {
 export function createH5SupportPlugins(): PluginOption[] {
     const plugins: PluginOption[] = [...react()]
 
-    if (patchStencilCssOrder) {
-        plugins.push(
-            babel({
-                include: /[\\/]@stencil[\\/]core[\\/]internal[\\/]client[\\/]index\.js(?:\?.*)?$/,
-                exclude: [],
-                plugins: [rewriteStencilStyleInsertion]
-            })
-        )
-    }
+    plugins.push(
+        babel({
+            include: /[\\/]@stencil[\\/]core[\\/]internal[\\/]client[\\/]index\.js(?:\?.*)?$/,
+            exclude: [],
+            plugins: [rewriteStencilStyleInsertion]
+        })
+    )
 
     // Mirrors Taro H5: rewrite default Taro.xxx calls from virtual:taro/api to named H5 API imports.
     plugins.push(
@@ -106,26 +101,53 @@ export function createH5SupportPlugins(): PluginOption[] {
     return plugins
 }
 
+/**
+ * Diverts Stencil's runtime component CSS into vite-plugin-taro's layered runtime injector so late-loaded
+ * component styles stay in the `taro` cascade layer instead of being appended as unlayered `<style>` tags.
+ */
 function rewriteStencilStyleInsertion(): PluginObj {
     return {
         name: 'rewrite-stencil-style-insertion',
         visitor: {
-            CallExpression(path: NodePath<BabelTypes.CallExpression>) {
-                if (!isStencilStyleInsertBeforeCall(path)) return
-
-                path.get('arguments.1').replaceWithSourceString(
-                    `scopeId.startsWith('sc-taro-') ? styleContainerNode.querySelector('style,link[rel="stylesheet"]') : styleContainerNode.querySelector('link')`
-                )
+            IfStatement(path: NodePath<BabelTypes.IfStatement>) {
+                if (!isInsideStencilAddStyle(path) || !isStencilStringStyleBranch(path)) return
+                path.insertBefore(createAddStyleRuntimeCssStatement())
             }
         }
     }
 }
 
-function isStencilStyleInsertBeforeCall(path: NodePath<BabelTypes.CallExpression>): boolean {
+/**
+ * Creates the small guard inserted before Stencil appends a style tag; returning the scope id tells Stencil
+ * the style was handled and prevents duplicate unlayered CSS from reaching the document head.
+ */
+function createAddStyleRuntimeCssStatement(): BabelTypes.Statement {
+    return template.statement.ast(`
+{
+    const insertTaroCss = globalThis.__vitePluginTaroInsertRuntimeCss;
+    if (typeof style === 'string' && (scopeId.startsWith('sc-taro-') || style.includes('.weui-')) && typeof insertTaroCss === 'function' && insertTaroCss(scopeId, style)) {
+        return scopeId;
+    }
+}
+`) as BabelTypes.Statement
+}
+
+/**
+ * Matches the stable Stencil branch where raw CSS text is available; patching here avoids touching unrelated runtime logic.
+ */
+function isStencilStringStyleBranch(path: NodePath<BabelTypes.IfStatement>): boolean {
+    return path.get('test').toString() === "typeof style === 'string'"
+}
+
+/**
+ * Restricts the Babel rewrite to Stencil's internal `addStyle` helper so similarly shaped user code is never modified.
+ */
+function isInsideStencilAddStyle(path: NodePath): boolean {
+    const parent = path.getFunctionParent()?.parentPath
     return (
-        path.get('callee').matchesPattern('styleContainerNode.insertBefore') &&
-        path.get('arguments.0').toString() === 'styleElm' &&
-        path.get('arguments.1').toString() === "styleContainerNode.querySelector('link')"
+        parent?.isVariableDeclarator() === true &&
+        parent.get('id').isIdentifier({ name: 'addStyle' }) &&
+        parent.get('init').isArrowFunctionExpression()
     )
 }
 
@@ -163,7 +185,7 @@ export function createWebIndexHtmlTags(context: VitePluginTaroBuildContext): Htm
 
 /**
  * Builds the generated Web entry around Taro's official Web router/runtime APIs.
- * H5 component CSS is exposed through vite-plugin-taro/taro.css so app CSS can choose cascade order/layers.
+ * H5 component CSS is exposed through virtual:taro/css so app CSS controls ordering and layers.
  *
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-loader/src/h5.ts#L120-L150
  */
