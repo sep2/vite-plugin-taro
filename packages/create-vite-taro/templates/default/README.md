@@ -28,7 +28,7 @@ Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` in `.env.local` to your WeChat App ID, then
 
 ## Styles
 
-Global styles live in `src/app.css`. Keep the `@import "virtual:taro/css" layer(taro);`, `tailwindcss`, and `@source "./";` lines so Taro component styles and Tailwind CSS v4 work for both targets.
+Global styles live in `src/app.css`. Keep the Tailwind subpath imports, `@import "virtual:taro/css";`, and `@source "./";` lines so Taro component styles and Tailwind CSS v4 work for both targets. If you manage cascade layers yourself, `@import "virtual:taro/css" layer(taro);` is also valid.
 
 ## Scripts
 

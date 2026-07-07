@@ -1,5 +1,4 @@
 import type { types as BabelTypes, NodePath, PluginObj } from '@babel/core'
-import { template } from '@babel/core'
 import babel from '@rolldown/plugin-babel'
 import react from '@vitejs/plugin-react'
 import type { HtmlTagDescriptor, PluginOption, UserConfig } from 'vite'
@@ -102,52 +101,28 @@ export function createH5SupportPlugins(): PluginOption[] {
 }
 
 /**
- * Diverts Stencil's runtime component CSS into vite-plugin-taro's layered runtime injector so late-loaded
- * component styles stay in the `taro` cascade layer instead of being appended as unlayered `<style>` tags.
+ * Keeps Stencil-injected Taro runtime CSS before the app stylesheet.
  */
 function rewriteStencilStyleInsertion(): PluginObj {
     return {
         name: 'rewrite-stencil-style-insertion',
         visitor: {
-            IfStatement(path: NodePath<BabelTypes.IfStatement>) {
-                if (!isInsideStencilAddStyle(path) || !isStencilStringStyleBranch(path)) return
-                path.insertBefore(createAddStyleRuntimeCssStatement())
+            CallExpression(path: NodePath<BabelTypes.CallExpression>) {
+                if (!isStencilStyleInsertBeforeCall(path)) return
+
+                path.get('arguments.1').replaceWithSourceString(
+                    `scopeId.startsWith('sc-taro-') ? styleContainerNode.querySelector('style,link[rel="stylesheet"]') : styleContainerNode.querySelector('link')`
+                )
             }
         }
     }
 }
 
-/**
- * Creates the small guard inserted before Stencil appends a style tag; returning the scope id tells Stencil
- * the style was handled and prevents duplicate unlayered CSS from reaching the document head.
- */
-function createAddStyleRuntimeCssStatement(): BabelTypes.Statement {
-    return template.statement.ast(`
-{
-    const insertTaroCss = globalThis.__vitePluginTaroInsertRuntimeCss;
-    if (typeof style === 'string' && (scopeId.startsWith('sc-taro-') || style.includes('.weui-')) && typeof insertTaroCss === 'function' && insertTaroCss(scopeId, style)) {
-        return scopeId;
-    }
-}
-`) as BabelTypes.Statement
-}
-
-/**
- * Matches the stable Stencil branch where raw CSS text is available; patching here avoids touching unrelated runtime logic.
- */
-function isStencilStringStyleBranch(path: NodePath<BabelTypes.IfStatement>): boolean {
-    return path.get('test').toString() === "typeof style === 'string'"
-}
-
-/**
- * Restricts the Babel rewrite to Stencil's internal `addStyle` helper so similarly shaped user code is never modified.
- */
-function isInsideStencilAddStyle(path: NodePath): boolean {
-    const parent = path.getFunctionParent()?.parentPath
+function isStencilStyleInsertBeforeCall(path: NodePath<BabelTypes.CallExpression>): boolean {
     return (
-        parent?.isVariableDeclarator() === true &&
-        parent.get('id').isIdentifier({ name: 'addStyle' }) &&
-        parent.get('init').isArrowFunctionExpression()
+        path.get('callee').matchesPattern('styleContainerNode.insertBefore') &&
+        path.get('arguments.0').toString() === 'styleElm' &&
+        path.get('arguments.1').toString() === "styleContainerNode.querySelector('link')"
     )
 }
 
@@ -185,7 +160,7 @@ export function createWebIndexHtmlTags(context: VitePluginTaroBuildContext): Htm
 
 /**
  * Builds the generated Web entry around Taro's official Web router/runtime APIs.
- * H5 component CSS is exposed through virtual:taro/css so app CSS controls ordering and layers.
+ * H5 static component CSS is exposed through virtual:taro/css; runtime Stencil CSS keeps coarse ordering before app CSS.
  *
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-loader/src/h5.ts#L120-L150
  */

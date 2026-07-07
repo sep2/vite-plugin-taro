@@ -132,7 +132,7 @@ function createWeappContext(projectRoot: string): WeappTailwindcssCoreContext {
 }
 
 /**
- * Maps the public virtual CSS import to a physical CSS file while preserving import modifiers such as `layer(...)`.
+ * Maps the public virtual CSS import to a physical CSS file while preserving trailing import modifiers.
  */
 function rewriteVirtualTaroCssImports(code: string, context: VitePluginTaroBuildContext): string {
     const cssId = getTaroCssId(context)

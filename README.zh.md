@@ -222,17 +222,18 @@ export default function App({ children }: PropsWithChildren) {
 `src/app.css` 可以使用普通 CSS，也可以配合组件内 CSS Modules 和 Tailwind CSS v4。默认全局样式会为两个目标启用 Taro 组件样式和 Tailwind 工具类：
 
 ```css
-@layer theme, base, taro, components, utilities;
+@import "tailwindcss/theme.css";
+@import "tailwindcss/preflight.css";
 
 /* Taro 组件样式。 */
-@import "virtual:taro/css" layer(taro);
-/* Tailwind CSS v4 样式和工具类。 */
-@import "tailwindcss";
+@import "virtual:taro/css";
+
+@import "tailwindcss/utilities.css";
 
 @source "./";
 ```
 
-请保留 `@source "./";`，让 Tailwind 扫描源码目录。
+请保留 `@source "./";`，让 Tailwind 扫描源码目录。如果你自行管理级联层，也可以使用 `@import "virtual:taro/css" layer(taro);`；插件只会保留这个标准 CSS import 修饰符。
 
 ### 5. 创建页面组件
 
@@ -409,12 +410,13 @@ import { Text, View } from 'virtual:taro/components'
 样式迁移：
 
 ```css
-@layer theme, base, taro, components, utilities;
+@import "tailwindcss/theme.css";
+@import "tailwindcss/preflight.css";
 
 /* Taro 组件样式。 */
-@import "virtual:taro/css" layer(taro);
-/* Tailwind CSS v4 样式和工具类。 */
-@import "tailwindcss";
+@import "virtual:taro/css";
+
+@import "tailwindcss/utilities.css";
 
 @source "./";
 ```

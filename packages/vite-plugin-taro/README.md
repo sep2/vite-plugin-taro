@@ -221,17 +221,18 @@ Import global styles from the app component. The next step creates `src/app.css`
 `src/app.css` can use plain CSS, component CSS modules, and Tailwind CSS v4. The default global stylesheet enables Taro component styles and Tailwind utilities for both targets:
 
 ```css
-@layer theme, base, taro, components, utilities;
+@import "tailwindcss/theme.css";
+@import "tailwindcss/preflight.css";
 
 /* Taro component styles. */
-@import "virtual:taro/css" layer(taro);
-/* Tailwind CSS v4 styles and utilities. */
-@import "tailwindcss";
+@import "virtual:taro/css";
+
+@import "tailwindcss/utilities.css";
 
 @source "./";
 ```
 
-Keep `@source "./";` so Tailwind scans your source tree.
+Keep `@source "./";` so Tailwind scans your source tree. If you manage cascade layers yourself, `@import "virtual:taro/css" layer(taro);` is also valid; the plugin only preserves the standard CSS import modifier.
 
 ### 5. Create a page component
 
@@ -408,12 +409,13 @@ import { Text, View } from 'virtual:taro/components'
 Style migration:
 
 ```css
-@layer theme, base, taro, components, utilities;
+@import "tailwindcss/theme.css";
+@import "tailwindcss/preflight.css";
 
 /* Taro component styles. */
-@import "virtual:taro/css" layer(taro);
-/* Tailwind CSS v4 styles and utilities. */
-@import "tailwindcss";
+@import "virtual:taro/css";
+
+@import "tailwindcss/utilities.css";
 
 @source "./";
 ```
