@@ -1,6 +1,8 @@
 @layer theme, base, taro, components, utilities;
 
+/* Taro component styles. */
 @import "virtual:taro/css";
+/* Tailwind CSS v4 styles and utilities. */
 @import "tailwindcss";
 
 @source "./";

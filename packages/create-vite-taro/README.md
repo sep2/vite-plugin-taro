@@ -8,6 +8,9 @@ Create a Vite 8 + React 19 + Taro app for WeChat Mini Program and H5 targets.
 # Create a new app from the default template
 npm create vite-taro@latest my-app
 
+# Or create with pnpm
+pnpm --config.minimum-release-age=0 create vite-taro@latest my-app
+
 # Enter the project and install dependencies
 cd my-app
 npm install
@@ -31,7 +34,7 @@ Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` in the generated `.env.local` to your WeCha
 ## Other package managers
 
 ```sh
-pnpm create vite-taro my-app
+pnpm --config.minimum-release-age=0 create vite-taro@latest my-app
 yarn create vite-taro my-app
 bun create vite-taro my-app
 ```

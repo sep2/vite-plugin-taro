@@ -8,7 +8,7 @@
 
 使用最新标准化前端技术栈 Vite 8、React 19 和 Tailwind CSS v4 构建微信小程序。
 
-`vite-plugin-taro` 适用于希望使用 Taro 跨平台 React 组件和 API，但更偏好 Vite 而非 Taro webpack 的应用。你只需要这个插件，就能构建完整的微信小程序。
+`vite-plugin-taro` 面向希望用 Vite 构建 Taro React 应用的团队：保留 Taro 跨平台组件和 API，告别 Taro webpack，并修复/规避官方 Taro Vite 的常见坑。一个插件即可构建微信小程序与 Web。
 
 在线演示：<https://sep2.github.io/vite-plugin-taro>。如何在本地运行，请参见[示例应用](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.zh.md)。
 
@@ -112,7 +112,7 @@ npm install react react-dom
 npm install -D vite typescript@rc @types/node @types/react @types/react-dom cross-env
 ```
 
-你不应再直接依赖任何 `@tarojs/*` 包。如果已经依赖，请将它们移除。
+请从 `dependencies` 和 `devDependencies` 中移除所有 `@tarojs/*` 包。
 
 下面的步骤会创建如下源码结构：
 
@@ -231,9 +231,30 @@ function App({ children }: PropsWithChildren) {
 export default App
 ```
 
-请在应用组件中导入全局样式。微信构建会将它们收集到 `app.wxss`，H5 输出也会包含它们。
+请在应用组件中导入全局样式。下一步会创建 `src/app.css`。
 
-### 4. 创建页面组件
+### 4. 创建全局样式
+
+`src/app.css` 可以使用普通 CSS，也可以配合组件内 CSS Modules 和 Tailwind CSS v4。默认全局样式会为两个目标启用 Taro 组件样式和 Tailwind 工具类：
+
+```css
+@layer theme, base, taro, components, utilities;
+
+/* Taro 组件样式。 */
+@import "virtual:taro/css";
+/* Tailwind CSS v4 样式和工具类。 */
+@import "tailwindcss";
+
+@source "./";
+
+@theme {
+    --text-22: 1.375rem;
+}
+```
+
+请保留 `@source "./";`，让 Tailwind 扫描源码目录。
+
+### 5. 创建页面组件
 
 `src/pages/index/index.tsx` 是 `pages/index/index` 对应的 React 页面组件。
 
@@ -259,7 +280,7 @@ export default function IndexPage() {
 }
 ```
 
-### 5. 添加 H5 HTML 外壳
+### 6. 添加 H5 HTML 外壳
 
 对于 H5，请保留一个普通的 Vite `index.html`，并包含 `#app` 挂载节点。插件会自动注入生成的 Taro H5 入口，因此你不需要普通 Vite 的 `src/main.tsx` 脚本。
 
@@ -277,7 +298,7 @@ export default function IndexPage() {
 </html>
 ```
 
-### 6. 添加脚本
+### 7. 添加脚本
 
 使用与 `create-vite-taro` 生成项目一致的脚本：
 
@@ -294,7 +315,7 @@ export default function IndexPage() {
 }
 ```
 
-### 7. 运行每个目标
+### 8. 运行每个目标
 
 ```sh
 npm run dev:wx       # 以 watch 模式重新构建 dist/wx
@@ -342,27 +363,6 @@ type VitePluginTaroOptions = {
 | `appJson` | 基础应用配置。插件会用 `options.pages` 覆盖其中的 `pages` 字段。 |
 | `projectConfigJson` | `wx` 构建时输出的微信 `project.config.json` 内容。即使当前目标是 `h5`，选项类型也要求提供它。 |
 | `sitemapJson` | `wx` 构建时输出的微信 `sitemap.json` 内容。即使当前目标是 `h5`，选项类型也要求提供它。 |
-
-## 样式
-
-你可以使用普通 CSS、CSS Modules 或 Tailwind CSS v4。
-
-Tailwind CSS v4 开箱即用。仍然可以像平常一样在 app 入口中导入自己的全局 CSS（例如 `src/app.css`）。在该样式中使用 `virtual:taro/css`，插件会自动为 H5 和微信小程序准备匹配的 Taro 组件样式，无需维护两套样式入口。
-
-```css
-@layer theme, base, taro, components, utilities;
-
-@import "virtual:taro/css";
-@import "tailwindcss";
-
-@source "./";
-
-@theme {
-    --text-22: 1.375rem;
-}
-```
-
-对于 `wx`，Vite 输出的 CSS 会被收集到 `app.wxss`，并为每个页面生成配套的 `.wxss` 文件。
 
 ## 条件编译
 
@@ -428,7 +428,9 @@ dist/wx/
 3. 在 `pages` 中注册每个页面。每个页面路径都必须匹配 `src/${path}.tsx`。
 4. 将 Taro 脚本替换为设置 `VITE_PLUGIN_TARO_TARGET=wx` 或 `VITE_PLUGIN_TARO_TARGET=h5` 的 Vite 脚本。
 5. 对于 H5，添加普通 Vite `index.html`，其中包含 `<div id="app"></div>`，且不要添加单独的 `src/main.tsx` 入口。
-6. 将应用代码中的 `@tarojs/*` 导入替换为插件虚拟模块。
+6. 将全局样式迁移到 `src/app.css`，在 app 入口保留 `import './app.css'`，并按下方示例添加 Taro/Tailwind 导入。
+7. 从 `dependencies` 和 `devDependencies` 中移除所有 `@tarojs/*` 包。
+8. 将应用代码中的 `@tarojs/*` 导入替换为插件虚拟模块。
 
 迁移前：
 
@@ -444,7 +446,20 @@ import Taro from 'virtual:taro/api'
 import { Text, View } from 'virtual:taro/components'
 ```
 
-应用代码中禁止直接导入 `@tarojs/*`。请让插件负责 Taro 运行时解析，使微信和 H5 构建都获得正确的目标特定别名。
+样式迁移：
+
+```css
+@layer theme, base, taro, components, utilities;
+
+/* Taro 组件样式。 */
+@import "virtual:taro/css";
+/* Tailwind CSS v4 样式和工具类。 */
+@import "tailwindcss";
+
+@source "./";
+```
+
+移除所有 `@tarojs/*` 包，并且不要在应用代码中直接导入它们。请让插件负责 Taro 运行时解析。
 
 ## 示例应用
 
