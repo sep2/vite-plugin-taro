@@ -224,7 +224,7 @@ Import global styles from the app component. The next step creates `src/app.css`
 @layer theme, base, taro, components, utilities;
 
 /* Taro component styles. */
-@import "virtual:taro/css";
+@import "virtual:taro/css" layer(taro);
 /* Tailwind CSS v4 styles and utilities. */
 @import "tailwindcss";
 
@@ -411,7 +411,7 @@ Style migration:
 @layer theme, base, taro, components, utilities;
 
 /* Taro component styles. */
-@import "virtual:taro/css";
+@import "virtual:taro/css" layer(taro);
 /* Tailwind CSS v4 styles and utilities. */
 @import "tailwindcss";
 

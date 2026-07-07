@@ -225,7 +225,7 @@ export default function App({ children }: PropsWithChildren) {
 @layer theme, base, taro, components, utilities;
 
 /* Taro 组件样式。 */
-@import "virtual:taro/css";
+@import "virtual:taro/css" layer(taro);
 /* Tailwind CSS v4 样式和工具类。 */
 @import "tailwindcss";
 
@@ -412,7 +412,7 @@ import { Text, View } from 'virtual:taro/components'
 @layer theme, base, taro, components, utilities;
 
 /* Taro 组件样式。 */
-@import "virtual:taro/css";
+@import "virtual:taro/css" layer(taro);
 /* Tailwind CSS v4 样式和工具类。 */
 @import "tailwindcss";
 
