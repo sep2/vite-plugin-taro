@@ -1,9 +1,5 @@
 @import "tailwindcss/theme.css";
 @import "tailwindcss/preflight.css";
-
-/* Taro component styles. */
-@import "virtual:taro/css";
-
 @import "tailwindcss/utilities.css";
 
 @source "./";

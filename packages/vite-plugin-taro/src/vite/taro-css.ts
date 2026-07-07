@@ -2,13 +2,9 @@ import path from 'node:path'
 import type { PluginOption } from 'vite'
 import { createContext } from 'weapp-tailwindcss/core'
 import { createWeappTailwindcssGenerator, resolveTailwindV4Source } from 'weapp-tailwindcss/generator'
-import { packageRoot } from './constants.ts'
 import type { VitePluginTaroBuildContext } from './types.ts'
 import { normalizeModuleId } from './utils.ts'
-import { virtualTaroCssId } from './virtual-modules.ts'
 
-const h5TaroCssPath = normalizeModuleId(path.join(packageRoot, 'src/virtual/taro.css'))
-const emptyTaroCssPath = normalizeModuleId(path.join(packageRoot, 'src/virtual/empty.css'))
 const wechatStyleOptions = {
     cssCalc: false,
     // Skyline does not support -webkit-prefixed declarations.
@@ -20,12 +16,11 @@ const wechatStyleOptions = {
 type WeappTailwindcssCoreContext = ReturnType<typeof createContext>
 
 /**
- * Rewrites vite-plugin-taro CSS virtual imports, generates Tailwind CSS v4 directly through
- * weapp-tailwindcss' generator, and applies the core class-name transformer to final Mini Program JS chunks.
+ * Generates Tailwind CSS v4 directly through weapp-tailwindcss' generator, and applies the core
+ * class-name transformer to final Mini Program JS chunks.
  *
- * This keeps the Taro plugin in charge of the whole CSS pipeline instead of
- * relying on the weapp-tailwindcss Vite adaptor, which cannot resolve custom
- * virtual CSS imports such as virtual:taro/css.
+ * This keeps the Taro plugin in charge of the whole CSS pipeline instead of relying on the
+ * weapp-tailwindcss Vite adaptor.
  */
 export function createTaroCssPlugin(context: VitePluginTaroBuildContext): PluginOption {
     let projectRoot = process.cwd()
@@ -47,14 +42,9 @@ export function createTaroCssPlugin(context: VitePluginTaroBuildContext): Plugin
             runtimeClassSet = new Set<string>()
         },
 
-        /** Resolves CSS virtual imports for every stylesheet and generates final CSS when that stylesheet imports Tailwind. */
+        /** Generates final CSS when a stylesheet imports Tailwind. */
         async transform(code, id) {
-            if (!isCssModuleId(id)) return
-
-            const css = code.includes(virtualTaroCssId) ? rewriteVirtualTaroCssImports(code, context) : code
-            if (!shouldGenerateTailwindCss(css)) {
-                return css === code ? undefined : css
-            }
+            if (!isCssModuleId(id) || !shouldGenerateTailwindCss(code)) return
 
             const cssFile = resolveCssFile(id, projectRoot)
             const cssBase = path.dirname(cssFile)
@@ -62,8 +52,8 @@ export function createTaroCssPlugin(context: VitePluginTaroBuildContext): Plugin
                 projectRoot,
                 cwd: projectRoot,
                 base: cssBase,
-                css,
-                cssSources: [{ file: cssFile, base: cssBase, css, dependencies: [cssFile] }]
+                css: code,
+                cssSources: [{ file: cssFile, base: cssBase, css: code, dependencies: [cssFile] }]
             })
             const generator = createWeappTailwindcssGenerator(source)
             const generated = await generator.generate({
@@ -129,21 +119,6 @@ function createWeappContext(projectRoot: string): WeappTailwindcssCoreContext {
         ...wechatStyleOptions,
         logLevel: 'silent'
     })
-}
-
-/**
- * Maps the public virtual CSS import to a physical CSS file while preserving trailing import modifiers.
- */
-function rewriteVirtualTaroCssImports(code: string, context: VitePluginTaroBuildContext): string {
-    const cssId = getTaroCssId(context)
-    return code.replace(/@import\s+(["'])virtual:taro\/css\1([^;]*);/g, `@import ${JSON.stringify(cssId)}$2;`)
-}
-
-/**
- * Selects the target-specific CSS payload: H5 needs Taro component CSS, while WX must not include H5/WEUI styles.
- */
-function getTaroCssId(context: VitePluginTaroBuildContext): string {
-    return context.target === 'wx' ? emptyTaroCssPath : h5TaroCssPath
 }
 
 /**

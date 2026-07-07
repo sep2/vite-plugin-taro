@@ -218,21 +218,17 @@ Import global styles from the app component. The next step creates `src/app.css`
 
 ### 4. Create global styles
 
-`src/app.css` can use plain CSS, component CSS modules, and Tailwind CSS v4. The default global stylesheet enables Taro component styles and Tailwind utilities for both targets:
+`src/app.css` can use plain CSS, component CSS modules, and Tailwind CSS v4. The plugin injects Taro H5 component styles automatically; the default global stylesheet enables Tailwind CSS v4 for both targets:
 
 ```css
 @import "tailwindcss/theme.css";
 @import "tailwindcss/preflight.css";
-
-/* Taro component styles. */
-@import "virtual:taro/css";
-
 @import "tailwindcss/utilities.css";
 
 @source "./";
 ```
 
-Keep `@source "./";` so Tailwind scans your source tree. If you manage cascade layers yourself, `@import "virtual:taro/css" layer(taro);` is also valid; the plugin only preserves the standard CSS import modifier.
+Keep `@source "./";` so Tailwind scans your source tree.
 
 ### 5. Create a page component
 
@@ -375,7 +371,7 @@ Open `dist/wx` with WeChat DevTools; do not open the source project directory.
 
 ### H5 / Web
 
-For `target: 'h5'`, the plugin injects a generated module into `index.html`, builds route records from `pages`, and mounts the app with Taro's hash-history router. Import `virtual:taro/css` from your app CSS to include Taro H5 component styles. Routes use the page paths from your config, for example `#/pages/index/index`.
+For `target: 'h5'`, the plugin injects a generated module into `index.html`, imports Taro H5 component styles before the app, builds route records from `pages`, and mounts the app with Taro's hash-history router. Routes use the page paths from your config, for example `#/pages/index/index`.
 
 ## Migrating from Taro
 
@@ -411,10 +407,6 @@ Style migration:
 ```css
 @import "tailwindcss/theme.css";
 @import "tailwindcss/preflight.css";
-
-/* Taro component styles. */
-@import "virtual:taro/css";
-
 @import "tailwindcss/utilities.css";
 
 @source "./";
@@ -498,8 +490,8 @@ Common scripts:
 | WeChat DevTools cannot open the app | Open the generated `dist/wx` folder and check `projectConfigJson.appid`. |
 | H5 shows a blank page | Keep `<div id="app"></div>` in `index.html`, register the plugin, and avoid adding a separate default Vite `main.tsx` entry. |
 | Taro APIs are missing or behave differently | Remove direct `@tarojs/*` imports from application code and import Taro from `virtual:taro/api`. |
-| Components render without expected styles on H5 | Ensure `src/app.css` imports `virtual:taro/css` and that the app entry imports `./app.css`. |
-| Tailwind classes do not appear | Ensure `src/app.css` imports `tailwindcss`, keeps `@source "./";`, and class names are statically discoverable. Restart the dev server after moving files. |
+| Components render without expected styles on H5 | Ensure the app entry imports `./app.css` and the generated H5 entry is injected into `index.html`. |
+| Tailwind classes do not appear | Ensure `src/app.css` imports Tailwind's CSS files, keeps `@source "./";`, and class names are statically discoverable. Restart the dev server after moving files. |
 
 ## Release workflow
 

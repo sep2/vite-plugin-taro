@@ -219,21 +219,17 @@ export default function App({ children }: PropsWithChildren) {
 
 ### 4. 创建全局样式
 
-`src/app.css` 可以使用普通 CSS，也可以配合组件内 CSS Modules 和 Tailwind CSS v4。默认全局样式会为两个目标启用 Taro 组件样式和 Tailwind 工具类：
+`src/app.css` 可以使用普通 CSS，也可以配合组件内 CSS Modules 和 Tailwind CSS v4。插件会自动注入 Taro H5 组件样式；默认全局样式会为两个目标启用 Tailwind CSS v4：
 
 ```css
 @import "tailwindcss/theme.css";
 @import "tailwindcss/preflight.css";
-
-/* Taro 组件样式。 */
-@import "virtual:taro/css";
-
 @import "tailwindcss/utilities.css";
 
 @source "./";
 ```
 
-请保留 `@source "./";`，让 Tailwind 扫描源码目录。如果你自行管理级联层，也可以使用 `@import "virtual:taro/css" layer(taro);`；插件只会保留这个标准 CSS import 修饰符。
+请保留 `@source "./";`，让 Tailwind 扫描源码目录。
 
 ### 5. 创建页面组件
 
@@ -376,7 +372,7 @@ dist/wx/
 
 ### H5 / Web
 
-对于 `target: 'h5'`，插件会向 `index.html` 注入生成模块，根据 `pages` 构建路由记录，并使用 Taro 的 hash-history 路由挂载应用。请在应用 CSS 中导入 `virtual:taro/css` 以包含 Taro H5 组件样式。路由使用配置中的页面路径，例如 `#/pages/index/index`。
+对于 `target: 'h5'`，插件会向 `index.html` 注入生成模块，在应用之前导入 Taro H5 组件样式，根据 `pages` 构建路由记录，并使用 Taro 的 hash-history 路由挂载应用。路由使用配置中的页面路径，例如 `#/pages/index/index`。
 
 ## 从 Taro 迁移
 
@@ -412,10 +408,6 @@ import { Text, View } from 'virtual:taro/components'
 ```css
 @import "tailwindcss/theme.css";
 @import "tailwindcss/preflight.css";
-
-/* Taro 组件样式。 */
-@import "virtual:taro/css";
-
 @import "tailwindcss/utilities.css";
 
 @source "./";
@@ -499,8 +491,8 @@ pnpm typecheck
 | 微信开发者工具无法打开应用 | 打开生成的 `dist/wx` 文件夹，并检查 `projectConfigJson.appid`。 |
 | H5 显示空白页 | 确保 `index.html` 中保留 `<div id="app"></div>`，已注册插件，并避免添加单独的默认 Vite `main.tsx` 入口。 |
 | Taro API 缺失或行为不同 | 移除应用代码中直接导入的 `@tarojs/*`，并从 `virtual:taro/api` 导入 Taro。 |
-| 组件在 H5 上渲染时缺少预期样式 | 确保 `src/app.css` 导入了 `virtual:taro/css`，并且 app 入口导入了 `./app.css`。 |
-| Tailwind 类没有生效 | 确保 `src/app.css` 导入了 `tailwindcss`，保留 `@source "./";`，并且类名可以被静态扫描到。移动文件后请重启开发服务。 |
+| 组件在 H5 上渲染时缺少预期样式 | 确保 app 入口导入了 `./app.css`，并且生成的 H5 入口已注入到 `index.html`。 |
+| Tailwind 类没有生效 | 确保 `src/app.css` 导入了 Tailwind CSS 文件，保留 `@source "./";`，并且类名可以被静态扫描到。移动文件后请重启开发服务。 |
 
 ## 发布流程
 
