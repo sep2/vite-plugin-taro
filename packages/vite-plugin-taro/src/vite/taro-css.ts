@@ -180,7 +180,10 @@ async function transformWxJsChunk(
  * Limits generation to real Tailwind entry stylesheets so ordinary CSS modules stay in Vite's normal CSS pipeline.
  */
 function shouldGenerateTailwindCss(code: string): boolean {
-    return code.includes('tailwindcss') && /@(import|reference)\s+(?:url\(\s*)?(?:["'])tailwindcss(?:["'])/.test(code)
+    const tailwindEntryImportPattern =
+        /@(import|reference)\s+(?:url\(\s*)?(?:["'])tailwindcss(?:\/(?:theme|preflight|utilities)(?:\.css)?)?(?:["'])/
+
+    return code.includes('tailwindcss') && tailwindEntryImportPattern.test(code)
 }
 
 /**
