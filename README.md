@@ -12,14 +12,14 @@ Build WeChat Mini Apps with the latest standards-based frontend stack: Vite 8, R
 
 Live demo: <https://sep2.github.io/vite-plugin-taro>. See [Sample app](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.md) how to run it locally.
 
-- **Native Vite builds** Use standard Vite 8 config instead of legacy webpack configuration, with support for all Vite plugins.
-- **Hot reload** Both WeChat Mini Program and H5 support dev-mode watch, with Vite 8 HMR/rebuilds for fast feedback.
-- **Battle-tested Taro foundation** Use the full set of Taro APIs and components instead of reinventing cross-platform primitives.
-- **Tailwind ready** Built-in Tailwind CSS v4 support for both WeChat Mini Program and H5 styles.
-- **Conditional compilation** Use Taro-style `#ifdef` / `#ifndef` / `#if` blocks to split code and styles by WeChat / web target.
-- **Workspace friendly** Supports standalone apps and monorepos, with npm, pnpm, Yarn, Bun, and other package managers.
-- **Type-friendly** The project supports TypeScript all the way.
-- **WeChat Skyline** Support WeChat Mini Program output with Skyline rendering mode.
+- **Vite + React 19** Build one codebase for WeChat Mini Program and web with the Vite 8 ecosystem.
+- **Taro power, no webpack** Use Taro components and APIs without the legacy webpack pipeline.
+- **Tailwind CSS v4 ready** Write utilities once; WeChat and web styles are handled automatically.
+- **Skyline ready** Support modern WeChat Skyline rendering.
+- **Fast previews** Use Vite HMR on web and watch builds for WeChat DevTools/device checks.
+- **Clean target splits** Split code and styles with Taro-style `#ifdef` / `#ifndef` / `#if`.
+- **Workspace friendly** Works in apps and monorepos with npm, pnpm, Yarn, and Bun.
+- **TypeScript ready** Typed from config to app code.
 
 ## Quick start
 
@@ -30,6 +30,9 @@ Use `create-vite-taro` for new apps. It scaffolds a Vite 8 + React 19 + Tailwind
 ```sh
 # Create a new app from the default template
 npm create vite-taro@latest my-app
+
+# Or create with pnpm
+pnpm --config.minimum-release-age=0 create vite-taro@latest my-app
 
 # Enter the project and install dependencies
 cd my-app
@@ -344,17 +347,22 @@ type VitePluginTaroOptions = {
 
 You can use plain CSS, CSS modules, or Tailwind CSS v4.
 
-For Tailwind CSS v4, import Tailwind from a global CSS file such as `src/app.css`:
+Tailwind CSS v4 works out of the box. Keep importing your own global CSS (for example `src/app.css`) from the app entry as usual. Use `virtual:taro/css` in that stylesheet and the plugin will prepare the matching Taro component styles for H5 and WeChat Mini Program, without separate style entries.
 
 ```css
-@import "tailwindcss/theme.css";
-@import "tailwindcss/preflight.css";
-@import "tailwindcss/utilities.css";
+@layer theme, base, taro, components, utilities;
+
+@import "virtual:taro/css";
+@import "tailwindcss";
 
 @source "./";
+
+@theme {
+    --text-22: 1.375rem;
+}
 ```
 
-The plugin registers `weapp-tailwindcss` for `wx` builds and `@tailwindcss/vite` for `h5` builds. For `wx`, CSS emitted by Vite is collected into `app.wxss`, and page `.wxss` companion files are emitted for each page.
+For `wx`, CSS emitted by Vite is collected into `app.wxss`, and page `.wxss` companion files are emitted for each page.
 
 ## Conditional compilation
 
@@ -407,7 +415,7 @@ Open `dist/wx` with WeChat DevTools; do not open the source project directory.
 
 ### H5
 
-For `target: 'h5'`, the plugin injects a generated module into `index.html`, imports Taro's H5 component styles, builds route records from `pages`, and mounts the app with Taro's hash-history router. Routes use the page paths from your config, for example `#/pages/index/index`.
+For `target: 'h5'`, the plugin injects a generated module into `index.html`, builds route records from `pages`, and mounts the app with Taro's hash-history router. Import `virtual:taro/css` from your app CSS to include Taro's H5 component styles. Routes use the page paths from your config, for example `#/pages/index/index`.
 
 ## Migrating from Taro
 
@@ -514,7 +522,7 @@ Common scripts:
 | H5 shows a blank page | Keep `<div id="app"></div>` in `index.html`, register the plugin, and avoid adding a separate default Vite `main.tsx` entry. |
 | Taro APIs are missing or behave differently | Remove direct `@tarojs/*` imports from application code and import Taro from `virtual:taro/api`. |
 | Components render without expected styles on H5 | Import components from `virtual:taro/components` and keep the plugin enabled for the `h5` target. |
-| Tailwind classes do not appear | Ensure your global CSS imports Tailwind and includes an `@source` path that covers your source files. |
+| Tailwind classes do not appear | Ensure `src/app.css` imports `tailwindcss`, keeps the `@source` directive pointed at your source tree, and class names are statically discoverable. Restart the dev server after moving files. |
 
 ## Release workflow
 
