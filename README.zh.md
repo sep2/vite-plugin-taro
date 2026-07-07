@@ -12,14 +12,14 @@
 
 在线演示：<https://sep2.github.io/vite-plugin-taro>。如何在本地运行，请参见[示例应用](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.zh.md)。
 
-- **原生 Vite 构建** 使用标准 Vite 8 配置，无需维护老旧的 webpack 配置，并支持所有 Vite 插件。
-- **热更新** 微信小程序与 H5 都支持开发模式 watch，基于 Vite 8 热更新/快速重建即时预览。
-- **依托成熟 Taro 能力** 复用久经实战检验的 Taro API 和组件，完整使用 Taro 跨端能力。
-- **Tailwind 就绪** 内置 Tailwind CSS v4 支持，微信小程序与 H5 样式开箱即用。
-- **条件编译** 支持 Taro 风格 `#ifdef` / `#ifndef` / `#if`，可按微信 / Web 裁剪代码和样式。
-- **工作区友好** 支持普通项目与 monorepo，兼容 npm、pnpm、Yarn、Bun 等包管理器。
-- **类型友好** 项目全链路支持 TypeScript。
-- **微信 Skyline** 支持微信小程序 Skyline 渲染模式输出。
+- **Vite + React 19** 基于 Vite 8 生态，一份代码覆盖微信小程序与 Web。
+- **Taro 能力，无需 webpack** 使用 Taro 组件和 API，摆脱旧式 webpack 链路。
+- **Tailwind CSS v4 开箱即用** 直接书写工具类，微信与 Web 样式自动适配。
+- **Skyline 就绪** 支持微信 Skyline 渲染模式。
+- **热更新** Web 与小程序都能快速查看改动，便于开发者工具和真机验证。
+- **条件编译** 用 Taro 风格 `#ifdef` / `#ifndef` / `#if` 拆分代码和样式。
+- **工作区友好** 支持普通项目与 monorepo，兼容 `npm`、`pnpm`、`Yarn`、`Bun`。
+- **TypeScript 友好** 从配置到应用代码都有类型支持。
 
 ## 快速开始
 
@@ -30,6 +30,9 @@
 ```sh
 # 使用默认模板创建新应用
 npm create vite-taro@latest my-app
+
+# 或使用 pnpm 创建
+pnpm --config.minimum-release-age=0 create vite-taro@latest my-app
 
 # 进入项目并安装依赖
 cd my-app
@@ -344,17 +347,22 @@ type VitePluginTaroOptions = {
 
 你可以使用普通 CSS、CSS Modules 或 Tailwind CSS v4。
 
-对于 Tailwind CSS v4，请从全局 CSS 文件（例如 `src/app.css`）导入 Tailwind：
+Tailwind CSS v4 开箱即用。仍然可以像平常一样在 app 入口中导入自己的全局 CSS（例如 `src/app.css`）。在该样式中使用 `virtual:taro/css`，插件会自动为 H5 和微信小程序准备匹配的 Taro 组件样式，无需维护两套样式入口。
 
 ```css
-@import "tailwindcss/theme.css";
-@import "tailwindcss/preflight.css";
-@import "tailwindcss/utilities.css";
+@layer theme, base, taro, components, utilities;
+
+@import "virtual:taro/css";
+@import "tailwindcss";
 
 @source "./";
+
+@theme {
+    --text-22: 1.375rem;
+}
 ```
 
-插件会为 `wx` 构建注册 `weapp-tailwindcss`，并为 `h5` 构建注册 `@tailwindcss/vite`。对于 `wx`，Vite 输出的 CSS 会被收集到 `app.wxss`，并为每个页面生成配套的 `.wxss` 文件。
+对于 `wx`，Vite 输出的 CSS 会被收集到 `app.wxss`，并为每个页面生成配套的 `.wxss` 文件。
 
 ## 条件编译
 
@@ -407,7 +415,7 @@ dist/wx/
 
 ### H5
 
-对于 `target: 'h5'`，插件会向 `index.html` 注入生成模块，导入 Taro 的 H5 组件样式，根据 `pages` 构建路由记录，并使用 Taro 的 hash-history 路由挂载应用。路由使用配置中的页面路径，例如 `#/pages/index/index`。
+对于 `target: 'h5'`，插件会向 `index.html` 注入生成模块，根据 `pages` 构建路由记录，并使用 Taro 的 hash-history 路由挂载应用。请在应用 CSS 中导入 `virtual:taro/css` 以包含 Taro H5 组件样式。路由使用配置中的页面路径，例如 `#/pages/index/index`。
 
 ## 从 Taro 迁移
 
@@ -514,7 +522,7 @@ pnpm typecheck
 | H5 显示空白页 | 确保 `index.html` 中保留 `<div id="app"></div>`，已注册插件，并避免添加单独的默认 Vite `main.tsx` 入口。 |
 | Taro API 缺失或行为不同 | 移除应用代码中直接导入的 `@tarojs/*`，并从 `virtual:taro/api` 导入 Taro。 |
 | 组件在 H5 上渲染时缺少预期样式 | 从 `virtual:taro/components` 导入组件，并确保 `h5` 目标启用了插件。 |
-| Tailwind 类没有生效 | 确保全局 CSS 导入 Tailwind，并包含覆盖源码文件的 `@source` 路径。 |
+| Tailwind 类没有生效 | 确保 `src/app.css` 导入了 `tailwindcss`，`@source` 指向源码目录，并且类名可以被静态扫描到。移动文件后请重启开发服务。 |
 
 ## 发布流程
 
