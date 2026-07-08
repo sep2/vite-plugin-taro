@@ -1,3 +1,5 @@
+// Ensure Taro's React runtime registers its `initNativeApi` hook before @tarojs/taro is initialized.
+import '@tarojs/plugin-framework-react/dist/runtime'
 import { hooks } from '@tarojs/runtime'
 import Taro from '@tarojs/taro'
 
