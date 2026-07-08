@@ -5,8 +5,8 @@
 Implement wx dev HMR/Fast Refresh for `vite-plugin-taro` with this contract:
 
 ```text
-React module implementation changed -> update through dist/wx/hmr/update.js
-Mini Program shape changed         -> rewrite affected wx output and let DevTools reload/recompile
+Application JS/TS source changed -> update through dist/wx/hmr/update.js
+Mini Program shape changed       -> rewrite affected wx output and let DevTools reload/recompile
 ```
 
 Production wx builds must not contain HMR runtime, update files, or React Refresh markers.
@@ -50,7 +50,7 @@ dist/wx/hmr/bootstrap.js  # initial logical source module factories
 dist/wx/hmr/update.js     # overwritten hot-update payload; no-op initially
 ```
 
-For React implementation edits, only this file should change:
+For application JS/TS source edits that do not change Mini Program shape, only this file should change:
 
 ```text
 dist/wx/hmr/update.js
@@ -78,7 +78,7 @@ hmr/bootstrap.js  # initial logical source module snapshot
 hmr/update.js     # latest executable hot-update payload
 ```
 
-Keep this split so source identity is independent from wx shell files, and React implementation edits can touch only `hmr/update.js`.
+Keep this split so source identity is independent from wx shell files, and application source edits can touch only `hmr/update.js`.
 
 `hmr/update.js` must be safe to leave on disk between DevTools sessions; stale payloads must not run before app/framework setup is ready.
 
@@ -163,13 +163,9 @@ A clean wx dev output opens in WeChat DevTools without runtime initialization er
 
 After a hot update, closing and reopening the wx folder still loads normally. Stale `hmr/update.js` must not execute before runtime/app readiness.
 
-### Existing React source edit
+### Application source edit
 
-Editing an existing React component/source module updates through React Refresh, and only `dist/wx/hmr/update.js` changes.
-
-### New React source module
-
-Adding a new JS/TS/TSX module imported by an existing React source module updates through `hmr/update.js` without requiring a pre-existing generated file for that module.
+Editing application JS/TS/TSX source modules updates through the wx HMR runtime. React components update through React Refresh, and only `dist/wx/hmr/update.js` changes.
 
 ### Mini Program shape edit
 
