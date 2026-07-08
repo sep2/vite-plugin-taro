@@ -47,7 +47,7 @@ const LoanGeniusHeader: FunctionComponent<LoanGeniusHeaderProps> = (props) => {
                 color="linear-gradient(360deg,rgba(154,231,205,1) 0%, rgba(18,186,131,1) 20%, rgba(18,186,131,1) 100%)"
             >
                 <Image src={PERCENT_ICON} className="absolute -bottom-2 right-0 -z-1 h-full w-26.25" />
-                <View className="flex w-full flex-col px-5">
+                <View className="box-border flex w-full flex-col px-5">
                     <View className="mt-5 flex flex-row items-center justify-between">
                         <View className="flex flex-row items-center">
                             <Text className="text-xl font-bold text-white">房屋总价</Text>
