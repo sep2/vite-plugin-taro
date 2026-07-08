@@ -85,7 +85,7 @@ This includes application source such as:
 - helper functions;
 - newly imported application JS/TS/TSX modules included with the changed importer.
 
-React components update through React Refresh. Non-component modules update through the wx HMR module graph and affected importers.
+All eligible source edits should be delivered through `hmr/update.js`.
 
 ## Reload scope
 
@@ -158,7 +158,7 @@ After a hot update, closing and reopening the wx folder still loads normally. St
 
 ### Application source edit
 
-Editing application JS/TS/TSX source updates through the wx HMR runtime. React components update through React Refresh. Only `dist/wx/hmr/update.js` changes.
+Editing application JS/TS/TSX source updates through the wx HMR runtime. Only `dist/wx/hmr/update.js` changes.
 
 ### Mini Program shape edit
 
