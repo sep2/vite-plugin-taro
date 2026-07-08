@@ -59,6 +59,9 @@ export default defineConfig(({ mode }) => {
                             defaultDisplayBlock: true,
                             defaultContentBox: true
                         }
+                    },
+                    window: {
+                        navigationStyle: 'custom'
                     }
                 },
                 projectConfigJson: {
