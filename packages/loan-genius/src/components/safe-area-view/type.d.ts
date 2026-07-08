@@ -5,8 +5,8 @@
  * @Last Modified by: qiuz
  */
 
-import type { FunctionComponent, PropsWithChildren } from 'react'
 import type { ViewProps } from 'virtual:taro/components'
+import type { FunctionComponent, PropsWithChildren } from 'react'
 
 export interface TaroSafeAreaViewProps extends ViewProps {
     style?: object

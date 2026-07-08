@@ -5,11 +5,11 @@
  * @Last Modified by: qiuz
  */
 
+import type { Color } from 'virtual:taro/api'
+import { View } from 'virtual:taro/components'
 import { isArray } from '@utils'
 import clsx from 'clsx'
 import type { CSSProperties, FunctionComponent, PropsWithChildren } from 'react'
-import { View } from 'virtual:taro/components'
-import type { Color } from 'virtual:taro/api'
 
 interface ShadowOffset {
     width: number

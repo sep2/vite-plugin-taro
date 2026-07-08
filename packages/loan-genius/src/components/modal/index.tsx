@@ -5,9 +5,9 @@
  * @Last Modified by: qiuz
  */
 
+import { Image, View } from 'virtual:taro/components'
 import clsx from 'clsx'
 import type { FunctionComponent, PropsWithChildren } from 'react'
-import { Image, View } from 'virtual:taro/components'
 import { CLOSE_ICON } from './constant'
 import type { TaroModalProps } from './type'
 

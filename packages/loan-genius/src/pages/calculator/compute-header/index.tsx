@@ -5,10 +5,10 @@
  * @Last Modified by: qiuz
  */
 
+import { Image, Text, View } from 'virtual:taro/components'
 import { BoxShadow, LinearGradient } from '@components'
 import { formatFloat } from '@utils'
 import { type FunctionComponent, memo } from 'react'
-import { Image, Text, View } from 'virtual:taro/components'
 import { GRADIENT_BG, PERCENT_ICON, RIGHT_ARROW, RIGHT_ARROW_WHITE } from '../constants'
 
 interface LoanGeniusHeaderProps {

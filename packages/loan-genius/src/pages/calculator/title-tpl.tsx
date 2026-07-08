@@ -5,9 +5,9 @@
  * @Last Modified by: qiuz
  */
 
+import { Text, View } from 'virtual:taro/components'
 import clsx from 'clsx'
 import type { FunctionComponent } from 'react'
-import { Text, View } from 'virtual:taro/components'
 
 interface TitleTplProps {
     title: string

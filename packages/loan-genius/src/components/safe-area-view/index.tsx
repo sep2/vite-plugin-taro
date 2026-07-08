@@ -5,8 +5,8 @@
  * @Last Modified by: qiuz
  */
 
-import clsx from 'clsx'
 import { View } from 'virtual:taro/components'
+import clsx from 'clsx'
 import type { TaroSafeAreaViewType } from './type'
 
 const TaroSafeAreaView: TaroSafeAreaViewType = (props) => {

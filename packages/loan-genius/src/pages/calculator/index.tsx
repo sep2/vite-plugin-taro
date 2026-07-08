@@ -9,96 +9,118 @@ import Taro from 'virtual:taro/api'
 import { Button, Input, ScrollView, Text, View } from 'virtual:taro/components'
 import { BoxShadow, NavigationBar } from '@components'
 import { formatFloat, getStorageData, isAndroid, setGlobalData } from '@utils'
-import { Component } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import LoanGeniusHeader from './compute-header'
-import { COMPUTE_WAY, COMPUTE_WAY_TITLE, getRenderList, LIST_TYPE, LOAN_WAY_TITLE, OPTION } from './constants'
+import {
+    COMPUTE_WAY,
+    COMPUTE_WAY_TITLE,
+    getRenderList as createRenderList,
+    LIST_TYPE,
+    LOAN_WAY_TITLE,
+    OPTION
+} from './constants'
 import { equalInterestCalc } from './helper'
 import { LineWrap } from './line-wrap'
 import { TitleTpl } from './title-tpl'
 
-export default class LoanGenius extends Component<any, any> {
-    loading: any
-    scroll: any
-    computeResult: any
-    isFirstChange: boolean = true
+function createInitialState() {
+    const { price = 0 } = Taro.getCurrentInstance().router!.params
+    return {
+        // 计算结果显示
+        showResult: false,
+        // 月付
+        equalPrincipalPayMonth: 0,
+        equalInterestPayMonth: 0,
+        // 用户优先贷款方式
+        userLoanWay: '等额本息',
+        // 计算方式
+        way: price ? 1 : 0,
+        // 贷款方式 loanType + 1 = 1: 组合贷款  2: 商业贷款  3：公积金贷款
+        loanType: 1,
+        // 表单渲染项
+        renderList: [],
+        // 配置项
+        options: {},
+        // 参数
+        params: {
+            // 房屋总价
+            houseTotal: price || 0,
+            // 首付百分比
+            downPayRate: 30,
+            // 贷款金额
+            loanAmount: 0,
+            // 公积金金额
+            accumulatTotalPirce: 0,
+            // 公积金贷款上限
+            accumulatLoanLimit: 0,
+            // 基点
+            commercialLoanBasePoint: 0,
+            // 商贷利率
+            commerceLoanRate: 0,
+            // 公积金利率
+            publicReserveFundsRate: 0,
+            // 商贷年限
+            commercialLoanTerm: 0,
+            // 商贷利率方式
+            commercialLoanWay: 0,
+            // 商贷金额
+            commerceTotalPirce: 0
+        },
+        // 默认值
+        defaultValue: {},
+        keyboardHeight: -1,
+        // 利率方式, 1 最新 | 0 旧版
+        loanLrpType: 1,
+        downPayRateCustom: '',
+        // 安卓上 手动输入时 隐藏计算按钮
+        btnOpacity: 1,
+        // 安卓状态栏
+        backgroundColor: '#fff'
+    }
+}
 
-    constructor(props: any) {
-        super(props)
-        const { price = 0 } = Taro.getCurrentInstance().router!.params
-        this.state = {
-            // 计算结果显示
-            showResult: false,
-            // 月付
-            equalPrincipalPayMonth: 0,
-            equalInterestPayMonth: 0,
-            // 用户优先贷款方式
-            userLoanWay: '等额本息',
-            // 计算方式
-            way: price ? 1 : 0,
-            // 贷款方式 loanType + 1 = 1: 组合贷款  2: 商业贷款  3：公积金贷款
-            loanType: 1,
-            // 表单渲染项
-            renderList: [],
-            // 配置项
-            options: {},
-            // 参数
-            params: {
-                // 房屋总价
-                houseTotal: price || 0,
-                // 首付百分比
-                downPayRate: 30,
-                // 贷款金额
-                loanAmount: 0,
-                // 公积金金额
-                accumulatTotalPirce: 0,
-                // 公积金贷款上限
-                accumulatLoanLimit: 0,
-                // 基点
-                commercialLoanBasePoint: 0,
-                // 商贷利率
-                commerceLoanRate: 0,
-                // 公积金利率
-                publicReserveFundsRate: 0,
-                // 商贷年限
-                commercialLoanTerm: 0,
-                // 商贷利率方式
-                commercialLoanWay: 0,
-                // 商贷金额
-                commerceTotalPirce: 0
-            },
-            // 默认值
-            defaultValue: {},
-            keyboardHeight: -1,
-            // 利率方式, 1 最新 | 0 旧版
-            loanLrpType: 1,
-            downPayRateCustom: '',
-            // 安卓上 手动输入时 隐藏计算按钮
-            btnOpacity: 1,
-            // 安卓状态栏
-            backgroundColor: '#fff'
+export default function LoanGenius() {
+    const [state, setReactState] = useState<any>(createInitialState)
+    const stateRef = useRef(state)
+    const loadingRef = useRef(false)
+    const scrollRef = useRef<unknown>(null)
+    const computeResultRef = useRef<object>({})
+    const isFirstChangeRef = useRef(true)
+
+    stateRef.current = state
+
+    const setState = useCallback((partial: Record<string, any>, callback?: () => void) => {
+        const nextState = {
+            ...stateRef.current,
+            ...partial
         }
-    }
+        stateRef.current = nextState
+        setReactState(nextState)
+        callback?.()
+    }, [])
 
-    componentDidMount() {
-        this.getData()
-    }
+    Taro.useLoad(() => {
+        getData()
+    })
 
-    async componentDidShow() {
-        const { title = '等额本息' } = (await getStorageData('USER_LOAN_WAY')) || {}
-        this.setState({ userLoanWay: title })
-    }
+    Taro.useDidShow(() => {
+        void (async () => {
+            const { title = '等额本息' } = (await getStorageData('USER_LOAN_WAY')) || {}
+            setState({ userLoanWay: title })
+        })()
+    })
 
     /**
      * 获取渲染项，处理picker range以及默认值
      * 需要在每次表单值改变后重新调用
      */
-    getRenderList = () => {
-        const { params, options, loanLrpType, commerceLoanRateNew, way } = this.state
+    function updateRenderList() {
+        const { params, options, loanLrpType, commerceLoanRateNew, way } = stateRef.current
         const commerceLoanRateEqua = `${params.loanLrp * 100}% + ${params.commercialLoanBasePoint}‱ = `
 
         const commerceLoanRateNewUnit = `${formatFloat(commerceLoanRateNew * 100, 2)}%`
-        this.setState({
-            renderList: getRenderList({
+        setState({
+            renderList: createRenderList({
                 ...params,
                 options,
                 way,
@@ -113,8 +135,8 @@ export default class LoanGenius extends Component<any, any> {
     /**
      * @description 请求配置
      */
-    getData = () => {
-        const { params } = this.state
+    function getData() {
+        const { params } = stateRef.current
         const { default: defaultData, options } = OPTION
         // 处理首付比例 手动输入选项 以及公积金利率一年 五年 商贷利率
         const {
@@ -129,8 +151,8 @@ export default class LoanGenius extends Component<any, any> {
             value: -1,
             label: '手动输入'
         })
-        this.handleDownPaySelectLabel(params.houseTotal, downPayRate)
-        params.loanAmount = Math.ceil(this.handleAmount(params.houseTotal, defaultData.downPayRate) as number)
+        handleDownPaySelectLabel(params.houseTotal, downPayRate)
+        params.loanAmount = Math.ceil(handleAmount(params.houseTotal, defaultData.downPayRate) as number)
         // 处理旧版商贷利率 关联 商贷年限
         commerceLoanRate.forEach((rate: any) => {
             // 大于五年
@@ -158,15 +180,15 @@ export default class LoanGenius extends Component<any, any> {
         })
         options.accumulatFundRate = [...accumulatFundRate, ...accumulatFundInFiveYearRate]
         const commerceLoanRateNew = formatFloat(defaultData.loanLrp + params.commercialLoanBasePoint / 10000, 4)
-        this.setState(
+        setState(
             {
                 ...OPTION,
                 commerceLoanRateNew,
                 params: { ...params, ...defaultData }
             },
             () => {
-                this.getRenderList()
-                params.houseTotal && this.submit()
+                updateRenderList()
+                params.houseTotal && void submit()
             }
         )
     }
@@ -176,27 +198,27 @@ export default class LoanGenius extends Component<any, any> {
      * @param data 当前选择配置项数据
      * @param selectObj 已选的数据项
      */
-    onChangePicker = (data: any, selectObj: { value: number | string; label: string }) => {
+    function onChangePicker(data: any, selectObj: { value: number | string; label: string }) {
         const { key } = data
-        const { params } = this.state
+        const { params } = stateRef.current
         const selectValue = Number(selectObj.value)
         // 处理首付比例切换
         if (key === 'downPayRate') {
             const isInput = selectValue === -1
             params[key] = isInput ? params[key] : selectValue
             if (!isInput) {
-                params.loanAmount = Math.ceil(this.handleAmount(params.houseTotal, selectValue) as number)
+                params.loanAmount = Math.ceil(handleAmount(params.houseTotal, selectValue) as number)
                 params.commerceTotalPirce = Math.max(parseInt(params.loanAmount) - params.accumulatTotalPirce, 0)
                 params.accumulatTotalPirce = parseInt(params.loanAmount) - params.commerceTotalPirce
             }
-            this.setState(
+            setState(
                 {
                     params,
                     btnOpacity: isInput ? 0 : 1,
                     // -1 标识手动输入
                     keyboardHeight: isInput ? 0 : -1
                 },
-                this.getRenderList
+                updateRenderList
             )
             return
         }
@@ -216,27 +238,27 @@ export default class LoanGenius extends Component<any, any> {
                       : params.commerceLoanInOneYearRate
         }
         params[key] = selectObj.value
-        let loanLrpTypeObj = {}
+        let loanLrpTypeObj: Record<string, any> = {}
         if (data.key === 'loanLrp') {
             loanLrpTypeObj = {
                 loanLrpType: selectObj.label.indexOf('最新') > -1 ? 1 : 0
             }
         }
 
-        this.setState(
+        setState(
             {
                 params,
                 ...loanLrpTypeObj
             },
-            this.getRenderList
+            updateRenderList
         )
     }
 
     /**
      * 处理首付展示
      */
-    handleDownPaySelectLabel = (data: number | string, range?: any[]) => {
-        const { options } = this.state
+    function handleDownPaySelectLabel(data: number | string, range?: any[]) {
+        const { options } = stateRef.current
         const list = range || options.downPayRate
         list.forEach((pay: any) => {
             pay.labelCopy = pay.labelCopy || pay.label
@@ -247,7 +269,7 @@ export default class LoanGenius extends Component<any, any> {
                 pay.label = pay.labelCopy
             }
         })
-        this.setState({
+        setState({
             options
         })
     }
@@ -258,15 +280,15 @@ export default class LoanGenius extends Component<any, any> {
      * @param value 输入的值
      * @param _index 当前配置项的索引
      */
-    onInputChange = (data: any, _value: number, _index: number) => {
-        const { params } = this.state
+    function onInputChange(data: any, _value: number, _index: number) {
+        const { params } = stateRef.current
         const value = _value > 0 ? _value : 0
 
         // 处理房屋总价输入时自动计算贷款金额
         if (data.key === 'houseTotal') {
-            this.handleDownPaySelectLabel(value)
+            handleDownPaySelectLabel(value)
             const { downPayRate } = params
-            params.loanAmount = Math.ceil(this.handleAmount(value, downPayRate) as number)
+            params.loanAmount = Math.ceil(handleAmount(value, downPayRate) as number)
         }
 
         params[data.key] = value
@@ -302,30 +324,30 @@ export default class LoanGenius extends Component<any, any> {
         // 校验公积金金额是否大于上限
         if (params.accumulatTotalPirce > accumulatLoanLimit) {
             // 修改商贷时 只提示一次
-            if (this.isFirstChange || data.key !== 'commerceTotalPirce') {
+            if (isFirstChangeRef.current || data.key !== 'commerceTotalPirce') {
                 Taro.showToast({
                     title: `当前城市公积金最高可贷${accumulatLoanLimit}万`,
                     icon: 'none'
                 })
                 params.commerceTotalPirce = parseInt(params.loanAmount) - accumulatLoanLimit
             }
-            this.isFirstChange = !(data.key === 'commerceTotalPirce')
+            isFirstChangeRef.current = !(data.key === 'commerceTotalPirce')
             params.accumulatTotalPirce = accumulatLoanLimit
             params.accumulatTotalPirceMaxValue = accumulatLoanLimit
         }
-        this.setState(
+        setState(
             {
                 params,
                 ...baseParams
             },
-            this.getRenderList
+            updateRenderList
         )
     }
 
     /**
      * 处理切换计算方式时，贷款总额或房屋总价
      */
-    handleAmount = (value: string | number, ratio: number) => {
+    function handleAmount(value: string | number, ratio: number) {
         return formatFloat(parseInt(value + '', 10) * (1 - ratio), 1)
     }
 
@@ -333,30 +355,30 @@ export default class LoanGenius extends Component<any, any> {
      * 计算方式、贷款方式改变事件
      * @param data
      */
-    onWayClick = (data: any) => {
+    function onWayClick(data: any) {
         const { key, index } = data
-        let obj = {}
+        let obj: Record<string, any> = {}
         // 处理切换成按房屋总价时 房屋总价根据 贷款总额 * (1 + 首付比例)
         if (data.key === 'way' && index === 1) {
-            const { params } = this.state
+            const { params } = stateRef.current
             const { downPayRate, loanAmount } = params
             params.houseTotal = Math.floor(formatFloat(loanAmount / (1 - downPayRate), 1) as number)
             obj = { params }
-            this.handleDownPaySelectLabel(params.houseTotal)
+            handleDownPaySelectLabel(params.houseTotal)
         }
         if (data.key === 'way' && index === 0) {
-            const { params } = this.state
+            const { params } = stateRef.current
             const { loanAmount } = params
             params.loanAmount = Math.ceil(formatFloat(loanAmount, 1) as number)
             obj = { params }
         }
-        this.setState(
+        setState(
             {
                 [key]: index,
                 showResult: false,
                 ...obj
             },
-            this.getRenderList
+            updateRenderList
         )
     }
 
@@ -364,48 +386,24 @@ export default class LoanGenius extends Component<any, any> {
      * 页面跳转
      * @param path 跳转路径
      */
-    goPage =
-        (path: string, data: object = {}) =>
-        () => {
+    function goPage(path: string, data: object = {}) {
+        return () => {
             setGlobalData('COMPUTE_RESULT', data)
             Taro.navigateTo({
                 url: `/pages/calculator/${path}/index`
             })
         }
-
-    /**
-     * 监听键盘出现事件
-     * @param frames 键盘对象
-     */
-    onKeyboardDidShow = (frames: Record<string, any>) => {
-        const { endCoordinates } = frames
-        console.log(endCoordinates)
-        this.setState({
-            btnOpacity: 0,
-            keyboardHeight: endCoordinates.height
-        })
-    }
-
-    /**
-     * 监听键盘收起事件
-     * @param frames 键盘对象
-     */
-    onKeyboardDidHide = (_frames: Record<string, any>) => {
-        this.setState({
-            keyboardHeight: -1,
-            btnOpacity: 1
-        })
     }
 
     /**
      * 首付选择手动输入处理
      * @param e
      */
-    downPayRateHandle = (e: any) => {
+    function downPayRateHandle(e: any) {
         const { value } = e.detail
         const valueNumbe = parseInt(value, 10)
         // 输入范围0-99
-        this.setState({
+        setState({
             downPayRateCustom: valueNumbe
         })
     }
@@ -413,12 +411,12 @@ export default class LoanGenius extends Component<any, any> {
     /**
      * 确定手动输入首付比例
      */
-    downPayRateConfirm = () => {
-        const { options, params, downPayRateCustom } = this.state
+    function downPayRateConfirm() {
+        const { options, params, downPayRateCustom } = stateRef.current
         const { downPayRate } = options
         const value = parseInt(downPayRateCustom, 10)
         if (!(value > 0 && value <= 99)) {
-            this.setState({
+            setState({
                 btnOpacity: 1,
                 keyboardHeight: -1
             })
@@ -438,9 +436,9 @@ export default class LoanGenius extends Component<any, any> {
             })
         }
         params.downPayRate = realValue
-        params.loanAmount = Math.ceil(this.handleAmount(params.houseTotal, params.downPayRate) as number)
+        params.loanAmount = Math.ceil(handleAmount(params.houseTotal, params.downPayRate) as number)
         params.commerceTotalPirce = parseInt(params.loanAmount) - params.accumulatTotalPirce
-        this.setState(
+        setState(
             {
                 options,
                 params,
@@ -448,8 +446,8 @@ export default class LoanGenius extends Component<any, any> {
                 keyboardHeight: -1
             },
             () => {
-                this.handleDownPaySelectLabel(params.houseTotal)
-                this.getRenderList()
+                handleDownPaySelectLabel(params.houseTotal)
+                updateRenderList()
             }
         )
     }
@@ -457,8 +455,8 @@ export default class LoanGenius extends Component<any, any> {
     /**
      * 检验公积金金额
      */
-    checkAccumulatLoanAmount = () => {
-        const { params } = this.state
+    function checkAccumulatLoanAmount() {
+        const { params } = stateRef.current
         const { accumulatLoanLimit, accumulatTotalPirce } = params
         if (accumulatTotalPirce > accumulatLoanLimit) {
             Taro.showToast({
@@ -480,8 +478,8 @@ export default class LoanGenius extends Component<any, any> {
         }
     }
 
-    checkParams = () => {
-        const { params, loanType } = this.state
+    function checkParams() {
+        const { params, loanType } = stateRef.current
         const { loanAmount, accumulatTotalPirce, commerceTotalPirce, accumulatLoanLimit } = params
         if (loanAmount === 0) {
             Taro.showToast({
@@ -507,8 +505,8 @@ export default class LoanGenius extends Component<any, any> {
         return true
     }
 
-    getTip = (showMonthlyPay = true) => {
-        const { params, loanType, loanLrpType, commerceLoanRateNew, userLoanWay } = this.state
+    function getTip(showMonthlyPay = true) {
+        const { params, loanType, loanLrpType, commerceLoanRateNew, userLoanWay } = stateRef.current
         const {
             commerceLoanYear,
             accumulatFundYear,
@@ -538,14 +536,14 @@ export default class LoanGenius extends Component<any, any> {
         return tip
     }
 
-    submit = async () => {
-        if (this.loading) return
-        if (!this.checkParams()) return
+    async function submit() {
+        if (loadingRef.current) return
+        if (!checkParams()) return
         Taro.showLoading({
             title: '计算中...'
         })
 
-        const { params, loanType, loanLrpType, commerceLoanRateNew, userLoanWay } = this.state
+        const { params, loanType, loanLrpType, commerceLoanRateNew, userLoanWay } = stateRef.current
         const {
             commerceLoanYear,
             accumulatFundYear,
@@ -566,14 +564,14 @@ export default class LoanGenius extends Component<any, any> {
             commerceTotalPirce: loanType === 1 ? loanAmount : commerceTotalPirce
         })
         try {
-            const tip = this.getTip(false)
-            this.computeResult = {
+            const tip = getTip(false)
+            computeResultRef.current = {
                 ...res,
                 loanAmount,
                 tip
             }
             const backgroundColor = '#12B983'
-            this.setState({
+            setState({
                 tip,
                 showResult: true,
                 equalInterestPayMonth: res.equalInterest.payMonth,
@@ -610,154 +608,141 @@ export default class LoanGenius extends Component<any, any> {
             setTimeout(() => {
                 Taro.hideLoading()
             }, 1000)
-            this.loading = false
+            loadingRef.current = false
         }
     }
 
-    render() {
-        const {
-            way,
-            loanType,
-            renderList,
-            params,
-            keyboardHeight,
-            btnOpacity,
-            userLoanWay,
-            equalInterestPayMonth,
-            equalPrincipalPayMonth,
-            showResult,
-            backgroundColor
-        } = this.state
-        const { houseTotal, downPayRate } = params
-        const navigationBarColor = backgroundColor === '#fff' ? '#0B0F12' : '#fff'
-        return (
-            <View className="relative flex flex-col flex-1 bg-white h-screen w-full overflow-hidden">
-                <NavigationBar backgroundColor={backgroundColor} color={navigationBarColor}>
-                    <Text>房贷计算器</Text>
-                </NavigationBar>
-                {keyboardHeight >= 0 && (
-                    <View className="fixed bottom-0 left-0 right-0 top-0 z-9999 size-full">
-                        <View className="fixed bottom-0 left-0 right-0 top-0 z-90 size-full bg-[rgba(0,0,0,0.6)]" />
+    const {
+        way,
+        loanType,
+        renderList,
+        params,
+        keyboardHeight,
+        btnOpacity,
+        userLoanWay,
+        equalInterestPayMonth,
+        equalPrincipalPayMonth,
+        showResult,
+        backgroundColor
+    } = state
+    const { houseTotal, downPayRate } = params
+    const navigationBarColor = backgroundColor === '#fff' ? '#0B0F12' : '#fff'
 
-                        <View
-                            className="fixed bottom-0 left-0 right-0 z-99 box-border flex h-12.5 flex-row items-center bg-white"
-                            style={{
-                                bottom: isAndroid() ? 0 : keyboardHeight
-                            }}
+    return (
+        <View className="relative flex flex-col flex-1 bg-white h-screen w-full overflow-hidden">
+            <NavigationBar backgroundColor={backgroundColor} color={navigationBarColor}>
+                <Text>房贷计算器</Text>
+            </NavigationBar>
+            {keyboardHeight >= 0 && (
+                <View className="fixed bottom-0 left-0 right-0 top-0 z-9999 size-full">
+                    <View className="fixed bottom-0 left-0 right-0 top-0 z-90 size-full bg-[rgba(0,0,0,0.6)]" />
+
+                    <View
+                        className="fixed bottom-0 left-0 right-0 z-99 box-border flex h-12.5 flex-row items-center bg-white"
+                        style={{
+                            bottom: isAndroid() ? 0 : keyboardHeight
+                        }}
+                    >
+                        <Text className="ml-5 flex h-6.75 shrink-0 items-center font-pingfang-regular text-base font-normal leading-6.75 text-[rgba(171,175,177,1)]">
+                            请输入
+                        </Text>
+                        <ScrollView
+                            scrollY
+                            // keyboardShouldPersistTaps="always"
+                            // enableAutomaticScroll={false}
+                            className="ml-6.75 flex-1 overflow-hidden rounded-xs bg-[rgba(240,240,240,1)] px-1.25"
                         >
-                            <Text className="ml-5 flex h-6.75 shrink-0 items-center font-pingfang-regular text-base font-normal leading-6.75 text-[rgba(171,175,177,1)]">
-                                请输入
-                            </Text>
-                            <ScrollView
-                                scrollY
-                                // keyboardShouldPersistTaps="always"
-                                // enableAutomaticScroll={false}
-                                // onKeyboardDidShow={this.onKeyboardDidShow}
-                                className="ml-6.75 flex-1 overflow-hidden rounded-xs bg-[rgba(240,240,240,1)] px-1.25"
-                                // onKeyboardDidHide={this.onKeyboardDidHide}
-                            >
-                                <Input
-                                    keyboardType="number-pad"
-                                    type="number"
-                                    // 针对小程序中底部fixed input被遮盖一部分 设置光标距离键盘距离
-                                    cursorSpacing={10}
-                                    className="h-6.75"
-                                    focus
-                                    style={{
-                                        // @ts-expect-error 针对安卓文字显示不全
-                                        paddingVertical: 0
-                                    }}
-                                    onInput={this.downPayRateHandle}
-                                    onBlur={this.downPayRateConfirm}
-                                    holdKeyboard
-                                />
-                            </ScrollView>
+                            <Input
+                                keyboardType="number-pad"
+                                type="number"
+                                // 针对小程序中底部fixed input被遮盖一部分 设置光标距离键盘距离
+                                cursorSpacing={10}
+                                className="h-6.75"
+                                focus
+                                style={{
+                                    // @ts-expect-error 针对安卓文字显示不全
+                                    paddingVertical: 0
+                                }}
+                                onInput={downPayRateHandle}
+                                onBlur={downPayRateConfirm}
+                                holdKeyboard
+                            />
+                        </ScrollView>
 
-                            <Text
-                                className="mx-4 shrink-0 font-pingfang-regular text-base font-normal text-[rgba(31,176,129,1)]"
-                                onClick={this.downPayRateConfirm}
-                            >
-                                确定
-                            </Text>
-                        </View>
+                        <Text
+                            className="mx-4 shrink-0 font-pingfang-regular text-base font-normal text-[rgba(31,176,129,1)]"
+                            onClick={downPayRateConfirm}
+                        >
+                            确定
+                        </Text>
                     </View>
+                </View>
+            )}
+
+            <ScrollView
+                scrollY
+                ref={(ref) => {
+                    scrollRef.current = ref
+                }}
+                className={'flex-1 overflow-x-hidden overflow-y-scroll flex flex-col'}
+                enable-flex="true"
+            >
+                {showResult && (
+                    <LoanGeniusHeader
+                        way={way}
+                        tip={getTip()}
+                        downPayRate={downPayRate}
+                        equalInterestPayMonth={equalInterestPayMonth}
+                        equalPrincipalPayMonth={equalPrincipalPayMonth}
+                        houseTotal={houseTotal}
+                        userLoanWay={userLoanWay}
+                        goHistory={goPage('history')}
+                        goMonthlyPayments={goPage('monthly-payments', computeResultRef.current)}
+                    />
                 )}
 
-                <ScrollView
-                    scrollY
-                    ref={(ref) => {
-                        this.scroll = ref
-                    }}
-                    className={'flex-1 overflow-x-hidden overflow-y-scroll flex flex-col'}
-                    enable-flex="true"
+                <View className="px-5 pb-8">
+                    <TitleTpl title="计算方式" data={COMPUTE_WAY_TITLE} onWayClick={onWayClick} activeIndex={way} />
+                    <LineWrap
+                        data={renderList}
+                        type={COMPUTE_WAY[way]}
+                        onChangePicker={onChangePicker}
+                        onInputChange={onInputChange}
+                    />
+                    <TitleTpl title="贷款方式" data={LOAN_WAY_TITLE} onWayClick={onWayClick} activeIndex={loanType} />
+
+                    <LineWrap
+                        data={renderList}
+                        type={LIST_TYPE[loanType]}
+                        onBlur={checkAccumulatLoanAmount}
+                        onChangePicker={onChangePicker}
+                        onInputChange={onInputChange}
+                    />
+                </View>
+            </ScrollView>
+
+            <BoxShadow
+                shadowColor="#000"
+                shadowOffset={{
+                    width: 0,
+                    height: -1
+                }}
+                shadowOpacity={0.1}
+                shadowRadius={1}
+                elevation={5}
+                className="flex w-full items-center justify-center bg-white"
+                style={{
+                    opacity: btnOpacity
+                }}
+                boxShadow="0px 2px 8px 0px rgba(211,215,218,1)"
+            >
+                <Button
+                    className="flex p-2 m-4 flex-1 items-center justify-center leading-normal rounded-xs bg-[rgba(35,201,147,1)] text-center"
+                    onClick={submit}
                 >
-                    {showResult && (
-                        <LoanGeniusHeader
-                            way={way}
-                            tip={this.getTip()}
-                            downPayRate={downPayRate}
-                            equalInterestPayMonth={equalInterestPayMonth}
-                            equalPrincipalPayMonth={equalPrincipalPayMonth}
-                            houseTotal={houseTotal}
-                            userLoanWay={userLoanWay}
-                            goHistory={this.goPage('history')}
-                            goMonthlyPayments={this.goPage('monthly-payments', this.computeResult)}
-                        />
-                    )}
-
-                    <View className="px-5 pb-8">
-                        <TitleTpl
-                            title="计算方式"
-                            data={COMPUTE_WAY_TITLE}
-                            onWayClick={this.onWayClick}
-                            activeIndex={way}
-                        />
-                        <LineWrap
-                            data={renderList}
-                            type={COMPUTE_WAY[way]}
-                            onChangePicker={this.onChangePicker}
-                            onInputChange={this.onInputChange}
-                        />
-                        <TitleTpl
-                            title="贷款方式"
-                            data={LOAN_WAY_TITLE}
-                            onWayClick={this.onWayClick}
-                            activeIndex={loanType}
-                        />
-
-                        <LineWrap
-                            data={renderList}
-                            type={LIST_TYPE[loanType]}
-                            onBlur={this.checkAccumulatLoanAmount}
-                            onChangePicker={this.onChangePicker}
-                            onInputChange={this.onInputChange}
-                        />
-                    </View>
-                </ScrollView>
-
-                <BoxShadow
-                    shadowColor="#000"
-                    shadowOffset={{
-                        width: 0,
-                        height: -1
-                    }}
-                    shadowOpacity={0.1}
-                    shadowRadius={1}
-                    elevation={5}
-                    className="flex w-full items-center justify-center bg-white"
-                    style={{
-                        opacity: btnOpacity
-                    }}
-                    boxShadow="0px 2px 8px 0px rgba(211,215,218,1)"
-                >
-                    <Button
-                        className="flex p-2 m-4 flex-1 items-center justify-center leading-normal rounded-xs bg-[rgba(35,201,147,1)] text-center"
-                        onClick={this.submit}
-                    >
-                        <Text className="font-pingfang-regular text-lg font-normal text-white">开始计算</Text>
-                    </Button>
-                </BoxShadow>
-            </View>
-        )
-    }
+                    <Text className="font-pingfang-regular text-lg font-normal text-white">开始计算</Text>
+                </Button>
+            </BoxShadow>
+        </View>
+    )
 }

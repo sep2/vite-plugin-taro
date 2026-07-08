@@ -6,10 +6,10 @@
  * @Last Modified by: qiuz
  */
 
-import clsx from 'clsx'
-import type { FunctionComponent, PropsWithChildren } from 'react'
 import type { ITouchEvent } from 'virtual:taro/components'
 import { Image, View } from 'virtual:taro/components'
+import clsx from 'clsx'
+import type { FunctionComponent, PropsWithChildren } from 'react'
 
 interface TaroLinearGradientProps {
     style?: object

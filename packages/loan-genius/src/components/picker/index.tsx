@@ -5,10 +5,10 @@
  * @Last Modified by: qiuz
  */
 
+import { Picker, PickerView, PickerViewColumn, Text, View } from 'virtual:taro/components'
 import { isArray } from '@utils'
 import clsx from 'clsx'
-import { Component, type ComponentType, type PropsWithChildren } from 'react'
-import { Picker, PickerView, PickerViewColumn, Text, View } from 'virtual:taro/components'
+import { type ComponentType, type PropsWithChildren, useEffect, useRef, useState } from 'react'
 import styles from './index.module.css'
 import type { RangeItem, TaroPickerSelectorProps } from './type'
 
@@ -113,77 +113,61 @@ TaroPickerSelector = TaroPickerSelectorH5
 /*  #endif  */
 
 /*  #ifdef  wx  */
-class TaroPickerSelectorWx extends Component<TaroPickerSelectorProps, any> {
-    static defaultProps = {
-        range: [],
-        value: [],
-        cols: 1,
-        cascade: true,
-        // rangeKey: 'label',
-        onChange: () => {},
-        onValueChange: () => {}
-    }
+const TaroPickerSelectorWx: ComponentType<PropsWithChildren<TaroPickerSelectorProps>> = (props) => {
+    const {
+        range = [],
+        value = [],
+        mode = 'selector',
+        title,
+        children,
+        onChange = () => {},
+        onValueChange = () => {}
+    } = props
+    const [visible, setVisible] = useState(false)
+    const [animation, setAnimation] = useState('slide-down')
+    const [selectedValue, setSelectedValue] = useState(value)
+    const realValue = useRef<unknown[] | undefined>(undefined)
 
-    realValue: any
+    useEffect(() => {
+        setSelectedValue(value)
+    }, [value])
 
-    constructor(props: TaroPickerSelectorProps) {
-        super(props)
-        this.state = {
-            visible: false
-        }
-    }
-
-    componentDidUpdate(prevProps: TaroPickerSelectorProps) {
-        if (this.props.value !== prevProps.value) {
-            this.setState({
-                selectedValue: this.props.value
-            })
-        }
-    }
-
-    showModal = (e: any) => {
+    const showModal = (e: any) => {
         e.stopPropagation()
-        const { value = [0] } = this.props
-        this.setState({
-            visible: true,
-            animation: 'slide-up',
-            selectedValue: value
-        })
+        setVisible(true)
+        setAnimation('slide-up')
+        setSelectedValue(value)
     }
 
-    closeModal = (e?: any) => {
+    const closeModal = (e?: any) => {
         e && e.stopPropagation()
-        this.setState({
-            animation: 'slide-down'
-        })
+        setAnimation('slide-down')
         // 延时 以展示完收起动画
         setTimeout(() => {
-            this.setState({
-                visible: false
-            })
+            setVisible(false)
         }, 150)
     }
 
-    handleChange = (e: any) => {
-        const { range, mode } = this.props
+    const handleChange = (e: any) => {
         if (mode === 'multiSelector') {
             const valueList = isArray(e.detail.value) ? e.detail.value : [e.detail.value]
-            this.realValue = valueList.map((v: any, i: number) => getRangeItem(range, mode, i, Number(v))?.value)
-            this.props.onValueChange!(this.realValue)
+            const nextValue = valueList.map((v: any, i: number) => getRangeItem(range, mode, i, Number(v))?.value)
+            realValue.current = nextValue
+            onValueChange(nextValue)
             return
         }
-        this.realValue = [getRangeItem(range, mode, 0, Number(e.detail.value))?.value]
-        this.props.onValueChange!(this.realValue)
+        const nextValue = [getRangeItem(range, mode, 0, Number(e.detail.value))?.value]
+        realValue.current = nextValue
+        onValueChange(nextValue)
     }
 
-    onConfirm = () => {
-        const { selectedValue } = this.state
-        this.props.onChange(this.realValue || selectedValue)
+    const onConfirm = () => {
+        onChange(realValue.current || selectedValue)
         // 展示过渡动画
-        setTimeout(this.closeModal)
+        setTimeout(closeModal)
     }
 
-    renderMultiPicker = (data: any) => {
+    const renderMultiPicker = (data: any) => {
         return data.map((item: any, index: number) => {
             return (
                 // biome-ignore lint/suspicious/noArrayIndexKey: columns are static and only identified by position
@@ -200,8 +184,7 @@ class TaroPickerSelectorWx extends Component<TaroPickerSelectorProps, any> {
         })
     }
 
-    getVlaueIndex = (selectValue: any[]) => {
-        const { range = [], mode } = this.props
+    const getVlaueIndex = (selectValue: any[]) => {
         return selectValue.map((v, i) => {
             let index = 0
             const data = (mode === 'multiSelector' ? range[i] : range) || []
@@ -214,57 +197,53 @@ class TaroPickerSelectorWx extends Component<TaroPickerSelectorProps, any> {
         })
     }
 
-    render() {
-        const { range = [], value, mode, title } = this.props
-        const { visible, animation } = this.state
-        return (
-            <View onClick={this.showModal}>
-                {visible && (
-                    <View
-                        className={clsx(
-                            'fixed bottom-0 left-0 right-0 top-0 z-998 bg-[rgba(0,0,0,0.5)]',
-                            animation === 'slide-up' ? styles.maskEnter : styles.maskLeave
-                        )}
-                        onClick={this.closeModal}
-                    />
-                )}
-                {visible && (
-                    <View
-                        className={clsx(
-                            'pb-safe fixed bottom-0 left-0 z-999 box-border w-full bg-white text-center',
-                            animation === 'slide-up' ? styles.modalEnter : styles.modalLeave
-                        )}
-                    >
-                        <View className="flex flex-row items-center justify-between bg-[rgba(248,249,251,1)] p-3.75 text-base">
-                            <Text className="text-[#474B4E]" onClick={this.closeModal}>
-                                取消
-                            </Text>
-                            <Text className="font-pingfang-medium text-base text-[rgba(11,15,18,1)]">{title}</Text>
-                            <Text className="font-bold text-[#1fb081]" onClick={this.onConfirm}>
-                                确定
-                            </Text>
-                        </View>
-                        <PickerView className="h-75" value={this.getVlaueIndex(value)} onChange={this.handleChange}>
-                            {mode === 'multiSelector' ? (
-                                this.renderMultiPicker(range)
-                            ) : (
-                                <PickerViewColumn>
-                                    {(range as RangeItem[]).map((i: any) => {
-                                        return (
-                                            <View className="flex items-center justify-center" key={i.value}>
-                                                {i.label}
-                                            </View>
-                                        )
-                                    })}
-                                </PickerViewColumn>
-                            )}
-                        </PickerView>
+    return (
+        <View onClick={showModal}>
+            {visible && (
+                <View
+                    className={clsx(
+                        'fixed bottom-0 left-0 right-0 top-0 z-998 bg-[rgba(0,0,0,0.5)]',
+                        animation === 'slide-up' ? styles.maskEnter : styles.maskLeave
+                    )}
+                    onClick={closeModal}
+                />
+            )}
+            {visible && (
+                <View
+                    className={clsx(
+                        'pb-safe fixed bottom-0 left-0 z-999 box-border w-full bg-white text-center',
+                        animation === 'slide-up' ? styles.modalEnter : styles.modalLeave
+                    )}
+                >
+                    <View className="flex flex-row items-center justify-between bg-[rgba(248,249,251,1)] p-3.75 text-base">
+                        <Text className="text-[#474B4E]" onClick={closeModal}>
+                            取消
+                        </Text>
+                        <Text className="font-pingfang-medium text-base text-[rgba(11,15,18,1)]">{title}</Text>
+                        <Text className="font-bold text-[#1fb081]" onClick={onConfirm}>
+                            确定
+                        </Text>
                     </View>
-                )}
-                {this.props.children}
-            </View>
-        )
-    }
+                    <PickerView className="h-75" value={getVlaueIndex(value)} onChange={handleChange}>
+                        {mode === 'multiSelector' ? (
+                            renderMultiPicker(range)
+                        ) : (
+                            <PickerViewColumn>
+                                {(range as RangeItem[]).map((i: any) => {
+                                    return (
+                                        <View className="flex items-center justify-center" key={i.value}>
+                                            {i.label}
+                                        </View>
+                                    )
+                                })}
+                            </PickerViewColumn>
+                        )}
+                    </PickerView>
+                </View>
+            )}
+            {children}
+        </View>
+    )
 }
 
 TaroPickerSelector = TaroPickerSelectorWx
