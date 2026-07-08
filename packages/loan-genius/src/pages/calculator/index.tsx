@@ -689,6 +689,7 @@ export default class LoanGenius extends Component<any, any> {
                         this.scroll = ref
                     }}
                     className={'flex-1 overflow-x-hidden overflow-y-scroll flex flex-col'}
+                    enable-flex="true"
                 >
                     {showResult && (
                         <LoanGeniusHeader

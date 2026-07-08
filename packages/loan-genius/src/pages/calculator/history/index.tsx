@@ -5,10 +5,10 @@
  * @Last Modified by: qiuz
  */
 
+import { ScrollView, Text, View } from 'virtual:taro/components'
 import { NavigationBar, SafeAreaView } from '@components'
 import { getStorageData } from '@utils'
 import { Component } from 'react'
-import { ScrollView, Text, View } from 'virtual:taro/components'
 
 export default class LoanGeniusHistory extends Component<any, any> {
     constructor(props: any) {
@@ -32,7 +32,11 @@ export default class LoanGeniusHistory extends Component<any, any> {
                 <NavigationBar>
                     <Text>计算历史</Text>
                 </NavigationBar>
-                <ScrollView scrollY className="flex flex-col flex-1 overflow-x-hidden overflow-y-scroll">
+                <ScrollView
+                    scrollY
+                    enable-flex="true"
+                    className="flex flex-col flex-1 overflow-x-hidden overflow-y-scroll"
+                >
                     {historyList.map((item: any, index: number) => {
                         return (
                             <View

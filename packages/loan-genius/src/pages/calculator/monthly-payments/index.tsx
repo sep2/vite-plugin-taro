@@ -5,12 +5,12 @@
  * @Last Modified by: qiuz
  */
 
+import Taro from 'virtual:taro/api'
+import { Image, ScrollView, Text, View } from 'virtual:taro/components'
 import { NavigationBar, SafeAreaView } from '@components'
 import { getGlobalData, getStorageData } from '@utils'
 import clsx from 'clsx'
 import { Component } from 'react'
-import { Image, ScrollView, Text, View } from 'virtual:taro/components'
-import Taro from 'virtual:taro/api'
 import { CHECK_RIDIO, CHECK_RIDIO_Y, MONTY_DATA, MONTY_TITLE } from '../constants'
 
 export default class LoanGeniusMonthlyPayments extends Component<any, any> {
@@ -91,6 +91,7 @@ export default class LoanGeniusMonthlyPayments extends Component<any, any> {
                 <ScrollView
                     className="flex flex-col flex-1 overflow-x-hidden overflow-y-scroll"
                     scrollY
+                    enable-flex="true"
                     enableBackToTop
                     onScrollToLower={this.onScrollToLower}
                 >
