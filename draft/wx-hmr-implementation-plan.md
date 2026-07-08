@@ -1,175 +1,109 @@
-# WeChat Mini Program Dev HMR Plan — Clean Architecture
+# WeChat Mini Program Dev HMR Plan — Intent-First Clean Architecture
 
-The goal is to implement wx dev HMR with the same conceptual pieces as web HMR:
+This document describes the intended architecture and rationale for wx dev HMR / React Refresh in `vite-plugin-taro`.
 
-- Vite dev server owns the module graph and transforms.
-- A wx-specific runtime owns module execution inside Mini Program appservice.
-- `dist/wx/hmr/update.js` is the executable transport because WeChat cannot execute streamed JS text.
+It intentionally avoids prescribing low-level implementation mechanics. The next implementation should choose clean internal APIs and file layout based on these principles.
 
-## 1. Core idea
+## 1. Goal
 
-Web Vite HMR works because the browser can execute updated modules by URL:
+Provide WeChat Mini Program development hot updates that feel close to React Refresh on web:
 
-```js
-import('/src/components/foo.tsx?t=123')
-```
+- editing React implementation code should update the running Mini Program without a full reload when React Refresh can safely do so;
+- unsupported edits should fall back to normal WeChat reload/recompile behavior instead of crashing or leaving stale generated output;
+- production wx output must remain free of dev HMR code.
 
-WeChat Mini Program cannot do that. It has no browser ESM loader and forbids `eval`/`new Function`. Therefore the only major architectural difference is **code execution transport**:
+The feature should prioritize correctness and maintainability over maximizing the number of edit types handled by hot update.
 
-```text
-web: Vite WS message -> browser imports updated module URL
-wx:  Vite dev event -> plugin writes dist/wx/hmr/update.js -> DevTools executes changed file
-```
+## 2. Non-goals for the first clean implementation
 
-Everything else should stay as close to Vite/web HMR concepts as possible:
+The first clean implementation does not need to solve every kind of dev update.
 
-- stable logical module IDs
-- module graph invalidation
-- module factory replacement
-- React Refresh family registration
-- refresh boundary validation
-- full reload fallback for incompatible updates
+Out of scope or acceptable as full reload:
 
-## 2. Desired dev output shape
+- CSS/Tailwind hot updates;
+- wx asset updates;
+- route/page list changes;
+- app/page JSON config changes;
+- native/custom component topology changes;
+- incompatible React Refresh edits;
+- class component state preservation.
 
-```text
-dist/wx/app.js
-dist/wx/app.json
-dist/wx/app.wxss                # can be coarse/full-regenerated initially
-dist/wx/base.wxml
-dist/wx/utils.wxs
-dist/wx/comp.js
-dist/wx/comp.json
-dist/wx/comp.wxml
-dist/wx/pages/**/index.js
-dist/wx/pages/**/index.json
-dist/wx/pages/**/index.wxml
-dist/wx/pages/**/index.wxss
+These should not block the JS/React architecture.
 
-dist/wx/common/taro.js           # framework/runtime/vendor bucket, exact shape TBD
-dist/wx/common/vendor.js         # third-party bucket, exact shape TBD
+## 3. Why wx HMR differs from web HMR
 
-dist/wx/hmr/runtime.js           # stable wx HMR + React Refresh runtime
-dist/wx/hmr/bootstrap.js         # initial logical source module factories
-dist/wx/hmr/update.js            # no-op initially; overwritten on hot update
-```
+Web HMR works because the browser can execute new JavaScript modules by URL. Vite can notify the browser that a module changed, and the browser can import the changed module.
 
-For a React-only implementation update, the dev contract is:
+WeChat Mini Program appservice cannot do the same:
+
+- it cannot use normal browser ESM module loading;
+- it cannot execute arbitrary code strings with `eval` or `new Function`;
+- it cannot directly run Vite's browser HMR client.
+
+Therefore the main difference from web HMR is the code execution transport.
+
+Conceptually:
 
 ```text
-React module implementation changed -> write only hmr/update.js
-Mini Program shape changed         -> rewrite affected wx output and let DevTools reload/recompile
+web: Vite update notice -> browser executes updated module URL
+wx:  Vite update notice -> plugin writes executable update file -> DevTools executes changed local file
 ```
 
-In this document, **React module implementation changed** means edits that can be represented by replacing one or more logical JS/TS/TSX module factories without changing the wx shell: component render logic, local helpers, constants, hooks, and newly imported JS source modules when they can be embedded into the update payload.
+The rest of the system should stay as close to web HMR semantics as practical.
 
-**Mini Program shape changed** means edits that alter files or metadata WeChat compiles outside the React runtime: app/page registration, routes, JSON config, WXML/template structure, native/custom component topology, WXSS/assets when not separately supported, or vendor/framework bundle structure.
+## 4. Core architectural principle
 
-Only the first category should keep `app.js`, page entries, `common/*`, and `hmr/bootstrap.js` stable. The second category should intentionally rewrite the affected stable files and accept a full reload.
+Use Vite/web HMR concepts for identity, invalidation, and React Refresh, but replace the browser module execution mechanism with a WeChat-compatible file-backed transport.
 
-## 3. Commands / mode split
+This means:
 
-Change wx dev from build-watch to real Vite dev server.
+- Vite should remain the source of truth for module graph and transforms;
+- React Refresh identity should be based on source modules, as on web;
+- wx should use a stable local update file as the executable carrier;
+- fallback reloads should be explicit and intentional.
 
-Current style:
+The implementation should not invent unrelated component-proxy semantics or rely on Mini Program mtime tricks as the primary model.
 
-```sh
-vite build --watch
-```
+## 5. Why use real Vite dev server for wx dev
 
-Target style:
+The wx dev mode should be based on Vite's dev-server mode rather than `vite build --watch`.
 
-```sh
-vite --host 127.0.0.1
-# equivalent to: vite dev --host 127.0.0.1
-```
+Reason:
 
-The Vite server is not used by Mini Program as a browser runtime. It is used by the plugin as:
+- Vite dev already models the behavior we want: module graph ownership, transform pipeline, invalidation, and React Refresh metadata;
+- build-watch is optimized for repeatedly producing full build output, not for fine-grained module replacement;
+- using the dev server makes wx HMR conceptually closer to web HMR, with only the execution transport changed.
 
-- file watcher
-- module graph
-- transform pipeline
-- dependency resolver
-- React Refresh transform source
-- invalidation engine
+In Vite plugin terminology the dev-server command is `serve`, even when users run `vite` or `vite dev` from the CLI.
 
-The plugin writes executable wx files to `dist/wx`.
+The Mini Program does not become a browser client of the dev server. The dev server is a compiler/graph backend for the plugin.
 
-Production wx remains normal `vite build`.
+## 6. Why use a file-backed update transport
 
-## 4. High-level components
+WeChat DevTools can observe and execute changed project files. That is the available execution path.
 
-Start with a small file split. Do not pre-create a large module tree.
-
-Suggested first-pass organization:
+Therefore wx hot updates should be carried through a stable local file:
 
 ```text
-packages/vite-plugin-taro/src/vite/targets/wx.ts          # existing wx build/prod config and public integration
-packages/vite-plugin-taro/src/vite/targets/wx-dev.ts      # wx dev server plugin, dev session, shell/update writing
-packages/vite-plugin-taro/src/vite/targets/wx-runtime.ts  # generated runtime/bootstrap/update code strings
+dist/wx/hmr/update.js
 ```
 
-Split further only when a file becomes too large or mixes unrelated responsibilities. Likely future split points, if needed:
+This file is not the source of truth for module identity. It is only the executable transport for a set of changed module factories.
 
-```text
-module compiler / factory generation
-logical module ID and path normalization
-wx shell/assets writer
-update payload writer
-vendor/framework external mapping
-```
+A stable update file is preferred because:
 
-Code quality rule:
+- DevTools can notice it;
+- it avoids forbidden dynamic code execution;
+- it gives the plugin one controlled place to deliver hot payloads;
+- it avoids touching app/page shell files for ordinary React implementation edits.
 
-```text
-Start with 2–3 files.
-Do not pre-create ten tiny modules.
-Do not let wx.ts become a 1000-line feature dump.
-```
+## 7. Logical module identity
 
-## 5. Vite plugin lifecycle
+Intent: mirror Vite/web HMR semantics.
 
-Add a wx dev plugin that runs only when:
+A React component's refresh identity should be tied to the source module that defines it, not to a generated wx output file.
 
-- target is `wx`
-- Vite command is `serve` (`vite` / `vite dev`; Vite's plugin API names dev-server mode `serve`, not `dev`)
-- not production
-
-Pseudo-shape:
-
-```ts
-export function createVitePluginTaroWechatDevPlugin(context): Plugin {
-  let session: WxDevSession | undefined
-
-  return {
-    name: 'vite-plugin-taro-wx-dev',
-    apply: 'serve',
-    configureServer(server) {
-      session = new WxDevSession(context, server)
-      session.start()
-    },
-    handleHotUpdate(ctx) {
-      return session?.handleHotUpdate(ctx) ?? ctx.modules
-    }
-  }
-}
-```
-
-`WxDevSession.start()` should:
-
-1. clean generated wx output safely
-2. write Mini Program shell files
-3. compile/write initial framework/vendor files if needed
-4. compile/write initial logical source factories to `hmr/bootstrap.js`
-5. write `hmr/runtime.js`
-6. write no-op `hmr/update.js`
-7. start listening to file changes through Vite
-
-## 6. Logical module identity
-
-Intent: mirror Vite/web HMR semantics. A React component's refresh identity should be tied to the source module that defines it, not to a generated wx output file.
-
-On web, Vite refreshes source module identities such as:
+Examples of intended identities:
 
 ```text
 /src/app.ts
@@ -177,482 +111,287 @@ On web, Vite refreshes source module identities such as:
 /src/components/navigation-bar/navigation-bar.tsx
 ```
 
-The wx runtime should use the same kind of identity even though it cannot execute those modules by URL. `hmr/bootstrap.js` and `hmr/update.js` should both refer to the same logical source identity, so an update can replace the module factory while React Refresh still recognizes the component family.
+React Refresh family identity should derive from that source module identity plus the component export/local name.
 
-Example React Refresh family identity:
+Example:
 
 ```text
 /src/components/navigation-bar/navigation-bar.tsx NavigationBar
 ```
 
-Do not base React Refresh identity on generated wx files such as `app.js`, `common/taro.js`, or any temporary update payload file. Those files are transport/build artifacts; changing them should not change the logical identity of the React component.
+Why this matters:
 
-The exact normalization rules should follow Vite's module-id semantics as closely as practical, including preserving meaningful virtual/query identities when they affect module meaning.
+- the same component should keep the same family identity across updates;
+- cache-busting timestamps and generated bundle names must not create new React families;
+- source identity aligns wx behavior with Vite web behavior;
+- it keeps the update transport separate from application semantics.
 
-## 7. Runtime architecture
+Generated files such as `app.js`, `common/taro.js`, `hmr/bootstrap.js`, or `hmr/update.js` are transport/build artifacts and should not define React Refresh family identity.
 
-`dist/wx/hmr/runtime.js` should install a global runtime:
+## 8. Runtime files and their purpose
 
-```js
-var g = typeof globalThis !== 'undefined' ? globalThis : global
-var hmr = g.__VITE_PLUGIN_TARO_WX_HMR__
+The dev wx output should have three HMR-specific files:
+
+```text
+dist/wx/hmr/runtime.js
+dist/wx/hmr/bootstrap.js
+dist/wx/hmr/update.js
 ```
 
-Runtime responsibilities:
+Their roles are intentionally separate.
 
-### 7.1 Module registry
+### `runtime.js`
 
-```ts
-type ModuleRecord = {
-  id: string
-  factory: Factory
-  exports: Record<string, unknown>
-  initialized: boolean
-  parents: Set<string>
-  children: Set<string>
-  hot?: HotContext
-}
+Why it exists:
+
+- wx needs a replacement for the browser's module execution/HMR client;
+- React Refresh runtime needs a Mini Program-safe global hook;
+- update application, invalidation, and refresh scheduling need one stable owner.
+
+### `bootstrap.js`
+
+Why it exists:
+
+- the initial app must have executable factories for source modules before any hot update occurs;
+- app/page shell files should stay small and stable;
+- initial module registration should be separated from later hot-update payloads.
+
+### `update.js`
+
+Why it exists:
+
+- it is the file-backed executable transport DevTools can rerun;
+- it carries only the latest update payload;
+- stale update execution can be guarded during cold start;
+- ordinary React implementation edits can avoid touching the wx shell.
+
+## 9. Stable shell contract
+
+The dev output should distinguish between React implementation changes and Mini Program shape changes.
+
+Contract:
+
+```text
+React module implementation changed -> write only hmr/update.js
+Mini Program shape changed         -> rewrite affected wx output and let DevTools reload/recompile
 ```
 
-Public methods:
+### React module implementation changed
 
-```js
-hmr.define(id, deps, factory)
-hmr.require(id)
-hmr.resolve(fromId, specifier)
-hmr.applyUpdate(payload)
-hmr.markReady()
-hmr.fullReload(reason)
-```
+This means the edit can be represented by replacing one or more logical JS/TS/TSX module factories without changing the wx shell.
 
-Factories should be synchronous CommonJS-style functions:
+Examples:
 
-```js
-function factory(require, module, exports, hot) {
-  // compiled module code
-}
-```
+- component render logic;
+- local helper code;
+- constants used by components;
+- hooks inside an existing source module;
+- newly imported JS source modules when they can be carried in the update payload.
 
-### 7.2 Dependency tracking
+Why this category should keep the shell stable:
 
-`require` inside a factory must:
+- React Refresh can handle it at the component/module level;
+- changing app/page files would cause unnecessary Mini Program reloads;
+- stable shell files avoid missing generated files and premature-recompile issues.
 
-- resolve logical source imports to logical IDs
-- resolve framework/vendor externals to local wx `require(...)`
-- track parent/child relationships
-- return cached exports unless invalidated
+### Mini Program shape changed
 
-### 7.3 Update application
+This means the edit changes something WeChat compiles or registers outside the React runtime.
 
-`hmr.applyUpdate(payload)` should:
+Examples:
 
-1. ignore if `hmr.ready !== true`
-2. register new/changed factories
-3. dispose old module instances where supported
-4. invalidate changed modules and necessary importers
-5. re-execute affected refresh boundaries
-6. register React exports
-7. call `performReactRefresh()`
-8. full reload on incompatible update
+- app entry semantics;
+- page registration or route list;
+- app/page JSON config;
+- WXML/template structure;
+- native/custom component topology;
+- vendor/framework bundle structure;
+- WXSS/assets until separately supported.
 
-### 7.4 React Refresh bridge
+Why this category should reload:
 
-Adapt Vite React Refresh runtime for Mini Program global object:
+- WeChat must recompile or re-register project structure;
+- React Refresh cannot safely represent these changes as component factory replacement;
+- attempting to keep the shell stable would hide required wx output changes and cause stale runtime state.
 
-- no browser `window` dependency
-- install global hook before React/Taro renderer initializes
-- define `$RefreshReg$` and `$RefreshSig$`
-- expose helpers:
+## 10. Cold-start and stale-update safety
 
-```js
-hmr.refresh = {
-  register,
-  performReactRefresh,
-  registerExportsForReactRefresh,
-  validateRefreshBoundaryAndEnqueueUpdate
-}
-```
-
-## 8. Shell files
-
-### 8.1 `app.js`
-
-Generated shape:
-
-```js
-require('./hmr/runtime.js')
-require('./hmr/bootstrap.js')
-require('./hmr/update.js') // stale update is guarded and returns during cold start
-
-const hmr = global.__VITE_PLUGIN_TARO_WX_HMR__
-const React = require('./common/vendor.js').react // exact export shape TBD
-const { createReactApp, ReactDOM } = require('./common/taro.js')
-const AppComponent = hmr.require('/src/app.ts').default
+A stale `hmr/update.js` may exist when the developer reopens the wx output folder.
 
-App(createReactApp(AppComponent, React, ReactDOM, APP_CONFIG))
-hmr.markReady()
-```
+This matters because DevTools may execute project files during startup before the normal app bootstrap has completed.
 
-Important ordering:
+The runtime must treat hot payloads as invalid until the app has finished normal registration.
 
-- `runtime.js` first
-- `bootstrap.js` second
-- `update.js` before `markReady()` so stale update files do not execute during cold start
-- call `markReady()` only after normal app registration succeeds
+Why:
 
-### 8.2 Page entries
+- a stale update must not initialize source modules before framework/runtime setup;
+- it must not cause errors like `Taro.useLaunch is not a function`;
+- reopening DevTools should behave like a normal first load, not like applying an old update early.
 
-Generated page entry shape:
+Cold-start safety is required even if ordinary hot updates work.
 
-```js
-require('../../hmr/runtime.js')
-require('../../hmr/bootstrap.js')
-require('../../hmr/update.js')
+## 11. React Refresh integration
 
-const hmr = global.__VITE_PLUGIN_TARO_WX_HMR__
-const { createPageConfig } = require('../../common/taro.js')
-const PageComponent = hmr.require('/src/pages/foo/index.tsx').default
+The wx HMR runtime should use real React Refresh semantics rather than ad-hoc component proxies.
 
-const taroPageConfig = createPageConfig(PageComponent, 'pages/foo/index', { root: { cn: [] } }, PAGE_CONFIG)
-Page(taroPageConfig)
-```
+Why:
 
-### 8.3 `comp.js`
+- React Refresh already defines when state can be preserved;
+- hook signatures and family registration are necessary for correct behavior;
+- incompatible updates should remount or reload instead of pretending to preserve state;
+- React's reconciler integration is the correct mechanism for updating mounted trees.
 
-Keep recursive Taro component config stable:
+Expected behavior:
 
-```js
-require('./hmr/runtime.js')
-require('./hmr/update.js')
-const { createRecursiveComponentConfig } = require('./common/taro.js')
-Component(createRecursiveComponentConfig())
-```
+- function components can preserve state when React Refresh accepts the edit;
+- class component state preservation is not required;
+- incompatible hook edits may remount or reload;
+- mixed exports and non-refresh boundaries may fallback.
 
-## 9. `hmr/bootstrap.js`
+## 12. New files and new components
 
-`bootstrap.js` contains the initial logical source module factories:
+The clean architecture should not make new source files impossible to hot update.
 
-```js
-require('./runtime.js')
-;(function () {
-  var hmr = global.__VITE_PLUGIN_TARO_WX_HMR__
-  hmr.define('/src/components/foo.tsx', { './bar': '/src/components/bar.ts' }, function (require, module, exports, hot) {
-    // compiled source module
-  })
-})()
-```
+Why:
 
-It should be generated once at dev session start and regenerated only on fallback/full snapshot rebuild.
+- web HMR can handle newly imported modules because the browser can execute the new module URL;
+- wx cannot execute a new URL, but `update.js` can carry the new module factory;
+- logical module identity plus payload factories allows a changed importer and a new dependency to be delivered together.
 
-## 10. `hmr/update.js`
+Preferred behavior:
 
-Initial no-op:
+- adding a new JS/TS/TSX component imported by an existing component should be hot-updateable when the affected graph is otherwise compatible.
 
-```js
-require('./runtime.js')
-```
+Acceptable first implementation fallback:
 
-Hot update shape:
+- full reload for new files if the compiler/invalidation path is not ready yet.
 
-```js
-require('./runtime.js')
-;(function () {
-  var hmr = global.__VITE_PLUGIN_TARO_WX_HMR__
-  if (!hmr || !hmr.ready) return
+Important requirement:
 
-  hmr.applyUpdate({
-    timestamp: 123,
-    modules: {
-      '/src/components/foo.tsx': {
-        deps: { './bar': '/src/components/bar.ts' },
-        factory: function (require, module, exports, hot) {
-          // compiled updated module
-        }
-      },
-      '/src/components/new-child.tsx': {
-        deps: {},
-        factory: function (...) {}
-      }
-    },
-    boundaries: ['/src/components/foo.tsx']
-  })
-})()
-```
-
-No `eval`. The changed file itself is executable JS.
-
-## 11. Module compiler
-
-This is the most important design point. We need transformed source modules as synchronous factories.
-
-Do **not** implement this with regex-only import/export rewriting.
-
-Prototype and choose one of these approaches:
-
-### Option A — Vite SSR transform adaptation
-
-Use Vite dev server transforms and SSR transform output if it can be converted into sync factories reliably.
-
-Pros:
-
-- closest to Vite internals
-- uses Vite graph and plugin transforms
-
-Risks:
-
-- SSR output may use async helpers
-- internals may be unstable in Vite 8
-
-### Option B — In-memory Rolldown/Rollup preserve-modules compiler
-
-Use Vite plugin container transforms, then run an in-memory preserve-modules compilation to CJS-like output. Do not write preserve modules to disk; embed output chunks into `bootstrap.js`/`update.js` factories keyed by logical IDs.
-
-Pros:
-
-- avoids hand-implementing ESM semantics
-- handles imports/exports/re-exports/barrels more robustly
-- supports new files naturally if included in update payload
-
-Risks:
-
-- more integration work
-- must keep logical IDs stable despite generated chunks
-
-### Option C — AST ESM-to-factory compiler
-
-Use OXC/Babel/SWC AST transforms to rewrite ESM to runtime calls.
-
-Pros:
-
-- maximal control
-- no physical chunks
-
-Risks:
-
-- easy to get live bindings/circular imports wrong
-- more long-term maintenance
-
-Recommendation: prototype Option B first. Fall back to Option C only if necessary.
-
-## 12. Externalization strategy
-
-Logical source factories should not bundle all framework/vendor code.
-
-Classify imports:
-
-1. **Project source** -> logical IDs handled by `hmr.require`
-2. **Virtual Taro modules** -> framework/common wx require mapping
-3. **React/Taro/runtime dependencies** -> `common/taro.js` / `common/vendor.js`
-4. **CSS/assets** -> full snapshot fallback or coarse asset rewrite initially
-
-The runtime needs an external resolver table, e.g.:
-
-```js
-hmr.externals = {
-  'react': function () { return require('../common/vendor.js').react },
-  'virtual:taro/api': function () { return require('../common/taro.js').api },
-  'virtual:taro/components': function () { return require('../common/taro.js').components }
-}
-```
-
-Exact export names can be generated; do not hardcode fragile minified names.
+- the architecture should not depend on pre-generating executable files for every possible future source module.
 
 ## 13. `virtual:taro/api` ordering
 
-Keep the existing minimal ordering fix:
+`virtual:taro/api` should ensure Taro's React runtime has registered its `initNativeApi` hook before `@tarojs/taro` is initialized.
 
-```ts
-// Ensure Taro's React runtime registers its `initNativeApi` hook before @tarojs/taro is initialized.
-import '@tarojs/plugin-framework-react/dist/runtime'
-import { hooks } from '@tarojs/runtime'
-import Taro from '@tarojs/taro'
-```
+Why:
 
-Do not manually import/export every lifecycle hook. The point is only to ensure Taro React registers `initNativeApi` before `@tarojs/taro` is initialized.
+- lifecycle hooks such as `useLaunch`, `useLoad`, and `useReady` are installed by Taro's React framework runtime;
+- HMR introduces new early execution paths;
+- relying on incidental module order can produce missing hook methods on cold reopen or stale update execution.
 
-This prevents errors like:
+Keep this fix minimal. The goal is ordering correctness, not manually duplicating every hook export.
 
-```text
-TypeError: Taro.useLaunch is not a function
-```
+## 14. Dev project config
 
-when HMR introduces early execution paths.
+Dev wx output should enable WeChat's compile hot reload setting when possible.
 
-## 14. Handling new components/files
+Why:
 
-Example edit:
+- DevTools is more likely to re-execute changed project files promptly;
+- the setting belongs to development output, not production;
+- users should not have to remember to configure it manually for this plugin feature.
 
-```tsx
-// existing component
-import { NewThing } from './new-thing'
-```
+This must merge with user project config rather than replacing it.
 
-and `new-thing.tsx` is newly created.
+## 15. Template fallback warning
 
-Hot payload should include both:
+React Refresh/Taro may transiently produce a node that lacks the expected Mini Program template name data.
 
-```text
-/src/components/existing.tsx
-/src/components/new-thing.tsx
-```
-
-Because both factories are embedded in `hmr/update.js`, no new physical JS file is needed.
-
-Fallback only if:
-
-- new file changes app/page route topology
-- new file is outside supported JS/TS/TSX source graph
-- compiler cannot resolve the import safely
-- source graph contains unsupported dynamic import behavior
-
-## 15. Hot update algorithm
-
-On `handleHotUpdate(ctx)`:
-
-1. Normalize changed file ID.
-2. Classify change:
-   - source JS/TS/TSX edit/add/delete
-   - app/page config change
-   - CSS/asset/template change
-   - unknown
-3. For eligible source changes:
-   - use Vite module graph to find affected modules
-   - find nearest React Refresh boundaries
-   - include changed modules plus required new dependencies
-   - compile factories
-   - write `hmr/update.js`
-4. For fallback changes:
-   - regenerate full wx snapshot
-   - write no-op `hmr/update.js`
-   - let DevTools perform normal reload/recompile
-
-Pseudo:
-
-```ts
-async handleHotUpdate(ctx) {
-  const change = classify(ctx)
-  if (!change.isJsSource) return fullSnapshot(change.reason)
-
-  const plan = analyzeAffectedGraph(ctx.modules)
-  if (!plan.canHotUpdate) return fullSnapshot(plan.reason)
-
-  const payload = await compileUpdatePayload(plan.modules)
-  await writeUpdateJs(payload)
-  return [] // prevent normal Vite browser HMR work for wx target
-}
-```
-
-## 16. Refresh boundary rules
-
-Use React Refresh semantics, not ad-hoc component replacement.
-
-For each updated module:
-
-- register component exports with stable IDs
-- validate refresh boundary compatibility
-- if compatible, re-execute module/importers as needed and call `performReactRefresh()`
-- if incompatible, fallback full snapshot/reload
-
-Known acceptable fallbacks:
-
-- edited class component state is not preserved
-- hook signature incompatibility
-- mixed non-component exports that invalidate boundary
-- app entry changes
-- route/config/template/native topology changes
-
-## 17. Full snapshot fallback
-
-A full snapshot rebuild should rewrite stable wx output:
-
-- shell entries
-- JSON/WXML/WXSS assets
-- framework/vendor bundles if needed
-- `hmr/bootstrap.js`
-- no-op `hmr/update.js`
-
-It should preserve WeChat private files:
-
-```text
-project.private.config.json
-```
-
-It should not rely on mtime-only hacks as the main mechanism, but changing normal app/page/bootstrap files during fallback is acceptable because fallback means reload/recompile.
-
-## 18. Project config
-
-In wx dev output, set:
-
-```json
-{
-  "setting": {
-    "compileHotReLoad": true
-  }
-}
-```
-
-Do not force this in production.
-
-Merge with user `projectConfigJson.setting`.
-
-## 19. WXML `nn` fallback
-
-If React Refresh/Taro transiently emits missing `nn`, WeChat can warn:
+Observed symptom:
 
 ```text
 Template `tmpl_0_undefined` not found
 ```
 
-Prefer to fix the data source. If still reproducible, add dev-only empty fallback templates:
+Preferred outcome:
 
-```xml
-<template name="tmpl_0_undefined"></template>
-<template name="tmpl_0_null"></template>
-<template name="tmpl_0_false"></template>
-<template name="tmpl_0_"></template>
+- fix the source of invalid hydrate/template data if possible.
+
+Acceptable dev-only mitigation:
+
+- add empty fallback templates for missing/undefined names.
+
+Why this must be dev-only:
+
+- production should not include templates that only mask transient HMR states;
+- dev warnings should not become production output behavior.
+
+## 16. Fallback philosophy
+
+Fallback is a feature, not a failure.
+
+The implementation should prefer full reload over unsafe hot update when:
+
+- the wx shell shape changed;
+- the module graph cannot be analyzed confidently;
+- React Refresh boundary validation fails;
+- an update would require unsupported runtime semantics;
+- a file deletion or dependency change cannot be represented safely.
+
+Why:
+
+- a correct full reload is better than a corrupted hot runtime;
+- Mini Program dev stability matters more than preserving state for every edit;
+- explicit fallback boundaries make the feature maintainable.
+
+Fallback reasons should be observable in development logs.
+
+## 17. Production boundary
+
+Production wx builds must not contain dev HMR behavior.
+
+Why:
+
+- HMR runtime increases output size;
+- React Refresh markers are development-only;
+- production should remain deterministic and close to Taro's normal Mini Program output;
+- dev-only template fallbacks and update guards should not leak into published output.
+
+Production output should not contain:
+
+- `hmr/update.js`;
+- `hmr/bootstrap.js`;
+- wx HMR globals;
+- React Refresh globals/markers;
+- dev-only fallback templates.
+
+## 18. Code quality expectations
+
+The implementation should be small enough to review and refactor incrementally.
+
+Start with a minimal split:
+
+```text
+packages/vite-plugin-taro/src/vite/targets/wx.ts
+packages/vite-plugin-taro/src/vite/targets/wx-dev.ts
+packages/vite-plugin-taro/src/vite/targets/wx-runtime.ts
 ```
 
-Do not include these in production.
+Why:
 
-## 20. CSS/assets scope
+- `wx.ts` should remain the public integration layer, not a large feature dump;
+- generated runtime code should be isolated from Vite plugin wiring;
+- dev-session logic should be separable from production wx build config.
 
-For this implementation pass:
+Do not pre-create a large module tree. Split further only when a clear responsibility boundary appears.
 
-- JS/TS/TSX React HMR is the priority.
-- CSS/assets may trigger full snapshot fallback.
-- Do not block the JS architecture on CSS HMR.
+Code quality priorities:
 
-Later CSS support can write WXSS outputs separately or use a similar file-backed update signal if DevTools supports it cleanly.
+- preserve web-HMR semantics where possible;
+- keep wx-specific transport concerns isolated;
+- keep production path simple;
+- make fallback decisions explicit;
+- avoid regex-only ESM semantics;
+- avoid coupling component identity to generated output file names.
 
-## 21. Acceptance criteria
+## 19. Acceptance criteria
 
-### 21.1 Production
+### First load
 
-Run:
+A clean wx dev output should open in WeChat DevTools without runtime initialization errors.
 
-```sh
-pnpm build:sample:wx
-pnpm build:sample:h5
-pnpm typecheck
-pnpm exec biome check <modified files>
-```
-
-Production wx must not contain dev HMR markers:
-
-```sh
-! rg "hmr/update|hmr/bootstrap|__VITE_PLUGIN_TARO_WX_HMR__|__VITE_PLUGIN_TARO_REACT_REFRESH__|\\$RefreshReg|tmpl_0_undefined" packages/loan-genius/dist/wx -n
-```
-
-### 21.2 Dev first load
-
-```sh
-rm -rf packages/loan-genius/dist/wx
-pnpm dev:sample:wx
-```
-
-Open `dist/wx` in WeChat DevTools.
-
-Must not throw:
+Important regressions to avoid:
 
 ```text
 ReferenceError: init_* is not defined
@@ -661,99 +400,83 @@ TypeError: Cannot read property 'useMemo' of undefined
 TypeError: require_common_taro.init_dist$1 is not a function
 ```
 
-### 21.3 Reopen with stale update
+### Reopen with stale update
 
-After a hot update, close and reopen the wx folder while dev server is running.
+After a hot update, closing and reopening the wx output folder should still load normally.
 
-Expected:
+Why this matters:
 
-- no stale update crash
-- `hmr/update.js` cold-start guard prevents early execution
-- app loads normally
+- stale `update.js` files are normal in file-backed HMR;
+- the system must be robust to DevTools startup order.
 
-### 21.4 Existing component edit
+### Existing component edit
 
-Edit:
+Editing an existing function component should update through React Refresh when compatible.
 
-```text
-src/components/navigation-bar/navigation-bar.tsx
-```
-
-Expected:
-
-- only `dist/wx/hmr/update.js` changes
-- active page refreshes without Mini Program full reload when React Refresh accepts the boundary
-
-### 21.5 New component file
-
-Add:
+Expected file behavior:
 
 ```text
-src/components/new-thing.tsx
+only dist/wx/hmr/update.js changes
 ```
 
-Import it from an existing active component.
+for React implementation edits that do not change Mini Program shape.
 
-Expected preferred behavior:
+### New component file
 
-- `hmr/update.js` includes both importer and new module factory
-- refresh works if boundary-compatible
+Adding a new JS/TS/TSX component imported by an existing component should either:
 
-Acceptable fallback for first iteration:
+- hot update by carrying the new module in `update.js`; or
+- fall back to full reload cleanly.
 
-- full snapshot/reload with no crash
+It must not leave missing generated files or crash the app.
 
-But the architecture should not make new-file support impossible.
+### Unsupported edit
 
-### 21.6 Unsupported edits
+Route/config/template/native topology/CSS/assets may full reload.
 
-App entry, route config, page list, WXML/template topology, and CSS/assets may full reload.
+They must not be forced through React Refresh.
 
-They must not corrupt runtime state or leave missing chunks.
+### Production build
 
-## 22. Implementation milestones
+Production wx output should not contain HMR files, HMR globals, React Refresh markers, or dev-only template fallbacks.
 
-### Milestone 1 — wx dev server skeleton
+## 20. Milestones
 
-- add wx `apply: 'serve'` plugin
-- write shell files and no-op HMR files
-- make `pnpm dev:sample:wx` start Vite dev and produce openable wx output
+### Milestone 1 — dev-server wx output
 
-### Milestone 2 — runtime + bootstrap
+Purpose: prove wx dev can be driven by Vite's dev server while writing openable Mini Program output.
 
-- implement `hmr/runtime.js` module registry
-- compile initial app/page source modules into `hmr/bootstrap.js`
-- app/page entries load components through logical `hmr.require`
+### Milestone 2 — logical module bootstrap
 
-### Milestone 3 — React Refresh runtime
+Purpose: prove app/page shell can load React source through logical module factories.
 
-- adapt Vite React Refresh runtime to wx global
-- register module exports with logical IDs
-- prove editing an existing function component refreshes
+### Milestone 3 — React Refresh bridge
 
-### Milestone 4 — update payload
+Purpose: prove component families are registered with stable source identities and React Refresh can update a mounted tree.
 
-- implement `handleHotUpdate`
-- compile changed module factories into `hmr/update.js`
-- update only `hmr/update.js` for eligible edits
+### Milestone 4 — update file transport
 
-### Milestone 5 — graph invalidation/new files
+Purpose: prove an eligible source edit changes only `hmr/update.js` and applies in DevTools.
 
-- support changed importer + newly added dependency in same update payload
-- robust fallback for deletes/topology changes
+### Milestone 5 — fallback boundaries
 
-### Milestone 6 — cleanup and tests
+Purpose: prove unsupported edits reload cleanly and never produce missing generated files or stale shell state.
 
-- split code into maintainable modules
-- add fixtures/regression checks for barrels, new files, stale update reopen, production no-HMR
+### Milestone 6 — new file support
 
-## 23. Code quality requirements
+Purpose: prove the architecture can carry newly added JS modules in update payloads, or cleanly fallback until full support is implemented.
 
-- Do not build the implementation around generated chunk file names.
-- Do not use regex-only ESM rewriting.
-- Keep runtime code generation isolated and snapshot-testable.
-- Keep path normalization centralized.
-- Make fallback reasons explicit and easy to log.
-- Preserve production output behavior.
-- Keep `virtual:taro/api` hook-order fix minimal.
-- Prefer Vite/Rolldown graph APIs over hand-maintained dependency maps.
+## 21. Summary
+
+The intended architecture is:
+
+```text
+Vite dev server owns graph/transforms/React Refresh semantics.
+wx runtime owns Mini Program-safe module execution.
+hmr/update.js is the executable transport.
+logical source IDs define React Refresh identity.
+React implementation edits hot update.
+Mini Program shape edits reload.
+```
+
+This keeps the design close to web HMR while respecting WeChat Mini Program execution constraints.
