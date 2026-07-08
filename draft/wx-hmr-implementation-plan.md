@@ -42,13 +42,14 @@ The Mini Program is not a browser client of the dev server. The plugin uses Vite
 
 ## Dev output contract
 
-Dev wx output should include:
+Dev wx output should include a stable HMR runtime and a stable executable update payload:
 
 ```text
 dist/wx/hmr/runtime.js    # wx-side HMR runtime + React Refresh bridge
-dist/wx/hmr/bootstrap.js  # initial logical source module snapshot
 dist/wx/hmr/update.js     # latest executable update payload; no-op initially
 ```
+
+The initial logical source module snapshot must also be available to the runtime before app/page code executes. It may be a file, a directory, or another stable generated artifact. The plan does not require a specific shape for it.
 
 For application JS/TS/TSX edits that do not change Mini Program shape, only this file should change:
 
@@ -56,7 +57,7 @@ For application JS/TS/TSX edits that do not change Mini Program shape, only this
 dist/wx/hmr/update.js
 ```
 
-The wx shell (`app.js`, page entries, framework/vendor files, and `hmr/bootstrap.js`) should stay stable for those edits.
+The wx shell, framework/vendor files, and initial source snapshot artifacts should stay stable for those edits.
 
 `hmr/update.js` must also be safe to leave on disk between DevTools sessions. A stale update payload must not run before app/framework setup is ready.
 
@@ -134,7 +135,7 @@ Intent:
 
 - `wx.ts`: wx build/prod config and public integration;
 - `wx-dev.ts`: dev-server integration, dev session, change classification, file writing;
-- `wx-runtime.ts`: generated runtime/bootstrap/update code.
+- `wx-runtime.ts`: generated runtime, initial snapshot, and update payload code.
 
 Split further only when a clear responsibility boundary appears. Do not create a large module tree up front, and do not put the whole feature in `wx.ts`.
 
@@ -169,6 +170,5 @@ Route/config/template/native topology/CSS/assets changes reload through normal w
 Production wx output must not contain:
 
 - `hmr/update.js`;
-- `hmr/bootstrap.js`;
 - wx HMR globals;
 - React Refresh globals/markers.
