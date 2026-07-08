@@ -42,13 +42,13 @@ The Mini Program is not a browser client of the dev server. The plugin uses Vite
 
 ## Dev output contract
 
-Dev wx output must include one stable executable update payload:
+Dev wx output must include one stable executable source payload:
 
 ```text
-dist/wx/hmr/update.js     # latest executable update payload; no-op initially
+dist/wx/hmr/update.js
 ```
 
-A Mini Program dev runtime and the initial logical source module snapshot must be available before app/page code executes.
+Use `hmr/update.js` for both first load and later hot updates. On first load it provides the current application source modules to the dev runtime. On source edits it is overwritten with the next source payload.
 
 For application JS/TS/TSX edits that do not change Mini Program shape, only this file should change:
 
@@ -56,9 +56,9 @@ For application JS/TS/TSX edits that do not change Mini Program shape, only this
 dist/wx/hmr/update.js
 ```
 
-The wx shell, framework/vendor files, and initial source snapshot artifacts should stay stable for those edits.
+The wx shell and framework/vendor files should stay stable for those edits.
 
-`hmr/update.js` must also be safe to leave on disk between DevTools sessions. A stale update payload must not run before app/framework setup is ready.
+`hmr/update.js` must be safe to leave on disk between DevTools sessions. A stale payload must not apply as a hot update before app/framework setup is ready.
 
 ## Module identity
 
@@ -70,7 +70,7 @@ Why:
 - generated wx files are transport/build artifacts;
 - cache-busting timestamps or output-file changes must not create new React families.
 
-The same logical source identity should be used by the initial snapshot and later update payloads.
+The same logical source identity should be used on first load and later updates.
 
 ## Hot-update scope
 
@@ -158,7 +158,7 @@ A clean wx dev output opens in WeChat DevTools without runtime initialization er
 
 ### Reopen after hot update
 
-After a hot update, closing and reopening the wx folder still loads normally. Stale `hmr/update.js` does not execute before runtime/app readiness.
+After a hot update, closing and reopening the wx folder still loads normally. The existing `hmr/update.js` acts as the first-load source payload and does not apply as a hot update before runtime/app readiness.
 
 ### Application source edit
 
