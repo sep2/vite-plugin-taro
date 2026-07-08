@@ -99,22 +99,33 @@ Production wx remains normal `vite build`.
 
 ## 4. High-level components
 
-Suggested code organization:
+Start with a small file split. Do not pre-create a large module tree.
+
+Suggested first-pass organization:
 
 ```text
-packages/vite-plugin-taro/src/vite/targets/wx.ts
-packages/vite-plugin-taro/src/vite/targets/wx/assets.ts
-packages/vite-plugin-taro/src/vite/targets/wx/dev-server-plugin.ts
-packages/vite-plugin-taro/src/vite/targets/wx/dev-session.ts
-packages/vite-plugin-taro/src/vite/targets/wx/module-compiler.ts
-packages/vite-plugin-taro/src/vite/targets/wx/module-ids.ts
-packages/vite-plugin-taro/src/vite/targets/wx/runtime-code.ts
-packages/vite-plugin-taro/src/vite/targets/wx/shell-writer.ts
-packages/vite-plugin-taro/src/vite/targets/wx/update-writer.ts
-packages/vite-plugin-taro/src/vite/targets/wx/vendor.ts
+packages/vite-plugin-taro/src/vite/targets/wx.ts          # existing wx build/prod config and public integration
+packages/vite-plugin-taro/src/vite/targets/wx-dev.ts      # wx dev server plugin, dev session, shell/update writing
+packages/vite-plugin-taro/src/vite/targets/wx-runtime.ts  # generated runtime/bootstrap/update code strings
 ```
 
-Keep `wx.ts` as the public integration layer. Do not put the full implementation in one file.
+Split further only when a file becomes too large or mixes unrelated responsibilities. Likely future split points, if needed:
+
+```text
+module compiler / factory generation
+logical module ID and path normalization
+wx shell/assets writer
+update payload writer
+vendor/framework external mapping
+```
+
+Code quality rule:
+
+```text
+Start with 2–3 files.
+Do not pre-create ten tiny modules.
+Do not let wx.ts become a 1000-line feature dump.
+```
 
 ## 5. Vite plugin lifecycle
 
@@ -154,9 +165,11 @@ export function createVitePluginTaroWechatDevPlugin(context): Plugin {
 6. write no-op `hmr/update.js`
 7. start listening to file changes through Vite
 
-## 6. Logical module IDs
+## 6. Logical module identity
 
-Use stable logical IDs, independent of output file names:
+Intent: mirror Vite/web HMR semantics. A React component's refresh identity should be tied to the source module that defines it, not to a generated wx output file.
+
+On web, Vite refreshes source module identities such as:
 
 ```text
 /src/app.ts
@@ -164,19 +177,17 @@ Use stable logical IDs, independent of output file names:
 /src/components/navigation-bar/navigation-bar.tsx
 ```
 
-Rules:
+The wx runtime should use the same kind of identity even though it cannot execute those modules by URL. `hmr/bootstrap.js` and `hmr/update.js` should both refer to the same logical source identity, so an update can replace the module factory while React Refresh still recognizes the component family.
 
-- normalize slashes
-- strip Vite query unless query materially changes module identity
-- keep IDs project-root-relative where possible
-- preserve virtual IDs with a namespace, e.g. `\0virtual:taro/api` or `virtual:taro/api`
-- do not use generated chunk file names as React Refresh IDs
-
-React Refresh family IDs should be based on these logical IDs:
+Example React Refresh family identity:
 
 ```text
 /src/components/navigation-bar/navigation-bar.tsx NavigationBar
 ```
+
+Do not base React Refresh identity on generated wx files such as `app.js`, `common/taro.js`, or any temporary update payload file. Those files are transport/build artifacts; changing them should not change the logical identity of the React component.
+
+The exact normalization rules should follow Vite's module-id semantics as closely as practical, including preserving meaningful virtual/query identities when they affect module meaning.
 
 ## 7. Runtime architecture
 
