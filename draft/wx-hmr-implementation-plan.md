@@ -42,14 +42,13 @@ The Mini Program is not a browser client of the dev server. The plugin uses Vite
 
 ## Dev output contract
 
-Dev wx output should include a stable HMR runtime and a stable executable update payload:
+Dev wx output must include one stable executable update payload:
 
 ```text
-dist/wx/hmr/runtime.js    # wx-side HMR runtime + React Refresh bridge
 dist/wx/hmr/update.js     # latest executable update payload; no-op initially
 ```
 
-The initial logical source module snapshot must also be available to the runtime before app/page code executes. It may be a file, a directory, or another stable generated artifact. The plan does not require a specific shape for it.
+A Mini Program dev runtime and the initial logical source module snapshot must be available before app/page code executes. They may be embedded in shell files or emitted as stable generated artifacts. The plan does not require separate runtime/bootstrap files.
 
 For application JS/TS/TSX edits that do not change Mini Program shape, only this file should change:
 
@@ -123,19 +122,23 @@ Merge with user project config. Do not force this in production.
 
 ## Code organization
 
-Start with a small split:
+Keep the dev HMR plugin target-agnostic enough for future Mini Program targets.
+
+Start with this split:
 
 ```text
 packages/vite-plugin-taro/src/vite/targets/wx.ts
-packages/vite-plugin-taro/src/vite/targets/wx-dev.ts
-packages/vite-plugin-taro/src/vite/targets/wx-runtime.ts
+packages/vite-plugin-taro/src/vite/hmr.ts
+packages/vite-plugin-taro/src/shim/dev-runtime.ts
 ```
 
 Intent:
 
-- `wx.ts`: wx build/prod config and public integration;
-- `wx-dev.ts`: dev-server integration, dev session, change classification, file writing;
-- `wx-runtime.ts`: generated runtime, initial snapshot, and update payload code.
+- `targets/wx.ts`: wx build/prod config and wx-specific shell/output details;
+- `vite/hmr.ts`: dev-server HMR integration, dev session, change classification, and update writing;
+- `shim/dev-runtime.ts`: static Mini Program dev runtime source controlled by `vite/hmr.ts`; it may be embedded or emitted as a stable artifact.
+
+The HMR plugin should not be buried under `vite/targets/wx/` because the same dev-server/update-file model can later serve other Mini Program targets. Keep target-specific behavior behind small target adapters instead.
 
 Split further only when a clear responsibility boundary appears. Do not create a large module tree up front, and do not put the whole feature in `wx.ts`.
 
