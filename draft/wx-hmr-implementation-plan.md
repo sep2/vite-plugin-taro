@@ -54,13 +54,18 @@ dist/wx/hmr/bootstrap.js         # initial logical source module factories
 dist/wx/hmr/update.js            # no-op initially; overwritten on hot update
 ```
 
-Hot update should normally touch only:
+For a React-only implementation update, the dev contract is:
 
 ```text
-dist/wx/hmr/update.js
+React module implementation changed -> write only hmr/update.js
+Mini Program shape changed         -> rewrite affected wx output and let DevTools reload/recompile
 ```
 
-`app.js`, page entries, `common/*`, and `hmr/bootstrap.js` should remain stable for ordinary edits to existing React source modules.
+In this document, **React module implementation changed** means edits that can be represented by replacing one or more logical JS/TS/TSX module factories without changing the wx shell: component render logic, local helpers, constants, hooks, and newly imported JS source modules when they can be embedded into the update payload.
+
+**Mini Program shape changed** means edits that alter files or metadata WeChat compiles outside the React runtime: app/page registration, routes, JSON config, WXML/template structure, native/custom component topology, WXSS/assets when not separately supported, or vendor/framework bundle structure.
+
+Only the first category should keep `app.js`, page entries, `common/*`, and `hmr/bootstrap.js` stable. The second category should intentionally rewrite the affected stable files and accept a full reload.
 
 ## 3. Commands / mode split
 
@@ -76,6 +81,7 @@ Target style:
 
 ```sh
 vite --host 127.0.0.1
+# equivalent to: vite dev --host 127.0.0.1
 ```
 
 The Vite server is not used by Mini Program as a browser runtime. It is used by the plugin as:
@@ -115,7 +121,7 @@ Keep `wx.ts` as the public integration layer. Do not put the full implementation
 Add a wx dev plugin that runs only when:
 
 - target is `wx`
-- command is `serve`
+- Vite command is `serve` (`vite` / `vite dev`; Vite's plugin API names dev-server mode `serve`, not `dev`)
 - not production
 
 Pseudo-shape:
