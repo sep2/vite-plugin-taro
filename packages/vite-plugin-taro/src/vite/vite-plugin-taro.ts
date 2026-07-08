@@ -8,6 +8,7 @@ import {
     loadH5VirtualModule
 } from './targets/h5.ts'
 import {
+    createVitePluginTaroWechatMinimalWritePlugin,
     createWxViteConfig,
     emitWechatAssets,
     emitWechatImplicitChunksForVirtualApp,
@@ -30,7 +31,8 @@ export default function vitePluginTaro(options: VitePluginTaroOptions): PluginOp
         createVitePluginTaroConditionalDirectivePlugin(context),
         createTaroCssPlugin(context),
         ...createTargetSupportPlugins(context),
-        createVitePluginTaroPlugin(context)
+        createVitePluginTaroPlugin(context),
+        createVitePluginTaroWechatMinimalWritePlugin(context)
     ]
 }
 
@@ -54,8 +56,8 @@ function createVitePluginTaroPlugin(context: VitePluginTaroBuildContext): Plugin
         /** Configures Vite/Rolldown for the active target. */
         config: {
             order: 'pre',
-            handler: (): UserConfig => {
-                return context.target === 'wx' ? createWxViteConfig(context) : createH5ViteConfig()
+            handler: (config, env): UserConfig => {
+                return context.target === 'wx' ? createWxViteConfig(context, env, config) : createH5ViteConfig()
             }
         },
 

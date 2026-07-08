@@ -1,7 +1,8 @@
+import fs from 'node:fs'
 import path from 'node:path'
 import { recursiveMerge } from '@tarojs/helper'
 import { Weapp as WechatPlatform } from '@tarojs/plugin-platform-weapp'
-import type { UserConfig } from 'vite'
+import type { ConfigEnv, Plugin, UserConfig } from 'vite'
 import { isProd, nodeRequire, wxShimImportPath } from '../constants.ts'
 import type { JsonObject, VitePluginTaroBuildContext, VitePluginTaroPageOption } from '../types.ts'
 import { createPageComponentImport, normalizeModuleId } from '../utils.ts'
@@ -44,7 +45,14 @@ const taroVersion = String(nodeRequire('@tarojs/runtime/package.json').version)
 /**
  * Configures wx target entry, output, and chunk layout.
  */
-export function createWxViteConfig(_context: VitePluginTaroBuildContext): UserConfig {
+export function createWxViteConfig(
+    context: VitePluginTaroBuildContext,
+    env?: ConfigEnv,
+    userConfig: UserConfig = {}
+): UserConfig {
+    const isWechatDevBuild = isWechatBuildWatch(userConfig) || !isProd || (env ? env.mode !== 'production' : false)
+    cleanWechatDevOutDirBeforeBuild(userConfig, env, isWechatDevBuild)
+
     return {
         define: createWechatTaroDefines(),
         css: {
@@ -79,6 +87,7 @@ export function createWxViteConfig(_context: VitePluginTaroBuildContext): UserCo
             target: 'es2018',
             assetsInlineLimit: 1024,
             cssCodeSplit: false,
+            emptyOutDir: isWechatDevBuild ? false : undefined,
             cssMinify: isProd ? 'lightningcss' : false,
             minify: isProd,
             rolldownOptions: {
@@ -95,20 +104,253 @@ export function createWxViteConfig(_context: VitePluginTaroBuildContext): UserCo
                     assetFileNames: 'assets/[name][extname]',
                     chunkFileNames: createWechatChunkFileName,
                     strictExecutionOrder: true,
-                    codeSplitting: {
-                        includeDependenciesRecursively: false,
-                        minSize: 0,
-                        // https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-webpack5-runner/src/webpack/MiniCombination.ts#L96-L144
-                        groups: [
-                            { name: 'taro', test: isWxTaroChunkModule, priority: 100 },
-                            { name: 'vendors', test: isNodeModule, priority: 10 },
-                            { name: 'common', minShareCount: 2, minModuleSize: 1, priority: 1 }
-                        ]
-                    }
+                    codeSplitting: createWechatCodeSplitting(context, isWechatDevBuild)
                 }
             }
         }
     }
+}
+
+/**
+ * Removes unchanged files from watch bundles so Vite/Rolldown does not update their mtimes.
+ * Combined with dev source-path chunks, this makes a page edit touch only the owning page/source JS file.
+ */
+export function createVitePluginTaroWechatMinimalWritePlugin(context: VitePluginTaroBuildContext): Plugin {
+    let outDir = ''
+    let sourceRoot = ''
+    let enabled = false
+
+    return {
+        name: 'vite-plugin-taro-wx-minimal-write',
+        enforce: 'post',
+        configResolved(config) {
+            outDir = path.resolve(config.root, config.build.outDir)
+            sourceRoot = normalizeModuleId(path.resolve(config.root, 'src'))
+            enabled = context.target === 'wx' && !!config.build.watch && config.build.write !== false
+        },
+        renderChunk(code, chunk) {
+            if (!enabled || !isWechatSelfInitChunk(chunk.fileName, chunk.moduleIds, sourceRoot)) return null
+
+            const selfInitializedCode = addWechatSelfInitCalls(code)
+            return selfInitializedCode === code ? null : { code: selfInitializedCode, map: null }
+        },
+        generateBundle: {
+            order: 'post',
+            handler(_, bundle) {
+                if (!enabled) return
+
+                for (const [fileName, item] of Object.entries(bundle)) {
+                    const filePath = path.join(outDir, ...fileName.split('/'))
+                    if (isWechatOutputItemUnchanged(filePath, item)) delete bundle[fileName]
+                }
+            }
+        }
+    }
+}
+
+function isWechatBuildWatch(userConfig: UserConfig): boolean {
+    return !!userConfig.build?.watch
+}
+
+function isWechatSelfInitChunk(fileName: string, moduleIds: string[], sourceRoot: string): boolean {
+    return (
+        fileName !== 'app.js' &&
+        fileName !== 'comp.js' &&
+        fileName !== 'runtime.js' &&
+        !fileName.startsWith('common/') &&
+        moduleIds.some((id) => isWechatProjectJavaScriptModule(id, sourceRoot))
+    )
+}
+
+function isWechatProjectJavaScriptModule(id: string, sourceRoot: string): boolean {
+    const fileId = toWechatModuleFileId(id)
+    return isWechatJavaScriptSource(fileId) && isInsideWechatSourceRoot(fileId, sourceRoot)
+}
+
+function addWechatSelfInitCalls(code: string): string {
+    const initNames = [
+        ...new Set(
+            [...code.matchAll(/Object\.defineProperty\(exports,\s*['"](init_[^'"]+)['"]/g)].map((match) => match[1])
+        )
+    ]
+    if (!initNames.length) return code
+
+    return `${code}\n${initNames.map((name) => `${name}();`).join('\n')}\n`
+}
+
+function cleanWechatDevOutDirBeforeBuild(
+    userConfig: UserConfig,
+    env: ConfigEnv | undefined,
+    isWechatDevBuild: boolean
+): void {
+    if (!isWechatDevBuild || env?.command !== 'build' || userConfig.build?.write === false) return
+
+    const root = path.resolve(process.cwd(), userConfig.root ?? '.')
+    const outDir = path.resolve(root, userConfig.build?.outDir ?? 'dist')
+    if (!shouldCleanWechatOutDir(root, outDir, userConfig)) return
+
+    emptyWechatOutDir(outDir)
+}
+
+function shouldCleanWechatOutDir(root: string, outDir: string, userConfig: UserConfig): boolean {
+    if (path.relative(root, outDir) === '') return false
+    if (userConfig.build?.emptyOutDir === false) return false
+    return userConfig.build?.emptyOutDir === true || isSameOrSubPath(root, outDir)
+}
+
+function emptyWechatOutDir(outDir: string): void {
+    if (!fs.existsSync(outDir)) return
+
+    for (const entry of fs.readdirSync(outDir)) {
+        if (entry === 'project.config.json' || entry === 'project.private.config.json') continue
+        fs.rmSync(path.join(outDir, entry), { recursive: true, force: true })
+    }
+}
+
+function isSameOrSubPath(parent: string, child: string): boolean {
+    const relative = path.relative(parent, child)
+    return relative === '' || (!!relative && !relative.startsWith('..') && !path.isAbsolute(relative))
+}
+
+/**
+ * Creates the wx JavaScript chunk layout.
+ *
+ * Production keeps a Taro-webpack-like coarse split. Development/watch uses uni-app-style Mini Program ownership:
+ * dependencies stay in stable common chunks, while project source modules keep their source path as the chunk path.
+ * This lets WeChat DevTools see page/source-file changes instead of a broad `common.js` change.
+ *
+ * https://github.com/dcloudio/uni-app/blob/d984f6c009acdf3973ed2d38924ffbc33a545571/packages/uni-mp-vite/src/plugin/build.ts#L248-L350
+ * https://github.com/dcloudio/uni-app/blob/d984f6c009acdf3973ed2d38924ffbc33a545571/packages/uni-mp-vite/src/plugin/build.ts#L412-L455
+ */
+function createWechatCodeSplitting(context: VitePluginTaroBuildContext, isWechatDevBuild: boolean) {
+    return {
+        includeDependenciesRecursively: false,
+        minSize: 0,
+        groups: isWechatDevBuild ? createWechatDevCodeSplittingGroups(context) : createWechatProdCodeSplittingGroups()
+    }
+}
+
+function createWechatProdCodeSplittingGroups() {
+    return [
+        { name: 'taro', test: isWxTaroChunkModule, priority: 100 },
+        { name: 'vendors', test: isNodeModule, priority: 10 },
+        { name: 'common', minShareCount: 2, minModuleSize: 1, priority: 1 }
+    ]
+}
+
+function createWechatDevCodeSplittingGroups(context: VitePluginTaroBuildContext) {
+    const sourceRoot = normalizeModuleId(path.resolve('src'))
+    const entrySourceIds = createWechatEntrySourceIds(context)
+    const reExportBarrelChunkNames = createWechatReExportBarrelChunkNameMap(sourceRoot)
+
+    return [
+        { name: 'common/taro', test: isWxTaroChunkModule, priority: 100 },
+        { name: 'common/vendor', test: isNodeModule, priority: 50 },
+        {
+            name: (id: string) => createWechatProjectSourceChunkName(id, sourceRoot, reExportBarrelChunkNames),
+            test: (id: string) => isWechatProjectSourceChunkCandidate(id, sourceRoot, entrySourceIds),
+            minSize: 0,
+            priority: 10
+        }
+    ]
+}
+
+function createWechatEntrySourceIds(context: VitePluginTaroBuildContext): Set<string> {
+    return new Set([
+        toWechatModuleFileId(context.appComponentImport),
+        ...context.pages.map((page) => normalizeModuleId(path.resolve(`src/${page.path}.tsx`)))
+    ])
+}
+
+function isWechatProjectSourceChunkCandidate(id: string, sourceRoot: string, entrySourceIds: Set<string>): boolean {
+    const fileId = toWechatModuleFileId(id)
+    return (
+        isWechatJavaScriptSource(fileId) &&
+        isInsideWechatSourceRoot(fileId, sourceRoot) &&
+        !entrySourceIds.has(fileId) &&
+        !fileId.includes('/node_modules/') &&
+        !isWxVirtualModuleId(fileId)
+    )
+}
+
+function createWechatProjectSourceChunkName(
+    id: string,
+    sourceRoot: string,
+    reExportBarrelChunkNames: Map<string, string>
+): string | null {
+    const fileId = toWechatModuleFileId(id)
+    const barrelChunkName = reExportBarrelChunkNames.get(fileId)
+    if (barrelChunkName) return barrelChunkName
+    if (!isInsideWechatSourceRoot(fileId, sourceRoot)) return null
+
+    const relativePath = normalizeModuleId(path.relative(sourceRoot, fileId))
+    return relativePath.replace(/\.[cm]?[jt]sx?$/, '')
+}
+
+function toWechatModuleFileId(id: string): string {
+    const normalizedId = normalizeModuleId(id)
+    return normalizedId.startsWith('/@fs/') ? normalizedId.slice('/@fs/'.length) : normalizedId
+}
+
+function isInsideWechatSourceRoot(id: string, sourceRoot: string): boolean {
+    return id === sourceRoot || id.startsWith(`${sourceRoot}/`)
+}
+
+function isWechatJavaScriptSource(id: string): boolean {
+    return /\.[cm]?[jt]sx?$/.test(id)
+}
+
+function createWechatReExportBarrelChunkNameMap(sourceRoot: string): Map<string, string> {
+    const barrelChunkNames = new Map<string, string>()
+    for (const fileId of collectWechatSourceFiles(sourceRoot)) {
+        const source = fs.readFileSync(fileId, 'utf8')
+        const reExportSpecifiers = [...source.matchAll(/^\s*export\s+\*\s+from\s+['"]([^'"]+)['"]/gm)]
+        if (!reExportSpecifiers.length) continue
+
+        const chunkName = createWechatSourceRelativeChunkName(fileId, sourceRoot)
+        barrelChunkNames.set(fileId, chunkName)
+        for (const match of reExportSpecifiers) {
+            const resolvedFile = resolveWechatSourceImport(fileId, match[1])
+            if (resolvedFile && isInsideWechatSourceRoot(resolvedFile, sourceRoot)) {
+                barrelChunkNames.set(resolvedFile, chunkName)
+            }
+        }
+    }
+    return barrelChunkNames
+}
+
+function collectWechatSourceFiles(sourceRoot: string): string[] {
+    if (!fs.existsSync(sourceRoot)) return []
+
+    const sourceFiles: string[] = []
+    for (const entry of fs.readdirSync(sourceRoot, { withFileTypes: true })) {
+        const entryPath = path.join(sourceRoot, entry.name)
+        if (entry.isDirectory()) {
+            sourceFiles.push(...collectWechatSourceFiles(entryPath))
+        } else if (entry.isFile() && isWechatJavaScriptSource(entryPath)) {
+            sourceFiles.push(normalizeModuleId(entryPath))
+        }
+    }
+    return sourceFiles
+}
+
+function resolveWechatSourceImport(importer: string, specifier: string): string | undefined {
+    if (!specifier.startsWith('.')) return
+
+    const basePath = path.resolve(path.dirname(importer), specifier)
+    for (const candidate of createWechatSourceImportCandidates(basePath)) {
+        if (fs.existsSync(candidate)) return normalizeModuleId(candidate)
+    }
+}
+
+function createWechatSourceImportCandidates(basePath: string): string[] {
+    const extensions = ['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs']
+    if (extensions.some((extension) => basePath.endsWith(extension))) return [basePath]
+    return extensions.flatMap((extension) => [basePath + extension, path.join(basePath, `index${extension}`)])
+}
+
+function createWechatSourceRelativeChunkName(fileId: string, sourceRoot: string): string {
+    return normalizeModuleId(path.relative(sourceRoot, fileId)).replace(/\.[cm]?[jt]sx?$/, '')
 }
 
 /**
@@ -173,6 +415,7 @@ type WechatBundleModule = {
 type WechatBundleItem = {
     type: 'asset' | 'chunk'
     source?: WechatAssetSource
+    code?: string
     modules?: Record<string, WechatBundleModule>
 }
 
@@ -432,6 +675,17 @@ function createWechatCompJson(): JsonObject {
 function getWechatAssetSource(item: WechatBundleItem): string {
     if (typeof item.source === 'string') return item.source
     return item.source ? new TextDecoder().decode(item.source) : ''
+}
+
+function isWechatOutputItemUnchanged(filePath: string, item: WechatBundleItem): boolean {
+    if (!fs.existsSync(filePath)) return false
+    return fs.readFileSync(filePath).equals(getWechatOutputItemSource(item))
+}
+
+function getWechatOutputItemSource(item: WechatBundleItem): Buffer {
+    if (item.type === 'chunk') return Buffer.from(item.code ?? '')
+    if (typeof item.source === 'string') return Buffer.from(item.source)
+    return item.source ? Buffer.from(item.source) : Buffer.from('')
 }
 
 /**

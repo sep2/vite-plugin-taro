@@ -71,7 +71,7 @@ export default defineConfig(({ mode }) => {
                     compileType: 'miniprogram',
                     // simulatorType: 'wechat',
                     setting: {
-                        skylineRenderEnable: true,
+                        skylineRenderEnable: false,
                         urlCheck: true,
                         es6: false,
                         postcss: false,
@@ -80,7 +80,7 @@ export default defineConfig(({ mode }) => {
                         uglifyFileName: false,
                         // minifyWXSS: true,
                         // minifyWXML: true,
-                        // compileHotReLoad: true,
+                        compileHotReLoad: true,
                         preloadBackgroundData: false,
                         newFeature: true,
                         autoAudits: false,
