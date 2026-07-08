@@ -180,11 +180,3 @@ Production wx output must not contain:
 - wx HMR globals;
 - React Refresh globals/markers.
 
-Run normal validation:
-
-```sh
-pnpm typecheck
-pnpm build:sample:wx
-pnpm build:sample:h5
-pnpm exec biome check <modified files>
-```
