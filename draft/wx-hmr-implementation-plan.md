@@ -62,59 +62,25 @@ dist/wx/hmr/update.js
 
 React Refresh identity must match Vite/web HMR semantics: source module identity, not generated wx output identity.
 
-Examples:
-
-```text
-/src/app.ts
-/src/pages/calculator/index.tsx
-/src/components/navigation-bar/navigation-bar.tsx
-```
-
-Example family identity:
-
-```text
-/src/components/navigation-bar/navigation-bar.tsx NavigationBar
-```
-
 Why:
 
-- the same component should keep the same family across updates;
-- generated files are transport/build artifacts;
+- a component must keep the same family across updates;
+- generated wx files are transport/build artifacts;
 - cache-busting timestamps or output-file changes must not create new React families.
 
-## Runtime responsibilities
+## HMR files
 
-`hmr/runtime.js` should own wx-side HMR execution:
+The dev output uses three HMR files:
 
-- register initial and updated logical module factories;
-- provide a Mini Program-safe module loader;
-- track dependency relationships for invalidation and re-execution;
-- install/adapt React Refresh for the Mini Program global object;
-- guard stale update payloads during cold start.
+```text
+hmr/runtime.js    # wx-side HMR/React Refresh runtime
+hmr/bootstrap.js  # initial logical source module snapshot
+hmr/update.js     # latest executable hot-update payload
+```
 
-Use real React Refresh semantics. Do not implement component proxy replacement as a substitute.
+Keep this split so source identity is independent from wx shell files, and React implementation edits can touch only `hmr/update.js`.
 
-## Bootstrap responsibilities
-
-`hmr/bootstrap.js` should register initial logical source module factories.
-
-Why:
-
-- app/page shell files stay small and stable;
-- initial source execution is separated from later hot-update payloads;
-- the same logical IDs can be reused by `hmr/update.js`.
-
-## Update payload responsibilities
-
-`hmr/update.js` should carry changed module factories and ask the runtime to apply them.
-
-Why:
-
-- DevTools can execute changed local files;
-- wx cannot execute JS received as text over a socket;
-- one stable update file avoids touching shell files for ordinary React edits.
-
-A stale `update.js` must not run during cold start before app/framework setup is ready.
+`hmr/update.js` must be safe to leave on disk between DevTools sessions; stale payloads must not run before app/framework setup is ready.
 
 ## Hot-update category
 
@@ -146,18 +112,6 @@ Why:
 
 - WeChat compiles/registers these structures outside React;
 - React module replacement is not the right mechanism for project-shape changes.
-
-## Taro API ordering requirement
-
-`virtual:taro/api` should ensure Taro's React runtime registers its `initNativeApi` hook before `@tarojs/taro` initializes.
-
-Why:
-
-- hooks such as `useLaunch`, `useLoad`, and `useReady` are installed by Taro's React framework runtime;
-- HMR creates earlier execution paths than normal app bootstrap;
-- relying on incidental module order can cause `Taro.useLaunch is not a function` on cold reopen or stale update execution.
-
-Keep this fix minimal. Do not manually duplicate every lifecycle hook.
 
 ## Dev project config
 
@@ -197,8 +151,7 @@ Split further only when a clear responsibility boundary appears. Do not create a
 - Keep wx transport concerns isolated.
 - Keep production path simple and unaffected.
 - Make reload reasons explicit in dev logs.
-- Do not use regex-only ESM semantics for module factory generation.
-- Do not base React Refresh identity on generated wx output file names.
+- Preserve ESM import/export semantics when generating module factories.
 
 ## Acceptance checks
 
