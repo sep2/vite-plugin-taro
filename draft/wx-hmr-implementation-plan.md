@@ -1,66 +1,68 @@
 # WeChat Mini Program Dev HMR Plan
 
-## Objective
+## Goal
 
-Implement wx dev HMR/Fast Refresh for `vite-plugin-taro` with this contract:
+Implement wx dev HMR/Fast Refresh for `vite-plugin-taro` with one clear contract:
 
 ```text
 Application JS/TS source changed -> update through dist/wx/hmr/update.js
-Mini Program shape changed       -> rewrite affected wx output and let DevTools reload/recompile
+Mini Program shape changed       -> regenerate wx output and let DevTools reload/recompile
 ```
 
-Production wx builds must not contain HMR runtime, update files, or React Refresh markers.
+Production wx builds must not contain HMR files, HMR globals, or React Refresh markers.
 
-## Core constraint
+## Constraint
 
-Vite web HMR works because the browser can execute updated module URLs. WeChat Mini Program cannot:
+Vite web HMR relies on the browser being able to execute updated module URLs. WeChat Mini Program cannot do that:
 
 - no browser ESM dev-server loader;
 - no `eval`;
 - no `new Function`;
 - no direct use of Vite's browser HMR client.
 
-So wx dev should keep Vite/web HMR semantics for graph, identity, invalidation, and React Refresh, but use a local executable file as the code transport:
+So the wx implementation should keep Vite/web HMR semantics for module graph, source identity, invalidation, and React Refresh, but use a local executable file as the transport:
 
 ```text
 dist/wx/hmr/update.js
 ```
 
-## Dev mode foundation
+## Dev-server model
 
-Use Vite dev-server mode for wx dev, not `vite build --watch`.
+Use Vite dev-server mode for wx dev instead of `vite build --watch`.
 
-Vite's plugin API calls this command `serve` even when users run `vite` or `vite dev`.
+In Vite's plugin API this is `command === 'serve'`, even when the user runs `vite` or `vite dev`.
 
 Why:
 
-- Vite dev owns the module graph, transforms, invalidation, and React Refresh metadata;
+- Vite dev already owns transforms, module graph, invalidation, and React Refresh metadata;
 - wx only needs a different execution transport;
 - build-watch is full-output oriented and is the wrong model for fine-grained module replacement.
 
-The Mini Program is not a browser client of the dev server. The plugin uses the dev server as a compiler and module-graph backend, then writes wx project files to `dist/wx`.
+The Mini Program is not a browser client of the dev server. The plugin uses Vite dev as a compiler/module-graph backend and writes wx project files to `dist/wx`.
 
-## Dev output model
+## Dev output contract
 
 Dev wx output should include:
 
 ```text
-dist/wx/hmr/runtime.js    # stable wx HMR runtime + React Refresh bridge
-dist/wx/hmr/bootstrap.js  # initial logical source module factories
-dist/wx/hmr/update.js     # overwritten hot-update payload; no-op initially
+dist/wx/hmr/runtime.js    # wx-side HMR runtime + React Refresh bridge
+dist/wx/hmr/bootstrap.js  # initial logical source module snapshot
+dist/wx/hmr/update.js     # latest executable update payload; no-op initially
 ```
 
-For application JS/TS source edits that do not change Mini Program shape, only this file should change:
+For application JS/TS/TSX edits that do not change Mini Program shape, only this file should change:
 
 ```text
 dist/wx/hmr/update.js
 ```
 
-`app.js`, page entries, common framework/vendor files, and `hmr/bootstrap.js` should stay stable for those edits.
+The wx shell (`app.js`, page entries, framework/vendor files, and `hmr/bootstrap.js`) should stay stable for those edits.
 
-## Logical module identity
+`hmr/update.js` must also be safe to leave on disk between DevTools sessions. A stale update payload must not run before app/framework setup is ready.
 
-React Refresh identity must match Vite/web HMR semantics: source module identity, not generated wx output identity.
+## Module identity
+
+React Refresh identity must follow Vite/web HMR semantics: source module identity, not generated wx output identity.
 
 Why:
 
@@ -68,37 +70,28 @@ Why:
 - generated wx files are transport/build artifacts;
 - cache-busting timestamps or output-file changes must not create new React families.
 
-## HMR files
+The same logical source identity should be used by the initial snapshot and later update payloads.
 
-The dev output uses three HMR files:
+## Hot-update scope
 
-```text
-hmr/runtime.js    # wx-side HMR/React Refresh runtime
-hmr/bootstrap.js  # initial logical source module snapshot
-hmr/update.js     # latest executable hot-update payload
-```
+A source change belongs on the `update.js` path when it can be represented as replacing logical JS/TS/TSX module factories without changing Mini Program shape.
 
-Keep this split so source identity is independent from wx shell files, and application source edits can touch only `hmr/update.js`.
+This includes application source such as:
 
-`hmr/update.js` must be safe to leave on disk between DevTools sessions; stale payloads must not run before app/framework setup is ready.
+- React component implementation;
+- hooks;
+- utility modules;
+- constants;
+- helper functions;
+- newly imported application JS/TS/TSX modules included with the changed importer.
 
-## Hot-update category
+React components update through React Refresh. Non-component modules update through the wx HMR module graph and affected importers.
 
-A change is eligible for `update.js` when it can be represented as replacing JS/TS/TSX logical module factories without changing Mini Program shell shape.
+## Reload scope
 
-Examples:
+A change should regenerate wx output and let DevTools reload/recompile when it changes Mini Program shape.
 
-- component render logic;
-- local helper code;
-- constants used by components;
-- hooks inside source modules;
-- newly imported JS/TS/TSX modules included in the update payload with the changed importer.
-
-## Full-reload category
-
-Rewrite affected wx output and let DevTools reload/recompile when the change affects Mini Program shape.
-
-Examples:
+This includes:
 
 - app entry semantics;
 - page registration or route list;
@@ -111,11 +104,11 @@ Examples:
 Why:
 
 - WeChat compiles/registers these structures outside React;
-- React module replacement is not the right mechanism for project-shape changes.
+- source module replacement is not the right mechanism for project-shape changes.
 
 ## Dev project config
 
-Dev wx output should enable:
+Dev wx output should enable WeChat compile hot reload:
 
 ```json
 {
@@ -129,7 +122,7 @@ Merge with user project config. Do not force this in production.
 
 ## Code organization
 
-Start small:
+Start with a small split:
 
 ```text
 packages/vite-plugin-taro/src/vite/targets/wx.ts
@@ -139,7 +132,7 @@ packages/vite-plugin-taro/src/vite/targets/wx-runtime.ts
 
 Intent:
 
-- `wx.ts`: existing wx build/prod config and public integration;
+- `wx.ts`: wx build/prod config and public integration;
 - `wx-dev.ts`: dev-server integration, dev session, change classification, file writing;
 - `wx-runtime.ts`: generated runtime/bootstrap/update code.
 
@@ -161,11 +154,11 @@ A clean wx dev output opens in WeChat DevTools without runtime initialization er
 
 ### Reopen after hot update
 
-After a hot update, closing and reopening the wx folder still loads normally. Stale `hmr/update.js` must not execute before runtime/app readiness.
+After a hot update, closing and reopening the wx folder still loads normally. Stale `hmr/update.js` does not execute before runtime/app readiness.
 
 ### Application source edit
 
-Editing application JS/TS/TSX source modules updates through the wx HMR runtime. React components update through React Refresh, and only `dist/wx/hmr/update.js` changes.
+Editing application JS/TS/TSX source updates through the wx HMR runtime. React components update through React Refresh. Only `dist/wx/hmr/update.js` changes.
 
 ### Mini Program shape edit
 
@@ -179,4 +172,3 @@ Production wx output must not contain:
 - `hmr/bootstrap.js`;
 - wx HMR globals;
 - React Refresh globals/markers.
-
