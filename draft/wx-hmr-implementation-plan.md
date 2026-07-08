@@ -48,7 +48,7 @@ Dev wx output must include one stable executable update payload:
 dist/wx/hmr/update.js     # latest executable update payload; no-op initially
 ```
 
-A Mini Program dev runtime and the initial logical source module snapshot must be available before app/page code executes. They may be embedded in shell files or emitted as stable generated artifacts. The plan does not require separate runtime/bootstrap files.
+A Mini Program dev runtime and the initial logical source module snapshot must be available before app/page code executes.
 
 For application JS/TS/TSX edits that do not change Mini Program shape, only this file should change:
 
@@ -136,7 +136,7 @@ Intent:
 
 - `targets/wx.ts`: wx build/prod config and wx-specific shell/output details;
 - `vite/hmr.ts`: dev-server HMR integration, dev session, change classification, and update writing;
-- `shim/dev-runtime.ts`: static Mini Program dev runtime source controlled by `vite/hmr.ts`; it may be embedded or emitted as a stable artifact.
+- `shim/dev-runtime.ts`: static Mini Program dev runtime source controlled by `vite/hmr.ts`.
 
 The HMR plugin should not be buried under `vite/targets/wx/` because the same dev-server/update-file model can later serve other Mini Program targets. Keep target-specific behavior behind small target adapters instead.
 
