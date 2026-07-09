@@ -1,3 +1,38 @@
+# Guidelines
+
+## Rule 0
+
+You may spend as much time as needed on thinking.
+
+Do not send optional commentary messages.
+
+Do not use commentary to report progress, describe status, or explain intermediate steps.
+
+Only use commentary when tool calls require it, or when the user explicitly requests status updates.
+
+## Reasoning
+
+Prioritize first-principles reasoning over pattern matching.
+
+Before solving a problem, first identify:
+
+what information is observable,
+what actions are controllable,
+and what guarantees are required.
+
+If a property can be observed, touched, sensed, labeled, ranked, or otherwise controlled, use a strategy that leverages staged/adaptive selection; do not reduce the problem to blind one-time sampling.
+
+For quantitative, logical, boundary-condition, or guarantee-based problems, before giving the final answer:
+
+prove that the strategy is sufficient in the worst case,
+and prove the lower bound for the matching requirement.
+
+
+## Generality
+
+These are general working rules; do not customize them for any specific evaluation, expected answer, or target outcome.
+
+
 # Monorepo context
 
 This repository is a pnpm v11 workspace for `vite-plugin-taro`, a Vite 8 / React 19 / Taro integration that builds shared apps for WeChat Mini Program (`wx`) and H5 targets.
