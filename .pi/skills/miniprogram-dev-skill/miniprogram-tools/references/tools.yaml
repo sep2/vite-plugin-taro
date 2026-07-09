@@ -1,0 +1,1407 @@
+{
+  "defaults": {
+    "timeoutMs": 20000
+  },
+  "tools": [
+    {
+      "id": "open_project_window",
+      "name": "打开项目窗口",
+      "summary": "打开包含模拟器的项目窗口。如果之前窗口已存在，则不打开新窗口，直接返回已打开的窗口 ID",
+      "group": "project",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "initializer"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true,
+          "description": "项目本地绝对路径；根目录必须包含 project.config.json"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "open_project_window"
+      }
+    },
+    {
+      "id": "close_project_window",
+      "name": "关闭项目窗口",
+      "summary": "关闭包含模拟器的项目窗口，不等于完全退出微信开发者工具",
+      "group": "project",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "initializer"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true,
+          "description": "项目本地绝对路径；根目录必须包含 project.config.json"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "close_project_window"
+      }
+    },
+    {
+      "id": "project_list",
+      "name": "列出已导入项目",
+      "summary": "只读列出微信开发者工具已导入的项目列表；默认返回主列表（小程序/小游戏等），可通过 scope 查看其他项目。不等于打开项目窗口。",
+      "group": "project",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "project-manager"
+      ],
+      "inputSchema": {
+        "scope": {
+          "type": "string",
+          "required": false,
+          "description": "列表范围：miniprogram（默认）、other、all"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "project_list"
+      }
+    },
+    {
+      "id": "project_import",
+      "name": "导入项目到列表",
+      "summary": "将本地项目目录导入 DevTools 项目列表，不打开项目窗口；路径已在列表中时返回 alreadyImported。与 project_open_window 不同，不做 appid 权限预检，无效目录由底层 importProject 报错。",
+      "group": "project",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "project-manager"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true,
+          "description": "项目本地绝对路径"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "project_import"
+      }
+    },
+    {
+      "id": "project_remove",
+      "name": "从列表删除项目",
+      "summary": "从微信开发者工具项目列表移除项目，不删除磁盘文件，不等于 project_close_window；云存储项目不支持；执行前会弹出 MCP 操作确认。",
+      "group": "project",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "project-manager"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true,
+          "description": "要从列表移除的项目本地绝对路径"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "project_remove"
+      }
+    },
+    {
+      "id": "buildnpm",
+      "name": "构建 npm",
+      "summary": "构建 npm。",
+      "group": "project",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "initializer",
+        "compiler"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "compile-type": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "buildnpm"
+      }
+    },
+    {
+      "id": "automation_runtime_info",
+      "name": "运行时信息",
+      "summary": "读取 DevTools 当前项目窗口和运行时信息，包括 pageStack、currentPage 或 systemInfo。",
+      "group": "automation",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "initializer",
+        "automator",
+        "debugger"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "action": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "automation_runtime_info"
+      }
+    },
+    {
+      "id": "check_devtools_status",
+      "name": "读取微信开发者工具状态",
+      "summary": "读取微信开发者工具登录态、openid 和当前运行的 skill 版本号；连接失败时会用当前 clientName 自动 auth 一次并重试。",
+      "group": "runtime",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "initializer"
+      ],
+      "inputSchema": {
+        "version": {
+          "type": "string",
+          "required": false,
+          "description": "当前调用侧 agent 加载的 miniprogram-dev-skill/skill.yaml 文件中的 version 字段值；不传则跳过版本对比提醒。"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "check_devtools_status"
+      }
+    },
+    {
+      "id": "get_user_appids",
+      "name": "获取用户可管理的全部 AppID",
+      "summary": "获取当前登录用户可管理的全部 AppID 列表。",
+      "group": "runtime",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "initializer"
+      ],
+      "inputSchema": {},
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "get_user_appids"
+      }
+    },
+    {
+      "id": "create_preview_qrcode",
+      "name": "获取小程序预览二维码",
+      "summary": "生成可扫码的小程序预览二维码。默认使用 qr-format=window 在新窗口中展示，无需指定本地输出路径。",
+      "group": "preview",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "previewer"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "qr-format": {
+          "type": "string",
+          "required": false,
+          "enum": [
+            "window",
+            "image"
+          ],
+          "description": "二维码展示方式。使用 window 在新窗口中展示。"
+        },
+        "qr-output": {
+          "type": "string",
+          "required": false,
+          "description": "二维码图片以文件形式输出的目标位置。"
+        },
+        "page-path": {
+          "type": "string",
+          "required": false,
+          "description": "指定的预览页面路径，如 page/index"
+        },
+        "query": {
+          "type": "string",
+          "required": false,
+          "description": "指定的预览页面的参数参数，如 a=b，多个参数用 & 连接，如 a=b&c=d"
+        },
+        "scene": {
+          "type": "string",
+          "required": false,
+          "description": "指定的预览进入的场景值，如 1001"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "create_preview_qrcode"
+      }
+    },
+    {
+      "id": "auto_preview",
+      "name": "推送手机预览",
+      "summary": "把预览直接推送到开发者微信，无需生成二维码文件。适合”直接发到手机看”场景。只需传 project 参数，可选传 page-path、scene、query 参数，不要传额外的本地输出路径参数。",
+      "group": "preview",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "previewer"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "page-path": {
+          "type": "string",
+          "required": false,
+          "description": "指定的预览页面路径，如 page/index"
+        },
+        "query": {
+          "type": "string",
+          "required": false,
+          "description": "指定的预览页面的参数参数，如 a=b，多个参数用 & 连接，如 a=b&c=d"
+        },
+        "scene": {
+          "type": "string",
+          "required": false,
+          "description": "指定的预览进入的场景值，如 1001"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "auto_preview"
+      }
+    },
+    {
+      "id": "cloud_env_list",
+      "name": "列出云环境",
+      "summary": "列出小程序可用云环境。",
+      "group": "cloud",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "cloudbase-operator"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": false
+        },
+        "appid": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "cloud_env_list"
+      }
+    },
+    {
+      "id": "cloud_db_read_struct",
+      "name": "读取云数据库结构",
+      "summary": "只读查询 NoSQL 集合与索引结构。env 请先用 cloud_env_list 获取。",
+      "group": "cloud",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "cloudbase-operator"
+      ],
+      "inputSchema": {
+        "appid": {
+          "type": "string",
+          "required": true,
+          "description": "小程序 AppID"
+        },
+        "env": {
+          "type": "string",
+          "required": true,
+          "description": "云开发环境 ID，请先用 cloud_env_list 获取"
+        },
+        "action": {
+          "type": "string",
+          "required": true,
+          "description": "listCollections | describeCollection | checkCollection | listIndexes | checkIndex"
+        },
+        "collectionName": {
+          "type": "string",
+          "required": false,
+          "description": "集合名称；describeCollection/listIndexes/checkCollection 时使用"
+        },
+        "indexName": {
+          "type": "string",
+          "required": false,
+          "description": "索引名称；checkIndex 时使用"
+        },
+        "limit": {
+          "type": "number",
+          "required": false,
+          "description": "返回数量限制"
+        },
+        "offset": {
+          "type": "number",
+          "required": false,
+          "description": "分页偏移"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "cloud_db_read_struct"
+      }
+    },
+    {
+      "id": "cloud_db_write_struct",
+      "name": "修改云数据库结构",
+      "summary": "修改云数据库集合结构（创建/删除集合、管理索引），属于写操作，需用户确认。env 请先用 cloud_env_list 获取。",
+      "group": "cloud",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "cloudbase-operator"
+      ],
+      "inputSchema": {
+        "appid": {
+          "type": "string",
+          "required": true,
+          "description": "小程序 AppID"
+        },
+        "env": {
+          "type": "string",
+          "required": true,
+          "description": "云开发环境 ID，请先用 cloud_env_list 获取"
+        },
+        "action": {
+          "type": "string",
+          "required": true,
+          "description": "createCollection | updateCollection | deleteCollection"
+        },
+        "collectionName": {
+          "type": "string",
+          "required": true,
+          "description": "集合名称"
+        },
+        "updateOptions": {
+          "type": "object",
+          "required": false,
+          "description": "updateCollection 使用；CreateIndexes 添加索引，DropIndexes 删除索引"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "cloud_db_write_struct"
+      }
+    },
+    {
+      "id": "cloud_db_read_doc",
+      "name": "读取云数据库内容",
+      "summary": "只读查询 NoSQL 集合文档，支持条件、投影、排序和分页。env 请先用 cloud_env_list 获取。",
+      "group": "cloud",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "cloudbase-operator"
+      ],
+      "inputSchema": {
+        "appid": {
+          "type": "string",
+          "required": true,
+          "description": "小程序 AppID"
+        },
+        "env": {
+          "type": "string",
+          "required": true,
+          "description": "云开发环境 ID，请先用 cloud_env_list 获取"
+        },
+        "collectionName": {
+          "type": "string",
+          "required": true,
+          "description": "集合名称"
+        },
+        "query": {
+          "type": "object",
+          "required": false,
+          "description": "查询条件对象"
+        },
+        "projection": {
+          "type": "object",
+          "required": false,
+          "description": "返回字段投影"
+        },
+        "sort": {
+          "type": "array",
+          "required": false,
+          "description": "排序条件，如 [{\"key\":\"createdAt\",\"direction\":-1}]"
+        },
+        "limit": {
+          "type": "number",
+          "required": false,
+          "description": "返回数量限制"
+        },
+        "offset": {
+          "type": "number",
+          "required": false,
+          "description": "跳过记录数"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "cloud_db_read_doc"
+      }
+    },
+    {
+      "id": "cloud_db_write_doc",
+      "name": "修改云数据库内容",
+      "summary": "修改云数据库集合文档（插入/更新/删除），属于写操作，需用户确认。env 请先用 cloud_env_list 获取。",
+      "group": "cloud",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "cloudbase-operator"
+      ],
+      "inputSchema": {
+        "appid": {
+          "type": "string",
+          "required": true,
+          "description": "小程序 AppID"
+        },
+        "env": {
+          "type": "string",
+          "required": true,
+          "description": "云开发环境 ID，请先用 cloud_env_list 获取"
+        },
+        "action": {
+          "type": "string",
+          "required": true,
+          "description": "insert | update | delete"
+        },
+        "collectionName": {
+          "type": "string",
+          "required": true,
+          "description": "集合名称"
+        },
+        "documents": {
+          "type": "array",
+          "required": false,
+          "description": "insert 操作的文档数组"
+        },
+        "query": {
+          "type": "object",
+          "required": false,
+          "description": "update/delete 操作的查询条件"
+        },
+        "update": {
+          "type": "object",
+          "required": false,
+          "description": "update 操作的更新内容，推荐使用 $set/$inc/$unset 等操作符"
+        },
+        "isMulti": {
+          "type": "boolean",
+          "required": false,
+          "description": "是否更新或删除多条记录"
+        },
+        "upsert": {
+          "type": "boolean",
+          "required": false,
+          "description": "update 时不存在则插入"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "cloud_db_write_doc"
+      }
+    },
+    {
+      "id": "cloud_stor_read",
+      "name": "读取云存储",
+      "summary": "只读查询云存储文件列表、文件信息、临时下载链接或文本内容。env 请先用 cloud_env_list 获取。",
+      "group": "cloud",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "cloudbase-operator"
+      ],
+      "inputSchema": {
+        "appid": {
+          "type": "string",
+          "required": true,
+          "description": "小程序 AppID"
+        },
+        "env": {
+          "type": "string",
+          "required": true,
+          "description": "云开发环境 ID，请先用 cloud_env_list 获取"
+        },
+        "action": {
+          "type": "string",
+          "required": true,
+          "description": "list | info | url | read"
+        },
+        "cloudPath": {
+          "type": "string",
+          "required": true,
+          "description": "云端文件路径，例如 files/data.txt 或 files/"
+        },
+        "maxAge": {
+          "type": "number",
+          "required": false,
+          "description": "临时链接有效期（秒），默认 3600"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "cloud_stor_read"
+      }
+    },
+    {
+      "id": "cloud_stor_write",
+      "name": "修改云存储",
+      "summary": "管理云存储文件（上传/下载/删除）；upload/delete 属于写操作，需用户确认。env 请先用 cloud_env_list 获取。",
+      "group": "cloud",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "cloudbase-operator"
+      ],
+      "inputSchema": {
+        "appid": {
+          "type": "string",
+          "required": true,
+          "description": "小程序 AppID"
+        },
+        "env": {
+          "type": "string",
+          "required": true,
+          "description": "云开发环境 ID，请先用 cloud_env_list 获取"
+        },
+        "action": {
+          "type": "string",
+          "required": true,
+          "description": "upload | download | delete"
+        },
+        "cloudPath": {
+          "type": "string",
+          "required": true,
+          "description": "云端文件路径，例如 files/data.txt"
+        },
+        "localPath": {
+          "type": "string",
+          "required": false,
+          "description": "本地文件路径，upload/download 时使用"
+        },
+        "force": {
+          "type": "boolean",
+          "required": false,
+          "description": "delete 时建议设为 true 以确认删除"
+        },
+        "isDirectory": {
+          "type": "boolean",
+          "required": false,
+          "description": "是否为目录操作"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "cloud_stor_write"
+      }
+    },
+    {
+      "id": "cloud_fn_list",
+      "name": "列出云函数",
+      "summary": "列出目标云环境下的云函数。",
+      "group": "cloud",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "cloudbase-operator"
+      ],
+      "inputSchema": {
+        "env": {
+          "type": "string",
+          "required": true
+        },
+        "appid": {
+          "type": "string",
+          "required": true,
+          "description": "小程序 AppID"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "cloud_fn_list"
+      }
+    },
+    {
+      "id": "cloud_fn_info",
+      "name": "查询云函数信息",
+      "summary": "查询目标云函数的状态、超时和运行时信息。",
+      "group": "cloud",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "cloudbase-operator"
+      ],
+      "inputSchema": {
+        "env": {
+          "type": "string",
+          "required": true
+        },
+        "names": {
+          "type": "string",
+          "required": true
+        },
+        "appid": {
+          "type": "string",
+          "required": true,
+          "description": "小程序 AppID"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "cloud_fn_info"
+      }
+    },
+    {
+      "id": "cloud_fn_deploy",
+      "name": "部署云函数",
+      "summary": "按云函数目录路径部署云函数。固定使用 paths + appid 链路：paths 指向云函数目录，函数目录名即函数名称。",
+      "group": "cloud",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "cloudbase-operator"
+      ],
+      "inputSchema": {
+        "env": {
+          "type": "string",
+          "required": true,
+          "description": "云环境 ID"
+        },
+        "paths": {
+          "type": "string",
+          "required": true,
+          "description": "云函数目录本地绝对路径，多个路径用逗号分隔；函数目录名即函数名称"
+        },
+        "remote-npm-install": {
+          "type": "boolean",
+          "required": false
+        },
+        "appid": {
+          "type": "string",
+          "required": true,
+          "description": "小程序 AppID"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "cloud_fn_deploy"
+      }
+    },
+    {
+      "id": "cloud_fn_inc_deploy",
+      "name": "增量部署云函数",
+      "summary": "执行云函数增量部署。",
+      "group": "cloud",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "cloudbase-operator"
+      ],
+      "inputSchema": {
+        "appid": {
+          "type": "string",
+          "required": true,
+          "description": "小程序 AppID"
+        },
+        "env": {
+          "type": "string",
+          "required": true,
+          "description": "云环境 ID"
+        },
+        "path": {
+          "type": "string",
+          "required": true,
+          "description": "云函数目录本地绝对路径，目录名即函数名称"
+        },
+        "file": {
+          "type": "string",
+          "required": true,
+          "description": "变更文件或目录路径，必须相对云函数目录"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "cloud_fn_inc_deploy"
+      }
+    },
+    {
+      "id": "scan_login",
+      "name": "触发扫码登录",
+      "summary": "打开微信开发者工具并显示扫码登录二维码，等待用户扫码完成登录。",
+      "group": "account",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "initializer"
+      ],
+      "inputSchema": {},
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "scan_login"
+      }
+    },
+    {
+      "id": "miniprogram_upload",
+      "name": "发布体验版",
+      "summary": "上传代码包发布体验版。仅在用户明确要求「发布体验版」时调用。",
+      "group": "app",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "previewer"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "version": {
+          "type": "string",
+          "required": true,
+          "description": "体验版版本号。CLI 使用 --upload-version"
+        },
+        "desc": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "miniprogram_upload"
+      }
+    },
+    {
+      "id": "quit",
+      "name": "退出工具",
+      "summary": "关闭 DevTools。",
+      "group": "account",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "initializer"
+      ],
+      "inputSchema": {},
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "quit"
+      }
+    },
+    {
+      "id": "get_app_console_content",
+      "name": "读取 console",
+      "summary": "对小程序 console 缓冲区执行 grep 过滤并返回命中行。command 是 grep 命令字符串（不含文件名），如 'grep -i error'。要获取全部日志请用 'grep -n .'（匹配任意行）。返回空字符串代表没有匹配行，不代表 console 为空。",
+      "group": "debug",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "debugger"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "command": {
+          "type": "string",
+          "required": true,
+          "description": "grep 命令字符串（不含文件名），例如: 'grep -n .'（全部）、'grep -i error'（过滤 error）、'grep -n warn'（过滤 warn）。不要传 'all' 等枚举值。"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "get_app_console_content"
+      }
+    },
+    {
+      "id": "get_app_network_content",
+      "name": "读取 network",
+      "summary": "对小程序 network 缓冲区执行 grep 过滤并返回命中行。command 是 grep 命令字符串（不含文件名）。要获取全部请求记录请用 'grep -n .'。",
+      "group": "debug",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "debugger"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "command": {
+          "type": "string",
+          "required": true,
+          "description": "grep 命令字符串（不含文件名），例如: 'grep -n .'（全部）、'grep -i fail'（过滤失败请求）。"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "get_app_network_content"
+      }
+    },
+    {
+      "id": "automation_navigate",
+      "name": "页面导航",
+      "summary": "执行小程序页面导航。",
+      "group": "automation",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "automator"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "action": {
+          "type": "string",
+          "required": true
+        },
+        "url": {
+          "type": "string",
+          "required": false
+        },
+        "delta": {
+          "type": "number",
+          "required": false
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "automation_navigate"
+      }
+    },
+    {
+      "id": "automation_viewport_action",
+      "name": "页面操作",
+      "summary": "执行滚动、截图、真机调试等操作。",
+      "group": "automation",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "automator"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "action": {
+          "type": "string",
+          "required": true
+        },
+        "scrollTop": {
+          "type": "number",
+          "required": false
+        },
+        "path": {
+          "type": "string",
+          "required": false,
+          "description": "截图本地输出路径"
+        },
+        "waitForSelector": {
+          "type": "string",
+          "required": false,
+          "description": "截图前等待该选择器出现。action=screenshot 时 waitForSelector 和 waitSeconds 必须至少传一个，推荐优先使用 waitForSelector"
+        },
+        "waitSeconds": {
+          "type": "number",
+          "required": false,
+          "description": "截图前固定等待秒数，范围 0-10。action=screenshot 时 waitForSelector 和 waitSeconds 必须至少传一个"
+        },
+        "ticket": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "automation_viewport_action"
+      }
+    },
+    {
+      "id": "automation_page_action",
+      "name": "页面级操作",
+      "summary": "执行页面数据读取、查询、等待和页面方法调用。",
+      "group": "automation",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "automator"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "action": {
+          "type": "string",
+          "required": true
+        },
+        "path": {
+          "type": "string",
+          "required": false
+        },
+        "patch": {
+          "type": "string",
+          "required": false
+        },
+        "condition": {
+          "type": "string",
+          "required": false
+        },
+        "selector": {
+          "type": "string",
+          "required": false
+        },
+        "method": {
+          "type": "string",
+          "required": false
+        },
+        "args": {
+          "type": "array",
+          "required": false
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "automation_page_action"
+      }
+    },
+    {
+      "id": "automation_element_action",
+      "name": "元素级操作",
+      "summary": "执行元素点击、输入、文本读取、样式读取和触摸操作。",
+      "group": "automation",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "automator"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "action": {
+          "type": "string",
+          "required": true
+        },
+        "selector": {
+          "type": "string",
+          "required": true
+        },
+        "type": {
+          "type": "string",
+          "required": false
+        },
+        "detail": {
+          "type": "object",
+          "required": false
+        },
+        "value": {
+          "type": "string",
+          "required": false
+        },
+        "name": {
+          "type": "string",
+          "required": false
+        },
+        "x": {
+          "type": "number",
+          "required": false
+        },
+        "y": {
+          "type": "number",
+          "required": false
+        },
+        "touches": {
+          "type": "array",
+          "required": false
+        },
+        "changedTouches": {
+          "type": "array",
+          "required": false
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "automation_element_action"
+      }
+    },
+    {
+      "id": "automation_evaluate",
+      "name": "运行时执行",
+      "summary": "在小程序上下文中执行受控 evaluate。",
+      "group": "automation",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "automator"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "action": {
+          "type": "string",
+          "fixed": true,
+          "description": "Always sent as \"evaluate\""
+        },
+        "fnSource": {
+          "type": "string",
+          "required": true
+        },
+        "args": {
+          "type": "array",
+          "required": false
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "automation_evaluate"
+      }
+    },
+    {
+      "id": "automation_wx_api",
+      "name": "小程序 API 调试",
+      "summary": "调用、mock 或恢复 wx API。",
+      "group": "automation",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "debugger",
+        "automator"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "action": {
+          "type": "string",
+          "required": true
+        },
+        "method": {
+          "type": "string",
+          "required": true
+        },
+        "args": {
+          "type": "array",
+          "required": false
+        },
+        "result": {
+          "type": "object",
+          "required": false
+        },
+        "functionDeclaration": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "automation_wx_api"
+      }
+    },
+    {
+      "id": "automation_generate_script",
+      "name": "生成 automator 脚本",
+      "summary": "把已记录调用生成可运行的 automator 脚本。",
+      "group": "automation",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "automator"
+      ],
+      "inputSchema": {
+        "includeFailed": {
+          "type": "boolean",
+          "required": false
+        },
+        "clearHistory": {
+          "type": "boolean",
+          "required": false
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "automation_generate_script"
+      }
+    },
+    {
+      "id": "compile_js",
+      "name": "编译单个 JS 文件",
+      "summary": "获取单个 JS/TS 文件编译结果摘要。",
+      "group": "compile",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "compiler"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "filePath": {
+          "type": "string",
+          "required": true,
+          "description": "待编译 JS/TS 文件相对路径（相对于 miniprogramRoot 或 pluginRoot），如 pages/index/index.js"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "compile_js"
+      }
+    },
+    {
+      "id": "compile_wxml",
+      "name": "编译 WXML 模板",
+      "summary": "编译 WXML 模板文件，返回编译结果。",
+      "group": "compile",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "compiler"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "filePath": {
+          "type": "string",
+          "required": true,
+          "description": "待编译 WXML 文件相对路径（相对于 miniprogramRoot 或 pluginRoot），如 pages/index/index.wxml"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "compile_wxml"
+      }
+    },
+    {
+      "id": "compile_wxss",
+      "name": "编译 WXSS 样式",
+      "summary": "编译 WXSS 样式文件，返回编译结果。",
+      "group": "compile",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "compiler"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "filePath": {
+          "type": "string",
+          "required": true,
+          "description": "待编译 WXSS 文件相对路径（相对于 miniprogramRoot 或 pluginRoot），如 pages/index/index.wxss"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "compile_wxss"
+      }
+    },
+    {
+      "id": "project_setting_get",
+      "name": "读取项目设置",
+      "summary": "读取当前项目设置。",
+      "group": "project",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "initializer"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "project_setting_get"
+      }
+    },
+    {
+      "id": "project_setting_update",
+      "name": "更新项目设置",
+      "summary": "更新项目设置，修改后会即时生效并写入项目配置。",
+      "group": "project",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "initializer"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "settings": {
+          "type": "object",
+          "required": true
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "project_setting_update"
+      }
+    },
+    {
+      "id": "simulator_open_page",
+      "name": "编译并打开指定页面",
+      "summary": "触发项目窗口模拟器编译并打开指定页面，不修改持久编译条件列表。",
+      "group": "simulator",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "compiler"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "page": {
+          "type": "string",
+          "required": true
+        },
+        "query": {
+          "type": "string",
+          "required": false
+        },
+        "scene": {
+          "type": "number",
+          "required": false
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "simulator_open_page"
+      }
+    },
+    {
+      "id": "simulator_refresh",
+      "name": "刷新模拟器",
+      "summary": "触发项目窗口模拟器重新编译/刷新当前页面。",
+      "group": "simulator",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "compiler",
+        "debugger"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "simulator_refresh"
+      }
+    },
+    {
+      "id": "debug_clear_cache",
+      "name": "清理缓存",
+      "summary": "清理项目缓存，支持细粒度操作。",
+      "group": "debug",
+      "source": {
+        "type": "devtools"
+      },
+      "scenes": [
+        "debugger"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true
+        },
+        "action": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "debug_clear_cache"
+      }
+    }
+  ]
+}
