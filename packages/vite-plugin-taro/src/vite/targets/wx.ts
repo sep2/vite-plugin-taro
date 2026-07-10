@@ -307,15 +307,6 @@ function createWechatAssets(
         { fileName: 'comp.wxml', source: builder.buildBaseComponentTemplate('.wxml') },
         { fileName: 'comp.json', source: stringifyJsonAsset(createWechatCompJson()) },
         { fileName: 'project.config.json', source: stringifyJsonAsset(context.projectConfigJson) },
-        {
-            // this is required since the urlCheck setting is not supported by project.config.json
-            fileName: 'project.private.config.json',
-            source: stringifyJsonAsset({
-                setting: {
-                    urlCheck: false
-                }
-            })
-        },
         { fileName: 'sitemap.json', source: stringifyJsonAsset(context.sitemapJson) },
         ...context.pages.flatMap((page) => [
             {
