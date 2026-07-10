@@ -15,6 +15,13 @@ const wechatStyleOptions = {
 
 type WeappTailwindcssCoreContext = ReturnType<typeof createContext>
 
+type WxTailwindRuntime = {
+    core: WeappTailwindcssCoreContext
+    classSet: Set<string>
+}
+
+const wxTailwindRuntimes = new Map<string, WxTailwindRuntime>()
+
 /**
  * Generates Tailwind CSS v4 directly through weapp-tailwindcss' generator, and applies the core
  * class-name transformer to final Mini Program JS chunks.
@@ -24,7 +31,7 @@ type WeappTailwindcssCoreContext = ReturnType<typeof createContext>
  */
 export function createTaroCssPlugin(context: VitePluginTaroBuildContext): PluginOption {
     let projectRoot = process.cwd()
-    let runtimeClassSet = new Set<string>()
+    const runtimeClassSet = new Set<string>()
     let weappContext: WeappTailwindcssCoreContext | undefined
 
     return {
@@ -35,11 +42,14 @@ export function createTaroCssPlugin(context: VitePluginTaroBuildContext): Plugin
         configResolved(config) {
             projectRoot = config.root
             weappContext = context.target === 'wx' ? createWeappContext(projectRoot) : undefined
+            if (weappContext) {
+                wxTailwindRuntimes.set(path.resolve(projectRoot), { core: weappContext, classSet: runtimeClassSet })
+            }
         },
 
         /** Clears collected class names for each build/rebuild so WX JS rewriting never uses stale candidates. */
         buildStart() {
-            runtimeClassSet = new Set<string>()
+            runtimeClassSet.clear()
         },
 
         /** Generates final CSS when a stylesheet imports Tailwind. */
@@ -73,7 +83,16 @@ export function createTaroCssPlugin(context: VitePluginTaroBuildContext): Plugin
             return generated.css
         },
 
-        /** Applies the WX-only weapp-tailwindcss core passes after Vite has produced concrete CSS assets and JS chunks. */
+        /** Rewrites emitted WX JS class strings before Rolldown serializes each chunk. */
+        async renderChunk(code, chunk) {
+            if (context.target !== 'wx' || runtimeClassSet.size === 0 || !weappContext) {
+                return
+            }
+
+            return await transformWxRuntimeClassNames(projectRoot, code, chunk.fileName)
+        },
+
+        /** Applies the WX-only weapp-tailwindcss WXSS pass after Vite has produced concrete CSS assets. */
         async generateBundle(_, bundle) {
             // H5/Web is already handled by transform() with generator target "web".
             // This hook is only for Mini Program CSS finalization and JS class-name escaping.
@@ -92,16 +111,6 @@ export function createTaroCssPlugin(context: VitePluginTaroBuildContext): Plugin
                 }
             }
             await Promise.all(wxssTasks)
-
-            if (runtimeClassSet.size === 0) return
-
-            const jsTasks: Promise<void>[] = []
-            for (const item of Object.values(bundle)) {
-                if (item.type === 'chunk') {
-                    jsTasks.push(transformWxJsChunk(weappContext, item, runtimeClassSet))
-                }
-            }
-            await Promise.all(jsTasks)
         }
     }
 }
@@ -109,6 +118,25 @@ export function createTaroCssPlugin(context: VitePluginTaroBuildContext): Plugin
 /**
  * Creates the WX-only weapp-tailwindcss core context once the app root is known, avoiding lazy setup in bundle output.
  */
+export async function transformWxRuntimeClassNames(projectRoot: string, code: string, filename: string) {
+    const runtime = wxTailwindRuntimes.get(path.resolve(projectRoot))
+
+    if (!runtime || runtime.classSet.size === 0) {
+        return { code, map: null }
+    }
+
+    const result = await runtime.core.transformJs(code, {
+        runtimeSet: runtime.classSet,
+        filename,
+        generateMap: false
+    })
+
+    return {
+        code: result.code,
+        map: null
+    }
+}
+
 function createWeappContext(projectRoot: string): WeappTailwindcssCoreContext {
     return createContext({
         appType: 'taro',
@@ -130,25 +158,6 @@ async function transformWxssAsset(
 ): Promise<void> {
     const result = await core.transformWxss(getAssetSource(item), { isMainChunk: true })
     item.source = result.css
-}
-
-/**
- * Rewrites JS class strings to match the escaped WX selectors emitted by the generator and WXSS transformer.
- */
-async function transformWxJsChunk(
-    core: WeappTailwindcssCoreContext,
-    item: { code: string; fileName: string; map?: unknown },
-    runtimeClassSet: Set<string>
-): Promise<void> {
-    const result = await core.transformJs(item.code, {
-        runtimeSet: runtimeClassSet,
-        filename: item.fileName,
-        generateMap: Boolean(item.map)
-    })
-    item.code = result.code
-    if (result.map && item.map) {
-        item.map = result.map
-    }
 }
 
 /**
