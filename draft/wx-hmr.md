@@ -1,165 +1,533 @@
-# WeChat Mini Program Dev HMR Plan
+## Overview
 
-## Goal
+This is not normal browser Vite HMR. WeChat cannot load updated ESM over HTTP or execute received JavaScript with `eval()`.
 
-Implement wx dev HMR/Fast Refresh for `vite-plugin-taro` with one clear contract:
+Instead, the implementation has two planes:
 
 ```text
-Application JS/TS source changed -> update through executable HMR payload file(s)
-Mini Program shape changed       -> regenerate wx output and let DevTools reload/recompile
+Control plane: Vite WebSocket
+    active page detection
+    page-reload preparation/acknowledgement
+
+Code plane: generated page entry
+    static JavaScript factories appended to pages/.../index.js
 ```
 
-Production wx builds must not contain HMR payload files, HMR globals, or React Refresh markers.
+No JavaScript source is sent through the WebSocket, and `app.js` never loads an HMR payload.
 
-## Constraint
+---
 
-Vite web HMR relies on the browser being able to execute updated module URLs. WeChat Mini Program cannot do that:
+## 1. Initial startup
 
-- no browser ESM dev-server loader;
-- no `eval`;
-- no `new Function`;
-- no direct use of Vite's browser HMR client.
+When running:
 
-So the wx implementation should keep Vite/web HMR semantics for module graph, source identity, invalidation, and React Refresh, but use changed local JS files as the execution transport.
+```bash
+npm run dev-wx
+```
 
-## Dev-server model
+`createWxDevHmrPlugin()` activates only for:
 
-Use Vite dev-server mode for wx dev instead of `vite build --watch`.
+- Vite `serve`
+- target `wx`
 
-In Vite's plugin API this is `command === 'serve'`, even when the user runs `vite` or `vite dev`.
+It then performs these steps.
 
-Why:
+### Build the page module graph
 
-- Vite dev already owns transforms, module graph, invalidation, and React Refresh metadata;
-- wx only needs a different execution transport;
-- build-watch is full-output oriented and is the wrong model for fine-grained module replacement.
+Each configured page TSX file is a graph root:
 
-The Mini Program is not a browser client of the dev server. The plugin uses Vite dev as a compiler/module-graph backend and writes wx project files to `dist/wx`.
+```text
+pages/calculator/index.tsx
+pages/calculator/history/index.tsx
+pages/calculator/monthly-payments/index.tsx
+```
 
-## Dev output contract
+The graph recursively resolves their source imports through Vite.
 
-Dev wx output must include executable HMR payload file(s) that are dependencies of the app/page code that should receive updates.
+Modules are classified as:
 
-Payload placement is a transport choice. It may be global, page-local, app-local, or a mix. For example, page-local payload files can align better with WeChat's page dependency model, while shared/global payloads can simplify app-wide or shared-module updates.
+- **Managed source modules**: JS/TS/TSX files under `src`
+- **Externals**: React, Taro virtual modules, npm packages and styles
 
-Payload file location must not define source module identity.
+For every managed module, the graph stores:
 
-For application JS/TS/TSX edits that do not change Mini Program shape, only the relevant HMR payload file(s) should change. The wx shell and framework/vendor files should stay stable for those edits.
+- transformed source
+- resolved imports
+- dependencies
+- importers
+- external imports
 
-Existing payload files must be safe to leave on disk between DevTools sessions. On reopen, they should provide the current source payload for first load and must not apply as premature hot updates before app/framework setup is ready.
+### Build the static Mini Program shell
 
-## Module identity
+A nested Vite build emits the regular Mini Program structure:
 
-React Refresh identity must follow Vite/web HMR semantics: source module identity, not generated wx output identity.
+```text
+app.js
+taro.js
+vendors.js
+common.js
+pages/calculator/index.js
+...
+```
 
-Why:
+In development:
 
-- a component must keep the same family across updates;
-- generated wx files are transport/build artifacts;
-- cache-busting timestamps or output-file changes must not create new React families.
+- `app.js` initializes the HMR runtime and WebSocket.
+- `app.js` creates the real Taro application.
+- Page entries register a stable `WxDevPageProxy`.
+- External dependencies are statically imported into an external registry.
+- No page HMR payload is imported by `app.js`.
 
-The same logical source identity should be used on first load and later updates, regardless of which payload file carries the code.
+The HMR runtime is imported before `@tarojs/react`, allowing React’s reconciler to register with the React Refresh hook.
 
-## Hot-update scope
+### Append initial payloads to page entries
 
-A source change belongs on the HMR payload path when it can be represented as replacing logical JS/TS/TSX module factories without changing Mini Program shape.
+The complete managed module graph is compiled into factory functions and appended directly to every page entry:
 
-This includes application source such as:
+```js
+/* vite-plugin-taro wx HMR payload */
+(function () {
+    const runtime = globalThis.__VITE_PLUGIN_TARO_WX_HMR__
 
-- React component implementation;
-- hooks;
-- utility modules;
-- constants;
-- helper functions;
-- newly imported application JS/TS/TSX modules included with the changed importer.
+    runtime.define({
+        '/src/pages/calculator/index.tsx': function (
+            module,
+            exports,
+            __import,
+            __export,
+            __reexport,
+            importMeta
+        ) {
+            // Transformed page module
+        }
+    }, {
+        version: 1,
+        roots: [...],
+        invalidate: [],
+        env: {...}
+    })
+})()
+```
 
-All eligible source edits should be delivered through executable HMR payload file(s).
+The payload is physically part of the page entry. It is not a separate JS file.
 
-## Reload scope
+That distinction is important: modifying a separate JS dependency caused DevTools to restart App Service, while appending code to the page entry can be hot-applied.
 
-A change should regenerate wx output and let DevTools reload/recompile when it changes Mini Program shape.
+---
 
-This includes:
+## 2. Compiling modules into factories
 
-- app entry semantics;
-- page registration or route list;
-- app/page JSON config;
-- WXML/template structure;
-- native/custom component topology;
-- framework/vendor bundle structure;
-- WXSS/assets until separately supported.
+WeChat cannot execute source received over the network, so there is no `eval()` or `new Function()`.
 
-Why:
+Instead, source is compiled ahead of time into literal function declarations.
 
-- WeChat compiles/registers these structures outside React;
-- source module replacement is not the right mechanism for project-shape changes.
+### Oxc transformation
 
-## Dev project config
+`transformWxSource()` performs:
 
-Dev wx output should enable WeChat compile hot reload:
+1. Taro conditional compilation.
+2. TypeScript/JSX transformation.
+3. React Refresh instrumentation.
+4. WX Tailwind class-name transformation.
 
-```json
+For example, JSX is converted to calls using `react/jsx-runtime`, and React Refresh adds registrations such as:
+
+```js
+$RefreshReg$(LoanGenius, 'LoanGenius')
+$RefreshSig$()
+```
+
+### ESM-to-factory transformation
+
+A Babel transform rewrites ESM constructs:
+
+```js
+import Foo from './foo'
+export default Component
+export { value }
+import.meta
+```
+
+into runtime operations resembling:
+
+```js
+const imported = __import('/absolute/path/foo.ts')
+const Foo = imported.default
+
+__export('default', () => Component)
+__export('value', () => value)
+
+importMeta
+```
+
+Exports use getters so they remain live bindings.
+
+### Static dependency registry
+
+Npm/Taro/React modules cannot be dynamically loaded by the factory system. They are imported normally by the shell and registered:
+
+```js
+runtime.registerExternal('react', ReactNamespace)
+runtime.registerExternal('virtual:taro/api', TaroApi)
+```
+
+A factory calling:
+
+```js
+__import('react')
+```
+
+therefore reads an already-loaded static module.
+
+---
+
+## 3. Runtime module system
+
+`WxDevHmrRuntime` maintains:
+
+```text
+factories   module ID -> factory function
+modules     module ID -> evaluated module
+externals   external ID -> static exports
+roots       page root module IDs
+version     latest applied payload version
+```
+
+Its `require(id)` operation:
+
+1. Checks the external registry.
+2. Returns a cached evaluated module when possible.
+3. Finds the managed factory.
+4. Creates the module record before execution, allowing basic cycles.
+5. Invokes the factory with runtime import/export helpers.
+6. Caches and returns its exports.
+
+Factories also receive a minimal `import.meta.hot`:
+
+```js
 {
-  "setting": {
-    "compileHotReLoad": true
-  }
+    data,
+    accept() {},
+    dispose(callback) {}
 }
 ```
 
-Merge with user project config. Do not force this in production.
+This implementation does not use Vite’s browser ESM loader. It is a small CommonJS-like module runtime specifically for WX development.
 
-## Code organization
+---
 
-Keep the dev HMR plugin target-agnostic enough for future Mini Program targets.
+## 4. Page proxy
 
-Start with this split:
+The Mini Program page is registered with a stable React component:
 
-```text
-packages/vite-plugin-taro/src/vite/targets/wx.ts
-packages/vite-plugin-taro/src/vite/hmr.ts
-packages/vite-plugin-taro/src/shim/dev-runtime.ts
+```js
+function WxDevPageProxy(props) {
+    const Component = runtime.require(componentId).default
+    return React.createElement(Component, props)
+}
 ```
 
-Intent:
+The page shell itself does not statically import the page component.
 
-- `targets/wx.ts`: wx build/prod config and wx-specific shell/output details;
-- `vite/hmr.ts`: dev-server HMR integration, dev session, change classification, and payload writing;
-- `shim/dev-runtime.ts`: static Mini Program dev runtime source controlled by `vite/hmr.ts`.
+This means:
 
-The HMR plugin should not be buried under `vite/targets/wx/` because the same dev-server/local-payload model can later serve other Mini Program targets. Keep target-specific behavior behind small target adapters instead.
+- The Taro page/root identity remains stable.
+- The proxy reads the newest module exports on every render.
+- React Refresh can replace the underlying component family without replacing the whole page configuration.
 
-Split further only when a clear responsibility boundary appears. Do not create a large module tree up front, and do not put the whole feature in `wx.ts`.
+---
 
-## Code quality requirements
+## 5. Detecting an update
 
-- Preserve Vite/web HMR semantics where possible.
-- Keep Mini Program transport concerns isolated.
-- Keep production path simple and unaffected.
-- Make reload reasons explicit in dev logs.
-- Preserve ESM import/export semantics when generating module factories.
+Vite calls `handleHotUpdate(file)`.
 
-## Acceptance checks
+### Normal HMR path
 
-### First load
+A file is eligible when it is:
 
-A clean wx dev output opens in WeChat DevTools without runtime initialization errors.
+- JS/TS/JSX/TSX
+- under `src`
+- already part of a page dependency graph
 
-### Reopen after hot update
+The graph determines the invalidation chain:
 
-After a hot update, closing and reopening the wx folder still loads normally. Existing HMR payload files do not apply as hot updates before runtime/app readiness.
+```text
+changed module
+    -> importer
+        -> importer
+            -> affected page root
+```
 
-### Application source edit
+Then it rebuilds its in-memory relationships and emits:
 
-Editing application JS/TS/TSX source updates through the wx HMR runtime. Only relevant HMR payload file(s) change.
+- only the changed factory
+- the complete invalidated-module ID list
 
-### Mini Program shape edit
+### Full regeneration path
 
-Route/config/template/native topology/CSS/assets changes reload through normal wx output regeneration.
+The shell is rebuilt instead when changing:
 
-### Production
+- CSS or other style files
+- declaration files
+- app/config/shape-related files
+- a source file outside the page graph
+- the set of static external imports
 
-Production wx output must not contain:
+Those cases may reload App Service and do not provide the same state guarantee.
 
-- HMR payload files;
-- wx HMR globals;
-- React Refresh globals/markers.
+---
+
+## 6. Selecting the target page
+
+Each page reports itself over the Vite WebSocket from `onLoad` and `onShow`:
+
+```text
+vite-plugin-taro:wx-active-page
+```
+
+The server remembers the active page.
+
+Therefore, normal updates touch only:
+
+```text
+pages/<active-page>.js
+```
+
+They do not touch:
+
+```text
+app.js
+taro.js
+vendors.js
+common.js
+```
+
+If no active page is known yet, the server appends the update to all page entries. Payload versioning prevents duplicate application.
+
+---
+
+## 7. Why the payload is appended
+
+The update uses:
+
+```ts
+appendFile(pageEntry, payload)
+```
+
+rather than rewriting the complete page file.
+
+The resulting page entry becomes:
+
+```text
+static page shell
+initial full-graph payload
+update payload version 2
+update payload version 3
+...
+```
+
+DevTools observes a suffix added to the page entry and executes that page fragment without restarting App Service.
+
+This is the key state-preserving behavior.
+
+The page file grows during the session. A full regeneration or server restart compacts it back to a fresh shell and initial payload.
+
+---
+
+## 8. Applying an update
+
+When the appended fragment executes:
+
+```js
+runtime.define(changedFactories, {
+    version: 2,
+    invalidate: [
+        'changed-module',
+        'its-importer',
+        'affected-page-root'
+    ]
+})
+```
+
+The runtime:
+
+1. Ignores stale or duplicate versions.
+2. Captures current input values.
+3. Saves previous exports of loaded invalidated modules.
+4. Runs their dispose callbacks.
+5. Removes invalidated modules from the evaluated cache.
+6. Replaces the changed factory.
+7. Re-requires all page roots.
+
+Unchanged factories and evaluated modules remain cached.
+
+Because importer modules were invalidated, they observe the new dependency exports when re-evaluated.
+
+---
+
+## 9. React Refresh
+
+The runtime embeds the React Refresh runtime used by Vite’s React plugin.
+
+Each component registration gets a stable family ID:
+
+```text
+<absolute module ID> + <component name>
+```
+
+After re-evaluation, the runtime compares previous and next exports and performs React Refresh.
+
+The Taro React reconciler receives:
+
+- a refresh-family resolver
+- the updated/stale family sets
+- a request to refresh mounted roots
+
+When component signatures are compatible, React preserves:
+
+- `useState`
+- `useRef`
+- component identity
+- mounted subtree state
+
+If hook order or component shape becomes incompatible, React Refresh may remount that component, matching normal Fast Refresh semantics.
+
+---
+
+## 10. Taro page preservation
+
+The runtime captures the active Taro page:
+
+```text
+$taroPath
+$taroParams
+pageElement
+```
+
+Before changing the page entry, the server sends:
+
+```text
+vite-plugin-taro:wx-page-update
+```
+
+The runtime marks that page as expecting an update and acknowledges it.
+
+If DevTools invokes page lifecycle registration during the update, the wrappers:
+
+- suppress the expected `onUnload`
+- reuse the old `$taroPath`
+- reattach the existing Taro root element
+- restore `Current.page` and `Current.router`
+- avoid duplicate `onReady`/`onShow`
+- trigger Taro’s recovery context action
+
+For the normal append-only path, the page timestamp remains unchanged and this recovery path is mostly defensive.
+
+---
+
+## 11. Input preservation
+
+React state preservation alone was insufficient for the controlled loan input in DevTools.
+
+Before invalidation, the runtime walks the Taro element tree and records input values by stable Taro path:
+
+```text
+root.cn.[0].cn.[1]....input
+    -> "999"
+```
+
+After React Refresh:
+
+1. It finds the corresponding updated input node.
+2. It retrieves the newest React `onInput` handler.
+3. It invokes that handler with the preserved value.
+4. It flushes the Taro child-node representation.
+5. It calls `performUpdate(true)` to synchronize Mini Program data.
+
+The value is restored through application state, rather than merely patching the rendered DOM node.
+
+That is why the tested `贷款金额` value remains `999`.
+
+---
+
+## 12. Tailwind/WX styles
+
+WX cannot directly use arbitrary Tailwind class names such as:
+
+```text
+bg-[rgba(35,201,147,1)]
+```
+
+`weapp-tailwindcss` converts them to safe names:
+
+```text
+bg-_brgba_p35_m201_m147_m1_P_B
+```
+
+The mechanism has two matching transformations:
+
+### CSS side
+
+Tailwind generates WXSS selectors using escaped Mini Program-safe names.
+
+### JavaScript side
+
+`renderChunk()` rewrites class strings before Rolldown serializes the JS chunk.
+
+Doing this in `generateBundle()` was too late: Rolldown could overwrite the mutated chunk code, which caused the broken styles.
+
+### HMR factory side
+
+The same Tailwind runtime candidate set is shared with `transformWxSource()`. Therefore, code inside appended HMR factories receives exactly the same escaped class names as the initial page shell.
+
+After the shell build creates the Tailwind candidate set, the source graph is rebuilt once so the initial payload also receives those transformed names.
+
+---
+
+## 13. Important invariants
+
+For a successful page-code update:
+
+```text
+app.js is unchanged
+shared host chunks are unchanged
+only the active page entry is appended
+App Service remains alive
+the Taro page identity remains alive
+React Refresh swaps component families
+input state is restored
+```
+
+The observed proof was:
+
+- Same global probe.
+- Same property stored on `getApp()`.
+- Same `$taroTimestamp`.
+- Label changed immediately.
+- Input remained `999`.
+- Styles remained correct.
+- No HMR module-resolution errors.
+
+---
+
+## 14. Current boundaries
+
+The state-preserving path applies to existing JS/TS modules in a page graph with a stable dependency shape.
+
+Full regeneration is still used for structural changes, including styles and app/config changes. Those updates can reload App Service.
+
+Other current limitations:
+
+- `import.meta.hot.accept()` is only a compatibility stub; invalidation propagates to page roots.
+- Page files grow append-only until regeneration.
+- React can remount components when hook signatures are incompatible.
+- Newly introduced internal dependency files need explicit graph-shape handling; the current delta payload normally emits only the changed module.
+- Newly introduced Tailwind candidates may require CSS regeneration.
+- Generic input restoration depends on the input exposing an `onInput` handler.
+
+The core implementation is in:
+
+- `packages/vite-plugin-taro/src/vite/hmr.ts`
+- `packages/vite-plugin-taro/src/shim/dev-runtime.ts`
+- `packages/vite-plugin-taro/src/vite/targets/wx.ts`
+- `packages/vite-plugin-taro/src/vite/taro-css.ts`
