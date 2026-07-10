@@ -34,6 +34,9 @@ export interface VitePluginTaroOptions {
     /** project.config.json content emitted at the Mini Program root. */
     projectConfigJson: JsonObject
 
+    /** project.private.config.json content emitted at the Mini Program root. */
+    projectPrivateConfigJson: JsonObject
+
     /** sitemap.json content emitted at the Mini Program root. */
     sitemapJson: JsonObject
 }
@@ -44,5 +47,6 @@ export type VitePluginTaroBuildContext = {
     pages: VitePluginTaroPageOption[]
     appConfig: JsonObject
     projectConfigJson: JsonObject
+    projectPrivateConfigJson: JsonObject
     sitemapJson: JsonObject
 }

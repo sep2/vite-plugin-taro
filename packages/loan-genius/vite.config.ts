@@ -78,8 +78,8 @@ export default defineConfig(({ mode }) => {
                         minified: false,
                         enhance: false,
                         uglifyFileName: false,
-                        // minifyWXSS: false,
-                        // minifyWXML: false,
+                        minifyWXSS: false,
+                        minifyWXML: false,
                         compileHotReLoad: true,
                         preloadBackgroundData: false,
                         newFeature: true,
@@ -88,6 +88,11 @@ export default defineConfig(({ mode }) => {
                         showShadowRootInWxmlPanel: false,
                         scopeDataCheck: false,
                         useCompilerModule: false
+                    }
+                },
+                projectPrivateConfigJson: {
+                    setting: {
+                        urlCheck: false
                     }
                 },
                 sitemapJson: {

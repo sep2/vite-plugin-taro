@@ -104,6 +104,7 @@ function createVitePluginTaroBuildContext(options: VitePluginTaroOptions): ViteP
             pages: options.pages.map((page) => page.path)
         },
         projectConfigJson: options.projectConfigJson,
+        projectPrivateConfigJson: options.projectPrivateConfigJson,
         sitemapJson: options.sitemapJson
     }
 }

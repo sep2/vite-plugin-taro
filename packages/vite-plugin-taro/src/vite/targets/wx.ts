@@ -307,6 +307,7 @@ function createWechatAssets(
         { fileName: 'comp.wxml', source: builder.buildBaseComponentTemplate('.wxml') },
         { fileName: 'comp.json', source: stringifyJsonAsset(createWechatCompJson()) },
         { fileName: 'project.config.json', source: stringifyJsonAsset(context.projectConfigJson) },
+        { fileName: 'project.priviate.config.json', source: stringifyJsonAsset(context.projectPrivateConfigJson) },
         { fileName: 'sitemap.json', source: stringifyJsonAsset(context.sitemapJson) },
         ...context.pages.flatMap((page) => [
             {
