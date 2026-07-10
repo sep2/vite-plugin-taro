@@ -8,7 +8,14 @@ import path from 'node:path'
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-loader/src/h5.ts#L12-L21
  */
 export function createPageComponentImport(pagePath: string): string {
-    return toImportPath(`src/${pagePath}.tsx`)
+    return toImportPath(createPageComponentFile(pagePath))
+}
+
+/**
+ * Resolves the source file backing a Taro-style page path.
+ */
+export function createPageComponentFile(pagePath: string): string {
+    return path.resolve(`src/${pagePath}.tsx`)
 }
 
 /**
