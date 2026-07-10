@@ -14,7 +14,7 @@ export function createVitePluginTaroConditionalDirectivePlugin(context: VitePlug
         enforce: 'pre',
         transform(code, id) {
             if (!isConditionalDirectiveSource(id) || !code.includes('#if')) return
-            return { code: transformConditionalDirectives(code, target), map: null }
+            return { code: transformTaroConditionalDirectives(code, target), map: null }
         }
     }
 }
@@ -48,7 +48,7 @@ type ConditionalDirectiveFrame = {
  *
  * Mirrors Taro's CSS #ifdef/#ifndef handling.
  */
-function transformConditionalDirectives(code: string, target: VitePluginTaroTarget): string {
+export function transformTaroConditionalDirectives(code: string, target: VitePluginTaroTarget): string {
     const lines = code.match(/[^\n]*(?:\n|$)/g) ?? []
     const frames: ConditionalDirectiveFrame[] = []
     let transformed = ''
