@@ -793,7 +793,7 @@
     {
       "id": "miniprogram_upload",
       "name": "发布体验版",
-      "summary": "上传代码包发布体验版。仅在用户明确要求「发布体验版」时调用。",
+      "summary": "上传代码包(发布体验版)。仅在用户明确要求「上传代码」或者「发布体验版」时调用。如果该用户的代码包已经被选为体验版，会需要用户手动确认才能上传。",
       "group": "app",
       "source": {
         "type": "devtools"
@@ -809,10 +809,11 @@
         "version": {
           "type": "string",
           "required": true,
-          "description": "体验版版本号。CLI 使用 --upload-version"
+          "description": "上传的代码版本号。如 1.0.0"
         },
         "desc": {
           "type": "string",
+          "description": "上传的代码版本的描述信息。",
           "required": false
         }
       },
@@ -1192,36 +1193,9 @@
       }
     },
     {
-      "id": "compile_js",
-      "name": "编译单个 JS 文件",
-      "summary": "获取单个 JS/TS 文件编译结果摘要。",
-      "group": "compile",
-      "source": {
-        "type": "devtools"
-      },
-      "scenes": [
-        "compiler"
-      ],
-      "inputSchema": {
-        "project": {
-          "type": "string",
-          "required": true
-        },
-        "filePath": {
-          "type": "string",
-          "required": true,
-          "description": "待编译 JS/TS 文件相对路径（相对于 miniprogramRoot 或 pluginRoot），如 pages/index/index.js"
-        }
-      },
-      "execution": {
-        "transport": "skill_call",
-        "toolName": "compile_js"
-      }
-    },
-    {
       "id": "compile_wxml",
       "name": "编译 WXML 模板",
-      "summary": "编译 WXML 模板文件，返回编译结果。",
+      "summary": "只读获取 WXML 模板的编译结果摘要，用于诊断模板编译产物；不是整页编译或预览。",
       "group": "compile",
       "source": {
         "type": "devtools"
@@ -1238,6 +1212,15 @@
           "type": "string",
           "required": true,
           "description": "待编译 WXML 文件相对路径（相对于 miniprogramRoot 或 pluginRoot），如 pages/index/index.wxml"
+        },
+        "compileType": {
+          "type": "string",
+          "required": false,
+          "enum": [
+            "miniprogram",
+            "plugin"
+          ],
+          "description": "编译类型：miniprogram(默认) 或 plugin"
         }
       },
       "execution": {
@@ -1248,7 +1231,7 @@
     {
       "id": "compile_wxss",
       "name": "编译 WXSS 样式",
-      "summary": "编译 WXSS 样式文件，返回编译结果。",
+      "summary": "只读获取 WXSS 样式的编译结果摘要，用于诊断样式编译产物；不是整页编译或预览。",
       "group": "compile",
       "source": {
         "type": "devtools"
@@ -1265,6 +1248,15 @@
           "type": "string",
           "required": true,
           "description": "待编译 WXSS 文件相对路径（相对于 miniprogramRoot 或 pluginRoot），如 pages/index/index.wxss"
+        },
+        "compileType": {
+          "type": "string",
+          "required": false,
+          "enum": [
+            "miniprogram",
+            "plugin"
+          ],
+          "description": "编译类型：miniprogram(默认) 或 plugin"
         }
       },
       "execution": {
@@ -1323,7 +1315,7 @@
     {
       "id": "simulator_open_page",
       "name": "编译并打开指定页面",
-      "summary": "触发项目窗口模拟器编译并打开指定页面，不修改持久编译条件列表。",
+      "summary": "触发项目窗口模拟器编译并打开指定页面。",
       "group": "simulator",
       "source": {
         "type": "devtools"
@@ -1334,19 +1326,23 @@
       "inputSchema": {
         "project": {
           "type": "string",
-          "required": true
+          "required": true,
+          "description": "项目绝对路径"
         },
         "page": {
           "type": "string",
-          "required": true
+          "required": true,
+          "description": "页面路径（如 pages/index/index）"
         },
         "query": {
           "type": "string",
-          "required": false
+          "required": false,
+          "description": "页面参数（如 id=1&type=test）"
         },
         "scene": {
           "type": "number",
-          "required": false
+          "required": false,
+          "description": "场景值（默认 1001）"
         }
       },
       "execution": {

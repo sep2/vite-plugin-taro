@@ -1,22 +1,22 @@
 ---
 name: miniprogram-dev-skill
-description: 微信小程序 DevTools 任务执行的根入口。用于在执行前先完成环境检查，再路由到预览、自动化、调试与云相关操作。
+description: 微信开发者工具 任务执行的根入口。用于在执行前先完成环境检查，再路由到预览、自动化、调试与云相关操作。
 metadata:
-  short-description: 小程序 DevTools skill 包
+  short-description: 小程序 微信开发者工具 skill 包
 ---
 
 # miniprogram-dev-skill
 
 ## 用途
 
-这是面向微信小程序 DevTools 工作流的根入口。
+这是面向微信小程序 微信开发者工具 工作流的根入口。
 
 以下任务应优先使用这个 skill：
 
 - 执行页面自动化、验证和截图
 - 排查运行时、页面或日志问题
 - 处理云环境、云函数相关动作
-- 执行预览、上传、登录等 DevTools 操作
+- 执行预览、上传、登录等 微信开发者工具 操作
 
 以下任务不应使用这个 skill：
 
@@ -26,7 +26,7 @@ metadata:
 
 ## Skill 安装
 
-在 AI agent 中安装 DevTools skill 前，先获取当前 DevTools 内置 skill 目录与版本号：
+在 AI agent 中安装 微信开发者工具 skill 前，先获取当前 微信开发者工具 内置 skill 目录与版本号：
 
 ```bash
 wechatide
@@ -43,7 +43,7 @@ wechatide help
 
 在进入任何 scene 或直接调用工具前，**必须**确认环境就绪且用户已登录（游客不可继续）。
 
-### 第一步：检查 DevTools 状态
+### 第一步：检查 微信开发者工具 状态
 
 ```bash
 wechatide -c <clientName> -t check_devtools_status --skill-version <skillVersionFromSkillYaml>
@@ -51,7 +51,7 @@ wechatide -c <clientName> -t check_devtools_status --skill-version <skillVersion
 
 其中 `<skillVersionFromSkillYaml>` 不是固定字符串；调用前应读取当前调用侧 agent 加载的 `miniprogram-dev-skill/skill.yaml`，取该文件顶层 `version` 字段的值填入。
 
-`check_devtools_status` 通过 skill-cli 调用时，如果 DevTools MCP 服务未启动或当前 client 尚未授权，CLI 会使用同一个 `<clientName>` 自动执行一次等价的 `wechatide auth -c <clientName>`，授权完成后重试本次状态检查。授权弹窗仍需用户确认。
+`check_devtools_status` 通过 skill-cli 调用时，如果 微信开发者工具 MCP 服务未启动或当前 client 尚未授权，CLI 会使用同一个 `<clientName>` 自动执行一次等价的 `wechatide auth -c <clientName>`，授权完成后重试本次状态检查。授权弹窗仍需用户确认。
 
 根据返回结果处理：
 
@@ -59,7 +59,7 @@ wechatide -c <clientName> -t check_devtools_status --skill-version <skillVersion
 |---------|------|
 | 返回内容中有 `openid` | 环境就绪，继续后续操作 |
 | 返回内容中有 `warning` | 当前工具内置 skill 版本与本地 agent 使用版本不一致，按提示路径安装更新 skill 后重新执行 `check_devtools_status` |
-| `command not found` | DevTools CLI 未安装或不在 PATH 中 |
+| `command not found` | 微信开发者工具 CLI 未安装或不在 PATH 中 |
 | `CONNECT_ERROR` / `AUTH_*` | 自动授权或连接重试失败，按错误信息处理；必要时手动执行下方 auth 命令 |
 | 无 `openid` | 未登录，需要触发扫码登录（见下方） |
 
@@ -67,9 +67,9 @@ wechatide -c <clientName> -t check_devtools_status --skill-version <skillVersion
 
 ### Skill 版本检查
 
-`check_devtools_status` 会返回当前运行 DevTools 内置的 skill 版本号 `skillVersion`。入参 `version` 应填写当前调用侧 agent 加载的 `miniprogram-dev-skill/skill.yaml` 文件中的顶层 `version` 字段值，工具会对比两者；不要硬编码示例版本。版本不一致时返回中会包含 `warning`，应按提示中的工具内置 skill 路径安装更新 skill。未传 `version` 时只检查 DevTools 状态和登录态，不返回版本对比提醒。
+`check_devtools_status` 会返回当前运行 微信开发者工具 内置的 skill 版本号 `skillVersion`。入参 `version` 应填写当前调用侧 agent 加载的 `miniprogram-dev-skill/skill.yaml` 文件中的顶层 `version` 字段值，工具会对比两者；不要硬编码示例版本。版本不一致时返回中会包含 `warning`，应按提示中的工具内置 skill 路径安装更新 skill。未传 `version` 时只检查 微信开发者工具 状态和登录态，不返回版本对比提醒。
 
-### DevTools 未启动时
+### 微信开发者工具 未启动时
 
 通常无需手动执行；`check_devtools_status` 连接失败时会自动用当前 `<clientName>` 执行一次。需要手动重试时，通过 `skill-cli auth` 启动工具并授权 CLI 连接：
 
@@ -105,7 +105,7 @@ wechatide -c <clientName> -t <toolName> [flags...]
 - 本地文件系统路径字段直接传本机绝对路径；Windows 可传 `C:/...`，CLI 会转成系统原生路径
 - `object` / `array` 类型字段使用 `--<field>-file path.json` 传递 JSON 文件
 
-首次连接时 DevTools 会弹窗确认授权，授权后该 clientName 后续连接自动通过。
+首次连接时 微信开发者工具 会弹窗确认授权，授权后该 clientName 后续连接自动通过。
 
 ### 常见调用示例
 

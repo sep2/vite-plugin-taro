@@ -73,7 +73,7 @@ wechatide -c <clientName> -t project_remove --project <absPath>
 |------|------|------|------|
 | `project` | string | 是 | 要从列表移除的项目路径 |
 
-- 触发 DevTools `mcp_action_auth` 确认弹窗，用户拒绝则返回 `User denied`
+- 触发 微信开发者工具 `mcp_action_auth` 确认弹窗，用户拒绝则返回 `User denied`
 - 只从列表移除，**不删除磁盘上的项目文件**
 - 若该项目窗口仍打开，会一并关闭该项目窗口
 - 云存储项目返回 `CLOUD_PROJECT_NOT_SUPPORTED`
@@ -85,4 +85,4 @@ wechatide -c <clientName> -t project_remove --project <absPath>
 | `project_import` | 仅写入项目列表 |
 | `open_project_window` | 校验 appid + 导入（如需）+ 打开模拟器窗口 |
 | `close_project_window` | 关闭窗口，列表项仍在 |
-| `project_remove` | 从列表移除，可不关整个 DevTools |
+| `project_remove` | 从列表移除，可不关整个 微信开发者工具 |

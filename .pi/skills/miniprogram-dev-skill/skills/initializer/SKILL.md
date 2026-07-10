@@ -1,6 +1,6 @@
 ---
 name: initializer
-description: 初始化微信小程序 DevTools 开发环境与基础信息。用于项目窗口打开或接管、登录信息获取、AppID 信息获取以及运行时上下文读取。
+description: 初始化 微信开发者工具 开发环境与基础信息。用于项目窗口打开或接管、登录信息获取、AppID 信息获取以及运行时上下文读取。
 ---
 
 # initializer
@@ -12,7 +12,7 @@ description: 初始化微信小程序 DevTools 开发环境与基础信息。用
 适合场景：
 
 - 打开项目或接管已有项目窗口
-- 关闭项目窗口或退出 DevTools
+- 关闭项目窗口或退出 微信开发者工具
 - 获取当前登录信息
 - 获取项目相关 AppID 信息
 - 获取项目身份、运行时上下文、云环境上下文
@@ -22,9 +22,9 @@ description: 初始化微信小程序 DevTools 开发环境与基础信息。用
 
 ## 工具列表
 
-### check_devtools_status — 检查 DevTools 状态
+### check_devtools_status — 检查 微信开发者工具 状态
 
-读取 DevTools 当前登录态、openid 和当前运行的 skill 版本号；传入当前调用侧 agent 加载的 `skill.yaml` version 字段值时，会检查两者是否匹配。通过 skill-cli 调用时，如果 DevTools MCP 服务未启动或当前 client 尚未授权，CLI 会使用同一个 `<clientName>` 自动执行一次 auth 并重试。**会话开始时调用一次，确认返回内容中有 `openid` 且无 `warning` 后不必重复调用。**
+读取 微信开发者工具 当前登录态、openid 和当前运行的 skill 版本号；传入当前调用侧 agent 加载的 `skill.yaml` version 字段值时，会检查两者是否匹配。通过 skill-cli 调用时，如果 微信开发者工具 MCP 服务未启动或当前 client 尚未授权，CLI 会使用同一个 `<clientName>` 自动执行一次 auth 并重试。**会话开始时调用一次，确认返回内容中有 `openid` 且无 `warning` 后不必重复调用。**
 
 ```bash
 wechatide -c <clientName> -t check_devtools_status --skill-version <skillVersionFromSkillYaml>
@@ -58,7 +58,7 @@ wechatide -c <clientName> -t scan_login
 
 1. 读取 `<project>/project.config.json` 文件内容
 2. 确认 `appid` 字段存在且不为空（`""` 和 `"touristappid"` 视为无效）
-3. 通过 `appid` 属性预检触发 DevTools 请求链路的 token 刷新与重试
+3. 通过 `appid` 属性预检触发 微信开发者工具 请求链路的 token 刷新与重试
 4. 如果 `project.config.json` 不存在或 `appid` 无效：
    - 调用 `get_user_appids` 获取可用 AppID
    - 让用户选择 AppID
@@ -90,7 +90,7 @@ wechatide -c <clientName> -t close_project_window --project <project>
 
 ---
 
-### quit — 退出 DevTools
+### quit — 退出 微信开发者工具
 
 关闭 DevTools。
 
@@ -116,7 +116,7 @@ wechatide -c <clientName> -t get_user_appids
 
 ### automation_runtime_info — 运行时信息
 
-读取 DevTools 当前项目窗口和运行时基础状态（pageStack、currentPage、systemInfo）。
+读取 微信开发者工具 当前项目窗口和运行时基础状态（pageStack、currentPage、systemInfo）。
 
 ```bash
 wechatide -c <clientName> -t automation_runtime_info --project <project> --action currentPage
@@ -181,7 +181,7 @@ wechatide -c <clientName> -t buildnpm --project <project> [--compile-type minipr
 | "看看现在登没登录" | `check_devtools_status` |
 | "需要主动登录" | `scan_login` |
 | "关闭项目窗口" | `close_project_window` |
-| "退出 DevTools" | `quit` |
+| "退出 微信开发者工具" | `quit` |
 | "帮我看看这个项目的 AppID" | `get_user_appids` |
 | "当前页面是什么" | `automation_runtime_info`（action: `currentPage`） |
 | "看看项目设置" | `project_setting_get` |

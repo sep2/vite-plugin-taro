@@ -57,7 +57,7 @@ wechatide -c <clientName> -t create_preview_qrcode --project <project> --qr-form
 | `qr-output` | string | 否 | 二维码本地输出文件路径；默认 `window` 不需要传 |
 | `info-output` | string | 否 | 预览信息本地输出文件路径 |
 
-**重要：优先使用 `qr-format: "window"`**，直接在 DevTools 内弹窗展示二维码，用户扫码后手动关闭窗口或等待 120 秒自动关闭。不需要指定 `qr-output` 路径，避免路径权限问题。
+**重要：优先使用 `qr-format: "window"`**，直接在 微信开发者工具 内弹窗展示二维码，用户扫码后手动关闭窗口或等待 120 秒自动关闭。不需要指定 `qr-output` 路径，避免路径权限问题。
 
 ---
 

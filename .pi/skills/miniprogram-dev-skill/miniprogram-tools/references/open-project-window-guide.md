@@ -2,7 +2,7 @@
 
 ## 概述
 
-调用 `project_open_window` 前，必须确保项目目录中存在有效的 `project.config.json` 且配置了 `appid`。否则 DevTools 无法正确识别和打开项目。
+调用 `project_open_window` 前，必须确保项目目录中存在有效的 `project.config.json` 且配置了 `appid`。否则 微信开发者工具 无法正确识别和打开项目。
 
 ## 检查流程
 

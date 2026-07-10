@@ -3,7 +3,7 @@
 ## 前置条件
 
 - 用户已登录（`check_devtools_status` 返回内容中有 `openid`）
-- DevTools CLI 可用
+- 微信开发者工具 CLI 可用
 
 ## 第一步：获取 AppID
 
@@ -34,7 +34,7 @@ wechatide -c <clientName> -t cloud_env_list --project <project> --appid <appid>
 
 ## 第三步：project.config.json
 
-每个小程序项目根目录必须有 `project.config.json`，它是 DevTools 识别和管理项目的核心配置文件。
+每个小程序项目根目录必须有 `project.config.json`，它是 微信开发者工具 识别和管理项目的核心配置文件。
 
 ### 必填字段
 
