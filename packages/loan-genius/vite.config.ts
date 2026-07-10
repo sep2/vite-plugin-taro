@@ -72,7 +72,7 @@ export default defineConfig(({ mode }) => {
                     // simulatorType: 'wechat',
                     setting: {
                         skylineRenderEnable: false,
-                        urlCheck: true,
+                        urlCheck: false,
                         es6: false,
                         postcss: false,
                         minified: false,
