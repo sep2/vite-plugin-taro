@@ -262,7 +262,7 @@ export default function IndexPage() {
 ```json
 {
     "scripts": {
-        "dev:wx": "cross-env NODE_ENV=development VITE_PLUGIN_TARO_TARGET=wx vite build --watch",
+        "dev:wx": "cross-env NODE_ENV=development VITE_PLUGIN_TARO_TARGET=wx vite",
         "dev:h5": "cross-env NODE_ENV=development VITE_PLUGIN_TARO_TARGET=h5 vite",
         "build:wx": "cross-env NODE_ENV=production VITE_PLUGIN_TARO_TARGET=wx vite build",
         "build:h5": "cross-env NODE_ENV=production VITE_PLUGIN_TARO_TARGET=h5 vite build",
