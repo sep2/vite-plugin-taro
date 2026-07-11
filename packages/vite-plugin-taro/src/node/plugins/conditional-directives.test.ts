@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { VitePluginTaroTarget } from '../../options.ts'
-import { BuildContext } from '../context.ts'
+import { BuildContext } from '../build-context.ts'
 import { createConditionalDirectivePlugin } from './conditional-directives.ts'
 
 function transform(code: string, target: VitePluginTaroTarget): string {

@@ -7,14 +7,14 @@ import path from 'node:path'
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-webpack5-runner/src/utils/app.ts#L74-L90
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-loader/src/h5.ts#L12-L21
  */
-export function createPageComponentImport(pagePath: string): string {
-    return toImportPath(createPageComponentFile(pagePath))
+export function createPageComponentImportPath(pagePath: string): string {
+    return toViteFileImportPath(createPageComponentFile(pagePath))
 }
 
 /**
  * Resolves the source file backing a Taro-style page path.
  */
-export function createPageComponentFile(pagePath: string): string {
+function createPageComponentFile(pagePath: string): string {
     return path.resolve(`src/${pagePath}.tsx`)
 }
 
@@ -24,7 +24,7 @@ export function createPageComponentFile(pagePath: string): string {
  * Rolldown does not reliably resolve raw Windows absolute paths from virtual
  * module source, so generated imports use Vite's /@fs/ prefix instead.
  */
-export function toImportPath(filePath: string): string {
+export function toViteFileImportPath(filePath: string): string {
     return `/@fs/${normalizeModuleId(path.resolve(filePath))}`
 }
 

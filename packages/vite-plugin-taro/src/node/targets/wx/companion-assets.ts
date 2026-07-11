@@ -1,67 +1,67 @@
 import path from 'node:path'
 import { recursiveMerge } from '@tarojs/helper'
-import { Weapp as WechatPlatform } from '@tarojs/plugin-platform-weapp'
+import { Weapp as WxPlatform } from '@tarojs/plugin-platform-weapp'
 import type { JsonObject } from '../../../options.ts'
-import type { BuildContext } from '../../context.ts'
+import type { BuildContext } from '../../build-context.ts'
 import { normalizeModuleId } from '../../module-paths.ts'
-import { nodeRequire } from '../../runtime-paths.ts'
+import { packageRequire } from '../../package-paths.ts'
 
-export type WechatAssetSource = string | Uint8Array
+export type WxAssetSource = string | Uint8Array
 
-export type WechatBundle = Record<
+export type WxBundle = Record<
     string,
     {
         type: 'asset' | 'chunk'
-        source?: WechatAssetSource
+        source?: WxAssetSource
         modules?: Record<string, { renderedExports?: string[] }>
     }
 >
 
-type WechatAssetEmitter = {
-    emitFile(asset: { type: 'asset'; fileName: string; source: WechatAssetSource }): string
+type WxAssetEmitter = {
+    emitFile(asset: { type: 'asset'; fileName: string; source: WxAssetSource }): string
 }
 
-type WechatTemplateComponentConfig = {
+type WxTemplateComponentConfig = {
     includes: Set<string>
     exclude: Set<string>
     thirdPartyComponents: Map<string, Set<string>>
     includeAll: boolean
 }
 
-const taroWechatComponentsReactPath = nodeRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
-let cachedTemplateBuilder: ReturnType<typeof createWechatTemplateBuilder> | undefined
+const taroWxComponentsPath = packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
+let cachedTemplateBuilder: ReturnType<typeof createWxTemplateBuilder> | undefined
 
-export function emitWechatAssets(emitter: WechatAssetEmitter, bundle: WechatBundle, context: BuildContext): void {
-    for (const asset of createWechatAssets(bundle, context)) {
+export function emitWxCompanionAssets(emitter: WxAssetEmitter, bundle: WxBundle, context: BuildContext): void {
+    for (const asset of createWxCompanionAssets(bundle, context)) {
         emitter.emitFile({ type: 'asset', fileName: asset.fileName, source: asset.source })
     }
 }
 
-function createWechatAssets(
-    bundle: WechatBundle,
+function createWxCompanionAssets(
+    bundle: WxBundle,
     context: BuildContext
-): { fileName: string; source: WechatAssetSource }[] {
-    cachedTemplateBuilder ??= createWechatTemplateBuilder()
+): { fileName: string; source: WxAssetSource }[] {
+    cachedTemplateBuilder ??= createWxTemplateBuilder()
     const templateBuilder = cachedTemplateBuilder
     const json = (value: JsonObject) =>
         context.behavior.prettyPrintJson ? JSON.stringify(value, null, 2) : JSON.stringify(value)
     return [
         { fileName: 'app.json', source: json(context.project.appConfig) },
-        { fileName: 'app.wxss', source: collectWechatBundleWxss(bundle) },
+        { fileName: 'app.wxss', source: collectWxBundleStyles(bundle) },
         {
             fileName: 'base.wxml',
-            source: templateBuilder.buildTemplate(collectWechatTemplateComponentConfig(bundle))
+            source: templateBuilder.buildTemplate(collectWxTemplateComponentConfig(bundle))
         },
         { fileName: 'utils.wxs', source: templateBuilder.buildXScript() },
         { fileName: 'comp.wxml', source: templateBuilder.buildBaseComponentTemplate('.wxml') },
-        { fileName: 'comp.json', source: json(createWechatCompJson()) },
-        { fileName: 'project.config.json', source: json(createWechatProjectConfig(context)) },
+        { fileName: 'comp.json', source: json(createWxComponentConfig()) },
+        { fileName: 'project.config.json', source: json(createWxProjectConfig(context)) },
         { fileName: 'project.private.config.json', source: json(context.project.projectPrivateConfigJson) },
         { fileName: 'sitemap.json', source: json(context.project.sitemapJson) },
         ...context.project.pages.flatMap((page) => [
             {
                 fileName: `${page.path}.wxml`,
-                source: templateBuilder.buildPageTemplate(relativeRootAsset(page.path, 'base.wxml'), {
+                source: templateBuilder.buildPageTemplate(relativeWxRootAsset(page.path, 'base.wxml'), {
                     content: page.config,
                     path: page.path
                 })
@@ -70,7 +70,7 @@ function createWechatAssets(
                 fileName: `${page.path}.json`,
                 source: json({
                     ...page.config,
-                    usingComponents: { comp: relativeRootAsset(page.path, 'comp') }
+                    usingComponents: { comp: relativeWxRootAsset(page.path, 'comp') }
                 })
             },
             { fileName: `${page.path}.wxss`, source: '' }
@@ -78,7 +78,7 @@ function createWechatAssets(
     ]
 }
 
-function createWechatProjectConfig(context: BuildContext): JsonObject {
+function createWxProjectConfig(context: BuildContext): JsonObject {
     const projectConfig = context.project.projectConfigJson
     const setting = isJsonObject(projectConfig.setting) ? projectConfig.setting : {}
     return {
@@ -91,8 +91,8 @@ function isJsonObject(value: unknown): value is JsonObject {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function createWechatTemplateBuilder() {
-    const platform = new WechatPlatform(
+function createWxTemplateBuilder() {
+    const platform = new WxPlatform(
         { helper: { recursiveMerge }, modifyWebpackChain() {}, registerPlatform() {} },
         {},
         {}
@@ -101,13 +101,13 @@ function createWechatTemplateBuilder() {
     return platform.template
 }
 
-function relativeRootAsset(pagePath: string, rootAsset: string): string {
+function relativeWxRootAsset(pagePath: string, rootAsset: string): string {
     const relativePath = path.posix.relative(path.posix.dirname(pagePath), rootAsset)
     return relativePath.startsWith('.') ? relativePath : `./${relativePath}`
 }
 
-function collectWechatTemplateComponentConfig(bundle: WechatBundle): WechatTemplateComponentConfig {
-    const config: WechatTemplateComponentConfig = {
+function collectWxTemplateComponentConfig(bundle: WxBundle): WxTemplateComponentConfig {
+    const config: WxTemplateComponentConfig = {
         includes: new Set([
             'view',
             'catch-view',
@@ -124,12 +124,12 @@ function collectWechatTemplateComponentConfig(bundle: WechatBundle): WechatTempl
         thirdPartyComponents: new Map(),
         includeAll: false
     }
-    const components = findBundleModule(bundle, taroWechatComponentsReactPath)
+    const components = findBundleModule(bundle, taroWxComponentsPath)
     for (const name of components?.renderedExports ?? []) config.includes.add(toDashed(name))
     return config
 }
 
-function findBundleModule(bundle: WechatBundle, resolvedId: string): { renderedExports?: string[] } | undefined {
+function findBundleModule(bundle: WxBundle, resolvedId: string): { renderedExports?: string[] } | undefined {
     const normalizedResolvedId = normalizeModuleId(resolvedId)
     for (const item of Object.values(bundle)) {
         if (item.type !== 'chunk') continue
@@ -142,7 +142,7 @@ function toDashed(value: string): string {
     return value.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
 }
 
-function createWechatCompJson(): JsonObject {
+function createWxComponentConfig(): JsonObject {
     return {
         component: true,
         styleIsolation: 'apply-shared',
@@ -150,7 +150,7 @@ function createWechatCompJson(): JsonObject {
     }
 }
 
-function collectWechatBundleWxss(bundle: WechatBundle): string {
+function collectWxBundleStyles(bundle: WxBundle): string {
     const styles: string[] = []
     for (const [fileName, item] of Object.entries(bundle)) {
         if (item.type !== 'asset' || !fileName.endsWith('.css')) continue

@@ -1,7 +1,7 @@
 import react from '@vitejs/plugin-react'
 import type { Plugin, PluginOption } from 'vite'
 import type { VitePluginTaroOptions } from '../options.ts'
-import { BuildContext } from './context.ts'
+import { BuildContext } from './build-context.ts'
 import { createConditionalDirectivePlugin } from './plugins/conditional-directives.ts'
 import { createH5TargetPlugins } from './targets/h5/plugin.ts'
 import { createH5ViteConfig } from './targets/h5/vite-config.ts'

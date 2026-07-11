@@ -18,7 +18,7 @@ export type BuildBehavior = Readonly<{
     prettyPrintJson: boolean
     bundledDevelopment: boolean
     reactRefresh: boolean
-    emitHmrRuntime: boolean
+    emitHotUpdateEntry: boolean
 }>
 
 const buildBehaviorByCommand: Record<ConfigEnv['command'], BuildBehavior> = {
@@ -27,14 +27,14 @@ const buildBehaviorByCommand: Record<ConfigEnv['command'], BuildBehavior> = {
         prettyPrintJson: true,
         bundledDevelopment: true,
         reactRefresh: true,
-        emitHmrRuntime: true
+        emitHotUpdateEntry: true
     },
     build: {
         minify: true,
         prettyPrintJson: false,
         bundledDevelopment: false,
         reactRefresh: false,
-        emitHmrRuntime: false
+        emitHotUpdateEntry: false
     }
 }
 

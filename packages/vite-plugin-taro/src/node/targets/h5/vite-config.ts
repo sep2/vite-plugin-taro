@@ -1,9 +1,6 @@
-import type { types as BabelTypes, NodePath, PluginObj } from '@babel/core'
-import babel from '@rolldown/plugin-babel'
-import type { PluginOption, UserConfig } from 'vite'
-import type { BuildContext } from '../../context.ts'
-import { nodeRequire } from '../../runtime-paths.ts'
-import { virtualTaroApiId } from '../../virtual-module-resolver.ts'
+import type { UserConfig } from 'vite'
+import type { BuildContext } from '../../build-context.ts'
+import { packageRequire } from '../../package-paths.ts'
 
 export function createH5ViteConfig(context: BuildContext): UserConfig {
     return {
@@ -13,18 +10,21 @@ export function createH5ViteConfig(context: BuildContext): UserConfig {
             alias: [
                 {
                     find: /^@stencil\/core\/internal\/client$/,
-                    replacement: nodeRequire.resolve('@stencil/core/internal/client', {
-                        paths: [nodeRequire.resolve('@tarojs/components/package.json')]
+                    replacement: packageRequire.resolve('@stencil/core/internal/client', {
+                        paths: [packageRequire.resolve('@tarojs/components/package.json')]
                     })
                 },
-                { find: /^@tarojs\/components$/, replacement: nodeRequire.resolve('@tarojs/components/lib/react') },
+                {
+                    find: /^@tarojs\/components$/,
+                    replacement: packageRequire.resolve('@tarojs/components/lib/react')
+                },
                 {
                     find: /^@tarojs\/components\/dist\/components$/,
-                    replacement: nodeRequire.resolve('@tarojs/components/dist/components')
+                    replacement: packageRequire.resolve('@tarojs/components/dist/components')
                 },
                 {
                     find: /^@tarojs\/taro$/,
-                    replacement: nodeRequire.resolve('@tarojs/plugin-platform-h5/dist/runtime/apis')
+                    replacement: packageRequire.resolve('@tarojs/plugin-platform-h5/dist/runtime/apis')
                 }
             ]
         },
@@ -36,49 +36,6 @@ export function createH5ViteConfig(context: BuildContext): UserConfig {
             minify: context.behavior.minify
         }
     }
-}
-
-export function createH5SupportPlugins(): PluginOption[] {
-    return [
-        babel({
-            include: /[\\/]@stencil[\\/]core[\\/]internal[\\/]client[\\/]index\.js(?:\?.*)?$/,
-            exclude: [],
-            plugins: [rewriteStencilStyleInsertion]
-        }),
-        babel({
-            plugins: [
-                [
-                    nodeRequire.resolve('babel-plugin-transform-taroapi'),
-                    {
-                        packageName: virtualTaroApiId,
-                        definition: nodeRequire(nodeRequire.resolve('@tarojs/plugin-platform-h5/dist/definition.json'))
-                    }
-                ]
-            ]
-        })
-    ]
-}
-
-function rewriteStencilStyleInsertion(): PluginObj {
-    return {
-        name: 'rewrite-stencil-style-insertion',
-        visitor: {
-            CallExpression(path: NodePath<BabelTypes.CallExpression>) {
-                if (!isStencilStyleInsertBeforeCall(path)) return
-                path.get('arguments.1').replaceWithSourceString(
-                    `scopeId.startsWith('sc-taro-') ? styleContainerNode.querySelector('style,link[rel="stylesheet"]') : styleContainerNode.querySelector('link')`
-                )
-            }
-        }
-    }
-}
-
-function isStencilStyleInsertBeforeCall(path: NodePath<BabelTypes.CallExpression>): boolean {
-    return (
-        path.get('callee').matchesPattern('styleContainerNode.insertBefore') &&
-        path.get('arguments.0').toString() === 'styleElm' &&
-        path.get('arguments.1').toString() === "styleContainerNode.querySelector('link')"
-    )
 }
 
 function createH5TaroDefines(): Record<string, string> {

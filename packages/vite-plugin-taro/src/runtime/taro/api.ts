@@ -1,3 +1,4 @@
+/** Physical runtime module backing the public `virtual:taro/api` facade. */
 // Ensure Taro's React runtime registers its `initNativeApi` hook before @tarojs/taro is initialized.
 import '@tarojs/plugin-framework-react/dist/runtime'
 import { hooks } from '@tarojs/runtime'

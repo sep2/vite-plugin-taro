@@ -1,5 +1,5 @@
 import type { ResolvedConfig, ViteDevServer } from 'vite'
-import type { WxOutputFile } from './output.ts'
+import type { WxOutputFile } from './bundle-output.ts'
 import { wxRolldownRuntimeSource } from './rolldown-runtime-source.ts'
 
 const clientId = 'vite-plugin-taro-wx'
@@ -40,7 +40,7 @@ type WxHotClient = {
     send(payload: unknown): void
 }
 
-type WxBundledDevInternal = {
+type ViteBundledDevInternal = {
     _devEngine?: WxDevEngineInternal
     clients: {
         setupIfNeeded(client: WxHotClient, clientId: string): void
@@ -51,25 +51,25 @@ type WxBundledDevInternal = {
     listen(): Promise<void>
 }
 
-type WxBundledDevCallbacks = {
+type ViteBundledDevCallbacks = {
     onOutput(output: WxOutputFile[]): void
     onPatch(files: string[], output: WxHmrOutput): boolean
     onError(message: string): void
-    waitUntilReady(): Promise<void>
+    waitForInitialBundle(): Promise<void>
 }
 
 /** Isolates the private Vite bundled-development API used by the WX session. */
-export class WxBundledDevAdapter {
-    private bundledDev: WxBundledDevInternal | undefined
+export class ViteBundledDevAdapter {
+    private bundledDev: ViteBundledDevInternal | undefined
 
     constructor(
         private readonly config: ResolvedConfig,
         private readonly server: ViteDevServer,
-        private readonly callbacks: WxBundledDevCallbacks
+        private readonly callbacks: ViteBundledDevCallbacks
     ) {}
 
     install(): void {
-        const bundledDev = this.server.environments.client.bundledDev as unknown as WxBundledDevInternal | undefined
+        const bundledDev = this.server.environments.client.bundledDev as unknown as ViteBundledDevInternal | undefined
         if (!bundledDev) throw new Error('vite-plugin-taro requires Vite bundled development for WX development.')
         if (
             typeof bundledDev.getRolldownOptions !== 'function' ||
@@ -96,7 +96,7 @@ export class WxBundledDevAdapter {
         await engine.ensureLatestBuildOutput()
     }
 
-    private installOptions(bundledDev: WxBundledDevInternal): void {
+    private installOptions(bundledDev: ViteBundledDevInternal): void {
         const getRolldownOptions = bundledDev.getRolldownOptions.bind(bundledDev)
         bundledDev.getRolldownOptions = async () => {
             const options = await getRolldownOptions()
@@ -108,7 +108,7 @@ export class WxBundledDevAdapter {
                 format: 'cjs',
                 sourcemap: false,
                 minify: false,
-                banner: createPageBanner
+                banner: createWxPageRuntimeBanner
             })
             options.experimental ??= {}
             options.experimental.devMode = {
@@ -121,7 +121,7 @@ export class WxBundledDevAdapter {
         }
     }
 
-    private installOutput(bundledDev: WxBundledDevInternal): void {
+    private installOutput(bundledDev: ViteBundledDevInternal): void {
         const storeOutputFiles = bundledDev.storeOutputFiles.bind(bundledDev)
         bundledDev.storeOutputFiles = (output) => {
             storeOutputFiles(output)
@@ -129,7 +129,7 @@ export class WxBundledDevAdapter {
         }
     }
 
-    private installPatches(bundledDev: WxBundledDevInternal): void {
+    private installPatches(bundledDev: ViteBundledDevInternal): void {
         const handleHmrOutput = bundledDev.handleHmrOutput.bind(bundledDev)
         bundledDev.handleHmrOutput = (client, files, output, info) => {
             if (output.type === 'Noop') return
@@ -137,7 +137,7 @@ export class WxBundledDevAdapter {
         }
     }
 
-    private installListener(bundledDev: WxBundledDevInternal): void {
+    private installListener(bundledDev: ViteBundledDevInternal): void {
         const listen = bundledDev.listen.bind(bundledDev)
         bundledDev.listen = async () => {
             await listen()
@@ -148,7 +148,7 @@ export class WxBundledDevAdapter {
             if ((await engine.getBundleState()).lastBuildErrored) {
                 throw new Error('The initial WX bundled-development build failed.')
             }
-            await this.callbacks.waitUntilReady()
+            await this.callbacks.waitForInitialBundle()
         }
     }
 
@@ -168,7 +168,7 @@ function getFirstOutput(options: WxRolldownOptions): Record<string, unknown> {
     return output
 }
 
-function createPageBanner(chunk: { fileName: string }): string {
+function createWxPageRuntimeBanner(chunk: { fileName: string }): string {
     if (!chunk.fileName.startsWith('pages/') || !chunk.fileName.endsWith('.js')) return ''
     const prefix = '../'.repeat(chunk.fileName.split('/').length - 1)
     return `require(${JSON.stringify(`${prefix}runtime.js`)}); require(${JSON.stringify(`${prefix}__wx_hmr__/update.js`)});`

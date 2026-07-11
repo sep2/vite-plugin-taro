@@ -5,14 +5,14 @@ import { createWeappTailwindcssGenerator, resolveTailwindV4Source } from 'weapp-
 import type { VitePluginTaroTarget } from '../options.ts'
 import { normalizeModuleId } from './module-paths.ts'
 
-const wechatStyleOptions = {
+const wxStyleOptions = {
     cssCalc: false,
     autoprefixer: false,
     rem2rpx: true,
     px2rpx: true
 } as const
 
-type WeappTailwindcssCoreContext = ReturnType<typeof createContext>
+type WxCssContext = ReturnType<typeof createContext>
 type CssTransformResult = { code: string; map: null }
 
 /** Owns CSS generation and the class-name state shared by normal chunks and literal WX patches. */
@@ -21,7 +21,7 @@ export class CssPipeline {
     private readonly target: VitePluginTaroTarget
     private readonly runtimeClassSet = new Set<string>()
     private projectRoot: string | undefined
-    private weappContext: WeappTailwindcssCoreContext | undefined
+    private wxContext: WxCssContext | undefined
 
     constructor(target: VitePluginTaroTarget) {
         this.target = target
@@ -31,12 +31,12 @@ export class CssPipeline {
     resolve(projectRoot: string): void {
         if (this.projectRoot) throw new Error('vite-plugin-taro CSS pipeline was already resolved.')
         this.projectRoot = projectRoot
-        this.weappContext = this.target === 'wx' ? createWeappContext(projectRoot) : undefined
+        this.wxContext = this.target === 'wx' ? createWxCssContext(projectRoot) : undefined
     }
 
-    async transformRuntimeClassNames(code: string, filename: string): Promise<CssTransformResult> {
-        if (!this.weappContext || this.runtimeClassSet.size === 0) return { code, map: null }
-        const result = await this.weappContext.transformJs(code, {
+    async transformWxClassNames(code: string, filename: string): Promise<CssTransformResult> {
+        if (!this.wxContext || this.runtimeClassSet.size === 0) return { code, map: null }
+        const result = await this.wxContext.transformJs(code, {
             runtimeSet: this.runtimeClassSet,
             filename,
             generateMap: false
@@ -72,7 +72,7 @@ export class CssPipeline {
                     target: pipeline.target === 'wx' ? 'weapp' : 'web',
                     scanSources: true,
                     candidates: [],
-                    styleOptions: pipeline.target === 'wx' ? wechatStyleOptions : undefined
+                    styleOptions: pipeline.target === 'wx' ? wxStyleOptions : undefined
                 })
 
                 for (const className of generated.classSet) pipeline.runtimeClassSet.add(className)
@@ -82,12 +82,12 @@ export class CssPipeline {
 
             async renderChunk(code, chunk) {
                 if (pipeline.target !== 'wx') return
-                return await pipeline.transformRuntimeClassNames(code, chunk.fileName)
+                return await pipeline.transformWxClassNames(code, chunk.fileName)
             },
 
             async generateBundle(_, bundle) {
                 if (pipeline.target !== 'wx') return
-                const core = pipeline.getWeappContext()
+                const core = pipeline.getWxContext()
                 await Promise.all(
                     Object.entries(bundle).map(async ([fileName, item]) => {
                         if (item.type === 'asset' && fileName.endsWith('.css')) {
@@ -104,26 +104,23 @@ export class CssPipeline {
         return this.projectRoot
     }
 
-    private getWeappContext(): WeappTailwindcssCoreContext {
-        if (!this.weappContext) throw new Error('vite-plugin-taro expected a resolved WeChat CSS pipeline.')
-        return this.weappContext
+    private getWxContext(): WxCssContext {
+        if (!this.wxContext) throw new Error('vite-plugin-taro expected a resolved WeChat CSS pipeline.')
+        return this.wxContext
     }
 }
 
-function createWeappContext(projectRoot: string): WeappTailwindcssCoreContext {
+function createWxCssContext(projectRoot: string): WxCssContext {
     return createContext({
         appType: 'taro',
         tailwindcssBasedir: projectRoot,
         generator: { target: 'weapp' },
-        ...wechatStyleOptions,
+        ...wxStyleOptions,
         logLevel: 'silent'
     })
 }
 
-async function transformWxssAsset(
-    core: WeappTailwindcssCoreContext,
-    item: { source?: string | Uint8Array }
-): Promise<void> {
+async function transformWxssAsset(core: WxCssContext, item: { source?: string | Uint8Array }): Promise<void> {
     const result = await core.transformWxss(getAssetSource(item), { isMainChunk: true })
     item.source = result.css
 }

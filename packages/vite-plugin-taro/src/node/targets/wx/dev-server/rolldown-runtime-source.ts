@@ -31,7 +31,7 @@ class WxHotContext {
   off() {}
   send() {}
 }
-class WxDevRuntime extends BaseDevRuntime {
+class WxRolldownRuntime extends BaseDevRuntime {
   contexts = new Map();
   patchedModules = new Set();
   applyingPatch = false;
@@ -90,5 +90,5 @@ class WxDevRuntime extends BaseDevRuntime {
   }
 }
 globalThis.__VITE_PLUGIN_TARO_WX__ = { version: 0, ready: false };
-globalThis.__rolldown_runtime__ = new WxDevRuntime(undefined, 'vite-plugin-taro-wx');
+globalThis.__rolldown_runtime__ = new WxRolldownRuntime(undefined, 'vite-plugin-taro-wx');
 `

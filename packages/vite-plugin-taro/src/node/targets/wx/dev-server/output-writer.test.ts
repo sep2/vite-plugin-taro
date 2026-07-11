@@ -3,15 +3,15 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { syncWxPublicDirectory, syncWxPublicFile, writeWxOutput } from './output.ts'
+import { syncWxPublicDirectory, syncWxPublicFile, writeWxOutputFiles } from './output-writer.ts'
 
 test('keeps unchanged WX files when DevEngine emits a partial full output', async () => {
     const outDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vite-plugin-taro-output-'))
-    await writeWxOutput(outDir, [
+    await writeWxOutputFiles(outDir, [
         { type: 'asset', fileName: 'base.wxml', source: 'base' },
         { type: 'chunk', fileName: 'app.js', code: 'first' }
     ])
-    await writeWxOutput(outDir, [{ type: 'chunk', fileName: 'app.js', code: 'second' }])
+    await writeWxOutputFiles(outDir, [{ type: 'chunk', fileName: 'app.js', code: 'second' }])
 
     assert.equal(await fs.readFile(path.join(outDir, 'base.wxml'), 'utf8'), 'base')
     assert.equal(await fs.readFile(path.join(outDir, 'app.js'), 'utf8'), 'second')

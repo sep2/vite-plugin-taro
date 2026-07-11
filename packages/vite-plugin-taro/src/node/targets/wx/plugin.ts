@@ -1,15 +1,11 @@
 import type { Plugin, PluginOption } from 'vite'
-import type { BuildContext } from '../../context.ts'
+import type { BuildContext } from '../../build-context.ts'
 import { stripVirtualPrefix } from '../../module-paths.ts'
-import { resolvePublicVirtualModuleId } from '../../virtual-module-resolver.ts'
-import { emitWechatAssets, type WechatBundle } from './companion-assets.ts'
-import { WxDevelopmentSession } from './development/session.ts'
-import {
-    emitWxImplicitChunks,
-    isWxVirtualModule,
-    loadWxVirtualModule,
-    transformWxDevelopmentModule
-} from './virtual-entries.ts'
+import { resolveTaroVirtualModule } from '../../taro-virtual-modules.ts'
+import { emitWxCompanionAssets, type WxBundle } from './companion-assets.ts'
+import { WxDevServerSession } from './dev-server/session.ts'
+import { transformWxReactRefreshModule } from './react-refresh.ts'
+import { emitWxEntryChunks, isWxVirtualModuleId, loadWxVirtualModule } from './virtual-modules.ts'
 
 /** Creates the plugins that own the complete WX build and development lifecycle. */
 export function createWxTargetPlugins(context: BuildContext): PluginOption[] {
@@ -17,7 +13,7 @@ export function createWxTargetPlugins(context: BuildContext): PluginOption[] {
 }
 
 function createWxTargetPlugin(context: BuildContext): Plugin {
-    let session: WxDevelopmentSession | undefined
+    let session: WxDevServerSession | undefined
 
     return {
         name: 'vite-plugin-taro:wx',
@@ -25,7 +21,7 @@ function createWxTargetPlugin(context: BuildContext): Plugin {
         resolveId: {
             order: 'pre',
             handler(id) {
-                return resolvePublicVirtualModuleId(id) ?? (isWxVirtualModule(id) ? `\0${id}` : undefined)
+                return resolveTaroVirtualModule(id) ?? (isWxVirtualModuleId(id) ? `\0${id}` : undefined)
             }
         },
 
@@ -33,7 +29,7 @@ function createWxTargetPlugin(context: BuildContext): Plugin {
             order: 'post',
             handler(id) {
                 const cleanId = stripVirtualPrefix(id)
-                emitWxImplicitChunks(this, context, cleanId)
+                emitWxEntryChunks(this, context, cleanId)
                 return loadWxVirtualModule(cleanId, context)
             }
         },
@@ -42,7 +38,7 @@ function createWxTargetPlugin(context: BuildContext): Plugin {
             order: 'post',
             handler(code, id) {
                 if (!context.behavior.reactRefresh) return
-                const transformed = transformWxDevelopmentModule(code, id, context.project.appComponentFile)
+                const transformed = transformWxReactRefreshModule(code, id, context.project.appComponentFile)
                 return transformed === code ? undefined : transformed
             }
         },
@@ -50,8 +46,8 @@ function createWxTargetPlugin(context: BuildContext): Plugin {
         generateBundle: {
             order: 'post',
             handler(_, bundle) {
-                emitWechatAssets(this, bundle as WechatBundle, context)
-                if (context.behavior.emitHmrRuntime) {
+                emitWxCompanionAssets(this, bundle as WxBundle, context)
+                if (context.behavior.emitHotUpdateEntry) {
                     this.emitFile({ type: 'asset', fileName: '__wx_hmr__/update.js', source: 'void 0;\n' })
                 }
             }
@@ -60,7 +56,7 @@ function createWxTargetPlugin(context: BuildContext): Plugin {
         configureServer: {
             order: 'post',
             handler(server) {
-                session = new WxDevelopmentSession(context, server)
+                session = new WxDevServerSession(context, server)
                 session.install()
             }
         },

@@ -1,20 +1,8 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import type { WxOutputFile } from './bundle-output.ts'
 
-export type WxOutputFile =
-    | {
-          type: 'chunk'
-          fileName: string
-          code: string
-          modules?: Record<string, unknown>
-      }
-    | {
-          type: 'asset'
-          fileName: string
-          source: string | Uint8Array
-      }
-
-export async function writeWxOutput(outDir: string, output: WxOutputFile[]): Promise<void> {
+export async function writeWxOutputFiles(outDir: string, output: WxOutputFile[]): Promise<void> {
     await Promise.all(
         output.map(async (item) => {
             const file = path.join(outDir, item.fileName)

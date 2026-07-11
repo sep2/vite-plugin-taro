@@ -1,17 +1,17 @@
 import path from 'node:path'
 import type { UserConfig } from 'vite'
-import type { BuildContext } from '../../context.ts'
+import type { BuildContext } from '../../build-context.ts'
 import { normalizeModuleId } from '../../module-paths.ts'
-import { nodeRequire } from '../../runtime-paths.ts'
-import { virtualWxAppId } from './virtual-entries.ts'
+import { packageRequire } from '../../package-paths.ts'
+import { virtualWxAppId } from './virtual-modules.ts'
 
-const taroWechatComponentsReactPath = nodeRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
-const vitePluginTaroSourcePath = normalizeModuleId(path.dirname(nodeRequire.resolve('vite-plugin-taro')))
-const taroVersion = String(nodeRequire('@tarojs/runtime/package.json').version)
+const taroWxComponentsPath = packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
+const vitePluginTaroSourcePath = normalizeModuleId(path.dirname(packageRequire.resolve('vite-plugin-taro')))
+const taroVersion = String(packageRequire('@tarojs/runtime/package.json').version)
 
 export function createWxViteConfig(context: BuildContext): UserConfig {
     return {
-        define: createWechatTaroDefines(),
+        define: createWxTaroDefines(),
         experimental: context.behavior.bundledDevelopment ? { bundledDev: true } : undefined,
         css: {
             lightningcss: {
@@ -35,7 +35,7 @@ export function createWxViteConfig(context: BuildContext): UserConfig {
             }
         },
         resolve: {
-            alias: [{ find: /^@tarojs\/components$/, replacement: taroWechatComponentsReactPath }]
+            alias: [{ find: /^@tarojs\/components$/, replacement: taroWxComponentsPath }]
         },
         build: {
             target: 'es2018',
@@ -67,7 +67,7 @@ export function createWxViteConfig(context: BuildContext): UserConfig {
     }
 }
 
-function createWechatTaroDefines(): Record<string, string> {
+function createWxTaroDefines(): Record<string, string> {
     return {
         'process.env.FRAMEWORK': JSON.stringify('react'),
         'process.env.SUPPORT_TARO_POLYFILL': JSON.stringify('disabled'),

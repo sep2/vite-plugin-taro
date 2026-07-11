@@ -1,9 +1,9 @@
 import type { Plugin, PluginOption } from 'vite'
-import type { BuildContext } from '../../context.ts'
+import type { BuildContext } from '../../build-context.ts'
 import { stripVirtualPrefix } from '../../module-paths.ts'
-import { resolvePublicVirtualModuleId } from '../../virtual-module-resolver.ts'
-import { createWebIndexHtmlTags, isH5VirtualModule, loadH5VirtualModule } from './virtual-entries.ts'
-import { createH5SupportPlugins } from './vite-config.ts'
+import { resolveTaroVirtualModule } from '../../taro-virtual-modules.ts'
+import { createH5SupportPlugins } from './support-plugins.ts'
+import { createH5IndexHtmlTags, isH5VirtualModuleId, loadH5VirtualModule } from './virtual-module.ts'
 
 /** Creates the plugins that own the complete H5 target lifecycle. */
 export function createH5TargetPlugins(context: BuildContext): PluginOption[] {
@@ -17,7 +17,7 @@ function createH5TargetPlugin(context: BuildContext): Plugin {
         resolveId: {
             order: 'pre',
             handler(id) {
-                return resolvePublicVirtualModuleId(id) ?? (isH5VirtualModule(id) ? `\0${id}` : undefined)
+                return resolveTaroVirtualModule(id) ?? (isH5VirtualModuleId(id) ? `\0${id}` : undefined)
             }
         },
 
@@ -31,7 +31,7 @@ function createH5TargetPlugin(context: BuildContext): Plugin {
         transformIndexHtml: {
             order: 'pre',
             handler() {
-                return createWebIndexHtmlTags(context)
+                return createH5IndexHtmlTags(context)
             }
         }
     }

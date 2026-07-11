@@ -8,21 +8,21 @@ import { document } from '@tarojs/runtime'
 // @ts-expect-error Vite exposes its React Refresh runtime through this development-only virtual module.
 import { validateRefreshBoundaryAndEnqueueUpdate } from '/@react-refresh'
 
-type WechatPage = {
+type WxPage = {
     $taroPath?: string
     $taroParams?: Record<string, unknown>
 }
 
-type PageConfig = Record<string, unknown>
-type PageLifecycle = (this: WechatPage, ...args: unknown[]) => unknown
+type WxPageConfig = Record<string, unknown>
+type PageLifecycle = (this: WxPage, ...args: unknown[]) => unknown
 
 type TaroRoot = {
-    ctx: WechatPage | null
+    ctx: WxPage | null
     updateChildNodes(): void
     performUpdate(initRender?: boolean): void
 }
 
-type RefreshResult = {
+type ReactRefreshResult = {
     staleFamilies?: Set<unknown>
 }
 
@@ -31,7 +31,7 @@ type WxRolldownRuntime = {
     endPatch?(): void
 }
 
-type WxDevelopmentBridge = {
+type WxHotUpdateBridge = {
     version: number
     fullBuild?: number
     ready: boolean
@@ -40,26 +40,26 @@ type WxDevelopmentBridge = {
     enqueueRefresh?: () => void
     beginUpdate?: () => void
     endUpdate?: () => void
-    afterRefresh?: (update?: RefreshResult) => void
+    afterRefresh?: (update?: ReactRefreshResult) => void
 }
 
-type WxDevelopmentGlobal = typeof globalThis & {
+type WxRuntimeGlobal = typeof globalThis & {
     __rolldown_runtime__?: WxRolldownRuntime
-    __VITE_PLUGIN_TARO_WX__?: WxDevelopmentBridge
+    __VITE_PLUGIN_TARO_WX__?: WxHotUpdateBridge
     getCurrentPages(): Array<{ route?: string }>
     wx: {
         reLaunch(options: { url: string }): void
     }
 }
 
-const wxGlobal = globalThis as WxDevelopmentGlobal
-wxGlobal.__VITE_PLUGIN_TARO_WX__ ??= { version: 0, ready: false }
-const bridge = wxGlobal.__VITE_PLUGIN_TARO_WX__
+const wxRuntimeGlobal = globalThis as WxRuntimeGlobal
+wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX__ ??= { version: 0, ready: false }
+const bridge = wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX__
 const refreshBoundary = { default: function WxRefreshBoundary() {} }
 const registeredRoutes = new Set<string>()
-const ignoredPages = new WeakSet<WechatPage>()
-let activePage: WechatPage | undefined
-let pendingPage: WechatPage | undefined
+const ignoredPages = new WeakSet<WxPage>()
+let activePage: WxPage | undefined
+let pendingPage: WxPage | undefined
 let pendingRoot: TaroRoot | undefined
 let suppressLifecycles = false
 
@@ -71,9 +71,9 @@ export function registerWxPage(route: string, register: () => void): void {
 }
 
 /** Retains Taro's live root while filtering DevTools' synthetic update lifecycles. */
-export function decorateWxPageConfig(config: PageConfig): PageConfig {
+export function decorateWxPageConfig(config: WxPageConfig): WxPageConfig {
     const onLoad = getLifecycle(config, 'onLoad')
-    config.onLoad = function (this: WechatPage, ...args: unknown[]) {
+    config.onLoad = function (this: WxPage, ...args: unknown[]) {
         if (suppressLifecycles) {
             ignoredPages.add(this)
             this.$taroPath = activePage?.$taroPath
@@ -96,9 +96,9 @@ export function decorateWxPageConfig(config: PageConfig): PageConfig {
     return config
 }
 
-function wrapLifecycle(config: PageConfig, name: string, after?: PageLifecycle): void {
+function wrapLifecycle(config: WxPageConfig, name: string, after?: PageLifecycle): void {
     const original = getLifecycle(config, name)
-    config[name] = function (this: WechatPage, ...args: unknown[]) {
+    config[name] = function (this: WxPage, ...args: unknown[]) {
         if (suppressLifecycles) return
         if (ignoredPages.has(this)) {
             if (name === 'onUnload') ignoredPages.delete(this)
@@ -110,7 +110,7 @@ function wrapLifecycle(config: PageConfig, name: string, after?: PageLifecycle):
     }
 }
 
-function getLifecycle(config: PageConfig, name: string): PageLifecycle | undefined {
+function getLifecycle(config: WxPageConfig, name: string): PageLifecycle | undefined {
     return typeof config[name] === 'function' ? (config[name] as PageLifecycle) : undefined
 }
 
@@ -122,7 +122,7 @@ function applyPendingUpdate(): void {
     pendingUpdate()
 }
 
-function getActiveRoot(): TaroRoot | undefined {
+function getActiveTaroRoot(): TaroRoot | undefined {
     if (!activePage?.$taroPath) return
     return (document.getElementById(activePage.$taroPath) as TaroRoot | null) ?? undefined
 }
@@ -133,9 +133,9 @@ bridge.enqueueRefresh = () => {
 
 bridge.beginUpdate = () => {
     bridge.blockRefreshRegistration = false
-    wxGlobal.__rolldown_runtime__?.beginPatch?.()
+    wxRuntimeGlobal.__rolldown_runtime__?.beginPatch?.()
     pendingPage = activePage
-    pendingRoot = getActiveRoot()
+    pendingRoot = getActiveTaroRoot()
     refreshTaroRoot(pendingRoot, pendingPage)
     suppressLifecycles = true
     setTimeout(() => {
@@ -144,7 +144,7 @@ bridge.beginUpdate = () => {
 }
 
 bridge.endUpdate = () => {
-    wxGlobal.__rolldown_runtime__?.endPatch?.()
+    wxRuntimeGlobal.__rolldown_runtime__?.endPatch?.()
     bridge.blockRefreshRegistration = true
     bridge.enqueueRefresh?.()
 }
@@ -163,19 +163,19 @@ bridge.afterRefresh = (update) => {
     if (root) setTimeout(() => refreshTaroRoot(root, activePage ?? page))
 }
 
-function refreshTaroRoot(root: TaroRoot | undefined, page: WechatPage | undefined): void {
+function refreshTaroRoot(root: TaroRoot | undefined, page: WxPage | undefined): void {
     if (!root) return
     root.ctx = page ?? null
     root.updateChildNodes()
     root.performUpdate(true)
 }
 
-function relaunchActiveRoute(page: WechatPage | undefined): void {
-    const route = wxGlobal.getCurrentPages().at(-1)?.route
+function relaunchActiveRoute(page: WxPage | undefined): void {
+    const route = wxRuntimeGlobal.getCurrentPages().at(-1)?.route
     if (!route) return
     const query = Object.entries(page?.$taroParams ?? {})
         .filter(([key, value]) => key !== '$taroTimestamp' && value !== undefined)
         .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
         .join('&')
-    setTimeout(() => wxGlobal.wx.reLaunch({ url: `/${route}${query ? `?${query}` : ''}` }))
+    setTimeout(() => wxRuntimeGlobal.wx.reLaunch({ url: `/${route}${query ? `?${query}` : ''}` }))
 }

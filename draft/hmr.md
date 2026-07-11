@@ -179,7 +179,7 @@ This parser recognizes only Rolldown's known initializer forms and throws on an 
 
 ```js
 globalThis.__WX_BUNDLED_RUNTIME_READY__ = false
-globalThis.__rolldown_runtime__ = new WxDevRuntime(...)
+globalThis.__rolldown_runtime__ = new WxRolldownRuntime(...)
 ```
 
 A stale runtime from DevTools' previous compile must never receive a new full bundle's pending patches.
@@ -322,7 +322,7 @@ Fail at startup. Silent degradation to another HMR implementation is forbidden.
 
 ## Concurrency and ownership
 
-One `WxDevelopmentSession` owns:
+One `WxDevServerSession` owns:
 
 - the DevEngine adapter;
 - the current full-output manifest;
@@ -344,18 +344,21 @@ The implementation should follow responsibilities rather than preserve the old l
 src/node/targets/wx/
     plugin.ts               WX target hooks
     vite-config.ts          Rolldown output and chunk layout
-    virtual-entries.ts      generated App/page entries and Refresh transforms
+    virtual-modules.ts      generated App/page/component modules
+    react-refresh.ts        WX-safe Refresh instrumentation and preamble
     companion-assets.ts     WXML, JSON, WXSS, and project files
-    development/
-        session.ts                      orchestration and serialization
-        vite-bundled-dev-adapter.ts     isolated Vite/Rolldown integration
-        output.ts                       atomic fixed-directory writes
-        patch-journal.ts                cumulative literal update.js
-        rolldown-runtime-source.ts      self-contained module bootstrap source for runtime.js
+    dev-server/
+        session.ts                  orchestration and serialization
+        vite-bundled-dev-adapter.ts isolated Vite/Rolldown integration
+        bundle-output.ts            in-memory output normalization
+        output-writer.ts            atomic fixed-directory writes
+        module-ids.ts               stable module ID extraction
+        patch-journal.ts            cumulative literal update.js
+        rolldown-runtime-source.ts  self-contained module bootstrap source for runtime.js
 
 src/runtime/wx/
-    taro-runtime.ts         Taro page/component facade
-    page-refresh-runtime.ts React Refresh, Taro root, and lifecycle bridge
+    runtime-bridge.ts       Taro page/component exports used by generated entries
+    hot-update-runtime.ts   React Refresh, Taro root, and lifecycle bridge
 ```
 
 The `node/` and `runtime/` boundary is strict: code bundled into the Mini Program never imports Vite or Node implementation code. Small modules may be merged when a type or helper has only one caller. Avoid abstract base classes, providers, protocol layers, and files containing only re-exports.

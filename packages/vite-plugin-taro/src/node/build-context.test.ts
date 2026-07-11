@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { ConfigEnv, ResolvedConfig } from 'vite'
-import { BuildContext } from './context.ts'
+import { BuildContext } from './build-context.ts'
 
 const options = {
     target: 'h5' as const,
@@ -18,20 +18,20 @@ function environment(command: ConfigEnv['command']): ConfigEnv {
 }
 
 test('derives build behavior once from the Vite command', () => {
-    const development = new BuildContext(options)
-    development.configure(environment('serve'))
-    assert.deepEqual(development.behavior, {
+    const serveContext = new BuildContext(options)
+    serveContext.configure(environment('serve'))
+    assert.deepEqual(serveContext.behavior, {
         minify: false,
         prettyPrintJson: true,
         bundledDevelopment: true,
         reactRefresh: true,
-        emitHmrRuntime: true
+        emitHotUpdateEntry: true
     })
 
-    const production = new BuildContext(options)
-    production.configure(environment('build'))
-    assert.equal(production.behavior.minify, true)
-    assert.equal(production.behavior.reactRefresh, false)
+    const buildContext = new BuildContext(options)
+    buildContext.configure(environment('build'))
+    assert.equal(buildContext.behavior.minify, true)
+    assert.equal(buildContext.behavior.reactRefresh, false)
 })
 
 test('enforces build context lifecycle order', () => {
