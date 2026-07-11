@@ -60,7 +60,7 @@ npm run dev:h5
 
 你可以在两个终端中同时运行 `npm run dev:wx` 和 `npm run dev:h5`。
 
-提示：受微信限制，开发者工具热重载有时不会完整生效。建议日常优先使用 Web 的 Vite 热更新快速调试，并定期在微信开发者工具中验证小程序端效果。
+微信开发模式使用 Rolldown 增量模块图和 React Refresh。兼容的 JavaScript 修改会保留当前原生页面及 React/输入状态；CSS、资源、public 文件和配置修改会执行完整微信构建。
 
 ### 4. 构建、预览和类型检查
 

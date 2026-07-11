@@ -60,7 +60,7 @@ npm run dev:h5
 
 You can keep `npm run dev:wx` and `npm run dev:h5` running at the same time in separate terminals.
 
-Note: Because of WeChat DevTools and Mini Program runtime limitations, hot reload/fast rebuilds for the WeChat target may not always apply cleanly. For day-to-day iteration, prefer Vite hot updates on Web for fast feedback, and periodically verify the Mini Program result in WeChat DevTools.
+WX development uses Rolldown's incremental module graph and React Refresh. Compatible JavaScript edits preserve the active native page and React/input state; CSS, assets, public files, and configuration changes use a complete WX rebuild.
 
 ### 4. Build, preview, and typecheck
 

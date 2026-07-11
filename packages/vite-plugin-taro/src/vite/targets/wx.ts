@@ -1,25 +1,119 @@
 import path from 'node:path'
+import { transformSync } from '@babel/core'
 import { recursiveMerge } from '@tarojs/helper'
 import { Weapp as WechatPlatform } from '@tarojs/plugin-platform-weapp'
-import type { UserConfig } from 'vite'
-import { isProd, nodeRequire, wxShimImportPath } from '../constants.ts'
+import type { Plugin, PluginOption, ResolvedConfig, UserConfig } from 'vite'
+import { WxDevelopmentSession } from '../../wx-dev/session.ts'
+import { isProd, nodeRequire, wxDevRuntimeImportPath, wxShimImportPath } from '../constants.ts'
 import type { JsonObject, VitePluginTaroBuildContext, VitePluginTaroPageOption } from '../types.ts'
-import { createPageComponentImport, normalizeModuleId } from '../utils.ts'
+import { createPageComponentImport, normalizeModuleId, stripVirtualPrefix, toImportPath } from '../utils.ts'
+import { resolvePublicVirtualModuleId } from '../virtual-modules.ts'
 
 const virtualWxAppId = 'virtual:vite-plugin-taro/wx/app'
 const virtualWxCompId = 'virtual:vite-plugin-taro/wx/comp'
 const virtualWxPagePrefix = 'virtual:vite-plugin-taro/wx/page/'
+const virtualWxRefreshPreambleId = 'virtual:vite-plugin-taro/wx/refresh-preamble'
+
+/** Creates the plugins that own the complete WX build and development lifecycle. */
+export function createWxTargetPlugins(context: VitePluginTaroBuildContext): PluginOption[] {
+    return [createWxTargetPlugin(context)]
+}
+
+function createWxTargetPlugin(context: VitePluginTaroBuildContext): Plugin {
+    let development = false
+    let resolvedConfig: ResolvedConfig | undefined
+    let session: WxDevelopmentSession | undefined
+
+    return {
+        name: 'vite-plugin-taro:wx',
+
+        config: {
+            order: 'pre',
+            handler(_, environment) {
+                development = environment.command === 'serve'
+                const config = createWxViteConfig(context)
+                if (development) config.experimental = { bundledDev: true }
+                return config
+            }
+        },
+
+        configResolved(config) {
+            resolvedConfig = config
+        },
+
+        resolveId: {
+            order: 'pre',
+            handler(id) {
+                return resolvePublicVirtualModuleId(id) ?? (isWxVirtualModuleId(id) ? `\0${id}` : undefined)
+            }
+        },
+
+        load: {
+            order: 'post',
+            handler(id) {
+                const cleanId = stripVirtualPrefix(id)
+                emitWechatImplicitChunksForVirtualApp(this, context, cleanId)
+                if (cleanId === virtualWxRefreshPreambleId) return createWxRefreshPreamble()
+                return loadWxVirtualModule(cleanId, context, development)
+            }
+        },
+
+        transform: {
+            order: 'post',
+            handler(code, id) {
+                if (!development) return
+                const appFile = normalizeModuleId(context.appComponentFile)
+                const instrumented = normalizeModuleId(id) === appFile ? instrumentWxAppComponent(code, appFile) : code
+                const transformed = transformWxRefreshGlobals(instrumented)
+                return transformed === code ? undefined : transformed
+            }
+        },
+
+        generateBundle: {
+            order: 'post',
+            handler(_, bundle) {
+                emitWechatAssets(this, bundle as WechatBundle, context)
+                if (development) {
+                    this.emitFile({ type: 'asset', fileName: '__wx_hmr__/update.js', source: 'void 0;\n' })
+                }
+            }
+        },
+
+        configureServer: {
+            order: 'post',
+            handler(server) {
+                if (!resolvedConfig)
+                    throw new Error('vite-plugin-taro expected Vite configuration before WX server setup.')
+                session = new WxDevelopmentSession(resolvedConfig, server)
+                session.install()
+            }
+        },
+
+        closeBundle() {
+            return session?.close()
+        }
+    }
+}
 
 /**
  * Checks whether an id belongs to a wx virtual module.
  */
 export function isWxVirtualModuleId(id: string): boolean {
-    return id === virtualWxAppId || id === virtualWxCompId || id.startsWith(virtualWxPagePrefix)
+    return (
+        id === virtualWxAppId ||
+        id === virtualWxCompId ||
+        id === virtualWxRefreshPreambleId ||
+        id.startsWith(virtualWxPagePrefix)
+    )
 }
 
-export function loadWxVirtualModule(cleanId: string, context: VitePluginTaroBuildContext): string | undefined {
+export function loadWxVirtualModule(
+    cleanId: string,
+    context: VitePluginTaroBuildContext,
+    development = false
+): string | undefined {
     if (cleanId === virtualWxAppId) {
-        return createWxAppEntry(context)
+        return createWxAppEntry(context, development)
     }
 
     if (cleanId === virtualWxCompId) {
@@ -33,10 +127,11 @@ export function loadWxVirtualModule(cleanId: string, context: VitePluginTaroBuil
     const pagePath = cleanId.slice(virtualWxPagePrefix.length)
     const page = context.pages.find((candidate) => candidate.path === pagePath)
     if (page) {
-        return createWxPageEntry(page)
+        return createWxPageEntry(page, development)
     }
 }
 
+const reactRefreshBabelPath = nodeRequire.resolve('react-refresh/babel')
 const taroWechatComponentsReactPath = nodeRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
 const vitePluginTaroSourcePath = normalizeModuleId(path.dirname(nodeRequire.resolve('vite-plugin-taro')))
 const taroVersion = String(nodeRequire('@tarojs/runtime/package.json').version)
@@ -229,12 +324,14 @@ export function emitWechatImplicitChunksForVirtualApp(
  *
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-loader/src/app.ts#L54-L63
  */
-export function createWxAppEntry(context: VitePluginTaroBuildContext): string {
+export function createWxAppEntry(context: VitePluginTaroBuildContext, development = false): string {
     const wechatAppConfigCode = JSON.stringify(context.appConfig)
+    const appComponentImport = toImportPath(context.appComponentFile)
+    const refreshPreamble = development ? `import ${JSON.stringify(virtualWxRefreshPreambleId)}\n` : ''
 
-    return `import { createReactApp, ReactDOM } from ${JSON.stringify(wxShimImportPath)}
+    return `${refreshPreamble}import { createReactApp, ReactDOM } from ${JSON.stringify(wxShimImportPath)}
 import React from 'react'
-import AppComponent from ${JSON.stringify(context.appComponentImport)}
+import AppComponent from ${JSON.stringify(appComponentImport)}
 
 const appConfig = ${wechatAppConfigCode}
 App(createReactApp(AppComponent, React, ReactDOM, appConfig))
@@ -246,19 +343,66 @@ App(createReactApp(AppComponent, React, ReactDOM, appConfig))
  *
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-loader/src/page.ts#L52-L78
  */
-export function createWxPageEntry(pageOption: VitePluginTaroPageOption): string {
+export function createWxPageEntry(pageOption: VitePluginTaroPageOption, development = false): string {
     const wechatPageConfigCode = JSON.stringify(pageOption.config)
     const pageComponentImport = createPageComponentImport(pageOption.path)
-    return `import { createPageConfig } from ${JSON.stringify(wxShimImportPath)}
+    const developmentImport = development
+        ? `import { decorateWxPageConfig, registerWxPage } from ${JSON.stringify(wxDevRuntimeImportPath)}\n`
+        : ''
+    const createConfig = `createPageConfig(PageComponent, '${pageOption.path}', { root: { cn: [] } }, pageConfig)`
+    const pageRegistration = development
+        ? `registerWxPage(${JSON.stringify(pageOption.path)}, () => Page(taroPageConfig))`
+        : 'Page(taroPageConfig)'
+    return `${developmentImport}import { createPageConfig } from ${JSON.stringify(wxShimImportPath)}
 import PageComponent from ${JSON.stringify(pageComponentImport)}
 
 const pageConfig = ${wechatPageConfigCode}
-const taroPageConfig = createPageConfig(PageComponent, '${pageOption.path}', { root: { cn: [] } }, pageConfig)
+const taroPageConfig = ${development ? `decorateWxPageConfig(${createConfig})` : createConfig}
 if (PageComponent && PageComponent.behaviors) {
   taroPageConfig.behaviors = (taroPageConfig.behaviors || []).concat(PageComponent.behaviors)
 }
-Page(taroPageConfig)
+${pageRegistration}
 `
+}
+
+function createWxRefreshPreamble(): string {
+    return `import RefreshRuntime from '/@react-refresh'
+RefreshRuntime.injectIntoGlobalHook(globalThis)
+globalThis.$RefreshReg$ = () => {}
+globalThis.$RefreshSig$ = () => (type) => type
+`
+}
+
+function instrumentWxAppComponent(code: string, appFile: string): string {
+    const transformed = transformSync(code, {
+        babelrc: false,
+        configFile: false,
+        filename: appFile,
+        plugins: [reactRefreshBabelPath],
+        sourceMaps: false
+    })?.code
+    if (!transformed) throw new Error(`vite-plugin-taro could not instrument the WX App component ${appFile}.`)
+    return `import {
+    createSignatureFunctionForTransform as __wxCreateRefreshSignature,
+    register as __wxRegisterRefreshType
+} from '/@react-refresh'
+const $RefreshReg$ = (type, id) => __wxRegisterRefreshType(type, ${JSON.stringify(`${appFile} `)} + id)
+const $RefreshSig$ = __wxCreateRefreshSignature
+${transformed}
+if (import.meta.hot) import.meta.hot.accept()
+`
+}
+
+function transformWxRefreshGlobals(code: string): string {
+    return code
+        .replaceAll('window.$Refresh', 'globalThis.$Refresh')
+        .replaceAll('window.__registerBeforePerformReactRefresh', 'globalThis.__registerBeforePerformReactRefresh')
+        .replaceAll('window.__getReactRefreshIgnoredExports', 'globalThis.__getReactRefreshIgnoredExports')
+        .replace(
+            'export function register(type, id) {',
+            'export function register(type, id) {\n  if (globalThis.__WX_BLOCK_REFRESH_REGISTRATION__) return'
+        )
+        .replace('\n  performReactRefresh()\n', '\n  globalThis.__WX_AFTER_REACT_REFRESH__?.(performReactRefresh())\n')
 }
 
 /**
