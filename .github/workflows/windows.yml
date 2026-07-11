@@ -39,7 +39,7 @@ jobs:
         run: pnpm typecheck
 
       - name: Build sample WeChat Mini Program
-        run: pnpm build:sample:wx
+        run: pnpm build:loan-genius:wx
 
       - name: Build sample H5
-        run: pnpm build:sample:h5
+        run: pnpm build:loan-genius:h5

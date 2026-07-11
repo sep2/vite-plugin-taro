@@ -43,7 +43,7 @@ jobs:
         run: pnpm build:plugin
 
       - name: Build sample H5
-        run: pnpm build:sample:h5
+        run: pnpm build:loan-genius:h5
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
