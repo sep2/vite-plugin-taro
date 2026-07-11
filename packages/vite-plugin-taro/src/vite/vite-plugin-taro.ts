@@ -1,4 +1,5 @@
 import path from 'node:path'
+import react from '@vitejs/plugin-react'
 import type { PluginOption } from 'vite'
 import { createVitePluginTaroConditionalDirectivePlugin } from './plugins.ts'
 import { createH5TargetPlugins } from './targets/h5.ts'
@@ -13,6 +14,7 @@ export default function vitePluginTaro(options: VitePluginTaroOptions): PluginOp
     return [
         createVitePluginTaroConditionalDirectivePlugin(context),
         createTaroCssPlugin(context),
+        ...react(),
         ...(context.target === 'wx' ? createWxTargetPlugins(context) : createH5TargetPlugins(context))
     ]
 }

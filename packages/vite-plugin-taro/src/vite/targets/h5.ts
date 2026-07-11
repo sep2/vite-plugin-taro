@@ -1,6 +1,5 @@
 import type { types as BabelTypes, NodePath, PluginObj } from '@babel/core'
 import babel from '@rolldown/plugin-babel'
-import react from '@vitejs/plugin-react'
 import type { HtmlTagDescriptor, Plugin, PluginOption, UserConfig } from 'vite'
 import { h5ShimImportPath, isProd, nodeRequire } from '../constants.ts'
 import type { JsonObject, VitePluginTaroBuildContext, VitePluginTaroPageOption } from '../types.ts'
@@ -108,7 +107,6 @@ function createH5ViteConfig(): UserConfig {
  */
 function createH5SupportPlugins(): PluginOption[] {
     return [
-        ...react(),
         babel({
             include: /[\\/]@stencil[\\/]core[\\/]internal[\\/]client[\\/]index\.js(?:\?.*)?$/,
             exclude: [],
