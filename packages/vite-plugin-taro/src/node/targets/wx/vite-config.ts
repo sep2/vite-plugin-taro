@@ -1,5 +1,6 @@
 import path from 'node:path'
 import type { UserConfig } from 'vite'
+import type { BuildContext } from '../../context.ts'
 import { normalizeModuleId } from '../../module-paths.ts'
 import { nodeRequire } from '../../runtime-paths.ts'
 import { virtualWxAppId } from './virtual-entries.ts'
@@ -8,9 +9,10 @@ const taroWechatComponentsReactPath = nodeRequire.resolve('@tarojs/plugin-platfo
 const vitePluginTaroSourcePath = normalizeModuleId(path.dirname(nodeRequire.resolve('vite-plugin-taro')))
 const taroVersion = String(nodeRequire('@tarojs/runtime/package.json').version)
 
-export function createWxViteConfig(production: boolean): UserConfig {
+export function createWxViteConfig(context: BuildContext): UserConfig {
     return {
         define: createWechatTaroDefines(),
+        experimental: context.behavior.bundledDevelopment ? { bundledDev: true } : undefined,
         css: {
             lightningcss: {
                 visitor: {
@@ -39,8 +41,8 @@ export function createWxViteConfig(production: boolean): UserConfig {
             target: 'es2018',
             assetsInlineLimit: 1024,
             cssCodeSplit: false,
-            cssMinify: production ? 'lightningcss' : false,
-            minify: production,
+            cssMinify: context.behavior.minify ? 'lightningcss' : false,
+            minify: context.behavior.minify,
             rolldownOptions: {
                 input: { app: virtualWxAppId },
                 experimental: { attachDebugInfo: 'none' },

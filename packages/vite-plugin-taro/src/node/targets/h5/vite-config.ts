@@ -1,10 +1,11 @@
 import type { types as BabelTypes, NodePath, PluginObj } from '@babel/core'
 import babel from '@rolldown/plugin-babel'
 import type { PluginOption, UserConfig } from 'vite'
+import type { BuildContext } from '../../context.ts'
 import { nodeRequire } from '../../runtime-paths.ts'
 import { virtualTaroApiId } from '../../virtual-module-resolver.ts'
 
-export function createH5ViteConfig(production: boolean): UserConfig {
+export function createH5ViteConfig(context: BuildContext): UserConfig {
     return {
         define: createH5TaroDefines(),
         resolve: {
@@ -32,7 +33,7 @@ export function createH5ViteConfig(production: boolean): UserConfig {
         },
         build: {
             target: 'es2018',
-            minify: production
+            minify: context.behavior.minify
         }
     }
 }

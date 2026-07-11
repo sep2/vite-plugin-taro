@@ -1,6 +1,6 @@
 import type { HtmlTagDescriptor } from 'vite'
 import type { JsonObject, VitePluginTaroPageOption } from '../../../options.ts'
-import type { VitePluginTaroBuildContext } from '../../context.ts'
+import type { BuildContext } from '../../context.ts'
 import { createPageComponentImport, toImportPath } from '../../module-paths.ts'
 import { h5RuntimeImportPath } from '../../runtime-paths.ts'
 
@@ -10,12 +10,12 @@ export function isH5VirtualModule(id: string): boolean {
     return id === virtualH5Id
 }
 
-export function loadH5VirtualModule(cleanId: string, context: VitePluginTaroBuildContext): string | undefined {
+export function loadH5VirtualModule(cleanId: string, context: BuildContext): string | undefined {
     if (cleanId === virtualH5Id) return createWebEntry(context)
 }
 
-export function createWebIndexHtmlTags(context: VitePluginTaroBuildContext): HtmlTagDescriptor[] | undefined {
-    if (context.target !== 'h5') return
+export function createWebIndexHtmlTags(context: BuildContext): HtmlTagDescriptor[] | undefined {
+    if (context.project.target !== 'h5') return
     return [
         {
             tag: 'script',
@@ -26,9 +26,9 @@ export function createWebIndexHtmlTags(context: VitePluginTaroBuildContext): Htm
     ]
 }
 
-function createWebEntry(context: VitePluginTaroBuildContext): string {
-    const appConfig = JSON.stringify(createWebAppConfig(context.appConfig))
-    const routes = createWebRoutesConfig(context.pages)
+function createWebEntry(context: BuildContext): string {
+    const appConfig = JSON.stringify(createWebAppConfig(context.project.appConfig))
+    const routes = createWebRoutesConfig(context.project.pages)
     return `import {
     createHashHistory,
     createReactApp,
@@ -38,7 +38,7 @@ function createWebEntry(context: VitePluginTaroBuildContext): string {
 } from ${JSON.stringify(h5RuntimeImportPath)}
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import AppComponent from ${JSON.stringify(toImportPath(context.appComponentFile))}
+import AppComponent from ${JSON.stringify(toImportPath(context.project.appComponentFile))}
 
 const config = window.__taroAppConfig = ${appConfig}
 config.routes = ${routes}
@@ -53,7 +53,7 @@ function createWebAppConfig(sharedAppConfig: JsonObject): JsonObject {
     return { router: {}, ...sharedAppConfig }
 }
 
-function createWebRoutesConfig(pages: VitePluginTaroPageOption[]): string {
+function createWebRoutesConfig(pages: readonly VitePluginTaroPageOption[]): string {
     const routes = pages.map((page) =>
         [
             'Object.assign({',
