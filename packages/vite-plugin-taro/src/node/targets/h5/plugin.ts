@@ -1,6 +1,5 @@
 import type { Plugin, PluginOption } from 'vite'
 import type { BuildContext } from '../../build-context.ts'
-import { resolveTaroVirtualModule } from '../../taro-virtual-modules.ts'
 import { stripVirtualPrefix } from '../../utils/modules.ts'
 import { createH5SupportPlugins } from './support-plugins.ts'
 import { createH5IndexHtmlTags, isH5VirtualModuleId, loadH5VirtualModule } from './virtual-modules.ts'
@@ -17,7 +16,7 @@ function createH5TargetPlugin(context: BuildContext): Plugin {
         resolveId: {
             order: 'pre',
             handler(id) {
-                return resolveTaroVirtualModule(id) ?? (isH5VirtualModuleId(id) ? `\0${id}` : undefined)
+                return isH5VirtualModuleId(id) ? `\0${id}` : undefined
             }
         },
 

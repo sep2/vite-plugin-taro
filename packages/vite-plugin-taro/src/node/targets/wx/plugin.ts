@@ -1,6 +1,5 @@
 import type { Plugin, PluginOption } from 'vite'
 import type { BuildContext } from '../../build-context.ts'
-import { resolveTaroVirtualModule } from '../../taro-virtual-modules.ts'
 import { stripVirtualPrefix } from '../../utils/modules.ts'
 import { emitWxCompanionAssets, type WxBundle } from './companion-assets.ts'
 import { WxDevelopmentSession } from './dev-server/development-session.ts'
@@ -21,7 +20,7 @@ function createWxTargetPlugin(context: BuildContext): Plugin {
         resolveId: {
             order: 'pre',
             handler(id) {
-                return resolveTaroVirtualModule(id) ?? (isWxVirtualModuleId(id) ? `\0${id}` : undefined)
+                return isWxVirtualModuleId(id) ? `\0${id}` : undefined
             }
         },
 
