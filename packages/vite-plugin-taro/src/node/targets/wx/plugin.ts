@@ -36,9 +36,9 @@ function createWxTargetPlugin(context: BuildContext): Plugin {
 
         transform: {
             order: 'post',
-            handler(code, id) {
+            async handler(code, id) {
                 if (!context.behavior.reactRefresh) return
-                const transformed = transformWxReactRefreshModule(code, id, context.project.appComponentFile)
+                const transformed = await transformWxReactRefreshModule(code, id, context.project.appComponentFile)
                 return transformed === code ? undefined : transformed
             }
         },

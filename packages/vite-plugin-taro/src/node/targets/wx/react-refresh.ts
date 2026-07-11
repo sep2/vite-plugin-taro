@@ -1,13 +1,14 @@
-import { transformSync } from '@babel/core'
+import { transformWithOxc } from 'vite'
 import { normalizeModuleId } from '../../module-paths.ts'
-import { packageRequire } from '../../package-paths.ts'
-
-const reactRefreshBabelPath = packageRequire.resolve('react-refresh/babel')
 
 /** Rewrites Vite's browser-oriented Refresh output for the WX App Service global environment. */
-export function transformWxReactRefreshModule(code: string, id: string, appComponentFile: string): string {
+export async function transformWxReactRefreshModule(
+    code: string,
+    id: string,
+    appComponentFile: string
+): Promise<string> {
     const appFile = normalizeModuleId(appComponentFile)
-    const instrumented = normalizeModuleId(id) === appFile ? instrumentWxAppComponent(code, appFile) : code
+    const instrumented = normalizeModuleId(id) === appFile ? await instrumentWxAppComponent(code, appFile) : code
     return instrumented
         .replaceAll('window.$Refresh', 'globalThis.$Refresh')
         .replaceAll('window.__registerBeforePerformReactRefresh', 'globalThis.__registerBeforePerformReactRefresh')
@@ -32,22 +33,19 @@ globalThis.$RefreshSig$ = () => (type) => type
 }
 
 /** Adds Refresh registration to JSX-free App modules that Vite's normal JSX transform would otherwise skip. */
-function instrumentWxAppComponent(code: string, appFile: string): string {
-    const transformed = transformSync(code, {
-        babelrc: false,
-        configFile: false,
-        filename: appFile,
-        plugins: [reactRefreshBabelPath],
-        sourceMaps: false
-    })?.code
-    if (!transformed) throw new Error(`vite-plugin-taro could not instrument the WX App component ${appFile}.`)
+async function instrumentWxAppComponent(code: string, appFile: string): Promise<string> {
+    const transformed = await transformWithOxc(code, appFile, {
+        lang: 'js',
+        sourcemap: false,
+        jsx: { refresh: true }
+    })
     return `import {
     createSignatureFunctionForTransform as __wxCreateRefreshSignature,
     register as __wxRegisterRefreshType
 } from '/@react-refresh'
 const $RefreshReg$ = (type, id) => __wxRegisterRefreshType(type, ${JSON.stringify(`${appFile} `)} + id)
 const $RefreshSig$ = __wxCreateRefreshSignature
-${transformed}
+${transformed.code}
 if (import.meta.hot) import.meta.hot.accept()
 `
 }
