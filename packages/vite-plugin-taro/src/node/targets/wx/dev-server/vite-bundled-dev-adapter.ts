@@ -1,7 +1,7 @@
 import path from 'node:path'
 import type { ResolvedConfig, ViteDevServer } from 'vite'
 import { wxPagePreloadFile, wxUpdateControlFile, wxUpdateFile } from '../development-files.ts'
-import type { WxOutputFile } from './development-output.ts'
+import type { WxOutputFile } from './output.ts'
 import { wxRolldownRuntimeSource } from './rolldown-runtime-source.ts'
 
 const clientId = 'vite-plugin-taro-wx'

@@ -17,14 +17,9 @@ import {
     writeFilesAtomically
 } from '../../../utils/filesystem.ts'
 import { wxDevelopmentDirectory, wxUpdateControlFile, wxUpdateFile } from '../development-files.ts'
-import {
-    isWxFullBuildOutput,
-    normalizeWxBundleStyles,
-    setWxAppStyles,
-    type WxOutputFile
-} from './development-output.ts'
 import { FullBuildScheduler } from './full-build-scheduler.ts'
-import { transformWxCompatibleJavaScript, transformWxOutputChunks } from './javascript-compatibility.ts'
+import { transformWxCompatibleJavaScript, transformWxOutputChunks } from './js-utils.ts'
+import { isWxFullBuildOutput, normalizeWxBundleStyles, setWxAppStyles, type WxOutputFile } from './output.ts'
 import { WxUpdateTransport } from './update-transport.ts'
 import { ViteBundledDevAdapter, type WxDevEngineUpdate } from './vite-bundled-dev-adapter.ts'
 

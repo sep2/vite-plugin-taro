@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { normalizeWxBundleStyles, type WxOutputFile } from './development-output.ts'
+import { normalizeWxBundleStyles, type WxOutputFile } from './output.ts'
 
 test('materializes embedded development styles as app.wxss', () => {
     const output: WxOutputFile[] = [

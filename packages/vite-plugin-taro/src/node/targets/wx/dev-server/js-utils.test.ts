@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { WxOutputFile } from './development-output.ts'
-import { transformWxCompatibleJavaScript, transformWxOutputChunks } from './javascript-compatibility.ts'
+import { transformWxCompatibleJavaScript, transformWxOutputChunks } from './js-utils.ts'
+import type { WxOutputFile } from './output.ts'
 
 test('lowers syntax rejected by the WeChat upload parser', async () => {
     const source = `
