@@ -8,15 +8,16 @@
 
 使用最新标准化前端技术栈 Vite 8、React 19、Taro 4 和 Tailwind CSS v4 构建微信小程序与 Web 应用。
 
+
 `vite-plugin-taro` 面向希望用 Vite 构建 Taro React 应用的团队：保留 Taro 跨平台组件和 API，告别 Taro webpack，并修复/规避官方 Taro Vite 的常见坑。一个插件即可构建微信小程序与 Web。
 
 在线演示：<https://sep2.github.io/vite-plugin-taro>。如何在本地运行，请参见[示例应用](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.zh.md)。
 
 - **Vite + React 19** 基于 Vite 8 生态，一份代码覆盖微信小程序与 Web。
-- **Taro 能力，无需 webpack** 使用 Taro 组件和 API，摆脱旧式 webpack 链路。
+- **热更新** 基于 Vite 重构的热更新，微信小程序完美支持，页面编辑不再丢失状态。
 - **Tailwind CSS v4 开箱即用** 直接书写工具类，微信与 Web 样式自动适配。
+- **基于 Taro，超越 Taro** 使用 Taro 组件和 API，摆脱旧式 webpack 链路。
 - **Skyline 就绪** 支持微信 Skyline 渲染模式。
-- **热更新** 依托于 Vite 标准的热更新支持，Web 与小程序开发都能快速查看改动。
 - **条件编译** 用 Taro 风格 `#ifdef` / `#ifndef` 条件块拆分代码和样式。
 - **工作区友好** 支持普通项目与 monorepo，兼容 `npm`、`pnpm`、`Yarn`、`Bun`。
 - **TypeScript 友好** 从配置到应用代码都有类型支持。
