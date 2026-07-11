@@ -1,8 +1,8 @@
 import type { types as BabelTypes, NodePath, PluginObj } from '@babel/core'
 import babel from '@rolldown/plugin-babel'
 import type { PluginOption } from 'vite'
-import { packageRequire } from '../../package-paths.ts'
 import { virtualTaroApiId } from '../../taro-virtual-modules.ts'
+import { packageRequire } from '../../utils/packages.ts'
 
 /** Creates H5-only Babel transforms for Stencil CSS ordering and Taro API imports. */
 export function createH5SupportPlugins(): PluginOption[] {

@@ -1,8 +1,8 @@
 import path from 'node:path'
 import type { UserConfig } from 'vite'
 import type { BuildContext } from '../../build-context.ts'
-import { packageRequire } from '../../package-paths.ts'
 import { normalizeModuleId } from '../../utils/modules.ts'
+import { packageRequire } from '../../utils/packages.ts'
 import { virtualWxAppId } from './virtual-modules.ts'
 
 const taroWxComponentsPath = packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')

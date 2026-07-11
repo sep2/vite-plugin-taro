@@ -3,8 +3,8 @@ import { recursiveMerge } from '@tarojs/helper'
 import { Weapp as WxPlatform } from '@tarojs/plugin-platform-weapp'
 import type { JsonObject } from '../../../options.ts'
 import type { BuildContext } from '../../build-context.ts'
-import { packageRequire } from '../../package-paths.ts'
 import { normalizeModuleId } from '../../utils/modules.ts'
+import { packageRequire } from '../../utils/packages.ts'
 
 export type WxAssetSource = string | Uint8Array
 

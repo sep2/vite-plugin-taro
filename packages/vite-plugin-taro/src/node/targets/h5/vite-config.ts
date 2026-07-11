@@ -1,6 +1,6 @@
 import type { UserConfig } from 'vite'
 import type { BuildContext } from '../../build-context.ts'
-import { packageRequire } from '../../package-paths.ts'
+import { packageRequire } from '../../utils/packages.ts'
 
 export function createH5ViteConfig(context: BuildContext): UserConfig {
     return {

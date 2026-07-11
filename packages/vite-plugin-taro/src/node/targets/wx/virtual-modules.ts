@@ -6,10 +6,14 @@
  */
 import type { VitePluginTaroPageOption } from '../../../options.ts'
 import type { BuildContext } from '../../build-context.ts'
-import { wxPageUpdateImportPath, wxTaroRuntimeImportPath, wxUpdateClientImportPath } from '../../package-paths.ts'
 import { createPageComponentImportPath, toViteFileImportPath } from '../../utils/modules.ts'
+import { resolvePackageFile } from '../../utils/packages.ts'
 import { wxPagePreloadFile } from './development-files.ts'
 import { createWxReactRefreshPreambleSource } from './react-refresh.ts'
+
+const wxTaroRuntimeImportPath = runtimeImportPath('taro-runtime.js')
+const wxPageUpdateImportPath = runtimeImportPath('page-update.js')
+const wxUpdateClientImportPath = runtimeImportPath('update-client.js')
 
 /** Generated native App entry. */
 export const virtualWxAppId = 'virtual:vite-plugin-taro/wx/app'
@@ -118,6 +122,10 @@ function createWxPagePreloadSource(context: BuildContext): string {
         return `import Page${index} from ${JSON.stringify(createPageComponentImportPath(page.path))}`
     })
     return `${imports.join('\n')}\nvoid [${context.project.pages.map((_, index) => `Page${index}`).join(', ')}]\n`
+}
+
+function runtimeImportPath(fileName: string): string {
+    return toViteFileImportPath(resolvePackageFile('dist/runtime/wx', fileName))
 }
 
 function createWxComponentEntrySource(): string {
