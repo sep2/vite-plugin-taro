@@ -23,11 +23,9 @@ type WxRequestTask = {
 
 type WxRequestResult = {
     data?: unknown
-    statusCode?: number
 }
 
 type WxUpdateBridge = {
-    version: number
     ready: boolean
     pendingUpdate?: () => void
     beginUpdate?: () => void
@@ -63,7 +61,8 @@ export function startWxUpdateClient(): void {
     const control = wxClientGlobal.__VITE_PLUGIN_TARO_WX_CONTROL__
     if (!control) throw new Error('vite-plugin-taro could not find its WX update control configuration.')
 
-    let state = createWxUpdateClientState(control.buildId, createSessionId())
+    let state = createWxUpdateClientState(control.buildId)
+    const sessionId = createSessionId()
     let requestGeneration = 0
     let activeRequest: WxRequestTask | undefined
     let pendingBatchApply: (() => void) | undefined
@@ -84,7 +83,7 @@ export function startWxUpdateClient(): void {
                 token: control.token,
                 action,
                 buildId: state.buildId,
-                sessionId: state.sessionId,
+                sessionId,
                 version
             },
             timeout: 30_000,
@@ -150,7 +149,6 @@ export function startWxUpdateClient(): void {
                     bridge.beginUpdate?.()
                     try {
                         batchApply()
-                        bridge.version = command.targetVersion
                         dispatch({ type: 'batch-executed', targetVersion: command.targetVersion })
                     } catch {
                         dispatch({ type: 'batch-failed' })
@@ -164,9 +162,6 @@ export function startWxUpdateClient(): void {
                 else dispatch({ type: 'batch-failed' })
                 return
             }
-            case 'perform-refresh':
-            case 'relaunch-route':
-                return
             case 'request-full-build':
                 send('rebuild', state.version)
                 return

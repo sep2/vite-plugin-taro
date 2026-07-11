@@ -37,7 +37,8 @@ export class BuildContext {
     }
 
     configure(environment: ConfigEnv): void {
-        if (this.developmentMode !== undefined) throw new Error('vite-plugin-taro build context was already configured.')
+        if (this.developmentMode !== undefined)
+            throw new Error('vite-plugin-taro build context was already configured.')
         this.developmentMode = environment.command === 'serve'
     }
 

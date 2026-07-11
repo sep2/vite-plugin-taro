@@ -12,12 +12,12 @@ function run(state: WxUpdateClientState, event: WxUpdateClientEvent) {
 }
 
 function start(): WxUpdateClientState {
-    const registering = run(createWxUpdateClientState('build-1', 'session-1'), { type: 'started' }).state
+    const registering = run(createWxUpdateClientState('build-1'), { type: 'started' }).state
     return run(registering, { type: 'registration-completed' }).state
 }
 
 test('registers before starting its polling loop', () => {
-    const initial = createWxUpdateClientState('build-1', 'session-1')
+    const initial = createWxUpdateClientState('build-1')
     const started = run(initial, { type: 'started' })
 
     assert.equal(started.state.phase, 'registering')
@@ -29,7 +29,7 @@ test('registers before starting its polling loop', () => {
 })
 
 test('queues an initial replay batch until registration completes', () => {
-    const started = run(createWxUpdateClientState('build-1', 'session-1'), { type: 'started' }).state
+    const started = run(createWxUpdateClientState('build-1'), { type: 'started' }).state
     const observed = run(started, {
         type: 'batch-observed',
         buildId: 'build-1',
@@ -45,7 +45,7 @@ test('queues an initial replay batch until registration completes', () => {
 })
 
 test('ignores a stale disk batch without aborting registration', () => {
-    const started = run(createWxUpdateClientState('build-1', 'session-1'), { type: 'started' }).state
+    const started = run(createWxUpdateClientState('build-1'), { type: 'started' }).state
     const stale = run(started, {
         type: 'batch-observed',
         buildId: 'build-1',
@@ -93,7 +93,7 @@ test('acknowledges only after patch execution and React Refresh complete', () =>
     const executed = run(state, { type: 'batch-executed', targetVersion: 2 })
     assert.equal(executed.state.version, 2)
     assert.equal(executed.state.phase, 'refreshing')
-    assert.deepEqual(executed.commands, [{ type: 'perform-refresh' }])
+    assert.deepEqual(executed.commands, [])
 
     state = executed.state
     const refreshed = run(state, { type: 'refresh-completed', stale: false })
@@ -112,7 +112,7 @@ test('waits for a relaunched stale-family route before acknowledging', () => {
 
     const stale = run(state, { type: 'refresh-completed', stale: true })
     assert.equal(stale.state.phase, 'relaunching')
-    assert.deepEqual(stale.commands, [{ type: 'relaunch-route' }])
+    assert.deepEqual(stale.commands, [])
 
     const ready = run(stale.state, { type: 'route-ready' })
     assert.deepEqual(ready.commands, [{ type: 'report-version', version: 1, reason: 'applied' }])

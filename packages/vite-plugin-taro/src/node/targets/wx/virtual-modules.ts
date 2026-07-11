@@ -68,9 +68,7 @@ export function emitWxEntryChunks(emitter: WxChunkEmitter, context: BuildContext
 }
 
 function createWxAppEntrySource(context: BuildContext): string {
-    const refreshPreamble = context.development
-        ? `import ${JSON.stringify(virtualWxRefreshPreambleId)}\n`
-        : ''
+    const refreshPreamble = context.development ? `import ${JSON.stringify(virtualWxRefreshPreambleId)}\n` : ''
     const updateClient = context.development
         ? `import { startWxUpdateClient } from ${JSON.stringify(wxUpdateClientRuntimeImportPath)}\n`
         : ''

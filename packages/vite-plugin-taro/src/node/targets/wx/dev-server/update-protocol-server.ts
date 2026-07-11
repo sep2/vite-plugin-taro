@@ -116,7 +116,7 @@ export class WxUpdateProtocolServer {
                 version: body.version
             })
             if (transition.some((command) => command.type === 'request-full-build')) this.requestFullBuild()
-            respond(response, 200, { type: 'registered', buildId: this.state.buildId })
+            respond(response, 200, { type: 'registered' })
             return
         }
         if (body.action !== 'poll') {

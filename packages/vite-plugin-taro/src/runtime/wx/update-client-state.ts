@@ -2,7 +2,6 @@ export type WxUpdateClientPhase = 'stopped' | 'registering' | 'polling' | 'apply
 
 export type WxUpdateClientState = {
     buildId: string
-    sessionId: string
     version: number
     phase: WxUpdateClientPhase
     targetVersion?: number
@@ -24,8 +23,6 @@ export type WxUpdateClientCommand =
     | { type: 'register'; version: number }
     | { type: 'poll'; version: number }
     | { type: 'apply-batch'; fromVersion: number; targetVersion: number }
-    | { type: 'perform-refresh' }
-    | { type: 'relaunch-route' }
     | { type: 'report-version'; version: number; reason: 'applied' | 'batch-mismatch' }
     | { type: 'request-full-build'; reason: 'batch-execution-failed' }
     | { type: 'retry-transport' }
@@ -35,8 +32,8 @@ export type WxUpdateClientTransition = {
     commands: WxUpdateClientCommand[]
 }
 
-export function createWxUpdateClientState(buildId: string, sessionId: string): WxUpdateClientState {
-    return { buildId, sessionId, version: 0, phase: 'stopped' }
+export function createWxUpdateClientState(buildId: string): WxUpdateClientState {
+    return { buildId, version: 0, phase: 'stopped' }
 }
 
 export function transitionWxUpdateClient(
@@ -65,7 +62,7 @@ export function transitionWxUpdateClient(
             if (state.phase !== 'applying' || state.targetVersion !== event.targetVersion) {
                 return command(state, { type: 'report-version', version: state.version, reason: 'batch-mismatch' })
             }
-            return command({ ...state, phase: 'refreshing', version: event.targetVersion }, { type: 'perform-refresh' })
+            return transition({ ...state, phase: 'refreshing', version: event.targetVersion })
         case 'batch-failed':
             return command(
                 { ...state, phase: 'polling', targetVersion: undefined },
@@ -73,9 +70,7 @@ export function transitionWxUpdateClient(
             )
         case 'refresh-completed':
             if (state.phase !== 'refreshing') return transition(state)
-            if (event.stale) {
-                return command({ ...state, phase: 'relaunching' }, { type: 'relaunch-route' })
-            }
+            if (event.stale) return transition({ ...state, phase: 'relaunching' })
             return applied(state)
         case 'route-ready':
             if (state.phase !== 'relaunching') return transition(state)

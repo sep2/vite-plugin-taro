@@ -12,47 +12,53 @@ import {
     type WxUpdateServerState
 } from './update-server-state.ts'
 
-function startClient(buildId: string, sessionId: string): WxUpdateClientState {
-    let client = createWxUpdateClientState(buildId, sessionId)
-    client = transitionWxUpdateClient(client, { type: 'started' }).state
-    return transitionWxUpdateClient(client, { type: 'registration-completed' }).state
+type ProtocolClient = {
+    sessionId: string
+    state: WxUpdateClientState
 }
 
-function registerClient(server: WxUpdateServerState, client: WxUpdateClientState): WxUpdateServerState {
+function startClient(buildId: string, sessionId: string): ProtocolClient {
+    let state = createWxUpdateClientState(buildId)
+    state = transitionWxUpdateClient(state, { type: 'started' }).state
+    state = transitionWxUpdateClient(state, { type: 'registration-completed' }).state
+    return { sessionId, state }
+}
+
+function registerClient(server: WxUpdateServerState, client: ProtocolClient): WxUpdateServerState {
     return transitionWxUpdateServer(server, {
         type: 'client-registered',
-        buildId: client.buildId,
+        buildId: client.state.buildId,
         sessionId: client.sessionId,
-        version: client.version
+        version: client.state.version
     }).state
 }
 
-function requestBatch(server: WxUpdateServerState, client: WxUpdateClientState) {
+function requestBatch(server: WxUpdateServerState, client: ProtocolClient) {
     return transitionWxUpdateServer(server, {
         type: 'client-reported',
-        buildId: client.buildId,
+        buildId: client.state.buildId,
         sessionId: client.sessionId,
-        version: client.version
+        version: client.state.version
     })
 }
 
-function applyBatch(client: WxUpdateClientState, batch: WxUpdateBatch, stale = false): WxUpdateClientState {
-    client = transitionWxUpdateClient(client, {
+function applyBatch(client: ProtocolClient, batch: WxUpdateBatch, stale = false): ProtocolClient {
+    let state = transitionWxUpdateClient(client.state, {
         type: 'batch-observed',
         buildId: batch.buildId,
         fromVersion: batch.fromVersion,
         targetVersion: batch.targetVersion
     }).state
-    client = transitionWxUpdateClient(client, {
+    state = transitionWxUpdateClient(state, {
         type: 'batch-executed',
         targetVersion: batch.targetVersion
     }).state
-    client = transitionWxUpdateClient(client, { type: 'refresh-completed', stale }).state
-    if (stale) client = transitionWxUpdateClient(client, { type: 'route-ready' }).state
-    return client
+    state = transitionWxUpdateClient(state, { type: 'refresh-completed', stale }).state
+    if (stale) state = transitionWxUpdateClient(state, { type: 'route-ready' }).state
+    return { ...client, state }
 }
 
-function publishedBatch(server: WxUpdateServerState, client: WxUpdateClientState) {
+function publishedBatch(server: WxUpdateServerState, client: ProtocolClient) {
     const transition = requestBatch(server, client)
     const command = transition.commands[0]
     assert.equal(command?.type, 'publish-batch')
@@ -73,8 +79,8 @@ test('server and client advance through a complete acknowledged batch', () => {
     client = applyBatch(client, published.batch)
     server = requestBatch(server, client).state
 
-    assert.equal(client.version, 1)
-    assert.equal(client.phase, 'polling')
+    assert.equal(client.state.version, 1)
+    assert.equal(client.state.phase, 'polling')
     assert.equal(server.inFlight, undefined)
     assert.equal(server.hostVersion, 1)
 })
@@ -109,7 +115,8 @@ test('a restarted App Service reconstructs the host version from retained deltas
     for (const code of ['delta-1', 'delta-2', 'delta-3']) {
         server = transitionWxUpdateServer(server, { type: 'delta-added', code }).state
     }
-    const oldClient = { ...startClient('build-1', 'old-session'), version: 3 }
+    const oldClient = startClient('build-1', 'old-session')
+    oldClient.state = { ...oldClient.state, version: 3 }
     server = registerClient(server, oldClient)
 
     let restarted = startClient('build-1', 'new-session')
@@ -117,7 +124,7 @@ test('a restarted App Service reconstructs the host version from retained deltas
     const replay = publishedBatch(server, restarted)
     restarted = applyBatch(restarted, replay.batch)
 
-    assert.equal(restarted.version, 3)
+    assert.equal(restarted.state.version, 3)
     assert.deepEqual(
         replay.batch.deltas.map((delta) => delta.version),
         [1, 2, 3]
@@ -138,8 +145,8 @@ test('lost acknowledgement and stale-family relaunch both converge without dupli
     const recovered = requestBatch(server, client)
     assert.equal(recovered.state.inFlight, undefined)
     assert.deepEqual(recovered.commands, [])
-    assert.equal(client.version, 1)
-    assert.equal(client.phase, 'polling')
+    assert.equal(client.state.version, 1)
+    assert.equal(client.state.phase, 'polling')
 })
 
 test('a full build invalidates old sessions and starts both machines at version zero', () => {
@@ -155,6 +162,6 @@ test('a full build invalidates old sessions and starts both machines at version 
 
     assert.equal(server.buildId, 'build-2')
     assert.equal(server.hostVersion, 0)
-    assert.equal(newClient.version, 0)
+    assert.equal(newClient.state.version, 0)
     assert.deepEqual(requestBatch(server, newClient).commands, [])
 })

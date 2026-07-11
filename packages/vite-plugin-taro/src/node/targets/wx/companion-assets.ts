@@ -41,8 +41,7 @@ function createWxCompanionAssets(
     bundle: WxBundle,
     context: BuildContext
 ): { fileName: string; source: WxAssetSource }[] {
-    const json = (value: JsonObject) =>
-        context.development ? JSON.stringify(value, null, 2) : JSON.stringify(value)
+    const json = (value: JsonObject) => (context.development ? JSON.stringify(value, null, 2) : JSON.stringify(value))
 
     return [
         { fileName: 'app.json', source: json(context.project.appConfig) },
