@@ -34,7 +34,9 @@ function createWxTargetPlugin(context: BuildContext): Plugin {
             order: 'post',
             handler(id) {
                 const cleanId = stripVirtualPrefix(id)
+
                 emitWxEntryChunks(this, context, cleanId)
+
                 return loadWxVirtualModule(cleanId, context)
             }
         },
@@ -43,6 +45,7 @@ function createWxTargetPlugin(context: BuildContext): Plugin {
             order: 'post',
             async handler(code, id) {
                 if (!context.development) return
+
                 const transformed = await transformWxReactRefreshModule(code, id, context.project.appComponentFile)
                 return transformed === code ? undefined : transformed
             }

@@ -58,6 +58,7 @@ export function loadWxVirtualModule(id: string, context: BuildContext): string |
 /** Registers every configured page and the shared recursive component as eager WX entry chunks. */
 export function emitWxEntryChunks(emitter: WxChunkEmitter, context: BuildContext, id: string): void {
     if (id !== virtualWxAppId) return
+
     for (const page of context.project.pages) {
         emitter.emitFile({
             type: 'chunk',
@@ -66,12 +67,14 @@ export function emitWxEntryChunks(emitter: WxChunkEmitter, context: BuildContext
             implicitlyLoadedAfterOneOf: [id]
         })
     }
+
     emitter.emitFile({
         type: 'chunk',
         id: virtualWxComponentId,
         fileName: 'comp.js',
         implicitlyLoadedAfterOneOf: [id]
     })
+
     if (context.development) {
         emitter.emitFile({
             type: 'chunk',
