@@ -57,7 +57,7 @@ export function emitWxEntryChunks(emitter: WxChunkEmitter, context: BuildContext
         fileName: 'comp.js',
         implicitlyLoadedAfterOneOf: [id]
     })
-    if (context.behavior.reactRefresh) {
+    if (context.development) {
         emitter.emitFile({
             type: 'chunk',
             id: virtualWxPreloadId,
@@ -68,10 +68,10 @@ export function emitWxEntryChunks(emitter: WxChunkEmitter, context: BuildContext
 }
 
 function createWxAppEntrySource(context: BuildContext): string {
-    const refreshPreamble = context.behavior.reactRefresh
+    const refreshPreamble = context.development
         ? `import ${JSON.stringify(virtualWxRefreshPreambleId)}\n`
         : ''
-    const updateClient = context.behavior.reactRefresh
+    const updateClient = context.development
         ? `import { startWxUpdateClient } from ${JSON.stringify(wxUpdateClientRuntimeImportPath)}\n`
         : ''
     return `${refreshPreamble}${updateClient}import { createReactApp, ReactDOM } from ${JSON.stringify(wxRuntimeBridgeImportPath)}
@@ -80,23 +80,23 @@ import AppComponent from ${JSON.stringify(toViteFileImportPath(context.project.a
 
 const appConfig = ${JSON.stringify(context.project.appConfig)}
 App(createReactApp(AppComponent, React, ReactDOM, appConfig))
-${context.behavior.reactRefresh ? 'startWxUpdateClient()' : ''}
+${context.development ? 'startWxUpdateClient()' : ''}
 `
 }
 
 function createWxPageEntrySource(page: VitePluginTaroPageOption, context: BuildContext): string {
-    const hotUpdateImport = context.behavior.reactRefresh
+    const hotUpdateImport = context.development
         ? `import { decorateWxPageConfig, registerWxPage } from ${JSON.stringify(wxHotUpdateRuntimeImportPath)}\n`
         : ''
     const createConfig = `createPageConfig(PageComponent, '${page.path}', { root: { cn: [] } }, pageConfig)`
-    const pageRegistration = context.behavior.reactRefresh
+    const pageRegistration = context.development
         ? `registerWxPage(${JSON.stringify(page.path)}, () => Page(taroPageConfig))`
         : 'Page(taroPageConfig)'
     return `${hotUpdateImport}import { createPageConfig } from ${JSON.stringify(wxRuntimeBridgeImportPath)}
 import PageComponent from ${JSON.stringify(createPageComponentImportPath(page.path))}
 
 const pageConfig = ${JSON.stringify(page.config)}
-const taroPageConfig = ${context.behavior.reactRefresh ? `decorateWxPageConfig(${createConfig})` : createConfig}
+const taroPageConfig = ${context.development ? `decorateWxPageConfig(${createConfig})` : createConfig}
 if (PageComponent && PageComponent.behaviors) {
   taroPageConfig.behaviors = (taroPageConfig.behaviors || []).concat(PageComponent.behaviors)
 }

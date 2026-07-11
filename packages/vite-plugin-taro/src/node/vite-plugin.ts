@@ -23,7 +23,7 @@ export default function vitePluginTaro(options: VitePluginTaroOptions): PluginOp
     ]
 }
 
-/** Establishes build behavior and resolved Vite state before target hooks consume the context. */
+/** Establishes build mode and resolved Vite state before target hooks consume the context. */
 function createBuildCoordinator(context: BuildContext): Plugin {
     return {
         name: 'vite-plugin-taro:build',
