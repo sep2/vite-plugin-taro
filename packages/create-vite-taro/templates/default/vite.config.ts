@@ -62,6 +62,7 @@ export default defineConfig(({ mode }) => {
                         es6: false,
                         postcss: false,
                         minified: false,
+                        compileHotReLoad: true,
                         enhance: false,
                         uglifyFileName: false,
                         preloadBackgroundData: false,

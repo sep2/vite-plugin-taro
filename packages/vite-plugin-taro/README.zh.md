@@ -275,7 +275,7 @@ export default function IndexPage() {
 ### 8. 运行每个目标
 
 ```sh
-npm run dev:wx       # 以 watch 模式重新构建 dist/wx
+npm run dev:wx       # 构建 dist/wx 并启用微信代码热更新
 npm run dev:h5       # 启动 H5 开发服务器
 npm run build:wx     # 构建 dist/wx
 npm run build:h5     # 构建 dist/h5
@@ -284,6 +284,8 @@ npm run typecheck    # 使用 tsc 进行类型检查
 ```
 
 在微信开发者工具中打开生成的 `dist/wx` 目录。
+
+微信开发模式会在 Vite 报告就绪前，预先完整构建 App 和所有已配置页面。JavaScript 和 TypeScript 组件修改通过 React Refresh 更新，并保留兼容的 React 状态、当前 Taro 页面以及原生输入状态。每次代码更新都会重置模块内部状态。修改 CSS、资源或应用配置时，会有意执行完整构建并让开发者工具重新加载。插件会自动为生成的开发项目启用微信的 `compileHotReLoad` 设置。
 
 | 目标 | 含义 | 输出目录 |
 | --- | --- | --- |

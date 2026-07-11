@@ -108,7 +108,7 @@ importers:
         version: 0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.1.3(@types/node@26.0.0)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))
       '@tarojs/components':
         specifier: ^4.2.0
-        version: 4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15)
+        version: 4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15)
       '@tarojs/helper':
         specifier: ^4.2.0
         version: 4.2.0
@@ -117,7 +117,7 @@ importers:
         version: link:../taro-plugin-framework-react
       '@tarojs/plugin-platform-h5':
         specifier: ^4.2.0
-        version: 4.2.0(@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(postcss@8.5.15))(postcss@8.5.16)(react@19.2.7)(solid-js@1.9.13)
+        version: 4.2.0(@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@types/react@19.2.17)(postcss@8.5.16)(react@19.2.7)(solid-js@1.9.13)
       '@tarojs/plugin-platform-weapp':
         specifier: ^4.2.0
         version: 4.2.0(@tarojs/service@4.2.0)(@tarojs/shared@4.2.0)
@@ -126,13 +126,13 @@ importers:
         version: link:../taro-react
       '@tarojs/router':
         specifier: ^4.2.0
-        version: 4.2.0(@tarojs/runtime@4.2.0)(@tarojs/shared@4.2.0)(@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(postcss@8.5.15))
+        version: 4.2.0(@tarojs/runtime@4.2.0)(@tarojs/shared@4.2.0)(@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))
       '@tarojs/runtime':
         specifier: ^4.2.0
         version: 4.2.0
       '@tarojs/taro':
         specifier: ^4.2.0
-        version: 4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(postcss@8.5.15)
+        version: 4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.15)
       '@vitejs/plugin-react':
         specifier: ^6.0.2
         version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.1.3(@types/node@26.0.0)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)))(vite@8.1.3(@types/node@26.0.0)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0))
@@ -161,6 +161,9 @@ importers:
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0
+      '@types/react':
+        specifier: ^19.2.17
+        version: 19.2.17
       '@types/react-refresh':
         specifier: ^0.14.7
         version: 0.14.7
@@ -3321,12 +3324,12 @@ snapshots:
       '@tarojs/runtime': 4.2.0
       '@tarojs/shared': 4.2.0
 
-  '@tarojs/components-react@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.16)(react@19.2.7)(solid-js@1.9.13)':
+  '@tarojs/components-react@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.16)(react@19.2.7)(solid-js@1.9.13)':
     dependencies:
       '@babel/runtime': 7.29.7
-      '@tarojs/components': 4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.16)
+      '@tarojs/components': 4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.16)
       '@tarojs/shared': 4.2.0
-      '@tarojs/taro': 4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(postcss@8.5.15)
+      '@tarojs/taro': 4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.15)
       classnames: 2.5.1
       identity-obj-proxy: 3.0.0
       react: 19.2.7
@@ -3344,18 +3347,20 @@ snapshots:
       - webpack-chain
       - webpack-dev-server
 
-  '@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15)':
+  '@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15)':
     dependencies:
       '@stencil/core': 2.22.3
       '@tarojs/runtime': 4.2.0
       '@tarojs/shared': 4.2.0
-      '@tarojs/taro': 4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(postcss@8.5.15)
+      '@tarojs/taro': 4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.15)
       classnames: 2.5.1
       hammerjs: 2.0.8
       hls.js: 1.6.16
       resolve-pathname: 3.0.0
       swiper: 11.1.15
       tslib: 2.8.1
+    optionalDependencies:
+      '@types/react': 19.2.17
     transitivePeerDependencies:
       - '@tarojs/helper'
       - html-webpack-plugin
@@ -3365,18 +3370,20 @@ snapshots:
       - webpack-chain
       - webpack-dev-server
 
-  '@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.16)':
+  '@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.16)':
     dependencies:
       '@stencil/core': 2.22.3
       '@tarojs/runtime': 4.2.0
       '@tarojs/shared': 4.2.0
-      '@tarojs/taro': 4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(postcss@8.5.16)
+      '@tarojs/taro': 4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.16)
       classnames: 2.5.1
       hammerjs: 2.0.8
       hls.js: 1.6.16
       resolve-pathname: 3.0.0
       swiper: 11.1.15
       tslib: 2.8.1
+    optionalDependencies:
+      '@types/react': 19.2.17
     transitivePeerDependencies:
       - '@tarojs/helper'
       - html-webpack-plugin
@@ -3413,16 +3420,16 @@ snapshots:
       - '@swc/helpers'
       - supports-color
 
-  '@tarojs/plugin-platform-h5@4.2.0(@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(postcss@8.5.15))(postcss@8.5.16)(react@19.2.7)(solid-js@1.9.13)':
+  '@tarojs/plugin-platform-h5@4.2.0(@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@types/react@19.2.17)(postcss@8.5.16)(react@19.2.7)(solid-js@1.9.13)':
     dependencies:
       '@babel/core': 7.29.7
-      '@tarojs/components': 4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.16)
-      '@tarojs/components-react': 4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.16)(react@19.2.7)(solid-js@1.9.13)
+      '@tarojs/components': 4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.16)
+      '@tarojs/components-react': 4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.16)(react@19.2.7)(solid-js@1.9.13)
       '@tarojs/helper': 4.2.0
       '@tarojs/runtime': 4.2.0
       '@tarojs/service': 4.2.0
       '@tarojs/shared': 4.2.0
-      '@tarojs/taro-h5': 4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15))(@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(postcss@8.5.15))
+      '@tarojs/taro-h5': 4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))
       babel-plugin-transform-taroapi: 4.2.0(@babel/core@7.29.7)
       change-case: 4.1.2
       lodash-es: 4.17.21
@@ -3447,11 +3454,11 @@ snapshots:
       '@tarojs/service': 4.2.0
       '@tarojs/shared': 4.2.0
 
-  '@tarojs/router@4.2.0(@tarojs/runtime@4.2.0)(@tarojs/shared@4.2.0)(@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(postcss@8.5.15))':
+  '@tarojs/router@4.2.0(@tarojs/runtime@4.2.0)(@tarojs/shared@4.2.0)(@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))':
     dependencies:
       '@tarojs/runtime': 4.2.0
       '@tarojs/shared': 4.2.0
-      '@tarojs/taro': 4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(postcss@8.5.15)
+      '@tarojs/taro': 4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.15)
       dingtalk-jsapi: 2.15.6
       history: 5.3.0
       mobile-detect: 1.4.5
@@ -3490,11 +3497,11 @@ snapshots:
 
   '@tarojs/shared@4.2.0': {}
 
-  '@tarojs/taro-h5@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15))(@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(postcss@8.5.15))':
+  '@tarojs/taro-h5@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))':
     dependencies:
       '@tarojs/api': 4.2.0(@tarojs/runtime@4.2.0)(@tarojs/shared@4.2.0)
-      '@tarojs/components': 4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15)
-      '@tarojs/router': 4.2.0(@tarojs/runtime@4.2.0)(@tarojs/shared@4.2.0)(@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(postcss@8.5.15))
+      '@tarojs/components': 4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15)
+      '@tarojs/router': 4.2.0(@tarojs/runtime@4.2.0)(@tarojs/shared@4.2.0)(@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))
       '@tarojs/runtime': 4.2.0
       '@tarojs/shared': 4.2.0
       abortcontroller-polyfill: 1.7.8
@@ -3510,25 +3517,29 @@ snapshots:
     transitivePeerDependencies:
       - '@tarojs/taro'
 
-  '@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(postcss@8.5.15)':
+  '@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.15)':
     dependencies:
       '@tarojs/api': 4.2.0(@tarojs/runtime@4.2.0)(@tarojs/shared@4.2.0)
-      '@tarojs/components': 4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15)
+      '@tarojs/components': 4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15)
       '@tarojs/helper': 4.2.0
       '@tarojs/runtime': 4.2.0
       '@tarojs/shared': 4.2.0
       '@types/postcss-url': 10.0.4
       postcss: 8.5.15
+    optionalDependencies:
+      '@types/react': 19.2.17
 
-  '@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(postcss@8.5.16)':
+  '@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.16)':
     dependencies:
       '@tarojs/api': 4.2.0(@tarojs/runtime@4.2.0)(@tarojs/shared@4.2.0)
-      '@tarojs/components': 4.2.0(@tarojs/helper@4.2.0)(postcss@8.5.15)
+      '@tarojs/components': 4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.15)
       '@tarojs/helper': 4.2.0
       '@tarojs/runtime': 4.2.0
       '@tarojs/shared': 4.2.0
       '@types/postcss-url': 10.0.4
       postcss: 8.5.16
+    optionalDependencies:
+      '@types/react': 19.2.17
 
   '@tybys/wasm-util@0.10.2':
     dependencies:
