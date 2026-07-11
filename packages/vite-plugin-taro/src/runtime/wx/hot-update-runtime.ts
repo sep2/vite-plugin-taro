@@ -43,9 +43,15 @@ type WxHotUpdateBridge = {
     afterRefresh?: (update?: ReactRefreshResult) => void
 }
 
+type WxUpdateClient = {
+    refreshCompleted(stale: boolean): void
+    routeReady(): void
+}
+
 type WxRuntimeGlobal = typeof globalThis & {
     __rolldown_runtime__?: WxRolldownRuntime
     __VITE_PLUGIN_TARO_WX__?: WxHotUpdateBridge
+    __VITE_PLUGIN_TARO_WX_CLIENT__?: WxUpdateClient
     getCurrentPages(): Array<{ route?: string }>
     wx: {
         reLaunch(options: { url: string }): void
@@ -117,9 +123,11 @@ function getLifecycle(config: WxPageConfig, name: string): PageLifecycle | undef
 function applyPendingUpdate(): void {
     bridge.ready = true
     const pendingUpdate = bridge.pendingUpdate
-    if (!pendingUpdate) return
-    delete bridge.pendingUpdate
-    pendingUpdate()
+    if (pendingUpdate) {
+        delete bridge.pendingUpdate
+        pendingUpdate()
+    }
+    wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX_CLIENT__?.routeReady()
 }
 
 function getActiveTaroRoot(): TaroRoot | undefined {
@@ -156,11 +164,16 @@ bridge.afterRefresh = (update) => {
     pendingPage = undefined
     pendingRoot = undefined
 
-    if (update?.staleFamilies?.size) {
+    const stale = Boolean(update?.staleFamilies?.size)
+    if (stale) {
+        wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX_CLIENT__?.refreshCompleted(true)
         relaunchActiveRoute(page)
         return
     }
-    if (root) setTimeout(() => refreshTaroRoot(root, activePage ?? page))
+    setTimeout(() => {
+        refreshTaroRoot(root, activePage ?? page)
+        wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX_CLIENT__?.refreshCompleted(false)
+    })
 }
 
 function refreshTaroRoot(root: TaroRoot | undefined, page: WxPage | undefined): void {

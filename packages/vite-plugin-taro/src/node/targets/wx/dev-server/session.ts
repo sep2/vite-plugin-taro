@@ -1,7 +1,9 @@
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import colors from 'picocolors'
 import type { ViteDevServer } from 'vite'
 import type { BuildContext } from '../../../build-context.ts'
+import { wxHotUpdateControlFile, wxHotUpdateDirectory, wxHotUpdateEntryFile } from '../hot-update-files.ts'
 import {
     isWxFullBuildOutput,
     normalizeWxBundleStyles,
@@ -12,7 +14,7 @@ import {
 import { transformWxCompatibleJavaScript, transformWxOutputChunks } from './javascript-compatibility.ts'
 import { collectWxBundleModuleIds, collectWxPatchModuleIds } from './module-ids.ts'
 import { syncWxPublicDirectory, syncWxPublicFile, writeWxOutputFiles } from './output-writer.ts'
-import { WxPatchJournal } from './patch-journal.ts'
+import { WxUpdateProtocolServer } from './update-protocol-server.ts'
 import { ViteBundledDevAdapter, type WxHmrOutput } from './vite-bundled-dev-adapter.ts'
 
 const maxPatchCount = 1_000
@@ -23,7 +25,7 @@ type WxDevServerContext = Pick<BuildContext, 'vite' | 'css'>
 /** Owns one WX bundled-development graph and all writes to its fixed output directory. */
 export class WxDevServerSession {
     private readonly adapter: ViteBundledDevAdapter
-    private readonly journal: WxPatchJournal
+    private readonly updates: WxUpdateProtocolServer
     private readonly outDir: string
     private readonly initialBundleReady: Promise<void>
     private markInitialBundleReady!: () => void
@@ -33,6 +35,7 @@ export class WxDevServerSession {
     private rebuildTimer: NodeJS.Timeout | undefined
     private rebuildWork: Promise<void> | undefined
     private latestAppStyles = ''
+    private initialBundleWritten = false
     private closed = false
 
     constructor(
@@ -41,7 +44,7 @@ export class WxDevServerSession {
     ) {
         const config = context.vite
         this.outDir = path.resolve(config.root, config.build.outDir)
-        this.journal = new WxPatchJournal(this.outDir)
+        this.updates = new WxUpdateProtocolServer(server, this.outDir, () => this.requestFullBuild())
         this.initialBundleReady = new Promise<void>((resolve) => {
             this.markInitialBundleReady = resolve
         })
@@ -58,6 +61,8 @@ export class WxDevServerSession {
     }
 
     install(): void {
+        this.updates.install()
+        this.server.httpServer?.once('listening', this.handleHttpListening)
         this.adapter.install()
         this.originalPrintUrls = this.server.printUrls.bind(this.server)
         this.server.printUrls = this.printUrls
@@ -73,10 +78,12 @@ export class WxDevServerSession {
         this.server.watcher.off('change', this.handleWatchedFile)
         this.server.watcher.off('add', this.handleWatchedFile)
         this.server.watcher.off('unlink', this.handleWatchedFile)
+        this.server.httpServer?.off('listening', this.handleHttpListening)
         if (this.server.printUrls === this.printUrls && this.originalPrintUrls) {
             this.server.printUrls = this.originalPrintUrls
         }
         if (this.rebuildTimer) clearTimeout(this.rebuildTimer)
+        this.updates.close()
         await this.rebuildWork
         await this.outputWork
     }
@@ -87,6 +94,10 @@ export class WxDevServerSession {
         this.server.config.logger.info(
             `  ${colors.green('➜')}  ${colors.bold('WeChat DevTools')}: ${colors.cyan(projectDirectory)}`
         )
+    }
+
+    private readonly handleHttpListening = (): void => {
+        this.enqueueOutput(() => this.updates.writeCurrentControlFile())
     }
 
     private readonly handleWatchedFile = (file: string): void => {
@@ -113,12 +124,19 @@ export class WxDevServerSession {
         }
 
         const moduleIds = collectWxBundleModuleIds(output, this.config.root)
+        const buildId = this.updates.createBuildId()
+        setDevelopmentAsset(output, wxHotUpdateControlFile, this.updates.createControlSource(buildId))
+        setDevelopmentAsset(output, wxHotUpdateEntryFile, 'void 0;\n')
         this.enqueueOutput(async () => {
             await transformWxOutputChunks(output)
+            if (!this.initialBundleWritten) {
+                await fs.rm(path.join(this.outDir, wxHotUpdateDirectory), { recursive: true, force: true })
+            }
+            this.updates.commitFullBuild(buildId)
             await writeWxOutputFiles(this.outDir, output)
             await syncWxPublicDirectory(this.config.publicDir, this.outDir)
-            await this.journal.reset()
             this.adapter.registerModules(moduleIds)
+            this.initialBundleWritten = true
             this.markInitialBundleReady()
             this.server.config.logger.info(
                 `[vite-plugin-taro] WX bundle ready (${moduleIds.length} modules, ${output.length} files)`
@@ -136,10 +154,14 @@ export class WxDevServerSession {
         this.enqueueOutput(async () => {
             const transformed = await this.context.css.transformWxClassNames(output.code, output.filename)
             const compatibleCode = await transformWxCompatibleJavaScript(transformed.code, output.filename)
-            await this.journal.append(compatibleCode)
-            if (this.journal.length >= maxPatchCount || this.journal.size >= maxPatchBytes) {
+            if (
+                this.updates.length >= maxPatchCount ||
+                this.updates.size + Buffer.byteLength(compatibleCode) >= maxPatchBytes
+            ) {
                 this.requestFullBuild()
+                return
             }
+            this.updates.addDelta(compatibleCode)
         })
         return true
     }
@@ -186,6 +208,13 @@ export class WxDevServerSession {
             )
         })
     }
+}
+
+function setDevelopmentAsset(output: WxOutputFile[], fileName: string, source: string): void {
+    const index = output.findIndex((item) => item.type === 'asset' && item.fileName === fileName)
+    const asset: WxOutputFile = { type: 'asset', fileName, source }
+    if (index >= 0) output[index] = asset
+    else output.push(asset)
 }
 
 function relativeToViteConfig(outDir: string, configFile: string | undefined, root: string): string {

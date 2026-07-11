@@ -15,3 +15,6 @@ export const wxRuntimeBridgeImportPath = toViteFileImportPath(
 export const wxHotUpdateRuntimeImportPath = toViteFileImportPath(
     path.join(packageRoot, 'dist/runtime/wx/hot-update-runtime.js')
 )
+export const wxUpdateClientRuntimeImportPath = toViteFileImportPath(
+    path.join(packageRoot, 'dist/runtime/wx/update-client-runtime.js')
+)

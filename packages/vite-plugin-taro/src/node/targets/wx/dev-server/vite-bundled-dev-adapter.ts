@@ -1,4 +1,5 @@
 import type { ResolvedConfig, ViteDevServer } from 'vite'
+import { wxHotUpdateControlFile, wxHotUpdateEntryFile, wxHotUpdatePreloadFile } from '../hot-update-files.ts'
 import type { WxOutputFile } from './bundle-output.ts'
 import { wxRolldownRuntimeSource } from './rolldown-runtime-source.ts'
 
@@ -108,7 +109,7 @@ export class ViteBundledDevAdapter {
                 format: 'cjs',
                 sourcemap: false,
                 minify: false,
-                banner: createWxPageRuntimeBanner
+                banner: createWxRuntimeBanner
             })
             options.experimental ??= {}
             options.experimental.devMode = {
@@ -168,8 +169,9 @@ function getFirstOutput(options: WxRolldownOptions): Record<string, unknown> {
     return output
 }
 
-function createWxPageRuntimeBanner(chunk: { fileName: string }): string {
+function createWxRuntimeBanner(chunk: { fileName: string }): string {
+    if (chunk.fileName === 'app.js') return `require(${JSON.stringify(`./${wxHotUpdateControlFile}`)});`
     if (!chunk.fileName.startsWith('pages/') || !chunk.fileName.endsWith('.js')) return ''
     const prefix = '../'.repeat(chunk.fileName.split('/').length - 1)
-    return `require(${JSON.stringify(`${prefix}runtime.js`)}); require(${JSON.stringify(`${prefix}__wx_hmr__/update.js`)});`
+    return `require(${JSON.stringify(`${prefix}runtime.js`)});require(${JSON.stringify(`${prefix}${wxHotUpdatePreloadFile}`)});require(${JSON.stringify(`${prefix}${wxHotUpdateEntryFile}`)});`
 }
