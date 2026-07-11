@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { FullBuildScheduler } from './development-coordination.ts'
+import { FullBuildScheduler } from './full-build-scheduler.ts'
 
 const waitForTimers = () => new Promise<void>((resolve) => setTimeout(resolve, 10))
 
