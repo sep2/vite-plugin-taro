@@ -17,7 +17,7 @@
 - **Tailwind CSS v4 开箱即用** 直接书写工具类，微信与 Web 样式自动适配。
 - **Skyline 就绪** 支持微信 Skyline 渲染模式。
 - **热更新** 依托于 Vite 标准的热更新支持，Web 与小程序开发都能快速查看改动。
-- **条件编译** 用 Taro 风格 `#ifdef` / `#ifndef` / `#if` 拆分代码和样式。
+- **条件编译** 用 Taro 风格 `#ifdef` / `#ifndef` 条件块拆分代码和样式。
 - **工作区友好** 支持普通项目与 monorepo，兼容 `npm`、`pnpm`、`Yarn`、`Bun`。
 - **TypeScript 友好** 从配置到应用代码都有类型支持。
 
@@ -336,16 +336,14 @@ console.log('WeChat only')
 console.log('H5 only')
 // #endif
 
-// #if wx && !h5
-console.log('WeChat expression')
-// #elif h5
-console.log('H5 expression')
+// #ifndef h5
+console.log('非 H5')
 // #else
-console.log('fallback')
+console.log('H5 fallback')
 // #endif
 ```
 
-支持的指令包括 `#ifdef`、`#ifndef`、`#if`、`#elif`、`#else` 和 `#endif`。条件使用插件目标标记 `wx` 和 `h5`；`#if` 表达式支持 `!`、`&&` 和 `||`。
+支持的指令包括 `#ifdef`、`#ifndef`、`#else` 和 `#endif`。条件使用插件目标标记 `wx` 和 `h5`。
 
 ## 按目标输出
 

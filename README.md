@@ -17,7 +17,7 @@ Live demo: <https://sep2.github.io/vite-plugin-taro>. See [Sample app](https://g
 - **Tailwind CSS v4 ready** Write utility classes directly; WeChat and Web styles adapt automatically.
 - **Skyline ready** Support WeChat Skyline rendering mode.
 - **Hot reload** Built on Vite's standard hot reload support for fast Web and Mini Program feedback.
-- **Conditional compilation** Split code and styles with Taro-style `#ifdef` / `#ifndef` / `#if`.
+- **Conditional compilation** Split code and styles with Taro-style `#ifdef` / `#ifndef` blocks.
 - **Workspace friendly** Supports standalone apps and monorepos, compatible with `npm`, `pnpm`, `Yarn`, and `Bun`.
 - **TypeScript friendly** Type support from config to app code.
 
@@ -335,16 +335,14 @@ console.log('WeChat only')
 console.log('H5 only')
 // #endif
 
-// #if wx && !h5
-console.log('WeChat expression')
-// #elif h5
-console.log('H5 expression')
+// #ifndef h5
+console.log('Not H5')
 // #else
-console.log('fallback')
+console.log('H5 fallback')
 // #endif
 ```
 
-Supported directives are `#ifdef`, `#ifndef`, `#if`, `#elif`, `#else`, and `#endif`. Conditions use the plugin target tokens `wx` and `h5`; `#if` expressions support `!`, `&&`, and `||`.
+Supported directives are `#ifdef`, `#ifndef`, `#else`, and `#endif`. Conditions use the plugin target tokens `wx` and `h5`.
 
 ## Output by target
 
