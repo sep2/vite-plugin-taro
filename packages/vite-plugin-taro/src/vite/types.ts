@@ -43,7 +43,7 @@ export interface VitePluginTaroOptions {
 
 export type VitePluginTaroBuildContext = {
     target: VitePluginTaroTarget
-    appComponentImport: string
+    appComponentFile: string
     pages: VitePluginTaroPageOption[]
     appConfig: JsonObject
     projectConfigJson: JsonObject
