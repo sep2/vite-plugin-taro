@@ -1,0 +1,29 @@
+{
+    "compilerOptions": {
+        "target": "es2023",
+        "module": "esnext",
+        "lib": ["ES2023", "DOM"],
+        "types": ["vite/client", "vite-plugin-taro/client"],
+        "jsx": "react-jsx",
+        "skipLibCheck": true,
+
+        "paths": {
+            "@components": ["./src/components"],
+            "@components/*": ["./src/components/*"],
+            "@utils": ["./src/utils"],
+            "@utils/*": ["./src/utils/*"]
+        },
+
+        "moduleResolution": "bundler",
+        "allowImportingTsExtensions": true,
+        "verbatimModuleSyntax": true,
+        "moduleDetection": "force",
+        "noEmit": true,
+
+        "noUnusedLocals": false,
+        "noUnusedParameters": false,
+        "erasableSyntaxOnly": true,
+        "noFallthroughCasesInSwitch": true
+    },
+    "include": ["src"]
+}

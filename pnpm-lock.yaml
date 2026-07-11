@@ -50,6 +50,34 @@ importers:
         specifier: ^8.1.4
         version: 8.1.4(@types/node@26.1.1)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)
 
+  packages/shadcn-demo:
+    dependencies:
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      react:
+        specifier: ^19.2.7
+        version: 19.2.7
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.7(react@19.2.7)
+      vite-plugin-taro:
+        specifier: workspace:*
+        version: link:../vite-plugin-taro
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.17
+        version: 19.2.17
+      cross-env:
+        specifier: ^10.1.0
+        version: 10.1.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: ^8.1.4
+        version: 8.1.4(@types/node@26.1.1)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)
+
   packages/taro-plugin-framework-react:
     dependencies:
       '@tarojs/helper':
