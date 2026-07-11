@@ -1,7 +1,7 @@
 import type { types as BabelTypes, NodePath, PluginObj } from '@babel/core'
 import babel from '@rolldown/plugin-babel'
 import type { HtmlTagDescriptor, Plugin, PluginOption, UserConfig } from 'vite'
-import { h5ShimImportPath, isProd, nodeRequire } from '../constants.ts'
+import { h5ShimImportPath, nodeRequire } from '../constants.ts'
 import type { JsonObject, VitePluginTaroBuildContext, VitePluginTaroPageOption } from '../types.ts'
 import { createPageComponentImport, stripVirtualPrefix, toImportPath } from '../utils.ts'
 import { resolvePublicVirtualModuleId, virtualTaroApiId } from '../virtual-modules.ts'
@@ -19,7 +19,9 @@ function createH5TargetPlugin(context: VitePluginTaroBuildContext): Plugin {
 
         config: {
             order: 'pre',
-            handler: createH5ViteConfig
+            handler(_, environment) {
+                return createH5ViteConfig(environment.command === 'build')
+            }
         },
 
         resolveId: {
@@ -62,7 +64,7 @@ function loadH5VirtualModule(cleanId: string, context: VitePluginTaroBuildContex
 /**
  * Configures the Vite pieces needed for Taro H5 resolve/runtime behavior.
  */
-function createH5ViteConfig(): UserConfig {
+function createH5ViteConfig(production: boolean): UserConfig {
     return {
         define: createH5TaroDefines(),
         resolve: {
@@ -95,7 +97,7 @@ function createH5ViteConfig(): UserConfig {
         },
         build: {
             target: 'es2018',
-            minify: isProd
+            minify: production
         }
     }
 }
