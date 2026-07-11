@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import type { WxOutputFile } from './bundle-output.ts'
 import { transformWxCompatibleJavaScript, transformWxOutputChunks } from './javascript-compatibility.ts'
 
 test('lowers syntax rejected by the WeChat upload parser', async () => {
@@ -17,14 +18,14 @@ globalThis.bridge ??= {}
     assert.match(code, /constructor\(\)/)
 })
 
-test('transforms every JavaScript chunk in bundled-development output', async () => {
-    const output = [
-        { type: 'chunk' as const, fileName: 'runtime.js', code: 'class Runtime { state = {} }' },
-        { type: 'asset' as const, fileName: 'app.wxss', source: '' }
-    ]
+test('replaces getter-only DevEngine chunks with compatible JavaScript', async () => {
+    const runtime = { type: 'chunk' as const, fileName: 'runtime.js' } as WxOutputFile
+    Object.defineProperty(runtime, 'code', { get: () => 'class Runtime { state = {} }', enumerable: true })
+    const output: WxOutputFile[] = [runtime, { type: 'asset', fileName: 'app.wxss', source: '' }]
 
     await transformWxOutputChunks(output)
 
-    assert.doesNotMatch(output[0]?.code ?? '', /^\s*state\s*=\s*\{\}/m)
-    assert.equal(output[1]?.source, '')
+    assert.notEqual(output[0], runtime)
+    assert.doesNotMatch(output[0]?.type === 'chunk' ? output[0].code : '', /^\s*state\s*=\s*\{\}/m)
+    assert.equal(output[1]?.type === 'asset' ? output[1].source : undefined, '')
 })

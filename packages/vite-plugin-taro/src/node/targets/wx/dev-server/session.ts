@@ -181,9 +181,9 @@ export class WxDevServerSession {
     private enqueueOutput(task: () => Promise<void>): void {
         this.outputWork = this.outputWork.then(task).catch((error: unknown) => {
             const normalizedError = error instanceof Error ? error : new Error(String(error))
-            this.server.config.logger.error('[vite-plugin-taro] WX development output failed', {
-                error: normalizedError
-            })
+            this.server.config.logger.error(
+                `[vite-plugin-taro] WX development output failed: ${normalizedError.stack ?? normalizedError.message}`
+            )
         })
     }
 }

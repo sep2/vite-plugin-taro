@@ -20,8 +20,14 @@ export async function transformWxCompatibleJavaScript(code: string, filename: st
 /** Applies the compatibility transform to every JavaScript chunk in a DevEngine output batch. */
 export async function transformWxOutputChunks(output: WxOutputFile[]): Promise<void> {
     await Promise.all(
-        output.map(async (item) => {
-            if (item.type === 'chunk') item.code = await transformWxCompatibleJavaScript(item.code, item.fileName)
+        output.map(async (item, index) => {
+            if (item.type !== 'chunk') return
+            output[index] = {
+                type: 'chunk',
+                fileName: item.fileName,
+                modules: item.modules,
+                code: await transformWxCompatibleJavaScript(item.code, item.fileName)
+            }
         })
     )
 }
