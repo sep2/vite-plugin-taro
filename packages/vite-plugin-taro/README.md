@@ -431,17 +431,17 @@ pnpm prepare:taro
 pnpm build:plugin
 
 # Run the sample app in WeChat
-pnpm dev:sample:wx
+pnpm dev:loan-genius:wx
 
 # Build the sample app to WeChat output
-pnpm build:sample:wx
+pnpm build:loan-genius:wx
 
 # Run the sample app in H5 dev mode
-pnpm dev:sample:h5
+pnpm dev:loan-genius:h5
 
 # Build the sample app to H5 output and preview it
-pnpm build:sample:h5
-pnpm preview:sample:h5
+pnpm build:loan-genius:h5
+pnpm preview:loan-genius:h5
 ```
 
 Open `packages/loan-genius/dist/wx` with WeChat DevTools to test the Mini Program output.
@@ -464,11 +464,11 @@ Common scripts:
 | `pnpm typecheck` | Typecheck the plugin and sample app with `tsc`. |
 | `pnpm lint` | Run Biome checks. |
 | `pnpm format` | Apply Biome formatting. |
-| `pnpm dev:sample:wx` | Start the WeChat Mini Program sample with hot reload. Build the plugin first. |
-| `pnpm dev:sample:h5` | Start the H5 sample app in Vite dev mode. Build the plugin first. |
-| `pnpm build:sample:wx` | Build the WeChat Mini Program sample to `packages/loan-genius/dist/wx`. |
-| `pnpm build:sample:h5` | Build the H5 sample app to `packages/loan-genius/dist/h5`. |
-| `pnpm preview:sample:h5` | Preview the built H5 sample. |
+| `pnpm dev:loan-genius:wx` | Start the WeChat Mini Program sample with hot reload. Build the plugin first. |
+| `pnpm dev:loan-genius:h5` | Start the H5 sample app in Vite dev mode. Build the plugin first. |
+| `pnpm build:loan-genius:wx` | Build the WeChat Mini Program sample to `packages/loan-genius/dist/wx`. |
+| `pnpm build:loan-genius:h5` | Build the H5 sample app to `packages/loan-genius/dist/h5`. |
+| `pnpm preview:loan-genius:h5` | Preview the built H5 sample. |
 | `pnpm changelog` | Regenerate `CHANGELOG.md` from git release tags. |
 | `pnpm publish:dry` | Dry-run package validation and publishing. |
 | `pnpm release <version\|bump>` | Validate, bump versions, update the changelog, create the release commit and tag, and push to trigger CI publishing. |

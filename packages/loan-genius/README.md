@@ -34,13 +34,13 @@ pnpm build:plugin
 Build the WeChat Mini Program once:
 
 ```sh
-pnpm build:sample:wx
+pnpm build:loan-genius:wx
 ```
 
 Or start development with hot reload:
 
 ```sh
-pnpm dev:sample:wx
+pnpm dev:loan-genius:wx
 ```
 
 WeChat output is written to:
@@ -56,14 +56,14 @@ Open `packages/loan-genius/dist/wx` in WeChat DevTools. Do not open the source p
 Start the H5 dev server:
 
 ```sh
-pnpm dev:sample:h5
+pnpm dev:loan-genius:h5
 ```
 
 Build and preview the H5 app:
 
 ```sh
-pnpm build:sample:h5
-pnpm preview:sample:h5
+pnpm build:loan-genius:h5
+pnpm preview:loan-genius:h5
 ```
 
 H5 output is written to:

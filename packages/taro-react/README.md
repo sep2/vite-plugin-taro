@@ -38,7 +38,7 @@ When updating the upstream Taro version:
 3. Update this package version in `package.json`.
 4. Update this package README.
 5. Run `pnpm prepare:taro`.
-6. Run `pnpm build:plugin`, `pnpm typecheck`, `pnpm build:sample:wx`, and `pnpm build:sample:h5`.
+6. Run `pnpm build:plugin`, `pnpm typecheck`, `pnpm build:loan-genius:wx`, and `pnpm build:loan-genius:h5`.
 
 ## License
 

@@ -53,11 +53,11 @@ Node.js v26+ is available and can execute TypeScript natively.
 - `pnpm typecheck`: typecheck the plugin and sample app.
 - `pnpm lint`: run Biome checks.
 - `pnpm format`: run Biome checks with safe writes.
-- `pnpm build:sample:h5`: build the sample H5 target.
-- `pnpm build:sample:wx`: build the sample WeChat Mini Program target.
-- `pnpm dev:sample:h5`: run the sample H5 dev server.
-- `pnpm dev:sample:wx`: start the sample WeChat Mini Program target with hot reload.
-- `pnpm preview:sample:h5`: preview the built sample H5 target.
+- `pnpm build:loan-genius:h5`: build the sample H5 target.
+- `pnpm build:loan-genius:wx`: build the sample WeChat Mini Program target.
+- `pnpm dev:loan-genius:h5`: run the sample H5 dev server.
+- `pnpm dev:loan-genius:wx`: start the sample WeChat Mini Program target with hot reload.
+- `pnpm preview:loan-genius:h5`: preview the built sample H5 target.
 - `pnpm changelog`: regenerate `CHANGELOG.md` from git release tags.
 - `pnpm publish:dry`: validate the release without publishing.
 - `pnpm publish:all`: publish public packages in dependency order.

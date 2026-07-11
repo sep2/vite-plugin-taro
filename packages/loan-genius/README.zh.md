@@ -34,13 +34,13 @@ pnpm build:plugin
 构建一次微信小程序：
 
 ```sh
-pnpm build:sample:wx
+pnpm build:loan-genius:wx
 ```
 
 或启动热更新开发模式：
 
 ```sh
-pnpm dev:sample:wx
+pnpm dev:loan-genius:wx
 ```
 
 微信小程序产物会写入：
@@ -56,14 +56,14 @@ packages/loan-genius/dist/wx
 启动 H5 开发服务器：
 
 ```sh
-pnpm dev:sample:h5
+pnpm dev:loan-genius:h5
 ```
 
 构建并预览 H5 应用：
 
 ```sh
-pnpm build:sample:h5
-pnpm preview:sample:h5
+pnpm build:loan-genius:h5
+pnpm preview:loan-genius:h5
 ```
 
 H5 产物会写入：

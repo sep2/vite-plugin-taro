@@ -433,17 +433,17 @@ pnpm prepare:taro
 pnpm build:plugin
 
 # 运行微信示例应用
-pnpm dev:sample:wx
+pnpm dev:loan-genius:wx
 
 # 将示例应用构建为微信输出
-pnpm build:sample:wx
+pnpm build:loan-genius:wx
 
 # 以开发模式运行 H5 示例应用
-pnpm dev:sample:h5
+pnpm dev:loan-genius:h5
 
 # 将示例应用构建为 H5 输出并预览
-pnpm build:sample:h5
-pnpm preview:sample:h5
+pnpm build:loan-genius:h5
+pnpm preview:loan-genius:h5
 ```
 
 使用微信开发者工具打开 `packages/loan-genius/dist/wx`，以测试小程序输出。
@@ -466,11 +466,11 @@ pnpm typecheck
 | `pnpm typecheck` | 使用 `tsc` 对插件和示例应用进行类型检查。 |
 | `pnpm lint` | 运行 Biome 检查。 |
 | `pnpm format` | 应用 Biome 格式化。 |
-| `pnpm dev:sample:wx` | 启动支持热更新的微信小程序示例。请先构建插件。 |
-| `pnpm dev:sample:h5` | 以 Vite 开发模式启动 H5 示例应用。请先构建插件。 |
-| `pnpm build:sample:wx` | 将微信小程序示例构建到 `packages/loan-genius/dist/wx`。 |
-| `pnpm build:sample:h5` | 将 H5 示例应用构建到 `packages/loan-genius/dist/h5`。 |
-| `pnpm preview:sample:h5` | 预览构建后的 H5 示例。 |
+| `pnpm dev:loan-genius:wx` | 启动支持热更新的微信小程序示例。请先构建插件。 |
+| `pnpm dev:loan-genius:h5` | 以 Vite 开发模式启动 H5 示例应用。请先构建插件。 |
+| `pnpm build:loan-genius:wx` | 将微信小程序示例构建到 `packages/loan-genius/dist/wx`。 |
+| `pnpm build:loan-genius:h5` | 将 H5 示例应用构建到 `packages/loan-genius/dist/h5`。 |
+| `pnpm preview:loan-genius:h5` | 预览构建后的 H5 示例。 |
 | `pnpm changelog` | 从 git release tag 重新生成 `CHANGELOG.md`。 |
 | `pnpm publish:dry` | 干运行包校验和发布流程。 |
 | `pnpm release <version\|bump>` | 验证发布、更新版本、更新 changelog、创建 release commit 和 tag，并推送触发 CI 发布。 |
