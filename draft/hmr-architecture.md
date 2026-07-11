@@ -93,7 +93,7 @@ Unsupported private API shapes fail at startup rather than silently selecting an
 
 ### Output writer
 
-The output writer keeps one fixed WX project directory. It writes changed files through temporary sibling files followed by atomic rename, preserves partial full-build output correctly, removes stale generated output, synchronizes public files, and leaves DevTools-owned private files alone.
+The output writer keeps one fixed WX project directory. It writes changed files through temporary sibling files followed by atomic rename, preserves files omitted from partial DevEngine output, synchronizes public files, and leaves DevTools-owned private files alone.
 
 At development-session startup, the plugin removes its complete `vpt-hmr` directory before writing the initial output. This also removes stale files from older protocol implementations.
 
@@ -214,7 +214,7 @@ Transform/build failures preserve the last good files and retained deltas. Runti
 
 ## Ownership and source layout
 
-One `WxDevServerSession` owns the DevEngine adapter, full-output manifest, protocol server, module registration, serialized output writes, fallback rebuilds, and shutdown.
+One `WxDevServerSession` owns the DevEngine adapter, protocol server, module registration, serialized output writes, fallback rebuilds, and shutdown.
 
 ```text
 src/node/targets/wx/dev-server/

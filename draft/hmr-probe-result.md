@@ -141,7 +141,7 @@ All scale tests used direct literal page dependencies and pre-existing empty fil
 
 The CLI/window overhead dominates these absolute values. The 1,000-slot case added roughly 1.5 seconds relative to the fastest run. Automatic preview accepted 1,000 files.
 
-The stress matrix proved that 1,000 slots work, but the implementation uses 512: the 16 MiB byte threshold is normally reached first, while 512 halves initial file and page-banner overhead. Slot paths use the short `vpt-hmr/<base36>.js` form. The 1,000-slot prototype reported 1,032 initial output files. The final 512-slot build reported 544 files and 1,405 ms readiness in its final measured run; the broader prototype range was 1,028-1,429 ms. A development automatic preview with four approximately 34 KiB patches was 1,975,053 bytes and succeeded.
+The stress matrix proved that 1,000 slots work, but the bounded-slot prototype selected 512: the 16 MiB byte threshold was normally reached first, while 512 halved initial file and page-banner overhead. Slot paths used the short `vpt-hmr/<base36>.js` form. The 1,000-slot prototype reported 1,032 initial output files. The 512-slot prototype reported 544 files and 1,405 ms readiness in its final measured run; the broader prototype range was 1,028-1,429 ms. A development automatic preview with four approximately 34 KiB patches was 1,975,053 bytes and succeeded.
 
 For 100 synthetic 36.5 KiB patches, slot writing measured:
 
@@ -161,7 +161,7 @@ Ten isolated slot changes executed in 45-183 ms, with a median around 147 ms. A 
 
 ## Full builds and errors
 
-A partial DevEngine full output does not necessarily re-emit development assets. Therefore slot reset must explicitly rewrite every used slot to `void 0;`. A new development session also deletes the plugin-owned slot directory before writing its initial output, preventing stale excess slots from earlier sessions. This was verified: a filled 34 KiB slot became 8 bytes after a CSS-triggered full build.
+The slot prototype established that a partial DevEngine full output does not necessarily re-emit development assets. It therefore explicitly rewrote every used slot to `void 0;` and deleted its owned directory at session startup. This was verified: a filled 34 KiB slot became 8 bytes after a CSS-triggered full build. The final protocol keeps the startup directory deletion but has only one `update.js` to reset.
 
 Atomic temporary-file rename prevents DevTools from compiling partially written patch code. Deliberately writing invalid JavaScript directly into a slot kept the page ID but reset input because no wrapper could execute; fixing the file recovered compilation. The real pipeline transforms and validates code before the atomic rename, so it does not expose this invalid intermediate state.
 
