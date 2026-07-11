@@ -306,8 +306,8 @@ function createWechatAssets(
         { fileName: 'utils.wxs', source: builder.buildXScript() },
         { fileName: 'comp.wxml', source: builder.buildBaseComponentTemplate('.wxml') },
         { fileName: 'comp.json', source: stringifyJsonAsset(createWechatCompJson()) },
-        { fileName: 'project.config.json', source: stringifyJsonAsset(context.projectConfigJson) },
-        { fileName: 'project.priviate.config.json', source: stringifyJsonAsset(context.projectPrivateConfigJson) },
+        { fileName: 'project.config.json', source: stringifyJsonAsset(createWechatProjectConfig(context)) },
+        { fileName: 'project.private.config.json', source: stringifyJsonAsset(context.projectPrivateConfigJson) },
         { fileName: 'sitemap.json', source: stringifyJsonAsset(context.sitemapJson) },
         ...context.pages.flatMap((page) => [
             {
@@ -329,6 +329,21 @@ function createWechatAssets(
             { fileName: `${page.path}.wxss`, source: '' }
         ])
     ]
+}
+
+function createWechatProjectConfig(context: VitePluginTaroBuildContext): JsonObject {
+    const setting = isJsonObject(context.projectConfigJson.setting) ? context.projectConfigJson.setting : {}
+    return {
+        ...context.projectConfigJson,
+        setting: {
+            ...setting,
+            compileHotReLoad: true
+        }
+    }
+}
+
+function isJsonObject(value: unknown): value is JsonObject {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function createWechatTemplateBuilder() {
