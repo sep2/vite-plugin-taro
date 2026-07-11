@@ -107,18 +107,14 @@ function createH5ViteConfig(): UserConfig {
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-platform-h5/src/program.ts#L219-L249
  */
 function createH5SupportPlugins(): PluginOption[] {
-    const plugins: PluginOption[] = [...react()]
-
-    plugins.push(
+    return [
+        ...react(),
         babel({
             include: /[\\/]@stencil[\\/]core[\\/]internal[\\/]client[\\/]index\.js(?:\?.*)?$/,
             exclude: [],
             plugins: [rewriteStencilStyleInsertion]
-        })
-    )
-
-    // Mirrors Taro H5: rewrite default Taro.xxx calls from virtual:taro/api to named H5 API imports.
-    plugins.push(
+        }),
+        // Mirrors Taro H5: rewrite default Taro.xxx calls from virtual:taro/api to named H5 API imports.
         babel({
             plugins: [
                 [
@@ -130,9 +126,7 @@ function createH5SupportPlugins(): PluginOption[] {
                 ]
             ]
         })
-    )
-
-    return plugins
+    ]
 }
 
 /**
