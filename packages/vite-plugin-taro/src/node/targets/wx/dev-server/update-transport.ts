@@ -14,6 +14,7 @@ import {
 } from './update-server-state.ts'
 
 const endpointPath = '/__vite_plugin_taro_wx_update__'
+// Keep the host response below update-client.ts's 30-second wx.request timeout.
 const pollTimeout = 25_000
 
 type PendingPoll = {
@@ -172,29 +173,26 @@ export class WxUpdateTransport {
 
     private holdPoll(sessionId: string, response: ServerResponse): void {
         const previous = this.pendingPolls.get(sessionId)
-        if (previous) {
-            clearTimeout(previous.timeout)
-            respond(previous.response, 200, { type: 'changed' })
+        if (previous) this.finishPoll(sessionId, previous, { type: 'changed' })
+
+        let pending: PendingPoll
+        pending = {
+            response,
+            timeout: setTimeout(() => this.finishPoll(sessionId, pending, { type: 'idle' }), pollTimeout)
         }
-        const timeout = setTimeout(() => {
-            this.pendingPolls.delete(sessionId)
-            respond(response, 200, { type: 'idle' })
-        }, pollTimeout)
-        this.pendingPolls.set(sessionId, { response, timeout })
-        response.on('close', () => {
-            const pending = this.pendingPolls.get(sessionId)
-            if (pending?.response !== response) return
-            clearTimeout(pending.timeout)
-            this.pendingPolls.delete(sessionId)
-        })
+        this.pendingPolls.set(sessionId, pending)
+        response.on('close', () => this.finishPoll(sessionId, pending))
     }
 
     private respondToAll(value: { type: string }): void {
-        for (const [sessionId, pending] of this.pendingPolls) {
-            clearTimeout(pending.timeout)
-            respond(pending.response, 200, value)
-            this.pendingPolls.delete(sessionId)
-        }
+        for (const [sessionId, pending] of this.pendingPolls) this.finishPoll(sessionId, pending, value)
+    }
+
+    private finishPoll(sessionId: string, pending: PendingPoll, value?: { type: string }): void {
+        if (this.pendingPolls.get(sessionId) !== pending) return
+        clearTimeout(pending.timeout)
+        this.pendingPolls.delete(sessionId)
+        if (value) respond(pending.response, 200, value)
     }
 
     private apply(event: Parameters<typeof transitionWxUpdateServer>[1]): WxUpdateServerCommand[] {

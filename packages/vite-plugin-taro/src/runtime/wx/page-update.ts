@@ -144,7 +144,7 @@ bridge.beginUpdate = () => {
     pendingRoot = getActiveTaroRoot()
     refreshTaroRoot(pendingRoot, pendingPage)
     suppressLifecycles = true
-    setTimeout(() => {
+    runInNextNativeTask(() => {
         suppressLifecycles = false
     })
 }
@@ -168,7 +168,7 @@ bridge.afterRefresh = (update) => {
         relaunchActiveRoute(page)
         return
     }
-    setTimeout(() => {
+    runInNextNativeTask(() => {
         refreshTaroRoot(root, activePage ?? page)
         wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX_UPDATE_CLIENT__?.refreshCompleted(false)
     })
@@ -188,5 +188,13 @@ function relaunchActiveRoute(page: WxPage | undefined): void {
         .filter(([key, value]) => key !== '$taroTimestamp' && value !== undefined)
         .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
         .join('&')
-    setTimeout(() => wxRuntimeGlobal.wx.reLaunch({ url: `/${route}${query ? `?${query}` : ''}` }))
+    runInNextNativeTask(() => wxRuntimeGlobal.wx.reLaunch({ url: `/${route}${query ? `?${query}` : ''}` }))
+}
+
+/**
+ * DevTools dispatches synthetic page lifecycles after the changed module returns. A macrotask—not a microtask—runs
+ * after that native turn and also avoids navigation or Taro root mutation from inside React Refresh's callback.
+ */
+function runInNextNativeTask(task: () => void): void {
+    setTimeout(task)
 }

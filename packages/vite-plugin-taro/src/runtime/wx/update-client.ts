@@ -61,6 +61,9 @@ type WxClientGlobal = typeof globalThis & {
 }
 
 const wxClientGlobal = globalThis as WxClientGlobal
+const transportRetryDelay = 500
+const rebuildPollDelay = 1_000
+const updateFileWatchdogDelay = 2_000
 
 export function startWxUpdateClient(): void {
     if (wxClientGlobal.__VITE_PLUGIN_TARO_WX_UPDATE_CLIENT__) return
@@ -71,6 +74,7 @@ export function startWxUpdateClient(): void {
     const sessionId = createSessionId()
     let requestGeneration = 0
     let activeRequest: WxRequestTask | undefined
+    let scheduledRequest: ReturnType<typeof setTimeout> | undefined
     let pendingBatchApply: (() => void) | undefined
 
     const dispatch = (event: WxUpdateClientEvent, apply?: () => void): void => {
@@ -80,6 +84,8 @@ export function startWxUpdateClient(): void {
     }
 
     const send = (action: 'register' | 'poll' | 'rebuild', version: number): void => {
+        if (scheduledRequest) clearTimeout(scheduledRequest)
+        scheduledRequest = undefined
         activeRequest?.abort()
         const generation = ++requestGeneration
         activeRequest = wxClientGlobal.wx.request({
@@ -106,18 +112,12 @@ export function startWxUpdateClient(): void {
                     return
                 }
                 if (response.type === 'batch-published') {
-                    const publishedVersion = state.version
-                    setTimeout(() => {
-                        if (state.phase === 'polling' && state.version === publishedVersion) {
-                            dispatch({ type: 'poll-completed' })
-                        }
-                    }, 2_000)
+                    // If DevTools misses the update.js event, report the unchanged version and republish with a new nonce.
+                    scheduleRequest(updateFileWatchdogDelay)
                     return
                 }
                 if (response.type === 'rebuilding') {
-                    setTimeout(() => {
-                        if (state.phase === 'polling') dispatch({ type: 'poll-completed' })
-                    }, 1_000)
+                    scheduleRequest(rebuildPollDelay)
                     return
                 }
                 dispatch({ type: 'transport-failed' })
@@ -128,6 +128,18 @@ export function startWxUpdateClient(): void {
                 dispatch({ type: 'transport-failed' })
             }
         })
+    }
+
+    /** Keeps exactly one delayed metadata request and discards it when protocol state advances. */
+    const scheduleRequest = (delay: number): void => {
+        if (scheduledRequest) clearTimeout(scheduledRequest)
+        const expectedPhase = state.phase
+        const expectedVersion = state.version
+        scheduledRequest = setTimeout(() => {
+            scheduledRequest = undefined
+            if (state.phase !== expectedPhase || state.version !== expectedVersion) return
+            send(state.phase === 'registering' ? 'register' : 'poll', state.version)
+        }, delay)
     }
 
     const execute = (command: WxUpdateClientCommand, apply?: () => void): void => {
@@ -172,10 +184,7 @@ export function startWxUpdateClient(): void {
                 send('rebuild', state.version)
                 return
             case 'retry-transport':
-                setTimeout(() => {
-                    if (state.phase === 'registering') send('register', state.version)
-                    else send('poll', state.version)
-                }, 500)
+                scheduleRequest(transportRetryDelay)
         }
     }
 

@@ -24,6 +24,7 @@ import { ViteBundledDevAdapter, type WxDevEngineUpdate } from './vite-bundled-de
 
 const maxRetainedDeltaCount = 1_000
 const maxRetainedDeltaBytes = 16 * 1024 * 1024
+const fullBuildDebounceDelay = 100
 
 type WxDevServerContext = Pick<BuildContext, 'vite' | 'css'>
 
@@ -191,13 +192,14 @@ export class WxDevelopmentSession {
         this.rebuildRequested = true
         if (this.rebuildWork) return
         if (this.rebuildTimer) clearTimeout(this.rebuildTimer)
+        // CSS and public-file edits commonly arrive as a burst; rebuild only after their trailing edge.
         this.rebuildTimer = setTimeout(() => {
             this.rebuildTimer = undefined
             this.rebuildWork = this.runRebuild().finally(() => {
                 this.rebuildWork = undefined
                 if (this.rebuildRequested) this.requestFullBuild()
             })
-        }, 100)
+        }, fullBuildDebounceDelay)
     }
 
     private async runRebuild(): Promise<void> {
