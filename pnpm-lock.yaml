@@ -151,9 +151,6 @@ importers:
       react-refresh:
         specifier: ^0.18.0
         version: 0.18.0
-      rolldown:
-        specifier: ^1.1.4
-        version: 1.1.4
       tailwindcss:
         specifier: ^4.3.2
         version: 4.3.2

@@ -1,11 +1,11 @@
-import { transform } from 'rolldown/utils'
+import { transformWithOxc } from 'vite'
 import type { WxOutputFile } from './bundle-output.ts'
 
 const wxJavaScriptTarget = 'es2018'
 
 /** Lowers generated JavaScript syntax that WeChat's upload parser does not accept. */
 export async function transformWxCompatibleJavaScript(code: string, filename: string): Promise<string> {
-    const result = await transform(filename, code, {
+    const result = await transformWithOxc(code, filename, {
         lang: 'js',
         target: wxJavaScriptTarget,
         sourcemap: false,
@@ -14,11 +14,6 @@ export async function transformWxCompatibleJavaScript(code: string, filename: st
             setPublicClassFields: true
         }
     })
-    if (result.errors.length) {
-        throw new Error(
-            `Could not lower ${filename} for WeChat: ${result.errors.map((error) => error.message).join('\n')}`
-        )
-    }
     return result.code
 }
 
