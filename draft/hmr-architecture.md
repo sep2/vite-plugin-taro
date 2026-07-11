@@ -212,28 +212,9 @@ No state-preservation guarantee applies to a full output.
 
 Transform/build failures preserve the last good files and retained deltas. Runtime execution failures stop that batch, request a full output, and never advance the client version.
 
-## Ownership and source layout
+## Ownership
 
-One `WxDevelopmentSession` owns the DevEngine adapter, update transport, module registration, serialized output writes, fallback rebuilds, and shutdown.
-
-```text
-src/node/targets/wx/dev-server/
-    development-session.ts
-    vite-bundled-dev-adapter.ts
-    update-server-state.ts
-    update-transport.ts
-    development-output.ts
-    javascript-compatibility.ts
-    rolldown-runtime-source.ts
-
-src/runtime/wx/
-    update-client-state.ts
-    update-client.ts
-    page-update.ts
-    taro-runtime.ts
-```
-
-Runtime modules never import Node or Vite implementation modules.
+One `WxDevelopmentSession` owns the DevEngine adapter, update transport, module registration, serialized output writes, fallback rebuilds, and shutdown. Runtime modules never import Node or Vite implementation modules.
 
 ### State ownership
 

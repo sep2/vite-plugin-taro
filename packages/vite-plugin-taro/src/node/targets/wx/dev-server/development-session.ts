@@ -9,6 +9,7 @@ import path from 'node:path'
 import colors from 'picocolors'
 import type { ViteDevServer } from 'vite'
 import type { BuildContext } from '../../../build-context.ts'
+import { SerializedTaskQueue } from '../../../utils/async.ts'
 import {
     copyDirectoryIfExists,
     copyFileOrRemove,
@@ -16,6 +17,7 @@ import {
     writeFilesAtomically
 } from '../../../utils/filesystem.ts'
 import { wxDevelopmentDirectory, wxUpdateControlFile, wxUpdateFile } from '../development-files.ts'
+import { FullBuildScheduler } from './development-coordination.ts'
 import {
     isWxFullBuildOutput,
     normalizeWxBundleStyles,
@@ -31,6 +33,11 @@ const maxRetainedDeltaBytes = 16 * 1024 * 1024
 const fullBuildDebounceDelay = 100
 
 type WxDevServerContext = Pick<BuildContext, 'vite' | 'css'>
+type SessionSnapshot = Readonly<{
+    lifecycle: 'open' | 'closed'
+    outputPhase: 'starting' | 'ready'
+    latestAppStyles: string
+}>
 
 /** Owns one WX bundled-development graph and all writes to its fixed output directory. */
 export class WxDevelopmentSession {
@@ -38,14 +45,10 @@ export class WxDevelopmentSession {
     private readonly updateTransport: WxUpdateTransport
     private readonly outDir: string
     private readonly initialBundle = Promise.withResolvers<void>()
+    private readonly outputQueue: SerializedTaskQueue
+    private readonly fullBuildScheduler: FullBuildScheduler
     private originalPrintUrls: (() => void) | undefined
-    private outputWork = Promise.resolve()
-    private rebuildRequested = false
-    private rebuildTimer: NodeJS.Timeout | undefined
-    private rebuildWork: Promise<void> | undefined
-    private latestAppStyles = ''
-    private initialBundleWritten = false
-    private closed = false
+    private snapshot: SessionSnapshot = { lifecycle: 'open', outputPhase: 'starting', latestAppStyles: '' }
 
     constructor(
         private readonly context: WxDevServerContext,
@@ -53,11 +56,12 @@ export class WxDevelopmentSession {
     ) {
         const config = context.vite
         this.outDir = path.resolve(config.root, config.build.outDir)
+        this.outputQueue = new SerializedTaskQueue((error) => this.reportOutputError(error))
         this.updateTransport = new WxUpdateTransport(
             server,
             () => this.requestFullBuild(),
             (buildId, source) =>
-                this.enqueueOutput(async () => {
+                this.outputQueue.enqueue(async () => {
                     // A full build queued before this write invalidates the old batch instead of letting it overwrite
                     // the new build's empty update.js.
                     if (!this.updateTransport.isCurrentBuild(buildId)) return
@@ -70,6 +74,11 @@ export class WxDevelopmentSession {
             onError: (message) => this.handleError(message),
             waitForInitialBundle: () => this.waitForInitialBundle()
         })
+        this.fullBuildScheduler = new FullBuildScheduler(
+            fullBuildDebounceDelay,
+            () => this.adapter.rebuild(),
+            (error) => this.reportRebuildError(error)
+        )
     }
 
     private get config() {
@@ -89,8 +98,8 @@ export class WxDevelopmentSession {
     }
 
     async close(): Promise<void> {
-        if (this.closed) return
-        this.closed = true
+        if (this.snapshot.lifecycle === 'closed') return
+        this.snapshot = { ...this.snapshot, lifecycle: 'closed' }
         this.server.watcher.off('change', this.handleWatchedFile)
         this.server.watcher.off('add', this.handleWatchedFile)
         this.server.watcher.off('unlink', this.handleWatchedFile)
@@ -98,10 +107,9 @@ export class WxDevelopmentSession {
         if (this.server.printUrls === this.printUrls && this.originalPrintUrls) {
             this.server.printUrls = this.originalPrintUrls
         }
-        if (this.rebuildTimer) clearTimeout(this.rebuildTimer)
         this.updateTransport.close()
-        await this.rebuildWork
-        await this.outputWork
+        await this.fullBuildScheduler.close()
+        await this.outputQueue.waitForIdle()
     }
 
     private readonly printUrls = (): void => {
@@ -113,7 +121,7 @@ export class WxDevelopmentSession {
     }
 
     private readonly handleHttpListening = (): void => {
-        this.enqueueOutput(() =>
+        this.outputQueue.enqueue(() =>
             writeFileAtomically(path.join(this.outDir, wxUpdateControlFile), this.updateTransport.createControlSource())
         )
     }
@@ -121,18 +129,20 @@ export class WxDevelopmentSession {
     private readonly handleWatchedFile = (file: string): void => {
         if (isFileInside(file, this.config.publicDir)) {
             const destination = path.join(this.outDir, path.relative(this.config.publicDir, file))
-            this.enqueueOutput(() => copyFileOrRemove(file, destination))
+            this.outputQueue.enqueue(() => copyFileOrRemove(file, destination))
             this.requestFullBuild()
         }
     }
 
     private handleBundleOutput(output: WxOutputFile[]): void {
         const appStyles = normalizeWxBundleStyles(output)
-        if (appStyles !== undefined) this.latestAppStyles = appStyles
-        if (isWxFullBuildOutput(output) && this.latestAppStyles) setWxAppStyles(output, this.latestAppStyles)
+        if (appStyles !== undefined) this.snapshot = { ...this.snapshot, latestAppStyles: appStyles }
+        if (isWxFullBuildOutput(output) && this.snapshot.latestAppStyles) {
+            setWxAppStyles(output, this.snapshot.latestAppStyles)
+        }
 
         if (!isWxFullBuildOutput(output)) {
-            this.enqueueOutput(async () => {
+            this.outputQueue.enqueue(async () => {
                 await transformWxOutputChunks(output)
                 await writeDevelopmentOutput(this.outDir, output)
             })
@@ -142,9 +152,9 @@ export class WxDevelopmentSession {
         const buildId = this.updateTransport.createBuildId()
         setDevelopmentAsset(output, wxUpdateControlFile, this.updateTransport.createControlSource(buildId))
         setDevelopmentAsset(output, wxUpdateFile, 'void 0;\n')
-        this.enqueueOutput(async () => {
+        this.outputQueue.enqueue(async () => {
             await transformWxOutputChunks(output)
-            if (!this.initialBundleWritten) {
+            if (this.snapshot.outputPhase === 'starting') {
                 // The directory is plugin-owned; clearing it once removes stale files from previous protocol designs.
                 await fs.rm(path.join(this.outDir, wxDevelopmentDirectory), { recursive: true, force: true })
             }
@@ -153,7 +163,7 @@ export class WxDevelopmentSession {
             await writeDevelopmentOutput(this.outDir, output)
             await copyDirectoryIfExists(this.config.publicDir, this.outDir)
             const moduleCount = this.adapter.registerBundleModules(output)
-            this.initialBundleWritten = true
+            this.snapshot = { ...this.snapshot, outputPhase: 'ready' }
             this.initialBundle.resolve()
             this.server.config.logger.info(
                 `[vite-plugin-taro] WX bundle ready (${moduleCount} modules, ${output.length} files)`
@@ -168,7 +178,7 @@ export class WxDevelopmentSession {
         }
 
         this.adapter.registerPatchModules(output.code)
-        this.enqueueOutput(async () => {
+        this.outputQueue.enqueue(async () => {
             const transformed = await this.context.css.transformWxClassNames(output.code, output.filename)
             const compatibleCode = await transformWxCompatibleJavaScript(transformed.code, output.filename)
             if (
@@ -188,45 +198,24 @@ export class WxDevelopmentSession {
     }
 
     private requestFullBuild(): void {
-        if (this.closed) return
-        this.rebuildRequested = true
-        if (this.rebuildWork) return
-        if (this.rebuildTimer) clearTimeout(this.rebuildTimer)
-        // CSS and public-file edits commonly arrive as a burst; rebuild only after their trailing edge.
-        this.rebuildTimer = setTimeout(() => {
-            this.rebuildTimer = undefined
-            this.rebuildWork = this.runRebuild().finally(() => {
-                this.rebuildWork = undefined
-                if (this.rebuildRequested) this.requestFullBuild()
-            })
-        }, fullBuildDebounceDelay)
-    }
-
-    private async runRebuild(): Promise<void> {
-        if (!this.rebuildRequested || this.closed) return
-        this.rebuildRequested = false
-        try {
-            await this.adapter.rebuild()
-        } catch (error) {
-            const normalizedError = error instanceof Error ? error : new Error(String(error))
-            this.server.config.logger.error('[vite-plugin-taro] WX rebuild failed', { error: normalizedError })
-        }
+        this.fullBuildScheduler.request()
     }
 
     private async waitForInitialBundle(): Promise<void> {
         await this.initialBundle.promise
-        await this.outputWork
+        await this.outputQueue.waitForIdle()
     }
 
-    private enqueueOutput(task: () => Promise<void>): Promise<void> {
-        const work = this.outputWork.then(task)
-        this.outputWork = work.catch((error: unknown) => {
-            const normalizedError = error instanceof Error ? error : new Error(String(error))
-            this.server.config.logger.error(
-                `[vite-plugin-taro] WX development output failed: ${normalizedError.stack ?? normalizedError.message}`
-            )
-        })
-        return work
+    private reportOutputError(error: unknown): void {
+        const normalizedError = error instanceof Error ? error : new Error(String(error))
+        this.server.config.logger.error(
+            `[vite-plugin-taro] WX development output failed: ${normalizedError.stack ?? normalizedError.message}`
+        )
+    }
+
+    private reportRebuildError(error: unknown): void {
+        const normalizedError = error instanceof Error ? error : new Error(String(error))
+        this.server.config.logger.error('[vite-plugin-taro] WX rebuild failed', { error: normalizedError })
     }
 }
 
