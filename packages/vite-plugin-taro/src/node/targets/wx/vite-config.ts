@@ -12,7 +12,7 @@ const taroVersion = String(packageRequire('@tarojs/runtime/package.json').versio
 export function createWxViteConfig(context: BuildContext): UserConfig {
     return {
         define: createWxTaroDefines(),
-        experimental: context.behavior.bundledDevelopment ? { bundledDev: true } : undefined,
+        experimental: context.development ? { bundledDev: true } : undefined,
         css: {
             lightningcss: {
                 visitor: {
@@ -41,8 +41,8 @@ export function createWxViteConfig(context: BuildContext): UserConfig {
             target: 'es2018',
             assetsInlineLimit: 1024,
             cssCodeSplit: false,
-            cssMinify: context.behavior.minify ? 'lightningcss' : false,
-            minify: context.behavior.minify,
+            cssMinify: context.development ? false : 'lightningcss',
+            minify: !context.development,
             rolldownOptions: {
                 input: { app: virtualWxAppId },
                 experimental: { attachDebugInfo: 'none' },

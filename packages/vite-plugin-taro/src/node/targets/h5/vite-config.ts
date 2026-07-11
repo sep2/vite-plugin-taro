@@ -33,7 +33,7 @@ export function createH5ViteConfig(context: BuildContext): UserConfig {
         },
         build: {
             target: 'es2018',
-            minify: context.behavior.minify
+            minify: !context.development
         }
     }
 }

@@ -4,7 +4,6 @@ import { stripVirtualPrefix } from '../../module-paths.ts'
 import { resolveTaroVirtualModule } from '../../taro-virtual-modules.ts'
 import { emitWxCompanionAssets, type WxBundle } from './companion-assets.ts'
 import { WxDevServerSession } from './dev-server/session.ts'
-import { wxHotUpdateControlFile, wxHotUpdateEntryFile } from './hot-update-files.ts'
 import { transformWxReactRefreshModule } from './react-refresh.ts'
 import { emitWxEntryChunks, isWxVirtualModuleId, loadWxVirtualModule } from './virtual-modules.ts'
 
@@ -38,7 +37,7 @@ function createWxTargetPlugin(context: BuildContext): Plugin {
         transform: {
             order: 'post',
             async handler(code, id) {
-                if (!context.behavior.reactRefresh) return
+                if (!context.development) return
                 const transformed = await transformWxReactRefreshModule(code, id, context.project.appComponentFile)
                 return transformed === code ? undefined : transformed
             }
@@ -48,10 +47,6 @@ function createWxTargetPlugin(context: BuildContext): Plugin {
             order: 'post',
             handler(_, bundle) {
                 emitWxCompanionAssets(this, bundle as WxBundle, context)
-                if (context.behavior.emitHotUpdateEntry) {
-                    this.emitFile({ type: 'asset', fileName: wxHotUpdateEntryFile, source: 'void 0;\n' })
-                    this.emitFile({ type: 'asset', fileName: wxHotUpdateControlFile, source: 'void 0;\n' })
-                }
             }
         },
 

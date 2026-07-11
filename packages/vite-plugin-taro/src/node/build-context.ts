@@ -13,36 +13,11 @@ export type ProjectContext = Readonly<{
     sitemapJson: JsonObject
 }>
 
-export type BuildBehavior = Readonly<{
-    minify: boolean
-    prettyPrintJson: boolean
-    bundledDevelopment: boolean
-    reactRefresh: boolean
-    emitHotUpdateEntry: boolean
-}>
-
-const buildBehaviorByCommand: Record<ConfigEnv['command'], BuildBehavior> = {
-    serve: {
-        minify: false,
-        prettyPrintJson: true,
-        bundledDevelopment: true,
-        reactRefresh: true,
-        emitHotUpdateEntry: true
-    },
-    build: {
-        minify: true,
-        prettyPrintJson: false,
-        bundledDevelopment: false,
-        reactRefresh: false,
-        emitHotUpdateEntry: false
-    }
-}
-
 /** Owns the shared project, Vite lifecycle state, and cross-target services for one build. */
 export class BuildContext {
     readonly project: ProjectContext
     readonly css: CssPipeline
-    private configuredBehavior: BuildBehavior | undefined
+    private developmentMode: boolean | undefined
     private resolvedViteConfig: ResolvedConfig | undefined
 
     constructor(options: VitePluginTaroOptions) {
@@ -62,12 +37,12 @@ export class BuildContext {
     }
 
     configure(environment: ConfigEnv): void {
-        if (this.configuredBehavior) throw new Error('vite-plugin-taro build context was already configured.')
-        this.configuredBehavior = buildBehaviorByCommand[environment.command]
+        if (this.developmentMode !== undefined) throw new Error('vite-plugin-taro build context was already configured.')
+        this.developmentMode = environment.command === 'serve'
     }
 
     resolve(config: ResolvedConfig): void {
-        if (!this.configuredBehavior) {
+        if (this.developmentMode === undefined) {
             throw new Error('vite-plugin-taro build context resolved before it was configured.')
         }
         if (this.resolvedViteConfig) throw new Error('vite-plugin-taro build context was already resolved.')
@@ -75,9 +50,9 @@ export class BuildContext {
         this.css.resolve(config.root)
     }
 
-    get behavior(): BuildBehavior {
-        if (!this.configuredBehavior) throw new Error('vite-plugin-taro build context is not configured.')
-        return this.configuredBehavior
+    get development(): boolean {
+        if (this.developmentMode === undefined) throw new Error('vite-plugin-taro build context is not configured.')
+        return this.developmentMode
     }
 
     get vite(): ResolvedConfig {

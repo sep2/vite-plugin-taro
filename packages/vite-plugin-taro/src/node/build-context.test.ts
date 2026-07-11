@@ -17,26 +17,19 @@ function environment(command: ConfigEnv['command']): ConfigEnv {
     return { command, mode: command === 'serve' ? 'development' : 'production', isSsrBuild: false, isPreview: false }
 }
 
-test('derives build behavior once from the Vite command', () => {
+test('derives development mode once from the Vite command', () => {
     const serveContext = new BuildContext(options)
     serveContext.configure(environment('serve'))
-    assert.deepEqual(serveContext.behavior, {
-        minify: false,
-        prettyPrintJson: true,
-        bundledDevelopment: true,
-        reactRefresh: true,
-        emitHotUpdateEntry: true
-    })
+    assert.equal(serveContext.development, true)
 
     const buildContext = new BuildContext(options)
     buildContext.configure(environment('build'))
-    assert.equal(buildContext.behavior.minify, true)
-    assert.equal(buildContext.behavior.reactRefresh, false)
+    assert.equal(buildContext.development, false)
 })
 
 test('enforces build context lifecycle order', () => {
     const context = new BuildContext(options)
-    assert.throws(() => context.behavior, /not configured/)
+    assert.throws(() => context.development, /not configured/)
     assert.throws(() => context.vite, /not resolved/)
     assert.throws(() => context.resolve({ root: '/tmp' } as ResolvedConfig), /before it was configured/)
 

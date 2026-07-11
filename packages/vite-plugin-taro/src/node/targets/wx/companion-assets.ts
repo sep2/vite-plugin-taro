@@ -42,7 +42,7 @@ function createWxCompanionAssets(
     context: BuildContext
 ): { fileName: string; source: WxAssetSource }[] {
     const json = (value: JsonObject) =>
-        context.behavior.prettyPrintJson ? JSON.stringify(value, null, 2) : JSON.stringify(value)
+        context.development ? JSON.stringify(value, null, 2) : JSON.stringify(value)
 
     return [
         { fileName: 'app.json', source: json(context.project.appConfig) },
