@@ -106,7 +106,10 @@ export function createWxViteConfig(context: BuildContext): UserConfig {
             minify: !context.development,
             rolldownOptions: {
                 input: { app: virtualWxAppId },
-                experimental: { attachDebugInfo: 'none' },
+                experimental: {
+                    // remove vite virtual module \0 in comments, which causes WeChat DevTools failed to compile
+                    attachDebugInfo: 'none'
+                },
                 output: {
                     format: 'cjs',
                     entryFileNames: '[name].js',
