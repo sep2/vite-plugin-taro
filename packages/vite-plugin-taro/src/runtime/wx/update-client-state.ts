@@ -4,9 +4,9 @@
  * It knows build versions and sequencing only; wx.request, literal code execution, and page lifecycle effects live in
  * update-client.ts and page-update.ts.
  */
-export type WxUpdateClientPhase = 'stopped' | 'registering' | 'polling' | 'applying' | 'refreshing' | 'relaunching'
+type WxUpdateClientPhase = 'stopped' | 'registering' | 'polling' | 'applying' | 'refreshing' | 'relaunching'
 
-export type WxUpdateClientState = {
+type WxUpdateClientState = {
     buildId: string
     version: number
     phase: WxUpdateClientPhase
@@ -33,7 +33,7 @@ export type WxUpdateClientCommand =
     | { type: 'request-full-build'; reason: 'batch-execution-failed' }
     | { type: 'retry-transport' }
 
-export type WxUpdateClientTransition = {
+type WxUpdateClientTransition = {
     state: WxUpdateClientState
     commands: WxUpdateClientCommand[]
 }

@@ -19,16 +19,16 @@ const wxUpdateClientImportPath = runtimeImportPath('update-client.js')
 export const virtualWxAppId = 'virtual:vite-plugin-taro/wx/app'
 
 /** Generated recursive Taro component entry. */
-export const virtualWxComponentId = 'virtual:vite-plugin-taro/wx/component'
+const virtualWxComponentId = 'virtual:vite-plugin-taro/wx/component'
 
 /** Prefix for one generated native entry per configured page route. */
-export const virtualWxPageIdPrefix = 'virtual:vite-plugin-taro/wx/page/'
+const virtualWxPageIdPrefix = 'virtual:vite-plugin-taro/wx/page/'
 
 /** App bootstrap module that installs React Refresh globals before application modules execute. */
-export const virtualWxRefreshPreambleId = 'virtual:vite-plugin-taro/wx/refresh-preamble'
+const virtualWxRefreshPreambleId = 'virtual:vite-plugin-taro/wx/refresh-preamble'
 
 /** Development-only entry that initializes all configured page components before update replay. */
-export const virtualWxPagePreloadId = 'virtual:vite-plugin-taro/wx/page-preload'
+const virtualWxPagePreloadId = 'virtual:vite-plugin-taro/wx/page-preload'
 
 type WxChunkEmitter = {
     emitFile(chunk: { type: 'chunk'; id: string; fileName: string; implicitlyLoadedAfterOneOf: string[] }): string

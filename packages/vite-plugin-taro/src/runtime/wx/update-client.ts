@@ -38,7 +38,7 @@ type WxPageUpdateCoordinator = {
     endUpdate?: () => void
 }
 
-export type WxUpdateClient = {
+type WxUpdateClient = {
     receiveBatch(metadata: WxUpdateBatchMetadata, apply: () => void): void
     refreshCompleted(stale: boolean): void
     routeReady(): void

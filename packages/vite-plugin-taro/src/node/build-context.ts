@@ -1,9 +1,9 @@
 import path from 'node:path'
 import type { ConfigEnv, ResolvedConfig } from 'vite'
 import type { JsonObject, VitePluginTaroOptions, VitePluginTaroPageOption, VitePluginTaroTarget } from '../options.ts'
-import { CssPipeline } from './css-pipeline.ts'
+import { CssPipeline } from './css/css-pipeline.ts'
 
-export type ProjectContext = Readonly<{
+type ProjectContext = Readonly<{
     target: VitePluginTaroTarget
     appComponentFile: string
     pages: readonly VitePluginTaroPageOption[]

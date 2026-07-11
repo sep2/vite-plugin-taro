@@ -1,11 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-    createWxUpdateServerState,
-    transitionWxUpdateServer,
-    type WxUpdateServerEvent,
-    type WxUpdateServerState
-} from './update-server-state.ts'
+import { createWxUpdateServerState, transitionWxUpdateServer } from './update-server-state.ts'
+
+type WxUpdateServerState = ReturnType<typeof createWxUpdateServerState>
+type WxUpdateServerEvent = Parameters<typeof transitionWxUpdateServer>[1]
 
 function run(state: WxUpdateServerState, event: WxUpdateServerEvent) {
     return transitionWxUpdateServer(state, event)

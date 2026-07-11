@@ -1,16 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-    createWxUpdateClientState,
-    transitionWxUpdateClient,
-    type WxUpdateClientState
-} from '../../../../runtime/wx/update-client-state.ts'
-import {
-    createWxUpdateServerState,
-    transitionWxUpdateServer,
-    type WxUpdateBatch,
-    type WxUpdateServerState
-} from './update-server-state.ts'
+import { createWxUpdateClientState, transitionWxUpdateClient } from '../../../../runtime/wx/update-client-state.ts'
+import { createWxUpdateServerState, transitionWxUpdateServer, type WxUpdateBatch } from './update-server-state.ts'
+
+type WxUpdateClientState = ReturnType<typeof createWxUpdateClientState>
+type WxUpdateServerState = ReturnType<typeof createWxUpdateServerState>
 
 type ProtocolClient = {
     sessionId: string

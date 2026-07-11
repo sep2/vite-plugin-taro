@@ -9,8 +9,7 @@ import {
     createWxUpdateServerState,
     transitionWxUpdateServer,
     type WxUpdateBatch,
-    type WxUpdateServerCommand,
-    type WxUpdateServerState
+    type WxUpdateServerCommand
 } from './update-server-state.ts'
 
 const endpointPath = '/__vite_plugin_taro_wx_update__'
@@ -31,7 +30,7 @@ type UpdateRequest = {
 }
 
 export class WxUpdateTransport {
-    private state: WxUpdateServerState = createWxUpdateServerState(createId())
+    private state = createWxUpdateServerState(createId())
     private readonly token = createId()
     private readonly pendingPolls = new Map<string, PendingPoll>()
     private closed = false

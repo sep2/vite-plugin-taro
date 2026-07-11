@@ -6,7 +6,7 @@ import type { BuildContext } from '../../build-context.ts'
 import { normalizeModuleId } from '../../utils/modules.ts'
 import { packageRequire } from '../../utils/packages.ts'
 
-export type WxAssetSource = string | Uint8Array
+type WxAssetSource = string | Uint8Array
 
 export type WxBundle = Record<
     string,

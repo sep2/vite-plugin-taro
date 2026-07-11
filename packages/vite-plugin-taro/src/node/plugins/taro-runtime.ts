@@ -3,7 +3,7 @@ import { resolvePackageFile } from '../utils/packages.ts'
 
 /** Public IDs used by Taro's API transform and generated target modules. */
 export const virtualTaroApiId = 'virtual:taro/api'
-export const virtualTaroComponentsId = 'virtual:taro/components'
+const virtualTaroComponentsId = 'virtual:taro/components'
 
 const runtimeModules = new Map([
     [virtualTaroApiId, resolvePackageFile('dist/runtime/taro/api.js')],

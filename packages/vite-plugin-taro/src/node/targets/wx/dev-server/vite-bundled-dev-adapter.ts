@@ -7,7 +7,7 @@ import { wxRolldownRuntimeSource } from './rolldown-runtime-source.ts'
 const clientId = 'vite-plugin-taro-wx'
 
 /** HMR boundary shape returned by Vite's private WX DevEngine integration. */
-export type WxDevEngineBoundary = {
+type WxDevEngineBoundary = {
     boundary: string
     acceptedVia: string
 }

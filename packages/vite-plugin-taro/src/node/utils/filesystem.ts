@@ -2,8 +2,8 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-export type FileSource = string | Uint8Array
-export type FileWrite = { file: string; source: FileSource }
+type FileSource = string | Uint8Array
+type FileWrite = { file: string; source: FileSource }
 
 /** Writes through a sibling temporary file so observers never read partial contents. */
 export async function writeFileAtomically(file: string, source: FileSource): Promise<void> {

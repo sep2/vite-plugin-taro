@@ -4,7 +4,7 @@
  * It retains versioned Rolldown deltas and selects one missing range for the active App Service. HTTP and filesystem
  * effects are represented as commands and handled by update-transport.ts.
  */
-export type WxUpdateDelta = {
+type WxUpdateDelta = {
     version: number
     code: string
 }
@@ -17,7 +17,7 @@ export type WxUpdateBatch = {
     deltas: WxUpdateDelta[]
 }
 
-export type WxUpdateServerState = {
+type WxUpdateServerState = {
     buildId: string
     hostVersion: number
     retainedDeltaBytes: number
@@ -27,7 +27,7 @@ export type WxUpdateServerState = {
     inFlight?: Pick<WxUpdateBatch, 'sessionId' | 'fromVersion' | 'targetVersion'>
 }
 
-export type WxUpdateServerEvent =
+type WxUpdateServerEvent =
     | { type: 'delta-added'; code: string; bytes?: number }
     | { type: 'client-registered'; buildId: string; sessionId: string; version: number }
     | { type: 'client-reported'; buildId: string; sessionId: string; version: number }
@@ -39,7 +39,7 @@ export type WxUpdateServerCommand =
     | { type: 'request-full-build'; reason: 'client-version-ahead' | 'invalid-client-version' }
     | { type: 'ignore-client'; reason: 'stale-build' | 'retired-session' | 'unknown-session' }
 
-export type WxUpdateServerTransition = {
+type WxUpdateServerTransition = {
     state: WxUpdateServerState
     commands: WxUpdateServerCommand[]
 }

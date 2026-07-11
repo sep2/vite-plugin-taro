@@ -6,7 +6,7 @@ import { resolvePackageFile } from '../../utils/packages.ts'
 
 const h5TaroRuntimeImportPath = toViteFileImportPath(resolvePackageFile('dist/runtime/h5/taro-runtime.js'))
 
-export const virtualH5EntryId = 'virtual:vite-plugin-taro/h5'
+const virtualH5EntryId = 'virtual:vite-plugin-taro/h5'
 
 export function isH5VirtualModuleId(id: string): boolean {
     return id === virtualH5EntryId
