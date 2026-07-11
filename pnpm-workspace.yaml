@@ -13,5 +13,5 @@ allowBuilds:
   esbuild: true
 
 minimumReleaseAgeExclude:
-  - '@weapp-tailwindcss/postcss@3.1.8'
-  - weapp-tailwindcss@5.1.9
+  - '@weapp-tailwindcss/postcss@3.1.10'
+  - weapp-tailwindcss@5.1.14
