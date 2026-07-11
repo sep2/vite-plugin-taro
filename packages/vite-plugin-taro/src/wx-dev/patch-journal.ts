@@ -6,7 +6,7 @@ const updateFileName = '__wx_hmr__/update.js'
 export class WxPatchJournal {
     private readonly outDir: string
     private patches: string[] = []
-    private writeQueue = Promise.resolve()
+    private bytes = 0
 
     constructor(outDir: string) {
         this.outDir = outDir
@@ -21,32 +21,27 @@ export class WxPatchJournal {
     }
 
     get size(): number {
-        return this.patches.reduce((total, patch) => total + Buffer.byteLength(patch), 0)
+        return this.bytes
     }
 
     reset(): Promise<void> {
         this.patches = []
-        return this.write(`globalThis.__WX_FULL_BUILD__ = ${Date.now()};\n`)
+        this.bytes = 0
+        return this.write(`globalThis.__VITE_PLUGIN_TARO_WX__.fullBuild = ${Date.now()};\n`)
     }
 
     append(code: string): Promise<void> {
         this.patches.push(code)
+        this.bytes += Buffer.byteLength(code)
         return this.write(renderJournal(this.patches))
     }
 
-    close(): Promise<void> {
-        return this.writeQueue
-    }
-
-    private write(source: string): Promise<void> {
+    private async write(source: string): Promise<void> {
         const file = path.join(this.outDir, updateFileName)
-        this.writeQueue = this.writeQueue.then(async () => {
-            await fs.mkdir(path.dirname(file), { recursive: true })
-            const temporaryFile = `${file}.tmp`
-            await fs.writeFile(temporaryFile, source)
-            await fs.rename(temporaryFile, file)
-        })
-        return this.writeQueue
+        await fs.mkdir(path.dirname(file), { recursive: true })
+        const temporaryFile = `${file}.tmp`
+        await fs.writeFile(temporaryFile, source)
+        await fs.rename(temporaryFile, file)
     }
 }
 
@@ -55,23 +50,23 @@ function renderJournal(patches: string[]): string {
     const updates = patches
         .map((code, index) => {
             const version = index + 1
-            return `if (globalThis.__WX_HMR_VERSION__ < ${version}) {\n${code}\nglobalThis.__WX_HMR_VERSION__ = ${version};\n}`
+            return `if (bridge.version < ${version}) {\n${code}\nbridge.version = ${version};\n}`
         })
         .join('\n')
 
-    return `globalThis.__WX_HMR_VERSION__ ??= 0;
-(() => {
+    return `(() => {
+    const bridge = globalThis.__VITE_PLUGIN_TARO_WX__;
     const applyUpdates = () => {
-        if (globalThis.__WX_HMR_VERSION__ >= ${latestVersion}) return;
-        globalThis.__WX_BUNDLED_HMR_BEGIN__?.();
+        if (bridge.version >= ${latestVersion}) return;
+        bridge.beginUpdate?.();
         try {
 ${indent(updates, 12)}
         } finally {
-            globalThis.__WX_BUNDLED_HMR_END__?.();
+            bridge.endUpdate?.();
         }
     };
-    if (globalThis.__rolldown_runtime__ && globalThis.__WX_BUNDLED_RUNTIME_READY__) applyUpdates();
-    else globalThis.__WX_PENDING_BUNDLED_HMR__ = applyUpdates;
+    if (globalThis.__rolldown_runtime__ && bridge.ready) applyUpdates();
+    else bridge.pendingUpdate = applyUpdates;
 })();
 `
 }

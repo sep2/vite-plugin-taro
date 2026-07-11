@@ -25,15 +25,21 @@ type WxRolldownRuntime = {
     endPatch?(): void
 }
 
+type WxDevelopmentBridge = {
+    version: number
+    fullBuild?: number
+    ready: boolean
+    pendingUpdate?: () => void
+    blockRefreshRegistration?: boolean
+    enqueueRefresh?: () => void
+    beginUpdate?: () => void
+    endUpdate?: () => void
+    afterRefresh?: (update?: RefreshResult) => void
+}
+
 type WxDevelopmentGlobal = typeof globalThis & {
     __rolldown_runtime__?: WxRolldownRuntime
-    __WX_BLOCK_REFRESH_REGISTRATION__?: boolean
-    __WX_BUNDLED_RUNTIME_READY__?: boolean
-    __WX_PENDING_BUNDLED_HMR__?: () => void
-    __WX_ENQUEUE_REACT_REFRESH__?: () => void
-    __WX_BUNDLED_HMR_BEGIN__?: () => void
-    __WX_BUNDLED_HMR_END__?: () => void
-    __WX_AFTER_REACT_REFRESH__?: (update?: RefreshResult) => void
+    __VITE_PLUGIN_TARO_WX__?: WxDevelopmentBridge
     getCurrentPages(): Array<{ route?: string }>
     wx: {
         reLaunch(options: { url: string }): void
@@ -41,6 +47,8 @@ type WxDevelopmentGlobal = typeof globalThis & {
 }
 
 const wxGlobal = globalThis as WxDevelopmentGlobal
+wxGlobal.__VITE_PLUGIN_TARO_WX__ ??= { version: 0, ready: false }
+const bridge = wxGlobal.__VITE_PLUGIN_TARO_WX__
 const refreshBoundary = { default: function WxRefreshBoundary() {} }
 const registeredRoutes = new Set<string>()
 const ignoredPages = new WeakSet<WechatPage>()
@@ -101,10 +109,10 @@ function getLifecycle(config: PageConfig, name: string): PageLifecycle | undefin
 }
 
 function applyPendingUpdate(): void {
-    wxGlobal.__WX_BUNDLED_RUNTIME_READY__ = true
-    const pendingUpdate = wxGlobal.__WX_PENDING_BUNDLED_HMR__
+    bridge.ready = true
+    const pendingUpdate = bridge.pendingUpdate
     if (!pendingUpdate) return
-    delete wxGlobal.__WX_PENDING_BUNDLED_HMR__
+    delete bridge.pendingUpdate
     pendingUpdate()
 }
 
@@ -113,12 +121,12 @@ function getActiveRoot(): TaroRoot | undefined {
     return (document.getElementById(activePage.$taroPath) as TaroRoot | null) ?? undefined
 }
 
-wxGlobal.__WX_ENQUEUE_REACT_REFRESH__ = () => {
+bridge.enqueueRefresh = () => {
     validateRefreshBoundaryAndEnqueueUpdate('vite-plugin-taro-wx', refreshBoundary, refreshBoundary)
 }
 
-wxGlobal.__WX_BUNDLED_HMR_BEGIN__ = () => {
-    wxGlobal.__WX_BLOCK_REFRESH_REGISTRATION__ = false
+bridge.beginUpdate = () => {
+    bridge.blockRefreshRegistration = false
     wxGlobal.__rolldown_runtime__?.beginPatch?.()
     pendingPage = activePage
     pendingRoot = getActiveRoot()
@@ -129,14 +137,14 @@ wxGlobal.__WX_BUNDLED_HMR_BEGIN__ = () => {
     })
 }
 
-wxGlobal.__WX_BUNDLED_HMR_END__ = () => {
+bridge.endUpdate = () => {
     wxGlobal.__rolldown_runtime__?.endPatch?.()
-    wxGlobal.__WX_BLOCK_REFRESH_REGISTRATION__ = true
-    wxGlobal.__WX_ENQUEUE_REACT_REFRESH__?.()
+    bridge.blockRefreshRegistration = true
+    bridge.enqueueRefresh?.()
 }
 
-wxGlobal.__WX_AFTER_REACT_REFRESH__ = (update) => {
-    wxGlobal.__WX_BLOCK_REFRESH_REGISTRATION__ = false
+bridge.afterRefresh = (update) => {
+    bridge.blockRefreshRegistration = false
     const page = pendingPage
     const root = pendingRoot
     pendingPage = undefined

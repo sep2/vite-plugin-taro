@@ -14,28 +14,41 @@ export type WxOutputFile =
           source: string | Uint8Array
       }
 
-export class WxOutputWriter {
-    private readonly outDir: string
+export async function writeWxOutput(outDir: string, output: WxOutputFile[]): Promise<void> {
+    await Promise.all(
+        output.map(async (item) => {
+            const file = path.join(outDir, item.fileName)
+            const source = item.type === 'chunk' ? item.code : item.source
+            await fs.mkdir(path.dirname(file), { recursive: true })
+            const temporaryFile = `${file}.tmp`
+            await fs.writeFile(temporaryFile, source)
+            await fs.rename(temporaryFile, file)
+        })
+    )
+}
 
-    constructor(outDir: string) {
-        this.outDir = outDir
+export async function syncWxPublicDirectory(publicDir: string, outDir: string): Promise<void> {
+    if (!publicDir) return
+    try {
+        await fs.cp(publicDir, outDir, { recursive: true, force: true })
+    } catch (error) {
+        if (!isMissingFileError(error)) throw error
     }
+}
 
-    async writeFullOutput(output: WxOutputFile[]): Promise<void> {
-        await fs.mkdir(this.outDir, { recursive: true })
-        await Promise.all(output.map((item) => this.writeFile(item)))
+export async function syncWxPublicFile(publicDir: string, outDir: string, file: string): Promise<void> {
+    const destination = path.join(outDir, path.relative(publicDir, file))
+    try {
+        const stat = await fs.stat(file)
+        if (stat.isDirectory()) return
+        await fs.mkdir(path.dirname(destination), { recursive: true })
+        await fs.copyFile(file, destination)
+    } catch (error) {
+        if (!isMissingFileError(error)) throw error
+        await fs.rm(destination, { recursive: true, force: true })
     }
+}
 
-    async writeOutput(output: WxOutputFile[]): Promise<void> {
-        await Promise.all(output.map((item) => this.writeFile(item)))
-    }
-
-    private async writeFile(item: WxOutputFile): Promise<void> {
-        const file = path.join(this.outDir, item.fileName)
-        const source = item.type === 'chunk' ? item.code : item.source
-        await fs.mkdir(path.dirname(file), { recursive: true })
-        const temporaryFile = `${file}.tmp`
-        await fs.writeFile(temporaryFile, source)
-        await fs.rename(temporaryFile, file)
-    }
+function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
+    return error instanceof Error && 'code' in error && error.code === 'ENOENT'
 }

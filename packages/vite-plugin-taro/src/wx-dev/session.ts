@@ -1,263 +1,146 @@
-import { existsSync, type FSWatcher, watch } from 'node:fs'
 import path from 'node:path'
 import type { ResolvedConfig, ViteDevServer } from 'vite'
-import { transformWxRuntimeClassNames } from '../vite/taro-css.ts'
-import { type WxOutputFile, WxOutputWriter } from './output-writer.ts'
+import type { WxRuntimeClassNameTransformer } from '../vite/taro-css.ts'
+import { WxBundledDevAdapter, type WxHmrOutput } from './bundled-dev-adapter.ts'
+import { syncWxPublicDirectory, syncWxPublicFile, type WxOutputFile, writeWxOutput } from './output-writer.ts'
 import { WxPatchJournal } from './patch-journal.ts'
-import { wxDevRuntimeImplementation } from './runtime-implementation.ts'
 
-const clientId = 'vite-plugin-taro-wx'
 const maxPatchCount = 1_000
 const maxPatchBytes = 16 * 1024 * 1024
 
-type WxHmrBoundary = {
-    boundary: string
-    acceptedVia: string
-}
-
-type WxHmrOutput =
-    | { type: 'Noop' }
-    | { type: 'FullReload'; reason?: string }
-    | {
-          type: 'Patch'
-          code: string
-          filename: string
-          hmrBoundaries: WxHmrBoundary[]
-      }
-
-type WxDevEngineInternal = {
-    registerModules(clientId: string, modules: string[]): void
-    ensureCurrentBuildFinish(): Promise<void>
-    ensureLatestBuildOutput(): Promise<unknown>
-    getBundleState(): Promise<{ lastBuildErrored: boolean }>
-    triggerFullBuild(): void
-}
-
-type WxRolldownOptions = {
-    output?: Record<string, unknown> | Array<Record<string, unknown>>
-    experimental?: {
-        devMode?: boolean | Record<string, unknown>
-        [key: string]: unknown
-    }
-    [key: string]: unknown
-}
-
-type WxBundledDevInternal = {
-    _devEngine?: WxDevEngineInternal
-    clients: {
-        setupIfNeeded(client: WxHotClient, clientId: string): void
-    }
-    getRolldownOptions(): Promise<WxRolldownOptions>
-    storeOutputFiles(output: WxOutputFile[]): void
-    handleHmrOutput(client: WxHotClient, files: string[], output: WxHmrOutput, info?: unknown): void
-    listen(): Promise<void>
-}
-
-type WxHotClient = {
-    send(payload: unknown): void
-}
-
 /** Owns one WX bundled-development graph and all writes to its fixed output directory. */
 export class WxDevelopmentSession {
+    private readonly adapter: WxBundledDevAdapter
     private readonly journal: WxPatchJournal
-    private readonly outputWriter: WxOutputWriter
+    private readonly outDir: string
     private readonly initialOutput: Promise<void>
     private resolveInitialOutput!: () => void
-    private rejectInitialOutput!: (error: unknown) => void
     private work = Promise.resolve()
-    private readonly fallbackWatchers: FSWatcher[] = []
-    private fallbackBuildUntil = 0
-    private buildErrored = false
-    private fullBuildPending = false
-    private lastFullBuildAt = 0
+    private rebuildRequested = false
+    private rebuildTimer: NodeJS.Timeout | undefined
+    private rebuildWork: Promise<void> | undefined
     private latestWxss = ''
     private closed = false
-    private bundledDev: WxBundledDevInternal | undefined
 
     constructor(
         private readonly config: ResolvedConfig,
-        private readonly server: ViteDevServer
+        private readonly server: ViteDevServer,
+        private readonly transformRuntimeClassNames: WxRuntimeClassNameTransformer
     ) {
-        const outDir = path.resolve(config.root, config.build.outDir)
-        this.journal = new WxPatchJournal(outDir)
-        this.outputWriter = new WxOutputWriter(outDir)
-        this.initialOutput = new Promise<void>((resolve, reject) => {
+        this.outDir = path.resolve(config.root, config.build.outDir)
+        this.journal = new WxPatchJournal(this.outDir)
+        this.initialOutput = new Promise<void>((resolve) => {
             this.resolveInitialOutput = resolve
-            this.rejectInitialOutput = reject
+        })
+        this.adapter = new WxBundledDevAdapter(config, server, {
+            onOutput: (output) => this.handleOutput(output),
+            onPatch: (files, output) => this.handlePatch(files, output),
+            onError: (message) => this.handleError(message),
+            waitUntilReady: () => this.waitUntilReady()
         })
     }
 
     install(): void {
-        const environment = this.server.environments.client
-        const bundledDev = environment.bundledDev as unknown as WxBundledDevInternal | undefined
-        if (!bundledDev) {
-            throw new Error('vite-plugin-taro requires Vite bundled development for the WX development server.')
-        }
-        if (
-            typeof bundledDev.getRolldownOptions !== 'function' ||
-            typeof bundledDev.storeOutputFiles !== 'function' ||
-            typeof bundledDev.handleHmrOutput !== 'function'
-        ) {
-            throw new Error('vite-plugin-taro does not support this Vite bundled-development API shape.')
-        }
-        this.bundledDev = bundledDev
-        this.installOptionsAdapter(bundledDev)
-        this.installOutputAdapter(bundledDev)
-        this.installPatchAdapter(bundledDev)
-        this.installListenerAdapter(bundledDev)
-        this.watchFallbackFiles(path.join(this.config.root, 'src'), false)
-        if (this.config.publicDir) this.watchFallbackFiles(this.config.publicDir, true)
+        this.adapter.install()
+        if (this.config.publicDir) this.server.watcher.add(this.config.publicDir)
+        this.server.watcher.on('change', this.handleWatchedFile)
+        this.server.watcher.on('add', this.handleWatchedFile)
+        this.server.watcher.on('unlink', this.handleWatchedFile)
     }
 
     async close(): Promise<void> {
         if (this.closed) return
         this.closed = true
-        for (const watcher of this.fallbackWatchers) watcher.close()
+        this.server.watcher.off('change', this.handleWatchedFile)
+        this.server.watcher.off('add', this.handleWatchedFile)
+        this.server.watcher.off('unlink', this.handleWatchedFile)
+        if (this.rebuildTimer) clearTimeout(this.rebuildTimer)
+        await this.rebuildWork
         await this.work
-        await this.journal.close()
     }
 
-    private watchFallbackFiles(directory: string, allFiles: boolean): void {
-        if (!existsSync(directory)) return
-        this.fallbackWatchers.push(
-            watch(directory, { recursive: true }, (_, fileName) => {
-                if (!fileName || isTemporaryFile(fileName)) return
-                if (/\.[cm]?[jt]sx?$/.test(fileName)) {
-                    if (this.buildErrored) {
-                        this.fallbackBuildUntil = Date.now() + 2_000
-                        this.requestFullBuild()
-                    }
-                    return
-                }
-                if (!allFiles && !isWxFallbackSource(fileName)) return
-                this.fallbackBuildUntil = Date.now() + 2_000
-                this.requestFullBuild()
-            })
-        )
+    private readonly handleWatchedFile = (file: string): void => {
+        if (isWithin(file, this.config.publicDir)) {
+            this.enqueue(() => syncWxPublicFile(this.config.publicDir, this.outDir, file))
+            this.requestFullBuild()
+        }
     }
 
-    private handleHotPayload(payload: unknown): void {
-        if (!isErrorPayload(payload)) return
-        this.buildErrored = true
-        const error = new Error(payload.err.message)
-        this.server.config.logger.error('[vite-plugin-taro] WX update failed', { error })
-    }
+    private handleOutput(output: WxOutputFile[]): void {
+        const wxss = normalizeWxStyles(output)
+        if (wxss !== undefined) this.latestWxss = wxss
+        if (isFullOutput(output)) {
+            if (this.latestWxss) setAppWxss(output, this.latestWxss)
+            stampFullOutput(output)
+        }
 
-    requestFullBuild(): void {
-        if (this.fullBuildPending || this.closed || Date.now() - this.lastFullBuildAt < 500) return
-        const engine = this.bundledDev?._devEngine
-        if (!engine) return
-        this.fullBuildPending = true
-        engine.triggerFullBuild()
-        void engine.ensureLatestBuildOutput().catch(() => {
-            this.fullBuildPending = false
+        if (!isFullOutput(output)) {
+            this.enqueue(() => writeWxOutput(this.outDir, output))
+            return
+        }
+
+        const moduleIds = collectInitialModuleIds(output, this.config.root)
+        this.enqueue(async () => {
+            await writeWxOutput(this.outDir, output)
+            await syncWxPublicDirectory(this.config.publicDir, this.outDir)
+            await this.journal.reset()
+            this.adapter.registerModules(moduleIds)
+            this.resolveInitialOutput()
+            this.server.config.logger.info(
+                `[vite-plugin-taro] WX bundle ready (${moduleIds.length} modules, ${output.length} files)`
+            )
         })
     }
 
-    private installOptionsAdapter(bundledDev: WxBundledDevInternal): void {
-        const getRolldownOptions = bundledDev.getRolldownOptions.bind(bundledDev)
-        bundledDev.getRolldownOptions = async () => {
-            const options = await getRolldownOptions()
-            if (!options.output) options.output = {}
-            let output: Record<string, unknown>
-            if (Array.isArray(options.output)) {
-                output = options.output[0] ?? {}
-                options.output[0] = output
-            } else {
-                output = options.output
+    private handlePatch(files: string[], output: WxHmrOutput): boolean {
+        if (!isSafeJavaScriptPatch(files, output)) {
+            this.requestFullBuild()
+            return false
+        }
+
+        this.adapter.registerModules(collectPatchModuleIds(output.code))
+        this.enqueue(async () => {
+            const transformed = await this.transformRuntimeClassNames(output.code, output.filename)
+            await this.journal.append(transformed.code)
+            if (this.journal.length >= maxPatchCount || this.journal.size >= maxPatchBytes) {
+                this.requestFullBuild()
             }
-            const configuredOutput = this.config.build.rolldownOptions.output
-            const desiredOutput = Array.isArray(configuredOutput) ? configuredOutput[0] : configuredOutput
-            Object.assign(output, desiredOutput, {
-                format: 'cjs',
-                sourcemap: false,
-                minify: false,
-                banner: createPageBanner
+        })
+        return true
+    }
+
+    private handleError(message: string): void {
+        this.server.config.logger.error('[vite-plugin-taro] WX update failed', { error: new Error(message) })
+    }
+
+    private requestFullBuild(): void {
+        if (this.closed) return
+        this.rebuildRequested = true
+        if (this.rebuildWork) return
+        if (this.rebuildTimer) clearTimeout(this.rebuildTimer)
+        this.rebuildTimer = setTimeout(() => {
+            this.rebuildTimer = undefined
+            this.rebuildWork = this.rebuild().finally(() => {
+                this.rebuildWork = undefined
+                if (this.rebuildRequested) this.requestFullBuild()
             })
-            options.experimental ??= {}
-            options.experimental.devMode = {
-                ...(typeof options.experimental.devMode === 'object' ? options.experimental.devMode : {}),
-                lazy: false,
-                implement: wxDevRuntimeImplementation
-            }
-            return options
+        }, 100)
+    }
+
+    private async rebuild(): Promise<void> {
+        if (!this.rebuildRequested || this.closed) return
+        this.rebuildRequested = false
+        try {
+            await this.adapter.rebuild()
+        } catch (error) {
+            const normalizedError = error instanceof Error ? error : new Error(String(error))
+            this.server.config.logger.error('[vite-plugin-taro] WX rebuild failed', { error: normalizedError })
         }
     }
 
-    private installOutputAdapter(bundledDev: WxBundledDevInternal): void {
-        const storeOutputFiles = bundledDev.storeOutputFiles.bind(bundledDev)
-        bundledDev.storeOutputFiles = (output) => {
-            const wxss = normalizeWxStyles(output)
-            if (wxss !== undefined) this.latestWxss = wxss
-            if (isFullOutput(output)) {
-                if (this.latestWxss) setAppWxss(output, this.latestWxss)
-                stampFullOutput(output)
-            }
-            storeOutputFiles(output)
-            if (!isFullOutput(output)) {
-                this.enqueue(() => this.outputWriter.writeOutput(output))
-                return
-            }
-            if (Date.now() - this.lastFullBuildAt < 1_000) {
-                this.enqueue(() => this.outputWriter.writeOutput(output))
-                return
-            }
-            const moduleIds = collectInitialModuleIds(output, this.config.root)
-            this.buildErrored = false
-            this.fullBuildPending = false
-            this.lastFullBuildAt = Date.now()
-            this.enqueue(async () => {
-                await this.outputWriter.writeFullOutput(output)
-                await this.journal.reset()
-                bundledDev._devEngine?.registerModules(clientId, moduleIds)
-                this.resolveInitialOutput()
-                this.server.config.logger.info(
-                    `[vite-plugin-taro] WX bundle ready (${moduleIds.length} modules, ${output.length} files)`
-                )
-            })
-        }
-    }
-
-    private installPatchAdapter(bundledDev: WxBundledDevInternal): void {
-        const handleHmrOutput = bundledDev.handleHmrOutput.bind(bundledDev)
-        bundledDev.handleHmrOutput = (client, files, output, info) => {
-            if (output.type === 'Noop') return
-            if (output.type === 'FullReload' || !isSafeJavaScriptPatch(files, output)) {
-                if (Date.now() >= this.fallbackBuildUntil) this.requestFullBuild()
-                return
-            }
-
-            const moduleIds = collectPatchModuleIds(output.code)
-            if (moduleIds.length) bundledDev._devEngine?.registerModules(clientId, moduleIds)
-            this.enqueue(async () => {
-                const transformed = await transformWxRuntimeClassNames(this.config.root, output.code, output.filename)
-                await this.journal.append(transformed.code)
-                if (this.journal.length >= maxPatchCount || this.journal.size >= maxPatchBytes) {
-                    this.requestFullBuild()
-                }
-            })
-            handleHmrOutput(client, files, output, info)
-        }
-    }
-
-    private installListenerAdapter(bundledDev: WxBundledDevInternal): void {
-        const listen = bundledDev.listen.bind(bundledDev)
-        bundledDev.listen = async () => {
-            await listen()
-            const client: WxHotClient = { send: (payload) => this.handleHotPayload(payload) }
-            bundledDev.clients.setupIfNeeded(client, clientId)
-            const engine = bundledDev._devEngine
-            if (!engine) throw new Error('vite-plugin-taro expected Vite to initialize the WX DevEngine.')
-            await engine.ensureCurrentBuildFinish()
-            const state = await engine.getBundleState()
-            if (state.lastBuildErrored) {
-                const error = new Error('The initial WX bundled-development build failed.')
-                this.rejectInitialOutput(error)
-                throw error
-            }
-            await this.initialOutput
-            await this.work
-        }
+    private async waitUntilReady(): Promise<void> {
+        await this.initialOutput
+        await this.work
     }
 
     private enqueue(task: () => Promise<void>): void {
@@ -270,34 +153,10 @@ export class WxDevelopmentSession {
     }
 }
 
-function isTemporaryFile(fileName: string): boolean {
-    const baseName = path.basename(fileName)
-    return (
-        baseName.startsWith('.~') ||
-        baseName.startsWith('.#') ||
-        baseName.endsWith('~') ||
-        /\.(?:tmp|swp|swx)$/.test(baseName) ||
-        baseName.includes('___jb_')
-    )
-}
-
-function isWxFallbackSource(fileName: string): boolean {
-    return /\.(?:css|scss|sass|less|styl|stylus|json|wxml|wxs|png|jpe?g|gif|webp|svg|ico|bmp|avif|woff2?|ttf|otf|eot|mp3|mp4|wav|ogg|webm)$/i.test(
-        fileName
-    )
-}
-
-function isErrorPayload(payload: unknown): payload is { type: 'error'; err: { message: string } } {
-    if (typeof payload !== 'object' || payload === null) return false
-    const candidate = payload as { type?: unknown; err?: { message?: unknown } }
-    return candidate.type === 'error' && typeof candidate.err?.message === 'string'
-}
-
-function createPageBanner(chunk: { fileName: string }): string {
-    if (!chunk.fileName.startsWith('pages/') || !chunk.fileName.endsWith('.js')) return ''
-    const depth = chunk.fileName.split('/').length - 1
-    const prefix = '../'.repeat(depth)
-    return `require(${JSON.stringify(`${prefix}runtime.js`)}); require(${JSON.stringify(`${prefix}__wx_hmr__/update.js`)});`
+function isWithin(file: string, directory: string): boolean {
+    if (!directory) return false
+    const relative = path.relative(directory, file)
+    return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative)
 }
 
 function stampFullOutput(output: WxOutputFile[]): void {
@@ -309,7 +168,7 @@ function stampFullOutput(output: WxOutputFile[]): void {
         type: 'chunk',
         fileName: app.fileName,
         modules: app.modules,
-        code: `${app.code}\n;globalThis.__WX_FULL_BUILD__ = ${Date.now()};\n`
+        code: `${app.code}\n;(globalThis.__VITE_PLUGIN_TARO_WX__ ??= {}).fullBuild = ${Date.now()};\n`
     }
 }
 
@@ -321,9 +180,9 @@ function normalizeWxStyles(output: WxOutputFile[]): string | undefined {
         if (item.type === 'asset' && item.fileName.endsWith('.css')) {
             styles.unshift(typeof item.source === 'string' ? item.source : new TextDecoder().decode(item.source))
             output.splice(index, 1)
-            continue
+        } else if (item.type === 'chunk') {
+            styles.push(...collectChunkStyles(item.code))
         }
-        if (item.type === 'chunk') styles.push(...collectChunkStyles(item.code))
     }
     if (styles.length === 0) return
     const source = styles.join('\n')

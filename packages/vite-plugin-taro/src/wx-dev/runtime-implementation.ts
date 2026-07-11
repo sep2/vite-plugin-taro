@@ -82,6 +82,6 @@ class WxDevRuntime extends BaseDevRuntime {
     }
   }
 }
-globalThis.__WX_BUNDLED_RUNTIME_READY__ = false;
+globalThis.__VITE_PLUGIN_TARO_WX__ = { version: 0, ready: false };
 globalThis.__rolldown_runtime__ = new WxDevRuntime(undefined, 'vite-plugin-taro-wx');
 `
