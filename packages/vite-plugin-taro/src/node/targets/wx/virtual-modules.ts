@@ -45,14 +45,27 @@ export function isWxVirtualModuleId(id: string): boolean {
 }
 
 export function loadWxVirtualModule(id: string, context: BuildContext): string | undefined {
-    if (id === virtualWxRefreshPreambleId) return createWxReactRefreshPreambleSource()
-    if (id === virtualWxAppId) return createWxAppEntrySource(context)
-    if (id === virtualWxComponentId) return createWxComponentEntrySource()
-    if (id === virtualWxPagePreloadId) return createWxPagePreloadSource(context)
-    if (!id.startsWith(virtualWxPageIdPrefix)) return
-    const pagePath = id.slice(virtualWxPageIdPrefix.length)
-    const page = context.project.pages.find((candidate) => candidate.path === pagePath)
-    if (page) return createWxPageEntrySource(page, context)
+    if (id === virtualWxRefreshPreambleId) {
+        return createWxReactRefreshPreambleSource()
+    }
+    if (id === virtualWxAppId) {
+        return createWxAppEntrySource(context)
+    }
+    if (id === virtualWxComponentId) {
+        return createWxComponentEntrySource()
+    }
+    if (id === virtualWxPagePreloadId) {
+        return createWxPagePreloadSource(context)
+    }
+
+    if (id.startsWith(virtualWxPageIdPrefix)) {
+        const pagePath = id.slice(virtualWxPageIdPrefix.length)
+
+        const page = context.project.pages.find((candidate) => candidate.path === pagePath)
+        if (page) {
+            return createWxPageEntrySource(page, context)
+        }
+    }
 }
 
 /** Registers every configured page and the shared recursive component as eager WX entry chunks. */
