@@ -57,8 +57,9 @@ export default defineConfig(({ mode }) => {
                     description: '',
                     compileType: 'miniprogram',
                     setting: {
-                        skylineRenderEnable: true,
-                        urlCheck: true,
+                        // wechat devtools does not support hot reload on skyline yet
+                        skylineRenderEnable: false,
+                        urlCheck: false,
                         es6: false,
                         postcss: false,
                         minified: false,
@@ -72,6 +73,11 @@ export default defineConfig(({ mode }) => {
                         showShadowRootInWxmlPanel: false,
                         scopeDataCheck: false,
                         useCompilerModule: false
+                    }
+                },
+                projectPrivateConfigJson: {
+                    setting: {
+                        urlCheck: false
                     }
                 },
                 sitemapJson: {
