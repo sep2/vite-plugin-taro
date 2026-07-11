@@ -6,8 +6,8 @@
  */
 import type { VitePluginTaroPageOption } from '../../../options.ts'
 import type { BuildContext } from '../../build-context.ts'
-import { createPageComponentImportPath, toViteFileImportPath } from '../../module-paths.ts'
 import { wxPageUpdateImportPath, wxTaroRuntimeImportPath, wxUpdateClientImportPath } from '../../package-paths.ts'
+import { createPageComponentImportPath, toViteFileImportPath } from '../../utils/modules.ts'
 import { wxPagePreloadFile } from './development-files.ts'
 import { createWxReactRefreshPreambleSource } from './react-refresh.ts'
 

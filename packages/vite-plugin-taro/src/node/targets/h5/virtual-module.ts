@@ -1,8 +1,8 @@
 import type { HtmlTagDescriptor } from 'vite'
 import type { JsonObject, VitePluginTaroPageOption } from '../../../options.ts'
 import type { BuildContext } from '../../build-context.ts'
-import { createPageComponentImportPath, toViteFileImportPath } from '../../module-paths.ts'
 import { h5TaroRuntimeImportPath } from '../../package-paths.ts'
+import { createPageComponentImportPath, toViteFileImportPath } from '../../utils/modules.ts'
 
 export const virtualH5EntryId = 'virtual:vite-plugin-taro/h5'
 

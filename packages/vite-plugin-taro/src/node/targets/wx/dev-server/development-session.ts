@@ -9,6 +9,12 @@ import path from 'node:path'
 import colors from 'picocolors'
 import type { ViteDevServer } from 'vite'
 import type { BuildContext } from '../../../build-context.ts'
+import {
+    copyDirectoryIfExists,
+    copyFileOrRemove,
+    writeFileAtomically,
+    writeFilesAtomically
+} from '../../../utils/filesystem.ts'
 import { wxDevelopmentDirectory, wxUpdateControlFile, wxUpdateFile } from '../development-files.ts'
 import {
     isWxFullBuildOutput,
@@ -18,7 +24,6 @@ import {
 } from './development-output.ts'
 import { transformWxCompatibleJavaScript, transformWxOutputChunks } from './javascript-compatibility.ts'
 import { collectWxBundleModuleIds, collectWxPatchModuleIds } from './module-ids.ts'
-import { syncWxPublicDirectory, syncWxPublicFile, writeWxOutputFile, writeWxOutputFiles } from './output-writer.ts'
 import { WxUpdateTransport } from './update-transport.ts'
 import { ViteBundledDevAdapter, type WxDevEngineUpdate } from './vite-bundled-dev-adapter.ts'
 
@@ -57,7 +62,7 @@ export class WxDevelopmentSession {
                     // A full build queued before this write invalidates the old batch instead of letting it overwrite
                     // the new build's empty update.js.
                     if (!this.updateTransport.isCurrentBuild(buildId)) return
-                    await writeWxOutputFile(this.outDir, wxUpdateFile, source)
+                    await writeFileAtomically(path.join(this.outDir, wxUpdateFile), source)
                 })
         )
         this.adapter = new ViteBundledDevAdapter(config, server, {
@@ -110,13 +115,14 @@ export class WxDevelopmentSession {
 
     private readonly handleHttpListening = (): void => {
         this.enqueueOutput(() =>
-            writeWxOutputFile(this.outDir, wxUpdateControlFile, this.updateTransport.createControlSource())
+            writeFileAtomically(path.join(this.outDir, wxUpdateControlFile), this.updateTransport.createControlSource())
         )
     }
 
     private readonly handleWatchedFile = (file: string): void => {
         if (isFileInside(file, this.config.publicDir)) {
-            this.enqueueOutput(() => syncWxPublicFile(this.config.publicDir, this.outDir, file))
+            const destination = path.join(this.outDir, path.relative(this.config.publicDir, file))
+            this.enqueueOutput(() => copyFileOrRemove(file, destination))
             this.requestFullBuild()
         }
     }
@@ -129,7 +135,7 @@ export class WxDevelopmentSession {
         if (!isWxFullBuildOutput(output)) {
             this.enqueueOutput(async () => {
                 await transformWxOutputChunks(output)
-                await writeWxOutputFiles(this.outDir, output)
+                await writeDevelopmentOutput(this.outDir, output)
             })
             return
         }
@@ -146,8 +152,8 @@ export class WxDevelopmentSession {
             }
             // Invalidate old HTTP reports before writing the new build epoch into the fixed DevTools directory.
             this.updateTransport.commitFullBuild(buildId)
-            await writeWxOutputFiles(this.outDir, output)
-            await syncWxPublicDirectory(this.config.publicDir, this.outDir)
+            await writeDevelopmentOutput(this.outDir, output)
+            await copyDirectoryIfExists(this.config.publicDir, this.outDir)
             this.adapter.registerModules(moduleIds)
             this.initialBundleWritten = true
             this.initialBundle.resolve()
@@ -224,6 +230,15 @@ export class WxDevelopmentSession {
         })
         return work
     }
+}
+
+function writeDevelopmentOutput(outDir: string, output: WxOutputFile[]): Promise<void> {
+    return writeFilesAtomically(
+        output.map((item) => ({
+            file: path.join(outDir, item.fileName),
+            source: item.type === 'chunk' ? item.code : item.source
+        }))
+    )
 }
 
 function setDevelopmentAsset(output: WxOutputFile[], fileName: string, source: string): void {

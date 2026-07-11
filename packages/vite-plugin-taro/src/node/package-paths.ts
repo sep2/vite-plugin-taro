@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module'
 import path from 'node:path'
-import { toViteFileImportPath } from './module-paths.ts'
+import { toViteFileImportPath } from './utils/modules.ts'
 
 /** Resolves package-owned dependencies and compiled runtime modules from the installed plugin location. */
 export const packageRequire = createRequire(import.meta.url)

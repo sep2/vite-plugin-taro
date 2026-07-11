@@ -3,7 +3,7 @@ import type { Plugin } from 'vite'
 import { createContext } from 'weapp-tailwindcss/core'
 import { createWeappTailwindcssGenerator, resolveTailwindV4Source } from 'weapp-tailwindcss/generator'
 import type { VitePluginTaroTarget } from '../options.ts'
-import { normalizeModuleId } from './module-paths.ts'
+import { normalizeModuleId } from './utils/modules.ts'
 
 const wxStyleOptions = {
     cssCalc: false,

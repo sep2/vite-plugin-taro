@@ -1,7 +1,7 @@
 import type { Plugin, PluginOption } from 'vite'
 import type { BuildContext } from '../../build-context.ts'
-import { stripVirtualPrefix } from '../../module-paths.ts'
 import { resolveTaroVirtualModule } from '../../taro-virtual-modules.ts'
+import { stripVirtualPrefix } from '../../utils/modules.ts'
 import { emitWxCompanionAssets, type WxBundle } from './companion-assets.ts'
 import { WxDevelopmentSession } from './dev-server/development-session.ts'
 import { transformWxReactRefreshModule } from './react-refresh.ts'

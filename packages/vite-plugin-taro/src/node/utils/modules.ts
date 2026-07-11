@@ -1,3 +1,4 @@
+/** Node-side helpers for application module files, Vite import specifiers, and normalized module IDs. */
 import path from 'node:path'
 
 /**

@@ -217,13 +217,16 @@ Transform/build failures preserve the last good files and retained deltas. Runti
 One `WxDevelopmentSession` owns the DevEngine adapter, update transport, module registration, serialized output writes, fallback rebuilds, and shutdown.
 
 ```text
+src/node/utils/
+    filesystem.ts
+    modules.ts
+
 src/node/targets/wx/dev-server/
     development-session.ts
     vite-bundled-dev-adapter.ts
     update-server-state.ts
     update-transport.ts
     development-output.ts
-    output-writer.ts
     module-ids.ts
     javascript-compatibility.ts
     rolldown-runtime-source.ts

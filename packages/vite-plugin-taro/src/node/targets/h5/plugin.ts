@@ -1,7 +1,7 @@
 import type { Plugin, PluginOption } from 'vite'
 import type { BuildContext } from '../../build-context.ts'
-import { stripVirtualPrefix } from '../../module-paths.ts'
 import { resolveTaroVirtualModule } from '../../taro-virtual-modules.ts'
+import { stripVirtualPrefix } from '../../utils/modules.ts'
 import { createH5SupportPlugins } from './support-plugins.ts'
 import { createH5IndexHtmlTags, isH5VirtualModuleId, loadH5VirtualModule } from './virtual-module.ts'
 
