@@ -1,6 +1,6 @@
 import path from 'node:path'
-import type { ResolvedConfig, ViteDevServer } from 'vite'
-import type { WxRuntimeClassNameTransformer } from '../../../css-integration.ts'
+import type { ViteDevServer } from 'vite'
+import type { BuildContext } from '../../../context.ts'
 import { syncWxPublicDirectory, syncWxPublicFile, type WxOutputFile, writeWxOutput } from './output.ts'
 import { WxPatchJournal } from './patch-journal.ts'
 import { WxBundledDevAdapter, type WxHmrOutput } from './vite-bundled-dev-adapter.ts'
@@ -9,6 +9,8 @@ const maxPatchCount = 1_000
 const maxPatchBytes = 16 * 1024 * 1024
 
 /** Owns one WX bundled-development graph and all writes to its fixed output directory. */
+type WxDevelopmentContext = Pick<BuildContext, 'vite' | 'css'>
+
 export class WxDevelopmentSession {
     private readonly adapter: WxBundledDevAdapter
     private readonly journal: WxPatchJournal
@@ -23,10 +25,10 @@ export class WxDevelopmentSession {
     private closed = false
 
     constructor(
-        private readonly config: ResolvedConfig,
-        private readonly server: ViteDevServer,
-        private readonly transformRuntimeClassNames: WxRuntimeClassNameTransformer
+        private readonly context: WxDevelopmentContext,
+        private readonly server: ViteDevServer
     ) {
+        const config = context.vite
         this.outDir = path.resolve(config.root, config.build.outDir)
         this.journal = new WxPatchJournal(this.outDir)
         this.initialOutput = new Promise<void>((resolve) => {
@@ -38,6 +40,10 @@ export class WxDevelopmentSession {
             onError: (message) => this.handleError(message),
             waitUntilReady: () => this.waitUntilReady()
         })
+    }
+
+    private get config() {
+        return this.context.vite
     }
 
     install(): void {
@@ -100,7 +106,7 @@ export class WxDevelopmentSession {
 
         this.adapter.registerModules(collectPatchModuleIds(output.code))
         this.enqueue(async () => {
-            const transformed = await this.transformRuntimeClassNames(output.code, output.filename)
+            const transformed = await this.context.css.transformRuntimeClassNames(output.code, output.filename)
             await this.journal.append(transformed.code)
             if (this.journal.length >= maxPatchCount || this.journal.size >= maxPatchBytes) {
                 this.requestFullBuild()
