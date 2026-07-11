@@ -31,11 +31,7 @@ type WechatTemplateComponentConfig = {
 const taroWechatComponentsReactPath = nodeRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
 let cachedTemplateBuilder: ReturnType<typeof createWechatTemplateBuilder> | undefined
 
-export function emitWechatAssets(
-    emitter: WechatAssetEmitter,
-    bundle: WechatBundle,
-    context: BuildContext
-): void {
+export function emitWechatAssets(emitter: WechatAssetEmitter, bundle: WechatBundle, context: BuildContext): void {
     for (const asset of createWechatAssets(bundle, context)) {
         emitter.emitFile({ type: 'asset', fileName: asset.fileName, source: asset.source })
     }
