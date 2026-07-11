@@ -52,7 +52,7 @@ export function stampWxFullBuild(output: WxOutputFile[]): void {
         type: 'chunk',
         fileName: app.fileName,
         modules: app.modules,
-        code: `${app.code}\n;globalThis.__VITE_PLUGIN_TARO_WX__.fullBuild = ${Date.now()};\n`
+        code: `${app.code}\n;globalThis.__VITE_PLUGIN_TARO_WX__ = globalThis.__VITE_PLUGIN_TARO_WX__ || { version: 0, ready: false };\nglobalThis.__VITE_PLUGIN_TARO_WX__.fullBuild = ${Date.now()};\n`
     }
 }
 
