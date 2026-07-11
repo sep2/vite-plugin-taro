@@ -10,3 +10,4 @@ export const packageRoot = path.dirname(nodeRequire.resolve('vite-plugin-taro/pa
 
 export const h5ShimImportPath = toImportPath(path.join(packageRoot, 'dist/shim/h5.js'))
 export const wxShimImportPath = toImportPath(path.join(packageRoot, 'dist/shim/wx.js'))
+export const wxDevRuntimeImportPath = toImportPath(path.join(packageRoot, 'dist/shim/dev-runtime.js'))
