@@ -1,19 +1,19 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { VitePluginTaroTarget } from '../../options.ts'
-import type { VitePluginTaroBuildContext } from '../context.ts'
+import { BuildContext } from '../context.ts'
 import { createVitePluginTaroConditionalDirectivePlugin } from './conditional-directives.ts'
 
 function transform(code: string, target: VitePluginTaroTarget): string {
-    const context = {
+    const context = new BuildContext({
         target,
-        appComponentFile: '',
+        app: 'src/app.ts',
         pages: [],
-        appConfig: {},
+        appJson: {},
         projectConfigJson: {},
         projectPrivateConfigJson: {},
         sitemapJson: {}
-    } satisfies VitePluginTaroBuildContext
+    })
     const hook = createVitePluginTaroConditionalDirectivePlugin(context).transform
     if (!hook) throw new Error('Expected a transform hook.')
     const handler = typeof hook === 'function' ? hook : hook.handler

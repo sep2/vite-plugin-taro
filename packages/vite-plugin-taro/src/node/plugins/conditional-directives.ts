@@ -1,15 +1,15 @@
 import type { Plugin } from 'vite'
 import type { VitePluginTaroTarget } from '../../options.ts'
-import type { VitePluginTaroBuildContext } from '../context.ts'
+import type { BuildContext } from '../context.ts'
 import { normalizeModuleId } from '../module-paths.ts'
 
-export function createVitePluginTaroConditionalDirectivePlugin(context: VitePluginTaroBuildContext): Plugin {
+export function createVitePluginTaroConditionalDirectivePlugin(context: BuildContext): Plugin {
     return {
         name: 'vite-plugin-taro-conditional-directives',
         enforce: 'pre',
         transform(code, id) {
             if (!isConditionalDirectiveSource(id) || !code.includes('#if')) return
-            return { code: transformConditionalDirectives(code, context.target), map: null }
+            return { code: transformConditionalDirectives(code, context.project.target), map: null }
         }
     }
 }
