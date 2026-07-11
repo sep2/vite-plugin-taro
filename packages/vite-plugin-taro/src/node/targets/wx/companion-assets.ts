@@ -2,7 +2,7 @@ import path from 'node:path'
 import { recursiveMerge } from '@tarojs/helper'
 import { Weapp as WechatPlatform } from '@tarojs/plugin-platform-weapp'
 import type { JsonObject } from '../../../options.ts'
-import type { VitePluginTaroBuildContext } from '../../context.ts'
+import type { BuildContext } from '../../context.ts'
 import { normalizeModuleId } from '../../module-paths.ts'
 import { nodeRequire } from '../../runtime-paths.ts'
 
@@ -34,24 +34,23 @@ let cachedTemplateBuilder: ReturnType<typeof createWechatTemplateBuilder> | unde
 export function emitWechatAssets(
     emitter: WechatAssetEmitter,
     bundle: WechatBundle,
-    context: VitePluginTaroBuildContext,
-    production: boolean
+    context: BuildContext
 ): void {
-    for (const asset of createWechatAssets(bundle, context, production)) {
+    for (const asset of createWechatAssets(bundle, context)) {
         emitter.emitFile({ type: 'asset', fileName: asset.fileName, source: asset.source })
     }
 }
 
 function createWechatAssets(
     bundle: WechatBundle,
-    context: VitePluginTaroBuildContext,
-    production: boolean
+    context: BuildContext
 ): { fileName: string; source: WechatAssetSource }[] {
     cachedTemplateBuilder ??= createWechatTemplateBuilder()
     const templateBuilder = cachedTemplateBuilder
-    const json = (value: JsonObject) => (production ? JSON.stringify(value) : JSON.stringify(value, null, 2))
+    const json = (value: JsonObject) =>
+        context.behavior.prettyPrintJson ? JSON.stringify(value, null, 2) : JSON.stringify(value)
     return [
-        { fileName: 'app.json', source: json(context.appConfig) },
+        { fileName: 'app.json', source: json(context.project.appConfig) },
         { fileName: 'app.wxss', source: collectWechatBundleWxss(bundle) },
         {
             fileName: 'base.wxml',
@@ -61,9 +60,9 @@ function createWechatAssets(
         { fileName: 'comp.wxml', source: templateBuilder.buildBaseComponentTemplate('.wxml') },
         { fileName: 'comp.json', source: json(createWechatCompJson()) },
         { fileName: 'project.config.json', source: json(createWechatProjectConfig(context)) },
-        { fileName: 'project.private.config.json', source: json(context.projectPrivateConfigJson) },
-        { fileName: 'sitemap.json', source: json(context.sitemapJson) },
-        ...context.pages.flatMap((page) => [
+        { fileName: 'project.private.config.json', source: json(context.project.projectPrivateConfigJson) },
+        { fileName: 'sitemap.json', source: json(context.project.sitemapJson) },
+        ...context.project.pages.flatMap((page) => [
             {
                 fileName: `${page.path}.wxml`,
                 source: templateBuilder.buildPageTemplate(relativeRootAsset(page.path, 'base.wxml'), {
@@ -83,10 +82,11 @@ function createWechatAssets(
     ]
 }
 
-function createWechatProjectConfig(context: VitePluginTaroBuildContext): JsonObject {
-    const setting = isJsonObject(context.projectConfigJson.setting) ? context.projectConfigJson.setting : {}
+function createWechatProjectConfig(context: BuildContext): JsonObject {
+    const projectConfig = context.project.projectConfigJson
+    const setting = isJsonObject(projectConfig.setting) ? projectConfig.setting : {}
     return {
-        ...context.projectConfigJson,
+        ...projectConfig,
         setting: { ...setting, compileHotReLoad: true }
     }
 }

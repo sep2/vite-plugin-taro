@@ -1,6 +1,6 @@
 import { transformSync } from '@babel/core'
 import type { VitePluginTaroPageOption } from '../../../options.ts'
-import type { VitePluginTaroBuildContext } from '../../context.ts'
+import type { BuildContext } from '../../context.ts'
 import { createPageComponentImport, normalizeModuleId, toImportPath } from '../../module-paths.ts'
 import { nodeRequire, wxDevelopmentRuntimeImportPath, wxRuntimeImportPath } from '../../runtime-paths.ts'
 
@@ -24,27 +24,19 @@ export function isWxVirtualModule(id: string): boolean {
     )
 }
 
-export function loadWxVirtualModule(
-    cleanId: string,
-    context: VitePluginTaroBuildContext,
-    development: boolean
-): string | undefined {
+export function loadWxVirtualModule(cleanId: string, context: BuildContext): string | undefined {
     if (cleanId === virtualWxRefreshPreambleId) return createWxRefreshPreamble()
-    if (cleanId === virtualWxAppId) return createWxAppEntry(context, development)
+    if (cleanId === virtualWxAppId) return createWxAppEntry(context)
     if (cleanId === virtualWxCompId) return createWxCompEntry()
     if (!cleanId.startsWith(virtualWxPagePrefix)) return
     const pagePath = cleanId.slice(virtualWxPagePrefix.length)
-    const page = context.pages.find((candidate) => candidate.path === pagePath)
-    if (page) return createWxPageEntry(page, development)
+    const page = context.project.pages.find((candidate) => candidate.path === pagePath)
+    if (page) return createWxPageEntry(page, context)
 }
 
-export function emitWxImplicitChunks(
-    emitter: WechatChunkEmitter,
-    context: VitePluginTaroBuildContext,
-    cleanId: string
-): void {
+export function emitWxImplicitChunks(emitter: WechatChunkEmitter, context: BuildContext, cleanId: string): void {
     if (cleanId !== virtualWxAppId) return
-    for (const page of context.pages) {
+    for (const page of context.project.pages) {
         emitter.emitFile({
             type: 'chunk',
             id: `${virtualWxPagePrefix}${page.path}`,
@@ -77,30 +69,32 @@ export function transformWxDevelopmentModule(code: string, id: string, appCompon
         )
 }
 
-function createWxAppEntry(context: VitePluginTaroBuildContext, development: boolean): string {
-    const refreshPreamble = development ? `import ${JSON.stringify(virtualWxRefreshPreambleId)}\n` : ''
+function createWxAppEntry(context: BuildContext): string {
+    const refreshPreamble = context.behavior.reactRefresh
+        ? `import ${JSON.stringify(virtualWxRefreshPreambleId)}\n`
+        : ''
     return `${refreshPreamble}import { createReactApp, ReactDOM } from ${JSON.stringify(wxRuntimeImportPath)}
 import React from 'react'
-import AppComponent from ${JSON.stringify(toImportPath(context.appComponentFile))}
+import AppComponent from ${JSON.stringify(toImportPath(context.project.appComponentFile))}
 
-const appConfig = ${JSON.stringify(context.appConfig)}
+const appConfig = ${JSON.stringify(context.project.appConfig)}
 App(createReactApp(AppComponent, React, ReactDOM, appConfig))
 `
 }
 
-function createWxPageEntry(page: VitePluginTaroPageOption, development: boolean): string {
-    const developmentImport = development
+function createWxPageEntry(page: VitePluginTaroPageOption, context: BuildContext): string {
+    const refreshRuntimeImport = context.behavior.reactRefresh
         ? `import { decorateWxPageConfig, registerWxPage } from ${JSON.stringify(wxDevelopmentRuntimeImportPath)}\n`
         : ''
     const createConfig = `createPageConfig(PageComponent, '${page.path}', { root: { cn: [] } }, pageConfig)`
-    const pageRegistration = development
+    const pageRegistration = context.behavior.reactRefresh
         ? `registerWxPage(${JSON.stringify(page.path)}, () => Page(taroPageConfig))`
         : 'Page(taroPageConfig)'
-    return `${developmentImport}import { createPageConfig } from ${JSON.stringify(wxRuntimeImportPath)}
+    return `${refreshRuntimeImport}import { createPageConfig } from ${JSON.stringify(wxRuntimeImportPath)}
 import PageComponent from ${JSON.stringify(createPageComponentImport(page.path))}
 
 const pageConfig = ${JSON.stringify(page.config)}
-const taroPageConfig = ${development ? `decorateWxPageConfig(${createConfig})` : createConfig}
+const taroPageConfig = ${context.behavior.reactRefresh ? `decorateWxPageConfig(${createConfig})` : createConfig}
 if (PageComponent && PageComponent.behaviors) {
   taroPageConfig.behaviors = (taroPageConfig.behaviors || []).concat(PageComponent.behaviors)
 }
