@@ -223,7 +223,6 @@ src/node/targets/wx/dev-server/
     update-server-state.ts
     update-transport.ts
     development-output.ts
-    module-ids.ts
     javascript-compatibility.ts
     rolldown-runtime-source.ts
 

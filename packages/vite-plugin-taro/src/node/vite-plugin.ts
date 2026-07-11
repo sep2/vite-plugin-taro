@@ -4,10 +4,8 @@ import type { VitePluginTaroOptions } from '../options.ts'
 import { BuildContext } from './build-context.ts'
 import { createConditionalDirectivePlugin } from './plugins/conditional-directives.ts'
 import { createTaroRuntimePlugin } from './plugins/taro-runtime.ts'
-import { createH5TargetPlugins } from './targets/h5/plugin.ts'
-import { createH5ViteConfig } from './targets/h5/vite-config.ts'
-import { createWxTargetPlugins } from './targets/wx/plugin.ts'
-import { createWxViteConfig } from './targets/wx/vite-config.ts'
+import { createH5TargetPlugins, createH5ViteConfig } from './targets/h5/plugin.ts'
+import { createWxTargetPlugins, createWxViteConfig } from './targets/wx/plugin.ts'
 
 /** Creates the Vite plugins for the selected Taro target. */
 export default function vitePluginTaro(options: VitePluginTaroOptions): PluginOption[] {

@@ -23,7 +23,6 @@ import {
     type WxOutputFile
 } from './development-output.ts'
 import { transformWxCompatibleJavaScript, transformWxOutputChunks } from './javascript-compatibility.ts'
-import { collectWxBundleModuleIds, collectWxPatchModuleIds } from './module-ids.ts'
 import { WxUpdateTransport } from './update-transport.ts'
 import { ViteBundledDevAdapter, type WxDevEngineUpdate } from './vite-bundled-dev-adapter.ts'
 
@@ -140,7 +139,6 @@ export class WxDevelopmentSession {
             return
         }
 
-        const moduleIds = collectWxBundleModuleIds(output, this.config.root)
         const buildId = this.updateTransport.createBuildId()
         setDevelopmentAsset(output, wxUpdateControlFile, this.updateTransport.createControlSource(buildId))
         setDevelopmentAsset(output, wxUpdateFile, 'void 0;\n')
@@ -154,11 +152,11 @@ export class WxDevelopmentSession {
             this.updateTransport.commitFullBuild(buildId)
             await writeDevelopmentOutput(this.outDir, output)
             await copyDirectoryIfExists(this.config.publicDir, this.outDir)
-            this.adapter.registerModules(moduleIds)
+            const moduleCount = this.adapter.registerBundleModules(output)
             this.initialBundleWritten = true
             this.initialBundle.resolve()
             this.server.config.logger.info(
-                `[vite-plugin-taro] WX bundle ready (${moduleIds.length} modules, ${output.length} files)`
+                `[vite-plugin-taro] WX bundle ready (${moduleCount} modules, ${output.length} files)`
             )
         })
     }
@@ -169,7 +167,7 @@ export class WxDevelopmentSession {
             return false
         }
 
-        this.adapter.registerModules(collectWxPatchModuleIds(output.code))
+        this.adapter.registerPatchModules(output.code)
         this.enqueueOutput(async () => {
             const transformed = await this.context.css.transformWxClassNames(output.code, output.filename)
             const compatibleCode = await transformWxCompatibleJavaScript(transformed.code, output.filename)

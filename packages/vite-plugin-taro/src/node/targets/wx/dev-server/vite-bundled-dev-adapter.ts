@@ -1,3 +1,4 @@
+import path from 'node:path'
 import type { ResolvedConfig, ViteDevServer } from 'vite'
 import { wxPagePreloadFile, wxUpdateControlFile, wxUpdateFile } from '../development-files.ts'
 import type { WxOutputFile } from './development-output.ts'
@@ -88,7 +89,23 @@ export class ViteBundledDevAdapter {
         this.installListener(bundledDev)
     }
 
-    registerModules(moduleIds: string[]): void {
+    registerBundleModules(output: WxOutputFile[]): number {
+        const moduleIds = new Set<string>()
+        for (const item of output) {
+            if (item.type !== 'chunk') continue
+            for (const id of Object.keys(item.modules ?? {})) moduleIds.add(toStableModuleId(id, this.config.root))
+        }
+        this.registerModules([...moduleIds])
+        return moduleIds.size
+    }
+
+    registerPatchModules(code: string): void {
+        const moduleIds = new Set<string>()
+        for (const match of code.matchAll(/create(?:Esm|Cjs)Initializer\("([^"]+)"/g)) moduleIds.add(match[1])
+        this.registerModules([...moduleIds])
+    }
+
+    private registerModules(moduleIds: string[]): void {
         if (moduleIds.length) this.bundledDev?._devEngine?.registerModules(clientId, moduleIds)
     }
 
@@ -162,6 +179,12 @@ export class ViteBundledDevAdapter {
             this.callbacks.onError(candidate.err.message)
         }
     }
+}
+
+function toStableModuleId(id: string, root: string): string {
+    const normalizedId = id.replace(/\\/g, '/')
+    if (normalizedId.startsWith('\0') || !path.posix.isAbsolute(normalizedId)) return normalizedId
+    return path.posix.relative(root.replace(/\\/g, '/'), normalizedId)
 }
 
 function getFirstOutput(options: WxRolldownOptions): Record<string, unknown> {
