@@ -69,6 +69,7 @@
         "@tarojs/taro": "^4.2.0",
         "@vitejs/plugin-react": "^6.0.2",
         "babel-plugin-transform-taroapi": "^4.2.0",
+        "picocolors": "^1.1.1",
         "react-refresh": "^0.18.0",
         "tailwindcss": "^4.3.2",
         "weapp-tailwindcss": "^5.1.9"

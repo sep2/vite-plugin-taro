@@ -1,4 +1,5 @@
 import path from 'node:path'
+import colors from 'picocolors'
 import type { ViteDevServer } from 'vite'
 import type { BuildContext } from '../../../build-context.ts'
 import {
@@ -25,6 +26,7 @@ export class WxDevServerSession {
     private readonly outDir: string
     private readonly initialBundleReady: Promise<void>
     private markInitialBundleReady!: () => void
+    private originalPrintUrls: (() => void) | undefined
     private outputWork = Promise.resolve()
     private rebuildRequested = false
     private rebuildTimer: NodeJS.Timeout | undefined
@@ -56,6 +58,8 @@ export class WxDevServerSession {
 
     install(): void {
         this.adapter.install()
+        this.originalPrintUrls = this.server.printUrls.bind(this.server)
+        this.server.printUrls = this.printUrls
         if (this.config.publicDir) this.server.watcher.add(this.config.publicDir)
         this.server.watcher.on('change', this.handleWatchedFile)
         this.server.watcher.on('add', this.handleWatchedFile)
@@ -68,9 +72,20 @@ export class WxDevServerSession {
         this.server.watcher.off('change', this.handleWatchedFile)
         this.server.watcher.off('add', this.handleWatchedFile)
         this.server.watcher.off('unlink', this.handleWatchedFile)
+        if (this.server.printUrls === this.printUrls && this.originalPrintUrls) {
+            this.server.printUrls = this.originalPrintUrls
+        }
         if (this.rebuildTimer) clearTimeout(this.rebuildTimer)
         await this.rebuildWork
         await this.outputWork
+    }
+
+    private readonly printUrls = (): void => {
+        this.originalPrintUrls?.()
+        const projectDirectory = relativeToViteConfig(this.outDir, this.config.configFile, this.config.root)
+        this.server.config.logger.info(
+            `  ${colors.green('➜')}  ${colors.bold('WeChat DevTools')}: ${colors.cyan(projectDirectory)}`
+        )
     }
 
     private readonly handleWatchedFile = (file: string): void => {
@@ -155,7 +170,6 @@ export class WxDevServerSession {
     private async waitForInitialBundle(): Promise<void> {
         await this.initialBundleReady
         await this.outputWork
-        this.server.config.logger.info(`[vite-plugin-taro] Open this directory in WeChat DevTools: ${this.outDir}`)
     }
 
     private enqueueOutput(task: () => Promise<void>): void {
@@ -166,6 +180,13 @@ export class WxDevServerSession {
             })
         })
     }
+}
+
+function relativeToViteConfig(outDir: string, configFile: string | undefined, root: string): string {
+    const configDirectory = configFile ? path.dirname(configFile) : root
+    const relativePath = path.relative(configDirectory, outDir).replaceAll('\\', '/')
+    if (!relativePath) return '.'
+    return relativePath.startsWith('.') ? relativePath : `./${relativePath}`
 }
 
 function isFileInside(file: string, directory: string): boolean {
