@@ -42,20 +42,6 @@ export function isWxFullBuildOutput(output: WxOutputFile[]): boolean {
     return output.some((item) => item.fileName === 'app.js')
 }
 
-/** Forces WeChat DevTools to observe each fallback build as a distinct App Service generation. */
-export function stampWxFullBuild(output: WxOutputFile[]): void {
-    const index = output.findIndex((item) => item.type === 'chunk' && item.fileName === 'app.js')
-    if (index < 0) return
-    const app = output[index]
-    if (app?.type !== 'chunk') return
-    output[index] = {
-        type: 'chunk',
-        fileName: app.fileName,
-        modules: app.modules,
-        code: `${app.code}\n;globalThis.__VITE_PLUGIN_TARO_WX__ = globalThis.__VITE_PLUGIN_TARO_WX__ || { version: 0, ready: false };\nglobalThis.__VITE_PLUGIN_TARO_WX__.fullBuild = ${Date.now()};\n`
-    }
-}
-
 function collectEmbeddedStyles(code: string): string[] {
     const styles: string[] = []
     for (const match of code.matchAll(/__vite__css(?:\$\d+)?\s*=\s*("(?:\\.|[^"\\])*");/g)) {
