@@ -69,7 +69,6 @@ export default defineConfig(({ mode }) => {
                     projectname: '房贷计算器',
                     description: '',
                     compileType: 'miniprogram',
-                    // simulatorType: 'wechat',
                     setting: {
                         skylineRenderEnable: false,
                         urlCheck: false,
