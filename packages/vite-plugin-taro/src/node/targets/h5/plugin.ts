@@ -3,7 +3,7 @@ import type { BuildContext } from '../../build-context.ts'
 import { resolveTaroVirtualModule } from '../../taro-virtual-modules.ts'
 import { stripVirtualPrefix } from '../../utils/modules.ts'
 import { createH5SupportPlugins } from './support-plugins.ts'
-import { createH5IndexHtmlTags, isH5VirtualModuleId, loadH5VirtualModule } from './virtual-module.ts'
+import { createH5IndexHtmlTags, isH5VirtualModuleId, loadH5VirtualModule } from './virtual-modules.ts'
 
 /** Creates the plugins that own the complete H5 target lifecycle. */
 export function createH5TargetPlugins(context: BuildContext): PluginOption[] {
