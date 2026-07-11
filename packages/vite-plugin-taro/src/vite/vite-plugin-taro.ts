@@ -1,21 +1,24 @@
 import path from 'node:path'
 import react from '@vitejs/plugin-react'
 import type { PluginOption } from 'vite'
-import { createVitePluginTaroConditionalDirectivePlugin } from './plugins.ts'
+import { createVitePluginTaroConditionalDirectivePlugin } from './plugins/conditional-directive-plugin.ts'
 import { createH5TargetPlugins } from './targets/h5.ts'
 import { createWxTargetPlugins } from './targets/wx.ts'
-import { createTaroCssPlugin } from './taro-css.ts'
+import { createTaroCssIntegration } from './taro-css.ts'
 import type { VitePluginTaroBuildContext, VitePluginTaroOptions } from './types.ts'
 
 /** Creates the Vite plugins for the selected Taro target. */
 export default function vitePluginTaro(options: VitePluginTaroOptions): PluginOption[] {
     const context = createVitePluginTaroBuildContext(options)
+    const css = createTaroCssIntegration(context)
 
     return [
         createVitePluginTaroConditionalDirectivePlugin(context),
-        createTaroCssPlugin(context),
+        css.plugin,
         ...react(),
-        ...(context.target === 'wx' ? createWxTargetPlugins(context) : createH5TargetPlugins(context))
+        ...(context.target === 'wx'
+            ? createWxTargetPlugins(context, css.transformWxRuntimeClassNames)
+            : createH5TargetPlugins(context))
     ]
 }
 
