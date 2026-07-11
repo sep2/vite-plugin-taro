@@ -9,6 +9,7 @@ import {
     stampWxFullBuild,
     type WxOutputFile
 } from './bundle-output.ts'
+import { transformWxCompatibleJavaScript, transformWxOutputChunks } from './javascript-compatibility.ts'
 import { collectWxBundleModuleIds, collectWxPatchModuleIds } from './module-ids.ts'
 import { syncWxPublicDirectory, syncWxPublicFile, writeWxOutputFiles } from './output-writer.ts'
 import { WxPatchJournal } from './patch-journal.ts'
@@ -104,12 +105,16 @@ export class WxDevServerSession {
         }
 
         if (!isWxFullBuildOutput(output)) {
-            this.enqueueOutput(() => writeWxOutputFiles(this.outDir, output))
+            this.enqueueOutput(async () => {
+                await transformWxOutputChunks(output)
+                await writeWxOutputFiles(this.outDir, output)
+            })
             return
         }
 
         const moduleIds = collectWxBundleModuleIds(output, this.config.root)
         this.enqueueOutput(async () => {
+            await transformWxOutputChunks(output)
             await writeWxOutputFiles(this.outDir, output)
             await syncWxPublicDirectory(this.config.publicDir, this.outDir)
             await this.journal.reset()
@@ -130,7 +135,8 @@ export class WxDevServerSession {
         this.adapter.registerModules(collectWxPatchModuleIds(output.code))
         this.enqueueOutput(async () => {
             const transformed = await this.context.css.transformWxClassNames(output.code, output.filename)
-            await this.journal.append(transformed.code)
+            const compatibleCode = await transformWxCompatibleJavaScript(transformed.code, output.filename)
+            await this.journal.append(compatibleCode)
             if (this.journal.length >= maxPatchCount || this.journal.size >= maxPatchBytes) {
                 this.requestFullBuild()
             }
