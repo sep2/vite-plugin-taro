@@ -47,7 +47,7 @@ export class CssPipeline {
     private createPlugin(): Plugin {
         const pipeline = this
         return {
-            name: 'vite-plugin-taro-css',
+            name: 'vite-plugin-taro:css',
             enforce: 'pre',
 
             buildStart() {

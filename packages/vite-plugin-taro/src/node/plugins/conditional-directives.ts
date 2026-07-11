@@ -5,7 +5,7 @@ import { normalizeModuleId } from '../utils/modules.ts'
 
 export function createConditionalDirectivePlugin(context: BuildContext): Plugin {
     return {
-        name: 'vite-plugin-taro-conditional-directives',
+        name: 'vite-plugin-taro:conditional-directives',
         enforce: 'pre',
         transform(code, id) {
             if (!isConditionalDirectiveSource(id) || !code.includes('#if')) return
