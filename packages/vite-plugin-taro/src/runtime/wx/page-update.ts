@@ -62,10 +62,21 @@ const bridge = wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX_PAGE_UPDATE__
 const refreshBoundary = { default: function WxRefreshBoundary() {} }
 const registeredRoutes = new Set<string>()
 const ignoredPages = new WeakSet<WxPage>()
-let activePage: WxPage | undefined
-let pendingPage: WxPage | undefined
-let pendingRoot: TaroRoot | undefined
-let suppressLifecycles = false
+
+type PageRuntimeState = Readonly<{
+    activePage?: WxPage
+    pendingUpdate?: { page?: WxPage; root?: TaroRoot }
+    suppressLifecycles: boolean
+}>
+
+type PageRuntimeEvent =
+    | { type: 'page-activated'; page: WxPage }
+    | { type: 'page-unloaded'; page: WxPage }
+    | { type: 'update-started'; root?: TaroRoot }
+    | { type: 'suppression-ended' }
+    | { type: 'refresh-finished' }
+
+let pageRuntimeState: PageRuntimeState = { suppressLifecycles: false }
 
 /** Registers a native route once per App Service runtime generation. */
 export function registerWxPage(route: string, register: () => void): void {
@@ -78,24 +89,24 @@ export function registerWxPage(route: string, register: () => void): void {
 export function decorateWxPageConfig(config: WxPageConfig): WxPageConfig {
     const onLoad = getLifecycle(config, 'onLoad')
     config.onLoad = function (this: WxPage, ...args: unknown[]) {
-        if (suppressLifecycles) {
+        if (pageRuntimeState.suppressLifecycles) {
             ignoredPages.add(this)
-            this.$taroPath = activePage?.$taroPath
-            this.$taroParams = activePage?.$taroParams
-            activePage = this
+            this.$taroPath = pageRuntimeState.activePage?.$taroPath
+            this.$taroParams = pageRuntimeState.activePage?.$taroParams
+            dispatchPageRuntime({ type: 'page-activated', page: this })
             return
         }
         const result = onLoad?.apply(this, args)
-        activePage = this
+        dispatchPageRuntime({ type: 'page-activated', page: this })
         return result
     }
     wrapLifecycle(config, 'onReady', applyPendingPageUpdate)
     wrapLifecycle(config, 'onShow', function () {
-        activePage = this
+        dispatchPageRuntime({ type: 'page-activated', page: this })
     })
     wrapLifecycle(config, 'onHide')
     wrapLifecycle(config, 'onUnload', function () {
-        if (activePage === this) activePage = undefined
+        dispatchPageRuntime({ type: 'page-unloaded', page: this })
     })
     return config
 }
@@ -103,7 +114,7 @@ export function decorateWxPageConfig(config: WxPageConfig): WxPageConfig {
 function wrapLifecycle(config: WxPageConfig, name: string, after?: PageLifecycle): void {
     const original = getLifecycle(config, name)
     config[name] = function (this: WxPage, ...args: unknown[]) {
-        if (suppressLifecycles) return
+        if (pageRuntimeState.suppressLifecycles) return
         if (ignoredPages.has(this)) {
             if (name === 'onUnload') ignoredPages.delete(this)
             return
@@ -129,8 +140,9 @@ function applyPendingPageUpdate(): void {
 }
 
 function getActiveTaroRoot(): TaroRoot | undefined {
-    if (!activePage?.$taroPath) return
-    return (document.getElementById(activePage.$taroPath) as TaroRoot | null) ?? undefined
+    const page = pageRuntimeState.activePage
+    if (!page?.$taroPath) return
+    return (document.getElementById(page.$taroPath) as TaroRoot | null) ?? undefined
 }
 
 bridge.enqueueRefresh = () => {
@@ -140,13 +152,9 @@ bridge.enqueueRefresh = () => {
 bridge.beginUpdate = () => {
     bridge.blockRefreshRegistration = false
     wxRuntimeGlobal.__rolldown_runtime__?.beginPatch?.()
-    pendingPage = activePage
-    pendingRoot = getActiveTaroRoot()
-    refreshTaroRoot(pendingRoot, pendingPage)
-    suppressLifecycles = true
-    runInNextNativeTask(() => {
-        suppressLifecycles = false
-    })
+    dispatchPageRuntime({ type: 'update-started', root: getActiveTaroRoot() })
+    refreshTaroRoot(pageRuntimeState.pendingUpdate?.root, pageRuntimeState.pendingUpdate?.page)
+    runInNextNativeTask(() => dispatchPageRuntime({ type: 'suppression-ended' }))
 }
 
 bridge.endUpdate = () => {
@@ -157,10 +165,10 @@ bridge.endUpdate = () => {
 
 bridge.afterRefresh = (update) => {
     bridge.blockRefreshRegistration = false
-    const page = pendingPage
-    const root = pendingRoot
-    pendingPage = undefined
-    pendingRoot = undefined
+    const pendingUpdate = pageRuntimeState.pendingUpdate
+    dispatchPageRuntime({ type: 'refresh-finished' })
+    const page = pendingUpdate?.page
+    const root = pendingUpdate?.root
 
     const stale = Boolean(update?.staleFamilies?.size)
     if (stale) {
@@ -169,9 +177,32 @@ bridge.afterRefresh = (update) => {
         return
     }
     runInNextNativeTask(() => {
-        refreshTaroRoot(root, activePage ?? page)
+        refreshTaroRoot(root, pageRuntimeState.activePage ?? page)
         wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX_UPDATE_CLIENT__?.refreshCompleted(false)
     })
+}
+
+function dispatchPageRuntime(event: PageRuntimeEvent): void {
+    pageRuntimeState = transitionPageRuntime(pageRuntimeState, event)
+}
+
+function transitionPageRuntime(state: PageRuntimeState, event: PageRuntimeEvent): PageRuntimeState {
+    switch (event.type) {
+        case 'page-activated':
+            return { ...state, activePage: event.page }
+        case 'page-unloaded':
+            return state.activePage === event.page ? { ...state, activePage: undefined } : state
+        case 'update-started':
+            return {
+                ...state,
+                pendingUpdate: { page: state.activePage, root: event.root },
+                suppressLifecycles: true
+            }
+        case 'suppression-ended':
+            return { ...state, suppressLifecycles: false }
+        case 'refresh-finished':
+            return { ...state, pendingUpdate: undefined }
+    }
 }
 
 function refreshTaroRoot(root: TaroRoot | undefined, page: WxPage | undefined): void {

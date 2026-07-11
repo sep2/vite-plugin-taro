@@ -34,7 +34,6 @@ export class WxUpdateTransport {
     private state: WxUpdateServerState = createWxUpdateServerState(createId())
     private readonly token = createId()
     private readonly pendingPolls = new Map<string, PendingPoll>()
-    private bytes = 0
     private closed = false
 
     constructor(
@@ -48,7 +47,7 @@ export class WxUpdateTransport {
     }
 
     get retainedDeltaBytes(): number {
-        return this.bytes
+        return this.state.retainedDeltaBytes
     }
 
     install(): void {
@@ -61,8 +60,7 @@ export class WxUpdateTransport {
     }
 
     addDelta(code: string): void {
-        this.apply({ type: 'delta-added', code })
-        this.bytes += Buffer.byteLength(code)
+        this.apply({ type: 'delta-added', code, bytes: Buffer.byteLength(code) })
         this.respondToAll({ type: 'changed' })
     }
 
@@ -76,7 +74,6 @@ export class WxUpdateTransport {
 
     commitFullBuild(buildId: string): void {
         this.apply({ type: 'full-build-committed', buildId })
-        this.bytes = 0
         this.respondToAll({ type: 'rebuilding' })
     }
 

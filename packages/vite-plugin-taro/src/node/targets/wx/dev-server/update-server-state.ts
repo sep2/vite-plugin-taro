@@ -20,6 +20,7 @@ export type WxUpdateBatch = {
 export type WxUpdateServerState = {
     buildId: string
     hostVersion: number
+    retainedDeltaBytes: number
     deltas: WxUpdateDelta[]
     activeSessionId?: string
     retiredSessionIds: string[]
@@ -27,7 +28,7 @@ export type WxUpdateServerState = {
 }
 
 export type WxUpdateServerEvent =
-    | { type: 'delta-added'; code: string }
+    | { type: 'delta-added'; code: string; bytes?: number }
     | { type: 'client-registered'; buildId: string; sessionId: string; version: number }
     | { type: 'client-reported'; buildId: string; sessionId: string; version: number }
     | { type: 'batch-publish-failed'; sessionId: string; targetVersion: number }
@@ -47,6 +48,7 @@ export function createWxUpdateServerState(buildId: string): WxUpdateServerState 
     return {
         buildId,
         hostVersion: 0,
+        retainedDeltaBytes: 0,
         deltas: [],
         retiredSessionIds: []
     }
@@ -62,6 +64,7 @@ export function transitionWxUpdateServer(
             return transition({
                 ...state,
                 hostVersion: version,
+                retainedDeltaBytes: state.retainedDeltaBytes + (event.bytes ?? event.code.length),
                 deltas: [...state.deltas, { version, code: event.code }]
             })
         }

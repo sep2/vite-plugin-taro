@@ -237,6 +237,10 @@ src/runtime/wx/
 
 Runtime modules never import Node or Vite implementation modules.
 
+### State ownership
+
+Durable protocol and page-lifecycle decisions use immutable state transitions. Mutation is restricted to external resource handles that cannot be represented as values: active HTTP requests, timers, pending long-poll responses, native Taro page objects, React Refresh globals, and Vite's private adapter hooks. Derived values such as retained byte counts live in their owning state machine rather than in parallel mutable counters.
+
 ## Validation
 
 Pure tests cover both state machines independently and together, including registration, normal acknowledgement, lost responses, deltas arriving in flight, App Service replay, retired sessions, malformed/ahead versions, stale-family relaunch, transport failure, execution failure, and full-build epoch reset.
