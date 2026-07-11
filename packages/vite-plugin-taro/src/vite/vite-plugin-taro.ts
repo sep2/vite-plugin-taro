@@ -2,7 +2,7 @@ import path from 'node:path'
 import type { PluginOption } from 'vite'
 import { createVitePluginTaroConditionalDirectivePlugin } from './plugins.ts'
 import { createH5TargetPlugins } from './targets/h5.ts'
-import { createWxTargetPlugin } from './targets/wx.ts'
+import { createWxTargetPlugins } from './targets/wx.ts'
 import { createTaroCssPlugin } from './taro-css.ts'
 import type { VitePluginTaroBuildContext, VitePluginTaroOptions } from './types.ts'
 
@@ -13,7 +13,7 @@ export default function vitePluginTaro(options: VitePluginTaroOptions): PluginOp
     return [
         createVitePluginTaroConditionalDirectivePlugin(context),
         createTaroCssPlugin(context),
-        ...(context.target === 'wx' ? [createWxTargetPlugin(context)] : createH5TargetPlugins(context))
+        ...(context.target === 'wx' ? createWxTargetPlugins(context) : createH5TargetPlugins(context))
     ]
 }
 
