@@ -32,8 +32,6 @@ type WxRolldownRuntime = {
 }
 
 type WxHotUpdateBridge = {
-    version: number
-    fullBuild?: number
     ready: boolean
     pendingUpdate?: () => void
     blockRefreshRegistration?: boolean
@@ -59,7 +57,7 @@ type WxRuntimeGlobal = typeof globalThis & {
 }
 
 const wxRuntimeGlobal = globalThis as WxRuntimeGlobal
-wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX__ ??= { version: 0, ready: false }
+wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX__ ??= { ready: false }
 const bridge = wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX__
 const refreshBoundary = { default: function WxRefreshBoundary() {} }
 const registeredRoutes = new Set<string>()
