@@ -13,7 +13,7 @@
 
 在线演示：<https://sep2.github.io/vite-plugin-taro>。如何在本地运行，请参见[示例应用](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.zh.md)。
 
-- **Vite + React 19** 基于 Vite 8 生态，一份代码覆盖微信小程序与 Web。
+- **Vite 8 + React 19** 基于 Vite 生态，一份代码覆盖微信小程序与 Web。
 - **热更新** 基于 Vite 重构的热更新，微信小程序完美支持，页面编辑不再丢失状态。
 - **Tailwind CSS v4 开箱即用** 直接书写工具类，微信与 Web 样式自动适配。
 - **基于 Taro，超越 Taro** 使用 Taro 组件和 API，摆脱旧式 webpack 链路。
@@ -277,7 +277,7 @@ export default function IndexPage() {
 
 ```sh
 npm run dev:wx       # 启动微信小程序热更新开发模式
-npm run dev:h5       # 启动 H5 开发服务器
+npm run dev:h5       # 启动 Web 开发服务器
 npm run build:wx     # 构建 dist/wx
 npm run build:h5     # 构建 dist/h5
 npm run preview:h5   # 预览 dist/h5
