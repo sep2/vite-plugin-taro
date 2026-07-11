@@ -1,13 +1,19 @@
 import type { VitePluginTaroPageOption } from '../../../options.ts'
 import type { BuildContext } from '../../build-context.ts'
 import { createPageComponentImportPath, toViteFileImportPath } from '../../module-paths.ts'
-import { wxHotUpdateRuntimeImportPath, wxRuntimeBridgeImportPath } from '../../package-paths.ts'
+import {
+    wxHotUpdateRuntimeImportPath,
+    wxRuntimeBridgeImportPath,
+    wxUpdateClientRuntimeImportPath
+} from '../../package-paths.ts'
+import { wxHotUpdatePreloadFile } from './hot-update-files.ts'
 import { createWxReactRefreshPreambleSource } from './react-refresh.ts'
 
 export const virtualWxAppId = 'virtual:vite-plugin-taro/wx/app'
 export const virtualWxComponentId = 'virtual:vite-plugin-taro/wx/comp'
 export const virtualWxPageIdPrefix = 'virtual:vite-plugin-taro/wx/page/'
 export const virtualWxRefreshPreambleId = 'virtual:vite-plugin-taro/wx/refresh-preamble'
+export const virtualWxPreloadId = 'virtual:vite-plugin-taro/wx/preload'
 
 type WxChunkEmitter = {
     emitFile(chunk: { type: 'chunk'; id: string; fileName: string; implicitlyLoadedAfterOneOf: string[] }): string
@@ -18,6 +24,7 @@ export function isWxVirtualModuleId(id: string): boolean {
         id === virtualWxAppId ||
         id === virtualWxComponentId ||
         id === virtualWxRefreshPreambleId ||
+        id === virtualWxPreloadId ||
         id.startsWith(virtualWxPageIdPrefix)
     )
 }
@@ -26,6 +33,7 @@ export function loadWxVirtualModule(id: string, context: BuildContext): string |
     if (id === virtualWxRefreshPreambleId) return createWxReactRefreshPreambleSource()
     if (id === virtualWxAppId) return createWxAppEntrySource(context)
     if (id === virtualWxComponentId) return createWxComponentEntrySource()
+    if (id === virtualWxPreloadId) return createWxPreloadSource(context)
     if (!id.startsWith(virtualWxPageIdPrefix)) return
     const pagePath = id.slice(virtualWxPageIdPrefix.length)
     const page = context.project.pages.find((candidate) => candidate.path === pagePath)
@@ -49,18 +57,30 @@ export function emitWxEntryChunks(emitter: WxChunkEmitter, context: BuildContext
         fileName: 'comp.js',
         implicitlyLoadedAfterOneOf: [id]
     })
+    if (context.behavior.reactRefresh) {
+        emitter.emitFile({
+            type: 'chunk',
+            id: virtualWxPreloadId,
+            fileName: wxHotUpdatePreloadFile,
+            implicitlyLoadedAfterOneOf: [id]
+        })
+    }
 }
 
 function createWxAppEntrySource(context: BuildContext): string {
     const refreshPreamble = context.behavior.reactRefresh
         ? `import ${JSON.stringify(virtualWxRefreshPreambleId)}\n`
         : ''
-    return `${refreshPreamble}import { createReactApp, ReactDOM } from ${JSON.stringify(wxRuntimeBridgeImportPath)}
+    const updateClient = context.behavior.reactRefresh
+        ? `import { startWxUpdateClient } from ${JSON.stringify(wxUpdateClientRuntimeImportPath)}\n`
+        : ''
+    return `${refreshPreamble}${updateClient}import { createReactApp, ReactDOM } from ${JSON.stringify(wxRuntimeBridgeImportPath)}
 import React from 'react'
 import AppComponent from ${JSON.stringify(toViteFileImportPath(context.project.appComponentFile))}
 
 const appConfig = ${JSON.stringify(context.project.appConfig)}
 App(createReactApp(AppComponent, React, ReactDOM, appConfig))
+${context.behavior.reactRefresh ? 'startWxUpdateClient()' : ''}
 `
 }
 
@@ -82,6 +102,13 @@ if (PageComponent && PageComponent.behaviors) {
 }
 ${pageRegistration}
 `
+}
+
+function createWxPreloadSource(context: BuildContext): string {
+    const imports = context.project.pages.map((page, index) => {
+        return `import Page${index} from ${JSON.stringify(createPageComponentImportPath(page.path))}`
+    })
+    return `${imports.join('\n')}\nvoid [${context.project.pages.map((_, index) => `Page${index}`).join(', ')}]\n`
 }
 
 function createWxComponentEntrySource(): string {
