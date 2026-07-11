@@ -1,23 +1,25 @@
 import type { ResolvedConfig, ViteDevServer } from 'vite'
-import { wxHotUpdateControlFile, wxHotUpdateEntryFile, wxHotUpdatePreloadFile } from '../hot-update-files.ts'
-import type { WxOutputFile } from './bundle-output.ts'
+import { wxPagePreloadFile, wxUpdateControlFile, wxUpdateFile } from '../development-files.ts'
+import type { WxOutputFile } from './development-output.ts'
 import { wxRolldownRuntimeSource } from './rolldown-runtime-source.ts'
 
 const clientId = 'vite-plugin-taro-wx'
 
-export type WxHmrBoundary = {
+/** HMR boundary shape returned by Vite's private WX DevEngine integration. */
+export type WxDevEngineBoundary = {
     boundary: string
     acceptedVia: string
 }
 
-export type WxHmrOutput =
+/** Update result shape returned by Vite's private bundled-development engine. */
+export type WxDevEngineUpdate =
     | { type: 'Noop' }
     | { type: 'FullReload'; reason?: string }
     | {
           type: 'Patch'
           code: string
           filename: string
-          hmrBoundaries: WxHmrBoundary[]
+          hmrBoundaries: WxDevEngineBoundary[]
       }
 
 type WxDevEngineInternal = {
@@ -37,24 +39,24 @@ type WxRolldownOptions = {
     [key: string]: unknown
 }
 
-type WxHotClient = {
+type WxDevEngineClient = {
     send(payload: unknown): void
 }
 
 type ViteBundledDevInternal = {
     _devEngine?: WxDevEngineInternal
     clients: {
-        setupIfNeeded(client: WxHotClient, clientId: string): void
+        setupIfNeeded(client: WxDevEngineClient, clientId: string): void
     }
     getRolldownOptions(): Promise<WxRolldownOptions>
     storeOutputFiles(output: WxOutputFile[]): void
-    handleHmrOutput(client: WxHotClient, files: string[], output: WxHmrOutput, info?: unknown): void
+    handleHmrOutput(client: WxDevEngineClient, files: string[], output: WxDevEngineUpdate, info?: unknown): void
     listen(): Promise<void>
 }
 
 type ViteBundledDevCallbacks = {
     onOutput(output: WxOutputFile[]): void
-    onPatch(files: string[], output: WxHmrOutput): boolean
+    onPatch(files: string[], output: WxDevEngineUpdate): boolean
     onError(message: string): void
     waitForInitialBundle(): Promise<void>
 }
@@ -109,7 +111,7 @@ export class ViteBundledDevAdapter {
                 format: 'cjs',
                 sourcemap: false,
                 minify: false,
-                banner: createWxRuntimeBanner
+                banner: createWxDevelopmentBanner
             })
             options.experimental ??= {}
             options.experimental.devMode = {
@@ -169,9 +171,10 @@ function getFirstOutput(options: WxRolldownOptions): Record<string, unknown> {
     return output
 }
 
-function createWxRuntimeBanner(chunk: { fileName: string }): string {
-    if (chunk.fileName === 'app.js') return `require(${JSON.stringify(`./${wxHotUpdateControlFile}`)});`
+/** Adds native direct dependencies whose execution order cannot be represented through the Rolldown graph. */
+function createWxDevelopmentBanner(chunk: { fileName: string }): string {
+    if (chunk.fileName === 'app.js') return `require(${JSON.stringify(`./${wxUpdateControlFile}`)});`
     if (!chunk.fileName.startsWith('pages/') || !chunk.fileName.endsWith('.js')) return ''
     const prefix = '../'.repeat(chunk.fileName.split('/').length - 1)
-    return `require(${JSON.stringify(`${prefix}runtime.js`)});require(${JSON.stringify(`${prefix}${wxHotUpdatePreloadFile}`)});require(${JSON.stringify(`${prefix}${wxHotUpdateEntryFile}`)});`
+    return `require(${JSON.stringify(`${prefix}runtime.js`)});require(${JSON.stringify(`${prefix}${wxPagePreloadFile}`)});require(${JSON.stringify(`${prefix}${wxUpdateFile}`)});`
 }

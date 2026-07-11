@@ -89,6 +89,7 @@ class WxRolldownRuntime extends BaseDevRuntime {
     }
   }
 }
-globalThis.__VITE_PLUGIN_TARO_WX__ = { version: 0, ready: false };
+// A full DevEngine runtime starts a new page-update generation before any application chunk executes.
+globalThis.__VITE_PLUGIN_TARO_WX_PAGE_UPDATE__ = { ready: false };
 globalThis.__rolldown_runtime__ = new WxRolldownRuntime(undefined, 'vite-plugin-taro-wx');
 `

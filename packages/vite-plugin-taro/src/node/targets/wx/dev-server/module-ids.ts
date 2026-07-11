@@ -1,5 +1,5 @@
 import path from 'node:path'
-import type { WxOutputFile } from './bundle-output.ts'
+import type { WxOutputFile } from './development-output.ts'
 
 /** Collects stable IDs from a full bundle so Rolldown can target them in later patches. */
 export function collectWxBundleModuleIds(output: WxOutputFile[], root: string): string[] {

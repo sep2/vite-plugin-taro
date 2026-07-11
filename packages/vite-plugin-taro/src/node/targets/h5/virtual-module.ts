@@ -2,7 +2,7 @@ import type { HtmlTagDescriptor } from 'vite'
 import type { JsonObject, VitePluginTaroPageOption } from '../../../options.ts'
 import type { BuildContext } from '../../build-context.ts'
 import { createPageComponentImportPath, toViteFileImportPath } from '../../module-paths.ts'
-import { h5RuntimeBridgeImportPath } from '../../package-paths.ts'
+import { h5TaroRuntimeImportPath } from '../../package-paths.ts'
 
 export const virtualH5EntryId = 'virtual:vite-plugin-taro/h5'
 
@@ -35,7 +35,7 @@ function createH5EntrySource(context: BuildContext): string {
     createRouter,
     handleAppMount,
     window
-} from ${JSON.stringify(h5RuntimeBridgeImportPath)}
+} from ${JSON.stringify(h5TaroRuntimeImportPath)}
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import AppComponent from ${JSON.stringify(toViteFileImportPath(context.project.appComponentFile))}

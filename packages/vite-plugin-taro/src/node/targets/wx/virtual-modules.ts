@@ -1,19 +1,30 @@
+/**
+ * Defines the generated WX application graph.
+ *
+ * App, page, and component IDs become native entry chunks. The Refresh preamble is an App bootstrap module, while the
+ * page-preload ID deliberately becomes its own development file with a later, page-only execution phase.
+ */
 import type { VitePluginTaroPageOption } from '../../../options.ts'
 import type { BuildContext } from '../../build-context.ts'
 import { createPageComponentImportPath, toViteFileImportPath } from '../../module-paths.ts'
-import {
-    wxHotUpdateRuntimeImportPath,
-    wxRuntimeBridgeImportPath,
-    wxUpdateClientRuntimeImportPath
-} from '../../package-paths.ts'
-import { wxHotUpdatePreloadFile } from './hot-update-files.ts'
+import { wxPageUpdateImportPath, wxTaroRuntimeImportPath, wxUpdateClientImportPath } from '../../package-paths.ts'
+import { wxPagePreloadFile } from './development-files.ts'
 import { createWxReactRefreshPreambleSource } from './react-refresh.ts'
 
+/** Generated native App entry. */
 export const virtualWxAppId = 'virtual:vite-plugin-taro/wx/app'
-export const virtualWxComponentId = 'virtual:vite-plugin-taro/wx/comp'
+
+/** Generated recursive Taro component entry. */
+export const virtualWxComponentId = 'virtual:vite-plugin-taro/wx/component'
+
+/** Prefix for one generated native entry per configured page route. */
 export const virtualWxPageIdPrefix = 'virtual:vite-plugin-taro/wx/page/'
+
+/** App bootstrap module that installs React Refresh globals before application modules execute. */
 export const virtualWxRefreshPreambleId = 'virtual:vite-plugin-taro/wx/refresh-preamble'
-export const virtualWxPreloadId = 'virtual:vite-plugin-taro/wx/preload'
+
+/** Development-only entry that initializes all configured page components before update replay. */
+export const virtualWxPagePreloadId = 'virtual:vite-plugin-taro/wx/page-preload'
 
 type WxChunkEmitter = {
     emitFile(chunk: { type: 'chunk'; id: string; fileName: string; implicitlyLoadedAfterOneOf: string[] }): string
@@ -24,7 +35,7 @@ export function isWxVirtualModuleId(id: string): boolean {
         id === virtualWxAppId ||
         id === virtualWxComponentId ||
         id === virtualWxRefreshPreambleId ||
-        id === virtualWxPreloadId ||
+        id === virtualWxPagePreloadId ||
         id.startsWith(virtualWxPageIdPrefix)
     )
 }
@@ -33,7 +44,7 @@ export function loadWxVirtualModule(id: string, context: BuildContext): string |
     if (id === virtualWxRefreshPreambleId) return createWxReactRefreshPreambleSource()
     if (id === virtualWxAppId) return createWxAppEntrySource(context)
     if (id === virtualWxComponentId) return createWxComponentEntrySource()
-    if (id === virtualWxPreloadId) return createWxPreloadSource(context)
+    if (id === virtualWxPagePreloadId) return createWxPagePreloadSource(context)
     if (!id.startsWith(virtualWxPageIdPrefix)) return
     const pagePath = id.slice(virtualWxPageIdPrefix.length)
     const page = context.project.pages.find((candidate) => candidate.path === pagePath)
@@ -60,8 +71,8 @@ export function emitWxEntryChunks(emitter: WxChunkEmitter, context: BuildContext
     if (context.development) {
         emitter.emitFile({
             type: 'chunk',
-            id: virtualWxPreloadId,
-            fileName: wxHotUpdatePreloadFile,
+            id: virtualWxPagePreloadId,
+            fileName: wxPagePreloadFile,
             implicitlyLoadedAfterOneOf: [id]
         })
     }
@@ -70,9 +81,9 @@ export function emitWxEntryChunks(emitter: WxChunkEmitter, context: BuildContext
 function createWxAppEntrySource(context: BuildContext): string {
     const refreshPreamble = context.development ? `import ${JSON.stringify(virtualWxRefreshPreambleId)}\n` : ''
     const updateClient = context.development
-        ? `import { startWxUpdateClient } from ${JSON.stringify(wxUpdateClientRuntimeImportPath)}\n`
+        ? `import { startWxUpdateClient } from ${JSON.stringify(wxUpdateClientImportPath)}\n`
         : ''
-    return `${refreshPreamble}${updateClient}import { createReactApp, ReactDOM } from ${JSON.stringify(wxRuntimeBridgeImportPath)}
+    return `${refreshPreamble}${updateClient}import { createReactApp, ReactDOM } from ${JSON.stringify(wxTaroRuntimeImportPath)}
 import React from 'react'
 import AppComponent from ${JSON.stringify(toViteFileImportPath(context.project.appComponentFile))}
 
@@ -84,13 +95,13 @@ ${context.development ? 'startWxUpdateClient()' : ''}
 
 function createWxPageEntrySource(page: VitePluginTaroPageOption, context: BuildContext): string {
     const hotUpdateImport = context.development
-        ? `import { decorateWxPageConfig, registerWxPage } from ${JSON.stringify(wxHotUpdateRuntimeImportPath)}\n`
+        ? `import { decorateWxPageConfig, registerWxPage } from ${JSON.stringify(wxPageUpdateImportPath)}\n`
         : ''
     const createConfig = `createPageConfig(PageComponent, '${page.path}', { root: { cn: [] } }, pageConfig)`
     const pageRegistration = context.development
         ? `registerWxPage(${JSON.stringify(page.path)}, () => Page(taroPageConfig))`
         : 'Page(taroPageConfig)'
-    return `${hotUpdateImport}import { createPageConfig } from ${JSON.stringify(wxRuntimeBridgeImportPath)}
+    return `${hotUpdateImport}import { createPageConfig } from ${JSON.stringify(wxTaroRuntimeImportPath)}
 import PageComponent from ${JSON.stringify(createPageComponentImportPath(page.path))}
 
 const pageConfig = ${JSON.stringify(page.config)}
@@ -102,7 +113,7 @@ ${pageRegistration}
 `
 }
 
-function createWxPreloadSource(context: BuildContext): string {
+function createWxPagePreloadSource(context: BuildContext): string {
     const imports = context.project.pages.map((page, index) => {
         return `import Page${index} from ${JSON.stringify(createPageComponentImportPath(page.path))}`
     })
@@ -110,7 +121,7 @@ function createWxPreloadSource(context: BuildContext): string {
 }
 
 function createWxComponentEntrySource(): string {
-    return `import { createRecursiveComponentConfig } from ${JSON.stringify(wxRuntimeBridgeImportPath)}
+    return `import { createRecursiveComponentConfig } from ${JSON.stringify(wxTaroRuntimeImportPath)}
 
 Component(createRecursiveComponentConfig())
 `

@@ -99,7 +99,7 @@ At development-session startup, the plugin removes its complete `vpt-hmr` direct
 
 ### Protocol server
 
-`update-server-state.ts` is a pure deterministic state machine. `update-protocol-server.ts` adapts it to Vite's local HTTP server and the output directory.
+`update-server-state.ts` is a pure deterministic state machine. `update-transport.ts` adapts it to Vite's local HTTP server and asks the development session to publish literal update files.
 
 Server state contains:
 
@@ -150,7 +150,7 @@ A build retains at most 1,000 deltas or 16 MiB of transformed patch code. Reachi
 
 ## Client state machine
 
-`update-client-state.ts` is pure and deterministic. `update-client-runtime.ts` adapts commands to `wx.request`, literal batch execution, React Refresh, and route readiness.
+`update-client-state.ts` is pure and deterministic. `update-client.ts` adapts commands to `wx.request` and literal batch execution, while `page-update.ts` owns React Refresh and route readiness.
 
 Client phases distinguish registration, polling, applying, refreshing, and relaunching. The state machine guarantees:
 
@@ -214,15 +214,15 @@ Transform/build failures preserve the last good files and retained deltas. Runti
 
 ## Ownership and source layout
 
-One `WxDevServerSession` owns the DevEngine adapter, protocol server, module registration, serialized output writes, fallback rebuilds, and shutdown.
+One `WxDevelopmentSession` owns the DevEngine adapter, update transport, module registration, serialized output writes, fallback rebuilds, and shutdown.
 
 ```text
 src/node/targets/wx/dev-server/
-    session.ts
+    development-session.ts
     vite-bundled-dev-adapter.ts
     update-server-state.ts
-    update-protocol-server.ts
-    bundle-output.ts
+    update-transport.ts
+    development-output.ts
     output-writer.ts
     module-ids.ts
     javascript-compatibility.ts
@@ -230,10 +230,9 @@ src/node/targets/wx/dev-server/
 
 src/runtime/wx/
     update-client-state.ts
-    update-client-runtime.ts
-    hot-update-runtime.ts
-    page-refresh-runtime.ts
-    runtime-bridge.ts
+    update-client.ts
+    page-update.ts
+    taro-runtime.ts
 ```
 
 Runtime modules never import Node or Vite implementation modules.

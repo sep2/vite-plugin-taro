@@ -1,5 +1,5 @@
 import { transformWithOxc } from 'vite'
-import type { WxOutputFile } from './bundle-output.ts'
+import type { WxOutputFile } from './development-output.ts'
 
 const wxJavaScriptTarget = 'es2018'
 

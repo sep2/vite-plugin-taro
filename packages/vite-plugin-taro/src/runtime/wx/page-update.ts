@@ -1,8 +1,8 @@
 /**
- * Application-side WX hot-update bridge loaded as a normal bundled module by generated page entries.
+ * Coordinates page-side update execution after the Rolldown and Taro runtimes exist.
  *
- * Unlike the Rolldown bootstrap runtime, this module runs after the module system and Taro runtime exist,
- * so it can coordinate React Refresh, native page registration, Taro root retention, and route relaunches.
+ * This module is intentionally page-only: it suppresses DevTools' synthetic lifecycles, preserves the Taro root,
+ * commits React Refresh, and relaunches stale component families. HTTP transport remains in update-client.ts.
  */
 import { document } from '@tarojs/runtime'
 // @ts-expect-error Vite exposes its React Refresh runtime through this development-only virtual module.
@@ -31,7 +31,7 @@ type WxRolldownRuntime = {
     endPatch?(): void
 }
 
-type WxHotUpdateBridge = {
+type WxPageUpdateCoordinator = {
     ready: boolean
     pendingUpdate?: () => void
     blockRefreshRegistration?: boolean
@@ -48,8 +48,8 @@ type WxUpdateClient = {
 
 type WxRuntimeGlobal = typeof globalThis & {
     __rolldown_runtime__?: WxRolldownRuntime
-    __VITE_PLUGIN_TARO_WX__?: WxHotUpdateBridge
-    __VITE_PLUGIN_TARO_WX_CLIENT__?: WxUpdateClient
+    __VITE_PLUGIN_TARO_WX_PAGE_UPDATE__?: WxPageUpdateCoordinator
+    __VITE_PLUGIN_TARO_WX_UPDATE_CLIENT__?: WxUpdateClient
     getCurrentPages(): Array<{ route?: string }>
     wx: {
         reLaunch(options: { url: string }): void
@@ -57,8 +57,8 @@ type WxRuntimeGlobal = typeof globalThis & {
 }
 
 const wxRuntimeGlobal = globalThis as WxRuntimeGlobal
-wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX__ ??= { ready: false }
-const bridge = wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX__
+wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX_PAGE_UPDATE__ ??= { ready: false }
+const bridge = wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX_PAGE_UPDATE__
 const refreshBoundary = { default: function WxRefreshBoundary() {} }
 const registeredRoutes = new Set<string>()
 const ignoredPages = new WeakSet<WxPage>()
@@ -89,7 +89,7 @@ export function decorateWxPageConfig(config: WxPageConfig): WxPageConfig {
         activePage = this
         return result
     }
-    wrapLifecycle(config, 'onReady', applyPendingUpdate)
+    wrapLifecycle(config, 'onReady', applyPendingPageUpdate)
     wrapLifecycle(config, 'onShow', function () {
         activePage = this
     })
@@ -118,14 +118,14 @@ function getLifecycle(config: WxPageConfig, name: string): PageLifecycle | undef
     return typeof config[name] === 'function' ? (config[name] as PageLifecycle) : undefined
 }
 
-function applyPendingUpdate(): void {
+function applyPendingPageUpdate(): void {
     bridge.ready = true
     const pendingUpdate = bridge.pendingUpdate
     if (pendingUpdate) {
         delete bridge.pendingUpdate
         pendingUpdate()
     }
-    wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX_CLIENT__?.routeReady()
+    wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX_UPDATE_CLIENT__?.routeReady()
 }
 
 function getActiveTaroRoot(): TaroRoot | undefined {
@@ -164,13 +164,13 @@ bridge.afterRefresh = (update) => {
 
     const stale = Boolean(update?.staleFamilies?.size)
     if (stale) {
-        wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX_CLIENT__?.refreshCompleted(true)
+        wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX_UPDATE_CLIENT__?.refreshCompleted(true)
         relaunchActiveRoute(page)
         return
     }
     setTimeout(() => {
         refreshTaroRoot(root, activePage ?? page)
-        wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX_CLIENT__?.refreshCompleted(false)
+        wxRuntimeGlobal.__VITE_PLUGIN_TARO_WX_UPDATE_CLIENT__?.refreshCompleted(false)
     })
 }
 

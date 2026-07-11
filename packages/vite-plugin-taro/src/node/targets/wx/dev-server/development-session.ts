@@ -1,15 +1,26 @@
+/**
+ * Top-level owner of one WX development lifecycle.
+ *
+ * It serializes every output write, connects DevEngine patches to the update transport, and coalesces conservative full
+ * rebuilds. No other module writes plugin-generated WX development files directly.
+ */
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import colors from 'picocolors'
 import type { ViteDevServer } from 'vite'
 import type { BuildContext } from '../../../build-context.ts'
-import { wxHotUpdateControlFile, wxHotUpdateDirectory, wxHotUpdateEntryFile } from '../hot-update-files.ts'
-import { isWxFullBuildOutput, normalizeWxBundleStyles, setWxAppStyles, type WxOutputFile } from './bundle-output.ts'
+import { wxDevelopmentDirectory, wxUpdateControlFile, wxUpdateFile } from '../development-files.ts'
+import {
+    isWxFullBuildOutput,
+    normalizeWxBundleStyles,
+    setWxAppStyles,
+    type WxOutputFile
+} from './development-output.ts'
 import { transformWxCompatibleJavaScript, transformWxOutputChunks } from './javascript-compatibility.ts'
 import { collectWxBundleModuleIds, collectWxPatchModuleIds } from './module-ids.ts'
 import { syncWxPublicDirectory, syncWxPublicFile, writeWxOutputFile, writeWxOutputFiles } from './output-writer.ts'
-import { WxUpdateProtocolServer } from './update-protocol-server.ts'
-import { ViteBundledDevAdapter, type WxHmrOutput } from './vite-bundled-dev-adapter.ts'
+import { WxUpdateTransport } from './update-transport.ts'
+import { ViteBundledDevAdapter, type WxDevEngineUpdate } from './vite-bundled-dev-adapter.ts'
 
 const maxRetainedDeltaCount = 1_000
 const maxRetainedDeltaBytes = 16 * 1024 * 1024
@@ -17,9 +28,9 @@ const maxRetainedDeltaBytes = 16 * 1024 * 1024
 type WxDevServerContext = Pick<BuildContext, 'vite' | 'css'>
 
 /** Owns one WX bundled-development graph and all writes to its fixed output directory. */
-export class WxDevServerSession {
+export class WxDevelopmentSession {
     private readonly adapter: ViteBundledDevAdapter
-    private readonly updates: WxUpdateProtocolServer
+    private readonly updateTransport: WxUpdateTransport
     private readonly outDir: string
     private readonly initialBundleReady: Promise<void>
     private markInitialBundleReady!: () => void
@@ -38,13 +49,15 @@ export class WxDevServerSession {
     ) {
         const config = context.vite
         this.outDir = path.resolve(config.root, config.build.outDir)
-        this.updates = new WxUpdateProtocolServer(
+        this.updateTransport = new WxUpdateTransport(
             server,
             () => this.requestFullBuild(),
             (buildId, source) =>
                 this.enqueueOutput(async () => {
-                    if (!this.updates.isCurrentBuild(buildId)) return
-                    await writeWxOutputFile(this.outDir, wxHotUpdateEntryFile, source)
+                    // A full build queued before this write invalidates the old batch instead of letting it overwrite
+                    // the new build's empty update.js.
+                    if (!this.updateTransport.isCurrentBuild(buildId)) return
+                    await writeWxOutputFile(this.outDir, wxUpdateFile, source)
                 })
         )
         this.initialBundleReady = new Promise<void>((resolve) => {
@@ -63,7 +76,7 @@ export class WxDevServerSession {
     }
 
     install(): void {
-        this.updates.install()
+        this.updateTransport.install()
         this.server.httpServer?.once('listening', this.handleHttpListening)
         this.adapter.install()
         this.originalPrintUrls = this.server.printUrls.bind(this.server)
@@ -85,7 +98,7 @@ export class WxDevServerSession {
             this.server.printUrls = this.originalPrintUrls
         }
         if (this.rebuildTimer) clearTimeout(this.rebuildTimer)
-        this.updates.close()
+        this.updateTransport.close()
         await this.rebuildWork
         await this.outputWork
     }
@@ -100,7 +113,7 @@ export class WxDevServerSession {
 
     private readonly handleHttpListening = (): void => {
         this.enqueueOutput(() =>
-            writeWxOutputFile(this.outDir, wxHotUpdateControlFile, this.updates.createControlSource())
+            writeWxOutputFile(this.outDir, wxUpdateControlFile, this.updateTransport.createControlSource())
         )
     }
 
@@ -125,15 +138,17 @@ export class WxDevServerSession {
         }
 
         const moduleIds = collectWxBundleModuleIds(output, this.config.root)
-        const buildId = this.updates.createBuildId()
-        setDevelopmentAsset(output, wxHotUpdateControlFile, this.updates.createControlSource(buildId))
-        setDevelopmentAsset(output, wxHotUpdateEntryFile, 'void 0;\n')
+        const buildId = this.updateTransport.createBuildId()
+        setDevelopmentAsset(output, wxUpdateControlFile, this.updateTransport.createControlSource(buildId))
+        setDevelopmentAsset(output, wxUpdateFile, 'void 0;\n')
         this.enqueueOutput(async () => {
             await transformWxOutputChunks(output)
             if (!this.initialBundleWritten) {
-                await fs.rm(path.join(this.outDir, wxHotUpdateDirectory), { recursive: true, force: true })
+                // The directory is plugin-owned; clearing it once removes stale files from previous protocol designs.
+                await fs.rm(path.join(this.outDir, wxDevelopmentDirectory), { recursive: true, force: true })
             }
-            this.updates.commitFullBuild(buildId)
+            // Invalidate old HTTP reports before writing the new build epoch into the fixed DevTools directory.
+            this.updateTransport.commitFullBuild(buildId)
             await writeWxOutputFiles(this.outDir, output)
             await syncWxPublicDirectory(this.config.publicDir, this.outDir)
             this.adapter.registerModules(moduleIds)
@@ -145,7 +160,7 @@ export class WxDevServerSession {
         })
     }
 
-    private handlePatch(files: string[], output: WxHmrOutput): boolean {
+    private handlePatch(files: string[], output: WxDevEngineUpdate): boolean {
         if (!isSafeJavaScriptPatch(files, output)) {
             this.requestFullBuild()
             return false
@@ -156,13 +171,13 @@ export class WxDevServerSession {
             const transformed = await this.context.css.transformWxClassNames(output.code, output.filename)
             const compatibleCode = await transformWxCompatibleJavaScript(transformed.code, output.filename)
             if (
-                this.updates.length >= maxRetainedDeltaCount ||
-                this.updates.size + Buffer.byteLength(compatibleCode) >= maxRetainedDeltaBytes
+                this.updateTransport.retainedDeltaCount >= maxRetainedDeltaCount ||
+                this.updateTransport.retainedDeltaBytes + Buffer.byteLength(compatibleCode) >= maxRetainedDeltaBytes
             ) {
                 this.requestFullBuild()
                 return
             }
-            this.updates.addDelta(compatibleCode)
+            this.updateTransport.addDelta(compatibleCode)
         })
         return true
     }
@@ -235,8 +250,8 @@ function isFileInside(file: string, directory: string): boolean {
 
 function isSafeJavaScriptPatch(
     files: string[],
-    output: WxHmrOutput
-): output is Extract<WxHmrOutput, { type: 'Patch' }> {
+    output: WxDevEngineUpdate
+): output is Extract<WxDevEngineUpdate, { type: 'Patch' }> {
     if (output.type !== 'Patch' || output.hmrBoundaries.length === 0) return false
     if (output.code.includes('__vite__updateStyle') || output.code.includes('.updateStyle(')) return false
     return files.every((file) => /\.[cm]?[jt]sx?$/.test(file))

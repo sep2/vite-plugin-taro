@@ -3,7 +3,7 @@ import type { BuildContext } from '../../build-context.ts'
 import { stripVirtualPrefix } from '../../module-paths.ts'
 import { resolveTaroVirtualModule } from '../../taro-virtual-modules.ts'
 import { emitWxCompanionAssets, type WxBundle } from './companion-assets.ts'
-import { WxDevServerSession } from './dev-server/session.ts'
+import { WxDevelopmentSession } from './dev-server/development-session.ts'
 import { transformWxReactRefreshModule } from './react-refresh.ts'
 import { emitWxEntryChunks, isWxVirtualModuleId, loadWxVirtualModule } from './virtual-modules.ts'
 
@@ -13,7 +13,7 @@ export function createWxTargetPlugins(context: BuildContext): PluginOption[] {
 }
 
 function createWxTargetPlugin(context: BuildContext): Plugin {
-    let session: WxDevServerSession | undefined
+    let developmentSession: WxDevelopmentSession | undefined
 
     return {
         name: 'vite-plugin-taro:wx',
@@ -53,13 +53,13 @@ function createWxTargetPlugin(context: BuildContext): Plugin {
         configureServer: {
             order: 'post',
             handler(server) {
-                session = new WxDevServerSession(context, server)
-                session.install()
+                developmentSession = new WxDevelopmentSession(context, server)
+                developmentSession.install()
             }
         },
 
         closeBundle() {
-            return session?.close()
+            return developmentSession?.close()
         }
     }
 }

@@ -15,11 +15,11 @@ export async function transformWxReactRefreshModule(
         .replaceAll('window.__getReactRefreshIgnoredExports', 'globalThis.__getReactRefreshIgnoredExports')
         .replace(
             'export function register(type, id) {',
-            'export function register(type, id) {\n  if (globalThis.__VITE_PLUGIN_TARO_WX__?.blockRefreshRegistration) return'
+            'export function register(type, id) {\n  if (globalThis.__VITE_PLUGIN_TARO_WX_PAGE_UPDATE__?.blockRefreshRegistration) return'
         )
         .replace(
             '\n  performReactRefresh()\n',
-            '\n  globalThis.__VITE_PLUGIN_TARO_WX__?.afterRefresh?.(performReactRefresh())\n'
+            '\n  globalThis.__VITE_PLUGIN_TARO_WX_PAGE_UPDATE__?.afterRefresh?.(performReactRefresh())\n'
         )
 }
 

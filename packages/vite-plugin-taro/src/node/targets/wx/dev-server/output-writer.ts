@@ -1,6 +1,7 @@
+/** Atomic filesystem primitives used only through WxDevelopmentSession's serialized output queue. */
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import type { WxOutputFile } from './bundle-output.ts'
+import type { WxOutputFile } from './development-output.ts'
 
 export async function writeWxOutputFiles(outDir: string, output: WxOutputFile[]): Promise<void> {
     await Promise.all(

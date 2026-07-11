@@ -6,15 +6,18 @@ import { toViteFileImportPath } from './module-paths.ts'
 export const packageRequire = createRequire(import.meta.url)
 export const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 
-export const h5RuntimeBridgeImportPath = toViteFileImportPath(
-    path.join(packageRoot, 'dist/runtime/h5/runtime-bridge.js')
-)
-export const wxRuntimeBridgeImportPath = toViteFileImportPath(
-    path.join(packageRoot, 'dist/runtime/wx/runtime-bridge.js')
-)
-export const wxHotUpdateRuntimeImportPath = toViteFileImportPath(
-    path.join(packageRoot, 'dist/runtime/wx/hot-update-runtime.js')
-)
-export const wxUpdateClientRuntimeImportPath = toViteFileImportPath(
-    path.join(packageRoot, 'dist/runtime/wx/update-client-runtime.js')
-)
+/** Taro/React exports consumed by generated H5 entries. */
+export const h5TaroRuntimeImportPath = runtimeImportPath('h5/taro-runtime.js')
+
+/** Taro/React exports consumed by generated WX App and page entries. */
+export const wxTaroRuntimeImportPath = runtimeImportPath('wx/taro-runtime.js')
+
+/** Page-only React Refresh and Taro lifecycle coordinator. */
+export const wxPageUpdateImportPath = runtimeImportPath('wx/page-update.js')
+
+/** App-owned metadata transport and update protocol client. */
+export const wxUpdateClientImportPath = runtimeImportPath('wx/update-client.js')
+
+function runtimeImportPath(fileName: string): string {
+    return toViteFileImportPath(path.join(packageRoot, 'dist/runtime', fileName))
+}

@@ -1,3 +1,9 @@
+/**
+ * Pure host-side stop-and-wait protocol state machine.
+ *
+ * It retains versioned Rolldown deltas and selects one missing range for the active App Service. HTTP and filesystem
+ * effects are represented as commands and handled by update-transport.ts.
+ */
 export type WxUpdateDelta = {
     version: number
     code: string

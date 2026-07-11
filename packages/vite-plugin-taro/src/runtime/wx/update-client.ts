@@ -1,3 +1,9 @@
+/**
+ * App-owned adapter for the WX update protocol.
+ *
+ * It transports metadata with wx.request and executes literal batches delivered through update.js. React/Taro page
+ * preservation is delegated to page-update.ts so the App never depends on the mutable update file.
+ */
 import {
     createWxUpdateClientState,
     transitionWxUpdateClient,
@@ -25,7 +31,7 @@ type WxRequestResult = {
     data?: unknown
 }
 
-type WxUpdateBridge = {
+type WxPageUpdateCoordinator = {
     ready: boolean
     pendingUpdate?: () => void
     beginUpdate?: () => void
@@ -40,8 +46,8 @@ export type WxUpdateClient = {
 
 type WxClientGlobal = typeof globalThis & {
     __VITE_PLUGIN_TARO_WX_CONTROL__?: WxUpdateControl
-    __VITE_PLUGIN_TARO_WX_CLIENT__?: WxUpdateClient
-    __VITE_PLUGIN_TARO_WX__?: WxUpdateBridge
+    __VITE_PLUGIN_TARO_WX_UPDATE_CLIENT__?: WxUpdateClient
+    __VITE_PLUGIN_TARO_WX_PAGE_UPDATE__?: WxPageUpdateCoordinator
     wx: {
         request(options: {
             url: string
@@ -57,7 +63,7 @@ type WxClientGlobal = typeof globalThis & {
 const wxClientGlobal = globalThis as WxClientGlobal
 
 export function startWxUpdateClient(): void {
-    if (wxClientGlobal.__VITE_PLUGIN_TARO_WX_CLIENT__) return
+    if (wxClientGlobal.__VITE_PLUGIN_TARO_WX_UPDATE_CLIENT__) return
     const control = wxClientGlobal.__VITE_PLUGIN_TARO_WX_CONTROL__
     if (!control) throw new Error('vite-plugin-taro could not find its WX update control configuration.')
 
@@ -141,7 +147,7 @@ export function startWxUpdateClient(): void {
                     return
                 }
                 const applyUpdate = () => {
-                    const bridge = wxClientGlobal.__VITE_PLUGIN_TARO_WX__
+                    const bridge = wxClientGlobal.__VITE_PLUGIN_TARO_WX_PAGE_UPDATE__
                     if (!bridge) {
                         dispatch({ type: 'batch-failed' })
                         return
@@ -156,7 +162,7 @@ export function startWxUpdateClient(): void {
                         bridge.endUpdate?.()
                     }
                 }
-                const bridge = wxClientGlobal.__VITE_PLUGIN_TARO_WX__
+                const bridge = wxClientGlobal.__VITE_PLUGIN_TARO_WX_PAGE_UPDATE__
                 if (bridge?.ready) applyUpdate()
                 else if (bridge) bridge.pendingUpdate = applyUpdate
                 else dispatch({ type: 'batch-failed' })
@@ -173,7 +179,7 @@ export function startWxUpdateClient(): void {
         }
     }
 
-    wxClientGlobal.__VITE_PLUGIN_TARO_WX_CLIENT__ = {
+    wxClientGlobal.__VITE_PLUGIN_TARO_WX_UPDATE_CLIENT__ = {
         receiveBatch(metadata, apply) {
             dispatch({ type: 'batch-observed', ...metadata }, apply)
             if (

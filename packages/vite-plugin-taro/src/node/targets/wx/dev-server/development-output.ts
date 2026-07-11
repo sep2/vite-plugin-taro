@@ -1,3 +1,8 @@
+/**
+ * Normalizes private DevEngine output before the development session writes it to the fixed WX project directory.
+ * DevEngine rebuilds may be partial, so these helpers mutate only files present in the current output.
+ */
+
 /** File shape emitted by Vite's private bundled-development engine. */
 export type WxOutputFile =
     | {

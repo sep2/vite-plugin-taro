@@ -1,3 +1,7 @@
+/**
+ * Adapts the pure server protocol to Vite HTTP middleware and literal update-file publication.
+ * HTTP messages contain metadata only; executable JavaScript reaches DevTools through the injected file writer.
+ */
 import { randomBytes } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { ViteDevServer } from 'vite'
@@ -25,7 +29,7 @@ type UpdateRequest = {
     version?: unknown
 }
 
-export class WxUpdateProtocolServer {
+export class WxUpdateTransport {
     private state: WxUpdateServerState = createWxUpdateServerState(createId())
     private readonly token = createId()
     private readonly pendingPolls = new Map<string, PendingPoll>()
@@ -35,14 +39,14 @@ export class WxUpdateProtocolServer {
     constructor(
         private readonly server: ViteDevServer,
         private readonly requestFullBuild: () => void,
-        private readonly publishBatch: (buildId: string, source: string) => Promise<void>
+        private readonly writeUpdateFile: (buildId: string, source: string) => Promise<void>
     ) {}
 
-    get length(): number {
+    get retainedDeltaCount(): number {
         return this.state.hostVersion
     }
 
-    get size(): number {
+    get retainedDeltaBytes(): number {
         return this.bytes
     }
 
@@ -75,6 +79,7 @@ export class WxUpdateProtocolServer {
         this.respondToAll({ type: 'rebuilding' })
     }
 
+    /** Generates late-bound App metadata after Vite has selected its actual listening port. */
     createControlSource(buildId = this.state.buildId): string {
         const address = this.server.httpServer?.address()
         const port = address && typeof address !== 'string' ? address.port : this.server.config.server.port
@@ -199,12 +204,13 @@ export class WxUpdateProtocolServer {
     }
 
     private async writeBatch(batch: WxUpdateBatch): Promise<void> {
-        await this.publishBatch(batch.buildId, renderBatch(batch, createId()))
+        await this.writeUpdateFile(batch.buildId, renderBatch(batch, createId()))
     }
 }
 
+/** Renders executable code for update.js; this source is never included in an HTTP response. */
 function renderBatch(batch: WxUpdateBatch, nonce: string): string {
-    return `// ${nonce}\nglobalThis.__VITE_PLUGIN_TARO_WX_CLIENT__.receiveBatch(${JSON.stringify({
+    return `// ${nonce}\nglobalThis.__VITE_PLUGIN_TARO_WX_UPDATE_CLIENT__.receiveBatch(${JSON.stringify({
         buildId: batch.buildId,
         fromVersion: batch.fromVersion,
         targetVersion: batch.targetVersion
