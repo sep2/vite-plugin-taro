@@ -1,0 +1,14 @@
+@import "tailwindcss/theme.css";
+@import "tailwindcss/preflight.css";
+@import "tailwindcss/utilities.css";
+
+@source "./";
+
+@theme {
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}

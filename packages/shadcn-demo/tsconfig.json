@@ -7,13 +7,6 @@
         "jsx": "react-jsx",
         "skipLibCheck": true,
 
-        "paths": {
-            "@components": ["./src/components"],
-            "@components/*": ["./src/components/*"],
-            "@utils": ["./src/utils"],
-            "@utils/*": ["./src/utils/*"]
-        },
-
         "moduleResolution": "bundler",
         "allowImportingTsExtensions": true,
         "verbatimModuleSyntax": true,
