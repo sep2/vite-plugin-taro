@@ -7,6 +7,7 @@ export const packageRoot = path.dirname(nodeRequire.resolve('vite-plugin-taro/pa
 
 export const h5RuntimeImportPath = toImportPath(path.join(packageRoot, 'dist/runtime/h5/taro-runtime.js'))
 export const wxRuntimeImportPath = toImportPath(path.join(packageRoot, 'dist/runtime/wx/taro-runtime.js'))
-export const wxDevelopmentRuntimeImportPath = toImportPath(
-    path.join(packageRoot, 'dist/runtime/wx/development-runtime.js')
+/** Normal bundled WX module that connects Taro page lifecycles to React Refresh updates. */
+export const wxPageRefreshRuntimeImportPath = toImportPath(
+    path.join(packageRoot, 'dist/runtime/wx/page-refresh-runtime.js')
 )

@@ -2,7 +2,7 @@ import { transformSync } from '@babel/core'
 import type { VitePluginTaroPageOption } from '../../../options.ts'
 import type { BuildContext } from '../../context.ts'
 import { createPageComponentImport, normalizeModuleId, toImportPath } from '../../module-paths.ts'
-import { nodeRequire, wxDevelopmentRuntimeImportPath, wxRuntimeImportPath } from '../../runtime-paths.ts'
+import { nodeRequire, wxPageRefreshRuntimeImportPath, wxRuntimeImportPath } from '../../runtime-paths.ts'
 
 export const virtualWxAppId = 'virtual:vite-plugin-taro/wx/app'
 export const virtualWxCompId = 'virtual:vite-plugin-taro/wx/comp'
@@ -84,7 +84,7 @@ App(createReactApp(AppComponent, React, ReactDOM, appConfig))
 
 function createWxPageEntry(page: VitePluginTaroPageOption, context: BuildContext): string {
     const refreshRuntimeImport = context.behavior.reactRefresh
-        ? `import { decorateWxPageConfig, registerWxPage } from ${JSON.stringify(wxDevelopmentRuntimeImportPath)}\n`
+        ? `import { decorateWxPageConfig, registerWxPage } from ${JSON.stringify(wxPageRefreshRuntimeImportPath)}\n`
         : ''
     const createConfig = `createPageConfig(PageComponent, '${page.path}', { root: { cn: [] } }, pageConfig)`
     const pageRegistration = context.behavior.reactRefresh

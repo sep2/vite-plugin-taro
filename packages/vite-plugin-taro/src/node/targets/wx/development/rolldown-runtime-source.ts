@@ -1,4 +1,11 @@
-export const wxDevRuntimeImplementation = `
+/**
+ * Self-contained source injected into Rolldown's DevEngine as the WX module bootstrap runtime.
+ *
+ * This TypeScript module runs in Node and only exports source text. The exported JavaScript becomes
+ * `runtime.js`, executes before every application module, and therefore cannot import Taro, React,
+ * or any module that depends on the runtime it is creating.
+ */
+export const wxRolldownRuntimeSource = `
 var BaseDevRuntime = DevRuntime;
 class WxHotContext {
   callbacks = [];

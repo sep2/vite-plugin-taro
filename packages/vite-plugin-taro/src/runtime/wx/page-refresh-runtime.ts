@@ -1,3 +1,9 @@
+/**
+ * Application-side WX hot-update bridge loaded as a normal bundled module by generated page entries.
+ *
+ * Unlike the Rolldown bootstrap runtime, this module runs after the module system and Taro runtime exist,
+ * so it can coordinate React Refresh, native page registration, Taro root retention, and route relaunches.
+ */
 import { document } from '@tarojs/runtime'
 // @ts-expect-error Vite exposes its React Refresh runtime through this development-only virtual module.
 import { validateRefreshBoundaryAndEnqueueUpdate } from '/@react-refresh'

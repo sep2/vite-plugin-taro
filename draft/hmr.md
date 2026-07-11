@@ -351,11 +351,11 @@ src/node/targets/wx/
         vite-bundled-dev-adapter.ts     isolated Vite/Rolldown integration
         output.ts                       atomic fixed-directory writes
         patch-journal.ts                cumulative literal update.js
-        dev-runtime-source.ts           WeChat-safe Rolldown runtime source
+        rolldown-runtime-source.ts      self-contained module bootstrap source for runtime.js
 
 src/runtime/wx/
     taro-runtime.ts         Taro page/component facade
-    development-runtime.ts React Refresh, Taro root, and lifecycle bridge
+    page-refresh-runtime.ts React Refresh, Taro root, and lifecycle bridge
 ```
 
 The `node/` and `runtime/` boundary is strict: code bundled into the Mini Program never imports Vite or Node implementation code. Small modules may be merged when a type or helper has only one caller. Avoid abstract base classes, providers, protocol layers, and files containing only re-exports.

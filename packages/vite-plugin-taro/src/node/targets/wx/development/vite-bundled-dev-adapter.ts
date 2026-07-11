@@ -1,6 +1,6 @@
 import type { ResolvedConfig, ViteDevServer } from 'vite'
-import { wxDevRuntimeImplementation } from './dev-runtime-source.ts'
 import type { WxOutputFile } from './output.ts'
+import { wxRolldownRuntimeSource } from './rolldown-runtime-source.ts'
 
 const clientId = 'vite-plugin-taro-wx'
 
@@ -114,7 +114,8 @@ export class WxBundledDevAdapter {
             options.experimental.devMode = {
                 ...(typeof options.experimental.devMode === 'object' ? options.experimental.devMode : {}),
                 lazy: false,
-                implement: wxDevRuntimeImplementation
+                // Rolldown compiles this source into runtime.js before any Taro/React module executes.
+                implement: wxRolldownRuntimeSource
             }
             return options
         }
