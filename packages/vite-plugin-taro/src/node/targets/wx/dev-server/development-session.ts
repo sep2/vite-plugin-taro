@@ -33,8 +33,7 @@ export class WxDevelopmentSession {
     private readonly adapter: ViteBundledDevAdapter
     private readonly updateTransport: WxUpdateTransport
     private readonly outDir: string
-    private readonly initialBundleReady: Promise<void>
-    private markInitialBundleReady!: () => void
+    private readonly initialBundle = Promise.withResolvers<void>()
     private originalPrintUrls: (() => void) | undefined
     private outputWork = Promise.resolve()
     private rebuildRequested = false
@@ -61,9 +60,6 @@ export class WxDevelopmentSession {
                     await writeWxOutputFile(this.outDir, wxUpdateFile, source)
                 })
         )
-        this.initialBundleReady = new Promise<void>((resolve) => {
-            this.markInitialBundleReady = resolve
-        })
         this.adapter = new ViteBundledDevAdapter(config, server, {
             onOutput: (output) => this.handleBundleOutput(output),
             onPatch: (files, output) => this.handlePatch(files, output),
@@ -154,7 +150,7 @@ export class WxDevelopmentSession {
             await syncWxPublicDirectory(this.config.publicDir, this.outDir)
             this.adapter.registerModules(moduleIds)
             this.initialBundleWritten = true
-            this.markInitialBundleReady()
+            this.initialBundle.resolve()
             this.server.config.logger.info(
                 `[vite-plugin-taro] WX bundle ready (${moduleIds.length} modules, ${output.length} files)`
             )
@@ -214,7 +210,7 @@ export class WxDevelopmentSession {
     }
 
     private async waitForInitialBundle(): Promise<void> {
-        await this.initialBundleReady
+        await this.initialBundle.promise
         await this.outputWork
     }
 
