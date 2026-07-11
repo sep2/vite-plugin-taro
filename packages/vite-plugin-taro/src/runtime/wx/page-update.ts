@@ -5,7 +5,6 @@
  * commits React Refresh, and relaunches stale component families. HTTP transport remains in update-client.ts.
  */
 import { document } from '@tarojs/runtime'
-// @ts-expect-error Vite exposes its React Refresh runtime through this development-only virtual module.
 import { validateRefreshBoundaryAndEnqueueUpdate } from '/@react-refresh'
 
 type WxPage = {

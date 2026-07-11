@@ -1,4 +1,5 @@
-declare module '/@react-refresh' {
+/** Vite's development-only React Refresh virtual module used by the WX runtime. */
+declare module '*/@react-refresh' {
     export type RefreshResult = {
         updatedFamilies: Set<unknown>
         staleFamilies: Set<unknown>
