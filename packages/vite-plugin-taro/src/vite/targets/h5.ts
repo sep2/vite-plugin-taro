@@ -1,25 +1,60 @@
 import type { types as BabelTypes, NodePath, PluginObj } from '@babel/core'
 import babel from '@rolldown/plugin-babel'
 import react from '@vitejs/plugin-react'
-import type { HtmlTagDescriptor, PluginOption, UserConfig } from 'vite'
+import type { HtmlTagDescriptor, Plugin, PluginOption, UserConfig } from 'vite'
 import { h5ShimImportPath, isProd, nodeRequire } from '../constants.ts'
 import type { JsonObject, VitePluginTaroBuildContext, VitePluginTaroPageOption } from '../types.ts'
-import { createPageComponentImport, toImportPath } from '../utils.ts'
-import { virtualTaroApiId } from '../virtual-modules.ts'
+import { createPageComponentImport, stripVirtualPrefix, toImportPath } from '../utils.ts'
+import { resolvePublicVirtualModuleId, virtualTaroApiId } from '../virtual-modules.ts'
 
 const virtualH5Id = 'virtual:vite-plugin-taro/h5'
 
-/**
- * Checks whether an id belongs to an H5 virtual module.
- */
-export function isH5VirtualModuleId(id: string): boolean {
+/** Creates the plugins that own the complete H5 target lifecycle. */
+export function createH5TargetPlugins(context: VitePluginTaroBuildContext): PluginOption[] {
+    return [...createH5SupportPlugins(), createH5TargetPlugin(context)]
+}
+
+function createH5TargetPlugin(context: VitePluginTaroBuildContext): Plugin {
+    return {
+        name: 'vite-plugin-taro:h5',
+
+        config: {
+            order: 'pre',
+            handler: createH5ViteConfig
+        },
+
+        resolveId: {
+            order: 'pre',
+            handler(id) {
+                return resolvePublicVirtualModuleId(id) ?? (isH5VirtualModuleId(id) ? `\0${id}` : undefined)
+            }
+        },
+
+        load: {
+            order: 'post',
+            handler(id) {
+                return loadH5VirtualModule(stripVirtualPrefix(id), context)
+            }
+        },
+
+        transformIndexHtml: {
+            order: 'pre',
+            handler() {
+                return createWebIndexHtmlTags(context)
+            }
+        }
+    }
+}
+
+/** Checks whether an id belongs to an H5 virtual module. */
+function isH5VirtualModuleId(id: string): boolean {
     return id === virtualH5Id
 }
 
 /**
  * Loads generated source for H5 virtual modules.
  */
-export function loadH5VirtualModule(cleanId: string, context: VitePluginTaroBuildContext): string | undefined {
+function loadH5VirtualModule(cleanId: string, context: VitePluginTaroBuildContext): string | undefined {
     if (cleanId === virtualH5Id) {
         return createWebEntry(context)
     }
@@ -28,7 +63,7 @@ export function loadH5VirtualModule(cleanId: string, context: VitePluginTaroBuil
 /**
  * Configures the Vite pieces needed for Taro H5 resolve/runtime behavior.
  */
-export function createH5ViteConfig(): UserConfig {
+function createH5ViteConfig(): UserConfig {
     return {
         define: createH5TaroDefines(),
         resolve: {
@@ -71,7 +106,7 @@ export function createH5ViteConfig(): UserConfig {
  *
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-platform-h5/src/program.ts#L219-L249
  */
-export function createH5SupportPlugins(): PluginOption[] {
+function createH5SupportPlugins(): PluginOption[] {
     const plugins: PluginOption[] = [...react()]
 
     plugins.push(
@@ -145,7 +180,7 @@ function createH5TaroDefines(): Record<string, string> {
 /**
  * Injects vite-plugin-taro's generated Web entry into Vite's HTML shell.
  */
-export function createWebIndexHtmlTags(context: VitePluginTaroBuildContext): HtmlTagDescriptor[] | undefined {
+function createWebIndexHtmlTags(context: VitePluginTaroBuildContext): HtmlTagDescriptor[] | undefined {
     if (context.target !== 'h5') return
 
     const tags: HtmlTagDescriptor[] = []
@@ -164,7 +199,7 @@ export function createWebIndexHtmlTags(context: VitePluginTaroBuildContext): Htm
  *
  * https://github.com/NervJS/taro/blob/f0e5c39d5f04290db975670411e23c3a396e15f8/packages/taro-loader/src/h5.ts#L120-L150
  */
-export function createWebEntry(context: VitePluginTaroBuildContext): string {
+function createWebEntry(context: VitePluginTaroBuildContext): string {
     const webAppConfigCode = JSON.stringify(createWebAppConfig(context.appConfig))
     const webRoutesConfigCode = createWebRoutesConfig(context.pages)
 
