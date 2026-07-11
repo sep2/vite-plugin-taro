@@ -2,7 +2,7 @@ import path from 'node:path'
 import type { Plugin } from 'vite'
 import { createContext } from 'weapp-tailwindcss/core'
 import { createWeappTailwindcssGenerator, resolveTailwindV4Source } from 'weapp-tailwindcss/generator'
-import type { VitePluginTaroBuildContext } from './context.ts'
+import type { VitePluginTaroTarget } from '../options.ts'
 import { normalizeModuleId } from './module-paths.ts'
 
 const wechatStyleOptions = {
@@ -13,48 +13,51 @@ const wechatStyleOptions = {
 } as const
 
 type WeappTailwindcssCoreContext = ReturnType<typeof createContext>
+type CssTransformResult = { code: string; map: null }
 
-export type WxRuntimeClassNameTransformer = (code: string, filename: string) => Promise<{ code: string; map: null }>
+/** Owns CSS generation and the class-name state shared by normal chunks and literal WX patches. */
+export class CssPipeline {
+    readonly plugin: Plugin
+    private readonly target: VitePluginTaroTarget
+    private readonly runtimeClassSet = new Set<string>()
+    private projectRoot: string | undefined
+    private weappContext: WeappTailwindcssCoreContext | undefined
 
-export type TaroCssIntegration = {
-    plugin: Plugin
-    transformWxRuntimeClassNames: WxRuntimeClassNameTransformer
-}
+    constructor(target: VitePluginTaroTarget) {
+        this.target = target
+        this.plugin = this.createPlugin()
+    }
 
-/** Creates one CSS runtime shared by normal chunk rendering and literal WX HMR patches. */
-export function createTaroCssIntegration(context: VitePluginTaroBuildContext): TaroCssIntegration {
-    let projectRoot = process.cwd()
-    const runtimeClassSet = new Set<string>()
-    let weappContext: WeappTailwindcssCoreContext | undefined
+    resolve(projectRoot: string): void {
+        if (this.projectRoot) throw new Error('vite-plugin-taro CSS pipeline was already resolved.')
+        this.projectRoot = projectRoot
+        this.weappContext = this.target === 'wx' ? createWeappContext(projectRoot) : undefined
+    }
 
-    const transformWxRuntimeClassNames: WxRuntimeClassNameTransformer = async (code, filename) => {
-        if (!weappContext || runtimeClassSet.size === 0) return { code, map: null }
-        const result = await weappContext.transformJs(code, {
-            runtimeSet: runtimeClassSet,
+    async transformRuntimeClassNames(code: string, filename: string): Promise<CssTransformResult> {
+        if (!this.weappContext || this.runtimeClassSet.size === 0) return { code, map: null }
+        const result = await this.weappContext.transformJs(code, {
+            runtimeSet: this.runtimeClassSet,
             filename,
             generateMap: false
         })
         return { code: result.code, map: null }
     }
 
-    return {
-        transformWxRuntimeClassNames,
-        plugin: {
+    private createPlugin(): Plugin {
+        const pipeline = this
+        return {
             name: 'vite-plugin-taro-css',
             enforce: 'pre',
 
-            configResolved(config) {
-                projectRoot = config.root
-                weappContext = context.target === 'wx' ? createWeappContext(projectRoot) : undefined
-            },
-
             buildStart() {
-                runtimeClassSet.clear()
+                pipeline.runtimeClassSet.clear()
             },
 
             async transform(code, id) {
                 if (!isCssModuleId(id) || !shouldGenerateTailwindCss(code)) return
 
+                const projectRoot = pipeline.getProjectRoot()
                 const cssFile = resolveCssFile(id, projectRoot)
                 const cssBase = path.dirname(cssFile)
                 const source = await resolveTailwindV4Source({
@@ -66,31 +69,25 @@ export function createTaroCssIntegration(context: VitePluginTaroBuildContext): T
                 })
                 const generator = createWeappTailwindcssGenerator(source)
                 const generated = await generator.generate({
-                    target: context.target === 'wx' ? 'weapp' : 'web',
+                    target: pipeline.target === 'wx' ? 'weapp' : 'web',
                     scanSources: true,
                     candidates: [],
-                    styleOptions: context.target === 'wx' ? wechatStyleOptions : undefined
+                    styleOptions: pipeline.target === 'wx' ? wechatStyleOptions : undefined
                 })
 
-                for (const className of generated.classSet) runtimeClassSet.add(className)
+                for (const className of generated.classSet) pipeline.runtimeClassSet.add(className)
                 for (const dependency of generated.dependencies) this.addWatchFile(dependency)
                 return generated.css
             },
 
             async renderChunk(code, chunk) {
-                if (context.target !== 'wx') return
-                return await transformWxRuntimeClassNames(code, chunk.fileName)
+                if (pipeline.target !== 'wx') return
+                return await pipeline.transformRuntimeClassNames(code, chunk.fileName)
             },
 
             async generateBundle(_, bundle) {
-                if (context.target !== 'wx') return
-                if (!weappContext) {
-                    throw new Error(
-                        'vite-plugin-taro-css expected a WeChat style context after Vite config resolution.'
-                    )
-                }
-                const core = weappContext
-
+                if (pipeline.target !== 'wx') return
+                const core = pipeline.getWeappContext()
                 await Promise.all(
                     Object.entries(bundle).map(async ([fileName, item]) => {
                         if (item.type === 'asset' && fileName.endsWith('.css')) {
@@ -100,6 +97,16 @@ export function createTaroCssIntegration(context: VitePluginTaroBuildContext): T
                 )
             }
         }
+    }
+
+    private getProjectRoot(): string {
+        if (!this.projectRoot) throw new Error('vite-plugin-taro CSS pipeline was used before configuration resolved.')
+        return this.projectRoot
+    }
+
+    private getWeappContext(): WeappTailwindcssCoreContext {
+        if (!this.weappContext) throw new Error('vite-plugin-taro expected a resolved WeChat CSS pipeline.')
+        return this.weappContext
     }
 }
 

@@ -3,7 +3,7 @@ import type { VitePluginTaroTarget } from '../../options.ts'
 import type { BuildContext } from '../context.ts'
 import { normalizeModuleId } from '../module-paths.ts'
 
-export function createVitePluginTaroConditionalDirectivePlugin(context: BuildContext): Plugin {
+export function createConditionalDirectivePlugin(context: BuildContext): Plugin {
     return {
         name: 'vite-plugin-taro-conditional-directives',
         enforce: 'pre',

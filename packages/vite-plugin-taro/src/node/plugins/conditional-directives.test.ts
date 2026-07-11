@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { VitePluginTaroTarget } from '../../options.ts'
 import { BuildContext } from '../context.ts'
-import { createVitePluginTaroConditionalDirectivePlugin } from './conditional-directives.ts'
+import { createConditionalDirectivePlugin } from './conditional-directives.ts'
 
 function transform(code: string, target: VitePluginTaroTarget): string {
     const context = new BuildContext({
@@ -14,7 +14,7 @@ function transform(code: string, target: VitePluginTaroTarget): string {
         projectPrivateConfigJson: {},
         sitemapJson: {}
     })
-    const hook = createVitePluginTaroConditionalDirectivePlugin(context).transform
+    const hook = createConditionalDirectivePlugin(context).transform
     if (!hook) throw new Error('Expected a transform hook.')
     const handler = typeof hook === 'function' ? hook : hook.handler
     const result = handler.call({} as never, code, 'example.ts')
