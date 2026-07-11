@@ -37,7 +37,7 @@ Build the WeChat Mini Program once:
 pnpm build:sample:wx
 ```
 
-Or rebuild it in watch mode:
+Or start development with hot reload:
 
 ```sh
 pnpm dev:sample:wx

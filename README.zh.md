@@ -13,7 +13,7 @@
 
 在线演示：<https://sep2.github.io/vite-plugin-taro>。如何在本地运行，请参见[示例应用](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.zh.md)。
 
-- **Vite + React 19** 基于 Vite 8 生态，一份代码覆盖微信小程序与 Web。
+- **Vite 8 + React 19** 基于 Vite 生态，一份代码覆盖微信小程序与 Web。
 - **热更新** 基于 Vite 重构的热更新，微信小程序完美支持，页面编辑不再丢失状态。
 - **Tailwind CSS v4 开箱即用** 直接书写工具类，微信与 Web 样式自动适配。
 - **基于 Taro，超越 Taro** 使用 Taro 组件和 API，摆脱旧式 webpack 链路。
@@ -47,7 +47,7 @@ npm install
 ### 3. 开发模式运行
 
 ```sh
-# 微信小程序：以 watch 模式重新构建 dist/wx
+# 微信小程序：启动 Vite 热更新开发模式
 npm run dev:wx
 
 # 然后在微信开发者工具中打开 dist/wx
@@ -61,7 +61,7 @@ npm run dev:h5
 
 你可以在两个终端中同时运行 `npm run dev:wx` 和 `npm run dev:h5`。
 
-微信开发模式使用 Rolldown 增量模块图和 React Refresh。兼容的 JavaScript 修改会保留当前原生页面及 React/输入状态；CSS、资源、public 文件和配置修改会执行完整微信构建。
+微信开发模式通过 Rolldown 增量模块图和 React Refresh 完整支持 Vite 热更新。JavaScript 修改会保留当前原生页面及 React/输入状态；CSS、资源、public 文件和配置修改会自动重新构建。
 
 ### 4. 构建、预览和类型检查
 
@@ -200,7 +200,7 @@ export default defineConfig(({ mode }) => {
 - `app` 是 React 根应用组件模块，应默认导出应用组件。
 - 每个 `pages[].path` 都会映射到 `src/${path}.tsx` 文件。例如，`pages/index/index` 需要 `src/pages/index/index.tsx`。
 - `appJson.pages` 会根据 `pages` 自动生成；你在 `appJson` 中传入的任何 `pages` 字段都会被覆盖。
-- 如果应用使用 Skyline，请保留模板里的相关 `appJson` 和 `projectConfigJson` 配置。
+- 如果应用使用 Skyline，请添加相关的 `appJson` 和 `projectConfigJson` 配置。
 - 插件不会读取 Taro CLI 配置文件，例如 `config/index.ts`、`app.config.ts` 或页面 `config.ts` 文件。请通过插件选项传入应用和页面配置。
 
 ### 3. 创建应用组件
@@ -276,8 +276,8 @@ export default function IndexPage() {
 ### 8. 运行每个目标
 
 ```sh
-npm run dev:wx       # 构建 dist/wx 并启用微信代码热更新
-npm run dev:h5       # 启动 H5 开发服务器
+npm run dev:wx       # 启动微信小程序热更新开发模式
+npm run dev:h5       # 启动 Web 开发服务器
 npm run build:wx     # 构建 dist/wx
 npm run build:h5     # 构建 dist/h5
 npm run preview:h5   # 预览 dist/h5
@@ -466,7 +466,7 @@ pnpm typecheck
 | `pnpm typecheck` | 使用 `tsc` 对插件和示例应用进行类型检查。 |
 | `pnpm lint` | 运行 Biome 检查。 |
 | `pnpm format` | 应用 Biome 格式化。 |
-| `pnpm dev:sample:wx` | 以 watch 模式构建微信小程序示例。请先构建插件。 |
+| `pnpm dev:sample:wx` | 启动支持热更新的微信小程序示例。请先构建插件。 |
 | `pnpm dev:sample:h5` | 以 Vite 开发模式启动 H5 示例应用。请先构建插件。 |
 | `pnpm build:sample:wx` | 将微信小程序示例构建到 `packages/loan-genius/dist/wx`。 |
 | `pnpm build:sample:h5` | 将 H5 示例应用构建到 `packages/loan-genius/dist/h5`。 |

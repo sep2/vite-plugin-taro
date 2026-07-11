@@ -37,7 +37,7 @@ pnpm build:plugin
 pnpm build:sample:wx
 ```
 
-或以 watch 模式重新构建：
+或启动热更新开发模式：
 
 ```sh
 pnpm dev:sample:wx

@@ -15,7 +15,7 @@ pnpm --config.minimum-release-age=0 create vite-taro@latest my-app
 cd my-app
 npm install
 
-# WeChat Mini Program: rebuild dist/wx in watch mode
+# WeChat Mini Program: start Vite with hot reload
 npm run dev:wx
 
 # Web/H5: start the Vite dev server
@@ -27,7 +27,7 @@ npm run dev:h5
 
 You can keep `npm run dev:wx` and `npm run dev:h5` running at the same time in separate terminals.
 
-Note: Because of WeChat DevTools and Mini Program runtime limitations, hot reload/fast rebuilds for the WeChat target may not always apply cleanly. For day-to-day iteration, prefer the Web/H5 Vite dev server for fast feedback, and periodically verify the Mini Program result in WeChat DevTools.
+WeChat development fully supports Vite-powered hot reload. JavaScript edits preserve the active native page and React/input state, while other changes are rebuilt automatically.
 
 Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` in the generated `.env.local` to your WeChat Mini Program App ID, then open `dist/wx` with WeChat DevTools for Mini Program development.
 
@@ -45,7 +45,7 @@ bun create vite-taro my-app
 
 | Command | Description |
 | --- | --- |
-| `npm run dev:wx` | Build the WeChat Mini Program in watch mode. |
+| `npm run dev:wx` | Start WeChat Mini Program development with hot reload. |
 | `npm run dev:h5` | Start the Web/H5 dev server. |
 | `npm run build:wx` | Build the WeChat Mini Program output into `dist/wx`. |
 | `npm run build:h5` | Build the Web/H5 output into `dist/h5`. |

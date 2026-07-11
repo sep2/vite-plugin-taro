@@ -56,7 +56,7 @@ Node.js v26+ is available and can execute TypeScript natively.
 - `pnpm build:sample:h5`: build the sample H5 target.
 - `pnpm build:sample:wx`: build the sample WeChat Mini Program target.
 - `pnpm dev:sample:h5`: run the sample H5 dev server.
-- `pnpm dev:sample:wx`: rebuild the sample WeChat Mini Program target in watch mode.
+- `pnpm dev:sample:wx`: start the sample WeChat Mini Program target with hot reload.
 - `pnpm preview:sample:h5`: preview the built sample H5 target.
 - `pnpm changelog`: regenerate `CHANGELOG.md` from git release tags.
 - `pnpm publish:dry`: validate the release without publishing.
