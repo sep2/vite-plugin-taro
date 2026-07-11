@@ -10,7 +10,7 @@ Docs and source: <https://github.com/sep2/vite-plugin-taro>
 # Install dependencies after scaffolding
 npm install
 
-# WeChat Mini Program: rebuild dist/wx in watch mode
+# WeChat Mini Program: start Vite with native hot reload
 npm run dev:wx
 
 # Web/H5: start the Vite dev server
@@ -22,9 +22,7 @@ npm run dev:h5
 
 You can keep `npm run dev:wx` and `npm run dev:h5` running at the same time in separate terminals.
 
-Note: Because of WeChat DevTools and Mini Program runtime limitations, hot reload/fast rebuilds for the WeChat target may not always apply cleanly. For day-to-day iteration, prefer the Web/H5 Vite dev server for fast feedback, and periodically verify the Mini Program result in WeChat DevTools.
-
-Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` in `.env.local` to your WeChat App ID, then open `dist/wx` with WeChat DevTools for Mini Program development.
+Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` in `.env.local` to your WeChat App ID, then open `dist/wx` with WeChat DevTools for Mini Program development. The generated project enables hot reload and disables Skyline rendering and URL checks by default.
 
 ## Styles
 
@@ -33,7 +31,7 @@ Global styles live in `src/app.css`. Keep the Tailwind subpath imports and `@sou
 ## Scripts
 
 ```sh
-npm run dev:wx      # Build the WeChat Mini Program in watch mode
+npm run dev:wx      # Start WeChat Mini Program development with hot reload
 npm run dev:h5      # Start the Web/H5 dev server
 npm run build:wx    # Build dist/wx
 npm run build:h5    # Build dist/h5
