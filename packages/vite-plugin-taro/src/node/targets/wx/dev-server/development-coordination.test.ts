@@ -13,7 +13,7 @@ test('coalesces scheduled and in-flight full-build requests', async () => {
             builds++
             if (builds === 1) await firstBuild.promise
         },
-        (error) => assert.fail(error)
+        (error) => assert.fail(error as Error)
     )
 
     scheduler.request()
@@ -36,7 +36,7 @@ test('closing cancels a scheduled full build', async () => {
         async () => {
             builds++
         },
-        (error) => assert.fail(error)
+        (error) => assert.fail(error as Error)
     )
 
     scheduler.request()
