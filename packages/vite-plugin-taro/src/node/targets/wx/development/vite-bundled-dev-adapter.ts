@@ -1,6 +1,6 @@
 import type { ResolvedConfig, ViteDevServer } from 'vite'
-import type { WxOutputFile } from './output-writer.ts'
-import { wxDevRuntimeImplementation } from './runtime-implementation.ts'
+import { wxDevRuntimeImplementation } from './dev-runtime-source.ts'
+import type { WxOutputFile } from './output.ts'
 
 const clientId = 'vite-plugin-taro-wx'
 

@@ -1,9 +1,10 @@
 import path from 'node:path'
 import { recursiveMerge } from '@tarojs/helper'
 import { Weapp as WechatPlatform } from '@tarojs/plugin-platform-weapp'
-import { nodeRequire } from '../constants.ts'
-import type { JsonObject, VitePluginTaroBuildContext } from '../types.ts'
-import { normalizeModuleId } from '../utils.ts'
+import type { JsonObject } from '../../../options.ts'
+import type { VitePluginTaroBuildContext } from '../../context.ts'
+import { normalizeModuleId } from '../../module-paths.ts'
+import { nodeRequire } from '../../runtime-paths.ts'
 
 export type WechatAssetSource = string | Uint8Array
 

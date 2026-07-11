@@ -1,6 +1,7 @@
 import type { Plugin } from 'vite'
-import type { VitePluginTaroBuildContext, VitePluginTaroTarget } from '../types.ts'
-import { normalizeModuleId } from '../utils.ts'
+import type { VitePluginTaroTarget } from '../../options.ts'
+import type { VitePluginTaroBuildContext } from '../context.ts'
+import { normalizeModuleId } from '../module-paths.ts'
 
 export function createVitePluginTaroConditionalDirectivePlugin(context: VitePluginTaroBuildContext): Plugin {
     return {

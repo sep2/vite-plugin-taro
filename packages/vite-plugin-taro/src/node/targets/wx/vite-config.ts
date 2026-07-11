@@ -1,8 +1,8 @@
 import path from 'node:path'
 import type { UserConfig } from 'vite'
-import { nodeRequire } from '../constants.ts'
-import { normalizeModuleId } from '../utils.ts'
-import { virtualWxAppId } from './wx-virtual.ts'
+import { normalizeModuleId } from '../../module-paths.ts'
+import { nodeRequire } from '../../runtime-paths.ts'
+import { virtualWxAppId } from './virtual-entries.ts'
 
 const taroWechatComponentsReactPath = nodeRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
 const vitePluginTaroSourcePath = normalizeModuleId(path.dirname(nodeRequire.resolve('vite-plugin-taro')))

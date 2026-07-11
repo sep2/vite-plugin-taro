@@ -341,21 +341,24 @@ No other plugin or environment writes WX development output.
 The implementation should follow responsibilities rather than preserve the old layout:
 
 ```text
-src/wx-dev/
-    session.ts              orchestration and serialization
-    bundled-dev-adapter.ts  isolated Vite/Rolldown integration
-    output-writer.ts        atomic fixed-directory writes
-    patch-journal.ts        cumulative literal update.js
-    classifier.ts           patch versus full rebuild
-    transforms.ts           entry and React Refresh transforms
-    module-ids.ts           stable ID extraction and registration
-    types.ts                local contracts only
+src/node/targets/wx/
+    plugin.ts               WX target hooks
+    vite-config.ts          Rolldown output and chunk layout
+    virtual-entries.ts      generated App/page entries and Refresh transforms
+    companion-assets.ts     WXML, JSON, WXSS, and project files
+    development/
+        session.ts                      orchestration and serialization
+        vite-bundled-dev-adapter.ts     isolated Vite/Rolldown integration
+        output.ts                       atomic fixed-directory writes
+        patch-journal.ts                cumulative literal update.js
+        dev-runtime-source.ts           WeChat-safe Rolldown runtime source
 
-src/shim/
-    wx-dev-runtime.ts       Rolldown runtime, React, Taro, lifecycle bridge
+src/runtime/wx/
+    taro-runtime.ts         Taro page/component facade
+    development-runtime.ts React Refresh, Taro root, and lifecycle bridge
 ```
 
-Small modules may be merged when a type or helper has only one caller. Avoid abstract base classes, providers, protocol layers, and files containing only re-exports.
+The `node/` and `runtime/` boundary is strict: code bundled into the Mini Program never imports Vite or Node implementation code. Small modules may be merged when a type or helper has only one caller. Avoid abstract base classes, providers, protocol layers, and files containing only re-exports.
 
 ## Replacement plan
 

@@ -1,2 +1,2 @@
-export type { VitePluginTaroOptions, VitePluginTaroPageOption, VitePluginTaroTarget } from './vite/types.ts'
-export { default } from './vite/vite-plugin-taro.ts'
+export { default } from './node/plugin.ts'
+export type { VitePluginTaroOptions, VitePluginTaroPageOption, VitePluginTaroTarget } from './options.ts'

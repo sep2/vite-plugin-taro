@@ -1,9 +1,9 @@
 import path from 'node:path'
 import type { ResolvedConfig, ViteDevServer } from 'vite'
-import type { WxRuntimeClassNameTransformer } from '../vite/taro-css.ts'
-import { WxBundledDevAdapter, type WxHmrOutput } from './bundled-dev-adapter.ts'
-import { syncWxPublicDirectory, syncWxPublicFile, type WxOutputFile, writeWxOutput } from './output-writer.ts'
+import type { WxRuntimeClassNameTransformer } from '../../../css-integration.ts'
+import { syncWxPublicDirectory, syncWxPublicFile, type WxOutputFile, writeWxOutput } from './output.ts'
 import { WxPatchJournal } from './patch-journal.ts'
+import { WxBundledDevAdapter, type WxHmrOutput } from './vite-bundled-dev-adapter.ts'
 
 const maxPatchCount = 1_000
 const maxPatchBytes = 16 * 1024 * 1024

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createVitePluginTaroConditionalDirectivePlugin } from '../src/vite/plugins/conditional-directive-plugin.ts'
-import type { VitePluginTaroBuildContext, VitePluginTaroTarget } from '../src/vite/types.ts'
+import type { VitePluginTaroTarget } from '../../options.ts'
+import type { VitePluginTaroBuildContext } from '../context.ts'
+import { createVitePluginTaroConditionalDirectivePlugin } from './conditional-directives.ts'
 
 function transform(code: string, target: VitePluginTaroTarget): string {
     const context = {

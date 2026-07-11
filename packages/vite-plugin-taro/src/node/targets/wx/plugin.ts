@@ -1,17 +1,17 @@
 import type { Plugin, PluginOption, ResolvedConfig } from 'vite'
-import { WxDevelopmentSession } from '../../wx-dev/session.ts'
-import type { WxRuntimeClassNameTransformer } from '../taro-css.ts'
-import type { VitePluginTaroBuildContext } from '../types.ts'
-import { stripVirtualPrefix } from '../utils.ts'
-import { resolvePublicVirtualModuleId } from '../virtual-modules.ts'
-import { emitWechatAssets, type WechatBundle } from './wx-assets.ts'
-import { createWxViteConfig } from './wx-config.ts'
+import type { VitePluginTaroBuildContext } from '../../context.ts'
+import type { WxRuntimeClassNameTransformer } from '../../css-integration.ts'
+import { stripVirtualPrefix } from '../../module-paths.ts'
+import { resolvePublicVirtualModuleId } from '../../virtual-module-resolver.ts'
+import { emitWechatAssets, type WechatBundle } from './companion-assets.ts'
+import { WxDevelopmentSession } from './development/session.ts'
 import {
     emitWxImplicitChunks,
     isWxVirtualModule,
     loadWxVirtualModule,
     transformWxDevelopmentModule
-} from './wx-virtual.ts'
+} from './virtual-entries.ts'
+import { createWxViteConfig } from './vite-config.ts'
 
 /** Creates the plugins that own the complete WX build and development lifecycle. */
 export function createWxTargetPlugins(

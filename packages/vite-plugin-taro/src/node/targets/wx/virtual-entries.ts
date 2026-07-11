@@ -1,7 +1,8 @@
 import { transformSync } from '@babel/core'
-import { nodeRequire, wxDevRuntimeImportPath, wxShimImportPath } from '../constants.ts'
-import type { VitePluginTaroBuildContext, VitePluginTaroPageOption } from '../types.ts'
-import { createPageComponentImport, normalizeModuleId, toImportPath } from '../utils.ts'
+import type { VitePluginTaroPageOption } from '../../../options.ts'
+import type { VitePluginTaroBuildContext } from '../../context.ts'
+import { createPageComponentImport, normalizeModuleId, toImportPath } from '../../module-paths.ts'
+import { nodeRequire, wxDevelopmentRuntimeImportPath, wxRuntimeImportPath } from '../../runtime-paths.ts'
 
 export const virtualWxAppId = 'virtual:vite-plugin-taro/wx/app'
 export const virtualWxCompId = 'virtual:vite-plugin-taro/wx/comp'
@@ -78,7 +79,7 @@ export function transformWxDevelopmentModule(code: string, id: string, appCompon
 
 function createWxAppEntry(context: VitePluginTaroBuildContext, development: boolean): string {
     const refreshPreamble = development ? `import ${JSON.stringify(virtualWxRefreshPreambleId)}\n` : ''
-    return `${refreshPreamble}import { createReactApp, ReactDOM } from ${JSON.stringify(wxShimImportPath)}
+    return `${refreshPreamble}import { createReactApp, ReactDOM } from ${JSON.stringify(wxRuntimeImportPath)}
 import React from 'react'
 import AppComponent from ${JSON.stringify(toImportPath(context.appComponentFile))}
 
@@ -89,13 +90,13 @@ App(createReactApp(AppComponent, React, ReactDOM, appConfig))
 
 function createWxPageEntry(page: VitePluginTaroPageOption, development: boolean): string {
     const developmentImport = development
-        ? `import { decorateWxPageConfig, registerWxPage } from ${JSON.stringify(wxDevRuntimeImportPath)}\n`
+        ? `import { decorateWxPageConfig, registerWxPage } from ${JSON.stringify(wxDevelopmentRuntimeImportPath)}\n`
         : ''
     const createConfig = `createPageConfig(PageComponent, '${page.path}', { root: { cn: [] } }, pageConfig)`
     const pageRegistration = development
         ? `registerWxPage(${JSON.stringify(page.path)}, () => Page(taroPageConfig))`
         : 'Page(taroPageConfig)'
-    return `${developmentImport}import { createPageConfig } from ${JSON.stringify(wxShimImportPath)}
+    return `${developmentImport}import { createPageConfig } from ${JSON.stringify(wxRuntimeImportPath)}
 import PageComponent from ${JSON.stringify(createPageComponentImport(page.path))}
 
 const pageConfig = ${JSON.stringify(page.config)}
@@ -108,7 +109,7 @@ ${pageRegistration}
 }
 
 function createWxCompEntry(): string {
-    return `import { createRecursiveComponentConfig } from ${JSON.stringify(wxShimImportPath)}
+    return `import { createRecursiveComponentConfig } from ${JSON.stringify(wxRuntimeImportPath)}
 
 Component(createRecursiveComponentConfig())
 `

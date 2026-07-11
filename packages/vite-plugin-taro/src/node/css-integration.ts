@@ -2,8 +2,8 @@ import path from 'node:path'
 import type { Plugin } from 'vite'
 import { createContext } from 'weapp-tailwindcss/core'
 import { createWeappTailwindcssGenerator, resolveTailwindV4Source } from 'weapp-tailwindcss/generator'
-import type { VitePluginTaroBuildContext } from './types.ts'
-import { normalizeModuleId } from './utils.ts'
+import type { VitePluginTaroBuildContext } from './context.ts'
+import { normalizeModuleId } from './module-paths.ts'
 
 const wechatStyleOptions = {
     cssCalc: false,
