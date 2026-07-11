@@ -4,15 +4,19 @@ import type { WxOutputFile } from './bundle-output.ts'
 
 export async function writeWxOutputFiles(outDir: string, output: WxOutputFile[]): Promise<void> {
     await Promise.all(
-        output.map(async (item) => {
-            const file = path.join(outDir, item.fileName)
+        output.map((item) => {
             const source = item.type === 'chunk' ? item.code : item.source
-            await fs.mkdir(path.dirname(file), { recursive: true })
-            const temporaryFile = `${file}.tmp`
-            await fs.writeFile(temporaryFile, source)
-            await fs.rename(temporaryFile, file)
+            return writeWxOutputFile(outDir, item.fileName, source)
         })
     )
+}
+
+export async function writeWxOutputFile(outDir: string, fileName: string, source: string | Uint8Array): Promise<void> {
+    const file = path.join(outDir, fileName)
+    await fs.mkdir(path.dirname(file), { recursive: true })
+    const temporaryFile = `${file}.tmp`
+    await fs.writeFile(temporaryFile, source)
+    await fs.rename(temporaryFile, file)
 }
 
 export async function syncWxPublicDirectory(publicDir: string, outDir: string): Promise<void> {

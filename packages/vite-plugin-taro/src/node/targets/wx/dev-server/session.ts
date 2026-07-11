@@ -4,21 +4,15 @@ import colors from 'picocolors'
 import type { ViteDevServer } from 'vite'
 import type { BuildContext } from '../../../build-context.ts'
 import { wxHotUpdateControlFile, wxHotUpdateDirectory, wxHotUpdateEntryFile } from '../hot-update-files.ts'
-import {
-    isWxFullBuildOutput,
-    normalizeWxBundleStyles,
-    setWxAppStyles,
-    stampWxFullBuild,
-    type WxOutputFile
-} from './bundle-output.ts'
+import { isWxFullBuildOutput, normalizeWxBundleStyles, setWxAppStyles, type WxOutputFile } from './bundle-output.ts'
 import { transformWxCompatibleJavaScript, transformWxOutputChunks } from './javascript-compatibility.ts'
 import { collectWxBundleModuleIds, collectWxPatchModuleIds } from './module-ids.ts'
-import { syncWxPublicDirectory, syncWxPublicFile, writeWxOutputFiles } from './output-writer.ts'
+import { syncWxPublicDirectory, syncWxPublicFile, writeWxOutputFile, writeWxOutputFiles } from './output-writer.ts'
 import { WxUpdateProtocolServer } from './update-protocol-server.ts'
 import { ViteBundledDevAdapter, type WxHmrOutput } from './vite-bundled-dev-adapter.ts'
 
-const maxPatchCount = 1_000
-const maxPatchBytes = 16 * 1024 * 1024
+const maxRetainedDeltaCount = 1_000
+const maxRetainedDeltaBytes = 16 * 1024 * 1024
 
 type WxDevServerContext = Pick<BuildContext, 'vite' | 'css'>
 
@@ -44,7 +38,15 @@ export class WxDevServerSession {
     ) {
         const config = context.vite
         this.outDir = path.resolve(config.root, config.build.outDir)
-        this.updates = new WxUpdateProtocolServer(server, this.outDir, () => this.requestFullBuild())
+        this.updates = new WxUpdateProtocolServer(
+            server,
+            () => this.requestFullBuild(),
+            (buildId, source) =>
+                this.enqueueOutput(async () => {
+                    if (!this.updates.isCurrentBuild(buildId)) return
+                    await writeWxOutputFile(this.outDir, wxHotUpdateEntryFile, source)
+                })
+        )
         this.initialBundleReady = new Promise<void>((resolve) => {
             this.markInitialBundleReady = resolve
         })
@@ -97,7 +99,9 @@ export class WxDevServerSession {
     }
 
     private readonly handleHttpListening = (): void => {
-        this.enqueueOutput(() => this.updates.writeCurrentControlFile())
+        this.enqueueOutput(() =>
+            writeWxOutputFile(this.outDir, wxHotUpdateControlFile, this.updates.createControlSource())
+        )
     }
 
     private readonly handleWatchedFile = (file: string): void => {
@@ -110,10 +114,7 @@ export class WxDevServerSession {
     private handleBundleOutput(output: WxOutputFile[]): void {
         const appStyles = normalizeWxBundleStyles(output)
         if (appStyles !== undefined) this.latestAppStyles = appStyles
-        if (isWxFullBuildOutput(output)) {
-            if (this.latestAppStyles) setWxAppStyles(output, this.latestAppStyles)
-            stampWxFullBuild(output)
-        }
+        if (isWxFullBuildOutput(output) && this.latestAppStyles) setWxAppStyles(output, this.latestAppStyles)
 
         if (!isWxFullBuildOutput(output)) {
             this.enqueueOutput(async () => {
@@ -155,8 +156,8 @@ export class WxDevServerSession {
             const transformed = await this.context.css.transformWxClassNames(output.code, output.filename)
             const compatibleCode = await transformWxCompatibleJavaScript(transformed.code, output.filename)
             if (
-                this.updates.length >= maxPatchCount ||
-                this.updates.size + Buffer.byteLength(compatibleCode) >= maxPatchBytes
+                this.updates.length >= maxRetainedDeltaCount ||
+                this.updates.size + Buffer.byteLength(compatibleCode) >= maxRetainedDeltaBytes
             ) {
                 this.requestFullBuild()
                 return
@@ -200,13 +201,15 @@ export class WxDevServerSession {
         await this.outputWork
     }
 
-    private enqueueOutput(task: () => Promise<void>): void {
-        this.outputWork = this.outputWork.then(task).catch((error: unknown) => {
+    private enqueueOutput(task: () => Promise<void>): Promise<void> {
+        const work = this.outputWork.then(task)
+        this.outputWork = work.catch((error: unknown) => {
             const normalizedError = error instanceof Error ? error : new Error(String(error))
             this.server.config.logger.error(
                 `[vite-plugin-taro] WX development output failed: ${normalizedError.stack ?? normalizedError.message}`
             )
         })
+        return work
     }
 }
 

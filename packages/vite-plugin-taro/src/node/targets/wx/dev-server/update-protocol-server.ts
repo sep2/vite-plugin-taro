@@ -1,9 +1,6 @@
 import { randomBytes } from 'node:crypto'
-import fs from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import path from 'node:path'
 import type { ViteDevServer } from 'vite'
-import { wxHotUpdateControlFile, wxHotUpdateEntryFile } from '../hot-update-files.ts'
 import {
     createWxUpdateServerState,
     transitionWxUpdateServer,
@@ -37,8 +34,8 @@ export class WxUpdateProtocolServer {
 
     constructor(
         private readonly server: ViteDevServer,
-        private readonly outDir: string,
-        private readonly requestFullBuild: () => void
+        private readonly requestFullBuild: () => void,
+        private readonly publishBatch: (buildId: string, source: string) => Promise<void>
     ) {}
 
     get length(): number {
@@ -68,13 +65,17 @@ export class WxUpdateProtocolServer {
         return createId()
     }
 
+    isCurrentBuild(buildId: string): boolean {
+        return this.state.buildId === buildId
+    }
+
     commitFullBuild(buildId: string): void {
         this.apply({ type: 'full-build-committed', buildId })
         this.bytes = 0
         this.respondToAll({ type: 'rebuilding' })
     }
 
-    createControlSource(buildId: string): string {
+    createControlSource(buildId = this.state.buildId): string {
         const address = this.server.httpServer?.address()
         const port = address && typeof address !== 'string' ? address.port : this.server.config.server.port
         return `globalThis.__VITE_PLUGIN_TARO_WX_CONTROL__ = ${JSON.stringify({
@@ -82,14 +83,6 @@ export class WxUpdateProtocolServer {
             token: this.token,
             buildId
         })};\n`
-    }
-
-    async writeCurrentControlFile(): Promise<void> {
-        const file = path.join(this.outDir, wxHotUpdateControlFile)
-        await fs.mkdir(path.dirname(file), { recursive: true })
-        const temporaryFile = `${file}.tmp`
-        await fs.writeFile(temporaryFile, this.createControlSource(this.state.buildId))
-        await fs.rename(temporaryFile, file)
     }
 
     private readonly handleRequest = async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
@@ -206,11 +199,7 @@ export class WxUpdateProtocolServer {
     }
 
     private async writeBatch(batch: WxUpdateBatch): Promise<void> {
-        const file = path.join(this.outDir, wxHotUpdateEntryFile)
-        await fs.mkdir(path.dirname(file), { recursive: true })
-        const temporaryFile = `${file}.tmp`
-        await fs.writeFile(temporaryFile, renderBatch(batch, createId()))
-        await fs.rename(temporaryFile, file)
+        await this.publishBatch(batch.buildId, renderBatch(batch, createId()))
     }
 }
 
