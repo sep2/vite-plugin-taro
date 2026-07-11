@@ -56,7 +56,7 @@
         "node": ">=22"
     },
     "dependencies": {
-        "@babel/core": "^8.0.1",
+        "@babel/core": "^7.29.7",
         "@rolldown/plugin-babel": "^0.2.3",
         "@tarojs/components": "^4.2.0",
         "@tarojs/helper": "^4.2.0",
