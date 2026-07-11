@@ -77,6 +77,8 @@ export function createWxViteConfig(context: BuildContext): UserConfig {
         css: {
             lightningcss: {
                 visitor: {
+                    // keep CSS3 style single colon :before, :after
+                    // while WeChat Mini Program does not support the double colons versions
                     Selector(selector) {
                         return selector.map((component) => {
                             if (
