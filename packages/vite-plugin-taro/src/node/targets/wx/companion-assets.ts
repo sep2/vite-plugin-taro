@@ -29,7 +29,7 @@ type WxTemplateComponentConfig = {
 }
 
 const taroWxComponentsPath = packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
-let cachedTemplateBuilder: ReturnType<typeof createWxTemplateBuilder> | undefined
+const templateBuilder = createWxTemplateBuilder()
 
 export function emitWxCompanionAssets(emitter: WxAssetEmitter, bundle: WxBundle, context: BuildContext): void {
     for (const asset of createWxCompanionAssets(bundle, context)) {
@@ -41,10 +41,9 @@ function createWxCompanionAssets(
     bundle: WxBundle,
     context: BuildContext
 ): { fileName: string; source: WxAssetSource }[] {
-    cachedTemplateBuilder ??= createWxTemplateBuilder()
-    const templateBuilder = cachedTemplateBuilder
     const json = (value: JsonObject) =>
         context.behavior.prettyPrintJson ? JSON.stringify(value, null, 2) : JSON.stringify(value)
+
     return [
         { fileName: 'app.json', source: json(context.project.appConfig) },
         { fileName: 'app.wxss', source: collectWxBundleStyles(bundle) },
