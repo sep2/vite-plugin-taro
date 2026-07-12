@@ -168,7 +168,8 @@ export function startWxUpdateClient(): void {
                     try {
                         batchApply()
                         dispatch({ type: 'batch-executed', targetVersion: command.targetVersion })
-                    } catch {
+                    } catch (error) {
+                        console.error('[vite-plugin-taro] WX update execution failed', error)
                         dispatch({ type: 'batch-failed' })
                     } finally {
                         bridge.endUpdate?.()
