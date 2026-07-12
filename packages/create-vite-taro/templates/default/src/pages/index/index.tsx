@@ -61,45 +61,51 @@ function IndexPage() {
                 </View>
 
                 <View className="relative z-10 flex shrink-0 flex-col items-center px-5">
-                    <View className="-mt-10 flex w-full max-w-4xl flex-col gap-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
-                        <View className="flex flex-row items-start justify-between gap-4">
-                            <View className="flex min-w-0 flex-1 flex-col gap-2">
-                                <Text className="block text-xs font-bold tracking-widest text-blue-600">LIVE DEMO</Text>
-                                <Text className="block text-xl font-bold text-slate-950">A tiny shared counter</Text>
-                                <Text className="block text-sm leading-6 text-slate-500">
-                                    Change the counter, then edit this page to see hot reload update both targets.
-                                </Text>
+                    <View className="-mt-10 flex w-full max-w-4xl flex-col rounded-3xl shadow-xl">
+                        <View className="flex w-full flex-col gap-6 overflow-hidden rounded-3xl border border-slate-200 bg-white p-6">
+                            <View className="flex flex-row items-start justify-between gap-4">
+                                <View className="flex min-w-0 flex-1 flex-col gap-2">
+                                    <Text className="block text-xs font-bold tracking-widest text-blue-600">
+                                        LIVE DEMO
+                                    </Text>
+                                    <Text className="block text-xl font-bold text-slate-950">
+                                        A tiny shared counter
+                                    </Text>
+                                    <Text className="block text-sm leading-6 text-slate-500">
+                                        Change the counter, then edit this page to see hot reload update both targets.
+                                    </Text>
+                                </View>
+                                <View className="flex items-center justify-center rounded-2xl bg-blue-50 px-4 py-3">
+                                    <Text className="text-3xl font-bold text-blue-600">{count}</Text>
+                                </View>
                             </View>
-                            <View className="flex items-center justify-center rounded-2xl bg-blue-50 px-4 py-3">
-                                <Text className="text-3xl font-bold text-blue-600">{count}</Text>
-                            </View>
-                        </View>
 
-                        <View className="flex flex-col gap-3">
-                            <View className="flex flex-row gap-3">
-                                <View className="flex flex-1">
-                                    <Button
-                                        className="flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 after:border-0"
-                                        onClick={() => setCount((currentCount) => currentCount - 1)}
-                                    >
-                                        Decrease
-                                    </Button>
+                            <View className="flex flex-col gap-3">
+                                <View className="flex flex-row gap-3">
+                                    <View className="flex flex-1">
+                                        <Button
+                                            className="flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 after:border-0"
+                                            onClick={() => setCount((currentCount) => currentCount - 1)}
+                                        >
+                                            Decrease
+                                        </Button>
+                                    </View>
+                                    <View className="flex flex-1">
+                                        <Button
+                                            className="flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white after:border-0"
+                                            onClick={() => setCount((currentCount) => currentCount + 1)}
+                                        >
+                                            Increase
+                                        </Button>
+                                    </View>
                                 </View>
-                                <View className="flex flex-1">
-                                    <Button
-                                        className="flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white after:border-0"
-                                        onClick={() => setCount((currentCount) => currentCount + 1)}
-                                    >
-                                        Increase
-                                    </Button>
-                                </View>
+                                <Button
+                                    className="flex w-full items-center justify-center rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-600 after:border-0"
+                                    onClick={() => Taro.showToast({ title: 'Hello from Taro!' })}
+                                >
+                                    Show toast
+                                </Button>
                             </View>
-                            <Button
-                                className="flex w-full items-center justify-center rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-600 after:border-0"
-                                onClick={() => Taro.showToast({ title: 'Hello from Taro!' })}
-                            >
-                                Show toast
-                            </Button>
                         </View>
                     </View>
                 </View>
@@ -121,7 +127,7 @@ function IndexPage() {
                                     key={feature.number}
                                     className={`flex flex-row gap-4 p-5 ${index < features.length - 1 ? 'border-b border-slate-200' : ''}`}
                                 >
-                                    <View className="flex shrink-0 items-center justify-center rounded-xl bg-slate-950 px-3 py-3">
+                                    <View className="flex shrink-0 self-center items-center justify-center rounded-xl bg-slate-950 px-3 py-3">
                                         <Text className="text-xs font-bold text-white">{feature.number}</Text>
                                     </View>
                                     <View className="flex min-w-0 flex-1 flex-col gap-1">
@@ -143,7 +149,7 @@ function IndexPage() {
                                     Edit this page, add your routes, and ship your next idea everywhere.
                                 </Text>
                             </View>
-                            <View className="flex self-start rounded-xl bg-white px-4 py-3">
+                            <View className="flex self-end rounded-xl bg-white px-4 py-3">
                                 <Text className="text-sm font-bold text-blue-600">Ready to build →</Text>
                             </View>
                         </View>
