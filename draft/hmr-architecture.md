@@ -29,6 +29,8 @@ This is the core design:
 
 > Convert arbitrary compatible source edits into changes to one page-scoped executable file, so WeChat reruns the page but keeps the App and React state alive.
 
+For each compatible update, `update.js` is the **only project file written**. Updated module code and patch history stay in the development server's memory; `app.js`, page bundles, shared chunks, and native files are not rewritten. The server writes only the missing patch range into `update.js`. DevTools therefore observes a change to the known page dependency and has no other file change that would trigger an App reload.
+
 ## Architecture
 
 ```mermaid
@@ -43,6 +45,7 @@ sequenceDiagram
     Server->>Server: Convert source edit into Rolldown patch
 
     alt Compatible JavaScript update
+        Server->>Server: Keep module updates in memory
         Server->>WX: Put patch code in update.js
         WX->>WX: Rerun page code while App code stays alive
         WX->>WX: update.js invokes HMR runtime
@@ -104,7 +107,7 @@ For a compatible source edit:
 9. React Refresh reconciles the new component implementations with the retained Fiber tree.
 10. The client acknowledges the new version only after Refresh has completed.
 
-The edit may come from an App component, the active page, an inactive page, or a shared dependency. On the compatible update path, the development server rewrites only `update.js`; it does not also rewrite that module's normal Mini Program output files.
+This applies whether the edit comes from an App component, the active page, an inactive page, or a shared dependency.
 
 ## The HMR runtime
 

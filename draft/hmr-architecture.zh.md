@@ -29,6 +29,8 @@ DevTools 重新执行页面时，会在页面常规初始化之前执行 `update
 
 > 把任意兼容的源码修改转换为一个页面级可执行文件的变化，让微信只重新执行页面，同时保留 App 和 React 状态。
 
+每次兼容更新都**只会写入 `update.js` 这一个项目文件**。更新后的模块代码和 patch 历史保留在开发服务器内存中；`app.js`、页面 bundle、共享 chunk 和原生文件都不会被改写。服务器只把当前缺少的 patch 范围写入 `update.js`。因此 DevTools 只能观察到这个已知页面依赖发生变化，不会因为其他文件变化而触发 App 重载。
+
 ## 架构
 
 ```mermaid
@@ -43,6 +45,7 @@ sequenceDiagram
     Server->>Server: 把源码修改转换为 Rolldown patch
 
     alt 兼容的 JavaScript 更新
+        Server->>Server: 把模块更新保留在内存中
         Server->>WX: 把 patch 代码写入 update.js
         WX->>WX: 重新执行页面代码并保留 App 代码
         WX->>WX: update.js 调用 HMR runtime
@@ -104,7 +107,7 @@ sequenceDiagram
 9. React Refresh 使用保留下来的 Fiber tree 协调新的组件实现。
 10. 只有 Refresh 完成后，客户端才确认新版本。
 
-修改可能来自 App 组件、当前页面、未打开的页面或共享依赖。只要走兼容更新路径，开发服务器就只改写 `update.js`，不会同时改写该模块对应的常规小程序输出文件。
+无论修改来自 App 组件、当前页面、未打开的页面还是共享依赖，都遵循同一条兼容更新路径。
 
 ## HMR runtime
 
