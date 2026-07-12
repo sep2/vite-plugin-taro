@@ -4,7 +4,17 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
-## [0.3.0] - 2026-07-11
+## [0.3.1] - 2026-07-12
+
+### Changed
+
+- add test step to publish and windows workflows (f6af81a)
+
+### Fixed
+
+- handle optional `project.private.config.json` in WX companion assets and improve error handling for missing sources (f3a7b2f)
+
+## [0.3.0] - 2026-07-12
 
 ### Changed
 
