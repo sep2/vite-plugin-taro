@@ -107,6 +107,7 @@ export function createWxViteConfig(context: BuildContext): UserConfig {
             target: 'es2018',
             assetsInlineLimit: 1024,
             cssCodeSplit: false,
+            // weapp-tailwindcss has no minifier setting; retain Vite's production CSS minification.
             cssMinify: context.development ? false : 'lightningcss',
             minify: !context.development,
             rolldownOptions: {
