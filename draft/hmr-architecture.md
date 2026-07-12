@@ -115,16 +115,16 @@ sequenceDiagram
         par Execution-plane event
             Server->>WX: Project file: atomically replace update.js
             WX->>WX: Recompile affected page graph
-            WX->>WX: Start page entry; early require executes update.js
-            WX->>WX: Apply patches; guard remaining page initialization
+            WX->>WX: Start page entry and execute early update.js require
+            WX->>WX: Apply patches and guard remaining page initialization
             WX->>WX: Perform React Refresh on retained Fiber tree
         and Control-plane response
             Server-->>WX: HTTP batch-published
-            Note right of WX: Starts watchdog only; it is not an acknowledgement
+            Note right of WX: Starts watchdog only, not an acknowledgement
         end
 
         WX-->>Server: HTTP poll(targetVersion) after Refresh
-        Server->>Server: Acknowledge range; hold poll or publish next range
+        Server->>Server: Acknowledge range, then hold poll or publish next range
     else Unsafe update or protocol failure
         Server->>Server: Build new baseline and reset versions
         Server->>WX: Complete project output with new buildId and empty update.js
