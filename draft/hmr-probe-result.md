@@ -19,13 +19,13 @@ The matrix varied every part of the update protocol that can affect DevTools beh
 - direct literal, transitive literal, and dynamic `require()` edges;
 - one cumulative file, immutable files, sequential preallocated files, and circular files;
 - synchronous, delayed, missing, and self-contained lifecycle suppression;
-- normal execution and App Service replay;
+- normal execution and HMR client replay;
 - single, rapid, coalesced, and out-of-order file events;
 - loaded and never-loaded routes;
 - JavaScript, JSON, WXML, WXSS, image, and ignored text files;
 - 0, 32, 128, 512, and 1,000 preallocated files.
 
-State assertions used the DevTools page ID, a live native input value, visible React output, console traces, and App Service close/reopen replay.
+State assertions used the DevTools page ID, a live native input value, visible React output, console traces, and HMR runtime close/reopen replay.
 
 ## What DevTools does
 
@@ -73,7 +73,7 @@ Adding an unrelated root JavaScript file also invalidated the active runtime. Fi
 | Literal page require wrapped in `try/catch`, file initially missing | first addition runs | no on first addition | not sufficient | missing module is not registered as a dependency |
 | Preallocated slot required through a shared dispatcher | no | no | no | changed child is cached; dispatcher is not re-executed |
 | Preallocated slot required through `comp.js` | no | no | no | same transitive-cache behavior |
-| Preallocated slot directly required by `app.js` | unsafe | no | no | App executes it before the WX runtime and may restart the App Service |
+| Preallocated slot directly required by `app.js` | unsafe | no | no | App executes it before the WX runtime and may reload the App |
 | Preallocated slot literally required by every page | yes | yes | yes | viable |
 
 Native dynamic `require('./path/' + value + '.js')` is supported in development and accepted by automatic preview. It does not provide the early static dependency edge needed for lifecycle suppression.
@@ -123,7 +123,7 @@ Circular reuse is not correct. A real two-patch probe showed:
 1. patch 1 introduced `src/hmr-slot-dependency.ts`;
 2. patch 2 loaded it but did not redefine it;
 3. overwriting patch 1's slot with patch 2 worked in the live runtime;
-4. after App Service restart, replay warned `Module src/hmr-slot-dependency.ts not found` and rendered `undefined-PAGE_V2`.
+4. after an HMR runtime restart, replay warned `Module src/hmr-slot-dependency.ts not found` and rendered `undefined-PAGE_V2`.
 
 A circle discards executable history. It cannot guarantee replay for new dependencies or independent module changes. Slots may only be reused after a full build establishes a new baseline.
 
@@ -177,7 +177,7 @@ A page-level `wx.request()` to a local control server was tested from the same f
 
 The implemented channel uses `http://localhost:<vite-port>` because Vite's default macOS listener may bind only to `::1`; `127.0.0.1` then fails even though `localhost` succeeds. The generated endpoint is authenticated by a per-server random token. Requests and responses carry only build/session/version metadata, never executable code.
 
-The protocol also had to account for an initial `update.js` batch executing before asynchronous App Service registration completes. Reporting that batch immediately aborts registration and leaves the client stuck. The final client state machine queues the literal batch until registration succeeds.
+The protocol also had to account for an initial `update.js` batch executing before asynchronous HMR client registration completes. Reporting that batch immediately aborts registration and leaves the client stuck. The final client state machine queues the literal batch until registration succeeds.
 
 ## Protocol transport validation
 
@@ -188,12 +188,12 @@ The final pull/ack transport was manually validated against the fixed `packages/
 - consecutive updates advanced `0 -> 1` and `1 -> 2`, preserved page ID `5`, and preserved native input `616161`;
 - two rapid source events converged to the fourth protocol version without losing the final render or input state;
 - compatible App updates preserved page ID `14` and input `717171`;
-- after App Service restart, the new session reported version 0 and the server published one retained `0 -> 1` batch; the client reached version 1 and rendered the update;
+- after an HMR runtime restart, the new session reported version 0 and the server published one retained `0 -> 1` batch; the client reached version 1 and rendered the update;
 - restarting Vite produced a new full-build epoch, reset `update.js` to `void 0;`, and retained the latest source in the full output;
 - a CSS edit changed `buildId`, reset protocol version to 0, and produced a full WX output;
 - reverting test edits recovered through the same protocol.
 
-The server retains deltas only in memory, publishes one missing range at a time, and does not acknowledge a range until the App Service reports its post-Refresh version. Every retry rewrites the same batch with a fresh nonce so a missed same-file event cannot be hidden by identical file content.
+The server retains deltas only in memory, publishes one missing range at a time, and does not acknowledge a range until the HMR client reports its post-Refresh version. Every retry rewrites the same batch with a fresh nonce so a missed same-file event cannot be hidden by identical file content.
 
 ## Final model
 
@@ -204,12 +204,12 @@ The final transport is:
 - eagerly preload every configured page component after the Rolldown runtime initializes;
 - require one fixed `vpt-hmr/update.js` directly from every page entry;
 - retain all current-build deltas and versions in Vite server memory;
-- let a fresh App Service register its actual version and long-poll for metadata;
+- let a fresh HMR client register its actual version and long-poll for metadata;
 - atomically write one literal missing-range batch into `update.js`;
 - synchronously protect that file event with `beginUpdate`/`endUpdate`;
 - execute one in-flight batch and acknowledge only after React Refresh or stale-route relaunch completes;
 - queue changes arriving in flight for the next batch;
-- replay retained versions from 0 after App Service restart;
+- replay retained versions from 0 after an HMR runtime restart;
 - establish a new full-build `buildId` after Vite restart, unsafe updates, failures, or retention limits;
 - retain at most 1,000 deltas or 16 MiB before a full-build reset.
 

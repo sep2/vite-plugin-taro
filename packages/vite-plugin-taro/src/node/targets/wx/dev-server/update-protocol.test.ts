@@ -104,7 +104,7 @@ test('deltas arriving during an in-flight batch are sent only after acknowledgem
     )
 })
 
-test('a restarted App Service reconstructs the host version from retained deltas', () => {
+test('a restarted HMR client reconstructs the host version from retained deltas', () => {
     let server = createWxUpdateServerState('build-1')
     for (const code of ['delta-1', 'delta-2', 'delta-3']) {
         server = transitionWxUpdateServer(server, { type: 'delta-added', code }).state

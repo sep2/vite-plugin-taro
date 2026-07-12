@@ -1,7 +1,7 @@
 import { transformWithOxc } from 'vite'
 import { normalizeModuleId } from '../../utils/modules.ts'
 
-/** Rewrites Vite's browser-oriented Refresh output for the WX App Service global environment. */
+/** Rewrites Vite's browser-oriented Refresh output for the WX global environment. */
 export async function transformWxReactRefreshModule(
     code: string,
     id: string,

@@ -77,7 +77,7 @@ type PageRuntimeEvent =
 
 let pageRuntimeState: PageRuntimeState = { suppressLifecycles: false }
 
-/** Registers a native route once per App Service runtime generation. */
+/** Registers a native route once per WX runtime generation. */
 export function registerWxPage(route: string, register: () => void): void {
     if (registeredRoutes.has(route)) return
     register()

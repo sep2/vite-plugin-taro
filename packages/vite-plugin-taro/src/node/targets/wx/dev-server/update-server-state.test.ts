@@ -144,7 +144,7 @@ test('republishes after an atomic batch write fails', () => {
     assert.equal(retry.commands[0]?.type, 'publish-batch')
 })
 
-test('replays all retained deltas to a restarted App Service session', () => {
+test('replays all retained deltas to a restarted HMR client session', () => {
     let state = addDeltas(createWxUpdateServerState('build-1'), 'delta-1', 'delta-2')
     state = run(state, {
         type: 'client-registered',
