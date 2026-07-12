@@ -28,8 +28,8 @@ function IndexPage() {
         <View className="flex h-screen flex-col overflow-hidden bg-slate-950 text-slate-950">
             <NavigationBar title="Vite Taro App" />
             <ScrollView scrollY className="flex min-h-0 flex-1 flex-col bg-slate-50">
-                <View className="relative flex flex-col items-center overflow-hidden bg-slate-950 px-6 pb-14 pt-10">
-                    <View className="relative flex w-full flex-col gap-6">
+                <View className="relative flex shrink-0 flex-col items-center overflow-hidden bg-slate-950 px-6 pb-16 pt-10">
+                    <View className="relative flex w-full max-w-4xl flex-col gap-6">
                         <View className="flex flex-row">
                             <View className="flex flex-row items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-2">
                                 <Text className="text-xs leading-none text-emerald-400">●</Text>
@@ -44,7 +44,7 @@ function IndexPage() {
                             <Text className="block text-4xl font-bold leading-tight text-blue-400">Every screen.</Text>
                         </View>
 
-                        <Text className="block text-base leading-7 text-slate-300">
+                        <Text className="block max-w-xl text-base leading-7 text-slate-300">
                             A modern React starter for building polished H5 and WeChat experiences without duplicating
                             work.
                         </Text>
@@ -60,8 +60,8 @@ function IndexPage() {
                     </View>
                 </View>
 
-                <View className="flex flex-col items-center px-5 pt-6">
-                    <View className="flex w-full flex-col gap-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <View className="relative z-10 flex shrink-0 flex-col items-center px-5">
+                    <View className="-mt-10 flex w-full max-w-4xl flex-col gap-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
                         <View className="flex flex-row items-start justify-between gap-4">
                             <View className="flex min-w-0 flex-1 flex-col gap-2">
                                 <Text className="block text-xs font-bold tracking-widest text-blue-600">LIVE DEMO</Text>
@@ -104,8 +104,8 @@ function IndexPage() {
                     </View>
                 </View>
 
-                <View className="flex flex-col items-center px-5 pb-10 pt-10">
-                    <View className="flex w-full flex-col gap-6">
+                <View className="flex shrink-0 flex-col items-center px-5 pb-10 pt-10">
+                    <View className="flex w-full max-w-4xl flex-col gap-6">
                         <View className="flex flex-col gap-2">
                             <Text className="block text-xs font-bold tracking-widest text-blue-600">
                                 BUILT FOR MOMENTUM
