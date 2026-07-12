@@ -21,6 +21,7 @@ export class BuildContext {
     private resolvedViteConfig: ResolvedConfig | undefined
 
     constructor(options: VitePluginTaroOptions) {
+        this.css = new CssPipeline(options.target)
         this.project = {
             target: options.target,
             appComponentFile: path.resolve(options.app),
@@ -33,7 +34,6 @@ export class BuildContext {
             projectPrivateConfigJson: options.projectPrivateConfigJson,
             sitemapJson: options.sitemapJson
         }
-        this.css = new CssPipeline(options.target)
     }
 
     configure(environment: ConfigEnv): void {
@@ -48,7 +48,6 @@ export class BuildContext {
         }
         if (this.resolvedViteConfig) throw new Error('vite-plugin-taro build context was already resolved.')
         this.resolvedViteConfig = config
-        this.css.resolve(config.root)
     }
 
     get development(): boolean {

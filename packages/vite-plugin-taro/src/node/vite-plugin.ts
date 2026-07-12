@@ -10,16 +10,15 @@ import { createWxTargetPlugins, createWxViteConfig } from './targets/wx/plugin.t
 /** Creates the Vite plugins for the selected Taro target. */
 export default function vitePluginTaro(options: VitePluginTaroOptions): PluginOption[] {
     const context = new BuildContext(options)
-    const targetPlugins =
-        context.project.target === 'wx' ? createWxTargetPlugins(context) : createH5TargetPlugins(context)
 
     return [
         createBuildCoordinator(context),
         createConditionalDirectivePlugin(context),
         createTaroRuntimePlugin(),
-        context.css.plugin,
+        ...context.css.plugins,
         ...react(),
-        ...targetPlugins
+        ...(context.project.target === 'wx' ? createWxTargetPlugins(context) : []),
+        ...(context.project.target === 'h5' ? createH5TargetPlugins(context) : [])
     ]
 }
 

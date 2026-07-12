@@ -157,6 +157,7 @@ export class WxDevelopmentSession {
             this.updateTransport.commitFullBuild(buildId)
             await writeDevelopmentOutput(this.outDir, output)
             await copyDirectoryIfExists(this.config.publicDir, this.outDir)
+            await this.context.css.captureFullBuild()
             const moduleCount = this.adapter.registerBundleModules(output)
             this.snapshot = { ...this.snapshot, outputPhase: 'ready' }
             this.initialBundle.resolve()
@@ -174,7 +175,11 @@ export class WxDevelopmentSession {
 
         this.adapter.registerPatchModules(output.code)
         this.outputQueue.enqueue(async () => {
-            const transformed = await this.context.css.transformWxClassNames(output.code, output.filename)
+            const transformed = await this.context.css.transformNativePatch(output.code, output.filename, files)
+            if ('requiresFullBuild' in transformed) {
+                this.requestFullBuild()
+                return
+            }
             const compatibleCode = await transformWxCompatibleJavaScript(transformed.code, output.filename)
             if (
                 this.updateTransport.retainedDeltaCount >= maxRetainedDeltaCount ||
