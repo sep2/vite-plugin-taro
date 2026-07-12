@@ -4,6 +4,27 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.3.2] - 2026-07-12
+
+### Changed
+
+- add detailed explanations and annotations to `css-pipeline` functions and methods (c479ce3)
+- add unit tests for WX class detection, CSS patch synchronization, and full build behavior in `css-pipeline` (ec7af5b)
+- restructure CSS pipeline handling and dependencies, optimize build flow and plugin initialization (496f7ac)
+- improve index page structure, adjust layout elements and alignment for better responsiveness and consistency (11b7a23)
+- enhance index page layout with max-width constraints and adjust padding for improved responsiveness (4769592)
+- simplify index page layout, remove redundant styles, and standardize padding across components (0f2cd71)
+- extend flex-based layout across index page components for consistent styling and improved structure (2f57a85)
+- improve index page structure, add flex-based layouts and enhance feature demo sections (90efae5)
+- enhance index page layout and add interactive counter demo (8ede813)
+
+### Fixed
+
+- ensure Vite production CSS minification for WeChat Mini Programs (551e104)
+- add error logging for WX update execution failure in update-client.ts (9b9a73c)
+- resolve pseudo-element border issue for WeChat Mini Program (413b698)
+- apply universal box-sizing for consistent layout styling (56a55fc)
+
 ## [0.3.1] - 2026-07-12
 
 ### Changed
