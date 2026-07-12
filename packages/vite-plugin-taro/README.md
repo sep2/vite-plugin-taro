@@ -10,7 +10,7 @@ Build WeChat Mini Program and Web apps with the latest standards-based frontend 
 
 ### React Hot Reload in WeChat DevTools
 
-<video src="https://github.com/user-attachments/assets/cd4e6d97-6bc7-40e0-9ba9-206c9fe369f1" controls muted loop playsinline width="100%"></video>
+<video src="https://github.com/user-attachments/assets/cd4e6d97-6bc7-40e0-9ba9-206c9fe369f1" controls autoplay muted loop playsinline width="100%"></video>
 
 Live demo: <https://sep2.github.io/vite-plugin-taro>. See [Sample app](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.md) for how to run it locally.
 
