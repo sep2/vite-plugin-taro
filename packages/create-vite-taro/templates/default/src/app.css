@@ -10,6 +10,11 @@
     box-sizing: border-box;
 }
 
+.__workaround_weapp_tailwind,
+button::after {
+    border: none;
+}
+
 body {
     margin: 0;
     background: #f8fafc;
