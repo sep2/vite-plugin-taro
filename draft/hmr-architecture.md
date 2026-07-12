@@ -24,12 +24,12 @@ That asymmetry creates the entire opportunity for HMR:
 App code and App Service remain alive
     -> DevTools recompiles the affected page graph and starts the page entry again
     -> the page entry reaches its direct update.js require
-    -> update.js applies embedded Rolldown patch code to the live App-owned module runtime
+    -> update.js applies embedded Rolldown patch code to the HMR runtime
     -> the rest of the rerun page initialization is isolated
     -> React Refresh reconciles against the existing Fiber tree
 ```
 
-The page code is disposable; the App-side runtime and React tree are the durable state. The implementation deliberately moves every executable delta into one fixed page dependency so that arbitrary source edits are observed by Vite, but DevTools sees only the safe page-scoped `update.js` change.
+The page code may run again; the HMR runtime and React tree survive that rerun. The implementation deliberately moves every executable delta into one fixed page dependency so that arbitrary source edits are observed by Vite, but DevTools sees only the safe page-scoped `update.js` change.
 
 A transitive or dynamically discovered file does not establish the same boundary early enough. Changing unrelated generated files can select a broader reload that destroys the state before the HMR runtime can act.
 
@@ -37,7 +37,7 @@ This gives the lower bound for state-preserving WX HMR:
 
 1. DevTools must compile the new code because the application cannot evaluate source dynamically.
 2. The physical file change must select page rerun rather than App rerun.
-3. The App-side update runtime must already exist and survive that page rerun.
+3. The HMR runtime must already exist and survive that page rerun.
 4. Therefore executable deltas must be placed in a pre-existing direct literal page dependency.
 
 The implementation reserves exactly one such dependency: `vpt-hmr/update.js`.
@@ -87,7 +87,7 @@ The mechanism is therefore analogous to web HMR in capability, but not in transp
 | HMR runtime applies module updates | WX Rolldown runtime applies module updates |
 | React Refresh preserves compatible Fibers | React Refresh preserves compatible Fibers |
 
-## Architecture and events
+## Architecture
 
 The system has two parties: the Vite development server and the WeChat DevTools/App Service runtime. They coordinate through a metadata-only HTTP control plane and a DevTools-observed project file.
 
@@ -96,50 +96,25 @@ sequenceDiagram
     participant Server as Vite development server
     participant WX as WeChat DevTools / App Service
 
-    Note over Server,WX: Initial baseline
-    Server->>WX: Project files: native CJS, control.js, preload.js, empty update.js
-    WX->>WX: Compile project, run app.js, install global update client
-    WX-->>Server: HTTP register(buildId, sessionId, version 0)
-    Server-->>WX: HTTP registered
-    WX-->>Server: HTTP poll(version 0)
+    Server->>WX: Initial native bundle with empty update.js
+    WX->>WX: Start App and initialize HMR runtime
+    WX-->>Server: Poll for updates
 
-    Note over Server,WX: Source edit
-    Server->>Server: DevEngine builds and classifies update
+    Server->>Server: Convert source edit into Rolldown patch
 
-    alt Compatible JavaScript patch
-        Server->>Server: Transform and retain next version
-        Server-->>WX: HTTP changed
-        WX-->>Server: HTTP poll(clientVersion)
-        Server->>Server: Select contiguous missing patch range
-
-        par Execution-plane event
-            Server->>WX: Project file: atomically replace update.js
-            WX->>WX: Recompile affected page graph
-            WX->>WX: Start page entry and execute early update.js require
-            WX->>WX: Apply patches and guard remaining page initialization
-            WX->>WX: Perform React Refresh on retained Fiber tree
-        and Control-plane response
-            Server-->>WX: HTTP batch-published
-            Note right of WX: Starts watchdog only, not an acknowledgement
-        end
-
-        WX-->>Server: HTTP poll(targetVersion) after Refresh
-        Server->>Server: Acknowledge range, then hold poll or publish next range
-    else Unsafe update or protocol failure
-        Server->>Server: Build new baseline and reset versions
-        Server->>WX: Complete project output with new buildId and empty update.js
-        WX->>WX: Reload native project / App Service
+    alt State-preserving JavaScript update
+        Server->>WX: Rewrite page-owned update.js with patch code
+        WX->>WX: Rerun page code while App code stays alive
+        WX->>WX: Apply patch through HMR runtime
+        WX->>WX: React Refresh preserves compatible Fiber state
+        WX-->>Server: Acknowledge applied version
+    else Update requires native rebuild
+        Server->>WX: Write complete native bundle
+        WX->>WX: Reload App Service
     end
 ```
 
-The project-file event and `batch-published` response race independently after the atomic write; neither is ordered relative to delivery of the other.
-
-Arrow labels distinguish the two planes:
-
-- **Metadata events:** authenticated `wx.request` messages containing only `buildId`, `sessionId`, versions, and status.
-- **Project-file events:** the server writes executable JavaScript directly to `vpt-hmr/update.js`; DevTools observes and compiles it as part of the Mini Program project.
-
-Executable source never crosses the HTTP endpoint. `batch-published` confirms only that the server wrote the file; `poll(targetVersion)` is the acknowledgement that the App Service executed it and completed Refresh.
+The control channel coordinates versions but never carries executable source. The project file `update.js` carries the patch code because DevTools must compile it. The key invariant is that changing this page-owned file reruns page code without rerunning App code, so the HMR runtime and React state survive.
 
 ## Development output and execution order
 
@@ -267,7 +242,7 @@ Three mechanisms keep it from undoing the delta:
 2. The custom Rolldown initializers remember modules installed while patch mode is active. If rerun page code reaches an old baseline initializer afterward, it returns the current patched exports instead of replacing them.
 3. Refresh registration is temporarily blocked while stale rerun code is executing, so old component implementations cannot overwrite the families just registered by the delta.
 
-The durable objects—the update client, module registry, current exports, Taro root, React families, and Fiber tree—remain in the App Service. The page entry merely reconnects native page glue to those objects.
+The update client, module registry, current exports, Taro root, React families, and Fiber tree remain in the App Service while page code reruns. The page entry merely reconnects native page glue to those objects.
 
 `page-update.ts` coordinates that reconnection. At `beginUpdate()` it captures the active page and Taro root and enables Rolldown patch mode. At `endUpdate()` it closes patch mode and enqueues official React Refresh. Compatible families retain their Fiber state; stale families trigger a route relaunch because React cannot safely preserve them.
 
@@ -313,7 +288,7 @@ Owns the WX Vite target. It installs virtual modules, Refresh transforms, native
 
 ### `src/node/targets/wx/virtual-modules.ts`
 
-Generates App, page, recursive-component, Refresh-preamble, and preload entries. It emits every configured page as an eager native entry. In development, App installs the durable update client and each page is decorated so rerunning its entry does not replace application state.
+Generates App, page, recursive-component, Refresh-preamble, and preload entries. It emits every configured page as an eager native entry. In development, App installs the update client in the App Service and each page is decorated so rerunning its entry does not replace application state.
 
 ### `src/node/targets/wx/development-files.ts`
 
