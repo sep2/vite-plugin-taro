@@ -9,7 +9,7 @@ Web HMR assumes that the running application can receive new JavaScript and exec
 - DevTools chooses how much of the Mini Program to reload from the file that changed;
 - if DevTools reloads the App, the old JavaScript heap, Taro root, and React Fiber tree are gone.
 
-React Refresh can preserve state only while the existing Fiber tree remains alive. The central problem is therefore not how to run React Refresh. It is how to deliver and execute new module code **without causing DevTools to rerun the App**.
+React Refresh can preserve state only while the existing Fiber tree remains alive. The central problem is how to deliver and execute new module code **without causing DevTools to rerun the App**.
 
 ## The key WeChat behavior
 
