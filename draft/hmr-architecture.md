@@ -19,11 +19,11 @@ A pre-existing JavaScript file that is a direct static dependency of a page has 
 - `app.js` is not rerun;
 - the existing JavaScript state remains available.
 
-This is the opening that makes HMR possible. Page code may run again, while the HMR runtime, module registry, Taro root, React families, and Fiber tree survive because App code is not rerun.
+This is the opening that makes HMR possible. Page code may run again, while the HMR runtime, module registry, Taro root, and Fiber tree survive because App code is not rerun.
 
-The plugin reserves one direct page dependency for this purpose: the **update bridge**, emitted as `update.js`. During initial development startup it is empty. For every compatible JavaScript edit, the development server puts the generated patch code into this same bridge. As far as DevTools is concerned, only the known page dependency changed.
+The plugin reserves one direct page dependency for this purpose: `update.js`. During initial development startup the file is empty. For every compatible JavaScript edit, the development server puts the generated patch code into this same file. As far as DevTools is concerned, only the known page dependency changed.
 
-When DevTools reruns the page, it reaches the update bridge before normal page initialization. The bridge calls the already-running HMR runtime, which applies the patch. The rest of the page code can then rerun without becoming the owner of application state.
+When DevTools reruns the page, it executes `update.js` before normal page initialization. The file calls the already-running HMR runtime, which applies the patch. The rest of the page entry then continues, while the HMR runtime keeps the patched module exports active and ensures that the page is registered only once.
 
 This is the core design:
 
@@ -36,16 +36,16 @@ sequenceDiagram
     participant Server as Vite development server
     participant WX as WeChat DevTools / Mini Program
 
-    Server->>WX: Initial native bundle with empty update bridge
+    Server->>WX: Initial native bundle with empty update.js
     WX->>WX: Start App and initialize HMR runtime
     WX-->>Server: Poll for updates
 
     Server->>Server: Convert source edit into Rolldown patch
 
     alt Compatible JavaScript update
-        Server->>WX: Put patch code in update bridge
+        Server->>WX: Put patch code in update.js
         WX->>WX: Rerun page code while App code stays alive
-        WX->>WX: Update bridge invokes HMR runtime
+        WX->>WX: update.js invokes HMR runtime
         WX->>WX: Apply patch and run React Refresh
         WX-->>Server: Acknowledge applied version
     else Native files must change
@@ -57,18 +57,34 @@ sequenceDiagram
 There are two channels between the parties:
 
 - The **control channel** uses `wx.request` to exchange build, session, and version metadata. It never carries executable source.
-- The **execution channel** is the update bridge. The development server writes JavaScript into the project, and DevTools compiles it through the normal Mini Program toolchain.
+- The **execution channel** is the `update.js` file. The development server writes JavaScript into the project, and DevTools compiles it through the normal Mini Program toolchain.
 
 The control channel decides *which* patches are missing. The execution channel is the only mechanism that can safely run them.
 
+## Why the control channel is needed
+
+The `update.js` file is a one-way execution mechanism. Writing it tells DevTools that a project file changed, but it does not tell the development server whether DevTools observed the change, whether the patch finished, or which version the HMR runtime now holds.
+
+Without feedback, the server could overwrite `update.js` with a newer patch before the previous one ran. A missed or coalesced file event could silently lose an update. After an App reload, the server would also have no way to distinguish the new HMR client from the previous one or know which patches must be replayed.
+
+The control channel closes that loop. It lets the HMR client:
+
+- identify its build ID and session;
+- report the last version that actually completed React Refresh;
+- let the server publish only the missing contiguous patch range;
+- acknowledge success after execution rather than after a file write;
+- keep reporting the old version when an update was missed, causing the server to republish it.
+
+HTTP is used because `wx.request` is available in the Mini Program and the Vite development server already exposes a local HTTP server. Long polling is sufficient for low-volume HMR metadata. The channel does not execute code and does not need a WebSocket; executable patch code still travels only through `update.js`.
+
 ## Initial development build
 
-Development uses one eager Vite/Rolldown module graph. The same graph produces both the initial complete native bundle—the **baseline**—and every later patch. This keeps module IDs, transforms, dependency boundaries, and React Refresh instrumentation consistent between the baseline and its updates.
+Development uses one eager Vite/Rolldown module graph. The same graph produces both the initial complete native bundle and every later patch. This keeps module IDs, transforms, dependency boundaries, and React Refresh instrumentation consistent between the full bundle and its patches.
 
 The initial output establishes three important conditions:
 
 1. The App starts the HMR runtime and control client.
-2. Every page has a direct static dependency on the empty update bridge.
+2. Every page has a direct static dependency on the empty `update.js` file.
 3. Every configured page component is initialized eagerly.
 
 The third condition is needed for inactive routes. A patch may update a page that has never been opened. Eager initialization gives that page's modules a place in the live module registry, so the patch can be applied immediately and will still be present when the route is opened later. It does not create native page instances.
@@ -82,13 +98,13 @@ For a compatible source edit:
 3. The patch is transformed to JavaScript syntax accepted by WeChat.
 4. The server assigns it the next version and retains it in memory.
 5. The client reports its current version through the control channel.
-6. The server places the client's missing patch range into the update bridge.
+6. The server places the client's missing patch range into `update.js`.
 7. DevTools sees the changed page dependency and reruns the active page code without rerunning the App.
-8. The update bridge invokes the HMR runtime, which applies the patches in order.
+8. `update.js` invokes the HMR runtime, which applies the patches in order.
 9. React Refresh reconciles the new component implementations with the retained Fiber tree.
 10. The client acknowledges the new version only after Refresh has completed.
 
-The source edit may have been in an App component, an active page, an inactive page, or a shared dependency. In the compatible path, the development server does not expose that source file as a separate native file change. The only executable file DevTools sees changing is the update bridge.
+The edit may come from an App component, the active page, an inactive page, or a shared dependency. On the compatible update path, the development server rewrites only `update.js`; it does not also rewrite that module's normal Mini Program output files.
 
 ## The HMR runtime
 
@@ -98,30 +114,30 @@ The HMR runtime survives page reruns because App code is not rerun. It combines 
 
 It owns the live module registry, current exports, hot contexts, and accepted update boundaries. Patch code updates this registry rather than loading a second copy of the application.
 
-The runtime also records modules initialized by a patch. When DevTools continues rerunning the page's original bundled code, an old baseline initializer must not overwrite the module that was just updated. In that case the initializer resolves the current patched exports instead.
+The runtime also records modules initialized by a patch. When DevTools continues rerunning the page's original bundled code, an initializer from the original bundle must not overwrite the module that was just updated. In that case the initializer resolves the current patched exports instead.
 
 This is what makes the order safe:
 
-- the update bridge installs the new module implementations;
+- `update.js` installs the new module implementations;
 - the remaining page code reruns;
-- stale baseline initialization cannot replace the new implementations.
+- stale initialization from the original bundle cannot replace the new implementations.
 
 ### Preserve React state
 
-The HMR runtime uses Vite's official React Refresh runtime. Rolldown updates module exports and invokes accepted boundaries; React Refresh decides whether the affected component families are compatible.
+The HMR runtime uses Vite's official React Refresh runtime. Rolldown updates module exports and invokes accepted boundaries; React Refresh decides whether the affected components can be updated compatibly.
 
-For compatible families, React reuses the existing Fiber tree and component state. The Fiber tree is not serialized into the update bridge or copied into a patch. It simply remains reachable because the App code and Taro root were never destroyed.
+For component updates that React Refresh considers compatible, React reuses the existing Fiber tree and component state. The Fiber tree is not serialized into `update.js` or copied into a patch. It simply remains reachable because the App code and Taro root were never destroyed.
 
-If React reports a stale family that cannot be refreshed safely, the active route is relaunched. State preservation is intentionally limited to updates React Refresh considers compatible.
+If a component cannot be refreshed safely, the active route is relaunched. State preservation is intentionally limited to updates React Refresh considers compatible.
 
 ### Make page rerun harmless
 
-Page entry code is native integration code and may execute again. The HMR runtime treats it as disposable setup rather than durable application state.
+Page entry code is native integration code and may execute again. The HMR runtime treats this as repeated integration setup and guards its side effects.
 
 The rerun is guarded so that it cannot:
 
 - register the same native route twice;
-- restore stale baseline module implementations;
+- restore stale module implementations from the original bundle;
 - replace new React Refresh registrations with old ones;
 - detach the retained Taro/React root.
 
@@ -133,13 +149,13 @@ Filesystem notifications, HTTP responses, page reruns, and React Refresh do not 
 
 The server tracks:
 
-- a **build ID** for the current complete baseline;
+- a **build ID** for the current full build;
 - a monotonically increasing **patch version**;
-- the retained patches for that baseline;
+- the patches retained since that full build;
 - the active HMR client **session**;
 - at most one published patch range awaiting acknowledgement.
 
-The client repeatedly reports the version it has actually applied. If it is behind, the server publishes one contiguous missing range into the update bridge. Changes arriving while that range is in flight wait for the next publication.
+The client repeatedly reports the version it has actually applied. If it is behind, the server publishes one contiguous missing range into `update.js`. Changes arriving while that range is in flight wait for the next publication.
 
 A file write is not considered success. The client acknowledges only after patch execution and React Refresh complete. If DevTools misses the file event, the client continues reporting the old version and the server republishes the same range with different file content. If the same batch is observed twice, version checks prevent duplicate application.
 
@@ -149,19 +165,19 @@ This stop-and-wait model favors correctness over throughput. HMR updates are sma
 
 ### HMR client restart
 
-The development server may still be running when DevTools reloads the App. The new HMR client creates a new session and starts at version zero. The server then republishes all patches retained since the current baseline.
+The development server may still be running when DevTools reloads the App. The new HMR client creates a new session and starts at version zero. The server then republishes all patches retained since the current full build.
 
 Eager page initialization ensures those patches can be replayed even for routes that have not yet been opened since the reload.
 
 ### Development-server restart
 
-Patch history is intentionally kept only in server memory. When Vite restarts, it creates a new complete baseline and a new build ID. The latest source is already represented in that bundle, so old patch history is neither needed nor trusted.
+Patch history is intentionally kept only in server memory. When Vite restarts, it creates a new full build and a new build ID. The latest source is already represented in that bundle, so old patch history is neither needed nor trusted.
 
-The new baseline resets the update bridge and patch versions to zero.
+The new full build resets `update.js` and patch versions to zero.
 
 ### Bounded history
 
-Retained patch history is bounded. When it grows too large, the server creates a new complete baseline and clears the old history. This keeps long development sessions from accumulating an unbounded replay log.
+Retained patch history is bounded. When it grows too large, the server creates a new full build and clears the old history. This keeps long development sessions from accumulating an unbounded replay log.
 
 ## Full-build boundary
 
@@ -187,16 +203,16 @@ The design follows directly from the platform constraints:
 3. The file must already be a direct static page dependency, otherwise DevTools does not establish the required reload boundary early enough.
 4. The HMR runtime must survive so it can apply the patch while the page reruns.
 
-Therefore the fixed update bridge is not an arbitrary transport choice. It is the minimum mechanism that simultaneously provides executable code and keeps the running App intact.
+Therefore the fixed `update.js` file is not an arbitrary transport choice. It is the minimum mechanism that simultaneously provides executable code and keeps the running App intact.
 
 ## Why this design is sufficient
 
 For a compatible update, every required property is established:
 
-1. DevTools compiles the patch code from the update bridge.
+1. DevTools compiles the patch code from `update.js`.
 2. Only page code reruns; App code and its existing JavaScript state remain intact.
 3. The HMR runtime applies patches to the existing module registry.
-4. Page rerun guards prevent baseline code from undoing the patch.
+4. Page rerun guards prevent code from the original bundle from undoing the patch.
 5. React Refresh reconciles against the retained Fiber tree.
 6. Versioned acknowledgement guarantees patches are applied as one ordered prefix.
 
@@ -214,7 +230,7 @@ Changing arbitrary JavaScript or native output files gives DevTools freedom to r
 
 ### Dynamic or transitive update imports
 
-A dependency discovered while the page is already rerunning is too late to define the safe reload boundary. The update bridge must exist and be a direct static page dependency in the initial bundle.
+A dependency discovered while the page is already rerunning is too late to define the safe reload boundary. `update.js` must exist and be a direct static page dependency in the initial bundle.
 
 ### Recreating application state after reload
 
@@ -228,12 +244,12 @@ For a compatible JavaScript update, the architecture is designed to preserve:
 - the active route and native page state;
 - the Taro root;
 - native input state;
-- React state for compatible component families.
+- component state that React Refresh can update compatibly.
 
 It does not guarantee preservation of:
 
 - arbitrary module-local singleton state;
-- incompatible React component families;
+- component state that React Refresh cannot update compatibly;
 - state across a complete native rebuild;
 - state across a development-server restart.
 
