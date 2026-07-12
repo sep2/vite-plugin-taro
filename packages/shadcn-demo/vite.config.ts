@@ -56,6 +56,7 @@ export default defineConfig(({ mode }) => {
                     description: '',
                     compileType: 'miniprogram',
                     setting: {
+                        // WeChat DevTools does not support hot reload with Skyline yet.
                         skylineRenderEnable: false,
                         urlCheck: false,
                         es6: false,

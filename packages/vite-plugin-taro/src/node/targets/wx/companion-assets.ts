@@ -19,6 +19,7 @@ export type WxBundle = Record<
 
 type WxAssetEmitter = {
     emitFile(asset: { type: 'asset'; fileName: string; source: WxAssetSource }): string
+    warn(message: string): void
 }
 
 type WxTemplateComponentConfig = {
@@ -33,6 +34,13 @@ const templateBuilder = createWxTemplateBuilder()
 
 export function emitWxCompanionAssets(emitter: WxAssetEmitter, bundle: WxBundle, context: BuildContext): void {
     for (const asset of createWxCompanionAssets(bundle, context)) {
+        if (!asset) continue
+        if (asset.source === undefined) {
+            emitter.warn(
+                `[vite-plugin-taro] WX companion asset "${asset.fileName}" is missing its source and was not emitted.`
+            )
+            continue
+        }
         emitter.emitFile({ type: 'asset', fileName: asset.fileName, source: asset.source })
     }
 }
@@ -40,7 +48,7 @@ export function emitWxCompanionAssets(emitter: WxAssetEmitter, bundle: WxBundle,
 function createWxCompanionAssets(
     bundle: WxBundle,
     context: BuildContext
-): { fileName: string; source: WxAssetSource }[] {
+): ({ fileName: string; source: WxAssetSource } | undefined)[] {
     const json = (value: JsonObject) => (context.development ? JSON.stringify(value, null, 2) : JSON.stringify(value))
 
     return [
@@ -54,7 +62,9 @@ function createWxCompanionAssets(
         { fileName: 'comp.wxml', source: templateBuilder.buildBaseComponentTemplate('.wxml') },
         { fileName: 'comp.json', source: json(createWxComponentConfig()) },
         { fileName: 'project.config.json', source: json(createWxProjectConfig(context)) },
-        { fileName: 'project.private.config.json', source: json(context.project.projectPrivateConfigJson) },
+        context.project.projectPrivateConfigJson
+            ? { fileName: 'project.private.config.json', source: json(context.project.projectPrivateConfigJson) }
+            : undefined,
         { fileName: 'sitemap.json', source: json(context.project.sitemapJson) },
         ...context.project.pages.flatMap((page) => [
             {

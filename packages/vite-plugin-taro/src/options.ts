@@ -20,6 +20,6 @@ export interface VitePluginTaroOptions {
     pages: VitePluginTaroPageOption[]
     appJson: JsonObject
     projectConfigJson: JsonObject
-    projectPrivateConfigJson: JsonObject
+    projectPrivateConfigJson?: JsonObject
     sitemapJson: JsonObject
 }

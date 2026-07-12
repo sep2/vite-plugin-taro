@@ -9,7 +9,7 @@ type ProjectContext = Readonly<{
     pages: readonly VitePluginTaroPageOption[]
     appConfig: JsonObject
     projectConfigJson: JsonObject
-    projectPrivateConfigJson: JsonObject
+    projectPrivateConfigJson?: JsonObject
     sitemapJson: JsonObject
 }>
 
