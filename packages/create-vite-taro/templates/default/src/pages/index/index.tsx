@@ -27,22 +27,22 @@ function IndexPage() {
     return (
         <View className="flex h-screen flex-col overflow-hidden bg-slate-950 text-slate-950">
             <NavigationBar title="Vite Taro App" />
-            <ScrollView scrollY className="min-h-0 flex-1 bg-slate-50">
+            <ScrollView scrollY className="flex min-h-0 flex-1 flex-col bg-slate-50">
                 <View className="relative flex flex-col items-center overflow-hidden bg-slate-950 px-6 pb-14 pt-10">
-                    <View className="absolute -right-16 top-8 h-48 w-48 rounded-full bg-blue-500 opacity-20" />
-                    <View className="absolute -left-12 bottom-6 h-32 w-32 rounded-full bg-cyan-400 opacity-10" />
+                    <View className="absolute -right-16 top-8 flex h-48 w-48 rounded-full bg-blue-500 opacity-20" />
+                    <View className="absolute -left-12 bottom-6 flex h-32 w-32 rounded-full bg-cyan-400 opacity-10" />
 
                     <View className="relative flex w-full max-w-4xl flex-col gap-6">
                         <View className="flex flex-row">
                             <View className="flex flex-row items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-2">
-                                <View className="h-2 w-2 rounded-full bg-emerald-400" />
+                                <View className="flex h-2 w-2 rounded-full bg-emerald-400" />
                                 <Text className="text-xs font-semibold tracking-widest text-slate-300">
                                     VITE × TARO
                                 </Text>
                             </View>
                         </View>
 
-                        <View>
+                        <View className="flex flex-col">
                             <Text className="block text-4xl font-bold leading-tight text-white">One codebase.</Text>
                             <Text className="block text-4xl font-bold leading-tight text-blue-400">Every screen.</Text>
                         </View>
@@ -53,10 +53,10 @@ function IndexPage() {
                         </Text>
 
                         <View className="flex flex-row gap-3">
-                            <View className="rounded-xl bg-white px-4 py-2">
+                            <View className="flex items-center rounded-xl bg-white px-4 py-2">
                                 <Text className="text-sm font-bold text-slate-950">WeChat Mini Program</Text>
                             </View>
-                            <View className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2">
+                            <View className="flex items-center rounded-xl border border-slate-700 bg-slate-900 px-4 py-2">
                                 <Text className="text-sm font-bold text-white">H5</Text>
                             </View>
                         </View>
@@ -73,14 +73,14 @@ function IndexPage() {
                                     Change the counter, then edit this page to see hot reload update both targets.
                                 </Text>
                             </View>
-                            <View className="rounded-2xl bg-blue-50 px-4 py-3">
+                            <View className="flex items-center justify-center rounded-2xl bg-blue-50 px-4 py-3">
                                 <Text className="text-3xl font-bold text-blue-600">{count}</Text>
                             </View>
                         </View>
 
                         <View className="flex flex-col gap-3">
                             <View className="flex flex-row gap-3">
-                                <View className="flex-1">
+                                <View className="flex flex-1">
                                     <Button
                                         className="flex h-12 w-full items-center justify-center rounded-xl border border-slate-200 bg-white p-0 text-sm font-semibold text-slate-700 after:border-0"
                                         onClick={() => setCount((currentCount) => currentCount - 1)}
@@ -88,7 +88,7 @@ function IndexPage() {
                                         Decrease
                                     </Button>
                                 </View>
-                                <View className="flex-1">
+                                <View className="flex flex-1">
                                     <Button
                                         className="flex h-12 w-full items-center justify-center rounded-xl bg-blue-600 p-0 text-sm font-semibold text-white after:border-0"
                                         onClick={() => setCount((currentCount) => currentCount + 1)}
@@ -118,7 +118,7 @@ function IndexPage() {
                             </Text>
                         </View>
 
-                        <View className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
+                        <View className="flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white">
                             {features.map((feature, index) => (
                                 <View
                                     key={feature.number}
@@ -146,12 +146,12 @@ function IndexPage() {
                                     Edit this page, add your routes, and ship your next idea everywhere.
                                 </Text>
                             </View>
-                            <View className="self-start rounded-xl bg-white px-4 py-3">
+                            <View className="flex self-start rounded-xl bg-white px-4 py-3">
                                 <Text className="text-sm font-bold text-blue-600">Ready to build →</Text>
                             </View>
                         </View>
 
-                        <View className="px-2 pt-2">
+                        <View className="flex flex-col px-2 pt-2">
                             <Text className="block text-center text-xs font-medium tracking-widest text-slate-400">
                                 VITE 8 · REACT 19 · TARO
                             </Text>
