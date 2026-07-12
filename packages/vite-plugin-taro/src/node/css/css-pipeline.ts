@@ -38,6 +38,7 @@ export class CssPipeline {
     // Only classes represented by a completed WX build are safe to publish in a JavaScript-only patch.
     private builtClassSet = new Set<string>()
 
+    /** Composes the upstream web/WX plugins and adds candidate tracking only for native WX patches. */
     constructor(target: VitePluginTaroTarget) {
         const pipeline = this
 
@@ -68,6 +69,7 @@ export class CssPipeline {
         ]
     }
 
+    /** Records every utility guaranteed to exist after a successful full WX build. */
     async captureFullBuild(): Promise<void> {
         this.sourceCache.clear()
         // Preserve removed development CSS, matching upstream's append-only HMR default.
@@ -77,10 +79,12 @@ export class CssPipeline {
         }
     }
 
+    /** Applies upstream mini-program compatibility transforms to Taro's fully materialized WXSS. */
     async transformWxss(code: string): Promise<string> {
         return (await this.getWxContext().transformWxss(code)).css
     }
 
+    /** Escapes a JavaScript-only WX patch, or rejects it when its utilities require new WXSS. */
     async transformNativePatch(code: string, filename: string, files: string[]): Promise<PatchResult> {
         if (await this.hasAddedCandidates(files)) return { requiresFullBuild: true }
         const result = await this.getWxContext().transformJs(code, {
@@ -91,10 +95,12 @@ export class CssPipeline {
         return { code: result.code }
     }
 
+    /** Retains Vite's root for resolving later CSS transforms and changed-file notifications. */
     private resolveWx(config: ResolvedConfig): void {
         this.root = config.root
     }
 
+    /** Creates one validator per Tailwind entry and refreshes the shared upstream WX transformer. */
     private async registerCssEntry(id: string, source: string): Promise<void> {
         const file = resolveFile(id, this.getRoot())
         if (this.entries.get(file)?.source === source) return
@@ -118,6 +124,7 @@ export class CssPipeline {
         })
     }
 
+    /** Incrementally checks changed source files for utilities absent from the completed WX build. */
     private async hasAddedCandidates(files: string[]): Promise<boolean> {
         for (const input of files) {
             const file = resolveFile(input, this.getRoot())
@@ -135,17 +142,20 @@ export class CssPipeline {
         return false
     }
 
+    /** Returns the initialized WX transformer and detects invalid lifecycle ordering. */
     private getWxContext(): WxContext {
         if (!this.wxContext) throw new Error('WX CSS pipeline was used before Vite resolved.')
         return this.wxContext
     }
 
+    /** Returns the resolved project root and detects use before Vite configuration. */
     private getRoot(): string {
         if (!this.root) throw new Error('WX CSS pipeline was used before Vite resolved.')
         return this.root
     }
 }
 
+/** Identifies style modules that establish a Tailwind design system. */
 function isTailwindCssEntry(code: string, id: string): boolean {
     return (
         /\.(?:css|scss|sass|less|styl|stylus)(?:$|[?#])/.test(id) &&
@@ -153,6 +163,7 @@ function isTailwindCssEntry(code: string, id: string): boolean {
     )
 }
 
+/** Converts Vite IDs, including /@fs/ IDs and query strings, into normalized absolute paths. */
 function resolveFile(id: string, root: string): string {
     const normalized = normalizeModuleId(id).replace(/[?#].*$/, '')
     const file = normalized.startsWith('/@fs/') ? normalized.slice('/@fs'.length) : normalized
