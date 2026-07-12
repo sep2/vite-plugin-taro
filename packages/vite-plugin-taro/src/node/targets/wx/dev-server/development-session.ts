@@ -131,13 +131,11 @@ export class WxDevelopmentSession {
 
     private handleBundleOutput(output: WxOutputFile[]): void {
         const appStyles = normalizeWxBundleStyles(output)
-        if (appStyles !== undefined) this.snapshot = { ...this.snapshot, latestAppStyles: appStyles }
-        if (isWxFullBuildOutput(output) && this.snapshot.latestAppStyles) {
-            setWxAppStyles(output, this.snapshot.latestAppStyles)
-        }
+        const fullBuild = isWxFullBuildOutput(output)
 
-        if (!isWxFullBuildOutput(output)) {
+        if (!fullBuild) {
             this.outputQueue.enqueue(async () => {
+                await this.finalizeAppStyles(output, appStyles, false)
                 await transformWxOutputChunks(output)
                 await writeDevelopmentOutput(this.outDir, output)
             })
@@ -148,6 +146,7 @@ export class WxDevelopmentSession {
         setDevelopmentAsset(output, wxUpdateControlFile, this.updateTransport.createControlSource(buildId))
         setDevelopmentAsset(output, wxUpdateFile, 'void 0;\n')
         this.outputQueue.enqueue(async () => {
+            await this.finalizeAppStyles(output, appStyles, true)
             await transformWxOutputChunks(output)
             if (this.snapshot.outputPhase === 'starting') {
                 // The directory is plugin-owned; clearing it once removes stale files from previous protocol designs.
@@ -165,6 +164,20 @@ export class WxDevelopmentSession {
                 `[vite-plugin-taro] WX bundle ready (${moduleCount} modules, ${output.length} files)`
             )
         })
+    }
+
+    private async finalizeAppStyles(
+        output: WxOutputFile[],
+        source: string | undefined,
+        fullBuild: boolean
+    ): Promise<void> {
+        if (source !== undefined) {
+            const transformed = await this.context.css.transformWxss(source)
+            this.snapshot = { ...this.snapshot, latestAppStyles: transformed }
+            setWxAppStyles(output, transformed)
+        } else if (fullBuild && this.snapshot.latestAppStyles) {
+            setWxAppStyles(output, this.snapshot.latestAppStyles)
+        }
     }
 
     private handlePatch(files: string[], output: WxDevEngineUpdate): boolean {

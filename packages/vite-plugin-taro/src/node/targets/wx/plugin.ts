@@ -53,8 +53,8 @@ function createWxTargetPlugin(context: BuildContext): Plugin {
 
         generateBundle: {
             order: 'post',
-            handler(_, bundle) {
-                emitWxCompanionAssets(this, bundle as WxBundle, context)
+            async handler(_, bundle) {
+                await emitWxCompanionAssets(this, bundle as WxBundle, context)
             }
         },
 

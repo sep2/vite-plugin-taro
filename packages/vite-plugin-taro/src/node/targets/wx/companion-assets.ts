@@ -32,8 +32,12 @@ type WxTemplateComponentConfig = {
 const taroWxComponentsPath = packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
 const templateBuilder = createWxTemplateBuilder()
 
-export function emitWxCompanionAssets(emitter: WxAssetEmitter, bundle: WxBundle, context: BuildContext): void {
-    for (const asset of createWxCompanionAssets(bundle, context)) {
+export async function emitWxCompanionAssets(
+    emitter: WxAssetEmitter,
+    bundle: WxBundle,
+    context: BuildContext
+): Promise<void> {
+    for (const asset of await createWxCompanionAssets(bundle, context)) {
         if (!asset) continue
         if (asset.source === undefined) {
             emitter.warn(
@@ -45,15 +49,15 @@ export function emitWxCompanionAssets(emitter: WxAssetEmitter, bundle: WxBundle,
     }
 }
 
-function createWxCompanionAssets(
+async function createWxCompanionAssets(
     bundle: WxBundle,
     context: BuildContext
-): ({ fileName: string; source: WxAssetSource } | undefined)[] {
+): Promise<({ fileName: string; source: WxAssetSource } | undefined)[]> {
     const json = (value: JsonObject) => (context.development ? JSON.stringify(value, null, 2) : JSON.stringify(value))
 
     return [
         { fileName: 'app.json', source: json(context.project.appConfig) },
-        { fileName: 'app.wxss', source: collectWxBundleStyles(bundle) },
+        { fileName: 'app.wxss', source: await context.css.transformWxss(collectWxBundleStyles(bundle)) },
         {
             fileName: 'base.wxml',
             source: templateBuilder.buildTemplate(collectWxTemplateComponentConfig(bundle))
