@@ -295,3 +295,9 @@ do not yet receive the page-level preservation guarantee.
 
 The bare DevTools observations establishing the JavaScript and WXSS boundaries are recorded in
 `draft/hmr-probe-result.md`.
+
+## Skyline rendering
+
+The project fully supports WeChat Skyline rendering, but WeChat DevTools itself does not currently support hot reload in
+Skyline mode. This is a DevTools restriction, not a plugin limitation. HMR therefore uses the standard WebView renderer,
+and generated development projects disable Skyline by default.
