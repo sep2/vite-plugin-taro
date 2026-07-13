@@ -1,11 +1,22 @@
+# Rule 0
+
+When designing a feature, I don't care about compatibility.
+I want the best simple code with the best readability.
+I don't want many moving parts with duplicated slop code.
+Suggest as elegant as possible.
+
 # Monorepo context
 
-This repository is a pnpm v11 workspace for `vite-plugin-taro`, a Vite 8 / React 19 / Taro integration that builds shared apps for WeChat Mini Program (`wx`) and H5 targets.
+This repository is a pnpm v11 workspace for `vite-plugin-taro`, a Vite 8 / React 19 / Taro integration that builds
+shared apps for WeChat Mini Program (`wx`) and H5 targets.
 
-- `packages/vite-plugin-taro`: publishable Vite plugin package. Source lives in `src`, build output is `dist`, and package README files are synced during build.
-- `packages/create-vite-taro`: publishable project generator package (`create-vite-taro`) with templates under `templates/default`.
+- `packages/vite-plugin-taro`: publishable Vite plugin package. Source lives in `src`, build output is `dist`, and
+  package README files are synced during build.
+- `packages/create-vite-taro`: publishable project generator package (`create-vite-taro`) with templates under
+  `templates/default`.
 - `packages/taro-react`: generated React 19-compatible fork of `@tarojs/react`, published as `vite-plugin-taro-react`.
-- `packages/taro-plugin-framework-react`: generated React 19-compatible fork of `@tarojs/plugin-framework-react`, published as `vite-plugin-taro-plugin-framework-react`.
+- `packages/taro-plugin-framework-react`: generated React 19-compatible fork of `@tarojs/plugin-framework-react`,
+  published as `vite-plugin-taro-plugin-framework-react`.
 - `packages/loan-genius`: sample app used to test the plugin against `h5` and `wx` targets.
 - `patches`: local patches applied to upstream Taro 4.2.0 packages when regenerating the generated packages.
 
@@ -26,16 +37,25 @@ Node.js v26+ is available and can execute TypeScript natively.
 - `pnpm changelog`: regenerate `CHANGELOG.md` from git release tags.
 - `pnpm publish:dry`: validate the release without publishing.
 - `pnpm publish:all`: publish public packages in dependency order.
-- `pnpm version:bump <version|major|minor|patch|premajor|preminor|prepatch|prerelease>`: bump every package version and the generated template's `vite-plugin-taro` dependency. Use `--dry-run` to preview changes and `--preid <id>` for prerelease bumps.
-- `pnpm release <version|major|minor|patch|premajor|preminor|prepatch|prerelease>`: bump versions, regenerate `CHANGELOG.md` for the release, validate publishable packages, create the release commit/tag, and push unless `--no-push` is used. Use `--dry-run` to preview and `--preid <id>` for prerelease bumps.
+- `pnpm version:bump <version|major|minor|patch|premajor|preminor|prepatch|prerelease>`: bump every package version and
+  the generated template's `vite-plugin-taro` dependency. Use `--dry-run` to preview changes and `--preid <id>` for
+  prerelease bumps.
+- `pnpm release <version|major|minor|patch|premajor|preminor|prepatch|prerelease>`: bump versions, regenerate
+  `CHANGELOG.md` for the release, validate publishable packages, create the release commit/tag, and push unless
+  `--no-push` is used. Use `--dry-run` to preview and `--preid <id>` for prerelease bumps.
 
 # Generated files and packages
 
-- User-facing documentation should show npm commands by default. Keep repository contributor/development instructions on pnpm.
+- User-facing documentation should show npm commands by default. Keep repository contributor/development instructions on
+  pnpm.
 - Do not manually edit `packages/vite-plugin-taro/dist`; rebuild it with `pnpm build:plugin`.
-- Do not manually edit `CHANGELOG.md`; regenerate it with `pnpm changelog`, or let `pnpm release ...` update it for a release.
-- Do not manually edit generated Taro package implementation files under `packages/taro-react` or `packages/taro-plugin-framework-react`. Change the relevant file in `patches/*@4.2.0-react19.patch`, then run `pnpm prepare:taro`.
-- The generated Taro package `package.json` and `README.md` files are local metadata and are preserved by `pnpm prepare:taro`.
+- Do not manually edit `CHANGELOG.md`; regenerate it with `pnpm changelog`, or let `pnpm release ...` update it for a
+  release.
+- Do not manually edit generated Taro package implementation files under `packages/taro-react` or
+  `packages/taro-plugin-framework-react`. Change the relevant file in `patches/*@4.2.0-react19.patch`, then run
+  `pnpm prepare:taro`.
+- The generated Taro package `package.json` and `README.md` files are local metadata and are preserved by
+  `pnpm prepare:taro`.
 
 # Code style
 
