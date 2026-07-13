@@ -64,7 +64,8 @@ npm run dev:h5
 
 你可以在两个终端中同时运行 `npm run dev:wx` 和 `npm run dev:h5`。
 
-微信开发模式通过 Rolldown 增量模块图和 React Refresh 完整支持 Vite 热更新。JavaScript 修改会保留当前原生页面及 React/输入状态；CSS、资源、public 文件和配置修改会自动重新构建。
+微信开发模式通过 Rolldown 增量模块图和 React Refresh 支持 Vite 热更新。JavaScript 修改会保留当前
+App 与 `globalData`、原生页面及 React/输入状态；其他修改会自动重新构建。
 
 ### 4. 构建、预览和类型检查
 
@@ -289,7 +290,15 @@ npm run typecheck    # 使用 tsc 进行类型检查
 
 在微信开发者工具中打开生成的 `dist/wx` 目录。
 
-微信开发模式会在 Vite 报告就绪前，预先完整构建 App 和所有已配置页面。JavaScript 和 TypeScript 组件修改通过 React Refresh 更新，并保留兼容的 React 状态、当前 Taro 页面以及原生输入状态。每次代码更新都会重置模块内部状态。修改 CSS、资源或应用配置时，会有意执行完整构建并让开发者工具重新加载。插件会自动为生成的开发项目启用微信的 `compileHotReLoad` 设置。
+微信开发模式会在 Vite 报告就绪前，预先完整构建 App 和所有已配置页面。JavaScript 和 TypeScript
+组件修改通过 React Refresh 更新，并保留当前 App 与 `globalData`、兼容的 React 状态、当前 Taro 页面以及
+原生输入状态。每次代码更新都会重置模块内部状态。
+
+当前 CSS pipeline 会把应用样式输出到 `app.wxss`；修改源码 CSS 因而会执行完整原生构建、重载 App，并且
+不会保留 runtime 状态。DevTools 直接保存 `page.wxss` 时会保留 App 与 Page 实例，但插件尚未把源码 CSS
+拆分成页面持有的产物。保留状态的 WXSS 热更新即将在后续版本支持。资源与配置修改也使用完整原生构建，
+不承诺保留状态。插件会自动为生成的开发项目
+启用微信的 `compileHotReLoad` 设置。
 
 | 目标 | 含义 | 输出目录 |
 | --- | --- | --- |

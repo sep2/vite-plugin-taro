@@ -64,7 +64,9 @@ npm run dev:h5
 
 You can keep `npm run dev:wx` and `npm run dev:h5` running at the same time in separate terminals.
 
-WX development provides full Vite-powered hot reload through Rolldown's incremental module graph and React Refresh. JavaScript edits preserve the active native page and React/input state; CSS, assets, public files, and configuration changes are rebuilt automatically.
+WX development provides Vite-powered hot reload through Rolldown's incremental module graph and React Refresh.
+JavaScript edits preserve the running App and `globalData`, active native page, and React/input state. Other changes are
+rebuilt automatically.
 
 ### 4. Build, preview, and typecheck
 
@@ -288,7 +290,16 @@ npm run typecheck    # Typecheck with tsc
 
 Open the generated `dist/wx` directory in WeChat DevTools.
 
-WX development completes an eager build of the App and every configured page before Vite reports ready. JavaScript and TypeScript component edits use React Refresh and preserve compatible React state, the current Taro page, and native input state. Module-local state resets on each code update. Changes to CSS, assets, or app configuration intentionally perform a complete rebuild and DevTools reload. The generated development project enables WeChat's `compileHotReLoad` setting automatically.
+WX development completes an eager build of the App and every configured page before Vite reports ready. JavaScript and
+TypeScript component edits use React Refresh and preserve the running App and `globalData`, compatible React state, the
+current Taro page, and native input state. Module-local state resets on each code update.
+
+The current CSS pipeline materializes application styles in `app.wxss`; source CSS edits therefore perform a complete
+native build, reload the App, and do not preserve runtime state. Direct `page.wxss` saves preserve the App and Page
+instance in DevTools, but the plugin does not yet partition source CSS into page-owned output. State-preserving WXSS hot
+reload will be supported in an upcoming release. Assets and configuration changes also use complete native builds and
+do not promise state preservation. The generated development project enables
+WeChat's `compileHotReLoad` setting automatically.
 
 | Target | Meaning | Output dir |
 | --- | --- | --- |

@@ -27,7 +27,8 @@ npm run dev:h5
 
 You can keep `npm run dev:wx` and `npm run dev:h5` running at the same time in separate terminals.
 
-WeChat development fully supports Vite-powered hot reload. JavaScript edits preserve the active native page and React/input state, while other changes are rebuilt automatically.
+WeChat development supports Vite-powered hot reload. Compatible JavaScript edits preserve the running App and
+`globalData`, active native page, and React/input state, while other changes are rebuilt automatically.
 
 Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` in the generated `.env.local` to your WeChat Mini Program App ID, then open `dist/wx` with WeChat DevTools for Mini Program development.
 

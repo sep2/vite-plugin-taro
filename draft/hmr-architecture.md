@@ -13,15 +13,26 @@ React Refresh can preserve state only while the existing Fiber tree remains aliv
 
 ## The key WeChat behavior
 
-A pre-existing JavaScript file that is a direct static dependency of a page has a useful reload boundary:
+Bare DevTools probes show a useful JavaScript reload boundary for `page.js` and files loaded directly by its initial
+code.
 
-- DevTools recompiles and reruns the page code when that dependency changes;
+Here, “loaded by a literal `require()`” has a precise meaning: the initial `page.js` contains a call such as
+`require('./update.js')`. A file loaded through another module, or through a path assembled at runtime, is not inside
+this boundary.
+
+When `page.js` itself or one of these directly loaded files changes:
+
+- DevTools recompiles and reruns page-side code;
 - `app.js` is not rerun;
-- the existing JavaScript state remains available.
+- the App instance, `globalData`, and App-owned runtime remain available.
 
-This is the opening that makes HMR possible. Page code may run again, while the HMR runtime, module registry, Taro root, and Fiber tree survive because App code is not rerun.
+This is the opening that makes JavaScript HMR possible. Page code runs again, but `app.js` does not; the existing App
+instance, HMR runtime, module registry, Taro root, and Fiber tree remain alive.
 
-The plugin reserves one direct page dependency for this purpose: `update.js`. During initial development startup the file is empty. For every compatible JavaScript edit, the development server puts the generated patch code into this same file. As far as DevTools is concerned, only the known page dependency changed.
+The plugin therefore makes every `page.js` directly `require()` the same `update.js` from the initial build onward. The
+file is empty at development startup. For every compatible JavaScript edit, the development server puts the generated
+patch code into this file. As far as DevTools is concerned, only a file that the page already loaded directly has
+changed.
 
 When DevTools reruns the page, it executes `update.js` before normal page initialization. The file calls the already-running HMR runtime, which applies the patch. The rest of the page entry then continues, while the HMR runtime keeps the patched module exports active and ensures that the page is registered only once.
 
@@ -47,11 +58,11 @@ sequenceDiagram
     alt Compatible JavaScript update
         Server->>Server: Keep module updates in memory
         Server->>WX: Put patch code in update.js
-        WX->>WX: Rerun page code while App code stays alive
+        WX->>WX: Rerun page code without rerunning app.js
         WX->>WX: update.js invokes HMR runtime
         WX->>WX: Apply patch and run React Refresh
         WX-->>Server: Acknowledge applied version
-    else Native files must change
+    else Current app-level CSS or other native files must change
         Server->>WX: Write complete native bundle
         WX->>WX: Reload App
     end
@@ -87,7 +98,7 @@ Development uses one eager Vite/Rolldown module graph. The same graph produces b
 The initial output establishes three important conditions:
 
 1. The App starts the HMR runtime and control client.
-2. Every page has a direct static dependency on the empty `update.js` file.
+2. Every `page.js` directly loads the empty `update.js` file through a literal `require()` call.
 3. Every configured page component is initialized eagerly.
 
 The third condition is needed for inactive routes. A patch may update a page that has never been opened. Eager initialization gives that page's modules a place in the live module registry, so the patch can be applied immediately and will still be present when the route is opened later. It does not create native page instances.
@@ -111,7 +122,8 @@ This applies whether the edit comes from an App component, the active page, an i
 
 ## The HMR runtime
 
-The HMR runtime survives page reruns because App code is not rerun. It combines three responsibilities.
+The HMR runtime remains attached to the existing App runtime because `app.js` is not rerun. It combines three
+responsibilities.
 
 ### Apply Rolldown patches
 
@@ -129,13 +141,16 @@ This is what makes the order safe:
 
 The HMR runtime uses Vite's official React Refresh runtime. Rolldown updates module exports and invokes accepted boundaries; React Refresh decides whether the affected components can be updated compatibly.
 
-For component updates that React Refresh considers compatible, React reuses the existing Fiber tree and component state. The Fiber tree is not serialized into `update.js` or copied into a patch. It simply remains reachable because the App code and Taro root were never destroyed.
+For component updates that React Refresh considers compatible, React reuses the existing Fiber tree and component state.
+The Fiber tree is not serialized into `update.js` or copied into a patch. It simply remains reachable because the
+existing App instance and Taro root were never destroyed.
 
 If a component cannot be refreshed safely, the active route is relaunched. State preservation is intentionally limited to updates React Refresh considers compatible.
 
 ### Make page rerun harmless
 
-Page entry code is native integration code and may execute again. The HMR runtime treats this as repeated integration setup and guards its side effects.
+Page entry code is native integration code and executes again during these updates. The HMR runtime treats this as
+repeated integration setup and guards its side effects.
 
 The rerun is guarded so that it cannot:
 
@@ -184,18 +199,23 @@ Retained patch history is bounded. When it grows too large, the server creates a
 
 ## Full-build boundary
 
-Only updates that can be expressed as safe JavaScript patches use the state-preserving path. A complete native rebuild is required when an edit changes or may change:
+Only updates that can be expressed as safe JavaScript patches use the current state-preserving path. A complete native
+rebuild is required when an edit changes or may change:
 
-- WXSS or newly required Tailwind utilities;
+- application CSS currently materialized as `app.wxss`, including newly required Tailwind utilities;
 - WXML, JSON, project configuration, or page configuration;
 - imported assets or public files;
 - output that Rolldown cannot associate with a valid HMR boundary;
 - protocol state that cannot be reconciled safely;
 - a patch that throws while executing.
 
-A complete rebuild may reload the App, so React state preservation is not promised.
+A direct page-owned `page.wxss` update is safe at the DevTools level and does not replace App state. The current plugin
+cannot use that boundary for general source CSS because its styles are aggregated into `app.wxss`. Until CSS ownership
+and route splitting exist, CSS edits remain on the complete-build path. State-preserving WXSS hot reload is the next
+planned extension and will be supported soon.
 
-This fallback is not merely conservative. Once DevTools chooses an App-level reload, the old heap and Fiber tree are already gone. No later HMR logic can recover them.
+A build that rewrites `app.wxss` reloads the App in the tested DevTools environment, so the old heap, HMR runtime, Taro
+root, and Fiber tree are gone. No later HMR logic can recover them.
 
 ## Why this design is necessary
 
@@ -213,7 +233,7 @@ Therefore the fixed `update.js` file is not an arbitrary transport choice. It is
 For a compatible update, every required property is established:
 
 1. DevTools compiles the patch code from `update.js`.
-2. Only page code reruns; App code and its existing JavaScript state remain intact.
+2. Only page code reruns; `app.js` does not, so the existing App instance and JavaScript state remain intact.
 3. The HMR runtime applies patches to the existing module registry.
 4. Page rerun guards prevent code from the original bundle from undoing the patch.
 5. React Refresh reconciles against the retained Fiber tree.
@@ -229,7 +249,10 @@ The Mini Program can receive source text but cannot execute it without forbidden
 
 ### Rewriting the original output files
 
-Changing arbitrary JavaScript or native output files gives DevTools freedom to reload the App. That destroys the state HMR is intended to preserve.
+The safe boundary is file-specific, not permission to rewrite arbitrary generated output. A page's JavaScript and
+`page.wxss` can avoid an App reload, but replacing original JavaScript bundles would bypass the live patch registry and
+React Refresh coordination, while replacing `app.wxss` demonstrably reloads the App. The fixed `update.js` dependency
+isolates executable updates from both hazards.
 
 ### Dynamic or transitive update imports
 
@@ -256,4 +279,9 @@ It does not guarantee preservation of:
 - state across a complete native rebuild;
 - state across a development-server restart.
 
-The DevTools observations establishing the direct-page-dependency requirement are recorded in `draft/hmr-probe-result.md`.
+At the DevTools level, a direct `page.wxss` save also preserves the App and page-side identities, whereas an `app.wxss`
+save replaces them. The current plugin still emits collected application styles through `app.wxss`, so source CSS edits
+do not yet receive the page-level preservation guarantee.
+
+The bare DevTools observations establishing the JavaScript and WXSS boundaries are recorded in
+`draft/hmr-probe-result.md`.

@@ -153,9 +153,19 @@ For H5, Tailwind produces web CSS and normal browser class names. Taro's global 
 
 For WX, JavaScript class strings and generated CSS must be transformed together. Mini Program output may require escaped class names, selector changes, and unit conversion such as `rem` or `px` to `rpx`. The same `weapp-tailwindcss` context transforms both sides so rendered class names continue to match the generated WXSS.
 
-Vite's collected application CSS is materialized as native WXSS. Taro's native component and template configuration then makes those styles available to the rendered page tree.
+Vite's collected application CSS is currently materialized in native `app.wxss`. Taro's native component and template
+configuration then makes those styles available to the rendered page tree.
 
-During WX HMR, a JavaScript patch may reuse utility classes already present in the current WXSS. Introducing a new Tailwind candidate requires a full native rebuild so JavaScript class names and WXSS cannot diverge. The detailed update protocol is described in `draft/hmr-architecture.md`.
+Bare DevTools probes establish a file-specific WXSS boundary: changing `page.wxss` updates styles while retaining the
+App, page module, and Page instance. Changing `app.wxss` instead reloads the App and loses its runtime state. The
+current CSS pipeline does not yet partition source styles by route, so source CSS edits still rebuild `app.wxss` and
+take the state-losing App-reload path. Route-partitioned, state-preserving WXSS hot reload is planned and will be
+supported soon.
+
+During JavaScript HMR, a patch may reuse utility classes already present in the current WXSS. Introducing a new Tailwind
+candidate requires a full native rebuild so JavaScript class names and WXSS cannot diverge. A future state-preserving
+page-style path would also need explicit ownership for page-local, shared, and global rules. The detailed update
+protocol is described in `draft/hmr-architecture.md`.
 
 ### Why styles need a shared pipeline
 
@@ -171,7 +181,11 @@ H5 uses Vite's normal browser development model. The browser loads modules from 
 
 ### WX development
 
-WX development uses Vite's bundled Rolldown graph because DevTools consumes a native project directory rather than browser modules. Compatible JavaScript updates stay in memory and are delivered through `update.js`, the only project file rewritten for those updates. CSS, native configuration, assets, and unsafe changes produce a complete native build.
+WX development uses Vite's bundled Rolldown graph because DevTools consumes a native project directory rather than
+browser modules. Compatible JavaScript updates stay in memory and are delivered through `update.js`, the only project
+file rewritten for those updates. The current app-level CSS output, native configuration, assets, and unsafe changes
+produce a complete native build. Although DevTools can update a direct `page.wxss` without replacing App state, the
+plugin does not yet emit route-partitioned CSS updates.
 
 This separation is deliberate: the plugin shares the source model and module graph concepts, not a transport that only works in browsers.
 
@@ -224,6 +238,7 @@ The current boundaries are intentional:
 - application code imports Taro through the plugin's virtual modules rather than directly from `@tarojs/*`;
 - App and page configuration comes from plugin options rather than Taro CLI config files;
 - platform-specific behavior may still require conditional source blocks;
-- WX changes that require native files use a complete native rebuild.
+- the current WX pipeline uses a complete native rebuild for changes that require native files; the observed safe
+  `page.wxss` boundary is not yet a generated update path.
 
 Within those boundaries, Taro application semantics are retained without retaining Taro's webpack build architecture.
