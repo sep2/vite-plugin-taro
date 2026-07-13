@@ -1,9 +1,9 @@
 # Rule 0
 
-When designing a feature, I don't care about compatibility. I want the best simple code with the best readability.
+When designing a feature, I don't care about compatibility. I want the best architecture with the best readability.
 I don't want many moving parts with duplicated slop code. If the new features intersect with old behaviors, design it
-more general that the new features cover broader cases so the old code are no longer needed. Suggest as elegant as
-possible. Never be conservative, always be progressive.
+more general that the new features cover broader cases so the old codes are no longer needed. You should never propose
+"minimalistic change". Suggest as elegant as possible. Never be conservative, always be progressive.
 
 # Monorepo context
 
