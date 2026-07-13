@@ -1,6 +1,6 @@
 import type { types as BabelTypes, NodePath, PluginObj } from '@babel/core'
 import babel from '@rolldown/plugin-babel'
-import type { Plugin, PluginOption, UserConfig } from 'vite'
+import type { Plugin, PluginOption } from 'vite'
 import type { BuildContext } from '../../build-context.ts'
 import { virtualTaroApiId } from '../../plugins/taro-runtime.ts'
 import { stripVirtualPrefix } from '../../utils/modules.ts'
@@ -15,6 +15,42 @@ export function createH5TargetPlugins(context: BuildContext): PluginOption[] {
 function createH5TargetPlugin(context: BuildContext): Plugin {
     return {
         name: 'vite-plugin-taro:h5',
+
+        config() {
+            return {
+                define: createH5TaroDefines(),
+                resolve: {
+                    mainFields: ['main:h5', 'browser', 'module', 'jsnext:main', 'jsnext'],
+                    alias: [
+                        {
+                            find: /^@stencil\/core\/internal\/client$/,
+                            replacement: packageRequire.resolve('@stencil/core/internal/client', {
+                                paths: [packageRequire.resolve('@tarojs/components/package.json')]
+                            })
+                        },
+                        {
+                            find: /^@tarojs\/components$/,
+                            replacement: packageRequire.resolve('@tarojs/components/lib/react')
+                        },
+                        {
+                            find: /^@tarojs\/components\/dist\/components$/,
+                            replacement: packageRequire.resolve('@tarojs/components/dist/components')
+                        },
+                        {
+                            find: /^@tarojs\/taro$/,
+                            replacement: packageRequire.resolve('@tarojs/plugin-platform-h5/dist/runtime/apis')
+                        }
+                    ]
+                },
+                optimizeDeps: {
+                    exclude: ['@stencil/core/internal/client']
+                },
+                build: {
+                    target: 'es2018',
+                    minify: !context.development
+                }
+            }
+        },
 
         resolveId: {
             order: 'pre',
@@ -84,43 +120,6 @@ function isStencilStyleInsertBeforeCall(path: NodePath<BabelTypes.CallExpression
         path.get('arguments.0').toString() === 'styleElm' &&
         path.get('arguments.1').toString() === "styleContainerNode.querySelector('link')"
     )
-}
-
-/** Supplies the complete H5 target configuration from the same target owner as its plugins. */
-export function createH5ViteConfig(context: BuildContext): UserConfig {
-    return {
-        define: createH5TaroDefines(),
-        resolve: {
-            mainFields: ['main:h5', 'browser', 'module', 'jsnext:main', 'jsnext'],
-            alias: [
-                {
-                    find: /^@stencil\/core\/internal\/client$/,
-                    replacement: packageRequire.resolve('@stencil/core/internal/client', {
-                        paths: [packageRequire.resolve('@tarojs/components/package.json')]
-                    })
-                },
-                {
-                    find: /^@tarojs\/components$/,
-                    replacement: packageRequire.resolve('@tarojs/components/lib/react')
-                },
-                {
-                    find: /^@tarojs\/components\/dist\/components$/,
-                    replacement: packageRequire.resolve('@tarojs/components/dist/components')
-                },
-                {
-                    find: /^@tarojs\/taro$/,
-                    replacement: packageRequire.resolve('@tarojs/plugin-platform-h5/dist/runtime/apis')
-                }
-            ]
-        },
-        optimizeDeps: {
-            exclude: ['@stencil/core/internal/client']
-        },
-        build: {
-            target: 'es2018',
-            minify: !context.development
-        }
-    }
 }
 
 function createH5TaroDefines(): Record<string, string> {

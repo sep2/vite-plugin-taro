@@ -1,5 +1,5 @@
 import path from 'node:path'
-import type { Plugin, PluginOption, UserConfig } from 'vite'
+import type { Plugin, PluginOption } from 'vite'
 import type { BuildContext } from '../../build-context.ts'
 import { normalizeModuleId, stripVirtualPrefix } from '../../utils/modules.ts'
 import { packageRequire } from '../../utils/packages.ts'
@@ -22,6 +22,70 @@ function createWxTargetPlugin(context: BuildContext): Plugin {
 
     return {
         name: 'vite-plugin-taro:wx',
+
+        config() {
+            return {
+                define: createWxTaroDefines(),
+                experimental: context.development ? { bundledDev: true } : undefined,
+                css: {
+                    lightningcss: {
+                        visitor: {
+                            // keep CSS3 style single colon :before, :after
+                            // while WeChat Mini Program does not support the double colons versions
+                            Selector(selector) {
+                                return selector.map((component) => {
+                                    if (
+                                        component.type === 'pseudo-element' &&
+                                        (component.kind === 'before' || component.kind === 'after')
+                                    ) {
+                                        return {
+                                            type: 'pseudo-element' as const,
+                                            kind: 'custom' as const,
+                                            name: component.kind
+                                        }
+                                    }
+                                    return component
+                                })
+                            }
+                        }
+                    }
+                },
+                resolve: {
+                    alias: [{ find: /^@tarojs\/components$/, replacement: taroWxComponentsPath }]
+                },
+                build: {
+                    target: 'es2018',
+                    assetsInlineLimit: 1024,
+                    cssCodeSplit: false,
+                    // weapp-tailwindcss has no minifier setting; retain Vite's production CSS minification.
+                    cssMinify: context.development ? false : 'lightningcss',
+                    minify: !context.development,
+                    rolldownOptions: {
+                        input: { app: virtualWxAppId },
+                        experimental: {
+                            // remove vite virtual module \0 in comments, which causes WeChat DevTools failed to compile
+                            attachDebugInfo: 'none'
+                        },
+                        output: {
+                            format: 'cjs',
+                            entryFileNames: '[name].js',
+                            assetFileNames: 'assets/[name][extname]',
+                            chunkFileNames: ({ name }) => `${name === 'rolldown-runtime' ? 'runtime' : name}.js`,
+                            strictExecutionOrder: true,
+                            codeSplitting: {
+                                includeDependenciesRecursively: false,
+                                minSize: 0,
+                                groups: [
+                                    { name: 'taro', test: isWxTaroChunkModule, priority: 100 },
+                                    { name: 'vendors', test: isNodeModule, priority: 10 },
+                                    { name: 'common', minShareCount: 2, minModuleSize: 1, priority: 1 }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        },
 
         resolveId: {
             order: 'pre',
@@ -68,71 +132,6 @@ function createWxTargetPlugin(context: BuildContext): Plugin {
 
         closeBundle() {
             return developmentSession?.close()
-        }
-    }
-}
-
-/** Supplies the complete WX target configuration from the same target owner as its plugin. */
-export function createWxViteConfig(context: BuildContext): UserConfig {
-    return {
-        define: createWxTaroDefines(),
-        experimental: context.development ? { bundledDev: true } : undefined,
-        css: {
-            lightningcss: {
-                visitor: {
-                    // keep CSS3 style single colon :before, :after
-                    // while WeChat Mini Program does not support the double colons versions
-                    Selector(selector) {
-                        return selector.map((component) => {
-                            if (
-                                component.type === 'pseudo-element' &&
-                                (component.kind === 'before' || component.kind === 'after')
-                            ) {
-                                return {
-                                    type: 'pseudo-element' as const,
-                                    kind: 'custom' as const,
-                                    name: component.kind
-                                }
-                            }
-                            return component
-                        })
-                    }
-                }
-            }
-        },
-        resolve: {
-            alias: [{ find: /^@tarojs\/components$/, replacement: taroWxComponentsPath }]
-        },
-        build: {
-            target: 'es2018',
-            assetsInlineLimit: 1024,
-            cssCodeSplit: false,
-            // weapp-tailwindcss has no minifier setting; retain Vite's production CSS minification.
-            cssMinify: context.development ? false : 'lightningcss',
-            minify: !context.development,
-            rolldownOptions: {
-                input: { app: virtualWxAppId },
-                experimental: {
-                    // remove vite virtual module \0 in comments, which causes WeChat DevTools failed to compile
-                    attachDebugInfo: 'none'
-                },
-                output: {
-                    format: 'cjs',
-                    entryFileNames: '[name].js',
-                    assetFileNames: 'assets/[name][extname]',
-                    chunkFileNames: ({ name }) => `${name === 'rolldown-runtime' ? 'runtime' : name}.js`,
-                    strictExecutionOrder: true,
-                    codeSplitting: {
-                        includeDependenciesRecursively: false,
-                        minSize: 0,
-                        groups: [
-                            { name: 'taro', test: isWxTaroChunkModule, priority: 100 },
-                            { name: 'vendors', test: isNodeModule, priority: 10 },
-                            { name: 'common', minShareCount: 2, minModuleSize: 1, priority: 1 }
-                        ]
-                    }
-                }
-            }
         }
     }
 }

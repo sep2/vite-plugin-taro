@@ -4,8 +4,8 @@ import type { VitePluginTaroOptions } from '../options.ts'
 import { BuildContext } from './build-context.ts'
 import { createConditionalDirectivePlugin } from './plugins/conditional-directives.ts'
 import { createTaroRuntimePlugin } from './plugins/taro-runtime.ts'
-import { createH5TargetPlugins, createH5ViteConfig } from './targets/h5/plugin.ts'
-import { createWxTargetPlugins, createWxViteConfig } from './targets/wx/plugin.ts'
+import { createH5TargetPlugins } from './targets/h5/plugin.ts'
+import { createWxTargetPlugins } from './targets/wx/plugin.ts'
 
 /** Creates the Vite plugins for the selected Taro target. */
 export default function vitePluginTaro(options: VitePluginTaroOptions): PluginOption[] {
@@ -30,7 +30,6 @@ function createBuildCoordinator(context: BuildContext): Plugin {
 
         config(_, environment) {
             context.configure(environment)
-            return context.project.target === 'wx' ? createWxViteConfig(context) : createH5ViteConfig(context)
         },
 
         configResolved(config) {
