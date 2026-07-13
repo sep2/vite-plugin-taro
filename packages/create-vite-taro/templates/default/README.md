@@ -22,7 +22,12 @@ npm run dev:h5
 
 You can keep `npm run dev:wx` and `npm run dev:h5` running at the same time in separate terminals.
 
-Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` in `.env.local` to your WeChat App ID, then open `dist/wx` with WeChat DevTools for Mini Program development. The generated project enables hot reload and disables Skyline rendering and URL checks by default.
+Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` in `.env.local` to your WeChat App ID, then open `dist/wx` with WeChat DevTools
+for Mini Program development. State-preserving hot reload requires `compileHotReLoad: true`; the generated project sets
+it automatically and also disables Skyline rendering and URL checks by default.
+
+Hot reload details:
+[WeChat Mini Program HMR architecture](https://github.com/sep2/vite-plugin-taro/blob/main/draft/hmr-architecture.md).
 
 ## Styles
 
@@ -30,7 +35,7 @@ Global styles live in `src/app.css`. Keep the Tailwind subpath imports and `@sou
 for both targets. Taro H5 component styles are injected by the plugin.
 
 For WeChat, application CSS is currently emitted through `app.wxss`. CSS edits therefore rebuild and reload the App,
-unlike compatible JavaScript hot updates, which preserve App, React, and input state. WeChat DevTools preserves the App
+unlike JavaScript hot updates, which preserve App, React, and input state. WeChat DevTools preserves the App
 and Page instance for direct `page.wxss` edits. Route-scoped, state-preserving WXSS hot reload will be supported in an
 upcoming release.
 

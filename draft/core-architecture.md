@@ -177,12 +177,13 @@ The two targets share source and transforms but use development behavior appropr
 
 ### H5 development
 
-H5 uses Vite's normal browser development model. The browser loads modules from the Vite server, and React Fast Refresh applies compatible component updates.
+H5 uses Vite's normal browser development model. The browser loads modules from the Vite server, and React Fast
+Refresh applies component updates.
 
 ### WX development
 
 WX development uses Vite's bundled Rolldown graph because DevTools consumes a native project directory rather than
-browser modules. Compatible JavaScript updates stay in memory and are delivered through `update.js`, the only project
+browser modules. JavaScript hot updates stay in memory and are delivered through `update.js`, the only project
 file rewritten for those updates. The current app-level CSS output, native configuration, assets, and unsafe changes
 produce a complete native build. Although DevTools can update a direct `page.wxss` without replacing App state, the
 plugin does not yet emit route-partitioned CSS updates.

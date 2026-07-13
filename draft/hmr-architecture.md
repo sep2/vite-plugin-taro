@@ -13,6 +13,9 @@ React Refresh can preserve state only while the existing Fiber tree remains aliv
 
 ## The key WeChat behavior
 
+State-preserving reloads require the WeChat project setting `compileHotReLoad: true`. All behavior described below
+assumes that setting remains enabled.
+
 Bare DevTools probes show a useful JavaScript reload boundary for `page.js` and files loaded directly by its initial
 code.
 
@@ -30,24 +33,30 @@ This is the opening that makes JavaScript HMR possible. Page code runs again, bu
 instance, HMR runtime, module registry, Taro root, and Fiber tree remain alive.
 
 The plugin therefore makes every `page.js` directly `require()` the same `update.js` from the initial build onward. The
-file is empty at development startup. For every compatible JavaScript edit, the development server puts the generated
-patch code into this file. As far as DevTools is concerned, only a file that the page already loaded directly has
-changed.
+file is empty at development startup. For every JavaScript edit handled by HMR, the development server puts the
+generated patch code into this file. As far as DevTools is concerned, only a file that the page already loaded directly
+has changed.
 
-When DevTools reruns the page, it executes `update.js` before normal page initialization. The file calls the already-running HMR runtime, which applies the patch. The rest of the page entry then continues, while the HMR runtime keeps the patched module exports active and ensures that the page is registered only once.
+When DevTools reruns the page, it executes `update.js` before normal page initialization. The file calls the
+already-running HMR runtime, which applies the patch. The rest of the page entry then continues, while the HMR runtime
+keeps the patched module exports active and ensures that the page is registered only once.
 
 This is the core design:
 
-> Convert arbitrary compatible source edits into changes to one page-scoped executable file, so WeChat reruns the page but keeps the App and React state alive.
+> Convert source edits handled by HMR into changes to one page-scoped executable file, so WeChat reruns the page but
+> keeps the App and React state alive.
 
-For each compatible update, `update.js` is the **only project file written**. Updated module code and patch history stay in the development server's memory; `app.js`, page bundles, shared chunks, and native files are not rewritten. The server writes only the missing patch range into `update.js`. DevTools therefore observes a change to the known page dependency and has no other file change that would trigger an App reload.
+Each HMR update writes **only `update.js`**. Updated module code and patch history stay
+in the development server's memory; `app.js`, page bundles, shared chunks, and native files are not rewritten. The
+server writes only the missing patch range into `update.js`. DevTools therefore observes a change to the known page
+dependency and has no other file change that would trigger an App reload.
 
 ## Architecture
 
 ```mermaid
 sequenceDiagram
     participant Server as Vite development server
-    participant WX as WeChat DevTools / Mini Program
+    participant WX as WeChat DevTools
 
     Server->>WX: Initial native bundle with empty update.js
     WX->>WX: Start App and initialize HMR runtime
@@ -55,7 +64,7 @@ sequenceDiagram
 
     Server->>Server: Convert source edit into Rolldown patch
 
-    alt Compatible JavaScript update
+    alt JavaScript update
         Server->>Server: Keep module updates in memory
         Server->>WX: Put patch code in update.js
         WX->>WX: Rerun page code without rerunning app.js
@@ -103,9 +112,9 @@ The initial output establishes three important conditions:
 
 The third condition is needed for inactive routes. A patch may update a page that has never been opened. Eager initialization gives that page's modules a place in the live module registry, so the patch can be applied immediately and will still be present when the route is opened later. It does not create native page instances.
 
-## Compatible update flow
+## State-preserving update flow
 
-For a compatible source edit:
+A JavaScript edit is applied as follows:
 
 1. Rolldown DevEngine computes a patch from the existing development graph.
 2. The server verifies that the patch can be applied without changing native files such as WXSS, WXML, JSON, or assets.
@@ -139,13 +148,14 @@ This is what makes the order safe:
 
 ### Preserve React state
 
-The HMR runtime uses Vite's official React Refresh runtime. Rolldown updates module exports and invokes accepted boundaries; React Refresh decides whether the affected components can be updated compatibly.
+The HMR runtime uses Vite's official React Refresh runtime. Rolldown updates module exports and invokes accepted
+boundaries; React Refresh decides whether the affected component state can be reused safely.
 
-For component updates that React Refresh considers compatible, React reuses the existing Fiber tree and component state.
-The Fiber tree is not serialized into `update.js` or copied into a patch. It simply remains reachable because the
-existing App instance and Taro root were never destroyed.
+React Refresh determines whether the affected component state can be reused. When it can, React reuses the existing
+Fiber tree and component state. The Fiber tree is not serialized into `update.js` or copied into a patch. It simply
+remains reachable because the existing App instance and Taro root were never destroyed.
 
-If a component cannot be refreshed safely, the active route is relaunched. State preservation is intentionally limited to updates React Refresh considers compatible.
+If React Refresh cannot safely update a component, the active route is relaunched and that component state is reset.
 
 ### Make page rerun harmless
 
@@ -199,8 +209,8 @@ Retained patch history is bounded. When it grows too large, the server creates a
 
 ## Full-build boundary
 
-Only updates that can be expressed as safe JavaScript patches use the current state-preserving path. A complete native
-rebuild is required when an edit changes or may change:
+State-preserving HMR accepts only safe JavaScript patches. A complete native rebuild is required when an edit changes
+or may change:
 
 - application CSS currently materialized as `app.wxss`, including newly required Tailwind utilities;
 - WXML, JSON, project configuration, or page configuration;
@@ -210,9 +220,9 @@ rebuild is required when an edit changes or may change:
 - a patch that throws while executing.
 
 A direct page-owned `page.wxss` update is safe at the DevTools level and does not replace App state. The current plugin
-cannot use that boundary for general source CSS because its styles are aggregated into `app.wxss`. Until CSS ownership
-and route splitting exist, CSS edits remain on the complete-build path. State-preserving WXSS hot reload is the next
-planned extension and will be supported soon.
+cannot use the `page.wxss` boundary for general source CSS because its styles are aggregated into `app.wxss`. Until CSS
+ownership and route splitting exist, CSS edits still require a complete build. State-preserving WXSS hot reload is the
+next planned extension and will be supported soon.
 
 A build that rewrites `app.wxss` reloads the App in the tested DevTools environment, so the old heap, HMR runtime, Taro
 root, and Fiber tree are gone. No later HMR logic can recover them.
@@ -230,7 +240,7 @@ Therefore the fixed `update.js` file is not an arbitrary transport choice. It is
 
 ## Why this design is sufficient
 
-For a compatible update, every required property is established:
+A JavaScript HMR update establishes every required property:
 
 1. DevTools compiles the patch code from `update.js`.
 2. Only page code reruns; `app.js` does not, so the existing App instance and JavaScript state remain intact.
@@ -264,18 +274,18 @@ Serializing selected values is not equivalent to preserving the live React Fiber
 
 ## Guarantees and limits
 
-For a compatible JavaScript update, the architecture is designed to preserve:
+JavaScript HMR preserves:
 
 - the running App and its existing JavaScript state;
 - the active route and native page state;
 - the Taro root;
 - native input state;
-- component state that React Refresh can update compatibly.
+- component state retained by React Refresh.
 
 It does not guarantee preservation of:
 
 - arbitrary module-local singleton state;
-- component state that React Refresh cannot update compatibly;
+- component state that React Refresh cannot retain;
 - state across a complete native rebuild;
 - state across a development-server restart.
 

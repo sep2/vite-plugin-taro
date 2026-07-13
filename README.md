@@ -68,6 +68,9 @@ WX development provides Vite-powered hot reload through Rolldown's incremental m
 JavaScript edits preserve the running App and `globalData`, active native page, and React/input state. Other changes are
 rebuilt automatically.
 
+Hot reload details:
+[WeChat Mini Program HMR architecture](https://github.com/sep2/vite-plugin-taro/blob/main/draft/hmr-architecture.md).
+
 ### 4. Build, preview, and typecheck
 
 ```sh
@@ -291,15 +294,15 @@ npm run typecheck    # Typecheck with tsc
 Open the generated `dist/wx` directory in WeChat DevTools.
 
 WX development completes an eager build of the App and every configured page before Vite reports ready. JavaScript and
-TypeScript component edits use React Refresh and preserve the running App and `globalData`, compatible React state, the
-current Taro page, and native input state. Module-local state resets on each code update.
+TypeScript component edits use React Refresh and preserve the running App and `globalData`, component state retained by
+React Refresh, the current Taro page, and native input state. State-preserving WX HMR requires
+`compileHotReLoad: true`; the generated development project enables it automatically.
 
 The current CSS pipeline materializes application styles in `app.wxss`; source CSS edits therefore perform a complete
 native build, reload the App, and do not preserve runtime state. Direct `page.wxss` saves preserve the App and Page
 instance in DevTools, but the plugin does not yet partition source CSS into page-owned output. State-preserving WXSS hot
 reload will be supported in an upcoming release. Assets and configuration changes also use complete native builds and
-do not promise state preservation. The generated development project enables
-WeChat's `compileHotReLoad` setting automatically.
+do not promise state preservation.
 
 | Target | Meaning | Output dir |
 | --- | --- | --- |
