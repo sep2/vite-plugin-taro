@@ -13,7 +13,32 @@ remains valid and is reused; the payload applied through that boundary changes f
 ordered System-definition transactions.
 
 The architecture is validated by isolated compiler, loader, planner, graph, and DevTools probes. Integration into the
-published plugin remains implementation work.
+published plugin remains implementation work. Probe success is not a platform support guarantee: preview, upload,
+real-device behavior, the actual Vite bundled-development API, React Refresh composition, and restart replay still have
+the explicit limits recorded below.
+
+## Evidence baseline and claim levels
+
+This document distinguishes four kinds of claims:
+
+- **Platform contract:** stated in the current [WeChat subpackage](https://developers.weixin.qq.com/miniprogram/dev/framework/subpackages/basic.html),
+  [subpackage async](https://developers.weixin.qq.com/miniprogram/dev/framework/subpackages/async.html), or
+  [`require`](https://developers.weixin.qq.com/miniprogram/dev/reference/api/require.html) documentation.
+- **Pinned implementation evidence:** behavior read from Vite 8.1.4 at
+  [`a477454`](https://github.com/vitejs/vite/blob/a477454442eff649b430f9e3c6caf2500fcb7183/packages/plugin-legacy/src/index.ts#L639-L657),
+  Rolldown 1.1.4 at
+  [`6cbd233`](https://github.com/rolldown/rolldown/blob/6cbd2330dc5ca973b90444973ee04c2dc7ee2f2d/packages/rolldown/src/types/rolldown-output.ts#L70-L90),
+  SystemJS 6.15.1 at
+  [`17c238e`](https://github.com/systemjs/systemjs/blob/17c238ec00cf7c4bcabcf3579f876513fcedba30/src/system-core.js#L80-L180),
+  Babel 7.29.7 for the probe transforms, and `miniprogram-ci@2.1.31`.
+- **Probe result:** behavior observed in the fixtures described by
+  [`systemjs-probe-result.md`](./systemjs-probe-result.md) and [`hmr-probe-result.md`](./hmr-probe-result.md). The System
+  package probes used DevTools base library 3.16.2; the bare file-save HMR probe used 3.15.2.
+- **Design requirement:** behavior the implementation must provide but that is not yet integrated or release-validated.
+
+Version-specific implementation details must be re-characterized when Vite, Rolldown, SystemJS, Babel, DevTools, or
+`miniprogram-ci` changes. In particular, the importer-aware System core described here must be treated as a maintained
+fork of a small upstream core, not as a public SystemJS HMR API.
 
 ## Goal
 
@@ -37,9 +62,9 @@ The WX-specific layer owns only the concerns Vite does not model:
 
 The resulting model is:
 
-> Vite and Rolldown produce canonical System definitions; the WX plugin places those definitions into legal physical
-> packages; `app-runtime.js` owns their one evaluated System graph; and development advances that graph through ordered
-> definition transactions.
+> Vite and Rolldown produce the resolved and optimized ESM units; the pinned System transform turns those units into
+> canonical definitions; the WX plugin places them into legal physical packages; `app-runtime.js` owns their one
+> evaluated System graph; and development advances that graph through ordered definition transactions.
 
 ## Scope
 
@@ -64,11 +89,14 @@ The first milestone does not include:
 - native `componentPlaceholder` orchestration;
 - remote JavaScript delivery or evaluation;
 - lazy CSS ownership;
+- lazy cross-subpackage placement for images, WASM, workers, or other non-JavaScript assets;
+- import-attribute or SystemJS module-type-extra support beyond code already lowered to JavaScript by Vite;
 - native Skyline hot reload;
 - a user-facing async-package configuration API.
 
 Configured App and page components remain static roots in main. Only ordinary dynamic-import boundaries below those
-roots create generated async packages.
+roots create generated async packages. Skyline production loading is an intended validation target, not a supported
+claim until it passes the release matrix.
 
 ## Platform constraints
 
@@ -84,15 +112,19 @@ root handles. User application modules behind those handles use System registrat
 
 ### Cross-package CommonJS is restricted
 
-A package download does not make arbitrary cross-package synchronous `require()` legal. Package A must not download
-package Shared and then call `require('../Shared/module.js')`.
+A package download does not make arbitrary cross-package synchronous `require()` legal. The public documentation says
+that an ordinary subpackage may synchronously require main or itself, but not another subpackage; the subpackage-async
+API obtains the other package's module result asynchronously. This architecture consumes that returned result directly.
+Package A must not download package Shared and then treat injection as permission to call
+`require('../Shared/module.js')` synchronously.
 
 Every synchronous `require()` emitted inside a generated package is package-local. Logical cross-package application
 edges are linked by SystemJS from the registration tuples returned by package resolvers.
 
 ### Async targets must be statically discoverable
 
-The WeChat compiler does not reliably include a module addressed only by a variable call:
+In the tested DevTools compiler, a module addressed only by a variable call was not entered in the compiled module
+table:
 
 ```js
 require.async(entryPath);
@@ -128,20 +160,34 @@ reruns the page-side boundary while retaining the App heap.
 
 The planner and final emitter must account for:
 
-- a 2 MiB hard limit for main;
-- a 2 MiB hard limit for every subpackage;
-- a soft planning target below the hard limit, initially about 1.8 MiB;
+- the public 2 M limit for main;
+- the public 2 M limit for every subpackage;
+- a soft planning target below the effective hard limit, initially about 90% of it (commonly described as 1.8 M);
 - the practical DevTools/compiler ceiling of 100 `app.json.subPackages` entries, shared by user and generated packages;
-- the applicable whole-project limit, generally 30 MiB or 20 MiB for service-provider-developed Mini Programs.
+- the applicable whole-project limit, publicly documented as 30 M, or 20 M for service-provider-developed Mini
+  Programs.
 
-The 100-package value is a practical tooling limit rather than a numerical limit currently stated in public WeChat
-documentation.
+WeChat's public documentation uses `M`, not `MiB`, and compiler/upload accounting is authoritative. The implementation
+must not silently substitute `2 * 1024 * 1024` for the toolchain's effective limit. It should consume effective compiler
+attributes when available, retain conservative headroom, and validate the final project with the supported DevTools/CI
+path.
+
+The public documentation does not currently state a numerical subpackage-count limit. The value 100 comes from
+`miniprogram-ci@2.1.31`: its
+[default project attributes](https://unpkg.com/miniprogram-ci@2.1.31/dist/config/config.js) use
+`MaxSubPackageLimit: 100`, and its
+[`app.json` validator](https://unpkg.com/miniprogram-ci@2.1.31/dist/modules/corecompiler/original/json/app/checkAppFields.js)
+checks against the effective project attribute. Treat 100 as a pinned compatibility ceiling and planner input, not an
+eternal platform constant.
 
 ### Base-library support
 
 The generated transport requires `require.async()`, so the minimum supported base library is 2.11.2. The runtime may
-use `wx.onLazyLoadError` as additional diagnostics on base library 2.24.3 or newer, but correctness cannot depend on that
-optional callback.
+use [`wx.onLazyLoadError`](https://developers.weixin.qq.com/miniprogram/dev/api/base/app/app-event/wx.onLazyLoadError.html)
+as additional diagnostics on base library 2.24.3 or newer, but correctness cannot depend on that optional callback. The
+minimum base-library declaration does not replace testing the client-version matrix listed by WeChat's async-subpackage
+documentation. It is only the transport floor: generated syntax, Promise/microtask behavior, System linking, Suspense, and
+top-level await must still be tested against the oldest claimed compiler/base-library combination.
 
 ## Architectural invariants
 
@@ -164,6 +210,10 @@ The implementation must preserve these invariants.
 10. **Updates form one ordered prefix.** A runtime state is one checkpoint plus revisions `1..N`, never an arbitrary set
     of deltas.
 11. **H5 is unchanged.** This architecture is isolated to the WX target.
+12. **Updates and imports are serialized at mutation boundaries.** A definition transaction cannot race a dynamic
+    import, package-instantiation completion, or another transaction against the same registry.
+13. **Non-JavaScript ownership stays legal.** Until asset-aware package placement is implemented, CSS and imported
+    assets used by async code are kept in main or rejected; they are never referenced across sibling subpackages.
 
 ## System overview
 
@@ -278,7 +328,7 @@ Representative development IDs are:
 
 ```text
 vpt:/module/src/components/Heavy.tsx
-vpt:/module/@virtual/vite-preload-helper
+vpt:/module/@virtual/taro-entry
 ```
 
 Representative production IDs are:
@@ -290,6 +340,7 @@ vpt:/chunk/shared-<hash>.js
 
 The canonicalizer must:
 
+- establish one canonical project root (including symlink/realpath policy) before relativizing IDs;
 - normalize path separators;
 - preserve semantically relevant Vite query identity;
 - distinguish virtual modules;
@@ -299,9 +350,11 @@ The canonicalizer must:
 - fail the build when an effective runtime import cannot be resolved to a known definition.
 
 IDs need to remain stable for the lifetime of one development checkpoint. A new checkpoint may establish a new ID
-space because its build ID prevents old updates from being mixed with it.
+space because its build ID prevents old updates from being mixed with it. The `vpt:` values are valid custom-scheme URLs
+for System resolution; `SystemContext.meta.url` must expose the canonical URL, not a generated native file path.
 
-The compiler rewrites emitted edges, not application source. Source still contains ordinary imports.
+The compiler rewrites emitted edges, not application source. Source still contains ordinary imports. Source maps may
+refer back to source paths, but absolute paths must not leak into runtime dependency IDs or production diagnostics.
 
 ## Compiler architecture
 
@@ -362,6 +415,12 @@ consumer and remove it.
 Development definitions use stable source-oriented IDs and are hashed after canonical normalization. Incremental output
 updates the current definition map; only changed definitions enter the ordered log.
 
+The probes produced this shape through repeated complete Vite builds. They did not prove that Vite 8.1.4's experimental
+bundled-development API exposes normalized changed ESM units directly. Obtaining module-granular incremental output and
+pairing it with accepted-edge metadata is therefore a current implementation gate, not an already-supported public
+Vite API. Falling back to repeated full output may be useful for characterization but is not the target performance
+model.
+
 ### Production output
 
 Production retains normal Rolldown code splitting. Dynamic entries and shared chunks remain Rolldown decisions. Each
@@ -383,7 +442,9 @@ Before the System transform, the compiler must:
 3. omit the now-unreachable preload-helper logical definition;
 4. derive topology from the normalized registration graph.
 
-The transformation must preserve evaluation semantics and dynamic target identity.
+The transformation must preserve evaluation semantics and dynamic target identity. It is pinned to Vite's emitted
+helper shape and must be re-characterized on Vite upgrades; it must identify the imported helper binding structurally
+rather than assuming that the local identifier is always named `__vitePreload`.
 
 ### System transform
 
@@ -392,7 +453,15 @@ and System module transforms, as used by Vite's legacy plugin architecture.
 
 This step is responsible for lowering live export mutations to `_export(...)` calls, preserving reexports, cycles,
 dynamic import, and top-level await. It must run after Rolldown's CommonJS and chunk transforms so generated namespace
-semantics remain intact.
+semantics remain intact. Vite 8.1.4's legacy plugin uses the same two Babel transforms, while Rolldown 1.1.4's
+[output-format type](https://github.com/rolldown/rolldown/blob/6cbd2330dc5ca973b90444973ee04c2dc7ee2f2d/packages/rolldown/src/options/output-options.ts#L53-L54)
+exposes ES, CommonJS, IIFE, and UMD but no native System format.
+
+The proven matrix covers JavaScript, Rolldown-lowered CommonJS, Vite-supported dynamic-import expansion, and top-level
+await. Import attributes, workers, WASM/module-type extras, and complete source-map chaining are not implied by that
+matrix and need separate characterization if admitted by the WX target. Vite-transformed JSON, CSS, and asset imports
+must enter this step only after their non-JavaScript output ownership is known. The Babel core and both transform plugins
+must be explicit pinned package dependencies; the implementation must not rely on an unrelated transitive installation.
 
 A future native Rolldown System output mode could replace the Babel step, but it must produce the same logical contract.
 
@@ -432,6 +501,12 @@ static closures belong to main. They are not lazy pages and do not trigger gener
 The native page shell can register synchronously because it registers a stable generic Taro page configuration. That
 configuration points at the main runtime root for the configured page. Main definitions are bootstrapped from local
 registration files; ordinary dynamic imports below the page root remain asynchronous.
+
+The isolated System probes do not by themselves prove the final Taro/React host bridge. Modules shared by the native
+CommonJS host and the System graph—especially React, the Taro runtime, and renderer singletons—must have one explicit
+owner or a synthetic host definition. The implementation must not bundle a second React or renderer instance merely to
+cross the host boundary. Synchronous native registration, main bootstrap timing, and retained-root handoff remain
+integration tests even though the page component's physical placement in main is settled.
 
 The relevant split is:
 
@@ -502,8 +577,8 @@ main = static closure of all configured App and page entry definitions
 Anything in this closure remains in main. If lazy code also consumes it, lazy code links back to the main definition.
 Main ownership cannot be traded for package-count reduction.
 
-If exact main output exceeds 2 MiB, placement cannot repair it by turning a static root edge into an async edge. The
-build must reduce or explicitly redesign the synchronous root.
+If toolchain-accounted main output exceeds the effective 2 M cap, placement cannot repair it by turning a static root
+edge into an async edge. The build must reduce or explicitly redesign the synchronous root.
 
 ### Dynamic demand
 
@@ -531,14 +606,15 @@ Shared {A, B}
 ```
 
 BigInt-backed demand keys avoid fixed 32- or 64-boundary limits. This matters for generated route groups and large
-`import.meta.glob` expansions.
+`import.meta.glob` expansions. BigInt is used only by the Node-side planner and does not increase the WX base-library
+requirement.
 
 SCCs with identical demand sets form initial affinity groups.
 
 ### Splitting and merging
 
-The normal package target is below the hard limit, initially about 1.8 MiB. Initial groups are packed using exact or
-conservative definition-size estimates.
+The normal package target is below the hard limit, initially about 90% of the effective per-package cap. Initial groups
+are packed using conservative definition-size estimates.
 
 The planner may merge bins when combined size remains safe and estimated overfetch is cheap:
 
@@ -549,33 +625,42 @@ overfetch =
 ```
 
 This lets tiny unrelated definitions share one physical download without changing logical execution. Large unrelated
-features remain separate when merge cost is high.
+features remain separate when merge cost is high. The formula is a deterministic heuristic, not an optimal traffic
+model: it has no route probabilities, visit frequency, or network telemetry. Count pressure may justify additional
+legal overfetch, but diagnostics must report that trade-off.
 
-If an async SCC exceeds 2 MiB but contains multiple logical definitions, it may be split across physical packages.
-SystemJS still links the one logical SCC. If one logical definition alone exceeds 2 MiB, the placer cannot split it; the
-compiler must request a different Rolldown chunk plan or fail with a diagnostic.
+If an async SCC exceeds the effective per-package cap but contains multiple logical definitions, it may be split across
+physical packages. SystemJS still links the one logical SCC. If one logical definition alone exceeds the cap, the placer
+cannot split it; the compiler must request a different Rolldown chunk plan or fail with a diagnostic. Rolldown may not
+be able to split every scope-hoisted or cyclic production chunk, so compiler-level repair is allowed to fail explicitly.
+The oversized-SCC probe used synthetic planning weights to force a cross-package cycle; it proves planner and linker
+semantics, not DevTools/upload behavior for files physically near the 2 M cap.
 
 ### Package count and existing packages
 
-User-defined and generated subpackages share the practical 100-entry ceiling:
+User-defined and generated subpackages share the effective toolchain ceiling. With the pinned compatibility value:
 
 ```text
-available generated packages = 100 - existing subPackages.length
+available generated packages = effective MaxSubPackageLimit - existing subPackages.length
 ```
 
-The planner may perform additional legal merges under count pressure. If no merge fits under the hard size limit, it
-fails instead of emitting an invalid project.
+The planner normalizes both documented `subPackages` and supported lowercase `subpackages` spellings before counting;
+independent and ordinary user packages both consume entries. It may perform additional legal merges under count
+pressure. If no merge fits under the hard size limit, it fails instead of emitting an invalid project.
 
 Generated roots derive from sorted logical IDs and use deterministic collision repair against existing user roots.
-Equivalent graph and size input must produce the same roots regardless of iteration order.
+A legal generated root is neither equal to nor nested under/above another package root. Equivalent graph and size input
+must produce the same roots regardless of iteration order.
 
-### Exact measurement and repair
+### Emitted measurement and repair
 
 Estimated registration bytes are not the final Mini Program package size. Resolver code, the literal dispatcher,
-native files, JSON, WXML, WXSS, source maps, and assets also contribute.
+native files, JSON, WXML, WXSS, included source maps, and assets may also contribute. Ignore rules, DevTools transforms,
+minification, and upload accounting can make raw directory bytes differ from the platform's reported package size.
 
-After emission, the build must measure every physical package exactly. A bounded repair loop may repartition async
-definitions and re-emit. It must never:
+After emission, the build must deterministically measure the files it intends to package, preserve headroom, and run the
+supported DevTools/CI validation. "Exact" means exact for the plugin's emitted input set; the compiler/upload result is
+the final authority. A bounded repair loop may repartition async definitions and re-emit. It must never:
 
 - move part of the static main closure into an async package;
 - duplicate a logical definition to hide overflow;
@@ -615,7 +700,10 @@ __vpt_async_ef56ab78/
     modules/*.js
 ```
 
-The exact names are implementation details, but ownership is not.
+The exact names are implementation details, but ownership is not. A large development graph may require sharded main
+and package resolvers rather than one enormous switch file. The ten-thousand-node planner probe does not establish that
+DevTools can efficiently watch, compile, or debug ten thousand generated registration files; file-count, resolver-size,
+and per-file compiler thresholds need separate stress tests.
 
 ### Main resolver
 
@@ -694,6 +782,15 @@ System export propagation invokes `record.setter(namespace)`.
 This is a narrow loader capability required for deletion and relinking. It does not create another namespace graph.
 The embedded System registry remains the owner of evaluated module state.
 
+Upstream SystemJS 6.15.1 stores
+[plain setter functions](https://github.com/systemjs/systemjs/blob/17c238ec00cf7c4bcabcf3579f876513fcedba30/src/system-core.js#L142-L176)
+in each dependency's importer list, and its
+[`delete()` path](https://github.com/systemjs/systemjs/blob/17c238ec00cf7c4bcabcf3579f876513fcedba30/src/features/registry.js#L64-L81)
+does not expose importer identity; it also declines deletion while a TLA execution is pending. The runtime therefore
+ships a pinned, characterized core patch rather than depending on undocumented minified field names. SystemJS is MIT
+licensed, so distributed source/bundles must retain the upstream copyright and license notice, plus a clear record of the
+local patch.
+
 ### Catalog lookup priority
 
 For a canonical ID, the current catalog resolves one provider:
@@ -706,14 +803,18 @@ cumulative runtime snapshots.
 
 ### Import preparation
 
-Before System evaluates a target, the runtime computes its static physical package closure from manifest topology:
+Before System evaluates a target, the runtime computes its static physical package closure from the **current catalog
+topology** and resolves locations through the frozen checkpoint manifest:
 
 ```ts
 async function prepare(moduleId: ModuleId) {
-    const packageIds = staticPackageClosure(moduleId, manifest);
+    const packageIds = staticPackageClosure(moduleId, currentCatalog, placementManifest);
     await Promise.all(packageIds.map(loadPackage));
 }
 ```
+
+A hot provider needs no checkpoint package download. Using only the checkpoint's old topology would incorrectly preload
+stale packages after a hot update adds, removes, or redirects a static edge.
 
 `instantiate()` performs this preparation so imports originating from `_context.import()` receive the same behavior as
 imports initiated by native integration code.
@@ -743,13 +844,17 @@ function loadPackage(packageId: string) {
 }
 ```
 
-This guarantees:
+This guarantees at the package-resolver layer:
 
 - one transport call for concurrent consumers;
 - stable successful package handles;
-- retry after a rejected load;
-- no duplicate definition execution;
-- stable System namespace identity.
+- eviction of a rejected package Promise so transport can be attempted again.
+
+System separately guarantees one execution and one namespace object for repeated successful imports within one module
+generation. HMR replacement creates a new namespace for an invalidated definition and reconnects stable importers; it
+does not promise namespace-object identity across revisions. A failed `System.import()` also leaves a failed System load
+record, so end-to-end retry requires clearing that record in addition to evicting the package Promise. That cleanup is a
+runtime requirement still needing an integrated retry test.
 
 The package boundary accepts either a direct CommonJS resolver or an ESM-style `default` wrapper. This normalization is
 restricted to package entries. Application namespaces remain genuine System namespaces.
@@ -776,7 +881,7 @@ Development uses the same logical contract with source-module granularity.
 The Vite-side integration must produce normalized definitions from the incremental bundled-development lifecycle. It
 maintains the current definition hash and topology map and emits one ordered delta when that state changes.
 
-The implementation may consume Rolldown's HMR analysis for accepted-boundary metadata, but it does not execute or ship
+The implementation may consume Rolldown's HMR analysis for accepted-edge metadata, but it does not execute or ship
 Rolldown's finalized patch JavaScript. A finalized patch's getter holder cannot preserve later mutable export updates in
 a System graph.
 
@@ -785,8 +890,13 @@ The compiler adapter must therefore provide, for each revision:
 - new or changed genuine System definitions;
 - removed canonical IDs;
 - old and new static/dynamic topology;
-- accepted HMR boundaries selected through Vite/Rolldown semantics;
+- accepted HMR **edge pairs** selected through Vite/Rolldown semantics;
 - diagnostics for native output affected by the same source edit.
+
+A boundary cannot be reduced to a set of module IDs: a module may accept one dependency and reject another, and
+self-acceptance is distinct from dependency acceptance. A self-accepted update uses an explicit pair whose boundary and
+accepted-via ID are the same. Source IDs reported by HMR analysis must be mapped to the same canonical development IDs
+used by the definitions.
 
 The implementation should use incremental output rather than repeatedly materializing complete snapshots. Repeated
 snapshot comparison was a probe technique, not the target server architecture.
@@ -800,7 +910,7 @@ A development update is conceptually:
 ```ts
 type HotBoundary = Readonly<{
     boundary: ModuleId;
-    acceptedVia?: ModuleId;
+    acceptedVia: ModuleId;
 }>;
 
 type ModuleUpdate<TRegistration> = Readonly<{
@@ -815,6 +925,9 @@ type ModuleUpdate<TRegistration> = Readonly<{
 
 A batch contains a contiguous ordered sequence of these transactions. The server representation contains generated
 registration source for `update.js`; the runtime receives actual registration tuples after DevTools compilation.
+Batches also need a conservative byte/definition cap so a long replay cannot turn the fixed update file into an
+unbounded source file. If one definition cannot fit the cap, the server checkpoints instead of splitting its registration
+text arbitrarily.
 
 ### Why finalized Rolldown patches are not used
 
@@ -829,40 +942,49 @@ WeChat.
 
 ### Affected-set computation
 
-Before mutating the evaluated graph, the runtime builds a transaction view from the union of old and new static
-topology:
+Before mutating the evaluated graph, the runtime builds a transaction view from the union of old and new topology:
 
 ```text
 changed and removed loaded definitions
     -> expand their static SCCs
-    -> walk reverse static edges
-    -> stop at accepted boundaries
+    -> walk Vite/Rolldown HMR propagation edges
+    -> stop only at matching (boundary, acceptedVia) edges
 ```
 
-The union matters when an update removes an edge: old topology identifies stale importer records that must be detached,
-while new topology determines the graph to reinstantiate.
+The static union identifies stale setter records when an edge is removed and determines the SCCs to reinstantiate.
+Propagation toward an accepted boundary must also respect HMR-relevant dynamic importer relationships reported or
+characterized from Vite/Rolldown; it cannot assume that reverse static edges describe every active dynamic consumer.
+A namespace returned earlier by `import()` is not a live static binding and does not change object identity when its
+module is replaced. Such consumers require a self/dependency accept callback, owner invalidation, or a checkpoint.
 
-Unloaded upserts do not enter the affected set. They replace the catalog provider and remain unevaluated.
+The current relinking probe exercises static propagation and fixed proof boundaries. Exact active dynamic-consumer
+propagation remains an integration characterization. Unloaded upserts do not enter the affected set: they replace the
+catalog provider and remain unevaluated.
 
 ### Relinking transaction
 
 The transaction order is:
 
 1. Validate build ID and contiguous revision before changing catalog or registry state.
-2. Synchronously begin page-rerun and native-lifecycle protection.
-3. Construct and validate the next catalog and topology.
-4. Compute the affected loaded set from old/new topology and accepted boundaries.
-5. Run hot-dispose callbacks for affected loaded modules.
-6. Delete affected System load records.
-7. Discard importer setters owned by affected records.
-8. Retain importer setters owned by stable external boundaries.
-9. Install the next catalog.
-10. Import the affected reload roots and await linking and top-level execution.
-11. Reattach stable external setters to the new load records.
-12. Invoke accepted hot callbacks.
-13. Run React Refresh.
-14. Reconnect the retained Taro root and finish page-rerun guards.
-15. Advance the revision and acknowledge it to the server.
+2. Synchronously begin page-rerun/native-lifecycle protection and reserve the update slot before the first asynchronous
+   wait.
+3. Acquire the runtime's exclusive mutation gate and revalidate build/revision state. Existing instantiations must
+   settle or fail first; new external imports and updates wait rather than observing partial catalog/registry state. The
+   gate must be reentrant for `_context.import()` work owned by the active relink transaction to avoid self-deadlock.
+4. Construct and validate the next catalog and topology.
+5. Compute the affected loaded set from old/new topology and accepted boundary edges.
+6. Run hot-dispose callbacks for affected loaded modules.
+7. Delete affected System load records.
+8. Discard importer setters owned by affected records.
+9. Retain importer setters owned by stable external boundaries.
+10. Install the next catalog.
+11. Import the affected reload roots and await linking and top-level execution.
+12. Reattach stable external setters to the new load records.
+13. Invoke accepted hot callbacks.
+14. Run React Refresh.
+15. Reconnect the retained Taro root and finish page-rerun guards.
+16. Advance the revision, release the mutation gate, and acknowledge it to the server. On failure, release the gate only
+    after marking the runtime as requiring a checkpoint.
 
 A revision is not acknowledged after file write, registration capture, or partial linking. Completion means the active
 runtime graph and UI transaction have finished.
@@ -891,8 +1013,10 @@ Pure-JavaScript topology changes are ordinary updates:
 - introducing a new lazy boundary.
 
 Physical checkpoint placement remains frozen. New or changed definitions live in the current hot catalog and are
-available to future imports. On App restart, the server replays the ordered log before those definitions are needed.
-The next checkpoint incorporates current topology into a new physical plan.
+available to future imports. On App restart, the server must replay the ordered log before a route can depend on those
+definitions. The transport can eventually republish the log, but a startup barrier that prevents stale checkpoint code
+from rendering or producing side effects is still an integration requirement. The next checkpoint incorporates current
+topology into a new physical plan.
 
 ### Unloaded modules
 
@@ -921,8 +1045,12 @@ The existing DevTools boundary remains part of the design.
 Every generated page entry directly and literally requires the same pre-existing `vpt-hmr/update.js` file from the
 initial checkpoint. During a JavaScript update, the server writes only this file.
 
-DevTools recompiles and reruns page-side code while retaining the App heap. `update.js` calls the existing
-`app-runtime.js` with the missing ordered definition range before ordinary page setup continues.
+In the tested active-page file-save case, DevTools recompiles and reruns page-side code while retaining the App heap.
+That probe did not establish inactive-page behavior, Page-instance identity for arbitrary JavaScript changes, or the
+final React/Taro composition. The System transaction probe applied pre-embedded updates in the same WeChat heap; it did
+not deliver those definitions through the fixed file. `update.js` is designed to call the existing `app-runtime.js` with
+the missing ordered definition range before ordinary page setup continues. The composition of those two proven pieces
+remains an integration test.
 
 Page rerun guards ensure that repeated native integration code cannot:
 
@@ -943,8 +1071,10 @@ The runtime reports metadata through `wx.request`:
 HTTP never carries executable definitions. The server responds by waiting, requesting a checkpoint, or publishing the
 missing contiguous range into `update.js`.
 
-Only one range is in flight. A missed file event leaves the client on its old revision, so the server republishes the
-same range with changed file content. Duplicate execution is rejected by revision checks.
+Only one bounded range is in flight. A missed file event leaves the client on its old revision, so the server
+republishes the same range with changed file content. Duplicate execution is rejected by revision checks. Atomic write
+and revision validation do not by themselves make an interrupted destructive runtime transaction recoverable; that case
+requests a checkpoint.
 
 ### Checkpoint and bounded log
 
@@ -962,8 +1092,9 @@ The server stores a bounded log, not cumulative overlay snapshots. A long-runnin
 new checkpoint and build ID from current source, resetting the log and `update.js`.
 
 On an App/client restart within the same server epoch, the new runtime starts from the checkpoint and reports revision
-zero. The server republishes retained updates in order. A Vite-server restart creates a new checkpoint; old history is
-not persisted or trusted.
+zero. The server republishes retained updates in order, subject to the startup barrier described above. A Vite-server
+restart creates a new checkpoint; old history is not persisted or trusted. Log bounds must cover revision count,
+retained source bytes, per-batch bytes, and compaction frequency rather than count alone.
 
 ## React Refresh and Taro integration
 
@@ -973,6 +1104,11 @@ transaction owned by the same `app-runtime.js`.
 Vite's React transform runs before Rolldown output and the System transform. The System context supplies the hot metadata
 required by the instrumented module. Accepted boundaries come from Vite/Rolldown HMR analysis rather than filename or
 component-name heuristics.
+
+The plain System transaction and the existing retained-root boundary have been probed separately. Their composition with
+real React Refresh registration, hook-state retention, `import.meta.hot.data`, dispose/prune callbacks, dependency-accept
+callbacks, and inactive routes is not yet proven by the new runtime. Those are release-blocking integration tests, not
+properties inherited automatically from SystemJS.
 
 The update order is:
 
@@ -1004,7 +1140,7 @@ A new checkpoint is required when output outside the hot definition catalog must
 - App or page native shell structure;
 - current app-level WXSS output;
 - imported assets or public files whose native output changes;
-- exact package-size overflow that requires physical replanning;
+- toolchain-reported package overflow that requires physical replanning;
 - update-log compaction;
 - an unrecoverable transaction or protocol error.
 
@@ -1025,6 +1161,11 @@ This avoids a second lazy style-ownership system but means:
 
 Bare probes show that direct page-owned `page.wxss` updates can preserve App and Page identity. Route-partitioned CSS can
 use that boundary in a later design, but it is not part of this module architecture.
+
+Imported images, JSON-derived assets, WASM, workers, and public files are not solved by the JavaScript SCC planner.
+Sibling subpackages also have resource-reference restrictions. The first implementation must hoist such shared/lazy
+assets to main when legal, preserve Vite's existing native emission, or fail with an ownership diagnostic. Asset-aware
+subpackage placement is a separate extension and its bytes can make main overflow even when the JavaScript plan fits.
 
 ## H5 isolation
 
@@ -1059,11 +1200,12 @@ The build fails with actionable diagnostics for:
 
 ### Runtime package failures
 
-A rejected package Promise is removed from the cache and may be retried. The error includes package ID, package root,
-requested module ID, and original `require.async()` failure when available.
+A rejected package Promise is removed from the cache and its transport may be retried. The error includes package ID,
+package root, requested module ID, and original `require.async()` failure when available.
 
-A resolver that does not expose the requested canonical ID is a checkpoint corruption error rather than a normal
-network retry.
+A complete retry of the same logical import must also remove the failed System load record created by the rejected
+`instantiate()` path. Package-cache eviction alone is insufficient. A resolver that does not expose the requested
+canonical ID is a checkpoint corruption error rather than a normal network retry.
 
 ### Runtime update failures
 
@@ -1083,13 +1225,14 @@ runs on changed output units rather than the entire source tree when the increme
 
 ### Package loading
 
-Static package closure prefetch starts independent downloads concurrently. In-flight Promise caching deduplicates
-sibling imports and overlapping closures.
+Static package closure prefetch invokes independent package loads concurrently. In-flight Promise caching deduplicates
+sibling imports and overlapping closures. Actual network scheduling and parallelism remain controlled by WeChat.
 
 ### Evaluation
 
 System executes only definitions needed by the requested logical graph. Downloading a package containing several lazy
-features does not execute every feature definition.
+features does not execute every application definition, although WeChat may still parse, compile, or account for all
+files in the physical package.
 
 ### HMR
 
@@ -1105,8 +1248,9 @@ The runtime retains:
 - one Promise/resolver per successfully loaded physical package;
 - hot-context data required by active modules.
 
-It does not retain every historical definition generation or a second Rolldown namespace graph. The server, not the
-client, owns bounded revision history.
+It does not deliberately retain every historical definition generation or a second Rolldown namespace graph. User code
+or hot callbacks can still retain an old namespace or closure, especially from a previous dynamic-import result; normal
+JavaScript reachability rules apply. The server, not the client, owns bounded revision history.
 
 ## Security and compliance
 
@@ -1122,7 +1266,9 @@ The architecture forbids:
 - treating downloaded text as a registration.
 
 `require.async()` addresses only files included in the generated Mini Program project through literal dispatcher cases.
-Canonical IDs cannot be converted into arbitrary filesystem paths at runtime.
+Canonical IDs cannot be converted into arbitrary filesystem paths at runtime. The development control endpoint must be
+loopback-scoped or session-authenticated, validate build/session tokens, and never allow an unauthenticated request to
+choose a project path or arbitrary `update.js` contents.
 
 ## Ownership boundaries
 
@@ -1136,7 +1282,7 @@ The Node/Vite process owns:
 - System registration generation;
 - current definition hashing and topology;
 - automatic physical planning;
-- exact package measurement and repair;
+- deterministic emitted-file measurement, effective-limit validation, and bounded repair;
 - checkpoint emission;
 - incremental boundary extraction;
 - the ordered update journal;
@@ -1222,7 +1368,8 @@ The new mechanism should replace overlapping old code rather than run as a compa
 A safe implementation sequence is:
 
 1. Add canonical definition generation and pinned compiler characterizations.
-2. Add the SCC package planner, exact emitter, manifest, resolvers, and literal dispatcher.
+2. Add the SCC package planner, deterministic emitter, toolchain validation, manifest, resolvers, and literal
+   dispatcher.
 3. Introduce the embedded System core and `app-runtime.js` as the sole application loader.
 4. Move initial WX application modules from the broad CommonJS application graph to System definitions while retaining
    native CommonJS shells.
@@ -1268,7 +1415,7 @@ Cover:
 - ten-thousand-module deep graphs;
 - more than one hundred dynamic boundaries;
 - fitting and oversized SCCs;
-- final emitted-size repair.
+- final emitted-size repair against effective compiler limits.
 
 ### Runtime characterizations
 
@@ -1280,12 +1427,14 @@ Cover:
 - nested dynamic imports;
 - concurrent imports;
 - namespace identity;
-- package retry;
+- package-transport retry and failed-System-load cleanup;
 - mutable bindings;
 - CommonJS and TLA;
 - unloaded hot definitions;
 - static and dynamic topology updates;
+- exact accepted-edge behavior, including self-acceptance and dependency-specific acceptance;
 - ordered revision rejection;
+- update/import serialization;
 - stale setter removal;
 - stable accepted roots;
 - one System instance.
@@ -1301,30 +1450,34 @@ Validate:
 - App/Page identity retention;
 - React Refresh and hook-state retention;
 - active and inactive configured pages;
-- package retry and `wx.onLazyLoadError` diagnostics;
+- end-to-end `System.import()` retry and `wx.onLazyLoadError` diagnostics;
 - checkpoint replay after App restart.
 
 ### Release validation
 
 Before declaring support complete, validate preview, upload, and real devices across supported iOS and Android base
-libraries, plus WebView rendering. Skyline production loading remains in scope, but Skyline HMR remains constrained by
-DevTools support.
+libraries, plus WebView rendering. No Skyline support claim should be made until production package loading is validated
+there; native Skyline HMR remains outside this milestone.
 
 ## Remaining implementation questions
 
 The probes close the core semantic questions, but these integration details still need final implementation decisions:
 
-- the cleanest Vite/Rolldown incremental API for changed normalized ESM units and accepted-boundary metadata;
+- the cleanest Vite/Rolldown incremental API for changed normalized ESM units and accepted-edge metadata;
+- canonical mapping from Rolldown/Vite HMR source IDs to definition IDs;
 - the exact generated registration-file representation;
-- the bounded exact-size repair loop and compiler rechunk request;
-- the pending-top-level-await update timeout policy;
-- checkpoint synchronization before rendering after an App/client restart;
-- route-level fallback when React Refresh invalidates a family;
-- source-map ownership across Rolldown output, System transform, and generated registration files;
-- final runtime/core minification and licensing notices;
+- effective package-limit discovery, emitted-size accounting, bounded repair, and compiler rechunk requests;
+- ownership of images, JSON-derived assets, WASM, workers, public files, and source maps;
+- failed-System-load cleanup for end-to-end package retry;
+- update/import serialization and the pending-top-level-await update timeout policy;
+- bounded `update.js` batch size and checkpoint synchronization before rendering after an App/client restart;
+- native-host singleton ownership for React, Taro runtime, and renderer modules;
+- real React Refresh hot-data/dispose/accept behavior and route-level fallback when a family invalidates;
+- final runtime/core minification, upstream SystemJS patch maintenance, and licensing notices;
 - preview, upload, and real-device behavior for JavaScript-only package bins.
 
-These questions affect implementation quality and recovery policy, not the selected one-graph architecture.
+These are implementation and release gates. They do not reopen the selected one-graph model, but the feature must not
+be advertised as complete until they are resolved or explicitly scoped out.
 
 ## Final architecture
 
@@ -1353,6 +1506,7 @@ checkpoint revision 0
 ```
 
 Native CommonJS remains the synchronous platform host. System registrations are the one application-module format.
-Vite and Rolldown remain the one compiler and optimizer. The package planner controls download placement without
-becoming another bundler. The runtime links packages without native cross-package `require()`, and HMR replaces only the
-affected loaded subgraph while retaining accepted roots.
+Vite and Rolldown remain the sole resolver, bundler, tree shaker, and production optimizer; Babel performs the pinned
+System format lowering. The package planner controls download placement without becoming another bundler. The runtime
+links packages without native cross-package `require()`, and HMR replaces only the affected loaded subgraph while
+retaining accepted roots.
