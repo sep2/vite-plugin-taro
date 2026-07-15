@@ -68,8 +68,11 @@ control and acknowledgement channel, not a code-evaluation channel.
 
 ### Application dependencies
 
-The application owns React. The plugin does not pin or enforce a specific React release, but its supported baseline is React 19 or
-newer.
+React ownership is a closed architectural decision: the application installs and owns `react` as a direct dependency. The plugin never
+bundles, vendors, aliases to a private copy, or provides a fallback React implementation. Its supported baseline is React 19 or newer,
+without pinning an exact application release. React and its subpaths otherwise use normal Vite resolution; the plugin adds no React
+identity, deduplication, or duplicate-instance validation. The application does not need to install Taro's renderer or
+`react-reconciler`.
 
 The plugin owns and ships:
 
@@ -1371,6 +1374,8 @@ The implementation enforces these invariants with build-time assertions and runt
 34. Application dependency resolution never consumes a user-installed `@tarojs/*` package.
 35. App and Page facades delegate to the exact configuration objects returned by bundled Taro `createReactApp()` and
     `createPageConfig()`; no second framework controller or lifecycle dispatcher exists.
+36. React is always an application-installed dependency, the plugin never ships a private React implementation, and React resolution
+    receives no plugin-specific identity or deduplication policy.
 
 ## Validation plan
 
@@ -1383,7 +1388,8 @@ The implementation enforces these invariants with build-time assertions and runt
 - browser `/@vite/client`, module-preload code, and WebSocket execution are absent;
 - the custom HotChannel receives Vite propagation results and emits metadata rather than executable source;
 - production builds only `builder.environments.wx`;
-- development and production both resolve user source through the same environment-aware plugin pipeline.
+- development and production both resolve user source through the same environment-aware plugin pipeline;
+- the plugin distribution contains no private React implementation or React-specific deduplication behavior.
 
 ### System loader tests
 
@@ -1582,6 +1588,6 @@ The architecture has five owners:
 5. **The development HMR runtime** follows Vite boundary propagation, delivers fresh namespaces to accept callbacks, then performs React
    Refresh without reconnecting old ESM importers.
 
-Tailwind, the complete Taro implementation, and React build integration are bundled and plugin-owned. React itself remains
-application-owned. Package boundaries never restrict source imports, production CSS is one `app.wxss`, and stable development IDs keep
+Tailwind, the complete Taro implementation, and React build integration are bundled and plugin-owned. React itself is always installed
+and owned by the application; this ownership boundary is closed and is not a future configuration choice. Package boundaries never restrict source imports, production CSS is one `app.wxss`, and stable development IDs keep
 HMR contexts and React Refresh family identities coherent across updates.
