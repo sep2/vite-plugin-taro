@@ -58,8 +58,8 @@ contract.
 6. The plugin owns framework and style integration so applications install no Taro or Tailwind packages.
 7. Development HMR follows Vite's acceptance-boundary model while retaining Vite's stable module IDs.
 8. Fresh namespaces are delivered to qualified HMR accept callbacks; existing ESM importers are not automatically reconnected.
-9. Circular or otherwise unsafe updates trigger a plugin-owned hard refresh rather than approximating hot replacement or leaving a
-   partially mutated runtime alive.
+9. Circular or otherwise unsafe updates stop plugin HMR and request a DevTools-owned hard refresh rather than
+   attempting to repair or approximate replacement inside the retained heap.
 10. Production output is optimized for delivery; development output is optimized for module identity and HMR.
 
 ## Platform constraints
@@ -649,7 +649,8 @@ Generated lazy packages use deterministic names and contain JavaScript capsules 
 }
 ```
 
-Code-only packages with empty page lists are a tested platform assumption.
+Code-only packages with empty page lists are a validated platform capability and part of the required WX baseline. An
+executable DevTools regression probe continuously verifies that capability.
 
 ### Placement goals
 
@@ -1233,7 +1234,7 @@ accept callbacks; it is not pushed automatically through old ESM setters.
 
 Before importing any accepted module, the runtime deletes the union of its loaded `reloadModuleIds`. A replacement is unsafe if deletion
 fails because a module is still executing, participates in unresolved top-level await, or is in another unsupported loader state. The
-runtime reports the failure without acknowledging the delivery, and the server performs a hard refresh.
+runtime reports the failure without acknowledging the delivery, and the server requests a DevTools hard refresh.
 
 ### React Refresh ordering
 
@@ -1258,8 +1259,8 @@ capture old qualified accept callbacks
 ```
 
 An incompatible React boundary calls `hot.invalidate()`. The server then propagates from that boundary to a higher accepting importer; if
-none exists, it performs a hard refresh. Existing importers are not automatically exposed to the fresh exports while this decision is
-made.
+none exists, it requests a DevTools hard refresh. Existing importers are not automatically exposed to the fresh exports
+while this decision is made.
 
 React Refresh remains the sole owner of component-family replacement, Fiber updates, and state preservation. The plugin owns its wrapper
 and scheduler, so `performReactRefresh()` is released only after every callback in the current delivery has completed successfully or its
@@ -1317,8 +1318,8 @@ Invoke each captured qualified callback with the corresponding fresh namespace. 
 `hot.invalidate()` to request propagation to a higher boundary.
 
 A linking, execution, dispose, or callback exception after deletion marks the batch irrecoverably failed. The runtime reports the failed
-phase without acknowledging the batch, and the server performs a hard refresh. The runtime never reports a partially applied batch as
-healthy.
+phase without acknowledging the batch, and the server requests a DevTools hard refresh. The runtime never reports a
+partially applied batch as healthy.
 
 #### 6. Refresh and acknowledge
 
@@ -1353,8 +1354,8 @@ subpackage declarations are not rewritten during the live session. The next cold
 Ordinary module loading always uses full SystemJS cycle semantics, including cycles that cross generated native packages.
 
 HMR deliberately follows Vite's stricter rule. If an accepting boundary is inside a circular import chain, the server stops plugin HMR
-before deleting any live System module and performs a hard refresh. The initial implementation does not attempt to reconstruct cycle
-execution order inside a retained application heap.
+before deleting any live System module and requests a DevTools hard refresh. The initial implementation does not
+attempt to reconstruct cycle execution order inside a retained application heap.
 
 ### Future: importer-aware live-binding reconnection
 
@@ -1484,9 +1485,10 @@ hard-refreshes into the new materialization.
 Delivery state is bounded for the active session. Exceeding the bound performs a hard refresh and starts a new build and runtime session;
 it never replays an accumulated history into another heap.
 
-## Plugin-owned hard refresh
+## DevTools-owned hard refresh
 
-A hard refresh is the single recovery path whenever a change cannot be represented safely as state-preserving HMR. It is triggered when:
+A hard-refresh request is the single recovery path whenever a change cannot be represented safely as state-preserving
+HMR. The plugin stops HMR and publishes a complete materialization intended for DevTools reload when:
 
 - Vite or the framework finds no acceptable HMR boundary;
 - propagation encounters an accepting boundary inside a circular import chain;
@@ -1502,22 +1504,27 @@ A hard refresh is the single recovery path whenever a change cannot be represent
 - the development server restarts;
 - active-session delivery state is exhausted.
 
-For a server-detected boundary, the registry is not mutated. For a runtime failure after mutation, the runtime reports the failed phase
-without acknowledging the delivery. The server then:
+For a server-detected boundary, the registry has not been mutated. For a runtime failure after mutation, the runtime
+reports the failed phase without acknowledging the delivery. These facts terminate plugin HMR for that heap but
+create no ordered teardown or runtime-state protocol.
 
-1. discards the active session and every pending delivery or on-demand token;
-2. builds a complete current Mini Program materialization under a new build ID without modifying the last runnable output if compilation
-   fails;
-3. publishes the complete generated project, including the new build ID in watched native bootstrap code;
-4. lets WeChat DevTools perform its normal full compilation and runtime restart;
-5. accepts hard-refresh completion only from a fresh session reporting the new build ID.
+The server transactionally builds a complete current Mini Program materialization under a new build ID. A failed build
+publishes nothing and leaves the last runnable generated project unchanged. A successful build publishes the complete
+project, including the new build ID in watched native bootstrap code. Publication does not sequence active-session
+disposal, DevTools compilation, or process restart. The server makes no state guarantee about the old heap after
+requesting the refresh.
+
+WeChat DevTools alone decides when to compile and reload the App. Once the reload occurs, the App starts with a
+fresh heap and session; the normal new-session handshake supersedes all old deliveries, acknowledgements, pending
+instantiations, callbacks, and `hot.data`. Hard-refresh completion is observed only when that fresh session reports
+the published build ID.
 
 CSS changes use WeChat's WXSS hot replacement whenever possible. If global replacement is unreliable, the complete stylesheet is emitted
 into every page WXSS during development rather than forcing every style edit through JavaScript HMR.
 
-Hard refresh does not use `wx.reLaunch()`, restore the route or Page stack, preserve application state, or replay HMR data. The plugin owns
-the decision and complete-file rematerialization; WeChat DevTools owns compilation and process restart. No DevTools CLI automation is
-required.
+Hard refresh does not use `wx.reLaunch()`, restore the route or Page stack, preserve application state, or replay
+HMR data. The plugin only classifies the update as unsafe and publishes a complete replacement project. WeChat
+DevTools owns the reload decision, compilation, and process restart. No DevTools CLI automation is required.
 
 ## Error handling and diagnostics
 
@@ -1547,7 +1554,7 @@ A transform failure before publication does not overwrite the last successful `u
 on its previous applied code.
 
 Once registry deletion begins, any unrecoverable failure terminates plugin HMR for that batch. The runtime never pretends that a partially
-applied Vite HMR batch is healthy; it reports the failure so the server can perform a hard refresh.
+applied Vite HMR batch is healthy; it reports the failure so the server can request a DevTools hard refresh.
 
 ## Hard invariants
 
@@ -1771,14 +1778,21 @@ The implementation enforces these invariants with build-time assertions and runt
 - server restart creates a new build ID and hard-refreshes into a complete materialization;
 - pending imports survive page entry reruns within one runtime session;
 - bounded active-session delivery state triggers a hard refresh;
-- hard refresh publishes one complete materialization and completes only when a fresh session reports its new build ID;
-- a hard-refresh compilation failure leaves the last runnable project and runtime untouched.
+- a successful hard-refresh materialization is published atomically with its new build ID;
+- publication imposes no ordering or state transition on the current runtime;
+- DevTools reload starts a fresh heap and session without restoring any previous runtime state;
+- hard-refresh completion is observed only when the fresh session reports the published build ID;
+- a failed hard-refresh materialization leaves the last runnable generated project unchanged and makes no runtime-state
+  guarantee.
 
 ### WeChat DevTools probes
 
+The validated code-only package capability remains covered by an executable regression probe:
+
+- code-only subpackages with `pages: []`.
+
 These behaviors remain executable integration probes rather than assumptions:
 
-- code-only subpackages with `pages: []`;
 - literal asynchronous loading in every main/subpackage direction;
 - cross-subpackage SystemJS cycles;
 - direct `page.js` to `update.js` dependency preserving the App heap;
