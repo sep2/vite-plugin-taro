@@ -284,8 +284,6 @@ JavaScript HMR 会保留：
 在 DevTools 层面，直接保存 `page.wxss` 也会保留 App 和页面侧 identity，而保存 `app.wxss` 会替换它们。
 当前插件仍然通过 `app.wxss` 输出收集到的应用样式，因此源码 CSS 修改暂时不具备页面级状态保留保证。
 
-关于 JavaScript 与 WXSS 边界的裸微信 DevTools 实验记录见 `draft/hmr-probe-result.md`。
-
 ## Skyline 渲染
 
 项目完整支持微信 Skyline 渲染模式，但微信开发者工具本身目前不支持 Skyline 模式热更新。这是微信开发者

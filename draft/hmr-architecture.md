@@ -293,9 +293,6 @@ At the DevTools level, a direct `page.wxss` save also preserves the App and page
 save replaces them. The current plugin still emits collected application styles through `app.wxss`, so source CSS edits
 do not yet receive the page-level preservation guarantee.
 
-The bare DevTools observations establishing the JavaScript and WXSS boundaries are recorded in
-`draft/hmr-probe-result.md`.
-
 ## Skyline rendering
 
 The project fully supports WeChat Skyline rendering, but WeChat DevTools itself does not currently support hot reload in
