@@ -113,6 +113,18 @@ export default function HomePage() {
 The virtual modules resolve to normal application modules inside the SystemJS graph. They do not bypass SystemJS and do not create a
 second runtime namespace.
 
+### Vite development HMR API
+
+Development modules receive the standard Vite `import.meta.hot` API. It is available to application code and third-party Vite plugin
+transforms, not only to the plugin's React Refresh wrapper.
+
+The runtime supports Vite-compatible self acceptance, dependency acceptance, accepted exports, `dispose`, `prune`, `invalidate`, persistent
+`data`, and custom `on`, `off`, and `send` events. Accepted dependency strings are normalized to the same stable canonical IDs used by
+SystemJS and the Vite development graph.
+
+Custom HMR events use the development control protocol as metadata; they never carry executable JavaScript. In production,
+`import.meta.hot` is absent and guarded HMR branches are tree-shaken normally.
+
 ### App and Page modules
 
 The App and every Page default-export a React component:
@@ -483,10 +495,12 @@ Code-only packages with empty page lists are a tested platform assumption.
 
 ### Placement goals
 
-Correctness does not depend on a particular lazy-package grouping because all cross-package edges are supported. The planner optimizes
-for:
+Correctness does not depend on a particular lazy-package grouping because all cross-package edges are supported. A dynamic import is an
+execution boundary, not a promise of one native download unit.
 
-- package-count limits;
+The planner minimizes generated package count first. It may coalesce unrelated dynamic roots into one code-only subpackage and splits them
+only when native package-size limits require it. Within the minimum feasible package count, it optimizes for:
+
 - main, per-package, and total size limits;
 - co-locating a dynamic root with its private static closure;
 - minimizing downloads for one dynamic boundary;
@@ -573,7 +587,7 @@ interface SystemRegisterPostprocessor {
 }
 ```
 
-The initial implementation can use Babel's SystemJS module transform, followed by a small AST pass that:
+The initial implementation uses Babel's SystemJS module transform, followed by a small AST pass that:
 
 - extracts the registration rather than executing global `System.register()`;
 - normalizes canonical dependency IDs;
@@ -726,6 +740,23 @@ Lifecycle events that arrive before activation are journaled in native arrival o
 
 If `onUnload` arrives before activation completes, the session is cancelled. The module can finish loading and remain cached, but the
 cancelled session never mounts, replays lifecycle events, or retains the native Page instance.
+
+### Activation failures
+
+Build, transform, and registration-generation errors are rejected before materialization and never overwrite the last runnable Mini
+Program. A successfully emitted capsule can still fail at runtime because native asynchronous loading fails, module execution or top-level
+await rejects, or an App/Page `activate()` implementation throws.
+
+The native `App()` or `Page()` registration has already completed when such a rejection occurs. The facade therefore:
+
+1. marks the App activation or Page session as `failed`;
+2. clears queued lifecycle work and prevents a later mount;
+3. rejects dependent Page activations when the App controller failed;
+4. logs one enriched error with the module chain, activation phase, and source-mapped location;
+5. rethrows the enriched error asynchronously so WeChat DevTools receives it through its normal error handling.
+
+The plugin does not render a custom runtime error overlay and does not retry native registration inside the failed runtime. Subsequent
+editing, compilation, and reload behavior belongs to WeChat DevTools.
 
 ## Lifecycle and event behavior
 
@@ -1108,6 +1139,9 @@ A complete native rebuild and App reload occurs when:
 CSS changes use WeChat's WXSS hot replacement whenever possible. If global replacement is unreliable, the complete stylesheet is emitted
 into every page WXSS during development rather than forcing every style edit through JavaScript HMR.
 
+After requesting a complete native reload, the plugin does not snapshot or restore the active route, query, Page stack, or application
+state. WeChat DevTools owns compilation, reload, and post-reload navigation behavior.
+
 ## Error handling and diagnostics
 
 A module-load error reports:
@@ -1119,6 +1153,9 @@ A module-load error reports:
 - build, session, and delivery IDs;
 - the SystemJS dependency chain;
 - the original source location through chained source maps.
+
+An initial activation error uses the same module-load diagnostics and additionally identifies the App or Page facade, activation phase,
+and affected Page session. It is logged once before being rethrown asynchronously.
 
 An HMR error additionally reports:
 
@@ -1162,11 +1199,12 @@ The implementation enforces these invariants with build-time assertions and runt
 21. Every initial System module ID has exactly one literal native capsule mapping.
 22. Cross-package edges never change logical module identity.
 23. Page entry reruns cannot recreate the App root or duplicate native route registration.
-24. A cancelled pre-activation Page session can never mount later.
-25. Production emits all Tailwind and ordinary CSS into one `app.wxss`.
-26. Tailwind and class rewriting are owned by the plugin's `weapp-tailwindcss` pipeline.
-27. Unsupported synchronous-return hooks are not silently approximated.
-28. The development protocol has one active runtime session.
+24. A cancelled or failed pre-activation Page session can never mount later.
+25. Runtime activation failures are surfaced through WeChat DevTools without a plugin-owned overlay.
+26. Production emits all Tailwind and ordinary CSS into one `app.wxss`.
+27. Tailwind and class rewriting are owned by the plugin's `weapp-tailwindcss` pipeline.
+28. Unsupported synchronous-return hooks are not silently approximated.
+29. The development protocol has one active runtime session.
 
 ## Validation plan
 
@@ -1191,6 +1229,9 @@ The implementation enforces these invariants with build-time assertions and runt
 - importers outside the invalidated region keep their original bindings;
 - self-accept callbacks receive the fresh self namespace;
 - dependency-accept callbacks receive only the fresh accepted dependency;
+- accepted-export boundaries follow Vite propagation rules;
+- application and third-party modules receive the complete Vite `import.meta.hot` context;
+- custom HMR events round-trip through the metadata control protocol;
 - dispose runs before deletion;
 - fresh execution registers React component types before the old accept callback runs;
 - a valid React boundary refreshes while retaining component state;
@@ -1230,6 +1271,9 @@ The implementation enforces these invariants with build-time assertions and runt
 - hidden pages remain mounted;
 - unload unmounts exactly once;
 - unload-before-activation cancels without replay or mount;
+- App activation failure rejects waiting Page sessions and prevents their mount;
+- Page activation failure enters `failed`, clears queued lifecycle work, and never mounts;
+- activation errors are enriched, logged once, and rethrown asynchronously without a plugin overlay;
 - repeated page entry execution is idempotent;
 - unsupported synchronous-return hooks are absent.
 
