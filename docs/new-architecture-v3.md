@@ -26,6 +26,7 @@ The initial implementation supports:
 - JavaScript HMR and React Refresh in WeChat DevTools;
 - stable development module IDs with Vite-compatible acceptance-boundary HMR;
 - one foundational SystemJS bootstrap barrier before any App, Page, or user module executes;
+- a deterministic ES2018 JavaScript target lowered by the Vite 8 Rolldown/Oxc toolchain;
 - Vite 8's Rolldown dependency optimizer for development dependencies and CommonJS interoperability.
 
 The initial implementation does not support:
@@ -707,6 +708,42 @@ Development and production share Vite's normal source semantics:
 - user Vite plugin transforms.
 
 The architecture does not introduce a second source resolver.
+
+### ES2018 JavaScript target
+
+Every executable JavaScript artifact targets ES2018. The dedicated `wx` environment configures the Vite 8 Rolldown/Oxc toolchain
+consistently across all compilation paths:
+
+```ts
+{
+    oxc: {
+        target: 'es2018'
+    },
+    build: {
+        target: 'es2018'
+    },
+    optimizeDeps: {
+        rolldownOptions: {
+            transform: {
+                target: 'es2018'
+            }
+        }
+    }
+}
+```
+
+`oxc.target` lowers development source modules, `build.target` lowers production Rolldown chunks, and the optimizer transform target
+lowers development dependency chunks. The System-register postprocessor runs after syntax lowering and performs only the module-format
+conversion; it does not establish a second language target.
+
+The same target applies to generated SystemJS runtime code, native bootstrap and facade files, `update.js`, React Refresh wrappers, and
+plugin-owned Taro runtime modules. Generated native files are either emitted through the same lowering stage or restricted and validated
+to ES2018 syntax.
+
+The generated WeChat project configuration disables DevTools' JavaScript-to-ES5 compilation. Development, preview, and production
+therefore execute plugin-generated ES2018 semantics rather than relying on a user or DevTools transpilation setting. The plugin does not
+inject general language polyfills; ES2018 runtime capabilities are part of the target baseline. `tsconfig.json`'s `target` does not
+override this architecture target.
 
 ### Production JavaScript
 
@@ -1471,6 +1508,8 @@ The implementation enforces these invariants with build-time assertions and runt
     optimizer rerun creates a new build ID and rematerialized files for WeChat DevTools to handle automatically.
 40. One shared foundational SystemJS import completes Taro runtime, WeChat platform, React framework, API, and development-HMR setup in
     order before any App, Page, or user module executes.
+41. Rolldown/Oxc lowers development source, optimized dependencies, production chunks, and generated runtime code to ES2018; DevTools
+    JavaScript-to-ES5 compilation is disabled.
 
 ## Validation plan
 
@@ -1484,6 +1523,9 @@ The implementation enforces these invariants with build-time assertions and runt
 - the custom HotChannel receives Vite propagation results and emits metadata rather than executable source;
 - production builds only `builder.environments.wx`;
 - development and production both resolve user source through the same environment-aware plugin pipeline;
+- development source, optimized dependencies, production chunks, and generated runtime files contain no syntax above ES2018;
+- the System-register pass changes module format without changing the established ES2018 target;
+- generated project configuration disables DevTools JavaScript-to-ES5 compilation;
 - the WX environment explicitly enables the Rolldown dependency optimizer with the generated App and Page discovery entries;
 - CommonJS npm dependencies execute from optimized System registrations;
 - optimized physical cache hashes do not enter canonical runtime IDs;
@@ -1674,6 +1716,10 @@ The architecture relies on these documented or source-verified behaviors:
   <https://github.com/vitejs/vite/blob/b59a73f76f5557492d83d097bb33b3dd02f27d51/docs/guide/dep-pre-bundling.md#L1-L60>
 - Vite 8's Rolldown dependency optimizer:
   <https://github.com/vitejs/vite/blob/b59a73f76f5557492d83d097bb33b3dd02f27d51/docs/guide/migration.md#L35-L62>
+- Vite's Oxc development target and build-target precedence:
+  <https://github.com/vitejs/vite/blob/b59a73f76f5557492d83d097bb33b3dd02f27d51/docs/guide/features.md#L81-L95>
+- Vite's Oxc-powered production target:
+  <https://github.com/vitejs/vite/blob/b59a73f76f5557492d83d097bb33b3dd02f27d51/docs/config/build-options.md#L3-L18>
 - Rolldown's current output formats:
   <https://github.com/rolldown/rolldown/blob/111132357228f06c208af96f6f1f3c164104bdf3/packages/rolldown/src/options/output-options.ts#L53-L55>
 - Taro's WeChat runtime host-config and component merge:
