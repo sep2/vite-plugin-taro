@@ -32,25 +32,34 @@ The initial implementation supports:
 The initial implementation does not support:
 
 - independent subpackages;
-- user-authored native `Component()` entry modules;
+- user-authored native `Component()` entry modules or dedicated integration for application-supplied or third-party native custom
+  components;
+- WeChat Worker entry points;
+- WeChat Mini Program plugins;
 - native callbacks whose return value affects WeChat behavior, including all share, favorite, and exit-state callbacks; this is a
   closed design exclusion;
 - remote JavaScript evaluation;
 - compatibility with user-installed `@tarojs/*` packages;
 - user-controlled chunk or native subpackage placement.
 
+Except where this document defines a closed exclusion or a hard invariant, an unsupported platform feature is simply outside the
+plugin's initial integration surface. The plugin adds no feature-specific detection, rejection, or compatibility layer for native custom
+components, Workers, or Mini Program plugins. Ordinary Vite, Taro, or WeChat behavior that happens to pass through is not a support
+contract.
+
 ## Design principles
 
 1. Native package boundaries are delivery boundaries, never source-level module boundaries.
 2. Native registration is synchronous; application activation is asynchronous.
-3. SystemJS owns application module identity, linking, execution, live bindings, and cycles.
+3. Vite owns application module IDs and the build graph; SystemJS uses those IDs unchanged and owns runtime linking, execution, live
+   bindings, and cycles.
 4. Every native code-loading path is generated as an AST string literal.
 5. Application modules never call native `require()`.
 6. The plugin owns framework and style integration so applications install no Taro or Tailwind packages.
-7. Development HMR follows Vite's acceptance-boundary model while retaining stable System module IDs.
+7. Development HMR follows Vite's acceptance-boundary model while retaining Vite's stable module IDs.
 8. Fresh namespaces are delivered to qualified HMR accept callbacks; existing ESM importers are not automatically reconnected.
-9. Circular or otherwise unsafe updates leave the plugin's HMR path and rely on WeChat DevTools' automatic reload behavior rather than
-   approximating hot replacement.
+9. Circular or otherwise unsafe updates trigger a plugin-owned hard refresh rather than approximating hot replacement or leaving a
+   partially mutated runtime alive.
 10. Production output is optimized for delivery; development output is optimized for module identity and HMR.
 
 ## Platform constraints
@@ -129,8 +138,8 @@ Development modules receive the standard Vite `import.meta.hot` API. It is avail
 transforms, not only to the plugin's React Refresh wrapper.
 
 The runtime supports Vite-compatible self acceptance, dependency acceptance, accepted exports, `dispose`, `prune`, `invalidate`, persistent
-`data`, and custom `on`, `off`, and `send` events. Accepted dependency strings are normalized to the same stable canonical IDs used by
-SystemJS and the Vite development graph.
+`data`, and custom `on`, `off`, and `send` events. Accepted dependency strings are resolved by Vite, and SystemJS uses the resulting
+stable Vite module IDs unchanged.
 
 Custom HMR events use the development control protocol as metadata; they never carry executable JavaScript. In production,
 `import.meta.hot` is absent and guarded HMR branches are tree-shaken normally.
@@ -156,7 +165,8 @@ export default function HomePage() {
 ```
 
 There are no user-facing `defineApp()`, `definePage()`, package declarations, lifecycle declarations, native bootstrap calls, or manual
-chunk declarations.
+chunk declarations. The plugin adds no separate native-instance extension API and does not restrict or validate other App/Page fields and
+methods that ordinary Taro or WeChat behavior exposes.
 
 ### Vite configuration
 
@@ -169,6 +179,13 @@ import { vitePluginTaro } from 'vite-plugin-taro';
 export default defineConfig({
     plugins: [
         vitePluginTaro({
+            project: {
+                appid: 'wx0000000000000000',
+                projectname: 'example'
+            },
+            sitemap: {
+                rules: []
+            },
             app: {
                 entry: 'src/app.tsx',
                 config: {
@@ -201,7 +218,17 @@ export default defineConfig({
 The page array order determines `app.json.pages` order and therefore the default home page. The plugin owns the generated `pages` and
 `subPackages` fields. User configuration cannot override those fields.
 
-Changes to native App/Page configuration trigger a complete native rebuild.
+`project`, optional `projectPrivate`, and `sitemap` are the sole inputs for `project.config.json`,
+`project.private.config.json`, and `sitemap.json`. The plugin does not discover source JSON files or merge generated configuration with
+user-owned project files. All native project, App, and Page configuration comes from `vite.config.ts`.
+
+Changes to native project, App, or Page configuration trigger a complete native rebuild.
+
+### Vite assets
+
+The target retains Vite's normal asset model. JavaScript and CSS imports use Vite's asset graph, while native configuration can refer to
+files copied from Vite's `publicDir`. The plugin adds no parallel static-asset API, reserved-path layer, or collision checker. Public files
+follow Vite's normal copy behavior and remain in the main package initially.
 
 ## Tailwind and CSS
 
@@ -266,8 +293,8 @@ any dynamic component renders.
 
 ### Development CSS
 
-The preferred development mode also regenerates one `app.wxss`. A CSS-only change must not enter a JavaScript HMR delivery and must not
-emit a JavaScript full-reload payload.
+The preferred development mode also regenerates one `app.wxss`. A CSS-only change must not enter a JavaScript HMR delivery or request a
+hard refresh.
 
 When a TSX edit changes both executable code and Tailwind candidates, the update order is:
 
@@ -335,7 +362,7 @@ For each complete WX bundle, the companion-asset stage emits:
 - `utils.wxs` from `templateBuilder.buildXScript()`;
 - `comp.wxml` from `templateBuilder.buildBaseComponentTemplate('.wxml')`;
 - `comp.json` with `component: true`, `styleIsolation: 'apply-shared'`, and a recursive self-reference to `comp`;
-- `project.config.json`, optional `project.private.config.json`, and `sitemap.json`;
+- `project.config.json`, optional `project.private.config.json`, and `sitemap.json` from the corresponding Vite configuration values;
 - one page WXML built with `templateBuilder.buildPageTemplate()` and a relative import of root `base.wxml`;
 - one page JSON that installs the root `comp` component alongside the page's native configuration;
 - one empty page WXSS, except when the documented development CSS fallback is active.
@@ -353,8 +380,8 @@ generated template contains every Taro host component reachable through either a
 blindly emitting the entire component surface.
 
 If an HMR graph edit introduces a host component that is absent from the live `base.wxml`, the change crosses a native-template boundary
-and leaves the JavaScript HMR path. The regenerated native files are left to WeChat DevTools' automatic compilation and reload behavior;
-JavaScript HMR never pretends that an unavailable native template became usable dynamically.
+and triggers a hard refresh with regenerated native files. JavaScript HMR never pretends that an unavailable native template became
+usable dynamically.
 
 ## Architectural layers
 
@@ -411,10 +438,11 @@ A single realm is required for:
 
 ### Foundational startup barrier
 
-The native bootstrap creates the SystemJS instance and immediately starts exactly one foundational import:
+The native bootstrap creates the SystemJS instance and immediately starts exactly one foundational import. The facade generator writes
+the exact Vite-provided foundation entry ID into the bootstrap:
 
 ```ts
-const foundationReady = System.import('wx:/runtime/foundation.js');
+const foundationReady = System.import('<Vite foundation entry ID>');
 ```
 
 This promise is shared by the App facade and every Page facade. App and Page delegate imports are chained after it; they are never started
@@ -441,41 +469,37 @@ The ordering is semantic, not cosmetic:
 4. Taro API initialization observes those installed hooks and binds the WeChat APIs.
 5. Development-only HMR and React Refresh foundations become available.
 
+In development, the final HMR foundation stage also performs the startup session handshake. The shared `foundationReady` barrier does not
+resolve until the server accepts the new runtime's session ID and build ID. If the physical materialization is stale, the server requests
+a hard refresh and the barrier remains pending, so no App, Page, or user module executes from the stale snapshot. A fresh runtime never
+catches up by replaying HMR deliveries.
+
 The foundation and its complete static closure are eager, main-package-owned, and instantiated through SystemJS like all application
 runtime code. They never use native `require()` directly. The module is an explicit production Rolldown entry and an explicit WX
 development dependency-discovery entry, preventing tree shaking or accidental placement behind a dynamic boundary.
 
 A foundation failure rejects App delegation and every waiting Page session. It is reported once as a foundational startup error and is
-not recovered by plugin HMR. The foundation and all setup modules are immutable for HMR; subsequent compilation and reload behavior is
-left to WeChat DevTools.
+not recovered by plugin HMR. The foundation and all setup modules are immutable for HMR; a subsequent successful edit is activated through
+a hard refresh.
 
-### Canonical IDs
+### Vite-owned module IDs
 
-Logical module identity is independent from its physical native capsule path.
+Logical module identity is independent from its physical native capsule path, but the plugin does not define a second ID format or
+identity namespace.
 
-Development IDs are stable Vite-derived canonical IDs:
+In development, SystemJS uses the stable module IDs exposed by the dedicated Vite `wx` environment and its `ModuleGraph` unchanged. The
+same IDs flow through transforms, the plugin-owned `HotChannel`, HMR contexts, update deliveries, and the SystemJS registry. Vite remains
+responsible for alias resolution, virtual-module identity, semantic resource queries, and optimized dependency IDs. The plugin does not
+prefix, encode, hash, alias, or otherwise serialize them into another ID format.
 
-```text
-wx:/runtime/foundation.js
-wx:/src/app.tsx
-wx:/src/pages/home/index.tsx
-wx:/node_modules/react/index.js
-wx:/@virtual/taro/api
-```
+In production, SystemJS uses the final output chunk IDs and filenames exposed by the Vite/Rolldown output graph unchanged. One such ID
+identifies one final Rolldown chunk; source modules combined into that chunk have no separate production identity.
 
-Production IDs identify final Rolldown chunks:
+Native facade generation runs after Vite has identified the foundation, App, and Page entries and embeds those actual IDs. The package
+planner maps the same unchanged IDs to physical capsule locations. Entry roles and native package paths never become alternate SystemJS
+IDs.
 
-```text
-wx:/chunks/foundation.js
-wx:/chunks/app.js
-wx:/chunks/shared-react.js
-wx:/dynamic/p_a1b2/editor.js
-```
-
-Vite resource and transform queries that identify distinct modules remain part of the canonical ID. HMR never appends a timestamp,
-content hash, or generation query to a development module ID.
-
-The React transform uses the stable source ID when registering component families. Re-executing a module therefore registers fresh
+The React transform uses the stable Vite source ID when registering component families. Re-executing a module therefore registers fresh
 component types under the same family identifiers.
 
 ### Custom host hooks
@@ -490,7 +514,8 @@ interface WxSystemHost {
 }
 ```
 
-`resolve()` is synchronous. `instantiate()` can use:
+`resolve()` is synchronous and follows the already-resolved Vite development graph or Vite/Rolldown output graph; it does not create a
+second source resolver or translate IDs into a plugin-owned namespace. `instantiate()` can use:
 
 - an initial native capsule;
 - an asynchronously loaded generated package capsule;
@@ -506,7 +531,7 @@ The ESM postprocessor produces a System registration and wraps it as an inert na
 
 ```js
 module.exports = [
-    ['wx:/chunks/dependency.js'],
+    ['chunks/dependency.js'],
     function (_export, _context) {
         let dependency;
 
@@ -534,10 +559,10 @@ The plugin generates a switch transport in which every native path is an AST str
 ```js
 function loadInitialRegistration(id) {
     switch (id) {
-        case 'wx:/chunks/app.js':
+        case 'entries/app.js':
             return Promise.resolve(require('./capsules/app.js'));
 
-        case 'wx:/dynamic/p_a1b2/editor.js':
+        case 'chunks/editor.js':
             return require.async('../__dynamic__/p_a1b2/capsules/editor.js');
 
         default:
@@ -553,9 +578,9 @@ path is not a string literal.
 
 ### Cross-package imports and cycles
 
-Every source import is valid regardless of generated package ownership. A System registration contains only canonical dependency IDs.
-When a dependency belongs to another generated package, `instantiate()` asynchronously obtains its registration through the literal
-native transport.
+Every source import is valid regardless of generated package ownership. A System registration contains only dependency IDs from the
+Vite development graph or Vite/Rolldown output graph. When a dependency belongs to another generated package, `instantiate()`
+asynchronously obtains its registration through the literal native transport.
 
 For a cycle between modules A and B in different packages:
 
@@ -609,7 +634,8 @@ App or Page
 ```
 
 A module remains in the main package if it is statically reachable from any eager entry, even when it is also dynamically reachable.
-Modules reachable only through dynamic boundaries are eligible for generated code-only subpackages.
+Modules reachable only through dynamic boundaries are eligible for generated code-only subpackages, but eligibility is not a placement
+requirement. The planner may retain any or all dynamic-only modules in the main package.
 
 ### Code-only subpackages
 
@@ -628,7 +654,8 @@ Code-only packages with empty page lists are a tested platform assumption.
 ### Placement goals
 
 Correctness does not depend on a particular lazy-package grouping because all cross-package edges are supported. A dynamic import is an
-execution boundary, not a promise of one native download unit.
+execution boundary only: it promises neither deferred physical delivery nor a dedicated native download unit. The planner freely chooses
+whether eligible code remains in the main package or enters one of the generated packages.
 
 The planner minimizes generated package count first. It may coalesce unrelated dynamic roots into one code-only subpackage and splits them
 only when native package-size limits require it. Within the minimum feasible package count, it optimizes for:
@@ -648,7 +675,7 @@ JavaScript and native resources have separate placement rules:
 - lazy JavaScript can enter generated code-only subpackages;
 - all Tailwind and ordinary CSS is emitted eagerly;
 - production CSS is flattened into `app.wxss`;
-- generated WXML and referenced assets remain in the main package initially.
+- generated WXML, Vite public assets, and referenced assets remain in the main package initially.
 
 ## Build pipeline
 
@@ -707,7 +734,9 @@ Development and production share Vite's normal source semantics:
 - JSON, CSS, and asset analysis;
 - user Vite plugin transforms.
 
-The architecture does not introduce a second source resolver.
+The architecture does not introduce a second source resolver or dynamic-import analyzer. Development consumes the dynamic edges Vite
+materializes in the `wx` environment graph, and production consumes the chunks and edges Vite/Rolldown emits. Dynamic-import forms that
+Vite can materialize therefore work automatically; an import left unresolved after the Vite pipeline cannot enter the closed WX graph.
 
 ### ES2018 JavaScript target
 
@@ -801,7 +830,7 @@ interface SystemRegisterPostprocessor {
 The initial implementation uses Babel's SystemJS module transform, followed by a small AST pass that:
 
 - extracts the registration rather than executing global `System.register()`;
-- normalizes canonical dependency IDs;
+- preserves Vite development IDs and resolves production chunk references to the IDs already supplied by the Vite/Rolldown output graph;
 - wraps the registration as a native capsule;
 - preserves top-level await and dynamic import;
 - chains source maps.
@@ -829,11 +858,11 @@ The dedicated `wx` environment enables Vite 8's Rolldown dependency optimizer. T
 every Page, and required internal virtual entries to WX dependency discovery. Bare npm dependencies and CommonJS packages are prebundled through Vite's normal
 optimizer before their output is converted into System registrations.
 
-Optimized output has stable canonical System IDs for one materialized development build even when its physical optimizer cache paths
-contain metadata hashes. Optimized dependencies are foundational HMR modules: they are reused by application updates and are never
-replaced inside the retained runtime heap. An optimizer rerun, dependency installation, lockfile change, optimizer configuration change,
-or changed optimized output creates a new development build ID and rematerializes the native project. WeChat DevTools observes the
-resulting files and performs its normal automatic compilation and reload behavior.
+Optimized output uses the stable module IDs supplied by Vite for the current materialized development build; the plugin does not derive a
+second identity from optimizer cache paths. Optimized dependencies are foundational HMR modules: they are reused by application updates
+and are never replaced inside the retained runtime heap. An optimizer rerun, dependency installation, lockfile change, optimizer
+configuration change, or changed optimized output creates a new development build ID, rematerializes the native project, and triggers a
+hard refresh.
 
 Linked workspace source that Vite does not optimize remains ordinary WX development modules and participates in normal HMR. Production
 does not consume the development optimizer; the production `wx` environment uses the normal Rolldown application build described above.
@@ -871,11 +900,12 @@ Generated `app.js` is intentionally small and synchronous:
 const runtime = require('./__taro__/bootstrap.js');
 
 App(runtime.createAppFacadeConfig({
-    moduleId: 'wx:/entries/app.js'
+    moduleId: '<Vite App delegate module ID>'
 }));
 ```
 
-`createAppFacadeConfig()` reuses the bootstrap's `foundationReady` promise, chains the App delegate `System.import()` after it, and returns
+The placeholder denotes the exact development module ID or production output chunk ID written by facade generation after Vite finalizes
+the relevant graph. `createAppFacadeConfig()` reuses the bootstrap's `foundationReady` promise, chains the App delegate `System.import()` after it, and returns
 the native App configuration before yielding control.
 
 The plugin-generated App delegate module imports the user's App component, React, the bundled Taro React renderer, and Taro framework
@@ -942,7 +972,7 @@ require('../../__taro__/update.js');
 runtime.registerPageFacade('pages/home/index', function () {
     Page(runtime.createPageFacadeConfig({
         route: 'pages/home/index',
-        moduleId: 'wx:/entries/pages/home/index.js',
+        moduleId: '<Vite Page delegate module ID>',
         initialData: { root: { cn: [] } }
     }));
 });
@@ -1028,8 +1058,8 @@ The native `App()` or `Page()` registration has already completed when such a re
 4. logs one enriched error with the module chain, activation phase, and source-mapped location;
 5. rethrows the enriched error asynchronously so WeChat DevTools receives it through its normal error handling.
 
-The plugin does not render a custom runtime error overlay and does not retry native registration inside the failed runtime. Subsequent
-editing, compilation, and reload behavior belongs to WeChat DevTools.
+The plugin does not render a custom runtime error overlay or retry native registration inside the failed runtime. After a subsequent
+successful compilation, the server rematerializes the project and activates it through a hard refresh.
 
 ## Lifecycle and event behavior
 
@@ -1070,13 +1100,15 @@ question.
 
 ### Stable module identities
 
-Development HMR keeps one canonical System ID for each logical module across the entire runtime session:
+Development HMR uses the stable module ID supplied by Vite for each module in the dedicated `wx` environment. For an ordinary source
+module, that ID may be the same URL Vite exposes in its development graph:
 
 ```text
-wx:/src/components/card.tsx
+/src/components/card.tsx
 ```
 
-There are no timestamped or content-hashed HMR IDs. Delivery versions identify executable `update.js` payloads, never logical modules.
+The plugin never creates timestamped, content-hashed, prefixed, or generation-specific module IDs. Vite remains the sole authority for
+module identity; delivery versions identify executable `update.js` payloads, never logical modules.
 
 Stable IDs provide two important properties:
 
@@ -1094,8 +1126,8 @@ The Vite development module graph decides whether an edit is hot-applicable befo
 1. Start at every changed module that has executed in the active runtime.
 2. Walk its importers until finding self-accepting modules, accepted dependencies, or accepted exports.
 3. Publish one update for each qualified boundary.
-4. Stop plugin HMR propagation if it reaches a dead end or an HMR boundary lies inside a circular import chain, leaving subsequent
-   compilation and reload behavior to WeChat DevTools.
+4. Stop plugin HMR propagation if it reaches a dead end or an HMR boundary lies inside a circular import chain, then request a hard
+   refresh before mutating the SystemJS registry.
 
 A runtime update carries the same essential relationship as Vite's web payload:
 
@@ -1132,7 +1164,8 @@ The following foundations are never hot-replaced:
 - the Taro WeChat platform runtime, API initialization, and renderer;
 - the native facade and bootstrap runtime.
 
-An update that reaches a foundational module is not published through plugin HMR; WeChat DevTools owns the resulting automatic reload.
+An update that reaches a foundational module is not published through plugin HMR; the server rematerializes the project and performs a
+hard refresh.
 
 ### SystemJS deletion contract
 
@@ -1159,7 +1192,8 @@ Importing a successfully deleted stable ID creates and evaluates a fresh load re
 accept callbacks; it is not pushed automatically through old ESM setters.
 
 Before importing any accepted module, the runtime deletes the union of its loaded `reloadModuleIds`. A replacement is unsafe if deletion
-fails because a module is still executing, participates in unresolved top-level await, or is in another unsupported loader state. Such an update exits the plugin HMR path and relies on WeChat DevTools for subsequent recovery.
+fails because a module is still executing, participates in unresolved top-level await, or is in another unsupported loader state. The
+runtime reports the failure without acknowledging the delivery, and the server performs a hard refresh.
 
 ### React Refresh ordering
 
@@ -1184,8 +1218,8 @@ capture old qualified accept callbacks
 ```
 
 An incompatible React boundary calls `hot.invalidate()`. The server then propagates from that boundary to a higher accepting importer; if
-none exists, it exits the plugin HMR path. Existing importers are not automatically exposed to the fresh exports while this decision is
-made, and WeChat DevTools owns subsequent compilation and reload behavior.
+none exists, it performs a hard refresh. Existing importers are not automatically exposed to the fresh exports while this decision is
+made.
 
 React Refresh remains the sole owner of component-family replacement, Fiber updates, and state preservation. The plugin owns its wrapper
 and scheduler, so `performReactRefresh()` is released only after every callback in the current delivery has completed successfully or its
@@ -1213,7 +1247,7 @@ The runtime applies a batch in these phases:
 
 #### 1. Prepare
 
-- Verify build ID, delivery version, and nonce.
+- Verify build ID, runtime session ID, delivery version, and nonce.
 - Reject foundational updates and Vite-detected circular HMR chains.
 - Capture qualified callbacks and dispose handlers before fresh HMR contexts replace them.
 - Ensure every registration required for the accepted imports is present or already safely loaded.
@@ -1242,8 +1276,9 @@ Fresh execution creates new HMR contexts and registers fresh React component typ
 Invoke each captured qualified callback with the corresponding fresh namespace. React boundary validation may queue Refresh work or call
 `hot.invalidate()` to request propagation to a higher boundary.
 
-A linking, execution, dispose, or callback exception after deletion marks the batch irrecoverably failed and exits plugin HMR. The
-runtime does not report a partially applied batch as healthy or try to trigger a native reload itself.
+A linking, execution, dispose, or callback exception after deletion marks the batch irrecoverably failed. The runtime reports the failed
+phase without acknowledging the batch, and the server performs a hard refresh. The runtime never reports a partially applied batch as
+healthy.
 
 #### 6. Refresh and acknowledge
 
@@ -1278,8 +1313,8 @@ subpackage declarations are not rewritten during the live session. The next cold
 Ordinary module loading always uses full SystemJS cycle semantics, including cycles that cross generated native packages.
 
 HMR deliberately follows Vite's stricter rule. If an accepting boundary is inside a circular import chain, the server stops plugin HMR
-before deleting any live System module. The initial implementation does not attempt to reconstruct cycle execution order inside a
-retained application heap; WeChat DevTools owns subsequent reload behavior.
+before deleting any live System module and performs a hard refresh. The initial implementation does not attempt to reconstruct cycle
+execution order inside a retained application heap.
 
 ### Future: importer-aware live-binding reconnection
 
@@ -1329,6 +1364,7 @@ A delivery has this shape:
 ```ts
 interface ExecutableDelivery {
     buildId: string;
+    sessionId: string;
     version: number;
     nonce: string;
     batch: HotUpdateBatch;
@@ -1338,6 +1374,7 @@ interface ExecutableDelivery {
 
 Properties:
 
+- `sessionId` binds the executable delivery to exactly one active runtime heap; a new session never consumes an old session's delivery;
 - `version` is a monotonically increasing delivery sequence, not a module identity.
 - `nonce` ensures DevTools observes a physical file change when a delivery must be republished.
 - executing the same delivery twice is harmless;
@@ -1365,15 +1402,20 @@ The server retains:
 - transformed registrations and update metadata;
 - a monotonic delivery sequence;
 - the active runtime's acknowledgement state;
-- bounded replay history.
+- bounded delivery state for the active session only.
 
 ### One active runtime session
 
 The protocol supports one active WeChat runtime at a time. A session ID does not represent concurrent-client support.
 
-A new session means WeChat DevTools or the App restarted and arrived with a fresh heap. The new session replaces the old active session.
-The server uses the session ID to decide which acknowledged updates must be replayed and which modules need current on-demand
-registrations.
+A new session means WeChat DevTools or the App restarted and arrived with a fresh heap. The new session replaces the old active session,
+and all old HMR deliveries, acknowledgements, pending instantiations, callbacks, and `hot.data` are discarded. Deliveries are never
+replayed into a new runtime.
+
+The development foundation barrier holds App and Page activation while the server makes that decision. If the physical project is already
+a current materialization, the server accepts the session and the new heap itself is the completed hard refresh. If source has advanced
+through session-local HMR since that materialization, the server leaves the barrier pending, emits a new complete materialization and
+build ID, and DevTools performs one full compilation and restart before development continues.
 
 There is no fairness, fan-out, or concurrent publication protocol for multiple simulator sessions sharing one `update.js`.
 
@@ -1388,49 +1430,60 @@ already applied version and acknowledges it again.
 
 #### App or DevTools restart
 
-A fresh runtime reports a new session ID and its current build ID. The server replays retained updates needed by the new runtime. Modules
-that remain unloaded receive current code through on-demand instantiation later.
+A fresh runtime reports a new session ID and its current build ID. The previous session is discarded and no delivery is replayed. If its
+physical files are behind current source, the server creates a new complete materialization and build ID and hard-refreshes once more into
+that current snapshot.
 
 #### Vite server restart
 
-The plugin creates a fresh physical development build and a new build ID. Deliveries from the previous build are never replayed.
+The plugin creates a fresh physical development build and a new build ID. Deliveries from the previous build are discarded, and DevTools
+hard-refreshes into the new materialization.
 
-#### Bounded history
+#### Bounded delivery state
 
-Update history is bounded. Exceeding the bound causes a fresh materialization, which WeChat DevTools observes normally. This prevents
-unbounded replay state even though stable System module IDs avoid registry generation growth.
+Delivery state is bounded for the active session. Exceeding the bound performs a hard refresh and starts a new build and runtime session;
+it never replays an accumulated history into another heap.
 
-## Automatic native reload boundary
+## Plugin-owned hard refresh
 
-A change leaves the plugin's state-preserving HMR path when:
+A hard refresh is the single recovery path whenever a change cannot be represented safely as state-preserving HMR. It is triggered when:
 
 - Vite or the framework finds no acceptable HMR boundary;
 - propagation encounters an accepting boundary inside a circular import chain;
 - `hot.invalidate()` propagation from an incompatible boundary reaches no higher acceptable boundary;
 - a foundational module changes;
 - `System.delete()` cannot safely remove an invalidated module;
-- fresh registration compilation, linking, or execution fails after mutation begins;
+- fresh registration linking or execution fails after registry mutation begins;
 - an accept, dispose, or Refresh step leaves the update batch unsafe;
 - WXML or native JSON changes;
 - App/Page routes or native configuration change;
 - the initial literal transport or cold package plan must be rematerialized immediately;
 - an asset change cannot be represented as a safe style-only update;
 - the development server restarts;
-- bounded update history is exhausted.
+- active-session delivery state is exhausted.
+
+For a server-detected boundary, the registry is not mutated. For a runtime failure after mutation, the runtime reports the failed phase
+without acknowledging the delivery. The server then:
+
+1. discards the active session and every pending delivery or on-demand token;
+2. builds a complete current Mini Program materialization under a new build ID without modifying the last runnable output if compilation
+   fails;
+3. publishes the complete generated project, including the new build ID in watched native bootstrap code;
+4. lets WeChat DevTools perform its normal full compilation and runtime restart;
+5. accepts hard-refresh completion only from a fresh session reporting the new build ID.
 
 CSS changes use WeChat's WXSS hot replacement whenever possible. If global replacement is unreliable, the complete stylesheet is emitted
 into every page WXSS during development rather than forcing every style edit through JavaScript HMR.
 
-The plugin has no native-reload command, app-file nonce, DevTools CLI automation, `wx.reLaunch()` fallback, route restoration, or reload
-acknowledgement protocol. It writes the generated files required by the change, stops any unsafe custom HMR work, and lets WeChat DevTools
-automatically decide compilation and reload behavior. WeChat DevTools also owns the resulting route, query, Page stack, and application
-state.
+Hard refresh does not use `wx.reLaunch()`, restore the route or Page stack, preserve application state, or replay HMR data. The plugin owns
+the decision and complete-file rematerialization; WeChat DevTools owns compilation and process restart. No DevTools CLI automation is
+required.
 
 ## Error handling and diagnostics
 
 A module-load error reports:
 
-- requested canonical ID;
+- requested Vite module or output chunk ID;
 - parent/importer ID;
 - resolved physical package and capsule path;
 - whether the source was an initial capsule, update-delivery registration, or on-demand response;
@@ -1448,13 +1501,13 @@ An HMR error additionally reports:
 - fresh accepted modules that executed;
 - callbacks that accepted, invalidated, or failed;
 - pending invalidation propagation;
-- whether the update exited the plugin HMR path.
+- whether and why the update requested a hard refresh.
 
 A transform failure before publication does not overwrite the last successful `update.js` or `app.wxss`. The running application stays
 on its previous applied code.
 
 Once registry deletion begins, any unrecoverable failure terminates plugin HMR for that batch. The runtime never pretends that a partially
-applied Vite HMR batch is healthy and does not implement its own native-reload mechanism.
+applied Vite HMR batch is healthy; it reports the failure so the server can perform a hard refresh.
 
 ## Hard invariants
 
@@ -1464,23 +1517,25 @@ The implementation enforces these invariants with build-time assertions and runt
 2. Every native code-loading path is an AST string literal.
 3. Application modules contain no native module-resolution calls.
 4. There is exactly one SystemJS realm.
-5. A logical application module has one canonical ID and one emitted owner package per build.
-6. Development HMR never changes a module's canonical ID.
+5. A logical application module uses exactly one ID supplied by Vite's development graph or Vite/Rolldown's production output graph and
+   has one emitted owner package per build; the plugin creates no alternate ID namespace or alias.
+6. Development HMR uses Vite's stable module ID unchanged for the lifetime of the active runtime session.
 7. HMR deletes every loaded invalidated System record before importing its fresh accepted ID.
 8. The runtime never calls or retains the importer-reconnection closure returned by upstream `System.delete()`.
 9. Existing ESM importers outside the invalidated region are not automatically reconnected.
 10. Fresh namespaces are delivered only to qualified Vite HMR accept callbacks.
 11. React Refresh executes only after the current delivery's accept callbacks complete.
-12. An incompatible boundary propagates with `hot.invalidate()` and reloads only when no higher boundary accepts it.
-13. A Vite-detected circular HMR chain exits plugin HMR before registry mutation and leaves reload behavior to WeChat DevTools.
+12. An incompatible boundary propagates with `hot.invalidate()` and hard-refreshes only when no higher boundary accepts it.
+13. A Vite-detected circular HMR chain triggers a hard refresh before registry mutation.
 14. Foundational modules are never hot-replaced.
-15. An unsafe update batch is never approximated or acknowledged; the plugin stops handling it and does not trigger native reload itself.
+15. An unsafe update batch is never approximated or acknowledged; it triggers a hard refresh.
 16. A delivery is acknowledged only after callbacks, React Refresh, and invalidation publication complete.
 17. Development delivery registrations are transient and do not form a second persistent module registry.
 18. Modules are never duplicated across generated packages.
 19. All configured native pages are emitted in the main package.
-20. Only JavaScript exclusively reachable through dynamic boundaries enters generated subpackages.
-21. Every initial System module ID has exactly one literal native capsule mapping.
+20. Only JavaScript exclusively reachable through dynamic boundaries is eligible to enter generated subpackages; the planner may retain
+    any eligible module in the main package.
+21. Every initially materialized Vite module or output chunk ID has exactly one literal native capsule mapping.
 22. Cross-package edges never change logical module identity.
 23. Page entry reruns cannot recreate the App root or duplicate native route registration.
 24. A cancelled or failed pre-activation Page session can never mount later.
@@ -1489,7 +1544,8 @@ The implementation enforces these invariants with build-time assertions and runt
 27. Tailwind and class rewriting are owned by the plugin's `weapp-tailwindcss` pipeline.
 28. Return-valued native callbacks are absent from the fixed facade surface, and the compiler neither detects nor specially handles
     user code that defines them.
-29. The development protocol has one active runtime session.
+29. The development protocol has one active runtime session; replacing it discards all HMR delivery state and never replays updates into
+    the new heap.
 30. The dedicated `wx` Vite environment is the only application transform, module, and HMR graph.
 31. Vite's browser client and `ModuleRunner` never evaluate WX application modules.
 32. The Taro template builder, component aliases, hydration schema, root updater, event bridge, and React renderer come from one bundled
@@ -1505,11 +1561,13 @@ The implementation enforces these invariants with build-time assertions and runt
 38. Every runtime JavaScript dependency is bundled into the WX graph; external System modules, native module passthrough, and remote
     executable modules are forbidden.
 39. WX development uses Vite's Rolldown dependency optimizer; optimized outputs are foundational for one materialized build, and any
-    optimizer rerun creates a new build ID and rematerialized files for WeChat DevTools to handle automatically.
+    optimizer rerun creates a new build ID, complete rematerialization, and hard refresh.
 40. One shared foundational SystemJS import completes Taro runtime, WeChat platform, React framework, API, and development-HMR setup in
     order before any App, Page, or user module executes.
 41. Rolldown/Oxc lowers development source, optimized dependencies, production chunks, and generated runtime code to ES2018; DevTools
     JavaScript-to-ES5 compilation is disabled.
+42. `vite.config.ts` is the sole source of native project, App, Page, and sitemap configuration; generated JSON files are never merged with
+    source JSON files.
 
 ## Validation plan
 
@@ -1528,18 +1586,23 @@ The implementation enforces these invariants with build-time assertions and runt
 - generated project configuration disables DevTools JavaScript-to-ES5 compilation;
 - the WX environment explicitly enables the Rolldown dependency optimizer with the generated App and Page discovery entries;
 - CommonJS npm dependencies execute from optimized System registrations;
-- optimized physical cache hashes do not enter canonical runtime IDs;
+- SystemJS and HMR use the stable module IDs supplied by Vite without a plugin prefix, alias, digest, or translation layer;
 - application HMR reuses foundational optimized dependencies;
-- optimizer reruns, lockfile changes, and changed optimized output force rematerialization and rely on DevTools' automatic reload;
+- optimizer reruns, lockfile changes, and changed optimized output force rematerialization and a hard refresh;
 - linked, unoptimized workspace source remains normally hot-replaceable;
-- the plugin distribution contains no private React implementation or React-specific deduplication behavior.
+- the plugin distribution contains no private React implementation or React-specific deduplication behavior;
+- native project, private-project, and sitemap outputs are generated only from Vite configuration;
+- Vite `publicDir` and graph assets retain Vite's normal behavior without a parallel plugin asset system.
 
 ### System loader tests
 
 - the foundational module executes exactly once before App, Page, and user modules;
 - platform host configuration exists before framework and API initialization execute;
 - concurrent App and Page requests share one `foundationReady` promise;
-- a foundational rejection prevents every delegate import and exits plugin HMR without invoking a reload mechanism;
+- a new development session cannot pass `foundationReady` until the server accepts its session ID and build ID;
+- a stale materialization remains behind the foundation barrier and hard-refreshes without executing App, Page, or user modules;
+- a foundational rejection prevents every delegate import and reports one startup failure; a subsequent successful correction activates
+  through a hard refresh;
 - production emits exactly one System registration for each final Rolldown JavaScript chunk;
 - production does not enable preserve-module output or expose source modules as independent System identities;
 - Rolldown-internalized module cycles and SystemJS cross-chunk cycles preserve their respective ESM semantics;
@@ -1555,7 +1618,7 @@ The implementation enforces these invariants with build-time assertions and runt
 - dynamic-import cycles;
 - concurrent imports of one unloaded package;
 - top-level await and error propagation;
-- canonical relative resolution;
+- relative resolution through the IDs and dependency relationships supplied by Vite and Vite/Rolldown;
 - one module instance across multiple importers;
 - literal transport failures with complete diagnostics.
 
@@ -1573,13 +1636,14 @@ The implementation enforces these invariants with build-time assertions and runt
 - fresh execution registers React component types before the old accept callback runs;
 - a valid React boundary refreshes while retaining component state;
 - an invalid React boundary emits `hot.invalidate()` and propagates to its importers;
-- invalidation with no higher boundary exits plugin HMR and leaves reload behavior to DevTools;
+- invalidation with no higher boundary triggers a hard refresh;
 - App, Page, and shared component modules retain Refresh family IDs;
 - multiple boundary updates share one delivery batch without reconnecting old importers;
-- an accepting boundary inside a circular import chain exits plugin HMR before deletion;
-- deletion failure exits plugin HMR without invoking a native reload;
-- linking, execution, dispose, or callback failure after deletion terminates the batch without acknowledging it;
-- foundational changes bypass plugin HMR and rely on DevTools' automatic handling;
+- an accepting boundary inside a circular import chain hard-refreshes before deletion;
+- deletion failure triggers a hard refresh;
+- linking, execution, dispose, or callback failure after deletion terminates the batch without acknowledging it and triggers a hard
+  refresh;
+- foundational changes bypass plugin HMR and trigger a hard refresh;
 - `hot.data` survives stable-ID replacement;
 - accept, prune, and invalidate behavior remains deterministic;
 - adding and removing imports works without changing module IDs;
@@ -1589,7 +1653,8 @@ The implementation enforces these invariants with build-time assertions and runt
 ### Package planner tests
 
 - eager closure remains in the main package;
-- dynamic-only closure enters lazy packages;
+- dynamic-only modules may remain main or enter generated packages according to the planner's physical layout;
+- no statically reachable module enters a generated subpackage;
 - a dynamically and statically reachable module remains main;
 - shared lazy modules are never duplicated;
 - cross-package cycles preserve one module identity;
@@ -1654,11 +1719,14 @@ The implementation enforces these invariants with build-time assertions and runt
 - duplicate deliveries are ignored and acknowledged;
 - missed deliveries are republished with a new nonce;
 - acknowledgement occurs only after callbacks, Refresh, and invalidation publication;
-- a fresh session replaces the previous active session;
-- App restart replays retained applied updates;
-- server restart creates a new build ID;
-- pending imports survive page entry reruns;
-- bounded history triggers fresh materialization.
+- a fresh session replaces the previous active session and discards its deliveries, pending imports, acknowledgements, and HMR data;
+- an `update.js` delivery addressed to an old session is ignored by a fresh runtime;
+- App restart never replays retained updates and hard-refreshes if the materialized project is behind current source;
+- server restart creates a new build ID and hard-refreshes into a complete materialization;
+- pending imports survive page entry reruns within one runtime session;
+- bounded active-session delivery state triggers a hard refresh;
+- hard refresh publishes one complete materialization and completes only when a fresh session reports its new build ID;
+- a hard-refresh compilation failure leaves the last runnable project and runtime untouched.
 
 ### WeChat DevTools probes
 
@@ -1672,7 +1740,7 @@ These behaviors remain executable integration probes rather than assumptions:
 - pending `System.import()` surviving an on-demand delivery rerun;
 - `System.delete()` replacement with the reconnect closure deliberately discarded;
 - App root and React Fiber identity surviving valid HMR;
-- invalid Refresh boundary propagating to a higher boundary, with full App replacement only at a dead end;
+- invalid Refresh boundary propagating to a higher boundary, with a hard refresh only at a dead end;
 - global `app.wxss` replacement preserving application state;
 - complete page-WXSS duplication fallback.
 
@@ -1749,14 +1817,17 @@ The architecture has five owners:
 
 1. **Native facades** synchronously register App and Pages, journal lifecycle events, and delegate them to the exact Taro configuration
    objects once available.
-2. **SystemJS** owns application module loading, normal ESM live bindings, cycles, stable identities, and deletion.
+2. **SystemJS** owns the runtime registry keyed by Vite's module IDs, application loading, normal ESM live bindings, cycles, and
+   deletion.
 3. **The bundled Taro React stack and template ABI** own one retained App root, runtime host-tree rendering, Page sessions, events, and
    lifecycle dispatch.
 4. **The dedicated Vite `wx` environment, Rolldown, and the System postprocessor** own source semantics, the application graph, and
    production optimization.
-5. **The development HMR runtime** follows Vite boundary propagation, delivers fresh namespaces to accept callbacks, then performs React
-   Refresh without reconnecting old ESM importers.
+5. **The development HMR runtime and server** follow Vite boundary propagation, deliver fresh namespaces to accept callbacks, perform
+   React Refresh without reconnecting old ESM importers, and hard-refresh whenever state-preserving replacement is unsafe.
 
 Tailwind, the complete Taro implementation, and React build integration are bundled and plugin-owned. React itself is always installed
-and owned by the application; this ownership boundary is closed and is not a future configuration choice. Package boundaries never restrict source imports, production CSS is one `app.wxss`, and stable development IDs keep
-HMR contexts and React Refresh family identities coherent across updates.
+and owned by the application; this ownership boundary is closed and is not a future configuration choice. Package boundaries never
+restrict source imports, production CSS is one `app.wxss`, Vite's module IDs flow unchanged into SystemJS, and stable development IDs keep
+HMR contexts and React Refresh family identities coherent across updates. Unsafe updates and runtime-session replacement never replay or
+approximate HMR; they converge through a complete hard refresh.
