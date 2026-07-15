@@ -25,6 +25,7 @@ The initial implementation supports:
 - automatic code-only subpackages for lazy JavaScript;
 - JavaScript HMR and React Refresh in WeChat DevTools;
 - stable development module IDs with Vite-compatible acceptance-boundary HMR;
+- one foundational SystemJS bootstrap barrier before any App, Page, or user module executes;
 - Vite 8's Rolldown dependency optimizer for development dependencies and CommonJS interoperability.
 
 The initial implementation does not support:
@@ -406,6 +407,45 @@ A single realm is required for:
 - dynamic import caching;
 - stable HMR identity.
 
+### Foundational startup barrier
+
+The native bootstrap creates the SystemJS instance and immediately starts exactly one foundational import:
+
+```ts
+const foundationReady = System.import('wx:/runtime/foundation.js');
+```
+
+This promise is shared by the App facade and every Page facade. App and Page delegate imports are chained after it; they are never started
+in parallel with foundational initialization. Native `App()` and `Page()` registration remains synchronous because registration stores
+and journals callbacks without awaiting the promise.
+
+The generated foundation module has an ordered side-effect dependency list:
+
+```ts
+import 'virtual:taro/internal/runtime';
+import 'virtual:taro/internal/weapp-runtime';
+import 'virtual:taro/internal/framework-react-runtime';
+import 'virtual:taro/internal/api-initialization';
+import 'virtual:taro/internal/hmr-foundation'; // empty in production
+
+export const initialized = true;
+```
+
+The ordering is semantic, not cosmetic:
+
+1. Taro shared state and runtime exist.
+2. The WeChat platform runtime merges its host config and component definitions.
+3. The React framework runtime installs lifecycle, reconciler, batching, and event hooks.
+4. Taro API initialization observes those installed hooks and binds the WeChat APIs.
+5. Development-only HMR and React Refresh foundations become available.
+
+The foundation and its complete static closure are eager, main-package-owned, and instantiated through SystemJS like all application
+runtime code. They never use native `require()` directly. The module is an explicit production Rolldown entry and an explicit WX
+development dependency-discovery entry, preventing tree shaking or accidental placement behind a dynamic boundary.
+
+A foundation failure rejects App delegation and every waiting Page session. It is reported once as a foundational startup error and
+requires a full native reload. The foundation and all setup modules are immutable for HMR.
+
 ### Canonical IDs
 
 Logical module identity is independent from its physical native capsule path.
@@ -413,6 +453,7 @@ Logical module identity is independent from its physical native capsule path.
 Development IDs are stable Vite-derived canonical IDs:
 
 ```text
+wx:/runtime/foundation.js
 wx:/src/app.tsx
 wx:/src/pages/home/index.tsx
 wx:/node_modules/react/index.js
@@ -422,6 +463,7 @@ wx:/@virtual/taro/api
 Production IDs identify final Rolldown chunks:
 
 ```text
+wx:/chunks/foundation.js
 wx:/chunks/app.js
 wx:/chunks/shared-react.js
 wx:/dynamic/p_a1b2/editor.js
@@ -541,8 +583,8 @@ belongs to a particular route.
 
 ### Eager JavaScript
 
-The planner begins with the generated App delegate entry and every generated Page delegate entry. It traverses static import edges and
-places the complete eager closure in the main package.
+The planner begins with the foundational runtime entry, the generated App delegate entry, and every generated Page delegate entry. It
+traverses static import edges and places the complete eager closure in the main package.
 
 ```text
 App and all Pages
@@ -744,8 +786,8 @@ identities from inside an optimized dependency chunk.
 
 ### Development dependency optimization
 
-The dedicated `wx` environment enables Vite 8's Rolldown dependency optimizer. The plugin supplies the App, every Page, and required
-internal virtual entries to WX dependency discovery. Bare npm dependencies and CommonJS packages are prebundled through Vite's normal
+The dedicated `wx` environment enables Vite 8's Rolldown dependency optimizer. The plugin supplies the foundational runtime, the App,
+every Page, and required internal virtual entries to WX dependency discovery. Bare npm dependencies and CommonJS packages are prebundled through Vite's normal
 optimizer before their output is converted into System registrations.
 
 Optimized output has stable canonical System IDs for one materialized development build even when its physical optimizer cache paths
@@ -765,7 +807,7 @@ does not run a second JavaScript bundler for development and never uses the brow
 
 At server startup the plugin creates a physical Mini Program project:
 
-1. Resolve the configured App and Page entries through Vite.
+1. Resolve the foundational runtime and configured App and Page entries through the `wx` Vite environment.
 2. Traverse their static and Vite-discoverable dynamic import graph.
 3. Transform each JavaScript module through Vite's development pipeline.
 4. Convert each transformed module into a native System registration capsule.
@@ -793,7 +835,8 @@ App(runtime.createAppFacadeConfig({
 }));
 ```
 
-`createAppFacadeConfig()` begins `System.import()` immediately and returns the native App configuration before yielding control.
+`createAppFacadeConfig()` reuses the bootstrap's `foundationReady` promise, chains the App delegate `System.import()` after it, and returns
+the native App configuration before yielding control.
 
 The plugin-generated App delegate module imports the user's App component, React, the bundled Taro React renderer, and Taro framework
 support through SystemJS. It exports the exact object returned by bundled Taro `createReactApp()`:
@@ -880,8 +923,9 @@ export default createPageConfig(
 );
 ```
 
-`createPageFacadeConfig()` begins importing this module during page-entry evaluation. Its synchronous native result contains only the
-build-known initial data, supported non-returning lifecycle wrappers, and the stable `eh` wrapper. Once ready, each wrapper invokes the
+`createPageFacadeConfig()` schedules this module import during page-entry evaluation, strictly after the shared `foundationReady`
+promise. Its synchronous native result contains only the build-known initial data, supported non-returning lifecycle wrappers, and the
+stable `eh` wrapper. Once ready, each wrapper invokes the
 corresponding function on the exact Taro Page configuration with the native Page instance as `this`. Taro remains solely responsible for
 mounting, `Current.page` and router state, lifecycle hooks, DOM updates, and event dispatch.
 
@@ -1039,11 +1083,12 @@ Application modules are eligible for hot replacement when Vite propagation reach
 
 The following foundations are never hot-replaced:
 
+- the generated foundational entry and all of its setup modules;
 - React;
 - `react-reconciler`;
 - the React Refresh runtime;
 - SystemJS;
-- the Taro renderer;
+- the Taro WeChat platform runtime, API initialization, and renderer;
 - the native facade and bootstrap runtime.
 
 An update that reaches a foundational module triggers a complete native reload.
@@ -1419,6 +1464,8 @@ The implementation enforces these invariants with build-time assertions and runt
     executable modules are forbidden.
 39. WX development uses Vite's Rolldown dependency optimizer; optimized outputs are foundational for one materialized build, and any
     optimizer rerun requires a new build ID and full native reload.
+40. One shared foundational SystemJS import completes Taro runtime, WeChat platform, React framework, API, and development-HMR setup in
+    order before any App, Page, or user module executes.
 
 ## Validation plan
 
@@ -1442,6 +1489,10 @@ The implementation enforces these invariants with build-time assertions and runt
 
 ### System loader tests
 
+- the foundational module executes exactly once before App, Page, and user modules;
+- platform host configuration exists before framework and API initialization execute;
+- concurrent App and Page requests share one `foundationReady` promise;
+- a foundational rejection prevents every delegate import and requires a full reload;
 - production emits exactly one System registration for each final Rolldown JavaScript chunk;
 - production does not enable preserve-module output or expose source modules as independent System identities;
 - Rolldown-internalized module cycles and SystemJS cross-chunk cycles preserve their respective ESM semantics;
@@ -1502,7 +1553,8 @@ The implementation enforces these invariants with build-time assertions and runt
 
 ### Facade tests
 
-- synchronous App and Page registration;
+- synchronous App and Page registration while the foundational import is pending;
+- neither App nor Page delegate import begins before `foundationReady` resolves;
 - App lifecycle journaling before delegation;
 - App lifecycle methods receive the original native App instance and arguments;
 - bundled Taro `createReactApp()` executes exactly once and its returned object is the exact App delegate;
@@ -1619,6 +1671,12 @@ The architecture relies on these documented or source-verified behaviors:
   <https://github.com/vitejs/vite/blob/b59a73f76f5557492d83d097bb33b3dd02f27d51/docs/guide/migration.md#L35-L62>
 - Rolldown's current output formats:
   <https://github.com/rolldown/rolldown/blob/111132357228f06c208af96f6f1f3c164104bdf3/packages/rolldown/src/options/output-options.ts#L53-L55>
+- Taro's WeChat runtime host-config and component merge:
+  <https://github.com/NervJS/taro/blob/0db37ec9d383ec774df54634a3db632286c0ffa1/packages/taro-platform-weapp/src/runtime.ts#L1-L6>
+- Taro React framework hook initialization:
+  <https://github.com/NervJS/taro/blob/0db37ec9d383ec774df54634a3db632286c0ffa1/packages/taro-framework-react/src/runtime/index.ts#L1-L66>
+- Taro API initialization after runtime hooks are installed:
+  <https://github.com/NervJS/taro/blob/0db37ec9d383ec774df54634a3db632286c0ffa1/packages/taro/index.js#L1-L8>
 - Taro's WeChat platform and template initialization:
   <https://github.com/NervJS/taro/blob/0db37ec9d383ec774df54634a3db632286c0ffa1/packages/taro-platform-weapp/src/program.ts#L10-L57>
 - Taro's WeChat page-template generation:
