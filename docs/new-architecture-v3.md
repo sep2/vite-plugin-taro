@@ -24,7 +24,7 @@ The initial implementation supports:
 - every import cycle valid under ESM evaluation semantics;
 - automatic code-only subpackages for lazy JavaScript;
 - JavaScript HMR and React Refresh in WeChat DevTools;
-- stable development module IDs with `System.delete()` replacement and live-binding reconnection.
+- stable development module IDs with Vite-compatible acceptance-boundary HMR.
 
 The initial implementation does not support:
 
@@ -43,9 +43,9 @@ The initial implementation does not support:
 4. Every native code-loading path is generated as an AST string literal.
 5. Application modules never call native `require()`.
 6. The plugin owns framework and style integration so applications install no Taro or Tailwind packages.
-7. Development modules retain stable IDs and are replaced transactionally through `System.delete()`.
-8. React Refresh validates a fresh module before its exports are reconnected to the running ESM graph.
-9. Unsafe infrastructure updates perform a full native reload rather than approximating hot replacement.
+7. Development HMR follows Vite's acceptance-boundary model while retaining stable System module IDs.
+8. Fresh namespaces are delivered to qualified HMR accept callbacks; existing ESM importers are not automatically reconnected.
+9. Circular or otherwise unsafe updates perform a full native reload rather than approximating hot replacement.
 10. Production output is optimized for delivery; development output is optimized for module identity and HMR.
 
 ## Platform constraints
@@ -244,15 +244,15 @@ any dynamic component renders.
 
 ### Development CSS
 
-The preferred development mode also regenerates one `app.wxss`. A CSS-only change must not enter the SystemJS HMR transaction and must
-not emit a JavaScript full-reload payload.
+The preferred development mode also regenerates one `app.wxss`. A CSS-only change must not enter a JavaScript HMR delivery and must not
+emit a JavaScript full-reload payload.
 
 When a TSX edit changes both executable code and Tailwind candidates, the update order is:
 
 ```text
 compile and write WXSS
     → publish JavaScript update.js delivery
-    → reconnect modules
+    → evaluate and accept fresh HMR boundaries
     → perform React Refresh
 ```
 
@@ -311,7 +311,7 @@ A single realm is required for:
 - live ESM bindings;
 - cross-package cycles;
 - dynamic import caching;
-- stable HMR replacement.
+- stable HMR identity.
 
 ### Canonical IDs
 
@@ -356,7 +356,7 @@ interface WxSystemHost {
 
 - an initial native capsule;
 - an asynchronously loaded generated package capsule;
-- a transient registration from the current `update.js` transaction;
+- a transient registration from the current `update.js` delivery;
 - an acknowledged on-demand development response.
 
 SystemJS's registry is the application module-instance store. Development delivery records are transient inputs to instantiation, not a
@@ -764,23 +764,48 @@ Development HMR keeps one canonical System ID for each logical module across the
 wx:/src/components/card.tsx
 ```
 
-There are no timestamped or content-hashed HMR IDs.
+There are no timestamped or content-hashed HMR IDs. Delivery versions identify executable `update.js` payloads, never logical modules.
 
 Stable IDs provide two important properties:
 
-1. SystemJS can reconnect existing ESM import setters to fresh exports.
+1. Every delivery, source stamp, HMR context, and fresh registration addresses the same logical module.
 2. React Refresh registers fresh component types under the same module-derived family identifiers.
 
-HMR intentionally uses SystemJS's registry replacement capability rather than reproducing the browser's immutable URL cache.
+Stable identity does not mean that an evaluated namespace object is mutated in place. HMR follows Vite's acceptance-boundary semantics:
+the runtime evaluates a fresh accepted module under its stable ID and passes its namespace to the old qualified accept callback. Importers
+outside the invalidated region retain their existing bindings unless the accept callback or framework updates application state.
+
+### Vite propagation and boundaries
+
+The Vite development module graph decides whether an edit is hot-applicable before `update.js` is published:
+
+1. Start at every changed module that has executed in the active runtime.
+2. Walk its importers until finding self-accepting modules, accepted dependencies, or accepted exports.
+3. Publish one update for each qualified boundary.
+4. Request a complete native reload if propagation reaches a dead end or an HMR boundary lies inside a circular import chain.
+
+A runtime update carries the same essential relationship as Vite's web payload:
+
+```ts
+interface HotUpdate {
+    boundaryId: string;
+    acceptedId: string;
+    reloadModuleIds: string[];
+}
+```
+
+`boundaryId` owns the old accept callback. `acceptedId` is freshly imported and passed to that callback. `reloadModuleIds` is the loaded,
+invalidated SystemJS region that must be removed so importing `acceptedId` observes current registrations. Several updates in one delivery
+can share registrations and reload IDs.
 
 ### Replaceable and foundational modules
 
-Application modules are hot-replaceable, including:
+Application modules are eligible for hot replacement when Vite propagation reaches a qualified boundary, including:
 
 - the user's App component;
 - Page components;
 - shared React components;
-- application stores and utilities;
+- application stores and utilities reached by an accepted boundary;
 - application-owned virtual modules;
 - newly introduced modules and import edges.
 
@@ -797,23 +822,31 @@ An update that reaches a foundational module triggers a complete native reload.
 
 ### SystemJS deletion contract
 
-The runtime owns a typed wrapper around the pinned SystemJS registry behavior:
+The runtime wraps the pinned SystemJS deletion API but deliberately does not use its importer-reconnection extension:
 
 ```ts
-type ReconnectImporters = () => boolean;
-
 interface HotSystem {
-    delete(id: string): false | ReconnectImporters;
+    deleteForViteHmr(id: string): boolean;
     import(id: string): Promise<ModuleNamespace>;
+}
+
+function deleteForViteHmr(id: string): boolean {
+    const reconnect = System.delete(id);
+
+    // Vite-compatible HMR intentionally leaves existing importers unchanged.
+    // Do not call or retain SystemJS's reconnect closure.
+    // FUTURE: an explicitly owner-aware SystemJS graph could stage a complete
+    // SCC, validate it, and reconnect only external importer edges atomically.
+    return reconnect !== false;
 }
 ```
 
-`System.delete(id)` removes the old load record and captures its importer setters. Importing the same stable ID creates and evaluates a
-fresh load record. Calling the returned function attaches the previous importers to the fresh record and pushes the fresh namespace
-through their ESM setters.
+Importing a successfully deleted stable ID creates and evaluates a fresh load record. The fresh namespace is delivered to qualified HMR
+accept callbacks; it is not pushed automatically through old ESM setters.
 
-A replacement is unsafe if deletion fails because the module is still executing, participating in unresolved top-level await, or is in
-another unsupported loader state. Such an update performs a full reload.
+Before importing any accepted module, the runtime deletes the union of its loaded `reloadModuleIds`. A replacement is unsafe if deletion
+fails because a module is still executing, participates in unresolved top-level await, or is in another unsupported loader state. Such an
+update performs a full native reload.
 
 ### React Refresh ordering
 
@@ -822,138 +855,135 @@ The React transform has two separate responsibilities:
 1. Fresh module execution registers component types with the React Refresh runtime.
 2. The old module's HMR accept callback validates whether the fresh export shape is a safe Refresh boundary.
 
-Export reconnection must happen after boundary validation succeeds but before React refreshes the Fiber tree:
+The update order mirrors Vite web HMR:
 
 ```text
-capture old accept callbacks
-    → run old dispose handlers
-    → System.delete(stable IDs)
+capture old qualified accept callbacks
+    → run dispose handlers for accepted modules
+    → System.delete(invalidated stable IDs)
     → install fresh registrations
-    → System.import(stable IDs)
+    → System.import(accepted stable IDs)
     → fresh component types register
-    → validate every React Refresh boundary
-    → if invalid: full native reload
-    → reconnect existing ESM importers
-    → perform queued React Refresh
+    → invoke old accept callbacks with fresh namespaces
+    → propagate hot.invalidate() when a boundary is incompatible
+    → perform queued React Refresh for valid boundaries
     → acknowledge delivery
 ```
 
-Reconnecting before validation is forbidden. An incompatible module must not leak fresh exports into the running application graph before
-React requests a full reload.
+An incompatible React boundary calls `hot.invalidate()`. The server then propagates from that boundary to a higher accepting importer; if
+none exists, it requests a complete native reload. Existing importers are not automatically exposed to the fresh exports while this
+decision is made.
 
-Reconnection updates ESM bindings only. It does not render React, replace fibers, or migrate component state. React Refresh remains the
-sole owner of component-family replacement and state preservation.
+React Refresh remains the sole owner of component-family replacement, Fiber updates, and state preservation. The plugin owns its wrapper
+and scheduler, so `performReactRefresh()` is released only after every callback in the current delivery has completed successfully or its
+invalidation has been handed back to the server.
 
-The plugin owns the React wrapper and Refresh scheduler, so it gates `performReactRefresh()` until the HMR transaction commits. The
-standard boundary validator can enqueue Refresh work, but the queue is released only after all reconnect callbacks succeed.
+### Hot delivery batch
 
-### Hot transaction
-
-One executable delivery can contain several related module updates. They are applied as one transaction:
+One executable delivery can contain several Vite boundary updates and one shared set of registrations:
 
 ```ts
-interface HotModuleReplacement {
+interface HotModuleRegistration {
     id: string;
     registration: SystemRegistration;
 }
 
-interface HotTransaction {
-    boundaries: HotBoundaryUpdate[];
-    replacements: HotModuleReplacement[];
-    newModules: HotModuleReplacement[];
+interface HotUpdateBatch {
+    updates: HotUpdate[];
+    registrations: HotModuleRegistration[];
+    newModules: HotModuleRegistration[];
     prunedModuleIds: string[];
 }
 ```
 
-The runtime applies a transaction in these phases:
+The runtime applies a batch in these phases:
 
 #### 1. Prepare
 
-- Verify build ID, delivery version, and transaction nonce.
-- Reject foundational updates.
-- Capture old HMR contexts, namespaces, accept callbacks, and dispose handlers.
-- Ensure every registration required for immediate fresh linking is present or already safely loaded.
+- Verify build ID, delivery version, and nonce.
+- Reject foundational updates and Vite-detected circular HMR chains.
+- Capture qualified callbacks and dispose handlers before fresh HMR contexts replace them.
+- Ensure every registration required for the accepted imports is present or already safely loaded.
 - Do not mutate the SystemJS registry yet.
 
 A transform or dependency-preparation failure leaves the running application untouched.
 
 #### 2. Dispose
 
-Run the captured old dispose handlers and preserve each module's `hot.data` object under its stable source ID.
+Run Vite-compatible dispose handlers for the accepted module IDs and preserve each module's `hot.data` object under its stable source ID.
 
 #### 3. Delete
 
-Call `System.delete()` for every loaded replacement module before importing any replacement. Retain every reconnect callback. Deleting the
-complete replacement set first allows SystemJS to link fresh cycles without accidentally selecting one stale member merely because it was
-replaced later in the transaction.
-
-New modules have no old load record and require no deletion.
+Call `deleteForViteHmr()` for the union of loaded `reloadModuleIds` before importing any accepted module. Discard every upstream reconnect
+closure immediately. New modules have no old load record and require no deletion.
 
 #### 4. Instantiate and execute
 
-Install the transaction registrations as transient instantiation inputs, then import the transaction roots by their stable IDs. SystemJS
-links static dependencies, cycles, live exports, dynamic imports, and top-level await normally.
+Install fresh registrations as transient instantiation inputs, then import every unique `acceptedId` under its stable ID. SystemJS links
+its fresh invalidated dependencies and reuses unaffected dependencies already in the registry.
 
-Fresh execution creates new HMR contexts under the same stable IDs and registers fresh React component types under the same Refresh family
-identifiers.
+Fresh execution creates new HMR contexts and registers fresh React component types under the same Refresh family identifiers.
 
-#### 5. Validate
+#### 5. Accept or invalidate
 
-Invoke the captured old accept handlers with the fresh namespaces. React boundary validation compares old and fresh exports. Refresh work
-can be queued but cannot execute yet.
+Invoke each captured qualified callback with the corresponding fresh namespace. React boundary validation may queue Refresh work or call
+`hot.invalidate()` to request propagation to a higher boundary.
 
-If any validator rejects, an accept callback throws, or fresh linking/execution fails:
+A linking, execution, dispose, or callback exception after deletion requests an immediate full native reload. The runtime does not report
+a partially applied batch as healthy.
 
-- do not call any reconnect callback;
-- do not continue running the partially replaced graph;
-- request an immediate full native rebuild and reload;
-- retire the current build ID rather than acknowledging the transaction.
+#### 6. Refresh and acknowledge
 
-Fresh registrations may have executed, but a mandatory native reload discards that heap before normal application work resumes.
+Release valid queued React Refresh work. After Refresh completes and every invalidation request has been accepted by the control server,
+acknowledge the delivery version.
 
-#### 6. Commit
-
-Invoke all reconnect callbacks in deterministic dependency order. This pushes fresh namespaces through existing SystemJS importer setters,
-including re-exports and namespace imports.
-
-If reconnection unexpectedly fails, perform a full native reload. The runtime never reports a partially reconnected transaction as
-successful.
-
-#### 7. Refresh and acknowledge
-
-Release the gated React Refresh queue, await Refresh completion and transaction-level accept effects, then acknowledge the delivery.
-
-A delivery is not successful merely because `update.js` executed. Success means fresh modules executed, validation passed, importers
-reconnected, React Refresh completed, and the runtime acknowledged the committed version.
+Executing `update.js` alone is not success. Success means all fresh accepted modules executed, callbacks completed, valid boundaries
+refreshed, invalid boundaries requested further propagation, and the runtime acknowledged the applied version.
 
 ### Import graph changes
 
-Adding or removing imports is hot-replaceable whenever the affected boundary validates.
+Adding or removing imports is hot-replaceable whenever Vite propagation finds a qualified boundary.
 
 For a newly added static dependency:
 
-1. The server includes its registration and required fresh closure in the transaction.
-2. The updated importer is deleted and imported under the same stable ID.
-3. SystemJS links the new dependency.
-4. Validation runs.
-5. Existing importers reconnect to the fresh importer namespace.
+1. The server includes its registration and the invalidated region needed by the accepted import.
+2. The runtime deletes that loaded region and imports `acceptedId` under its stable ID.
+3. SystemJS links the new dependency into the fresh region.
+4. The old boundary callback receives the fresh accepted namespace.
 
-For a removed dependency, the fresh registration no longer declares it. The old module remains loaded only if another live importer still
-uses it. Otherwise Vite prune semantics run its cleanup handlers and the runtime can delete its unreferenced SystemJS record without a
-reconnect.
+Importers above the boundary are not automatically reconnected. The accept callback or framework owns the visible update, matching Vite's
+web contract.
+
+For a removed dependency, the fresh registration no longer declares it. Vite prune semantics run cleanup handlers once no current loaded
+module uses the dependency, after which the runtime may delete its unreferenced SystemJS record.
 
 A new dynamic dependency can be delivered immediately or fetched through the on-demand development path when first imported. Native
 subpackage declarations are not rewritten during the live session. The next cold materialization replans package ownership.
 
 ### Circular updates
 
-Ordinary module loading always uses full SystemJS cycle semantics.
+Ordinary module loading always uses full SystemJS cycle semantics, including cycles that cross generated native packages.
 
-For HMR, all changed members present in one transaction are deleted before any are imported. Their registrations are then linked together
-as a fresh graph. Reconnect callbacks run only after the full transaction validates.
+HMR deliberately follows Vite's stricter rule. If an accepting boundary is inside a circular import chain, the server requests a complete
+native reload before deleting any live System module. The initial implementation does not attempt to reconstruct cycle execution order
+inside a retained application heap.
 
-If deletion, fresh execution, or boundary validation cannot establish a safe cycle update, the runtime performs a full native reload.
-It does not attempt a partial SCC repair after exports have begun reconnecting.
+### Future: importer-aware live-binding reconnection
+
+A stronger SystemJS-specific HMR model remains a possible future architecture, but it is intentionally not part of the initial runtime.
+Such a model could replace a complete changed SCC and reconnect existing live ESM importers after validation. Doing that safely requires
+more than upstream `System.delete()`:
+
+- SystemJS currently stores importer setters as anonymous functions without importer IDs;
+- a multi-module replacement must distinguish stale internal setters from stable external importer edges;
+- every changed member must be staged and linked before any external namespace is exposed;
+- failed validation must not leak fresh exports into retained modules;
+- top-level await and module side effects need explicit transaction rules.
+
+A future implementation would therefore need owner-aware edges such as
+`{ importerId, dependencyId, setter }` and a first-class staged replacement transaction. It must be introduced as an explicit HMR semantic
+change with dedicated conformance tests, not hidden behind the current Vite-compatible deletion wrapper. The `FUTURE` comment in
+`deleteForViteHmr()` is the implementation marker for this work.
 
 ### Unloaded modules
 
@@ -968,7 +998,7 @@ When that stable ID is first imported later:
 5. The delivery resolves the pending instantiation token with the current registration.
 6. SystemJS links and executes the module once under its stable ID.
 
-There is no deletion or reconnection because no old load record exists.
+There is no deletion or accept callback because no old load record or HMR boundary instance exists.
 
 ## `update.js` executable delivery
 
@@ -988,7 +1018,7 @@ interface ExecutableDelivery {
     buildId: string;
     version: number;
     nonce: string;
-    transactions: HotTransaction[];
+    batch: HotUpdateBatch;
     pendingModuleResponses: PendingModuleResponse[];
 }
 ```
@@ -998,8 +1028,8 @@ Properties:
 - `version` is a monotonically increasing delivery sequence, not a module identity.
 - `nonce` ensures DevTools observes a physical file change when a delivery must be republished.
 - executing the same delivery twice is harmless;
-- registrations remain only until their transaction or pending instantiation consumes them;
-- an applied version prefix is acknowledged only after all transactions commit.
+- registrations remain only until the update batch or pending instantiation consumes them;
+- an applied version is acknowledged only after callbacks, Refresh work, and invalidation publication complete.
 
 ## Development control protocol
 
@@ -1011,10 +1041,10 @@ The runtime reports:
 
 - build ID;
 - runtime session ID;
-- last committed delivery version;
+- last applied delivery version;
 - loaded stable module IDs or source stamps;
 - pending on-demand instantiation requests;
-- transaction success or failure.
+- update-batch success, invalidation, or failure.
 
 The server retains:
 
@@ -1039,7 +1069,7 @@ There is no fairness, fan-out, or concurrent publication protocol for multiple s
 Only one unacknowledged delivery range is published for the active session. Rewriting `update.js` is not an acknowledgement.
 
 If DevTools misses or coalesces a file notification, the server republishes the same version with a new nonce. The runtime ignores an
-already committed version and acknowledges it again.
+already applied version and acknowledges it again.
 
 ### Restart behavior
 
@@ -1062,11 +1092,12 @@ state even though stable System module IDs avoid registry generation growth.
 A complete native rebuild and App reload occurs when:
 
 - Vite or the framework finds no acceptable HMR boundary;
-- React Refresh boundary validation fails;
+- propagation encounters an accepting boundary inside a circular import chain;
+- `hot.invalidate()` propagation from an incompatible boundary reaches no higher acceptable boundary;
 - a foundational module changes;
-- `System.delete()` cannot safely remove a replacement;
+- `System.delete()` cannot safely remove an invalidated module;
 - fresh registration compilation, linking, or execution fails after mutation begins;
-- an accept, dispose, reconnect, or Refresh step leaves the transaction unsafe;
+- an accept, dispose, or Refresh step leaves the update batch unsafe;
 - WXML or native JSON changes;
 - App/Page routes or native configuration change;
 - the initial literal transport or cold package plan must be rematerialized immediately;
@@ -1084,25 +1115,25 @@ A module-load error reports:
 - requested canonical ID;
 - parent/importer ID;
 - resolved physical package and capsule path;
-- whether the source was an initial capsule, transaction registration, or on-demand response;
+- whether the source was an initial capsule, update-delivery registration, or on-demand response;
 - build, session, and delivery IDs;
 - the SystemJS dependency chain;
 - the original source location through chained source maps.
 
 An HMR error additionally reports:
 
-- transaction phase;
+- update-batch phase;
 - deleted module IDs;
-- fresh modules that executed;
-- boundaries that validated or failed;
-- reconnect callbacks that committed;
+- fresh accepted modules that executed;
+- callbacks that accepted, invalidated, or failed;
+- pending invalidation propagation;
 - whether a full native reload was requested.
 
 A transform failure before publication does not overwrite the last successful `update.js` or `app.wxss`. The running application stays
-on its previous committed code.
+on its previous applied code.
 
-Once registry deletion begins, any unrecoverable failure requires a full reload. The runtime never pretends that a partially mutated
-System graph is healthy.
+Once registry deletion begins, any unrecoverable failure requires a full reload. The runtime never pretends that a partially applied
+Vite HMR batch is healthy.
 
 ## Hard invariants
 
@@ -1114,26 +1145,28 @@ The implementation enforces these invariants with build-time assertions and runt
 4. There is exactly one SystemJS realm.
 5. A logical application module has one canonical ID and one emitted owner package per build.
 6. Development HMR never changes a module's canonical ID.
-7. HMR replacement uses `System.delete()` before importing the same stable ID.
-8. All loaded replacements in a transaction are deleted before any replacement import begins.
-9. Existing ESM importers reconnect only after every boundary in the transaction validates.
-10. React Refresh executes only after ESM reconnection commits.
-11. A failed validation never reconnects fresh exports into the running graph.
-12. Foundational modules are never hot-replaced.
-13. An unsafe transaction always performs a full native reload.
-14. A delivery is acknowledged only after reconnection and React Refresh complete.
-15. Development delivery registrations are transient and do not form a second persistent module registry.
-16. Modules are never duplicated across generated packages.
-17. All configured native pages are emitted in the main package.
-18. Only JavaScript exclusively reachable through dynamic boundaries enters generated subpackages.
-19. Every initial System module ID has exactly one literal native capsule mapping.
-20. Cross-package edges never change logical module identity.
-21. Page entry reruns cannot recreate the App root or duplicate native route registration.
-22. A cancelled pre-activation Page session can never mount later.
-23. Production emits all Tailwind and ordinary CSS into one `app.wxss`.
-24. Tailwind and class rewriting are owned by the plugin's `weapp-tailwindcss` pipeline.
-25. Unsupported synchronous-return hooks are not silently approximated.
-26. The development protocol has one active runtime session.
+7. HMR deletes every loaded invalidated System record before importing its fresh accepted ID.
+8. The runtime never calls or retains the importer-reconnection closure returned by upstream `System.delete()`.
+9. Existing ESM importers outside the invalidated region are not automatically reconnected.
+10. Fresh namespaces are delivered only to qualified Vite HMR accept callbacks.
+11. React Refresh executes only after the current delivery's accept callbacks complete.
+12. An incompatible boundary propagates with `hot.invalidate()` and reloads only when no higher boundary accepts it.
+13. A Vite-detected circular HMR chain always performs a full native reload before registry mutation.
+14. Foundational modules are never hot-replaced.
+15. An unsafe update batch always performs a full native reload.
+16. A delivery is acknowledged only after callbacks, React Refresh, and invalidation publication complete.
+17. Development delivery registrations are transient and do not form a second persistent module registry.
+18. Modules are never duplicated across generated packages.
+19. All configured native pages are emitted in the main package.
+20. Only JavaScript exclusively reachable through dynamic boundaries enters generated subpackages.
+21. Every initial System module ID has exactly one literal native capsule mapping.
+22. Cross-package edges never change logical module identity.
+23. Page entry reruns cannot recreate the App root or duplicate native route registration.
+24. A cancelled pre-activation Page session can never mount later.
+25. Production emits all Tailwind and ordinary CSS into one `app.wxss`.
+26. Tailwind and class rewriting are owned by the plugin's `weapp-tailwindcss` pipeline.
+27. Unsupported synchronous-return hooks are not silently approximated.
+28. The development protocol has one active runtime session.
 
 ## Validation plan
 
@@ -1154,18 +1187,20 @@ The implementation enforces these invariants with build-time assertions and runt
 ### Stable-ID HMR tests
 
 - importing the same ID after `System.delete()` evaluates the fresh registration;
-- deletion returns importer reconnection capability;
-- reconnect pushes fresh named, namespace, and re-exported bindings;
+- `deleteForViteHmr()` discards and does not retain the upstream reconnect closure;
+- importers outside the invalidated region keep their original bindings;
+- self-accept callbacks receive the fresh self namespace;
+- dependency-accept callbacks receive only the fresh accepted dependency;
 - dispose runs before deletion;
-- fresh execution registers React component types before validation;
-- invalid React boundaries never reconnect;
-- reconnect runs before `performReactRefresh()`;
-- React component state is retained after a valid transaction;
+- fresh execution registers React component types before the old accept callback runs;
+- a valid React boundary refreshes while retaining component state;
+- an invalid React boundary emits `hot.invalidate()` and propagates to its importers;
+- invalidation with no higher boundary forces a full native reload;
 - App, Page, and shared component modules retain Refresh family IDs;
-- multiple replacements commit as one transaction;
-- changed cycles are deleted before fresh linking;
+- multiple boundary updates share one delivery batch without reconnecting old importers;
+- an accepting boundary inside a circular import chain forces a full reload before deletion;
 - deletion failure forces a full reload;
-- linking or execution failure after deletion forces a full reload;
+- linking, execution, dispose, or callback failure after deletion forces a full reload;
 - foundational changes force a full reload;
 - `hot.data` survives stable-ID replacement;
 - accept, prune, and invalidate behavior remains deterministic;
@@ -1215,9 +1250,9 @@ The implementation enforces these invariants with build-time assertions and runt
 
 - duplicate deliveries are ignored and acknowledged;
 - missed deliveries are republished with a new nonce;
-- acknowledgement occurs only after transaction commit;
+- acknowledgement occurs only after callbacks, Refresh, and invalidation publication;
 - a fresh session replaces the previous active session;
-- App restart replays retained committed updates;
+- App restart replays retained applied updates;
 - server restart creates a new build ID;
 - pending imports survive page entry reruns;
 - bounded history triggers fresh materialization.
@@ -1232,9 +1267,9 @@ These behaviors remain executable integration probes rather than assumptions:
 - direct `page.js` to `update.js` dependency preserving the App heap;
 - page entry rerun and route-registration guarding;
 - pending `System.import()` surviving an on-demand delivery rerun;
-- `System.delete()` replacement followed by importer reconnection;
+- `System.delete()` replacement with the reconnect closure deliberately discarded;
 - App root and React Fiber identity surviving valid HMR;
-- invalid Refresh boundary causing full App replacement;
+- invalid Refresh boundary propagating to a higher boundary, with full App replacement only at a dead end;
 - global `app.wxss` replacement preserving application state;
 - complete page-WXSS duplication fallback.
 
@@ -1252,10 +1287,18 @@ The architecture relies on these documented or source-verified behaviors:
   <https://github.com/systemjs/systemjs/blob/9647576d43294e938ddae8fe231beb62255f4e46/docs/system-register.md>
 - SystemJS custom loader hooks:
   <https://github.com/systemjs/systemjs/blob/9647576d43294e938ddae8fe231beb62255f4e46/docs/hooks.md>
-- SystemJS registry deletion and importer reconnection:
+- SystemJS registry deletion and its deliberately unused importer-reconnection return value:
   <https://github.com/systemjs/systemjs/blob/9647576d43294e938ddae8fe231beb62255f4e46/src/features/registry.js#L64-L93>
+- SystemJS's anonymous importer-setter storage, which motivates the documented future work:
+  <https://github.com/systemjs/systemjs/blob/9647576d43294e938ddae8fe231beb62255f4e46/src/system-core.js#L142-L166>
+- Vite's documented acceptance-boundary semantics, including that original imports are not swapped:
+  <https://vite.dev/guide/api-hmr#hot-accept-cb>
 - Vite's environment-neutral HMR client:
   <https://github.com/vitejs/vite/blob/b59a73f76f5557492d83d097bb33b3dd02f27d51/packages/vite/src/shared/hmr.ts>
+- Vite's server-side boundary propagation and circular-import detection:
+  <https://github.com/vitejs/vite/blob/b59a73f76f5557492d83d097bb33b3dd02f27d51/packages/vite/src/node/server/hmr.ts#L799-L963>
+- Rolldown's owner-aware bundled-development graph, relevant only as future design evidence:
+  <https://github.com/rolldown/rolldown/blob/111132357228f06c208af96f6f1f3c164104bdf3/crates/rolldown_plugin_hmr/src/runtime/runtime-extra-dev-common.js#L57-L170>
 - React Refresh wrapper registration and boundary validation:
   <https://github.com/vitejs/vite-plugin-react/blob/8ae5449be23079dd17fdefc64064a3d94be6fc39/packages/common/refresh-utils.ts#L20-L64>
 - React Refresh export registration, validation, and scheduling:
@@ -1274,11 +1317,12 @@ The architecture relies on these documented or source-verified behaviors:
 The architecture has five owners:
 
 1. **Native facades** synchronously register App and Pages and journal lifecycle events.
-2. **SystemJS** owns application module loading, cycles, stable identities, deletion, and live-binding reconnection.
+2. **SystemJS** owns application module loading, normal ESM live bindings, cycles, stable identities, and deletion.
 3. **React/Taro integration** owns one retained App root, Page sessions, events, and lifecycle dispatch.
 4. **Vite/Rolldown plus the System postprocessor** own source semantics and production optimization.
-5. **The development transaction runtime** validates fresh modules, reconnects ESM importers, then performs React Refresh.
+5. **The development HMR runtime** follows Vite boundary propagation, delivers fresh namespaces to accept callbacks, then performs React
+   Refresh without reconnecting old ESM importers.
 
 Tailwind, Taro, and React build integration are plugin-owned. React itself remains application-owned. Package boundaries never restrict
-source imports, production CSS is one `app.wxss`, and HMR uses stable IDs so SystemJS live bindings and React Refresh family identities
-remain coherent across updates.
+source imports, production CSS is one `app.wxss`, and stable development IDs keep HMR contexts and React Refresh family identities
+coherent across updates.
