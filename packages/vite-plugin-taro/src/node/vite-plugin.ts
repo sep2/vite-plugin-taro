@@ -30,10 +30,6 @@ function createBuildCoordinator(context: BuildContext): Plugin {
 
         config(_, environment) {
             context.configure(environment)
-        },
-
-        configResolved(config) {
-            context.resolve(config)
         }
     }
 }
