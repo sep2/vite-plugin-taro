@@ -30,7 +30,8 @@ The initial implementation does not support:
 
 - independent subpackages;
 - user-authored native `Component()` entry modules;
-- native lifecycle hooks whose result must be returned synchronously;
+- native callbacks whose return value affects WeChat behavior, including all share, favorite, and exit-state callbacks; this is a
+  closed design exclusion;
 - remote JavaScript evaluation;
 - compatibility with user-installed `@tarojs/*` packages;
 - user-controlled chunk or native subpackage placement.
@@ -360,7 +361,7 @@ usable dynamically.
 │ SystemJS application runtime                                       │
 │ identity, resolution, linking, execution, live bindings, cycles    │
 └──────────────────────────────┬─────────────────────────────────────┘
-                               │ activate(host)
+                               │ delegate configuration
 ┌──────────────────────────────▼─────────────────────────────────────┐
 │ React/Taro adapter                                                  │
 │ one App root, page sessions, lifecycle and event dispatch          │
@@ -536,8 +537,8 @@ belongs to a particular route.
 
 ### Eager JavaScript
 
-The planner begins with the generated App activation entry and every generated Page activation entry. It traverses static import edges
-and places the complete eager closure in the main package.
+The planner begins with the generated App delegate entry and every generated Page delegate entry. It traverses static import edges and
+places the complete eager closure in the main package.
 
 ```text
 App and all Pages
@@ -754,30 +755,49 @@ App(runtime.createAppFacadeConfig({
 
 `createAppFacadeConfig()` begins `System.import()` immediately and returns the native App configuration before yielding control.
 
-The plugin-generated App activation module has this contract:
+The plugin-generated App delegate module imports the user's App component, React, the bundled Taro React renderer, and Taro framework
+support through SystemJS. It exports the exact object returned by bundled Taro `createReactApp()`:
 
 ```ts
-interface AppActivationModule {
-    activate(host: AppFacadeHost): AppController | Promise<AppController>;
+import React from 'react';
+import ReactRenderer from 'virtual:taro/internal/react-renderer';
+import { createReactApp } from 'virtual:taro/internal/framework-react';
+import AppComponent from 'virtual:taro/user-app';
+import appConfig from 'virtual:taro/app-config';
+
+export default createReactApp(AppComponent, React, ReactRenderer, appConfig);
+```
+
+Conceptually, its contract is:
+
+```ts
+interface AppFacadeDelegateModule {
+    default: ReturnType<typeof createReactApp>;
 }
 ```
 
-It imports the user's App component, React, the plugin-owned Taro renderer, and framework support through SystemJS. The native facade
-does not understand React.
+The internal virtual-module names are not user-facing API. `createAppFacadeConfig()` validates the default export and retains that object
+as the App delegate. It does not translate the delegate into a second controller abstraction.
+
+Every facade lifecycle wrapper records the native `this` value and arguments. Once the delegate is available, the facade calls the exact
+Taro method with native receiver semantics:
+
+```ts
+delegate[lifecycle]?.apply(nativeAppInstance, args);
+```
+
+Taro's delegate remains the object stored in its own `Current.app`; its private `mount`, `unmount`, renderer, hook, and routing behavior
+are not copied or reimplemented by the facade. Data that WeChat requires while registering `App()` remains in the synchronous facade.
+Runtime data that Taro attaches during delegated lifecycle execution behaves exactly as it does when the Taro object is passed directly
+to `App()`.
 
 ### One App-owned React root
 
-The App controller creates one React root and retains it for the lifetime of the native App:
+Executing the App delegate module calls bundled Taro `createReactApp()`. Taro creates one React root and retains it for the lifetime of
+the native App. There is no plugin-defined `AppController` between the facade and Taro.
 
-```ts
-interface AppController {
-    mountPage(session: PageSession, component: React.ComponentType): Promise<PageController>;
-    unmountPage(session: PageSession): Promise<void>;
-    dispatchAppLifecycle(event: FacadeEvent): void;
-}
-```
-
-The user's App component is the root component. Mounted pages are its children.
+The user's App component is the root component. Taro's normal `Current.app.mount()` and `Current.app.unmount()` paths add and remove Page
+children in that retained tree.
 
 Consequences:
 
@@ -805,14 +825,35 @@ runtime.registerPageFacade('pages/home/index', function () {
 });
 ```
 
+The generated Page delegate module exports the exact object returned by bundled Taro `createPageConfig()`:
+
+```ts
+import { createPageConfig } from 'virtual:taro/internal/runtime';
+import PageComponent from 'virtual:taro/user-page';
+import pageConfig from 'virtual:taro/page-config';
+
+export default createPageConfig(
+    PageComponent,
+    'pages/home/index',
+    { root: { cn: [] } },
+    pageConfig
+);
+```
+
+`createPageFacadeConfig()` begins importing this module during page-entry evaluation. Its synchronous native result contains only the
+build-known initial data, supported non-returning lifecycle wrappers, and the stable `eh` wrapper. Once ready, each wrapper invokes the
+corresponding function on the exact Taro Page configuration with the native Page instance as `this`. Taro remains solely responsible for
+mounting, `Current.page` and router state, lifecycle hooks, DOM updates, and event dispatch.
+
 `update.js` is present only for development execution delivery. Every page has a direct literal dependency on it so WeChat DevTools can
 rerun page-side code when a delivery is published.
 
 `registerPageFacade()` makes page entry re-execution idempotent. Re-executing a page entry during HMR cannot:
 
 - call native `Page()` twice for the live route;
-- recreate the App controller;
+- recreate the Taro App delegate;
 - recreate the React root;
+- recreate the route's Taro Page delegate;
 - remount an active Page session;
 - restore an old application module.
 
@@ -835,30 +876,31 @@ interface PageSession {
     nativeInstance: WechatMiniprogram.Page.Instance<Record<string, unknown>, Record<string, unknown>>;
     state: PageSessionState;
     events: FacadeEvent[];
-    activation: Promise<PageController>;
+    delegate: Promise<ReturnType<typeof createPageConfig>>;
     cancellation: AbortController;
 }
 ```
 
-The implementation module import begins during page entry evaluation. `onLoad` binds the native instance and creates the session. Page
-activation waits for both the App controller and Page implementation module.
+The delegate-module import begins during page-entry evaluation. `onLoad` binds the native instance and creates the session. Delegation
+waits for the App delegate's initial lifecycle replay barrier and the route's Taro Page delegate.
 
-Lifecycle events that arrive before activation are journaled in native arrival order.
+Lifecycle and native events that arrive before delegation are journaled in native arrival order. Replaying an event means calling the
+matching Taro configuration method exactly once; the facade does not independently dispatch a Taro hook.
 
-If `onUnload` arrives before activation completes, the session is cancelled. The module can finish loading and remain cached, but the
-cancelled session never mounts, replays lifecycle events, or retains the native Page instance.
+If `onUnload` arrives before delegation begins, the session is cancelled. The module can finish loading and remain cached, but the
+cancelled session never invokes Taro `onLoad`, mounts, replays lifecycle events, or retains the native Page instance.
 
-### Activation failures
+### Delegate and activation failures
 
 Build, transform, and registration-generation errors are rejected before materialization and never overwrite the last runnable Mini
 Program. A successfully emitted capsule can still fail at runtime because native asynchronous loading fails, module execution or top-level
-await rejects, or an App/Page `activate()` implementation throws.
+await rejects, or a generated delegate module or Taro configuration creator throws.
 
 The native `App()` or `Page()` registration has already completed when such a rejection occurs. The facade therefore:
 
-1. marks the App activation or Page session as `failed`;
-2. clears queued lifecycle work and prevents a later mount;
-3. rejects dependent Page activations when the App controller failed;
+1. marks the App delegate or Page session as `failed`;
+2. clears queued lifecycle work and prevents a later Taro mount;
+3. rejects dependent Page delegation when the App delegate failed;
 4. logs one enriched error with the module chain, activation phase, and source-mapped location;
 5. rethrows the enriched error asynchronously so WeChat DevTools receives it through its normal error handling.
 
@@ -869,8 +911,9 @@ editing, compilation, and reload behavior belongs to WeChat DevTools.
 
 Lifecycle semantics follow the Taro programming model, not a previous bootstrap implementation.
 
-The App facade synchronously exposes and journals the standard App lifecycle surface. App lifecycle replay occurs after the App component
-and framework hooks are ready. Page activation waits for the App controller and initial App lifecycle replay barrier.
+The App facade synchronously exposes and journals the standard App lifecycle surface. App lifecycle replay invokes the corresponding
+methods on the Taro App delegate after `createReactApp()` has returned it. Page delegation waits for the App delegate and its initial
+lifecycle replay barrier.
 
 Core Page lifecycle order is preserved:
 
@@ -881,16 +924,23 @@ onLoad → onShow → onReady → onHide/onShow cycles → onUnload
 Additional non-returning Page callbacks, including pull-down refresh, reach-bottom, page scroll, resize, and tab-item callbacks, use the
 same ordered dispatcher. The generated `eh` method is the stable native template event bridge into the Taro event system.
 
-The initial implementation does not register callbacks whose native return value affects synchronous WeChat behavior, including:
+### Closed exclusion: native return-valued callbacks
+
+The target never registers callbacks whose return value affects WeChat behavior, including:
 
 - `onShareAppMessage`;
 - `onShareTimeline`;
 - `onAddToFavorites`;
 - `onSaveExitState`;
-- future callbacks with equivalent synchronous-return requirements.
+- future callbacks with equivalent return-value requirements.
 
-If static analysis identifies unsupported usage, the build reports it. Such hooks are never registered optimistically because their mere
-presence can change native UI behavior.
+This exclusion includes the share callbacks even on base-library versions that accept a returned `promise`. The synchronous facade has a
+fixed supported callback surface and simply never contains these method names.
+
+The compiler performs no detection, static analysis, warning, error, fallback, or transformation for unsupported callbacks. It does not
+inspect user components or Taro delegates for them. If user code defines one, it remains ordinary unreachable application code because
+WeChat was never given the corresponding native callback. This is a settled architecture decision, not a deferred feature or an open
+question.
 
 ## Development HMR architecture
 
@@ -1310,7 +1360,8 @@ The implementation enforces these invariants with build-time assertions and runt
 25. Runtime activation failures are surfaced through WeChat DevTools without a plugin-owned overlay.
 26. Production emits all Tailwind and ordinary CSS into one `app.wxss`.
 27. Tailwind and class rewriting are owned by the plugin's `weapp-tailwindcss` pipeline.
-28. Unsupported synchronous-return hooks are not silently approximated.
+28. Return-valued native callbacks are absent from the fixed facade surface, and the compiler neither detects nor specially handles
+    user code that defines them.
 29. The development protocol has one active runtime session.
 30. The dedicated `wx` Vite environment is the only application transform, module, and HMR graph.
 31. Vite's browser client and `ModuleRunner` never evaluate WX application modules.
@@ -1318,6 +1369,8 @@ The implementation enforces these invariants with build-time assertions and runt
     implementation.
 33. JSX structure is rendered through Taro's runtime host tree and is never compiled into page-specific structural WXML.
 34. Application dependency resolution never consumes a user-installed `@tarojs/*` package.
+35. App and Page facades delegate to the exact configuration objects returned by bundled Taro `createReactApp()` and
+    `createPageConfig()`; no second framework controller or lifecycle dispatcher exists.
 
 ## Validation plan
 
@@ -1388,18 +1441,26 @@ The implementation enforces these invariants with build-time assertions and runt
 ### Facade tests
 
 - synchronous App and Page registration;
-- App lifecycle journaling before activation;
+- App lifecycle journaling before delegation;
+- App lifecycle methods receive the original native App instance and arguments;
+- bundled Taro `createReactApp()` executes exactly once and its returned object is the exact App delegate;
+- bundled Taro `createPageConfig()` executes exactly once per route and its returned object is the exact Page delegate;
+- Page lifecycle wrappers invoke only the matching Taro delegate method with the original native Page instance and arguments;
+- facade replay never dispatches a Taro lifecycle independently of the delegate;
 - Page lifecycle ordering before and after mount;
 - App readiness before Page mount;
+- Taro `Current.app` remains the object created by `createReactApp()`;
 - one App-owned React root;
 - hidden pages remain mounted;
 - unload unmounts exactly once;
 - unload-before-activation cancels without replay or mount;
-- App activation failure rejects waiting Page sessions and prevents their mount;
-- Page activation failure enters `failed`, clears queued lifecycle work, and never mounts;
+- App delegate failure rejects waiting Page sessions and prevents their Taro mount;
+- Page delegate failure enters `failed`, clears queued lifecycle work, and never invokes Taro `onLoad`;
 - activation errors are enriched, logged once, and rethrown asynchronously without a plugin overlay;
 - repeated page entry execution is idempotent;
-- unsupported synchronous-return hooks are absent.
+- `onShareAppMessage`, `onShareTimeline`, `onAddToFavorites`, and `onSaveExitState` are absent from every facade;
+- defining an unsupported callback does not change compilation or produce a diagnostic;
+- promise-capable WeChat share callbacks receive no special handling.
 
 ### Taro rendering ABI tests
 
@@ -1511,7 +1572,8 @@ The architecture relies on these documented or source-verified behaviors:
 
 The architecture has five owners:
 
-1. **Native facades** synchronously register App and Pages and journal lifecycle events.
+1. **Native facades** synchronously register App and Pages, journal lifecycle events, and delegate them to the exact Taro configuration
+   objects once available.
 2. **SystemJS** owns application module loading, normal ESM live bindings, cycles, stable identities, and deletion.
 3. **The bundled Taro React stack and template ABI** own one retained App root, runtime host-tree rendering, Page sessions, events, and
    lifecycle dispatch.
