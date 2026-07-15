@@ -14,7 +14,7 @@ The initial implementation supports:
 - Vite 8 and Rolldown;
 - user-owned React 19 or newer;
 - plugin-owned React transforms and React Refresh integration;
-- plugin-owned Taro APIs, components, renderer, and runtime integration;
+- a plugin-bundled Taro API, component, React renderer, DOM, event, and WeChat template stack;
 - plugin-owned Tailwind CSS and WeChat Tailwind adaptation;
 - synchronous native `App()` and `Page()` registration;
 - one App-owned React root;
@@ -74,13 +74,15 @@ The plugin owns and ships:
 
 - the React Vite transform and React Refresh integration;
 - SystemJS;
-- the Taro API implementation;
-- Taro components;
-- the Taro React renderer and native event bridge;
+- the complete Taro implementation used by the target, including its API, components, React reconciler, runtime DOM, hydration,
+  event bridge, shared template ABI, helper, and WeChat platform template builder;
 - Tailwind CSS;
 - the `weapp-tailwindcss` transformation pipeline.
 
-Applications do not install any `@tarojs/*`, Tailwind, SystemJS, or React Refresh packages.
+All Taro packages are bundled implementation dependencies of `vite-plugin-taro`, not application peer dependencies. Build-side Taro
+code is bundled into the plugin distribution, and runtime-side Taro code is emitted into the application's SystemJS graph. The
+application resolver never consults a user-installed `@tarojs/*` package, so applications do not install Taro, Tailwind, SystemJS, or
+React Refresh packages themselves.
 
 ### Virtual Taro modules
 
@@ -272,6 +274,80 @@ If WeChat DevTools does not reliably retain application state while replacing gl
 the complete generated stylesheet into every page's `page.wxss`. This fallback changes only development transport; production remains a
 single `app.wxss`.
 
+## Taro rendering and native companion assets
+
+### One bundled Taro rendering ABI
+
+The target uses Taro's runtime host-tree model. It does not compile JSX structure into page-specific WXML. React renders through the
+bundled Taro React reconciler, which mutates the bundled Taro DOM. Taro hydration converts that DOM into the compact node records consumed
+by Taro's WeChat templates, and the root element publishes those records through native `setData()` calls.
+
+```text
+React Fiber
+    → bundled Taro React reconciler
+    → bundled Taro DOM nodes
+    → Taro hydration and component aliases
+    → Page.setData({ root... })
+    → generated Taro WeChat host templates
+```
+
+The template generator, `Shortcuts` and component aliases, hydrated node schema, root update paths, and `eh` event bridge are one internal
+ABI. They always come from the same bundled Taro implementation. The plugin does not combine Taro's template output with a separately
+reimplemented renderer.
+
+This runtime model is a hard requirement for arbitrary React composition, context across the App-owned tree, `React.lazy`, Suspense, and
+React Refresh. Generated page WXML is only a host-tree interpreter; application component structure remains in React and SystemJS.
+
+### Taro WeChat template builder
+
+The companion-asset stage constructs the template builder directly from Taro's WeChat platform implementation:
+
+```ts
+import { recursiveMerge } from '@tarojs/helper';
+import { Weapp as WxPlatform } from '@tarojs/plugin-platform-weapp';
+
+function createWxTemplateBuilder() {
+    const platform = new WxPlatform(
+        { helper: { recursiveMerge }, modifyWebpackChain() {}, registerPlatform() {} },
+        {},
+        {}
+    );
+    platform.modifyTemplate({});
+    return platform.template;
+}
+```
+
+These imports are private build-time implementation details bundled into the plugin. They are not resolved from the application.
+
+For each complete WX bundle, the companion-asset stage emits:
+
+- `app.json` from the normalized App configuration;
+- one transformed `app.wxss` containing all collected bundle CSS;
+- `base.wxml` from `templateBuilder.buildTemplate(componentConfig)`;
+- `utils.wxs` from `templateBuilder.buildXScript()`;
+- `comp.wxml` from `templateBuilder.buildBaseComponentTemplate('.wxml')`;
+- `comp.json` with `component: true`, `styleIsolation: 'apply-shared'`, and a recursive self-reference to `comp`;
+- `project.config.json`, optional `project.private.config.json`, and `sitemap.json`;
+- one page WXML built with `templateBuilder.buildPageTemplate()` and a relative import of root `base.wxml`;
+- one page JSON that installs the root `comp` component alongside the page's native configuration;
+- one empty page WXSS, except when the documented development CSS fallback is active.
+
+The component configuration always includes Taro's optimized core host variants:
+
+```text
+view, catch-view, static-view, pure-view, click-view, scroll-view,
+image, static-image, text, static-text
+```
+
+It then adds the dashed names of the Taro component module's `renderedExports`. Production obtains those exports from Rolldown's final
+bundle metadata. Development derives the equivalent set from the complete `wx` environment graph materialized at startup. Therefore the
+generated template contains every Taro host component reachable through either a static or Vite-discoverable dynamic import, without
+blindly emitting the entire component surface.
+
+If an HMR graph edit introduces a host component that is absent from the live `base.wxml`, the change crosses a native-template boundary
+and triggers rematerialization and a complete native reload. JavaScript HMR never pretends that an unavailable native template became
+usable dynamically.
+
 ## Architectural layers
 
 ```text
@@ -450,7 +526,13 @@ mutually awaited dynamic imports that would also deadlock under native ESM.
 
 ### Native pages
 
-All configured native pages are emitted in the main package. Users do not assign pages to subpackages.
+All configured native pages are emitted in the main package. This is a hard invariant: the planner never places a native Page shell,
+its WXML, JSON, or facade in a subpackage, and users do not assign pages to native packages.
+
+Page-level laziness is expressed only through normal application code, for example with `React.lazy(() => import('./body'))` or a direct
+Vite-supported dynamic import. The statically imported Page entry remains eager and main-package-owned, while the dynamic-only closure is
+eligible for an automatically generated code-only subpackage. The plugin never infers an asynchronous boundary merely because a module
+belongs to a particular route.
 
 ### Eager JavaScript
 
@@ -520,6 +602,30 @@ JavaScript and native resources have separate placement rules:
 
 ## Build pipeline
 
+### Dedicated `wx` Vite environment
+
+The plugin registers one first-class Vite environment named `wx` for the WeChat application. It is the sole owner of the application
+module graph in development and the sole application environment built in production.
+
+The exact resolution-condition list is normalized by the plugin, but `consumer: 'client'` is intentional: WX consumes client-side assets,
+CSS, and browser-oriented package exports even though it is not a browser runtime.
+
+In development, `createWxDevEnvironment()` creates a `DevEnvironment` with its own module graph and a plugin-owned `HotChannel`. The hot
+channel adapts Vite's environment-neutral HMR messages to the update compiler and the metadata/acknowledgement protocol. Executable code
+still travels only through generated native files and `update.js`.
+
+The WX environment is not a `RunnableDevEnvironment` and does not use Vite's `ModuleRunner` or its `AsyncFunction` evaluator. SystemJS in
+WeChat is the only application evaluator. The environment exists on the Vite side to resolve, transform, cache, and analyze modules and
+to calculate HMR propagation.
+
+In production, the `wx` build environment owns the Rolldown build and the subsequent System-register, package-planning, native-asset, and
+literal-transport stages. The plugin opts into Vite's app builder and builds only `builder.environments.wx`; the default browser `client`
+and Node `ssr` environments are not application build graphs.
+
+Third-party Vite plugins participate normally in the `wx` environment. Their hooks observe `this.environment.name === 'wx'`, and every
+per-environment transform result and import edge belongs to the isolated WX graph. Browser `/@vite/client`, module-preload bootstrap, and
+browser WebSocket execution are never injected into generated Mini Program code.
+
 ### Plugin-owned Vite integration
 
 `vitePluginTaro()` installs the complete ordered plugin set required by the target, including:
@@ -555,7 +661,7 @@ The architecture does not introduce a second source resolver.
 
 ### Production JavaScript
 
-Production uses the normal Rolldown application graph:
+Production uses the dedicated `wx` build environment's Rolldown application graph:
 
 ```text
 source modules
@@ -610,8 +716,9 @@ source module
 
 This preserves Vite module graph granularity, stable source IDs, HMR boundaries, and React Refresh family identifiers.
 
-The normal Vite dev server remains the source transformation server. The plugin uses `transformRequest()`, the Vite module graph, and
-normal hot-update hooks. It does not run a second JavaScript bundler for development.
+The normal Vite dev server remains the source transformation server. The plugin uses
+`server.environments.wx.transformRequest()`, `server.environments.wx.moduleGraph`, and the WX environment's normal hot-update hooks. It
+does not run a second JavaScript bundler for development and never uses the browser client's module graph as a fallback.
 
 ### Development startup materialization
 
@@ -1205,8 +1312,25 @@ The implementation enforces these invariants with build-time assertions and runt
 27. Tailwind and class rewriting are owned by the plugin's `weapp-tailwindcss` pipeline.
 28. Unsupported synchronous-return hooks are not silently approximated.
 29. The development protocol has one active runtime session.
+30. The dedicated `wx` Vite environment is the only application transform, module, and HMR graph.
+31. Vite's browser client and `ModuleRunner` never evaluate WX application modules.
+32. The Taro template builder, component aliases, hydration schema, root updater, event bridge, and React renderer come from one bundled
+    implementation.
+33. JSX structure is rendered through Taro's runtime host tree and is never compiled into page-specific structural WXML.
+34. Application dependency resolution never consumes a user-installed `@tarojs/*` package.
 
 ## Validation plan
+
+### WX Vite environment tests
+
+- development transforms use only `server.environments.wx`;
+- the WX graph has independent resolved IDs, importers, accepted dependencies, and transform caches;
+- third-party plugin hooks execute with `this.environment.name === 'wx'`;
+- WX resolution selects the configured client and platform package conditions;
+- browser `/@vite/client`, module-preload code, and WebSocket execution are absent;
+- the custom HotChannel receives Vite propagation results and emits metadata rather than executable source;
+- production builds only `builder.environments.wx`;
+- development and production both resolve user source through the same environment-aware plugin pipeline.
 
 ### System loader tests
 
@@ -1277,6 +1401,19 @@ The implementation enforces these invariants with build-time assertions and runt
 - repeated page entry execution is idempotent;
 - unsupported synchronous-return hooks are absent.
 
+### Taro rendering ABI tests
+
+- the bundled WeChat template builder and bundled runtime agree on every `Shortcuts` field and component alias;
+- `base.wxml`, `utils.wxs`, `comp.wxml`, and `comp.json` are deterministic;
+- every page WXML imports root `base.wxml` through a correct relative path;
+- every page JSON installs the recursive `comp` component without discarding native page configuration;
+- production `renderedExports` select all and only reachable Taro host components plus the required optimized core variants;
+- development graph analysis produces the same host-component set for the same source graph;
+- Taro hydration output renders through the generated templates;
+- `eh` dispatch resolves `sid` values back to the corresponding bundled Taro DOM node;
+- introducing a previously absent host component during HMR forces a native template rebuild;
+- no generated application module resolves a user-installed `@tarojs/*` package.
+
 ### Tailwind and CSS tests
 
 - zero Tailwind roots disables Tailwind;
@@ -1337,6 +1474,10 @@ The architecture relies on these documented or source-verified behaviors:
   <https://github.com/systemjs/systemjs/blob/9647576d43294e938ddae8fe231beb62255f4e46/src/system-core.js#L142-L166>
 - Vite's documented acceptance-boundary semantics, including that original imports are not swapped:
   <https://vite.dev/guide/api-hmr#hot-accept-cb>
+- Vite's isolated environment module graphs and environment-scoped transforms:
+  <https://github.com/vitejs/vite/blob/b59a73f76f5557492d83d097bb33b3dd02f27d51/docs/guide/api-environment-instances.md#L31-L140>
+- Vite's runtime-provider environment factory and custom transport model:
+  <https://github.com/vitejs/vite/blob/b59a73f76f5557492d83d097bb33b3dd02f27d51/docs/guide/api-environment-runtimes.md#L16-L83>
 - Vite's environment-neutral HMR client:
   <https://github.com/vitejs/vite/blob/b59a73f76f5557492d83d097bb33b3dd02f27d51/packages/vite/src/shared/hmr.ts>
 - Vite's server-side boundary propagation and circular-import detection:
@@ -1351,6 +1492,16 @@ The architecture relies on these documented or source-verified behaviors:
   <https://github.com/vitejs/vite/blob/b59a73f76f5557492d83d097bb33b3dd02f27d51/docs/guide/features.md#dynamic-import>
 - Rolldown's current output formats:
   <https://github.com/rolldown/rolldown/blob/111132357228f06c208af96f6f1f3c164104bdf3/packages/rolldown/src/options/output-options.ts#L53-L55>
+- Taro's WeChat platform and template initialization:
+  <https://github.com/NervJS/taro/blob/0db37ec9d383ec774df54634a3db632286c0ffa1/packages/taro-platform-weapp/src/program.ts#L10-L57>
+- Taro's WeChat page-template generation:
+  <https://github.com/NervJS/taro/blob/0db37ec9d383ec774df54634a3db632286c0ffa1/packages/taro-platform-weapp/src/template.ts#L107-L132>
+- Taro's base component, WXS, recursive, and unrolled template generators:
+  <https://github.com/NervJS/taro/blob/0db37ec9d383ec774df54634a3db632286c0ffa1/packages/shared/src/template.ts#L550-L673>
+- Taro's matching compact hydration schema and component aliases:
+  <https://github.com/NervJS/taro/blob/0db37ec9d383ec774df54634a3db632286c0ffa1/packages/taro-runtime/src/hydrate.ts#L29-L127>
+- Taro's native `eh` event bridge:
+  <https://github.com/NervJS/taro/blob/0db37ec9d383ec774df54634a3db632286c0ffa1/packages/taro-runtime/src/dom/event.ts#L154-L190>
 - `weapp-tailwindcss` generator contract:
   <https://github.com/sonofmagic/weapp-tailwindcss/blob/c2262d743ad4fab4779576a7f54296eeb3e03338/packages/weapp-tailwindcss/src/generator/types.ts#L22-L55>
 - `weapp-tailwindcss` Mini Program CSS finalization:
@@ -1362,11 +1513,13 @@ The architecture has five owners:
 
 1. **Native facades** synchronously register App and Pages and journal lifecycle events.
 2. **SystemJS** owns application module loading, normal ESM live bindings, cycles, stable identities, and deletion.
-3. **React/Taro integration** owns one retained App root, Page sessions, events, and lifecycle dispatch.
-4. **Vite/Rolldown plus the System postprocessor** own source semantics and production optimization.
+3. **The bundled Taro React stack and template ABI** own one retained App root, runtime host-tree rendering, Page sessions, events, and
+   lifecycle dispatch.
+4. **The dedicated Vite `wx` environment, Rolldown, and the System postprocessor** own source semantics, the application graph, and
+   production optimization.
 5. **The development HMR runtime** follows Vite boundary propagation, delivers fresh namespaces to accept callbacks, then performs React
    Refresh without reconnecting old ESM importers.
 
-Tailwind, Taro, and React build integration are plugin-owned. React itself remains application-owned. Package boundaries never restrict
-source imports, production CSS is one `app.wxss`, and stable development IDs keep HMR contexts and React Refresh family identities
-coherent across updates.
+Tailwind, the complete Taro implementation, and React build integration are bundled and plugin-owned. React itself remains
+application-owned. Package boundaries never restrict source imports, production CSS is one `app.wxss`, and stable development IDs keep
+HMR contexts and React Refresh family identities coherent across updates.
