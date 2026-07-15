@@ -679,7 +679,12 @@ source modules
     → literal transport
 ```
 
-Runtime System module IDs correspond to output chunks, not individual source modules.
+Production granularity is a closed architectural decision: one System registration corresponds to one final Rolldown output chunk, not
+to one source or Vite module. Production never enables preserve-module output merely to expose more identities to SystemJS.
+
+Rolldown owns source-module resolution, tree shaking, scope hoisting, and execution semantics inside each chunk. SystemJS owns the final
+chunk graph: inter-chunk static dependencies, dynamic imports, live chunk exports, and cycles crossing chunk boundaries. Source modules
+combined into one chunk intentionally have no independent production runtime identity.
 
 Rolldown does not currently emit SystemJS, so one isolated postprocessor owns the conversion:
 
@@ -1376,6 +1381,8 @@ The implementation enforces these invariants with build-time assertions and runt
     `createPageConfig()`; no second framework controller or lifecycle dispatcher exists.
 36. React is always an application-installed dependency, the plugin never ships a private React implementation, and React resolution
     receives no plugin-specific identity or deduplication policy.
+37. Every production System registration is a final Rolldown chunk; source modules do not retain independent production runtime
+    identities.
 
 ## Validation plan
 
@@ -1393,6 +1400,9 @@ The implementation enforces these invariants with build-time assertions and runt
 
 ### System loader tests
 
+- production emits exactly one System registration for each final Rolldown JavaScript chunk;
+- production does not enable preserve-module output or expose source modules as independent System identities;
+- Rolldown-internalized module cycles and SystemJS cross-chunk cycles preserve their respective ESM semantics;
 - static imports and live bindings;
 - re-exports and namespace imports;
 - function hoisting through cycles;
