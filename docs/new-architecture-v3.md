@@ -24,7 +24,8 @@ The initial implementation supports:
 - every import cycle valid under ESM evaluation semantics;
 - automatic code-only subpackages for lazy JavaScript;
 - JavaScript HMR and React Refresh in WeChat DevTools;
-- stable development module IDs with Vite-compatible acceptance-boundary HMR.
+- stable development module IDs with Vite-compatible acceptance-boundary HMR;
+- Vite 8's Rolldown dependency optimizer for development dependencies and CommonJS interoperability.
 
 The initial implementation does not support:
 
@@ -686,6 +687,20 @@ Rolldown owns source-module resolution, tree shaking, scope hoisting, and execut
 chunk graph: inter-chunk static dependencies, dynamic imports, live chunk exports, and cycles crossing chunk boundaries. Source modules
 combined into one chunk intentionally have no independent production runtime identity.
 
+### No runtime externals
+
+Runtime JavaScript externalization is forbidden. Every user, Taro, React, and third-party JavaScript dependency must resolve into the WX
+Vite graph and a Rolldown output chunk. Application-owned dependencies such as React are bundled from the application's installation; they
+are not runtime externals.
+
+A Vite plugin result or `rolldownOptions.external` rule that leaves a runtime import external fails the build. The final output validator
+requires every System registration dependency ID to resolve to another emitted registration or a plugin-owned internal host module with a
+concrete implementation. There is no user-facing `System.set()`, global-name mapping, CDN module, native npm external, or passthrough
+native `require()` escape hatch.
+
+Node built-ins are unsupported unless an ordinary Vite plugin rewrites them to a bundled implementation before final linking. Network
+requests may still load data and assets through WeChat APIs; they never load executable JavaScript modules.
+
 Rolldown does not currently emit SystemJS, so one isolated postprocessor owns the conversion:
 
 ```ts
@@ -723,7 +738,24 @@ source module
     → initial native capsule or update.js registration
 ```
 
-This preserves Vite module graph granularity, stable source IDs, HMR boundaries, and React Refresh family identifiers.
+This preserves Vite module graph granularity, stable source IDs, HMR boundaries, and React Refresh family identifiers. A Vite module may
+be either one transformed source module or one output of Vite's dependency optimizer; development does not attempt to recover source-level
+identities from inside an optimized dependency chunk.
+
+### Development dependency optimization
+
+The dedicated `wx` environment enables Vite 8's Rolldown dependency optimizer. The plugin supplies the App, every Page, and required
+internal virtual entries to WX dependency discovery. Bare npm dependencies and CommonJS packages are prebundled through Vite's normal
+optimizer before their output is converted into System registrations.
+
+Optimized output has stable canonical System IDs for one materialized development build even when its physical optimizer cache paths
+contain metadata hashes. Optimized dependencies are foundational HMR modules: they are reused by application updates and are never
+replaced inside the retained runtime heap. An optimizer rerun, dependency installation, lockfile change, optimizer configuration change,
+or changed optimized output creates a new development build ID, rematerializes the native project, and requests a full App reload.
+
+Linked workspace source that Vite does not optimize remains ordinary WX development modules and participates in normal HMR. Production
+does not consume the development optimizer; the production `wx` environment uses the normal Rolldown application build described above.
+Dependency optimization never creates a runtime external.
 
 The normal Vite dev server remains the source transformation server. The plugin uses
 `server.environments.wx.transformRequest()`, `server.environments.wx.moduleGraph`, and the WX environment's normal hot-update hooks. It
@@ -1383,6 +1415,10 @@ The implementation enforces these invariants with build-time assertions and runt
     receives no plugin-specific identity or deduplication policy.
 37. Every production System registration is a final Rolldown chunk; source modules do not retain independent production runtime
     identities.
+38. Every runtime JavaScript dependency is bundled into the WX graph; external System modules, native module passthrough, and remote
+    executable modules are forbidden.
+39. WX development uses Vite's Rolldown dependency optimizer; optimized outputs are foundational for one materialized build, and any
+    optimizer rerun requires a new build ID and full native reload.
 
 ## Validation plan
 
@@ -1396,6 +1432,12 @@ The implementation enforces these invariants with build-time assertions and runt
 - the custom HotChannel receives Vite propagation results and emits metadata rather than executable source;
 - production builds only `builder.environments.wx`;
 - development and production both resolve user source through the same environment-aware plugin pipeline;
+- the WX environment explicitly enables the Rolldown dependency optimizer with the generated App and Page discovery entries;
+- CommonJS npm dependencies execute from optimized System registrations;
+- optimized physical cache hashes do not enter canonical runtime IDs;
+- application HMR reuses foundational optimized dependencies;
+- optimizer reruns, lockfile changes, and changed optimized output force rematerialization and full native reload;
+- linked, unoptimized workspace source remains normally hot-replaceable;
 - the plugin distribution contains no private React implementation or React-specific deduplication behavior.
 
 ### System loader tests
@@ -1403,6 +1445,10 @@ The implementation enforces these invariants with build-time assertions and runt
 - production emits exactly one System registration for each final Rolldown JavaScript chunk;
 - production does not enable preserve-module output or expose source modules as independent System identities;
 - Rolldown-internalized module cycles and SystemJS cross-chunk cycles preserve their respective ESM semantics;
+- every final System dependency resolves to an emitted registration or plugin-owned implemented host module;
+- user or plugin attempts to externalize runtime JavaScript fail the build;
+- application-owned React is bundled from the application installation rather than externalized;
+- Node built-ins fail unless transformed to bundled modules before linking;
 - static imports and live bindings;
 - re-exports and namespace imports;
 - function hoisting through cycles;
@@ -1567,6 +1613,10 @@ The architecture relies on these documented or source-verified behaviors:
   <https://github.com/vitejs/vite-plugin-react/blob/8ae5449be23079dd17fdefc64064a3d94be6fc39/packages/common/refresh-runtime.js#L569-L648>
 - Vite dynamic-import behavior:
   <https://github.com/vitejs/vite/blob/b59a73f76f5557492d83d097bb33b3dd02f27d51/docs/guide/features.md#dynamic-import>
+- Vite dependency prebundling and discovery:
+  <https://github.com/vitejs/vite/blob/b59a73f76f5557492d83d097bb33b3dd02f27d51/docs/guide/dep-pre-bundling.md#L1-L60>
+- Vite 8's Rolldown dependency optimizer:
+  <https://github.com/vitejs/vite/blob/b59a73f76f5557492d83d097bb33b3dd02f27d51/docs/guide/migration.md#L35-L62>
 - Rolldown's current output formats:
   <https://github.com/rolldown/rolldown/blob/111132357228f06c208af96f6f1f3c164104bdf3/packages/rolldown/src/options/output-options.ts#L53-L55>
 - Taro's WeChat platform and template initialization:
