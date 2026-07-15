@@ -4,29 +4,24 @@ import type { BuildContext } from '../../build-context.ts'
 import { normalizeModuleId, stripVirtualPrefix } from '../../utils/modules.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { emitWxCompanionAssets, type WxBundle } from './companion-assets.ts'
-import { WxDevelopmentSession } from './dev-server/development-session.ts'
-import { transformWxReactRefreshModule } from './react-refresh.ts'
 import { emitWxEntryChunks, isWxVirtualModuleId, loadWxVirtualModule, virtualWxAppId } from './virtual-modules.ts'
 
 const taroWxComponentsPath = packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
 const vitePluginTaroSourcePath = normalizeModuleId(path.dirname(packageRequire.resolve('vite-plugin-taro')))
 const taroVersion = String(packageRequire('@tarojs/runtime/package.json').version)
 
-/** Creates the plugins that own the complete WX build and development lifecycle. */
+/** Creates the plugins that own WX build configuration and output generation. */
 export function createWxTargetPlugins(context: BuildContext): PluginOption[] {
     return [createWxTargetPlugin(context)]
 }
 
 function createWxTargetPlugin(context: BuildContext): Plugin {
-    let developmentSession: WxDevelopmentSession | undefined
-
     return {
         name: 'vite-plugin-taro:wx',
 
         config() {
             return {
                 define: createWxTaroDefines(),
-                experimental: context.development ? { bundledDev: true } : undefined,
                 css: {
                     lightningcss: {
                         visitor: {
@@ -105,33 +100,11 @@ function createWxTargetPlugin(context: BuildContext): Plugin {
             }
         },
 
-        transform: {
-            order: 'post',
-            async handler(code, id) {
-                if (!context.development) return
-
-                const transformed = await transformWxReactRefreshModule(code, id, context.project.appComponentFile)
-                return transformed === code ? undefined : transformed
-            }
-        },
-
         generateBundle: {
             order: 'post',
             async handler(_, bundle) {
                 await emitWxCompanionAssets(this, bundle as WxBundle, context)
             }
-        },
-
-        configureServer: {
-            order: 'post',
-            handler(server) {
-                developmentSession = new WxDevelopmentSession(context, server)
-                developmentSession.install()
-            }
-        },
-
-        closeBundle() {
-            return developmentSession?.close()
         }
     }
 }

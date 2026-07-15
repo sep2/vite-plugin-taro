@@ -1,5 +1,5 @@
 import path from 'node:path'
-import type { ConfigEnv, ResolvedConfig } from 'vite'
+import type { ConfigEnv } from 'vite'
 import type { JsonObject, VitePluginTaroOptions, VitePluginTaroPageOption, VitePluginTaroTarget } from '../options.ts'
 import { CssPipeline } from './css/css-pipeline.ts'
 
@@ -18,7 +18,6 @@ export class BuildContext {
     readonly project: ProjectContext
     readonly css: CssPipeline
     private developmentMode: boolean | undefined
-    private resolvedViteConfig: ResolvedConfig | undefined
 
     constructor(options: VitePluginTaroOptions) {
         this.css = new CssPipeline(options.target)
@@ -39,24 +38,11 @@ export class BuildContext {
     configure(environment: ConfigEnv): void {
         if (this.developmentMode !== undefined)
             throw new Error('vite-plugin-taro build context was already configured.')
-        this.developmentMode = environment.command === 'serve'
-    }
-
-    resolve(config: ResolvedConfig): void {
-        if (this.developmentMode === undefined) {
-            throw new Error('vite-plugin-taro build context resolved before it was configured.')
-        }
-        if (this.resolvedViteConfig) throw new Error('vite-plugin-taro build context was already resolved.')
-        this.resolvedViteConfig = config
+        this.developmentMode = environment.command === 'serve' || environment.mode === 'development'
     }
 
     get development(): boolean {
         if (this.developmentMode === undefined) throw new Error('vite-plugin-taro build context is not configured.')
         return this.developmentMode
-    }
-
-    get vite(): ResolvedConfig {
-        if (!this.resolvedViteConfig) throw new Error('vite-plugin-taro build context is not resolved.')
-        return this.resolvedViteConfig
     }
 }

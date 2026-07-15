@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { ConfigEnv, ResolvedConfig } from 'vite'
+import type { ConfigEnv } from 'vite'
 import { BuildContext } from './build-context.ts'
 
 const options = {
@@ -13,14 +13,21 @@ const options = {
     sitemapJson: {}
 }
 
-function environment(command: ConfigEnv['command']): ConfigEnv {
-    return { command, mode: command === 'serve' ? 'development' : 'production', isSsrBuild: false, isPreview: false }
+function environment(
+    command: ConfigEnv['command'],
+    mode = command === 'serve' ? 'development' : 'production'
+): ConfigEnv {
+    return { command, mode, isSsrBuild: false, isPreview: false }
 }
 
-test('derives development mode once from the Vite command', () => {
+test('derives development mode once from the Vite command and mode', () => {
     const serveContext = new BuildContext(options)
     serveContext.configure(environment('serve'))
     assert.equal(serveContext.development, true)
+
+    const watchContext = new BuildContext(options)
+    watchContext.configure(environment('build', 'development'))
+    assert.equal(watchContext.development, true)
 
     const buildContext = new BuildContext(options)
     buildContext.configure(environment('build'))
@@ -30,12 +37,7 @@ test('derives development mode once from the Vite command', () => {
 test('enforces build context lifecycle order', () => {
     const context = new BuildContext(options)
     assert.throws(() => context.development, /not configured/)
-    assert.throws(() => context.vite, /not resolved/)
-    assert.throws(() => context.resolve({ root: '/tmp' } as ResolvedConfig), /before it was configured/)
 
     context.configure(environment('build'))
     assert.throws(() => context.configure(environment('build')), /already configured/)
-    context.resolve({ root: '/tmp' } as ResolvedConfig)
-    assert.equal(context.vite.root, '/tmp')
-    assert.throws(() => context.resolve({ root: '/tmp' } as ResolvedConfig), /already resolved/)
 })

@@ -65,7 +65,7 @@ async function createWxCompanionAssets(
         { fileName: 'utils.wxs', source: templateBuilder.buildXScript() },
         { fileName: 'comp.wxml', source: templateBuilder.buildBaseComponentTemplate('.wxml') },
         { fileName: 'comp.json', source: json(createWxComponentConfig()) },
-        { fileName: 'project.config.json', source: json(createWxProjectConfig(context)) },
+        { fileName: 'project.config.json', source: json(context.project.projectConfigJson) },
         context.project.projectPrivateConfigJson
             ? { fileName: 'project.private.config.json', source: json(context.project.projectPrivateConfigJson) }
             : undefined,
@@ -88,19 +88,6 @@ async function createWxCompanionAssets(
             { fileName: `${page.path}.wxss`, source: '' }
         ])
     ]
-}
-
-function createWxProjectConfig(context: BuildContext): JsonObject {
-    const projectConfig = context.project.projectConfigJson
-    const setting = isJsonObject(projectConfig.setting) ? projectConfig.setting : {}
-    return {
-        ...projectConfig,
-        setting: { ...setting, compileHotReLoad: true }
-    }
-}
-
-function isJsonObject(value: unknown): value is JsonObject {
-    return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function createWxTemplateBuilder() {

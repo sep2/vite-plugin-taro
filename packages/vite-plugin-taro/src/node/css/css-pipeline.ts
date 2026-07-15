@@ -1,17 +1,9 @@
-import fs from 'node:fs/promises'
 import path from 'node:path'
-import { extractSourceCandidates } from '@tailwindcss-mangle/engine'
 import type { PluginOption, ResolvedConfig } from 'vite'
 import { createContext } from 'weapp-tailwindcss/core'
-import {
-    createWeappTailwindcssGenerator,
-    resolveTailwindV4Source,
-    type WeappTailwindcssGenerator
-} from 'weapp-tailwindcss/generator'
 import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
 import type { VitePluginTaroTarget } from '../../options.ts'
 import { normalizeModuleId } from '../utils/modules.ts'
-import { resolvePackageFile } from '../utils/packages.ts'
 
 const wxStyleOptions = {
     cssCalc: false,
@@ -21,24 +13,15 @@ const wxStyleOptions = {
 } as const
 
 type WxContext = ReturnType<typeof createContext>
-type CssEntry = { source: string; generator: WeappTailwindcssGenerator }
-type PatchResult = { code: string } | { requiresFullBuild: true }
 
-/** Owns Tailwind's Vite integration and native WX patch synchronization. */
+/** Owns Tailwind's Vite integration and native WX output transformation. */
 export class CssPipeline {
     readonly plugins: PluginOption[]
-    // Each Tailwind CSS entry can define a different design system, so additions must pass every relevant validator.
-    private readonly entries = new Map<string, CssEntry>()
-    // Vite can report the same source more than once; avoid repeating extraction and validation.
-    private readonly sourceCache = new Map<string, string>()
-    // Upstream owns WX JavaScript escaping; this context is deliberately reused between patches.
+    private readonly entries = new Map<string, string>()
     private wxContext: WxContext | undefined
-    // CSS transforms arrive after configResolved, so the Vite root is retained for source and module resolution.
     private root: string | undefined
-    // Only classes represented by a completed WX build are safe to publish in a JavaScript-only patch.
-    private builtClassSet = new Set<string>()
 
-    /** Composes the upstream web/WX plugins and adds candidate tracking only for native WX patches. */
+    /** Composes the upstream web/WX plugins and records WX Tailwind entries for final WXSS transformation. */
     constructor(target: VitePluginTaroTarget) {
         const pipeline = this
 
@@ -52,9 +35,9 @@ export class CssPipeline {
                       configResolved(config) {
                           pipeline.resolveWx(config)
                       },
-                      async transform(code, id) {
+                      transform(code, id) {
                           if (!isTailwindCssEntry(code, id)) return
-                          await pipeline.registerCssEntry(id, code)
+                          pipeline.registerCssEntry(id, code)
                       }
                   }
                 : undefined,
@@ -69,30 +52,9 @@ export class CssPipeline {
         ]
     }
 
-    /** Records every utility guaranteed to exist after a successful full WX build. */
-    async captureFullBuild(): Promise<void> {
-        this.sourceCache.clear()
-        // Preserve removed development CSS, matching upstream's append-only HMR default.
-        for (const { generator } of this.entries.values()) {
-            const result = await generator.generate({ scanSources: true })
-            for (const candidate of result.classSet) this.builtClassSet.add(candidate)
-        }
-    }
-
     /** Applies upstream mini-program compatibility transforms to Taro's fully materialized WXSS. */
     async transformWxss(code: string): Promise<string> {
         return (await this.getWxContext().transformWxss(code)).css
-    }
-
-    /** Escapes a JavaScript-only WX patch, or rejects it when its utilities require new WXSS. */
-    async transformNativePatch(code: string, filename: string, files: string[]): Promise<PatchResult> {
-        if (await this.hasAddedCandidates(files)) return { requiresFullBuild: true }
-        const result = await this.getWxContext().transformJs(code, {
-            runtimeSet: this.builtClassSet,
-            filename,
-            generateMap: false
-        })
-        return { code: result.code }
     }
 
     /** Retains Vite's root for resolving later CSS transforms and changed-file notifications. */
@@ -100,20 +62,11 @@ export class CssPipeline {
         this.root = config.root
     }
 
-    /** Creates one validator per Tailwind entry and refreshes the shared upstream WX transformer. */
-    private async registerCssEntry(id: string, source: string): Promise<void> {
+    /** Refreshes the shared WX transformer when a Tailwind entry changes. */
+    private registerCssEntry(id: string, source: string): void {
         const file = resolveFile(id, this.getRoot())
-        if (this.entries.get(file)?.source === source) return
-        const base = path.dirname(file)
-        const resolved = await resolveTailwindV4Source({
-            projectRoot: this.getRoot(),
-            cwd: this.getRoot(),
-            base,
-            baseFallbacks: [resolvePackageFile()],
-            css: source,
-            cssSources: [{ file, base, css: source, dependencies: [file] }]
-        })
-        this.entries.set(file, { source, generator: createWeappTailwindcssGenerator(resolved) })
+        if (this.entries.get(file) === source) return
+        this.entries.set(file, source)
         this.wxContext = createContext({
             appType: 'taro',
             cssEntries: [...this.entries.keys()],
@@ -122,24 +75,6 @@ export class CssPipeline {
             ...wxStyleOptions,
             logLevel: 'silent'
         })
-    }
-
-    /** Incrementally checks changed source files for utilities absent from the completed WX build. */
-    private async hasAddedCandidates(files: string[]): Promise<boolean> {
-        for (const input of files) {
-            const file = resolveFile(input, this.getRoot())
-            if (!/\.[cm]?[jt]sx?$/.test(file)) continue
-            const source = await fs.readFile(file, 'utf8')
-            if (this.sourceCache.get(file) === source) continue
-            this.sourceCache.set(file, source)
-            const extracted = await extractSourceCandidates(source, path.extname(file).slice(1))
-            for (const { generator } of this.entries.values()) {
-                const candidates = await generator.validateCandidates(extracted)
-                // Native WX patches bypass Vite; a new utility therefore requires synchronized WXSS first.
-                for (const candidate of candidates) if (!this.builtClassSet.has(candidate)) return true
-            }
-        }
-        return false
     }
 
     /** Returns the initialized WX transformer and detects invalid lifecycle ordering. */
