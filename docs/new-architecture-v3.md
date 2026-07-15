@@ -892,6 +892,49 @@ changing the live native package layout. The next cold materialization replans t
 
 ## Native synchronous facades
 
+### Native invocation relay
+
+The synchronous native shell must expose App and Page methods before their SystemJS delegates exist. Both facades bridge
+that gap with one shared `NativeInvocationRelay`; there are no separate App and Page invocation-journal implementations.
+
+```ts
+interface NativeInvocation {
+    method: string;
+    receiver: object;
+    args: readonly unknown[];
+}
+
+type NativeInvocationRelayState = 'loading' | 'replaying' | 'active' | 'cancelled' | 'failed';
+
+interface NativeInvocationRelay<Delegate extends object> {
+    readonly state: NativeInvocationRelayState;
+    readonly delegate: Promise<Delegate>;
+    readonly invocationJournal: readonly NativeInvocation[];
+    readonly initialReplayReady: Promise<void>;
+    invoke(invocation: NativeInvocation): void;
+    cancel(): void;
+}
+```
+
+While the delegate is loading or the initial journal is replaying, `invoke()` appends each supported native
+invocation in arrival order. Once the delegate resolves, the relay drains that journal as one FIFO sequence;
+invocations arriving during the drain join its tail. `initialReplayReady` resolves only after the relay becomes
+active. In the active state, later invocations are forwarded immediately. Each invocation calls the same-named
+delegate method exactly once with its original receiver and arguments:
+
+```ts
+delegate[invocation.method]?.apply(invocation.receiver, invocation.args);
+```
+
+A Page that unloads before activation cancels its relay and discards its journal. Delegate failure moves the relay to
+`failed`, clears the journal, and follows the documented activation-failure path.
+
+The relay is transport coordination, not framework lifecycle dispatch. It never maps lifecycle names, dispatches Taro
+hooks, mounts or unmounts React children, mutates `Current`, routing, or DOM state, or synthesizes framework events. The
+exact objects returned by Taro's `createReactApp()` and `createPageConfig()` remain the sole owners of those semantics.
+Return-valued native callbacks remain excluded because an asynchronously activated relay cannot satisfy their native
+return contract.
+
 ### App facade
 
 Generated `app.js` is intentionally small and synchronous:
@@ -929,20 +972,14 @@ interface AppFacadeDelegateModule {
 }
 ```
 
-The internal virtual-module names are not user-facing API. `createAppFacadeConfig()` validates the default export and retains that object
-as the App delegate. It does not translate the delegate into a second controller abstraction.
+The internal virtual-module names are not user-facing API. `createAppFacadeConfig()` validates the default export and
+retains that exact object as the App delegate. The App facade submits supported native calls to the shared
+`NativeInvocationRelay`; it does not translate the delegate into a second framework controller.
 
-Every facade lifecycle wrapper records the native `this` value and arguments. Once the delegate is available, the facade calls the exact
-Taro method with native receiver semantics:
-
-```ts
-delegate[lifecycle]?.apply(nativeAppInstance, args);
-```
-
-Taro's delegate remains the object stored in its own `Current.app`; its private `mount`, `unmount`, renderer, hook, and routing behavior
-are not copied or reimplemented by the facade. Data that WeChat requires while registering `App()` remains in the synchronous facade.
-Runtime data that Taro attaches during delegated lifecycle execution behaves exactly as it does when the Taro object is passed directly
-to `App()`.
+Taro's delegate remains the object stored in its own `Current.app`; its private `mount`, `unmount`, renderer,
+hook, and routing behavior are not copied or reimplemented by the facade. Data that WeChat requires while
+registering `App()` remains in the synchronous facade. Runtime data that Taro attaches during delegated lifecycle
+execution behaves exactly as it does when the Taro object is passed directly to `App()`.
 
 ### One App-owned React root
 
@@ -993,11 +1030,12 @@ export default createPageConfig(
 );
 ```
 
-`createPageFacadeConfig()` schedules this module import during page-entry evaluation, strictly after the shared `foundationReady`
-promise. Its synchronous native result contains only the build-known initial data, supported non-returning lifecycle wrappers, and the
-stable `eh` wrapper. Once ready, each wrapper invokes the
-corresponding function on the exact Taro Page configuration with the native Page instance as `this`. Taro remains solely responsible for
-mounting, `Current.page` and router state, lifecycle hooks, DOM updates, and event dispatch.
+`createPageFacadeConfig()` schedules this module import during page-entry evaluation, strictly after the shared
+`foundationReady` promise. Its synchronous native result contains only the build-known initial data, supported
+non-returning lifecycle wrappers, and the stable `eh` wrapper. Each wrapper submits its native invocation to the
+Page session's shared `NativeInvocationRelay`. The relay forwards it to the same-named function on the exact Taro Page
+configuration with the native Page instance as `this`. Taro remains solely responsible for mounting, `Current.page` and
+router state, lifecycle hooks, DOM updates, and event dispatch.
 
 `update.js` is present only for development execution delivery. Every page has a direct literal dependency on it so WeChat DevTools can
 rerun page-side code when a delivery is published.
@@ -1029,20 +1067,21 @@ interface PageSession {
     route: string;
     nativeInstance: WechatMiniprogram.Page.Instance<Record<string, unknown>, Record<string, unknown>>;
     state: PageSessionState;
-    events: FacadeEvent[];
-    delegate: Promise<ReturnType<typeof createPageConfig>>;
-    cancellation: AbortController;
+    relay: NativeInvocationRelay<ReturnType<typeof createPageConfig>>;
 }
 ```
 
-The delegate-module import begins during page-entry evaluation. `onLoad` binds the native instance and creates the session. Delegation
-waits for the App delegate's initial lifecycle replay barrier and the route's Taro Page delegate.
+The delegate-module import begins during page-entry evaluation. `onLoad` binds the native instance and creates the
+session and its relay. Page activation waits for the App relay's `initialReplayReady` barrier and the route's Taro
+Page delegate.
 
-Lifecycle and native events that arrive before delegation are journaled in native arrival order. Replaying an event means calling the
-matching Taro configuration method exactly once; the facade does not independently dispatch a Taro hook.
+Lifecycle callbacks and native template events that arrive before activation become `NativeInvocation` records in the
+relay's journal. The relay forwards each record to the matching Taro configuration method exactly once; it never
+independently dispatches a Taro hook.
 
-If `onUnload` arrives before delegation begins, the session is cancelled. The module can finish loading and remain cached, but the
-cancelled session never invokes Taro `onLoad`, mounts, replays lifecycle events, or retains the native Page instance.
+If `onUnload` arrives before activation, the session and its relay are cancelled. The module can finish loading
+and remain cached, but the cancelled relay discards its journal and never invokes Taro `onLoad`, mounts, or retains
+the native Page instance.
 
 ### Delegate and activation failures
 
@@ -1053,7 +1092,7 @@ await rejects, or a generated delegate module or Taro configuration creator thro
 The native `App()` or `Page()` registration has already completed when such a rejection occurs. The facade therefore:
 
 1. marks the App delegate or Page session as `failed`;
-2. clears queued lifecycle work and prevents a later Taro mount;
+2. clears the invocation journal and prevents a later Taro mount;
 3. rejects dependent Page delegation when the App delegate failed;
 4. logs one enriched error with the module chain, activation phase, and source-mapped location;
 5. rethrows the enriched error asynchronously so WeChat DevTools receives it through its normal error handling.
@@ -1065,9 +1104,9 @@ successful compilation, the server rematerializes the project and activates it t
 
 Lifecycle semantics follow the Taro programming model, not a previous bootstrap implementation.
 
-The App facade synchronously exposes and journals the standard App lifecycle surface. App lifecycle replay invokes the corresponding
-methods on the Taro App delegate after `createReactApp()` has returned it. Page delegation waits for the App delegate and its initial
-lifecycle replay barrier.
+The App facade synchronously exposes the standard App lifecycle surface and submits each call to its
+`NativeInvocationRelay`. Once `createReactApp()` returns the exact Taro App delegate, the relay forwards its
+initial journal in FIFO order. Page activation waits for the App relay's `initialReplayReady` barrier.
 
 Core Page lifecycle order is preserved:
 
@@ -1075,8 +1114,9 @@ Core Page lifecycle order is preserved:
 onLoad → onShow → onReady → onHide/onShow cycles → onUnload
 ```
 
-Additional non-returning Page callbacks, including pull-down refresh, reach-bottom, page scroll, resize, and tab-item callbacks, use the
-same ordered dispatcher. The generated `eh` method is the stable native template event bridge into the Taro event system.
+Additional non-returning Page callbacks, including pull-down refresh, reach-bottom, page scroll, resize, and tab-item
+callbacks, use the same FIFO invocation relay. The generated `eh` method is the stable native template event bridge
+into the Taro event system.
 
 ### Closed exclusion: native return-valued callbacks
 
@@ -1552,8 +1592,11 @@ The implementation enforces these invariants with build-time assertions and runt
     implementation.
 33. JSX structure is rendered through Taro's runtime host tree and is never compiled into page-specific structural WXML.
 34. Application dependency resolution never consumes a user-installed `@tarojs/*` package.
-35. App and Page facades delegate to the exact configuration objects returned by bundled Taro `createReactApp()` and
-    `createPageConfig()`; no second framework controller or lifecycle dispatcher exists.
+35. App and Page facades are transport coordinators, not framework controllers. They use one shared
+    `NativeInvocationRelay` abstraction to journal supported native invocations only while bridging asynchronous
+    delegate activation, then forward each invocation exactly once and in arrival order to the exact objects
+    returned by Taro's `createReactApp()` and `createPageConfig()`. The relay never interprets lifecycles or
+    independently dispatches Taro hooks, mounting, routing, DOM updates, or framework events.
 36. React is always an application-installed dependency, the plugin never ships a private React implementation, and React resolution
     receives no plugin-specific identity or deduplication policy.
 37. Every production System registration is a final Rolldown chunk; source modules do not retain independent production runtime
@@ -1667,12 +1710,15 @@ The implementation enforces these invariants with build-time assertions and runt
 
 - synchronous App and Page registration while the foundational import is pending;
 - neither App nor Page delegate import begins before `foundationReady` resolves;
-- App lifecycle journaling before delegation;
-- App lifecycle methods receive the original native App instance and arguments;
+- App and Page facades use the same `NativeInvocationRelay` implementation;
+- pre-activation App invocations are journaled and replayed in FIFO order;
+- invocations arriving during initial replay join the FIFO tail before `initialReplayReady` resolves;
+- active relays forward invocations immediately;
+- every forwarded invocation preserves its method name, native receiver, and arguments and executes exactly once;
 - bundled Taro `createReactApp()` executes exactly once and its returned object is the exact App delegate;
 - bundled Taro `createPageConfig()` executes exactly once per route and its returned object is the exact Page delegate;
-- Page lifecycle wrappers invoke only the matching Taro delegate method with the original native Page instance and arguments;
-- facade replay never dispatches a Taro lifecycle independently of the delegate;
+- the relay never interprets a lifecycle or independently dispatches a Taro hook, mount, route update, DOM update, or
+  framework event;
 - Page lifecycle ordering before and after mount;
 - App readiness before Page mount;
 - Taro `Current.app` remains the object created by `createReactApp()`;
@@ -1681,7 +1727,7 @@ The implementation enforces these invariants with build-time assertions and runt
 - unload unmounts exactly once;
 - unload-before-activation cancels without replay or mount;
 - App delegate failure rejects waiting Page sessions and prevents their Taro mount;
-- Page delegate failure enters `failed`, clears queued lifecycle work, and never invokes Taro `onLoad`;
+- Page delegate failure enters `failed`, clears the invocation journal, and never invokes Taro `onLoad`;
 - activation errors are enriched, logged once, and rethrown asynchronously without a plugin overlay;
 - repeated page entry execution is idempotent;
 - `onShareAppMessage`, `onShareTimeline`, `onAddToFavorites`, and `onSaveExitState` are absent from every facade;
@@ -1815,8 +1861,9 @@ The architecture relies on these documented or source-verified behaviors:
 
 The architecture has five owners:
 
-1. **Native facades** synchronously register App and Pages, journal lifecycle events, and delegate them to the exact Taro configuration
-   objects once available.
+1. **Native facades** synchronously register App and Pages and use one FIFO native-invocation relay to bridge
+   asynchronous activation. The relay forwards exact calls; the Taro configuration objects alone own lifecycle and
+   framework semantics.
 2. **SystemJS** owns the runtime registry keyed by Vite's module IDs, application loading, normal ESM live bindings, cycles, and
    deletion.
 3. **The bundled Taro React stack and template ABI** own one retained App root, runtime host-tree rendering, Page sessions, events, and
