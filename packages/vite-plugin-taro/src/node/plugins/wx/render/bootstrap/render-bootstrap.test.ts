@@ -4,10 +4,10 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
 import { transformWithOxc } from 'vite'
-import { wxBootstrapEntryName } from '../../virtual/virtual-modules.ts'
 import { postRenderChunk } from '../post-render-chunk.ts'
 import { toModuleUrl } from '../transport/module-url.ts'
 import { renderTransport } from '../transport/render-transport.ts'
+import { bootstrapEntryName } from './bootstrap-name.ts'
 
 /** A test SystemJS module namespace. */
 type SystemModule = Readonly<Record<string, unknown>>
@@ -45,7 +45,7 @@ const bootstrapJavaScript = (
 const bootstrapChunk = {
     fileName: '__taro__/bootstrap.js',
     isEntry: true,
-    name: wxBootstrapEntryName
+    name: bootstrapEntryName
 }
 
 /** Evaluates the bootstrap with isolated native globals. */
