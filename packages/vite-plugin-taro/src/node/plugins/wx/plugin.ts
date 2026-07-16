@@ -2,8 +2,8 @@ import type { Plugin } from 'vite'
 import { DevEnvironment } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
-import { postRenderChunk } from './post-render-chunk.ts'
-import { createWxVirtualModules } from './virtual-modules.ts'
+import { postRenderChunk } from './render/post-render-chunk.ts'
+import { createWxVirtualModules } from './virtual/virtual-modules.ts'
 
 const wxEnvironmentName = 'wx'
 const wxJavaScriptTarget = 'es2018'
@@ -82,7 +82,8 @@ export function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
         },
 
         load(id) {
-            return virtualModules.load(id, this.environment.config.root)
+            const projectRoot = this.environment.config.root
+            return virtualModules.load(id, projectRoot)
         },
 
         renderChunk: {

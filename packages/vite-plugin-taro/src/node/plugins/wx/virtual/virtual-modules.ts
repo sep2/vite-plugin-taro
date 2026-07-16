@@ -1,8 +1,8 @@
 /** Defines the generated WX App and Page delegate entry modules. */
 import path from 'node:path'
-import type { VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../options.ts'
-import { escapeImport, toViteFileImportPath } from '../../utils/modules.ts'
-import { resolvePackageFile } from '../../utils/packages.ts'
+import type { VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../../options.ts'
+import { escapeImport, toViteFileImportPath } from '../../../utils/modules.ts'
+import { resolvePackageFile } from '../../../utils/packages.ts'
 import { isVitePreload, overrideVitePreload } from './vite-preload.ts'
 
 // Vite's internal prefix prevents resolved virtual IDs from being treated as filesystem paths.
