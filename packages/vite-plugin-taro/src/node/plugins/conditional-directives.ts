@@ -3,6 +3,10 @@ import type { VitePluginTaroTarget } from '../../options.ts'
 import type { BuildContext } from '../build-context.ts'
 import { normalizeModuleId } from '../utils/modules.ts'
 
+/**
+ * Preserves the current source-level `#ifdef wx` and `#ifdef h5` contract for shared applications.
+ * The pre-transform removes inactive lines before target-specific React, CSS, or dependency transforms inspect them.
+ */
 export function createConditionalDirectivePlugin(context: BuildContext): Plugin {
     return {
         name: 'vite-plugin-taro:conditional-directives',
@@ -14,6 +18,7 @@ export function createConditionalDirectivePlugin(context: BuildContext): Plugin 
     }
 }
 
+/** Limits directive parsing to user-authored script and style modules so dependency comments remain untouched. */
 function isConditionalDirectiveSource(id: string): boolean {
     const normalizedId = normalizeModuleId(id)
     return !normalizedId.includes('/node_modules/') && /\.(?:[cm]?[jt]sx?|css|s[ac]ss|less|styl)$/.test(normalizedId)
@@ -30,6 +35,10 @@ type DirectiveFrame = {
     active: boolean
 }
 
+/**
+ * Evaluates nested target branches with a stack while preserving the original line count.
+ * Inactive content becomes line endings, keeping downstream source locations aligned with the user's file.
+ */
 function transformConditionalDirectives(code: string, target: VitePluginTaroTarget): string {
     const lines = code.match(/[^\n]*(?:\n|$)/g) ?? []
     const frames: DirectiveFrame[] = []
@@ -61,6 +70,10 @@ function transformConditionalDirectives(code: string, target: VitePluginTaroTarg
     return transformed
 }
 
+/**
+ * Parses only the current simple directive grammar and rejects removed expression forms explicitly.
+ * Returning undefined for ordinary lines lets the transformer copy source without a second tokenizer.
+ */
 function parseDirective(line: string): Directive | undefined {
     const match = line.match(/^\s*(?:(?:\/\/)|(?:\/\*))\s*#(ifdef|ifndef|if|elif|else|endif)\b([^*\r\n]*)/)
     if (!match) return

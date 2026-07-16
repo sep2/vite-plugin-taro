@@ -4,6 +4,7 @@ import type { VitePluginTaroTarget } from '../../options.ts'
 import { BuildContext } from '../build-context.ts'
 import { createConditionalDirectivePlugin } from './conditional-directives.ts'
 
+/** Executes the plugin hook directly so directive semantics can be tested without starting a Vite server. */
 function transform(code: string, target: VitePluginTaroTarget): string {
     const context = new BuildContext({
         target,
