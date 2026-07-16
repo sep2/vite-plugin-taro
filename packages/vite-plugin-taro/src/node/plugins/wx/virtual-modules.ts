@@ -3,6 +3,7 @@ import path from 'node:path'
 import type { VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../options.ts'
 import { escapeImport, toViteFileImportPath } from '../../utils/modules.ts'
 import { resolvePackageFile } from '../../utils/packages.ts'
+import { isVitePreload, overrideVitePreload } from './vite-preload.ts'
 
 // Vite's internal prefix prevents resolved virtual IDs from being treated as filesystem paths.
 const resolvedVirtualModulePrefix = '\0'
@@ -44,8 +45,12 @@ export function createWxVirtualModules(options: VitePluginTaroOptions) {
             if (virtualModuleIds.has(id)) return `${resolvedVirtualModulePrefix}${id}`
         },
 
-        // Generate source only after Vite has resolved an owned ID to its internal form.
+        // Override Vite's browser preload runtime, then generate source for resolved delegate IDs.
         load(id: string, projectRoot: string): string | undefined {
+            if (isVitePreload(id)) {
+                return overrideVitePreload(id)
+            }
+
             if (!id.startsWith(resolvedVirtualModulePrefix)) return
 
             const moduleId = id.slice(resolvedVirtualModulePrefix.length)

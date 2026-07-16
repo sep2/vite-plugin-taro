@@ -2,8 +2,7 @@ import type { Plugin } from 'vite'
 import { DevEnvironment } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
-import { transformWxSystemRegisterChunk } from './post-render-chunk.ts'
-import { loadWxPreloadHelper } from './preload-helper.ts'
+import { postRenderChunk } from './post-render-chunk.ts'
 import { createWxVirtualModules } from './virtual-modules.ts'
 
 const wxEnvironmentName = 'wx'
@@ -83,14 +82,14 @@ export function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
         },
 
         load(id) {
-            return loadWxPreloadHelper(id) ?? virtualModules.load(id, this.environment.config.root)
+            return virtualModules.load(id, this.environment.config.root)
         },
 
         renderChunk: {
             // Convert final ESM chunks before Vite finalizes hashes, source maps, and preload markers.
             order: 'post',
             handler(code, chunk) {
-                return transformWxSystemRegisterChunk(code, chunk)
+                return postRenderChunk(code, chunk)
             }
         }
     }
