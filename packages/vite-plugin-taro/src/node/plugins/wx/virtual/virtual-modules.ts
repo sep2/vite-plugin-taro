@@ -11,9 +11,6 @@ const resolvedVirtualModulePrefix = '\0'
 // The native bootstrap is built as a plain WX CommonJS entry rather than a System capsule.
 export const wxBootstrapEntryName = 'bootstrap'
 
-// The Taro bridge is an eager entry and gates every App and Page delegate import.
-export const wxTaroBridgeEntryName = 'taro-bridge'
-
 // The root entry exports Taro's App delegate without calling the native App constructor.
 const virtualWxAppDelegateId = 'virtual:vite-plugin-taro/wx/app'
 
@@ -43,10 +40,9 @@ export function createWxVirtualModules(options: VitePluginTaroOptions) {
     const virtualModuleIds = new Set([virtualWxAppDelegateId, ...pageEntries.map((page) => page.moduleId)])
 
     return {
-        // Bootstrap, Taro bridge, root, and route names become stable entries with Vite-owned module IDs.
+        // Bootstrap, root, and route names become stable entries with Vite-owned module IDs.
         input: Object.fromEntries([
             [wxBootstrapEntryName, wxBootstrapImportPath],
-            [wxTaroBridgeEntryName, wxTaroBridgeImportPath],
             ['root', virtualWxAppDelegateId],
             ...pageEntries.map((page) => [page.option.path, page.moduleId])
         ]) satisfies Record<string, string>,
