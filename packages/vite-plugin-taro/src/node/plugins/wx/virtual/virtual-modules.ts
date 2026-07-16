@@ -8,14 +8,23 @@ import { isVitePreload, overrideVitePreload } from './vite-preload.ts'
 // Vite's internal prefix prevents resolved virtual IDs from being treated as filesystem paths.
 const resolvedVirtualModulePrefix = '\0'
 
+// The native bootstrap is built as a plain WX CommonJS entry rather than a System capsule.
+export const wxBootstrapEntryName = 'bootstrap'
+
+// The Taro bridge is an eager entry and gates every App and Page delegate import.
+export const wxTaroBridgeEntryName = 'taro-bridge'
+
 // The root entry exports Taro's App delegate without calling the native App constructor.
 const virtualWxAppDelegateId = 'virtual:vite-plugin-taro/wx/app'
 
 // Every configured route receives its own delegate entry and native activation boundary.
 const pageDelegateModulePrefix = 'virtual:vite-plugin-taro/wx/page/'
 
-// Delegates share the plugin-owned WX runtime instead of resolving Taro internals from the application.
-const wxFoundationImportPath = toViteFileImportPath(resolvePackageFile('dist/runtime/wx/foundation.js'))
+// The bootstrap owns the native SystemJS realm before any application capsule executes.
+const wxBootstrapImportPath = toViteFileImportPath(resolvePackageFile('dist/runtime/wx/bootstrap.js'))
+
+// Delegates share one Taro bridge instead of resolving framework internals independently.
+const wxTaroBridgeImportPath = toViteFileImportPath(resolvePackageFile('dist/runtime/wx/taro-bridge.js'))
 
 /** Creates the stable virtual module ID for one configured page route. */
 function createVirtualWxPageDelegateId(pagePath: string): string {
@@ -34,8 +43,10 @@ export function createWxVirtualModules(options: VitePluginTaroOptions) {
     const virtualModuleIds = new Set([virtualWxAppDelegateId, ...pageEntries.map((page) => page.moduleId)])
 
     return {
-        // Root and route names become stable entry names while the values remain Vite-owned module IDs.
+        // Bootstrap, Taro bridge, root, and route names become stable entries with Vite-owned module IDs.
         input: Object.fromEntries([
+            [wxBootstrapEntryName, wxBootstrapImportPath],
+            [wxTaroBridgeEntryName, wxTaroBridgeImportPath],
             ['root', virtualWxAppDelegateId],
             ...pageEntries.map((page) => [page.option.path, page.moduleId])
         ]) satisfies Record<string, string>,
@@ -71,7 +82,7 @@ function createWxAppDelegateSource(options: VitePluginTaroOptions, projectRoot: 
     const userAppPath = toViteFileImportPath(path.resolve(projectRoot, options.app))
     const appConfig = { ...options.appJson, pages: options.pages.map((page) => page.path) }
 
-    return `import { createReactApp, ReactDOM } from ${escapeImport(wxFoundationImportPath)}
+    return `import { createReactApp, ReactDOM } from ${escapeImport(wxTaroBridgeImportPath)}
 import React from 'react'
 import AppComponent from ${escapeImport(userAppPath)}
 export default createReactApp(AppComponent, React, ReactDOM, ${JSON.stringify(appConfig)})`
@@ -81,7 +92,7 @@ export default createReactApp(AppComponent, React, ReactDOM, ${JSON.stringify(ap
 function createWxPageDelegateSource(page: VitePluginTaroPageOption, projectRoot: string): string {
     const userPagePath = toViteFileImportPath(path.resolve(projectRoot, 'src', `${page.path}.tsx`))
 
-    return `import { createPageConfig } from ${escapeImport(wxFoundationImportPath)}
+    return `import { createPageConfig } from ${escapeImport(wxTaroBridgeImportPath)}
 import PageComponent from ${escapeImport(userPagePath)}
 export default createPageConfig(PageComponent, ${JSON.stringify(page.path)}, { root: { cn: [] } }, ${JSON.stringify(page.config)})`
 }
