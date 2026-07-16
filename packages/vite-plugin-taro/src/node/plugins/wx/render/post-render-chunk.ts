@@ -6,7 +6,7 @@ import { wxBootstrapEntryName } from '../virtual/virtual-modules.ts'
 import { renderBootstrap } from './render-bootstrap.ts'
 import { systemRegisterCapsulePlugin } from './system-register.ts'
 
-/** Converts one final Rolldown chunk into its native WX representation. */
+/** Renders one final Rolldown chunk for WX. */
 export function postRenderChunk(
     code: string,
     chunk: Pick<Rolldown.RenderedChunk, 'fileName' | 'isEntry' | 'name'>
@@ -22,7 +22,7 @@ export function postRenderChunk(
         filename: chunk.fileName,
         plugins: [
             transformDynamicImport,
-            // Babel exposes this plugin's internal pass state in its public type, while PluginTarget intentionally erases it.
+            // Erase Babel's internal plugin pass type.
             transformModulesSystemjs as PluginTarget,
             systemRegisterCapsulePlugin
         ],

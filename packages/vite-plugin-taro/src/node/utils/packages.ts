@@ -4,6 +4,7 @@ import path from 'node:path'
 export const packageRequire = createRequire(import.meta.url)
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 
+/** Resolves a file shipped by this package. */
 export function resolvePackageFile(...segments: string[]): string {
     return path.join(packageRoot, ...segments)
 }
