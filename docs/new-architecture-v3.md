@@ -17,6 +17,7 @@ The initial implementation supports:
 - a plugin-bundled Taro API, component, React renderer, DOM, event, and WeChat template stack;
 - plugin-owned Tailwind CSS and WeChat Tailwind adaptation;
 - synchronous native `App()` and `Page()` registration;
+- the complete native callback surface registered by bundled Taro, including share, favorite, and exit-state callbacks;
 - one App-owned React root;
 - SystemJS as the only application module loader;
 - static imports and every dynamic-import form supported by Vite;
@@ -36,16 +37,14 @@ The initial implementation does not support:
   components;
 - WeChat Worker entry points;
 - WeChat Mini Program plugins;
-- native callbacks whose return value affects WeChat behavior, including all share, favorite, and exit-state callbacks; this is a
-  closed design exclusion;
 - remote JavaScript evaluation;
 - compatibility with user-installed `@tarojs/*` packages;
 - user-controlled chunk or native subpackage placement.
 
-Except where this document defines a closed exclusion or a hard invariant, an unsupported platform feature is simply outside the
-plugin's initial integration surface. The plugin adds no feature-specific detection, rejection, or compatibility layer for native custom
-components, Workers, or Mini Program plugins. Ordinary Vite, Taro, or WeChat behavior that happens to pass through is not a support
-contract.
+Except where this document defines a hard invariant, an unsupported platform feature is simply outside the
+plugin's initial integration surface. The plugin adds no feature-specific detection, rejection, or compatibility
+layer for native custom components, Workers, or Mini Program plugins. Ordinary Vite, Taro, or WeChat behavior that
+happens to pass through is not a support contract.
 
 ## Design principles
 
@@ -164,9 +163,10 @@ export default function HomePage() {
 }
 ```
 
-There are no user-facing `defineApp()`, `definePage()`, package declarations, lifecycle declarations, native bootstrap calls, or manual
-chunk declarations. The plugin adds no separate native-instance extension API and does not restrict or validate other App/Page fields and
-methods that ordinary Taro or WeChat behavior exposes.
+There are no user-facing `defineApp()`, `definePage()`, package declarations, lifecycle declarations, native
+bootstrap calls, or manual chunk declarations. The plugin adds no separate native-instance extension API. Each
+native facade exposes exactly the fields and callback names that the bundled Taro integration resolves for that App
+or Page entry; the plugin defines no additional callback surface or callback-specific semantics.
 
 ### Vite configuration
 
@@ -912,29 +912,48 @@ interface NativeInvocationRelay<Delegate extends object> {
     readonly delegate: Promise<Delegate>;
     readonly invocationJournal: readonly NativeInvocation[];
     readonly initialReplayReady: Promise<void>;
-    invoke(invocation: NativeInvocation): void;
+    invoke(invocation: NativeInvocation): unknown;
     cancel(): void;
 }
 ```
 
-While the delegate is loading or the initial journal is replaying, `invoke()` appends each supported native
-invocation in arrival order. Once the delegate resolves, the relay drains that journal as one FIFO sequence;
-invocations arriving during the drain join its tail. `initialReplayReady` resolves only after the relay becomes
-active. In the active state, later invocations are forwarded immediately. Each invocation calls the same-named
-delegate method exactly once with its original receiver and arguments:
+The callback names and their conditional presence come from the bundled Taro lifecycle and per-entry transform metadata.
+The facade generator neither adds nor removes callback names. A change to that resolved native surface crosses a native
+registration boundary and requests a DevTools hard refresh.
+
+While the delegate is loading or the initial journal is replaying, `invoke()` appends each native invocation in
+arrival order and returns `undefined`. Once the delegate resolves, the relay drains that journal as one FIFO
+sequence; invocations arriving during the drain join its tail. Replay ignores return values because the original
+native calls have already returned. `initialReplayReady` resolves only after the relay becomes active.
+
+In the active state, every callback uses the same guarded forwarding path and returns exactly what Taro returns:
 
 ```ts
-delegate[invocation.method]?.apply(invocation.receiver, invocation.args);
+function invoke(invocation: NativeInvocation): unknown {
+    if (!activeDelegate) {
+        invocationJournal.push(invocation);
+        return undefined;
+    }
+
+    const methods = activeDelegate as Record<string, unknown>;
+    const method = methods[invocation.method];
+
+    if (typeof method !== 'function') {
+        return undefined;
+    }
+
+    return method.apply(invocation.receiver, invocation.args);
+}
 ```
 
-A Page that unloads before activation cancels its relay and discards its journal. Delegate failure moves the relay to
-`failed`, clears the journal, and follows the documented activation-failure path.
+This follows Taro's use of `Function.prototype.apply()` and does not depend on `Reflect.apply()`. A Page that
+unloads before activation cancels its relay and discards its journal. Delegate failure moves the relay to `failed`,
+clears the journal, and follows the documented activation-failure path.
 
 The relay is transport coordination, not framework lifecycle dispatch. It never maps lifecycle names, dispatches Taro
-hooks, mounts or unmounts React children, mutates `Current`, routing, or DOM state, or synthesizes framework events. The
-exact objects returned by Taro's `createReactApp()` and `createPageConfig()` remain the sole owners of those semantics.
-Return-valued native callbacks remain excluded because an asynchronously activated relay cannot satisfy their native
-return contract.
+hooks, mounts or unmounts React children, mutates `Current`, routing, or DOM state, synthesizes framework events, or
+interprets callback return values. The exact objects returned by Taro's `createReactApp()` and
+`createPageConfig()` remain the sole owners of those semantics.
 
 ### App facade
 
@@ -1032,11 +1051,11 @@ export default createPageConfig(
 ```
 
 `createPageFacadeConfig()` schedules this module import during page-entry evaluation, strictly after the shared
-`foundationReady` promise. Its synchronous native result contains only the build-known initial data, supported
-non-returning lifecycle wrappers, and the stable `eh` wrapper. Each wrapper submits its native invocation to the
-Page session's shared `NativeInvocationRelay`. The relay forwards it to the same-named function on the exact Taro Page
-configuration with the native Page instance as `this`. Taro remains solely responsible for mounting, `Current.page` and
-router state, lifecycle hooks, DOM updates, and event dispatch.
+`foundationReady` promise. Its synchronous native result contains the build-known initial data, every callback wrapper
+resolved by the bundled Taro integration for that entry, and the stable `eh` wrapper. Each wrapper submits its
+native invocation to the Page session's shared `NativeInvocationRelay`. The relay forwards it to the same-named
+function on the exact Taro Page configuration with the native Page instance as `this`. Taro remains solely
+responsible for mounting, `Current.page` and router state, lifecycle hooks, DOM updates, and event dispatch.
 
 `update.js` is present only for development execution delivery. Every page has a direct literal dependency on it so WeChat DevTools can
 rerun page-side code when a delivery is published.
@@ -1115,27 +1134,21 @@ Core Page lifecycle order is preserved:
 onLoad → onShow → onReady → onHide/onShow cycles → onUnload
 ```
 
-Additional non-returning Page callbacks, including pull-down refresh, reach-bottom, page scroll, resize, and tab-item
-callbacks, use the same FIFO invocation relay. The generated `eh` method is the stable native template event bridge
-into the Taro event system.
+Additional Page callbacks, including pull-down refresh, reach-bottom, page scroll, resize, and tab-item callbacks,
+use the same FIFO invocation relay. The generated `eh` method is the stable native template event bridge into the
+Taro event system.
 
-### Closed exclusion: native return-valued callbacks
+### Complete Taro callback surface
 
-The target never registers callbacks whose return value affects WeChat behavior, including:
+The facade exposes every callback that the bundled Taro integration resolves for the entry, including
+`onShareAppMessage`, `onShareTimeline`, `onAddToFavorites`, and `onSaveExitState`. Conditional callback presence follows
+Taro's own source-transform and page configuration behavior; the plugin does not independently infer, add, remove, or
+reinterpret callbacks.
 
-- `onShareAppMessage`;
-- `onShareTimeline`;
-- `onAddToFavorites`;
-- `onSaveExitState`;
-- future callbacks with equivalent return-value requirements.
-
-This exclusion includes the share callbacks even on base-library versions that accept a returned `promise`. The synchronous facade has a
-fixed supported callback surface and simply never contains these method names.
-
-The compiler performs no detection, static analysis, warning, error, fallback, or transformation for unsupported callbacks. It does not
-inspect user components or Taro delegates for them. If user code defines one, it remains ordinary unreachable application code because
-WeChat was never given the corresponding native callback. This is a settled architecture decision, not a deferred feature or an open
-question.
+Before activation, a callback invocation is journaled and returns `undefined`. After activation, the relay invokes
+the exact method on the Taro configuration object and returns its value unchanged, including a returned object or
+`Promise`. Adding or removing a conditionally registered callback regenerates the native facade and requests a
+DevTools hard refresh.
 
 ## Development HMR architecture
 
@@ -1589,8 +1602,8 @@ The implementation enforces these invariants with build-time assertions and runt
 25. Runtime activation failures are surfaced through WeChat DevTools without a plugin-owned overlay.
 26. Production emits all Tailwind and ordinary CSS into one `app.wxss`.
 27. Tailwind and class rewriting are owned by the plugin's `weapp-tailwindcss` pipeline.
-28. Return-valued native callbacks are absent from the fixed facade surface, and the compiler neither detects nor specially handles
-    user code that defines them.
+28. Each facade's callback names and conditional presence are exactly the native surface resolved by the bundled Taro
+    integration; the plugin neither adds nor removes callbacks, and active forwarding returns Taro's result unchanged.
 29. The development protocol has one active runtime session; replacing it discards all HMR delivery state and never replays updates into
     the new heap.
 30. The dedicated `wx` Vite environment is the only application transform, module, and HMR graph.
@@ -1602,8 +1615,9 @@ The implementation enforces these invariants with build-time assertions and runt
 35. App and Page facades are transport coordinators, not framework controllers. They use one shared
     `NativeInvocationRelay` abstraction to journal supported native invocations only while bridging asynchronous
     delegate activation, then forward each invocation exactly once and in arrival order to the exact objects
-    returned by Taro's `createReactApp()` and `createPageConfig()`. The relay never interprets lifecycles or
-    independently dispatches Taro hooks, mounting, routing, DOM updates, or framework events.
+    returned by Taro's `createReactApp()` and `createPageConfig()`. Once active, the relay returns the exact delegate
+    result. It never interprets lifecycles, callback return values, or independently dispatches Taro hooks, mounting,
+    routing, DOM updates, or framework events.
 36. React is always an application-installed dependency, the plugin never ships a private React implementation, and React resolution
     receives no plugin-specific identity or deduplication policy.
 37. Every production System registration is a final Rolldown chunk; source modules do not retain independent production runtime
@@ -1720,8 +1734,10 @@ The implementation enforces these invariants with build-time assertions and runt
 - App and Page facades use the same `NativeInvocationRelay` implementation;
 - pre-activation App invocations are journaled and replayed in FIFO order;
 - invocations arriving during initial replay join the FIFO tail before `initialReplayReady` resolves;
-- active relays forward invocations immediately;
+- active relays forward invocations immediately and return the exact delegate result;
 - every forwarded invocation preserves its method name, native receiver, and arguments and executes exactly once;
+- every facade contains exactly the callback names that bundled Taro resolves for that entry;
+- changing conditional callback presence requests a DevTools hard refresh;
 - bundled Taro `createReactApp()` executes exactly once and its returned object is the exact App delegate;
 - bundled Taro `createPageConfig()` executes exactly once per route and its returned object is the exact Page delegate;
 - the relay never interprets a lifecycle or independently dispatches a Taro hook, mount, route update, DOM update, or
@@ -1737,9 +1753,10 @@ The implementation enforces these invariants with build-time assertions and runt
 - Page delegate failure enters `failed`, clears the invocation journal, and never invokes Taro `onLoad`;
 - activation errors are enriched, logged once, and rethrown asynchronously without a plugin overlay;
 - repeated page entry execution is idempotent;
-- `onShareAppMessage`, `onShareTimeline`, `onAddToFavorites`, and `onSaveExitState` are absent from every facade;
-- defining an unsupported callback does not change compilation or produce a diagnostic;
-- promise-capable WeChat share callbacks receive no special handling.
+- `onShareAppMessage`, `onShareTimeline`, `onAddToFavorites`, and `onSaveExitState` are forwarded when Taro registers
+  them;
+- callback objects and Promises returned by Taro are returned unchanged;
+- forwarding uses guarded `Function.prototype.apply()` rather than `Reflect.apply()`.
 
 ### Taro rendering ABI tests
 
@@ -1852,6 +1869,14 @@ The architecture relies on these documented or source-verified behaviors:
   <https://github.com/rolldown/rolldown/blob/111132357228f06c208af96f6f1f3c164104bdf3/packages/rolldown/src/options/output-options.ts#L53-L55>
 - Taro's WeChat runtime host-config and component merge:
   <https://github.com/NervJS/taro/blob/0db37ec9d383ec774df54634a3db632286c0ffa1/packages/taro-platform-weapp/src/runtime.ts#L1-L6>
+- Taro's native App and Page lifecycle metadata:
+  <https://github.com/NervJS/taro/blob/0db37ec9d383ec774df54634a3db632286c0ffa1/packages/shared/src/runtime-hooks.ts#L78-L112>
+- Taro's WeChat lifecycle augmentation:
+  <https://github.com/NervJS/taro/blob/0db37ec9d383ec774df54634a3db632286c0ffa1/packages/taro-platform-weapp/src/runtime-utils.ts#L10-L18>
+- Taro Page callback generation and exact return forwarding:
+  <https://github.com/NervJS/taro/blob/0db37ec9d383ec774df54634a3db632286c0ffa1/packages/taro-runtime/src/dsl/common.ts#L249-L313>
+- Taro React App configuration construction:
+  <https://github.com/NervJS/taro/blob/0db37ec9d383ec774df54634a3db632286c0ffa1/packages/taro-framework-react/src/runtime/connect.ts#L275-L435>
 - Taro React framework hook initialization:
   <https://github.com/NervJS/taro/blob/0db37ec9d383ec774df54634a3db632286c0ffa1/packages/taro-framework-react/src/runtime/index.ts#L1-L66>
 - Taro API initialization after runtime hooks are installed:
@@ -1876,8 +1901,8 @@ The architecture relies on these documented or source-verified behaviors:
 The architecture has five owners:
 
 1. **Native facades** synchronously register App and Pages and use one FIFO native-invocation relay to bridge
-   asynchronous activation. The relay forwards exact calls; the Taro configuration objects alone own lifecycle and
-   framework semantics.
+   asynchronous activation. Bundled Taro owns the callback surface and semantics; active forwarding preserves its
+   exact callback results.
 2. **SystemJS** owns the runtime registry keyed by Vite's module IDs, application loading, normal ESM live bindings, cycles, and
    deletion.
 3. **The bundled Taro React stack and template ABI** own one retained App root, runtime host-tree rendering, Page sessions, events, and
