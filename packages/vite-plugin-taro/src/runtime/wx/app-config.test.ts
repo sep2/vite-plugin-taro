@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { type AppShellConfig, createAppShellConfig } from './app-config.ts'
+import { createAppShellConfig } from './app-config.ts'
 
 test('queues App callbacks until the App module activates', async () => {
     let resolveAppModule: (module: { default: object }) => void = () => undefined
@@ -12,7 +12,7 @@ test('queues App callbacks until the App module activates', async () => {
     const receiver = {}
     const appConfig = {}
     let appModuleRequested = false
-    let shellConfig: AppShellConfig
+    let shellConfig: ReturnType<typeof createAppShellConfig>
 
     shellConfig = createAppShellConfig(() => {
         appModuleRequested = true

@@ -16,7 +16,7 @@ interface AppModule {
 }
 
 /** The synchronous configuration passed to the native App constructor. */
-export type AppShellConfig = { config: Record<string, unknown> } & Record<
+type AppShellConfig = { config: Record<string, unknown> } & Record<
     AppMethod,
     (this: object, ...args: unknown[]) => unknown
 >
@@ -28,7 +28,6 @@ export function createAppShellConfig(
 ): AppShellConfig {
     const journal: AppInvocation[] = []
     let app: Record<string, unknown> | undefined
-    let replaying = false
     let failed = false
 
     void Promise.resolve()
@@ -38,18 +37,16 @@ export function createAppShellConfig(
                 throw new Error('Expected an App configuration from the App module')
             }
 
-            app = module.default as Record<string, unknown>
-            replaying = true
+            const activatedApp = module.default as Record<string, unknown>
             for (let index = 0; index < journal.length; index++) {
                 const invocation = journal[index]
-                callApp(app, invocation.method, invocation.receiver, invocation.args)
+                callApp(activatedApp, invocation.method, invocation.receiver, invocation.args)
             }
             journal.length = 0
-            replaying = false
+            app = activatedApp
         })
         .catch((error: unknown) => {
             app = undefined
-            replaying = false
             failed = true
             journal.length = 0
             console.error('Failed to activate App module', error)
@@ -61,7 +58,7 @@ export function createAppShellConfig(
             if (failed) {
                 return
             }
-            if (!app || replaying) {
+            if (!app) {
                 journal.push({
                     method,
                     receiver: this,
