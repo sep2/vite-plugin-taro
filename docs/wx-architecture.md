@@ -1,4 +1,4 @@
-# vite-plugin-taro WX Architecture v3
+# vite-plugin-taro WX Architecture
 
 ## Status
 
