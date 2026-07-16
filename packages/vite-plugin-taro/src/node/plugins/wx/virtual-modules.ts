@@ -1,9 +1,9 @@
 import path from 'node:path'
-import type { VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../../options.ts'
-import { escapeImport, toViteFileImportPath } from '../../../utils/modules.ts'
-import { resolvePackageFile } from '../../../utils/packages.ts'
-import { bootstrapEntryName } from '../render/bootstrap/bootstrap-name.ts'
-import { isVitePreload, overrideVitePreload } from '../render/vite-preload/vite-preload.ts'
+import type { VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../options.ts'
+import { escapeImport, toViteFileImportPath } from '../../utils/modules.ts'
+import { resolvePackageFile } from '../../utils/packages.ts'
+import { bootstrapEntryName } from './bootstrap/bootstrap-name.ts'
+import { isVitePreload, overrideVitePreload } from './vite-preload/vite-preload.ts'
 
 const resolvedVirtualModulePrefix = '\0'
 
