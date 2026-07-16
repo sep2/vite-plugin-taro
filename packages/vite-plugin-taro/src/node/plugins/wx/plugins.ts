@@ -95,9 +95,12 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
         renderChunk: {
             // Convert final ESM chunks before Vite finalizes hashes, source maps, and preload markers.
             order: 'post',
-            handler(code, chunk) {
-                return postRenderChunk(code, chunk)
-            }
+            handler: postRenderChunk
+        },
+
+        // Emit the native transport only after final chunk IDs and hashes are known.
+        generateBundle(_, bundle) {
+            this.emitFile(createTransport(bundle))
         }
     }
 }
