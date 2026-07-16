@@ -8,10 +8,12 @@ import { createWxVirtualModules } from './virtual/virtual-modules.ts'
 const wxEnvironmentName = 'wx'
 const wxJavaScriptTarget = 'es2018'
 
+/** Creates the Vite plugins that own the WX environment and its generated entries. */
 export function createWxTargetPlugins(options: VitePluginTaroOptions): Plugin[] {
     return [createWxTargetPlugin(options)]
 }
 
+/** Configures and transforms the dedicated WX Vite environment. */
 function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
     const virtualModules = createWxVirtualModules(options)
 
@@ -100,6 +102,7 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
     }
 }
 
+/** Creates the compile-time constants that select Taro's WeChat runtime branches. */
 function createWxTaroDefines(): Record<string, string> {
     const taroVersion = String((packageRequire('@tarojs/runtime/package.json') as { version: string }).version)
 

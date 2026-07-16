@@ -8,6 +8,7 @@ export function overrideVitePreload(id: string): string | undefined {
     }
 }
 
+/** Identifies Vite's internal browser preload-helper module. */
 export function isVitePreload(id: string): boolean {
     return id === vitePreloadHelperId
 }
