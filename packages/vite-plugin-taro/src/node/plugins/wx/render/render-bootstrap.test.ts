@@ -14,7 +14,6 @@ type SystemModule = Readonly<Record<string, unknown>>
 /** The generated graph and native capsule loader. */
 interface NativeTransport {
     instantiate(id: string, parentId?: string): unknown
-    resolve(specifier: string, parentId?: string): string
 }
 
 /** The hookable SystemJS surface used by the bootstrap test. */
@@ -108,15 +107,10 @@ test('restores native require after Rolldown rendering', () => {
     assert.throws(() => postRenderChunk('const value = 1', bootstrapChunk), /Expected native require/)
 })
 
-test('renders canonical resolution and a literal native capsule transport', () => {
+test('renders a literal native capsule transport', () => {
     const source = renderTransport(['assets/root-c.js', 'assets/taro-bridge-a.js', 'assets/chunks/lazy-b.js'])
     const capsule = {}
     const evaluated = evaluateTransport(source, () => capsule)
-
-    assert.equal(evaluated.transport.resolve('./shared.js', 'assets/chunks/root.js'), 'assets/chunks/shared.js')
-    assert.equal(evaluated.transport.resolve('../shared.js', 'assets/chunks/root.js'), 'assets/shared.js')
-    assert.equal(evaluated.transport.resolve('external', 'assets/root.js'), 'external')
-    assert.throws(() => evaluated.transport.resolve('../../outside.js', 'assets/root.js'), /escapes the output root/)
 
     assert.strictEqual(evaluated.transport.instantiate('assets/chunks/lazy-b.js'), capsule)
     assert.deepEqual(evaluated.requiredPaths, ['../assets/chunks/lazy-b.js'])
@@ -133,8 +127,7 @@ test('renders canonical resolution and a literal native capsule transport', () =
 test('configures the shared SystemJS registry for concurrent imports', async () => {
     const imports: string[] = []
     const transport: NativeTransport = {
-        instantiate: () => undefined,
-        resolve: (specifier) => specifier
+        instantiate: () => undefined
     }
     const evaluated = evaluateBootstrap(transport, (id) => {
         imports.push(id)
@@ -147,7 +140,10 @@ test('configures the shared SystemJS registry for concurrent imports', async () 
     ])
 
     assert.strictEqual(evaluated.system.instantiate, transport.instantiate)
-    assert.strictEqual(evaluated.system.resolve, transport.resolve)
+    assert.equal(evaluated.system.resolve('./shared.js', 'assets/chunks/root.js'), 'assets/chunks/shared.js')
+    assert.equal(evaluated.system.resolve('../shared.js', 'assets/chunks/root.js'), 'assets/shared.js')
+    assert.equal(evaluated.system.resolve('external', 'assets/root.js'), 'external')
+    assert.throws(() => evaluated.system.resolve('../../outside.js', 'assets/root.js'), /escapes the output root/)
     assert.deepEqual(imports, ['assets/root.js', 'assets/page.js'])
     assert.equal(appModule.id, 'assets/root.js')
     assert.equal(pageModule.id, 'assets/page.js')
