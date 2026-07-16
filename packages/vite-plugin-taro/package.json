@@ -36,7 +36,7 @@
         "README.zh.md"
     ],
     "scripts": {
-        "build": "node ../../scripts/sync-plugin-readme.ts && node ../../scripts/clean-directory.ts dist && tsc --project tsconfig.json",
+        "build": "node ../../scripts/sync-plugin-readme.ts && node ../../scripts/clean-directory.ts dist && tsc --project tsconfig.build.json",
         "test": "node --test",
         "typecheck": "tsc --project tsconfig.json --noEmit"
     },

@@ -7,8 +7,8 @@ import { systemRegisterCapsulePlugin } from './system-register.ts'
 /** Converts one final Rolldown ESM chunk into an inert native System registration capsule. */
 export function postRenderChunk(
     code: string,
-    chunk: Rolldown.RenderedChunk
-): { code: string; map: Rolldown.SourceMapInput } {
+    chunk: Pick<Rolldown.RenderedChunk, 'fileName'>
+): { code: string; map: Rolldown.ExistingRawSourceMap } {
     const capsule = transformSync(code, {
         babelrc: false,
         compact: false,
