@@ -7,6 +7,6 @@ export const taroBridgeImportPath = toViteFileImportPath(resolvePackageFile('dis
 const pageEntryIdPrefix = '\0vpt:page/'
 
 /** Converts a page path to its entry module ID. */
-export function pagePathToEntryId(pagePath: string): `\0${string}` {
+export function pagePathToEntryId(pagePath: string): string {
     return `${pageEntryIdPrefix}${pagePath}`
 }

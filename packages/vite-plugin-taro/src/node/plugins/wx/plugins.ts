@@ -72,10 +72,6 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
             }
         },
 
-        resolveId(id) {
-            return entries.resolveId(id)
-        },
-
         load(id) {
             if (isVitePreload(id)) {
                 return overrideVitePreload(id)
