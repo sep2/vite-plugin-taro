@@ -1,8 +1,9 @@
+import path from 'node:path'
 import type { Plugin } from 'vite'
 import { DevEnvironment } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
-import { appShellFileName, appShellImportPath } from './app/constant.ts'
+import { appComponentId, appShellFileName, appShellPath } from './app/constant.ts'
 import { generateBundle } from './generate-bundle.ts'
 import { postRenderChunk } from './post-render-chunk.ts'
 import { isVitePreload, overrideVitePreload } from './vite-preload/vite-preload.ts'
@@ -62,7 +63,7 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
 
                             rolldownOptions: {
                                 input: {
-                                    [appShellFileName]: appShellImportPath
+                                    [appShellFileName]: appShellPath
                                 },
                                 output: {
                                     entryFileNames: appShellFileName
@@ -72,6 +73,12 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
                         }
                     }
                 }
+            }
+        },
+
+        resolveId(id) {
+            if (id === appComponentId) {
+                return path.resolve(this.environment.config.root, options.app)
             }
         },
 

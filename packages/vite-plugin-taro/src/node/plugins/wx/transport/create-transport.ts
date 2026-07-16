@@ -10,8 +10,18 @@ export function createTransport(bundle: Rolldown.OutputBundle): Rolldown.Emitted
     if (!appShellChunk) {
         throw new Error('App shell was not emitted')
     }
-    if (appShellChunk.imports.length > 0 || appShellChunk.dynamicImports.length > 0) {
-        throw new Error('App shell must be self-contained')
+    if (appShellChunk.imports.length > 0) {
+        throw new Error('App shell must not statically import chunks')
+    }
+
+    const [appModuleFileName] = appShellChunk.dynamicImports
+    if (appShellChunk.dynamicImports.length !== 1) {
+        throw new Error('App shell must import one App module')
+    }
+
+    const appModuleChunk = chunks.find((chunk) => chunk.fileName === appModuleFileName)
+    if (!appModuleChunk) {
+        throw new Error('App module was not emitted')
     }
 
     return {
