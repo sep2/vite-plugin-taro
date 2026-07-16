@@ -65,7 +65,7 @@ export function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
 
                             rolldownOptions: {
                                 // Build the generated App and Page delegates instead of an HTML entry.
-                                input: virtualModules.buildEntries,
+                                input: virtualModules.input,
 
                                 // Native facades consume delegate exports outside the ESM graph.
                                 preserveEntrySignatures: 'strict'
