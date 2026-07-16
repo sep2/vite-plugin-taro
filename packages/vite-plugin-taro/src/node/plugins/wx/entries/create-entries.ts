@@ -15,6 +15,8 @@ export function createEntries(options: VitePluginTaroOptions) {
         entryId: pagePathToEntryId(option.path)
     }))
 
+    const entryIds = new Set([appEntryId, ...pages.map((page) => page.entryId)])
+
     const pageByEntryId = new Map(pages.map((page) => [page.entryId, page.option]))
 
     return {
@@ -23,6 +25,12 @@ export function createEntries(options: VitePluginTaroOptions) {
             ['root', appEntryId],
             ...pages.map((page) => [page.option.path, page.entryId])
         ]) satisfies Record<string, string>,
+
+        resolveId(id: string): string | undefined {
+            if (entryIds.has(id)) {
+                return id
+            }
+        },
 
         load(id: string, projectRoot: string): string | undefined {
             if (id === appEntryId) {
