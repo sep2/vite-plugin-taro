@@ -2,8 +2,8 @@ import type { Plugin } from 'vite'
 import { DevEnvironment } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
+import { generateBundle } from './render/generate-bundle.ts'
 import { postRenderChunk } from './render/post-render-chunk.ts'
-import { createTransport } from './render/transport/create-transport.ts'
 import { createWxVirtualModules } from './virtual/virtual-modules.ts'
 
 const wxEnvironmentName = 'wx'
@@ -86,7 +86,9 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
         },
 
         generateBundle(_, bundle) {
-            this.emitFile(createTransport(bundle))
+            generateBundle(bundle).forEach((file) => {
+                this.emitFile(file)
+            })
         }
     }
 }

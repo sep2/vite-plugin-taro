@@ -4,10 +4,10 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
 import { transformWithOxc } from 'vite'
-import { toModuleUrl } from '../module/id.ts'
-import { renderTransport } from '../module/transport.ts'
-import { wxBootstrapEntryName } from '../virtual/virtual-modules.ts'
-import { postRenderChunk } from './post-render-chunk.ts'
+import { wxBootstrapEntryName } from '../../virtual/virtual-modules.ts'
+import { postRenderChunk } from '../post-render-chunk.ts'
+import { toModuleUrl } from '../transport/module-url.ts'
+import { renderTransport } from '../transport/render-transport.ts'
 
 /** A test SystemJS module namespace. */
 type SystemModule = Readonly<Record<string, unknown>>
@@ -36,7 +36,7 @@ interface EvaluatedTransport {
 }
 
 const bootstrapTypeScript = readFileSync(
-    fileURLToPath(new URL('../../../../runtime/wx/bootstrap.ts', import.meta.url)),
+    fileURLToPath(new URL('../../../../../runtime/wx/bootstrap.ts', import.meta.url)),
     'utf8'
 )
 const bootstrapJavaScript = (

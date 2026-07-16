@@ -1,5 +1,5 @@
 import type { Rolldown } from 'vite'
-import { wxBootstrapEntryName } from '../virtual/virtual-modules.ts'
+import { bootstrapEntryName } from './bootstrap/bootstrap-name.ts'
 import { renderBootstrap } from './bootstrap/render-bootstrap.ts'
 import { renderCapsule } from './capsule/render-capsule.ts'
 
@@ -8,7 +8,7 @@ export function postRenderChunk(
     code: string,
     chunk: Pick<Rolldown.RenderedChunk, 'fileName' | 'isEntry' | 'name'>
 ): { code: string; map: Rolldown.ExistingRawSourceMap } {
-    if (chunk.isEntry && chunk.name === wxBootstrapEntryName) {
+    if (chunk.isEntry && chunk.name === bootstrapEntryName) {
         return renderBootstrap(code, chunk.fileName)
     }
 

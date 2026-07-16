@@ -1,0 +1,1 @@
+export const bootstrapEntryName = 'bootstrap'

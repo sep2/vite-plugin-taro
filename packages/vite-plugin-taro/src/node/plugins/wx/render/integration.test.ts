@@ -6,7 +6,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
 import { transformWithOxc } from 'vite'
-import { wxBootstrapEntryName } from '../virtual/virtual-modules.ts'
+import { bootstrapEntryName } from './bootstrap/bootstrap-name.ts'
 import { postRenderChunk } from './post-render-chunk.ts'
 import { toModuleUrl } from './transport/module-url.ts'
 import { renderTransport } from './transport/render-transport.ts'
@@ -62,7 +62,7 @@ const bootstrapJavaScript = (
 const bootstrapCode = postRenderChunk(bootstrapJavaScript, {
     fileName: '__taro__/bootstrap.js',
     isEntry: true,
-    name: wxBootstrapEntryName
+    name: bootstrapEntryName
 }).code
 
 /** Creates a SystemJS realm with the bootstrap and transport. */
