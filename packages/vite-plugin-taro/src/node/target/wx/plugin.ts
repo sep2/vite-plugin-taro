@@ -3,6 +3,7 @@ import { DevEnvironment } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { transformWxSystemRegisterChunk } from './post-render-chunk.ts'
+import { loadWxPreloadHelper } from './preload-helper.ts'
 import { createWxVirtualModules } from './virtual-modules.ts'
 
 const wxEnvironmentName = 'wx'
@@ -82,11 +83,11 @@ export function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
         },
 
         load(id) {
-            return virtualModules.load(id, this.environment.config.root)
+            return loadWxPreloadHelper(id) ?? virtualModules.load(id, this.environment.config.root)
         },
 
         renderChunk: {
-            // Run after Vite has rendered its preload wrapper, then let Rolldown finalize hashes and source maps.
+            // Convert final ESM chunks before Vite finalizes hashes, source maps, and preload markers.
             order: 'post',
             handler(code, chunk) {
                 return transformWxSystemRegisterChunk(code, chunk)

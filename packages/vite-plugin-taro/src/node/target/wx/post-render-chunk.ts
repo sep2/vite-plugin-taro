@@ -3,7 +3,6 @@ import transformDynamicImport from '@babel/plugin-transform-dynamic-import'
 import transformModulesSystemjs from '@babel/plugin-transform-modules-systemjs'
 import type { Rolldown } from 'vite'
 import { systemRegisterCapsulePlugin } from './post-render-chunk/system-register.ts'
-import { normalizeVitePreloadPlugin } from './post-render-chunk/vite-preload.ts'
 
 // Babel exposes this plugin's internal pass state in its public type, while PluginTarget intentionally erases it.
 const transformModulesSystemjsPlugin = transformModulesSystemjs as PluginTarget
@@ -18,12 +17,7 @@ export function transformWxSystemRegisterChunk(
         compact: false,
         configFile: false,
         filename: chunk.fileName,
-        plugins: [
-            normalizeVitePreloadPlugin,
-            transformDynamicImport,
-            transformModulesSystemjsPlugin,
-            systemRegisterCapsulePlugin
-        ],
+        plugins: [transformDynamicImport, transformModulesSystemjsPlugin, systemRegisterCapsulePlugin],
         sourceFileName: chunk.fileName,
         sourceMaps: true,
         sourceType: 'module'
