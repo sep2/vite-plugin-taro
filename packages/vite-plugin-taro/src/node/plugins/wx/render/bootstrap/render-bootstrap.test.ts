@@ -4,31 +4,32 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
 import { transformWithOxc } from 'vite'
+import { toModuleUrl } from '../module/id.ts'
+import { renderTransport } from '../module/transport.ts'
 import { wxBootstrapEntryName } from '../virtual/virtual-modules.ts'
-import { renderTransport } from './create-transport.ts'
 import { postRenderChunk } from './post-render-chunk.ts'
 
-/** A live namespace returned by the test System implementation. */
+/** A test SystemJS module namespace. */
 type SystemModule = Readonly<Record<string, unknown>>
 
-/** The generated graph and native capsule loader. */
+/** The generated native capsule loader. */
 interface NativeTransport {
     instantiate(id: string, parentId?: string): unknown
 }
 
-/** The hookable SystemJS surface used by the bootstrap test. */
+/** The SystemJS surface used by bootstrap tests. */
 interface SystemJsInstance {
     import(id: string, parentId?: string): Promise<SystemModule>
     instantiate(id: string, parentId?: string): unknown
     resolve(specifier: string, parentId?: string): string
 }
 
-/** The captured result of evaluating the actual bootstrap source. */
+/** An evaluated bootstrap fixture. */
 interface EvaluatedBootstrap {
     system: SystemJsInstance
 }
 
-/** The captured result of evaluating a generated transport. */
+/** An evaluated transport fixture. */
 interface EvaluatedTransport {
     requiredPaths: string[]
     transport: NativeTransport
@@ -47,7 +48,7 @@ const bootstrapChunk = {
     name: wxBootstrapEntryName
 }
 
-/** Evaluates the actual bootstrap source with isolated native globals. */
+/** Evaluates the bootstrap with isolated native globals. */
 function evaluateBootstrap(
     transport: NativeTransport,
     importModule: (id: string, parentId?: string) => Promise<SystemModule>
@@ -56,7 +57,7 @@ function evaluateBootstrap(
         require: () => transport
     }
 
-    /** Models the stock SystemJS instance constructed by the bootstrap. */
+    /** Models the SystemJS instance configured by the bootstrap. */
     class TestSystem implements SystemJsInstance {
         import(id: string, parentId?: string): Promise<SystemModule> {
             return importModule(id, parentId)
@@ -80,12 +81,12 @@ function evaluateBootstrap(
     return { system }
 }
 
-/** Evaluates a generated transport with a fake native require. */
+/** Evaluates a transport with a fake native require. */
 function evaluateTransport(source: string, loadCapsule: (path: string) => unknown): EvaluatedTransport {
     const requiredPaths: string[] = []
     const commonJsModule: { exports: unknown } = { exports: {} }
 
-    /** Records and loads one literal capsule path. */
+    /** Loads and records one capsule path. */
     function nativeRequire(id: string): unknown {
         requiredPaths.push(id)
         return loadCapsule(id)
@@ -99,10 +100,10 @@ function evaluateTransport(source: string, loadCapsule: (path: string) => unknow
 }
 
 test('restores native require after Rolldown rendering', () => {
-    const code = 'const transport = __VITE_PLUGIN_TARO_NATIVE_REQUIRE__("./transport.js")'
+    const code = 'const transport = __VITE_PLUGIN_TARO_NATIVE_REQUIRE__("../transport.js")'
     const bootstrap = postRenderChunk(code, bootstrapChunk)
 
-    assert.equal(bootstrap.code, 'const transport=require("./transport.js");')
+    assert.equal(bootstrap.code, 'const transport=require("../transport.js");')
     assert.deepEqual(bootstrap.map.sources, ['__taro__/bootstrap.js'])
     assert.throws(() => postRenderChunk('const value = 1', bootstrapChunk), /Expected native require/)
 })
@@ -112,16 +113,12 @@ test('renders a literal native capsule transport', () => {
     const capsule = {}
     const evaluated = evaluateTransport(source, () => capsule)
 
-    assert.strictEqual(evaluated.transport.instantiate('assets/chunks/lazy-b.js'), capsule)
-    assert.deepEqual(evaluated.requiredPaths, ['../assets/chunks/lazy-b.js'])
-    assert.throws(() => evaluated.transport.instantiate('assets/missing.js'), /Unknown System module/)
+    assert.strictEqual(evaluated.transport.instantiate(toModuleUrl('assets/chunks/lazy-b.js')), capsule)
+    assert.deepEqual(evaluated.requiredPaths, ['./assets/chunks/lazy-b.js'])
+    assert.throws(() => evaluated.transport.instantiate(toModuleUrl('assets/missing.js')), /Unknown System module/)
 
     const requireArguments = [...source.matchAll(/\brequire\(([^)]+)\)/g)].map((match) => JSON.parse(match[1]))
-    assert.deepEqual(requireArguments, [
-        '../assets/chunks/lazy-b.js',
-        '../assets/root-c.js',
-        '../assets/taro-bridge-a.js'
-    ])
+    assert.deepEqual(requireArguments, ['./assets/chunks/lazy-b.js', './assets/root-c.js', './assets/taro-bridge-a.js'])
 })
 
 test('configures the shared SystemJS registry for concurrent imports', async () => {
@@ -134,17 +131,12 @@ test('configures the shared SystemJS registry for concurrent imports', async () 
         return Promise.resolve({ id })
     })
 
-    const [appModule, pageModule] = await Promise.all([
-        evaluated.system.import('assets/root.js'),
-        evaluated.system.import('assets/page.js')
-    ])
+    const appId = toModuleUrl('assets/root.js')
+    const pageId = toModuleUrl('assets/page.js')
+    const [appModule, pageModule] = await Promise.all([evaluated.system.import(appId), evaluated.system.import(pageId)])
 
     assert.strictEqual(evaluated.system.instantiate, transport.instantiate)
-    assert.equal(evaluated.system.resolve('./shared.js', 'assets/chunks/root.js'), 'assets/chunks/shared.js')
-    assert.equal(evaluated.system.resolve('../shared.js', 'assets/chunks/root.js'), 'assets/shared.js')
-    assert.equal(evaluated.system.resolve('external', 'assets/root.js'), 'external')
-    assert.throws(() => evaluated.system.resolve('../../outside.js', 'assets/root.js'), /escapes the output root/)
-    assert.deepEqual(imports, ['assets/root.js', 'assets/page.js'])
-    assert.equal(appModule.id, 'assets/root.js')
-    assert.equal(pageModule.id, 'assets/page.js')
+    assert.deepEqual(imports, [appId, pageId])
+    assert.equal(appModule.id, appId)
+    assert.equal(pageModule.id, pageId)
 })

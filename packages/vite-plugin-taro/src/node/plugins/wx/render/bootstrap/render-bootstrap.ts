@@ -5,7 +5,7 @@ export const wxBootstrapFileName = '__taro__/bootstrap.js'
 
 const nativeRequirePlaceholder = '__VITE_PLUGIN_TARO_NATIVE_REQUIRE__'
 
-/** Restores the native require hidden from Rolldown's CommonJS transform. */
+/** Renders the native bootstrap with its native require restored. */
 export function renderBootstrap(code: string, fileName: string): { code: string; map: Rolldown.ExistingRawSourceMap } {
     if (!code.includes(nativeRequirePlaceholder)) {
         throw new Error(`Expected native require placeholder in ${fileName}`)
@@ -29,7 +29,7 @@ export function renderBootstrap(code: string, fileName: string): { code: string;
     return { code: bootstrap.code, map: bootstrap.map as Rolldown.ExistingRawSourceMap }
 }
 
-/** Rewrites the bootstrap placeholder as native require. */
+/** Creates the native-require rewrite plugin. */
 function nativeCommonJsGlobalsPlugin(): PluginObject {
     return {
         name: 'vite-plugin-taro:native-commonjs-globals',
