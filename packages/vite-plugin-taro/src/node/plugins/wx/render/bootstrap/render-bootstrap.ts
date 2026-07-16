@@ -1,8 +1,6 @@
 import { type PluginObject, transformSync } from '@babel/core'
 import type { Rolldown } from 'vite'
 
-export const wxBootstrapFileName = '__taro__/bootstrap.js'
-
 const nativeRequirePlaceholder = '__VITE_PLUGIN_TARO_NATIVE_REQUIRE__'
 
 /** Renders the native bootstrap with its native require restored. */

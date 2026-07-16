@@ -3,17 +3,18 @@ import { DevEnvironment } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { postRenderChunk } from './render/post-render-chunk.ts'
+import { createTransport } from './render/transport/create-transport.ts'
 import { createWxVirtualModules } from './virtual/virtual-modules.ts'
 
 const wxEnvironmentName = 'wx'
 const wxJavaScriptTarget = 'es2018'
 
-/** Creates the Vite plugins that own the WX environment and its generated entries. */
+/** Creates the WX target plugins. */
 export function createWxTargetPlugins(options: VitePluginTaroOptions): Plugin[] {
     return [createWxTargetPlugin(options)]
 }
 
-/** Configures and transforms the dedicated WX Vite environment. */
+/** Configures the WX Vite environment. */
 function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
     const virtualModules = createWxVirtualModules(options)
 
@@ -22,16 +23,12 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
 
         config() {
             return {
-                // Taro's compile-time flags select its React Mini Program runtime and remove unsupported DOM branches.
                 define: createWxTaroDefines(),
 
-                // WX has native App/Page entries and must not use Vite's SPA HTML fallback.
                 appType: 'custom',
 
-                // Vite's development source transforms must emit syntax supported by the WX runtime.
                 oxc: { target: wxJavaScriptTarget },
 
-                // The default app builder targets the browser client; WX is the only production environment for this target.
                 builder: {
                     async buildApp(builder) {
                         await builder.build(builder.environments[wxEnvironmentName])
@@ -40,7 +37,6 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
 
                 resolve: {
                     alias: [
-                        // The public component facade stays target-neutral; WX selects Taro's native host names here.
                         {
                             find: /^@tarojs\/components$/,
                             replacement: packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
@@ -50,31 +46,23 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
 
                 environments: {
                     [wxEnvironmentName]: {
-                        // WX consumes client-side package exports, CSS, and assets without being a browser environment.
                         consumer: 'client',
 
                         dev: {
-                            // WX modules execute in DevTools, so Vite must transform them without a Node ModuleRunner.
                             createEnvironment(name, config) {
                                 return new DevEnvironment(name, config, {
-                                    // HMR stays disabled until the WX metadata channel has an update consumer.
                                     hot: false
                                 })
                             }
                         },
 
                         build: {
-                            // WX has no browser module-preload runtime.
                             modulePreload: false,
 
-                            // Production chunks must use the same WX-supported syntax level as development modules.
                             target: wxJavaScriptTarget,
 
                             rolldownOptions: {
-                                // Build the generated App and Page delegates instead of an HTML entry.
                                 input: virtualModules.input,
-
-                                // Native facades consume delegate exports outside the ESM graph.
                                 preserveEntrySignatures: 'strict'
                             }
                         }
@@ -93,19 +81,17 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
         },
 
         renderChunk: {
-            // Convert final ESM chunks before Vite finalizes hashes, source maps, and preload markers.
             order: 'post',
             handler: postRenderChunk
         },
 
-        // Emit the native transport only after final chunk IDs and hashes are known.
         generateBundle(_, bundle) {
             this.emitFile(createTransport(bundle))
         }
     }
 }
 
-/** Creates the compile-time constants that select Taro's WeChat runtime branches. */
+/** Creates Taro's WX compile-time constants. */
 function createWxTaroDefines(): Record<string, string> {
     const taroVersion = String((packageRequire('@tarojs/runtime/package.json') as { version: string }).version)
 
