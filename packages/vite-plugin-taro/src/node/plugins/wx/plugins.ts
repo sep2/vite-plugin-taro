@@ -1,16 +1,14 @@
 import type { Plugin } from 'vite'
 import { DevEnvironment } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
-import { toViteFileImportPath } from '../../utils/modules.ts'
-import { packageRequire, resolvePackageFile } from '../../utils/packages.ts'
-import { appShellFileName } from './app/constant.ts'
+import { packageRequire } from '../../utils/packages.ts'
+import { appShellFileName, appShellImportPath } from './app/constant.ts'
 import { generateBundle } from './generate-bundle.ts'
 import { postRenderChunk } from './post-render-chunk.ts'
 import { isVitePreload, overrideVitePreload } from './vite-preload/vite-preload.ts'
 
 const wxEnvironmentName = 'wx'
 const wxJavaScriptTarget = 'es2018'
-const appShellImportPath = toViteFileImportPath(resolvePackageFile('dist/runtime/wx/app.js'))
 
 /** Creates the WX target plugins. */
 export function createWxTargetPlugins(options: VitePluginTaroOptions): Plugin[] {
