@@ -2,16 +2,24 @@ import type { types as BabelTypes, NodePath, PluginObj } from '@babel/core'
 import babel from '@rolldown/plugin-babel'
 import type { Plugin, PluginOption } from 'vite'
 import type { BuildContext } from '../../build-context.ts'
+import { createH5CssPlugins } from '../../css/css-pipeline.ts'
 import { virtualTaroApiId } from '../../plugins/taro-runtime.ts'
 import { stripVirtualPrefix } from '../../utils/modules.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { createH5IndexHtmlTags, isH5VirtualModuleId, loadH5VirtualModule } from './virtual-modules.ts'
 
-/** Creates the plugins that own the complete H5 target lifecycle. */
+/**
+ * Restores the complete current H5 pipeline alongside the greenfield WX environment.
+ * Babel compatibility, web-target Tailwind processing, and H5 entry generation remain isolated from WX hooks.
+ */
 export function createH5TargetPlugins(context: BuildContext): PluginOption[] {
-    return [...createH5SupportPlugins(), createH5TargetPlugin(context)]
+    return [...createH5SupportPlugins(), ...createH5CssPlugins(), createH5TargetPlugin(context)]
 }
 
+/**
+ * Owns H5 resolution, browser defines, virtual entries, and HTML injection.
+ * Keeping these hooks in one target plugin prevents browser aliases from entering the dedicated WX environment.
+ */
 function createH5TargetPlugin(context: BuildContext): Plugin {
     return {
         name: 'vite-plugin-taro:h5',
@@ -75,7 +83,10 @@ function createH5TargetPlugin(context: BuildContext): Plugin {
     }
 }
 
-/** Creates H5-only Babel transforms for Stencil CSS ordering and Taro API imports. */
+/**
+ * Creates H5-only Babel transforms needed by current Taro and Stencil packages.
+ * The transforms run before the H5 target plugin so generated imports resolve through the public virtual Taro API.
+ */
 function createH5SupportPlugins(): PluginOption[] {
     return [
         babel({
@@ -99,7 +110,10 @@ function createH5SupportPlugins(): PluginOption[] {
     ]
 }
 
-/** Keeps Stencil-injected Taro component styles before application stylesheets. */
+/**
+ * Keeps Stencil-injected Taro component styles before application stylesheets.
+ * The Babel visitor rewrites only Stencil's known insertion call and leaves every other DOM operation unchanged.
+ */
 function rewriteStencilStyleInsertion(): PluginObj {
     return {
         name: 'rewrite-stencil-style-insertion',
@@ -114,6 +128,10 @@ function rewriteStencilStyleInsertion(): PluginObj {
     }
 }
 
+/**
+ * Narrows the Babel visitor to the exact Stencil style insertion expression.
+ * Matching callee and both arguments avoids rewriting unrelated `insertBefore` calls in dependency code.
+ */
 function isStencilStyleInsertBeforeCall(path: NodePath<BabelTypes.CallExpression>): boolean {
     return (
         path.get('callee').matchesPattern('styleContainerNode.insertBefore') &&
@@ -122,6 +140,10 @@ function isStencilStyleInsertBeforeCall(path: NodePath<BabelTypes.CallExpression
     )
 }
 
+/**
+ * Supplies the compile-time environment constants expected by Taro's H5 runtime.
+ * Stringified values let Vite fold platform branches without leaking WX runtime settings into the browser bundle.
+ */
 function createH5TaroDefines(): Record<string, string> {
     return {
         'process.env.FRAMEWORK': JSON.stringify('react'),
