@@ -499,9 +499,6 @@ Native facade generation runs after Vite has identified the foundation, App, and
 planner maps the same unchanged IDs to physical capsule locations. Entry roles and native package paths never become alternate SystemJS
 IDs.
 
-The React transform uses the stable Vite source ID when registering component families. Re-executing a module therefore registers fresh
-component types under the same family identifiers.
-
 ### Custom host hooks
 
 The runtime is built from SystemJS core and registry behavior, without the browser script loader. It provides WX-specific hooks:
@@ -649,8 +646,7 @@ Generated lazy packages use deterministic names and contain JavaScript capsules 
 }
 ```
 
-Code-only packages with empty page lists are a validated platform capability and part of the required WX baseline. An
-executable DevTools regression probe continuously verifies that capability.
+Code-only packages with empty page lists are a validated platform capability and part of the required WX baseline.
 
 ### Placement goals
 
@@ -671,11 +667,6 @@ A shared module is emitted exactly once. The planner never duplicates it to avoi
 
 ### Resource placement
 
-JavaScript and native resources have separate placement rules:
-
-- lazy JavaScript can enter generated code-only subpackages;
-- all Tailwind and ordinary CSS is emitted eagerly;
-- production CSS is flattened into `app.wxss`;
 - generated WXML, Vite public assets, and referenced assets remain in the main package initially.
 
 ## Build pipeline
@@ -719,8 +710,6 @@ browser WebSocket execution are never injected into generated Mini Program code.
 - development update delivery.
 
 Users do not add a separate React or Tailwind Vite plugin.
-
-Third-party Vite plugins still participate through Vite's normal resolution, loading, transformation, and asset hooks.
 
 ### Shared front half
 
@@ -795,8 +784,7 @@ Production granularity is a closed architectural decision: one System registrati
 to one source or Vite module. Production never enables preserve-module output merely to expose more identities to SystemJS.
 
 Rolldown owns source-module resolution, tree shaking, scope hoisting, and execution semantics inside each chunk. SystemJS owns the final
-chunk graph: inter-chunk static dependencies, dynamic imports, live chunk exports, and cycles crossing chunk boundaries. Source modules
-combined into one chunk intentionally have no independent production runtime identity.
+chunk graph: inter-chunk static dependencies, dynamic imports, live chunk exports, and cycles crossing chunk boundaries.
 
 ### No runtime externals
 
@@ -888,8 +876,7 @@ At server startup the plugin creates a physical Mini Program project:
 9. Write an inert but directly required `__taro__/update.js`.
 10. Start the development control endpoints.
 
-Dynamic modules are materialized but not evaluated. Modules introduced after startup can be delivered through `update.js` without
-changing the live native package layout. The next cold materialization replans their production-like package ownership.
+Dynamic modules are materialized but not evaluated.
 
 ## Native synchronous facades
 
@@ -916,10 +903,6 @@ interface NativeInvocationRelay<Delegate extends object> {
     cancel(): void;
 }
 ```
-
-The callback names and their conditional presence come from the bundled Taro lifecycle and per-entry transform metadata.
-The facade generator neither adds nor removes callback names. A change to that resolved native surface crosses a native
-registration boundary and requests a DevTools hard refresh.
 
 While the delegate is loading or the initial journal is replaying, `invoke()` appends each native invocation in
 arrival order and returns `undefined`. Once the delegate resolves, the relay drains that journal as one FIFO
@@ -1105,8 +1088,7 @@ the native Page instance.
 
 ### Delegate and activation failures
 
-Build, transform, and registration-generation errors are rejected before materialization and never overwrite the last runnable Mini
-Program. A successfully emitted capsule can still fail at runtime because native asynchronous loading fails, module execution or top-level
+A successfully emitted capsule can still fail at runtime because native asynchronous loading fails, module execution or top-level
 await rejects, or a generated delegate module or Taro configuration creator throws.
 
 The native `App()` or `Page()` registration has already completed when such a rejection occurs. The facade therefore:
@@ -1121,12 +1103,6 @@ The plugin does not render a custom runtime error overlay or retry native regist
 successful compilation, the server rematerializes the project and activates it through a hard refresh.
 
 ## Lifecycle and event behavior
-
-Lifecycle semantics follow the Taro programming model, not a previous bootstrap implementation.
-
-The App facade synchronously exposes the standard App lifecycle surface and submits each call to its
-`NativeInvocationRelay`. Once `createReactApp()` returns the exact Taro App delegate, the relay forwards its
-initial journal in FIFO order. Page activation waits for the App relay's `initialReplayReady` barrier.
 
 Core Page lifecycle order is preserved:
 
@@ -1145,7 +1121,7 @@ The facade exposes every callback that the bundled Taro integration resolves for
 Taro's own source-transform and page configuration behavior; the plugin does not independently infer, add, remove, or
 reinterpret callbacks.
 
-Before activation, a callback invocation is journaled and returns `undefined`. After activation, the relay invokes
+After activation, the relay invokes
 the exact method on the Taro configuration object and returns its value unchanged, including a returned object or
 `Promise`. Adding or removing a conditionally registered callback regenerates the native facade and requests a
 DevTools hard refresh.
@@ -1153,16 +1129,6 @@ DevTools hard refresh.
 ## Development HMR architecture
 
 ### Stable module identities
-
-Development HMR uses the stable module ID supplied by Vite for each module in the dedicated `wx` environment. For an ordinary source
-module, that ID may be the same URL Vite exposes in its development graph:
-
-```text
-/src/components/card.tsx
-```
-
-The plugin never creates timestamped, content-hashed, prefixed, or generation-specific module IDs. Vite remains the sole authority for
-module identity; delivery versions identify executable `update.js` payloads, never logical modules.
 
 Stable IDs provide two important properties:
 
@@ -1245,7 +1211,7 @@ function deleteForViteHmr(id: string): boolean {
 Importing a successfully deleted stable ID creates and evaluates a fresh load record. The fresh namespace is delivered to qualified HMR
 accept callbacks; it is not pushed automatically through old ESM setters.
 
-Before importing any accepted module, the runtime deletes the union of its loaded `reloadModuleIds`. A replacement is unsafe if deletion
+A replacement is unsafe if deletion
 fails because a module is still executing, participates in unresolved top-level await, or is in another unsupported loader state. The
 runtime reports the failure without acknowledging the delivery, and the server requests a DevTools hard refresh.
 
@@ -1255,21 +1221,6 @@ The React transform has two separate responsibilities:
 
 1. Fresh module execution registers component types with the React Refresh runtime.
 2. The old module's HMR accept callback validates whether the fresh export shape is a safe Refresh boundary.
-
-The update order mirrors Vite web HMR:
-
-```text
-capture old qualified accept callbacks
-    → run dispose handlers for accepted modules
-    → System.delete(invalidated stable IDs)
-    → install fresh registrations
-    → System.import(accepted stable IDs)
-    → fresh component types register
-    → invoke old accept callbacks with fresh namespaces
-    → propagate hot.invalidate() when a boundary is incompatible
-    → perform queued React Refresh for valid boundaries
-    → acknowledge delivery
-```
 
 An incompatible React boundary calls `hot.invalidate()`. The server then propagates from that boundary to a higher accepting importer; if
 none exists, it requests a DevTools hard refresh. Existing importers are not automatically exposed to the fresh exports
@@ -1322,8 +1273,6 @@ closure immediately. New modules have no old load record and require no deletion
 
 Install fresh registrations as transient instantiation inputs, then import every unique `acceptedId` under its stable ID. SystemJS links
 its fresh invalidated dependencies and reuses unaffected dependencies already in the registry.
-
-Fresh execution creates new HMR contexts and registers fresh React component types under the same Refresh family identifiers.
 
 #### 5. Accept or invalidate
 
@@ -1466,7 +1415,7 @@ A new session means WeChat DevTools or the App restarted and arrived with a fres
 and all old HMR deliveries, acknowledgements, pending instantiations, callbacks, and `hot.data` are discarded. Deliveries are never
 replayed into a new runtime.
 
-The development foundation barrier holds App and Page activation while the server makes that decision. If the physical project is already
+If the physical project is already
 a current materialization, the server accepts the session and the new heap itself is the completed hard refresh. If source has advanced
 through session-local HMR since that materialization, the server leaves the barrier pending, emits a new complete materialization and
 build ID, and DevTools performs one full compilation and restart before development continues.
@@ -1482,12 +1431,6 @@ already applied version and acknowledges it again.
 
 ### Restart behavior
 
-#### App or DevTools restart
-
-A fresh runtime reports a new session ID and its current build ID. The previous session is discarded and no delivery is replayed. If its
-physical files are behind current source, the server creates a new complete materialization and build ID and hard-refreshes once more into
-that current snapshot.
-
 #### Vite server restart
 
 The plugin creates a fresh physical development build and a new build ID. Deliveries from the previous build are discarded, and DevTools
@@ -1495,7 +1438,7 @@ hard-refreshes into the new materialization.
 
 #### Bounded delivery state
 
-Delivery state is bounded for the active session. Exceeding the bound performs a hard refresh and starts a new build and runtime session;
+Exceeding the bound performs a hard refresh and starts a new build and runtime session;
 it never replays an accumulated history into another heap.
 
 ## DevTools-owned hard refresh
@@ -1532,12 +1475,8 @@ fresh heap and session; the normal new-session handshake supersedes all old deli
 instantiations, callbacks, and `hot.data`. Hard-refresh completion is observed only when that fresh session reports
 the published build ID.
 
-CSS changes use WeChat's WXSS hot replacement whenever possible. If global replacement is unreliable, the complete stylesheet is emitted
-into every page WXSS during development rather than forcing every style edit through JavaScript HMR.
-
 Hard refresh does not use `wx.reLaunch()`, restore the route or Page stack, preserve application state, or replay
-HMR data. The plugin only classifies the update as unsafe and publishes a complete replacement project. WeChat
-DevTools owns the reload decision, compilation, and process restart. No DevTools CLI automation is required.
+HMR data. No DevTools CLI automation is required.
 
 ## Error handling and diagnostics
 
@@ -1565,9 +1504,6 @@ An HMR error additionally reports:
 
 A transform failure before publication does not overwrite the last successful `update.js` or `app.wxss`. The running application stays
 on its previous applied code.
-
-Once registry deletion begins, any unrecoverable failure terminates plugin HMR for that batch. The runtime never pretends that a partially
-applied Vite HMR batch is healthy; it reports the failure so the server can request a DevTools hard refresh.
 
 ## Hard invariants
 
@@ -1612,12 +1548,7 @@ The implementation enforces these invariants with build-time assertions and runt
     implementation.
 33. JSX structure is rendered through Taro's runtime host tree and is never compiled into page-specific structural WXML.
 34. Application dependency resolution never consumes a user-installed `@tarojs/*` package.
-35. App and Page facades are transport coordinators, not framework controllers. They use one shared
-    `NativeInvocationRelay` abstraction to journal supported native invocations only while bridging asynchronous
-    delegate activation, then forward each invocation exactly once and in arrival order to the exact objects
-    returned by Taro's `createReactApp()` and `createPageConfig()`. Once active, the relay returns the exact delegate
-    result. It never interprets lifecycles, callback return values, or independently dispatches Taro hooks, mounting,
-    routing, DOM updates, or framework events.
+35. App and Page facades are transport coordinators, not framework controllers.
 36. React is always an application-installed dependency, the plugin never ships a private React implementation, and React resolution
     receives no plugin-specific identity or deduplication policy.
 37. Every production System registration is a final Rolldown chunk; source modules do not retain independent production runtime
