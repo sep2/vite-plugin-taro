@@ -8,7 +8,11 @@ import { createWxVirtualModules } from './virtual/virtual-modules.ts'
 const wxEnvironmentName = 'wx'
 const wxJavaScriptTarget = 'es2018'
 
-export function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
+export function createWxTargetPlugins(options: VitePluginTaroOptions): Plugin[] {
+    return [createWxTargetPlugin(options)]
+}
+
+function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
     const virtualModules = createWxVirtualModules(options)
 
     return {
