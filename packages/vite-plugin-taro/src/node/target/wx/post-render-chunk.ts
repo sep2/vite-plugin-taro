@@ -1,11 +1,12 @@
-import { transformSync } from '@babel/core'
-// @ts-expect-error Babel's CommonJS plugin package does not publish TypeScript declarations.
-import transformDynamicImportModule from '@babel/plugin-transform-dynamic-import'
-// @ts-expect-error Babel's CommonJS plugin package does not publish TypeScript declarations.
-import transformModulesSystemjsModule from '@babel/plugin-transform-modules-systemjs'
+import { type PluginTarget, transformSync } from '@babel/core'
+import transformDynamicImport from '@babel/plugin-transform-dynamic-import'
+import transformModulesSystemjs from '@babel/plugin-transform-modules-systemjs'
 import type { Rolldown } from 'vite'
 import { systemRegisterCapsulePlugin } from './post-render-chunk/system-register.ts'
 import { normalizeVitePreloadPlugin } from './post-render-chunk/vite-preload.ts'
+
+// Babel exposes this plugin's internal pass state in its public type, while PluginTarget intentionally erases it.
+const transformModulesSystemjsPlugin = transformModulesSystemjs as PluginTarget
 
 /** Normalizes and converts one final Rolldown ESM chunk into an inert native System registration capsule. */
 export function transformWxSystemRegisterChunk(
@@ -19,8 +20,8 @@ export function transformWxSystemRegisterChunk(
         filename: chunk.fileName,
         plugins: [
             normalizeVitePreloadPlugin,
-            transformDynamicImportModule.default,
-            transformModulesSystemjsModule.default,
+            transformDynamicImport,
+            transformModulesSystemjsPlugin,
             systemRegisterCapsulePlugin
         ],
         sourceFileName: chunk.fileName,
@@ -32,5 +33,13 @@ export function transformWxSystemRegisterChunk(
         throw new Error(`Failed to generate the capsule for ${chunk.fileName}`)
     }
 
-    return { code: capsule.code, map: capsule.map }
+    return {
+        code: capsule.code,
+        map: {
+            ...capsule.map,
+            names: [...capsule.map.names],
+            sources: [...capsule.map.sources],
+            sourcesContent: capsule.map.sourcesContent ? [...capsule.map.sourcesContent] : undefined
+        }
+    }
 }
