@@ -1,14 +1,16 @@
 import type { Plugin } from 'vite'
 import { DevEnvironment } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
-import { packageRequire } from '../../utils/packages.ts'
-import { createEntries } from './entries/create-entries.ts'
+import { toViteFileImportPath } from '../../utils/modules.ts'
+import { packageRequire, resolvePackageFile } from '../../utils/packages.ts'
+import { appShellFileName } from './app/constant.ts'
 import { generateBundle } from './generate-bundle.ts'
 import { postRenderChunk } from './post-render-chunk.ts'
 import { isVitePreload, overrideVitePreload } from './vite-preload/vite-preload.ts'
 
 const wxEnvironmentName = 'wx'
 const wxJavaScriptTarget = 'es2018'
+const appShellImportPath = toViteFileImportPath(resolvePackageFile('dist/runtime/wx/app.js'))
 
 /** Creates the WX target plugins. */
 export function createWxTargetPlugins(options: VitePluginTaroOptions): Plugin[] {
@@ -17,14 +19,12 @@ export function createWxTargetPlugins(options: VitePluginTaroOptions): Plugin[] 
 
 /** Configures the WX Vite environment. */
 function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
-    const entries = createEntries(options)
-
     return {
         name: 'vite-plugin-taro:wx',
 
         config() {
             return {
-                define: createWxTaroDefines(),
+                define: createWxDefines(options),
 
                 appType: 'custom',
 
@@ -63,7 +63,12 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
                             target: wxJavaScriptTarget,
 
                             rolldownOptions: {
-                                input: entries.input,
+                                input: {
+                                    [appShellFileName]: appShellImportPath
+                                },
+                                output: {
+                                    entryFileNames: appShellFileName
+                                },
                                 preserveEntrySignatures: 'strict'
                             }
                         }
@@ -72,17 +77,10 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
             }
         },
 
-        resolveId(id) {
-            return entries.resolveId(id)
-        },
-
         load(id) {
             if (isVitePreload(id)) {
                 return overrideVitePreload(id)
             }
-
-            const projectRoot = this.environment.config.root
-            return entries.load(id, projectRoot)
         },
 
         renderChunk: {
@@ -98,11 +96,12 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
     }
 }
 
-/** Creates Taro's WX compile-time constants. */
-function createWxTaroDefines(): Record<string, string> {
+/** Creates WX compile-time constants. */
+function createWxDefines(options: VitePluginTaroOptions): Record<string, string> {
     const taroVersion = String((packageRequire('@tarojs/runtime/package.json') as { version: string }).version)
 
     return {
+        __VITE_PLUGIN_TARO_APP_CONFIG__: JSON.stringify(options.appJson),
         'process.env.FRAMEWORK': JSON.stringify('react'),
         'process.env.SUPPORT_TARO_POLYFILL': JSON.stringify('disabled'),
         'process.env.TARO_ENV': JSON.stringify('weapp'),

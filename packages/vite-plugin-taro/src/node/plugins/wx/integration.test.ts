@@ -6,7 +6,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
 import { transformWithOxc } from 'vite'
-import { bootstrapEntryName } from './bootstrap/bootstrap-name.ts'
+import { renderAppShell } from './app/render-app-shell.ts'
 import { postRenderChunk } from './post-render-chunk.ts'
 import { chunkIdToModuleUrl } from './transport/module-url.ts'
 import { renderTransport } from './transport/render-transport.ts'
@@ -59,11 +59,7 @@ const bootstrapTypeScript = readFileSync(
 const bootstrapJavaScript = (
     await transformWithOxc(bootstrapTypeScript, 'bootstrap.ts', { target: 'es2018' })
 ).code.replace(/^import ['"]systemjs\/s\.js['"];\s*/m, '')
-const bootstrapCode = postRenderChunk(bootstrapJavaScript, {
-    fileName: '__taro__/bootstrap.js',
-    isEntry: true,
-    name: bootstrapEntryName
-}).code
+const bootstrapCode = renderAppShell(bootstrapJavaScript, 'app.js').code
 
 /** Creates a SystemJS realm with the bootstrap and transport. */
 function createTestSystem(
@@ -78,7 +74,9 @@ function createTestSystem(
         const capsuleId = path.posix.normalize(path.posix.join(path.posix.dirname(transportFileName), id))
         onInstantiate(capsuleId)
         const registration = capsules.get(capsuleId)
-        if (!registration) throw new Error(`Unknown test module: ${capsuleId}`)
+        if (!registration) {
+            throw new Error(`Unknown test module: ${capsuleId}`)
+        }
         return registration
     }
 
@@ -115,7 +113,9 @@ function assertSystemRegistration(value: unknown): asserts value is SystemRegist
 /** Calls a validated function export. */
 function callExport(module: SystemModule, name: string, ...arguments_: unknown[]): unknown {
     const value = module[name]
-    if (typeof value !== 'function') throw new Error(`Expected ${name} to be a function`)
+    if (typeof value !== 'function') {
+        throw new Error(`Expected ${name} to be a function`)
+    }
     return value.apply(undefined, arguments_)
 }
 
@@ -191,7 +191,9 @@ test('deduplicates concurrent instantiation and execution', async () => {
         })
     ]
     const system = createTestSystem(new Map([['entry.js', registration]]), (id) => {
-        if (id === 'entry.js') instantiations++
+        if (id === 'entry.js') {
+            instantiations++
+        }
     })
 
     const entryId = chunkIdToModuleUrl('entry.js')
@@ -201,57 +203,6 @@ test('deduplicates concurrent instantiation and execution', async () => {
     assert.equal(first.value, 42)
     assert.equal(instantiations, 1)
     assert.equal(executions, 1)
-})
-
-test('executes one shared Taro bridge before concurrent entries', async () => {
-    const order: string[] = []
-    let bridgeExecutions = 0
-    const registrations = new Map<string, SystemRegistration>([
-        [
-            'taro-bridge.js',
-            [
-                [],
-                (exportBinding) => ({
-                    execute() {
-                        bridgeExecutions++
-                        order.push('bridge')
-                        exportBinding('ready', true)
-                    }
-                })
-            ]
-        ],
-        ...['app.js', 'page.js'].map((id): [string, SystemRegistration] => [
-            id,
-            [
-                ['./taro-bridge.js'],
-                () => {
-                    let bridgeReady = false
-                    return {
-                        setters: [
-                            (module) => {
-                                bridgeReady = module.ready === true
-                            }
-                        ],
-                        execute() {
-                            if (!bridgeReady) throw new Error('Taro bridge was not ready')
-                            order.push(id)
-                        }
-                    }
-                }
-            ]
-        ])
-    ])
-    let bridgeInstantiations = 0
-    const system = createTestSystem(registrations, (id) => {
-        if (id === 'taro-bridge.js') bridgeInstantiations++
-    })
-
-    await Promise.all([system.import(chunkIdToModuleUrl('app.js')), system.import(chunkIdToModuleUrl('page.js'))])
-
-    assert.equal(bridgeInstantiations, 1)
-    assert.equal(bridgeExecutions, 1)
-    assert.equal(order[0], 'bridge')
-    assert.deepEqual(new Set(order.slice(1)), new Set(['app.js', 'page.js']))
 })
 
 test('links circular dependencies through declaration-time exports', async () => {
@@ -272,7 +223,9 @@ test('links circular dependencies through declaration-time exports', async () =>
                             }
                         ],
                         execute() {
-                            if (typeof importedB !== 'function') throw new Error('Module b was not linked')
+                            if (typeof importedB !== 'function') {
+                                throw new Error('Module b was not linked')
+                            }
                             exportBinding('value', `${importedB.call(undefined)}a`)
                         }
                     }
@@ -295,7 +248,9 @@ test('links circular dependencies through declaration-time exports', async () =>
                             }
                         ],
                         execute() {
-                            if (typeof importedA !== 'function') throw new Error('Module a was not linked')
+                            if (typeof importedA !== 'function') {
+                                throw new Error('Module a was not linked')
+                            }
                             exportBinding('value', `${importedA.call(undefined)}b`)
                         }
                     }
