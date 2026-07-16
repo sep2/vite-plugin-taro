@@ -6,7 +6,7 @@ test('converts a final ESM chunk into a System registration capsule', () => {
     const result = postRenderChunk(
         `import { value } from './dependency.js'
 export const doubled = value * 2`,
-        { fileName: 'assets/root.js' }
+        { fileName: 'assets/root.js', isEntry: true, name: 'root' }
     )
     const commonJsModule: { exports?: unknown } = {}
 
@@ -20,7 +20,9 @@ export const doubled = value * 2`,
 
 test('converts dynamic imports and generates a source map for the final chunk', () => {
     const result = postRenderChunk(`export const load = () => import('./lazy.js')`, {
-        fileName: 'assets/root.js'
+        fileName: 'assets/root.js',
+        isEntry: true,
+        name: 'root'
     })
 
     assert.match(result.code, /_context\.import\(['"]\.\/lazy\.js['"]\)/)

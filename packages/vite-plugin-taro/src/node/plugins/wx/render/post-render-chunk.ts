@@ -35,13 +35,5 @@ export function postRenderChunk(
         throw new Error(`Failed to generate the capsule for ${chunk.fileName}`)
     }
 
-    return {
-        code: capsule.code,
-        map: {
-            ...capsule.map,
-            names: [...capsule.map.names],
-            sources: [...capsule.map.sources],
-            sourcesContent: capsule.map.sourcesContent ? [...capsule.map.sourcesContent] : undefined
-        }
-    }
+    return { code: capsule.code, map: capsule.map as Rolldown.ExistingRawSourceMap }
 }
