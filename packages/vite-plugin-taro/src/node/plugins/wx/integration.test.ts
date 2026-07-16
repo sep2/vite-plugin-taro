@@ -8,7 +8,7 @@ import vm from 'node:vm'
 import { transformWithOxc } from 'vite'
 import { bootstrapEntryName } from './bootstrap/bootstrap-name.ts'
 import { postRenderChunk } from './post-render-chunk.ts'
-import { toModuleUrl } from './transport/module-url.ts'
+import { chunkIdToModuleUrl } from './transport/module-url.ts'
 import { renderTransport } from './transport/render-transport.ts'
 import { transportFileName } from './transport/transport.ts'
 
@@ -156,14 +156,14 @@ export const current = value`
         instantiations.set(id, (instantiations.get(id) ?? 0) + 1)
     })
 
-    const rootId = toModuleUrl('chunks/root.js')
+    const rootId = chunkIdToModuleUrl('chunks/root.js')
     assert.equal(system.resolve(rootId), rootId)
-    assert.equal(system.resolve('./state.js', rootId), toModuleUrl('chunks/state.js'))
+    assert.equal(system.resolve('./state.js', rootId), chunkIdToModuleUrl('chunks/state.js'))
 
     const root = await system.import(rootId)
 
     assert.equal(callExport(root, 'read'), 1)
-    assert.equal(root.moduleUrl, toModuleUrl('chunks/root.js'))
+    assert.equal(root.moduleUrl, chunkIdToModuleUrl('chunks/root.js'))
     assert.equal(instantiations.get('chunks/lazy.js'), undefined)
 
     callExport(root, 'setValue', 7)
@@ -172,7 +172,7 @@ export const current = value`
     const lazy = await callExport(root, 'load')
     assert.ok(lazy && typeof lazy === 'object')
     assert.equal(Object.getOwnPropertyDescriptor(lazy, 'current')?.value, 7)
-    assert.strictEqual(await system.import(toModuleUrl('chunks/lazy.js')), lazy)
+    assert.strictEqual(await system.import(chunkIdToModuleUrl('chunks/lazy.js')), lazy)
     assert.equal(instantiations.get('chunks/root.js'), 1)
     assert.equal(instantiations.get('chunks/state.js'), 1)
     assert.equal(instantiations.get('chunks/lazy.js'), 1)
@@ -194,7 +194,7 @@ test('deduplicates concurrent instantiation and execution', async () => {
         if (id === 'entry.js') instantiations++
     })
 
-    const entryId = toModuleUrl('entry.js')
+    const entryId = chunkIdToModuleUrl('entry.js')
     const [first, second] = await Promise.all([system.import(entryId), system.import(entryId)])
 
     assert.strictEqual(first, second)
@@ -246,7 +246,7 @@ test('executes one shared Taro bridge before concurrent delegates', async () => 
         if (id === 'taro-bridge.js') bridgeInstantiations++
     })
 
-    await Promise.all([system.import(toModuleUrl('app.js')), system.import(toModuleUrl('page.js'))])
+    await Promise.all([system.import(chunkIdToModuleUrl('app.js')), system.import(chunkIdToModuleUrl('page.js'))])
 
     assert.equal(bridgeInstantiations, 1)
     assert.equal(bridgeExecutions, 1)
@@ -305,8 +305,8 @@ test('links circular dependencies through declaration-time exports', async () =>
     ])
     const system = createTestSystem(registrations)
 
-    const a = await system.import(toModuleUrl('a.js'))
-    const b = await system.import(toModuleUrl('b.js'))
+    const a = await system.import(chunkIdToModuleUrl('a.js'))
+    const b = await system.import(chunkIdToModuleUrl('b.js'))
 
     assert.equal(a.value, 'ba')
     assert.equal(b.value, 'ab')
@@ -352,7 +352,7 @@ test('waits for asynchronous dependency execution before executing importers', a
     ])
     const system = createTestSystem(registrations)
 
-    const root = await system.import(toModuleUrl('root.js'))
+    const root = await system.import(chunkIdToModuleUrl('root.js'))
 
     assert.deepEqual(order, ['dependency:start', 'dependency:end', 'root'])
     assert.equal(root.value, 42)

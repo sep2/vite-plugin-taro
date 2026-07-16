@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { toModuleUrl } from './module-url.ts'
+import { chunkIdToModuleUrl } from './module-url.ts'
 import { transportFileName } from './transport.ts'
 
 /** Renders literal native loaders for final chunks. */
@@ -8,7 +8,7 @@ export function renderTransport(chunkIds: readonly string[]): string {
         .sort()
         .map((chunkId) => {
             const requirePath = toNativeRequirePath(transportFileName, chunkId)
-            return `        case ${JSON.stringify(toModuleUrl(chunkId))}:
+            return `        case ${JSON.stringify(chunkIdToModuleUrl(chunkId))}:
             return require(${JSON.stringify(requirePath)})`
         })
         .join('\n')

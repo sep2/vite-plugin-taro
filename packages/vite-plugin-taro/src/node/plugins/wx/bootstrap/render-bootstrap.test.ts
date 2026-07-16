@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
 import { transformWithOxc } from 'vite'
 import { postRenderChunk } from '../post-render-chunk.ts'
-import { toModuleUrl } from '../transport/module-url.ts'
+import { chunkIdToModuleUrl } from '../transport/module-url.ts'
 import { renderTransport } from '../transport/render-transport.ts'
 import { bootstrapEntryName } from './bootstrap-name.ts'
 
@@ -113,9 +113,12 @@ test('renders a literal native capsule transport', () => {
     const capsule = {}
     const evaluated = evaluateTransport(source, () => capsule)
 
-    assert.strictEqual(evaluated.transport.instantiate(toModuleUrl('assets/chunks/lazy-b.js')), capsule)
+    assert.strictEqual(evaluated.transport.instantiate(chunkIdToModuleUrl('assets/chunks/lazy-b.js')), capsule)
     assert.deepEqual(evaluated.requiredPaths, ['./assets/chunks/lazy-b.js'])
-    assert.throws(() => evaluated.transport.instantiate(toModuleUrl('assets/missing.js')), /Unknown System module/)
+    assert.throws(
+        () => evaluated.transport.instantiate(chunkIdToModuleUrl('assets/missing.js')),
+        /Unknown System module/
+    )
 
     const requireArguments = [...source.matchAll(/\brequire\(([^)]+)\)/g)].map((match) => JSON.parse(match[1]))
     assert.deepEqual(requireArguments, ['./assets/chunks/lazy-b.js', './assets/root-c.js', './assets/taro-bridge-a.js'])
@@ -131,8 +134,8 @@ test('configures the shared SystemJS registry for concurrent imports', async () 
         return Promise.resolve({ id })
     })
 
-    const appId = toModuleUrl('assets/root.js')
-    const pageId = toModuleUrl('assets/page.js')
+    const appId = chunkIdToModuleUrl('assets/root.js')
+    const pageId = chunkIdToModuleUrl('assets/page.js')
     const [appModule, pageModule] = await Promise.all([evaluated.system.import(appId), evaluated.system.import(pageId)])
 
     assert.strictEqual(evaluated.system.instantiate, transport.instantiate)
