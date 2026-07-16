@@ -1,6 +1,6 @@
 import path from 'node:path'
+import { transportFileName } from './constant.ts'
 import { chunkIdToModuleUrl } from './module-url.ts'
-import { transportFileName } from './transport.ts'
 
 /** Renders literal native loaders for final chunks. */
 export function renderTransport(chunkIds: readonly string[]): string {

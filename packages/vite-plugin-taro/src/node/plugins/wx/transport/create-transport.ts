@@ -1,7 +1,7 @@
 import type { Rolldown } from 'vite'
 import { appShellFileName } from '../app/constant.ts'
+import { transportFileName } from './constant.ts'
 import { renderTransport } from './render-transport.ts'
-import { transportFileName } from './transport.ts'
 
 /** Creates the transport asset from the final bundle. */
 export function createTransport(bundle: Rolldown.OutputBundle): Rolldown.EmittedAsset {

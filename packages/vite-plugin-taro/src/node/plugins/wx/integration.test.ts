@@ -8,9 +8,9 @@ import vm from 'node:vm'
 import { transformWithOxc } from 'vite'
 import { renderAppShell } from './app/render-app-shell.ts'
 import { postRenderChunk } from './post-render-chunk.ts'
+import { transportFileName } from './transport/constant.ts'
 import { chunkIdToModuleUrl } from './transport/module-url.ts'
 import { renderTransport } from './transport/render-transport.ts'
-import { transportFileName } from './transport/transport.ts'
 
 /** A test SystemJS module namespace. */
 type SystemModule = Readonly<Record<string, unknown>>
