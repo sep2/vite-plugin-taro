@@ -53,7 +53,7 @@ interface SystemJsGlobal {
 const packageRequire = createRequire(import.meta.url)
 const systemSource = readFileSync(packageRequire.resolve('systemjs/s.js'), 'utf8')
 const bootstrapTypeScript = readFileSync(
-    fileURLToPath(new URL('../../../../runtime/wx/bootstrap.ts', import.meta.url)),
+    fileURLToPath(new URL('../../../runtime/wx/bootstrap.ts', import.meta.url)),
     'utf8'
 )
 const bootstrapJavaScript = (
@@ -203,7 +203,7 @@ test('deduplicates concurrent instantiation and execution', async () => {
     assert.equal(executions, 1)
 })
 
-test('executes one shared Taro bridge before concurrent delegates', async () => {
+test('executes one shared Taro bridge before concurrent entries', async () => {
     const order: string[] = []
     let bridgeExecutions = 0
     const registrations = new Map<string, SystemRegistration>([

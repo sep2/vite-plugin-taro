@@ -36,7 +36,7 @@ interface EvaluatedTransport {
 }
 
 const bootstrapTypeScript = readFileSync(
-    fileURLToPath(new URL('../../../../../runtime/wx/bootstrap.ts', import.meta.url)),
+    fileURLToPath(new URL('../../../../runtime/wx/bootstrap.ts', import.meta.url)),
     'utf8'
 )
 const bootstrapJavaScript = (

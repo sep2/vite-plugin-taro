@@ -2,9 +2,10 @@ import type { Plugin } from 'vite'
 import { DevEnvironment } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
+import { createEntries } from './entries/create-entries.ts'
 import { generateBundle } from './generate-bundle.ts'
 import { postRenderChunk } from './post-render-chunk.ts'
-import { createWxVirtualModules } from './virtual-modules.ts'
+import { isVitePreload, overrideVitePreload } from './vite-preload/vite-preload.ts'
 
 const wxEnvironmentName = 'wx'
 const wxJavaScriptTarget = 'es2018'
@@ -16,7 +17,7 @@ export function createWxTargetPlugins(options: VitePluginTaroOptions): Plugin[] 
 
 /** Configures the WX Vite environment. */
 function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
-    const virtualModules = createWxVirtualModules(options)
+    const entries = createEntries(options)
 
     return {
         name: 'vite-plugin-taro:wx',
@@ -62,7 +63,7 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
                             target: wxJavaScriptTarget,
 
                             rolldownOptions: {
-                                input: virtualModules.input,
+                                input: entries.input,
                                 preserveEntrySignatures: 'strict'
                             }
                         }
@@ -72,12 +73,16 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
         },
 
         resolveId(id) {
-            return virtualModules.resolveId(id)
+            return entries.resolveId(id)
         },
 
         load(id) {
+            if (isVitePreload(id)) {
+                return overrideVitePreload(id)
+            }
+
             const projectRoot = this.environment.config.root
-            return virtualModules.load(id, projectRoot)
+            return entries.load(id, projectRoot)
         },
 
         renderChunk: {
