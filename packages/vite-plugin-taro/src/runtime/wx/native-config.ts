@@ -16,7 +16,7 @@ export type NativeConfig<Method extends string, Config extends object> = Config 
 
 /** Creates a synchronous native configuration backed by an asynchronous module. */
 export function createNativeConfig<Method extends string, Config extends object>(
-    moduleName: 'App' | 'Page',
+    moduleName: 'App' | 'Page' | 'Component',
     loadModule: () => Promise<NativeModule>,
     methods: readonly Method[],
     config: Config
