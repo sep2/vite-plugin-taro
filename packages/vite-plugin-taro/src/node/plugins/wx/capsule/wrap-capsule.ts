@@ -1,9 +1,9 @@
 import { type PluginObject, types } from '@babel/core'
 
-/** Rewrites System.register as an inert CommonJS registration tuple. */
-export function systemRegisterCapsulePlugin(): PluginObject {
+/** Wraps System.register as an inert CommonJS capsule tuple. */
+export function wrapCapsulePlugin(): PluginObject {
     return {
-        name: 'vite-plugin-taro:system-register-capsule',
+        name: 'vite-plugin-taro:wrap-capsule',
         visitor: {},
 
         post(file) {

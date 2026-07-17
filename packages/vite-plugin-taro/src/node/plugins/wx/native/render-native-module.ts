@@ -31,22 +31,28 @@ export function renderNativeModule(
     }
 }
 
-/** Creates the syntax rewrites required by synchronous native modules. */
+/**
+ * Preserves Rolldown's ESM graph while adapting its final native chunks to WeChat's synchronous CommonJS runtime.
+ * Application chunks remain asynchronous SystemJS capsules, so native dynamic imports must cross that boundary explicitly.
+ */
 function rewriteNativeModulePlugin(fileName: string): PluginObject {
     return {
         name: 'vite-plugin-taro:rewrite-native-module',
         visitor: {
             Identifier(identifierPath) {
+                // Keep transport outside Rolldown's graph, then restore native require only after chunking is complete.
                 if (identifierPath.node.name === nativeRequirePlaceholder) {
                     identifierPath.node.name = 'require'
                 }
             },
 
             ImportExpression(importPath) {
+                // Rolldown owns the dynamic graph edge; SystemJS owns loading the emitted capsule at runtime.
                 if (!types.isStringLiteral(importPath.node.source)) {
                     throw new Error(`Expected a literal module import in ${fileName}`)
                 }
 
+                // Resolve the final relative chunk reference before converting it to the canonical vpt:/ module URL.
                 const chunkId = path.posix.join(path.posix.dirname(fileName), importPath.node.source.value)
                 importPath.replaceWith(
                     types.callExpression(

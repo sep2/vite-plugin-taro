@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { transformSync } from '@babel/core'
-import { systemRegisterCapsulePlugin } from './system-register.ts'
+import { wrapCapsulePlugin } from './wrap-capsule.ts'
 
 /** Applies the capsule rewrite to a test registration. */
 function transformRegistration(code: string): string {
@@ -9,7 +9,7 @@ function transformRegistration(code: string): string {
         babelrc: false,
         configFile: false,
         filename: 'chunk.js',
-        plugins: [systemRegisterCapsulePlugin],
+        plugins: [wrapCapsulePlugin],
         sourceType: 'script'
     })
 
