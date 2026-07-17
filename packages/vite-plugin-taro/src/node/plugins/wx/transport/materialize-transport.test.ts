@@ -4,13 +4,14 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { type Rolldown, transformWithOxc } from 'vite'
 import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
-import { transportPath } from '../native/constant.ts'
+import { bootstrapPath, transportPath } from '../native/constant.ts'
 import { renderNativeModule } from '../native/render-native-module.ts'
 import { materializeTransport } from './materialize-transport.ts'
 
 /** The generated native capsule-loader table. */
 interface NativeTransport {
-    modules: Readonly<Record<string, () => unknown>>
+    bootstrapModuleUrl: string
+    transportTable: Readonly<Record<string, () => unknown>>
 }
 
 const transportTypeScript = readFileSync(
@@ -19,7 +20,7 @@ const transportTypeScript = readFileSync(
 )
 const transportJavaScript = (await transformWithOxc(transportTypeScript, 'transport.ts', { target: 'es2018' })).code
 const transportCode = renderNativeModule(transportJavaScript, {
-    fileName: 'assets/bootstrap.js'
+    fileName: 'transport.js'
 } as Rolldown.RenderedChunk).code
 
 /** Materializes one transport entry with the requested capsule outputs. */
@@ -43,6 +44,14 @@ async function materializeTestTransport({
         }
     } as Rolldown.OutputChunk
     const bundle: Rolldown.OutputBundle = {
+        'assets/bootstrap.js': {
+            type: 'chunk',
+            fileName: 'assets/bootstrap.js',
+            isEntry: false,
+            modules: {
+                [bootstrapPath]: {}
+            }
+        } as Rolldown.OutputChunk,
         [fileName]: transport
     }
     capsuleChunkIds.forEach((chunkId) => {
@@ -79,17 +88,18 @@ function evaluateTransport(source: string, loadModule: (path: string) => unknown
 test('specializes the physical runtime with literal capsule loaders', async () => {
     const source = await materializeTestTransport({
         code: transportCode,
-        fileName: 'assets/bootstrap.js',
+        fileName: 'transport.js',
         capsuleChunkIds: ['assets/root-c.js', 'assets/shared-a.js', 'assets/chunks/lazy-b.js']
     })
     const capsule = {}
     const evaluated = evaluateTransport(source, () => capsule)
 
-    const modules = evaluated.transport.modules
+    const modules = evaluated.transport.transportTable
+    assert.equal(evaluated.transport.bootstrapModuleUrl, chunkIdToModuleUrl('assets/bootstrap.js'))
     assert.strictEqual(modules[chunkIdToModuleUrl('assets/chunks/lazy-b.js')]?.(), capsule)
-    assert.deepEqual(evaluated.requiredPaths, ['./chunks/lazy-b.js'])
+    assert.deepEqual(evaluated.requiredPaths, ['./assets/chunks/lazy-b.js'])
     assert.strictEqual(modules[chunkIdToModuleUrl('assets/missing.js')], undefined)
 
     const requireArguments = [...source.matchAll(/\brequire\(([^)]+)\)/g)].map((match) => JSON.parse(match[1]))
-    assert.deepEqual(requireArguments, ['./chunks/lazy-b.js', './root-c.js', './shared-a.js'])
+    assert.deepEqual(requireArguments, ['./assets/chunks/lazy-b.js', './assets/root-c.js', './assets/shared-a.js'])
 })

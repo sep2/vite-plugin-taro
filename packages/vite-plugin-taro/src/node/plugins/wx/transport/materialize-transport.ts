@@ -3,22 +3,25 @@ import { types } from '@babel/core'
 import generate from '@babel/generator'
 import { type Rolldown, transformWithOxc } from 'vite'
 import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
-import { isNativeModule, isTransportModule } from '../native/is-native-module.ts'
+import { isBootstrapModule, isNativeModule, isTransportModule } from '../native/is-native-module.ts'
 
-const modulesPlaceholder = '__VITE_PLUGIN_TARO_MODULES__'
+const bootstrapModuleUrlPlaceholder = '__VITE_PLUGIN_TARO_BOOTSTRAP_MODULE_URL__'
+const modulesPlaceholder = '__VITE_PLUGIN_TARO_TRANSPORT_TABLE__'
 
 /** Materializes the final native transport entry after every capsule filename is known. */
 export async function materializeTransport(bundle: Rolldown.OutputBundle): Promise<void> {
     const chunks = Object.values(bundle).filter((output): output is Rolldown.OutputChunk => output.type === 'chunk')
 
+    const bootstrap = chunks.find(isBootstrapModule)
+    if (!bootstrap) {
+        throw new Error('Expected native bootstrap chunk')
+    }
     const transport = chunks.find(isTransportModule)
     if (!transport) {
         throw new Error('Expected transport chunk')
     }
-    const replacementCount = transport.code.split(modulesPlaceholder).length - 1
-    if (replacementCount !== 1) {
-        throw new Error(`Expected one WX transport module-table placeholder, found ${replacementCount}`)
-    }
+    requireOnePlaceholder(transport.code, bootstrapModuleUrlPlaceholder)
+    requireOnePlaceholder(transport.code, modulesPlaceholder)
 
     // Babel constructs and safely serializes an expression shaped like:
     // {
@@ -39,16 +42,28 @@ export async function materializeTransport(bundle: Rolldown.OutputBundle): Promi
 
     const transformed = await transformWithOxc(transport.code, transport.fileName, {
         define: {
+            [bootstrapModuleUrlPlaceholder]: generate(types.stringLiteral(chunkIdToModuleUrl(bootstrap.fileName)), {
+                comments: false,
+                compact: true
+            }).code,
             [modulesPlaceholder]: generate(moduleTable, { comments: false, compact: true }).code
         },
         target: 'es2018'
     })
-    if (transformed.code.includes(modulesPlaceholder)) {
+    if (transformed.code.includes(bootstrapModuleUrlPlaceholder) || transformed.code.includes(modulesPlaceholder)) {
         throw new Error(`Failed to materialize the WX transport in ${transport.fileName}`)
     }
 
     transport.code = transformed.code
     transport.map = null
+}
+
+/** Validates one graph-metadata placeholder in the already-compiled transport entry. */
+function requireOnePlaceholder(code: string, placeholder: string): void {
+    const replacementCount = code.split(placeholder).length - 1
+    if (replacementCount !== 1) {
+        throw new Error(`Expected one WX transport placeholder ${placeholder}, found ${replacementCount}`)
+    }
 }
 
 /** Creates one URL-keyed loader while keeping its native require argument literal. */

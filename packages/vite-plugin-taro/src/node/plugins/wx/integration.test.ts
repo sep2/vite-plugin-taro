@@ -8,16 +8,17 @@ import vm from 'node:vm'
 import { type Rolldown, transformWithOxc } from 'vite'
 import { chunkIdToModuleUrl } from '../../utils/modules.ts'
 import { renderCapsule } from './capsule/render-capsule.ts'
-import { transportPath } from './native/constant.ts'
+import { bootstrapPath, transportPath } from './native/constant.ts'
 import { renderNativeModule } from './native/render-native-module.ts'
 import { materializeTransport } from './transport/materialize-transport.ts'
 
 /** A test SystemJS module namespace. */
 type SystemModule = Readonly<Record<string, unknown>>
 
-/** The generated native capsule loader. */
+/** The generated native transport metadata. */
 interface NativeTransport {
-    instantiate(id: string, parentId?: string): unknown
+    bootstrapModuleUrl: string
+    transportTable: Readonly<Record<string, () => unknown>>
 }
 
 /** The SystemJS surface used by runtime tests. */
@@ -88,6 +89,14 @@ async function materializeTestTransport(capsuleChunkIds: readonly string[]): Pro
         }
     } as Rolldown.OutputChunk
     const bundle: Rolldown.OutputBundle = {
+        'assets/bootstrap.js': {
+            type: 'chunk',
+            fileName: 'assets/bootstrap.js',
+            isEntry: false,
+            modules: {
+                [bootstrapPath]: {}
+            }
+        } as Rolldown.OutputChunk,
         [transportFileName]: transport
     }
     capsuleChunkIds.forEach((chunkId) => {

@@ -54,22 +54,6 @@ function connectNativeImportPlugin(fileName: string): PluginObject {
                         [types.stringLiteral(chunkIdToModuleUrl(chunkId))]
                     )
                 )
-            },
-
-            MemberExpression(memberPath) {
-                const { object, property, computed } = memberPath.node
-                if (
-                    computed ||
-                    !types.isMetaProperty(object) ||
-                    !types.isIdentifier(object.meta, { name: 'import' }) ||
-                    !types.isIdentifier(object.property, { name: 'meta' }) ||
-                    !types.isIdentifier(property, { name: 'url' })
-                ) {
-                    return
-                }
-
-                // WeChat CommonJS has no import.meta. Give native modules the same canonical identity SystemJS uses.
-                memberPath.replaceWith(types.stringLiteral(chunkIdToModuleUrl(fileName)))
             }
         }
     }

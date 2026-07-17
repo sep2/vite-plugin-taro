@@ -5,8 +5,7 @@ import { renderNativeModule } from './render-native-module.ts'
 
 test('renders native require and CommonJS exports', () => {
     const source = `import { instantiate } from "../transport.js"
-export { instantiate }
-export const moduleUrl = import.meta.url`
+export { instantiate }`
     const result = renderNativeModule(source, { fileName: 'assets/bootstrap-a.js' } as Rolldown.RenderedChunk)
     const requiredPaths: string[] = []
     const commonJsModule: { exports: Record<string, unknown> } = {
@@ -30,7 +29,6 @@ export const moduleUrl = import.meta.url`
 
     assert.deepEqual(requiredPaths, ['../transport.js'])
     assert.strictEqual(commonJsModule.exports.instantiate, instantiate)
-    assert.equal(commonJsModule.exports.moduleUrl, 'vpt:/assets/bootstrap-a.js')
     assert.deepEqual(result.map.sources, ['assets/bootstrap-a.js'])
 })
 
