@@ -1,7 +1,7 @@
 // Install the stock minimal SystemJS loader before either native shell can request an application capsule.
 import 'systemjs/s.js'
 import { createNativeConfig } from './native-config.ts'
-import { modules as capsuleModules } from './transport.ts'
+import { transportTable } from './transport.ts'
 
 // Share the asynchronous configuration relay through the bootstrap module cached by native require.
 export { createNativeConfig }
@@ -30,11 +30,11 @@ const bootstrapRegistration: System.Registration = [
 ]
 
 // Complete the private transport table before exposing instantiate to SystemJS.
-capsuleModules[import.meta.url] = () => bootstrapRegistration
+transportTable[import.meta.url] = () => bootstrapRegistration
 
 /** Loads native bootstrap or one application capsule from the finalized transport table. */
 installedSystem.instantiate = (id: string): System.Registration => {
-    const load = capsuleModules[id]
+    const load = transportTable[id]
     if (!load) {
         throw new Error(`Unknown System module: ${id}`)
     }
