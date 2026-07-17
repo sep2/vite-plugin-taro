@@ -8,7 +8,7 @@ const bootstrapModuleUrl = __VITE_PLUGIN_TARO_BOOTSTRAP_MODULE_URL__
 const transportTable = __VITE_PLUGIN_TARO_TRANSPORT_TABLE__
 
 /** Adds the already-executed native bootstrap to the materialized capsule loader table. */
-export function createTransport(bootstrapModule: Readonly<Record<string, unknown>>) {
+export function finalizeTransport(bootstrapModule: Readonly<Record<string, unknown>>) {
     const registration: System.Registration = [
         // Native bootstrap has completed its synchronous dependencies before SystemJS observes it.
         [],
