@@ -2,6 +2,6 @@ import type { Rolldown } from 'vite'
 import { bootstrapPath } from './constant.ts'
 
 /** Tests whether a chunk executes through native CommonJS. */
-export function isNativeModule(chunk: Pick<Rolldown.RenderedChunk, 'isEntry' | 'modules'>): boolean {
+export function isNativeModule(chunk: Rolldown.RenderedChunk): boolean {
     return chunk.isEntry || bootstrapPath in chunk.modules
 }

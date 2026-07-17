@@ -1,7 +1,16 @@
 import path from 'node:path'
-import type { VitePluginTaroOptions } from '../../../../options.ts'
-import { appComponentId, bootstrapPath, pageModuleId, pageModuleIdPrefix, vitePreloadId } from './constant.ts'
-import { renderPageModule } from './render-page-module.ts'
+import type { VitePluginTaroOptions } from '../../../../../options.ts'
+import {
+    appComponentId,
+    appShellFileName,
+    appShellPath,
+    bootstrapPath,
+    pageModuleId,
+    pageModuleIdPrefix,
+    pageShellPath,
+    vitePreloadId
+} from '../constant.ts'
+import { renderPageModule } from '../render-page-module.ts'
 
 /** Resolves one exact private import using its importer and configured project root. */
 type RuntimeModuleResolver = (importer: string | undefined, projectRoot: string) => string
@@ -38,6 +47,16 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
     ])
 
     return {
+        // Make every native shell a distinct entry so Rolldown preserves WeChat's exact file paths.
+        input: {
+            [appShellFileName]: appShellPath,
+            ...Object.fromEntries(
+                options.pages.map((page) => {
+                    return [`${page.path}.js`, `${pageShellPath}?route=${encodeURIComponent(page.path)}`]
+                })
+            )
+        },
+
         resolveId(id: string, importer: string | undefined, projectRoot: string): string | undefined {
             // Unknown IDs fall through so Vite and other plugins retain normal resolution.
             return moduleResolvers.get(id)?.(importer, projectRoot)

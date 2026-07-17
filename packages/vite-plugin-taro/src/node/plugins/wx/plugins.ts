@@ -4,10 +4,9 @@ import type { VitePluginTaroOptions } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { renderCapsule } from './capsule/render-capsule.ts'
 import { generateBundle } from './generate-bundle.ts'
-import { appShellFileName, appShellPath, pageShellPath } from './native/constant.ts'
 import { isNativeModule } from './native/is-native-module.ts'
-import { createModuleResolver } from './native/module-resolver.ts'
 import { renderNativeModule } from './native/render-native-module.ts'
+import { createModuleResolver } from './native/resolver/module-resolver.ts'
 
 const wxEnvironmentName = 'wx'
 const wxJavaScriptTarget = 'es2018'
@@ -65,17 +64,7 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
                             target: wxJavaScriptTarget,
 
                             rolldownOptions: {
-                                input: {
-                                    [appShellFileName]: appShellPath,
-                                    ...Object.fromEntries(
-                                        options.pages.map((page) => {
-                                            return [
-                                                `${page.path}.js`,
-                                                `${pageShellPath}?route=${encodeURIComponent(page.path)}`
-                                            ]
-                                        })
-                                    )
-                                },
+                                input: moduleResolver.input,
                                 output: {
                                     entryFileNames: '[name]'
                                 },
@@ -99,9 +88,9 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
             order: 'post',
             handler(code, chunk) {
                 if (isNativeModule(chunk)) {
-                    return renderNativeModule(code, chunk.fileName)
+                    return renderNativeModule(code, chunk)
                 }
-                return renderCapsule(code, chunk.fileName)
+                return renderCapsule(code, chunk)
             }
         },
 

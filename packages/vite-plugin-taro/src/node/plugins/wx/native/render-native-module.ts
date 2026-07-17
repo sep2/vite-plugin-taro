@@ -9,20 +9,20 @@ const nativeRequirePlaceholder = '__VITE_PLUGIN_TARO_NATIVE_REQUIRE__'
 /** Renders a synchronous native module. */
 export function renderNativeModule(
     code: string,
-    fileName: string
+    chunk: Rolldown.RenderedChunk
 ): { code: string; map: Rolldown.ExistingRawSourceMap } {
     const nativeModule = transformSync(code, {
         babelrc: false,
         compact: true,
         configFile: false,
-        filename: fileName,
-        plugins: [rewriteNativeModulePlugin(fileName) as PluginTarget, transformModulesCommonjs as PluginTarget],
-        sourceFileName: fileName,
+        filename: chunk.fileName,
+        plugins: [rewriteNativeModulePlugin(chunk.fileName) as PluginTarget, transformModulesCommonjs as PluginTarget],
+        sourceFileName: chunk.fileName,
         sourceMaps: true,
         sourceType: 'module'
     })
     if (!nativeModule?.code || !nativeModule.map) {
-        throw new Error(`Failed to render native module ${fileName}`)
+        throw new Error(`Failed to render native module ${chunk.fileName}`)
     }
 
     return {

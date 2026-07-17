@@ -1,8 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
-import { appComponentId, appModulePath, bootstrapPath, pageModuleId, vitePreloadId } from './constant.ts'
-import { createModuleResolver } from './module-resolver.ts'
+import {
+    appComponentId,
+    appModulePath,
+    appShellPath,
+    bootstrapPath,
+    pageModuleId,
+    pageShellPath,
+    vitePreloadId
+} from './constant.ts'
+import { createModuleResolver } from './resolver/module-resolver.ts'
 
 const options: VitePluginTaroOptions = {
     target: 'wx',
@@ -24,6 +32,10 @@ test('resolves fixed and route-specific private modules', () => {
     const resolver = createModuleResolver(options)
     const projectRoot = '/project'
 
+    assert.deepEqual(resolver.input, {
+        'app.js': appShellPath,
+        'pages/home/index.js': `${pageShellPath}?route=pages%2Fhome%2Findex`
+    })
     assert.equal(resolver.resolveId(vitePreloadId, undefined, projectRoot), bootstrapPath)
     assert.equal(resolver.resolveId(appComponentId, undefined, projectRoot), '/project/src/app.tsx')
 
