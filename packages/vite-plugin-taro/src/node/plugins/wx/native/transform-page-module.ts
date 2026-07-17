@@ -9,12 +9,17 @@ const pagePathPlaceholder = '__VITE_PLUGIN_TARO_PAGE_PATH__'
 const pageConfigPlaceholder = '__VITE_PLUGIN_TARO_PAGE_CONFIG__'
 
 /** Specializes the real Page module for one configured route. */
-export function transformPageModule(
-    code: string,
-    id: string,
-    page: VitePluginTaroPageOption,
+export function transformPageModule({
+    code,
+    id,
+    page,
+    projectRoot
+}: {
+    code: string
+    id: string
+    page: VitePluginTaroPageOption
     projectRoot: string
-): { code: string; map: Rolldown.ExistingRawSourceMap } {
+}): { code: string; map: Rolldown.ExistingRawSourceMap } {
     const replacements = {
         component: 0,
         path: 0,
@@ -26,7 +31,13 @@ export function transformPageModule(
         compact: false,
         configFile: false,
         filename: id,
-        plugins: [createPageModuleTransform(page, pageComponentPath, replacements) as PluginTarget],
+        plugins: [
+            createPageModuleTransform({
+                page,
+                pageComponentPath,
+                replacements
+            }) as PluginTarget
+        ],
         sourceFileName: id,
         sourceMaps: true,
         sourceType: 'module'
@@ -45,11 +56,15 @@ export function transformPageModule(
 }
 
 /** Creates the route-specific Page-module AST transform. */
-function createPageModuleTransform(
-    page: VitePluginTaroPageOption,
-    pageComponentPath: string,
+function createPageModuleTransform({
+    page,
+    pageComponentPath,
+    replacements
+}: {
+    page: VitePluginTaroPageOption
+    pageComponentPath: string
     replacements: { component: number; path: number; config: number }
-): PluginObject {
+}): PluginObject {
     return {
         name: 'vite-plugin-taro:transform-page-module',
         visitor: {

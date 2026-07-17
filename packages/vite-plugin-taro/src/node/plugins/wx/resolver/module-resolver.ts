@@ -1,5 +1,5 @@
 import path from 'node:path'
-import type { VitePluginTaroOptions } from '../../../../options.ts'
+import type { VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../../options.ts'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import {
     appComponentId,
@@ -29,25 +29,28 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
         [
             pageModuleId,
             (importer) => {
-                // Recover the route attached to this specific native Page-shell entry.
-                const pagePath = requirePagePath(importer)
-                if (!pageByPath.has(pagePath)) {
-                    throw new Error(`Unknown Page module: ${pagePath}`)
-                }
-
                 // Query-qualify the real module so every Page retains a distinct graph identity.
-                return `${pageModulePath}?route=${encodeURIComponent(pagePath)}`
+                const page = requirePage({ moduleId: importer, pageByPath })
+
+                return createRouteModuleId({ moduleId: pageModulePath, pagePath: page.path })
             }
         ]
     ])
 
     return {
-        // Make every native shell a distinct entry so Rolldown preserves WeChat's exact file paths.
+        // Make every native shell a distinct entry, so Rolldown preserves WeChat's exact file paths.
         input: {
             [appShellFileName]: appShellPath,
+
             ...Object.fromEntries(
                 options.pages.map((page) => {
-                    return [`${page.path}.js`, `${pageShellPath}?route=${encodeURIComponent(page.path)}`]
+                    return [
+                        `${page.path}.js`,
+                        createRouteModuleId({
+                            moduleId: pageShellPath,
+                            pagePath: page.path
+                        })
+                    ]
                 })
             )
         },
@@ -58,27 +61,38 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
         },
 
         transform(code: string, id: string, projectRoot: string) {
-            if (normalizeModuleId(id) !== normalizeModuleId(pageModulePath)) {
-                return
+            if (normalizeModuleId(id) === normalizeModuleId(pageModulePath)) {
+                return transformPageModule({
+                    code,
+                    id,
+                    page: requirePage({ moduleId: id, pageByPath }),
+                    projectRoot
+                })
             }
-
-            const pagePath = requirePagePath(id)
-            const page = pageByPath.get(pagePath)
-            if (!page) {
-                throw new Error(`Unknown Page module: ${pagePath}`)
-            }
-
-            return transformPageModule(code, id, page, projectRoot)
         }
     }
 }
 
-/** Reads the required Page path from a route-qualified module ID. */
-function requirePagePath(moduleId: string | undefined): string {
+/** Creates one route-qualified module ID. */
+function createRouteModuleId({ moduleId, pagePath }: { moduleId: string; pagePath: string }): string {
+    return `${moduleId}?route=${encodeURIComponent(pagePath)}`
+}
+
+/** Returns the configured Page identified by a route-qualified module ID. */
+function requirePage({
+    moduleId,
+    pageByPath
+}: {
+    moduleId: string | undefined
+    pageByPath: ReadonlyMap<string, VitePluginTaroPageOption>
+}): VitePluginTaroPageOption {
     const queryIndex = moduleId?.indexOf('?') ?? -1
     const pagePath = queryIndex === -1 ? undefined : new URLSearchParams(moduleId?.slice(queryIndex + 1)).get('route')
-    if (!pagePath) {
-        throw new Error('Page module import must originate from a route module')
+    const page = pagePath ? pageByPath.get(pagePath) : undefined
+    if (!page) {
+        throw new Error(
+            pagePath ? `Unknown Page module: ${pagePath}` : 'Page module import must originate from a route module'
+        )
     }
-    return pagePath
+    return page
 }
