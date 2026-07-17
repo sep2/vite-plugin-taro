@@ -93,11 +93,12 @@ function createTestSystem(
         module: commonJsModule,
         require: () => transport
     }
-    sandbox.global = sandbox
+    // WeChat exposes a SystemJS installation host distinct from the App-service globalThis object.
+    sandbox.global = {}
     const context = vm.createContext(sandbox)
     vm.runInContext(systemSource, context)
     vm.runInContext(bootstrapCode, context)
-    return (sandbox as unknown as SystemJsGlobal).System!
+    return (sandbox.global as SystemJsGlobal).System!
 }
 
 /** Compiles ESM and evaluates its inert registration assignment. */

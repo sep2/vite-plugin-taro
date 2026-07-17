@@ -52,7 +52,7 @@ App({
 
     Function(
         'require',
-        'globalThis',
+        'global',
         'App',
         result.code
     )(

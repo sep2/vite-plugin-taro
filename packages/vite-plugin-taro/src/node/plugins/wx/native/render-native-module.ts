@@ -57,7 +57,7 @@ function connectNativeImportPlugin(fileName: string): PluginObject {
                 importPath.replaceWith(
                     types.callExpression(
                         types.memberExpression(
-                            types.memberExpression(types.identifier('globalThis'), types.identifier('System')),
+                            types.memberExpression(types.identifier('global'), types.identifier('System')),
                             types.identifier('import')
                         ),
                         [types.stringLiteral(chunkIdToModuleUrl(chunkId))]
