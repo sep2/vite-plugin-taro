@@ -6,7 +6,7 @@ import { createReactApp } from '@tarojs/plugin-framework-react/dist/runtime'
 import ReactDOM from '@tarojs/react'
 import React from 'react'
 
-// @ts-expect-error The WX build resolves this private App component.
+// @ts-expect-error: The WX build resolves this private App component.
 import AppComponent from '\0vpt:app'
 
 declare const __VITE_PLUGIN_TARO_APP_CONFIG__: Record<string, unknown>

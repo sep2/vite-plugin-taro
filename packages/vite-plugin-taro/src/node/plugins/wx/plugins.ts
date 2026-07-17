@@ -1,13 +1,12 @@
-import path from 'node:path'
 import type { Plugin } from 'vite'
 import { DevEnvironment } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
-import { appComponentId, appShellFileName, appShellPath } from './app/constant.ts'
+import { renderCapsule } from './capsule/render-capsule.ts'
 import { generateBundle } from './generate-bundle.ts'
-import { pageShellPath } from './page/constant.ts'
-import { postRenderChunk } from './post-render-chunk.ts'
-import { isVitePreload, overrideVitePreload } from './vite-preload/vite-preload.ts'
+import { appShellFileName, appShellPath, pageShellPath } from './native/constant.ts'
+import { createModuleResolver } from './native/module-resolver.ts'
+import { isNativeModule, renderNativeModule } from './native/render-native-module.ts'
 
 const wxEnvironmentName = 'wx'
 const wxJavaScriptTarget = 'es2018'
@@ -19,6 +18,8 @@ export function createWxTargetPlugins(options: VitePluginTaroOptions): Plugin[] 
 
 /** Configures the WX Vite environment. */
 function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
+    const moduleResolver = createModuleResolver(options)
+
     return {
         name: 'vite-plugin-taro:wx',
 
@@ -85,21 +86,22 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
             }
         },
 
-        resolveId(id) {
-            if (id === appComponentId) {
-                return path.resolve(this.environment.config.root, options.app)
-            }
+        resolveId(id, importer) {
+            return moduleResolver.resolveId(id, importer, this.environment.config.root)
         },
 
         load(id) {
-            if (isVitePreload(id)) {
-                return overrideVitePreload()
-            }
+            return moduleResolver.load(id)
         },
 
         renderChunk: {
             order: 'post',
-            handler: postRenderChunk
+            handler(code, chunk) {
+                if (isNativeModule(chunk)) {
+                    return renderNativeModule(code, chunk.fileName)
+                }
+                return renderCapsule(code, chunk.fileName)
+            }
         },
 
         generateBundle(_, bundle) {

@@ -6,8 +6,8 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
 import { transformWithOxc } from 'vite'
-import { renderAppShell } from './app/render-app-shell.ts'
-import { postRenderChunk } from './post-render-chunk.ts'
+import { renderCapsule } from './capsule/render-capsule.ts'
+import { renderNativeModule } from './native/render-native-module.ts'
 import { transportFileName } from './transport/constant.ts'
 import { chunkIdToModuleUrl } from './transport/module-url.ts'
 import { renderTransport } from './transport/render-transport.ts'
@@ -56,10 +56,10 @@ const bootstrapTypeScript = readFileSync(
     fileURLToPath(new URL('../../../runtime/wx/bootstrap.ts', import.meta.url)),
     'utf8'
 )
-const bootstrapJavaScript = (
-    await transformWithOxc(bootstrapTypeScript, 'bootstrap.ts', { target: 'es2018' })
-).code.replace(/^import ['"]systemjs\/s\.js['"];\s*/m, '')
-const bootstrapCode = renderAppShell(bootstrapJavaScript, 'app.js').code
+const bootstrapJavaScript = (await transformWithOxc(bootstrapTypeScript, 'bootstrap.ts', { target: 'es2018' })).code
+    .replace(/^import ['"]systemjs\/s\.js['"];\s*/m, '')
+    .replace(/^export \{ createNativeConfig \} from ['"]\.\/native-config\.(?:ts|js)['"];\s*/m, '')
+const bootstrapCode = renderNativeModule(bootstrapJavaScript, 'assets/bootstrap.js').code
 
 /** Creates a SystemJS realm with the bootstrap and transport. */
 function createTestSystem(
@@ -83,7 +83,12 @@ function createTestSystem(
     Function('require', 'module', renderTransport([...capsules.keys()]))(nativeRequire, transportModule)
     const transport = transportModule.exports as NativeTransport
 
+    const commonJsModule: { exports: Record<string, unknown> } = {
+        exports: {}
+    }
     const sandbox: Record<string, unknown> = {
+        exports: commonJsModule.exports,
+        module: commonJsModule,
         require: () => transport
     }
     sandbox.global = sandbox
@@ -95,7 +100,7 @@ function createTestSystem(
 
 /** Compiles ESM and evaluates its inert registration assignment. */
 function compileRegistration(id: string, source: string): SystemRegistration {
-    const capsule = postRenderChunk(source, { fileName: id, isEntry: false, name: id })
+    const capsule = renderCapsule(source, id)
     assert.ok(capsule)
 
     const commonJsModule: { exports?: unknown } = {}
