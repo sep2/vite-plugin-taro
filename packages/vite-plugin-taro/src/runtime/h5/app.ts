@@ -1,9 +1,12 @@
-// @ts-expect-error The H5 build resolves this private App component.
-import AppComponent from '\0vpt:app-component'
+/** biome-ignore-all assist/source/organizeImports: keep side effect orders */
+
+import { createHashHistory, createReactApp, createRouter, handleAppMount, window } from './taro-runtime.ts'
 import type { Route, SpaRouterConfig } from '@tarojs/router/types/router'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { createHashHistory, createReactApp, createRouter, handleAppMount, window } from './taro-runtime.ts'
+
+// @ts-expect-error: The H5 build resolves this private App component.
+import AppComponent from '\0vpt:app-component'
 
 declare const __VITE_PLUGIN_TARO_H5_APP_CONFIG__: SpaRouterConfig
 declare const __VITE_PLUGIN_TARO_H5_ROUTES__: Route[]
