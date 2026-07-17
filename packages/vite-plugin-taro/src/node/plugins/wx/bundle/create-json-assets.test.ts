@@ -10,7 +10,10 @@ const options: VitePluginTaroOptions = {
         {
             path: 'pages/home/index',
             config: {
-                navigationBarTitleText: 'Home'
+                navigationBarTitleText: 'Home',
+                usingComponents: {
+                    custom: '../../custom'
+                }
             }
         },
         {
@@ -60,10 +63,17 @@ test('creates configured native JSON assets at exact output paths', () => {
         }
     })
     assert.deepEqual(assets.get('pages/home/index.json'), {
-        navigationBarTitleText: 'Home'
+        navigationBarTitleText: 'Home',
+        usingComponents: {
+            custom: '../../custom',
+            comp: '../../comp'
+        }
     })
     assert.deepEqual(assets.get('pages/account/index.json'), {
-        navigationBarTitleText: 'Account'
+        navigationBarTitleText: 'Account',
+        usingComponents: {
+            comp: '../../comp'
+        }
     })
     assert.deepEqual(assets.get('project.config.json'), options.projectConfigJson)
     assert.deepEqual(assets.get('project.private.config.json'), options.projectPrivateConfigJson)
