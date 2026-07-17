@@ -2,6 +2,7 @@ import path from 'node:path'
 import { type PluginObject, type PluginTarget, transformSync, types } from '@babel/core'
 import transformModulesCommonjs from '@babel/plugin-transform-modules-commonjs'
 import type { Rolldown } from 'vite'
+import { removeVitePreloadPlugin } from '../babel/remove-vite-preload.ts'
 import { chunkIdToModuleUrl } from '../transport/module-url.ts'
 
 const nativeRequirePlaceholder = '__VITE_PLUGIN_TARO_NATIVE_REQUIRE__'
@@ -16,7 +17,11 @@ export function renderNativeModule(
         compact: true,
         configFile: false,
         filename: chunk.fileName,
-        plugins: [connectNativeImportPlugin(chunk.fileName) as PluginTarget, transformModulesCommonjs as PluginTarget],
+        plugins: [
+            removeVitePreloadPlugin,
+            connectNativeImportPlugin(chunk.fileName) as PluginTarget,
+            transformModulesCommonjs as PluginTarget
+        ],
         sourceFileName: chunk.fileName,
         sourceMaps: true,
         sourceType: 'module'

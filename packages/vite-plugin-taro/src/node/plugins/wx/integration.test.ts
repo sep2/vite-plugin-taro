@@ -17,7 +17,7 @@ type SystemModule = Readonly<Record<string, unknown>>
 
 /** The generated native capsule loader. */
 interface NativeTransport {
-    instantiate(id: string, parentId?: string): unknown
+    instantiate(id: string, parentId?: string): Promise<unknown>
 }
 
 /** The SystemJS surface used by runtime tests. */
@@ -72,7 +72,7 @@ function createTestSystem(
     const transportModule: { exports: unknown } = { exports: {} }
 
     /** Loads one inert capsule. */
-    function nativeRequire(id: string): unknown {
+    async function loadNativeCapsule(id: string): Promise<unknown> {
         const capsuleId = path.posix.normalize(path.posix.join(path.posix.dirname(transportFileName), id))
         onInstantiate(capsuleId)
         const registration = capsules.get(capsuleId)
@@ -82,7 +82,7 @@ function createTestSystem(
         return registration
     }
 
-    Function('require', 'module', renderTransport([...capsules.keys()]))(nativeRequire, transportModule)
+    Function('require', 'module', renderTransport([...capsules.keys()]))({ async: loadNativeCapsule }, transportModule)
     const transport = transportModule.exports as NativeTransport
 
     const commonJsModule: { exports: Record<string, unknown> } = {

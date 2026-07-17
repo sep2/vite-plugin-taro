@@ -4,7 +4,7 @@ import 'systemjs/s.js'
 // Share the asynchronous configuration relay through the bootstrap module cached by native require.
 export { createNativeConfig } from './native-config.ts'
 
-// Replace Vite's browser preload behavior with direct loading for the non-browser WeChat runtime.
+// Vite requires this graph export while rendering; final AST rendering removes every preload call.
 export const __vitePreload = <Value>(load: () => Value): Value => load()
 
 // Keep transport outside the Rolldown graph; native rendering rewrites this placeholder to require.
