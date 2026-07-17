@@ -1,9 +1,12 @@
 import type { Plugin } from 'vite'
 import { resolvePackageFile } from '../../utils/packages.ts'
 
+export const clientTaroApiId = 'virtual:taro/api'
+const clientTaroComponentId = 'virtual:taro/components'
+
 const clientTaroModules = new Map([
-    ['virtual:taro/api', resolvePackageFile('dist/runtime/client/taro/api.js')],
-    ['virtual:taro/components', resolvePackageFile('dist/runtime/client/taro/component.js')]
+    [clientTaroApiId, resolvePackageFile('dist/runtime/client/taro/api.js')],
+    [clientTaroComponentId, resolvePackageFile('dist/runtime/client/taro/component.js')]
 ])
 
 /** Creates the target-neutral Taro facade plugin. */

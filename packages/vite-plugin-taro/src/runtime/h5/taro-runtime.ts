@@ -1,0 +1,8 @@
+/** Runtime exports consumed by the generated H5 entry. */
+import '@tarojs/components/global.css'
+import '@tarojs/components/dist/taro-components/taro-components.css'
+
+// @ts-expect-error Taro exposes createReactApp from this runtime-only deep entry without types.
+export { createReactApp } from '@tarojs/plugin-framework-react/dist/runtime'
+export { createHashHistory, createRouter, handleAppMount } from '@tarojs/router'
+export { window } from '@tarojs/runtime'
