@@ -6,6 +6,8 @@ import {
     appShellFileName,
     appShellPath,
     bootstrapPath,
+    componentShellFileName,
+    componentShellPath,
     pageModuleId,
     pageModulePath,
     pageShellPath,
@@ -41,6 +43,7 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
         // Make every native shell a distinct entry, so Rolldown preserves WeChat's exact file paths.
         input: {
             [appShellFileName]: appShellPath,
+            [componentShellFileName]: componentShellPath,
 
             ...Object.fromEntries(
                 options.pages.map((page) => {

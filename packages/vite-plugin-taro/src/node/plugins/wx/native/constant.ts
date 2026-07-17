@@ -12,6 +12,12 @@ export const appShellFileName = 'app.js'
 /** Provides the synchronous native App registration entry. */
 export const appShellPath = resolvePackageFile('dist/runtime/wx/app.js')
 
+/** Forces Taro's recursive native component entry to emit at its configured root path. */
+export const componentShellFileName = 'comp.js'
+
+/** Provides the synchronous recursive component registration entry. */
+export const componentShellPath = resolvePackageFile('dist/runtime/wx/comp.js')
+
 /** Marks the Page-component import replaced while specializing the real Page module for one route. */
 export const pageComponentId = '\0vpt:page-component'
 

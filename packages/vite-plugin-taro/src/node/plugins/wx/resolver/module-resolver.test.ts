@@ -5,6 +5,7 @@ import { appComponentId } from '../../client/constant.ts'
 import {
     appShellPath,
     bootstrapPath,
+    componentShellPath,
     pageModuleId,
     pageModulePath,
     pageShellPath,
@@ -34,6 +35,7 @@ test('resolves fixed and route-specific private modules', () => {
 
     assert.deepEqual(resolver.input, {
         'app.js': appShellPath,
+        'comp.js': componentShellPath,
         'pages/home/index.js': `${pageShellPath}?route=pages%2Fhome%2Findex`
     })
     assert.equal(resolver.resolveId(vitePreloadId, undefined, projectRoot), bootstrapPath)
