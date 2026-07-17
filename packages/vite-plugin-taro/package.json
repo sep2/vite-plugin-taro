@@ -57,6 +57,7 @@
     },
     "dependencies": {
         "@babel/core": "^8.0.1",
+        "@babel/generator": "^8.0.0",
         "@babel/plugin-transform-dynamic-import": "^8.0.1",
         "@babel/plugin-transform-modules-commonjs": "^8.0.1",
         "@babel/plugin-transform-modules-systemjs": "^8.0.1",
