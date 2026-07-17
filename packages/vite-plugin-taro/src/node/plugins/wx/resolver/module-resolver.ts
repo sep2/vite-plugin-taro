@@ -1,5 +1,5 @@
 import path from 'node:path'
-import type { VitePluginTaroOptions } from '../../../../../options.ts'
+import type { VitePluginTaroOptions } from '../../../../options.ts'
 import {
     appComponentId,
     appShellFileName,
@@ -9,8 +9,8 @@ import {
     pageModuleIdPrefix,
     pageShellPath,
     vitePreloadId
-} from '../constant.ts'
-import { renderPageModule } from '../render-page-module.ts'
+} from '../native/constant.ts'
+import { renderPageModule } from '../native/render-page-module.ts'
 
 /** Resolves one exact private import using its importer and configured project root. */
 type RuntimeModuleResolver = (importer: string | undefined, projectRoot: string) => string

@@ -6,7 +6,7 @@ import { renderCapsule } from './capsule/render-capsule.ts'
 import { generateBundle } from './generate-bundle.ts'
 import { isNativeModule } from './native/is-native-module.ts'
 import { renderNativeModule } from './native/render-native-module.ts'
-import { createModuleResolver } from './native/resolver/module-resolver.ts'
+import { createModuleResolver } from './resolver/module-resolver.ts'
 
 const wxEnvironmentName = 'wx'
 const wxJavaScriptTarget = 'es2018'

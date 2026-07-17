@@ -9,8 +9,8 @@ import {
     pageModuleId,
     pageShellPath,
     vitePreloadId
-} from './constant.ts'
-import { createModuleResolver } from './resolver/module-resolver.ts'
+} from '../native/constant.ts'
+import { createModuleResolver } from './module-resolver.ts'
 
 const options: VitePluginTaroOptions = {
     target: 'wx',
