@@ -6,7 +6,7 @@ import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
 import { isBootstrapModule, isNativeModule, isTransportModule } from '../native/is-native-module.ts'
 
 const bootstrapModuleUrlPlaceholder = '__VITE_PLUGIN_TARO_BOOTSTRAP_MODULE_URL__'
-const modulesPlaceholder = '__VITE_PLUGIN_TARO_TRANSPORT_TABLE__'
+const transportTablePlaceholder = '__VITE_PLUGIN_TARO_TRANSPORT_TABLE__'
 
 /** Materializes the final native transport entry after every capsule filename is known. */
 export async function materializeTransport(bundle: Rolldown.OutputBundle): Promise<void> {
@@ -21,7 +21,7 @@ export async function materializeTransport(bundle: Rolldown.OutputBundle): Promi
         throw new Error('Expected transport chunk')
     }
     requireOnePlaceholder(transport.code, bootstrapModuleUrlPlaceholder)
-    requireOnePlaceholder(transport.code, modulesPlaceholder)
+    requireOnePlaceholder(transport.code, transportTablePlaceholder)
 
     // Babel constructs and safely serializes an expression shaped like:
     // {
@@ -46,11 +46,14 @@ export async function materializeTransport(bundle: Rolldown.OutputBundle): Promi
                 comments: false,
                 compact: true
             }).code,
-            [modulesPlaceholder]: generate(moduleTable, { comments: false, compact: true }).code
+            [transportTablePlaceholder]: generate(moduleTable, { comments: false, compact: true }).code
         },
         target: 'es2018'
     })
-    if (transformed.code.includes(bootstrapModuleUrlPlaceholder) || transformed.code.includes(modulesPlaceholder)) {
+    if (
+        transformed.code.includes(bootstrapModuleUrlPlaceholder) ||
+        transformed.code.includes(transportTablePlaceholder)
+    ) {
         throw new Error(`Failed to materialize the WX transport in ${transport.fileName}`)
     }
 
