@@ -5,6 +5,7 @@ import type { VitePluginTaroOptions } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { appComponentId, appShellFileName, appShellPath } from './app/constant.ts'
 import { generateBundle } from './generate-bundle.ts'
+import { pageShellPath } from './page/constant.ts'
 import { postRenderChunk } from './post-render-chunk.ts'
 import { isVitePreload, overrideVitePreload } from './vite-preload/vite-preload.ts'
 
@@ -63,10 +64,18 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
 
                             rolldownOptions: {
                                 input: {
-                                    [appShellFileName]: appShellPath
+                                    [appShellFileName]: appShellPath,
+                                    ...Object.fromEntries(
+                                        options.pages.map((page) => {
+                                            return [
+                                                `${page.path}.js`,
+                                                `${pageShellPath}?route=${encodeURIComponent(page.path)}`
+                                            ]
+                                        })
+                                    )
                                 },
                                 output: {
-                                    entryFileNames: appShellFileName
+                                    entryFileNames: '[name]'
                                 },
                                 preserveEntrySignatures: 'strict'
                             }

@@ -96,6 +96,8 @@ function createTestSystem(
 /** Compiles ESM and evaluates its inert registration assignment. */
 function compileRegistration(id: string, source: string): SystemRegistration {
     const capsule = postRenderChunk(source, { fileName: id, isEntry: false, name: id })
+    assert.ok(capsule)
+
     const commonJsModule: { exports?: unknown } = {}
     Function('module', capsule.code)(commonJsModule)
     assertSystemRegistration(commonJsModule.exports)

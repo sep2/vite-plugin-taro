@@ -7,9 +7,13 @@ import { renderCapsule } from './capsule/render-capsule.ts'
 export function postRenderChunk(
     code: string,
     chunk: Pick<Rolldown.RenderedChunk, 'fileName' | 'isEntry' | 'name'>
-): { code: string; map: Rolldown.ExistingRawSourceMap } {
+): { code: string; map: Rolldown.ExistingRawSourceMap } | null {
     if (chunk.isEntry && chunk.name === appShellFileName) {
         return renderAppShell(code, chunk.fileName)
     }
+    if (chunk.isEntry) {
+        return null
+    }
+
     return renderCapsule(code, chunk.fileName)
 }
