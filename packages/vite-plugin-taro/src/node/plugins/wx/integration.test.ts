@@ -8,9 +8,9 @@ import vm from 'node:vm'
 import { type Rolldown, transformWithOxc } from 'vite'
 import { chunkIdToModuleUrl } from '../../utils/modules.ts'
 import { renderCapsule } from './capsule/render-capsule.ts'
+import { transportPath } from './native/constant.ts'
 import { renderNativeModule } from './native/render-native-module.ts'
-import { transportFileName } from './transport/constant.ts'
-import { renderTransport } from './transport/render-transport.ts'
+import { materializeTransport } from './transport/materialize-transport.ts'
 
 /** A test SystemJS module namespace. */
 type SystemModule = Readonly<Record<string, unknown>>
@@ -50,6 +50,7 @@ interface SystemJsGlobal {
     System?: SystemJsInstance
 }
 
+const transportFileName = 'transport.js'
 const packageRequire = createRequire(import.meta.url)
 const systemSource = readFileSync(packageRequire.resolve('systemjs/s.js'), 'utf8')
 const bootstrapTypeScript = readFileSync(
@@ -58,10 +59,49 @@ const bootstrapTypeScript = readFileSync(
 )
 const bootstrapJavaScript = (await transformWithOxc(bootstrapTypeScript, 'bootstrap.ts', { target: 'es2018' })).code
     .replace(/^import ['"]systemjs\/s\.js['"];\s*/m, '')
-    .replace(/^export \{ createNativeConfig \} from ['"]\.\/native-config\.(?:ts|js)['"];\s*/m, '')
+    .replace(
+        /^import \{ createNativeConfig \} from ['"]\.\/native-config\.(?:ts|js)['"];\s*/m,
+        'const createNativeConfig = () => ({})\n'
+    )
 const bootstrapCode = renderNativeModule(bootstrapJavaScript, {
     fileName: 'assets/bootstrap.js'
 } as Rolldown.RenderedChunk).code
+const transportTypeScript = readFileSync(
+    fileURLToPath(new URL('../../../runtime/wx/transport.ts', import.meta.url)),
+    'utf8'
+)
+const transportJavaScript = (await transformWithOxc(transportTypeScript, 'transport.ts', { target: 'es2018' })).code
+const transportCode = renderNativeModule(transportJavaScript, {
+    fileName: transportFileName
+} as Rolldown.RenderedChunk).code
+
+/** Materializes the test transport from finalized capsule outputs. */
+async function materializeTestTransport(capsuleChunkIds: readonly string[]): Promise<string> {
+    const transport = {
+        type: 'chunk',
+        code: transportCode,
+        fileName: transportFileName,
+        isEntry: true,
+        map: null,
+        modules: {
+            [transportPath]: {}
+        }
+    } as Rolldown.OutputChunk
+    const bundle: Rolldown.OutputBundle = {
+        [transportFileName]: transport
+    }
+    capsuleChunkIds.forEach((chunkId) => {
+        bundle[chunkId] = {
+            type: 'chunk',
+            fileName: chunkId,
+            isEntry: false,
+            modules: {}
+        } as Rolldown.OutputChunk
+    })
+
+    await materializeTransport(bundle)
+    return transport.code
+}
 
 /** Creates a SystemJS realm with the bootstrap and transport. */
 async function createTestSystem(
@@ -85,11 +125,9 @@ async function createTestSystem(
     Function(
         'require',
         'module',
-        await renderTransport({
-            bootstrapChunkId: 'bootstrap.js',
-            capsuleChunkIds: [...capsules.keys()]
-        })
-    )(nativeRequire, transportModule)
+        'exports',
+        await materializeTestTransport([...capsules.keys()])
+    )(nativeRequire, transportModule, transportModule.exports)
     const transport = transportModule.exports as NativeTransport
 
     const commonJsModule: { exports: Record<string, unknown> } = {
@@ -135,6 +173,14 @@ function callExport(module: SystemModule, name: string, ...arguments_: unknown[]
     }
     return value.apply(undefined, arguments_)
 }
+
+test('publishes native bootstrap directly through its System registration', async () => {
+    const system = await createTestSystem(new Map())
+    const bootstrap = await system.import(chunkIdToModuleUrl('assets/bootstrap.js'))
+
+    assert.equal(typeof bootstrap.createNativeConfig, 'function')
+    assert.equal(typeof bootstrap.__vitePreload, 'function')
+})
 
 test('loads real capsules with static imports, dynamic imports, live bindings, and import.meta', async () => {
     const registrations = new Map<string, SystemRegistration>([

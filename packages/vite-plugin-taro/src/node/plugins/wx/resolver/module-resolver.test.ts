@@ -9,6 +9,8 @@ import {
     pageModuleId,
     pageModulePath,
     pageShellPath,
+    transportFileName,
+    transportPath,
     vitePreloadId
 } from '../native/constant.ts'
 import { createModuleResolver } from './module-resolver.ts'
@@ -36,6 +38,7 @@ test('resolves fixed and route-specific private modules', () => {
     assert.deepEqual(resolver.input, {
         'app.js': appShellPath,
         'comp.js': componentShellPath,
+        [transportFileName]: transportPath,
         'pages/home/index.js': `${pageShellPath}?route=pages%2Fhome%2Findex`
     })
     assert.equal(resolver.resolveId(vitePreloadId, undefined, projectRoot), bootstrapPath)

@@ -3,6 +3,12 @@ import { resolvePackageFile } from '../../../utils/packages.ts'
 /** Identifies the shared native runtime that initializes SystemJS and serves both shell entry types. */
 export const bootstrapPath = resolvePackageFile('dist/runtime/wx/bootstrap.js')
 
+/** Identifies the native transport entry specialized after chunk filenames are finalized. */
+export const transportPath = resolvePackageFile('dist/runtime/wx/transport.js')
+
+/** Keeps post-hash transport specialization out of content-hashed chunks. */
+export const transportFileName = 'transport.js'
+
 /** Redirects Vite's injected browser preload helper to the bootstrap identity loader. */
 export const vitePreloadId = '\0vite/preload-helper.js'
 

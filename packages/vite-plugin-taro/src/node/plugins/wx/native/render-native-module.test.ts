@@ -4,8 +4,9 @@ import type { Rolldown } from 'vite'
 import { renderNativeModule } from './render-native-module.ts'
 
 test('renders native require and CommonJS exports', () => {
-    const source = `const transport = __VITE_PLUGIN_TARO_NATIVE_REQUIRE__("../transport.js")
-export const instantiate = transport.instantiate`
+    const source = `import { instantiate } from "../transport.js"
+export { instantiate }
+export const moduleUrl = import.meta.url`
     const result = renderNativeModule(source, { fileName: 'assets/bootstrap-a.js' } as Rolldown.RenderedChunk)
     const requiredPaths: string[] = []
     const commonJsModule: { exports: Record<string, unknown> } = {
@@ -29,6 +30,7 @@ export const instantiate = transport.instantiate`
 
     assert.deepEqual(requiredPaths, ['../transport.js'])
     assert.strictEqual(commonJsModule.exports.instantiate, instantiate)
+    assert.equal(commonJsModule.exports.moduleUrl, 'vpt:/assets/bootstrap-a.js')
     assert.deepEqual(result.map.sources, ['assets/bootstrap-a.js'])
 })
 

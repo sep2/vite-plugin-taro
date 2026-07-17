@@ -11,6 +11,8 @@ import {
     pageModuleId,
     pageModulePath,
     pageShellPath,
+    transportFileName,
+    transportPath,
     vitePreloadId
 } from '../native/constant.ts'
 import { transformPageModule } from '../native/transform-page-module.ts'
@@ -40,10 +42,11 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
     ])
 
     return {
-        // Make every native shell a distinct entry, so Rolldown preserves WeChat's exact file paths.
+        // Make every native file a distinct entry, so Rolldown preserves WeChat's exact synchronous boundaries.
         input: {
             [appShellFileName]: appShellPath,
             [componentShellFileName]: componentShellPath,
+            [transportFileName]: transportPath,
 
             ...Object.fromEntries(
                 options.pages.map((page) => {
