@@ -7,7 +7,8 @@ import { createWxTargetPlugins } from './plugins/wx/plugins.ts'
 
 /** Creates the Vite plugins for one Taro target. */
 export default function vitePluginTaro(options: VitePluginTaroOptions): PluginOption[] {
-    const cssPipeline = new CssPipeline()
+    const cssPipeline = new CssPipeline(options.target)
+
     return [
         createClientTaroPlugin(),
         ...cssPipeline.plugins,

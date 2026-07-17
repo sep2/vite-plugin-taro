@@ -22,7 +22,7 @@ test('uses upstream transformed app.wxss and removes duplicate browser styles', 
         }
     } as unknown as Rolldown.OutputBundle
 
-    const appWxss = await new CssPipeline().createAppWxss(bundle)
+    const appWxss = await new CssPipeline('wx').createAppWxss(bundle)
 
     assert.equal(appWxss, '@import "./app-origin.wxss";\n')
     assert.equal(bundle['app.wxss'], undefined)

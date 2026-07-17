@@ -7,6 +7,7 @@ import {
     type WeappTailwindcssGenerator
 } from 'weapp-tailwindcss/generator'
 import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
+import type { VitePluginTaroTarget } from '../../../options.ts'
 import { resolvePackageFile } from '../../utils/packages.ts'
 
 const wxStyleOptions = {
@@ -52,29 +53,32 @@ export class CssPipeline {
     private root: string | undefined
     private wxContext: WxContext | undefined
 
-    constructor() {
+    constructor(target: VitePluginTaroTarget) {
         const pipeline = this
+        const wx = target === 'wx'
 
         this.plugins = [
-            {
-                name: 'vite-plugin-taro:css',
-                enforce: 'pre',
-                configResolved(config) {
-                    pipeline.resolveConfig(config)
-                },
-                async transform(code, id) {
-                    if (isTailwindCssEntry(code, id)) {
-                        await pipeline.registerCssEntry(id, code)
-                    }
-                }
-            },
+            wx
+                ? {
+                      name: 'vite-plugin-taro:wx-css',
+                      enforce: 'pre',
+                      configResolved(config) {
+                          pipeline.resolveConfig(config)
+                      },
+                      async transform(code, id) {
+                          if (isTailwindCssEntry(code, id)) {
+                              await pipeline.registerCssEntry(id, code)
+                          }
+                      }
+                  }
+                : undefined,
             ...(WeappTailwindcss({
                 appType: 'taro',
                 rewriteCssImports: true,
                 generator: {
-                    target: 'weapp'
+                    target: wx ? 'weapp' : 'web'
                 },
-                ...wxStyleOptions,
+                ...(wx ? wxStyleOptions : {}),
                 logLevel: 'silent'
             }) ?? [])
         ]

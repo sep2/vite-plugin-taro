@@ -24,7 +24,7 @@ const options: VitePluginTaroOptions = {
 }
 
 test('creates shared Taro templates and one native facade per Page', async () => {
-    const templateAssets = await createTemplateAssets({} as Rolldown.OutputBundle, options, new CssPipeline())
+    const templateAssets = await createTemplateAssets({} as Rolldown.OutputBundle, options, new CssPipeline('wx'))
     const assets = new Map(templateAssets.map((asset) => [asset.fileName, String(asset.source)]))
 
     assert.deepEqual(
