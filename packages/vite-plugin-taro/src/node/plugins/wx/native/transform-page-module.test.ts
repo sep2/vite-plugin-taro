@@ -9,17 +9,17 @@ export default createPageConfig(PageComponent, __VITE_PLUGIN_TARO_PAGE_PATH__, u
 
 test('specializes the real Page module for one route', () => {
     const id = '/plugin/runtime/wx/page-module.js?route=pages%2Fhome%2Findex'
-    const result = transformPageModule(
-        source,
+    const result = transformPageModule({
+        code: source,
         id,
-        {
+        page: {
             path: 'pages/home/index',
             config: {
                 navigationBarTitleText: 'Home'
             }
         },
-        '/project'
-    )
+        projectRoot: '/project'
+    })
 
     assert.match(result.code, /from ["']\/@fs\/\/project\/src\/pages\/home\/index\.tsx["']/)
     assert.match(result.code, /["']pages\/home\/index["']/)
@@ -31,15 +31,15 @@ test('specializes the real Page module for one route', () => {
 test('rejects a Page module missing its specialization placeholders', () => {
     assert.throws(
         () =>
-            transformPageModule(
-                'export default {}',
-                '/plugin/runtime/wx/page-module.js?route=pages%2Fhome%2Findex',
-                {
+            transformPageModule({
+                code: 'export default {}',
+                id: '/plugin/runtime/wx/page-module.js?route=pages%2Fhome%2Findex',
+                page: {
                     path: 'pages/home/index',
                     config: {}
                 },
-                '/project'
-            ),
+                projectRoot: '/project'
+            }),
         /Expected one component, path, and config placeholder/
     )
 })
