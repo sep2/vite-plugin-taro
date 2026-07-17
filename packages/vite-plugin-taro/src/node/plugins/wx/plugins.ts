@@ -65,7 +65,8 @@ function createWxTargetPlugin(options: VitePluginTaroOptions, cssPipeline: CssPi
                         build: {
                             modulePreload: false,
                             cssCodeSplit: false,
-                            cssMinify: 'lightningcss',
+                            // Preserve source CSS until CssPipeline applies the final WXSS transform.
+                            cssMinify: false,
 
                             target: wxJavaScriptTarget,
 
