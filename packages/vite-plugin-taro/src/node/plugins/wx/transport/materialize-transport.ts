@@ -8,7 +8,14 @@ import { isBootstrapModule, isNativeModule } from '../native/is-native-module.ts
 const bootstrapModuleUrlPlaceholder = '__VITE_PLUGIN_TARO_BOOTSTRAP_MODULE_URL__'
 const transportTablePlaceholder = '__VITE_PLUGIN_TARO_TRANSPORT_TABLE__'
 
-/** Materializes the native transport while Rollup's preliminary hash placeholders are still active. */
+/**
+ * Materializes transport while Rolldown's preliminary hash placeholders are still active, so the injected capsule
+ * references participate in final hash calculation instead of changing code after its filename has been fixed.
+ *
+ * This intentionally creates broad hash invalidation: changing one capsule can rename transport, then bootstrap, then
+ * chunks that import bootstrap. WX ships one application package rather than independently cached HTTP chunks, so honest
+ * content hashes and automatic graph linking are more valuable here than minimizing that hash fan-out.
+ */
 export async function materializeTransport({
     code,
     transportChunk,
