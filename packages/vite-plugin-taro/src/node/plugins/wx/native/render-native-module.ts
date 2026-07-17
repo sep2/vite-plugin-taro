@@ -4,8 +4,6 @@ import transformModulesCommonjs from '@babel/plugin-transform-modules-commonjs'
 import type { Rolldown } from 'vite'
 import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
 
-const nativeRequirePlaceholder = '__VITE_PLUGIN_TARO_NATIVE_REQUIRE__'
-
 /** Renders a synchronous native module. */
 export function renderNativeModule(
     code: string,
@@ -39,13 +37,6 @@ function connectNativeImportPlugin(fileName: string): PluginObject {
     return {
         name: 'vite-plugin-taro:connect-native-import',
         visitor: {
-            Identifier(identifierPath) {
-                // Keep transport outside Rolldown's graph, then restore native require only after chunking is complete.
-                if (identifierPath.node.name === nativeRequirePlaceholder) {
-                    identifierPath.node.name = 'require'
-                }
-            },
-
             ImportExpression(importPath) {
                 // Rolldown owns the dynamic graph edge; SystemJS owns loading the emitted capsule at runtime.
                 if (!types.isStringLiteral(importPath.node.source)) {
@@ -63,6 +54,22 @@ function connectNativeImportPlugin(fileName: string): PluginObject {
                         [types.stringLiteral(chunkIdToModuleUrl(chunkId))]
                     )
                 )
+            },
+
+            MemberExpression(memberPath) {
+                const { object, property, computed } = memberPath.node
+                if (
+                    computed ||
+                    !types.isMetaProperty(object) ||
+                    !types.isIdentifier(object.meta, { name: 'import' }) ||
+                    !types.isIdentifier(object.property, { name: 'meta' }) ||
+                    !types.isIdentifier(property, { name: 'url' })
+                ) {
+                    return
+                }
+
+                // WeChat CommonJS has no import.meta. Give native modules the same canonical identity SystemJS uses.
+                memberPath.replaceWith(types.stringLiteral(chunkIdToModuleUrl(fileName)))
             }
         }
     }
