@@ -11,3 +11,10 @@ declare function Page(options: object): void
 
 /** Registers a native WeChat Mini Program component. */
 declare function Component(options: object): void
+
+/**
+ * Returns the native WeChat Mini Program application instance.
+ * Only available after App() is called.
+ * https://developers.weixin.qq.com/miniprogram/dev/reference/api/getApp.html
+ */
+declare function getApp(options: object): { globalData: unknown }
