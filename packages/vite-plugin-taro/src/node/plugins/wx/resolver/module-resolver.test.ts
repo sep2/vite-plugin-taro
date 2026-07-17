@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
+import { appComponentId } from '../../client/constant.ts'
 import {
-    appComponentId,
     appShellPath,
     bootstrapPath,
     pageModuleId,

@@ -1,11 +1,12 @@
 import type { Rolldown } from 'vite'
 import type { JsonObject, VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../../options.ts'
+import { createAppConfig } from '../../../utils/project-config.ts'
 import { relativeRootAsset } from './relative-root-asset.ts'
 
 /** Creates every configured native JSON asset. */
 export function createJsonAssets(options: VitePluginTaroOptions): Rolldown.EmittedAsset[] {
     return [
-        createJsonAsset('app.json', createAppJson(options)),
+        createJsonAsset('app.json', createAppConfig(options)),
 
         ...options.pages.map((page) => createJsonAsset(`${page.path}.json`, createPageJson(page))),
 
@@ -17,14 +18,6 @@ export function createJsonAssets(options: VitePluginTaroOptions): Rolldown.Emitt
 
         createJsonAsset('sitemap.json', options.sitemapJson)
     ]
-}
-
-/** Creates App JSON with the configured Page order as the authoritative pages field. */
-export function createAppJson(options: VitePluginTaroOptions): JsonObject {
-    return {
-        ...options.appJson,
-        pages: options.pages.map((page) => page.path)
-    }
 }
 
 /** Creates Page JSON with Taro's recursive root component alongside user components. */

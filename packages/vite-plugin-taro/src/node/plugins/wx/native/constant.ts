@@ -6,9 +6,6 @@ export const bootstrapPath = resolvePackageFile('dist/runtime/wx/bootstrap.js')
 /** Redirects Vite's injected browser preload helper to the bootstrap identity loader. */
 export const vitePreloadId = '\0vite/preload-helper.js'
 
-/** Maps the App module's private import to the configured application component. */
-export const appComponentId = '\0vpt:app-component'
-
 /** Forces the native App shell entry to emit at WeChat's required root path. */
 export const appShellFileName = 'app.js'
 

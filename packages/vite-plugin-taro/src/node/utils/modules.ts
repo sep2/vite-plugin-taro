@@ -1,5 +1,16 @@
 import path from 'node:path'
 
+/** Creates a portable import for one configured Page component. */
+export function createPageComponentImportPath({
+    pagePath,
+    projectRoot
+}: {
+    pagePath: string
+    projectRoot: string
+}): string {
+    return toViteFileImportPath(path.resolve(projectRoot, 'src', `${pagePath}.tsx`))
+}
+
 /** Normalizes a file-backed Vite module ID for stable comparisons. */
 export function normalizeModuleId(id: string): string {
     return id.replaceAll('\\', '/').replace(/\?.*$/, '')

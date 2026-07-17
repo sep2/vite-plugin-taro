@@ -1,8 +1,7 @@
-import path from 'node:path'
 import { type PluginObject, type PluginTarget, transformSync, types } from '@babel/core'
 import type { Rolldown } from 'vite'
 import type { VitePluginTaroPageOption } from '../../../../options.ts'
-import { toViteFileImportPath } from '../../../utils/modules.ts'
+import { createPageComponentImportPath } from '../../../utils/modules.ts'
 import { pageComponentId } from './constant.ts'
 
 const pagePathPlaceholder = '__VITE_PLUGIN_TARO_PAGE_PATH__'
@@ -25,7 +24,8 @@ export function transformPageModule({
         path: 0,
         config: 0
     }
-    const pageComponentPath = toViteFileImportPath(path.resolve(projectRoot, 'src', `${page.path}.tsx`))
+    const pageComponentPath = createPageComponentImportPath({ pagePath: page.path, projectRoot })
+
     const pageModule = transformSync(code, {
         babelrc: false,
         compact: false,

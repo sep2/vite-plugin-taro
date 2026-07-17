@@ -1,8 +1,8 @@
 import path from 'node:path'
 import type { VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../../options.ts'
 import { normalizeModuleId } from '../../../utils/modules.ts'
+import { appComponentId } from '../../client/constant.ts'
 import {
-    appComponentId,
     appShellFileName,
     appShellPath,
     bootstrapPath,
