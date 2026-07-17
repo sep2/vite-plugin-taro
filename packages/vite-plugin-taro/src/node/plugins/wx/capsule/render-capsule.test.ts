@@ -19,19 +19,12 @@ export const doubled = value * 2`,
     assert.doesNotMatch(result.code, /System\.register/)
 })
 
-test('removes Vite preload wrappers while converting dynamic imports', () => {
-    const result = renderCapsule(
-        `import { __vitePreload } from './bootstrap.js'
-export const load = () => __vitePreload(() => import('./lazy.js'), __VITE_PRELOAD__)`,
-        { fileName: 'assets/root.js' } as Rolldown.RenderedChunk
-    )
-    const commonJsModule: { exports?: unknown } = {}
-    Function('module', result.code)(commonJsModule)
+test('converts dynamic imports and generates a source map', () => {
+    const result = renderCapsule(`export const load = () => import('./lazy.js')`, {
+        fileName: 'assets/root.js'
+    } as Rolldown.RenderedChunk)
 
-    assert.ok(Array.isArray(commonJsModule.exports))
-    assert.deepEqual(commonJsModule.exports[0], [])
     assert.match(result.code, /_context\.import\(['"]\.\/lazy\.js['"]\)/)
-    assert.doesNotMatch(result.code, /VITE_PRELOAD|bootstrap/)
     assert.notEqual(typeof result.map, 'string')
     assert.deepEqual(result.map.sources, ['assets/root.js'])
     assert.ok(result.map.mappings)

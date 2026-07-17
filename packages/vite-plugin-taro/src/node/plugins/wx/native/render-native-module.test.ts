@@ -32,9 +32,9 @@ export const instantiate = transport.instantiate`
     assert.deepEqual(result.map.sources, ['assets/bootstrap-a.js'])
 })
 
-test('removes Vite preload while rendering native and dynamic imports', async () => {
+test('keeps the native Vite preload identity wrapper around dynamic imports', async () => {
     const source = `import { createNativeConfig, __vitePreload } from "./assets/bootstrap-a.js"
-const loadModule = () => __vitePreload(() => import("./assets/module-b.js"), __VITE_PRELOAD__)
+const loadModule = () => __vitePreload(() => import("./assets/module-b.js"), void 0)
 App({
     createNativeConfig,
     loadModule
@@ -61,6 +61,9 @@ App({
             return {
                 createNativeConfig() {
                     return undefined
+                },
+                __vitePreload(load: () => unknown) {
+                    return load()
                 }
             }
         },
@@ -72,6 +75,6 @@ App({
 
     assert.deepEqual(requiredPaths, ['./assets/bootstrap-a.js'])
     assert.deepEqual(importedModuleUrls, ['vpt:/assets/module-b.js'])
-    assert.doesNotMatch(result.code, /VITE_PRELOAD|vitePreload/)
+    assert.match(result.code, /vitePreload/)
     assert.deepEqual(result.map.sources, ['app.js'])
 })

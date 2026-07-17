@@ -4,7 +4,7 @@ import 'systemjs/s.js'
 // Share the asynchronous configuration relay through the bootstrap module cached by native require.
 export { createNativeConfig } from './native-config.ts'
 
-// Vite requires this graph export while rendering; final AST rendering removes every preload call.
+// Native chunks use this identity helper; capsule rendering removes the browser preload wrapper.
 export const __vitePreload = <Value>(load: () => Value): Value => load()
 
 // Keep transport outside the Rolldown graph; native rendering rewrites this placeholder to require.

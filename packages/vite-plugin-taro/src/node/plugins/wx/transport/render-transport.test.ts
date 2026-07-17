@@ -5,7 +5,7 @@ import { renderTransport } from './render-transport.ts'
 
 /** The generated native capsule loader. */
 interface NativeTransport {
-    instantiate(id: string, parentId?: string): Promise<unknown>
+    instantiate(id: string, parentId?: string): unknown
 }
 
 /** Evaluates a transport with a fake native require. */
@@ -14,11 +14,9 @@ function evaluateTransport(source: string, loadCapsule: (path: string) => unknow
     const commonJsModule: { exports: unknown } = { exports: {} }
 
     /** Loads and records one capsule path. */
-    const nativeRequire = {
-        async async(id: string): Promise<unknown> {
-            requiredPaths.push(id)
-            return loadCapsule(id)
-        }
+    function nativeRequire(id: string): unknown {
+        requiredPaths.push(id)
+        return loadCapsule(id)
     }
 
     Function('require', 'module', source)(nativeRequire, commonJsModule)
@@ -28,18 +26,18 @@ function evaluateTransport(source: string, loadCapsule: (path: string) => unknow
     }
 }
 
-test('renders literal asynchronous native capsule loaders', async () => {
+test('renders literal native capsule loaders', () => {
     const source = renderTransport(['assets/root-c.js', 'assets/shared-a.js', 'assets/chunks/lazy-b.js'])
     const capsule = {}
     const evaluated = evaluateTransport(source, () => capsule)
 
-    assert.strictEqual(await evaluated.transport.instantiate(chunkIdToModuleUrl('assets/chunks/lazy-b.js')), capsule)
+    assert.strictEqual(evaluated.transport.instantiate(chunkIdToModuleUrl('assets/chunks/lazy-b.js')), capsule)
     assert.deepEqual(evaluated.requiredPaths, ['./assets/chunks/lazy-b.js'])
     assert.throws(
         () => evaluated.transport.instantiate(chunkIdToModuleUrl('assets/missing.js')),
         /Unknown System module/
     )
 
-    const requireArguments = [...source.matchAll(/\brequire\.async\(([^)]+)\)/g)].map((match) => JSON.parse(match[1]))
+    const requireArguments = [...source.matchAll(/\brequire\(([^)]+)\)/g)].map((match) => JSON.parse(match[1]))
     assert.deepEqual(requireArguments, ['./assets/chunks/lazy-b.js', './assets/root-c.js', './assets/shared-a.js'])
 })
