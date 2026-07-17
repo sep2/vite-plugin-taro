@@ -1,5 +1,4 @@
 import type { Plugin, PluginOption } from 'vite'
-import { DevEnvironment } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { createAppConfig } from '../../utils/project-config.ts'
@@ -9,7 +8,6 @@ import { isNativeModule } from './native/is-native-module.ts'
 import { renderNativeModule } from './native/render-native-module.ts'
 import { createModuleResolver } from './resolver/module-resolver.ts'
 
-const wxEnvironmentName = 'wx'
 const wxJavaScriptTarget = 'es2018'
 
 /** Creates the WX target plugins. */
@@ -17,7 +15,7 @@ export function createWxTargetPlugins(options: VitePluginTaroOptions): PluginOpt
     return [createWxTargetPlugin(options)]
 }
 
-/** Configures the WX Vite environment. */
+/** Configures the wx target. */
 function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
     const moduleResolver = createModuleResolver(options)
 
@@ -32,12 +30,6 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
 
                 oxc: { target: wxJavaScriptTarget },
 
-                builder: {
-                    async buildApp(builder) {
-                        await builder.build(builder.environments[wxEnvironmentName])
-                    }
-                },
-
                 resolve: {
                     alias: [
                         {
@@ -47,39 +39,27 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
                     ]
                 },
 
-                environments: {
-                    [wxEnvironmentName]: {
-                        consumer: 'client',
+                build: {
+                    modulePreload: false,
+                    cssCodeSplit: false,
+                    // Let weapp-tailwindcss own final WXSS transformation.
+                    cssMinify: false,
 
-                        dev: {
-                            createEnvironment(name, config) {
-                                return new DevEnvironment(name, config, {
-                                    hot: false
-                                })
+                    target: wxJavaScriptTarget,
+
+                    rolldownOptions: {
+                        input: moduleResolver.input,
+                        output: {
+                            entryFileNames: '[name]',
+                            assetFileNames(asset) {
+                                if (asset.names.some((name) => name.endsWith('.css'))) {
+                                    return 'app.wxss'
+                                }
+
+                                return 'assets/[name]-[hash][extname]'
                             }
                         },
-
-                        build: {
-                            modulePreload: false,
-                            cssCodeSplit: false,
-                            // Let weapp-tailwindcss own final WXSS transformation.
-                            cssMinify: false,
-
-                            target: wxJavaScriptTarget,
-
-                            rolldownOptions: {
-                                input: moduleResolver.input,
-                                output: {
-                                    entryFileNames: '[name]',
-                                    assetFileNames(asset) {
-                                        return asset.names.some((name) => name.endsWith('.css'))
-                                            ? 'app.wxss'
-                                            : 'assets/[name]-[hash][extname]'
-                                    }
-                                },
-                                preserveEntrySignatures: 'strict'
-                            }
-                        }
+                        preserveEntrySignatures: 'strict'
                     }
                 }
             }
