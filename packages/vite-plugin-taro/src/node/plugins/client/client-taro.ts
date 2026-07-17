@@ -1,5 +1,5 @@
 import type { Plugin } from 'vite'
-import { resolvePackageFile } from '../utils/packages.ts'
+import { resolvePackageFile } from '../../utils/packages.ts'
 
 const clientTaroModules = new Map([
     ['virtual:taro/api', resolvePackageFile('dist/runtime/client/taro/api.js')],

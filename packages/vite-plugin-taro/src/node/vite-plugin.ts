@@ -1,7 +1,7 @@
 import react from '@vitejs/plugin-react'
 import type { PluginOption } from 'vite'
 import type { VitePluginTaroOptions } from '../options.ts'
-import { createClientTaroPlugin } from './plugins/client-taro.ts'
+import { createClientTaroPlugin } from './plugins/client/client-taro.ts'
 import { CssPipeline } from './plugins/css/css-pipeline.ts'
 import { createWxTargetPlugins } from './plugins/wx/plugins.ts'
 
