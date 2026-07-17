@@ -1,5 +1,12 @@
 import path from 'node:path'
 
+const moduleRoot = 'vpt:/'
+
+/** Converts a final chunk ID to its canonical runtime module URL. */
+export function chunkIdToModuleUrl(chunkId: string): string {
+    return `${moduleRoot}${chunkId}`
+}
+
 /** Creates a portable import for one configured Page component. */
 export function createPageComponentImportPath({
     pagePath,

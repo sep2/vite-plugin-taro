@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { chunkIdToModuleUrl } from './module-url.ts'
+import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
 import { renderTransport } from './render-transport.ts'
 
 /** The generated native capsule loader. */
@@ -29,8 +29,8 @@ function evaluateTransport(source: string, loadModule: (path: string) => unknown
     }
 }
 
-test('renders literal capsule loaders and a native bootstrap registration', () => {
-    const source = renderTransport({
+test('specializes the physical runtime with literal loaders and a bootstrap registration', async () => {
+    const source = await renderTransport({
         bootstrapChunkId: 'assets/bootstrap-d.js',
         capsuleChunkIds: ['assets/root-c.js', 'assets/shared-a.js', 'assets/chunks/lazy-b.js']
     })

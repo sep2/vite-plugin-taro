@@ -2,7 +2,7 @@ import path from 'node:path'
 import { type PluginObject, type PluginTarget, transformSync, types } from '@babel/core'
 import transformModulesCommonjs from '@babel/plugin-transform-modules-commonjs'
 import type { Rolldown } from 'vite'
-import { chunkIdToModuleUrl } from '../transport/module-url.ts'
+import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
 
 const nativeRequirePlaceholder = '__VITE_PLUGIN_TARO_NATIVE_REQUIRE__'
 

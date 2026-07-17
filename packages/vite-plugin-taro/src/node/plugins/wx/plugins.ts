@@ -88,8 +88,8 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
 
         generateBundle: {
             order: 'post',
-            handler(_, bundle) {
-                const files = generateBundle(bundle, options)
+            async handler(_, bundle) {
+                const files = await generateBundle(bundle, options)
 
                 files.forEach((file) => {
                     this.emitFile(file)

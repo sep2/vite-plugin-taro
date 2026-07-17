@@ -6,10 +6,10 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
 import { type Rolldown, transformWithOxc } from 'vite'
+import { chunkIdToModuleUrl } from '../../utils/modules.ts'
 import { renderCapsule } from './capsule/render-capsule.ts'
 import { renderNativeModule } from './native/render-native-module.ts'
 import { transportFileName } from './transport/constant.ts'
-import { chunkIdToModuleUrl } from './transport/module-url.ts'
 import { renderTransport } from './transport/render-transport.ts'
 
 /** A test SystemJS module namespace. */
@@ -64,10 +64,10 @@ const bootstrapCode = renderNativeModule(bootstrapJavaScript, {
 } as Rolldown.RenderedChunk).code
 
 /** Creates a SystemJS realm with the bootstrap and transport. */
-function createTestSystem(
+async function createTestSystem(
     registrations: ReadonlyMap<string, SystemRegistration>,
     onInstantiate: (id: string) => void = () => undefined
-): SystemJsInstance {
+): Promise<SystemJsInstance> {
     const capsules = new Map(registrations)
     const transportModule: { exports: unknown } = { exports: {} }
 
@@ -85,7 +85,7 @@ function createTestSystem(
     Function(
         'require',
         'module',
-        renderTransport({
+        await renderTransport({
             bootstrapChunkId: 'bootstrap.js',
             capsuleChunkIds: [...capsules.keys()]
         })
@@ -169,7 +169,7 @@ export const current = value`
         ]
     ])
     const instantiations = new Map<string, number>()
-    const system = createTestSystem(registrations, (id) => {
+    const system = await createTestSystem(registrations, (id) => {
         instantiations.set(id, (instantiations.get(id) ?? 0) + 1)
     })
 
@@ -207,7 +207,7 @@ test('deduplicates concurrent instantiation and execution', async () => {
             }
         })
     ]
-    const system = createTestSystem(new Map([['entry.js', registration]]), (id) => {
+    const system = await createTestSystem(new Map([['entry.js', registration]]), (id) => {
         if (id === 'entry.js') {
             instantiations++
         }
@@ -275,7 +275,7 @@ test('links circular dependencies through declaration-time exports', async () =>
             ]
         ]
     ])
-    const system = createTestSystem(registrations)
+    const system = await createTestSystem(registrations)
 
     const a = await system.import(chunkIdToModuleUrl('a.js'))
     const b = await system.import(chunkIdToModuleUrl('b.js'))
@@ -322,7 +322,7 @@ test('waits for asynchronous dependency execution before executing importers', a
             ]
         ]
     ])
-    const system = createTestSystem(registrations)
+    const system = await createTestSystem(registrations)
 
     const root = await system.import(chunkIdToModuleUrl('root.js'))
 

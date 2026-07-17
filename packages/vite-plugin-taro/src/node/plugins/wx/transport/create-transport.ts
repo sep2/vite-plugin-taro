@@ -4,7 +4,7 @@ import { transportFileName } from './constant.ts'
 import { renderTransport } from './render-transport.ts'
 
 /** Creates the transport asset from the final bundle. */
-export function createTransport(bundle: Rolldown.OutputBundle): Rolldown.EmittedAsset {
+export async function createTransport(bundle: Rolldown.OutputBundle): Promise<Rolldown.EmittedAsset> {
     const chunks = Object.values(bundle).filter((output): output is Rolldown.OutputChunk => output.type === 'chunk')
 
     // Vite's preload helper makes application capsules import the native bootstrap chunk. Capture its final hashed ID so
@@ -20,9 +20,6 @@ export function createTransport(bundle: Rolldown.OutputBundle): Rolldown.Emitted
     return {
         type: 'asset',
         fileName: transportFileName,
-        source: renderTransport({
-            bootstrapChunkId: bootstrap.fileName,
-            capsuleChunkIds
-        })
+        source: await renderTransport({ bootstrapChunkId: bootstrap.fileName, capsuleChunkIds })
     }
 }
