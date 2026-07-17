@@ -1,7 +1,5 @@
 declare module 'systemjs/s.js' {
     global {
-        var System: System.Loader
-
         namespace System {
             /** A live SystemJS module namespace. */
             type Module = Readonly<Record<string, unknown>>

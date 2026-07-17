@@ -10,12 +10,8 @@ export const __vitePreload = <Value>(load: () => Value): Value => load()
 // Keep transport outside the Rolldown graph; native rendering rewrites this placeholder to require.
 declare function __VITE_PLUGIN_TARO_NATIVE_REQUIRE__(id: '../transport.js'): Pick<System.Loader, 'instantiate'>
 
-type SystemHost = {
-    System?: System.Loader
-}
-
 // SystemJS installs on WeChat's `global` object; its properties are not lexical App-service bindings.
-const installedSystem = (global as SystemHost).System
+const installedSystem = (global as unknown as WeChatAppServiceGlobal & { System: System.Loader }).System
 if (!installedSystem) {
     throw new Error('SystemJS failed to initialize in the WeChat runtime')
 }
