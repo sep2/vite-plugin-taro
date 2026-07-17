@@ -1,16 +1,17 @@
 import path from 'node:path'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
+import { normalizeModuleId } from '../../../utils/modules.ts'
 import {
     appComponentId,
     appShellFileName,
     appShellPath,
     bootstrapPath,
     pageModuleId,
-    pageModuleIdPrefix,
+    pageModulePath,
     pageShellPath,
     vitePreloadId
 } from '../native/constant.ts'
-import { renderPageModule } from '../native/render-page-module.ts'
+import { transformPageModule } from '../native/transform-page-module.ts'
 
 /** Resolves one exact private import using its importer and configured project root. */
 type RuntimeModuleResolver = (importer: string | undefined, projectRoot: string) => string
@@ -20,9 +21,6 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
     // Provide constant-time route validation and access to each configured Page JSON object.
     const pageByPath = new Map(options.pages.map((page) => [page.path, page]))
 
-    // Bridge route-specific source generated during resolution to Vite's later load hook.
-    const moduleSources = new Map<string, string>()
-
     const moduleResolvers = new Map<string, RuntimeModuleResolver>([
         // Reuse bootstrap's identity loader instead of Vite's browser preload implementation.
         [vitePreloadId, () => bootstrapPath],
@@ -30,18 +28,15 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
         [appComponentId, (_importer, projectRoot) => path.resolve(projectRoot, options.app)],
         [
             pageModuleId,
-            (importer, projectRoot) => {
+            (importer) => {
                 // Recover the route attached to this specific native Page-shell entry.
                 const pagePath = requirePagePath(importer)
-                const page = pageByPath.get(pagePath)
-                if (!page) {
+                if (!pageByPath.has(pagePath)) {
                     throw new Error(`Unknown Page module: ${pagePath}`)
                 }
 
-                // Give every generated Page module a stable route identity for the graph and future HMR.
-                const resolvedId = `${pageModuleIdPrefix}${encodeURIComponent(pagePath)}`
-                moduleSources.set(resolvedId, renderPageModule(page, projectRoot))
-                return resolvedId
+                // Query-qualify the real module so every Page retains a distinct graph identity.
+                return `${pageModulePath}?route=${encodeURIComponent(pagePath)}`
             }
         ]
     ])
@@ -62,17 +57,26 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
             return moduleResolvers.get(id)?.(importer, projectRoot)
         },
 
-        load(id: string): string | undefined {
-            // Only route-qualified Page modules have generated source to load.
-            return moduleSources.get(id)
+        transform(code: string, id: string, projectRoot: string) {
+            if (normalizeModuleId(id) !== normalizeModuleId(pageModulePath)) {
+                return
+            }
+
+            const pagePath = requirePagePath(id)
+            const page = pageByPath.get(pagePath)
+            if (!page) {
+                throw new Error(`Unknown Page module: ${pagePath}`)
+            }
+
+            return transformPageModule(code, id, page, projectRoot)
         }
     }
 }
 
-/** Reads the required Page path from an importing route module. */
-function requirePagePath(importer: string | undefined): string {
-    const queryIndex = importer?.indexOf('?') ?? -1
-    const pagePath = queryIndex === -1 ? undefined : new URLSearchParams(importer?.slice(queryIndex + 1)).get('route')
+/** Reads the required Page path from a route-qualified module ID. */
+function requirePagePath(moduleId: string | undefined): string {
+    const queryIndex = moduleId?.indexOf('?') ?? -1
+    const pagePath = queryIndex === -1 ? undefined : new URLSearchParams(moduleId?.slice(queryIndex + 1)).get('route')
     if (!pagePath) {
         throw new Error('Page module import must originate from a route module')
     }

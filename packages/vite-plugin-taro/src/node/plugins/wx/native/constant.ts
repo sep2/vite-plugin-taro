@@ -1,10 +1,13 @@
 import { resolvePackageFile } from '../../../utils/packages.ts'
 
-/** Maps the App module's private import to the configured application component. */
-export const appComponentId = '\0vpt:app'
+/** Identifies the shared native runtime that initializes SystemJS and serves both shell entry types. */
+export const bootstrapPath = resolvePackageFile('dist/runtime/wx/bootstrap.js')
 
-/** Lets generated Page modules depend on App-module initialization through the normal module graph. */
-export const appModulePath = resolvePackageFile('dist/runtime/wx/app-module.js')
+/** Redirects Vite's injected browser preload helper to the bootstrap identity loader. */
+export const vitePreloadId = '\0vite/preload-helper.js'
+
+/** Maps the App module's private import to the configured application component. */
+export const appComponentId = '\0vpt:app-component'
 
 /** Forces the native App shell entry to emit at WeChat's required root path. */
 export const appShellFileName = 'app.js'
@@ -12,17 +15,14 @@ export const appShellFileName = 'app.js'
 /** Provides the synchronous native App registration entry. */
 export const appShellPath = resolvePackageFile('dist/runtime/wx/app.js')
 
-/** Identifies the shared native runtime that initializes SystemJS and serves both shell entry types. */
-export const bootstrapPath = resolvePackageFile('dist/runtime/wx/bootstrap.js')
+/** Marks the Page-component import replaced while specializing the real Page module for one route. */
+export const pageComponentId = '\0vpt:page-component'
 
 /** Gives every Page shell one private dynamic-import target that can be resolved using its route. */
 export const pageModuleId = '\0vpt:page-module'
 
-/** Gives each generated Page module a distinct and stable route-qualified module ID. */
-export const pageModuleIdPrefix = `${pageModuleId}/`
+/** Provides the real Page module specialized through a stable route query. */
+export const pageModulePath = resolvePackageFile('dist/runtime/wx/page-module.js')
 
 /** Provides the reusable synchronous native Page registration entry. */
 export const pageShellPath = resolvePackageFile('dist/runtime/wx/page.js')
-
-/** Redirects Vite's injected browser preload helper to the bootstrap identity loader. */
-export const vitePreloadId = '\0vite/preload-helper.js'

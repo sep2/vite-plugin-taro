@@ -86,8 +86,11 @@ function createWxTargetPlugin(options: VitePluginTaroOptions, cssPipeline: CssPi
             return moduleResolver.resolveId(id, importer, this.environment.config.root)
         },
 
-        load(id) {
-            return moduleResolver.load(id)
+        transform: {
+            order: 'pre',
+            handler(code, id) {
+                return moduleResolver.transform(code, id, this.environment.config.root)
+            }
         },
 
         renderChunk: {
