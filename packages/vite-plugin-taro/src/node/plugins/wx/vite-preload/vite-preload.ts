@@ -2,7 +2,7 @@ const vitePreloadHelperId = '\0vite/preload-helper.js'
 const vitePreloadHelperSource = 'export const __vitePreload = (load) => load()'
 
 /** Returns the preload-helper replacement. */
-export function overrideVitePreload(id: string): string | undefined {
+export function overrideVitePreload(): string {
     return vitePreloadHelperSource
 }
 

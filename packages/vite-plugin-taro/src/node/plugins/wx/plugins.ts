@@ -84,7 +84,7 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
 
         load(id) {
             if (isVitePreload(id)) {
-                return overrideVitePreload(id)
+                return overrideVitePreload()
             }
         },
 
