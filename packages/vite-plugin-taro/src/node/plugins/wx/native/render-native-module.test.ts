@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import type { Rolldown } from 'vite'
 import { renderNativeModule } from './render-native-module.ts'
 
 test('renders native require and CommonJS exports', () => {
     const source = `const transport = __VITE_PLUGIN_TARO_NATIVE_REQUIRE__("../transport.js")
 export const instantiate = transport.instantiate`
-    const result = renderNativeModule(source, 'assets/bootstrap-a.js')
+    const result = renderNativeModule(source, { fileName: 'assets/bootstrap-a.js' } as Rolldown.RenderedChunk)
     const requiredPaths: string[] = []
     const commonJsModule: { exports: Record<string, unknown> } = {
         exports: {}
@@ -38,7 +39,7 @@ App({
     createNativeConfig,
     loadModule
 })`
-    const result = renderNativeModule(source, 'app.js')
+    const result = renderNativeModule(source, { fileName: 'app.js' } as Rolldown.RenderedChunk)
     const importedModuleUrls: string[] = []
     const requiredPaths: string[] = []
     const registrations: unknown[] = []

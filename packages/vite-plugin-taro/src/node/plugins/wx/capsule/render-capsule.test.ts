@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import type { Rolldown } from 'vite'
 import { renderCapsule } from './render-capsule.ts'
 
 test('converts a final ESM chunk into a System registration capsule', () => {
     const result = renderCapsule(
         `import { value } from './dependency.js'
 export const doubled = value * 2`,
-        'assets/root.js'
+        { fileName: 'assets/root.js' } as Rolldown.RenderedChunk
     )
     const commonJsModule: { exports?: unknown } = {}
 
@@ -19,7 +20,9 @@ export const doubled = value * 2`,
 })
 
 test('converts dynamic imports and generates a source map', () => {
-    const result = renderCapsule(`export const load = () => import('./lazy.js')`, 'assets/root.js')
+    const result = renderCapsule(`export const load = () => import('./lazy.js')`, {
+        fileName: 'assets/root.js'
+    } as Rolldown.RenderedChunk)
 
     assert.match(result.code, /_context\.import\(['"]\.\/lazy\.js['"]\)/)
     assert.notEqual(typeof result.map, 'string')

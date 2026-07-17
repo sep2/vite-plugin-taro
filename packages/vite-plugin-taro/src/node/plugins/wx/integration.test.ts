@@ -5,7 +5,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
-import { transformWithOxc } from 'vite'
+import { type Rolldown, transformWithOxc } from 'vite'
 import { renderCapsule } from './capsule/render-capsule.ts'
 import { renderNativeModule } from './native/render-native-module.ts'
 import { transportFileName } from './transport/constant.ts'
@@ -59,7 +59,9 @@ const bootstrapTypeScript = readFileSync(
 const bootstrapJavaScript = (await transformWithOxc(bootstrapTypeScript, 'bootstrap.ts', { target: 'es2018' })).code
     .replace(/^import ['"]systemjs\/s\.js['"];\s*/m, '')
     .replace(/^export \{ createNativeConfig \} from ['"]\.\/native-config\.(?:ts|js)['"];\s*/m, '')
-const bootstrapCode = renderNativeModule(bootstrapJavaScript, 'assets/bootstrap.js').code
+const bootstrapCode = renderNativeModule(bootstrapJavaScript, {
+    fileName: 'assets/bootstrap.js'
+} as Rolldown.RenderedChunk).code
 
 /** Creates a SystemJS realm with the bootstrap and transport. */
 function createTestSystem(
@@ -100,7 +102,7 @@ function createTestSystem(
 
 /** Compiles ESM and evaluates its inert registration assignment. */
 function compileRegistration(id: string, source: string): SystemRegistration {
-    const capsule = renderCapsule(source, id)
+    const capsule = renderCapsule(source, { fileName: id } as Rolldown.RenderedChunk)
     assert.ok(capsule)
 
     const commonJsModule: { exports?: unknown } = {}
