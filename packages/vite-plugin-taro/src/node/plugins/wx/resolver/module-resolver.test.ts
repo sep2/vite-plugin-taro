@@ -8,6 +8,7 @@ import {
     bootstrapPath,
     pageModuleId,
     pageShellPath,
+    taroRuntimePath,
     vitePreloadId
 } from '../native/constant.ts'
 import { createModuleResolver } from './module-resolver.ts'
@@ -44,7 +45,7 @@ test('resolves fixed and route-specific private modules', () => {
     assert.equal(
         resolver.load(pageModule),
         `import ${JSON.stringify(appModulePath)}
-import { createPageConfig } from '@tarojs/runtime'
+import { createPageConfig } from ${JSON.stringify(taroRuntimePath)}
 import PageComponent from "/project/src/pages/home/index.tsx"
 
 export default createPageConfig(PageComponent, "pages/home/index", undefined, {"navigationBarTitleText":"Home"})`

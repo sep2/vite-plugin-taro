@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
+import { CssPipeline } from '../../css/css-pipeline.ts'
 import { createTemplateAssets } from './create-template-assets.ts'
 
 const options: VitePluginTaroOptions = {
@@ -22,13 +23,9 @@ const options: VitePluginTaroOptions = {
     sitemapJson: {}
 }
 
-test('creates shared Taro templates and one native facade per Page', () => {
-    const assets = new Map(
-        createTemplateAssets({} as Rolldown.OutputBundle, options).map((asset) => [
-            asset.fileName,
-            String(asset.source)
-        ])
-    )
+test('creates shared Taro templates and one native facade per Page', async () => {
+    const templateAssets = await createTemplateAssets({} as Rolldown.OutputBundle, options, new CssPipeline())
+    const assets = new Map(templateAssets.map((asset) => [asset.fileName, String(asset.source)]))
 
     assert.deepEqual(
         [...assets.keys()],

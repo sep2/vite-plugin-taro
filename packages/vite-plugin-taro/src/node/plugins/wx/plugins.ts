@@ -1,7 +1,8 @@
-import type { Plugin } from 'vite'
+import type { Plugin, PluginOption } from 'vite'
 import { DevEnvironment } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
+import type { CssPipeline } from '../css/css-pipeline.ts'
 import { createAppJson } from './bundle/create-json-assets.ts'
 import { generateBundle } from './bundle/generate-bundle.ts'
 import { renderCapsule } from './capsule/render-capsule.ts'
@@ -13,12 +14,12 @@ const wxEnvironmentName = 'wx'
 const wxJavaScriptTarget = 'es2018'
 
 /** Creates the WX target plugins. */
-export function createWxTargetPlugins(options: VitePluginTaroOptions): Plugin[] {
-    return [createWxTargetPlugin(options)]
+export function createWxTargetPlugins(options: VitePluginTaroOptions, cssPipeline: CssPipeline): PluginOption[] {
+    return [createWxTargetPlugin(options, cssPipeline)]
 }
 
 /** Configures the WX Vite environment. */
-function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
+function createWxTargetPlugin(options: VitePluginTaroOptions, cssPipeline: CssPipeline): Plugin {
     const moduleResolver = createModuleResolver(options)
 
     return {
@@ -31,6 +32,8 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
                 appType: 'custom',
 
                 oxc: { target: wxJavaScriptTarget },
+
+                css: cssPipeline.config,
 
                 builder: {
                     async buildApp(builder) {
@@ -61,6 +64,8 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
 
                         build: {
                             modulePreload: false,
+                            cssCodeSplit: false,
+                            cssMinify: 'lightningcss',
 
                             target: wxJavaScriptTarget,
 
@@ -95,10 +100,15 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
             }
         },
 
-        generateBundle(_, bundle) {
-            generateBundle(bundle, options).forEach((file) => {
-                this.emitFile(file)
-            })
+        generateBundle: {
+            order: 'post',
+            async handler(_, bundle) {
+                const files = await generateBundle(bundle, options, cssPipeline)
+
+                files.forEach((file) => {
+                    this.emitFile(file)
+                })
+            }
         }
     }
 }

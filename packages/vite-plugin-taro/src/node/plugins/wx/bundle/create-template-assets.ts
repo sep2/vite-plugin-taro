@@ -3,6 +3,7 @@ import { Weapp as WxPlatform } from '@tarojs/plugin-platform-weapp'
 import type { Rolldown } from 'vite'
 import type { JsonObject, VitePluginTaroOptions } from '../../../../options.ts'
 import { packageRequire } from '../../../utils/packages.ts'
+import type { CssPipeline } from '../../css/css-pipeline.ts'
 import { renderJson } from './create-json-assets.ts'
 import { relativeRootAsset } from './relative-root-asset.ts'
 
@@ -16,14 +17,15 @@ type TemplateComponentConfig = {
 const taroWxComponentsPath = packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
 
 /** Creates Taro's shared WeChat templates and one native facade for every Page. */
-export function createTemplateAssets(
+export async function createTemplateAssets(
     bundle: Rolldown.OutputBundle,
-    options: VitePluginTaroOptions
-): Rolldown.EmittedAsset[] {
+    options: VitePluginTaroOptions,
+    cssPipeline: CssPipeline
+): Promise<Rolldown.EmittedAsset[]> {
     const templateBuilder = createTemplateBuilder()
 
     return [
-        createAsset('app.wxss', ''),
+        createAsset('app.wxss', await cssPipeline.createAppWxss(bundle)),
         createAsset('base.wxml', templateBuilder.buildTemplate(collectTemplateComponentConfig(bundle))),
         createAsset('utils.wxs', templateBuilder.buildXScript()),
         createAsset('comp.wxml', templateBuilder.buildBaseComponentTemplate('.wxml')),
