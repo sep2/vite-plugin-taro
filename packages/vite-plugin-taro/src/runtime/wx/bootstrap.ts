@@ -1,7 +1,7 @@
 // Install the stock minimal SystemJS loader before any native shell can request an application capsule.
 import 'systemjs/s.js'
 import { createNativeConfig } from './native-config.ts'
-import { createTransportTable } from './transport.ts'
+import { createTransport } from './transport.ts'
 
 // Share the asynchronous configuration relay through the bootstrap module cached by native require.
 export { createNativeConfig }
@@ -17,7 +17,7 @@ if (!installedSystem) {
 }
 
 // Capsules import Rolldown's final export aliases, so register the actual CommonJS namespace rather than source names.
-const transportTable = createTransportTable(module.exports as Readonly<Record<string, unknown>>)
+const transportTable = createTransport(module.exports as Readonly<Record<string, unknown>>)
 
 /** Loads native bootstrap or one application capsule from the finalized transport table. */
 installedSystem.instantiate = (id: string): System.Registration => {
