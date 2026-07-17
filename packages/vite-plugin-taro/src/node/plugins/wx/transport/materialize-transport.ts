@@ -44,12 +44,20 @@ export async function materializeTransport(bundle: Rolldown.OutputBundle): Promi
         define: {
             [bootstrapModuleUrlPlaceholder]: generate(types.stringLiteral(chunkIdToModuleUrl(bootstrap.fileName)), {
                 comments: false,
-                compact: true
+                compact: true,
+                concise: true,
+                minified: true
             }).code,
-            [transportTablePlaceholder]: generate(moduleTable, { comments: false, compact: true }).code
+            [transportTablePlaceholder]: generate(moduleTable, {
+                comments: false,
+                compact: true,
+                concise: true,
+                minified: true
+            }).code
         },
         target: 'es2018'
     })
+
     if (
         transformed.code.includes(bootstrapModuleUrlPlaceholder) ||
         transformed.code.includes(transportTablePlaceholder)
