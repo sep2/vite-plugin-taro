@@ -2,7 +2,6 @@ import { type PluginTarget, transformSync } from '@babel/core'
 import transformDynamicImport from '@babel/plugin-transform-dynamic-import'
 import transformModulesSystemjs from '@babel/plugin-transform-modules-systemjs'
 import type { Rolldown } from 'vite'
-import { removeVitePreloadPlugin } from './remove-vite-preload.ts'
 import { wrapCapsulePlugin } from './wrap-capsule.ts'
 
 /** Renders one ESM chunk as an inert SystemJS capsule. */
@@ -16,7 +15,6 @@ export function renderCapsule(
         configFile: false,
         filename: chunk.fileName,
         plugins: [
-            removeVitePreloadPlugin,
             transformDynamicImport,
             // Erase Babel's internal plugin pass type.
             transformModulesSystemjs as PluginTarget,

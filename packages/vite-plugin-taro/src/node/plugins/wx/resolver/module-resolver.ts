@@ -24,7 +24,7 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
     const pageByPath = new Map(options.pages.map((page) => [page.path, page]))
 
     const moduleResolvers = new Map<string, RuntimeModuleResolver>([
-        // Native chunks use bootstrap's identity helper; capsule rendering removes its static dependency.
+        // Share bootstrap's identity helper through native require and the specialized SystemJS transport case.
         [vitePreloadId, () => bootstrapPath],
         // Keep the configured App component behind one stable private import in the App module.
         [appComponentId, (_importer, projectRoot) => path.resolve(projectRoot, options.app)],

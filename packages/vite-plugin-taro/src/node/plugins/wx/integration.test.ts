@@ -82,7 +82,14 @@ function createTestSystem(
         return registration
     }
 
-    Function('require', 'module', renderTransport([...capsules.keys()]))(nativeRequire, transportModule)
+    Function(
+        'require',
+        'module',
+        renderTransport({
+            bootstrapChunkId: 'bootstrap.js',
+            capsuleChunkIds: [...capsules.keys()]
+        })
+    )(nativeRequire, transportModule)
     const transport = transportModule.exports as NativeTransport
 
     const commonJsModule: { exports: Record<string, unknown> } = {
