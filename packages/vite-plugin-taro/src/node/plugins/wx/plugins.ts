@@ -4,9 +4,11 @@ import { packageRequire } from '../../utils/packages.ts'
 import { createAppConfig } from '../../utils/project-config.ts'
 import { generateBundle } from './bundle/generate-bundle.ts'
 import { renderCapsule } from './capsule/render-capsule.ts'
-import { isNativeModule } from './native/is-native-module.ts'
+import { transportPath } from './native/constant.ts'
+import { isNativeModule, isTransportModule } from './native/is-native-module.ts'
 import { renderNativeModule } from './native/render-native-module.ts'
 import { createModuleResolver } from './resolver/module-resolver.ts'
+import { materializeTransport } from './transport/materialize-transport.ts'
 
 const wxJavaScriptTarget = 'es2018'
 
@@ -50,7 +52,9 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
                     rolldownOptions: {
                         input: moduleResolver.input,
                         output: {
-                            entryFileNames: '[name]',
+                            entryFileNames(chunk) {
+                                return chunk.moduleIds.includes(transportPath) ? 'assets/[name]-[hash].js' : '[name]'
+                            },
                             assetFileNames(asset) {
                                 if (asset.names.some((name) => name.endsWith('.css'))) {
                                     return 'app.wxss'
@@ -78,18 +82,28 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
 
         renderChunk: {
             order: 'post',
-            handler(code, chunk) {
-                if (isNativeModule(chunk)) {
-                    return renderNativeModule(code, chunk)
+            async handler(code, chunk, _outputOptions, meta) {
+                if (!isNativeModule(chunk)) {
+                    return renderCapsule(code, chunk)
                 }
-                return renderCapsule(code, chunk)
+
+                const nativeModule = renderNativeModule(code, chunk)
+                if (!isTransportModule(chunk)) {
+                    return nativeModule
+                }
+
+                return materializeTransport({
+                    code: nativeModule.code,
+                    transportChunk: chunk,
+                    chunks: Object.values(meta.chunks)
+                })
             }
         },
 
         generateBundle: {
             order: 'post',
-            async handler(_, bundle) {
-                const files = await generateBundle(bundle, options)
+            handler(_, bundle) {
+                const files = generateBundle(bundle, options)
 
                 files.forEach((file) => {
                     this.emitFile(file)

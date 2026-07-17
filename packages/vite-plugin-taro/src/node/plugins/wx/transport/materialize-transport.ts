@@ -3,25 +3,27 @@ import { types } from '@babel/core'
 import generate from '@babel/generator'
 import { type Rolldown, transformWithOxc } from 'vite'
 import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
-import { isBootstrapModule, isNativeModule, isTransportModule } from '../native/is-native-module.ts'
+import { isBootstrapModule, isNativeModule } from '../native/is-native-module.ts'
 
 const bootstrapModuleUrlPlaceholder = '__VITE_PLUGIN_TARO_BOOTSTRAP_MODULE_URL__'
 const transportTablePlaceholder = '__VITE_PLUGIN_TARO_TRANSPORT_TABLE__'
 
-/** Materializes the final native transport entry after every capsule filename is known. */
-export async function materializeTransport(bundle: Rolldown.OutputBundle): Promise<void> {
-    const chunks = Object.values(bundle).filter((output): output is Rolldown.OutputChunk => output.type === 'chunk')
-
+/** Materializes the native transport while Rollup's preliminary hash placeholders are still active. */
+export async function materializeTransport({
+    code,
+    transportChunk,
+    chunks
+}: {
+    code: string
+    transportChunk: Rolldown.RenderedChunk
+    chunks: readonly Rolldown.RenderedChunk[]
+}): Promise<{ code: string; map: null }> {
     const bootstrap = chunks.find(isBootstrapModule)
     if (!bootstrap) {
         throw new Error('Expected native bootstrap chunk')
     }
-    const transport = chunks.find(isTransportModule)
-    if (!transport) {
-        throw new Error('Expected transport chunk')
-    }
-    requireOnePlaceholder(transport.code, bootstrapModuleUrlPlaceholder)
-    requireOnePlaceholder(transport.code, transportTablePlaceholder)
+    requireOnePlaceholder(code, bootstrapModuleUrlPlaceholder)
+    requireOnePlaceholder(code, transportTablePlaceholder)
 
     // Babel constructs and safely serializes an expression shaped like:
     // {
@@ -35,39 +37,40 @@ export async function materializeTransport(bundle: Rolldown.OutputBundle): Promi
         capsuleChunkIds.sort().map((chunkId) => {
             return createModuleLoader({
                 chunkId,
-                transportFileName: transport.fileName
+                transportFileName: transportChunk.fileName
             })
         })
     )
 
-    const transformed = await transformWithOxc(transport.code, transport.fileName, {
+    const transformed = await transformWithOxc(code, transportChunk.fileName, {
         define: {
-            [bootstrapModuleUrlPlaceholder]: generate(types.stringLiteral(chunkIdToModuleUrl(bootstrap.fileName)), {
-                comments: false,
-                compact: true,
-                concise: true,
-                minified: true
-            }).code,
-            [transportTablePlaceholder]: generate(moduleTable, {
-                comments: false,
-                compact: true,
-                concise: true,
-                minified: true
-            }).code
+            [bootstrapModuleUrlPlaceholder]: generate(
+                types.stringLiteral(chunkIdToModuleUrl(bootstrap.fileName)),
+                generatorOptions
+            ).code,
+            [transportTablePlaceholder]: generate(moduleTable, generatorOptions).code
         },
         target: 'es2018'
     })
-
     if (
         transformed.code.includes(bootstrapModuleUrlPlaceholder) ||
         transformed.code.includes(transportTablePlaceholder)
     ) {
-        throw new Error(`Failed to materialize the WX transport in ${transport.fileName}`)
+        throw new Error(`Failed to materialize the WX transport in ${transportChunk.fileName}`)
     }
 
-    transport.code = transformed.code
-    transport.map = null
+    return {
+        code: transformed.code,
+        map: null
+    }
 }
+
+const generatorOptions = {
+    comments: false,
+    compact: true,
+    concise: true,
+    minified: true
+} as const
 
 /** Validates one graph-metadata placeholder in the already-compiled transport entry. */
 function requireOnePlaceholder(code: string, placeholder: string): void {
@@ -93,7 +96,7 @@ function createModuleLoader({
     )
 }
 
-/** Converts one finalized output path to a literal require path relative to the native transport entry. */
+/** Converts one preliminary output path to a literal require path relative to the native transport entry. */
 function toNativeRequirePath(fromFileName: string, toFileName: string): string {
     const relativePath = path.posix.relative(path.posix.dirname(fromFileName), toFileName)
     return relativePath.startsWith('.') ? relativePath : `./${relativePath}`

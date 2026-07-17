@@ -15,10 +15,9 @@ import { materializeTransport } from './transport/materialize-transport.ts'
 /** A test SystemJS module namespace. */
 type SystemModule = Readonly<Record<string, unknown>>
 
-/** The generated native transport metadata. */
+/** The generated native transport runtime. */
 interface NativeTransport {
-    bootstrapModuleUrl: string
-    transportTable: Readonly<Record<string, () => unknown>>
+    finalizeTransport(bootstrapModule: object): Readonly<Record<string, () => unknown>>
 }
 
 /** The SystemJS surface used by runtime tests. */
@@ -78,38 +77,37 @@ const transportCode = renderNativeModule(transportJavaScript, {
 
 /** Materializes the test transport from finalized capsule outputs. */
 async function materializeTestTransport(capsuleChunkIds: readonly string[]): Promise<string> {
-    const transport = {
-        type: 'chunk',
-        code: transportCode,
+    const transportChunk = {
         fileName: transportFileName,
         isEntry: true,
-        map: null,
         modules: {
             [transportPath]: {}
         }
-    } as Rolldown.OutputChunk
-    const bundle: Rolldown.OutputBundle = {
-        'assets/bootstrap.js': {
-            type: 'chunk',
+    } as Rolldown.RenderedChunk
+    const chunks: Rolldown.RenderedChunk[] = [
+        {
             fileName: 'assets/bootstrap.js',
             isEntry: false,
             modules: {
                 [bootstrapPath]: {}
             }
-        } as Rolldown.OutputChunk,
-        [transportFileName]: transport
-    }
-    capsuleChunkIds.forEach((chunkId) => {
-        bundle[chunkId] = {
-            type: 'chunk',
-            fileName: chunkId,
-            isEntry: false,
-            modules: {}
-        } as Rolldown.OutputChunk
-    })
+        } as Rolldown.RenderedChunk,
+        transportChunk,
+        ...capsuleChunkIds.map((chunkId) => {
+            return {
+                fileName: chunkId,
+                isEntry: false,
+                modules: {}
+            } as Rolldown.RenderedChunk
+        })
+    ]
 
-    await materializeTransport(bundle)
-    return transport.code
+    const materialized = await materializeTransport({
+        code: transportCode,
+        transportChunk,
+        chunks
+    })
+    return materialized.code
 }
 
 /** Creates a SystemJS realm with the bootstrap and transport. */

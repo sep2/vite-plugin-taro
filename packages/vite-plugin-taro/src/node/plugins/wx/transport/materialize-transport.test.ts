@@ -10,8 +10,7 @@ import { materializeTransport } from './materialize-transport.ts'
 
 /** The generated native capsule-loader table. */
 interface NativeTransport {
-    bootstrapModuleUrl: string
-    transportTable: Readonly<Record<string, () => unknown>>
+    finalizeTransport(bootstrapModule: object): Readonly<Record<string, () => unknown>>
 }
 
 const transportTypeScript = readFileSync(
@@ -33,38 +32,37 @@ async function materializeTestTransport({
     fileName: string
     capsuleChunkIds: readonly string[]
 }): Promise<string> {
-    const transport = {
-        type: 'chunk',
-        code,
+    const transportChunk = {
         fileName,
         isEntry: true,
-        map: null,
         modules: {
             [transportPath]: {}
         }
-    } as Rolldown.OutputChunk
-    const bundle: Rolldown.OutputBundle = {
-        'assets/bootstrap.js': {
-            type: 'chunk',
+    } as Rolldown.RenderedChunk
+    const chunks: Rolldown.RenderedChunk[] = [
+        {
             fileName: 'assets/bootstrap.js',
             isEntry: false,
             modules: {
                 [bootstrapPath]: {}
             }
-        } as Rolldown.OutputChunk,
-        [fileName]: transport
-    }
-    capsuleChunkIds.forEach((chunkId) => {
-        bundle[chunkId] = {
-            type: 'chunk',
-            fileName: chunkId,
-            isEntry: false,
-            modules: {}
-        } as Rolldown.OutputChunk
-    })
+        } as Rolldown.RenderedChunk,
+        transportChunk,
+        ...capsuleChunkIds.map((chunkId) => {
+            return {
+                fileName: chunkId,
+                isEntry: false,
+                modules: {}
+            } as Rolldown.RenderedChunk
+        })
+    ]
 
-    await materializeTransport(bundle)
-    return transport.code
+    const materialized = await materializeTransport({
+        code,
+        transportChunk,
+        chunks
+    })
+    return materialized.code
 }
 
 /** Evaluates a transport with a fake native require. */
@@ -94,8 +92,9 @@ test('specializes the physical runtime with literal capsule loaders', async () =
     const capsule = {}
     const evaluated = evaluateTransport(source, () => capsule)
 
-    const modules = evaluated.transport.transportTable
-    assert.equal(evaluated.transport.bootstrapModuleUrl, chunkIdToModuleUrl('assets/bootstrap.js'))
+    const bootstrapModule = {}
+    const modules = evaluated.transport.finalizeTransport(bootstrapModule)
+    assert.ok(modules[chunkIdToModuleUrl('assets/bootstrap.js')]?.())
     assert.strictEqual(modules[chunkIdToModuleUrl('assets/chunks/lazy-b.js')]?.(), capsule)
     assert.deepEqual(evaluated.requiredPaths, ['./assets/chunks/lazy-b.js'])
     assert.strictEqual(modules[chunkIdToModuleUrl('assets/missing.js')], undefined)

@@ -11,7 +11,6 @@ import {
     pageModuleId,
     pageModulePath,
     pageShellPath,
-    transportFileName,
     transportPath,
     vitePreloadId
 } from '../native/constant.ts'
@@ -46,7 +45,7 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
         input: {
             [appShellFileName]: appShellPath,
             [componentShellFileName]: componentShellPath,
-            [transportFileName]: transportPath,
+            transport: transportPath,
 
             ...Object.fromEntries(
                 options.pages.map((page) => {
