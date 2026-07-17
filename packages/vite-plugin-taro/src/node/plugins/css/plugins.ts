@@ -25,10 +25,10 @@ export function createCssPlugins(target: VitePluginTaroTarget): PluginOption[] {
             // upstream default.
             rewriteCssImports: wx,
             generator: {
-                target: wx ? 'weapp' : 'web',
-                webCompat: {
-                    preset: 'legacy-web'
-                }
+                target: wx ? 'weapp' : 'web'
+                // webCompat: {
+                //     preset: 'legacy-web'
+                // }
             },
             cssOptions: {
                 ...wxStyleOptions,
