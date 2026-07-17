@@ -52,7 +52,7 @@ App({
 
     Function(
         'require',
-        'System',
+        'globalThis',
         'App',
         result.code
     )(
@@ -64,7 +64,7 @@ App({
                 }
             }
         },
-        system,
+        { System: system },
         (config: unknown) => registrations.push(config)
     )
     const registration = registrations[0] as { loadModule: () => Promise<unknown> }
