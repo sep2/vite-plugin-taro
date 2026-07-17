@@ -3,7 +3,6 @@ import { DevEnvironment } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { createAppConfig } from '../../utils/project-config.ts'
-import type { CssPipeline } from '../css/css-pipeline.ts'
 import { generateBundle } from './bundle/generate-bundle.ts'
 import { renderCapsule } from './capsule/render-capsule.ts'
 import { isNativeModule } from './native/is-native-module.ts'
@@ -14,12 +13,12 @@ const wxEnvironmentName = 'wx'
 const wxJavaScriptTarget = 'es2018'
 
 /** Creates the WX target plugins. */
-export function createWxTargetPlugins(options: VitePluginTaroOptions, cssPipeline: CssPipeline): PluginOption[] {
-    return [createWxTargetPlugin(options, cssPipeline)]
+export function createWxTargetPlugins(options: VitePluginTaroOptions): PluginOption[] {
+    return [createWxTargetPlugin(options)]
 }
 
 /** Configures the WX Vite environment. */
-function createWxTargetPlugin(options: VitePluginTaroOptions, cssPipeline: CssPipeline): Plugin {
+function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
     const moduleResolver = createModuleResolver(options)
 
     return {
@@ -32,8 +31,6 @@ function createWxTargetPlugin(options: VitePluginTaroOptions, cssPipeline: CssPi
                 appType: 'custom',
 
                 oxc: { target: wxJavaScriptTarget },
-
-                css: cssPipeline.config,
 
                 builder: {
                     async buildApp(builder) {
@@ -65,7 +62,7 @@ function createWxTargetPlugin(options: VitePluginTaroOptions, cssPipeline: CssPi
                         build: {
                             modulePreload: false,
                             cssCodeSplit: false,
-                            // Preserve source CSS until CssPipeline applies the final WXSS transform.
+                            // Let weapp-tailwindcss own final WXSS transformation.
                             cssMinify: false,
 
                             target: wxJavaScriptTarget,
@@ -73,7 +70,12 @@ function createWxTargetPlugin(options: VitePluginTaroOptions, cssPipeline: CssPi
                             rolldownOptions: {
                                 input: moduleResolver.input,
                                 output: {
-                                    entryFileNames: '[name]'
+                                    entryFileNames: '[name]',
+                                    assetFileNames(asset) {
+                                        return asset.names.some((name) => name.endsWith('.css'))
+                                            ? 'app.wxss'
+                                            : 'assets/[name]-[hash][extname]'
+                                    }
                                 },
                                 preserveEntrySignatures: 'strict'
                             }
@@ -106,8 +108,8 @@ function createWxTargetPlugin(options: VitePluginTaroOptions, cssPipeline: CssPi
 
         generateBundle: {
             order: 'post',
-            async handler(_, bundle) {
-                const files = await generateBundle(bundle, options, cssPipeline)
+            handler(_, bundle) {
+                const files = generateBundle(bundle, options)
 
                 files.forEach((file) => {
                     this.emitFile(file)
