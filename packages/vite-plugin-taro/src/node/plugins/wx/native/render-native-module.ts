@@ -16,7 +16,7 @@ export function renderNativeModule(
         compact: true,
         configFile: false,
         filename: chunk.fileName,
-        plugins: [rewriteNativeModulePlugin(chunk.fileName) as PluginTarget, transformModulesCommonjs as PluginTarget],
+        plugins: [connectNativeImportPlugin(chunk.fileName) as PluginTarget, transformModulesCommonjs as PluginTarget],
         sourceFileName: chunk.fileName,
         sourceMaps: true,
         sourceType: 'module'
@@ -35,9 +35,9 @@ export function renderNativeModule(
  * Preserves Rolldown's ESM graph while adapting its final native chunks to WeChat's synchronous CommonJS runtime.
  * Application chunks remain asynchronous SystemJS capsules, so native dynamic imports must cross that boundary explicitly.
  */
-function rewriteNativeModulePlugin(fileName: string): PluginObject {
+function connectNativeImportPlugin(fileName: string): PluginObject {
     return {
-        name: 'vite-plugin-taro:rewrite-native-module',
+        name: 'vite-plugin-taro:connect-native-import',
         visitor: {
             Identifier(identifierPath) {
                 // Keep transport outside Rolldown's graph, then restore native require only after chunking is complete.
