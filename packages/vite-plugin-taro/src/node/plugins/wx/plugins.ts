@@ -2,6 +2,7 @@ import type { Plugin } from 'vite'
 import { DevEnvironment } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
+import { createAppJson } from './bundle/create-json-assets.ts'
 import { generateBundle } from './bundle/generate-bundle.ts'
 import { renderCapsule } from './capsule/render-capsule.ts'
 import { isNativeModule } from './native/is-native-module.ts'
@@ -23,7 +24,7 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
     return {
         name: 'vite-plugin-taro:wx',
 
-        config() {
+        config(_config, _env) {
             return {
                 define: createWxDefines(options),
 
@@ -95,7 +96,7 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
         },
 
         generateBundle(_, bundle) {
-            generateBundle(bundle).forEach((file) => {
+            generateBundle(bundle, options).forEach((file) => {
                 this.emitFile(file)
             })
         }
@@ -107,7 +108,7 @@ function createWxDefines(options: VitePluginTaroOptions): Record<string, string>
     const taroVersion = String((packageRequire('@tarojs/runtime/package.json') as { version: string }).version)
 
     return {
-        __VITE_PLUGIN_TARO_APP_CONFIG__: JSON.stringify(options.appJson),
+        __VITE_PLUGIN_TARO_APP_CONFIG__: JSON.stringify(createAppJson(options)),
         'process.env.FRAMEWORK': JSON.stringify('react'),
         'process.env.SUPPORT_TARO_POLYFILL': JSON.stringify('disabled'),
         'process.env.TARO_ENV': JSON.stringify('weapp'),
