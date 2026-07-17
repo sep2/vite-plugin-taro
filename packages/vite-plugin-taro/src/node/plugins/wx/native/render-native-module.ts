@@ -56,7 +56,10 @@ function connectNativeImportPlugin(fileName: string): PluginObject {
                 const chunkId = path.posix.join(path.posix.dirname(fileName), importPath.node.source.value)
                 importPath.replaceWith(
                     types.callExpression(
-                        types.memberExpression(types.identifier('System'), types.identifier('import')),
+                        types.memberExpression(
+                            types.memberExpression(types.identifier('globalThis'), types.identifier('System')),
+                            types.identifier('import')
+                        ),
                         [types.stringLiteral(chunkIdToModuleUrl(chunkId))]
                     )
                 )
