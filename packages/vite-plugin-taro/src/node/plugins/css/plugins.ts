@@ -3,27 +3,27 @@ import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
 import type { VitePluginTaroTarget } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
 
-const wxStyleOptions = {
-    platform: 'weapp',
-    cssCalc: false,
-    autoprefixer: false,
-    rem2rpx: true,
-    px2rpx: true
-} as const
-
 /** Creates the target-aware Tailwind CSS plugins. */
 export function createCssPlugins(target: VitePluginTaroTarget): PluginOption[] {
     const wx = target === 'wx'
 
     return [
-        createTailwindCssResolver(),
+        // createTailwindCssResolver(),
         ...(WeappTailwindcss({
-            appType: wx ? 'weapp-vite' : 'taro',
-            rewriteCssImports: !wx,
+            appType: 'weapp-vite',
             generator: {
-                target: wx ? 'weapp' : 'web'
+                target: wx ? 'weapp' : 'web',
+                webCompat: {
+                    preset: 'legacy-web'
+                }
             },
-            cssOptions: wx ? wxStyleOptions : undefined,
+            cssOptions: {
+                cssCalc: false,
+                autoprefixer: !wx,
+                rem2rpx: true,
+                px2rpx: true
+            },
+
             logLevel: 'silent'
         }) ?? [])
     ]
