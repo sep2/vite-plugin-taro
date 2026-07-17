@@ -1,5 +1,5 @@
 import type { Rolldown } from 'vite'
-import { isNativeModule } from '../native/render-native-module.ts'
+import { isNativeModule } from '../native/is-native-module.ts'
 import { transportFileName } from './constant.ts'
 import { renderTransport } from './render-transport.ts'
 

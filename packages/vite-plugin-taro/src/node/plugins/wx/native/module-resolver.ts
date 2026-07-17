@@ -18,7 +18,7 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
         // Reuse bootstrap's identity loader instead of Vite's browser preload implementation.
         [vitePreloadId, () => bootstrapPath],
         // Keep the configured App component behind one stable private import in the App module.
-        [appComponentId, (_, projectRoot) => path.resolve(projectRoot, options.app)],
+        [appComponentId, (_importer, projectRoot) => path.resolve(projectRoot, options.app)],
         [
             pageModuleId,
             (importer, projectRoot) => {

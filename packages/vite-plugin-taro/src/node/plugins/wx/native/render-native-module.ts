@@ -3,14 +3,8 @@ import { type PluginObject, type PluginTarget, transformSync, types } from '@bab
 import transformModulesCommonjs from '@babel/plugin-transform-modules-commonjs'
 import type { Rolldown } from 'vite'
 import { chunkIdToModuleUrl } from '../transport/module-url.ts'
-import { bootstrapPath } from './constant.ts'
 
 const nativeRequirePlaceholder = '__VITE_PLUGIN_TARO_NATIVE_REQUIRE__'
-
-/** Tests whether a chunk executes through native CommonJS. */
-export function isNativeModule(chunk: Pick<Rolldown.RenderedChunk, 'isEntry' | 'modules'>): boolean {
-    return chunk.isEntry || bootstrapPath in chunk.modules
-}
 
 /** Renders a synchronous native module. */
 export function renderNativeModule(
