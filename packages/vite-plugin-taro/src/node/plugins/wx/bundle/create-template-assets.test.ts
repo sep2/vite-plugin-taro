@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
-import { CssPipeline } from '../../css/css-pipeline.ts'
 import { createTemplateAssets } from './create-template-assets.ts'
 
 const options: VitePluginTaroOptions = {
@@ -23,14 +22,13 @@ const options: VitePluginTaroOptions = {
     sitemapJson: {}
 }
 
-test('creates shared Taro templates and one native facade per Page', async () => {
-    const templateAssets = await createTemplateAssets({} as Rolldown.OutputBundle, options, new CssPipeline('wx'))
+test('creates shared Taro templates and one native facade per Page', () => {
+    const templateAssets = createTemplateAssets({} as Rolldown.OutputBundle, options)
     const assets = new Map(templateAssets.map((asset) => [asset.fileName, String(asset.source)]))
 
     assert.deepEqual(
         [...assets.keys()],
         [
-            'app.wxss',
             'base.wxml',
             'utils.wxs',
             'comp.wxml',
@@ -41,7 +39,6 @@ test('creates shared Taro templates and one native facade per Page', async () =>
             'pages/account/index.wxss'
         ]
     )
-    assert.equal(assets.get('app.wxss'), '')
     assert.ok(assets.get('base.wxml'))
     assert.ok(assets.get('utils.wxs'))
     assert.ok(assets.get('comp.wxml'))

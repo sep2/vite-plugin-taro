@@ -3,20 +3,18 @@ import type { PluginOption } from 'vite'
 import type { VitePluginTaroOptions } from '../options.ts'
 import { createClientTaroPlugin } from './plugins/client/client-taro.ts'
 import { createConditionalDirectivePlugin } from './plugins/conditional/conditional-directives.ts'
-import { CssPipeline } from './plugins/css/css-pipeline.ts'
+import { createCssPlugins } from './plugins/css/plugins.ts'
 import { createH5TargetPlugins } from './plugins/h5/plugins.ts'
 import { createWxTargetPlugins } from './plugins/wx/plugins.ts'
 
 /** Creates the Vite plugins for one Taro target. */
 export default function vitePluginTaro(options: VitePluginTaroOptions): PluginOption[] {
-    const cssPipeline = new CssPipeline(options.target)
-
     return [
         createConditionalDirectivePlugin(options.target),
         createClientTaroPlugin(),
-        ...cssPipeline.plugins,
+        ...createCssPlugins(options.target),
         ...react(),
-        ...(options.target === 'wx' ? createWxTargetPlugins(options, cssPipeline) : []),
+        ...(options.target === 'wx' ? createWxTargetPlugins(options) : []),
         ...(options.target === 'h5' ? createH5TargetPlugins(options) : [])
     ]
 }
