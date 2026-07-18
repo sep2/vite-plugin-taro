@@ -2,7 +2,6 @@ import type { Plugin } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { HmrServer } from './hmr-server.ts'
 import { rewriteReactRefresh } from './react-refresh.ts'
-import { injectDevRuntime } from './runtime/bootstrap.ts'
 import { createHmrSupportFiles } from './support.ts'
 
 /** Adds the serve-only bundled-development adapter for the wx target. */
@@ -33,7 +32,7 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
             // React's Vite plugin has already injected its browser-oriented Refresh wrapper at this point. Rewrite only
             // those generated runtime references; user-authored window access remains untouched.
             handler(code, id) {
-                return injectDevRuntime(code, id) ?? rewriteReactRefresh(code, id, false)
+                return rewriteReactRefresh(code, id, false)
             }
         },
 

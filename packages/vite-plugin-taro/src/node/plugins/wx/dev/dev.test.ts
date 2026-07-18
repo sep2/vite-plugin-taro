@@ -134,7 +134,8 @@ test('lets the DevEngine write the initial project and keeps HMR patch-only', as
         const devMode = rolldownOptions.experimental.devMode as Record<string, unknown>
         const outputOptions = rolldownOptions.output as OutputOptions
         assert.equal(devMode.lazy, false)
-        assert.equal(devMode.implement, '')
+        assert.match(String(devMode.implement), /global\.__rolldown_runtime__/)
+        assert.match(String(devMode.implement), /vite-plugin-taro-wx/)
         assert.equal(outputOptions.entryFileNames, '[name]')
         const chunkFileNames = outputOptions.chunkFileNames
         if (typeof chunkFileNames !== 'function') throw new Error('Expected development chunk filename function.')

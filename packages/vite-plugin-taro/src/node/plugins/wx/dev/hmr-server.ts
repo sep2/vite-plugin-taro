@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import colors from 'picocolors'
@@ -5,8 +6,8 @@ import type { InputOptions, OutputOptions } from 'rolldown'
 import { type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
+import { resolvePackageFile } from '../../../utils/packages.ts'
 import { SerializedTaskQueue } from '../../../utils/serialized-task-queue.ts'
-import { rolldownRuntimeBinding } from './runtime/bootstrap.ts'
 import { controlFileName, updateFileName } from './support.ts'
 
 type BundledDevRolldownOptions = InputOptions & {
@@ -107,6 +108,9 @@ export class HmrServer {
     private installRolldownOptions(): void {
         const getRolldownOptions = this.bundledDev.getRolldownOptions.bind(this.bundledDev)
 
+        const devRuntimePath = resolvePackageFile('dist/runtime/wx/dev/dev-runtime.js')
+        const devRuntimeSource = readFileSync(devRuntimePath, 'utf8')
+
         this.bundledDev.getRolldownOptions = async () => {
             const rolldownOptions = await getRolldownOptions()
             if (Array.isArray(rolldownOptions.output)) {
@@ -143,9 +147,9 @@ export class HmrServer {
                     ? rolldownOptions.experimental.devMode
                     : {}),
                 lazy: false,
-                // Suppress Rolldown's browser implementation. The post-ordered wx development plugin appends its host
-                // bootstrap directly to the generated runtime module after the built-in HMR transform defines DevRuntime.
-                implement: ''
+                // Rolldown appends this compiled host directly after its generated DevRuntime base class. Reading the
+                // normal package build output keeps TypeScript and runtime compilation outside the instrumented graph.
+                implement: devRuntimeSource
             }
 
             // Vite installs its native reporter only for the build command. Bundled serve uses the same Rolldown output
@@ -302,6 +306,10 @@ async function syncPublicDirFiles(event: string, sourcePath: string, destination
     await fs.mkdir(path.dirname(destinationPath), { recursive: true })
     await fs.copyFile(sourcePath, destinationPath)
 }
+
+// Rolldown's generated development modules reference this lexical binding. Native and SystemJS-rendered chunks cannot
+// import a browser HMR client, so every physical development chunk binds it to the one runtime installed on `global`.
+const rolldownRuntimeBinding = 'const __rolldown_runtime__ = global.__rolldown_runtime__;'
 
 /** Composes user banners with the wx runtime binding and native development dependencies. */
 function createDevelopmentBanner(
