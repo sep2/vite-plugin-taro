@@ -14,6 +14,6 @@ export function isTransportModule(chunk: ModuleChunk): boolean {
 }
 
 /** Tests whether a chunk executes through native CommonJS. */
-export function isNativeModule(chunk: Rolldown.RenderedChunk): boolean {
+export function isNativeModule(chunk: ModuleChunk): boolean {
     return chunk.isEntry || isBootstrapModule(chunk) || isTransportModule(chunk)
 }
