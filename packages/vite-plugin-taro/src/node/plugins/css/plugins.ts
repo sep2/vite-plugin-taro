@@ -1,10 +1,14 @@
+import path from 'node:path'
 import type { Plugin, PluginOption, Rolldown } from 'vite'
 import { createContext } from 'weapp-tailwindcss/core'
 import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
 import type { VitePluginTaroTarget } from '../../../options.ts'
+import { packageRequire } from '../../utils/packages.ts'
 
 // Keep the Vite plugin and the compatibility finalizer on identical WX conversion settings. A difference here can
 // make the second pass preserve browser units or apply a transformation that the first pass did not expect.
+const tailwindcssBasedir = path.dirname(packageRequire.resolve('tailwindcss/package.json'))
+
 const wxStyleOptions = {
     cssCalc: false,
     autoprefixer: false,
@@ -24,6 +28,9 @@ export function createCssPlugins(target: VitePluginTaroTarget): PluginOption[] {
             // by vite-plugin-taro. The web generator consumes the imports before that resolver runs, so H5 keeps the
             // upstream default.
             rewriteCssImports: wx,
+            // Tailwind is a plugin dependency, not an application dependency. Give weapp-tailwindcss the owning package
+            // directory explicitly so bundled development and strict package managers resolve split CSS imports equally.
+            tailwindcssBasedir,
             generator: {
                 target: wx ? 'weapp' : 'web'
                 // webCompat: {
