@@ -36,6 +36,14 @@ test('lets the DevEngine write the initial project and keeps HMR patch-only', as
         async unwatch() {}
     })
     // Stand in for the normal wx JSON/CSS output hooks while keeping the graph small enough for a focused DevEngine test.
+    const viteTransformPlugin = {
+        name: 'builtin:vite-transform',
+        _options: {
+            transformOptions: {
+                sourcemap: true
+            }
+        }
+    }
     const fixtureOutputPlugin: RolldownPlugin = {
         name: 'fixture-output',
         generateBundle() {
@@ -59,7 +67,7 @@ test('lets the DevEngine write the initial project and keeps HMR patch-only', as
                     dir: outDir,
                     entryFileNames: 'assets/[name].js'
                 } satisfies OutputOptions,
-                plugins: [plugin as RolldownPlugin, fixtureOutputPlugin],
+                plugins: [viteTransformPlugin as RolldownPlugin, plugin as RolldownPlugin, fixtureOutputPlugin],
                 experimental: {
                     devMode: {
                         lazy: true,
@@ -117,6 +125,7 @@ test('lets the DevEngine write the initial project and keeps HMR patch-only', as
     try {
         const developmentConfig = getDevelopmentConfig(plugin)
         assert.equal(developmentConfig.define, undefined)
+        assert.equal(developmentConfig.build?.sourcemap, false)
         assert.equal(developmentConfig.experimental?.bundledDev, true)
 
         installConfigureServer(plugin, server)
@@ -137,6 +146,7 @@ test('lets the DevEngine write the initial project and keeps HMR patch-only', as
         assert.equal(outputOptions.format, 'es')
         assert.equal(outputOptions.minify, true)
         assert.equal(outputOptions.sourcemap, false)
+        assert.equal(viteTransformPlugin._options.transformOptions.sourcemap, false)
 
         const banner = outputOptions.banner
         if (typeof banner !== 'function') throw new Error('Expected development banner function.')
@@ -182,6 +192,7 @@ test('lets the DevEngine write the initial project and keeps HMR patch-only', as
 
 function getDevelopmentConfig(plugin: Plugin): {
     define?: Record<string, string>
+    build?: { sourcemap?: boolean | 'inline' | 'hidden' }
     experimental?: { bundledDev?: boolean }
 } {
     const hook = plugin.config
