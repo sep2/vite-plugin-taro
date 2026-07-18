@@ -6,7 +6,7 @@ const pagePathPlaceholder = '__VITE_PLUGIN_TARO_PAGE_PATH__'
 const pageConfigPlaceholder = '__VITE_PLUGIN_TARO_PAGE_CONFIG__'
 
 /** Specializes the real Page module for one configured route. */
-export async function transformPageModule({
+export function transformPageModule({
     code,
     id,
     page
@@ -15,7 +15,7 @@ export async function transformPageModule({
     id: string
     page: VitePluginTaroPageOption
 }): Promise<AstTransformResult> {
-    return await replaceWithAst(code, id, {
+    return replaceWithAst(code, id, {
         [pagePathPlaceholder]: types.stringLiteral(page.path),
         [pageConfigPlaceholder]: types.valueToNode(page.config)
     })
