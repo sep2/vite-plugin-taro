@@ -5,7 +5,10 @@ import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
 import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
 import { getWxModuleKind } from '../module.ts'
 
-const transportSourcesPlaceholder = '__VITE_PLUGIN_TARO_TRANSPORT_SOURCES__'
+const transportPlaceholder = '__VITE_PLUGIN_TARO_TRANSPORT__'
+const moduleIdParameter = 'moduleId'
+const namespaceVariable = 'namespace'
+const exportBindingParameter = 'exportBinding'
 
 type TransportedChunk = {
     chunk: Rolldown.RenderedChunk
@@ -32,32 +35,45 @@ export async function materializeTransport({
     getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async'
 }): Promise<AstTransformResult> {
     // Babel constructs and safely serializes an expression shaped like:
-    // {
-    //     'vpt:/assets/app.js': ['capsule', () => require('./app.js')],
-    //     'vpt:/sub/p_account/page.js': ['capsule', () => require.async('../sub/p_account/page.js')],
-    //     'vpt:/assets/bootstrap.js': ['amphibious', () => require('./bootstrap.js')],
-    //     'vpt:/assets/rolldown-runtime.js': ['amphibious', () => require('./rolldown-runtime.js')]
+    // (moduleId) => {
+    //     let namespace
+    //     switch (moduleId) {
+    //         case 'vpt:/assets/app.js': return require('./app.js')
+    //         case 'vpt:/sub/p_account/page.js': return require.async('../sub/p_account/page.js')
+    //         case 'vpt:/assets/bootstrap.js':
+    //             namespace = require('./bootstrap.js')
+    //             break
+    //         default: throw new Error(`Unknown System module: ${moduleId}`)
+    //     }
+    //     return [[], (exportBinding) => ({ execute() { exportBinding(namespace) } })]
     // }
-    //
-    // The physical transport turns amphibious namespaces into registrations at runtime. Keeping that policy in the
-    // physical runtime avoids generating executable registration machinery in this render-time AST materializer.
-    return await replaceWithAst(code, transportChunk.fileName, {
-        [transportSourcesPlaceholder]: types.objectExpression(
-            getTransportedChunks(chunks)
-                .sort((left, right) => left.chunk.fileName.localeCompare(right.chunk.fileName))
-                .map(({ chunk, kind }) => {
-                    const loadMode = getLoadMode(chunk)
-                    if (kind === 'amphibious' && loadMode !== 'sync') {
-                        throw new Error(`Amphibious wx module must be in the main package: ${chunk.fileName}`)
-                    }
+    const cases = getTransportedChunks(chunks)
+        .sort((left, right) => left.chunk.fileName.localeCompare(right.chunk.fileName))
+        .map(({ chunk, kind }) => {
+            const loadMode = getLoadMode(chunk)
+            if (kind === 'amphibious' && loadMode !== 'sync') {
+                throw new Error(`Amphibious wx module must be in the main package: ${chunk.fileName}`)
+            }
 
-                    return createTransportSource({
-                        chunkId: chunk.fileName,
-                        transportFileName: transportChunk.fileName,
-                        loadMode,
-                        kind
-                    })
-                })
+            return createTransportCase({
+                chunkId: chunk.fileName,
+                transportFileName: transportChunk.fileName,
+                loadMode,
+                kind
+            })
+        })
+
+    return await replaceWithAst(code, transportChunk.fileName, {
+        [transportPlaceholder]: types.arrowFunctionExpression(
+            [types.identifier(moduleIdParameter)],
+            types.blockStatement([
+                types.variableDeclaration('let', [types.variableDeclarator(types.identifier(namespaceVariable))]),
+                types.switchStatement(types.identifier(moduleIdParameter), [
+                    ...cases,
+                    createUnknownModuleCase(moduleIdParameter)
+                ]),
+                types.returnStatement(createAmphibiousRegistrationExpression(namespaceVariable))
+            ])
         )
     })
 }
@@ -76,8 +92,8 @@ function getTransportedChunks(chunks: Readonly<Record<string, Rolldown.RenderedC
     return transportedChunks
 }
 
-/** Creates one URL-keyed source descriptor while keeping its native require argument literal. */
-function createTransportSource({
+/** Creates one URL-keyed switch case while keeping its native require argument literal. */
+function createTransportCase({
     chunkId,
     transportFileName,
     loadMode,
@@ -87,23 +103,59 @@ function createTransportSource({
     transportFileName: string
     loadMode: 'sync' | 'async'
     kind: 'capsule' | 'amphibious'
-}): ReturnType<typeof types.objectProperty> {
+}): ReturnType<typeof types.switchCase> {
     const requirePath = toNativeRequirePath(transportFileName, chunkId)
-
     const requireCallee =
         loadMode === 'sync'
             ? types.identifier('require')
             : types.memberExpression(types.identifier('require'), types.identifier('async'))
+    const registration = types.callExpression(requireCallee, [types.stringLiteral(requirePath)])
+    const statements =
+        kind === 'capsule'
+            ? [types.returnStatement(registration)]
+            : [
+                  types.expressionStatement(
+                      types.assignmentExpression('=', types.identifier(namespaceVariable), registration)
+                  ),
+                  types.breakStatement()
+              ]
 
-    const load = types.arrowFunctionExpression(
-        [],
-        types.callExpression(requireCallee, [types.stringLiteral(requirePath)])
-    )
+    return types.switchCase(types.stringLiteral(chunkIdToModuleUrl(chunkId)), statements)
+}
 
-    return types.objectProperty(
-        types.stringLiteral(chunkIdToModuleUrl(chunkId)),
-        types.arrayExpression([types.stringLiteral(kind), load])
-    )
+/** Creates a SystemJS registration that publishes one already-executed CommonJS namespace. */
+function createAmphibiousRegistrationExpression(namespace: string): ReturnType<typeof types.arrayExpression> {
+    return types.arrayExpression([
+        types.arrayExpression([]),
+        types.arrowFunctionExpression(
+            [types.identifier(exportBindingParameter)],
+            types.objectExpression([
+                types.objectMethod(
+                    'method',
+                    types.identifier('execute'),
+                    [],
+                    types.blockStatement([
+                        types.expressionStatement(
+                            types.callExpression(types.identifier(exportBindingParameter), [
+                                types.identifier(namespace)
+                            ])
+                        )
+                    ])
+                )
+            ])
+        )
+    ])
+}
+
+/** Rejects module IDs absent from the closed output graph. */
+function createUnknownModuleCase(moduleId: string): ReturnType<typeof types.switchCase> {
+    return types.switchCase(null, [
+        types.throwStatement(
+            types.newExpression(types.identifier('Error'), [
+                types.binaryExpression('+', types.stringLiteral('Unknown System module: '), types.identifier(moduleId))
+            ])
+        )
+    ])
 }
 
 /** Converts one preliminary output path to a literal require path relative to transport. */

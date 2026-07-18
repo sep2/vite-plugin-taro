@@ -94,11 +94,4 @@ if (!installedSystem) {
 
 // Transport returns synchronous registrations for main-package capsules and amphibious modules, and promise-like
 // registrations only for capsules that physically live in generated subpackages.
-/** Loads one amphibious module or capsule from materialized transport. */
-installedSystem.instantiate = (moduleId: string): System.Registration | PromiseLike<System.Registration> => {
-    const load = transport[moduleId]
-    if (!load) {
-        throw new Error(`Unknown System module: ${moduleId}`)
-    }
-    return load()
-}
+installedSystem.instantiate = transport

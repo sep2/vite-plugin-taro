@@ -554,17 +554,30 @@ linking, setter propagation, execution ordering, live exports, dynamic import, a
 The plugin generates a switch transport in which every native path is an AST string literal:
 
 ```js
-function loadInitialRegistration(id) {
-    switch (id) {
-        case 'entries/app.js':
-            return Promise.resolve(require('./capsules/app.js'));
+function transport(moduleId) {
+    let namespace;
+    switch (moduleId) {
+        case 'vpt:/assets/app.js':
+            return require('./assets/app.js');
 
-        case 'chunks/editor.js':
-            return require.async('../sub/p_a1b2/assets/abc123.js');
+        case 'vpt:/assets/bootstrap.js':
+            namespace = require('./assets/bootstrap.js');
+            break;
+
+        case 'vpt:/sub/p_a1b2/assets/abc123.js':
+            return require.async('./sub/p_a1b2/assets/abc123.js');
 
         default:
-            return Promise.reject(new Error(`Unknown System module: ${id}`));
+            throw new Error(`Unknown System module: ${moduleId}`);
     }
+    return [
+        [],
+        (exportBinding) => ({
+            execute() {
+                exportBinding(namespace);
+            }
+        })
+    ];
 }
 ```
 
@@ -597,9 +610,9 @@ wx output modules have exactly three execution-domain kinds:
 
 Bootstrap is always amphibious. When strict execution is enabled, Rolldown emits `\0rolldown/runtime.js`, which is amphibious as well. The
 renderer identifies both by source module ID rather than filename. Amphibious modules are synchronous main-package modules: transport
-stores a deferred literal `require()` closure, then creates a registration around the CommonJS-cached namespace only when SystemJS asks
-for it. Bootstrap can therefore import transport without an eager self-require cycle, and native shells and capsules share one initialized
-namespace without changing the default Rolldown policy.
+executes the matching literal `require()` switch case only when SystemJS asks for it, then creates a registration around the CommonJS-cached
+namespace. Bootstrap can therefore import transport without an eager self-require cycle, and native shells and capsules share one
+initialized namespace without changing the default Rolldown policy.
 
 ### Cross-package imports and cycles
 

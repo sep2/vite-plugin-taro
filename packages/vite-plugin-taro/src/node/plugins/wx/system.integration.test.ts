@@ -19,7 +19,7 @@ type SystemModule = Readonly<Record<string, unknown>>
 
 /** CommonJS exports of the generated transport runtime. */
 interface TransportExports {
-    transport: Readonly<Record<string, () => unknown>>
+    transport(moduleId: string): unknown
 }
 
 /** The SystemJS surface used by runtime tests. */
