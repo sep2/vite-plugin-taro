@@ -1,8 +1,8 @@
 import type { Plugin } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { HmrServer } from './hmr-server.ts'
-import { createWxDevelopmentFiles } from './output.ts'
 import { rewriteReactRefresh } from './react-refresh.ts'
+import { createWxDevelopmentFiles } from './support.ts'
 
 /** Adds the serve-only bundled-development adapter for the wx target. */
 export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugin {

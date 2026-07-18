@@ -4,8 +4,8 @@ import type { InputOptions, OutputOptions } from 'rolldown'
 import { type DevEngine, dev } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
-import { controlFileName, updateFileName } from './output.ts'
 import { SerializedTaskQueue } from './serialized-task-queue.ts'
+import { controlFileName, updateFileName } from './support.ts'
 
 // Rolldown's generated development modules reference this lexical binding. Native and SystemJS-rendered chunks cannot
 // import a browser HMR client, so every physical development chunk binds it to the one runtime installed on `global`.
