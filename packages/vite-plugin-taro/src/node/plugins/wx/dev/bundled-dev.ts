@@ -216,7 +216,9 @@ class WxBundledDevelopment {
                 if (current.phase === 'ready') {
                     this.registerBundleModules(outputModules)
                 } else {
-                    bundledModules = new Set([...bundledModules, ...outputModules])
+                    // A complete DevEngine callback contains every chunk, so its immutable module set replaces rather
+                    // than copies or merges the previous startup snapshot.
+                    bundledModules = outputModules
                 }
             }
 
