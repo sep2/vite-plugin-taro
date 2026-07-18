@@ -13,6 +13,8 @@ const reactRefreshHostProperties = new Set(['__getReactRefreshIgnoredExports', '
  * runtime-only extension points are redirected to a private module-local object. User-authored window access is untouched.
  */
 export function rewriteReactRefresh(code: string, id: string) {
+    // Query variants of Vite's virtual runtime share the same implementation. Ordinary modules are parsed only when the
+    // exact generated preamble error is present, keeping this post-transform cheap and avoiding broad window rewrites.
     const refreshRuntime = id.split('?', 1)[0] === reactRefreshRuntimeId
     const refreshBoundary = code.includes(reactRefreshPreambleError)
     if (!refreshRuntime && !refreshBoundary) return
@@ -26,6 +28,8 @@ function createReactRefreshRewritePlugin(refreshRuntime: boolean): PluginObject 
         visitor: {
             Program(programPath) {
                 if (!refreshRuntime) return
+                // This object is lexical to the refresh runtime module. Never alias or assign global/window: WeChat's
+                // window property is a read-only getter, and global Refresh hooks would leak across module boundaries.
                 programPath.unshiftContainer(
                     'body',
                     types.variableDeclaration('const', [
@@ -36,6 +40,8 @@ function createReactRefreshRewritePlugin(refreshRuntime: boolean): PluginObject 
 
             MemberExpression(memberPath) {
                 if (!refreshRuntime) return
+                // Redirect only the two extension properties authored by the known refresh runtime. The exact object and
+                // property checks intentionally leave every user-authored or future unrelated `window` access untouched.
                 const member = memberPath.node
                 if (
                     !types.isIdentifier(member.object, { name: 'window' }) ||
@@ -48,6 +54,8 @@ function createReactRefreshRewritePlugin(refreshRuntime: boolean): PluginObject 
             },
 
             IfStatement(ifPath) {
+                // Browser Vite installs $RefreshReg$ from an HTML preamble; wx modules already receive module-local
+                // instrumentation, so remove only the structurally exact generated guard and preserve all other checks.
                 if (isReactRefreshPreambleGuard(ifPath.node)) ifPath.remove()
             }
         }

@@ -4,7 +4,8 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import type { Plugin, Rolldown, ViteDevServer } from 'vite'
+import type { OutputOptions, Plugin as RolldownPlugin } from 'rolldown'
+import type { Plugin, ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { createWxDevelopmentPlugin } from './plugin.ts'
 
@@ -17,40 +18,48 @@ const options: VitePluginTaroOptions = {
     sitemapJson: {}
 }
 
-test('materializes initial and complete incremental DevEngine output', async () => {
+test('lets the DevEngine write the initial project and keeps HMR patch-only', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'vite-plugin-taro-wx-dev-'))
     const outDir = path.join(root, 'dist/wx')
     const publicDir = path.join(root, 'public')
+    const sourcePath = path.join(root, 'src/app.js')
+    await mkdir(path.dirname(sourcePath), { recursive: true })
     await mkdir(publicDir)
+    await writeFile(sourcePath, `export const message = 'initial'\n`)
     await writeFile(path.join(publicDir, 'public.txt'), 'public')
 
-    let triggerCount = 0
-    const nextOutput = createOutput(root, 'updated', 'assets/shared.js')
+    const plugin = createWxDevelopmentPlugin(options)
+    // The production adapter needs only Vite's shared watcher for public files. Rolldown creates and owns the independent
+    // source watcher inside the DevEngine, so this fixture never emits source events manually.
     const watcher = Object.assign(new EventEmitter(), {
         add() {},
         async unwatch() {}
     })
-
-    const engine = {
-        async ensureCurrentBuildFinish() {},
-        async ensureLatestBuildOutput() {
-            if (triggerCount > 0) bundledDevelopment.storeOutputFiles(nextOutput)
-        },
-        async getBundleState() {
-            return { lastBuildErrored: false }
-        },
-        triggerFullBuild() {
-            triggerCount++
+    // Stand in for the normal wx JSON/CSS output hooks while keeping the graph small enough for a focused DevEngine test.
+    const fixtureOutputPlugin: RolldownPlugin = {
+        name: 'fixture-output',
+        generateBundle() {
+            this.emitFile({ type: 'asset', fileName: 'app.wxss', source: 'styles' })
+            this.emitFile({ type: 'asset', fileName: 'app.json', source: '{}\n' })
         }
     }
-
+    // Model only the private Vite surface declared by hmr.ts. The original methods deliberately fail/return the
+    // opposite result so the assertions prove that configureServer replaced them.
     const bundledDevelopment = {
-        _devEngine: engine,
+        _devEngine: undefined as
+            | {
+                  close(): Promise<void>
+                  getBundleState(): Promise<{ hasStaleOutput: boolean }>
+              }
+            | undefined,
         async getRolldownOptions() {
             return {
+                input: { 'app.js': sourcePath },
                 output: {
+                    dir: outDir,
                     entryFileNames: 'assets/[name].js'
-                },
+                } satisfies OutputOptions,
+                plugins: [plugin as RolldownPlugin, fixtureOutputPlugin],
                 experimental: {
                     devMode: {
                         lazy: true,
@@ -59,10 +68,11 @@ test('materializes initial and complete incremental DevEngine output', async () 
                 }
             }
         },
-        handleHmrOutput(_client?: unknown, _files?: string[], _update?: { type: string }) {},
-        storeOutputFiles(_output: Array<Rolldown.OutputAsset | Rolldown.OutputChunk>) {},
         async listen() {
-            bundledDevelopment.storeOutputFiles(createInitialOutput(root))
+            throw new Error('Vite listen must be replaced by the wx development adapter.')
+        },
+        async triggerBundleRegenerationIfStale() {
+            return true
         }
     }
 
@@ -98,8 +108,6 @@ test('materializes initial and complete incremental DevEngine output', async () 
         watcher
     } as unknown as ViteDevServer
 
-    const plugin = createWxDevelopmentPlugin(options)
-
     try {
         const developmentConfig = getDevelopmentConfig(plugin)
         assert.equal(developmentConfig.define, undefined)
@@ -109,7 +117,7 @@ test('materializes initial and complete incremental DevEngine output', async () 
 
         const rolldownOptions = await bundledDevelopment.getRolldownOptions()
         const devMode = rolldownOptions.experimental.devMode as Record<string, unknown>
-        const outputOptions = rolldownOptions.output as Record<string, unknown>
+        const outputOptions = rolldownOptions.output as OutputOptions
         assert.equal(devMode.lazy, false)
         assert.notEqual(devMode.implement, 'browser runtime')
         assert.doesNotMatch(String(devMode.implement), /\$Refresh(?:Reg|Sig)\$/)
@@ -118,83 +126,51 @@ test('materializes initial and complete incremental DevEngine output', async () 
         assert.equal(outputOptions.entryFileNames, '[name]')
         const chunkFileNames = outputOptions.chunkFileNames
         if (typeof chunkFileNames !== 'function') throw new Error('Expected development chunk filename function.')
-        assert.equal(chunkFileNames({}), 'sub/p_test/assets/[name].js')
+        assert.equal(chunkFileNames({} as never), 'sub/p_test/assets/[name].js')
         assert.equal(outputOptions.assetFileNames, 'assets/[name][extname]')
         assert.equal(outputOptions.format, 'es')
 
         const banner = outputOptions.banner
         if (typeof banner !== 'function') throw new Error('Expected development banner function.')
         assert.equal(
-            await banner({ fileName: 'app.js' }),
+            await banner({ fileName: 'app.js' } as never),
             'const __rolldown_runtime__ = global.__rolldown_runtime__;\nrequire("./vpt-hmr/control.js");'
         )
         assert.equal(
-            await banner({ fileName: 'pages/home/index.js' }),
+            await banner({ fileName: 'pages/home/index.js' } as never),
             'const __rolldown_runtime__ = global.__rolldown_runtime__;\nrequire("../../vpt-hmr/update.js");'
         )
 
+        // The replacement listen() does not return until Rolldown's initial incremental_write() has physically finished.
         await bundledDevelopment.listen()
 
-        const initialControl = await readFile(path.join(outDir, 'vpt-hmr/control.js'), 'utf8')
-        assert.equal(await readFile(path.join(outDir, 'app.js'), 'utf8'), 'initial')
+        const initialApp = await readFile(path.join(outDir, 'app.js'), 'utf8')
+        assert.match(initialApp, /initial/)
         assert.equal(await readFile(path.join(outDir, 'app.wxss'), 'utf8'), 'styles')
         assert.equal(await readFile(path.join(outDir, 'app.json'), 'utf8'), '{}\n')
         assert.equal(await readFile(path.join(outDir, 'public.txt'), 'utf8'), 'public')
+        assert.match(await readFile(path.join(outDir, 'vpt-hmr/control.js'), 'utf8'), /buildId/)
+        assert.equal(await readFile(path.join(outDir, 'vpt-hmr/update.js'), 'utf8'), 'module.exports = undefined;\n')
+        assert.equal(await bundledDevelopment.triggerBundleRegenerationIfStale(), false)
+
+        // rebuildStrategy:'never' must make a normal watcher change patch-only. A stale bundle proves the HMR task ran;
+        // byte-identical app.js proves skipWrite:false did not turn that task into a physical incremental rebuild.
+        await writeFile(sourcePath, `export const message = 'updated'\n`)
+        await waitFor(async () => Boolean((await bundledDevelopment._devEngine?.getBundleState())?.hasStaleOutput))
+        assert.equal(await readFile(path.join(outDir, 'app.js'), 'utf8'), initialApp)
 
         await writeFile(path.join(publicDir, 'public.txt'), 'changed public')
         watcher.emit('all', 'change', path.join(publicDir, 'public.txt'))
         await waitFor(async () => (await readFile(path.join(outDir, 'public.txt'), 'utf8')) === 'changed public')
 
-        watcher.emit('all', 'change', path.join(root, 'src/app.ts'))
-        await waitFor(async () => (await readFile(path.join(outDir, 'app.js'), 'utf8')) === 'updated')
-
-        assert.equal(triggerCount, 1)
-        assert.equal(await readFile(path.join(outDir, 'app.wxss'), 'utf8'), 'styles')
-        assert.equal(await readFile(path.join(outDir, 'app.json'), 'utf8'), '{}\n')
-        assert.equal(await readFile(path.join(outDir, 'assets/shared.js'), 'utf8'), 'new')
-        assert.notEqual(await readFile(path.join(outDir, 'vpt-hmr/control.js'), 'utf8'), initialControl)
         assert.deepEqual(loggerErrors, [])
     } finally {
+        // Detach the adapter first, then emulate Vite's ownership of `_devEngine` by closing it separately.
         await closePlugin(plugin)
+        await bundledDevelopment._devEngine?.close()
         await rm(root, { recursive: true, force: true })
     }
 })
-
-function createInitialOutput(root: string): Array<Rolldown.OutputAsset | Rolldown.OutputChunk> {
-    return [
-        createChunk('app.js', 'initial', [path.join(root, 'src/app.ts')]),
-        createChunk('assets/shared.js', 'old'),
-        createAsset('app.wxss', 'styles'),
-        createAsset('app.json', '{}\n')
-    ]
-}
-
-function createOutput(
-    root: string,
-    appCode: string,
-    chunkFileName: string
-): Array<Rolldown.OutputAsset | Rolldown.OutputChunk> {
-    return [createChunk('app.js', appCode, [path.join(root, 'src/app.ts')]), createChunk(chunkFileName, 'new')]
-}
-
-function createChunk(fileName: string, code: string, moduleIds: string[] = []): Rolldown.OutputChunk {
-    return {
-        type: 'chunk',
-        fileName,
-        code,
-        moduleIds
-    } as Rolldown.OutputChunk
-}
-
-function createAsset(fileName: string, source: string): Rolldown.OutputAsset {
-    return {
-        type: 'asset',
-        fileName,
-        source,
-        names: [],
-        originalFileNames: []
-    } as unknown as Rolldown.OutputAsset
-}
 
 function getDevelopmentConfig(plugin: Plugin): {
     define?: Record<string, string>
@@ -227,5 +203,5 @@ async function waitFor(predicate: () => Promise<boolean>): Promise<void> {
         if (await predicate()) return
         await new Promise((resolve) => setTimeout(resolve, 10))
     }
-    throw new Error('Timed out waiting for wx development rematerialization.')
+    throw new Error('Timed out waiting for wx development output.')
 }
