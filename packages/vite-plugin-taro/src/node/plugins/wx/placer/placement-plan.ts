@@ -296,9 +296,9 @@ function createPackedPackage(bin: PackageBin): PackedPackage {
     }
 }
 
-/** Derives the native package alias from its generated physical root. */
-export function getSubpackageName(location: SubpackageLocation): string {
-    return `dynamic-${location.root.slice(generatedPackageRootPrefix.length)}`
+/** Uses the generated root directory itself as the native package alias. */
+export function getSubpackageName(root: string): string {
+    return root.slice(root.lastIndexOf('/') + 1)
 }
 
 /** Tests the plugin-owned output prefix that physically identifies every generated package. */

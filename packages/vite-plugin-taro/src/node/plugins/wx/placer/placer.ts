@@ -69,7 +69,6 @@ export function createPlacer() {
          *
          * name()                              assigns lazy-a and lazy-b to their planned package groups
          * includeDependenciesRecursively      false: does not pull lazy-b back into package A
-         * strictExecutionOrder                preserves the original lazy-a → lazy-b side-effect order
          * preserveEntrySignatures             allows cross-chunk bindings without weakening native entry exports
          *
          * package A capsule
@@ -92,7 +91,7 @@ export function createPlacer() {
                         {
                             name(moduleId: string): string | null {
                                 const location = plan.get(moduleId)
-                                return location?.kind === 'subpackage' ? getSubpackageName(location) : null
+                                return location?.kind === 'subpackage' ? getSubpackageName(location.root) : null
                             },
                             // Do not let Rolldown pull a group's static closure into the same chunk. Lazy static edges may
                             // cross physical packages because transport obtains registrations asynchronously before
@@ -101,10 +100,9 @@ export function createPlacer() {
                         }
                     ]
                 },
-                // The placer deliberately leaves static dependencies in their own package groups. Preserve original
-                // side-effect order while Rolldown turns cross-group edges into chunk imports; SystemJS can only link
-                // asynchronously after Rolldown has produced a correct ordered graph.
-                strictExecutionOrder: true,
+                // strictExecutionOrder deliberately has no plugin default. When an application enables it through normal
+                // Rolldown output options, the generated helper runtime is rendered as native CommonJS and bridged into
+                // SystemJS by transport so both output domains consume one initialized namespace.
                 /** Preserves exact native entries while allowing transport to participate in content hashing. */
                 entryFileNames(chunk: Rolldown.PreRenderedChunk): string {
                     return isTransportModule(chunk) ? 'assets/[name]-[hash].js' : '[name]'
@@ -115,7 +113,9 @@ export function createPlacer() {
                     if (location.kind === 'main') {
                         return 'assets/[name]-[hash].js'
                     }
-                    return `${location.root}/assets/[name]-[hash].js`
+                    // The containing package already supplies a stable identity. Do not leak the Rolldown group name into
+                    // every physical chunk filename; content identity alone is sufficient inside that package root.
+                    return `${location.root}/assets/[hash].js`
                 },
                 /** Keeps the one global stylesheet exact and places all other assets in main-package assets. */
                 assetFileNames(asset: Rolldown.PreRenderedAsset): string {
@@ -157,7 +157,7 @@ export function createPlacer() {
             }
 
             return [...emittedPackageRoots].sort().map((root) => ({
-                name: getSubpackageName({ kind: 'subpackage', root }),
+                name: getSubpackageName(root),
                 root,
                 pages: []
             }))
