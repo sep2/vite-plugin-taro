@@ -29,8 +29,8 @@ const source = `const config = __VITE_PLUGIN_TARO_H5_APP_CONFIG__
 config.routes = __VITE_PLUGIN_TARO_H5_ROUTES__
 `
 
-test('specializes the physical H5 App configuration and routes', () => {
-    const result = transformH5App({
+test('specializes the physical H5 App configuration and routes', async () => {
+    const result = await transformH5App({
         code: source,
         id,
         options,
@@ -46,8 +46,8 @@ test('specializes the physical H5 App configuration and routes', () => {
     assert.equal(result.map.sources?.[0], id)
 })
 
-test('rejects an H5 App missing its specialization placeholders', () => {
-    assert.throws(
+test('rejects an H5 App missing its specialization placeholders', async () => {
+    await assert.rejects(
         () =>
             transformH5App({
                 code: 'export default {}',
@@ -55,6 +55,6 @@ test('rejects an H5 App missing its specialization placeholders', () => {
                 options,
                 projectRoot: '/project'
             }),
-        /Expected one config and routes placeholder/
+        /Expected one placeholder __VITE_PLUGIN_TARO_H5_APP_CONFIG__, found 0/
     )
 })
