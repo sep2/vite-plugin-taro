@@ -119,7 +119,7 @@ export class HmrServer {
         // shared chunks must not receive it because only native Page evaluation is observable by WeChat DevTools.
         this.pageFiles = new Set(options.pages.map((page) => `${page.path}.js`))
 
-        // Seed the queue with mandatory output preparation. Its rejection remains on the queue tail, so listen() fails
+        // Seed the queue with mandatory output preparation. Its rejection remains on the queue tail, so listen() fails,
         // and no DevEngine starts when the initial cleanup or public-directory copy is unsuccessful.
         this.fileTasks.enqueue(() =>
             initializePublicDirOutput({
@@ -205,6 +205,7 @@ export class HmrServer {
 
         this.bundledDev.listen = async () => {
             await this.fileTasks.waitForIdle()
+
             const rolldownOptions = await this.bundledDev.getRolldownOptions()
             const outputOptions = rolldownOptions.output
             if (!outputOptions || Array.isArray(outputOptions)) {
@@ -214,6 +215,7 @@ export class HmrServer {
             // ensureCurrentBuildFinish() can resolve before the JavaScript onOutput callback has run. Use the callback as
             // the startup barrier because incremental_write() has completed its physical writes before invoking it.
             const initialOutput = Promise.withResolvers<void>()
+
             const engine = await dev(rolldownOptions, outputOptions, {
                 // Ordinary watcher changes become Hmr tasks, not HmrRebuild tasks. Consequently they compute patches but
                 // never enter incremental_write(). Recovery/full-build operations remain able to write intentionally.
@@ -240,10 +242,12 @@ export class HmrServer {
 
             // Publish the engine before run() so Vite's close lifecycle and future private callers see the same instance.
             this.bundledDev._devEngine = engine
+
             void engine.run().catch((error: unknown) => {
                 this.reportError('DevEngine', error)
                 initialOutput.reject(error)
             })
+
             await initialOutput.promise
         }
     }
