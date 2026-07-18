@@ -1,5 +1,4 @@
 import { type PluginObject, types } from '@babel/core'
-import type { Plugin } from 'vite'
 import { transformWithBabel } from '../../../utils/transform.ts'
 
 const reactRefreshRuntimeId = '/@react-refresh'
@@ -7,28 +6,13 @@ const reactRefreshPreambleError = "@vitejs/plugin-react can't detect preamble. S
 const reactRefreshHost = '__vptReactRefreshHost'
 const reactRefreshHostProperties = new Set(['__getReactRefreshIgnoredExports', '__registerBeforePerformReactRefresh'])
 
-/** Removes React Refresh's browser HTML-preamble contract without changing application globals. */
-export function createWxReactRefreshPlugin(): Plugin {
-    return {
-        name: 'vite-plugin-taro:wx-react-refresh',
-        apply: 'serve',
-
-        transform: {
-            order: 'post',
-            handler(code, id) {
-                return rewriteReactRefresh(code, id)
-            }
-        }
-    }
-}
-
 /**
  * The React transform already emits module-local registration and signature functions. Its only remaining browser
  * assumptions are a guard that checks `window.$RefreshReg$` and two optional extension points stored on `window` by the
  * refresh runtime. wx has no HTML preamble and its global `window` property is read-only, so the guard is removed and the
  * runtime-only extension points are redirected to a private module-local object. User-authored window access is untouched.
  */
-function rewriteReactRefresh(code: string, id: string) {
+export function rewriteReactRefresh(code: string, id: string) {
     const refreshRuntime = id.split('?', 1)[0] === reactRefreshRuntimeId
     const refreshBoundary = code.includes(reactRefreshPreambleError)
     if (!refreshRuntime && !refreshBoundary) return

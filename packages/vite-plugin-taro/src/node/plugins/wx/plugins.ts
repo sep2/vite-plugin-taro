@@ -3,7 +3,6 @@ import type { VitePluginTaroOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { createWxDevelopmentPlugin } from './dev/dev.ts'
-import { createWxReactRefreshPlugin } from './dev/react-refresh.ts'
 import { getWxModuleKind, isTransportModule } from './module.ts'
 import { createOutputFiles } from './output/files.ts'
 import { createPlacer } from './placement/placer.ts'
@@ -14,7 +13,7 @@ import { createResolver } from './resolve/resolver.ts'
 
 /** Creates the complete plugin set for the wx target. */
 export function createWxTargetPlugins(options: VitePluginTaroOptions): PluginOption[] {
-    return [createWxPlugin(options), createWxReactRefreshPlugin(), createWxDevelopmentPlugin(options)]
+    return [createWxPlugin(options), createWxDevelopmentPlugin(options)]
 }
 
 /** Configures the complete wx target build pipeline. */
