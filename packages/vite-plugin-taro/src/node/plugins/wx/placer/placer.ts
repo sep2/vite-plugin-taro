@@ -1,18 +1,14 @@
 import type { Rolldown } from 'vite'
-import { isTransportModule } from '../native/is-native-module.ts'
+import { type AbstractChunk, isNativeModule, isTransportModule } from '../native/is-native-module.ts'
 
 export type PackageLocation = { kind: 'main' } | { kind: 'subpackage'; root: string }
 export type LoadMode = 'sync' | 'async'
 export type ModuleKind = 'eager' | 'lazy'
+type ChunkEligibility = 'main-required' | 'subpackage-eligible'
 
-type ChunkInfo = Pick<Rolldown.PreRenderedChunk, 'moduleIds'>
 type Graph = {
     moduleIds: Iterable<string>
     getModuleInfo(moduleId: string): Rolldown.ModuleInfo | null
-}
-type PendingModule = {
-    moduleId: string
-    crossedDynamicBoundary: boolean
 }
 
 const mainPackage: PackageLocation = { kind: 'main' }
@@ -43,15 +39,44 @@ export function createPlacer() {
         },
 
         /** Returns the physical package selected for one chunk. */
-        locateChunk(_chunk: ChunkInfo): PackageLocation {
+        locateChunk(chunk: AbstractChunk): PackageLocation {
+            const eligibility = getChunkEligibility(moduleKinds, chunk)
+            if (eligibility === 'main-required') {
+                return mainPackage
+            }
+
+            // Eligible chunks remain in main until generated code-only packages are introduced.
             return mainPackage
         },
 
         /** Main transport can synchronously load every chunk in the initial placement. */
-        getLoadMode(_chunk: ChunkInfo): LoadMode {
+        getLoadMode(_chunk: AbstractChunk): LoadMode {
             return 'sync'
         }
     }
+}
+
+/** Derives physical-placement eligibility from every module Rolldown included in one chunk. */
+function getChunkEligibility(moduleKinds: Map<string, ModuleKind>, chunk: AbstractChunk): ChunkEligibility {
+    if (isNativeModule(chunk) || chunk.moduleIds.length === 0) {
+        return 'main-required'
+    }
+
+    for (const moduleId of chunk.moduleIds) {
+        const moduleKind = moduleKinds.get(moduleId)
+        if (!moduleKind) {
+            throw new Error(`Unclassified WX module: ${moduleId}`)
+        }
+        if (moduleKind === 'eager') {
+            return 'main-required'
+        }
+    }
+    return 'subpackage-eligible'
+}
+
+type PendingModule = {
+    moduleId: string
+    crossedDynamicBoundary: boolean
 }
 
 /** Classifies static entry closures as eager and dynamic-only closures as lazy. */

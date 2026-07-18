@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
-import { transportPath } from '../native/constant.ts'
+import { bootstrapPath, transportPath } from '../native/constant.ts'
 import { createPlacer } from './placer.ts'
 
 function chunk(...moduleIds: string[]): Rolldown.PreRenderedChunk {
@@ -63,9 +63,31 @@ test('classifies cycles reached after a dynamic boundary as lazy', () => {
     assert.equal(placer.getModuleKind('/cycle-b'), 'lazy')
 })
 
+test('keeps required and eligible chunks in the initial main placement', () => {
+    const placer = createPlacer()
+    analyze(placer, {
+        '/entry': { isEntry: true, imports: ['/eager'], dynamicImports: ['/lazy'] },
+        '/eager': {},
+        '/lazy': { imports: ['/lazy-dependency'] },
+        '/lazy-dependency': {}
+    })
+
+    assert.deepEqual(placer.locateChunk(chunk('/lazy', '/lazy-dependency')), { kind: 'main' })
+    assert.deepEqual(placer.locateChunk(chunk('/eager', '/lazy')), { kind: 'main' })
+    assert.deepEqual(placer.locateChunk({ ...chunk('/native-entry'), isEntry: true } as Rolldown.PreRenderedChunk), {
+        kind: 'main'
+    })
+    assert.deepEqual(placer.locateChunk(chunk()), { kind: 'main' })
+    assert.deepEqual(placer.locateChunk(chunk(bootstrapPath)), { kind: 'main' })
+    assert.throws(() => placer.locateChunk(chunk('/unknown')), /Unclassified WX module: \/unknown/)
+})
+
 test('places the initial WX chunk graph in the main package', () => {
     const placer = createPlacer()
     const applicationChunk = chunk('/application')
+    analyze(placer, {
+        '/application': { isEntry: true }
+    })
 
     assert.deepEqual(placer.locateChunk(applicationChunk), { kind: 'main' })
     assert.equal(placer.getLoadMode(applicationChunk), 'sync')
