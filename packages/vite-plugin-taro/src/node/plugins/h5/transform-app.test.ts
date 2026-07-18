@@ -43,6 +43,7 @@ test('specializes the physical H5 App configuration and routes', async () => {
     assert.match(result.code, /path: ["']pages\/home\/index["']/)
     assert.match(result.code, /navigationBarTitleText: ["']Home["']/)
     assert.match(result.code, /import\(["']\/@fs\/\/project\/src\/pages\/home\/index\.tsx["']\)/)
+    assert.ok(result.map)
     assert.equal(result.map.sources?.[0], id)
 })
 

@@ -12,24 +12,31 @@ export async function transformH5App({
     code,
     id,
     options,
-    projectRoot
+    projectRoot,
+    sourcemap = true
 }: {
     code: string
     id: string
     options: VitePluginTaroOptions
     projectRoot: string
+    sourcemap?: boolean
 }): Promise<AstTransformResult> {
-    const transformed = await replaceWithAst(code, id, {
-        [appConfigPlaceholder]: types.valueToNode({
-            router: {},
-            ...createAppConfig(options)
-        }),
-        [routesPlaceholder]: types.arrayExpression(
-            options.pages.map((page) => {
-                return createRoute({ page, projectRoot })
-            })
-        )
-    })
+    const transformed = await replaceWithAst(
+        code,
+        id,
+        {
+            [appConfigPlaceholder]: types.valueToNode({
+                router: {},
+                ...createAppConfig(options)
+            }),
+            [routesPlaceholder]: types.arrayExpression(
+                options.pages.map((page) => {
+                    return createRoute({ page, projectRoot })
+                })
+            )
+        },
+        sourcemap
+    )
 
     return { code: transformed.code, map: transformed.map }
 }

@@ -13,14 +13,19 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
             }
         },
 
-        transform({ code, id, projectRoot }: { code: string; id: string; projectRoot: string }) {
+        transform({
+            code,
+            id,
+            projectRoot,
+            sourcemap = true
+        }: {
+            code: string
+            id: string
+            projectRoot: string
+            sourcemap?: boolean
+        }) {
             if (normalizeModuleId(id) === normalizeModuleId(h5AppPath)) {
-                return transformH5App({
-                    code,
-                    id,
-                    options,
-                    projectRoot
-                })
+                return transformH5App({ code, id, options, projectRoot, sourcemap })
             }
         }
     }
