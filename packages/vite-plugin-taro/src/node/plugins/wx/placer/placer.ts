@@ -31,7 +31,7 @@ export type GeneratedSubpackage = {
  */
 export function createPlacer() {
     // Filename and output callbacks run after analyze and read this immutable plan through their shared closure.
-    let packageByModule: PlacementPlan = new Map()
+    let plan: PlacementPlan = new Map()
 
     /**
      * Reduces module ownership to one package for filename generation. Unknown Rolldown-generated modules default to
@@ -40,7 +40,7 @@ export function createPlacer() {
     function getChunkPackageForNaming(chunk: Rolldown.PreRenderedChunk): PackageLocation {
         let location: PackageLocation | undefined
         for (const moduleId of chunk.moduleIds) {
-            const moduleLocation = packageByModule.get(moduleId) ?? mainPackage
+            const moduleLocation = plan.get(moduleId) ?? mainPackage
             if (!location) {
                 location = moduleLocation
                 continue
@@ -55,7 +55,7 @@ export function createPlacer() {
     return {
         /** Assigns every transformed module to main or one generated, size-bounded package. */
         analyze(graph: ModuleGraph): void {
-            packageByModule = createPlacementPlan(graph)
+            plan = createPlacementPlan(graph)
         },
 
         /**
@@ -91,7 +91,7 @@ export function createPlacer() {
                     groups: [
                         {
                             name(moduleId: string): string | null {
-                                const location = packageByModule.get(moduleId)
+                                const location = plan.get(moduleId)
                                 return location?.kind === 'subpackage' ? getSubpackageName(location) : null
                             },
                             // Do not let Rolldown pull a group's static closure into the same chunk. Lazy static edges may
@@ -149,7 +149,7 @@ export function createPlacer() {
                     continue
                 }
                 for (const moduleId of output.moduleIds) {
-                    const location = packageByModule.get(moduleId)
+                    const location = plan.get(moduleId)
                     if (location?.kind === 'subpackage') {
                         emittedPackageRoots.add(location.root)
                     }

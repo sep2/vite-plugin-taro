@@ -301,12 +301,7 @@ export function getSubpackageName(location: SubpackageLocation): string {
     return `dynamic-${location.root.slice(generatedPackageRootPrefix.length)}`
 }
 
-/** Tests whether a rendered file physically belongs to one generated package. */
+/** Tests the plugin-owned output prefix that physically identifies every generated package. */
 export function isGeneratedSubpackageFile(fileName: string): boolean {
-    const hashStart = generatedPackageRootPrefix.length
-    return (
-        fileName.startsWith(generatedPackageRootPrefix) &&
-        /^[a-f0-9]{8}$/.test(fileName.slice(hashStart, hashStart + 8)) &&
-        fileName[hashStart + 8] === '/'
-    )
+    return fileName.startsWith(generatedPackageRootPrefix)
 }
