@@ -6,11 +6,13 @@ test('keeps React Refresh extension state private to its runtime module', async 
     const transformed = rewriteReactRefresh(
         `window.__registerBeforePerformReactRefresh = (callback) => callback()
 const ignored = window.__getReactRefreshIgnoredExports?.({ id: 'test' }) ?? []`,
-        '/@react-refresh'
+        '/@react-refresh',
+        false
     )
     if (!transformed) throw new Error('Expected the React Refresh runtime to be rewritten.')
     const result = transformed.code
 
+    assert.equal(transformed.map, null)
     assert.match(result, /const __vptReactRefreshHost=\{\}/)
     assert.doesNotMatch(result, /window\.__registerBeforePerformReactRefresh/)
     assert.doesNotMatch(result, /window\.__getReactRefreshIgnoredExports/)

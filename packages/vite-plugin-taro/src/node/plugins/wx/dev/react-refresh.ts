@@ -12,14 +12,17 @@ const reactRefreshHostProperties = new Set(['__getReactRefreshIgnoredExports', '
  * refresh runtime. wx has neither an HTML preamble nor a browser `window`, so the guard is removed and the
  * runtime-only extension points are redirected to a private module-local object. User-authored window access is untouched.
  */
-export function rewriteReactRefresh(code: string, id: string) {
+export function rewriteReactRefresh(code: string, id: string, sourcemap = true) {
     // Query variants of Vite's virtual runtime share the same implementation. Ordinary modules are parsed only when the
     // exact generated preamble error is present, keeping this post-transform cheap and avoiding broad window rewrites.
     const refreshRuntime = id.split('?', 1)[0] === reactRefreshRuntimeId
     const refreshBoundary = code.includes(reactRefreshPreambleError)
-    if (!refreshRuntime && !refreshBoundary) return
 
-    return transformWithBabel(code, id, [() => createReactRefreshRewritePlugin(refreshRuntime)])
+    if (!refreshRuntime && !refreshBoundary) {
+        return
+    }
+
+    return transformWithBabel(code, id, [() => createReactRefreshRewritePlugin(refreshRuntime)], sourcemap)
 }
 
 function createReactRefreshRewritePlugin(refreshRuntime: boolean): PluginObject {
