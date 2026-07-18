@@ -1,7 +1,7 @@
 // Ensure the asynchronous App module initializes Current.app before this Page can mount.
 import './app-module.ts'
 
-// @ts-expect-error: The WX build replaces this private import with the configured Page component.
+// @ts-expect-error: The wx build replaces this private import with the configured Page component.
 import PageComponent from '\0vpt:page-component'
 import { createPageConfig } from './taro-runtime.ts'
 
