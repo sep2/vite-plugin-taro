@@ -80,32 +80,36 @@ async function materializeTestTransport(capsuleChunkIds: readonly string[]): Pro
     const transportChunk = {
         fileName: transportFileName,
         isEntry: true,
+        moduleIds: [transportPath],
         modules: {
             [transportPath]: {}
         }
     } as Rolldown.RenderedChunk
-    const chunks: Rolldown.RenderedChunk[] = [
-        {
+    const chunks: Record<string, Rolldown.RenderedChunk> = {
+        'assets/bootstrap.js': {
             fileName: 'assets/bootstrap.js',
             isEntry: false,
+            moduleIds: [bootstrapPath],
             modules: {
                 [bootstrapPath]: {}
             }
         } as Rolldown.RenderedChunk,
-        transportChunk,
-        ...capsuleChunkIds.map((chunkId) => {
-            return {
-                fileName: chunkId,
-                isEntry: false,
-                modules: {}
-            } as Rolldown.RenderedChunk
-        })
-    ]
+        [transportFileName]: transportChunk
+    }
+    capsuleChunkIds.forEach((chunkId) => {
+        chunks[chunkId] = {
+            fileName: chunkId,
+            isEntry: false,
+            moduleIds: [chunkId],
+            modules: {}
+        } as Rolldown.RenderedChunk
+    })
 
     const materialized = await materializeTransport({
         code: transportCode,
         transportChunk,
-        chunks
+        chunks,
+        getLoadMode: () => 'sync'
     })
     return materialized.code
 }

@@ -1,14 +1,16 @@
 import type { Rolldown } from 'vite'
 import { bootstrapPath, transportPath } from './constant.ts'
 
+type ModuleChunk = Rolldown.PreRenderedChunk | Rolldown.RenderedChunk
+
 /** Tests whether a chunk contains the shared native bootstrap. */
-export function isBootstrapModule(chunk: Rolldown.RenderedChunk): boolean {
-    return bootstrapPath in chunk.modules
+export function isBootstrapModule(chunk: ModuleChunk): boolean {
+    return chunk.moduleIds.includes(bootstrapPath)
 }
 
 /** Tests whether a chunk contains the transport implementation. */
-export function isTransportModule(chunk: Rolldown.RenderedChunk): boolean {
-    return transportPath in chunk.modules
+export function isTransportModule(chunk: ModuleChunk): boolean {
+    return chunk.moduleIds.includes(transportPath)
 }
 
 /** Tests whether a chunk executes through native CommonJS. */

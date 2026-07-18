@@ -1,8 +1,8 @@
 import path from 'node:path'
 import { types } from '@babel/core'
-import generate from '@babel/generator'
 import { type Rolldown, transformWithOxc } from 'vite'
 import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
+import { ast2str, requireOnePlaceholder } from '../../utils/babel.ts'
 import { isBootstrapModule, isNativeModule } from '../native/is-native-module.ts'
 
 const bootstrapModuleUrlPlaceholder = '__VITE_PLUGIN_TARO_BOOTSTRAP_MODULE_URL__'
@@ -19,13 +19,16 @@ const transportTablePlaceholder = '__VITE_PLUGIN_TARO_TRANSPORT_TABLE__'
 export async function materializeTransport({
     code,
     transportChunk,
-    chunks
+    chunks,
+    getLoadMode
 }: {
     code: string
     transportChunk: Rolldown.RenderedChunk
-    chunks: readonly Rolldown.RenderedChunk[]
+    chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
+    getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async'
 }): Promise<{ code: string; map: null }> {
-    const bootstrap = chunks.find(isBootstrapModule)
+    const renderedChunks = Object.values(chunks)
+    const bootstrap = renderedChunks.find(isBootstrapModule)
     if (!bootstrap) {
         throw new Error('Expected native bootstrap chunk')
     }
@@ -35,36 +38,29 @@ export async function materializeTransport({
     // Babel constructs and safely serializes an expression shaped like:
     // {
     //     'vpt:/assets/app.js': () => require('./assets/app.js'),
-    //     'vpt:/assets/page.js': () => require('./assets/page.js')
+    //     'vpt:/packages/account/page.js': () => require.async('./packages/account/page.js')
     // }
     // Oxc then parses that expression through define while processing the already-transpiled native entry.
-    const capsuleChunkIds = chunks.filter((chunk) => !isNativeModule(chunk)).map((chunk) => chunk.fileName)
-
+    const capsuleChunks = renderedChunks.filter((chunk) => !isNativeModule(chunk))
     const moduleTable = types.objectExpression(
-        capsuleChunkIds.sort().map((chunkId) => {
-            return createModuleLoader({
-                chunkId,
-                transportFileName: transportChunk.fileName
+        capsuleChunks
+            .sort((left, right) => left.fileName.localeCompare(right.fileName))
+            .map((chunk) => {
+                return createModuleLoader({
+                    chunkId: chunk.fileName,
+                    transportFileName: transportChunk.fileName,
+                    loadMode: getLoadMode(chunk)
+                })
             })
-        })
     )
 
     const transformed = await transformWithOxc(code, transportChunk.fileName, {
         define: {
-            [bootstrapModuleUrlPlaceholder]: generate(
-                types.stringLiteral(chunkIdToModuleUrl(bootstrap.fileName)),
-                generatorOptions
-            ).code,
-            [transportTablePlaceholder]: generate(moduleTable, generatorOptions).code
+            [bootstrapModuleUrlPlaceholder]: ast2str(types.stringLiteral(chunkIdToModuleUrl(bootstrap.fileName))),
+            [transportTablePlaceholder]: ast2str(moduleTable)
         },
         target: 'es2018'
     })
-    if (
-        transformed.code.includes(bootstrapModuleUrlPlaceholder) ||
-        transformed.code.includes(transportTablePlaceholder)
-    ) {
-        throw new Error(`Failed to materialize the WX transport in ${transportChunk.fileName}`)
-    }
 
     return {
         code: transformed.code,
@@ -72,31 +68,25 @@ export async function materializeTransport({
     }
 }
 
-const generatorOptions = {
-    comments: false,
-    compact: true,
-    concise: true,
-    minified: true
-} as const
-
-/** Validates one graph-metadata placeholder in the already-compiled transport entry. */
-function requireOnePlaceholder(code: string, placeholder: string): void {
-    const replacementCount = code.split(placeholder).length - 1
-    if (replacementCount !== 1) {
-        throw new Error(`Expected one WX transport placeholder ${placeholder}, found ${replacementCount}`)
-    }
-}
-
 /** Creates one URL-keyed loader while keeping its native require argument literal. */
 function createModuleLoader({
     chunkId,
-    transportFileName
+    transportFileName,
+    loadMode
 }: {
     chunkId: string
     transportFileName: string
+    loadMode: 'sync' | 'async'
 }): ReturnType<typeof types.objectProperty> {
     const requirePath = toNativeRequirePath(transportFileName, chunkId)
-    const load = types.callExpression(types.identifier('require'), [types.stringLiteral(requirePath)])
+
+    const requireCallee =
+        loadMode === 'sync'
+            ? types.identifier('require')
+            : types.memberExpression(types.identifier('require'), types.identifier('async'))
+
+    const load = types.callExpression(requireCallee, [types.stringLiteral(requirePath)])
+
     return types.objectProperty(
         types.stringLiteral(chunkIdToModuleUrl(chunkId)),
         types.arrowFunctionExpression([], load)

@@ -26,41 +26,47 @@ const transportCode = renderNativeModule(transportJavaScript, {
 async function materializeTestTransport({
     code,
     fileName,
-    capsuleChunkIds
+    capsuleChunkIds,
+    loadMode = 'sync'
 }: {
     code: string
     fileName: string
     capsuleChunkIds: readonly string[]
+    loadMode?: 'sync' | 'async'
 }): Promise<string> {
     const transportChunk = {
         fileName,
         isEntry: true,
+        moduleIds: [transportPath],
         modules: {
             [transportPath]: {}
         }
     } as Rolldown.RenderedChunk
-    const chunks: Rolldown.RenderedChunk[] = [
-        {
+    const chunks: Record<string, Rolldown.RenderedChunk> = {
+        'assets/bootstrap.js': {
             fileName: 'assets/bootstrap.js',
             isEntry: false,
+            moduleIds: [bootstrapPath],
             modules: {
                 [bootstrapPath]: {}
             }
         } as Rolldown.RenderedChunk,
-        transportChunk,
-        ...capsuleChunkIds.map((chunkId) => {
-            return {
-                fileName: chunkId,
-                isEntry: false,
-                modules: {}
-            } as Rolldown.RenderedChunk
-        })
-    ]
+        [fileName]: transportChunk
+    }
+    capsuleChunkIds.forEach((chunkId) => {
+        chunks[chunkId] = {
+            fileName: chunkId,
+            isEntry: false,
+            moduleIds: [chunkId],
+            modules: {}
+        } as Rolldown.RenderedChunk
+    })
 
     const materialized = await materializeTransport({
         code,
         transportChunk,
-        chunks
+        chunks,
+        getLoadMode: () => loadMode
     })
     return materialized.code
 }
@@ -101,4 +107,15 @@ test('specializes the physical runtime with literal capsule loaders', async () =
 
     const requireArguments = [...source.matchAll(/\brequire\(([^)]+)\)/g)].map((match) => JSON.parse(match[1]))
     assert.deepEqual(requireArguments, ['./assets/chunks/lazy-b.js', './assets/root-c.js', './assets/shared-a.js'])
+})
+
+test('materializes subpackage capsules with literal asynchronous loaders', async () => {
+    const source = await materializeTestTransport({
+        code: transportCode,
+        fileName: 'transport.js',
+        capsuleChunkIds: ['packages/account/page.js'],
+        loadMode: 'async'
+    })
+
+    assert.match(source, /require\.async\(['"]\.\/packages\/account\/page\.js['"]\)/)
 })
