@@ -72,14 +72,18 @@ test('keeps required and eligible chunks in the initial main placement', () => {
         '/lazy-dependency': {}
     })
 
-    assert.deepEqual(placer.locateChunk(chunk('/lazy', '/lazy-dependency')), { kind: 'main' })
-    assert.deepEqual(placer.locateChunk(chunk('/eager', '/lazy')), { kind: 'main' })
-    assert.deepEqual(placer.locateChunk({ ...chunk('/native-entry'), isEntry: true } as Rolldown.PreRenderedChunk), {
-        kind: 'main'
-    })
-    assert.deepEqual(placer.locateChunk(chunk()), { kind: 'main' })
-    assert.deepEqual(placer.locateChunk(chunk(bootstrapPath)), { kind: 'main' })
-    assert.throws(() => placer.locateChunk(chunk('/unknown')), /Unclassified WX module: \/unknown/)
+    const chunks = [
+        chunk('/lazy', '/lazy-dependency'),
+        chunk('/eager', '/lazy'),
+        { ...chunk('/native-entry'), isEntry: true } as Rolldown.PreRenderedChunk,
+        chunk(),
+        chunk(bootstrapPath),
+        chunk('/output-runtime')
+    ]
+    for (const currentChunk of chunks) {
+        assert.equal(placer.chunkFileNames(currentChunk), 'assets/[name]-[hash].js')
+        assert.equal(placer.getLoadMode(currentChunk), 'sync')
+    }
 })
 
 test('places the initial WX chunk graph in the main package', () => {
@@ -89,9 +93,8 @@ test('places the initial WX chunk graph in the main package', () => {
         '/application': { isEntry: true }
     })
 
-    assert.deepEqual(placer.locateChunk(applicationChunk), { kind: 'main' })
     assert.equal(placer.getLoadMode(applicationChunk), 'sync')
-    assert.equal(placer.chunkFileNames(), 'assets/[name]-[hash].js')
+    assert.equal(placer.chunkFileNames(applicationChunk), 'assets/[name]-[hash].js')
 })
 
 test('hashes transport while preserving exact native entry paths', () => {

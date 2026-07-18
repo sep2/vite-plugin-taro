@@ -17,6 +17,17 @@ const mainPackage: PackageLocation = { kind: 'main' }
 export function createPlacer() {
     let moduleKinds = new Map<string, ModuleKind>()
 
+    /** Returns the physical package selected for one chunk. */
+    function locateChunk(chunk: AbstractChunk): PackageLocation {
+        const eligibility = getChunkEligibility(moduleKinds, chunk)
+        if (eligibility === 'main-required') {
+            return mainPackage
+        }
+
+        // Eligible chunks remain in main until generated code-only packages are introduced.
+        return mainPackage
+    }
+
     return {
         /** Classifies the complete graph without changing its initial main-package placement. */
         analyze(graph: Graph): void {
@@ -33,25 +44,15 @@ export function createPlacer() {
             return isTransportModule(chunk) ? 'assets/[name]-[hash].js' : '[name]'
         },
 
-        /** Places the initial shared and dynamic chunk graph in main-package assets. */
-        chunkFileNames(): string {
-            return 'assets/[name]-[hash].js'
+        /** Names chunks from the package selected by the placement policy. */
+        chunkFileNames(chunk: Rolldown.PreRenderedChunk): string {
+            const location = locateChunk(chunk)
+            return location.kind === 'main' ? 'assets/[name]-[hash].js' : `${location.root}/assets/[name]-[hash].js`
         },
 
-        /** Returns the physical package selected for one chunk. */
-        locateChunk(chunk: AbstractChunk): PackageLocation {
-            const eligibility = getChunkEligibility(moduleKinds, chunk)
-            if (eligibility === 'main-required') {
-                return mainPackage
-            }
-
-            // Eligible chunks remain in main until generated code-only packages are introduced.
-            return mainPackage
-        },
-
-        /** Main transport can synchronously load every chunk in the initial placement. */
-        getLoadMode(_chunk: AbstractChunk): LoadMode {
-            return 'sync'
+        /** Selects native loading mode from the physical package boundary. */
+        getLoadMode(chunk: AbstractChunk): LoadMode {
+            return locateChunk(chunk).kind === 'main' ? 'sync' : 'async'
         }
     }
 }
