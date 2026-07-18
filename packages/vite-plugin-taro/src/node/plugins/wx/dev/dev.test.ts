@@ -118,14 +118,21 @@ test('materializes initial and complete incremental DevEngine output', async () 
         assert.equal(devMode.lazy, false)
         assert.notEqual(devMode.implement, 'browser runtime')
         assert.doesNotMatch(String(devMode.implement), /\$Refresh(?:Reg|Sig)\$/)
-        assert.doesNotMatch(String(devMode.implement), /globalThis\.window\s*=/)
+        assert.match(String(devMode.implement), /global\.__rolldown_runtime__/)
+        assert.doesNotMatch(String(devMode.implement), /globalThis/)
         assert.equal(outputOptions.entryFileNames, '[name]')
         assert.equal(outputOptions.format, 'es')
 
         const banner = outputOptions.banner
         if (typeof banner !== 'function') throw new Error('Expected development banner function.')
-        assert.equal(await banner({ fileName: 'app.js' }), 'require("./vpt-hmr/control.js");')
-        assert.equal(await banner({ fileName: 'pages/home/index.js' }), 'require("../../vpt-hmr/update.js");')
+        assert.equal(
+            await banner({ fileName: 'app.js' }),
+            'const __rolldown_runtime__ = global.__rolldown_runtime__;\nrequire("./vpt-hmr/control.js");'
+        )
+        assert.equal(
+            await banner({ fileName: 'pages/home/index.js' }),
+            'const __rolldown_runtime__ = global.__rolldown_runtime__;\nrequire("../../vpt-hmr/update.js");'
+        )
 
         await bundledDevelopment.listen()
 

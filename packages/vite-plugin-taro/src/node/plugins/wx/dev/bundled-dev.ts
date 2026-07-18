@@ -9,6 +9,7 @@ import {
 } from './output.ts'
 
 const clientId = 'vite-plugin-taro-wx'
+const rolldownRuntimeBinding = 'const __rolldown_runtime__ = global.__rolldown_runtime__;'
 
 type DevelopmentEngine = {
     ensureCurrentBuildFinish(): Promise<void>
@@ -86,7 +87,7 @@ class WxDevRuntime extends WxBaseDevRuntime {
   }
   applyUpdates() {}
 }
-globalThis.__rolldown_runtime__ = new WxDevRuntime();
+global.__rolldown_runtime__ = new WxDevRuntime();
 `
 
 /** Installs the one guarded private Vite adapter used by wx bundled development. */
@@ -321,7 +322,12 @@ function getConfiguredOutput(config: ResolvedConfig): Record<string, unknown> {
     return (Array.isArray(output) ? output[0] : output) as Record<string, unknown>
 }
 
-/** Composes user output banners with literal native dependencies required by the later HMR transport. */
+/**
+ * Composes user output banners with the explicit wx runtime binding and native HMR dependencies.
+ *
+ * WeChat's `global` properties do not become lexical bindings. Rolldown emits calls through the free
+ * `__rolldown_runtime__` identifier, so every physical output module captures the runtime from `global` explicitly.
+ */
 function createDevelopmentBanner(
     configuredBanner: OutputAddon | undefined,
     pageFiles: ReadonlySet<string>
@@ -330,7 +336,7 @@ function createDevelopmentBanner(
         const configured =
             typeof configuredBanner === 'function' ? await configuredBanner(chunk) : (configuredBanner ?? '')
         const development = createNativeDevelopmentDependency(chunk.fileName, pageFiles)
-        return [configured, development].filter(Boolean).join('\n')
+        return [configured, rolldownRuntimeBinding, development].filter(Boolean).join('\n')
     }
 }
 

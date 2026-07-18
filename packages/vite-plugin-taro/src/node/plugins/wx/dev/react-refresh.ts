@@ -9,7 +9,7 @@ const reactRefreshHostProperties = new Set(['__getReactRefreshIgnoredExports', '
 /**
  * The React transform already emits module-local registration and signature functions. Its only remaining browser
  * assumptions are a guard that checks `window.$RefreshReg$` and two optional extension points stored on `window` by the
- * refresh runtime. wx has no HTML preamble and its global `window` property is read-only, so the guard is removed and the
+ * refresh runtime. wx has neither an HTML preamble nor a browser `window`, so the guard is removed and the
  * runtime-only extension points are redirected to a private module-local object. User-authored window access is untouched.
  */
 export function rewriteReactRefresh(code: string, id: string) {
