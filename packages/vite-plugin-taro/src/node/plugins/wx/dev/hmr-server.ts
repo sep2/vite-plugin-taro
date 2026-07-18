@@ -148,11 +148,17 @@ export class HmrServer {
 
         this.bundledDev.getRolldownOptions = async () => {
             const rolldownOptions = await getRolldownOptions()
-            if (Array.isArray(rolldownOptions.output)) throw new Error('wx development supports one Rolldown output.')
+            if (Array.isArray(rolldownOptions.output)) {
+                throw new Error('wx development supports one Rolldown output.')
+            }
+
             rolldownOptions.output ??= {}
             const output = rolldownOptions.output
             const configuredOutput = this.server.config.build.rolldownOptions.output
-            if (Array.isArray(configuredOutput)) throw new Error('wx development supports one configured output.')
+            if (Array.isArray(configuredOutput)) {
+                throw new Error('wx development supports one configured output.')
+            }
+
             const configured = (configuredOutput ?? {}) as Record<string, unknown>
             const configuredBanner = configured.banner as OutputAddon | undefined
 
