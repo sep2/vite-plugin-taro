@@ -1,6 +1,7 @@
-type ModuleLoader = () => System.Registration
+type Instantiation = System.Registration | PromiseLike<System.Registration>
+type ModuleLoader = () => Instantiation
 
-/** Materialized from the finalized output graph before this native entry is emitted. */
+/** Materialized from the preliminary output graph before Rolldown finalizes content hashes. */
 declare const __VITE_PLUGIN_TARO_BOOTSTRAP_MODULE_URL__: string
 declare const __VITE_PLUGIN_TARO_TRANSPORT_TABLE__: Record<string, ModuleLoader>
 
