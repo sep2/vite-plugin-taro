@@ -32,6 +32,7 @@ export const load = () => __vitePreload(() => import('./lazy.js'), __VITE_PRELOA
     assert.deepEqual(commonJsModule.exports[0], ['./bootstrap.js'])
     assert.match(result.code, /_context\.import\(['"]\.\/lazy\.js['"]\)/)
     assert.match(result.code, /VITE_PRELOAD/)
+    assert.ok(result.map)
     assert.notEqual(typeof result.map, 'string')
     assert.deepEqual(result.map.sources, ['assets/root.js'])
     assert.ok(result.map.mappings)

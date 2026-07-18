@@ -6,11 +6,16 @@ import { type AstTransformResult, transformWithBabel } from '../../../utils/tran
 import { wrapCapsulePlugin } from './capsule-wrapper.ts'
 
 /** Renders one ESM chunk as an inert SystemJS capsule. */
-export function renderCapsule(code: string, chunk: Rolldown.RenderedChunk): AstTransformResult {
-    return transformWithBabel(code, chunk.fileName, [
-        transformDynamicImport,
-        // Erase Babel's internal plugin pass type.
-        transformModulesSystemjs as PluginTarget,
-        wrapCapsulePlugin
-    ])
+export function renderCapsule(code: string, chunk: Rolldown.RenderedChunk, sourcemap = true): AstTransformResult {
+    return transformWithBabel(
+        code,
+        chunk.fileName,
+        [
+            transformDynamicImport,
+            // Erase Babel's internal plugin pass type.
+            transformModulesSystemjs as PluginTarget,
+            wrapCapsulePlugin
+        ],
+        sourcemap
+    )
 }

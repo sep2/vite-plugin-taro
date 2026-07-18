@@ -24,6 +24,7 @@ test('specializes the Page capsule for one route', async () => {
     assert.match(result.code, /["']pages\/home\/index["']/)
     assert.match(result.code, /navigationBarTitleText:\s*["']Home["']/)
     assert.doesNotMatch(result.code, /__VITE_PLUGIN_TARO_PAGE_/)
+    assert.ok(result.map)
     assert.deepEqual(result.map.sources, [id])
 })
 

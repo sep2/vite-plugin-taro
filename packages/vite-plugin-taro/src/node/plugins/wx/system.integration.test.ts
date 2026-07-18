@@ -60,7 +60,9 @@ const bootstrapTypeScript = readFileSync(
     fileURLToPath(new URL('../../../runtime/wx/amphibious/bootstrap.ts', import.meta.url)),
     'utf8'
 )
-const compiledBootstrap = (await transformWithOxc(bootstrapTypeScript, 'bootstrap.ts', { target: esTarget })).code
+const compiledBootstrap = (
+    await transformWithOxc(bootstrapTypeScript, 'bootstrap.ts', { sourcemap: false, target: esTarget })
+).code
 const bootstrapJavaScript = (
     await specializeBootstrap({
         code: compiledBootstrap,
@@ -80,7 +82,9 @@ const transportTypeScript = readFileSync(
     fileURLToPath(new URL('../../../runtime/wx/amphibious/transport.ts', import.meta.url)),
     'utf8'
 )
-const transportJavaScript = (await transformWithOxc(transportTypeScript, 'transport.ts', { target: esTarget })).code
+const transportJavaScript = (
+    await transformWithOxc(transportTypeScript, 'transport.ts', { sourcemap: false, target: esTarget })
+).code
 const transportCode = renderNative(transportJavaScript, {
     fileName: transportFileName
 } as Rolldown.RenderedChunk).code

@@ -64,7 +64,7 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
         transform: {
             order: 'pre',
             handler(code, id) {
-                return resolver.specialize(code, id)
+                return resolver.specialize(code, id, Boolean(this.environment.config.build.sourcemap))
             }
         },
 
@@ -77,23 +77,25 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
 
         renderChunk: {
             order: 'post',
-            async handler(code, chunk, _outputOptions, meta) {
+            async handler(code, chunk, outputOptions, meta) {
                 const moduleKind = getWxModuleKind(chunk)
+                const sourcemap = Boolean(outputOptions.sourcemap)
 
                 if (moduleKind === 'capsule') {
-                    return renderCapsule(code, chunk)
+                    return renderCapsule(code, chunk, sourcemap)
                 }
 
                 // Native and amphibious modules share the CommonJS renderer. Amphibious transport exposure is a
                 // separate concern materialized from final output paths after the physical transport itself is rendered.
-                const native = renderNative(code, chunk)
+                const native = renderNative(code, chunk, sourcemap)
 
                 if (isTransportModule(chunk)) {
                     return materializeTransport({
                         code: native.code,
                         transportChunk: chunk,
                         chunks: meta.chunks,
-                        getLoadMode: placer.getLoadMode
+                        getLoadMode: placer.getLoadMode,
+                        sourcemap
                     })
                 }
 

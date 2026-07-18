@@ -8,13 +8,20 @@ const appConfigPlaceholder = '__VITE_PLUGIN_TARO_APP_CONFIG__'
 export function specializeBootstrap({
     code,
     id,
-    appConfig
+    appConfig,
+    sourcemap = true
 }: {
     code: string
     id: string
     appConfig: JsonObject
+    sourcemap?: boolean
 }): Promise<AstTransformResult> {
-    return replaceWithAst(code, id, {
-        [appConfigPlaceholder]: types.valueToNode(appConfig)
-    })
+    return replaceWithAst(
+        code,
+        id,
+        {
+            [appConfigPlaceholder]: types.valueToNode(appConfig)
+        },
+        sourcemap
+    )
 }

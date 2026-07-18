@@ -20,7 +20,11 @@ test('specializes the amphibious bootstrap with the App configuration', async ()
     assert.match(result.code, /pages:\s*\[\s*["']pages\/home\/index["']/)
     assert.match(result.code, /navigationBarTitleText:\s*["']Example["']/)
     assert.doesNotMatch(result.code, /__VITE_PLUGIN_TARO_APP_CONFIG__/)
+    assert.ok(result.map)
     assert.deepEqual(result.map.sources, [id])
+
+    const withoutSourceMap = await specializeBootstrap({ code: source, id, appConfig: {}, sourcemap: false })
+    assert.equal(withoutSourceMap.map, null)
 })
 
 test('rejects a bootstrap missing its App configuration placeholder', async () => {

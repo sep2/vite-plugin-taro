@@ -5,14 +5,15 @@ import { esTarget } from './constant.ts'
 
 export type AstTransformResult = {
     code: string
-    map: Rolldown.ExistingRawSourceMap
+    map: Rolldown.ExistingRawSourceMap | null
 }
 
 /** Replaces each placeholder with a Babel AST expression while transforming the module through Oxc. */
 export async function replaceWithAst(
     code: string,
     filename: string,
-    replacement: Readonly<Record<string, Parameters<typeof generate>[0]>>
+    replacement: Readonly<Record<string, Parameters<typeof generate>[0]>>,
+    sourcemap = true
 ): Promise<AstTransformResult> {
     const define: Record<string, string> = {}
 
@@ -21,20 +22,20 @@ export async function replaceWithAst(
         define[placeholder] = ast2str(node)
     }
 
-    const transformed = await transformWithOxc(code, filename, { define, target: esTarget })
+    const transformed = await transformWithOxc(code, filename, { define, sourcemap, target: esTarget })
 
     for (const placeholder of Object.keys(replacement)) {
         if (transformed.code.includes(placeholder)) {
             throw new Error(`Failed to replace placeholder ${placeholder} in ${filename}`)
         }
     }
-    if (!transformed.map) {
+    if (sourcemap && !transformed.map) {
         throw new Error(`Failed to generate a source map for ${filename}`)
     }
 
     return {
         code: transformed.code,
-        map: transformed.map
+        map: sourcemap ? (transformed.map ?? null) : null
     }
 }
 
@@ -52,7 +53,12 @@ function requireOnePlaceholder(code: string, placeholder: string): void {
 }
 
 /** Transforms one module with Babel's shared parser and source-map configuration. */
-export function transformWithBabel(code: string, filename: string, plugins: PluginItem[]): AstTransformResult {
+export function transformWithBabel(
+    code: string,
+    filename: string,
+    plugins: PluginItem[],
+    sourcemap = true
+): AstTransformResult {
     const transformed = transformSync(code, {
         babelrc: false,
         compact: true,
@@ -62,15 +68,15 @@ export function transformWithBabel(code: string, filename: string, plugins: Plug
         filename,
         plugins,
         sourceFileName: filename,
-        sourceMaps: true,
+        sourceMaps: sourcemap,
         sourceType: 'module'
     })
-    if (!transformed?.code || !transformed.map) {
+    if (!transformed?.code || (sourcemap && !transformed.map)) {
         throw new Error(`Failed to transform ${filename} with Babel`)
     }
 
     return {
         code: transformed.code,
-        map: transformed.map as Rolldown.ExistingRawSourceMap
+        map: sourcemap ? (transformed.map as Rolldown.ExistingRawSourceMap) : null
     }
 }
