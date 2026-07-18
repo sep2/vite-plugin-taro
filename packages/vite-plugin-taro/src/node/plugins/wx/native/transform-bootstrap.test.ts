@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { transformBootstrapModule } from './transform-bootstrap-module.ts'
+import { transformBootstrap } from './transform-bootstrap.ts'
 
 const id = '/plugin/runtime/wx/bootstrap.js'
 const source = 'export const appConfig = __VITE_PLUGIN_TARO_APP_CONFIG__'
 
 test('specializes the native bootstrap with the App configuration', async () => {
-    const result = await transformBootstrapModule({
+    const result = await transformBootstrap({
         code: source,
         id,
         appConfig: {
@@ -26,7 +26,7 @@ test('specializes the native bootstrap with the App configuration', async () => 
 test('rejects a bootstrap module missing its App configuration placeholder', async () => {
     await assert.rejects(
         () =>
-            transformBootstrapModule({
+            transformBootstrap({
                 code: 'export const appConfig = {}',
                 id,
                 appConfig: {}

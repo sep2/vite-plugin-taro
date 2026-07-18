@@ -5,7 +5,7 @@ import { type AstTransformResult, replaceWithAst } from '../../../utils/transfor
 const appConfigPlaceholder = '__VITE_PLUGIN_TARO_APP_CONFIG__'
 
 /** Specializes the native bootstrap with the shared App configuration. */
-export async function transformBootstrapModule({
+export async function transformBootstrap({
     code,
     id,
     appConfig

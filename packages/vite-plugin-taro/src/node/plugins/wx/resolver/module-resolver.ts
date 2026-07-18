@@ -15,7 +15,7 @@ import {
     transportPath,
     vitePreloadId
 } from '../native/constant.ts'
-import { transformBootstrapModule } from '../native/transform-bootstrap-module.ts'
+import { transformBootstrap } from '../native/transform-bootstrap.ts'
 import { transformPageModule } from '../native/transform-page-module.ts'
 
 /** Resolves one exact private import using its importer and configured project root. */
@@ -76,7 +76,7 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
             const normalizedId = normalizeModuleId(id)
 
             if (normalizedId === normalizedBootstrapPath) {
-                return transformBootstrapModule({ code, id, appConfig: createAppConfig(options) })
+                return transformBootstrap({ code, id, appConfig: createAppConfig(options) })
             }
 
             if (normalizedId === normalizedPageModulePath) {

@@ -11,7 +11,7 @@ import { chunkIdToModuleUrl } from '../../utils/modules.ts'
 import { renderCapsule } from './capsule/render-capsule.ts'
 import { bootstrapPath, transportPath } from './native/constant.ts'
 import { renderNative } from './native/render-native.ts'
-import { transformBootstrapModule } from './native/transform-bootstrap-module.ts'
+import { transformBootstrap } from './native/transform-bootstrap.ts'
 import { materializeTransport } from './transport/materialize-transport.ts'
 
 /** A test SystemJS module namespace. */
@@ -62,7 +62,7 @@ const bootstrapTypeScript = readFileSync(
 )
 const compiledBootstrap = (await transformWithOxc(bootstrapTypeScript, 'bootstrap.ts', { target: esTarget })).code
 const bootstrapJavaScript = (
-    await transformBootstrapModule({
+    await transformBootstrap({
         code: compiledBootstrap,
         id: 'bootstrap.js',
         appConfig: testAppConfig
