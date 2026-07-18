@@ -10,7 +10,7 @@ import { SerializedTaskQueue } from './serialized-task-queue.ts'
 // import a browser HMR client, so every physical development chunk binds it to the one runtime installed on `global`.
 const rolldownRuntimeBinding = 'const __rolldown_runtime__ = global.__rolldown_runtime__;'
 
-type DevelopmentRolldownOptions = InputOptions & {
+type BundledDevRolldownOptions = InputOptions & {
     output?: OutputOptions | OutputOptions[]
     experimental?: {
         devMode?: boolean | Record<string, unknown>
@@ -19,11 +19,11 @@ type DevelopmentRolldownOptions = InputOptions & {
 }
 
 /** The deliberately small Vite 8.1 private surface used by the wx adapter. */
-type BundledDevelopment = {
+type BundledDev = {
     // Vite's close lifecycle reads this field, so the owned engine must be published back to the original instance.
     _devEngine?: DevEngine
     // This is still the authoritative way to obtain Vite's fully resolved plugin and optimizer configuration.
-    getRolldownOptions(): Promise<DevelopmentRolldownOptions>
+    getRolldownOptions(): Promise<BundledDevRolldownOptions>
     // Replaced before Vite starts the environment so Vite cannot create its own skip-write DevEngine.
     listen(): Promise<void>
     // Replaced because Vite's HTML middleware otherwise turns stale HMR output into an implicit physical rebuild.
@@ -78,7 +78,7 @@ global.__rolldown_runtime__ = new WxDevRuntime();
  */
 export class HmrServer {
     private readonly server: ViteDevServer
-    private readonly bundledDev: BundledDevelopment
+    private readonly bundledDev: BundledDev
 
     private readonly outDir: string
     private readonly publicDir: string
@@ -87,7 +87,6 @@ export class HmrServer {
     // Generated output bypasses this queue and is written directly by Rolldown. It serializes only initial directory
     // preparation and public-file events, whose asynchronous filesystem operations must preserve watcher order.
     private readonly fileTasks = new SerializedTaskQueue()
-    private readonly outputPreparation: Promise<void>
 
     private readonly handleWatcherEvent = (event: string, filePath: string): void => {
         // Vite already watches the project and public directory. Ignore every event outside publicDir so source changes
@@ -96,11 +95,15 @@ export class HmrServer {
         if (!destinationPath) return
 
         // The queue was seeded with output preparation, so even an event received before listen() runs cannot race the
-        // initial cleanup/copy. A failed public operation is reported through its own task promise while later tasks keep
-        // running because SerializedTaskQueue does not let one rejection poison its tail.
-        void this.fileTasks
-            .enqueue(() => syncWxPublicFile(event, filePath, destinationPath))
-            .catch((error: unknown) => this.reportError('public file sync', error))
+        // initial cleanup/copy. Public-file errors are recoverable and handled inside the task so they do not stop later
+        // synchronization; the unhandled initial-preparation task remains fatal to startup.
+        this.fileTasks.enqueue(async () => {
+            try {
+                await syncWxPublicFile(event, filePath, destinationPath)
+            } catch (error) {
+                this.reportError('public file sync', error)
+            }
+        })
     }
 
     constructor(server: ViteDevServer, options: VitePluginTaroOptions) {
@@ -113,17 +116,15 @@ export class HmrServer {
         // shared chunks must not receive it because only native Page evaluation is observable by WeChat DevTools.
         this.pageFiles = new Set(options.pages.map((page) => `${page.path}.js`))
 
-        // Seed the serialized filesystem queue immediately, then retain this task's result separately. The queue tail is
-        // intentionally failure-neutral so later public events can continue after an error; listen() must still reject if
-        // the mandatory initial preparation itself fails.
-        this.outputPreparation = this.fileTasks.enqueue(() =>
+        // Seed the queue with mandatory output preparation. Its rejection remains on the queue tail, so listen() fails
+        // and no DevEngine starts when the initial cleanup or public-directory copy is unsuccessful.
+        this.fileTasks.enqueue(() =>
             initializeWxDevelopmentOutput({
                 outDir: this.outDir,
                 publicDir: this.publicDir,
                 emptyOutDir: server.config.build.emptyOutDir !== false
             })
         )
-        void this.outputPreparation.catch((error: unknown) => this.reportError('output preparation', error))
     }
 
     install(): this {
@@ -191,7 +192,6 @@ export class HmrServer {
         this.bundledDev.triggerBundleRegenerationIfStale = async () => false
 
         this.bundledDev.listen = async () => {
-            await this.outputPreparation
             await this.fileTasks.waitForIdle()
             const rolldownOptions = await this.bundledDev.getRolldownOptions()
             const outputOptions = rolldownOptions.output
@@ -233,12 +233,6 @@ export class HmrServer {
                 initialOutput.reject(error)
             })
             await initialOutput.promise
-
-            // onOutput errors reject the barrier, while the state check also protects against native engine failures that
-            // complete without a successful output callback.
-            if ((await engine.getBundleState()).lastBuildErrored) {
-                throw new Error('The initial wx bundled-development build failed.')
-            }
 
             this.server.config.logger.info(`[vite-plugin-taro] wx project writes at ${this.outDir}`)
         }
@@ -302,7 +296,7 @@ function toStableFileName(fileName: string): string {
 }
 
 function getBundledDev(server: ViteDevServer) {
-    const bundledDev = server.environments.client.bundledDev as unknown as BundledDevelopment | undefined
+    const bundledDev = server.environments.client.bundledDev as unknown as BundledDev | undefined
     if (!bundledDev) {
         throw new Error('Vite did not create the wx bundled-development environment.')
     }

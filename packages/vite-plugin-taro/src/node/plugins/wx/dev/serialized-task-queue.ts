@@ -1,20 +1,9 @@
-/**
- * Runs asynchronous tasks in insertion order while allowing callers to observe each task's own result.
- *
- * A rejected task does not poison the queue: its returned promise still rejects, but later tasks start after that failure
- * has settled. This is important for public-file watching, where one failed copy must be reported without permanently
- * disabling synchronization for subsequent events.
- */
+/** Runs asynchronous tasks in insertion order. A rejected task stops the queue unless the task handles it. */
 export class SerializedTaskQueue {
     private tail: Promise<void> = Promise.resolve()
 
-    enqueue<T>(task: () => T | PromiseLike<T>): Promise<T> {
-        const result = this.tail.then(task)
-        this.tail = result.then(
-            () => undefined,
-            () => undefined
-        )
-        return result
+    enqueue(task: () => Promise<void>): void {
+        this.tail = this.tail.then(task)
     }
 
     /** Waits for every task that was queued when this method was called. */
