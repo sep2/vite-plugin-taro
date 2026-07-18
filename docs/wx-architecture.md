@@ -1,8 +1,8 @@
-# vite-plugin-taro WX Architecture
+# vite-plugin-taro wx Architecture
 
 ## Status
 
-This document defines the greenfield architecture for the WX-only version of `vite-plugin-taro`.
+This document defines the greenfield architecture for the wx-only version of `vite-plugin-taro`.
 
 There are no compatibility requirements with previous plugin APIs, generated files, package layouts, or runtime bootstrap
 implementations. The design keeps the Taro React programming model while replacing the build, loading, native registration, package
@@ -21,7 +21,7 @@ The initial implementation supports:
 - one App-owned React root;
 - SystemJS as the only application module loader;
 - static imports and every dynamic-import form supported by Vite;
-- imports across every generated package boundary;
+- imports across every generated subpackage boundary;
 - every import cycle valid under ESM evaluation semantics;
 - automatic code-only subpackages for lazy JavaScript;
 - JavaScript HMR and React Refresh in WeChat DevTools;
@@ -354,7 +354,7 @@ function createWxTemplateBuilder() {
 
 These imports are private build-time implementation details bundled into the plugin. They are not resolved from the application.
 
-For each complete WX bundle, the companion-asset stage emits:
+For each complete wx bundle, the companion-asset stage emits:
 
 - `app.json` from the normalized App configuration;
 - one transformed `app.wxss` containing all collected bundle CSS;
@@ -438,7 +438,7 @@ A single realm is required for:
 
 ### Foundational startup barrier
 
-The native bootstrap creates the SystemJS instance and immediately starts exactly one foundational import. The facade generator writes
+The amphibious bootstrap creates the SystemJS instance and immediately starts exactly one foundational import. The facade generator writes
 the exact Vite-provided foundation entry ID into the bootstrap:
 
 ```ts
@@ -475,7 +475,7 @@ a hard refresh and the barrier remains pending, so no App, Page, or user module 
 catches up by replaying HMR deliveries.
 
 The foundation and its complete static closure are eager, main-package-owned, and instantiated through SystemJS like all application
-runtime code. They never use native `require()` directly. The module is an explicit production Rolldown entry and an explicit WX
+runtime code. They never use native `require()` directly. The module is an explicit production Rolldown entry and an explicit wx
 development dependency-discovery entry, preventing tree shaking or accidental placement behind a dynamic boundary.
 
 A foundation failure rejects App delegation and every waiting Page session. It is reported once as a foundational startup error and is
@@ -501,7 +501,7 @@ IDs.
 
 ### Custom host hooks
 
-The runtime is built from SystemJS core and registry behavior, without the browser script loader. It provides WX-specific hooks:
+The runtime is built from SystemJS core and registry behavior, without the browser script loader. It provides wx-specific hooks:
 
 ```ts
 interface WxSystemHost {
@@ -515,7 +515,7 @@ interface WxSystemHost {
 second source resolver or translate IDs into a plugin-owned namespace. `instantiate()` can use:
 
 - an initial native capsule;
-- an asynchronously loaded generated package capsule;
+- an asynchronously loaded generated subpackage capsule;
 - a transient registration from the current `update.js` delivery;
 - an acknowledged on-demand development response.
 
@@ -589,7 +589,7 @@ export default defineConfig({
 })
 ```
 
-WX output modules have exactly three execution-domain kinds:
+wx output modules have exactly three execution-domain kinds:
 
 - **native** modules execute only through WeChat CommonJS and do not appear in SystemJS transport;
 - **capsule** modules are inert SystemJS registrations loaded through literal native transport;
@@ -603,8 +603,8 @@ namespace without changing the default Rolldown policy.
 
 ### Cross-package imports and cycles
 
-Every source import is valid regardless of generated package ownership. A System registration contains only dependency IDs from the
-Vite development graph or Vite/Rolldown output graph. When a dependency belongs to another generated package, `instantiate()`
+Every source import is valid regardless of generated subpackage ownership. A System registration contains only dependency IDs from the
+Vite development graph or Vite/Rolldown output graph. When a dependency belongs to another generated subpackage, `instantiate()`
 asynchronously obtains its registration through the literal native transport.
 
 For a cycle between modules A and B in different packages:
@@ -674,15 +674,15 @@ Generated lazy packages use deterministic names and contain JavaScript capsules 
 }
 ```
 
-Code-only packages with empty page lists are a validated platform capability and part of the required WX baseline.
+Code-only packages with empty page lists are a validated platform capability and part of the required wx baseline.
 
 ### Placement goals
 
 Correctness does not depend on a particular lazy-package grouping because all cross-package edges are supported. A dynamic import is an
 execution boundary only: it promises neither deferred physical delivery nor a dedicated native download unit. The planner freely chooses
-whether eligible code remains in the main package or enters one of the generated packages.
+whether eligible code remains in the main package or enters one of the generated subpackages.
 
-The planner minimizes generated package count first. It may coalesce unrelated dynamic roots into one code-only subpackage and splits them
+The planner minimizes generated subpackage count first. It may coalesce unrelated dynamic roots into one code-only subpackage and splits them
 only when native package-size limits require it. Within the minimum feasible package count, it optimizes for:
 
 - main, per-package, and total size limits;
@@ -704,14 +704,14 @@ A shared module is emitted exactly once. The planner never duplicates it to avoi
 The plugin registers one first-class Vite environment named `wx` for the WeChat application. It is the sole owner of the application
 module graph in development and the sole application environment built in production.
 
-The exact resolution-condition list is normalized by the plugin, but `consumer: 'client'` is intentional: WX consumes client-side assets,
+The exact resolution-condition list is normalized by the plugin, but `consumer: 'client'` is intentional: wx consumes client-side assets,
 CSS, and browser-oriented package exports even though it is not a browser runtime.
 
 In development, `createWxDevEnvironment()` creates a `DevEnvironment` with its own module graph and a plugin-owned `HotChannel`. The hot
 channel adapts Vite's environment-neutral HMR messages to the update compiler and the metadata/acknowledgement protocol. Executable code
 still travels only through generated native files and `update.js`.
 
-The WX environment is not a `RunnableDevEnvironment` and does not use Vite's `ModuleRunner` or its `AsyncFunction` evaluator. SystemJS in
+The wx environment is not a `RunnableDevEnvironment` and does not use Vite's `ModuleRunner` or its `AsyncFunction` evaluator. SystemJS in
 WeChat is the only application evaluator. The environment exists on the Vite side to resolve, transform, cache, and analyze modules and
 to calculate HMR propagation.
 
@@ -720,7 +720,7 @@ literal-transport stages. The plugin opts into Vite's app builder and builds onl
 and Node `ssr` environments are not application build graphs.
 
 Third-party Vite plugins participate normally in the `wx` environment. Their hooks observe `this.environment.name === 'wx'`, and every
-per-environment transform result and import edge belongs to the isolated WX graph. Browser `/@vite/client`, module-preload bootstrap, and
+per-environment transform result and import edge belongs to the isolated wx graph. Browser `/@vite/client`, module-preload bootstrap, and
 browser WebSocket execution are never injected into generated Mini Program code.
 
 ### Plugin-owned Vite integration
@@ -754,7 +754,7 @@ Development and production share Vite's normal source semantics:
 
 The architecture does not introduce a second source resolver or dynamic-import analyzer. Development consumes the dynamic edges Vite
 materializes in the `wx` environment graph, and production consumes the chunks and edges Vite/Rolldown emits. Dynamic-import forms that
-Vite can materialize therefore work automatically; an import left unresolved after the Vite pipeline cannot enter the closed WX graph.
+Vite can materialize therefore work automatically; an import left unresolved after the Vite pipeline cannot enter the closed wx graph.
 
 ### ES2018 JavaScript target
 
@@ -783,7 +783,7 @@ consistently across all compilation paths:
 lowers development dependency chunks. The System-register postprocessor runs after syntax lowering and performs only the module-format
 conversion; it does not establish a second language target.
 
-The same target applies to generated SystemJS runtime code, native bootstrap and facade files, `update.js`, React Refresh wrappers, and
+The same target applies to generated SystemJS runtime code, the amphibious bootstrap, native facade files, `update.js`, React Refresh wrappers, and
 plugin-owned Taro runtime modules. Generated native files are either emitted through the same lowering stage or restricted and validated
 to ES2018 syntax.
 
@@ -816,7 +816,7 @@ chunk graph: inter-chunk static dependencies, dynamic imports, live chunk export
 
 ### No runtime externals
 
-Runtime JavaScript externalization is forbidden. Every user, Taro, React, and third-party JavaScript dependency must resolve into the WX
+Runtime JavaScript externalization is forbidden. Every user, Taro, React, and third-party JavaScript dependency must resolve into the wx
 Vite graph and a Rolldown output chunk. Application-owned dependencies such as React are bundled from the application's installation; they
 are not runtime externals.
 
@@ -872,7 +872,7 @@ identities from inside an optimized dependency chunk.
 ### Development dependency optimization
 
 The dedicated `wx` environment enables Vite 8's Rolldown dependency optimizer. The plugin supplies the foundational runtime, the App,
-every Page, and required internal virtual entries to WX dependency discovery. Bare npm dependencies and CommonJS packages are prebundled through Vite's normal
+every Page, and required internal virtual entries to wx dependency discovery. Bare npm dependencies and CommonJS packages are prebundled through Vite's normal
 optimizer before their output is converted into System registrations.
 
 Optimized output uses the stable module IDs supplied by Vite for the current materialized development build; the plugin does not derive a
@@ -881,12 +881,12 @@ and are never replaced inside the retained runtime heap. An optimizer rerun, dep
 configuration change, or changed optimized output creates a new development build ID, rematerializes the native project, and triggers a
 hard refresh.
 
-Linked workspace source that Vite does not optimize remains ordinary WX development modules and participates in normal HMR. Production
+Linked workspace source that Vite does not optimize remains ordinary wx development modules and participates in normal HMR. Production
 does not consume the development optimizer; the production `wx` environment uses the normal Rolldown application build described above.
 Dependency optimization never creates a runtime external.
 
 The normal Vite dev server remains the source transformation server. The plugin uses
-`server.environments.wx.transformRequest()`, `server.environments.wx.moduleGraph`, and the WX environment's normal hot-update hooks. It
+`server.environments.wx.transformRequest()`, `server.environments.wx.moduleGraph`, and the wx environment's normal hot-update hooks. It
 does not run a second JavaScript bundler for development and never uses the browser client's module graph as a fallback.
 
 ### Development startup materialization
@@ -1494,7 +1494,7 @@ create no ordered teardown or runtime-state protocol.
 
 The server transactionally builds a complete current Mini Program materialization under a new build ID. A failed build
 publishes nothing and leaves the last runnable generated project unchanged. A successful build publishes the complete
-project, including the new build ID in watched native bootstrap code. Publication does not sequence active-session
+project, including the new build ID in watched amphibious bootstrap code. Publication does not sequence active-session
 disposal, DevTools compilation, or process restart. The server makes no state guarantee about the old heap after
 requesting the refresh.
 
@@ -1555,7 +1555,7 @@ The implementation enforces these invariants with build-time assertions and runt
 15. An unsafe update batch is never approximated or acknowledged; it triggers a hard refresh.
 16. A delivery is acknowledged only after callbacks, React Refresh, and invalidation publication complete.
 17. Development delivery registrations are transient and do not form a second persistent module registry.
-18. Modules are never duplicated across generated packages.
+18. Modules are never duplicated across generated subpackages.
 19. All configured native pages are emitted in the main package.
 20. Only JavaScript exclusively reachable through dynamic boundaries is eligible to enter generated subpackages; the planner may retain
     any eligible module in the main package.
@@ -1571,7 +1571,7 @@ The implementation enforces these invariants with build-time assertions and runt
 29. The development protocol has one active runtime session; replacing it discards all HMR delivery state and never replays updates into
     the new heap.
 30. The dedicated `wx` Vite environment is the only application transform, module, and HMR graph.
-31. Vite's browser client and `ModuleRunner` never evaluate WX application modules.
+31. Vite's browser client and `ModuleRunner` never evaluate wx application modules.
 32. The Taro template builder, component aliases, hydration schema, root updater, event bridge, and React renderer come from one bundled
     implementation.
 33. JSX structure is rendered through Taro's runtime host tree and is never compiled into page-specific structural WXML.
@@ -1581,9 +1581,9 @@ The implementation enforces these invariants with build-time assertions and runt
     receives no plugin-specific identity or deduplication policy.
 37. Every production System registration is a final Rolldown chunk; source modules do not retain independent production runtime
     identities.
-38. Every runtime JavaScript dependency is bundled into the WX graph; external System modules, native module passthrough, and remote
+38. Every runtime JavaScript dependency is bundled into the wx graph; external System modules, native module passthrough, and remote
     executable modules are forbidden.
-39. WX development uses Vite's Rolldown dependency optimizer; optimized outputs are foundational for one materialized build, and any
+39. wx development uses Vite's Rolldown dependency optimizer; optimized outputs are foundational for one materialized build, and any
     optimizer rerun creates a new build ID, complete rematerialization, and hard refresh.
 40. One shared foundational SystemJS import completes Taro runtime, WeChat platform, React framework, API, and development-HMR setup in
     order before any App, Page, or user module executes.
@@ -1594,12 +1594,12 @@ The implementation enforces these invariants with build-time assertions and runt
 
 ## Validation plan
 
-### WX Vite environment tests
+### wx Vite environment tests
 
 - development transforms use only `server.environments.wx`;
-- the WX graph has independent resolved IDs, importers, accepted dependencies, and transform caches;
+- the wx graph has independent resolved IDs, importers, accepted dependencies, and transform caches;
 - third-party plugin hooks execute with `this.environment.name === 'wx'`;
-- WX resolution selects the configured client and platform package conditions;
+- wx resolution selects the configured client and platform package conditions;
 - browser `/@vite/client`, module-preload code, and WebSocket execution are absent;
 - the custom HotChannel receives Vite propagation results and emits metadata rather than executable source;
 - production builds only `builder.environments.wx`;
@@ -1607,7 +1607,7 @@ The implementation enforces these invariants with build-time assertions and runt
 - development source, optimized dependencies, production chunks, and generated runtime files contain no syntax above ES2018;
 - the System-register pass changes module format without changing the established ES2018 target;
 - generated project configuration disables DevTools JavaScript-to-ES5 compilation;
-- the WX environment explicitly enables the Rolldown dependency optimizer with the generated App and Page discovery entries;
+- the wx environment explicitly enables the Rolldown dependency optimizer with the generated App and Page discovery entries;
 - CommonJS npm dependencies execute from optimized System registrations;
 - SystemJS and HMR use the stable module IDs supplied by Vite without a plugin prefix, alias, digest, or translation layer;
 - application HMR reuses foundational optimized dependencies;
@@ -1636,7 +1636,7 @@ The implementation enforces these invariants with build-time assertions and runt
 - static imports and live bindings;
 - re-exports and namespace imports;
 - function hoisting through cycles;
-- cycles crossing two or more generated packages;
+- cycles crossing two or more generated subpackages;
 - dynamic and nested dynamic imports;
 - dynamic-import cycles;
 - concurrent imports of one unloaded package;
@@ -1676,7 +1676,7 @@ The implementation enforces these invariants with build-time assertions and runt
 ### Package planner tests
 
 - eager closure remains in the main package;
-- dynamic-only modules may remain main or enter generated packages according to the planner's physical layout;
+- dynamic-only modules may remain main or enter generated subpackages according to the planner's physical layout;
 - no statically reachable module enters a generated subpackage;
 - a dynamically and statically reachable module remains main;
 - shared lazy modules are never duplicated;
