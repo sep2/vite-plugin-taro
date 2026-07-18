@@ -2,7 +2,7 @@ import type { Plugin } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { HmrServer } from './hmr-server.ts'
 import { rewriteReactRefresh } from './react-refresh.ts'
-import { createWxDevelopmentFiles } from './support.ts'
+import { createHmrSupportFiles } from './support.ts'
 
 /** Adds the serve-only bundled-development adapter for the wx target. */
 export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugin {
@@ -32,7 +32,7 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
         generateBundle() {
             // Emit these as normal assets so Rolldown's initial incremental_write() owns their directories and commit.
             // Future hot updates replace only update.js through the dedicated publisher, outside generateBundle.
-            for (const file of createWxDevelopmentFiles()) this.emitFile(file)
+            for (const file of createHmrSupportFiles()) this.emitFile(file)
         },
 
         configureServer: {
@@ -40,7 +40,7 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
             // asks bundledDev to create its hard-coded skip-write DevEngine.
             order: 'post',
             handler(server) {
-                hmrServer = new HmrServer(server, options).install()
+                hmrServer = new HmrServer(server, options)
             }
         },
 

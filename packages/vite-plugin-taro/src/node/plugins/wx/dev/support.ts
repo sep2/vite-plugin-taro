@@ -12,7 +12,7 @@ export const updateFileName = 'vpt-hmr/update.js'
  * placeholders for the metadata protocol. update.js is valid but inert until the future publisher atomically replaces
  * it with one native executable patch.
  */
-export function createWxDevelopmentFiles(): Array<{
+export function createHmrSupportFiles(): Array<{
     type: 'asset'
     fileName: string
     source: string

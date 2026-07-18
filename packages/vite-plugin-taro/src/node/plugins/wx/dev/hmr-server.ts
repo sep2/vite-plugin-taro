@@ -126,15 +126,12 @@ export class HmrServer {
                 emptyOutDir: server.config.build.emptyOutDir !== false
             })
         )
-    }
 
-    install(): this {
         // Ordering matters: the replacement listen() calls the wrapped option resolver, and both replacements must be in
         // place before Vite starts the client environment after configureServer hooks complete.
         this.installRolldownOptions()
         this.installDevEngine()
         this.server.watcher.on('all', this.handleWatcherEvent)
-        return this
     }
 
     async close(): Promise<void> {
@@ -292,7 +289,7 @@ function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
  * Copying only the changed path preserves generated files and makes deletion semantics explicit; no rebuild or complete
  * public-directory recopy is needed after startup.
  */
-export async function syncWxPublicFile(event: string, sourcePath: string, destinationPath: string): Promise<void> {
+async function syncWxPublicFile(event: string, sourcePath: string, destinationPath: string): Promise<void> {
     if (event === 'unlink' || event === 'unlinkDir') {
         // Recursive removal is reserved for an actual directory event so a malformed file event cannot remove siblings.
         await fs.rm(destinationPath, { recursive: event === 'unlinkDir', force: true })
