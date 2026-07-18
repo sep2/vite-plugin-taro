@@ -15,7 +15,7 @@ export function renderNative(code: string, chunk: Rolldown.RenderedChunk): AstTr
 
 /**
  * Preserves Rolldown's ESM graph while adapting its final native chunks to WeChat's synchronous CommonJS runtime.
- * Application chunks remain asynchronous SystemJS capsules, so native dynamic imports must cross that boundary explicitly.
+ * Capsule chunks remain asynchronous SystemJS registrations, so native dynamic imports cross that boundary explicitly.
  */
 function connectNativeImportPlugin(fileName: string): PluginObject {
     return {

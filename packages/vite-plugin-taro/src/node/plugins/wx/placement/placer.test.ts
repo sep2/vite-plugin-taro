@@ -52,7 +52,7 @@ test('places the eager graph and output-only modules in main', () => {
     assert.equal(placer.getLoadMode(renderedChunk('assets/application.js')), 'sync')
 })
 
-test('places dynamic-only modules in a generated asynchronous package', () => {
+test('places dynamic-only modules in a generated asynchronous subpackage', () => {
     const placer = createPlacer()
     analyze(placer, {
         '/entry': { isEntry: true, dynamicImports: ['/application'] },

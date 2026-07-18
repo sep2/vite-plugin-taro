@@ -9,8 +9,8 @@ import { bootstrapPath, rolldownRuntimeId, transportPath } from '../module.ts'
 import { renderNative } from './native.ts'
 import { materializeTransport } from './transport.ts'
 
-/** The generated native transport runtime. */
-interface NativeTransport {
+/** CommonJS exports of the generated transport runtime. */
+interface TransportExports {
     transport: Readonly<Record<string, () => unknown>>
 }
 
@@ -23,7 +23,7 @@ const transportCode = renderNative(transportJavaScript, {
     fileName: 'transport.js'
 } as Rolldown.RenderedChunk).code
 
-/** Materializes one transport entry with the requested capsule and optional Rolldown runtime outputs. */
+/** Materializes transport with the requested capsules and optional amphibious Rolldown runtime. */
 async function materializeTestTransport({
     code,
     fileName,
@@ -80,21 +80,21 @@ async function materializeTestTransport({
     return materialized.code
 }
 
-/** Evaluates a transport with a fake native require. */
-function evaluateTransport(source: string, loadModule: (path: string) => unknown) {
+/** Evaluates transport with a fake native require. */
+function evaluateTransport(source: string, loadFile: (path: string) => unknown) {
     const requiredPaths: string[] = []
     const commonJsModule: { exports: unknown } = { exports: {} }
 
-    /** Loads and records one native module path. */
+    /** Loads and records one native file path. */
     function nativeRequire(id: string): unknown {
         requiredPaths.push(id)
-        return loadModule(id)
+        return loadFile(id)
     }
 
     Function('require', 'module', 'exports', source)(nativeRequire, commonJsModule, commonJsModule.exports)
     return {
         requiredPaths,
-        runtime: commonJsModule.exports as NativeTransport
+        runtime: commonJsModule.exports as TransportExports
     }
 }
 
@@ -117,11 +117,11 @@ test('materializes capsule loaders with literal physical paths', async () => {
     })
     const capsule = {}
     const evaluated = evaluateTransport(source, () => capsule)
-    const modules = evaluated.runtime.transport
+    const registrationLoaders = evaluated.runtime.transport
 
-    assert.strictEqual(modules[chunkIdToModuleUrl('assets/chunks/lazy-b.js')]?.(), capsule)
+    assert.strictEqual(registrationLoaders[chunkIdToModuleUrl('assets/chunks/lazy-b.js')]?.(), capsule)
     assert.deepEqual(evaluated.requiredPaths, ['./assets/chunks/lazy-b.js'])
-    assert.strictEqual(modules[chunkIdToModuleUrl('assets/missing.js')], undefined)
+    assert.strictEqual(registrationLoaders[chunkIdToModuleUrl('assets/missing.js')], undefined)
 
     const requireArguments = [...source.matchAll(/\brequire\(([^)]+)\)/g)].map((match) => JSON.parse(match[1]))
     assert.deepEqual(requireArguments, [
@@ -145,12 +145,14 @@ test('bridges amphibious bootstrap and Rolldown runtime namespaces lazily', asyn
     const evaluated = evaluateTransport(source, (id) => {
         return id === './assets/bootstrap.js' ? bootstrapNamespace : runtimeNamespace
     })
-    const modules = evaluated.runtime.transport
+    const registrationLoaders = evaluated.runtime.transport
 
     // Creating transport must not recursively require bootstrap while bootstrap itself imports transport.
     assert.deepEqual(evaluated.requiredPaths, [])
-    const publishedBootstrap = executeAmphibiousRegistration(modules[chunkIdToModuleUrl('assets/bootstrap.js')]?.())
-    const publishedRuntime = executeAmphibiousRegistration(modules[chunkIdToModuleUrl(runtimeChunkId)]?.())
+    const publishedBootstrap = executeAmphibiousRegistration(
+        registrationLoaders[chunkIdToModuleUrl('assets/bootstrap.js')]?.()
+    )
+    const publishedRuntime = executeAmphibiousRegistration(registrationLoaders[chunkIdToModuleUrl(runtimeChunkId)]?.())
 
     assert.deepEqual(evaluated.requiredPaths, ['./assets/bootstrap.js', './assets/rolldown-runtime-a.js'])
     assert.strictEqual(publishedBootstrap.appConfig, bootstrapNamespace.appConfig)

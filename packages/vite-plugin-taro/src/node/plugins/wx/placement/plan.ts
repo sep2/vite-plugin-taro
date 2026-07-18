@@ -1,25 +1,25 @@
 import { createHash } from 'node:crypto'
 import type { Rolldown } from 'vite'
 
-// Leave headroom below WeChat's 2M package limit for capsule wrappers and bundler-generated code.
-const packagePlanningBudget = 1_900_000
-const generatedPackageRootPrefix = 'sub/p_'
+// Leave headroom below WeChat's 2M subpackage limit for capsule wrappers and bundler-generated code.
+const subpackagePlanningBudget = 1_900_000
+const generatedSubpackageRootPrefix = 'sub/p_'
 
-/** Identifies one generated code-only package by its physical output root. */
+/** Identifies one generated code-only subpackage by its physical output root. */
 export type SubpackageLocation = {
-    /** Discriminates generated packages from main. */
+    /** Discriminates generated subpackages from main. */
     kind: 'subpackage'
-    /** Native package root relative to the Mini Program output directory. */
+    /** Native subpackage root relative to the Mini Program output directory. */
     root: string
 }
 
-/** Physical package ownership for one transformed application module. */
+/** Physical package ownership for one transformed module. */
 export type PackageLocation = { kind: 'main' } | SubpackageLocation
 
 /** Immutable module-to-package ownership produced before Rolldown creates chunks. */
 export type PlacementPlan = ReadonlyMap<string, PackageLocation>
 
-/** Minimal Rolldown graph interface consumed by the package planner. */
+/** Minimal Rolldown graph interface consumed by the subpackage planner. */
 export type ModuleGraph = {
     /** Every transformed module known after graph construction. */
     moduleIds: Iterable<string>
@@ -27,8 +27,8 @@ export type ModuleGraph = {
     getModuleInfo(moduleId: string): Rolldown.ModuleInfo | null
 }
 
-/** One independently movable lazy module together with size and co-location preferences. */
-type PlacementItem = {
+/** One independently placeable lazy module together with size and co-location preferences. */
+type PlaceableModule = {
     /** Stable module identity and final ownership key. */
     moduleId: string
     /** UTF-8 size of transformed source used as the bin-packing estimate. */
@@ -39,9 +39,9 @@ type PlacementItem = {
     neighbors: ReadonlySet<string>
 }
 
-/** Mutable package candidate used only while best-fit packing is in progress. */
-type PackageBin = {
-    /** Modules currently assigned to this mutable packing candidate. */
+/** Mutable subpackage candidate used only while best-fit packing is in progress. */
+type SubpackageBin = {
+    /** Modules currently assigned to this candidate. */
     moduleIds: string[]
     /** Accumulated transformed-source estimate. */
     estimatedBytes: number
@@ -49,8 +49,8 @@ type PackageBin = {
     consumers: Set<string>
 }
 
-/** Final membership and stable physical location for one generated package. */
-type PackedPackage = SubpackageLocation & {
+/** Final membership and stable physical location for one generated subpackage. */
+type PackedSubpackage = SubpackageLocation & {
     /** Sorted membership used both for stable hashing and ownership assignment. */
     moduleIds: readonly string[]
 }
@@ -59,10 +59,10 @@ type PackedPackage = SubpackageLocation & {
 export const mainPackage = { kind: 'main' } as const
 
 /**
- * Creates one deterministic package plan:
+ * Creates one deterministic subpackage placement plan:
  *
  * 1. Snapshot Rolldown's transformed module graph.
- * 2. Reserve every explicit entry and its eager application closure for main.
+ * 2. Reserve every explicit entry and its eager capsule closure for main.
  * 3. Annotate remaining modules with dynamic-root and static-edge affinity.
  * 4. Pack those lazy modules independently under the planning budget.
  * 5. Return only module ownership; chunks and native manifests are reconciled later.
@@ -73,7 +73,7 @@ export const mainPackage = { kind: 'main' } as const
 export function createPlacementPlan({
     moduleIds,
     getModuleInfo,
-    planningBudgetBytes = packagePlanningBudget
+    planningBudgetBytes = subpackagePlanningBudget
 }: ModuleGraph & { planningBudgetBytes?: number }): PlacementPlan {
     // Materialize the iterable once because every later phase needs stable random access by module ID.
     const infos = new Map<string, Rolldown.ModuleInfo>()
@@ -88,7 +88,7 @@ export function createPlacementPlan({
     const eagerModules = findEagerModules(infos)
     const consumersByModule = findLazyConsumers({ infos, eagerModules })
     const neighborsByModule = findLazyNeighbors({ infos, eagerModules })
-    const lazyItems = [...infos.entries()]
+    const placeableModules = [...infos.entries()]
         .filter(([moduleId]) => !eagerModules.has(moduleId))
         .map(([moduleId, info]) => ({
             moduleId,
@@ -97,25 +97,25 @@ export function createPlacementPlan({
             neighbors: neighborsByModule.get(moduleId) ?? new Set<string>()
         }))
 
-    // Packing operates at module granularity, so a large lazy closure or cycle may span multiple packages.
-    const packages = packItems({ items: lazyItems, planningBudgetBytes }).map(createPackedPackage)
-    const packageByModule = new Map<string, PackageLocation>()
+    // Packing operates at module granularity, so a large lazy closure or cycle may span several subpackages.
+    const subpackages = packSubpackages({ modules: placeableModules, planningBudgetBytes }).map(createPackedSubpackage)
+    const locationByModule = new Map<string, PackageLocation>()
     for (const moduleId of eagerModules) {
-        packageByModule.set(moduleId, mainPackage)
+        locationByModule.set(moduleId, mainPackage)
     }
-    for (const packagePlan of packages) {
-        for (const moduleId of packagePlan.moduleIds) {
-            packageByModule.set(moduleId, packagePlan)
+    for (const subpackage of subpackages) {
+        for (const moduleId of subpackage.moduleIds) {
+            locationByModule.set(moduleId, subpackage)
         }
     }
 
-    return packageByModule
+    return locationByModule
 }
 
 /**
  * Finds modules that must remain in main. Explicit native entries seed the traversal, their static imports remain eager,
  * and their direct dynamic imports are also eager because App and Page shells use import() only as a SystemJS capsule
- * activation mechanism. Dynamic imports below those application roots remain genuine lazy boundaries.
+ * activation mechanism. Dynamic imports below those capsule roots remain genuine lazy boundaries.
  */
 function findEagerModules(infos: ReadonlyMap<string, Rolldown.ModuleInfo>): Set<string> {
     const eagerModules = new Set<string>()
@@ -132,7 +132,7 @@ function findEagerModules(infos: ReadonlyMap<string, Rolldown.ModuleInfo>): Set<
         }
         eagerModules.add(moduleId)
         pending.push(...info.importedIds)
-        // Native App and Page shells use import() to request their eager application capsules.
+        // Native App and Page shells use import() to request their eager capsules.
         if (info.isEntry) {
             pending.push(...info.dynamicallyImportedIds)
         }
@@ -143,7 +143,7 @@ function findEagerModules(infos: ReadonlyMap<string, Rolldown.ModuleInfo>): Set<
 /**
  * Records dynamic-root demand for each lazy module. Every non-eager dynamic target starts one root traversal; that
  * traversal follows static edges only, stopping before nested dynamic boundaries. A shared module accumulates every root
- * that can request it. These consumer sets improve co-location but never prevent package splitting.
+ * that can request it. These consumer sets improve co-location but never prevent subpackage splitting.
  */
 function findLazyConsumers({
     infos,
@@ -224,29 +224,29 @@ function addNeighbor(neighborsByModule: Map<string, Set<string>>, moduleId: stri
  *
  * 1. Visit larger transformed modules first, with module ID as the stable tie-breaker.
  * 2. Consider only existing bins that stay within the planning budget.
- * 3. Prefer the bin with the least remaining space, minimizing package count in the usual best-fit heuristic.
+ * 3. Prefer the bin with the least remaining space, minimizing subpackage count in the usual best-fit heuristic.
  * 4. When remaining space ties, prefer shared dynamic consumers and then static neighbors.
  * 5. Create a new bin when no existing bin fits; an individually oversized module receives its own bin.
  */
-function packItems({
-    items,
+function packSubpackages({
+    modules,
     planningBudgetBytes
 }: {
-    items: readonly PlacementItem[]
+    modules: readonly PlaceableModule[]
     planningBudgetBytes: number
-}): PackageBin[] {
-    const bins: PackageBin[] = []
-    const sortedItems = [...items].sort((left, right) => {
+}): SubpackageBin[] {
+    const bins: SubpackageBin[] = []
+    const sortedModules = [...modules].sort((left, right) => {
         return right.estimatedBytes - left.estimatedBytes || left.moduleId.localeCompare(right.moduleId)
     })
 
-    for (const item of sortedItems) {
+    for (const module of sortedModules) {
         const candidate = bins
-            .filter((bin) => bin.estimatedBytes + item.estimatedBytes <= planningBudgetBytes)
+            .filter((bin) => bin.estimatedBytes + module.estimatedBytes <= planningBudgetBytes)
             .map((bin) => ({
                 bin,
-                remainingBytes: planningBudgetBytes - bin.estimatedBytes - item.estimatedBytes,
-                affinity: getAffinity(bin, item)
+                remainingBytes: planningBudgetBytes - bin.estimatedBytes - module.estimatedBytes,
+                affinity: getAffinity(bin, module)
             }))
             .sort((left, right) => {
                 return left.remainingBytes - right.remainingBytes || right.affinity - left.affinity
@@ -260,9 +260,9 @@ function packItems({
         if (!candidate) {
             bins.push(bin)
         }
-        bin.moduleIds.push(item.moduleId)
-        bin.estimatedBytes += item.estimatedBytes
-        for (const consumer of item.consumers) {
+        bin.moduleIds.push(module.moduleId)
+        bin.estimatedBytes += module.estimatedBytes
+        for (const consumer of module.consumers) {
             bin.consumers.add(consumer)
         }
     }
@@ -270,14 +270,14 @@ function packItems({
 }
 
 /** Scores dynamic-root overlap above direct static adjacency when equally full bins compete. */
-function getAffinity(bin: PackageBin, item: PlacementItem): number {
+function getAffinity(bin: SubpackageBin, module: PlaceableModule): number {
     let affinity = 0
-    for (const consumer of item.consumers) {
+    for (const consumer of module.consumers) {
         if (bin.consumers.has(consumer)) {
             affinity += 2
         }
     }
-    for (const neighbor of item.neighbors) {
+    for (const neighbor of module.neighbors) {
         if (bin.moduleIds.includes(neighbor)) {
             affinity += 1
         }
@@ -285,23 +285,23 @@ function getAffinity(bin: PackageBin, item: PlacementItem): number {
     return affinity
 }
 
-/** Freezes bin membership and derives a stable package root from sorted module IDs. */
-function createPackedPackage(bin: PackageBin): PackedPackage {
+/** Freezes bin membership and derives a stable subpackage root from sorted module IDs. */
+function createPackedSubpackage(bin: SubpackageBin): PackedSubpackage {
     const moduleIds = [...bin.moduleIds].sort()
     const hash = createHash('sha256').update(moduleIds.join('\0')).digest('hex').slice(0, 8)
     return {
         kind: 'subpackage',
-        root: `${generatedPackageRootPrefix}${hash}`,
+        root: `${generatedSubpackageRootPrefix}${hash}`,
         moduleIds
     }
 }
 
-/** Uses the generated root directory itself as the native package alias. */
+/** Uses the generated root directory itself as the native subpackage alias. */
 export function getSubpackageName(root: string): string {
     return root.slice(root.lastIndexOf('/') + 1)
 }
 
-/** Tests the plugin-owned output prefix that physically identifies every generated package. */
+/** Tests the plugin-owned output prefix that physically identifies every generated subpackage. */
 export function isGeneratedSubpackageFile(fileName: string): boolean {
-    return fileName.startsWith(generatedPackageRootPrefix)
+    return fileName.startsWith(generatedSubpackageRootPrefix)
 }

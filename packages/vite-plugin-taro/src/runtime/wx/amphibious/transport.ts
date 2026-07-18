@@ -1,10 +1,10 @@
 // Transport itself executes only as native CommonJS. It lives beside bootstrap because together they implement the
 // amphibious boundary that publishes native namespaces to SystemJS without re-evaluating their module bodies.
-type Instantiation = System.Registration | PromiseLike<System.Registration>
-type ModuleLoader = () => Instantiation
-type AmphibiousLoader = () => Readonly<Record<string, unknown>>
+type RegistrationLoad = System.Registration | PromiseLike<System.Registration>
+type RegistrationLoader = () => RegistrationLoad
+type AmphibiousNamespaceLoader = () => Readonly<Record<string, unknown>>
 
-type TransportSource = readonly ['capsule', ModuleLoader] | readonly ['amphibious', AmphibiousLoader]
+type TransportSource = readonly ['capsule', RegistrationLoader] | readonly ['amphibious', AmphibiousNamespaceLoader]
 
 /** Materialized from the preliminary output graph before Rolldown finalizes content hashes. */
 declare const __VITE_PLUGIN_TARO_TRANSPORT_SOURCES__: Readonly<Record<string, TransportSource>>
@@ -28,20 +28,22 @@ function createAmphibiousRegistration(namespace: Readonly<Record<string, unknown
  * Capsule loaders already return registrations. Amphibious loaders synchronously require a main-package CommonJS module
  * only when SystemJS first requests it, making bootstrap's deferred self-require safe through WeChat's CommonJS cache.
  */
-export const transport: Readonly<Record<string, ModuleLoader>> = createTransport(__VITE_PLUGIN_TARO_TRANSPORT_SOURCES__)
+export const transport: Readonly<Record<string, RegistrationLoader>> = createTransport(
+    __VITE_PLUGIN_TARO_TRANSPORT_SOURCES__
+)
 
-function createTransport(sources: Readonly<Record<string, TransportSource>>): Record<string, ModuleLoader> {
-    const table: Record<string, ModuleLoader> = {}
+function createTransport(sources: Readonly<Record<string, TransportSource>>): Record<string, RegistrationLoader> {
+    const registrationLoaders: Record<string, RegistrationLoader> = {}
 
     for (const [moduleId, source] of Object.entries(sources)) {
         if (source[0] === 'capsule') {
-            table[moduleId] = source[1]
+            registrationLoaders[moduleId] = source[1]
             continue
         }
 
         const loadNamespace = source[1]
-        table[moduleId] = () => createAmphibiousRegistration(loadNamespace())
+        registrationLoaders[moduleId] = () => createAmphibiousRegistration(loadNamespace())
     }
 
-    return table
+    return registrationLoaders
 }

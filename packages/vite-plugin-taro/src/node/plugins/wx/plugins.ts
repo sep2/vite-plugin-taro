@@ -3,12 +3,12 @@ import type { VitePluginTaroOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { getWxModuleKind, isTransportModule } from './module.ts'
-import { generateBundle } from './output/bundle.ts'
+import { createOutputFiles } from './output/files.ts'
 import { createPlacer } from './placement/placer.ts'
 import { renderCapsule } from './render/capsule.ts'
 import { renderNative } from './render/native.ts'
 import { materializeTransport } from './render/transport.ts'
-import { createModuleResolver } from './resolve/resolver.ts'
+import { createResolver } from './resolve/resolver.ts'
 
 /** Creates the complete plugin set for the wx target. */
 export function createWxTargetPlugins(options: VitePluginTaroOptions): PluginOption[] {
@@ -17,7 +17,7 @@ export function createWxTargetPlugins(options: VitePluginTaroOptions): PluginOpt
 
 /** Configures the complete wx target build pipeline. */
 function createWxPlugin(options: VitePluginTaroOptions): Plugin {
-    const moduleResolver = createModuleResolver(options)
+    const resolver = createResolver(options)
     const placer = createPlacer()
 
     return {
@@ -25,7 +25,7 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
 
         config(_config, _env) {
             return {
-                define: createWxDefines(),
+                define: createTaroDefines(),
 
                 appType: 'custom',
 
@@ -50,20 +50,20 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
 
                     rolldownOptions: {
                         ...placer.rolldownOptions,
-                        input: moduleResolver.input
+                        input: resolver.input
                     }
                 }
             }
         },
 
         resolveId(id, importer) {
-            return moduleResolver.resolveId(id, importer, this.environment.config.root)
+            return resolver.resolveId(id, importer, this.environment.config.root)
         },
 
         transform: {
             order: 'pre',
             handler(code, id) {
-                return moduleResolver.transform(code, id)
+                return resolver.specialize(code, id)
             }
         },
 
@@ -104,9 +104,9 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
             order: 'post',
             handler(_, bundle) {
                 const subpackages = placer.getSubpackages(bundle)
-                const files = generateBundle({ bundle, options, subpackages })
+                const outputFiles = createOutputFiles({ bundle, options, subpackages })
 
-                files.forEach((file) => {
+                outputFiles.forEach((file) => {
                     this.emitFile(file)
                 })
             }
@@ -114,8 +114,8 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
     }
 }
 
-/** Taro legacy constants */
-function createWxDefines(): Record<string, string> {
+/** Creates the build-time constants required by Taro's legacy feature gates. */
+function createTaroDefines(): Record<string, string> {
     const taroVersion = String((packageRequire('@tarojs/runtime/package.json') as { version: string }).version)
 
     return {

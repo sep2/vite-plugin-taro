@@ -2,7 +2,7 @@ import type { Rolldown } from 'vite'
 import type { JsonObject, VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../../options.ts'
 import { createAppConfig } from '../../../utils/project-config.ts'
 import type { GeneratedSubpackage } from '../placement/placer.ts'
-import { relativeRootAsset } from './relative-root.ts'
+import { toRootRelativePath } from './relative-root.ts'
 
 /** Creates every configured native JSON asset. */
 export function createJsonAssets({
@@ -37,7 +37,7 @@ function createPageJson(page: VitePluginTaroPageOption): JsonObject {
         ...page.config,
         usingComponents: {
             ...usingComponents,
-            comp: relativeRootAsset(page.path, 'comp')
+            comp: toRootRelativePath(page.path, 'comp')
         }
     }
 }

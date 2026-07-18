@@ -17,8 +17,8 @@ type TransportedChunk = {
  * reference participates in final hash calculation instead of changing code after its filename has been fixed.
  *
  * This intentionally creates broad hash invalidation: changing one capsule can rename transport, then bootstrap, then
- * chunks that import bootstrap. WX ships one application package rather than independently cached HTTP chunks, so honest
- * content hashes and automatic graph linking are more valuable here than minimizing that hash fan-out.
+ * chunks that import bootstrap. A Mini Program ships one application package rather than independently cached HTTP
+ * chunks, so honest content hashes and automatic graph linking are more valuable than minimizing that hash fan-out.
  */
 export async function materializeTransport({
     code,
@@ -62,7 +62,7 @@ export async function materializeTransport({
     })
 }
 
-/** Keeps only modules that SystemJS may instantiate and carries their narrowed kind into source generation. */
+/** Keeps only capsule and amphibious chunks and carries their narrowed kind into source generation. */
 function getTransportedChunks(chunks: Readonly<Record<string, Rolldown.RenderedChunk>>): TransportedChunk[] {
     const transportedChunks: TransportedChunk[] = []
 
@@ -106,7 +106,7 @@ function createTransportSource({
     )
 }
 
-/** Converts one preliminary output path to a literal require path relative to the native transport entry. */
+/** Converts one preliminary output path to a literal require path relative to transport. */
 function toNativeRequirePath(fromFileName: string, toFileName: string): string {
     const relativePath = path.posix.relative(path.posix.dirname(fromFileName), toFileName)
     return relativePath.startsWith('.') ? relativePath : `./${relativePath}`

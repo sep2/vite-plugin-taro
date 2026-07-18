@@ -8,47 +8,47 @@ import {
     bootstrapPath,
     componentShellFileName,
     componentShellPath,
+    pageCapsuleId,
+    pageCapsulePath,
     pageComponentId,
-    pageModuleId,
-    pageModulePath,
     pageShellPath,
     transportPath,
     vitePreloadId
 } from '../module.ts'
-import { transformBootstrap } from './specialize-bootstrap.ts'
-import { transformPageModule } from './specialize-page.ts'
+import { specializeBootstrap } from './specialize-bootstrap.ts'
+import { specializePageCapsule } from './specialize-page-capsule.ts'
 
-/** Resolves one exact private import using its importer and configured project root. */
-type RuntimeModuleResolver = (importer: string | undefined, projectRoot: string) => string
+/** Resolves one exact plugin-private ID using its importer and configured project root. */
+type PrivateIdResolver = (importer: string | undefined, projectRoot: string) => string
 
-/** Creates the private WX module resolver. */
-export function createModuleResolver(options: VitePluginTaroOptions) {
+/** Creates the resolver and source specializer for the wx module graph. */
+export function createResolver(options: VitePluginTaroOptions) {
     const normalizedBootstrapPath = normalizeModuleId(bootstrapPath)
-    const normalizedPageModulePath = normalizeModuleId(pageModulePath)
+    const normalizedPageCapsulePath = normalizeModuleId(pageCapsulePath)
 
     // Provide constant-time route validation and access to each configured Page JSON object.
     const pageByPath = new Map(options.pages.map((page) => [page.path, page]))
 
-    const moduleResolvers = new Map<string, RuntimeModuleResolver>([
-        // Share bootstrap's identity helper through native require and its amphibious SystemJS registration.
+    const privateIdResolvers = new Map<string, PrivateIdResolver>([
+        // Share bootstrap's preload identity through native require and its amphibious SystemJS registration.
         [vitePreloadId, () => bootstrapPath],
-        // Keep the configured App component behind one stable private import in the App module.
+        // Keep the configured App component behind one stable private import in the App capsule.
         [appComponentId, (_importer, projectRoot) => resolveAppComponentPath({ appPath: options.app, projectRoot })],
         [
             pageComponentId,
             (importer, projectRoot) => {
-                const page = requirePage({ moduleId: importer, pageByPath })
+                const page = requireConfiguredPage({ moduleId: importer, pageByPath })
 
                 return resolvePageComponentPath({ pagePath: page.path, projectRoot })
             }
         ],
         [
-            pageModuleId,
+            pageCapsuleId,
             (importer) => {
-                // Query-qualify the real module so every Page retains a distinct graph identity.
-                const page = requirePage({ moduleId: importer, pageByPath })
+                // Query-qualify the capsule source so every Page retains a distinct graph identity.
+                const page = requireConfiguredPage({ moduleId: importer, pageByPath })
 
-                return createRouteModuleId({ moduleId: pageModulePath, pagePath: page.path })
+                return createRouteModuleId({ moduleId: pageCapsulePath, pagePath: page.path })
             }
         ]
     ])
@@ -69,18 +69,22 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
 
         resolveId(id: string, importer: string | undefined, projectRoot: string): string | undefined {
             // Unknown IDs fall through so Vite and other plugins retain normal resolution.
-            return moduleResolvers.get(id)?.(importer, projectRoot)
+            return privateIdResolvers.get(id)?.(importer, projectRoot)
         },
 
-        transform(code: string, id: string) {
+        specialize(code: string, id: string) {
             const normalizedId = normalizeModuleId(id)
 
             if (normalizedId === normalizedBootstrapPath) {
-                return transformBootstrap({ code, id, appConfig: createAppConfig(options) })
+                return specializeBootstrap({ code, id, appConfig: createAppConfig(options) })
             }
 
-            if (normalizedId === normalizedPageModulePath) {
-                return transformPageModule({ code, id, page: requirePage({ moduleId: id, pageByPath }) })
+            if (normalizedId === normalizedPageCapsulePath) {
+                return specializePageCapsule({
+                    code,
+                    id,
+                    page: requireConfiguredPage({ moduleId: id, pageByPath })
+                })
             }
         }
     }
@@ -91,8 +95,8 @@ function createRouteModuleId({ moduleId, pagePath }: { moduleId: string; pagePat
     return `${moduleId}?route=${encodeURIComponent(pagePath)}`
 }
 
-/** Returns the configured Page identified by a route-qualified module ID. */
-function requirePage({
+/** Returns the configured Page identified by a route-qualified capsule ID. */
+function requireConfiguredPage({
     moduleId,
     pageByPath
 }: {
@@ -104,7 +108,7 @@ function requirePage({
     const page = pagePath ? pageByPath.get(pagePath) : undefined
     if (!page) {
         throw new Error(
-            pagePath ? `Unknown Page module: ${pagePath}` : 'Page module import must originate from a route module'
+            pagePath ? `Unknown Page capsule: ${pagePath}` : 'Page capsule import must originate from a route module'
         )
     }
     return page

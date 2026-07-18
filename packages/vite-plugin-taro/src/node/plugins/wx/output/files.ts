@@ -4,8 +4,8 @@ import type { GeneratedSubpackage } from '../placement/placer.ts'
 import { createJsonAssets } from './json.ts'
 import { createTemplateAssets } from './templates.ts'
 
-/** Creates native files from the final bundle. */
-export function generateBundle({
+/** Creates every native companion file derived from the final Rolldown bundle. */
+export function createOutputFiles({
     bundle,
     options,
     subpackages

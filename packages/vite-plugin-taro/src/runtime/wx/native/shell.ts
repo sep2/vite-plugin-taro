@@ -1,59 +1,59 @@
-/** One native invocation queued before module activation. */
-interface NativeInvocation<Method extends string> {
+/** One native callback invocation queued before capsule activation. */
+interface QueuedInvocation<Method extends string> {
     method: Method
     receiver: object
     args: unknown[]
 }
 
-/** An asynchronously loaded native configuration module. */
-interface NativeModule {
+/** The namespace returned after SystemJS executes an App, Page, or Component capsule. */
+interface CapsuleNamespace {
     default: unknown
 }
 
-/** Inputs for a synchronous native shell backed by an asynchronous module. */
+/** Inputs for a synchronous native shell backed by an asynchronously activated capsule. */
 interface NativeShellOptions<Method extends string, Properties extends object> {
-    moduleName: 'App' | 'Page' | 'Component'
-    loadModule: () => Promise<NativeModule>
+    shellName: 'App' | 'Page' | 'Component'
+    loadCapsule: () => Promise<CapsuleNamespace>
     methods: readonly Method[]
     properties: Properties
 }
 
-/** A synchronous native shell backed by an asynchronous module. */
+/** A synchronous native shell backed by an asynchronously activated capsule. */
 export type NativeShell<Method extends string, Properties extends object> = Properties &
     Record<Method, (this: object, ...args: unknown[]) => unknown>
 
-/** Creates a synchronous native shell backed by an asynchronous module. */
+/** Creates a synchronous native shell and replays callbacks after its capsule supplies the real configuration. */
 export function createNativeShell<Method extends string, Properties extends object>({
-    moduleName,
-    loadModule,
+    shellName,
+    loadCapsule,
     methods,
     properties
 }: NativeShellOptions<Method, Properties>): NativeShell<Method, Properties> {
-    const journal: NativeInvocation<Method>[] = []
-    let activatedConfig: Record<string, unknown> | undefined
+    const journal: QueuedInvocation<Method>[] = []
+    let activeConfig: Record<string, unknown> | undefined
     let failed = false
 
-    // Every native shell activates independently; cross-shell prerequisites must be explicit module dependencies.
+    // Every shell activates independently; prerequisites shared by several shells must be explicit capsule dependencies.
     void Promise.resolve()
-        .then(loadModule)
-        .then((module) => {
-            if (!module.default || typeof module.default !== 'object') {
-                throw new Error(`Expected a ${moduleName} configuration`)
+        .then(loadCapsule)
+        .then((capsule) => {
+            if (!capsule.default || typeof capsule.default !== 'object') {
+                throw new Error(`Expected a ${shellName} configuration`)
             }
 
-            const nextConfig = module.default as Record<string, unknown>
+            const nextConfig = capsule.default as Record<string, unknown>
             for (let index = 0; index < journal.length; index++) {
                 const invocation = journal[index]
-                callNativeConfig(nextConfig, invocation.method, invocation.receiver, invocation.args)
+                callConfigMethod(nextConfig, invocation.method, invocation.receiver, invocation.args)
             }
             journal.length = 0
-            activatedConfig = nextConfig
+            activeConfig = nextConfig
         })
         .catch((error: unknown) => {
-            activatedConfig = undefined
+            activeConfig = undefined
             failed = true
             journal.length = 0
-            console.error(`Failed to activate ${moduleName} module`, error)
+            console.error(`Failed to activate ${shellName} capsule`, error)
         })
 
     const callbacks = {} as Record<Method, (this: object, ...args: unknown[]) => unknown>
@@ -62,7 +62,7 @@ export function createNativeShell<Method extends string, Properties extends obje
             if (failed) {
                 return
             }
-            if (!activatedConfig) {
+            if (!activeConfig) {
                 journal.push({
                     method,
                     receiver: this,
@@ -70,7 +70,7 @@ export function createNativeShell<Method extends string, Properties extends obje
                 })
                 return
             }
-            return callNativeConfig(activatedConfig, method, this, args)
+            return callConfigMethod(activeConfig, method, this, args)
         }
     }
 
@@ -80,8 +80,8 @@ export function createNativeShell<Method extends string, Properties extends obje
     }
 }
 
-/** Calls one native method when the activated configuration provides it. */
-function callNativeConfig<Method extends string>(
+/** Calls one shell method when the activated capsule configuration provides it. */
+function callConfigMethod<Method extends string>(
     config: Record<string, unknown>,
     method: Method,
     receiver: object,

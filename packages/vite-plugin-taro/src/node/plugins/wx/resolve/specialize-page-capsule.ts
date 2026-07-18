@@ -5,8 +5,8 @@ import { type AstTransformResult, replaceWithAst } from '../../../utils/transfor
 const pagePathPlaceholder = '__VITE_PLUGIN_TARO_PAGE_PATH__'
 const pageConfigPlaceholder = '__VITE_PLUGIN_TARO_PAGE_CONFIG__'
 
-/** Specializes the real Page module for one configured route. */
-export function transformPageModule({
+/** Specializes the Page capsule for one configured route. */
+export function specializePageCapsule({
     code,
     id,
     page

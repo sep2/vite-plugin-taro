@@ -55,8 +55,8 @@ App(createAppShell(() => __vitePreload(() => import("./assets/module-b.js"), voi
         (id: string) => {
             requiredPaths.push(id)
             return {
-                createAppShell(loadModule: () => Promise<unknown>) {
-                    return { loadModule }
+                createAppShell(loadCapsule: () => Promise<unknown>) {
+                    return { loadCapsule }
                 },
                 __vitePreload(load: () => unknown) {
                     return load()
@@ -66,8 +66,8 @@ App(createAppShell(() => __vitePreload(() => import("./assets/module-b.js"), voi
         { System: system },
         (config: unknown) => registrations.push(config)
     )
-    const registration = registrations[0] as { loadModule: () => Promise<unknown> }
-    await registration.loadModule()
+    const registration = registrations[0] as { loadCapsule: () => Promise<unknown> }
+    await registration.loadCapsule()
 
     assert.deepEqual(requiredPaths, ['./assets/bootstrap-a.js'])
     assert.deepEqual(importedModuleUrls, ['vpt:/assets/module-b.js'])

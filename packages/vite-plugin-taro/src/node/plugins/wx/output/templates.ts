@@ -5,7 +5,7 @@ import type { JsonObject, VitePluginTaroOptions } from '../../../../options.ts'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import { renderJson } from './json.ts'
-import { relativeRootAsset } from './relative-root.ts'
+import { toRootRelativePath } from './relative-root.ts'
 
 type TemplateComponentConfig = {
     includes: Set<string>
@@ -14,9 +14,9 @@ type TemplateComponentConfig = {
     includeAll: boolean
 }
 
-const taroWxComponentsPath = packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
+const taroComponentsModulePath = packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
 
-/** Creates Taro's shared WeChat templates and one native facade for every Page. */
+/** Creates Taro's shared WeChat templates and native WXML/WXSS companions for every Page. */
 export function createTemplateAssets(
     bundle: Rolldown.OutputBundle,
     options: VitePluginTaroOptions
@@ -31,7 +31,7 @@ export function createTemplateAssets(
         ...options.pages.flatMap((page) => [
             createAsset(
                 `${page.path}.wxml`,
-                templateBuilder.buildPageTemplate(relativeRootAsset(page.path, 'base.wxml'), {
+                templateBuilder.buildPageTemplate(toRootRelativePath(page.path, 'base.wxml'), {
                     content: page.config,
                     path: page.path
                 })
@@ -77,7 +77,7 @@ function collectTemplateComponentConfig(bundle: Rolldown.OutputBundle): Template
         thirdPartyComponents: new Map(),
         includeAll: false
     }
-    const components = findBundleModule(bundle, taroWxComponentsPath)
+    const components = findBundleModule(bundle, taroComponentsModulePath)
     for (const name of components?.renderedExports ?? []) {
         config.includes.add(toDashed(name))
     }

@@ -1,6 +1,6 @@
 /** biome-ignore-all assist/source/organizeImports: keep side effect orders */
 
-/** Runtime exports shared by the asynchronous App and Page modules. */
+/** Taro runtime exports shared by the App, Page, and recursive Component capsules. */
 import '@tarojs/plugin-platform-weapp/dist/runtime.js'
 
 // @ts-expect-error: Taro exposes createReactApp from this runtime-only deep entry without types.

@@ -7,7 +7,7 @@ function chunk({ moduleIds, isEntry = false }: { moduleIds: readonly string[]; i
     return { moduleIds, isEntry } as Rolldown.PreRenderedChunk
 }
 
-test('classifies native, capsule, and amphibious WX modules', () => {
+test('classifies native, capsule, and amphibious wx modules', () => {
     assert.equal(getWxModuleKind(chunk({ moduleIds: ['/application'] })), 'capsule')
     assert.equal(getWxModuleKind(chunk({ moduleIds: ['/shell'], isEntry: true })), 'native')
     assert.equal(getWxModuleKind(chunk({ moduleIds: [transportPath], isEntry: true })), 'native')

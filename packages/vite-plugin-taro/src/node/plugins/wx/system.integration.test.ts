@@ -12,13 +12,13 @@ import { bootstrapPath, transportPath } from './module.ts'
 import { renderCapsule } from './render/capsule.ts'
 import { renderNative } from './render/native.ts'
 import { materializeTransport } from './render/transport.ts'
-import { transformBootstrap } from './resolve/specialize-bootstrap.ts'
+import { specializeBootstrap } from './resolve/specialize-bootstrap.ts'
 
 /** A test SystemJS module namespace. */
 type SystemModule = Readonly<Record<string, unknown>>
 
-/** The generated native transport runtime. */
-interface NativeTransport {
+/** CommonJS exports of the generated transport runtime. */
+interface TransportExports {
     transport: Readonly<Record<string, () => unknown>>
 }
 
@@ -62,7 +62,7 @@ const bootstrapTypeScript = readFileSync(
 )
 const compiledBootstrap = (await transformWithOxc(bootstrapTypeScript, 'bootstrap.ts', { target: esTarget })).code
 const bootstrapJavaScript = (
-    await transformBootstrap({
+    await specializeBootstrap({
         code: compiledBootstrap,
         id: 'bootstrap.js',
         appConfig: testAppConfig
@@ -155,7 +155,7 @@ async function createTestSystem(
         'exports',
         await materializeTestTransport([...capsules.keys()])
     )(nativeRequire, transportModule, transportModule.exports)
-    const transport = transportModule.exports as NativeTransport
+    const transport = transportModule.exports as TransportExports
 
     const sandbox: Record<string, unknown> = {
         exports: bootstrapModule.exports,
@@ -198,7 +198,7 @@ function callExport(module: SystemModule, name: string, ...arguments_: unknown[]
     return value.apply(undefined, arguments_)
 }
 
-test('shares native bootstrap exports with application capsules', async () => {
+test('shares amphibious bootstrap exports with capsules', async () => {
     const registrations = new Map<string, SystemRegistration>([
         [
             'assets/consumer.js',

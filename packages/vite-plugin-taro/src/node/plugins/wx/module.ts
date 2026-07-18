@@ -4,10 +4,10 @@ import { resolvePackageFile } from '../../utils/packages.ts'
 /** Identifies Rolldown's generated helper module independently of its unstable output filename. */
 export const rolldownRuntimeId = '\0rolldown/runtime.js'
 
-/** Identifies the amphibious runtime that initializes SystemJS and serves every native shell. */
+/** Identifies the amphibious bootstrap that initializes SystemJS and serves every native shell. */
 export const bootstrapPath = resolvePackageFile('dist/runtime/wx/amphibious/bootstrap.js')
 
-/** Identifies the native transport entry materialized before Rolldown finalizes content hashes. */
+/** Identifies the native transport source materialized before Rolldown finalizes content hashes. */
 export const transportPath = resolvePackageFile('dist/runtime/wx/amphibious/transport.js')
 
 /** Redirects Vite's injected browser preload helper to the bootstrap identity loader. */
@@ -16,30 +16,30 @@ export const vitePreloadId = '\0vite/preload-helper.js'
 /** Forces the native App shell entry to emit at WeChat's required root path. */
 export const appShellFileName = 'app.js'
 
-/** Provides the synchronous native App registration entry. */
+/** Identifies the synchronous native App shell source. */
 export const appShellPath = resolvePackageFile('dist/runtime/wx/native/app.js')
 
-/** Forces Taro's recursive native component entry to emit at its configured root path. */
+/** Forces Taro's recursive native Component entry to emit at its configured root path. */
 export const componentShellFileName = 'comp.js'
 
-/** Provides the synchronous recursive component registration entry. */
+/** Identifies the synchronous recursive Component shell source. */
 export const componentShellPath = resolvePackageFile('dist/runtime/wx/native/component.js')
 
-/** Resolves the configured Page component from its route-qualified importing module. */
+/** Resolves the configured Page component from its route-qualified capsule importer. */
 export const pageComponentId = '\0vpt:page-component'
 
-/** Gives every Page shell one private dynamic-import target that can be resolved using its route. */
-export const pageModuleId = '\0vpt:page-module'
+/** Gives every Page shell one private capsule target that can be resolved using its route. */
+export const pageCapsuleId = '\0vpt:page-capsule'
 
-/** Provides the real Page capsule source specialized through a stable route query. */
-export const pageModulePath = resolvePackageFile('dist/runtime/wx/capsule/page.js')
+/** Provides the Page capsule source specialized through a stable route query. */
+export const pageCapsulePath = resolvePackageFile('dist/runtime/wx/capsule/page.js')
 
-/** Provides the reusable synchronous native Page registration entry. */
+/** Identifies the reusable synchronous native Page shell source. */
 export const pageShellPath = resolvePackageFile('dist/runtime/wx/native/page.js')
 
-export type AbstractChunk = Rolldown.PreRenderedChunk | Rolldown.RenderedChunk
+export type WxChunk = Rolldown.PreRenderedChunk | Rolldown.RenderedChunk
 
-/** The execution domains in which one final WX JavaScript module participates. */
+/** The execution domains in which one final wx JavaScript module participates. */
 export type WxModuleKind = 'native' | 'capsule' | 'amphibious'
 
 // Cross-boundary identity is centralized here so future plugin-owned native runtimes join both rendering domains by
@@ -47,7 +47,7 @@ export type WxModuleKind = 'native' | 'capsule' | 'amphibious'
 const amphibiousModuleIds: ReadonlySet<string> = new Set([bootstrapPath, rolldownRuntimeId])
 
 /** Tests whether a chunk contains the physical transport implementation. */
-export function isTransportModule(chunk: AbstractChunk): boolean {
+export function isTransportModule(chunk: WxChunk): boolean {
     return chunk.moduleIds.includes(transportPath)
 }
 
@@ -63,7 +63,7 @@ export function isTransportModule(chunk: AbstractChunk): boolean {
  * registration. New plugin-owned cross-boundary modules join the amphibious ID set above without changing rendering or
  * transport code.
  */
-export function getWxModuleKind(chunk: AbstractChunk): WxModuleKind {
+export function getWxModuleKind(chunk: WxChunk): WxModuleKind {
     if (chunk.moduleIds.some((moduleId) => amphibiousModuleIds.has(moduleId))) {
         return 'amphibious'
     }

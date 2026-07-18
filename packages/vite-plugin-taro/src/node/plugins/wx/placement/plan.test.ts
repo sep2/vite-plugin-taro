@@ -10,7 +10,7 @@ type TestModule = {
     dynamicImports?: readonly string[]
 }
 
-function packageRoots(plan: PlacementPlan): string[] {
+function subpackageRoots(plan: PlacementPlan): string[] {
     return [
         ...new Set([...plan.values()].flatMap((location) => (location.kind === 'subpackage' ? [location.root] : [])))
     ].sort()
@@ -51,7 +51,7 @@ test('keeps the complete eager closure in main', () => {
     assert.equal(plan.get('/lazy')?.kind, 'subpackage')
 })
 
-test('splits an oversized lazy static cycle across packages', () => {
+test('splits an oversized lazy static cycle across subpackages', () => {
     const plan = createPlacementPlan({
         ...graph({
             '/entry': { isEntry: true, imports: ['/application'] },
@@ -93,7 +93,7 @@ test('co-locates a lazy root and static dependencies when size permits', () => {
     )
 })
 
-test('produces stable package roots independent of graph iteration order', () => {
+test('produces stable subpackage roots independent of graph iteration order', () => {
     const modules = {
         '/entry': { isEntry: true, imports: ['/application'] },
         '/application': { dynamicImports: ['/lazy'] },
@@ -105,5 +105,5 @@ test('produces stable package roots independent of graph iteration order', () =>
         graph(Object.fromEntries(Object.entries(modules).reverse()) as Readonly<Record<string, TestModule>>)
     )
 
-    assert.deepEqual(packageRoots(forward), packageRoots(reverse))
+    assert.deepEqual(subpackageRoots(forward), subpackageRoots(reverse))
 })

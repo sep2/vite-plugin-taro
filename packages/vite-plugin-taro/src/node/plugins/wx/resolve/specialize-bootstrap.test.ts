@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { transformBootstrap } from './specialize-bootstrap.ts'
+import { specializeBootstrap } from './specialize-bootstrap.ts'
 
 const id = '/plugin/runtime/wx/amphibious/bootstrap.js'
 const source = 'export const appConfig = __VITE_PLUGIN_TARO_APP_CONFIG__'
 
-test('specializes the native bootstrap with the App configuration', async () => {
-    const result = await transformBootstrap({
+test('specializes the amphibious bootstrap with the App configuration', async () => {
+    const result = await specializeBootstrap({
         code: source,
         id,
         appConfig: {
@@ -23,10 +23,10 @@ test('specializes the native bootstrap with the App configuration', async () => 
     assert.deepEqual(result.map.sources, [id])
 })
 
-test('rejects a bootstrap module missing its App configuration placeholder', async () => {
+test('rejects a bootstrap missing its App configuration placeholder', async () => {
     await assert.rejects(
         () =>
-            transformBootstrap({
+            specializeBootstrap({
                 code: 'export const appConfig = {}',
                 id,
                 appConfig: {}

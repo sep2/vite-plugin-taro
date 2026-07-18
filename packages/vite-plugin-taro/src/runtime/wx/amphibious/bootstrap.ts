@@ -1,14 +1,14 @@
-// Install the stock minimal SystemJS loader before any native shell can request an application capsule.
+// Install the stock minimal SystemJS loader before any native shell can request its capsule.
 import 'systemjs/s.js'
 import { createNativeShell } from '../native/shell.ts'
 import { transport } from './transport.ts'
 
 declare const __VITE_PLUGIN_TARO_APP_CONFIG__: Record<string, unknown>
 
-/** Shares one App configuration object between native shells and application capsules. */
+/** Shares one App configuration object between native shells and capsules. */
 export const appConfig = __VITE_PLUGIN_TARO_APP_CONFIG__
 
-type NativeModuleLoader = () => Promise<{ default: unknown }>
+type CapsuleLoader = () => Promise<{ default: unknown }>
 
 const appMethods = ['onLaunch', 'onShow', 'onHide', 'onError', 'onUnhandledRejection', 'onPageNotFound'] as const
 
@@ -36,20 +36,20 @@ const pageMethods = [
 const componentMethods = ['eh'] as const
 
 /** Creates the synchronous native App shell. */
-export function createAppShell(loadModule: NativeModuleLoader) {
+export function createAppShell(loadCapsule: CapsuleLoader) {
     return createNativeShell({
-        moduleName: 'App',
-        loadModule,
+        shellName: 'App',
+        loadCapsule,
         methods: appMethods,
         properties: { config: appConfig }
     })
 }
 
 /** Creates the synchronous native Page shell. */
-export function createPageShell(loadModule: NativeModuleLoader) {
+export function createPageShell(loadCapsule: CapsuleLoader) {
     return createNativeShell({
-        moduleName: 'Page',
-        loadModule,
+        shellName: 'Page',
+        loadCapsule,
         methods: pageMethods,
         properties: {
             data: {
@@ -62,10 +62,10 @@ export function createPageShell(loadModule: NativeModuleLoader) {
 }
 
 /** Creates the synchronous native recursive Component shell. */
-export function createComponentShell(loadModule: NativeModuleLoader) {
+export function createComponentShell(loadCapsule: CapsuleLoader) {
     const methods = createNativeShell({
-        moduleName: 'Component',
-        loadModule,
+        shellName: 'Component',
+        loadCapsule,
         methods: componentMethods,
         properties: {}
     })
@@ -82,8 +82,8 @@ export function createComponentShell(loadModule: NativeModuleLoader) {
     }
 }
 
-// Vite wraps dynamic imports with this browser preload hook. WX has no modulepreload transport, so native chunks call
-// the loader directly; application capsules receive this same cached export through bootstrap's native registration.
+// Vite wraps dynamic imports with this browser preload hook. The wx target has no modulepreload transport, so native chunks call
+// the loader directly; capsules receive this same cached export through bootstrap's amphibious registration.
 export const __vitePreload = <Value>(load: () => Value): Value => load()
 
 // SystemJS installs on WeChat's `global` object; its properties are not lexical App-service bindings.
@@ -94,7 +94,7 @@ if (!installedSystem) {
 
 // Transport returns synchronous registrations for main-package capsules and amphibious modules, and promise-like
 // registrations only for capsules that physically live in generated subpackages.
-/** Loads one amphibious module or application capsule from the materialized transport table. */
+/** Loads one amphibious module or capsule from materialized transport. */
 installedSystem.instantiate = (moduleId: string): System.Registration | PromiseLike<System.Registration> => {
     const load = transport[moduleId]
     if (!load) {

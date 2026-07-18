@@ -10,13 +10,13 @@ import {
     type PlacementPlan
 } from './plan.ts'
 
-/** Native app.json declaration for one generated code-only package. */
+/** Native app.json declaration for one generated code-only subpackage. */
 export type GeneratedSubpackage = {
     /** Stable native alias derived from the generated root hash. */
     name: string
-    /** Physical directory containing this package's emitted capsules. */
+    /** Physical directory containing this subpackage's emitted capsules. */
     root: string
-    /** Marks this as a code-only package with no native Page routes. */
+    /** Marks this as a code-only subpackage with no native Page routes. */
     pages: readonly []
 }
 
@@ -25,7 +25,7 @@ export type GeneratedSubpackage = {
  *
  * - renderStart analyzes transformed modules before chunking.
  * - codeSplitting prevents modules assigned to different packages from being merged.
- * - filename callbacks materialize planned package roots.
+ * - filename callbacks materialize planned subpackage roots.
  * - renderChunk derives native loading mode from those physical paths.
  * - generateBundle reconciles the plan with chunks that survived tree shaking.
  */
@@ -37,7 +37,7 @@ export function createPlacer() {
      * Reduces module ownership to one package for filename generation. Unknown Rolldown-generated modules default to
      * main, empty chunks default to main, and a chunk containing multiple known owners is rejected before paths diverge.
      */
-    function getChunkPackageForNaming(chunk: Rolldown.PreRenderedChunk): PackageLocation {
+    function getChunkLocation(chunk: Rolldown.PreRenderedChunk): PackageLocation {
         let location: PackageLocation | undefined
         for (const moduleId of chunk.moduleIds) {
             const moduleLocation = plan.get(moduleId) ?? mainPackage
@@ -45,7 +45,7 @@ export function createPlacer() {
                 location = moduleLocation
                 continue
             }
-            if (!isSamePackage(location, moduleLocation)) {
+            if (!hasSameLocation(location, moduleLocation)) {
                 throw new Error(`wx chunk mixes package owners: ${chunk.moduleIds.join(', ')}`)
             }
         }
@@ -53,7 +53,7 @@ export function createPlacer() {
     }
 
     return {
-        /** Assigns every transformed module to main or one generated, size-bounded package. */
+        /** Assigns every transformed module to main or one generated, size-bounded subpackage. */
         analyze(graph: ModuleGraph): void {
             plan = createPlacementPlan(graph)
         },
@@ -63,7 +63,7 @@ export function createPlacer() {
          *
          * ```text
          * native App/Page entry
-         *   └─ import() ─▶ eager application capsule [main]
+         *   └─ import() ─▶ eager App/Page capsule [main]
          *                    └─ import() ─▶ lazy-a [package A]
          *                                      └─ static import ─▶ lazy-b [package B after size splitting]
          *
@@ -83,8 +83,9 @@ export function createPlacer() {
         rolldownOptions: {
             output: {
                 /**
-                 * Gives every generated package a distinct Rolldown chunk group. Recursive dependency capture must stay
-                 * disabled: lazy static dependencies may belong to other packages and SystemJS links them asynchronously.
+                 * Gives every generated subpackage a distinct Rolldown chunk group. Recursive dependency capture must
+                 * stay disabled: lazy static dependencies may belong to other subpackages and SystemJS links them
+                 * asynchronously.
                  */
                 codeSplitting: {
                     groups: [
@@ -107,14 +108,14 @@ export function createPlacer() {
                 entryFileNames(chunk: Rolldown.PreRenderedChunk): string {
                     return isTransportModule(chunk) ? 'assets/[name]-[hash].js' : '[name]'
                 },
-                /** Converts the planned owner into its physical main or generated-package filename template. */
+                /** Converts the planned owner into its physical main or generated subpackage filename template. */
                 chunkFileNames(chunk: Rolldown.PreRenderedChunk): string {
-                    const location = getChunkPackageForNaming(chunk)
+                    const location = getChunkLocation(chunk)
                     if (location.kind === 'main') {
                         return 'assets/[name]-[hash].js'
                     }
-                    // The containing package already supplies a stable identity. Do not leak the Rolldown group name into
-                    // every physical chunk filename; content identity alone is sufficient inside that package root.
+                    // The containing subpackage already supplies a stable identity. Do not leak the Rolldown group name
+                    // into every physical chunk filename; content identity alone is sufficient beneath that root.
                     return `${location.root}/assets/[hash].js`
                 },
                 /** Keeps the one global stylesheet exact and places all other assets in main-package assets. */
@@ -132,18 +133,18 @@ export function createPlacer() {
 
         /**
          * Selects loading mode from physical output rather than graph intent. Transport executes in main, so main files
-         * use require() and every generated-package file uses require.async().
+         * use require() and every generated subpackage file uses require.async().
          */
         getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async' {
             return isGeneratedSubpackageFile(chunk.fileName) ? 'async' : 'sync'
         },
 
         /**
-         * Reconciles planned ownership with final chunks through module IDs. Tree-shaken packages disappear naturally,
+         * Reconciles planned ownership with final chunks through module IDs. Tree-shaken subpackages disappear naturally,
          * while roots are deduplicated and sorted before becoming deterministic app.json declarations.
          */
         getSubpackages(bundle: Rolldown.OutputBundle): GeneratedSubpackage[] {
-            const emittedPackageRoots = new Set<string>()
+            const emittedSubpackageRoots = new Set<string>()
             for (const output of Object.values(bundle)) {
                 if (output.type !== 'chunk') {
                     continue
@@ -151,12 +152,12 @@ export function createPlacer() {
                 for (const moduleId of output.moduleIds) {
                     const location = plan.get(moduleId)
                     if (location?.kind === 'subpackage') {
-                        emittedPackageRoots.add(location.root)
+                        emittedSubpackageRoots.add(location.root)
                     }
                 }
             }
 
-            return [...emittedPackageRoots].sort().map((root) => ({
+            return [...emittedSubpackageRoots].sort().map((root) => ({
                 name: getSubpackageName(root),
                 root,
                 pages: []
@@ -165,7 +166,7 @@ export function createPlacer() {
     }
 }
 
-/** Compares main by discriminant and generated packages by their unique physical root. */
-function isSamePackage(left: PackageLocation, right: PackageLocation): boolean {
+/** Compares main by discriminant and generated subpackages by their unique physical root. */
+function hasSameLocation(left: PackageLocation, right: PackageLocation): boolean {
     return left.kind === 'main' ? right.kind === 'main' : right.kind === 'subpackage' && left.root === right.root
 }

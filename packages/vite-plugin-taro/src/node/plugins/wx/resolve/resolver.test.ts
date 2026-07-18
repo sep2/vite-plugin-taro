@@ -6,14 +6,14 @@ import {
     appShellPath,
     bootstrapPath,
     componentShellPath,
+    pageCapsuleId,
+    pageCapsulePath,
     pageComponentId,
-    pageModuleId,
-    pageModulePath,
     pageShellPath,
     transportPath,
     vitePreloadId
 } from '../module.ts'
-import { createModuleResolver } from './resolver.ts'
+import { createResolver } from './resolver.ts'
 
 const options: VitePluginTaroOptions = {
     target: 'wx',
@@ -36,8 +36,8 @@ const options: VitePluginTaroOptions = {
     sitemapJson: {}
 }
 
-test('resolves fixed and route-specific private modules', () => {
-    const resolver = createModuleResolver(options)
+test('resolves fixed and route-specific private IDs', () => {
+    const resolver = createResolver(options)
     const projectRoot = '/project'
 
     assert.deepEqual(resolver.input, {
@@ -49,14 +49,14 @@ test('resolves fixed and route-specific private modules', () => {
     assert.equal(resolver.resolveId(vitePreloadId, undefined, projectRoot), bootstrapPath)
     assert.equal(resolver.resolveId(appComponentId, undefined, projectRoot), '/project/src/app.tsx')
 
-    const pageModule = resolver.resolveId(pageModuleId, '/runtime/page.js?route=pages%2Fhome%2Findex', projectRoot)
-    assert.equal(pageModule, `${pageModulePath}?route=pages%2Fhome%2Findex`)
-    assert.equal(resolver.resolveId(pageComponentId, pageModule, projectRoot), '/project/src/pages/home/index.tsx')
+    const pageCapsule = resolver.resolveId(pageCapsuleId, '/runtime/page.js?route=pages%2Fhome%2Findex', projectRoot)
+    assert.equal(pageCapsule, `${pageCapsulePath}?route=pages%2Fhome%2Findex`)
+    assert.equal(resolver.resolveId(pageComponentId, pageCapsule, projectRoot), '/project/src/pages/home/index.tsx')
 })
 
 test('specializes bootstrap with the configured App JSON', async () => {
-    const resolver = createModuleResolver(options)
-    const result = await resolver.transform('export const appConfig = __VITE_PLUGIN_TARO_APP_CONFIG__', bootstrapPath)
+    const resolver = createResolver(options)
+    const result = await resolver.specialize('export const appConfig = __VITE_PLUGIN_TARO_APP_CONFIG__', bootstrapPath)
 
     assert.ok(result)
     assert.match(result.code, /pages:\s*\[\s*["']pages\/home\/index["']/)
