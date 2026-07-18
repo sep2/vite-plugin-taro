@@ -72,18 +72,19 @@ export function createResolver(options: VitePluginTaroOptions) {
             return privateIdResolvers.get(id)?.(importer, projectRoot)
         },
 
-        specialize(code: string, id: string) {
+        specialize(code: string, id: string, sourcemap = true) {
             const normalizedId = normalizeModuleId(id)
 
             if (normalizedId === normalizedBootstrapPath) {
-                return specializeBootstrap({ code, id, appConfig: createAppConfig(options) })
+                return specializeBootstrap({ code, id, appConfig: createAppConfig(options), sourcemap })
             }
 
             if (normalizedId === normalizedPageCapsulePath) {
                 return specializePageCapsule({
                     code,
                     id,
-                    page: requireConfiguredPage({ moduleId: id, pageByPath })
+                    page: requireConfiguredPage({ moduleId: id, pageByPath }),
+                    sourcemap
                 })
             }
         }
