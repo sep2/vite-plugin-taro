@@ -2,7 +2,7 @@ import { types } from '@babel/core'
 import type { VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../options.ts'
 import { createPageComponentImportPath } from '../../utils/modules.ts'
 import { createAppConfig } from '../../utils/project-config.ts'
-import { type AstTransformResult, replaceWithAst } from '../utils/babel.ts'
+import { type AstTransformResult, replaceWithAst } from '../../utils/transform.ts'
 
 const appConfigPlaceholder = '__VITE_PLUGIN_TARO_H5_APP_CONFIG__'
 const routesPlaceholder = '__VITE_PLUGIN_TARO_H5_ROUTES__'

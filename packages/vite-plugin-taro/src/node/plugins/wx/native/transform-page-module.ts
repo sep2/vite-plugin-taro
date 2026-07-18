@@ -1,6 +1,6 @@
 import { types } from '@babel/core'
 import type { VitePluginTaroPageOption } from '../../../../options.ts'
-import { type AstTransformResult, replaceWithAst } from '../../utils/babel.ts'
+import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
 
 const pagePathPlaceholder = '__VITE_PLUGIN_TARO_PAGE_PATH__'
 const pageConfigPlaceholder = '__VITE_PLUGIN_TARO_PAGE_CONFIG__'

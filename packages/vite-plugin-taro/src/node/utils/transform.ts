@@ -1,7 +1,7 @@
 import { type PluginItem, transformSync } from '@babel/core'
 import generate from '@babel/generator'
 import { type Rolldown, transformWithOxc } from 'vite'
-import { esTarget } from '../../utils/constant.ts'
+import { esTarget } from './constant.ts'
 
 export type AstTransformResult = {
     code: string

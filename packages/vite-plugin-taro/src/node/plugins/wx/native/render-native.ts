@@ -3,7 +3,7 @@ import { type PluginObject, type PluginTarget, types } from '@babel/core'
 import transformModulesCommonjs from '@babel/plugin-transform-modules-commonjs'
 import type { Rolldown } from 'vite'
 import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
-import { type AstTransformResult, transformWithBabel } from '../../utils/babel.ts'
+import { type AstTransformResult, transformWithBabel } from '../../../utils/transform.ts'
 
 /** Renders a synchronous native module. */
 export function renderNative(code: string, chunk: Rolldown.RenderedChunk): AstTransformResult {

@@ -2,7 +2,7 @@ import type { PluginTarget } from '@babel/core'
 import transformDynamicImport from '@babel/plugin-transform-dynamic-import'
 import transformModulesSystemjs from '@babel/plugin-transform-modules-systemjs'
 import type { Rolldown } from 'vite'
-import { type AstTransformResult, transformWithBabel } from '../../utils/babel.ts'
+import { type AstTransformResult, transformWithBabel } from '../../../utils/transform.ts'
 import { wrapCapsulePlugin } from './wrap-capsule.ts'
 
 /** Renders one ESM chunk as an inert SystemJS capsule. */
