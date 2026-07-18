@@ -84,7 +84,12 @@ test('lets the DevEngine write the initial project and keeps HMR patch-only', as
             cacheDir: path.join(root, 'node_modules/.vite'),
             build: {
                 outDir,
+                assetsDir: 'assets',
+                chunkSizeWarningLimit: 500,
                 emptyOutDir: true,
+                lib: false,
+                minify: false,
+                reportCompressedSize: true,
                 rolldownOptions: {
                     output: {
                         entryFileNames: '[name]',

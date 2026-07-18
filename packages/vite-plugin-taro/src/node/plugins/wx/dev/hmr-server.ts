@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { InputOptions, OutputOptions } from 'rolldown'
-import { type DevEngine, dev } from 'rolldown/experimental'
+import { type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { SerializedTaskQueue } from './serialized-task-queue.ts'
@@ -185,6 +185,11 @@ export class HmrServer {
                 implement: wxDevRuntimeSource
             }
 
+            // Vite installs its native reporter only for the build command. Bundled serve uses the same Rolldown output
+            // lifecycle but omits that plugin, so append it to retain normal transform, render, and generated-file output
+            // in the terminal while Rolldown writes the physical Mini Program.
+            rolldownOptions.plugins = [rolldownOptions.plugins, createViteReporter(this.server)]
+
             return rolldownOptions
         }
     }
@@ -238,8 +243,6 @@ export class HmrServer {
                 initialOutput.reject(error)
             })
             await initialOutput.promise
-
-            this.server.config.logger.info(`[vite-plugin-taro] wx project writes at ${this.outDir}`)
         }
     }
 
@@ -360,6 +363,21 @@ function toStableFileName(fileName: string): string {
         .replace(/(^|\/)\[hash(?::\d+)?\](?=\.|$)/g, '$1[name]')
         .replace(/[-_.]\[hash(?::\d+)?\]/g, '')
         .replace(/\[hash(?::\d+)?\]/g, '[name]')
+}
+
+/** Configures Vite's native build reporter for physical development output without gzip work. */
+function createViteReporter(server: ViteDevServer) {
+    const { build, logger, root } = server.config
+    return viteReporterPlugin({
+        root,
+        isTty: Boolean(process.stdout.isTTY && !process.env.CI),
+        isLib: Boolean(build.lib),
+        assetsDir: path.join(build.assetsDir, '/'),
+        chunkLimit: build.chunkSizeWarningLimit,
+        warnLargeChunks: Boolean(build.minify && !build.lib),
+        reportCompressedSize: false,
+        logInfo: (message) => logger.info(message)
+    })
 }
 
 function getBundledDev(server: ViteDevServer) {
