@@ -110,6 +110,7 @@ test('lets the DevEngine write the initial project and keeps HMR patch-only', as
                 bundledDev: bundledDevelopment
             }
         },
+        printUrls() {},
         watcher
     } as unknown as ViteDevServer
 

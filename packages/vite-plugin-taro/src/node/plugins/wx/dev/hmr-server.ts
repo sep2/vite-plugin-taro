@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import colors from 'picocolors'
 import type { InputOptions, OutputOptions } from 'rolldown'
 import { type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
@@ -132,6 +133,7 @@ export class HmrServer {
         // place before Vite starts the client environment after configureServer hooks complete.
         this.installRolldownOptions()
         this.installDevEngine()
+        this.installDevToolsOutput()
         this.server.watcher.on('all', this.handleWatcherEvent)
     }
 
@@ -243,6 +245,19 @@ export class HmrServer {
                 initialOutput.reject(error)
             })
             await initialOutput.promise
+        }
+    }
+
+    /** Adds the physical Mini Program path directly beneath Vite's normal Local and Network URL output. */
+    private installDevToolsOutput(): void {
+        const printUrls = this.server.printUrls.bind(this.server)
+        this.server.printUrls = () => {
+            printUrls()
+            const relativeOutDir = path.relative(this.server.config.root, this.outDir).split(path.sep).join('/')
+            const devToolsPath = relativeOutDir ? `./${relativeOutDir}` : '.'
+            this.server.config.logger.info(
+                `  ${colors.green('➜')}  ${colors.bold(colors.cyan('WeChat DevTools:'))} ${colors.cyan(devToolsPath)}`
+            )
         }
     }
 
