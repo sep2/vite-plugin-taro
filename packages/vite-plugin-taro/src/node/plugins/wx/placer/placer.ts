@@ -1,130 +1,171 @@
 import type { Rolldown } from 'vite'
-import { type AbstractChunk, isNativeModule, isTransportModule } from '../native/is-native-module.ts'
+import { isTransportModule } from '../native/is-native-module.ts'
+import {
+    createPlacementPlan,
+    getSubpackageName,
+    isGeneratedSubpackageFile,
+    type ModuleGraph,
+    mainPackage,
+    type PackageLocation,
+    type PlacementPlan
+} from './placement-plan.ts'
 
-export type PackageLocation = { kind: 'main' } | { kind: 'subpackage'; root: string }
-export type LoadMode = 'sync' | 'async'
-export type ModuleKind = 'eager' | 'lazy'
-type ChunkEligibility = 'main-required' | 'subpackage-eligible'
-
-type Graph = {
-    moduleIds: Iterable<string>
-    getModuleInfo(moduleId: string): Rolldown.ModuleInfo | null
+/** Native app.json declaration for one generated code-only package. */
+export type GeneratedSubpackage = {
+    /** Stable native alias derived from the generated root hash. */
+    name: string
+    /** Physical directory containing this package's emitted capsules. */
+    root: string
+    /** Marks this as a code-only package with no native Page routes. */
+    pages: readonly []
 }
 
-const mainPackage: PackageLocation = { kind: 'main' }
-
-/** Creates the package-placement planner. The initial implementation places every chunk in the main package. */
+/**
+ * Creates the stateful adapter between graph planning and Rolldown's output lifecycle:
+ *
+ * - renderStart analyzes transformed modules before chunking.
+ * - codeSplitting prevents modules assigned to different packages from being merged.
+ * - filename callbacks materialize planned package roots.
+ * - renderChunk derives native loading mode from those physical paths.
+ * - generateBundle reconciles the plan with chunks that survived tree shaking.
+ */
 export function createPlacer() {
-    let moduleKinds = new Map<string, ModuleKind>()
+    // Filename and output callbacks run after analyze and read this immutable plan through their shared closure.
+    let packageByModule: PlacementPlan = new Map()
 
-    /** Returns the physical package selected for one chunk. */
-    function locateChunk(chunk: AbstractChunk): PackageLocation {
-        const eligibility = getChunkEligibility(moduleKinds, chunk)
-        if (eligibility === 'main-required') {
-            return mainPackage
+    /**
+     * Reduces module ownership to one package for filename generation. Unknown Rolldown-generated modules default to
+     * main, empty chunks default to main, and a chunk containing multiple known owners is rejected before paths diverge.
+     */
+    function getChunkPackageForNaming(chunk: Rolldown.PreRenderedChunk): PackageLocation {
+        let location: PackageLocation | undefined
+        for (const moduleId of chunk.moduleIds) {
+            const moduleLocation = packageByModule.get(moduleId) ?? mainPackage
+            if (!location) {
+                location = moduleLocation
+                continue
+            }
+            if (!isSamePackage(location, moduleLocation)) {
+                throw new Error(`wx chunk mixes package owners: ${chunk.moduleIds.join(', ')}`)
+            }
         }
-
-        // Eligible chunks remain in main until generated code-only packages are introduced.
-        return mainPackage
+        return location ?? mainPackage
     }
 
     return {
-        /** Classifies the complete graph without changing its initial main-package placement. */
-        analyze(graph: Graph): void {
-            moduleKinds = classifyModules(graph)
+        /** Assigns every transformed module to main or one generated, size-bounded package. */
+        analyze(graph: ModuleGraph): void {
+            packageByModule = createPlacementPlan(graph)
         },
 
-        /** Returns how one application module is reached from the native entry graph. */
-        getModuleKind(moduleId: string): ModuleKind | undefined {
-            return moduleKinds.get(moduleId)
+        /**
+         * Complete Rolldown fragment required to preserve package placement and native entry semantics.
+         *
+         * ```text
+         * native App/Page entry
+         *   └─ import() ─▶ eager application capsule [main]
+         *                    └─ import() ─▶ lazy-a [package A]
+         *                                      └─ static import ─▶ lazy-b [package B after size splitting]
+         *
+         * name()                              assigns lazy-a and lazy-b to their planned package groups
+         * includeDependenciesRecursively      false: does not pull lazy-b back into package A
+         * strictExecutionOrder                preserves the original lazy-a → lazy-b side-effect order
+         * preserveEntrySignatures             allows cross-chunk bindings without weakening native entry exports
+         *
+         * package A capsule
+         *   └─ SystemJS dependency ─▶ package B capsule
+         *                                ▲
+         *                                └─ main transport obtains registration with require.async()
+         * ```
+         *
+         * The physical fetch is asynchronous, but SystemJS links the complete static graph before execution, so splitting
+         * a static edge or cycle across packages does not turn it into an application-level dynamic import.
+         */
+        rolldownOptions: {
+            output: {
+                /**
+                 * Gives every generated package a distinct Rolldown chunk group. Recursive dependency capture must stay
+                 * disabled: lazy static dependencies may belong to other packages and SystemJS links them asynchronously.
+                 */
+                codeSplitting: {
+                    groups: [
+                        {
+                            name(moduleId: string): string | null {
+                                const location = packageByModule.get(moduleId)
+                                return location?.kind === 'subpackage' ? getSubpackageName(location) : null
+                            },
+                            // Do not let Rolldown pull a group's static closure into the same chunk. Lazy static edges may
+                            // cross physical packages because transport obtains registrations asynchronously before
+                            // SystemJS links and executes the original static graph, including cycles.
+                            includeDependenciesRecursively: false
+                        }
+                    ]
+                },
+                // The placer deliberately leaves static dependencies in their own package groups. Preserve original
+                // side-effect order while Rolldown turns cross-group edges into chunk imports; SystemJS can only link
+                // asynchronously after Rolldown has produced a correct ordered graph.
+                strictExecutionOrder: true,
+                /** Preserves exact native entries while allowing transport to participate in content hashing. */
+                entryFileNames(chunk: Rolldown.PreRenderedChunk): string {
+                    return isTransportModule(chunk) ? 'assets/[name]-[hash].js' : '[name]'
+                },
+                /** Converts the planned owner into its physical main or generated-package filename template. */
+                chunkFileNames(chunk: Rolldown.PreRenderedChunk): string {
+                    const location = getChunkPackageForNaming(chunk)
+                    if (location.kind === 'main') {
+                        return 'assets/[name]-[hash].js'
+                    }
+                    return `${location.root}/assets/[name]-[hash].js`
+                },
+                /** Keeps the one global stylesheet exact and places all other assets in main-package assets. */
+                assetFileNames(asset: Rolldown.PreRenderedAsset): string {
+                    return asset.names.some((name) => name.endsWith('.css'))
+                        ? 'app.wxss'
+                        : 'assets/[name]-[hash][extname]'
+                }
+            },
+            // Rolldown rejects strict entry signatures when code-splitting groups disable recursive dependency capture.
+            // allow-extension retains required native-entry exports while permitting the extra cross-chunk bindings used
+            // to split lazy static closures across physical packages.
+            preserveEntrySignatures: 'allow-extension' as const
         },
 
-        /** Preserves exact native entries while allowing transport to participate in content hashing. */
-        entryFileNames(chunk: Rolldown.PreRenderedChunk): string {
-            return isTransportModule(chunk) ? 'assets/[name]-[hash].js' : '[name]'
+        /**
+         * Selects loading mode from physical output rather than graph intent. Transport executes in main, so main files
+         * use require() and every generated-package file uses require.async().
+         */
+        getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async' {
+            return isGeneratedSubpackageFile(chunk.fileName) ? 'async' : 'sync'
         },
 
-        /** Names chunks from the package selected by the placement policy. */
-        chunkFileNames(chunk: Rolldown.PreRenderedChunk): string {
-            const location = locateChunk(chunk)
-            return location.kind === 'main' ? 'assets/[name]-[hash].js' : `${location.root}/assets/[name]-[hash].js`
-        },
+        /**
+         * Reconciles planned ownership with final chunks through module IDs. Tree-shaken packages disappear naturally,
+         * while roots are deduplicated and sorted before becoming deterministic app.json declarations.
+         */
+        getSubpackages(bundle: Rolldown.OutputBundle): GeneratedSubpackage[] {
+            const emittedPackageRoots = new Set<string>()
+            for (const output of Object.values(bundle)) {
+                if (output.type !== 'chunk') {
+                    continue
+                }
+                for (const moduleId of output.moduleIds) {
+                    const location = packageByModule.get(moduleId)
+                    if (location?.kind === 'subpackage') {
+                        emittedPackageRoots.add(location.root)
+                    }
+                }
+            }
 
-        /** Selects native loading mode from the physical package boundary. */
-        getLoadMode(chunk: AbstractChunk): LoadMode {
-            return locateChunk(chunk).kind === 'main' ? 'sync' : 'async'
+            return [...emittedPackageRoots].sort().map((root) => ({
+                name: getSubpackageName({ kind: 'subpackage', root }),
+                root,
+                pages: []
+            }))
         }
     }
 }
 
-/** Derives physical-placement eligibility from every module Rolldown included in one chunk. */
-function getChunkEligibility(moduleKinds: Map<string, ModuleKind>, chunk: AbstractChunk): ChunkEligibility {
-    if (isNativeModule(chunk) || chunk.moduleIds.length === 0) {
-        return 'main-required'
-    }
-
-    for (const moduleId of chunk.moduleIds) {
-        const moduleKind = moduleKinds.get(moduleId)
-        // Rolldown may synthesize output-only runtime modules after renderStart; keep every unknown module in main.
-        if (!moduleKind || moduleKind === 'eager') {
-            return 'main-required'
-        }
-    }
-    return 'subpackage-eligible'
-}
-
-type PendingModule = {
-    moduleId: string
-    crossedDynamicBoundary: boolean
-}
-
-/** Classifies static entry closures as eager and dynamic-only closures as lazy. */
-function classifyModules({ moduleIds, getModuleInfo }: Graph): Map<string, ModuleKind> {
-    const eagerModules = new Set<string>()
-    const lazyModules = new Set<string>()
-    const pending: PendingModule[] = []
-
-    for (const moduleId of moduleIds) {
-        if (getModuleInfo(moduleId)?.isEntry) {
-            pending.push({ moduleId, crossedDynamicBoundary: false })
-        }
-    }
-
-    while (pending.length > 0) {
-        const current = pending.pop()
-        if (!current) {
-            continue
-        }
-
-        const visited = current.crossedDynamicBoundary ? lazyModules : eagerModules
-        if (visited.has(current.moduleId)) {
-            continue
-        }
-
-        const moduleInfo = getModuleInfo(current.moduleId)
-        if (!moduleInfo) {
-            continue
-        }
-        visited.add(current.moduleId)
-
-        for (const importedId of moduleInfo.importedIds) {
-            pending.push({
-                moduleId: importedId,
-                crossedDynamicBoundary: current.crossedDynamicBoundary
-            })
-        }
-        for (const importedId of moduleInfo.dynamicallyImportedIds) {
-            pending.push({ moduleId: importedId, crossedDynamicBoundary: true })
-        }
-    }
-
-    const moduleKinds = new Map<string, ModuleKind>()
-    for (const moduleId of lazyModules) {
-        moduleKinds.set(moduleId, 'lazy')
-    }
-    // Static reachability wins when a module is reachable through both edge kinds.
-    for (const moduleId of eagerModules) {
-        moduleKinds.set(moduleId, 'eager')
-    }
-    return moduleKinds
+/** Compares main by discriminant and generated packages by their unique physical root. */
+function isSamePackage(left: PackageLocation, right: PackageLocation): boolean {
+    return left.kind === 'main' ? right.kind === 'main' : right.kind === 'subpackage' && left.root === right.root
 }

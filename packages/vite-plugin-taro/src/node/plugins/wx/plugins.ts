@@ -49,19 +49,8 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
                     target: esTarget,
 
                     rolldownOptions: {
-                        input: moduleResolver.input,
-                        output: {
-                            entryFileNames: placer.entryFileNames,
-                            chunkFileNames: placer.chunkFileNames,
-                            assetFileNames(asset) {
-                                if (asset.names.some((name) => name.endsWith('.css'))) {
-                                    return 'app.wxss'
-                                }
-
-                                return 'assets/[name]-[hash][extname]'
-                            }
-                        },
-                        preserveEntrySignatures: 'strict'
+                        ...placer.rolldownOptions,
+                        input: moduleResolver.input
                     }
                 }
             }
@@ -109,7 +98,8 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
         generateBundle: {
             order: 'post',
             handler(_, bundle) {
-                const files = generateBundle(bundle, options)
+                const subpackages = placer.getSubpackages(bundle)
+                const files = generateBundle({ bundle, options, subpackages })
 
                 files.forEach((file) => {
                     this.emitFile(file)

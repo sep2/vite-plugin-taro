@@ -43,7 +43,12 @@ const options: VitePluginTaroOptions = {
 }
 
 test('creates configured native JSON assets at exact output paths', () => {
-    const assets = new Map(createJsonAssets(options).map((asset) => [asset.fileName, JSON.parse(String(asset.source))]))
+    const assets = new Map(
+        createJsonAssets({ options, subpackages: [] }).map((asset) => [
+            asset.fileName,
+            JSON.parse(String(asset.source))
+        ])
+    )
 
     assert.deepEqual(
         [...assets.keys()],
@@ -80,10 +85,25 @@ test('creates configured native JSON assets at exact output paths', () => {
     assert.deepEqual(assets.get('sitemap.json'), options.sitemapJson)
 })
 
+test('adds generated code-only subpackages to app.json', () => {
+    const assets = createJsonAssets({
+        options,
+        subpackages: [{ name: 'dynamic-example', root: '__dynamic__/p_example', pages: [] }]
+    })
+    const appJson = assets.find((asset) => asset.fileName === 'app.json')
+
+    assert.deepEqual(JSON.parse(String(appJson?.source)).subPackages, [
+        { name: 'dynamic-example', root: '__dynamic__/p_example', pages: [] }
+    ])
+})
+
 test('omits project.private.config.json when it is not configured', () => {
     const assets = createJsonAssets({
-        ...options,
-        projectPrivateConfigJson: undefined
+        options: {
+            ...options,
+            projectPrivateConfigJson: undefined
+        },
+        subpackages: []
     })
 
     assert.equal(

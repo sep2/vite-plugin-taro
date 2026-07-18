@@ -5,10 +5,15 @@ import { bootstrapPath, transportPath } from '../native/constant.ts'
 import { createPlacer } from './placer.ts'
 
 function chunk(...moduleIds: string[]): Rolldown.PreRenderedChunk {
-    return { moduleIds } as Rolldown.PreRenderedChunk
+    return { isEntry: false, moduleIds } as Rolldown.PreRenderedChunk
+}
+
+function renderedChunk(fileName: string): Rolldown.RenderedChunk {
+    return { fileName } as Rolldown.RenderedChunk
 }
 
 type TestModule = {
+    code?: string
     isEntry?: boolean
     imports?: readonly string[]
     dynamicImports?: readonly string[]
@@ -24,6 +29,8 @@ function analyze(placer: ReturnType<typeof createPlacer>, modules: Readonly<Reco
                 return null
             }
             return {
+                id: moduleId,
+                code: module.code ?? '',
                 isEntry: module.isEntry ?? false,
                 importedIds: module.imports ?? [],
                 dynamicallyImportedIds: module.dynamicImports ?? []
@@ -32,74 +39,69 @@ function analyze(placer: ReturnType<typeof createPlacer>, modules: Readonly<Reco
     })
 }
 
-test('classifies eager and dynamic-only module closures', () => {
+test('places the eager graph and output-only modules in main', () => {
     const placer = createPlacer()
     analyze(placer, {
-        '/entry': { isEntry: true, imports: ['/static'], dynamicImports: ['/lazy'] },
-        '/static': { imports: ['/shared'] },
-        '/lazy': { imports: ['/lazy-dependency', '/shared'], dynamicImports: ['/nested-lazy'] },
-        '/lazy-dependency': {},
-        '/nested-lazy': {},
-        '/shared': {}
+        '/entry': { isEntry: true, imports: ['/application'] },
+        '/application': {}
     })
 
-    assert.equal(placer.getModuleKind('/entry'), 'eager')
-    assert.equal(placer.getModuleKind('/static'), 'eager')
-    assert.equal(placer.getModuleKind('/shared'), 'eager')
-    assert.equal(placer.getModuleKind('/lazy'), 'lazy')
-    assert.equal(placer.getModuleKind('/lazy-dependency'), 'lazy')
-    assert.equal(placer.getModuleKind('/nested-lazy'), 'lazy')
-})
-
-test('classifies cycles reached after a dynamic boundary as lazy', () => {
-    const placer = createPlacer()
-    analyze(placer, {
-        '/entry': { isEntry: true, dynamicImports: ['/cycle-a'] },
-        '/cycle-a': { imports: ['/cycle-b'] },
-        '/cycle-b': { dynamicImports: ['/cycle-a'] }
-    })
-
-    assert.equal(placer.getModuleKind('/cycle-a'), 'lazy')
-    assert.equal(placer.getModuleKind('/cycle-b'), 'lazy')
-})
-
-test('keeps required and eligible chunks in the initial main placement', () => {
-    const placer = createPlacer()
-    analyze(placer, {
-        '/entry': { isEntry: true, imports: ['/eager'], dynamicImports: ['/lazy'] },
-        '/eager': {},
-        '/lazy': { imports: ['/lazy-dependency'] },
-        '/lazy-dependency': {}
-    })
-
-    const chunks = [
-        chunk('/lazy', '/lazy-dependency'),
-        chunk('/eager', '/lazy'),
-        { ...chunk('/native-entry'), isEntry: true } as Rolldown.PreRenderedChunk,
-        chunk(),
-        chunk(bootstrapPath),
-        chunk('/output-runtime')
-    ]
-    for (const currentChunk of chunks) {
-        assert.equal(placer.chunkFileNames(currentChunk), 'assets/[name]-[hash].js')
-        assert.equal(placer.getLoadMode(currentChunk), 'sync')
+    for (const currentChunk of [chunk('/application'), chunk('/output-runtime'), chunk(), chunk(bootstrapPath)]) {
+        assert.equal(placer.rolldownOptions.output.chunkFileNames(currentChunk), 'assets/[name]-[hash].js')
     }
+    assert.equal(placer.getLoadMode(renderedChunk('assets/application.js')), 'sync')
 })
 
-test('places the initial WX chunk graph in the main package', () => {
+test('places dynamic-only modules in a generated asynchronous package', () => {
     const placer = createPlacer()
-    const applicationChunk = chunk('/application')
     analyze(placer, {
-        '/application': { isEntry: true }
+        '/entry': { isEntry: true, dynamicImports: ['/application'] },
+        '/application': { dynamicImports: ['/lazy'] },
+        '/lazy': { imports: ['/dependency'] },
+        '/dependency': {}
     })
 
-    assert.equal(placer.getLoadMode(applicationChunk), 'sync')
-    assert.equal(placer.chunkFileNames(applicationChunk), 'assets/[name]-[hash].js')
+    const lazyChunk = chunk('/lazy', '/dependency')
+    const filePattern = placer.rolldownOptions.output.chunkFileNames(lazyChunk)
+    const root = filePattern.slice(0, filePattern.indexOf('/assets/'))
+    const fileName = `${root}/assets/lazy.js`
+    const bundle = {
+        [fileName]: {
+            type: 'chunk',
+            fileName,
+            moduleIds: lazyChunk.moduleIds
+        }
+    } as unknown as Rolldown.OutputBundle
+
+    assert.match(filePattern, /^__dynamic__\/p_[a-f0-9]{8}\/assets\/\[name]-\[hash]\.js$/)
+    assert.equal(placer.getLoadMode(renderedChunk(fileName)), 'async')
+    assert.deepEqual(placer.getSubpackages({}), [])
+    assert.deepEqual(placer.getSubpackages(bundle), [
+        {
+            name: `dynamic-${root.slice('__dynamic__/p_'.length)}`,
+            root,
+            pages: []
+        }
+    ])
+})
+
+test('rejects a Rolldown chunk that mixes physical package owners', () => {
+    const placer = createPlacer()
+    analyze(placer, {
+        '/entry': { isEntry: true, imports: ['/eager'] },
+        '/eager': { dynamicImports: ['/lazy'] },
+        '/lazy': {}
+    })
+
+    assert.throws(
+        () => placer.rolldownOptions.output.chunkFileNames(chunk('/eager', '/lazy')),
+        /wx chunk mixes package owners/
+    )
 })
 
 test('hashes transport while preserving exact native entry paths', () => {
     const placer = createPlacer()
 
-    assert.equal(placer.entryFileNames(chunk(transportPath)), 'assets/[name]-[hash].js')
-    assert.equal(placer.entryFileNames(chunk('/native-shell')), '[name]')
+    assert.equal(placer.rolldownOptions.output.entryFileNames(chunk(transportPath)), 'assets/[name]-[hash].js')
+    assert.equal(placer.rolldownOptions.output.entryFileNames(chunk('/native-shell')), '[name]')
 })

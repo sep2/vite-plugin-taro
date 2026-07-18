@@ -1,12 +1,22 @@
 import type { Rolldown } from 'vite'
 import type { JsonObject, VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../../options.ts'
 import { createAppConfig } from '../../../utils/project-config.ts'
+import type { GeneratedSubpackage } from '../placer/placer.ts'
 import { relativeRootAsset } from './relative-root-asset.ts'
 
 /** Creates every configured native JSON asset. */
-export function createJsonAssets(options: VitePluginTaroOptions): Rolldown.EmittedAsset[] {
+export function createJsonAssets({
+    options,
+    subpackages
+}: {
+    options: VitePluginTaroOptions
+    subpackages: readonly GeneratedSubpackage[]
+}): Rolldown.EmittedAsset[] {
     return [
-        createJsonAsset('app.json', createAppConfig(options)),
+        createJsonAsset('app.json', {
+            ...createAppConfig(options),
+            ...(subpackages.length > 0 ? { subPackages: subpackages } : {})
+        }),
 
         ...options.pages.map((page) => createJsonAsset(`${page.path}.json`, createPageJson(page))),
 
