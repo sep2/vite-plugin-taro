@@ -10,7 +10,7 @@ import { esTarget } from '../../utils/constant.ts'
 import { chunkIdToModuleUrl } from '../../utils/modules.ts'
 import { renderCapsule } from './capsule/render-capsule.ts'
 import { bootstrapPath, transportPath } from './native/constant.ts'
-import { renderNativeModule } from './native/render-native-module.ts'
+import { renderNative } from './native/render-native.ts'
 import { materializeTransport } from './transport/materialize-transport.ts'
 
 /** A test SystemJS module namespace. */
@@ -64,7 +64,7 @@ const bootstrapJavaScript = (await transformWithOxc(bootstrapTypeScript, 'bootst
         /^import \{ createNativeConfig \} from ['"]\.\/native-config\.(?:ts|js)['"];\s*/m,
         'const createNativeConfig = () => ({})\n'
     )
-const bootstrapCode = renderNativeModule(bootstrapJavaScript, {
+const bootstrapCode = renderNative(bootstrapJavaScript, {
     fileName: 'assets/bootstrap.js'
 } as Rolldown.RenderedChunk).code
 const transportTypeScript = readFileSync(
@@ -72,7 +72,7 @@ const transportTypeScript = readFileSync(
     'utf8'
 )
 const transportJavaScript = (await transformWithOxc(transportTypeScript, 'transport.ts', { target: esTarget })).code
-const transportCode = renderNativeModule(transportJavaScript, {
+const transportCode = renderNative(transportJavaScript, {
     fileName: transportFileName
 } as Rolldown.RenderedChunk).code
 

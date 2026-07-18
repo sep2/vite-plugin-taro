@@ -6,7 +6,7 @@ import { type Rolldown, transformWithOxc } from 'vite'
 import { esTarget } from '../../../utils/constant.ts'
 import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
 import { bootstrapPath, transportPath } from '../native/constant.ts'
-import { renderNativeModule } from '../native/render-native-module.ts'
+import { renderNative } from '../native/render-native.ts'
 import { materializeTransport } from './materialize-transport.ts'
 
 /** The generated native capsule-loader table. */
@@ -19,7 +19,7 @@ const transportTypeScript = readFileSync(
     'utf8'
 )
 const transportJavaScript = (await transformWithOxc(transportTypeScript, 'transport.ts', { target: esTarget })).code
-const transportCode = renderNativeModule(transportJavaScript, {
+const transportCode = renderNative(transportJavaScript, {
     fileName: 'transport.js'
 } as Rolldown.RenderedChunk).code
 

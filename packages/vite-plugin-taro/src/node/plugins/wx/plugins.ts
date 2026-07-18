@@ -6,7 +6,7 @@ import { createAppConfig } from '../../utils/project-config.ts'
 import { generateBundle } from './bundle/generate-bundle.ts'
 import { renderCapsule } from './capsule/render-capsule.ts'
 import { isNativeModule, isTransportModule } from './native/is-native-module.ts'
-import { renderNativeModule } from './native/render-native-module.ts'
+import { renderNative } from './native/render-native.ts'
 import { createPlacer } from './placer/placer.ts'
 import { createModuleResolver } from './resolver/module-resolver.ts'
 import { materializeTransport } from './transport/materialize-transport.ts'
@@ -86,13 +86,13 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
                     return renderCapsule(code, chunk)
                 }
 
-                const nativeModule = renderNativeModule(code, chunk)
+                const native = renderNative(code, chunk)
                 if (!isTransportModule(chunk)) {
-                    return nativeModule
+                    return native
                 }
 
                 return materializeTransport({
-                    code: nativeModule.code,
+                    code: native.code,
                     transportChunk: chunk,
                     chunks: meta.chunks,
                     getLoadMode: placer.getLoadMode

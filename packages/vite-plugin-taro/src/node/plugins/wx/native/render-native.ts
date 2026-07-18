@@ -6,7 +6,7 @@ import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
 import { type AstTransformResult, transformWithBabel } from '../../utils/babel.ts'
 
 /** Renders a synchronous native module. */
-export function renderNativeModule(code: string, chunk: Rolldown.RenderedChunk): AstTransformResult {
+export function renderNative(code: string, chunk: Rolldown.RenderedChunk): AstTransformResult {
     return transformWithBabel(code, chunk.fileName, [
         connectNativeImportPlugin(chunk.fileName) as PluginTarget,
         transformModulesCommonjs as PluginTarget
