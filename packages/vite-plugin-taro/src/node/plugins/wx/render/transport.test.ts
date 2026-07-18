@@ -18,7 +18,9 @@ const transportTypeScript = readFileSync(
     fileURLToPath(new URL('../../../../runtime/wx/amphibious/transport.ts', import.meta.url)),
     'utf8'
 )
-const transportJavaScript = (await transformWithOxc(transportTypeScript, 'transport.ts', { target: esTarget })).code
+const transportJavaScript = (
+    await transformWithOxc(transportTypeScript, 'transport.ts', { sourcemap: false, target: esTarget })
+).code
 const transportCode = renderNative(transportJavaScript, {
     fileName: 'transport.js'
 } as Rolldown.RenderedChunk).code

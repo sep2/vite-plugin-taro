@@ -27,12 +27,14 @@ export async function materializeTransport({
     code,
     transportChunk,
     chunks,
-    getLoadMode
+    getLoadMode,
+    sourcemap = true
 }: {
     code: string
     transportChunk: Rolldown.RenderedChunk
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
     getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async'
+    sourcemap?: boolean
 }): Promise<AstTransformResult> {
     // Babel constructs and safely serializes an expression shaped like:
     // (moduleId) => {
@@ -63,19 +65,24 @@ export async function materializeTransport({
             })
         })
 
-    return await replaceWithAst(code, transportChunk.fileName, {
-        [transportPlaceholder]: types.arrowFunctionExpression(
-            [types.identifier(moduleIdParameter)],
-            types.blockStatement([
-                types.variableDeclaration('let', [types.variableDeclarator(types.identifier(namespaceVariable))]),
-                types.switchStatement(types.identifier(moduleIdParameter), [
-                    ...cases,
-                    createUnknownModuleCase(moduleIdParameter)
-                ]),
-                types.returnStatement(createAmphibiousRegistrationExpression(namespaceVariable))
-            ])
-        )
-    })
+    return await replaceWithAst(
+        code,
+        transportChunk.fileName,
+        {
+            [transportPlaceholder]: types.arrowFunctionExpression(
+                [types.identifier(moduleIdParameter)],
+                types.blockStatement([
+                    types.variableDeclaration('let', [types.variableDeclarator(types.identifier(namespaceVariable))]),
+                    types.switchStatement(types.identifier(moduleIdParameter), [
+                        ...cases,
+                        createUnknownModuleCase(moduleIdParameter)
+                    ]),
+                    types.returnStatement(createAmphibiousRegistrationExpression(namespaceVariable))
+                ])
+            )
+        },
+        sourcemap
+    )
 }
 
 /** Keeps only capsule and amphibious chunks and carries their narrowed kind into source generation. */
