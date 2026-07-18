@@ -37,7 +37,7 @@ export function createNativeShell<Method extends string, Properties extends obje
         .then(loadModule)
         .then((module) => {
             if (!module.default || typeof module.default !== 'object') {
-                throw new Error(`Expected a ${moduleName} configuration from the ${moduleName} module`)
+                throw new Error(`Expected a ${moduleName} configuration`)
             }
 
             const nextConfig = module.default as Record<string, unknown>

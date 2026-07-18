@@ -212,7 +212,10 @@ export { appConfig }`
 
     assert.equal(JSON.stringify(bootstrap.appConfig), JSON.stringify(testAppConfig))
     assert.strictEqual(consumer.appConfig, bootstrap.appConfig)
-    assert.equal(typeof bootstrap.createNativeShell, 'function')
+    assert.equal(typeof bootstrap.createAppShell, 'function')
+    assert.equal(typeof bootstrap.createPageShell, 'function')
+    assert.equal(typeof bootstrap.createComponentShell, 'function')
+    assert.equal(bootstrap.createNativeShell, undefined)
     assert.equal(typeof bootstrap.__vitePreload, 'function')
 })
 

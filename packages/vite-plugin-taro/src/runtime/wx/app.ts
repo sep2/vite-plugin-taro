@@ -1,12 +1,3 @@
-import { appConfig, createNativeShell } from './bootstrap.ts'
+import { createAppShell } from './bootstrap.ts'
 
-const appMethods = ['onLaunch', 'onShow', 'onHide', 'onError', 'onUnhandledRejection', 'onPageNotFound'] as const
-
-App(
-    createNativeShell({
-        moduleName: 'App',
-        loadModule: () => import('./app-module.ts'),
-        methods: appMethods,
-        properties: { config: appConfig }
-    })
-)
+App(createAppShell(() => import('./app-module.ts')))

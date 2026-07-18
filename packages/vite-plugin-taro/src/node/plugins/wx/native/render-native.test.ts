@@ -33,12 +33,8 @@ export { instantiate }`
 })
 
 test('keeps the native Vite preload identity wrapper around dynamic imports', async () => {
-    const source = `import { createNativeShell, __vitePreload } from "./assets/bootstrap-a.js"
-const loadModule = () => __vitePreload(() => import("./assets/module-b.js"), void 0)
-App({
-    createNativeShell,
-    loadModule
-})`
+    const source = `import { createAppShell, __vitePreload } from "./assets/bootstrap-a.js"
+App(createAppShell(() => __vitePreload(() => import("./assets/module-b.js"), void 0)))`
     const result = renderNative(source, { fileName: 'app.js' } as Rolldown.RenderedChunk)
     const importedModuleUrls: string[] = []
     const requiredPaths: string[] = []
@@ -59,8 +55,8 @@ App({
         (id: string) => {
             requiredPaths.push(id)
             return {
-                createNativeShell() {
-                    return undefined
+                createAppShell(loadModule: () => Promise<unknown>) {
+                    return { loadModule }
                 },
                 __vitePreload(load: () => unknown) {
                     return load()

@@ -1,19 +1,3 @@
-import { createNativeShell } from './bootstrap.ts'
+import { createComponentShell } from './bootstrap.ts'
 
-const methods = createNativeShell({
-    moduleName: 'Component',
-    loadModule: () => import('./comp-module.ts'),
-    methods: ['eh'] as const,
-    properties: {}
-})
-
-Component({
-    properties: {
-        i: Object,
-        l: String
-    },
-    options: {
-        virtualHost: true
-    },
-    methods
-})
+Component(createComponentShell(() => import('./comp-module.ts')))

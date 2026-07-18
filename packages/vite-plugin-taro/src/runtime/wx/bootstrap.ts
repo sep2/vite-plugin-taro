@@ -8,8 +8,79 @@ declare const __VITE_PLUGIN_TARO_APP_CONFIG__: Record<string, unknown>
 /** Shares one App configuration object between native shells and application capsules. */
 export const appConfig = __VITE_PLUGIN_TARO_APP_CONFIG__
 
-// Share the asynchronous native shell through bootstrap's cached module identity.
-export { createNativeShell }
+type NativeModuleLoader = () => Promise<{ default: unknown }>
+
+const appMethods = ['onLaunch', 'onShow', 'onHide', 'onError', 'onUnhandledRejection', 'onPageNotFound'] as const
+
+const pageMethods = [
+    'onLoad',
+    'onUnload',
+    'onReady',
+    'onShow',
+    'onHide',
+    'onPullDownRefresh',
+    'onReachBottom',
+    'onPageScroll',
+    'onResize',
+    'onTabItemTap',
+    'onTitleClick',
+    'onOptionMenuClick',
+    'onKeyboardHeight',
+    'onPopMenuClick',
+    'onPullIntercept',
+    'onAddToFavorites',
+    'onSaveExitState',
+    'eh'
+] as const
+
+const componentMethods = ['eh'] as const
+
+/** Creates the synchronous native App shell. */
+export function createAppShell(loadModule: NativeModuleLoader) {
+    return createNativeShell({
+        moduleName: 'App',
+        loadModule,
+        methods: appMethods,
+        properties: { config: appConfig }
+    })
+}
+
+/** Creates the synchronous native Page shell. */
+export function createPageShell(loadModule: NativeModuleLoader) {
+    return createNativeShell({
+        moduleName: 'Page',
+        loadModule,
+        methods: pageMethods,
+        properties: {
+            data: {
+                root: {
+                    cn: []
+                }
+            }
+        }
+    })
+}
+
+/** Creates the synchronous native recursive Component shell. */
+export function createComponentShell(loadModule: NativeModuleLoader) {
+    const methods = createNativeShell({
+        moduleName: 'Component',
+        loadModule,
+        methods: componentMethods,
+        properties: {}
+    })
+
+    return {
+        properties: {
+            i: Object,
+            l: String
+        },
+        options: {
+            virtualHost: true
+        },
+        methods
+    }
+}
 
 // Vite wraps dynamic imports with this browser preload hook. WX has no modulepreload transport, so native chunks call
 // the loader directly; application capsules receive this same cached export through bootstrap's native registration.
