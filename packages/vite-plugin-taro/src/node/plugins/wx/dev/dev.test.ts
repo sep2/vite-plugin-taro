@@ -134,10 +134,7 @@ test('lets the DevEngine write the initial project and keeps HMR patch-only', as
         const devMode = rolldownOptions.experimental.devMode as Record<string, unknown>
         const outputOptions = rolldownOptions.output as OutputOptions
         assert.equal(devMode.lazy, false)
-        assert.notEqual(devMode.implement, 'browser runtime')
-        assert.doesNotMatch(String(devMode.implement), /\$Refresh(?:Reg|Sig)\$/)
-        assert.match(String(devMode.implement), /global\.__rolldown_runtime__/)
-        assert.doesNotMatch(String(devMode.implement), /globalThis/)
+        assert.equal(devMode.implement, '')
         assert.equal(outputOptions.entryFileNames, '[name]')
         const chunkFileNames = outputOptions.chunkFileNames
         if (typeof chunkFileNames !== 'function') throw new Error('Expected development chunk filename function.')
@@ -164,6 +161,8 @@ test('lets the DevEngine write the initial project and keeps HMR patch-only', as
 
         const initialApp = await readFile(path.join(outDir, 'app.js'), 'utf8')
         assert.match(initialApp, /initial/)
+        assert.match(initialApp, /__rolldown_runtime__/)
+        assert.match(initialApp, /vite-plugin-taro-wx/)
         assert.equal(await readFile(path.join(outDir, 'app.wxss'), 'utf8'), 'styles')
         assert.equal(await readFile(path.join(outDir, 'app.json'), 'utf8'), '{}\n')
         assert.equal(await readFile(path.join(outDir, 'public.txt'), 'utf8'), 'public')

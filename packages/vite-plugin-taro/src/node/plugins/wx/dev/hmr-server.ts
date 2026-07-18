@@ -6,11 +6,8 @@ import { type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { SerializedTaskQueue } from '../../../utils/serialized-task-queue.ts'
+import { rolldownRuntimeBinding } from './runtime/bootstrap.ts'
 import { controlFileName, updateFileName } from './support.ts'
-
-// Rolldown's generated development modules reference this lexical binding. Native and SystemJS-rendered chunks cannot
-// import a browser HMR client, so every physical development chunk binds it to the one runtime installed on `global`.
-const rolldownRuntimeBinding = 'const __rolldown_runtime__ = global.__rolldown_runtime__;'
 
 type BundledDevRolldownOptions = InputOptions & {
     output?: OutputOptions | OutputOptions[]
@@ -33,44 +30,6 @@ type BundledDev = {
 }
 
 type OutputAddon = string | ((chunk: { fileName: string }) => string | Promise<string>)
-
-/**
- * Minimal host implementation used until the physical update transport starts applying Rolldown patches.
- *
- * Rolldown injects this string into its generated helper runtime, so it must be self-contained and executable in the
- * WeChat JavaScript heap. The hot-context methods deliberately do nothing for now: the DevEngine computes patch-only
- * updates, but no update is delivered or applied until the physical `update.js` publisher exists. Keeping the real base
- * `DevRuntime` still gives every initially rendered module the exact instrumentation and stable IDs required by that
- * future implementation.
- */
-const devRuntimeSource = `
-var WxBaseDevRuntime = DevRuntime;
-class WxHotContext {
-  constructor(moduleId) {
-    this.moduleId = moduleId;
-    this.data = {};
-    this._internal = { updateStyle() {}, removeStyle() {} };
-  }
-  accept() {}
-  acceptExports() {}
-  dispose() {}
-  prune() {}
-  invalidate() {}
-  on() {}
-  off() {}
-  send() {}
-}
-class WxDevRuntime extends WxBaseDevRuntime {
-  constructor() {
-    super({ send() {} }, 'vite-plugin-taro-wx');
-  }
-  createModuleHotContext(moduleId) {
-    return new WxHotContext(moduleId);
-  }
-  applyUpdates() {}
-}
-global.__rolldown_runtime__ = new WxDevRuntime();
-`
 
 /**
  * Coordinates the one Vite environment, one Rolldown DevEngine, and one physical wx output directory.
@@ -184,7 +143,9 @@ export class HmrServer {
                     ? rolldownOptions.experimental.devMode
                     : {}),
                 lazy: false,
-                implement: devRuntimeSource
+                // Suppress Rolldown's browser implementation. The post-ordered wx development plugin appends its host
+                // bootstrap directly to the generated runtime module after the built-in HMR transform defines DevRuntime.
+                implement: ''
             }
 
             // Vite installs its native reporter only for the build command. Bundled serve uses the same Rolldown output
