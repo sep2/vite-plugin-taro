@@ -105,11 +105,14 @@ function createTransportCase({
     kind: 'capsule' | 'amphibious'
 }): ReturnType<typeof types.switchCase> {
     const requirePath = toNativeRequirePath(transportFileName, chunkId)
+
     const requireCallee =
         loadMode === 'sync'
             ? types.identifier('require')
             : types.memberExpression(types.identifier('require'), types.identifier('async'))
+
     const registration = types.callExpression(requireCallee, [types.stringLiteral(requirePath)])
+
     const statements =
         kind === 'capsule'
             ? [types.returnStatement(registration)]
