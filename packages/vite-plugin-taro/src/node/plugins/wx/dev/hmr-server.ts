@@ -5,7 +5,7 @@ import type { InputOptions, OutputOptions } from 'rolldown'
 import { type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
-import { SerializedTaskQueue } from './serialized-task-queue.ts'
+import { SerializedTaskQueue } from '../../../utils/serialized-task-queue.ts'
 import { controlFileName, updateFileName } from './support.ts'
 
 // Rolldown's generated development modules reference this lexical binding. Native and SystemJS-rendered chunks cannot
