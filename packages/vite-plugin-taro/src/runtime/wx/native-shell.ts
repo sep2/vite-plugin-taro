@@ -33,6 +33,7 @@ export function createNativeShell<Method extends string, Properties extends obje
     let activatedConfig: Record<string, unknown> | undefined
     let failed = false
 
+    // Every native shell activates independently; cross-shell prerequisites must be explicit module dependencies.
     void Promise.resolve()
         .then(loadModule)
         .then((module) => {

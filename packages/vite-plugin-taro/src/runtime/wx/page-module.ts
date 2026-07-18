@@ -1,4 +1,4 @@
-// Ensure the asynchronous App module initializes Current.app before this Page can mount.
+// App and Page shells activate independently; make Current.app initialization an explicit prerequisite for Page mount.
 import './app-module.ts'
 
 // @ts-expect-error: The wx build replaces this private import with the configured Page component.
