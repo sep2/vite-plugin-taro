@@ -1,7 +1,7 @@
 // Install the stock minimal SystemJS loader before any native shell can request an application capsule.
 import 'systemjs/s.js'
 import { createNativeShell } from './native-shell.ts'
-import { finalizeTransport } from './transport.ts'
+import { transportTable } from './transport.ts'
 
 declare const __VITE_PLUGIN_TARO_APP_CONFIG__: Record<string, unknown>
 
@@ -92,10 +92,9 @@ if (!installedSystem) {
     throw new Error('SystemJS failed to initialize in the WeChat runtime')
 }
 
-// Capsules import Rolldown's final export aliases, so register the actual CommonJS namespace rather than source names.
-const transportTable = finalizeTransport(module.exports as Readonly<Record<string, unknown>>)
-
-/** Loads native bootstrap or one application capsule from the finalized transport table. */
+// Transport returns synchronous registrations for main-package capsules and amphibious modules, and promise-like
+// registrations only for capsules that physically live in generated subpackages.
+/** Loads one amphibious module or application capsule from the materialized transport table. */
 installedSystem.instantiate = (moduleId: string): System.Registration | PromiseLike<System.Registration> => {
     const load = transportTable[moduleId]
     if (!load) {

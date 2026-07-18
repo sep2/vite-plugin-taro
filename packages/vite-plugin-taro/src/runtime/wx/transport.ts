@@ -1,28 +1,47 @@
 type Instantiation = System.Registration | PromiseLike<System.Registration>
 type ModuleLoader = () => Instantiation
+type AmphibiousLoader = () => Readonly<Record<string, unknown>>
+
+type TransportSource = readonly ['capsule', ModuleLoader] | readonly ['amphibious', AmphibiousLoader]
 
 /** Materialized from the preliminary output graph before Rolldown finalizes content hashes. */
-declare const __VITE_PLUGIN_TARO_BOOTSTRAP_MODULE_URL__: string
-declare const __VITE_PLUGIN_TARO_TRANSPORT_TABLE__: Record<string, ModuleLoader>
+declare const __VITE_PLUGIN_TARO_TRANSPORT_SOURCES__: Readonly<Record<string, TransportSource>>
 
-const bootstrapModuleUrl = __VITE_PLUGIN_TARO_BOOTSTRAP_MODULE_URL__
-const transportTable = __VITE_PLUGIN_TARO_TRANSPORT_TABLE__
-
-/** Adds the already-executed native bootstrap to the materialized capsule loader table. */
-export function finalizeTransport(bootstrapModule: Readonly<Record<string, unknown>>) {
-    const registration: System.Registration = [
-        // Native bootstrap has completed its synchronous dependencies before SystemJS observes it.
+/** Publishes one already-executed native CommonJS namespace without executing its module body a second time. */
+function createAmphibiousRegistration(namespace: Readonly<Record<string, unknown>>): System.Registration {
+    return [
         [],
         (exportBinding) => ({
             execute() {
-                // Publish the actual CommonJS namespace so Rolldown's final export aliases remain intact.
-                exportBinding(bootstrapModule)
+                // Publish final Rolldown aliases rather than source export names. CommonJS owns module evaluation and
+                // caching; this registration only presents the completed namespace to SystemJS dependency setters.
+                exportBinding(namespace)
             }
         })
     ]
+}
 
-    // The materialized URL identifies bootstrap without requiring its native chunk a second time.
-    transportTable[bootstrapModuleUrl] = () => registration
+/**
+ * Converts materialized physical sources into SystemJS registration loaders once during native transport evaluation.
+ * Capsule loaders already return registrations. Amphibious loaders synchronously require a main-package CommonJS module
+ * only when SystemJS first requests it, making bootstrap's deferred self-require safe through WeChat's CommonJS cache.
+ */
+export const transportTable: Readonly<Record<string, ModuleLoader>> = createTransportTable(
+    __VITE_PLUGIN_TARO_TRANSPORT_SOURCES__
+)
 
-    return transportTable
+function createTransportTable(sources: Readonly<Record<string, TransportSource>>): Record<string, ModuleLoader> {
+    const table: Record<string, ModuleLoader> = {}
+
+    for (const [moduleId, source] of Object.entries(sources)) {
+        if (source[0] === 'capsule') {
+            table[moduleId] = source[1]
+            continue
+        }
+
+        const loadNamespace = source[1]
+        table[moduleId] = () => createAmphibiousRegistration(loadNamespace())
+    }
+
+    return table
 }

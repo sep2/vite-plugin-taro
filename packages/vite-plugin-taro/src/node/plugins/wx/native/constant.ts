@@ -1,5 +1,8 @@
 import { resolvePackageFile } from '../../../utils/packages.ts'
 
+/** Identifies Rolldown's generated helper module independently of its unstable output filename. */
+export const rolldownRuntimeId = '\0rolldown/runtime.js'
+
 /** Identifies the shared native runtime that initializes SystemJS and serves both shell entry types. */
 export const bootstrapPath = resolvePackageFile('dist/runtime/wx/bootstrap.js')
 

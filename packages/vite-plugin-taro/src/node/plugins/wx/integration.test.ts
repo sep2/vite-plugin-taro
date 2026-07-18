@@ -19,7 +19,7 @@ type SystemModule = Readonly<Record<string, unknown>>
 
 /** The generated native transport runtime. */
 interface NativeTransport {
-    finalizeTransport(bootstrapModule: object): Readonly<Record<string, () => unknown>>
+    transportTable: Readonly<Record<string, () => unknown>>
 }
 
 /** The SystemJS surface used by runtime tests. */
@@ -131,14 +131,20 @@ async function createTestSystem(
 ): Promise<SystemJsInstance> {
     const capsules = new Map(registrations)
     const transportModule: { exports: unknown } = { exports: {} }
+    const bootstrapModule: { exports: Record<string, unknown> } = {
+        exports: {}
+    }
 
-    /** Loads one inert capsule. */
+    /** Loads one inert capsule or the completed amphibious bootstrap namespace. */
     function nativeRequire(id: string): unknown {
-        const capsuleId = path.posix.normalize(path.posix.join(path.posix.dirname(transportFileName), id))
-        onInstantiate(capsuleId)
-        const registration = capsules.get(capsuleId)
+        const moduleId = path.posix.normalize(path.posix.join(path.posix.dirname(transportFileName), id))
+        onInstantiate(moduleId)
+        if (moduleId === 'assets/bootstrap.js') {
+            return bootstrapModule.exports
+        }
+        const registration = capsules.get(moduleId)
         if (!registration) {
-            throw new Error(`Unknown test module: ${capsuleId}`)
+            throw new Error(`Unknown test module: ${moduleId}`)
         }
         return registration
     }
@@ -151,12 +157,9 @@ async function createTestSystem(
     )(nativeRequire, transportModule, transportModule.exports)
     const transport = transportModule.exports as NativeTransport
 
-    const commonJsModule: { exports: Record<string, unknown> } = {
-        exports: {}
-    }
     const sandbox: Record<string, unknown> = {
-        exports: commonJsModule.exports,
-        module: commonJsModule,
+        exports: bootstrapModule.exports,
+        module: bootstrapModule,
         require: () => transport
     }
     // WeChat exposes a SystemJS installation host distinct from the App-service globalThis object.

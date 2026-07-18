@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
-import { bootstrapPath, transportPath } from '../native/constant.ts'
+import { bootstrapPath, rolldownRuntimeId, transportPath } from '../native/constant.ts'
+import { getWxModuleKind } from '../native/module-kind.ts'
 import { createPlacer } from './placer.ts'
 
 function chunk(...moduleIds: string[]): Rolldown.PreRenderedChunk {
@@ -73,12 +74,12 @@ test('places dynamic-only modules in a generated asynchronous package', () => {
         }
     } as unknown as Rolldown.OutputBundle
 
-    assert.match(filePattern, /^__dynamic__\/p_[a-f0-9]{8}\/assets\/\[name]-\[hash]\.js$/)
+    assert.match(filePattern, /^sub\/p_[a-f0-9]{8}\/assets\/\[hash]\.js$/)
     assert.equal(placer.getLoadMode(renderedChunk(fileName)), 'async')
     assert.deepEqual(placer.getSubpackages({}), [])
     assert.deepEqual(placer.getSubpackages(bundle), [
         {
-            name: `dynamic-${root.slice('__dynamic__/p_'.length)}`,
+            name: root.slice('sub/'.length),
             root,
             pages: []
         }
@@ -97,6 +98,13 @@ test('rejects a Rolldown chunk that mixes physical package owners', () => {
         () => placer.rolldownOptions.output.chunkFileNames(chunk('/eager', '/lazy')),
         /wx chunk mixes package owners/
     )
+})
+
+test('supports an optional amphibious Rolldown runtime without choosing strict ordering', () => {
+    const placer = createPlacer()
+
+    assert.equal('strictExecutionOrder' in placer.rolldownOptions.output, false)
+    assert.equal(getWxModuleKind(chunk(rolldownRuntimeId)), 'amphibious')
 })
 
 test('hashes transport while preserving exact native entry paths', () => {

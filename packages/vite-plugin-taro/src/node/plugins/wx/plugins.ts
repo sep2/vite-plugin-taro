@@ -4,7 +4,7 @@ import { esTarget } from '../../utils/constant.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { generateBundle } from './bundle/generate-bundle.ts'
 import { renderCapsule } from './capsule/render-capsule.ts'
-import { isNativeModule, isTransportModule } from './native/is-native-module.ts'
+import { getWxModuleKind, isTransportModule } from './native/module-kind.ts'
 import { renderNative } from './native/render-native.ts'
 import { createPlacer } from './placer/placer.ts'
 import { createModuleResolver } from './resolver/module-resolver.ts'
@@ -77,21 +77,26 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
         renderChunk: {
             order: 'post',
             async handler(code, chunk, _outputOptions, meta) {
-                if (!isNativeModule(chunk)) {
+                const moduleKind = getWxModuleKind(chunk)
+
+                if (moduleKind === 'capsule') {
                     return renderCapsule(code, chunk)
                 }
 
+                // Native and amphibious modules share the CommonJS renderer. Amphibious transport exposure is a
+                // separate concern materialized from final output paths after the physical transport itself is rendered.
                 const native = renderNative(code, chunk)
-                if (!isTransportModule(chunk)) {
-                    return native
+
+                if (isTransportModule(chunk)) {
+                    return materializeTransport({
+                        code: native.code,
+                        transportChunk: chunk,
+                        chunks: meta.chunks,
+                        getLoadMode: placer.getLoadMode
+                    })
                 }
 
-                return materializeTransport({
-                    code: native.code,
-                    transportChunk: chunk,
-                    chunks: meta.chunks,
-                    getLoadMode: placer.getLoadMode
-                })
+                return native
             }
         },
 

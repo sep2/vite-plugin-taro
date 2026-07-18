@@ -88,12 +88,12 @@ test('creates configured native JSON assets at exact output paths', () => {
 test('adds generated code-only subpackages to app.json', () => {
     const assets = createJsonAssets({
         options,
-        subpackages: [{ name: 'dynamic-example', root: '__dynamic__/p_example', pages: [] }]
+        subpackages: [{ name: 'p_example', root: 'sub/p_example', pages: [] }]
     })
     const appJson = assets.find((asset) => asset.fileName === 'app.json')
 
     assert.deepEqual(JSON.parse(String(appJson?.source)).subPackages, [
-        { name: 'dynamic-example', root: '__dynamic__/p_example', pages: [] }
+        { name: 'p_example', root: 'sub/p_example', pages: [] }
     ])
 })
 

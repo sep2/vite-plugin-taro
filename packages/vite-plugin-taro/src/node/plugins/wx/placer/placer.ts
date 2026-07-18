@@ -1,5 +1,5 @@
 import type { Rolldown } from 'vite'
-import { isTransportModule } from '../native/is-native-module.ts'
+import { isTransportModule } from '../native/module-kind.ts'
 import {
     createPlacementPlan,
     getSubpackageName,
@@ -101,8 +101,8 @@ export function createPlacer() {
                     ]
                 },
                 // strictExecutionOrder deliberately has no plugin default. When an application enables it through normal
-                // Rolldown output options, the generated helper runtime is rendered as native CommonJS and bridged into
-                // SystemJS by transport so both output domains consume one initialized namespace.
+                // Rolldown output options, the generated helper runtime becomes amphibious: CommonJS evaluates it once and
+                // transport publishes that cached namespace to SystemJS.
                 /** Preserves exact native entries while allowing transport to participate in content hashing. */
                 entryFileNames(chunk: Rolldown.PreRenderedChunk): string {
                     return isTransportModule(chunk) ? 'assets/[name]-[hash].js' : '[name]'

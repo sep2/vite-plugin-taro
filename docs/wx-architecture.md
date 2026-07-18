@@ -560,7 +560,7 @@ function loadInitialRegistration(id) {
             return Promise.resolve(require('./capsules/app.js'));
 
         case 'chunks/editor.js':
-            return require.async('../__dynamic__/p_a1b2/capsules/editor.js');
+            return require.async('../sub/p_a1b2/assets/abc123.js');
 
         default:
             return Promise.reject(new Error(`Unknown System module: ${id}`));
@@ -572,6 +572,34 @@ Runtime IDs can be dynamic. Native paths cannot be dynamic.
 
 The build validates the final JavaScript AST and fails if any native `require`, callback-form asynchronous `require`, or `require.async`
 path is not a string literal.
+
+### Optional strict execution runtime
+
+The plugin does not choose Rolldown's `strictExecutionOrder` setting. Applications may enable it through the normal Vite output options:
+
+```ts
+export default defineConfig({
+    build: {
+        rolldownOptions: {
+            output: {
+                strictExecutionOrder: true
+            }
+        }
+    }
+})
+```
+
+WX output modules have exactly three execution-domain kinds:
+
+- **native** modules execute only through WeChat CommonJS and do not appear in SystemJS transport;
+- **capsule** modules are inert SystemJS registrations loaded through literal native transport;
+- **amphibious** modules execute as native CommonJS and expose that same completed namespace through a SystemJS registration.
+
+Bootstrap is always amphibious. When strict execution is enabled, Rolldown emits `\0rolldown/runtime.js`, which is amphibious as well. The
+renderer identifies both by source module ID rather than filename. Amphibious modules are synchronous main-package modules: transport
+stores a deferred literal `require()` closure, then creates a registration around the CommonJS-cached namespace only when SystemJS asks
+for it. Bootstrap can therefore import transport without an eager self-require cycle, and native shells and capsules share one initialized
+namespace without changing the default Rolldown policy.
 
 ### Cross-package imports and cycles
 
@@ -640,8 +668,8 @@ Generated lazy packages use deterministic names and contain JavaScript capsules 
 
 ```json
 {
-    "root": "__dynamic__/p_a1b2",
-    "name": "dynamic-p_a1b2",
+    "root": "sub/p_a1b2",
+    "name": "p_a1b2",
     "pages": []
 }
 ```
