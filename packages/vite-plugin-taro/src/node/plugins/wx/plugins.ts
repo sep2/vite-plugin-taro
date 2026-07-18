@@ -1,5 +1,6 @@
 import type { Plugin, PluginOption } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
+import { esTarget } from '../../utils/constant.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { createAppConfig } from '../../utils/project-config.ts'
 import { generateBundle } from './bundle/generate-bundle.ts'
@@ -9,8 +10,6 @@ import { renderNativeModule } from './native/render-native-module.ts'
 import { createPlacer } from './placer/placer.ts'
 import { createModuleResolver } from './resolver/module-resolver.ts'
 import { materializeTransport } from './transport/materialize-transport.ts'
-
-const wxJavaScriptTarget = 'es2018'
 
 /** Creates the WX target plugins. */
 export function createWxTargetPlugins(options: VitePluginTaroOptions): PluginOption[] {
@@ -31,7 +30,7 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
 
                 appType: 'custom',
 
-                oxc: { target: wxJavaScriptTarget },
+                oxc: { target: esTarget },
 
                 resolve: {
                     alias: [
@@ -48,7 +47,7 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
                     // Let weapp-tailwindcss own final WXSS transformation.
                     cssMinify: false,
 
-                    target: wxJavaScriptTarget,
+                    target: esTarget,
 
                     rolldownOptions: {
                         input: moduleResolver.input,

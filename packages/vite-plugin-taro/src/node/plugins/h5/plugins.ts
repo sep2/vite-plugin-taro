@@ -3,6 +3,7 @@ import { type NodePath, type PluginObject, types } from '@babel/core'
 import babel from '@rolldown/plugin-babel'
 import type { HtmlTagDescriptor, Plugin, PluginOption } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
+import { esTarget } from '../../utils/constant.ts'
 import { toViteFileImportPath } from '../../utils/modules.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { clientTaroApiId } from '../client/client-taro.ts'
@@ -51,7 +52,7 @@ function createH5TargetPlugin(options: VitePluginTaroOptions): Plugin {
                     exclude: ['@stencil/core/internal/client']
                 },
                 build: {
-                    target: 'es2018'
+                    target: esTarget
                 }
             }
         },

@@ -1,9 +1,9 @@
 import { types } from '@babel/core'
-import { type Rolldown, transformWithOxc } from 'vite'
+import type { Rolldown } from 'vite'
 import type { VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../options.ts'
 import { createPageComponentImportPath } from '../../utils/modules.ts'
 import { createAppConfig } from '../../utils/project-config.ts'
-import { ast2str, requireOnePlaceholder } from '../utils/babel.ts'
+import { replaceWithAst } from '../utils/babel.ts'
 
 const appConfigPlaceholder = '__VITE_PLUGIN_TARO_H5_APP_CONFIG__'
 const routesPlaceholder = '__VITE_PLUGIN_TARO_H5_ROUTES__'
@@ -19,37 +19,20 @@ export async function transformH5App({
     id: string
     options: VitePluginTaroOptions
     projectRoot: string
-}): Promise<{ code: string; map: Rolldown.ExistingRawSourceMap }> {
-    requireOnePlaceholder(code, appConfigPlaceholder)
-    requireOnePlaceholder(code, routesPlaceholder)
-
-    // Babel constructs and safely serializes the project-specific expressions. Oxc then parses them through define
-    // while processing the physical App and producing its source map.
-    const appConfig = types.valueToNode({
-        router: {},
-        ...createAppConfig(options)
-    })
-    const routes = types.arrayExpression(
-        options.pages.map((page) => {
-            return createRoute({ page, projectRoot })
-        })
-    )
-    const transformed = await transformWithOxc(code, id, {
-        define: {
-            [appConfigPlaceholder]: ast2str(appConfig),
-            [routesPlaceholder]: ast2str(routes)
-        },
-        target: 'es2018'
+}): Promise<Rolldown.TransformResult> {
+    const transformed = await replaceWithAst(code, id, {
+        [appConfigPlaceholder]: types.valueToNode({
+            router: {},
+            ...createAppConfig(options)
+        }),
+        [routesPlaceholder]: types.arrayExpression(
+            options.pages.map((page) => {
+                return createRoute({ page, projectRoot })
+            })
+        )
     })
 
-    if (!transformed.map) {
-        throw new Error(`Failed to generate the H5 App source map for ${id}`)
-    }
-
-    return {
-        code: transformed.code,
-        map: transformed.map
-    }
+    return { code: transformed.code, map: transformed.map }
 }
 
 /**

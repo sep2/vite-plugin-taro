@@ -6,6 +6,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
 import { type Rolldown, transformWithOxc } from 'vite'
+import { esTarget } from '../../utils/constant.ts'
 import { chunkIdToModuleUrl } from '../../utils/modules.ts'
 import { renderCapsule } from './capsule/render-capsule.ts'
 import { bootstrapPath, transportPath } from './native/constant.ts'
@@ -57,7 +58,7 @@ const bootstrapTypeScript = readFileSync(
     fileURLToPath(new URL('../../../runtime/wx/bootstrap.ts', import.meta.url)),
     'utf8'
 )
-const bootstrapJavaScript = (await transformWithOxc(bootstrapTypeScript, 'bootstrap.ts', { target: 'es2018' })).code
+const bootstrapJavaScript = (await transformWithOxc(bootstrapTypeScript, 'bootstrap.ts', { target: esTarget })).code
     .replace(/^import ['"]systemjs\/s\.js['"];\s*/m, '')
     .replace(
         /^import \{ createNativeConfig \} from ['"]\.\/native-config\.(?:ts|js)['"];\s*/m,
@@ -70,7 +71,7 @@ const transportTypeScript = readFileSync(
     fileURLToPath(new URL('../../../runtime/wx/transport.ts', import.meta.url)),
     'utf8'
 )
-const transportJavaScript = (await transformWithOxc(transportTypeScript, 'transport.ts', { target: 'es2018' })).code
+const transportJavaScript = (await transformWithOxc(transportTypeScript, 'transport.ts', { target: esTarget })).code
 const transportCode = renderNativeModule(transportJavaScript, {
     fileName: transportFileName
 } as Rolldown.RenderedChunk).code

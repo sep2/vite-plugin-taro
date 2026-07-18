@@ -1,8 +1,8 @@
 import path from 'node:path'
 import { types } from '@babel/core'
-import { type Rolldown, transformWithOxc } from 'vite'
+import type { Rolldown } from 'vite'
 import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
-import { ast2str, requireOnePlaceholder } from '../../utils/babel.ts'
+import { replaceWithAst } from '../../utils/babel.ts'
 import { isBootstrapModule, isNativeModule } from '../native/is-native-module.ts'
 
 const bootstrapModuleUrlPlaceholder = '__VITE_PLUGIN_TARO_BOOTSTRAP_MODULE_URL__'
@@ -26,14 +26,13 @@ export async function materializeTransport({
     transportChunk: Rolldown.RenderedChunk
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
     getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async'
-}): Promise<{ code: string; map: null }> {
+}): Promise<Rolldown.TransformResult> {
     const renderedChunks = Object.values(chunks)
+
     const bootstrap = renderedChunks.find(isBootstrapModule)
     if (!bootstrap) {
         throw new Error('Expected native bootstrap chunk')
     }
-    requireOnePlaceholder(code, bootstrapModuleUrlPlaceholder)
-    requireOnePlaceholder(code, transportTablePlaceholder)
 
     // Babel constructs and safely serializes an expression shaped like:
     // {
@@ -41,31 +40,22 @@ export async function materializeTransport({
     //     'vpt:/packages/account/page.js': () => require.async('./packages/account/page.js')
     // }
     // Oxc then parses that expression through define while processing the already-transpiled native entry.
-    const capsuleChunks = renderedChunks.filter((chunk) => !isNativeModule(chunk))
-    const moduleTable = types.objectExpression(
-        capsuleChunks
-            .sort((left, right) => left.fileName.localeCompare(right.fileName))
-            .map((chunk) => {
-                return createModuleLoader({
-                    chunkId: chunk.fileName,
-                    transportFileName: transportChunk.fileName,
-                    loadMode: getLoadMode(chunk)
+
+    return await replaceWithAst(code, transportChunk.fileName, {
+        [bootstrapModuleUrlPlaceholder]: types.stringLiteral(chunkIdToModuleUrl(bootstrap.fileName)),
+        [transportTablePlaceholder]: types.objectExpression(
+            renderedChunks
+                .filter((chunk) => !isNativeModule(chunk))
+                .sort((left, right) => left.fileName.localeCompare(right.fileName))
+                .map((chunk) => {
+                    return createModuleLoader({
+                        chunkId: chunk.fileName,
+                        transportFileName: transportChunk.fileName,
+                        loadMode: getLoadMode(chunk)
+                    })
                 })
-            })
-    )
-
-    const transformed = await transformWithOxc(code, transportChunk.fileName, {
-        define: {
-            [bootstrapModuleUrlPlaceholder]: ast2str(types.stringLiteral(chunkIdToModuleUrl(bootstrap.fileName))),
-            [transportTablePlaceholder]: ast2str(moduleTable)
-        },
-        target: 'es2018'
+        )
     })
-
-    return {
-        code: transformed.code,
-        map: null
-    }
 }
 
 /** Creates one URL-keyed loader while keeping its native require argument literal. */
