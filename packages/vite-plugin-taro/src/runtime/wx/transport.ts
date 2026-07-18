@@ -26,11 +26,9 @@ function createAmphibiousRegistration(namespace: Readonly<Record<string, unknown
  * Capsule loaders already return registrations. Amphibious loaders synchronously require a main-package CommonJS module
  * only when SystemJS first requests it, making bootstrap's deferred self-require safe through WeChat's CommonJS cache.
  */
-export const transportTable: Readonly<Record<string, ModuleLoader>> = createTransportTable(
-    __VITE_PLUGIN_TARO_TRANSPORT_SOURCES__
-)
+export const transport: Readonly<Record<string, ModuleLoader>> = createTransport(__VITE_PLUGIN_TARO_TRANSPORT_SOURCES__)
 
-function createTransportTable(sources: Readonly<Record<string, TransportSource>>): Record<string, ModuleLoader> {
+function createTransport(sources: Readonly<Record<string, TransportSource>>): Record<string, ModuleLoader> {
     const table: Record<string, ModuleLoader> = {}
 
     for (const [moduleId, source] of Object.entries(sources)) {

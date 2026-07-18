@@ -10,8 +10,10 @@ import { Image, ScrollView, Text, View } from 'virtual:taro/components'
 import { NavigationBar, SafeAreaView } from '@components'
 import { getGlobalData, getStorageData } from '@utils'
 import clsx from 'clsx'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { CHECK_RIDIO, CHECK_RIDIO_Y, MONTY_DATA, MONTY_TITLE } from '../constants'
+
+const HelloLazy = React.lazy(() => import('../../../components/hello.tsx'))
 
 export default function LoanGeniusMonthlyPayments() {
     const pageRef = useRef(1)
@@ -105,6 +107,11 @@ export default function LoanGeniusMonthlyPayments() {
                 <View className="px-5">
                     <View className="mt-5.5 flex flex-row flex-nowrap items-center">
                         <Text className="font-pingfang-medium text-xl text-[rgba(11,15,18,1)]">贷款总额</Text>
+
+                        <Suspense fallback={<View>loading...</View>}>
+                            <HelloLazy />
+                        </Suspense>
+
                         <Text className="mx-1.25 font-avenir-black text-22 font-bold text-[rgba(11,15,18,1)]">
                             {loanAmount}
                         </Text>

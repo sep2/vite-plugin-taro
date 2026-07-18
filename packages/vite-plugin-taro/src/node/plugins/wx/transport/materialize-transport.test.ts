@@ -11,7 +11,7 @@ import { materializeTransport } from './materialize-transport.ts'
 
 /** The generated native transport runtime. */
 interface NativeTransport {
-    transportTable: Readonly<Record<string, () => unknown>>
+    transport: Readonly<Record<string, () => unknown>>
 }
 
 const transportTypeScript = readFileSync(
@@ -94,7 +94,7 @@ function evaluateTransport(source: string, loadModule: (path: string) => unknown
     Function('require', 'module', 'exports', source)(nativeRequire, commonJsModule, commonJsModule.exports)
     return {
         requiredPaths,
-        transport: commonJsModule.exports as NativeTransport
+        runtime: commonJsModule.exports as NativeTransport
     }
 }
 
@@ -117,7 +117,7 @@ test('materializes capsule loaders with literal physical paths', async () => {
     })
     const capsule = {}
     const evaluated = evaluateTransport(source, () => capsule)
-    const modules = evaluated.transport.transportTable
+    const modules = evaluated.runtime.transport
 
     assert.strictEqual(modules[chunkIdToModuleUrl('assets/chunks/lazy-b.js')]?.(), capsule)
     assert.deepEqual(evaluated.requiredPaths, ['./assets/chunks/lazy-b.js'])
@@ -145,9 +145,9 @@ test('bridges amphibious bootstrap and Rolldown runtime namespaces lazily', asyn
     const evaluated = evaluateTransport(source, (id) => {
         return id === './assets/bootstrap.js' ? bootstrapNamespace : runtimeNamespace
     })
-    const modules = evaluated.transport.transportTable
+    const modules = evaluated.runtime.transport
 
-    // Creating the table must not recursively require bootstrap while bootstrap itself imports transport.
+    // Creating transport must not recursively require bootstrap while bootstrap itself imports transport.
     assert.deepEqual(evaluated.requiredPaths, [])
     const publishedBootstrap = executeAmphibiousRegistration(modules[chunkIdToModuleUrl('assets/bootstrap.js')]?.())
     const publishedRuntime = executeAmphibiousRegistration(modules[chunkIdToModuleUrl(runtimeChunkId)]?.())

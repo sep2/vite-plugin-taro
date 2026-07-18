@@ -19,7 +19,7 @@ type SystemModule = Readonly<Record<string, unknown>>
 
 /** The generated native transport runtime. */
 interface NativeTransport {
-    transportTable: Readonly<Record<string, () => unknown>>
+    transport: Readonly<Record<string, () => unknown>>
 }
 
 /** The SystemJS surface used by runtime tests. */

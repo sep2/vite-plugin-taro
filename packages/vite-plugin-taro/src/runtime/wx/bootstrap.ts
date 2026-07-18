@@ -1,7 +1,7 @@
 // Install the stock minimal SystemJS loader before any native shell can request an application capsule.
 import 'systemjs/s.js'
 import { createNativeShell } from './native-shell.ts'
-import { transportTable } from './transport.ts'
+import { transport } from './transport.ts'
 
 declare const __VITE_PLUGIN_TARO_APP_CONFIG__: Record<string, unknown>
 
@@ -96,7 +96,7 @@ if (!installedSystem) {
 // registrations only for capsules that physically live in generated subpackages.
 /** Loads one amphibious module or application capsule from the materialized transport table. */
 installedSystem.instantiate = (moduleId: string): System.Registration | PromiseLike<System.Registration> => {
-    const load = transportTable[moduleId]
+    const load = transport[moduleId]
     if (!load) {
         throw new Error(`Unknown System module: ${moduleId}`)
     }
