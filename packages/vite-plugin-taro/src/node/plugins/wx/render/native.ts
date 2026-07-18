@@ -6,11 +6,13 @@ import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
 import { type AstTransformResult, transformWithBabel } from '../../../utils/transform.ts'
 
 /** Renders a synchronous native module. */
-export function renderNative(code: string, chunk: Rolldown.RenderedChunk): AstTransformResult {
-    return transformWithBabel(code, chunk.fileName, [
-        connectNativeImportPlugin(chunk.fileName) as PluginTarget,
-        transformModulesCommonjs as PluginTarget
-    ])
+export function renderNative(code: string, chunk: Rolldown.RenderedChunk, sourcemap = true): AstTransformResult {
+    return transformWithBabel(
+        code,
+        chunk.fileName,
+        [connectNativeImportPlugin(chunk.fileName) as PluginTarget, transformModulesCommonjs as PluginTarget],
+        sourcemap
+    )
 }
 
 /**

@@ -29,6 +29,7 @@ export { instantiate }`
 
     assert.deepEqual(requiredPaths, ['../transport.js'])
     assert.strictEqual(commonJsModule.exports.instantiate, instantiate)
+    assert.ok(result.map)
     assert.deepEqual(result.map.sources, ['assets/bootstrap-a.js'])
 })
 
@@ -72,5 +73,6 @@ App(createAppShell(() => __vitePreload(() => import("./assets/module-b.js"), voi
     assert.deepEqual(requiredPaths, ['./assets/bootstrap-a.js'])
     assert.deepEqual(importedModuleUrls, ['vpt:/assets/module-b.js'])
     assert.match(result.code, /vitePreload/)
+    assert.ok(result.map)
     assert.deepEqual(result.map.sources, ['app.js'])
 })
