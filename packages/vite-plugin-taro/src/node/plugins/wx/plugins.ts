@@ -2,21 +2,21 @@ import type { Plugin, PluginOption } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
 import { packageRequire } from '../../utils/packages.ts'
-import { generateBundle } from './bundle/generate-bundle.ts'
-import { renderCapsule } from './capsule/render-capsule.ts'
-import { getWxModuleKind, isTransportModule } from './native/module-kind.ts'
-import { renderNative } from './native/render-native.ts'
-import { createPlacer } from './placer/placer.ts'
-import { createModuleResolver } from './resolver/module-resolver.ts'
-import { materializeTransport } from './transport/materialize-transport.ts'
+import { getWxModuleKind, isTransportModule } from './module.ts'
+import { generateBundle } from './output/bundle.ts'
+import { createPlacer } from './placement/placer.ts'
+import { renderCapsule } from './render/capsule.ts'
+import { renderNative } from './render/native.ts'
+import { materializeTransport } from './render/transport.ts'
+import { createModuleResolver } from './resolve/resolver.ts'
 
-/** Creates the WX target plugins. */
+/** Creates the complete plugin set for the wx target. */
 export function createWxTargetPlugins(options: VitePluginTaroOptions): PluginOption[] {
-    return [createWxTargetPlugin(options)]
+    return [createWxPlugin(options)]
 }
 
-/** Configures the wx target. */
-function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
+/** Configures the complete wx target build pipeline. */
+function createWxPlugin(options: VitePluginTaroOptions): Plugin {
     const moduleResolver = createModuleResolver(options)
     const placer = createPlacer()
 
