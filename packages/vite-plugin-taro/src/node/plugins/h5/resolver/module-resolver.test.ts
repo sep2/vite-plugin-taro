@@ -21,14 +21,14 @@ test('resolves the configured App component', () => {
     assert.equal(resolver.resolveId({ id: 'react', projectRoot: '/project' }), undefined)
 })
 
-test('specializes only the physical H5 App', () => {
+test('specializes only the physical H5 App', async () => {
     const resolver = createModuleResolver(options)
     const source = `const config = __VITE_PLUGIN_TARO_H5_APP_CONFIG__
 config.routes = __VITE_PLUGIN_TARO_H5_ROUTES__
 `
 
     assert.ok(
-        resolver.transform({
+        await resolver.transform({
             code: source,
             id: h5AppPath,
             projectRoot: '/project'
