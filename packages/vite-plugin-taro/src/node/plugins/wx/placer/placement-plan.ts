@@ -3,7 +3,7 @@ import type { Rolldown } from 'vite'
 
 // Leave headroom below WeChat's 2M package limit for capsule wrappers and bundler-generated code.
 const packagePlanningBudget = 1_900_000
-const generatedPackageRootPrefix = '__dynamic__/p_'
+const generatedPackageRootPrefix = 'sub/p_'
 
 /** Identifies one generated code-only package by its physical output root. */
 export type SubpackageLocation = {
