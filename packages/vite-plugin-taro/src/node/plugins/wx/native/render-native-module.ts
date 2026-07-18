@@ -1,32 +1,16 @@
 import path from 'node:path'
-import { type PluginObject, type PluginTarget, transformSync, types } from '@babel/core'
+import { type PluginObject, type PluginTarget, types } from '@babel/core'
 import transformModulesCommonjs from '@babel/plugin-transform-modules-commonjs'
 import type { Rolldown } from 'vite'
 import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
+import { type AstTransformResult, transformWithBabel } from '../../utils/babel.ts'
 
 /** Renders a synchronous native module. */
-export function renderNativeModule(
-    code: string,
-    chunk: Rolldown.RenderedChunk
-): { code: string; map: Rolldown.ExistingRawSourceMap } {
-    const nativeModule = transformSync(code, {
-        babelrc: false,
-        compact: true,
-        configFile: false,
-        filename: chunk.fileName,
-        plugins: [connectNativeImportPlugin(chunk.fileName) as PluginTarget, transformModulesCommonjs as PluginTarget],
-        sourceFileName: chunk.fileName,
-        sourceMaps: true,
-        sourceType: 'module'
-    })
-    if (!nativeModule?.code || !nativeModule.map) {
-        throw new Error(`Failed to render native module ${chunk.fileName}`)
-    }
-
-    return {
-        code: nativeModule.code,
-        map: nativeModule.map as Rolldown.ExistingRawSourceMap
-    }
+export function renderNativeModule(code: string, chunk: Rolldown.RenderedChunk): AstTransformResult {
+    return transformWithBabel(code, chunk.fileName, [
+        connectNativeImportPlugin(chunk.fileName) as PluginTarget,
+        transformModulesCommonjs as PluginTarget
+    ])
 }
 
 /**

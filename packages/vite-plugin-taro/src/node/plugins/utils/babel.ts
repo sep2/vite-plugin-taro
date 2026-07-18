@@ -1,18 +1,7 @@
+import { type PluginItem, transformSync } from '@babel/core'
 import generate from '@babel/generator'
 import { type Rolldown, transformWithOxc } from 'vite'
 import { esTarget } from '../../utils/constant.ts'
-
-const generatorOptions = {
-    comments: false,
-    compact: true,
-    concise: true,
-    minified: true
-} as const
-
-/** Serializes a Babel AST node as a compact expression for Oxc substitution. */
-export function ast2str(node: Parameters<typeof generate>[0]): string {
-    return generate(node, generatorOptions).code
-}
 
 export type AstTransformResult = {
     code: string
@@ -32,10 +21,7 @@ export async function replaceWithAst(
         define[placeholder] = ast2str(node)
     }
 
-    const transformed = await transformWithOxc(code, filename, {
-        define,
-        target: esTarget
-    })
+    const transformed = await transformWithOxc(code, filename, { define, target: esTarget })
 
     for (const placeholder of Object.keys(replacement)) {
         if (transformed.code.includes(placeholder)) {
@@ -52,10 +38,39 @@ export async function replaceWithAst(
     }
 }
 
+/** Serializes a Babel AST node as a compact expression for Oxc substitution. */
+function ast2str(node: Parameters<typeof generate>[0]): string {
+    return generate(node, { comments: false, compact: true, concise: true, minified: true }).code
+}
+
 /** Validates exactly one placeholder before Babel expression substitution. */
-export function requireOnePlaceholder(code: string, placeholder: string): void {
+function requireOnePlaceholder(code: string, placeholder: string): void {
     const replacementCount = code.split(placeholder).length - 1
     if (replacementCount !== 1) {
         throw new Error(`Expected one placeholder ${placeholder}, found ${replacementCount}`)
+    }
+}
+
+/** Transforms one module with Babel's shared parser and source-map configuration. */
+export function transformWithBabel(code: string, filename: string, plugins: PluginItem[]): AstTransformResult {
+    const transformed = transformSync(code, {
+        babelrc: false,
+        compact: true,
+        minified: true,
+        comments: false,
+        configFile: false,
+        filename,
+        plugins,
+        sourceFileName: filename,
+        sourceMaps: true,
+        sourceType: 'module'
+    })
+    if (!transformed?.code || !transformed.map) {
+        throw new Error(`Failed to transform ${filename} with Babel`)
+    }
+
+    return {
+        code: transformed.code,
+        map: transformed.map as Rolldown.ExistingRawSourceMap
     }
 }
