@@ -179,6 +179,7 @@ export class HmrServer {
         // invokes ensureLatestBuildOutput(), which would enter Rolldown's write path merely because a browser loaded `/`.
         // The wx application is consumed from the physical directory, so HTTP access must never control its revision.
         this.bundledDev.triggerBundleRegenerationIfStale = async () => false
+
         this.bundledDev.listen = async () => {
             await this.writes
             const rolldownOptions = await this.bundledDev.getRolldownOptions()
@@ -228,7 +229,7 @@ export class HmrServer {
                 throw new Error('The initial wx bundled-development build failed.')
             }
 
-            this.server.config.logger.info(`[vite-plugin-taro] wx project materialized at ${this.outDir}`)
+            this.server.config.logger.info(`[vite-plugin-taro] wx project writes at ${this.outDir}`)
         }
     }
 
