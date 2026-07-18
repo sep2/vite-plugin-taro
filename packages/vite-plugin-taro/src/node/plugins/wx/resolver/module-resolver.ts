@@ -58,13 +58,7 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
 
             ...Object.fromEntries(
                 options.pages.map((page) => {
-                    return [
-                        `${page.path}.js`,
-                        createRouteModuleId({
-                            moduleId: pageShellPath,
-                            pagePath: page.path
-                        })
-                    ]
+                    return [`${page.path}.js`, createRouteModuleId({ moduleId: pageShellPath, pagePath: page.path })]
                 })
             )
         },
