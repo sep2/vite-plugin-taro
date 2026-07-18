@@ -144,7 +144,7 @@ test('materializes initial and complete incremental DevEngine output', async () 
         assert.equal(await readFile(path.join(outDir, 'app.wxss'), 'utf8'), 'styles')
         assert.equal(await readFile(path.join(outDir, 'app.json'), 'utf8'), '{}\n')
         assert.equal(await readFile(path.join(outDir, 'assets/new.js'), 'utf8'), 'new')
-        await assert.rejects(readFile(path.join(outDir, 'assets/old.js')), { code: 'ENOENT' })
+        assert.equal(await readFile(path.join(outDir, 'assets/old.js'), 'utf8'), 'old')
         assert.notEqual(await readFile(path.join(outDir, 'vpt-hmr/control.js'), 'utf8'), initialControl)
         assert.deepEqual(loggerErrors, [])
     } finally {

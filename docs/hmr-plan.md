@@ -201,9 +201,10 @@ For an initial or complete output, the session:
 3. adds the development control and inert update files;
 4. writes every output through a temporary sibling and rename;
 5. copies `publicDir` files;
-6. removes files that existed in the previous committed output manifest but not in the new one;
-7. commits a new build ID;
-8. reports the physical project path only after all writes finish.
+6. clears the previous physical project only when the development session starts;
+7. retains files omitted by later DevEngine callbacks, including harmless unreferenced hashes, until the next session;
+8. commits a new build ID;
+9. reports the physical project path only after all writes finish.
 
 A failed build publishes nothing and leaves the previous physical project untouched.
 
@@ -624,7 +625,6 @@ At the end of this phase, source edits may perform complete rematerializations o
 - duplicate delivery and retry handling;
 - runtime/server restart behavior;
 - bounded queue and byte limits;
-- output manifest cleanup;
 - complete diagnostics and source maps.
 
 ## Validation

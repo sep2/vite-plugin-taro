@@ -2,10 +2,11 @@ import path from 'node:path'
 import type { ResolvedConfig, ViteDevServer } from 'vite'
 import {
     controlFileName,
+    createWxDevelopmentOutput,
     updateFileName,
-    type WxDevelopmentMaterializer,
-    type WxDevelopmentOutput
-} from './materializer.ts'
+    type WxDevelopmentOutput,
+    writeWxDevelopmentOutput
+} from './output.ts'
 
 const clientId = 'vite-plugin-taro-wx'
 
@@ -45,6 +46,13 @@ type BundledDevelopment = {
 
 type OutputAddon = string | ((chunk: { fileName: string }) => string | Promise<string>)
 type DevelopmentPhase = 'starting' | 'ready' | 'closed'
+type DevelopmentState = Readonly<{
+    phase: DevelopmentPhase
+    initialWrite?: Promise<void>
+    writeTail: Promise<void>
+    rebuildTail: Promise<void>
+    bundledModules: ReadonlySet<string>
+}>
 
 /**
  * Minimal host implementation used while source updates deliberately rematerialize the complete physical project.
@@ -84,35 +92,36 @@ globalThis.__rolldown_runtime__ = new WxDevRuntime();
 /** Installs the one guarded private Vite adapter used by wx bundled development. */
 export function installWxBundledDevelopment({
     server,
-    materializer,
     pagePaths
 }: {
     server: ViteDevServer
-    materializer: WxDevelopmentMaterializer
     pagePaths: readonly string[]
 }): { close(): Promise<void> } {
-    const session = new WxBundledDevelopment(server, materializer, pagePaths)
+    const session = new WxBundledDevelopment(server, pagePaths)
     session.install()
     return session
 }
 
-/** Owns private Vite integration, synthetic client registration, and complete-build requests. */
+/** Owns all mutable development state as one immutable snapshot. */
 class WxBundledDevelopment {
     private readonly server: ViteDevServer
-    private readonly materializer: WxDevelopmentMaterializer
     private readonly bundledDevelopment: BundledDevelopment
+    private readonly outDir: string
     private readonly pageFiles: ReadonlySet<string>
-    private readonly bundledModules = new Set<string>()
+    private readonly pageStyleFiles: ReadonlySet<string>
     private readonly client: DevelopmentClient = {
         send: (payload) => this.handleClientPayload(payload)
     }
-    private phase: DevelopmentPhase = 'starting'
-    private initialWrite: Promise<void> | undefined
-    private rebuildTail: Promise<void> = Promise.resolve()
+    private state: DevelopmentState = {
+        phase: 'starting',
+        writeTail: Promise.resolve(),
+        rebuildTail: Promise.resolve(),
+        bundledModules: new Set()
+    }
 
-    constructor(server: ViteDevServer, materializer: WxDevelopmentMaterializer, pagePaths: readonly string[]) {
+    constructor(server: ViteDevServer, pagePaths: readonly string[]) {
         this.server = server
-        this.materializer = materializer
+        this.outDir = path.resolve(server.config.root, server.config.build.outDir)
         const bundledDevelopment = server.environments.client.bundledDev as unknown as BundledDevelopment | undefined
         if (!bundledDevelopment) {
             throw new Error('vite-plugin-taro requires Vite bundled development for wx development.')
@@ -129,20 +138,22 @@ class WxBundledDevelopment {
 
         this.bundledDevelopment = bundledDevelopment
         this.pageFiles = new Set(pagePaths.map((pagePath) => `${pagePath}.js`))
+        this.pageStyleFiles = new Set(pagePaths.map((pagePath) => `${pagePath}.wxss`))
     }
 
     install(): void {
         this.installRolldownOptions()
-        this.installOutputMaterializer()
+        this.installOutputWriter()
         this.installFullRematerialization()
         this.installInitialBuildBarrier()
     }
 
     async close(): Promise<void> {
-        if (this.phase === 'closed') return
-        this.phase = 'closed'
-        await this.rebuildTail
-        await this.materializer.close()
+        const current = this.state
+        if (current.phase === 'closed') return
+        this.state = { ...current, phase: 'closed' }
+        await current.rebuildTail
+        await this.state.writeTail
     }
 
     private installRolldownOptions(): void {
@@ -178,17 +189,43 @@ class WxBundledDevelopment {
         }
     }
 
-    private installOutputMaterializer(): void {
+    private installOutputWriter(): void {
         const storeOutputFiles = this.bundledDevelopment.storeOutputFiles.bind(this.bundledDevelopment)
 
         this.bundledDevelopment.storeOutputFiles = (output) => {
             storeOutputFiles(output)
-            const write = this.materializer.write(output)
-            if (!write.complete) return
+            const current = this.state
+            if (current.phase === 'closed') return
 
-            this.collectBundleModules(output)
-            if (!this.initialWrite) this.initialWrite = write.done
-            if (this.phase === 'ready') this.registerBundleModules()
+            const revision = createWxDevelopmentOutput(output, this.pageStyleFiles)
+            const clearOutput =
+                revision.complete && !current.initialWrite && this.server.config.build.emptyOutDir !== false
+            const write = current.writeTail.then(() =>
+                writeWxDevelopmentOutput({
+                    config: this.server.config,
+                    outDir: this.outDir,
+                    ...revision,
+                    clearOutput
+                })
+            )
+            const writeTail = write.catch((error: unknown) => this.reportWriteError(error))
+            let bundledModules = current.bundledModules
+
+            if (revision.complete) {
+                const outputModules = getBundledModules(output, this.server.config.root)
+                if (current.phase === 'ready') {
+                    this.registerBundleModules(outputModules)
+                } else {
+                    bundledModules = new Set([...bundledModules, ...outputModules])
+                }
+            }
+
+            this.state = {
+                ...current,
+                initialWrite: current.initialWrite ?? (revision.complete ? write : undefined),
+                writeTail,
+                bundledModules
+            }
         }
     }
 
@@ -196,23 +233,20 @@ class WxBundledDevelopment {
         this.bundledDevelopment.handleHmrOutput = (_client, _files, update) => {
             // DevEngine already creates complete output for FullReload. A Patch normally creates only its native update
             // program, so Phase 1 upgrades that case explicitly instead of publishing the patch.
-            if (update.type !== 'Patch' || this.phase !== 'ready') return
+            const current = this.state
+            if (update.type !== 'Patch' || current.phase !== 'ready') return
 
-            this.rebuildTail = this.rebuildTail
-                .then(async () => {
-                    if (this.phase === 'closed') return
-                    const engine = this.requireEngine()
-                    engine.triggerFullBuild()
-                    await engine.ensureLatestBuildOutput()
-                    await this.materializer.waitForIdle()
-                })
-                .catch((error: unknown) => {
-                    if (this.phase === 'closed') return
-                    const normalizedError = error instanceof Error ? error : new Error(String(error))
-                    this.server.config.logger.error('[vite-plugin-taro] wx rematerialization failed', {
-                        error: normalizedError
-                    })
-                })
+            const rebuild = current.rebuildTail.then(async () => {
+                if (this.state.phase === 'closed') return
+                const engine = this.requireEngine()
+                engine.triggerFullBuild()
+                await engine.ensureLatestBuildOutput()
+                await this.state.writeTail
+            })
+            this.state = {
+                ...current,
+                rebuildTail: rebuild.catch((error: unknown) => this.reportRematerializationError(error))
+            }
         }
     }
 
@@ -228,29 +262,31 @@ class WxBundledDevelopment {
             if ((await engine.getBundleState()).lastBuildErrored) {
                 throw new Error('The initial wx bundled-development build failed.')
             }
-            if (!this.initialWrite) {
+            if (!this.state.initialWrite) {
                 throw new Error('The initial wx bundled-development build produced no app.js output.')
             }
 
-            this.registerBundleModules()
-            await this.initialWrite
-            await this.materializer.waitForIdle()
-            this.phase = 'ready'
-            this.server.config.logger.info(`[vite-plugin-taro] wx project materialized at ${this.materializer.outDir}`)
+            await this.state.initialWrite
+            await this.state.writeTail
+            this.registerBundleModules(this.state.bundledModules)
+            this.state = { ...this.state, phase: 'ready', bundledModules: new Set() }
+            this.server.config.logger.info(`[vite-plugin-taro] wx project materialized at ${this.outDir}`)
         }
     }
 
-    private collectBundleModules(output: WxDevelopmentOutput): void {
-        for (const file of output) {
-            if (file.type !== 'chunk') continue
-            for (const moduleId of file.moduleIds) {
-                this.bundledModules.add(toStableModuleId(moduleId, this.server.config.root))
-            }
-        }
+    private registerBundleModules(moduleIds: ReadonlySet<string>): void {
+        this.requireEngine().registerModules(clientId, [...moduleIds])
     }
 
-    private registerBundleModules(): void {
-        this.requireEngine().registerModules(clientId, [...this.bundledModules])
+    private reportWriteError(error: unknown): void {
+        const normalizedError = error instanceof Error ? error : new Error(String(error))
+        this.server.config.logger.error('[vite-plugin-taro] wx output write failed', { error: normalizedError })
+    }
+
+    private reportRematerializationError(error: unknown): void {
+        if (this.state.phase === 'closed') return
+        const normalizedError = error instanceof Error ? error : new Error(String(error))
+        this.server.config.logger.error('[vite-plugin-taro] wx rematerialization failed', { error: normalizedError })
     }
 
     private handleClientPayload(payload: unknown): void {
@@ -302,6 +338,14 @@ function createNativeDevelopmentDependency(fileName: string, pageFiles: Readonly
 
     const root = '../'.repeat(fileName.split('/').length - 1)
     return `require(${JSON.stringify(`${root}${updateFileName}`)});`
+}
+
+function getBundledModules(output: WxDevelopmentOutput, root: string): ReadonlySet<string> {
+    return new Set(
+        output.flatMap((file) =>
+            file.type === 'chunk' ? file.moduleIds.map((moduleId) => toStableModuleId(moduleId, root)) : []
+        )
+    )
 }
 
 function toStableModuleId(moduleId: string, root: string): string {
