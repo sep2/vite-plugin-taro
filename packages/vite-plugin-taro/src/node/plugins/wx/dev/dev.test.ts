@@ -6,7 +6,7 @@ import path from 'node:path'
 import test from 'node:test'
 import type { Plugin, Rolldown, ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
-import { createWxDevelopmentPlugin } from './dev.ts'
+import { createWxDevelopmentPlugin } from './plugin.ts'
 
 const options: VitePluginTaroOptions = {
     target: 'wx',
