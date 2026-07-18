@@ -43,7 +43,7 @@ type OutputAddon = string | ((chunk: { fileName: string }) => string | Promise<s
  * `DevRuntime` still gives every initially rendered module the exact instrumentation and stable IDs required by that
  * future implementation.
  */
-const wxDevRuntimeSource = `
+const devRuntimeSource = `
 var WxBaseDevRuntime = DevRuntime;
 class WxHotContext {
   constructor(moduleId) {
@@ -184,13 +184,14 @@ export class HmrServer {
                     ? rolldownOptions.experimental.devMode
                     : {}),
                 lazy: false,
-                implement: wxDevRuntimeSource
+                implement: devRuntimeSource
             }
 
             // Vite installs its native reporter only for the build command. Bundled serve uses the same Rolldown output
             // lifecycle but omits that plugin, so append it to retain normal transform, render, and generated-file output
             // in the terminal while Rolldown writes the physical Mini Program.
             rolldownOptions.plugins = [rolldownOptions.plugins, createViteReporter(this.server)]
+            disableViteOxcSourcemap(rolldownOptions.plugins)
 
             return rolldownOptions
         }
@@ -382,6 +383,35 @@ function toStableFileName(fileName: string): string {
         .replace(/(^|\/)\[hash(?::\d+)?\](?=\.|$)/g, '$1[name]')
         .replace(/[-_.]\[hash(?::\d+)?\]/g, '')
         .replace(/\[hash(?::\d+)?\]/g, '[name]')
+}
+
+// Vite forces its bundled-serve Oxc transform to generate maps even when final output maps are disabled. Its native
+// BuiltinPlugin keeps the constructor options on this private field until Rolldown consumes them, so disable that wasted
+// work at the same private boundary where HmrServer already replaces Vite's DevEngine startup.
+type ViteTransformPlugin = {
+    name?: string
+    _options?: {
+        transformOptions?: {
+            sourcemap?: boolean
+        }
+    }
+}
+
+function disableViteOxcSourcemap(pluginOption: unknown): void {
+    if (Array.isArray(pluginOption)) {
+        for (const plugin of pluginOption) {
+            disableViteOxcSourcemap(plugin)
+        }
+        return
+    }
+    if (!pluginOption || typeof pluginOption !== 'object') {
+        return
+    }
+
+    const plugin = pluginOption as ViteTransformPlugin
+    if (plugin.name === 'builtin:vite-transform' && plugin._options?.transformOptions) {
+        plugin._options.transformOptions.sourcemap = false
+    }
 }
 
 /** Configures Vite's native build reporter for physical development output without gzip work. */
