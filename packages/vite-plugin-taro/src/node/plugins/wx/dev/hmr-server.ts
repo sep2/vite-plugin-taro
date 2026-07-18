@@ -168,8 +168,8 @@ export class HmrServer {
             // any future wx output option survive. Only development-specific rendering and filenames are overridden.
             Object.assign(output, configured, {
                 format: 'es',
-                minify: false,
-                sourcemap: true,
+                minify: true,
+                sourcemap: false,
                 entryFileNames: createStableFileNames(configured.entryFileNames, '[name]'),
                 chunkFileNames: createStableFileNames(configured.chunkFileNames, 'assets/[name].js'),
                 assetFileNames: createStableFileNames(configured.assetFileNames, 'assets/[name][extname]'),

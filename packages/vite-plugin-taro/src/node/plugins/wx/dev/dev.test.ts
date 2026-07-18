@@ -135,6 +135,8 @@ test('lets the DevEngine write the initial project and keeps HMR patch-only', as
         assert.equal(chunkFileNames({} as never), 'sub/p_test/assets/[name].js')
         assert.equal(outputOptions.assetFileNames, 'assets/[name][extname]')
         assert.equal(outputOptions.format, 'es')
+        assert.equal(outputOptions.minify, true)
+        assert.equal(outputOptions.sourcemap, false)
 
         const banner = outputOptions.banner
         if (typeof banner !== 'function') throw new Error('Expected development banner function.')
