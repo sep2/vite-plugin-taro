@@ -11,6 +11,7 @@ import { chunkIdToModuleUrl } from '../../utils/modules.ts'
 import { renderCapsule } from './capsule/render-capsule.ts'
 import { bootstrapPath, transportPath } from './native/constant.ts'
 import { renderNative } from './native/render-native.ts'
+import { transformBootstrapModule } from './native/transform-bootstrap-module.ts'
 import { materializeTransport } from './transport/materialize-transport.ts'
 
 /** A test SystemJS module namespace. */
@@ -59,7 +60,14 @@ const bootstrapTypeScript = readFileSync(
     fileURLToPath(new URL('../../../runtime/wx/bootstrap.ts', import.meta.url)),
     'utf8'
 )
-const bootstrapJavaScript = (await transformWithOxc(bootstrapTypeScript, 'bootstrap.ts', { target: esTarget })).code
+const compiledBootstrap = (await transformWithOxc(bootstrapTypeScript, 'bootstrap.ts', { target: esTarget })).code
+const bootstrapJavaScript = (
+    await transformBootstrapModule({
+        code: compiledBootstrap,
+        id: 'bootstrap.js',
+        appConfig: testAppConfig
+    })
+).code
     .replace(/^import ['"]systemjs\/s\.js['"];\s*/m, '')
     .replace(
         /^import \{ createNativeShell \} from ['"]\.\/native-shell\.(?:ts|js)['"];\s*/m,
@@ -147,7 +155,6 @@ async function createTestSystem(
         exports: {}
     }
     const sandbox: Record<string, unknown> = {
-        __VITE_PLUGIN_TARO_APP_CONFIG__: testAppConfig,
         exports: commonJsModule.exports,
         module: commonJsModule,
         require: () => transport
@@ -203,8 +210,8 @@ export { appConfig }`
     const bootstrap = await system.import(chunkIdToModuleUrl('assets/bootstrap.js'))
     const consumer = await system.import(chunkIdToModuleUrl('assets/consumer.js'))
 
-    assert.strictEqual(bootstrap.appConfig, testAppConfig)
-    assert.strictEqual(consumer.appConfig, testAppConfig)
+    assert.equal(JSON.stringify(bootstrap.appConfig), JSON.stringify(testAppConfig))
+    assert.strictEqual(consumer.appConfig, bootstrap.appConfig)
     assert.equal(typeof bootstrap.createNativeShell, 'function')
     assert.equal(typeof bootstrap.__vitePreload, 'function')
 })

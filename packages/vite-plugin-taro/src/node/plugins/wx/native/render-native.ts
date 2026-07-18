@@ -29,6 +29,7 @@ function connectNativeImportPlugin(fileName: string): PluginObject {
 
                 // Resolve the final relative chunk reference before converting it to the canonical vpt:/ module URL.
                 const chunkId = path.posix.join(path.posix.dirname(fileName), importPath.node.source.value)
+
                 importPath.replaceWith(
                     types.callExpression(
                         types.memberExpression(

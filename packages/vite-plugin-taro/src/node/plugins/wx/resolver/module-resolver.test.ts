@@ -26,7 +26,12 @@ const options: VitePluginTaroOptions = {
             }
         }
     ],
-    appJson: {},
+    appJson: {
+        pages: ['stale/page'],
+        window: {
+            navigationBarTitleText: 'Example'
+        }
+    },
     projectConfigJson: {},
     sitemapJson: {}
 }
@@ -47,4 +52,14 @@ test('resolves fixed and route-specific private modules', () => {
     const pageModule = resolver.resolveId(pageModuleId, '/runtime/page.js?route=pages%2Fhome%2Findex', projectRoot)
     assert.equal(pageModule, `${pageModulePath}?route=pages%2Fhome%2Findex`)
     assert.equal(resolver.resolveId(pageComponentId, pageModule, projectRoot), '/project/src/pages/home/index.tsx')
+})
+
+test('specializes bootstrap with the configured App JSON', async () => {
+    const resolver = createModuleResolver(options)
+    const result = await resolver.transform('export const appConfig = __VITE_PLUGIN_TARO_APP_CONFIG__', bootstrapPath)
+
+    assert.ok(result)
+    assert.match(result.code, /pages:\s*\[\s*["']pages\/home\/index["']/)
+    assert.doesNotMatch(result.code, /stale\/page/)
+    assert.match(result.code, /navigationBarTitleText:\s*["']Example["']/)
 })

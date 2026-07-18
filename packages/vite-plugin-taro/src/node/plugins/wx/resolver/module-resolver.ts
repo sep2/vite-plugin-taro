@@ -1,5 +1,6 @@
 import type { VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../../options.ts'
 import { normalizeModuleId, resolveAppComponentPath, resolvePageComponentPath } from '../../../utils/modules.ts'
+import { createAppConfig } from '../../../utils/project-config.ts'
 import { appComponentId } from '../../client/constant.ts'
 import {
     appShellFileName,
@@ -14,6 +15,7 @@ import {
     transportPath,
     vitePreloadId
 } from '../native/constant.ts'
+import { transformBootstrapModule } from '../native/transform-bootstrap-module.ts'
 import { transformPageModule } from '../native/transform-page-module.ts'
 
 /** Resolves one exact private import using its importer and configured project root. */
@@ -21,6 +23,9 @@ type RuntimeModuleResolver = (importer: string | undefined, projectRoot: string)
 
 /** Creates the private WX module resolver. */
 export function createModuleResolver(options: VitePluginTaroOptions) {
+    const normalizedBootstrapPath = normalizeModuleId(bootstrapPath)
+    const normalizedPageModulePath = normalizeModuleId(pageModulePath)
+
     // Provide constant-time route validation and access to each configured Page JSON object.
     const pageByPath = new Map(options.pages.map((page) => [page.path, page]))
 
@@ -68,7 +73,13 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
         },
 
         transform(code: string, id: string) {
-            if (normalizeModuleId(id) === normalizeModuleId(pageModulePath)) {
+            const normalizedId = normalizeModuleId(id)
+
+            if (normalizedId === normalizedBootstrapPath) {
+                return transformBootstrapModule({ code, id, appConfig: createAppConfig(options) })
+            }
+
+            if (normalizedId === normalizedPageModulePath) {
                 return transformPageModule({ code, id, page: requirePage({ moduleId: id, pageByPath }) })
             }
         }
