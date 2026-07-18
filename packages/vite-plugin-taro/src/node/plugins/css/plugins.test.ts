@@ -40,7 +40,7 @@ test('finalizes split Tailwind imports as WXSS', async () => {
                 rolldownOptions: {
                     input: path.join(root, 'app.ts'),
                     output: {
-                        assetFileNames: 'app.wxss'
+                        assetFileNames: 'src/[name].wxss'
                     }
                 }
             }

@@ -118,12 +118,9 @@ export function createPlacer() {
                     // into every physical chunk filename; content identity alone is sufficient beneath that root.
                     return `${location.root}/assets/[hash].js`
                 },
-                /** Keeps the one global stylesheet exact and places all other assets in main-package assets. */
-                assetFileNames(asset: Rolldown.PreRenderedAsset): string {
-                    return asset.names.some((name) => name.endsWith('.css'))
-                        ? 'app.wxss'
-                        : 'assets/[name]-[hash][extname]'
-                }
+                // Keep generic assets independent of stylesheet conventions. The CSS adapter sees Tailwind's final
+                // mutation and owns the exact global `app.wxss` identity without confusing native Page companions.
+                assetFileNames: 'assets/[name]-[hash][extname]'
             },
             // Rolldown rejects strict entry signatures when code-splitting groups disable recursive dependency capture.
             // allow-extension retains required native-entry exports while permitting the extra cross-chunk bindings used

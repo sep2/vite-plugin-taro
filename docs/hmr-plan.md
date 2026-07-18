@@ -194,19 +194,20 @@ instrumented body and registers each executed source module with DevRuntime.
 Vite configures bundled development with `skipWrite`, so the complete output remains in Vite's memory file store. One
 `WxDevelopmentSession` owns all physical writes to the configured wx output directory.
 
-For an initial or complete output, the session:
+Development uses stable physical filenames, so complete outputs overwrite the previous chunks without a manifest or
+stale-file cleanup. The session:
 
-1. waits for a successful full DevEngine output;
-2. normalizes any development CSS payload into `app.wxss`;
-3. adds the development control and inert update files;
-4. writes every output through a temporary sibling and rename;
-5. copies `publicDir` files;
-6. clears the previous physical project only when the development session starts;
-7. retains files omitted by later DevEngine callbacks, including harmless unreferenced hashes, until the next session;
+1. clears the previous physical project when the session starts;
+2. copies `publicDir` once and mirrors later public-file watcher events;
+3. waits for a successful full DevEngine output;
+4. receives the global stylesheet as `app.wxss` directly from the wx output pipeline;
+5. adds the development control and inert update files;
+6. writes ordinary full-reload files directly;
+7. atomically replaces `app.wxss` and publishes `update.js` last;
 8. commits a new build ID;
 9. reports the physical project path only after all writes finish.
 
-A failed build publishes nothing and leaves the previous physical project untouched.
+A failed DevEngine build produces no physical output callback. Filesystem failures are reported through Vite's logger.
 
 ### Development-only physical files
 

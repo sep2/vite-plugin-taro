@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import type { ResolvedConfig, Rolldown } from 'vite'
+import type { Rolldown } from 'vite'
 
 export const controlFileName = 'vpt-hmr/control.js'
 export const updateFileName = 'vpt-hmr/update.js'
@@ -9,61 +9,80 @@ export const updateFileName = 'vpt-hmr/update.js'
 /** File shape passed to Vite's private bundled-development output store. */
 export type WxDevelopmentOutput = Array<Rolldown.OutputAsset | Rolldown.OutputChunk>
 
-type WxDevelopmentFile = {
-    fileName: string
-    source: string | Uint8Array
+/** Clears the previous session and copies public files before the first generated output is committed. */
+export async function initializeWxDevelopmentOutput({
+    outDir,
+    publicDir,
+    emptyOutDir
+}: {
+    outDir: string
+    publicDir: string
+    emptyOutDir: boolean
+}): Promise<void> {
+    if (emptyOutDir) await fs.rm(outDir, { recursive: true, force: true })
+    await fs.mkdir(outDir, { recursive: true })
+    if (!publicDir) return
+
+    try {
+        await fs.cp(publicDir, outDir, { recursive: true, force: true })
+    } catch (error) {
+        if (!isMissingFileError(error)) throw error
+    }
 }
 
-/** Queues one DevEngine callback for physical writing. */
+/** Mirrors one public-directory watcher event into the physical Mini Program directory. */
+export async function syncWxPublicFile(event: string, sourcePath: string, destinationPath: string): Promise<void> {
+    if (event === 'unlink' || event === 'unlinkDir') {
+        await fs.rm(destinationPath, { recursive: event === 'unlinkDir', force: true })
+        return
+    }
+    if (event === 'addDir') {
+        await fs.mkdir(destinationPath, { recursive: true })
+        return
+    }
+    if (event !== 'add' && event !== 'change') return
+
+    await fs.mkdir(path.dirname(destinationPath), { recursive: true })
+    await fs.copyFile(sourcePath, destinationPath)
+}
+
+/** Queues one DevEngine callback behind the previous physical write. */
 export function writeWxDevelopmentOutput({
-    config,
     outDir,
     output,
-    pageStyleFiles,
-    previousWrite,
-    clearOutput
+    previousWrite
 }: {
-    config: ResolvedConfig
     outDir: string
     output: WxDevelopmentOutput
-    pageStyleFiles: ReadonlySet<string>
     previousWrite: Promise<void>
-    clearOutput: boolean
 }): { complete: boolean; done: Promise<void> } {
-    const complete = output.some((file) => validateFileName(file.fileName) === 'app.js')
+    const complete = output.some((file) => file.fileName === 'app.js')
 
     return {
         complete,
         done: previousWrite.then(async () => {
-            const files = new Map<string, string | Uint8Array>()
-            if (complete) {
-                for (const file of await readPublicFiles(config.publicDir)) files.set(file.fileName, file.source)
-            }
-            for (const file of output) {
-                const fileName = getDevelopmentFileName(file, pageStyleFiles)
-                files.set(fileName, file.type === 'chunk' ? file.code : file.source)
-            }
-            if (complete) {
-                for (const file of createDevelopmentFiles()) files.set(file.fileName, file.source)
-            }
+            const files = output.map((file) => ({
+                fileName: file.fileName,
+                source: file.type === 'chunk' ? file.code : file.source
+            }))
+            if (complete) files.push(...createDevelopmentFiles())
 
-            if (complete && clearOutput) await fs.rm(outDir, { recursive: true, force: true })
-            await writeFilesAtomically(outDir, files)
+            const update = files.find((file) => file.fileName === updateFileName)
+            await Promise.all(
+                files
+                    .filter((file) => file !== update)
+                    .map((file) =>
+                        file.fileName === 'app.wxss'
+                            ? writeFileAtomically(outDir, file.fileName, file.source)
+                            : writeFile(outDir, file.fileName, file.source)
+                    )
+            )
+            if (update) await writeFileAtomically(outDir, update.fileName, update.source)
         })
     }
 }
 
-function getDevelopmentFileName(file: WxDevelopmentOutput[number], pageStyleFiles: ReadonlySet<string>): string {
-    const fileName = validateFileName(file.fileName)
-    // The Tailwind adapter assigns its global asset a source-relative wxss filename after the configured asset callback.
-    // CSS splitting is disabled, and Page styles are exact companions, so every other CSS/WXSS asset is app.wxss.
-    return file.type === 'asset' &&
-        (fileName.endsWith('.css') || (fileName.endsWith('.wxss') && !pageStyleFiles.has(fileName)))
-        ? 'app.wxss'
-        : fileName
-}
-
-function createDevelopmentFiles(): WxDevelopmentFile[] {
+function createDevelopmentFiles(): Array<{ fileName: string; source: string }> {
     const buildId = crypto.randomUUID()
     return [
         {
@@ -77,66 +96,23 @@ function createDevelopmentFiles(): WxDevelopmentFile[] {
     ]
 }
 
-async function readPublicFiles(publicDir: string): Promise<WxDevelopmentFile[]> {
-    if (!publicDir) return []
+async function writeFile(outDir: string, fileName: string, source: string | Uint8Array): Promise<void> {
+    const destinationPath = path.join(outDir, fileName)
+    await fs.mkdir(path.dirname(destinationPath), { recursive: true })
+    await fs.writeFile(destinationPath, source)
+}
+
+async function writeFileAtomically(outDir: string, fileName: string, source: string | Uint8Array): Promise<void> {
+    const destinationPath = path.join(outDir, fileName)
+    const temporaryPath = `${destinationPath}.${crypto.randomUUID()}.tmp`
+    await fs.mkdir(path.dirname(destinationPath), { recursive: true })
 
     try {
-        const files: WxDevelopmentFile[] = []
-        await collectPublicFiles(publicDir, '', files)
-        return files
-    } catch (error) {
-        if (isMissingFileError(error)) return []
-        throw error
+        await fs.writeFile(temporaryPath, source)
+        await fs.rename(temporaryPath, destinationPath)
+    } finally {
+        await fs.rm(temporaryPath, { force: true })
     }
-}
-
-async function collectPublicFiles(
-    directory: string,
-    relativeDirectory: string,
-    files: WxDevelopmentFile[]
-): Promise<void> {
-    const entries = await fs.readdir(path.join(directory, relativeDirectory), { withFileTypes: true })
-    await Promise.all(
-        entries.map(async (entry) => {
-            const relativePath = path.posix.join(relativeDirectory.replaceAll('\\', '/'), entry.name)
-            if (entry.isDirectory()) {
-                await collectPublicFiles(directory, relativePath, files)
-            } else if (entry.isFile()) {
-                files.push({
-                    fileName: validateFileName(relativePath),
-                    source: await fs.readFile(path.join(directory, relativePath))
-                })
-            }
-        })
-    )
-}
-
-/** Writes every temporary sibling before renaming any file, minimizing partially prepared DevTools revisions. */
-async function writeFilesAtomically(outDir: string, files: ReadonlyMap<string, string | Uint8Array>): Promise<void> {
-    const nonce = crypto.randomUUID()
-    const staged: Array<{ temporaryPath: string; destinationPath: string }> = []
-
-    try {
-        for (const [fileName, source] of files) {
-            const destinationPath = path.join(outDir, fileName)
-            const temporaryPath = `${destinationPath}.${nonce}.tmp`
-            await fs.mkdir(path.dirname(destinationPath), { recursive: true })
-            await fs.writeFile(temporaryPath, source)
-            staged.push({ temporaryPath, destinationPath })
-        }
-        for (const file of staged) await fs.rename(file.temporaryPath, file.destinationPath)
-    } catch (error) {
-        await Promise.all(staged.map((file) => fs.rm(file.temporaryPath, { force: true })))
-        throw error
-    }
-}
-
-function validateFileName(fileName: string): string {
-    const normalized = fileName.replaceAll('\\', '/')
-    if (path.posix.isAbsolute(normalized) || normalized === '..' || normalized.startsWith('../')) {
-        throw new Error(`wx output file escapes outDir: ${fileName}`)
-    }
-    return normalized
 }
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {

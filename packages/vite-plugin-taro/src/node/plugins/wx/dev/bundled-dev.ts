@@ -1,20 +1,25 @@
 import path from 'node:path'
-import type { ResolvedConfig, ViteDevServer } from 'vite'
-import { controlFileName, updateFileName, type WxDevelopmentOutput, writeWxDevelopmentOutput } from './output.ts'
+import type { ViteDevServer } from 'vite'
+import {
+    controlFileName,
+    initializeWxDevelopmentOutput,
+    syncWxPublicFile,
+    updateFileName,
+    type WxDevelopmentOutput,
+    writeWxDevelopmentOutput
+} from './output.ts'
 
-const clientId = 'vite-plugin-taro-wx'
 const rolldownRuntimeBinding = 'const __rolldown_runtime__ = global.__rolldown_runtime__;'
 
 type DevelopmentEngine = {
     ensureCurrentBuildFinish(): Promise<void>
     ensureLatestBuildOutput(): Promise<unknown>
     getBundleState(): Promise<{ lastBuildErrored: boolean }>
-    registerModules(clientId: string, moduleIds: string[]): void
     triggerFullBuild(): void
 }
 
 type DevelopmentRolldownOptions = {
-    output?: Record<string, unknown> | Array<Record<string, unknown>>
+    output?: Record<string, unknown>
     experimental?: {
         devMode?: boolean | Record<string, unknown>
         [key: string]: unknown
@@ -22,38 +27,34 @@ type DevelopmentRolldownOptions = {
     [key: string]: unknown
 }
 
-type DevelopmentClient = {
-    send(payload: unknown): void
-}
-
-type DevelopmentUpdate = { type: 'Noop' | 'FullReload' | 'Patch' }
-
 type BundledDevelopment = {
     _devEngine?: DevelopmentEngine
-    clients: {
-        setupIfNeeded(client: DevelopmentClient, clientId: string): void
-    }
     getRolldownOptions(): Promise<DevelopmentRolldownOptions>
-    handleHmrOutput(client: DevelopmentClient, files: string[], update: DevelopmentUpdate, invalidation?: unknown): void
     storeOutputFiles(output: WxDevelopmentOutput): void
     listen(): Promise<void>
 }
 
 type OutputAddon = string | ((chunk: { fileName: string }) => string | Promise<string>)
-type DevelopmentPhase = 'starting' | 'ready' | 'closed'
-type DevelopmentState = Readonly<{
-    phase: DevelopmentPhase
+type StartingState = Readonly<{
+    status: 'starting'
+    writes: Promise<void>
     initialWrite?: Promise<void>
-    writeTail: Promise<void>
-    rebuildTail: Promise<void>
-    bundledModules: ReadonlySet<string>
 }>
+type ReadyState = Readonly<{
+    status: 'ready'
+    writes: Promise<void>
+    rebuild?: Promise<void>
+    rebuildAgain: boolean
+}>
+type ClosedState = Readonly<{
+    status: 'closed'
+    done: Promise<void>
+}>
+type DevelopmentState = StartingState | ReadyState | ClosedState
 
 /**
  * Minimal host implementation used while source updates deliberately rematerialize the complete physical project.
- *
- * Rolldown injects this source into its generated helper runtime. It must therefore be self-contained and must not use
- * browser transports, DOM APIs, or executable code fetched over HTTP. Patch application is added in the next phase.
+ * Rolldown injects this self-contained source into its generated helper runtime.
  */
 const wxDevRuntimeSource = `
 var WxBaseDevRuntime = DevRuntime;
@@ -74,7 +75,7 @@ class WxHotContext {
 }
 class WxDevRuntime extends WxBaseDevRuntime {
   constructor() {
-    super({ send() {} }, ${JSON.stringify(clientId)});
+    super({ send() {} }, 'vite-plugin-taro-wx');
   }
   createModuleHotContext(moduleId) {
     return new WxHotContext(moduleId);
@@ -84,7 +85,7 @@ class WxDevRuntime extends WxBaseDevRuntime {
 global.__rolldown_runtime__ = new WxDevRuntime();
 `
 
-/** Installs the one guarded private Vite adapter used by wx bundled development. */
+/** Installs the pinned Vite bundled-development adapter. */
 export function installWxBundledDevelopment({
     server,
     pagePaths
@@ -92,63 +93,69 @@ export function installWxBundledDevelopment({
     server: ViteDevServer
     pagePaths: readonly string[]
 }): { close(): Promise<void> } {
-    const session = new WxBundledDevelopment(server, pagePaths)
+    const bundledDevelopment = server.environments.client.bundledDev as unknown as BundledDevelopment | undefined
+    if (!bundledDevelopment) throw new Error('Vite did not create the wx bundled-development environment.')
+
+    const session = new WxBundledDevelopment(server, bundledDevelopment, pagePaths)
     session.install()
     return session
 }
 
-/** Owns all mutable development state as one immutable snapshot. */
+/** Owns the complete development lifecycle as one immutable state value. */
 class WxBundledDevelopment {
     private readonly server: ViteDevServer
     private readonly bundledDevelopment: BundledDevelopment
     private readonly outDir: string
+    private readonly publicDir: string
     private readonly pageFiles: ReadonlySet<string>
-    private readonly pageStyleFiles: ReadonlySet<string>
-    private readonly client: DevelopmentClient = {
-        send: (payload) => this.handleClientPayload(payload)
-    }
-    private state: DevelopmentState = {
-        phase: 'starting',
-        writeTail: Promise.resolve(),
-        rebuildTail: Promise.resolve(),
-        bundledModules: new Set()
+    private state: DevelopmentState
+    private readonly handleWatcherEvent = (event: string, filePath: string): void => {
+        const publicDestination = this.getPublicDestination(filePath)
+        if (publicDestination) {
+            this.queuePublicFile(event, filePath, publicDestination)
+            return
+        }
+        if (!isInside(this.outDir, filePath) && (event === 'add' || event === 'change' || event === 'unlink')) {
+            this.requestRebuild()
+        }
     }
 
-    constructor(server: ViteDevServer, pagePaths: readonly string[]) {
+    constructor(server: ViteDevServer, bundledDevelopment: BundledDevelopment, pagePaths: readonly string[]) {
         this.server = server
-        this.outDir = path.resolve(server.config.root, server.config.build.outDir)
-        const bundledDevelopment = server.environments.client.bundledDev as unknown as BundledDevelopment | undefined
-        if (!bundledDevelopment) {
-            throw new Error('vite-plugin-taro requires Vite bundled development for wx development.')
-        }
-        if (
-            typeof bundledDevelopment.getRolldownOptions !== 'function' ||
-            typeof bundledDevelopment.handleHmrOutput !== 'function' ||
-            typeof bundledDevelopment.storeOutputFiles !== 'function' ||
-            typeof bundledDevelopment.listen !== 'function' ||
-            typeof bundledDevelopment.clients?.setupIfNeeded !== 'function'
-        ) {
-            throw new Error('vite-plugin-taro does not support this Vite bundled-development API shape.')
-        }
-
         this.bundledDevelopment = bundledDevelopment
+        this.outDir = path.resolve(server.config.root, server.config.build.outDir)
+        this.publicDir = server.config.publicDir ? path.resolve(server.config.publicDir) : ''
         this.pageFiles = new Set(pagePaths.map((pagePath) => `${pagePath}.js`))
-        this.pageStyleFiles = new Set(pagePaths.map((pagePath) => `${pagePath}.wxss`))
+        this.state = {
+            status: 'starting',
+            writes: initializeWxDevelopmentOutput({
+                outDir: this.outDir,
+                publicDir: this.publicDir,
+                emptyOutDir: server.config.build.emptyOutDir !== false
+            })
+        }
     }
 
     install(): void {
         this.installRolldownOptions()
         this.installOutputWriter()
-        this.installFullRematerialization()
         this.installInitialBuildBarrier()
+        this.server.watcher.add(this.server.config.root)
+        this.server.watcher.on('all', this.handleWatcherEvent)
     }
 
     async close(): Promise<void> {
         const current = this.state
-        if (current.phase === 'closed') return
-        this.state = { ...current, phase: 'closed' }
-        await current.rebuildTail
-        await this.state.writeTail
+        if (current.status === 'closed') return current.done
+
+        this.server.watcher.off('all', this.handleWatcherEvent)
+        const done =
+            current.status === 'ready' && current.rebuild
+                ? Promise.all([current.writes, current.rebuild]).then(() => undefined)
+                : current.writes
+        this.state = { status: 'closed', done }
+        await this.server.watcher.unwatch(this.server.config.root)
+        await done
     }
 
     private installRolldownOptions(): void {
@@ -156,16 +163,21 @@ class WxBundledDevelopment {
 
         this.bundledDevelopment.getRolldownOptions = async () => {
             const rolldownOptions = await getRolldownOptions()
-            const output = getFirstOutput(rolldownOptions)
-            const configuredOutput = getConfiguredOutput(this.server.config)
-            const configuredBanner = configuredOutput.banner as OutputAddon | undefined
+            if (Array.isArray(rolldownOptions.output)) throw new Error('wx development supports one Rolldown output.')
+            rolldownOptions.output ??= {}
+            const output = rolldownOptions.output
+            const configuredOutput = this.server.config.build.rolldownOptions.output
+            if (Array.isArray(configuredOutput)) throw new Error('wx development supports one configured output.')
+            const configured = (configuredOutput ?? {}) as Record<string, unknown>
+            const configuredBanner = configured.banner as OutputAddon | undefined
 
-            // Vite bundled development replaces filename callbacks after resolving normal build configuration. Restore
-            // the complete wx fragment so development uses production's native paths, capsule placement, and hashes.
-            Object.assign(output, configuredOutput, {
+            Object.assign(output, configured, {
                 format: 'es',
                 minify: false,
                 sourcemap: true,
+                entryFileNames: createStableFileNames(configured.entryFileNames, '[name]'),
+                chunkFileNames: createStableFileNames(configured.chunkFileNames, 'assets/[name].js'),
+                assetFileNames: createStableFileNames(configured.assetFileNames, 'assets/[name][extname]'),
                 banner: createDevelopmentBanner(configuredBanner, this.pageFiles)
             })
 
@@ -174,8 +186,6 @@ class WxBundledDevelopment {
                 ...(typeof rolldownOptions.experimental.devMode === 'object'
                     ? rolldownOptions.experimental.devMode
                     : {}),
-                // Browser lazy compilation returns JavaScript over HTTP. wx materializes every discoverable capsule as
-                // a physical Mini Program file instead.
                 lazy: false,
                 implement: wxDevRuntimeSource
             }
@@ -190,57 +200,18 @@ class WxBundledDevelopment {
         this.bundledDevelopment.storeOutputFiles = (output) => {
             storeOutputFiles(output)
             const current = this.state
-            if (current.phase === 'closed') return
+            if (current.status === 'closed') return
 
-            const write = writeWxDevelopmentOutput({
-                config: this.server.config,
-                outDir: this.outDir,
-                output,
-                pageStyleFiles: this.pageStyleFiles,
-                previousWrite: current.writeTail,
-                clearOutput: !current.initialWrite && this.server.config.build.emptyOutDir !== false
-            })
-            const writeTail = write.done.catch((error: unknown) => this.reportWriteError(error))
-            let bundledModules = current.bundledModules
-
-            if (write.complete) {
-                const outputModules = getBundledModules(output, this.server.config.root)
-                if (current.phase === 'ready') {
-                    this.registerBundleModules(outputModules)
-                } else {
-                    // A complete DevEngine callback contains every chunk, so its immutable module set replaces rather
-                    // than copies or merges the previous startup snapshot.
-                    bundledModules = outputModules
-                }
-            }
-
-            this.state = {
-                ...current,
-                initialWrite: current.initialWrite ?? (write.complete ? write.done : undefined),
-                writeTail,
-                bundledModules
-            }
-        }
-    }
-
-    private installFullRematerialization(): void {
-        this.bundledDevelopment.handleHmrOutput = (_client, _files, update) => {
-            // DevEngine already creates complete output for FullReload. A Patch normally creates only its native update
-            // program, so Phase 1 upgrades that case explicitly instead of publishing the patch.
-            const current = this.state
-            if (update.type !== 'Patch' || current.phase !== 'ready') return
-
-            const rebuild = current.rebuildTail.then(async () => {
-                if (this.state.phase === 'closed') return
-                const engine = this.requireEngine()
-                engine.triggerFullBuild()
-                await engine.ensureLatestBuildOutput()
-                await this.state.writeTail
-            })
-            this.state = {
-                ...current,
-                rebuildTail: rebuild.catch((error: unknown) => this.reportRematerializationError(error))
-            }
+            const write = writeWxDevelopmentOutput({ outDir: this.outDir, output, previousWrite: current.writes })
+            const writes = write.done.catch((error: unknown) => this.reportError('output write', error))
+            this.state =
+                current.status === 'starting'
+                    ? {
+                          ...current,
+                          writes,
+                          initialWrite: current.initialWrite ?? (write.complete ? write.done : undefined)
+                      }
+                    : { ...current, writes }
         }
     }
 
@@ -250,45 +221,73 @@ class WxBundledDevelopment {
         this.bundledDevelopment.listen = async () => {
             await listen()
             const engine = this.requireEngine()
-            this.bundledDevelopment.clients.setupIfNeeded(this.client, clientId)
             await engine.ensureCurrentBuildFinish()
 
             if ((await engine.getBundleState()).lastBuildErrored) {
                 throw new Error('The initial wx bundled-development build failed.')
             }
-            if (!this.state.initialWrite) {
+            if (this.state.status !== 'starting' || !this.state.initialWrite) {
                 throw new Error('The initial wx bundled-development build produced no app.js output.')
             }
 
             await this.state.initialWrite
-            await this.state.writeTail
-            this.registerBundleModules(this.state.bundledModules)
-            this.state = { ...this.state, phase: 'ready', bundledModules: new Set() }
+            await engine.ensureLatestBuildOutput()
+            if (this.state.status !== 'starting') return
+            await this.state.writes
+            this.state = { status: 'ready', writes: this.state.writes, rebuildAgain: false }
             this.server.config.logger.info(`[vite-plugin-taro] wx project materialized at ${this.outDir}`)
         }
     }
 
-    private registerBundleModules(moduleIds: ReadonlySet<string>): void {
-        this.requireEngine().registerModules(clientId, [...moduleIds])
-    }
-
-    private reportWriteError(error: unknown): void {
-        const normalizedError = error instanceof Error ? error : new Error(String(error))
-        this.server.config.logger.error('[vite-plugin-taro] wx output write failed', { error: normalizedError })
-    }
-
-    private reportRematerializationError(error: unknown): void {
-        if (this.state.phase === 'closed') return
-        const normalizedError = error instanceof Error ? error : new Error(String(error))
-        this.server.config.logger.error('[vite-plugin-taro] wx rematerialization failed', { error: normalizedError })
-    }
-
-    private handleClientPayload(payload: unknown): void {
-        if (typeof payload !== 'object' || payload === null) return
-        const candidate = payload as { type?: unknown; err?: { message?: unknown } }
-        if (candidate.type === 'error' && typeof candidate.err?.message === 'string') {
-            this.server.config.logger.error(`[vite-plugin-taro] wx DevEngine failed: ${candidate.err.message}`)
+    private requestRebuild(): void {
+        const current = this.state
+        if (current.status !== 'ready') return
+        if (current.rebuild) {
+            this.state = { ...current, rebuildAgain: true }
+            return
         }
+
+        const rebuild = this.rebuild().catch((error: unknown) => this.reportError('rematerialization', error))
+        this.state = { ...current, rebuild, rebuildAgain: false }
+        void rebuild.then(() => this.finishRebuild(rebuild))
+    }
+
+    private async rebuild(): Promise<void> {
+        const engine = this.requireEngine()
+        engine.triggerFullBuild()
+        await engine.ensureLatestBuildOutput()
+        if (this.state.status !== 'closed') await this.state.writes
+    }
+
+    private finishRebuild(rebuild: Promise<void>): void {
+        const current = this.state
+        if (current.status !== 'ready' || current.rebuild !== rebuild) return
+
+        const rebuildAgain = current.rebuildAgain
+        this.state = { status: 'ready', writes: current.writes, rebuildAgain: false }
+        if (rebuildAgain) this.requestRebuild()
+    }
+
+    private queuePublicFile(event: string, sourcePath: string, destinationPath: string): void {
+        const current = this.state
+        if (current.status === 'closed') return
+
+        const write = current.writes.then(() => syncWxPublicFile(event, sourcePath, destinationPath))
+        const writes = write.catch((error: unknown) => this.reportError('public file sync', error))
+        this.state = { ...current, writes }
+    }
+
+    private getPublicDestination(filePath: string): string | undefined {
+        if (!this.publicDir) return
+        const relativePath = path.relative(this.publicDir, filePath)
+        if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) return
+        return path.join(this.outDir, relativePath)
+    }
+
+    private reportError(operation: string, error: unknown): void {
+        if (this.state.status === 'closed') return
+        const normalizedError = error instanceof Error ? error : new Error(String(error))
+        this.server.config.logger.error(`[vite-plugin-taro] wx ${operation} failed`, { error: normalizedError })
     }
 
     private requireEngine(): DevelopmentEngine {
@@ -298,27 +297,7 @@ class WxBundledDevelopment {
     }
 }
 
-function getFirstOutput(options: DevelopmentRolldownOptions): Record<string, unknown> {
-    if (!options.output) options.output = {}
-    if (!Array.isArray(options.output)) return options.output
-
-    const output = options.output[0] ?? {}
-    options.output[0] = output
-    return output
-}
-
-function getConfiguredOutput(config: ResolvedConfig): Record<string, unknown> {
-    const output = config.build.rolldownOptions.output
-    if (!output) return {}
-    return (Array.isArray(output) ? output[0] : output) as Record<string, unknown>
-}
-
-/**
- * Composes user output banners with the explicit wx runtime binding and native HMR dependencies.
- *
- * WeChat's `global` properties do not become lexical bindings. Rolldown emits calls through the free
- * `__rolldown_runtime__` identifier, so every physical output module captures the runtime from `global` explicitly.
- */
+/** Composes user banners with the wx runtime binding and native development dependencies. */
 function createDevelopmentBanner(
     configuredBanner: OutputAddon | undefined,
     pageFiles: ReadonlySet<string>
@@ -339,17 +318,21 @@ function createNativeDevelopmentDependency(fileName: string, pageFiles: Readonly
     return `require(${JSON.stringify(`${root}${updateFileName}`)});`
 }
 
-function getBundledModules(output: WxDevelopmentOutput, root: string): ReadonlySet<string> {
-    return new Set(
-        output.flatMap((file) =>
-            file.type === 'chunk' ? file.moduleIds.map((moduleId) => toStableModuleId(moduleId, root)) : []
-        )
-    )
+function createStableFileNames<T>(addon: unknown, fallback: string): string | ((value: T) => string) {
+    if (typeof addon === 'function') {
+        return (value) => toStableFileName(String(addon(value)))
+    }
+    return toStableFileName(typeof addon === 'string' ? addon : fallback)
 }
 
-function toStableModuleId(moduleId: string, root: string): string {
-    const normalizedId = moduleId.replaceAll('\\', '/')
-    const normalizedRoot = root.replaceAll('\\', '/')
-    if (normalizedId.startsWith('\0') || !path.posix.isAbsolute(normalizedId)) return normalizedId
-    return path.posix.relative(normalizedRoot, normalizedId)
+function toStableFileName(fileName: string): string {
+    return fileName
+        .replace(/(^|\/)\[hash(?::\d+)?\](?=\.|$)/g, '$1[name]')
+        .replace(/[-_.]\[hash(?::\d+)?\]/g, '')
+        .replace(/\[hash(?::\d+)?\]/g, '[name]')
+}
+
+function isInside(directory: string, filePath: string): boolean {
+    const relativePath = path.relative(directory, filePath)
+    return relativePath === '' || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath))
 }

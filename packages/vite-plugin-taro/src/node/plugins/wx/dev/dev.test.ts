@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { EventEmitter } from 'node:events'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -24,21 +25,19 @@ test('materializes initial and complete incremental DevEngine output', async () 
     await writeFile(path.join(publicDir, 'public.txt'), 'public')
 
     let triggerCount = 0
-    let registeredClientId: string | undefined
-    let registeredModuleIds: string[] = []
-    const nextOutput = createOutput(root, 'updated', 'assets/new.js')
+    const nextOutput = createOutput(root, 'updated', 'assets/shared.js')
+    const watcher = Object.assign(new EventEmitter(), {
+        add() {},
+        async unwatch() {}
+    })
 
     const engine = {
         async ensureCurrentBuildFinish() {},
         async ensureLatestBuildOutput() {
-            bundledDevelopment.storeOutputFiles(nextOutput)
+            if (triggerCount > 0) bundledDevelopment.storeOutputFiles(nextOutput)
         },
         async getBundleState() {
             return { lastBuildErrored: false }
-        },
-        registerModules(clientId: string, moduleIds: string[]) {
-            registeredClientId = clientId
-            registeredModuleIds = moduleIds
         },
         triggerFullBuild() {
             triggerCount++
@@ -47,11 +46,6 @@ test('materializes initial and complete incremental DevEngine output', async () 
 
     const bundledDevelopment = {
         _devEngine: engine,
-        clients: {
-            setupIfNeeded(_client: unknown, clientId: string) {
-                registeredClientId = clientId
-            }
-        },
         async getRolldownOptions() {
             return {
                 output: {
@@ -84,8 +78,8 @@ test('materializes initial and complete incremental DevEngine output', async () 
                 rolldownOptions: {
                     output: {
                         entryFileNames: '[name]',
-                        chunkFileNames: 'assets/[hash].js',
-                        assetFileNames: 'assets/[name][extname]'
+                        chunkFileNames: () => 'sub/p_test/assets/[hash].js',
+                        assetFileNames: 'assets/[name]-[hash][extname]'
                     }
                 }
             },
@@ -100,7 +94,8 @@ test('materializes initial and complete incremental DevEngine output', async () 
             client: {
                 bundledDev: bundledDevelopment
             }
-        }
+        },
+        watcher
     } as unknown as ViteDevServer
 
     const plugin = createWxDevelopmentPlugin(options)
@@ -121,6 +116,10 @@ test('materializes initial and complete incremental DevEngine output', async () 
         assert.match(String(devMode.implement), /global\.__rolldown_runtime__/)
         assert.doesNotMatch(String(devMode.implement), /globalThis/)
         assert.equal(outputOptions.entryFileNames, '[name]')
+        const chunkFileNames = outputOptions.chunkFileNames
+        if (typeof chunkFileNames !== 'function') throw new Error('Expected development chunk filename function.')
+        assert.equal(chunkFileNames({}), 'sub/p_test/assets/[name].js')
+        assert.equal(outputOptions.assetFileNames, 'assets/[name][extname]')
         assert.equal(outputOptions.format, 'es')
 
         const banner = outputOptions.banner
@@ -141,17 +140,18 @@ test('materializes initial and complete incremental DevEngine output', async () 
         assert.equal(await readFile(path.join(outDir, 'app.wxss'), 'utf8'), 'styles')
         assert.equal(await readFile(path.join(outDir, 'app.json'), 'utf8'), '{}\n')
         assert.equal(await readFile(path.join(outDir, 'public.txt'), 'utf8'), 'public')
-        assert.equal(registeredClientId, 'vite-plugin-taro-wx')
-        assert.deepEqual(registeredModuleIds, ['src/app.ts'])
 
-        bundledDevelopment.handleHmrOutput({}, ['src/app.ts'], { type: 'Patch' })
+        await writeFile(path.join(publicDir, 'public.txt'), 'changed public')
+        watcher.emit('all', 'change', path.join(publicDir, 'public.txt'))
+        await waitFor(async () => (await readFile(path.join(outDir, 'public.txt'), 'utf8')) === 'changed public')
+
+        watcher.emit('all', 'change', path.join(root, 'src/app.ts'))
         await waitFor(async () => (await readFile(path.join(outDir, 'app.js'), 'utf8')) === 'updated')
 
         assert.equal(triggerCount, 1)
         assert.equal(await readFile(path.join(outDir, 'app.wxss'), 'utf8'), 'styles')
         assert.equal(await readFile(path.join(outDir, 'app.json'), 'utf8'), '{}\n')
-        assert.equal(await readFile(path.join(outDir, 'assets/new.js'), 'utf8'), 'new')
-        assert.equal(await readFile(path.join(outDir, 'assets/old.js'), 'utf8'), 'old')
+        assert.equal(await readFile(path.join(outDir, 'assets/shared.js'), 'utf8'), 'new')
         assert.notEqual(await readFile(path.join(outDir, 'vpt-hmr/control.js'), 'utf8'), initialControl)
         assert.deepEqual(loggerErrors, [])
     } finally {
@@ -163,8 +163,8 @@ test('materializes initial and complete incremental DevEngine output', async () 
 function createInitialOutput(root: string): Array<Rolldown.OutputAsset | Rolldown.OutputChunk> {
     return [
         createChunk('app.js', 'initial', [path.join(root, 'src/app.ts')]),
-        createChunk('assets/old.js', 'old'),
-        createAsset('src/app.wxss', 'styles'),
+        createChunk('assets/shared.js', 'old'),
+        createAsset('app.wxss', 'styles'),
         createAsset('app.json', '{}\n')
     ]
 }

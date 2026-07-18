@@ -19,6 +19,7 @@ const wxStyleOptions = {
 /** Creates the target-aware Tailwind CSS plugins. */
 export function createCssPlugins(target: VitePluginTaroTarget): PluginOption[] {
     const wx = target === 'wx'
+    const wxStyleAsset = wx ? createWxStyleAssetCapture() : undefined
 
     return [
         ...(WeappTailwindcss({
@@ -41,10 +42,34 @@ export function createCssPlugins(target: VitePluginTaroTarget): PluginOption[] {
                 ...wxStyleOptions,
                 autoprefixer: !wx
             },
+            // The adapter can replace Rolldown's `app.wxss` filename with a source-relative path such as
+            // `src/app.wxss`. Capture that exact mutation here so the finalizer can restore only the global asset.
+            onUpdate: wxStyleAsset?.capture,
             logLevel: 'warn'
         }) ?? []),
-        wx ? createWxssCompatibilityFinalizer() : undefined
+        wxStyleAsset ? createWxssCompatibilityFinalizer(wxStyleAsset.get) : undefined
     ]
+}
+
+/**
+ * Captures the global style path from the Tailwind adapter's own mutation callback.
+ *
+ * Rolldown reconstructs output objects between plugin hooks in bundled development, so object identity cannot correlate
+ * the asset across hooks. The callback path remains stable. With `cssCodeSplit: false`, Tailwind reports one global style,
+ * while native Page companions are emitted later by the wx plugin and never pass through this callback.
+ */
+function createWxStyleAssetCapture(): { capture(fileName: string): void; get(): string | undefined } {
+    let styleFileName: string | undefined
+
+    return {
+        capture(fileName) {
+            const normalized = fileName.replaceAll('\\', '/')
+            if (normalized.endsWith('.css') || normalized.endsWith('.wxss')) styleFileName = normalized
+        },
+        get() {
+            return styleFileName
+        }
+    }
 }
 
 /**
@@ -55,11 +80,11 @@ export function createCssPlugins(target: VitePluginTaroTarget): PluginOption[] {
  * CSS containing values and syntax such as `rem`, escaped class selectors, and `@property`. It is then recorded as a
  * processed Vite asset, so the upstream output finalizer does not perform the missing complete WXSS adaptation.
  *
- * This plugin is appended after the upstream plugin list and repeats only the compatibility transform on final WXSS
- * assets. It does not scan candidates or generate Tailwind utilities. Remove it when upstream stops deferring CSS
- * adaptation for the mini-program `rewriteCssImports` path.
+ * This plugin runs after the upstream finalizer, repeats only the compatibility transform, and restores the captured
+ * global asset to WeChat's required `app.wxss` path. Exact path correlation leaves Page WXSS companions untouched.
+ * Remove it when upstream both completes adaptation and preserves the bundler-selected filename.
  */
-function createWxssCompatibilityFinalizer(): Plugin {
+function createWxssCompatibilityFinalizer(getStyleFileName: () => string | undefined): Plugin {
     const context = createContext({
         appType: 'weapp-vite',
         generator: {
@@ -75,6 +100,13 @@ function createWxssCompatibilityFinalizer(): Plugin {
         generateBundle: {
             order: 'post',
             async handler(_, bundle) {
+                const styleFileName = getStyleFileName()
+                const styleAsset = styleFileName
+                    ? Object.values(bundle).find(
+                          (output): output is Rolldown.OutputAsset =>
+                              output.type === 'asset' && output.fileName.replaceAll('\\', '/') === styleFileName
+                      )
+                    : undefined
                 // Both finalizers use a post-ordered generateBundle hook. Array order places this hook after the
                 // upstream finalizer, where every Vite-produced WXSS asset has its final contents and filename.
                 await Promise.all(
@@ -89,6 +121,8 @@ function createWxssCompatibilityFinalizer(): Plugin {
                             asset.source = (await context.transformWxss(source)).css
                         })
                 )
+                // Rename only the path reported by Tailwind; never infer the global asset from all final `.wxss` files.
+                if (styleAsset) styleAsset.fileName = 'app.wxss'
             }
         }
     }
