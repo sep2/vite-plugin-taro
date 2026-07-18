@@ -2,8 +2,8 @@ import crypto from 'node:crypto'
 
 // Keep both identities stable: native App/Page banners contain literal require() paths and WeChat DevTools observes
 // update.js as the executable hot-update boundary.
-export const controlFileName = 'vpt-hmr/control.js'
-export const updateFileName = 'vpt-hmr/update.js'
+export const controlFileName = 'hmr/control.js'
+export const updateFileName = 'hmr/update.js'
 
 /**
  * Creates the two development assets emitted by the normal initial generateBundle lifecycle.

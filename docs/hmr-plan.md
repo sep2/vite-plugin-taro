@@ -72,7 +72,7 @@ record stays evaluated and cached.
 3. DevRuntime is the only runtime allowed to apply a source-module HMR patch.
 4. A normal HMR patch never deletes or re-imports an outer SystemJS capsule.
 5. HMR callbacks read fresh exports through DevRuntime, never through a stale outer chunk namespace.
-6. Every executable delivery is a literal physical `vpt-hmr/update.js` file.
+6. Every executable delivery is a literal physical `hmr/update.js` file.
 7. A delivery is successful only after factory installation, module re-execution, accept callbacks, React Refresh, and
    acknowledgement all complete.
 8. A failed or partially applied delivery terminates HMR for that runtime heap and requests a hard reload.
@@ -218,7 +218,7 @@ dist/wx/
 ├── pages/**/index.js
 ├── assets/**
 ├── sub/p_*/**
-└── vpt-hmr/
+└── hmr/
     ├── control.js
     └── update.js
 ```
@@ -239,8 +239,8 @@ interface WxHmrControl {
 
 Development output adds literal native dependencies without changing the shared shell source behavior:
 
-- `app.js` requires `./vpt-hmr/control.js` before application code executes.
-- Every native Page file requires the correctly relative `vpt-hmr/update.js`.
+- `app.js` requires `./hmr/control.js` before application code executes.
+- Every native Page file requires the correctly relative `hmr/update.js`.
 
 Use a development-only output banner or a native render option. Do not generate a second family of App/Page shell modules.
 

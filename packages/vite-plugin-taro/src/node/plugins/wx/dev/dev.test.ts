@@ -140,11 +140,11 @@ test('lets the DevEngine write the initial project and keeps HMR patch-only', as
         if (typeof banner !== 'function') throw new Error('Expected development banner function.')
         assert.equal(
             await banner({ fileName: 'app.js' } as never),
-            'const __rolldown_runtime__ = global.__rolldown_runtime__;\nrequire("./vpt-hmr/control.js");'
+            'const __rolldown_runtime__ = global.__rolldown_runtime__;\nrequire("./hmr/control.js");'
         )
         assert.equal(
             await banner({ fileName: 'pages/home/index.js' } as never),
-            'const __rolldown_runtime__ = global.__rolldown_runtime__;\nrequire("../../vpt-hmr/update.js");'
+            'const __rolldown_runtime__ = global.__rolldown_runtime__;\nrequire("../../hmr/update.js");'
         )
 
         // The replacement listen() does not return until Rolldown's initial incremental_write() has physically finished.
@@ -155,8 +155,8 @@ test('lets the DevEngine write the initial project and keeps HMR patch-only', as
         assert.equal(await readFile(path.join(outDir, 'app.wxss'), 'utf8'), 'styles')
         assert.equal(await readFile(path.join(outDir, 'app.json'), 'utf8'), '{}\n')
         assert.equal(await readFile(path.join(outDir, 'public.txt'), 'utf8'), 'public')
-        assert.match(await readFile(path.join(outDir, 'vpt-hmr/control.js'), 'utf8'), /buildId/)
-        assert.equal(await readFile(path.join(outDir, 'vpt-hmr/update.js'), 'utf8'), 'module.exports = undefined;\n')
+        assert.match(await readFile(path.join(outDir, 'hmr/control.js'), 'utf8'), /buildId/)
+        assert.equal(await readFile(path.join(outDir, 'hmr/update.js'), 'utf8'), 'module.exports = undefined;\n')
         assert.equal(await bundledDevelopment.triggerBundleRegenerationIfStale(), false)
 
         // rebuildStrategy:'never' must make a normal watcher change patch-only. A stale bundle proves the HMR task ran;

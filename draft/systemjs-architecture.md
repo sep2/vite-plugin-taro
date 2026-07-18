@@ -153,7 +153,7 @@ checkpoint.
 Code received through `wx.request` cannot be executed through `eval`, `Function`, a data URL, or an equivalent dynamic
 code path. HTTP carries control metadata only.
 
-Executable hot definitions are written to the fixed `vpt-hmr/update.js` project file. DevTools compiles that file and
+Executable hot definitions are written to the fixed `hmr/update.js` project file. DevTools compiles that file and
 reruns the page-side boundary while retaining the App heap.
 
 ### Package limits apply to physical output
@@ -244,7 +244,7 @@ flowchart LR
     end
 
     Checkpoint -->|"Generated project files"| Host
-    Journal -->|"vpt-hmr/update.js"| Runtime
+    Journal -->|"hmr/update.js"| Runtime
     Runtime -.->|"HTTP metadata only"| Journal
 ```
 
@@ -487,7 +487,7 @@ comp.js
 app-runtime.js
 vpt-system-core.js
 vpt-package-loaders.js
-vpt-hmr/update.js
+hmr/update.js
 ```
 
 They initialize the Mini Program environment, synchronously call `App(...)` or `Page(...)`, expose package-local
@@ -682,7 +682,7 @@ vpt-system-core.js
 vpt-module-manifest.js
 vpt-main-resolver.js
 vpt-package-loaders.js
-vpt-hmr/update.js
+hmr/update.js
 
 pages/index/index.js
 pages/index/index.json
@@ -1042,7 +1042,7 @@ The existing DevTools boundary remains part of the design.
 
 ### Fixed execution file
 
-Every generated page entry directly and literally requires the same pre-existing `vpt-hmr/update.js` file from the
+Every generated page entry directly and literally requires the same pre-existing `hmr/update.js` file from the
 initial checkpoint. During a JavaScript update, the server writes only this file.
 
 In the tested active-page file-save case, DevTools recompiles and reruns page-side code while retaining the App heap.

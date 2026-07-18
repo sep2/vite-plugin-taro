@@ -219,7 +219,7 @@ export class HmrServer {
                 // never enter incremental_write(). Recovery/full-build operations remain able to write intentionally.
                 rebuildStrategy: 'never',
                 // Successful patches are intentionally left inside the callback boundary for now. The real HMR work will
-                // register the active runtime client and publish these results through physical `vpt-hmr/update.js`.
+                // register the active runtime client and publish these results through physical `hmr/update.js`.
                 onHmrUpdates: (result) => {
                     if (result instanceof Error) this.reportError('HMR generation', result)
                 },
