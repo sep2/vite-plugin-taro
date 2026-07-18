@@ -2,7 +2,9 @@ import path from 'node:path'
 import type { InputOptions, OutputOptions } from 'rolldown'
 import { type DevEngine, dev } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
+import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { controlFileName, initializeWxDevelopmentOutput, syncWxPublicFile, updateFileName } from './output.ts'
+import { SerializedTaskQueue } from './serialized-task-queue.ts'
 
 // Rolldown's generated development modules reference this lexical binding. Native and SystemJS-rendered chunks cannot
 // import a browser HMR client, so every physical development chunk binds it to the one runtime installed on `global`.
@@ -82,8 +84,10 @@ export class HmrServer {
     private readonly publicDir: string
     private readonly pageFiles: ReadonlySet<string>
 
-    // This queue contains only output-directory preparation and public-file writes. Rolldown writes generated output.
-    private writes: Promise<void>
+    // Generated output bypasses this queue and is written directly by Rolldown. It serializes only initial directory
+    // preparation and public-file events, whose asynchronous filesystem operations must preserve watcher order.
+    private readonly fileTasks = new SerializedTaskQueue()
+    private readonly outputPreparation: Promise<void>
 
     private readonly handleWatcherEvent = (event: string, filePath: string): void => {
         // Vite already watches the project and public directory. Ignore every event outside publicDir so source changes
@@ -91,13 +95,15 @@ export class HmrServer {
         const destinationPath = this.getPublicDestination(filePath)
         if (!destinationPath) return
 
-        // Serialize public writes with the initial copy and with each other. This prevents an early watcher event from
-        // racing the initial directory preparation without introducing an output manifest or generated-file queue.
-        this.writes = this.writes.then(() => syncWxPublicFile(event, filePath, destinationPath))
-        void this.writes.catch((error: unknown) => this.reportError('public file sync', error))
+        // The queue was seeded with output preparation, so even an event received before listen() runs cannot race the
+        // initial cleanup/copy. A failed public operation is reported through its own task promise while later tasks keep
+        // running because SerializedTaskQueue does not let one rejection poison its tail.
+        void this.fileTasks
+            .enqueue(() => syncWxPublicFile(event, filePath, destinationPath))
+            .catch((error: unknown) => this.reportError('public file sync', error))
     }
 
-    constructor(server: ViteDevServer, pagePaths: readonly string[]) {
+    constructor(server: ViteDevServer, options: VitePluginTaroOptions) {
         this.server = server
         this.bundledDev = getBundledDev(server)
 
@@ -105,15 +111,19 @@ export class HmrServer {
         this.publicDir = server.config.publicDir ? path.resolve(server.config.publicDir) : ''
         // Page entry identities are exact native paths. They need the inert update dependency; application capsules and
         // shared chunks must not receive it because only native Page evaluation is observable by WeChat DevTools.
-        this.pageFiles = new Set(pagePaths.map((pagePath) => `${pagePath}.js`))
+        this.pageFiles = new Set(options.pages.map((page) => `${page.path}.js`))
 
-        // Start preparation immediately, but make the replacement listen() await it before constructing the DevEngine.
-        // Rolldown can then write into a ready directory without racing cleanup or the initial public-directory copy.
-        this.writes = initializeWxDevelopmentOutput({
-            outDir: this.outDir,
-            publicDir: this.publicDir,
-            emptyOutDir: server.config.build.emptyOutDir !== false
-        })
+        // Seed the serialized filesystem queue immediately, then retain this task's result separately. The queue tail is
+        // intentionally failure-neutral so later public events can continue after an error; listen() must still reject if
+        // the mandatory initial preparation itself fails.
+        this.outputPreparation = this.fileTasks.enqueue(() =>
+            initializeWxDevelopmentOutput({
+                outDir: this.outDir,
+                publicDir: this.publicDir,
+                emptyOutDir: server.config.build.emptyOutDir !== false
+            })
+        )
+        void this.outputPreparation.catch((error: unknown) => this.reportError('output preparation', error))
     }
 
     install(): this {
@@ -127,7 +137,7 @@ export class HmrServer {
 
     async close(): Promise<void> {
         this.server.watcher.off('all', this.handleWatcherEvent)
-        await this.writes
+        await this.fileTasks.waitForIdle()
         // Do not close the DevEngine here. Vite closes `_devEngine`, which invokes plugin closeBundle hooks including this
         // method; closing it here would recurse through the same lifecycle.
     }
@@ -181,7 +191,8 @@ export class HmrServer {
         this.bundledDev.triggerBundleRegenerationIfStale = async () => false
 
         this.bundledDev.listen = async () => {
-            await this.writes
+            await this.outputPreparation
+            await this.fileTasks.waitForIdle()
             const rolldownOptions = await this.bundledDev.getRolldownOptions()
             const outputOptions = rolldownOptions.output
             if (!outputOptions || Array.isArray(outputOptions)) {
@@ -255,7 +266,9 @@ function createDevelopmentBanner(
     return async (chunk) => {
         const configured =
             typeof configuredBanner === 'function' ? await configuredBanner(chunk) : (configuredBanner ?? '')
+
         const development = createNativeDevelopmentDependency(chunk.fileName, pageFiles)
+
         return [configured, rolldownRuntimeBinding, development].filter(Boolean).join('\n')
     }
 }

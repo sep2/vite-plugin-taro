@@ -40,8 +40,7 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
             // asks bundledDev to create its hard-coded skip-write DevEngine.
             order: 'post',
             handler(server) {
-                const pagePaths = options.pages.map((page) => page.path)
-                hmrServer = new HmrServer(server, pagePaths).install()
+                hmrServer = new HmrServer(server, options).install()
             }
         },
 
