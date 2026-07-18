@@ -414,7 +414,7 @@ function disableViteOxcSourcemap(pluginOption: unknown): void {
     }
 }
 
-/** Configures Vite's native build reporter for physical development output without gzip work. */
+/** Configures Vite's native reporter with the WeChat 2 MB JavaScript warning threshold and no gzip work. */
 function createViteReporter(server: ViteDevServer) {
     const { build, logger, root } = server.config
     return viteReporterPlugin({
@@ -422,8 +422,10 @@ function createViteReporter(server: ViteDevServer) {
         isTty: Boolean(process.stdout.isTTY && !process.env.CI),
         isLib: Boolean(build.lib),
         assetsDir: path.join(build.assetsDir, '/'),
-        chunkLimit: build.chunkSizeWarningLimit,
-        warnLargeChunks: Boolean(build.minify && !build.lib),
+        // chunkLimit: build.chunkSizeWarningLimit,
+        chunkLimit: 2000,
+        // warnLargeChunks: Boolean(build.minify && !build.lib),
+        warnLargeChunks: true,
         reportCompressedSize: false,
         logInfo: (message) => logger.info(message)
     })
