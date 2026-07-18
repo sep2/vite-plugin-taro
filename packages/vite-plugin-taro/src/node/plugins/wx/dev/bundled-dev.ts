@@ -1,12 +1,6 @@
 import path from 'node:path'
 import type { ResolvedConfig, ViteDevServer } from 'vite'
-import {
-    controlFileName,
-    createWxDevelopmentOutput,
-    updateFileName,
-    type WxDevelopmentOutput,
-    writeWxDevelopmentOutput
-} from './output.ts'
+import { controlFileName, updateFileName, type WxDevelopmentOutput, writeWxDevelopmentOutput } from './output.ts'
 
 const clientId = 'vite-plugin-taro-wx'
 const rolldownRuntimeBinding = 'const __rolldown_runtime__ = global.__rolldown_runtime__;'
@@ -198,21 +192,18 @@ class WxBundledDevelopment {
             const current = this.state
             if (current.phase === 'closed') return
 
-            const revision = createWxDevelopmentOutput(output, this.pageStyleFiles)
-            const clearOutput =
-                revision.complete && !current.initialWrite && this.server.config.build.emptyOutDir !== false
-            const write = current.writeTail.then(() =>
-                writeWxDevelopmentOutput({
-                    config: this.server.config,
-                    outDir: this.outDir,
-                    ...revision,
-                    clearOutput
-                })
-            )
-            const writeTail = write.catch((error: unknown) => this.reportWriteError(error))
+            const write = writeWxDevelopmentOutput({
+                config: this.server.config,
+                outDir: this.outDir,
+                output,
+                pageStyleFiles: this.pageStyleFiles,
+                previousWrite: current.writeTail,
+                clearOutput: !current.initialWrite && this.server.config.build.emptyOutDir !== false
+            })
+            const writeTail = write.done.catch((error: unknown) => this.reportWriteError(error))
             let bundledModules = current.bundledModules
 
-            if (revision.complete) {
+            if (write.complete) {
                 const outputModules = getBundledModules(output, this.server.config.root)
                 if (current.phase === 'ready') {
                     this.registerBundleModules(outputModules)
@@ -225,7 +216,7 @@ class WxBundledDevelopment {
 
             this.state = {
                 ...current,
-                initialWrite: current.initialWrite ?? (revision.complete ? write : undefined),
+                initialWrite: current.initialWrite ?? (write.complete ? write.done : undefined),
                 writeTail,
                 bundledModules
             }

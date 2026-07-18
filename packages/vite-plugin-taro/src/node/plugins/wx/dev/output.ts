@@ -9,65 +9,58 @@ export const updateFileName = 'vpt-hmr/update.js'
 /** File shape passed to Vite's private bundled-development output store. */
 export type WxDevelopmentOutput = Array<Rolldown.OutputAsset | Rolldown.OutputChunk>
 
-export type WxDevelopmentFile = {
+type WxDevelopmentFile = {
     fileName: string
     source: string | Uint8Array
 }
 
-/** Converts one DevEngine callback into immutable physical output. */
-export function createWxDevelopmentOutput(
-    output: WxDevelopmentOutput,
-    pageStyleFiles: ReadonlySet<string>
-): { complete: boolean; files: readonly WxDevelopmentFile[] } {
-    const files = output.map((file) => {
-        const fileName = validateFileName(file.fileName)
-
-        return {
-            // The Tailwind adapter assigns its global asset a source-relative wxss filename after the configured asset
-            // callback. CSS splitting is disabled, and Page styles are exact companions, so every other CSS/WXSS asset
-            // is the Mini Program's root stylesheet.
-            fileName:
-                file.type === 'asset' &&
-                (fileName.endsWith('.css') || (fileName.endsWith('.wxss') && !pageStyleFiles.has(fileName)))
-                    ? 'app.wxss'
-                    : fileName,
-            source: file.type === 'chunk' ? file.code : copySource(file.source)
-        }
-    })
-    const complete = files.some((file) => file.fileName === 'app.js')
-
-    return {
-        complete,
-        files: complete ? [...files, ...createDevelopmentFiles()] : files
-    }
-}
-
-/** Writes one immutable output revision. Unchanged DevEngine assets remain in place between complete callbacks. */
-export async function writeWxDevelopmentOutput({
+/** Queues one DevEngine callback for physical writing. */
+export function writeWxDevelopmentOutput({
     config,
     outDir,
-    files: output,
-    complete,
+    output,
+    pageStyleFiles,
+    previousWrite,
     clearOutput
 }: {
     config: ResolvedConfig
     outDir: string
-    files: readonly WxDevelopmentFile[]
-    complete: boolean
+    output: WxDevelopmentOutput
+    pageStyleFiles: ReadonlySet<string>
+    previousWrite: Promise<void>
     clearOutput: boolean
-}): Promise<void> {
-    const files = new Map<string, string | Uint8Array>()
-    if (complete) {
-        for (const file of await readPublicFiles(config.publicDir)) files.set(file.fileName, file.source)
-    }
-    for (const file of output) files.set(validateFileName(file.fileName), file.source)
+}): { complete: boolean; done: Promise<void> } {
+    const complete = output.some((file) => validateFileName(file.fileName) === 'app.js')
 
-    if (clearOutput) await fs.rm(outDir, { recursive: true, force: true })
-    await writeFilesAtomically(outDir, files)
+    return {
+        complete,
+        done: previousWrite.then(async () => {
+            const files = new Map<string, string | Uint8Array>()
+            if (complete) {
+                for (const file of await readPublicFiles(config.publicDir)) files.set(file.fileName, file.source)
+            }
+            for (const file of output) {
+                const fileName = getDevelopmentFileName(file, pageStyleFiles)
+                files.set(fileName, file.type === 'chunk' ? file.code : file.source)
+            }
+            if (complete) {
+                for (const file of createDevelopmentFiles()) files.set(file.fileName, file.source)
+            }
+
+            if (complete && clearOutput) await fs.rm(outDir, { recursive: true, force: true })
+            await writeFilesAtomically(outDir, files)
+        })
+    }
 }
 
-function copySource(source: string | Uint8Array): string | Uint8Array {
-    return typeof source === 'string' ? source : source.slice()
+function getDevelopmentFileName(file: WxDevelopmentOutput[number], pageStyleFiles: ReadonlySet<string>): string {
+    const fileName = validateFileName(file.fileName)
+    // The Tailwind adapter assigns its global asset a source-relative wxss filename after the configured asset callback.
+    // CSS splitting is disabled, and Page styles are exact companions, so every other CSS/WXSS asset is app.wxss.
+    return file.type === 'asset' &&
+        (fileName.endsWith('.css') || (fileName.endsWith('.wxss') && !pageStyleFiles.has(fileName)))
+        ? 'app.wxss'
+        : fileName
 }
 
 function createDevelopmentFiles(): WxDevelopmentFile[] {
