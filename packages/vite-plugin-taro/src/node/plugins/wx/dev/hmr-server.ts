@@ -102,7 +102,7 @@ export class HmrServer {
         // synchronization; the unhandled initial-preparation task remains fatal to startup.
         this.fileTasks.enqueue(async () => {
             try {
-                await syncPublicFiles(event, filePath, destinationPath)
+                await syncPublicDirFiles(event, filePath, destinationPath)
             } catch (error) {
                 this.reportError('public file sync', error)
             }
@@ -122,7 +122,7 @@ export class HmrServer {
         // Seed the queue with mandatory output preparation. Its rejection remains on the queue tail, so listen() fails
         // and no DevEngine starts when the initial cleanup or public-directory copy is unsuccessful.
         this.fileTasks.enqueue(() =>
-            initializeWxDevelopmentOutput({
+            initializePublicDirOutput({
                 outDir: this.outDir,
                 publicDir: server.config.publicDir || '',
                 emptyOutDir: server.config.build.emptyOutDir !== false
@@ -289,7 +289,7 @@ export class HmrServer {
  * engine starts: it optionally removes the previous project, creates the destination, and copies public files that are
  * outside Rolldown's bundle graph.
  */
-async function initializeWxDevelopmentOutput({
+async function initializePublicDirOutput({
     outDir,
     publicDir,
     emptyOutDir
@@ -321,7 +321,7 @@ function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
  * Copying only the changed path preserves generated files and makes deletion semantics explicit; no rebuild or complete
  * public-directory recopy is needed after startup.
  */
-async function syncPublicFiles(event: string, sourcePath: string, destinationPath: string): Promise<void> {
+async function syncPublicDirFiles(event: string, sourcePath: string, destinationPath: string): Promise<void> {
     if (event === 'unlink' || event === 'unlinkDir') {
         // Recursive removal is reserved for an actual directory event so a malformed file event cannot remove siblings.
         await fs.rm(destinationPath, { recursive: event === 'unlinkDir', force: true })
