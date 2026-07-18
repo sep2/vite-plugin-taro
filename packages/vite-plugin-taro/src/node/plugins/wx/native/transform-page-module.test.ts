@@ -7,9 +7,9 @@ import { createPageConfig } from './taro-runtime.js'
 import PageComponent from '\0vpt:page-component'
 export default createPageConfig(PageComponent, __VITE_PLUGIN_TARO_PAGE_PATH__, undefined, __VITE_PLUGIN_TARO_PAGE_CONFIG__)`
 
-test('specializes the real Page module for one route', () => {
+test('specializes the real Page module for one route', async () => {
     const id = '/plugin/runtime/wx/page-module.js?route=pages%2Fhome%2Findex'
-    const result = transformPageModule({
+    const result = await transformPageModule({
         code: source,
         id,
         page: {
@@ -17,19 +17,18 @@ test('specializes the real Page module for one route', () => {
             config: {
                 navigationBarTitleText: 'Home'
             }
-        },
-        projectRoot: '/project'
+        }
     })
 
-    assert.match(result.code, /from ["']\/@fs\/\/project\/src\/pages\/home\/index\.tsx["']/)
+    assert.match(result.code, /vpt:page-component/)
     assert.match(result.code, /["']pages\/home\/index["']/)
     assert.match(result.code, /navigationBarTitleText:\s*["']Home["']/)
-    assert.doesNotMatch(result.code, /__VITE_PLUGIN_TARO_PAGE_|\0vpt:page-component/)
+    assert.doesNotMatch(result.code, /__VITE_PLUGIN_TARO_PAGE_/)
     assert.deepEqual(result.map.sources, [id])
 })
 
-test('rejects a Page module missing its specialization placeholders', () => {
-    assert.throws(
+test('rejects a Page module missing its specialization placeholders', async () => {
+    await assert.rejects(
         () =>
             transformPageModule({
                 code: 'export default {}',
@@ -37,9 +36,8 @@ test('rejects a Page module missing its specialization placeholders', () => {
                 page: {
                     path: 'pages/home/index',
                     config: {}
-                },
-                projectRoot: '/project'
+                }
             }),
-        /Expected one component, path, and config placeholder/
+        /Expected one placeholder __VITE_PLUGIN_TARO_PAGE_PATH__, found 0/
     )
 })

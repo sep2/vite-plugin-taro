@@ -75,7 +75,7 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
         transform: {
             order: 'pre',
             handler(code, id) {
-                return moduleResolver.transform(code, id, this.environment.config.root)
+                return moduleResolver.transform(code, id)
             }
         },
 

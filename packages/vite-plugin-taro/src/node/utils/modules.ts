@@ -2,20 +2,24 @@ import path from 'node:path'
 
 const moduleRoot = 'vpt:/'
 
+type PageComponentPathOptions = {
+    pagePath: string
+    projectRoot: string
+}
+
 /** Converts a final chunk ID to its canonical runtime module URL. */
 export function chunkIdToModuleUrl(chunkId: string): string {
     return `${moduleRoot}${chunkId}`
 }
 
+/** Resolves the source file for one configured Page component. */
+export function resolvePageComponentPath({ pagePath, projectRoot }: PageComponentPathOptions): string {
+    return path.resolve(projectRoot, 'src', `${pagePath}.tsx`)
+}
+
 /** Creates a portable import for one configured Page component. */
-export function createPageComponentImportPath({
-    pagePath,
-    projectRoot
-}: {
-    pagePath: string
-    projectRoot: string
-}): string {
-    return toViteFileImportPath(path.resolve(projectRoot, 'src', `${pagePath}.tsx`))
+export function createPageComponentImportPath(options: PageComponentPathOptions): string {
+    return toViteFileImportPath(resolvePageComponentPath(options))
 }
 
 /** Normalizes a file-backed Vite module ID for stable comparisons. */

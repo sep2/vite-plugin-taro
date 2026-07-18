@@ -1,6 +1,6 @@
 import path from 'node:path'
 import type { VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../../options.ts'
-import { normalizeModuleId } from '../../../utils/modules.ts'
+import { normalizeModuleId, resolvePageComponentPath } from '../../../utils/modules.ts'
 import { appComponentId } from '../../client/constant.ts'
 import {
     appShellFileName,
@@ -8,6 +8,7 @@ import {
     bootstrapPath,
     componentShellFileName,
     componentShellPath,
+    pageComponentId,
     pageModuleId,
     pageModulePath,
     pageShellPath,
@@ -29,6 +30,14 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
         [vitePreloadId, () => bootstrapPath],
         // Keep the configured App component behind one stable private import in the App module.
         [appComponentId, (_importer, projectRoot) => path.resolve(projectRoot, options.app)],
+        [
+            pageComponentId,
+            (importer, projectRoot) => {
+                const page = requirePage({ moduleId: importer, pageByPath })
+
+                return resolvePageComponentPath({ pagePath: page.path, projectRoot })
+            }
+        ],
         [
             pageModuleId,
             (importer) => {
@@ -65,14 +74,9 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
             return moduleResolvers.get(id)?.(importer, projectRoot)
         },
 
-        transform(code: string, id: string, projectRoot: string) {
+        transform(code: string, id: string) {
             if (normalizeModuleId(id) === normalizeModuleId(pageModulePath)) {
-                return transformPageModule({
-                    code,
-                    id,
-                    page: requirePage({ moduleId: id, pageByPath }),
-                    projectRoot
-                })
+                return transformPageModule({ code, id, page: requirePage({ moduleId: id, pageByPath }) })
             }
         }
     }

@@ -2,7 +2,7 @@ import path from 'node:path'
 import { types } from '@babel/core'
 import type { Rolldown } from 'vite'
 import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
-import { replaceWithAst } from '../../utils/babel.ts'
+import { type AstTransformResult, replaceWithAst } from '../../utils/babel.ts'
 import { isBootstrapModule, isNativeModule } from '../native/is-native-module.ts'
 
 const bootstrapModuleUrlPlaceholder = '__VITE_PLUGIN_TARO_BOOTSTRAP_MODULE_URL__'
@@ -26,7 +26,7 @@ export async function materializeTransport({
     transportChunk: Rolldown.RenderedChunk
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
     getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async'
-}): Promise<Rolldown.TransformResult> {
+}): Promise<AstTransformResult> {
     const renderedChunks = Object.values(chunks)
 
     const bootstrap = renderedChunks.find(isBootstrapModule)

@@ -21,7 +21,7 @@ export const componentShellFileName = 'comp.js'
 /** Provides the synchronous recursive component registration entry. */
 export const componentShellPath = resolvePackageFile('dist/runtime/wx/comp.js')
 
-/** Marks the Page-component import replaced while specializing the real Page module for one route. */
+/** Resolves the configured Page component from its route-qualified importing module. */
 export const pageComponentId = '\0vpt:page-component'
 
 /** Gives every Page shell one private dynamic-import target that can be resolved using its route. */

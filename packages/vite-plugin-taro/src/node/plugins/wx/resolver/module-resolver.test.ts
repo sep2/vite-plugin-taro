@@ -6,6 +6,7 @@ import {
     appShellPath,
     bootstrapPath,
     componentShellPath,
+    pageComponentId,
     pageModuleId,
     pageModulePath,
     pageShellPath,
@@ -45,4 +46,5 @@ test('resolves fixed and route-specific private modules', () => {
 
     const pageModule = resolver.resolveId(pageModuleId, '/runtime/page.js?route=pages%2Fhome%2Findex', projectRoot)
     assert.equal(pageModule, `${pageModulePath}?route=pages%2Fhome%2Findex`)
+    assert.equal(resolver.resolveId(pageComponentId, pageModule, projectRoot), '/project/src/pages/home/index.tsx')
 })

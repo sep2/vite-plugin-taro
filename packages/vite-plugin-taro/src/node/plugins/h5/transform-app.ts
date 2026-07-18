@@ -1,9 +1,8 @@
 import { types } from '@babel/core'
-import type { Rolldown } from 'vite'
 import type { VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../options.ts'
 import { createPageComponentImportPath } from '../../utils/modules.ts'
 import { createAppConfig } from '../../utils/project-config.ts'
-import { replaceWithAst } from '../utils/babel.ts'
+import { type AstTransformResult, replaceWithAst } from '../utils/babel.ts'
 
 const appConfigPlaceholder = '__VITE_PLUGIN_TARO_H5_APP_CONFIG__'
 const routesPlaceholder = '__VITE_PLUGIN_TARO_H5_ROUTES__'
@@ -19,7 +18,7 @@ export async function transformH5App({
     id: string
     options: VitePluginTaroOptions
     projectRoot: string
-}): Promise<Rolldown.TransformResult> {
+}): Promise<AstTransformResult> {
     const transformed = await replaceWithAst(code, id, {
         [appConfigPlaceholder]: types.valueToNode({
             router: {},
@@ -53,10 +52,8 @@ function createRoute({
     page: VitePluginTaroPageOption
     projectRoot: string
 }): ReturnType<typeof types.objectExpression> {
-    const pageComponentPath = createPageComponentImportPath({
-        pagePath: page.path,
-        projectRoot
-    })
+    const pageComponentPath = createPageComponentImportPath({ pagePath: page.path, projectRoot })
+
     const load = types.functionExpression(
         null,
         [types.identifier('context'), types.identifier('params')],

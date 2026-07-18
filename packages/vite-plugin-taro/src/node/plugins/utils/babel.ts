@@ -1,5 +1,5 @@
 import generate from '@babel/generator'
-import { transformWithOxc } from 'vite'
+import { type Rolldown, transformWithOxc } from 'vite'
 import { esTarget } from '../../utils/constant.ts'
 
 const generatorOptions = {
@@ -14,12 +14,17 @@ export function ast2str(node: Parameters<typeof generate>[0]): string {
     return generate(node, generatorOptions).code
 }
 
+export type AstTransformResult = {
+    code: string
+    map: Rolldown.ExistingRawSourceMap
+}
+
 /** Replaces each placeholder with a Babel AST expression while transforming the module through Oxc. */
 export async function replaceWithAst(
     code: string,
     filename: string,
     replacement: Readonly<Record<string, Parameters<typeof generate>[0]>>
-): ReturnType<typeof transformWithOxc> {
+): Promise<AstTransformResult> {
     const define: Record<string, string> = {}
 
     for (const [placeholder, node] of Object.entries(replacement)) {
@@ -37,8 +42,14 @@ export async function replaceWithAst(
             throw new Error(`Failed to replace placeholder ${placeholder} in ${filename}`)
         }
     }
+    if (!transformed.map) {
+        throw new Error(`Failed to generate a source map for ${filename}`)
+    }
 
-    return transformed
+    return {
+        code: transformed.code,
+        map: transformed.map
+    }
 }
 
 /** Validates exactly one placeholder before Babel expression substitution. */
