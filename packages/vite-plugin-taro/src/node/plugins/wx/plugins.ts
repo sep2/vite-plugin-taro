@@ -78,6 +78,13 @@ function createWxTargetPlugin(options: VitePluginTaroOptions): Plugin {
             }
         },
 
+        renderStart() {
+            placer.analyze({
+                moduleIds: this.getModuleIds(),
+                getModuleInfo: (moduleId) => this.getModuleInfo(moduleId)
+            })
+        },
+
         renderChunk: {
             order: 'post',
             async handler(code, chunk, _outputOptions, meta) {

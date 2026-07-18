@@ -8,6 +8,61 @@ function chunk(...moduleIds: string[]): Rolldown.PreRenderedChunk {
     return { moduleIds } as Rolldown.PreRenderedChunk
 }
 
+type TestModule = {
+    isEntry?: boolean
+    imports?: readonly string[]
+    dynamicImports?: readonly string[]
+}
+
+/** Analyzes a compact test graph through Rolldown's module-info contract. */
+function analyze(placer: ReturnType<typeof createPlacer>, modules: Readonly<Record<string, TestModule>>): void {
+    placer.analyze({
+        moduleIds: Object.keys(modules),
+        getModuleInfo(moduleId) {
+            const module = modules[moduleId]
+            if (!module) {
+                return null
+            }
+            return {
+                isEntry: module.isEntry ?? false,
+                importedIds: module.imports ?? [],
+                dynamicallyImportedIds: module.dynamicImports ?? []
+            } as unknown as Rolldown.ModuleInfo
+        }
+    })
+}
+
+test('classifies eager and dynamic-only module closures', () => {
+    const placer = createPlacer()
+    analyze(placer, {
+        '/entry': { isEntry: true, imports: ['/static'], dynamicImports: ['/lazy'] },
+        '/static': { imports: ['/shared'] },
+        '/lazy': { imports: ['/lazy-dependency', '/shared'], dynamicImports: ['/nested-lazy'] },
+        '/lazy-dependency': {},
+        '/nested-lazy': {},
+        '/shared': {}
+    })
+
+    assert.equal(placer.getModuleKind('/entry'), 'eager')
+    assert.equal(placer.getModuleKind('/static'), 'eager')
+    assert.equal(placer.getModuleKind('/shared'), 'eager')
+    assert.equal(placer.getModuleKind('/lazy'), 'lazy')
+    assert.equal(placer.getModuleKind('/lazy-dependency'), 'lazy')
+    assert.equal(placer.getModuleKind('/nested-lazy'), 'lazy')
+})
+
+test('classifies cycles reached after a dynamic boundary as lazy', () => {
+    const placer = createPlacer()
+    analyze(placer, {
+        '/entry': { isEntry: true, dynamicImports: ['/cycle-a'] },
+        '/cycle-a': { imports: ['/cycle-b'] },
+        '/cycle-b': { dynamicImports: ['/cycle-a'] }
+    })
+
+    assert.equal(placer.getModuleKind('/cycle-a'), 'lazy')
+    assert.equal(placer.getModuleKind('/cycle-b'), 'lazy')
+})
+
 test('places the initial WX chunk graph in the main package', () => {
     const placer = createPlacer()
     const applicationChunk = chunk('/application')
