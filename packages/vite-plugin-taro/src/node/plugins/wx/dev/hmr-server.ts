@@ -82,7 +82,6 @@ export class HmrServer {
     private readonly bundledDev: BundledDev
 
     private readonly outDir: string
-    private readonly publicDir: string
     private readonly pageFiles: ReadonlySet<string>
 
     // Generated output bypasses this queue and is written directly by Rolldown. It serializes only initial directory
@@ -93,14 +92,16 @@ export class HmrServer {
         // Vite already watches the project and public directory. Ignore every event outside publicDir so source changes
         // remain exclusively owned by the DevEngine's watcher and cannot accidentally request a full rematerialization.
         const destinationPath = this.getPublicDestination(filePath)
-        if (!destinationPath) return
+        if (!destinationPath) {
+            return
+        }
 
         // The queue was seeded with output preparation, so even an event received before listen() runs cannot race the
         // initial cleanup/copy. Public-file errors are recoverable and handled inside the task so they do not stop later
         // synchronization; the unhandled initial-preparation task remains fatal to startup.
         this.fileTasks.enqueue(async () => {
             try {
-                await syncWxPublicFile(event, filePath, destinationPath)
+                await syncPublicFiles(event, filePath, destinationPath)
             } catch (error) {
                 this.reportError('public file sync', error)
             }
@@ -112,7 +113,7 @@ export class HmrServer {
         this.bundledDev = getBundledDev(server)
 
         this.outDir = path.resolve(server.config.root, server.config.build.outDir)
-        this.publicDir = server.config.publicDir ? path.resolve(server.config.publicDir) : ''
+
         // Page entry identities are exact native paths. They need the inert update dependency; application capsules and
         // shared chunks must not receive it because only native Page evaluation is observable by WeChat DevTools.
         this.pageFiles = new Set(options.pages.map((page) => `${page.path}.js`))
@@ -122,7 +123,7 @@ export class HmrServer {
         this.fileTasks.enqueue(() =>
             initializeWxDevelopmentOutput({
                 outDir: this.outDir,
-                publicDir: this.publicDir,
+                publicDir: server.config.publicDir || '',
                 emptyOutDir: server.config.build.emptyOutDir !== false
             })
         )
@@ -238,9 +239,16 @@ export class HmrServer {
 
     /** Maps only paths contained by publicDir into their identical relative location beneath outDir. */
     private getPublicDestination(filePath: string): string | undefined {
-        if (!this.publicDir) return
-        const relativePath = path.relative(this.publicDir, filePath)
-        if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) return
+        const publicDir = this.server.config.publicDir
+        if (!publicDir) {
+            return
+        }
+
+        const relativePath = path.relative(publicDir, filePath)
+        if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+            return
+        }
+
         return path.join(this.outDir, relativePath)
     }
 
@@ -289,7 +297,7 @@ function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
  * Copying only the changed path preserves generated files and makes deletion semantics explicit; no rebuild or complete
  * public-directory recopy is needed after startup.
  */
-async function syncWxPublicFile(event: string, sourcePath: string, destinationPath: string): Promise<void> {
+async function syncPublicFiles(event: string, sourcePath: string, destinationPath: string): Promise<void> {
     if (event === 'unlink' || event === 'unlinkDir') {
         // Recursive removal is reserved for an actual directory event so a malformed file event cannot remove siblings.
         await fs.rm(destinationPath, { recursive: event === 'unlinkDir', force: true })
