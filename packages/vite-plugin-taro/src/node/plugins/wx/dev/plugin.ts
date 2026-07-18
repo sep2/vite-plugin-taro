@@ -14,6 +14,11 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
 
         config() {
             return {
+                build: {
+                    // Disable maps in resolved environment config as well as final output so Oxc and Babel skip producing
+                    // intermediate maps that Rolldown would discard.
+                    sourcemap: false
+                },
                 experimental: {
                     // Ask Vite to resolve its bundled-development graph and expose the private adapter instance. The wx
                     // configureServer hook replaces only its startup method with the directly writing DevEngine.
@@ -26,7 +31,9 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
             order: 'post',
             // React's Vite plugin has already injected its browser-oriented Refresh wrapper at this point. Rewrite only
             // those generated runtime references; user-authored window access remains untouched.
-            handler: rewriteReactRefresh
+            handler(code, id) {
+                return rewriteReactRefresh(code, id, false)
+            }
         },
 
         generateBundle() {

@@ -1,7 +1,7 @@
 import type { types as BabelTypes } from '@babel/core'
 import { type NodePath, type PluginObject, types } from '@babel/core'
 import babel from '@rolldown/plugin-babel'
-import type { HtmlTagDescriptor, Plugin, PluginOption } from 'vite'
+import { type HtmlTagDescriptor, type Plugin, type PluginOption, perEnvironmentPlugin } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
 import { toViteFileImportPath } from '../../utils/modules.ts'
@@ -73,7 +73,8 @@ function createH5TargetPlugin(options: VitePluginTaroOptions): Plugin {
                 return moduleResolver.transform({
                     code,
                     id,
-                    projectRoot: this.environment.config.root
+                    projectRoot: this.environment.config.root,
+                    sourcemap: Boolean(this.environment.config.build.sourcemap)
                 })
             }
         },
@@ -104,24 +105,30 @@ function createH5IndexHtmlTags(): HtmlTagDescriptor[] {
 /** Creates H5-only Babel transforms for Stencil CSS ordering and Taro API imports. */
 function createH5SupportPlugins(): PluginOption[] {
     return [
-        babel({
-            include: /[\\/]@stencil[\\/]core[\\/]internal[\\/]client[\\/]index\.js(?:\?.*)?$/,
-            exclude: [],
-            plugins: [rewriteStencilStyleInsertion]
-        }),
-        babel({
-            plugins: [
-                [
-                    packageRequire.resolve('babel-plugin-transform-taroapi'),
-                    {
-                        packageName: clientTaroApiId,
-                        definition: packageRequire(
-                            packageRequire.resolve('@tarojs/plugin-platform-h5/dist/definition.json')
-                        )
-                    }
-                ]
-            ]
-        })
+        perEnvironmentPlugin('vite-plugin-taro:h5-stencil-babel', (environment) =>
+            babel({
+                include: /[\\/]@stencil[\\/]core[\\/]internal[\\/]client[\\/]index\.js(?:\?.*)?$/,
+                exclude: [],
+                plugins: [rewriteStencilStyleInsertion],
+                sourceMap: Boolean(environment.config.build.sourcemap)
+            })
+        ),
+        perEnvironmentPlugin('vite-plugin-taro:h5-api-babel', (environment) =>
+            babel({
+                plugins: [
+                    [
+                        packageRequire.resolve('babel-plugin-transform-taroapi'),
+                        {
+                            packageName: clientTaroApiId,
+                            definition: packageRequire(
+                                packageRequire.resolve('@tarojs/plugin-platform-h5/dist/definition.json')
+                            )
+                        }
+                    ]
+                ],
+                sourceMap: Boolean(environment.config.build.sourcemap)
+            })
+        )
     ]
 }
 
