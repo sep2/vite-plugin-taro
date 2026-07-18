@@ -2,6 +2,7 @@ import { recursiveMerge } from '@tarojs/helper'
 import { Weapp as WxPlatform } from '@tarojs/plugin-platform-weapp'
 import type { Rolldown } from 'vite'
 import type { JsonObject, VitePluginTaroOptions } from '../../../../options.ts'
+import { normalizeModuleId } from '../../../utils/modules.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import { renderJson } from './create-json-assets.ts'
 import { relativeRootAsset } from './relative-root-asset.ts'
@@ -95,12 +96,6 @@ function findBundleModule(bundle: Rolldown.OutputBundle, resolvedId: string): Ro
             return found[1]
         }
     }
-}
-
-/** Normalizes file-backed module IDs for metadata lookup. */
-function normalizeModuleId(id: string): string {
-    const queryIndex = id.indexOf('?')
-    return (queryIndex === -1 ? id : id.slice(0, queryIndex)).replaceAll('\\', '/')
 }
 
 /** Converts a React component export to Taro's dashed host-component name. */

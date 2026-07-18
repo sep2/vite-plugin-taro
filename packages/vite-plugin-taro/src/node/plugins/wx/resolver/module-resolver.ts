@@ -1,6 +1,5 @@
-import path from 'node:path'
 import type { VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../../options.ts'
-import { normalizeModuleId, resolvePageComponentPath } from '../../../utils/modules.ts'
+import { normalizeModuleId, resolveAppComponentPath, resolvePageComponentPath } from '../../../utils/modules.ts'
 import { appComponentId } from '../../client/constant.ts'
 import {
     appShellFileName,
@@ -29,7 +28,7 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
         // Share bootstrap's identity helper through native require and the specialized SystemJS transport case.
         [vitePreloadId, () => bootstrapPath],
         // Keep the configured App component behind one stable private import in the App module.
-        [appComponentId, (_importer, projectRoot) => path.resolve(projectRoot, options.app)],
+        [appComponentId, (_importer, projectRoot) => resolveAppComponentPath({ appPath: options.app, projectRoot })],
         [
             pageComponentId,
             (importer, projectRoot) => {

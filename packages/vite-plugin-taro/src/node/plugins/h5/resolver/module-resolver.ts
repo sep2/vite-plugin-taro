@@ -1,6 +1,5 @@
-import path from 'node:path'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
-import { normalizeModuleId } from '../../../utils/modules.ts'
+import { normalizeModuleId, resolveAppComponentPath } from '../../../utils/modules.ts'
 import { appComponentId } from '../../client/constant.ts'
 import { h5AppPath } from '../constant.ts'
 import { transformH5App } from '../transform-app.ts'
@@ -10,7 +9,7 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
     return {
         resolveId({ id, projectRoot }: { id: string; projectRoot: string }): string | undefined {
             if (id === appComponentId) {
-                return path.resolve(projectRoot, options.app)
+                return resolveAppComponentPath({ appPath: options.app, projectRoot })
             }
         },
 
