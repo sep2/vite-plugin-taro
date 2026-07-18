@@ -1,7 +1,5 @@
 import path from 'node:path'
 
-const moduleRoot = 'vpt:/'
-
 type AppComponentPathOptions = {
     appPath: string
     projectRoot: string
@@ -13,8 +11,8 @@ type PageComponentPathOptions = {
 }
 
 /** Converts a final chunk ID to its canonical runtime module URL. */
-export function chunkIdToModuleUrl(chunkId: string): string {
-    return `${moduleRoot}${chunkId}`
+export function chunkIdToModuleUrl(chunkId: string): `vpt:/${string}` {
+    return `vpt:/${chunkId}`
 }
 
 /** Resolves the source file for the configured App component. */
