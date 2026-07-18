@@ -1,7 +1,6 @@
 // Transport itself executes only as native CommonJS. It lives beside bootstrap because together they implement the
 // amphibious boundary that publishes native namespaces to SystemJS without re-evaluating their module bodies.
-type RegistrationLoad = System.Registration | PromiseLike<System.Registration>
-type RegistrationLoader = () => RegistrationLoad
+type RegistrationLoader = () => System.Registration | PromiseLike<System.Registration>
 type AmphibiousNamespaceLoader = () => Readonly<Record<string, unknown>>
 
 type TransportSource = readonly ['capsule', RegistrationLoader] | readonly ['amphibious', AmphibiousNamespaceLoader]
