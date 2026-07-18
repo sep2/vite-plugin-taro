@@ -64,10 +64,8 @@ function getChunkEligibility(moduleKinds: Map<string, ModuleKind>, chunk: Abstra
 
     for (const moduleId of chunk.moduleIds) {
         const moduleKind = moduleKinds.get(moduleId)
-        if (!moduleKind) {
-            throw new Error(`Unclassified WX module: ${moduleId}`)
-        }
-        if (moduleKind === 'eager') {
+        // Rolldown may synthesize output-only runtime modules after renderStart; keep every unknown module in main.
+        if (!moduleKind || moduleKind === 'eager') {
             return 'main-required'
         }
     }
