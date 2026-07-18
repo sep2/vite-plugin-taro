@@ -20,7 +20,7 @@ if (!installedSystem) {
 const transportTable = finalizeTransport(module.exports as Readonly<Record<string, unknown>>)
 
 /** Loads native bootstrap or one application capsule from the finalized transport table. */
-installedSystem.instantiate = (moduleId: string): System.Registration => {
+installedSystem.instantiate = (moduleId: string): System.Registration | PromiseLike<System.Registration> => {
     const load = transportTable[moduleId]
     if (!load) {
         throw new Error(`Unknown System module: ${moduleId}`)
