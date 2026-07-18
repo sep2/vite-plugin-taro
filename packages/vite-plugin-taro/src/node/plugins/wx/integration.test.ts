@@ -52,6 +52,7 @@ interface SystemJsGlobal {
 }
 
 const transportFileName = 'transport.js'
+const testAppConfig = { pages: ['pages/index/index'] }
 const packageRequire = createRequire(import.meta.url)
 const systemSource = readFileSync(packageRequire.resolve('systemjs/s.js'), 'utf8')
 const bootstrapTypeScript = readFileSync(
@@ -61,8 +62,8 @@ const bootstrapTypeScript = readFileSync(
 const bootstrapJavaScript = (await transformWithOxc(bootstrapTypeScript, 'bootstrap.ts', { target: esTarget })).code
     .replace(/^import ['"]systemjs\/s\.js['"];\s*/m, '')
     .replace(
-        /^import \{ createNativeConfig \} from ['"]\.\/native-config\.(?:ts|js)['"];\s*/m,
-        'const createNativeConfig = () => ({})\n'
+        /^import \{ createNativeShell \} from ['"]\.\/native-shell\.(?:ts|js)['"];\s*/m,
+        'const createNativeShell = () => ({})\n'
     )
 const bootstrapCode = renderNative(bootstrapJavaScript, {
     fileName: 'assets/bootstrap.js'
@@ -146,6 +147,7 @@ async function createTestSystem(
         exports: {}
     }
     const sandbox: Record<string, unknown> = {
+        __VITE_PLUGIN_TARO_APP_CONFIG__: testAppConfig,
         exports: commonJsModule.exports,
         module: commonJsModule,
         require: () => transport
@@ -186,11 +188,24 @@ function callExport(module: SystemModule, name: string, ...arguments_: unknown[]
     return value.apply(undefined, arguments_)
 }
 
-test('publishes native bootstrap directly through its System registration', async () => {
-    const system = await createTestSystem(new Map())
+test('shares native bootstrap exports with application capsules', async () => {
+    const registrations = new Map<string, SystemRegistration>([
+        [
+            'assets/consumer.js',
+            compileRegistration(
+                'assets/consumer.js',
+                `import { appConfig } from './bootstrap.js'
+export { appConfig }`
+            )
+        ]
+    ])
+    const system = await createTestSystem(registrations)
     const bootstrap = await system.import(chunkIdToModuleUrl('assets/bootstrap.js'))
+    const consumer = await system.import(chunkIdToModuleUrl('assets/consumer.js'))
 
-    assert.equal(typeof bootstrap.createNativeConfig, 'function')
+    assert.strictEqual(bootstrap.appConfig, testAppConfig)
+    assert.strictEqual(consumer.appConfig, testAppConfig)
+    assert.equal(typeof bootstrap.createNativeShell, 'function')
     assert.equal(typeof bootstrap.__vitePreload, 'function')
 })
 

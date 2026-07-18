@@ -1,8 +1,11 @@
-import { createNativeConfig } from './bootstrap.ts'
+import { createNativeShell } from './bootstrap.ts'
 
-const componentMethods = ['eh'] as const
-const loadComponentModule = () => import('./comp-module.ts')
-const methods = createNativeConfig('Component', loadComponentModule, componentMethods, {})
+const methods = createNativeShell({
+    moduleName: 'Component',
+    loadModule: () => import('./comp-module.ts'),
+    methods: ['eh'] as const,
+    properties: {}
+})
 
 Component({
     properties: {

@@ -1,10 +1,15 @@
 // Install the stock minimal SystemJS loader before any native shell can request an application capsule.
 import 'systemjs/s.js'
-import { createNativeConfig } from './native-config.ts'
+import { createNativeShell } from './native-shell.ts'
 import { finalizeTransport } from './transport.ts'
 
-// Share the asynchronous configuration relay through the bootstrap module cached by native require.
-export { createNativeConfig }
+declare const __VITE_PLUGIN_TARO_APP_CONFIG__: Record<string, unknown>
+
+/** Shares one App configuration object between native shells and application capsules. */
+export const appConfig = __VITE_PLUGIN_TARO_APP_CONFIG__
+
+// Share the asynchronous native shell through bootstrap's cached module identity.
+export { createNativeShell }
 
 // Vite wraps dynamic imports with this browser preload hook. WX has no modulepreload transport, so native chunks call
 // the loader directly; application capsules receive this same cached export through bootstrap's native registration.

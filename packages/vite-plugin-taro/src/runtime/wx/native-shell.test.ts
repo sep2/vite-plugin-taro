@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createNativeConfig } from './native-config.ts'
+import { createNativeShell } from './native-shell.ts'
 
 const appMethods = ['onLaunch', 'onShow', 'onHide', 'onError'] as const
 
@@ -15,17 +15,17 @@ test('queues native callbacks until the module activates', async () => {
     const appConfig = {}
     let appModuleRequested = false
 
-    const shellConfig = createNativeConfig(
-        'App',
-        () => {
+    const shellConfig = createNativeShell({
+        moduleName: 'App',
+        loadModule: () => {
             appModuleRequested = true
             return appModule
         },
-        appMethods,
-        {
+        methods: appMethods,
+        properties: {
             config: appConfig
         }
-    )
+    })
     assert.equal(appModuleRequested, false)
 
     shellConfig.onShow.call(receiver, 'first')

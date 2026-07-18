@@ -1,4 +1,4 @@
-import { createNativeConfig } from './bootstrap.ts'
+import { createNativeShell } from './bootstrap.ts'
 
 const pageMethods = [
     'onLoad',
@@ -21,14 +21,18 @@ const pageMethods = [
     'eh'
 ] as const
 
-// @ts-expect-error: The WX build resolves the route-specific Page module.
-const loadPageModule = () => import('\0vpt:page-module')
-const pageConfig = createNativeConfig('Page', loadPageModule, pageMethods, {
-    data: {
-        root: {
-            cn: []
+Page(
+    createNativeShell({
+        moduleName: 'Page',
+        // @ts-expect-error: The wx build resolves the route-specific Page module.
+        loadModule: () => import('\0vpt:page-module'),
+        methods: pageMethods,
+        properties: {
+            data: {
+                root: {
+                    cn: []
+                }
+            }
         }
-    }
-})
-
-Page(pageConfig)
+    })
+)

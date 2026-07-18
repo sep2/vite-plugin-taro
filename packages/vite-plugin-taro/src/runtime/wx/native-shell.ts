@@ -10,17 +10,25 @@ interface NativeModule {
     default: unknown
 }
 
-/** A synchronous native configuration backed by an asynchronous module. */
-export type NativeConfig<Method extends string, Config extends object> = Config &
+/** Inputs for a synchronous native shell backed by an asynchronous module. */
+interface NativeShellOptions<Method extends string, Properties extends object> {
+    moduleName: 'App' | 'Page' | 'Component'
+    loadModule: () => Promise<NativeModule>
+    methods: readonly Method[]
+    properties: Properties
+}
+
+/** A synchronous native shell backed by an asynchronous module. */
+export type NativeShell<Method extends string, Properties extends object> = Properties &
     Record<Method, (this: object, ...args: unknown[]) => unknown>
 
-/** Creates a synchronous native configuration backed by an asynchronous module. */
-export function createNativeConfig<Method extends string, Config extends object>(
-    moduleName: 'App' | 'Page' | 'Component',
-    loadModule: () => Promise<NativeModule>,
-    methods: readonly Method[],
-    config: Config
-): NativeConfig<Method, Config> {
+/** Creates a synchronous native shell backed by an asynchronous module. */
+export function createNativeShell<Method extends string, Properties extends object>({
+    moduleName,
+    loadModule,
+    methods,
+    properties
+}: NativeShellOptions<Method, Properties>): NativeShell<Method, Properties> {
     const journal: NativeInvocation<Method>[] = []
     let activatedConfig: Record<string, unknown> | undefined
     let failed = false
@@ -66,7 +74,7 @@ export function createNativeConfig<Method extends string, Config extends object>
     }
 
     return {
-        ...config,
+        ...properties,
         ...callbacks
     }
 }
