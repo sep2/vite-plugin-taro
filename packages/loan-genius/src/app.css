@@ -12,6 +12,12 @@
     --text-22: 1.375rem;
 }
 
+*,
+::before,
+::after {
+    box-sizing: border-box;
+}
+
 .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
 }
