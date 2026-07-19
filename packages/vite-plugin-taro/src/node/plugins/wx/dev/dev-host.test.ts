@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
+import { Readable } from 'node:stream'
 import test from 'node:test'
 import type { OutputOptions, Plugin as RolldownPlugin } from 'rolldown'
 import type { Plugin, ViteDevServer } from 'vite'
@@ -86,6 +88,12 @@ test('DevHost lets the DevEngine write the initial project and keeps HMR patch-o
 
     const loggerErrors: unknown[] = []
     const loggerInfos: unknown[] = []
+    let hmrMiddleware: ((request: IncomingMessage, response: ServerResponse) => void) | undefined
+    const middlewares = {
+        use(pathname: string, handler: (request: IncomingMessage, response: ServerResponse) => void) {
+            if (pathname === '/__vite_plugin_taro_wx_hmr__') hmrMiddleware = handler
+        }
+    }
     const httpServer = Object.assign(new EventEmitter(), {
         listening: false,
         address() {
@@ -131,6 +139,7 @@ test('DevHost lets the DevEngine write the initial project and keeps HMR patch-o
             }
         },
         httpServer,
+        middlewares,
         resolvedUrls: null,
         printUrls() {},
         watcher
@@ -152,7 +161,9 @@ test('DevHost lets the DevEngine write the initial project and keeps HMR patch-o
         assert.match(String(devMode.implement), /Math\.random\(\)\.toString\(36\)/)
         assert.equal(outputOptions.entryFileNames, '[name]')
         const chunkFileNames = outputOptions.chunkFileNames
-        if (typeof chunkFileNames !== 'function') throw new Error('Expected development chunk filename function.')
+        if (typeof chunkFileNames !== 'function') {
+            throw new Error('Expected development chunk filename function.')
+        }
         assert.equal(chunkFileNames({} as never), 'sub/p_test/assets/[name].js')
         assert.equal(outputOptions.assetFileNames, 'assets/[name][extname]')
         assert.equal(outputOptions.format, 'es')
@@ -161,7 +172,9 @@ test('DevHost lets the DevEngine write the initial project and keeps HMR patch-o
         assert.equal(viteTransformPlugin._options.transformOptions.sourcemap, false)
 
         const banner = outputOptions.banner
-        if (typeof banner !== 'function') throw new Error('Expected development banner function.')
+        if (typeof banner !== 'function') {
+            throw new Error('Expected development banner function.')
+        }
         assert.equal(
             await banner({ fileName: 'app.js' } as never),
             'const __rolldown_runtime__ = global.__rolldown_runtime__;\n__rolldown_runtime__.setHmrInfo(require("./hmr/info.js"));'
@@ -195,7 +208,9 @@ test('DevHost lets the DevEngine write the initial project and keeps HMR patch-o
                 const hmrInfo = await readHmrInfo(hmrInfoPath)
                 return hmrInfo.endpoint === 'http://127.0.0.1:5174/__vite_plugin_taro_wx_hmr__'
             } catch (error) {
-                if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return false
+                if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+                    return false
+                }
                 throw error
             }
         })
@@ -204,6 +219,34 @@ test('DevHost lets the DevEngine write the initial project and keeps HMR patch-o
         assert.equal(hmrInfo.endpoint, 'http://127.0.0.1:5174/__vite_plugin_taro_wx_hmr__')
         assert.ok(loggerInfos.some((message) => String(message).includes('WeChat DevTools: ./dist/wx')))
         assert.equal(await readFile(hmrUpdatePath, 'utf8'), 'module.exports = undefined;\n')
+
+        assert.ok(hmrMiddleware)
+        const registrations: Array<{ clientId: string; modules: string[] }> = []
+        const engine = bundledDevelopment._devEngine as unknown as {
+            registerModules(clientId: string, modules: string[]): Promise<void>
+        }
+        engine.registerModules = async (clientId, modules) => {
+            registrations.push({ clientId, modules })
+        }
+        let responseEnded = false
+        const response = {
+            statusCode: 0,
+            end() {
+                responseEnded = true
+            }
+        } as unknown as ServerResponse
+        hmrMiddleware(
+            Object.assign(
+                Readable.from([
+                    JSON.stringify({ buildId: hmrInfo.buildId, clientId: 'runtime-1', modules: [sourcePath] })
+                ]),
+                { method: 'POST' }
+            ) as IncomingMessage,
+            response
+        )
+        await waitFor(async () => responseEnded)
+        assert.equal(response.statusCode, 204)
+        assert.deepEqual(registrations, [{ clientId: 'runtime-1', modules: [sourcePath] }])
         assert.equal(await bundledDevelopment.triggerBundleRegenerationIfStale(), false)
 
         // rebuildStrategy:'never' must make a normal watcher change patch-only. A stale bundle proves the HMR task ran;
@@ -231,23 +274,31 @@ function getDevelopmentConfig(plugin: Plugin): {
     experimental?: { bundledDev?: boolean }
 } {
     const hook = plugin.config
-    if (!hook) throw new Error('Expected config hook.')
+    if (!hook) {
+        throw new Error('Expected config hook.')
+    }
     const handler = typeof hook === 'function' ? hook : hook.handler
     const result = handler.call({} as never, {}, { command: 'serve', mode: 'development' })
-    if (!result || result instanceof Promise) throw new Error('Expected synchronous development config.')
+    if (!result || result instanceof Promise) {
+        throw new Error('Expected synchronous development config.')
+    }
     return result
 }
 
 function installConfigureServer(plugin: Plugin, server: ViteDevServer): void {
     const hook = plugin.configureServer
-    if (!hook) throw new Error('Expected configureServer hook.')
+    if (!hook) {
+        throw new Error('Expected configureServer hook.')
+    }
     const handler = typeof hook === 'function' ? hook : hook.handler
     handler.call({} as never, server)
 }
 
 async function closePlugin(plugin: Plugin): Promise<void> {
     const hook = plugin.closeBundle
-    if (!hook) return
+    if (!hook) {
+        return
+    }
     const handler = typeof hook === 'function' ? hook : hook.handler
     await handler.call({} as never)
 }
@@ -255,13 +306,17 @@ async function closePlugin(plugin: Plugin): Promise<void> {
 async function readHmrInfo(filePath: string): Promise<{ buildId: string; endpoint: string }> {
     const source = await readFile(filePath, 'utf8')
     const match = source.match(/^module\.exports = Object\.freeze\((.+)\);$/m)
-    if (!match) throw new Error('Expected rendered HMR info.')
+    if (!match) {
+        throw new Error('Expected rendered HMR info.')
+    }
     return JSON.parse(match[1])
 }
 
 async function waitFor(predicate: () => Promise<boolean>): Promise<void> {
     for (let attempt = 0; attempt < 100; attempt++) {
-        if (await predicate()) return
+        if (await predicate()) {
+            return
+        }
         await new Promise((resolve) => setTimeout(resolve, 10))
     }
     throw new Error('Timed out waiting for wx development output.')
