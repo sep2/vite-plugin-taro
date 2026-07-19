@@ -17,9 +17,6 @@ type HmrModuleRegistration = Readonly<{
     modules: string[]
 }>
 
-// This path belongs to DevHost: it will both render the HMR URL and install the matching Vite middleware.
-const hmrRequestPath = '/__wx_hmr__'
-
 /**
  * Coordinates the one Vite environment, physical wx output directory, and HMR session.
  *
@@ -153,12 +150,15 @@ function setupHttpHandler({
         }
     }
 
+    // The communication channel between DevHost and DevRuntime
+    const hmrRequestPath = '/__vpt_hmr__'
+
     const publish = async (): Promise<void> => {
         await taskQueue.enqueue(async () => {
             try {
                 const origin = server.resolvedUrls?.local[0]
                 if (!origin) {
-                    throw new Error('Vite did not resolve a local development URL for WX HMR.')
+                    throw new Error('Vite did not resolve a development URL.')
                 }
 
                 const hmrInfo = createHmrInfo(new URL(hmrRequestPath, origin).href)
