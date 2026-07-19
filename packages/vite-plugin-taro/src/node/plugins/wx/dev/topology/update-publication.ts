@@ -1,5 +1,5 @@
 import { concatMap, filter, map, type Observable, take } from 'rxjs'
-import type { Bootstrap, PatchHistory, UpdatePoll, UpdatePublication, UpdatePublicationEffect } from './types.ts'
+import type { BuildEpoch, PatchHistory, UpdatePoll, UpdatePublication, WritePublicationEffect } from './types.ts'
 
 /**
  * Materializes retained patches only in response to an active runtime poll.
@@ -18,25 +18,25 @@ import type { Bootstrap, PatchHistory, UpdatePoll, UpdatePublication, UpdatePubl
  * update.js until a runtime poll observes that the client is behind.
  */
 export function createUpdatePublications$({
-    bootstrap,
+    epoch,
     history$,
     polls$,
     writePublication
 }: {
-    /** Immutable metadata embedded in every physical update projection. */
-    bootstrap: Bootstrap
+    /** Successful build epoch embedded in every physical update projection. */
+    epoch: BuildEpoch
     /** Replayed append-only patch history for the current full build. */
     history$: Observable<PatchHistory>
     /** Version reports from the active runtime control channel. */
     polls$: Observable<UpdatePoll>
     /** Atomic physical update.js writer edge. */
-    writePublication: UpdatePublicationEffect
+    writePublication: WritePublicationEffect
 }): Observable<UpdatePublication> {
     return polls$.pipe(
-        filter((poll) => poll.buildId === bootstrap.buildId),
+        filter((poll) => poll.buildId === epoch.buildId),
         concatMap((poll, index) =>
             history$.pipe(
-                map((history) => selectPublication(bootstrap, poll, history, index + 1)),
+                map((history) => selectPublication(epoch, poll, history, index + 1)),
                 filter((publication): publication is UpdatePublication => publication !== undefined),
                 take(1),
                 concatMap((publication) => writePublication(publication).pipe(map(() => publication)))
@@ -47,21 +47,17 @@ export function createUpdatePublications$({
 
 /** Selects every retained version strictly after the runtime's applied contiguous prefix. */
 function selectPublication(
-    bootstrap: Bootstrap,
+    epoch: BuildEpoch,
     poll: UpdatePoll,
     history: PatchHistory,
     publicationId: number
 ): UpdatePublication | undefined {
-    if (
-        history.buildId !== bootstrap.buildId ||
-        poll.appliedVersion < 0 ||
-        poll.appliedVersion >= history.patches.length
-    ) {
+    if (history.buildId !== epoch.buildId || poll.appliedVersion < 0 || poll.appliedVersion >= history.patches.length) {
         return
     }
 
     return {
-        bootstrap,
+        epoch,
         clientId: poll.clientId,
         patches: history.patches.slice(poll.appliedVersion),
         publicationId

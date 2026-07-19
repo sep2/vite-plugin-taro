@@ -1,5 +1,5 @@
 import { type Observable, scan, shareReplay } from 'rxjs'
-import type { Bootstrap, PatchHistory, RetainedPatch, SafePatch } from './types.ts'
+import type { BuildEpoch, PatchHistory, RetainedPatch, SafePatch } from './types.ts'
 
 /**
  * Retains safe DevEngine patches as one ordered prefix for the current physical build.
@@ -14,11 +14,8 @@ import type { Bootstrap, PatchHistory, RetainedPatch, SafePatch } from './types.
  * The history stream is the server's HMR memory. It is intentionally separate from physical publication: a later
  * runtime poll selects and materializes a range from this prefix.
  */
-export function createPatchHistory$(
-    bootstrap: Bootstrap,
-    safePatches$: Observable<SafePatch>
-): Observable<PatchHistory> {
-    const initialHistory: PatchHistory = { buildId: bootstrap.buildId, patches: [] }
+export function createPatchHistory$(epoch: BuildEpoch, safePatches$: Observable<SafePatch>): Observable<PatchHistory> {
+    const initialHistory: PatchHistory = { buildId: epoch.buildId, patches: [] }
     return safePatches$.pipe(
         scan(
             (history, patch): PatchHistory => ({
@@ -27,7 +24,7 @@ export function createPatchHistory$(
             }),
             initialHistory
         ),
-        shareReplay({ bufferSize: 1, refCount: false })
+        shareReplay({ bufferSize: 1, refCount: true })
     )
 }
 

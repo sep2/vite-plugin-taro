@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { of, ReplaySubject, Subject } from 'rxjs'
-import type { Bootstrap, PatchHistory, UpdatePoll, UpdatePublication } from './types.ts'
+import type { BuildEpoch, PatchHistory, UpdatePoll, UpdatePublication } from './types.ts'
 import { createUpdatePublications$ } from './update-publication.ts'
 
-const bootstrap: Bootstrap = { buildId: 'build-1', endpoint: 'http://localhost/__vpt_hmr__' }
+const epoch: BuildEpoch = { buildId: 'build-1', endpoint: 'http://localhost/__vpt_hmr__' }
 
 test('publishes a missing retained range only after a runtime poll', () => {
     const history$ = new ReplaySubject<PatchHistory>(1)
@@ -12,7 +12,7 @@ test('publishes a missing retained range only after a runtime poll', () => {
     const writes: UpdatePublication[] = []
     const publications: UpdatePublication[] = []
     const subscription = createUpdatePublications$({
-        bootstrap,
+        epoch,
         history$,
         polls$,
         writePublication(publication) {
