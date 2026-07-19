@@ -58,20 +58,34 @@ class WxHotContext {
 class WxDevRuntime extends DevRuntime {
     private hmrInfo: HmrInfo | undefined
 
-    /**
-     * Installs Rolldown's base runtime with this heap's unique client identity. The inert messenger exists only until the
-     * DevHost protocol starts reporting executed modules.
-     */
+    /** Installs Rolldown's base runtime and forwards its already-batched executed-module reports to DevHost. */
     constructor(clientId: string) {
-        super({ send(): void {} }, clientId)
+        // Rolldown's constructor stores this messenger without invoking it, so the deferred arrow can safely bind this
+        // runtime after super() returns.
+        super({ send: ({ modules }) => this.registerModules(modules) }, clientId)
     }
 
-    /** Receives the App-loaded build metadata without requiring a second HMR global. */
+    /** Receives App-loaded metadata and registers this heap before its first module report, like Vite's client hello. */
     setHmrInfo(hmrInfo: HmrInfo): void {
-        if (this.hmrInfo?.buildId === hmrInfo.buildId && this.hmrInfo.endpoint === hmrInfo.endpoint) {
+        this.hmrInfo = hmrInfo
+        this.registerModules([])
+    }
+
+    /** Posts one Rolldown-batched execution report; Rolldown reuses its array, so copy it before native request handling. */
+    private registerModules(modules: string[]): void {
+        const hmrInfo = this.hmrInfo
+        if (!hmrInfo) {
             return
         }
-        this.hmrInfo = hmrInfo
+
+        wx.request({
+            url: hmrInfo.endpoint,
+            method: 'POST',
+            data: { buildId: hmrInfo.buildId, clientId: this.clientId, modules: modules.slice() },
+            header: { 'content-type': 'application/json' },
+            success(): void {},
+            complete(): void {}
+        })
     }
 
     /** Creates the context that each Rolldown-instrumented module receives before its original module body runs. */
