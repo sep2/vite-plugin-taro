@@ -75,6 +75,7 @@
         "@vitejs/plugin-react": "^6.0.3",
         "babel-plugin-transform-taroapi": "^4.2.0",
         "picocolors": "^1.1.1",
+        "react-reconciler": "0.33.0",
         "react-refresh": "^0.18.0",
         "rolldown": "~1.1.4",
         "rxjs": "^7.8.2",
