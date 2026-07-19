@@ -2,8 +2,10 @@
 export class SerializedTaskQueue {
     private tail: Promise<void> = Promise.resolve()
 
-    enqueue(task: () => Promise<void>): void {
-        this.tail = this.tail.then(task)
+    enqueue(task: () => Promise<void>): Promise<void> {
+        const work = this.tail.then(task)
+        this.tail = work
+        return work
     }
 
     /** Waits for every task that was queued when this method was called. */
