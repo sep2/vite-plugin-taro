@@ -1,103 +1,113 @@
 import { type PluginObject, types } from '@babel/core'
 import { transformWithBabel } from '../../../utils/transform.ts'
+import { reactReconcilerRoot, reactRefreshRuntimeId } from '../module.ts'
 
-const reactRefreshRuntimeId = '/@react-refresh'
-const reactRefreshPreambleError = "@vitejs/plugin-react can't detect preamble. Something is wrong."
-const refreshHost = '__vptReactRefreshHost'
-const refreshHostProperties = new Set(['__getReactRefreshIgnoredExports', '__registerBeforePerformReactRefresh'])
+const runtime = '__rolldown_runtime__'
+const reactDevtoolsHook = '__REACT_DEVTOOLS_GLOBAL_HOOK__'
 
-/** Removes browser-preamble assumptions and connects React Refresh completion to the App-owned WX runtime. */
+/** Binds Vite React Refresh completion and React Reconciler's DevTools hook to the WX App runtime. */
 export function rewriteReactRefresh(code: string, id: string, sourcemap = true) {
-    const refreshRuntime = id.split('?', 1)[0] === reactRefreshRuntimeId
-    const refreshBoundary = code.includes(reactRefreshPreambleError)
-    if (!refreshRuntime && !refreshBoundary) {
-        return
+    const moduleId = id.split('?', 1)[0]
+
+    if (moduleId === reactRefreshRuntimeId) {
+        return transformWithBabel(code, id, [createRefreshRuntimePlugin], sourcemap)
     }
 
-    return transformWithBabel(code, id, [() => createReactRefreshRewritePlugin(refreshRuntime)], sourcemap)
+    if (moduleId.startsWith(`${reactReconcilerRoot}/`) && code.includes(reactDevtoolsHook)) {
+        return transformWithBabel(code, id, [createReactReconcilerPlugin], sourcemap)
+    }
+
+    if (code.includes('window.$Refresh')) {
+        return transformWithBabel(code, id, [createRefreshBoundaryPlugin], sourcemap)
+    }
 }
 
-function createReactRefreshRewritePlugin(refreshRuntime: boolean): PluginObject {
+/** Adapts Vite's Refresh runtime and delays HMR acknowledgement until its debounced refresh has finished. */
+function createRefreshRuntimePlugin(): PluginObject {
     return {
-        name: 'vite-plugin-taro:wx-react-refresh-rewrite',
+        name: 'vite-plugin-taro:wx-react-refresh-runtime',
         visitor: {
             Program(programPath) {
-                if (!refreshRuntime) {
-                    return
-                }
-                programPath.unshiftContainer(
+                // The native runtime installed the capture hook before React starts; this Vite preamble step decorates
+                // it with Refresh helpers and replays any renderer that registered in the meantime.
+                programPath.pushContainer(
                     'body',
-                    types.variableDeclaration('const', [
-                        types.variableDeclarator(
-                            types.identifier(refreshHost),
-                            types.memberExpression(types.identifier('global'), types.identifier(refreshHost))
-                        )
-                    ])
+                    types.expressionStatement(
+                        types.callExpression(types.identifier('injectIntoGlobalHook'), [types.identifier('global')])
+                    )
                 )
             },
 
             MemberExpression(memberPath) {
-                if (!refreshRuntime) {
-                    return
-                }
-                const member = memberPath.node
+                // Vite's runtime installs and reads these two optional integration hooks during refresh validation.
+                // Rewrites the two browser-only hooks used by Vite's own Refresh runtime.
                 if (
-                    !types.isIdentifier(member.object, { name: 'window' }) ||
-                    !types.isIdentifier(member.property) ||
-                    !refreshHostProperties.has(member.property.name)
+                    types.isIdentifier(memberPath.node.object, { name: 'window' }) &&
+                    types.isIdentifier(memberPath.node.property) &&
+                    (memberPath.node.property.name === '__getReactRefreshIgnoredExports' ||
+                        memberPath.node.property.name === '__registerBeforePerformReactRefresh')
                 ) {
-                    return
+                    memberPath.node.object = types.identifier('global')
                 }
-                member.object = types.identifier(refreshHost)
             },
 
             CallExpression(callPath) {
-                if (!refreshRuntime || !types.isIdentifier(callPath.node.callee)) {
+                // This brackets Vite's debounced enqueue/perform pair so the physical publication is acknowledged
+                // only after React has reconciled it.
+                const callee = callPath.node.callee
+                if (
+                    !types.isIdentifier(callee) ||
+                    (callee.name !== 'enqueueUpdate' && callee.name !== 'performReactRefresh')
+                ) {
                     return
                 }
-                const callee = callPath.node.callee.name
-                if (callee !== 'enqueueUpdate' && callee !== 'performReactRefresh') {
-                    return
-                }
-
                 callPath.replaceWith(
                     types.callExpression(
                         types.memberExpression(
-                            types.identifier(refreshHost),
-                            types.identifier(callee === 'enqueueUpdate' ? 'enqueueRefresh' : 'performReactRefresh')
+                            types.memberExpression(types.identifier('global'), types.identifier(runtime)),
+                            types.identifier(callee.name === 'enqueueUpdate' ? 'enqueueRefresh' : 'performReactRefresh')
                         ),
-                        [types.identifier(callee)]
+                        [types.identifier(callee.name)]
                     )
                 )
                 callPath.skip()
-            },
+            }
+        }
+    }
+}
 
-            IfStatement(ifPath) {
-                if (isReactRefreshPreambleGuard(ifPath.node)) {
-                    ifPath.remove()
+/** Rebinds only the free DevTools-hook identifier that React Reconciler reads during renderer registration. */
+function createReactReconcilerPlugin(): PluginObject {
+    return {
+        name: 'vite-plugin-taro:wx-react-reconciler',
+        visitor: {
+            Identifier(identifierPath) {
+                if (identifierPath.node.name === reactDevtoolsHook && identifierPath.isReferencedIdentifier()) {
+                    identifierPath.replaceWith(
+                        types.memberExpression(types.identifier('global'), types.identifier(reactDevtoolsHook))
+                    )
+                    identifierPath.skip()
                 }
             }
         }
     }
 }
 
-function isReactRefreshPreambleGuard(statement: ReturnType<typeof types.ifStatement>): boolean {
-    if (
-        !types.isUnaryExpression(statement.test, { operator: '!' }) ||
-        !types.isMemberExpression(statement.test.argument) ||
-        !types.isIdentifier(statement.test.argument.object, { name: 'window' }) ||
-        !types.isIdentifier(statement.test.argument.property, { name: '$RefreshReg$' }) ||
-        !types.isBlockStatement(statement.consequent) ||
-        statement.consequent.body.length !== 1
-    ) {
-        return false
+/** Makes Vite's component preamble and registration helpers use the WX App global without changing user code. */
+function createRefreshBoundaryPlugin(): PluginObject {
+    return {
+        name: 'vite-plugin-taro:wx-react-refresh-boundary',
+        visitor: {
+            MemberExpression(memberPath) {
+                /** Rewrites Vite's component preamble globals but leaves every other browser-style `window.*` expression untouched. */
+                if (
+                    types.isIdentifier(memberPath.node.object, { name: 'window' }) &&
+                    types.isIdentifier(memberPath.node.property) &&
+                    memberPath.node.property.name.startsWith('$Refresh')
+                ) {
+                    memberPath.node.object = types.identifier('global')
+                }
+            }
+        }
     }
-
-    const [throwStatement] = statement.consequent.body
-    return (
-        types.isThrowStatement(throwStatement) &&
-        types.isNewExpression(throwStatement.argument) &&
-        types.isIdentifier(throwStatement.argument.callee, { name: 'Error' }) &&
-        types.isStringLiteral(throwStatement.argument.arguments[0], { value: reactRefreshPreambleError })
-    )
 }
