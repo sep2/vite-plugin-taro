@@ -1,4 +1,18 @@
-import { filter, map, merge, type Observable, share, switchMap, take, takeUntil, withLatestFrom } from 'rxjs'
+import {
+    catchError,
+    defer,
+    filter,
+    map,
+    merge,
+    type Observable,
+    of,
+    share,
+    shareReplay,
+    switchMap,
+    take,
+    takeUntil,
+    withLatestFrom
+} from 'rxjs'
 import { createBuildEvents$ } from './build-epochs.ts'
 import { type ClientPollEvent, createClientPollEvents$ } from './client-polls.ts'
 import { createPatchHistory$ } from './patch-history.ts'
@@ -10,6 +24,7 @@ import type {
     EpochEvent,
     HmrEvent,
     RebuildSignal,
+    SafePatch,
     SafePatchSource,
     UpdatePoll,
     WriteBootstrapEffect,
@@ -85,7 +100,17 @@ function createEpochEvents$(
     safePatchesForEpoch: SafePatchSource,
     writePublication: WritePublicationEffect
 ): Observable<EpochEvent> {
-    const history$ = createPatchHistory$(safePatchesForEpoch(epoch))
+    const safePatchEvents$ = defer(() => safePatchesForEpoch(epoch)).pipe(
+        map((patch): SafePatchEvent => ({ kind: 'safe-patch', patch })),
+        catchError((error: unknown) => of<SafePatchEvent>({ error, kind: 'safe-patch-failed' })),
+        shareReplay({ bufferSize: 1, refCount: true })
+    )
+    const history$ = createPatchHistory$(
+        safePatchEvents$.pipe(
+            filter((event): event is Extract<SafePatchEvent, { kind: 'safe-patch' }> => event.kind === 'safe-patch'),
+            map(({ patch }) => patch)
+        )
+    )
     const clientPollEvents$ = createClientPollEvents$(epoch, polls$)
     const acceptedPolls$ = clientPollEvents$.pipe(
         filter((event): event is Extract<ClientPollEvent, { kind: 'accepted-poll' }> => event.kind === 'accepted-poll'),
@@ -106,7 +131,18 @@ function createEpochEvents$(
         take(1),
         map((): RebuildSignal => ({ buildId: epoch.buildId, kind: 'rebuild-needed', reason: 'runtime-desynchronized' }))
     )
-    const localRebuild$ = merge(clientChanged$, historyLimit$, desynchronized$).pipe(take(1), share())
+    const safePatchFailure$ = safePatchEvents$.pipe(
+        filter(
+            (event): event is Extract<SafePatchEvent, { kind: 'safe-patch-failed' }> =>
+                event.kind === 'safe-patch-failed'
+        ),
+        take(1),
+        map((): RebuildSignal => ({ buildId: epoch.buildId, kind: 'rebuild-needed', reason: 'rolldown-full-reload' }))
+    )
+    const localRebuild$ = merge(clientChanged$, historyLimit$, desynchronized$, safePatchFailure$).pipe(
+        take(1),
+        share()
+    )
     const nonTerminalEvents$ = merge(
         history$.pipe(map((history): EpochEvent => ({ epoch, history, kind: 'history-retained' }))),
         createUpdatePublications$({
@@ -119,6 +155,16 @@ function createEpochEvents$(
 
     return merge(nonTerminalEvents$.pipe(takeUntil(localRebuild$)), localRebuild$).pipe(takeUntil(buildStarts$))
 }
+
+type SafePatchEvent =
+    | Readonly<{
+          kind: 'safe-patch'
+          patch: SafePatch
+      }>
+    | Readonly<{
+          error: unknown
+          kind: 'safe-patch-failed'
+      }>
 
 function isBuildStarted(event: BuildEvent): event is Extract<BuildEvent, { kind: 'build-started' }> {
     return event.kind === 'build-started'

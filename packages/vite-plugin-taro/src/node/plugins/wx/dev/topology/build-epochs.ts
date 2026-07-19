@@ -1,4 +1,16 @@
-import { catchError, concat, concatMap, map, type Observable, of, share } from 'rxjs'
+import {
+    catchError,
+    concat,
+    concatMap,
+    endWith,
+    ignoreElements,
+    map,
+    type Observable,
+    of,
+    queueScheduler,
+    scheduled,
+    share
+} from 'rxjs'
 import type { BuildEpoch, BuildEvent, BuildRequest, CompleteBuildEffect, WriteBootstrapEffect } from './types.ts'
 
 /**
@@ -29,8 +41,13 @@ export function createBuildEvents$({
             const epoch: BuildEpoch = { buildId: request.buildId }
             return concat(
                 of<BuildEvent>({ kind: 'build-started', request }),
-                completeBuild(request).pipe(
-                    concatMap(() => writeBootstrap(epoch)),
+                // A queue turn lets the current epoch synchronously cancel an in-flight update.js write in response
+                // to build-started before this complete build can touch the same physical files.
+                scheduled([undefined], queueScheduler).pipe(
+                    concatMap(() => completeBuild(request)),
+                    ignoreElements(),
+                    endWith(undefined),
+                    concatMap(() => writeBootstrap(epoch).pipe(ignoreElements(), endWith(undefined))),
                     map((): BuildEvent => ({ epoch, kind: 'build-ready' })),
                     catchError((error: unknown) => of<BuildEvent>({ error, kind: 'build-failed', request }))
                 )

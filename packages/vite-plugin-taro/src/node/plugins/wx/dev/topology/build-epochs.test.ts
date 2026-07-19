@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { of, Subject, throwError } from 'rxjs'
+import { EMPTY, of, Subject, throwError } from 'rxjs'
 import { createBuildEvents$ } from './build-epochs.ts'
 import type { BuildEvent, BuildRequest } from './types.ts'
 
@@ -28,6 +28,9 @@ test('serializes complete builds and emits ready only after bootstrap materializ
     assert.equal(completions.length, 1)
 
     completions[0].next()
+    assert.deepEqual(events, [{ kind: 'build-started', request: request('build-1', 'initial') }])
+    assert.deepEqual(writes, [])
+
     completions[0].complete()
     assert.deepEqual(writes, ['build-1'])
     assert.deepEqual(events, [
@@ -41,6 +44,28 @@ test('serializes complete builds and emits ready only after bootstrap materializ
     completions[1].complete()
     assert.deepEqual(writes, ['build-1', 'build-2'])
     assert.deepEqual(events.at(-1), { epoch: { buildId: 'build-2' }, kind: 'build-ready' })
+
+    subscription.unsubscribe()
+})
+
+test('treats completion—not an arbitrary next value—as full-build and bootstrap success', () => {
+    const buildRequests$ = new Subject<BuildRequest>()
+    const events: BuildEvent[] = []
+    const subscription = createBuildEvents$({
+        buildRequests$,
+        completeBuild() {
+            return EMPTY
+        },
+        writeBootstrap() {
+            return EMPTY
+        }
+    }).subscribe((event) => events.push(event))
+
+    buildRequests$.next(request('build-1', 'initial'))
+    assert.deepEqual(events, [
+        { kind: 'build-started', request: request('build-1', 'initial') },
+        { epoch: { buildId: 'build-1' }, kind: 'build-ready' }
+    ])
 
     subscription.unsubscribe()
 })

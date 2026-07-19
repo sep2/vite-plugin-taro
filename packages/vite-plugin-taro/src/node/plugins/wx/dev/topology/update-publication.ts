@@ -1,4 +1,4 @@
-import { catchError, concatMap, filter, map, type Observable, of, take } from 'rxjs'
+import { catchError, concatMap, endWith, filter, ignoreElements, map, type Observable, of, take } from 'rxjs'
 import type {
     PatchHistory,
     UpdatePoll,
@@ -46,6 +46,8 @@ export function createUpdatePublications$({
                 take(1),
                 concatMap((publication) =>
                     writePublication(publication).pipe(
+                        ignoreElements(),
+                        endWith(undefined),
                         map((): UpdatePublicationResult => ({ kind: 'update-published', publication })),
                         catchError((error: unknown) =>
                             of<UpdatePublicationResult>({ error, kind: 'update-write-failed', publication })

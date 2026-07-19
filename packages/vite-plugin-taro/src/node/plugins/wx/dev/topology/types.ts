@@ -165,8 +165,17 @@ export type CompleteBuildEffect = (request: BuildRequest) => Observable<void>
  */
 export type WriteBootstrapEffect = (epoch: BuildEpoch) => Observable<void>
 
-/** Supplies safe patches for exactly one successful build epoch. */
+/**
+ * Supplies safe patches for exactly one successful build epoch.
+ *
+ * A source error becomes a `rolldown-full-reload` rebuild signal, so it cannot tear down the shared topology stream.
+ */
 export type SafePatchSource = (epoch: BuildEpoch) => Observable<SafePatch>
 
-/** Atomically writes one poll-selected range into hmr/update.js. */
+/**
+ * Atomically writes one poll-selected range into hmr/update.js.
+ *
+ * Unsubscription is a build boundary: the edge must ensure an unsubscribed write cannot later commit over the bootstrap
+ * or update file of a replacement epoch.
+ */
 export type WritePublicationEffect = (publication: UpdatePublication) => Observable<void>
