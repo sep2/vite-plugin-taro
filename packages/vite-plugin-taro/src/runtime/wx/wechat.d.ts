@@ -2,7 +2,22 @@
 type WeChatAppServiceGlobal = {}
 
 // This object is available everywhere, but no globalThis, window on WeChat Mini Program
-declare var global: WeChatAppServiceGlobal
+declare const global: WeChatAppServiceGlobal
+
+/** Minimal wx.request surface used by the DevRuntime; application API types remain owned by Taro/WeChat packages. */
+type WeChatRequestOptions = Readonly<{
+    url: string
+    method: 'POST'
+    data: unknown
+    header: Readonly<Record<string, string>>
+    success(result: unknown): void
+    complete(): void
+}>
+
+/** Native HTTP request API available in the Mini Program JavaScript environment. */
+declare const wx: {
+    request(options: WeChatRequestOptions): void
+}
 
 /** Registers the native WeChat Mini Program application. */
 declare function App(options: object): void
