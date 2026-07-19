@@ -85,11 +85,21 @@ test('DevHost lets the DevEngine write the initial project and keeps HMR patch-o
     }
 
     const loggerErrors: unknown[] = []
+    const loggerInfos: unknown[] = []
+    const httpServer = Object.assign(new EventEmitter(), {
+        listening: false,
+        address() {
+            return { address: '127.0.0.1', family: 'IPv4', port: 5174 }
+        }
+    })
     const server = {
         config: {
             root,
             publicDir,
             cacheDir: path.join(root, 'node_modules/.vite'),
+            server: {
+                origin: undefined
+            },
             build: {
                 outDir,
                 assetsDir: 'assets',
@@ -107,7 +117,9 @@ test('DevHost lets the DevEngine write the initial project and keeps HMR patch-o
                 }
             },
             logger: {
-                info() {},
+                info(message: unknown) {
+                    loggerInfos.push(message)
+                },
                 error(message: unknown) {
                     loggerErrors.push(message)
                 }
@@ -118,6 +130,8 @@ test('DevHost lets the DevEngine write the initial project and keeps HMR patch-o
                 bundledDev: bundledDevelopment
             }
         },
+        httpServer,
+        resolvedUrls: null,
         printUrls() {},
         watcher
     } as unknown as ViteDevServer
@@ -135,7 +149,7 @@ test('DevHost lets the DevEngine write the initial project and keeps HMR patch-o
         const outputOptions = rolldownOptions.output as OutputOptions
         assert.equal(devMode.lazy, false)
         assert.match(String(devMode.implement), /global\.__rolldown_runtime__/)
-        assert.match(String(devMode.implement), /vite-plugin-taro-wx/)
+        assert.match(String(devMode.implement), /Math\.random\(\)\.toString\(36\)/)
         assert.equal(outputOptions.entryFileNames, '[name]')
         const chunkFileNames = outputOptions.chunkFileNames
         if (typeof chunkFileNames !== 'function') throw new Error('Expected development chunk filename function.')
@@ -150,7 +164,7 @@ test('DevHost lets the DevEngine write the initial project and keeps HMR patch-o
         if (typeof banner !== 'function') throw new Error('Expected development banner function.')
         assert.equal(
             await banner({ fileName: 'app.js' } as never),
-            'const __rolldown_runtime__ = global.__rolldown_runtime__;\nrequire("./hmr/control.js");'
+            'const __rolldown_runtime__ = global.__rolldown_runtime__;\n__rolldown_runtime__.setHmrInfo(require("./hmr/info.js"));'
         )
         assert.equal(
             await banner({ fileName: 'pages/home/index.js' } as never),
@@ -163,12 +177,33 @@ test('DevHost lets the DevEngine write the initial project and keeps HMR patch-o
         const initialApp = await readFile(path.join(outDir, 'app.js'), 'utf8')
         assert.match(initialApp, /initial/)
         assert.match(initialApp, /__rolldown_runtime__/)
-        assert.match(initialApp, /vite-plugin-taro-wx/)
+        assert.match(initialApp, /Math\.random\(\)\.toString\(36\)/)
         assert.equal(await readFile(path.join(outDir, 'app.wxss'), 'utf8'), 'styles')
         assert.equal(await readFile(path.join(outDir, 'app.json'), 'utf8'), '{}\n')
         assert.equal(await readFile(path.join(outDir, 'public.txt'), 'utf8'), 'public')
-        assert.match(await readFile(path.join(outDir, 'hmr/control.js'), 'utf8'), /buildId/)
-        assert.equal(await readFile(path.join(outDir, 'hmr/update.js'), 'utf8'), 'module.exports = undefined;\n')
+        const hmrInfoPath = path.join(outDir, 'hmr/info.js')
+        const hmrUpdatePath = path.join(outDir, 'hmr/update.js')
+        await assert.rejects(readFile(hmrInfoPath, 'utf8'), { code: 'ENOENT' })
+        await assert.rejects(readFile(hmrUpdatePath, 'utf8'), { code: 'ENOENT' })
+        server.resolvedUrls = {
+            local: ['http://127.0.0.1:5174/'],
+            network: []
+        }
+        httpServer.emit('listening')
+        await waitFor(async () => {
+            try {
+                const hmrInfo = await readHmrInfo(hmrInfoPath)
+                return hmrInfo.endpoint === 'http://127.0.0.1:5174/__vite_plugin_taro_wx_hmr__'
+            } catch (error) {
+                if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return false
+                throw error
+            }
+        })
+        const hmrInfo = await readHmrInfo(hmrInfoPath)
+        assert.match(hmrInfo.buildId, /^[0-9a-f-]{36}$/)
+        assert.equal(hmrInfo.endpoint, 'http://127.0.0.1:5174/__vite_plugin_taro_wx_hmr__')
+        assert.ok(loggerInfos.some((message) => String(message).includes('WeChat DevTools: ./dist/wx')))
+        assert.equal(await readFile(hmrUpdatePath, 'utf8'), 'module.exports = undefined;\n')
         assert.equal(await bundledDevelopment.triggerBundleRegenerationIfStale(), false)
 
         // rebuildStrategy:'never' must make a normal watcher change patch-only. A stale bundle proves the HMR task ran;
@@ -215,6 +250,13 @@ async function closePlugin(plugin: Plugin): Promise<void> {
     if (!hook) return
     const handler = typeof hook === 'function' ? hook : hook.handler
     await handler.call({} as never)
+}
+
+async function readHmrInfo(filePath: string): Promise<{ buildId: string; endpoint: string }> {
+    const source = await readFile(filePath, 'utf8')
+    const match = source.match(/^module\.exports = Object\.freeze\((.+)\);$/m)
+    if (!match) throw new Error('Expected rendered HMR info.')
+    return JSON.parse(match[1])
 }
 
 async function waitFor(predicate: () => Promise<boolean>): Promise<void> {

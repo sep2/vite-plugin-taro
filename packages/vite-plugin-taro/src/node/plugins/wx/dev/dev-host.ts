@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -8,7 +9,8 @@ import type { ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { resolvePackageFile } from '../../../utils/packages.ts'
 import { SerializedTaskQueue } from '../../../utils/serialized-task-queue.ts'
-import { controlFileName, updateFileName } from './support.ts'
+import { createHmrInfo, hmrInfoFileName, renderHmrInfo } from './hmr-info.ts'
+import { hmrUpdateFileName, renderInitialHmrUpdate } from './hmr-update.ts'
 
 type BundledDevRolldownOptions = InputOptions & {
     output?: OutputOptions | OutputOptions[]
@@ -31,6 +33,9 @@ type BundledDev = {
 }
 
 type OutputAddon = string | ((chunk: { fileName: string }) => string | Promise<string>)
+
+// This path belongs to DevHost: it will both render the HMR URL and install the matching Vite middleware.
+const hmrRequestPath = '/__vite_plugin_taro_wx_hmr__'
 
 /**
  * Coordinates the one Vite environment, one Rolldown DevEngine, and one physical wx output directory.
@@ -93,15 +98,44 @@ export class DevHost {
         // place before Vite starts the client environment after configureServer hooks complete.
         this.installRolldownOptions()
         this.installDevEngine()
-        this.installDevToolsOutput()
         this.server.watcher.on('all', this.handleWatcherEvent)
+
+        if (this.server.httpServer?.listening) {
+            this.initializeHmrFiles()
+        } else {
+            this.server.httpServer?.once('listening', this.initializeHmrFiles)
+        }
     }
 
     async close(): Promise<void> {
+        this.server.httpServer?.off('listening', this.initializeHmrFiles)
         this.server.watcher.off('all', this.handleWatcherEvent)
         await this.fileTasks.waitForIdle()
         // Do not close the DevEngine here. Vite closes `_devEngine`, which invokes plugin closeBundle hooks including this
         // method; closing it here would recurse through the same lifecycle.
+    }
+
+    private readonly initializeHmrFiles = (): void => {
+        this.fileTasks.enqueue(async () => {
+            try {
+                const origin = this.server.resolvedUrls?.local[0]
+                if (!origin) {
+                    throw new Error('Vite did not resolve a local development URL for WX HMR.')
+                }
+
+                await Promise.all([
+                    writeHmrFile(
+                        this.outDir,
+                        hmrInfoFileName,
+                        renderHmrInfo(createHmrInfo(new URL(hmrRequestPath, origin).href))
+                    ),
+                    writeHmrFile(this.outDir, hmrUpdateFileName, renderInitialHmrUpdate())
+                ])
+                this.printDevToolsPath()
+            } catch (error) {
+                this.reportError('HMR file initialization', error)
+            }
+        })
     }
 
     /** Restores wx output semantics that Vite's bundled-development resolver replaces with browser defaults. */
@@ -156,6 +190,7 @@ export class DevHost {
             // lifecycle but omits that plugin, so append it to retain normal transform, render, and generated-file output
             // in the terminal while Rolldown writes the physical Mini Program.
             rolldownOptions.plugins = [rolldownOptions.plugins, createViteReporter(this.server)]
+
             disableViteOxcSourcemap(rolldownOptions.plugins)
 
             return rolldownOptions
@@ -218,17 +253,13 @@ export class DevHost {
         }
     }
 
-    /** Adds the physical Mini Program path directly beneath Vite's normal Local and Network URL output. */
-    private installDevToolsOutput(): void {
-        const printUrls = this.server.printUrls.bind(this.server)
-        this.server.printUrls = () => {
-            printUrls()
-            const relativeOutDir = path.relative(this.server.config.root, this.outDir).split(path.sep).join('/')
-            const devToolsPath = relativeOutDir ? `./${relativeOutDir}` : '.'
-            this.server.config.logger.info(
-                `  ${colors.green('➜')}  ${colors.bold(colors.cyan('WeChat DevTools:'))} ${colors.cyan(devToolsPath)}`
-            )
-        }
+    /** Prints the project location only after hmr/info.js exists with Vite's final listening URL. */
+    private printDevToolsPath(): void {
+        const relativeOutDir = path.relative(this.server.config.root, this.outDir).split(path.sep).join('/')
+        const devToolsPath = relativeOutDir ? `./${relativeOutDir}` : '.'
+        this.server.config.logger.info(
+            `  ${colors.green('➜')}  ${colors.bold(colors.cyan('WeChat DevTools:'))} ${colors.cyan(devToolsPath)}`
+        )
     }
 
     /** Maps only paths contained by publicDir into their identical relative location beneath outDir. */
@@ -307,6 +338,19 @@ async function syncPublicDirFiles(event: string, sourcePath: string, destination
     await fs.copyFile(sourcePath, destinationPath)
 }
 
+/** Atomically writes one DevHost-owned HMR file without involving Rolldown's normal output lifecycle. */
+async function writeHmrFile(outDir: string, fileName: string, source: string): Promise<void> {
+    const filePath = path.join(outDir, fileName)
+    const temporaryPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.${randomUUID()}.tmp`)
+    await fs.mkdir(path.dirname(filePath), { recursive: true })
+    try {
+        await fs.writeFile(temporaryPath, source)
+        await fs.rename(temporaryPath, filePath)
+    } finally {
+        await fs.rm(temporaryPath, { force: true })
+    }
+}
+
 // Rolldown's generated development modules reference this lexical binding. Native and SystemJS-rendered chunks cannot
 // import a browser HMR client, so every physical development chunk binds it to the one runtime installed on `global`.
 const rolldownRuntimeBinding = 'const __rolldown_runtime__ = global.__rolldown_runtime__;'
@@ -320,22 +364,27 @@ function createDevelopmentBanner(
         const configured =
             typeof configuredBanner === 'function' ? await configuredBanner(chunk) : (configuredBanner ?? '')
 
-        const development = createNativeDevelopmentDependency(chunk.fileName, pageFiles)
+        const hmrRequires = createHmrRequires(chunk.fileName, pageFiles)
 
-        return [configured, rolldownRuntimeBinding, development].filter(Boolean).join('\n')
+        return [configured, rolldownRuntimeBinding, hmrRequires].filter(Boolean).join('\n')
     }
 }
 
 /** Adds literal native dependencies whose paths are valid from the final physical entry location. */
-function createNativeDevelopmentDependency(fileName: string, pageFiles: ReadonlySet<string>): string {
-    // App synchronously establishes the build/session metadata before application capsules can execute.
-    if (fileName === 'app.js') return `require(${JSON.stringify(`./${controlFileName}`)});`
-    if (!pageFiles.has(fileName)) return ''
+function createHmrRequires(fileName: string, pageFiles: ReadonlySet<string>): string {
+    // App synchronously configures the already-installed runtime before application capsules can execute.
+    if (fileName === 'app.js') {
+        return `__rolldown_runtime__.setHmrInfo(require(${JSON.stringify(`./${hmrInfoFileName}`)}));`
+    }
 
-    // Page entries can be nested at arbitrary route depths. Derive the literal root-relative require from the rendered
-    // filename instead of assuming the conventional `pages/<route>/index.js` depth.
-    const root = '../'.repeat(fileName.split('/').length - 1)
-    return `require(${JSON.stringify(`${root}${updateFileName}`)});`
+    if (pageFiles.has(fileName)) {
+        // Page entries can be nested at arbitrary route depths. Derive the literal root-relative require from the rendered
+        // filename instead of assuming the conventional `pages/<route>/index.js` depth.
+        const root = '../'.repeat(fileName.split('/').length - 1)
+        return `require(${JSON.stringify(`${root}${hmrUpdateFileName}`)});`
+    }
+
+    return ''
 }
 
 /** Preserves configured naming functions while removing content hashes from their development results. */
