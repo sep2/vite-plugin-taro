@@ -38,7 +38,7 @@ type OutputAddon = string | ((chunk: { fileName: string }) => string | Promise<s
  * Vite continues to own configuration resolution and shutdown. This adapter owns only the DevEngine options, initial
  * physical output preparation, and public-directory synchronization required by WeChat DevTools.
  */
-export class HmrServer {
+export class DevHost {
     private readonly server: ViteDevServer
     private readonly bundledDev: BundledDev
 
@@ -356,7 +356,7 @@ function toStableFileName(fileName: string): string {
 
 // Vite forces its bundled-serve Oxc transform to generate maps even when final output maps are disabled. Its native
 // BuiltinPlugin keeps the constructor options on this private field until Rolldown consumes them, so disable that wasted
-// work at the same private boundary where HmrServer already replaces Vite's DevEngine startup.
+// work at the same private boundary where DevHost already replaces Vite's DevEngine startup.
 type ViteTransformPlugin = {
     name?: string
     _options?: {

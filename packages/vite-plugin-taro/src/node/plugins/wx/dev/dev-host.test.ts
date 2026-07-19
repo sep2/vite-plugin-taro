@@ -18,7 +18,7 @@ const options: VitePluginTaroOptions = {
     sitemapJson: {}
 }
 
-test('lets the DevEngine write the initial project and keeps HMR patch-only', async () => {
+test('DevHost lets the DevEngine write the initial project and keeps HMR patch-only', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'vite-plugin-taro-wx-dev-'))
     const outDir = path.join(root, 'dist/wx')
     const publicDir = path.join(root, 'public')
@@ -29,7 +29,7 @@ test('lets the DevEngine write the initial project and keeps HMR patch-only', as
     await writeFile(path.join(publicDir, 'public.txt'), 'public')
 
     const plugin = createWxDevelopmentPlugin(options)
-    // The production adapter needs only Vite's shared watcher for public files. Rolldown creates and owns the independent
+    // DevHost needs only Vite's shared watcher for public files. Rolldown creates and owns the independent
     // source watcher inside the DevEngine, so this fixture never emits source events manually.
     const watcher = Object.assign(new EventEmitter(), {
         add() {},
@@ -51,7 +51,7 @@ test('lets the DevEngine write the initial project and keeps HMR patch-only', as
             this.emitFile({ type: 'asset', fileName: 'app.json', source: '{}\n' })
         }
     }
-    // Model only the private Vite surface declared by hmr.ts. The original methods deliberately fail/return the
+    // Model only the private Vite surface declared by dev-host.ts. The original methods deliberately fail/return the
     // opposite result so the assertions prove that configureServer replaced them.
     const bundledDevelopment = {
         _devEngine: undefined as
@@ -183,7 +183,7 @@ test('lets the DevEngine write the initial project and keeps HMR patch-only', as
 
         assert.deepEqual(loggerErrors, [])
     } finally {
-        // Detach the adapter first, then emulate Vite's ownership of `_devEngine` by closing it separately.
+        // Detach DevHost first, then emulate Vite's ownership of `_devEngine` by closing it separately.
         await closePlugin(plugin)
         await bundledDevelopment._devEngine?.close()
         await rm(root, { recursive: true, force: true })

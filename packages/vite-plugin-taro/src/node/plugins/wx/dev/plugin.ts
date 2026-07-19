@@ -1,12 +1,12 @@
 import type { Plugin } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
-import { HmrServer } from './hmr-server.ts'
+import { DevHost } from './dev-host.ts'
 import { rewriteReactRefresh } from './react-refresh.ts'
 import { createHmrSupportFiles } from './support.ts'
 
 /** Adds the serve-only bundled-development adapter for the wx target. */
 export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugin {
-    let hmrServer: HmrServer | null = null
+    let devHost: DevHost | null = null
 
     return {
         name: 'vite-plugin-taro:wx-dev',
@@ -47,14 +47,14 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
             // asks bundledDev to create its hard-coded skip-write DevEngine.
             order: 'post',
             handler(server) {
-                hmrServer = new HmrServer(server, options)
+                devHost = new DevHost(server, options)
             }
         },
 
         closeBundle() {
             // The owned DevEngine is still closed by Vite. This hook only detaches public-file synchronization and waits
             // for already queued public writes, avoiding a recursive engine.close() from its own closeBundle lifecycle.
-            return hmrServer?.close()
+            return devHost?.close()
         }
     }
 }
