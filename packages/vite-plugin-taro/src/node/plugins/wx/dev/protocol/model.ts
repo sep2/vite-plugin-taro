@@ -7,7 +7,6 @@
 export type StartingState = Readonly<{
     /** Stable identity of this physical DevHost session. */
     buildId: string
-    /** Distinguishes this variant from all later lifecycle states. */
     phase: 'starting'
 }>
 
@@ -20,7 +19,6 @@ export type StartingState = Readonly<{
 export type AwaitingClientState = Readonly<{
     /** Stable identity of this physical DevHost session. */
     buildId: string
-    /** Distinguishes the idle, ready-for-registration lifecycle state. */
     phase: 'awaiting-client'
 }>
 
@@ -34,7 +32,6 @@ export type ActiveClientState = Readonly<{
     buildId: string
     /** Runtime-generated identity of the one heap allowed to receive HMR work. */
     clientId: string
-    /** Distinguishes the synchronized single-client lifecycle state. */
     phase: 'active'
 }>
 
@@ -48,7 +45,6 @@ export type RebuildingState = Readonly<{
     buildId: string
     /** Identity of the heap that caused this full rebuild. */
     nextClientId: string
-    /** Distinguishes the exclusive rebuild lifecycle state. */
     phase: 'rebuilding'
 }>
 
@@ -60,7 +56,6 @@ export type RebuildingState = Readonly<{
 export type StoppedState = Readonly<{
     /** Stable identity of the DevHost session that stopped. */
     buildId: string
-    /** Distinguishes the terminal lifecycle state. */
     phase: 'stopped'
 }>
 
@@ -80,21 +75,17 @@ export type DevProtocolState = StartingState | AwaitingClientState | ActiveClien
  */
 export type DevProtocolEvent =
     | Readonly<{
-          /** Signals successful initial physical output preparation. */
           type: 'ready'
       }>
     | Readonly<{
           /** Identifies the runtime heap attempting to become or remain active. */
           clientId: string
-          /** Signals a validated WX runtime registration. */
           type: 'client-connected'
       }>
     | Readonly<{
-          /** Signals that the currently requested full physical rebuild has completed. */
           type: 'rebuild-finished'
       }>
     | Readonly<{
-          /** Requests idempotent DevHost shutdown from any non-terminal lifecycle state. */
           type: 'stop'
       }>
 
@@ -108,11 +99,9 @@ export type DevProtocolCommand =
     | Readonly<{
           /** Identifies the heap for which the complete physical project must be regenerated. */
           clientId: string
-          /** Requests a non-HMR rebuild after a client replacement. */
           type: 'full-rebuild'
       }>
     | Readonly<{
-          /** Requests release of DevHost resources after the protocol reaches its terminal state. */
           type: 'close-session'
       }>
 
