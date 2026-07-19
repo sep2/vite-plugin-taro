@@ -4,7 +4,6 @@ export const hmrInfoFileName = 'hmr/info.js'
 export type HmrInfo = Readonly<{
     buildId: string
     endpoint: string
-    token: string
 }>
 
 /** Renders the App-loaded HMR metadata module. It must remain CommonJS because native app.js loads it synchronously. */
