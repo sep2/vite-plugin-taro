@@ -49,8 +49,8 @@ export async function createDevHost(
     // recoverable DevHost background work: public-file synchronization and one-time HMR-file publication.
     const taskQueue = new SerializedTaskQueue(reportError)
 
-    // The adapter replaces bundledDev.getRolldownOptions() and bundledDev.listen(). Install both before Vite starts the
-    // client environment after configureServer hooks complete.
+    // The adapter replaces bundledDev.getRolldownOptions() and bundledDev.listen().
+    // Install both before Vite starts the client environment after configureServer hooks complete.
     const bundledDev = createBundledDevSession({
         server,
         pageFiles,

@@ -50,6 +50,7 @@ export function createBundledDevSession({
     reportError(operation: string, error: unknown): void
 }): BundledDevSession {
     const bundledDev = getBundledDev(server)
+
     installRolldownOptions()
     installDevEngine()
 
@@ -138,6 +139,7 @@ export function createBundledDevSession({
             // ensureCurrentBuildFinish() can resolve before the JavaScript onOutput callback has run. Use the callback as
             // the startup barrier because incremental_write() has completed its physical writes before invoking it.
             const initialOutput = Promise.withResolvers<void>()
+
             const engine = await dev(rolldownOptions, outputOptions, {
                 // Ordinary watcher changes become Hmr tasks, not HmrRebuild tasks. Consequently they compute patches but
                 // never enter incremental_write(). Recovery/full-build operations remain able to write intentionally.
@@ -166,10 +168,12 @@ export function createBundledDevSession({
 
             // Publish the engine before run() so Vite's close lifecycle and future private callers see the same instance.
             bundledDev._devEngine = engine
+
             void engine.run().catch((error: unknown) => {
                 reportError('DevEngine', error)
                 initialOutput.reject(error)
             })
+
             await initialOutput.promise
         }
     }
