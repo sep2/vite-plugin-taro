@@ -1,11 +1,16 @@
-/** Runs asynchronous tasks in insertion order. A rejected task stops the queue unless the task handles it. */
+/** Runs recoverable background tasks in insertion order and reports failures without blocking later work. */
 export class SerializedTaskQueue {
     private tail: Promise<void> = Promise.resolve()
+    private readonly reportError: (operation: string, error: unknown) => void
 
-    enqueue(task: () => Promise<void>): Promise<void> {
-        const work = this.tail.then(task)
-        this.tail = work
-        return work
+    constructor(reportError: (operation: string, error: unknown) => void) {
+        this.reportError = reportError
+    }
+
+    enqueue(operation: string, task: () => Promise<void>): void {
+        this.tail = this.tail.then(task).catch((error) => {
+            this.reportError(operation, error)
+        })
     }
 
     /** Waits for every task that was queued when this method was called. */

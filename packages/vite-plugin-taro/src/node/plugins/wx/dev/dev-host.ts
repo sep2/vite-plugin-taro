@@ -33,24 +33,21 @@ export async function createDevHost(
     // shared chunks must not receive it because only native Page evaluation is observable by WeChat DevTools.
     const pageFiles = new Set(options.pages.map((page) => `${page.path}.js`))
 
-    // Rolldown-generated bundle output bypasses this queue and writes directly to disk. The queue orders DevHost-owned
-    // initial directory preparation, public-file events, and one-time HMR-file publication against each other.
-    const taskQueue = new SerializedTaskQueue()
-
     function reportError(operation: string, error: unknown): void {
         const normalizedError = error instanceof Error ? error : new Error(String(error))
         server.config.logger.error(`[vite-plugin-taro] wx ${operation} failed`, { error: normalizedError })
     }
 
-    // Seed and await mandatory output preparation. A cleanup or initial public-directory-copy failure aborts DevHost
-    // creation, so Vite cannot start the DevEngine against a partially prepared physical project.
-    await taskQueue.enqueue(() =>
-        initializePublicDirOutput({
-            outDir,
-            publicDir: server.config.publicDir || '',
-            emptyOutDir: server.config.build.emptyOutDir !== false
-        })
-    )
+    // Initial output preparation is fatal. Complete it before creating any background task source or DevEngine adapter.
+    await initializePublicDirOutput({
+        outDir,
+        publicDir: server.config.publicDir || '',
+        emptyOutDir: server.config.build.emptyOutDir !== false
+    })
+
+    // Rolldown-generated bundle output bypasses this queue and writes directly to disk. This queue serializes only
+    // recoverable DevHost background work: public-file synchronization and one-time HMR-file publication.
+    const taskQueue = new SerializedTaskQueue(reportError)
 
     // The adapter replaces bundledDev.getRolldownOptions() and bundledDev.listen(). Install both before Vite starts the
     // client environment after configureServer hooks complete.
@@ -72,8 +69,7 @@ export async function createDevHost(
         watcher: server.watcher,
         outDir,
         publicDir: server.config.publicDir,
-        taskQueue,
-        reportError: (error) => reportError('public file sync', error)
+        taskQueue
     })
 
     return {
@@ -153,29 +149,25 @@ function setupHttpHandler({
     // The communication channel between DevHost and DevRuntime
     const hmrRequestPath = '/__vpt_hmr__'
 
-    const publish = async (): Promise<void> => {
-        await taskQueue.enqueue(async () => {
-            try {
-                const origin = server.resolvedUrls?.local[0]
-                if (!origin) {
-                    throw new Error('Vite did not resolve a development URL.')
-                }
-
-                const hmrInfo = createHmrInfo(new URL(hmrRequestPath, origin).href)
-                await Promise.all([
-                    writeHmrFile(outDir, hmrInfoFileName, renderHmrInfo(hmrInfo)),
-                    writeHmrFile(outDir, hmrUpdateFileName, renderInitialHmrUpdate())
-                ])
-
-                // The endpoint is installed only after both files exist.
-                server.middlewares.use(hmrRequestPath, async (request, response) => {
-                    await registerHmrModules(hmrInfo, request, response)
-                })
-
-                printDevToolsPath()
-            } catch (error) {
-                reportError('HMR file initialization', error)
+    const publish = (): void => {
+        taskQueue.enqueue('HMR file initialization', async () => {
+            const origin = server.resolvedUrls?.local[0]
+            if (!origin) {
+                throw new Error('Vite did not resolve a development URL.')
             }
+
+            const hmrInfo = createHmrInfo(new URL(hmrRequestPath, origin).href)
+            await Promise.all([
+                writeHmrFile(outDir, hmrInfoFileName, renderHmrInfo(hmrInfo)),
+                writeHmrFile(outDir, hmrUpdateFileName, renderInitialHmrUpdate())
+            ])
+
+            // The endpoint is installed only after both files exist.
+            server.middlewares.use(hmrRequestPath, async (request, response) => {
+                await registerHmrModules(hmrInfo, request, response)
+            })
+
+            printDevToolsPath()
         })
     }
 
