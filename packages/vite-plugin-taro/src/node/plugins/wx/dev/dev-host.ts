@@ -63,10 +63,10 @@ export async function createDevHost(
         reportError
     })
 
-    const closeHmr = createHmr({
+    const uninstallHttpHandler = setupHttpHandler({
         server,
         outDir,
-        taskQueue: taskQueue,
+        taskQueue,
         registerModules: bundledDev.registerModules,
         reportError
     })
@@ -81,7 +81,7 @@ export async function createDevHost(
 
     return {
         async close(): Promise<void> {
-            closeHmr()
+            uninstallHttpHandler()
             closePublicDirWatcher()
             await taskQueue.waitForIdle()
             // Do not close the DevEngine here. Vite closes the engine published by bundled-dev.ts, whose closeBundle hook
@@ -96,7 +96,7 @@ export async function createDevHost(
  * Its explicit arguments are the only capabilities it needs from DevHost: Vite's server, physical output serialization,
  * the bundled DevEngine registration operation, and shared error reporting.
  */
-function createHmr({
+function setupHttpHandler({
     server,
     outDir,
     taskQueue,
@@ -187,6 +187,7 @@ function createHmr({
     // Vite runs configureServer before binding HTTP. Publish App/Page-required HMR files and install their endpoint only
     // after listening exposes the final address; DevTools is told the path afterward.
     httpServer.once('listening', publish)
+
     return () => {
         httpServer.off('listening', publish)
     }
