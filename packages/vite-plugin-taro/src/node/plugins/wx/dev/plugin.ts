@@ -1,11 +1,11 @@
 import type { Plugin } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
-import { DevHost } from './dev-host.ts'
+import { createDevHost } from './dev-host.ts'
 import { rewriteReactRefresh } from './react-refresh.ts'
 
 /** Adds the serve-only bundled-development adapter for the wx target. */
 export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugin {
-    let devHost: DevHost | null = null
+    let devHost: { close(): Promise<void> } | null = null
 
     return {
         name: 'vite-plugin-taro:wx-dev',
@@ -39,8 +39,8 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
             // Install after Vite and user plugins have finished configuring the environment, but before server.listen()
             // asks bundledDev to create its hard-coded skip-write DevEngine.
             order: 'post',
-            handler(server) {
-                devHost = new DevHost(server, options)
+            async handler(server) {
+                devHost = await createDevHost(server, options)
             }
         },
 

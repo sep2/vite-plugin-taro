@@ -91,7 +91,9 @@ test('DevHost lets the DevEngine write the initial project and keeps HMR patch-o
     let hmrMiddleware: ((request: IncomingMessage, response: ServerResponse) => void) | undefined
     const middlewares = {
         use(pathname: string, handler: (request: IncomingMessage, response: ServerResponse) => void) {
-            if (pathname === '/__vite_plugin_taro_wx_hmr__') hmrMiddleware = handler
+            if (pathname === '/__wx_hmr__') {
+                hmrMiddleware = handler
+            }
         }
     }
     const httpServer = Object.assign(new EventEmitter(), {
@@ -206,7 +208,7 @@ test('DevHost lets the DevEngine write the initial project and keeps HMR patch-o
         await waitFor(async () => {
             try {
                 const hmrInfo = await readHmrInfo(hmrInfoPath)
-                return hmrInfo.endpoint === 'http://127.0.0.1:5174/__vite_plugin_taro_wx_hmr__'
+                return hmrInfo.endpoint === 'http://127.0.0.1:5174/__wx_hmr__'
             } catch (error) {
                 if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
                     return false
@@ -216,7 +218,7 @@ test('DevHost lets the DevEngine write the initial project and keeps HMR patch-o
         })
         const hmrInfo = await readHmrInfo(hmrInfoPath)
         assert.match(hmrInfo.buildId, /^[0-9a-f-]{36}$/)
-        assert.equal(hmrInfo.endpoint, 'http://127.0.0.1:5174/__vite_plugin_taro_wx_hmr__')
+        assert.equal(hmrInfo.endpoint, 'http://127.0.0.1:5174/__wx_hmr__')
         assert.ok(loggerInfos.some((message) => String(message).includes('WeChat DevTools: ./dist/wx')))
         assert.equal(await readFile(hmrUpdatePath, 'utf8'), 'module.exports = undefined;\n')
 
