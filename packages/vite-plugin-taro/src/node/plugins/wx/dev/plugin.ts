@@ -1,7 +1,6 @@
 import type { Plugin } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
-import { createDevHost } from './dev-host.ts'
-import { rewriteReactRefresh } from './react-refresh.ts'
+import { createDevHost } from './legacy-dev-host.ts'
 
 /** Adds the serve-only bundled-development adapter for the wx target. */
 export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugin {
@@ -31,7 +30,7 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
             // React's Vite plugin has already injected its browser-oriented Refresh wrapper at this point. Rewrite only
             // those generated runtime references; user-authored window access remains untouched.
             handler(code, id) {
-                return rewriteReactRefresh(code, id, false)
+                // return rewriteReactRefresh(code, id, false)
             }
         },
 

@@ -5,7 +5,7 @@ import path from 'node:path'
 import test from 'node:test'
 import type { OutputOptions, Plugin as RolldownPlugin } from 'rolldown'
 import type { ViteDevServer } from 'vite'
-import { createBundledDevSession } from './bundled-dev.ts'
+import { createBundledDevSession } from './legacy-bundled-dev.ts'
 
 test('replaces Vite bundled development with a physical wx DevEngine session', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'vite-plugin-taro-wx-bundled-dev-'))

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { rewriteReactRefresh } from './react-refresh.ts'
+import { rewriteReactRefresh } from './legacy-react-refresh.ts'
 
 test('keeps React Refresh extension state private to its runtime module', async () => {
     const transformed = rewriteReactRefresh(

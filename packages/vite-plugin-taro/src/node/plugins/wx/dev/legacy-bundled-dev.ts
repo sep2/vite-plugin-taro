@@ -4,8 +4,8 @@ import type { InputOptions, OutputOptions } from 'rolldown'
 import { type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
 import { resolvePackageFile } from '../../../utils/packages.ts'
-import { hmrInfoFileName } from './hmr-info.ts'
-import { hmrUpdateFileName } from './hmr-update.ts'
+import { hmrInfoFileName } from './legacy-hmr-info.ts'
+import { hmrUpdateFileName } from './legacy-hmr-update.ts'
 
 type BundledDevRolldownOptions = InputOptions & {
     output?: OutputOptions | OutputOptions[]
@@ -16,7 +16,7 @@ type BundledDevRolldownOptions = InputOptions & {
 }
 
 /** The deliberately small Vite 8.1 private surface used by the wx adapter. */
-type BundledDev = {
+type LegacyBundledDev = {
     // Vite's close lifecycle reads this field, so the owned engine must be published back to the original instance.
     _devEngine?: DevEngine
     // This is still the authoritative way to obtain Vite's fully resolved plugin and optimizer configuration.
@@ -275,8 +275,8 @@ function createViteReporter(server: ViteDevServer) {
     })
 }
 
-function getBundledDev(server: ViteDevServer): BundledDev {
-    const bundledDev = server.environments.client.bundledDev as unknown as BundledDev | undefined
+function getBundledDev(server: ViteDevServer): LegacyBundledDev {
+    const bundledDev = server.environments.client.bundledDev as unknown as LegacyBundledDev | undefined
     if (!bundledDev) {
         throw new Error('Vite did not create the wx bundled-development environment.')
     }
