@@ -10,7 +10,9 @@ type WeChatRequestOptions = Readonly<{
     method: 'POST'
     data: unknown
     header: Readonly<Record<string, string>>
+    timeout?: number
     success(result: unknown): void
+    fail(error: unknown): void
     complete(): void
 }>
 
