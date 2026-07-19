@@ -1,42 +1,36 @@
-import { catchError, concatMap, endWith, filter, ignoreElements, map, type Observable, of, take } from 'rxjs'
-import type {
-    PatchHistory,
-    UpdatePoll,
-    UpdatePublication,
-    UpdatePublicationResult,
-    WritePublicationEffect
-} from './types.ts'
+import { concatMap, filter, ignoreElements, map, merge, type Observable, of, take } from 'rxjs'
+import type { PatchHistory, UpdatePoll, UpdatePublication, UpdateWriteResult, WriteUpdateCommand } from './types.ts'
 
 /**
- * Materializes retained patches only in response to an accepted runtime poll.
+ * Selects and serializes physical update commands from accepted polls and retained history.
  *
  * ```text
  * retained history ────────────────┐
  *                                  ▼
- * accepted poll(applied version) → select missing contiguous range → physical update.js
- *                                                                       │
- * WX page rerun ← executes range ←─────────────────────────────────────┘
+ * accepted poll(applied version) → missing range → write-update command → wait for write-result fact
+ *                                                                            │
+ * next poll may retry an unchanged applied version after either result ──────┘
  * ```
  *
- * DevEngine patches are intentionally absent. A poll at the current version waits for later history; an older poll
- * republishes its missing range with a new physical publication identity. Version desynchronization is detected and
- * terminates the enclosing session before it reaches this function.
+ * A current-version poll waits for later history. Repeating an older version emits a new publication identity for the
+ * same missing range. Waiting for each result prevents overlapping physical writes without invoking the writer here. The
+ * result listener is established before its command is exposed, so synchronous edge feedback is not lost.
  */
-export function createUpdatePublications$({
+export function createUpdateCommands$({
     buildId,
     history$,
     polls$,
-    writePublication
+    updateWriteResults$
 }: {
-    /** Active epoch identity embedded in every physical update projection. */
+    /** Active build identity embedded in every publication. */
     buildId: string
     /** Replayed append-only patch history scoped to the active epoch. */
     history$: Observable<PatchHistory>
-    /** Polls already accepted for the active WX heap. */
+    /** Polls already accepted for the active WX heap and validated against history. */
     polls$: Observable<UpdatePoll>
-    /** Atomic physical update.js writer edge. */
-    writePublication: WritePublicationEffect
-}): Observable<UpdatePublicationResult> {
+    /** Result facts that release serialized update-command processing. */
+    updateWriteResults$: Observable<UpdateWriteResult>
+}): Observable<WriteUpdateCommand> {
     return polls$.pipe(
         filter((poll) => poll.buildId === buildId),
         concatMap((poll, index) =>
@@ -45,13 +39,17 @@ export function createUpdatePublications$({
                 filter((publication): publication is UpdatePublication => publication !== undefined),
                 take(1),
                 concatMap((publication) =>
-                    writePublication(publication).pipe(
-                        ignoreElements(),
-                        endWith(undefined),
-                        map((): UpdatePublicationResult => ({ kind: 'update-published', publication })),
-                        catchError((error: unknown) =>
-                            of<UpdatePublicationResult>({ error, kind: 'update-write-failed', publication })
-                        )
+                    merge(
+                        updateWriteResults$.pipe(
+                            filter(
+                                (result) =>
+                                    result.buildId === publication.buildId &&
+                                    result.publicationId === publication.publicationId
+                            ),
+                            take(1),
+                            ignoreElements()
+                        ),
+                        of<WriteUpdateCommand>({ kind: 'write-update', publication })
                     )
                 )
             )

@@ -1,50 +1,37 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { EMPTY, of, ReplaySubject, Subject, throwError } from 'rxjs'
-import type { PatchHistory, UpdatePoll, UpdatePublication, UpdatePublicationResult } from './types.ts'
-import { createUpdatePublications$ } from './update-publication.ts'
+import { ReplaySubject, Subject } from 'rxjs'
+import type { PatchHistory, UpdatePoll, UpdateWriteResult, WriteUpdateCommand } from './types.ts'
+import { createUpdateCommands$ } from './update-publication.ts'
 
-test('publishes a missing retained range only after an accepted runtime poll', () => {
+test('emits missing-range commands only after polls and serializes them by write results', () => {
     const history$ = new ReplaySubject<PatchHistory>(1)
     const polls$ = new Subject<UpdatePoll>()
-    const writes: UpdatePublication[] = []
-    const results: UpdatePublicationResult[] = []
-    const subscription = createUpdatePublications$({
+    const updateWriteResults$ = new Subject<UpdateWriteResult>()
+    const commands: WriteUpdateCommand[] = []
+    const subscription = createUpdateCommands$({
         buildId: 'build-1',
         history$,
         polls$,
-        writePublication(publication) {
-            writes.push(publication)
-            return of(undefined)
-        }
-    }).subscribe((result) => results.push(result))
+        updateWriteResults$
+    }).subscribe((command) => commands.push(command))
 
     history$.next({ patches: [] })
-    assert.equal(writes.length, 0)
-
     polls$.next(poll(0))
-    assert.equal(writes.length, 0)
+    assert.equal(commands.length, 0)
 
     history$.next({ patches: [{ patch: { code: 'first', fileName: 'src/first.ts' }, version: 1 }] })
-    assert.deepEqual(
-        writes.map(({ publicationId }) => publicationId),
-        [1]
-    )
-    assert.deepEqual(
-        writes[0].patches.map(({ version }) => version),
-        [1]
-    )
+    assert.deepEqual(publicationIds(commands), [1])
+    assert.deepEqual(versions(commands[0]), [1])
 
     polls$.next(poll(0))
-    assert.deepEqual(
-        writes.map(({ publicationId }) => publicationId),
-        [1, 2]
-    )
-    assert.deepEqual(
-        writes[1].patches.map(({ version }) => version),
-        [1]
-    )
+    assert.deepEqual(publicationIds(commands), [1])
 
+    updateWriteResults$.next({ buildId: 'build-1', ok: true, publicationId: 1 })
+    assert.deepEqual(publicationIds(commands), [1, 2])
+    assert.deepEqual(versions(commands[1]), [1])
+
+    updateWriteResults$.next({ buildId: 'build-1', ok: true, publicationId: 2 })
     history$.next({
         patches: [
             { patch: { code: 'first', fileName: 'src/first.ts' }, version: 1 },
@@ -52,119 +39,97 @@ test('publishes a missing retained range only after an accepted runtime poll', (
         ]
     })
     polls$.next(poll(1))
-    assert.deepEqual(
-        writes.map(({ publicationId }) => publicationId),
-        [1, 2, 3]
-    )
-    assert.deepEqual(
-        writes[2].patches.map(({ version }) => version),
-        [2]
-    )
-    assert.deepEqual(
-        results.map(({ kind }) => kind),
-        ['update-published', 'update-published', 'update-published']
-    )
+    assert.deepEqual(publicationIds(commands), [1, 2, 3])
+    assert.deepEqual(versions(commands[2]), [2])
 
     subscription.unsubscribe()
 })
 
-test('reports a write failure and lets a later poll retry without terminating publication', () => {
+test('a failed write result releases the next poll to retry without a timer', () => {
     const history$ = new ReplaySubject<PatchHistory>(1)
     const polls$ = new Subject<UpdatePoll>()
-    const results: UpdatePublicationResult[] = []
-    let attempts = 0
-    const subscription = createUpdatePublications$({
+    const updateWriteResults$ = new Subject<UpdateWriteResult>()
+    const commands: WriteUpdateCommand[] = []
+    const subscription = createUpdateCommands$({
         buildId: 'build-1',
         history$,
         polls$,
-        writePublication() {
-            attempts += 1
-            return attempts === 1 ? throwError(() => new Error('disk unavailable')) : EMPTY
-        }
-    }).subscribe((result) => results.push(result))
+        updateWriteResults$
+    }).subscribe((command) => commands.push(command))
 
     history$.next({ patches: [{ patch: { code: 'first', fileName: 'src/first.ts' }, version: 1 }] })
     polls$.next(poll(0))
     polls$.next(poll(0))
-
-    assert.equal(attempts, 2)
-    assert.deepEqual(
-        results.map(({ kind }) => kind),
-        ['update-write-failed', 'update-published']
-    )
-
-    subscription.unsubscribe()
-})
-
-test('serializes physical writes when polls arrive faster than the writer completes', () => {
-    const history$ = new ReplaySubject<PatchHistory>(1)
-    const polls$ = new Subject<UpdatePoll>()
-    const writes: UpdatePublication[] = []
-    const completions: Subject<void>[] = []
-    const subscription = createUpdatePublications$({
+    updateWriteResults$.next({
         buildId: 'build-1',
-        history$,
-        polls$,
-        writePublication(publication) {
-            writes.push(publication)
-            const completion = new Subject<void>()
-            completions.push(completion)
-            return completion
-        }
-    }).subscribe()
-
-    history$.next({
-        patches: [
-            { patch: { code: 'first', fileName: 'src/first.ts' }, version: 1 },
-            { patch: { code: 'second', fileName: 'src/second.ts' }, version: 2 }
-        ]
+        error: new Error('disk unavailable'),
+        ok: false,
+        publicationId: 1
     })
-    polls$.next(poll(0))
-    polls$.next(poll(1))
 
-    assert.deepEqual(
-        writes.map(({ publicationId, patches }) => [publicationId, patches.map(({ version }) => version)]),
-        [[1, [1, 2]]]
-    )
-
-    completions[0].next()
-    assert.equal(writes.length, 1)
-    completions[0].complete()
-    assert.deepEqual(
-        writes.map(({ publicationId, patches }) => [publicationId, patches.map(({ version }) => version)]),
-        [
-            [1, [1, 2]],
-            [2, [2]]
-        ]
-    )
-
-    completions[1].complete()
+    assert.deepEqual(publicationIds(commands), [1, 2])
     subscription.unsubscribe()
 })
 
-test('ignores polls for another build and accepts completion-only writers', () => {
+test('captures synchronous write feedback produced while commands are consumed', () => {
     const history$ = new ReplaySubject<PatchHistory>(1)
     const polls$ = new Subject<UpdatePoll>()
-    const results: UpdatePublicationResult[] = []
-    const subscription = createUpdatePublications$({
+    const updateWriteResults$ = new Subject<UpdateWriteResult>()
+    const commands: WriteUpdateCommand[] = []
+    const subscription = createUpdateCommands$({
         buildId: 'build-1',
         history$,
         polls$,
-        writePublication() {
-            return EMPTY
-        }
-    }).subscribe((result) => results.push(result))
+        updateWriteResults$
+    }).subscribe((command) => {
+        commands.push(command)
+        updateWriteResults$.next({
+            buildId: command.publication.buildId,
+            ok: true,
+            publicationId: command.publication.publicationId
+        })
+    })
 
     history$.next({ patches: [{ patch: { code: 'first', fileName: 'src/first.ts' }, version: 1 }] })
-    polls$.next({ appliedVersion: 0, buildId: 'other-build', clientId: 'client-a' })
+    polls$.next(poll(0))
     polls$.next(poll(0))
 
-    assert.deepEqual(
-        results.map(({ kind }) => kind),
-        ['update-published']
-    )
+    assert.deepEqual(publicationIds(commands), [1, 2])
     subscription.unsubscribe()
 })
+
+test('ignores write results that do not identify the active publication', () => {
+    const history$ = new ReplaySubject<PatchHistory>(1)
+    const polls$ = new Subject<UpdatePoll>()
+    const updateWriteResults$ = new Subject<UpdateWriteResult>()
+    const commands: WriteUpdateCommand[] = []
+    const subscription = createUpdateCommands$({
+        buildId: 'build-1',
+        history$,
+        polls$,
+        updateWriteResults$
+    }).subscribe((command) => commands.push(command))
+
+    history$.next({ patches: [{ patch: { code: 'first', fileName: 'src/first.ts' }, version: 1 }] })
+    polls$.next(poll(0))
+    polls$.next(poll(0))
+    updateWriteResults$.next({ buildId: 'stale', ok: true, publicationId: 1 })
+    updateWriteResults$.next({ buildId: 'build-1', ok: true, publicationId: 99 })
+    assert.equal(commands.length, 1)
+
+    updateWriteResults$.next({ buildId: 'build-1', ok: true, publicationId: 1 })
+    assert.equal(commands.length, 2)
+
+    subscription.unsubscribe()
+})
+
+function publicationIds(commands: readonly WriteUpdateCommand[]) {
+    return commands.map(({ publication }) => publication.publicationId)
+}
+
+function versions(command: WriteUpdateCommand) {
+    return command.publication.patches.map(({ version }) => version)
+}
 
 function poll(appliedVersion: number): UpdatePoll {
     return { appliedVersion, buildId: 'build-1', clientId: 'client-a' }

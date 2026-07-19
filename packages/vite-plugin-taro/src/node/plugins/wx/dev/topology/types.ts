@@ -1,19 +1,16 @@
 import type { Observable } from 'rxjs'
 
 /**
- * High-level HMR topology:
+ * Pure WX HMR topology:
  *
  * ```text
- * build request → complete build epoch → retained patch history
- *                                           ▲          │
- *                                           │          │ missing range
- * WX runtime ← physical update.js ← publication from poll(applied version)
- *      │                                                               │
- *      └──────────── next poll(new applied version) ──────────────────┘
+ * facts ──> topology ──> commands ──> edge consumers
+ *   ▲                                      │
+ *   └──────────── operation results ───────┘
  * ```
  *
- * Safe DevEngine patches only extend the epoch-scoped history. A runtime poll is the only event that materializes
- * update.js. A complete-build or local rebuild boundary immediately ends the current epoch scope.
+ * The topology owns ordering, epoch lifetime, client ownership, retained history, and missing-range selection. It never
+ * invokes DevEngine, HTTP, filesystem, ID generation, or any other effect.
  */
 
 /** Why the DevHost must create a fresh complete physical WX baseline. */
@@ -34,32 +31,36 @@ export type BuildRequest = Readonly<{
     reason: BuildReason
 }>
 
-/** A successful complete physical baseline ready for runtime control and HMR history. */
+/** A successful physical baseline whose bootstrap materialization also completed. */
 export type BuildEpoch = Readonly<{
-    /** Identity shared by this baseline, its patch history, and runtime control. */
     buildId: string
 }>
 
-/** One complete-build event. */
-export type BuildEvent =
+/** Result fact produced by the complete-build edge. */
+export type CompleteBuildResult =
     | Readonly<{
-          /** Complete physical build effect has begun; the previous epoch is no longer safe to use. */
-          kind: 'build-started'
-          request: BuildRequest
+          buildId: string
+          ok: true
       }>
     | Readonly<{
-          /** Complete output and bootstrap files are ready for runtime control. */
-          epoch: BuildEpoch
-          kind: 'build-ready'
-      }>
-    | Readonly<{
-          /** Complete build or bootstrap materialization failed without producing an epoch. */
+          buildId: string
           error: unknown
-          kind: 'build-failed'
-          request: BuildRequest
+          ok: false
       }>
 
-/** A safe executable patch emitted by DevEngine for one active build epoch. */
+/** Result fact produced by the bootstrap writer edge. */
+export type BootstrapWriteResult =
+    | Readonly<{
+          buildId: string
+          ok: true
+      }>
+    | Readonly<{
+          buildId: string
+          error: unknown
+          ok: false
+      }>
+
+/** A safe executable patch emitted as a fact by the DevEngine edge. */
 export type SafePatch = Readonly<{
     /** JavaScript patch body emitted by Rolldown. */
     code: string
@@ -71,26 +72,25 @@ export type SafePatch = Readonly<{
     sourcemapFileName?: string
 }>
 
-/** A safe patch after append-only history assigns its version. */
-export type RetainedPatch = Readonly<{
-    /** Immutable DevEngine patch content. */
+/** One safe-patch fact correlated to the physical baseline that produced it. */
+export type SafePatchFact = Readonly<{
+    buildId: string
     patch: SafePatch
-    /** Monotonic version within the current build epoch. */
+}>
+
+/** A safe patch after append-only history assigns its epoch-local version. */
+export type RetainedPatch = Readonly<{
+    patch: SafePatch
     version: number
 }>
 
-/**
- * Append-only retained patch history for the current epoch.
- *
- * Its build identity is lexical: the stream exists only inside one `BuildEpoch`, so duplicating an ID here would create
- * an invalid state the topology cannot actually produce.
- */
+/** Append-only retained patch history for one lexical build epoch. */
 export type PatchHistory = Readonly<{
     /** Ordered patch prefix beginning at version one. */
     patches: readonly RetainedPatch[]
 }>
 
-/** One control-channel report from the WX runtime. */
+/** One control-channel fact reported by a WX runtime. */
 export type UpdatePoll = Readonly<{
     /** Build identity read from hmr/info.js. */
     buildId: string
@@ -100,7 +100,7 @@ export type UpdatePoll = Readonly<{
     appliedVersion: number
 }>
 
-/** One poll-driven physical projection of a missing contiguous patch range. */
+/** One physical projection of a contiguous missing patch range. */
 export type UpdatePublication = Readonly<{
     /** Build baseline allowed to execute this update. */
     buildId: string
@@ -112,70 +112,66 @@ export type UpdatePublication = Readonly<{
     publicationId: number
 }>
 
-/** Result of attempting one atomic physical update.js materialization. */
-export type UpdatePublicationResult =
+/** Result fact produced by the atomic update.js writer edge. */
+export type UpdateWriteResult =
     | Readonly<{
-          /** Physical update.js was written and is ready for the WX page rerun. */
-          kind: 'update-published'
-          publication: UpdatePublication
+          buildId: string
+          ok: true
+          publicationId: number
       }>
     | Readonly<{
-          /** The writer failed; the next runtime poll can retry without a timer. */
+          buildId: string
           error: unknown
-          kind: 'update-write-failed'
-          publication: UpdatePublication
+          ok: false
+          publicationId: number
       }>
 
+/** Runs one complete physical DevEngine build. */
+export type RunBuildCommand = Readonly<{
+    kind: 'run-build'
+    request: BuildRequest
+}>
+
+/** Materializes hmr/info.js and inert hmr/update.js after complete output exists. */
+export type WriteBootstrapCommand = Readonly<{
+    epoch: BuildEpoch
+    kind: 'write-bootstrap'
+}>
+
+/** Atomically materializes one poll-selected range into physical hmr/update.js. */
+export type WriteUpdateCommand = Readonly<{
+    kind: 'write-update'
+    publication: UpdatePublication
+}>
+
 /**
- * A local condition that has already stopped the active epoch and needs a fresh edge-created `BuildRequest`.
+ * Requests a fresh build identity and `BuildRequest` from the DevHost edge.
  *
- * The topology never creates build IDs. The DevHost edge maps this signal to a request with a new ID and feeds it back
- * into the build-request source.
+ * Emitting this command immediately ends the active epoch; the topology does not wait for the edge to feed the new
+ * request back into `buildRequests$`.
  */
-export type RebuildSignal = Readonly<{
+export type RequestRebuildCommand = Readonly<{
     /** Epoch that became unsafe and was stopped. */
     buildId: string
-    /** Distinguishes this local boundary from lifecycle and publication events. */
-    kind: 'rebuild-needed'
-    /** Reason for the replacement baseline. */
+    kind: 'request-rebuild'
     reason: Exclude<BuildReason, 'initial'>
 }>
 
-/** One fact emitted while a successful build epoch is active. */
-export type EpochEvent =
-    | Readonly<{
-          /** Retained patch history changed within its active epoch. */
-          epoch: BuildEpoch
-          history: PatchHistory
-          kind: 'history-retained'
-      }>
-    | RebuildSignal
-    | UpdatePublicationResult
+/** The complete output language consumed by effectful edges. */
+export type HmrCommand = RunBuildCommand | WriteBootstrapCommand | WriteUpdateCommand | RequestRebuildCommand
 
-/** One fact emitted by the complete pure topology. */
-export type HmrEvent = BuildEvent | EpochEvent
-
-/** Complete physical DevEngine build effect. */
-export type CompleteBuildEffect = (request: BuildRequest) => Observable<void>
-
-/**
- * Bootstrap materialization that follows a complete physical build.
- *
- * Endpoint and filesystem details belong to this edge: topology only establishes the build identity and ordering.
- */
-export type WriteBootstrapEffect = (epoch: BuildEpoch) => Observable<void>
-
-/**
- * Supplies safe patches for exactly one successful build epoch.
- *
- * A source error becomes a `rolldown-full-reload` rebuild signal, so it cannot tear down the shared topology stream.
- */
-export type SafePatchSource = (epoch: BuildEpoch) => Observable<SafePatch>
-
-/**
- * Atomically writes one poll-selected range into hmr/update.js.
- *
- * Unsubscription is a build boundary: the edge must ensure an unsubscribed write cannot later commit over the bootstrap
- * or update file of a replacement epoch.
- */
-export type WritePublicationEffect = (publication: UpdatePublication) => Observable<void>
+/** Immutable input facts for the complete pure HMR topology. */
+export type HmrFacts = Readonly<{
+    /** Initial and edge-created replacement build requests. */
+    buildRequests$: Observable<BuildRequest>
+    /** Complete-build operation results. */
+    completeBuildResults$: Observable<CompleteBuildResult>
+    /** Bootstrap writer operation results. */
+    bootstrapWriteResults$: Observable<BootstrapWriteResult>
+    /** Safe DevEngine patches from all build epochs. */
+    safePatches$: Observable<SafePatchFact>
+    /** Runtime control reports from every connected WX heap. */
+    polls$: Observable<UpdatePoll>
+    /** Physical update.js writer operation results. */
+    updateWriteResults$: Observable<UpdateWriteResult>
+}>

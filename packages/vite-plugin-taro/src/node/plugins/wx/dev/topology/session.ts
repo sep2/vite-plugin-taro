@@ -1,175 +1,115 @@
-import {
-    catchError,
-    defer,
-    filter,
-    map,
-    merge,
-    type Observable,
-    of,
-    share,
-    shareReplay,
-    switchMap,
-    take,
-    takeUntil,
-    withLatestFrom
-} from 'rxjs'
-import { createBuildEvents$ } from './build-epochs.ts'
-import { type ClientPollEvent, createClientPollEvents$ } from './client-polls.ts'
+import { filter, map, merge, type Observable, share, switchMap, take, takeUntil, withLatestFrom } from 'rxjs'
+import { createBuildFlow$, isBuildCommand, isEpochReady } from './build-epochs.ts'
+import { createClientPolls$, isAcceptedPoll, isClientRebuild } from './client-polls.ts'
 import { createPatchHistory$ } from './patch-history.ts'
-import type {
-    BuildEpoch,
-    BuildEvent,
-    BuildRequest,
-    CompleteBuildEffect,
-    EpochEvent,
-    HmrEvent,
-    RebuildSignal,
-    SafePatch,
-    SafePatchSource,
-    UpdatePoll,
-    WriteBootstrapEffect,
-    WritePublicationEffect
-} from './types.ts'
-import { createUpdatePublications$ } from './update-publication.ts'
+import type { BuildEpoch, HmrCommand, HmrFacts, RequestRebuildCommand, SafePatch, UpdatePoll } from './types.ts'
+import { createUpdateCommands$ } from './update-publication.ts'
 
 /**
- * The complete pure WX HMR topology.
+ * Creates the complete pure WX HMR command topology.
  *
  * ```text
- * build requests → serialized build events → ready epoch → history + one-client polls → update publications
- *                                  │                    │               │
- *                                  │                    │               └── local rebuild signal
- *                                  │                    └── stops on any rebuild boundary
- *                                  └── emits start, ready, or failure
+ * build/result facts → serialized build flow → ready epoch
+ *                                              ├── retained safe-patch history
+ * runtime polls ───────────────────────────────┼── one-client ownership
+ * operation results ──────────────────────────┴── serialized physical update commands
+ *
+ * topology output: run-build | write-bootstrap | write-update | request-rebuild
  * ```
  *
- * Subscribe once to the returned event stream. Its single lifetime owns all retained history, active-client identity,
- * physical update publication, and rebuild boundaries; no DevHost field, response map, queue, or timer coordinates
- * them.
+ * The returned shared stream is the only output. Edge consumers subscribe to commands, perform the named operation, and
+ * feed result facts back through the supplied streams. The topology itself performs no subscription and invokes no edge.
  */
-export function createHmrTopology({
-    buildRequests$,
-    completeBuild,
-    maximumPatchCount,
-    polls$,
-    safePatchesForEpoch,
-    writeBootstrap,
-    writePublication
-}: {
-    /** Initial and later edge-created complete-build requests. */
-    buildRequests$: Observable<BuildRequest>
-    /** Complete physical DevEngine build effect. */
-    completeBuild: CompleteBuildEffect
-    /** Maximum retained safe patches before the epoch stops and asks for a replacement baseline. */
-    maximumPatchCount: number
-    /** Runtime control reports from every connected WX heap. */
-    polls$: Observable<UpdatePoll>
-    /** Build-scoped safe DevEngine patch source. */
-    safePatchesForEpoch: SafePatchSource
-    /** HMR bootstrap materialization after complete output. */
-    writeBootstrap: WriteBootstrapEffect
-    /** Poll-driven atomic update.js writer edge. */
-    writePublication: WritePublicationEffect
-}): Observable<HmrEvent> {
+export function createHmrTopology(
+    {
+        bootstrapWriteResults$,
+        buildRequests$,
+        completeBuildResults$,
+        polls$,
+        safePatches$,
+        updateWriteResults$
+    }: HmrFacts,
+    { maximumPatchCount }: { maximumPatchCount: number }
+): Observable<HmrCommand> {
     if (!Number.isSafeInteger(maximumPatchCount) || maximumPatchCount < 1) {
         throw new RangeError('maximumPatchCount must be a positive safe integer')
     }
 
-    const buildEvents$ = createBuildEvents$({ buildRequests$, completeBuild, writeBootstrap })
-    const buildStarts$ = buildEvents$.pipe(filter(isBuildStarted), share())
-    const readyEpochs$ = buildEvents$.pipe(
-        filter(isBuildReady),
-        map(({ epoch }) => epoch),
+    const buildFlow$ = createBuildFlow$({ bootstrapWriteResults$, buildRequests$, completeBuildResults$ })
+    const buildCommands$ = buildFlow$.pipe(filter(isBuildCommand))
+    const buildStarts$ = buildCommands$.pipe(
+        filter((command) => command.kind === 'run-build'),
         share()
     )
-    const epochEvents$ = readyEpochs$.pipe(
+    const readyEpochs$ = buildFlow$.pipe(
+        filter(isEpochReady),
+        map(({ epoch }) => epoch)
+    )
+    const epochCommands$ = readyEpochs$.pipe(
         switchMap((epoch) =>
-            createEpochEvents$(epoch, buildStarts$, maximumPatchCount, polls$, safePatchesForEpoch, writePublication)
+            createEpochCommands$(
+                epoch,
+                buildStarts$,
+                maximumPatchCount,
+                polls$,
+                safePatches$.pipe(
+                    filter((fact) => fact.buildId === epoch.buildId),
+                    map(({ patch }) => patch)
+                ),
+                updateWriteResults$
+            )
         )
     )
 
-    return merge(buildEvents$, epochEvents$).pipe(share())
+    return merge(buildCommands$, epochCommands$).pipe(share())
 }
 
-/** Creates every HMR stream whose lifetime is exactly one successful build epoch. */
-function createEpochEvents$(
+/** Creates all command streams whose lifetime is exactly one successful build epoch. */
+function createEpochCommands$(
     epoch: BuildEpoch,
     buildStarts$: Observable<unknown>,
     maximumPatchCount: number,
     polls$: Observable<UpdatePoll>,
-    safePatchesForEpoch: SafePatchSource,
-    writePublication: WritePublicationEffect
-): Observable<EpochEvent> {
-    const safePatchEvents$ = defer(() => safePatchesForEpoch(epoch)).pipe(
-        map((patch): SafePatchEvent => ({ kind: 'safe-patch', patch })),
-        catchError((error: unknown) => of<SafePatchEvent>({ error, kind: 'safe-patch-failed' })),
-        shareReplay({ bufferSize: 1, refCount: true })
-    )
-    const history$ = createPatchHistory$(
-        safePatchEvents$.pipe(
-            filter((event): event is Extract<SafePatchEvent, { kind: 'safe-patch' }> => event.kind === 'safe-patch'),
-            map(({ patch }) => patch)
-        )
-    )
-    const clientPollEvents$ = createClientPollEvents$(epoch, polls$)
-    const acceptedPolls$ = clientPollEvents$.pipe(
-        filter((event): event is Extract<ClientPollEvent, { kind: 'accepted-poll' }> => event.kind === 'accepted-poll'),
+    safePatches$: Observable<SafePatch>,
+    updateWriteResults$: HmrFacts['updateWriteResults$']
+): Observable<Extract<HmrCommand, { kind: 'request-rebuild' | 'write-update' }>> {
+    const history$ = createPatchHistory$(safePatches$)
+    const clientPolls$ = createClientPolls$(epoch, polls$)
+    const acceptedPolls$ = clientPolls$.pipe(
+        filter(isAcceptedPoll),
         map(({ poll }) => poll)
     )
-    const clientChanged$ = clientPollEvents$.pipe(
-        filter((event): event is RebuildSignal => event.kind === 'rebuild-needed'),
-        take(1)
-    )
+    const clientChanged$ = clientPolls$.pipe(filter(isClientRebuild), take(1))
     const historyLimit$ = history$.pipe(
         filter(({ patches }) => patches.length >= maximumPatchCount),
         take(1),
-        map((): RebuildSignal => ({ buildId: epoch.buildId, kind: 'rebuild-needed', reason: 'history-limit' }))
+        map(
+            (): RequestRebuildCommand => ({
+                buildId: epoch.buildId,
+                kind: 'request-rebuild',
+                reason: 'history-limit'
+            })
+        )
     )
     const desynchronized$ = acceptedPolls$.pipe(
         withLatestFrom(history$),
         filter(([poll, history]) => poll.appliedVersion < 0 || poll.appliedVersion > history.patches.length),
         take(1),
-        map((): RebuildSignal => ({ buildId: epoch.buildId, kind: 'rebuild-needed', reason: 'runtime-desynchronized' }))
+        map(
+            (): RequestRebuildCommand => ({
+                buildId: epoch.buildId,
+                kind: 'request-rebuild',
+                reason: 'runtime-desynchronized'
+            })
+        )
     )
-    const safePatchFailure$ = safePatchEvents$.pipe(
-        filter(
-            (event): event is Extract<SafePatchEvent, { kind: 'safe-patch-failed' }> =>
-                event.kind === 'safe-patch-failed'
-        ),
-        take(1),
-        map((): RebuildSignal => ({ buildId: epoch.buildId, kind: 'rebuild-needed', reason: 'rolldown-full-reload' }))
-    )
-    const localRebuild$ = merge(clientChanged$, historyLimit$, desynchronized$, safePatchFailure$).pipe(
-        take(1),
-        share()
-    )
-    const nonTerminalEvents$ = merge(
-        history$.pipe(map((history): EpochEvent => ({ epoch, history, kind: 'history-retained' }))),
-        createUpdatePublications$({
-            buildId: epoch.buildId,
-            history$,
-            polls$: acceptedPolls$,
-            writePublication
-        })
-    )
+    const localRebuild$ = merge(clientChanged$, historyLimit$, desynchronized$).pipe(take(1), share())
+    const updateCommands$ = createUpdateCommands$({
+        buildId: epoch.buildId,
+        history$,
+        polls$: acceptedPolls$,
+        updateWriteResults$
+    })
 
-    return merge(nonTerminalEvents$.pipe(takeUntil(localRebuild$)), localRebuild$).pipe(takeUntil(buildStarts$))
-}
-
-type SafePatchEvent =
-    | Readonly<{
-          kind: 'safe-patch'
-          patch: SafePatch
-      }>
-    | Readonly<{
-          error: unknown
-          kind: 'safe-patch-failed'
-      }>
-
-function isBuildStarted(event: BuildEvent): event is Extract<BuildEvent, { kind: 'build-started' }> {
-    return event.kind === 'build-started'
-}
-
-function isBuildReady(event: BuildEvent): event is Extract<BuildEvent, { kind: 'build-ready' }> {
-    return event.kind === 'build-ready'
+    return merge(updateCommands$.pipe(takeUntil(localRebuild$)), localRebuild$).pipe(takeUntil(buildStarts$))
 }

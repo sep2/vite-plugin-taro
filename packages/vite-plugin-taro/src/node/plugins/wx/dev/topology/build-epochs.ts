@@ -1,58 +1,80 @@
-import {
-    catchError,
-    concat,
-    concatMap,
-    endWith,
-    ignoreElements,
-    map,
-    type Observable,
-    of,
-    queueScheduler,
-    scheduled,
-    share
-} from 'rxjs'
-import type { BuildEpoch, BuildEvent, BuildRequest, CompleteBuildEffect, WriteBootstrapEffect } from './types.ts'
+import { concatMap, EMPTY, filter, map, merge, type Observable, of, share, switchMap, take } from 'rxjs'
+import type {
+    BootstrapWriteResult,
+    BuildEpoch,
+    BuildRequest,
+    CompleteBuildResult,
+    RunBuildCommand,
+    WriteBootstrapCommand
+} from './types.ts'
+
+/** Internal build-flow value used to begin an epoch only after both edge operations succeed. */
+export type BuildFlowValue = RunBuildCommand | WriteBootstrapCommand | EpochReady
+
+type EpochReady = Readonly<{
+    epoch: BuildEpoch
+    kind: 'epoch-ready'
+}>
 
 /**
- * Serializes complete physical build epochs.
+ * Turns build requests and operation-result facts into a serialized command flow.
  *
  * ```text
- * build request ──concatMap──> build-started → complete output → bootstrap → build-ready | build-failed
+ * request → run-build ──success──> write-bootstrap ──success──> epoch-ready
+ *                      └─failure──> complete          └─failure──> complete
  * ```
  *
- * The explicit bootstrap phase is intentional: a baseline cannot become an active epoch until both DevEngine output and
- * its hmr/info.js plus inert hmr/update.js exist. Later requests wait for the current build lifetime; no latch or timer
- * coordinates completion.
+ * `concatMap` prevents complete physical builds from overlapping. Each result listener is established before its command
+ * is exposed, so even a synchronous edge adapter cannot lose feedback. Failures remain observable as edge-owned facts;
+ * the topology ends that request and advances to the next queued request.
  */
-export function createBuildEvents$({
+export function createBuildFlow$({
+    bootstrapWriteResults$,
     buildRequests$,
-    completeBuild,
-    writeBootstrap
+    completeBuildResults$
 }: {
-    /** Initial and later edge-created complete-build requests. */
+    bootstrapWriteResults$: Observable<BootstrapWriteResult>
     buildRequests$: Observable<BuildRequest>
-    /** Complete physical DevEngine build effect. */
-    completeBuild: CompleteBuildEffect
-    /** Bootstrap materialization after complete output. */
-    writeBootstrap: WriteBootstrapEffect
-}): Observable<BuildEvent> {
+    completeBuildResults$: Observable<CompleteBuildResult>
+}): Observable<BuildFlowValue> {
     return buildRequests$.pipe(
-        concatMap((request) => {
-            const epoch: BuildEpoch = { buildId: request.buildId }
-            return concat(
-                of<BuildEvent>({ kind: 'build-started', request }),
-                // A queue turn lets the current epoch synchronously cancel an in-flight update.js write in response
-                // to build-started before this complete build can touch the same physical files.
-                scheduled([undefined], queueScheduler).pipe(
-                    concatMap(() => completeBuild(request)),
-                    ignoreElements(),
-                    endWith(undefined),
-                    concatMap(() => writeBootstrap(epoch).pipe(ignoreElements(), endWith(undefined))),
-                    map((): BuildEvent => ({ epoch, kind: 'build-ready' })),
-                    catchError((error: unknown) => of<BuildEvent>({ error, kind: 'build-failed', request }))
-                )
+        concatMap((request) =>
+            merge(
+                completeBuildResults$.pipe(
+                    filter((result) => result.buildId === request.buildId),
+                    take(1),
+                    switchMap((result) =>
+                        result.ok ? createBootstrapFlow$(request.buildId, bootstrapWriteResults$) : EMPTY
+                    )
+                ),
+                of<BuildFlowValue>({ kind: 'run-build', request })
             )
-        }),
+        ),
         share()
     )
+}
+
+/** Emits the bootstrap command, then waits for its correlated result before activating the epoch. */
+function createBootstrapFlow$(
+    buildId: string,
+    bootstrapWriteResults$: Observable<BootstrapWriteResult>
+): Observable<BuildFlowValue> {
+    const epoch: BuildEpoch = { buildId }
+    return merge(
+        bootstrapWriteResults$.pipe(
+            filter((result) => result.buildId === buildId),
+            take(1),
+            switchMap((result) => (result.ok ? of(result) : EMPTY)),
+            map((): BuildFlowValue => ({ epoch, kind: 'epoch-ready' }))
+        ),
+        of<BuildFlowValue>({ epoch, kind: 'write-bootstrap' })
+    )
+}
+
+export function isBuildCommand(value: BuildFlowValue): value is RunBuildCommand | WriteBootstrapCommand {
+    return value.kind === 'run-build' || value.kind === 'write-bootstrap'
+}
+
+export function isEpochReady(value: BuildFlowValue): value is EpochReady {
+    return value.kind === 'epoch-ready'
 }
