@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import fs from 'node:fs/promises'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import path from 'node:path'
 import colors from 'picocolors'
 import type { InputOptions, OutputOptions } from 'rolldown'
@@ -9,8 +10,9 @@ import type { ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { resolvePackageFile } from '../../../utils/packages.ts'
 import { SerializedTaskQueue } from '../../../utils/serialized-task-queue.ts'
-import { hmrInfoFileName, renderHmrInfo } from './hmr-info.ts'
+import { createHmrInfo, type HmrInfo, hmrInfoFileName, renderHmrInfo } from './hmr-info.ts'
 import { hmrUpdateFileName, renderInitialHmrUpdate } from './hmr-update.ts'
+import { initializePublicDirOutput } from './public-dir.ts'
 
 type BundledDevRolldownOptions = InputOptions & {
     output?: OutputOptions | OutputOptions[]
@@ -34,8 +36,14 @@ type BundledDev = {
 
 type OutputAddon = string | ((chunk: { fileName: string }) => string | Promise<string>)
 
+type HmrModuleRegistration = Readonly<{
+    buildId: string
+    clientId: string
+    modules: string[]
+}>
+
 // This path belongs to DevHost: it will both render the HMR URL and install the matching Vite middleware.
-const hmrRequestPath = '/__vite_plugin_taro_wx_hmr__'
+const hmrRequestPath = '/__wx_hmr__'
 
 /**
  * Coordinates the one Vite environment, one Rolldown DevEngine, and one physical wx output directory.
@@ -49,10 +57,15 @@ export class DevHost {
 
     private readonly outDir: string
     private readonly pageFiles: ReadonlySet<string>
+    private hmrInfo: HmrInfo | undefined
 
     // Generated output bypasses this queue and is written directly by Rolldown. It serializes only initial directory
     // preparation and public-file events, whose asynchronous filesystem operations must preserve watcher order.
     private readonly fileTasks = new SerializedTaskQueue()
+
+    private readonly handleHmrRequest = (request: IncomingMessage, response: ServerResponse): void => {
+        void this.registerHmrModules(request, response)
+    }
 
     private readonly handleWatcherEvent = (event: string, filePath: string): void => {
         // Vite already watches the project and public directory. Ignore every event outside publicDir so source changes
@@ -98,26 +111,27 @@ export class DevHost {
         // place before Vite starts the client environment after configureServer hooks complete.
         this.installRolldownOptions()
         this.installDevEngine()
+        this.server.middlewares.use(hmrRequestPath, this.handleHmrRequest)
         this.server.watcher.on('all', this.handleWatcherEvent)
 
         // The DevEngine initial build runs before Vite binds HTTP, so hmr/info.js cannot contain the final URL yet.
         // Create both HMR files only after binding; if middleware supplies an already-listening server, do it immediately.
         if (this.server.httpServer?.listening) {
-            this.initializeHmrFiles()
+            this.setupHmr()
         } else {
-            this.server.httpServer?.once('listening', this.initializeHmrFiles)
+            this.server.httpServer?.once('listening', this.setupHmr)
         }
     }
 
     async close(): Promise<void> {
-        this.server.httpServer?.off('listening', this.initializeHmrFiles)
+        this.server.httpServer?.off('listening', this.setupHmr)
         this.server.watcher.off('all', this.handleWatcherEvent)
         await this.fileTasks.waitForIdle()
         // Do not close the DevEngine here. Vite closes `_devEngine`, which invokes plugin closeBundle hooks including this
         // method; closing it here would recurse through the same lifecycle.
     }
 
-    private readonly initializeHmrFiles = (): void => {
+    private readonly setupHmr = (): void => {
         this.fileTasks.enqueue(async () => {
             try {
                 const origin = this.server.resolvedUrls?.local[0]
@@ -125,19 +139,45 @@ export class DevHost {
                     throw new Error('Vite did not resolve a local development URL for WX HMR.')
                 }
 
+                this.hmrInfo = createHmrInfo(new URL(hmrRequestPath, origin).href)
+
                 await Promise.all([
-                    writeHmrFile(
-                        this.outDir,
-                        hmrInfoFileName,
-                        renderHmrInfo({ endpoint: new URL(hmrRequestPath, origin).href, buildId: randomUUID() })
-                    ),
+                    writeHmrFile(this.outDir, hmrInfoFileName, renderHmrInfo(this.hmrInfo)),
                     writeHmrFile(this.outDir, hmrUpdateFileName, renderInitialHmrUpdate())
                 ])
+
                 this.printDevToolsPath()
             } catch (error) {
                 this.reportError('HMR file initialization', error)
             }
         })
+    }
+
+    /** Registers modules executed by one verified JavaScript heap with the owned DevEngine. */
+    private async registerHmrModules(request: IncomingMessage, response: ServerResponse): Promise<void> {
+        if (request.method !== 'POST') {
+            response.statusCode = 405
+            response.end()
+            return
+        }
+
+        try {
+            const registration = await parseHmrModuleRegistration(request)
+            const engine = this.bundledDev._devEngine
+            if (!engine || !this.hmrInfo || registration.buildId !== this.hmrInfo.buildId) {
+                response.statusCode = 409
+                response.end()
+                return
+            }
+
+            await engine.registerModules(registration.clientId, registration.modules)
+            response.statusCode = 204
+            response.end()
+        } catch (error) {
+            response.statusCode = 400
+            response.end()
+            this.reportError('HMR module registration', error)
+        }
     }
 
     /** Restores wx output semantics that Vite's bundled-development resolver replaces with browser defaults. */
@@ -286,39 +326,6 @@ export class DevHost {
 }
 
 /**
- * Performs the small part of Vite's prepare-out-dir behavior needed by physical bundled development.
- *
- * Rolldown owns every generated file because the DevEngine runs with skipWrite:false. This helper runs only before the
- * engine starts: it optionally removes the previous project, creates the destination, and copies public files that are
- * outside Rolldown's bundle graph.
- */
-async function initializePublicDirOutput({
-    outDir,
-    publicDir,
-    emptyOutDir
-}: {
-    outDir: string
-    publicDir: string
-    emptyOutDir: boolean
-}): Promise<void> {
-    if (emptyOutDir) await fs.rm(outDir, { recursive: true, force: true })
-    await fs.mkdir(outDir, { recursive: true })
-    if (!publicDir) return
-
-    try {
-        await fs.cp(publicDir, outDir, { recursive: true, force: true })
-    } catch (error) {
-        // Vite permits a configured/default public directory that does not exist. Match that behavior while preserving
-        // every other filesystem failure, including permissions and invalid destinations.
-        if (!isMissingFileError(error)) throw error
-    }
-}
-
-function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
-    return error instanceof Error && 'code' in error && error.code === 'ENOENT'
-}
-
-/**
  * Mirrors one Vite watcher event from publicDir into the physical Mini Program directory.
  *
  * Copying only the changed path preserves generated files and makes deletion semantics explicit; no rebuild or complete
@@ -334,10 +341,37 @@ async function syncPublicDirFiles(event: string, sourcePath: string, destination
         await fs.mkdir(destinationPath, { recursive: true })
         return
     }
-    if (event !== 'add' && event !== 'change') return
+    if (event !== 'add' && event !== 'change') {
+        return
+    }
 
     await fs.mkdir(path.dirname(destinationPath), { recursive: true })
     await fs.copyFile(sourcePath, destinationPath)
+}
+
+/** Reads the small local-only executed-module payload without adding a second transport abstraction. */
+async function parseHmrModuleRegistration(request: IncomingMessage): Promise<HmrModuleRegistration> {
+    let text = ''
+    for await (const chunk of request) {
+        text += chunk
+    }
+
+    const value: unknown = JSON.parse(text)
+    if (!value || typeof value !== 'object') {
+        throw new Error('Expected an HMR module registration object.')
+    }
+
+    const { buildId, clientId, modules } = value as Partial<HmrModuleRegistration>
+    if (
+        typeof buildId !== 'string' ||
+        typeof clientId !== 'string' ||
+        !Array.isArray(modules) ||
+        modules.some((module) => typeof module !== 'string')
+    ) {
+        throw new Error('Expected string buildId, clientId, and module IDs in HMR module registration.')
+    }
+
+    return { buildId, clientId, modules }
 }
 
 /** Atomically writes one DevHost-owned HMR file without involving Rolldown's normal output lifecycle. */
