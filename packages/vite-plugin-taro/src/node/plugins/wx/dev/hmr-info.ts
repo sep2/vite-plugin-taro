@@ -1,0 +1,14 @@
+export const hmrInfoFileName = 'hmr/info.js'
+
+/** Metadata shared by DevHost and the DevRuntime through synchronous CommonJS hmr/info.js. */
+export type HmrInfo = Readonly<{
+    buildId: string
+    endpoint: string
+    token: string
+}>
+
+/** Renders the App-loaded HMR metadata module. It must remain CommonJS because native app.js loads it synchronously. */
+export function renderHmrInfo(info: HmrInfo): string {
+    return `module.exports = Object.freeze(${JSON.stringify(info)});
+`
+}
