@@ -153,7 +153,7 @@ test('DevHost lets the DevEngine write the initial project and keeps HMR patch-o
         assert.equal(developmentConfig.build?.sourcemap, false)
         assert.equal(developmentConfig.experimental?.bundledDev, true)
 
-        installConfigureServer(plugin, server)
+        await installConfigureServer(plugin, server)
 
         const rolldownOptions = await bundledDevelopment.getRolldownOptions()
         const devMode = rolldownOptions.experimental.devMode as Record<string, unknown>
@@ -287,13 +287,13 @@ function getDevelopmentConfig(plugin: Plugin): {
     return result
 }
 
-function installConfigureServer(plugin: Plugin, server: ViteDevServer): void {
+async function installConfigureServer(plugin: Plugin, server: ViteDevServer): Promise<void> {
     const hook = plugin.configureServer
     if (!hook) {
         throw new Error('Expected configureServer hook.')
     }
     const handler = typeof hook === 'function' ? hook : hook.handler
-    handler.call({} as never, server)
+    await handler.call({} as never, server)
 }
 
 async function closePlugin(plugin: Plugin): Promise<void> {

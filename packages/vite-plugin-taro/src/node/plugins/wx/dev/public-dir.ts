@@ -14,9 +14,9 @@ type Watcher = {
 /**
  * Performs the small part of Vite's prepare-out-dir behavior needed by physical bundled development.
  *
- * Rolldown owns every generated file because the DevEngine runs with skipWrite:false. This helper runs only before the
- * engine starts: it optionally removes the previous project, creates the destination, and copies public files that are
- * outside Rolldown's bundle graph.
+ * Rolldown owns every generated bundle file because the DevEngine runs with skipWrite:false. This helper runs before
+ * the engine starts: it optionally removes the previous project, creates the destination, and copies public files that
+ * are outside Rolldown's bundle graph. DevHost later publishes its separate HMR coordination files.
  */
 export async function initializePublicDirOutput({
     outDir,
@@ -48,7 +48,7 @@ export async function initializePublicDirOutput({
     }
 }
 
-/** Starts publicDir synchronization and returns the sole cleanup operation required when DevHost closes. */
+/** Starts publicDir synchronization and returns the watcher cleanup operation DevHost invokes during close. */
 export function createPublicDirWatcher({
     watcher,
     outDir,
@@ -70,9 +70,9 @@ export function createPublicDirWatcher({
             return
         }
 
-        // The queue was seeded with output preparation, so even an event received before listen() runs cannot race the
-        // initial cleanup/copy. Public-file errors are recoverable and handled inside the task so they do not stop later
-        // synchronization; the unhandled initial-preparation task remains fatal to startup.
+        // The queue is seeded with initial output preparation, so an early watcher event cannot race cleanup/copy.
+        // Public-file errors are recoverable and handled inside the task so one failure does not stop later sync. Initial
+        // preparation is awaited by createDevHost, where its failure remains fatal to startup.
         taskQueue.enqueue(async () => {
             try {
                 await syncPublicDirFiles(event, filePath, destinationPath)
