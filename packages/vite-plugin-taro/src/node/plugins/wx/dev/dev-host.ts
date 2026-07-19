@@ -100,6 +100,8 @@ export class DevHost {
         this.installDevEngine()
         this.server.watcher.on('all', this.handleWatcherEvent)
 
+        // The DevEngine initial build runs before Vite binds HTTP, so hmr/info.js cannot contain the final URL yet.
+        // Create both HMR files only after binding; if middleware supplies an already-listening server, do it immediately.
         if (this.server.httpServer?.listening) {
             this.initializeHmrFiles()
         } else {
