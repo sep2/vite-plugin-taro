@@ -1,29 +1,27 @@
-import { type Observable, scan, shareReplay } from 'rxjs'
-import type { BuildEpoch, PatchHistory, RetainedPatch, SafePatch } from './types.ts'
+import { type Observable, scan, shareReplay, startWith } from 'rxjs'
+import type { PatchHistory, RetainedPatch, SafePatch } from './types.ts'
 
 /**
- * Retains safe DevEngine patches as one ordered prefix for the current physical build.
+ * Retains safe DevEngine patches as one ordered prefix for an active build epoch.
  *
  * ```text
- * safePatches$ → append immutable versioned patch → history$ (replayed current prefix)
- *
- * source edit ──> DevEngine patch ──> history only
- *                                      └── no update.js write
+ * safe patches → append immutable versioned patch → replayed history
+ *                                                └── never writes update.js
  * ```
  *
- * The history stream is the server's HMR memory. It is intentionally separate from physical publication: a later
- * runtime poll selects and materializes a range from this prefix.
+ * Build identity is owned by the enclosing epoch scope, not repeated in every history value. The initial empty prefix is
+ * replayed immediately so a version-zero runtime poll can wait for the next patch without special handling.
  */
-export function createPatchHistory$(epoch: BuildEpoch, safePatches$: Observable<SafePatch>): Observable<PatchHistory> {
-    const initialHistory: PatchHistory = { buildId: epoch.buildId, patches: [] }
+export function createPatchHistory$(safePatches$: Observable<SafePatch>): Observable<PatchHistory> {
+    const initialHistory: PatchHistory = { patches: [] }
     return safePatches$.pipe(
         scan(
             (history, patch): PatchHistory => ({
-                buildId: history.buildId,
                 patches: [...history.patches, versionPatch(history.patches.length + 1, patch)]
             }),
             initialHistory
         ),
+        startWith(initialHistory),
         shareReplay({ bufferSize: 1, refCount: true })
     )
 }

@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { of, Subject, throwError } from 'rxjs'
-import { createBuildLifecycle$ } from './full-build.ts'
-import type { BuildLifecycle, BuildRequest } from './types.ts'
+import { createBuildEvents$ } from './build-epochs.ts'
+import type { BuildEvent, BuildRequest } from './types.ts'
 
-test('serializes complete builds and publishes each epoch only after bootstrap materializes', () => {
+test('serializes complete builds and emits ready only after bootstrap materializes', () => {
     const buildRequests$ = new Subject<BuildRequest>()
     const completions: Subject<void>[] = []
     const writes: string[] = []
-    const lifecycle: BuildLifecycle[] = []
-    const subscription = createBuildLifecycle$({
+    const events: BuildEvent[] = []
+    const subscription = createBuildEvents$({
         buildRequests$,
         completeBuild() {
             const completion = new Subject<void>()
@@ -20,38 +20,35 @@ test('serializes complete builds and publishes each epoch only after bootstrap m
             writes.push(epoch.buildId)
             return of(undefined)
         }
-    }).subscribe((value) => lifecycle.push(value))
+    }).subscribe((event) => events.push(event))
 
     buildRequests$.next(request('build-1', 'initial'))
     buildRequests$.next(request('build-2', 'client-changed'))
-    assert.deepEqual(lifecycle, [{ kind: 'started', request: request('build-1', 'initial') }])
+    assert.deepEqual(events, [{ kind: 'build-started', request: request('build-1', 'initial') }])
     assert.equal(completions.length, 1)
 
     completions[0].next()
     completions[0].complete()
     assert.deepEqual(writes, ['build-1'])
-    assert.deepEqual(lifecycle, [
-        { kind: 'started', request: request('build-1', 'initial') },
-        { kind: 'succeeded', epoch: { buildId: 'build-1', endpoint: 'http://localhost/__vpt_hmr__' } },
-        { kind: 'started', request: request('build-2', 'client-changed') }
+    assert.deepEqual(events, [
+        { kind: 'build-started', request: request('build-1', 'initial') },
+        { epoch: { buildId: 'build-1' }, kind: 'build-ready' },
+        { kind: 'build-started', request: request('build-2', 'client-changed') }
     ])
     assert.equal(completions.length, 2)
 
     completions[1].next()
     completions[1].complete()
     assert.deepEqual(writes, ['build-1', 'build-2'])
-    assert.deepEqual(lifecycle.at(-1), {
-        kind: 'succeeded',
-        epoch: { buildId: 'build-2', endpoint: 'http://localhost/__vpt_hmr__' }
-    })
+    assert.deepEqual(events.at(-1), { epoch: { buildId: 'build-2' }, kind: 'build-ready' })
 
     subscription.unsubscribe()
 })
 
-test('reports a failed build and proceeds with the next rebuild request without a timer retry', () => {
+test('reports a failed complete build and proceeds with the next request without a timer retry', () => {
     const buildRequests$ = new Subject<BuildRequest>()
-    const lifecycle: BuildLifecycle[] = []
-    const subscription = createBuildLifecycle$({
+    const events: BuildEvent[] = []
+    const subscription = createBuildEvents$({
         buildRequests$,
         completeBuild(request) {
             return request.buildId === 'failed' ? throwError(() => new Error('output failed')) : of(undefined)
@@ -59,26 +56,23 @@ test('reports a failed build and proceeds with the next rebuild request without 
         writeBootstrap() {
             return of(undefined)
         }
-    }).subscribe((value) => lifecycle.push(value))
+    }).subscribe((event) => events.push(event))
 
     buildRequests$.next(request('failed', 'native-output-changed'))
     buildRequests$.next(request('recovered', 'native-output-changed'))
 
-    assert.equal(lifecycle[0].kind, 'started')
-    assert.equal(lifecycle[1].kind, 'failed')
-    assert.equal(lifecycle[2].kind, 'started')
-    assert.deepEqual(lifecycle[3], {
-        kind: 'succeeded',
-        epoch: { buildId: 'recovered', endpoint: 'http://localhost/__vpt_hmr__' }
-    })
+    assert.equal(events[0].kind, 'build-started')
+    assert.equal(events[1].kind, 'build-failed')
+    assert.equal(events[2].kind, 'build-started')
+    assert.deepEqual(events[3], { epoch: { buildId: 'recovered' }, kind: 'build-ready' })
 
     subscription.unsubscribe()
 })
 
 test('reports bootstrap failure as a failed build epoch', () => {
     const buildRequests$ = new Subject<BuildRequest>()
-    const lifecycle: BuildLifecycle[] = []
-    const subscription = createBuildLifecycle$({
+    const events: BuildEvent[] = []
+    const subscription = createBuildEvents$({
         buildRequests$,
         completeBuild() {
             return of(undefined)
@@ -88,22 +82,19 @@ test('reports bootstrap failure as a failed build epoch', () => {
                 ? throwError(() => new Error('bootstrap failed'))
                 : of(undefined)
         }
-    }).subscribe((value) => lifecycle.push(value))
+    }).subscribe((event) => events.push(event))
 
     buildRequests$.next(request('bootstrap-failed', 'initial'))
     buildRequests$.next(request('recovered', 'initial'))
 
-    assert.equal(lifecycle[0].kind, 'started')
-    assert.equal(lifecycle[1].kind, 'failed')
-    assert.equal(lifecycle[2].kind, 'started')
-    assert.deepEqual(lifecycle[3], {
-        kind: 'succeeded',
-        epoch: { buildId: 'recovered', endpoint: 'http://localhost/__vpt_hmr__' }
-    })
+    assert.equal(events[0].kind, 'build-started')
+    assert.equal(events[1].kind, 'build-failed')
+    assert.equal(events[2].kind, 'build-started')
+    assert.deepEqual(events[3], { epoch: { buildId: 'recovered' }, kind: 'build-ready' })
 
     subscription.unsubscribe()
 })
 
 function request(buildId: string, reason: BuildRequest['reason']): BuildRequest {
-    return { buildId, endpoint: 'http://localhost/__vpt_hmr__', reason }
+    return { buildId, reason }
 }
