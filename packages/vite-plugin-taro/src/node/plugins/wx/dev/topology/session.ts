@@ -1,8 +1,19 @@
-import { filter, map, merge, type Observable, share, switchMap, take, takeUntil, withLatestFrom } from 'rxjs'
+import {
+    filter,
+    map,
+    merge,
+    type Observable,
+    share,
+    shareReplay,
+    switchMap,
+    take,
+    takeUntil,
+    withLatestFrom
+} from 'rxjs'
 import { createBuildFlow$, isBuildCommand, isEpochReady } from './build-epochs.ts'
 import { createClientPolls$, isAcceptedPoll, isClientRebuild } from './client-polls.ts'
 import { createPatchHistory$ } from './patch-history.ts'
-import type { BuildEpoch, HmrCommand, HmrFacts, RequestRebuildCommand, SafePatch, UpdatePoll } from './types.ts'
+import type { BuildEpoch, HmrCommand, HmrFacts, RequestRebuildCommand, SafePatchFact, UpdatePoll } from './types.ts'
 import { createUpdateCommands$ } from './update-publication.ts'
 
 /**
@@ -52,10 +63,7 @@ export function createHmrTopology(
                 buildStarts$,
                 maximumPatchCount,
                 polls$,
-                safePatches$.pipe(
-                    filter((fact) => fact.buildId === epoch.buildId),
-                    map(({ patch }) => patch)
-                ),
+                safePatches$.pipe(filter((fact) => fact.buildId === epoch.buildId)),
                 updateWriteResults$
             )
         )
@@ -70,14 +78,25 @@ function createEpochCommands$(
     buildStarts$: Observable<unknown>,
     maximumPatchCount: number,
     polls$: Observable<UpdatePoll>,
-    safePatches$: Observable<SafePatch>,
+    safePatches$: Observable<SafePatchFact>,
     updateWriteResults$: HmrFacts['updateWriteResults$']
 ): Observable<Extract<HmrCommand, { kind: 'request-rebuild' | 'write-update' }>> {
-    const history$ = createPatchHistory$(safePatches$)
     const clientPolls$ = createClientPolls$(epoch, polls$)
     const acceptedPolls$ = clientPolls$.pipe(
         filter(isAcceptedPoll),
         map(({ poll }) => poll)
+    )
+    const activeClientId$ = acceptedPolls$.pipe(
+        map(({ clientId }) => clientId),
+        take(1),
+        shareReplay({ bufferSize: 1, refCount: true })
+    )
+    const history$ = createPatchHistory$(
+        safePatches$.pipe(
+            withLatestFrom(activeClientId$),
+            filter(([fact, clientId]) => fact.clientId === clientId),
+            map(([{ patch }]) => patch)
+        )
     )
     const clientChanged$ = clientPolls$.pipe(filter(isClientRebuild), take(1))
     const historyLimit$ = history$.pipe(

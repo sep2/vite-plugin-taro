@@ -183,11 +183,11 @@ function request(buildId: string, reason: BuildRequest['reason']): BuildRequest 
 }
 
 function poll(buildId: string, clientId: string, appliedVersion: number): UpdatePoll {
-    return { appliedVersion, buildId, clientId }
+    return { appliedVersion, buildId, clientId, requestId: `request-${buildId}-${clientId}-${appliedVersion}` }
 }
 
-function patchFact(buildId: string, code: string): SafePatchFact {
-    return { buildId, patch: patch(code) }
+function patchFact(buildId: string, code: string, clientId = 'client-a'): SafePatchFact {
+    return { buildId, clientId, patch: patch(code) }
 }
 
 function patch(code: string): SafePatch {

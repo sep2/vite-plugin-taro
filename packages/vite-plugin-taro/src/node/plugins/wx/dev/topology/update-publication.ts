@@ -44,7 +44,8 @@ export function createUpdateCommands$({
                             filter(
                                 (result) =>
                                     result.buildId === publication.buildId &&
-                                    result.publicationId === publication.publicationId
+                                    result.publicationId === publication.publicationId &&
+                                    result.requestId === publication.requestId
                             ),
                             take(1),
                             ignoreElements()
@@ -72,6 +73,7 @@ function selectPublication(
         buildId,
         clientId: poll.clientId,
         patches: history.patches.slice(poll.appliedVersion),
-        publicationId
+        publicationId,
+        requestId: poll.requestId
     }
 }

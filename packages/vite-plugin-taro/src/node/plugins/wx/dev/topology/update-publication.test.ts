@@ -27,11 +27,11 @@ test('emits missing-range commands only after polls and serializes them by write
     polls$.next(poll(0))
     assert.deepEqual(publicationIds(commands), [1])
 
-    updateWriteResults$.next({ buildId: 'build-1', ok: true, publicationId: 1 })
+    updateWriteResults$.next({ buildId: 'build-1', ok: true, publicationId: 1, requestId: 'request-0' })
     assert.deepEqual(publicationIds(commands), [1, 2])
     assert.deepEqual(versions(commands[1]), [1])
 
-    updateWriteResults$.next({ buildId: 'build-1', ok: true, publicationId: 2 })
+    updateWriteResults$.next({ buildId: 'build-1', ok: true, publicationId: 2, requestId: 'request-0' })
     history$.next({
         patches: [
             { patch: { code: 'first', fileName: 'src/first.ts' }, version: 1 },
@@ -64,7 +64,8 @@ test('a failed write result releases the next poll to retry without a timer', ()
         buildId: 'build-1',
         error: new Error('disk unavailable'),
         ok: false,
-        publicationId: 1
+        publicationId: 1,
+        requestId: 'request-0'
     })
 
     assert.deepEqual(publicationIds(commands), [1, 2])
@@ -86,7 +87,8 @@ test('captures synchronous write feedback produced while commands are consumed',
         updateWriteResults$.next({
             buildId: command.publication.buildId,
             ok: true,
-            publicationId: command.publication.publicationId
+            publicationId: command.publication.publicationId,
+            requestId: command.publication.requestId
         })
     })
 
@@ -113,11 +115,11 @@ test('ignores write results that do not identify the active publication', () => 
     history$.next({ patches: [{ patch: { code: 'first', fileName: 'src/first.ts' }, version: 1 }] })
     polls$.next(poll(0))
     polls$.next(poll(0))
-    updateWriteResults$.next({ buildId: 'stale', ok: true, publicationId: 1 })
-    updateWriteResults$.next({ buildId: 'build-1', ok: true, publicationId: 99 })
+    updateWriteResults$.next({ buildId: 'stale', ok: true, publicationId: 1, requestId: 'request-0' })
+    updateWriteResults$.next({ buildId: 'build-1', ok: true, publicationId: 99, requestId: 'request-0' })
     assert.equal(commands.length, 1)
 
-    updateWriteResults$.next({ buildId: 'build-1', ok: true, publicationId: 1 })
+    updateWriteResults$.next({ buildId: 'build-1', ok: true, publicationId: 1, requestId: 'request-0' })
     assert.equal(commands.length, 2)
 
     subscription.unsubscribe()
@@ -132,5 +134,5 @@ function versions(command: WriteUpdateCommand) {
 }
 
 function poll(appliedVersion: number): UpdatePoll {
-    return { appliedVersion, buildId: 'build-1', clientId: 'client-a' }
+    return { appliedVersion, buildId: 'build-1', clientId: 'client-a', requestId: 'request-0' }
 }

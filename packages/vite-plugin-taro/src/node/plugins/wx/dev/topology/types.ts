@@ -75,6 +75,7 @@ export type SafePatch = Readonly<{
 /** One safe-patch fact correlated to the physical baseline that produced it. */
 export type SafePatchFact = Readonly<{
     buildId: string
+    clientId: string
     patch: SafePatch
 }>
 
@@ -96,6 +97,8 @@ export type UpdatePoll = Readonly<{
     buildId: string
     /** Identity of the WX JavaScript heap making this report. */
     clientId: string
+    /** Edge-created identity of the one outstanding HTTP poll. */
+    requestId: string
     /** Highest contiguous patch version that completed runtime execution and React Refresh. */
     appliedVersion: number
 }>
@@ -110,6 +113,8 @@ export type UpdatePublication = Readonly<{
     patches: readonly RetainedPatch[]
     /** Unique materialization identity, including retries of the same missing range. */
     publicationId: number
+    /** Control request completed by this physical materialization. */
+    requestId: string
 }>
 
 /** Result fact produced by the atomic update.js writer edge. */
@@ -118,12 +123,14 @@ export type UpdateWriteResult =
           buildId: string
           ok: true
           publicationId: number
+          requestId: string
       }>
     | Readonly<{
           buildId: string
           error: unknown
           ok: false
           publicationId: number
+          requestId: string
       }>
 
 /** Runs one complete physical DevEngine build. */

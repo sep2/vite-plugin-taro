@@ -29,12 +29,12 @@ test('ignores polls for a different build epoch', () => {
     const values: unknown[] = []
     const subscription = createClientPolls$(epoch, polls$).subscribe((value) => values.push(value))
 
-    polls$.next({ appliedVersion: 0, buildId: 'other-build', clientId: 'client-a' })
+    polls$.next({ appliedVersion: 0, buildId: 'other-build', clientId: 'client-a', requestId: 'request-0' })
     assert.deepEqual(values, [])
 
     subscription.unsubscribe()
 })
 
 function poll(clientId: string, appliedVersion: number): UpdatePoll {
-    return { appliedVersion, buildId: 'build-1', clientId }
+    return { appliedVersion, buildId: 'build-1', clientId, requestId: `request-${clientId}-${appliedVersion}` }
 }
