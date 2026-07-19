@@ -31,55 +31,23 @@ export async function createDevHost(
     options: VitePluginTaroOptions
 ): Promise<{ close(): Promise<void> }> {
     const outDir = path.resolve(server.config.root, server.config.build.outDir)
+
     // Page entry identities are exact native paths. They need the inert update dependency; application capsules and
     // shared chunks must not receive it because only native Page evaluation is observable by WeChat DevTools.
     const pageFiles = new Set(options.pages.map((page) => `${page.path}.js`))
 
-    let hmrInfo: HmrInfo | undefined
-
     // Rolldown-generated bundle output bypasses this queue and writes directly to disk. The queue orders DevHost-owned
     // initial directory preparation, public-file events, and one-time HMR-file publication against each other.
-    const fileTasks = new SerializedTaskQueue()
+    const taskQueue = new SerializedTaskQueue()
 
     function reportError(operation: string, error: unknown): void {
         const normalizedError = error instanceof Error ? error : new Error(String(error))
         server.config.logger.error(`[vite-plugin-taro] wx ${operation} failed`, { error: normalizedError })
     }
 
-    /** Prints the project location only after hmr/info.js exists with Vite's final listening URL. */
-    function printDevToolsPath(): void {
-        const relativeOutDir = path.relative(server.config.root, outDir).split(path.sep).join('/')
-        const devToolsPath = relativeOutDir ? `./${relativeOutDir}` : '.'
-        server.config.logger.info(
-            `  ${colors.green('➜')}  ${colors.bold(colors.cyan('WeChat DevTools:'))} ${colors.cyan(devToolsPath)}`
-        )
-    }
-
-    const setupHmr = (): void => {
-        fileTasks.enqueue(async () => {
-            try {
-                const origin = server.resolvedUrls?.local[0]
-                if (!origin) {
-                    throw new Error('Vite did not resolve a local development URL for WX HMR.')
-                }
-
-                const info = createHmrInfo(new URL(hmrRequestPath, origin).href)
-                await Promise.all([
-                    writeHmrFile(outDir, hmrInfoFileName, renderHmrInfo(info)),
-                    writeHmrFile(outDir, hmrUpdateFileName, renderInitialHmrUpdate())
-                ])
-                // Accept runtime registrations only after both App/Page-required physical files are complete.
-                hmrInfo = info
-                printDevToolsPath()
-            } catch (error) {
-                reportError('HMR file initialization', error)
-            }
-        })
-    }
-
     // Seed and await mandatory output preparation. A cleanup or initial public-directory-copy failure aborts DevHost
     // creation, so Vite cannot start the DevEngine against a partially prepared physical project.
-    await fileTasks.enqueue(() =>
+    await taskQueue.enqueue(() =>
         initializePublicDirOutput({
             outDir,
             publicDir: server.config.publicDir || '',
@@ -95,8 +63,67 @@ export async function createDevHost(
         reportError
     })
 
-    /** Registers modules reported by a runtime whose build ID matches this physical DevHost session. */
-    async function registerHmrModules(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    const closeHmr = createHmr({
+        server,
+        outDir,
+        taskQueue: taskQueue,
+        registerModules: bundledDev.registerModules,
+        reportError
+    })
+
+    const closePublicDirWatcher = createPublicDirWatcher({
+        watcher: server.watcher,
+        outDir,
+        publicDir: server.config.publicDir,
+        taskQueue,
+        reportError: (error) => reportError('public file sync', error)
+    })
+
+    return {
+        async close(): Promise<void> {
+            closeHmr()
+            closePublicDirWatcher()
+            await taskQueue.waitForIdle()
+            // Do not close the DevEngine here. Vite closes the engine published by bundled-dev.ts, whose closeBundle hook
+            // invokes this callback; closing it here would recurse through the same lifecycle.
+        }
+    }
+}
+
+/**
+ * Owns the complete HMR lifecycle for one DevHost session and returns the matching listener cleanup.
+ *
+ * Its explicit arguments are the only capabilities it needs from DevHost: Vite's server, physical output serialization,
+ * the bundled DevEngine registration operation, and shared error reporting.
+ */
+function createHmr({
+    server,
+    outDir,
+    taskQueue,
+    registerModules,
+    reportError
+}: {
+    server: ViteDevServer
+    outDir: string
+    taskQueue: SerializedTaskQueue
+    registerModules(clientId: string, modules: string[]): Promise<boolean>
+    reportError(operation: string, error: unknown): void
+}): () => void {
+    /** Prints the project location only after hmr/info.js exists with Vite's final listening URL. */
+    function printDevToolsPath(): void {
+        const relativeOutDir = path.relative(server.config.root, outDir).split(path.sep).join('/')
+        const devToolsPath = relativeOutDir ? `./${relativeOutDir}` : '.'
+        server.config.logger.info(
+            `  ${colors.green('➜')}  ${colors.bold(colors.cyan('WeChat DevTools:'))} ${colors.cyan(devToolsPath)}`
+        )
+    }
+
+    /** Registers modules reported by a runtime whose build ID matches immutable metadata for this physical session. */
+    async function registerHmrModules(
+        hmrInfo: HmrInfo,
+        request: IncomingMessage,
+        response: ServerResponse
+    ): Promise<void> {
         if (request.method !== 'POST') {
             response.statusCode = 405
             response.end()
@@ -105,13 +132,13 @@ export async function createDevHost(
 
         try {
             const registration = await parseHmrModuleRegistration(request)
-            if (!hmrInfo || registration.buildId !== hmrInfo.buildId) {
+            if (registration.buildId !== hmrInfo.buildId) {
                 response.statusCode = 409
                 response.end()
                 return
             }
 
-            if (!(await bundledDev.registerModules(registration.clientId, registration.modules))) {
+            if (!(await registerModules(registration.clientId, registration.modules))) {
                 response.statusCode = 409
                 response.end()
                 return
@@ -126,35 +153,42 @@ export async function createDevHost(
         }
     }
 
-    const handleHmrRequest = (request: IncomingMessage, response: ServerResponse): void => {
-        void registerHmrModules(request, response)
+    const publish = async (): Promise<void> => {
+        await taskQueue.enqueue(async () => {
+            try {
+                const origin = server.resolvedUrls?.local[0]
+                if (!origin) {
+                    throw new Error('Vite did not resolve a local development URL for WX HMR.')
+                }
+
+                const hmrInfo = createHmrInfo(new URL(hmrRequestPath, origin).href)
+                await Promise.all([
+                    writeHmrFile(outDir, hmrInfoFileName, renderHmrInfo(hmrInfo)),
+                    writeHmrFile(outDir, hmrUpdateFileName, renderInitialHmrUpdate())
+                ])
+
+                // The endpoint is installed only after both files exist.
+                server.middlewares.use(hmrRequestPath, async (request, response) => {
+                    await registerHmrModules(hmrInfo, request, response)
+                })
+
+                printDevToolsPath()
+            } catch (error) {
+                reportError('HMR file initialization', error)
+            }
+        })
     }
-    server.middlewares.use(hmrRequestPath, handleHmrRequest)
 
-    // The DevEngine initial build runs before Vite binds HTTP, so hmr/info.js cannot contain the final endpoint yet.
-    // Publish both App/Page-required HMR files only after binding; DevTools is told the project path afterward.
-    if (server.httpServer?.listening) {
-        setupHmr()
-    } else {
-        server.httpServer?.once('listening', setupHmr)
+    const httpServer = server.httpServer
+    if (!httpServer) {
+        throw new Error('Vite did not start an http server.')
     }
 
-    const closePublicDirWatcher = createPublicDirWatcher({
-        watcher: server.watcher,
-        outDir,
-        publicDir: server.config.publicDir,
-        taskQueue: fileTasks,
-        reportError: (error) => reportError('public file sync', error)
-    })
-
-    return {
-        async close(): Promise<void> {
-            server.httpServer?.off('listening', setupHmr)
-            closePublicDirWatcher()
-            await fileTasks.waitForIdle()
-            // Do not close the DevEngine here. Vite closes the engine published by bundled-dev.ts, whose closeBundle hook
-            // invokes this callback; closing it here would recurse through the same lifecycle.
-        }
+    // Vite runs configureServer before binding HTTP. Publish App/Page-required HMR files and install their endpoint only
+    // after listening exposes the final address; DevTools is told the path afterward.
+    httpServer.once('listening', publish)
+    return () => {
+        httpServer.off('listening', publish)
     }
 }
 
