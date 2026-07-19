@@ -2,6 +2,11 @@ import type { Messenger, DevRuntime as RolldownDevRuntime } from 'rolldown/exper
 
 type DevRuntimeConstructor = new (messenger: Messenger, clientId: string) => RolldownDevRuntime
 
+type HmrInfo = Readonly<{
+    buildId: string
+    endpoint: string
+}>
+
 type DevRuntimeGlobal = {
     __rolldown_runtime__?: RolldownDevRuntime
 }
@@ -32,8 +37,17 @@ class WxHotContext {
 }
 
 class WxDevRuntime extends DevRuntime {
-    constructor() {
-        super({ send(): void {} }, 'vite-plugin-taro-wx')
+    private hmrInfo: HmrInfo | undefined
+
+    constructor(clientId: string) {
+        super({ send(): void {} }, clientId)
+    }
+
+    setHmrInfo(hmrInfo: HmrInfo): void {
+        if (this.hmrInfo?.buildId === hmrInfo.buildId && this.hmrInfo.endpoint === hmrInfo.endpoint) {
+            return
+        }
+        this.hmrInfo = hmrInfo
     }
 
     override createModuleHotContext(moduleId: string): WxHotContext {
@@ -43,4 +57,8 @@ class WxDevRuntime extends DevRuntime {
     override applyUpdates(_boundaries: [string, string][]): void {}
 }
 
-global.__rolldown_runtime__ = new WxDevRuntime()
+global.__rolldown_runtime__ = new WxDevRuntime(createClientId())
+
+function createClientId(): string {
+    return `${Date.now().toString(36)}:${Math.random().toString(36).slice(2)}`
+}
