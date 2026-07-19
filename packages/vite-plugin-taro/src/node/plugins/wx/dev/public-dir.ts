@@ -1,10 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-
-/** A serialized task sink shared with DevHost's initial output preparation. */
-type TaskQueue = {
-    enqueue(task: () => Promise<void>): void
-}
+import type { SerializedTaskQueue } from '../../../utils/serialized-task-queue.ts'
 
 type Watcher = {
     on(event: 'all', listener: (event: string, filePath: string) => void): unknown
@@ -59,10 +55,10 @@ export function createPublicDirWatcher({
     watcher: Watcher
     outDir: string
     publicDir: string
-    taskQueue: TaskQueue
+    taskQueue: SerializedTaskQueue
     reportError(error: unknown): void
 }): () => void {
-    const handleWatcherEvent = (event: string, filePath: string): void => {
+    const handleWatcherEvent = async (event: string, filePath: string): Promise<void> => {
         // Vite already watches the project and public directory. Ignore every event outside publicDir so source changes
         // remain exclusively owned by the DevEngine's watcher and cannot accidentally request a full rematerialization.
         const destinationPath = getPublicDestination(outDir, publicDir, filePath)
@@ -71,9 +67,9 @@ export function createPublicDirWatcher({
         }
 
         // The queue is seeded with initial output preparation, so an early watcher event cannot race cleanup/copy.
-        // Public-file errors are recoverable and handled inside the task so one failure does not stop later sync. Initial
+        // Public-file errors are recoverable and handled inside the task, so one failure does not stop later sync. Initial
         // preparation is awaited by createDevHost, where its failure remains fatal to startup.
-        taskQueue.enqueue(async () => {
+        await taskQueue.enqueue(async () => {
             try {
                 await syncPublicDirFiles(event, filePath, destinationPath)
             } catch (error) {
