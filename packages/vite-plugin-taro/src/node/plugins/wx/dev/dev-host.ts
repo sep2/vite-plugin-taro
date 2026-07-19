@@ -9,7 +9,7 @@ import type { ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { resolvePackageFile } from '../../../utils/packages.ts'
 import { SerializedTaskQueue } from '../../../utils/serialized-task-queue.ts'
-import { createHmrInfo, hmrInfoFileName, renderHmrInfo } from './hmr-info.ts'
+import { hmrInfoFileName, renderHmrInfo } from './hmr-info.ts'
 import { hmrUpdateFileName, renderInitialHmrUpdate } from './hmr-update.ts'
 
 type BundledDevRolldownOptions = InputOptions & {
@@ -129,7 +129,7 @@ export class DevHost {
                     writeHmrFile(
                         this.outDir,
                         hmrInfoFileName,
-                        renderHmrInfo(createHmrInfo(new URL(hmrRequestPath, origin).href))
+                        renderHmrInfo({ endpoint: new URL(hmrRequestPath, origin).href, buildId: randomUUID() })
                     ),
                     writeHmrFile(this.outDir, hmrUpdateFileName, renderInitialHmrUpdate())
                 ])
