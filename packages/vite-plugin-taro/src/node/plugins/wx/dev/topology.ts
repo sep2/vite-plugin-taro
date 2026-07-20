@@ -35,7 +35,7 @@ import {
  * limit requests this rebuild once, but does not stop later patches from appending while it runs.
  */
 
-export type RebuildReason =
+export type BuildReason =
     | 'patch-limit'
     | 'initial'
     | 'patch-generation-failed'
@@ -46,9 +46,9 @@ export type RebuildReason =
     | 'source-requires-full-build'
 
 /** An edge-created rebuild request. Every complete build gets a fresh identity. */
-export type FullBuildRequest = Readonly<{
+export type BuildRequest = Readonly<{
     buildId: string
-    reason: RebuildReason
+    reason: BuildReason
 }>
 
 /** Result of the one complete rebuild operation. */
@@ -94,7 +94,7 @@ export type PatchProjection = Readonly<{
 
 /** All observations entering the topology from DevEngine, physical output, and runtime-control edges. */
 export type WxHostFact =
-    | Readonly<{ type: 'rebuild-requested'; reason: RebuildReason }>
+    | Readonly<{ type: 'rebuild-requested'; reason: BuildReason }>
     | Readonly<{ type: 'full-build-finished'; result: FullBuildResult }>
     | Readonly<{ type: 'patch-produced'; patch: ProducedPatch }>
     | Readonly<{
@@ -110,7 +110,7 @@ export type WxHostFact =
 
 /** The only host effects: rebuild the entire physical project or write one patch file. */
 export type WxHostCommand =
-    | Readonly<{ kind: 'request-rebuild'; reason: RebuildReason }>
+    | Readonly<{ kind: 'request-rebuild'; reason: BuildReason }>
     | Readonly<{ kind: 'write-patches'; projection: PatchProjection }>
 
 type FactOf<Type extends WxHostFact['type']> = Extract<WxHostFact, { type: Type }>
