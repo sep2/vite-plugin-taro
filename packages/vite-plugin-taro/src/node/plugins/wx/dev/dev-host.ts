@@ -1,4 +1,27 @@
-// Imports are intentionally deferred while the control, output, and DevEngine edges are rewritten around this host.
+import { randomUUID } from 'node:crypto'
+import path from 'node:path'
+import { EMPTY, from, merge, type Observable, Subject, type Subscription } from 'rxjs'
+import { catchError, concatMap, filter, map, shareReplay, withLatestFrom } from 'rxjs/operators'
+import type { ViteDevServer } from 'vite'
+import type { VitePluginTaroOptions } from '../../../../options.ts'
+import { createControlEdge } from './edges/control.ts'
+import { createDevEngineEdge } from './edges/dev-engine.ts'
+import { createPhysicalOutputEdge } from './edges/output.ts'
+import { preparePublicFiles, watchPublicFiles } from './edges/public-files.ts'
+import {
+    createWxHostTopology,
+    type FullBuildReason,
+    type FullBuildRequest,
+    type FullBuildResult,
+    type PatchProjection,
+    type ProducedPatch,
+    type RuntimeFailure,
+    type RuntimePatchRequest
+} from './topology.ts'
+
+const safeJavaScriptExtensions = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx'])
+
+type Effect = () => Promise<void>
 
 /**
  * Wires Vite's effectful WX development edges around the RxJS host topology.
@@ -13,18 +36,20 @@
  * delivery, or last runtime version.
  * ```
  */
-export async function createDevHost(server, options) {
+export async function createDevHost(
+    server: ViteDevServer,
+    options: VitePluginTaroOptions
+): Promise<Readonly<{ close(): Promise<void> }>> {
     const outDir = path.resolve(server.config.root, server.config.build.outDir)
     const pageFiles = new Set(options.pages.map((page) => `${page.path}.js`))
-    const closed$ = new Subject()
-    const fullBuildReasons$ = new Subject()
-    const fullBuildResults$ = new Subject()
-    const fullMaterializationFailures$ = new Subject()
-    const patchesWriteFailures$ = new Subject()
-    const producedPatches$ = new Subject()
-    const runtimeFailures$ = new Subject()
-    const runtimeRequests$ = new Subject()
-    const subscriptions = []
+    const fullBuildReasons$ = new Subject<FullBuildReason>()
+    const fullBuildResults$ = new Subject<FullBuildResult>()
+    const fullMaterializationFailures$ = new Subject<Readonly<{ buildId: string }>>()
+    const patchesWriteFailures$ = new Subject<Readonly<{ buildId: string }>>()
+    const producedPatches$ = new Subject<ProducedPatch>()
+    const runtimeFailures$ = new Subject<RuntimeFailure>()
+    const runtimeRequests$ = new Subject<RuntimePatchRequest>()
+    const subscriptions: Subscription[] = []
     let closed = false
 
     await preparePublicFiles({
@@ -34,7 +59,7 @@ export async function createDevHost(server, options) {
     })
 
     const devEngine = createDevEngineEdge({ pageFiles, server })
-    const control = createControlChannel({
+    const control = createControlEdge({
         registerModules: devEngine.registerModules,
         reportFailure: (failure) => runtimeFailures$.next(failure),
         requestPatches: (request) => runtimeRequests$.next(request),
@@ -51,24 +76,42 @@ export async function createDevHost(server, options) {
         runtimeRequests$
     })
 
-    // DevEngine HMR results need the current build identity, but no mutable host variable retains it.
+    // This derives the build identity from the topology input stream; no mutable runtime/session record is retained.
     const activeBuildId$ = fullBuildResults$.pipe(
-        filter((result) => result.ok),
+        filter((result): result is Extract<FullBuildResult, { ok: true }> => result.ok),
         map((result) => result.buildId),
         shareReplay({ bufferSize: 1, refCount: true })
     )
 
-    const effects$ = merge(
-        topology.fullBuildReasons$.pipe(map((reason) => () => runFullBuild(reason))),
-        topology.fullMaterializations$.pipe(map((build) => () => materializeFull(build))),
-        topology.patchProjections$.pipe(map((projection) => () => materializePatches(projection)))
+    const effects$: Observable<Effect> = merge(
+        topology.fullBuildReasons$.pipe(
+            map(
+                (reason): Effect =>
+                    () =>
+                        runFullBuild(reason)
+            )
+        ),
+        topology.fullMaterializations$.pipe(
+            map(
+                (build): Effect =>
+                    () =>
+                        materializeFull(build)
+            )
+        ),
+        topology.patchProjections$.pipe(
+            map(
+                (projection): Effect =>
+                    () =>
+                        materializePatches(projection)
+            )
+        )
     )
     subscriptions.push(
         effects$
             .pipe(
-                // Physical writes and full builds share one ordered edge. Safe patches may still accumulate in the
-                // topology while this queue is busy; a later runtime request projects the complete latest suffix.
-                concatMap((effect) => from(effect()).pipe(catchError((error) => reportEffectFailure(error))))
+                // Physical writes and full builds share one lane. Patches may accumulate in topology history while it
+                // is busy; the next stateless runtime version request selects the complete latest suffix.
+                concatMap((effect) => from(effect()).pipe(catchError((error: unknown) => reportEffectFailure(error))))
             )
             .subscribe()
     )
@@ -114,14 +157,12 @@ export async function createDevHost(server, options) {
         watcher: server.watcher
     })
 
-    // All effect subscribers are connected before this first fact enters the topology.
+    // Every stream consumer is attached before the initial full-build reason enters the topology.
     fullBuildReasons$.next('initial')
 
     return {
-        async close() {
+        async close(): Promise<void> {
             closed = true
-            closed$.next()
-            closed$.complete()
             control.close()
             await publicFiles.close()
             physicalOutput.close()
@@ -131,44 +172,50 @@ export async function createDevHost(server, options) {
         }
     }
 
-    async function runFullBuild(reason) {
-        const request = { buildId: randomUUID(), reason }
+    async function runFullBuild(reason: FullBuildReason): Promise<void> {
+        const request: FullBuildRequest = { buildId: randomUUID(), reason }
         const result = await devEngine.runBuild(request)
         if (!result.ok) {
             reportError('complete build', result.error)
         }
-        fullBuildResults$.next(result)
+        if (!closed) {
+            fullBuildResults$.next(result)
+        }
     }
 
-    async function materializeFull(build) {
+    async function materializeFull(build: Readonly<{ buildId: string }>): Promise<void> {
         try {
             await physicalOutput.writeBootstrap(build)
         } catch (error) {
             reportError('full WX materialization', error)
-            fullMaterializationFailures$.next(build)
+            if (!closed) {
+                fullMaterializationFailures$.next(build)
+            }
         }
     }
 
-    async function materializePatches(projection) {
+    async function materializePatches(projection: PatchProjection): Promise<void> {
         try {
             await physicalOutput.writePatches(projection)
         } catch (error) {
             reportError('patches.js materialization', error)
-            patchesWriteFailures$.next({ buildId: projection.buildId })
+            if (!closed) {
+                patchesWriteFailures$.next({ buildId: projection.buildId })
+            }
         }
     }
 
-    function reportEffectFailure(error) {
+    function reportEffectFailure(error: unknown): Observable<never> {
         reportError('WX development effect', error)
         return EMPTY
     }
 }
 
-function isSafeJavaScriptChange(fileName) {
+function isSafeJavaScriptChange(fileName: string): boolean {
     return safeJavaScriptExtensions.has(path.extname(fileName.split('?', 1)[0]).toLowerCase())
 }
 
-function reportError(operation, error) {
+function reportError(operation: string, error: unknown): void {
     const normalized = error instanceof Error ? error : new Error(String(error))
     console.error(`[vite-plugin-taro] wx ${operation} failed`, normalized)
 }
