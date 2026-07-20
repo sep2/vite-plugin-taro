@@ -1,5 +1,15 @@
-import { EMPTY, merge, type Observable, of } from 'rxjs'
-import { filter, map, mergeMap, scan, share, shareReplay, startWith, switchMap, withLatestFrom } from 'rxjs/operators'
+import { EMPTY, merge, of, type Observable } from 'rxjs'
+import {
+    filter,
+    map,
+    mergeMap,
+    scan,
+    share,
+    shareReplay,
+    startWith,
+    switchMap,
+    withLatestFrom
+} from 'rxjs/operators'
 
 /**
  * Pure WX HMR topology.
@@ -22,16 +32,16 @@ import { filter, map, mergeMap, scan, share, shareReplay, startWith, switchMap, 
  * runtime/write failure ─────────────────────┴── withLatestFrom ──▶ complete build command
  * ```
  *
- * A full build has a fresh `buildId`, not a version, and starts patch numbering at zero. `hmr/patches.js` only stores
- * factories in the persistent App runtime; that runtime reconciles them after Page evaluation returns.
+ * A full build is one edge operation: generate a fresh buildId, let DevEngine write complete output, then write
+ * hmr/info.js and inert hmr/patches.js. It has no version of its own and starts patch numbering at zero.
  */
 
 export type FullBuildReason =
     | 'initial'
-    | 'full-materialization-failed'
     | 'patch-generation-failed'
     | 'patch-write-failed'
     | 'runtime-ahead-of-history'
+    | 'runtime-build-mismatch'
     | 'runtime-failed'
     | 'source-requires-full-build'
 
@@ -41,6 +51,7 @@ export type FullBuildRequest = Readonly<{
     reason: FullBuildReason
 }>
 
+/** Result of the complete operation: DevEngine output plus physical HMR bootstrap files. */
 export type FullBuildResult =
     | Readonly<{ buildId: string; ok: true }>
     | Readonly<{ buildId: string; error: unknown; ok: false }>
@@ -85,7 +96,6 @@ export type PatchProjection = Readonly<{
 export type WxHostFact =
     | Readonly<{ type: 'full-build-requested'; reason: FullBuildReason }>
     | Readonly<{ type: 'full-build-finished'; result: FullBuildResult }>
-    | Readonly<{ type: 'full-materialized'; buildId: string; ok: boolean; error?: unknown }>
     | Readonly<{ type: 'patch-produced'; patch: ProducedPatch }>
     | Readonly<{
           type: 'patches-written'
@@ -101,7 +111,6 @@ export type WxHostFact =
 /** Effects selected by topology and performed by DevHost edges. */
 export type WxHostCommand =
     | Readonly<{ kind: 'run-full-build'; reason: FullBuildReason }>
-    | Readonly<{ kind: 'materialize-full'; buildId: string }>
     | Readonly<{ kind: 'write-patches'; projection: PatchProjection }>
 
 type PatchHistory = Readonly<{
@@ -115,20 +124,18 @@ type RuntimeRequestFact = Extract<WxHostFact, { type: 'runtime-requested' }>
 /**
  * Derives one command stream from edge facts. No subscription or effect occurs here.
  *
- * The returned stream can be consumed directly by one serialized DevHost edge lane. Every full-build, materialization,
- * and patch-write result returns to `facts$` as another fact, closing the topology loop without a mutable reducer.
+ * The returned stream is consumed by one serialized DevHost edge lane. Every full-build and patch-write operation
+ * returns a result fact to `facts$`, closing the topology loop without a mutable reducer.
  */
 export function createWxHostTopology(facts$: Observable<WxHostFact>): Observable<WxHostCommand> {
     const successfulBuilds$ = facts$.pipe(
-        filter(
-            (fact): fact is Extract<WxHostFact, { type: 'full-build-finished' }> => fact.type === 'full-build-finished'
-        ),
+        filter((fact): fact is Extract<WxHostFact, { type: 'full-build-finished' }> => fact.type === 'full-build-finished'),
         map(({ result }) => result),
         filter((result): result is SuccessfulBuild => result.ok),
         share()
     )
 
-    // A new complete build replaces the baseline and cancels the previous patch-history branch automatically.
+    // A successful full build replaces the baseline and cancels the preceding patch-history branch automatically.
     const patchHistory$ = successfulBuilds$.pipe(
         switchMap(({ buildId }) =>
             facts$.pipe(
@@ -155,15 +162,6 @@ export function createWxHostTopology(facts$: Observable<WxHostFact>): Observable
         ),
         facts$.pipe(
             filter(
-                (fact): fact is Extract<WxHostFact, { type: 'full-materialized' }> =>
-                    fact.type === 'full-materialized' && !fact.ok
-            ),
-            withLatestFrom(patchHistory$),
-            filter(([{ buildId }, history]) => buildId === history.buildId),
-            map((): WxHostCommand => ({ kind: 'run-full-build', reason: 'full-materialization-failed' }))
-        ),
-        facts$.pipe(
-            filter(
                 (fact): fact is Extract<WxHostFact, { type: 'patches-written' }> =>
                     fact.type === 'patches-written' && !fact.ok
             ),
@@ -172,7 +170,9 @@ export function createWxHostTopology(facts$: Observable<WxHostFact>): Observable
             map((): WxHostCommand => ({ kind: 'run-full-build', reason: 'patch-write-failed' }))
         ),
         facts$.pipe(
-            filter((fact): fact is Extract<WxHostFact, { type: 'runtime-failed' }> => fact.type === 'runtime-failed'),
+            filter(
+                (fact): fact is Extract<WxHostFact, { type: 'runtime-failed' }> => fact.type === 'runtime-failed'
+            ),
             withLatestFrom(patchHistory$),
             filter(([{ failure }, history]) => failure.buildId === history.buildId),
             map((): WxHostCommand => ({ kind: 'run-full-build', reason: 'runtime-failed' }))
@@ -185,17 +185,13 @@ export function createWxHostTopology(facts$: Observable<WxHostFact>): Observable
         mergeMap(([{ request }, history]) => projectRequest(request, history))
     )
 
-    return merge(
-        fullBuildCommands$,
-        successfulBuilds$.pipe(map(({ buildId }): WxHostCommand => ({ buildId, kind: 'materialize-full' }))),
-        requestCommands$
-    ).pipe(share())
+    return merge(fullBuildCommands$, requestCommands$).pipe(share())
 }
 
 /** Projects exactly one runtime request against the latest private patch-history value. */
 function projectRequest(request: RuntimePatchRequest, history: PatchHistory): Observable<WxHostCommand> {
     if (request.buildId !== history.buildId) {
-        return of({ buildId: history.buildId, kind: 'materialize-full' })
+        return of({ kind: 'run-full-build', reason: 'runtime-build-mismatch' })
     }
     if (!Number.isSafeInteger(request.version) || request.version < 0 || request.version > history.patches.length) {
         return of({ kind: 'run-full-build', reason: 'runtime-ahead-of-history' })
