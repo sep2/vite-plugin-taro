@@ -42,7 +42,6 @@ export async function createDevHost(
     const facts$ = new Subject<WxHostFact>()
     const fullBuildResults$ = new Subject<FullBuildResult>()
     const subscriptions: Subscription[] = []
-    let closed = false
 
     await preparePublicFiles({
         emptyOutDir: server.config.build.emptyOutDir !== false,
@@ -119,7 +118,6 @@ export async function createDevHost(
 
     return {
         async close(): Promise<void> {
-            closed = true
             control.close()
             await publicFiles.close()
             physicalOutput.close()
@@ -145,9 +143,7 @@ export async function createDevHost(
                 if (!result.ok) {
                     reportError('complete build', result.error)
                 }
-                if (!closed) {
-                    fullBuildResults$.next(result)
-                }
+                fullBuildResults$.next(result)
                 return { type: 'full-build-finished', result }
             }
             case 'write-patches': {
