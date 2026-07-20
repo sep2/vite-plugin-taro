@@ -17,8 +17,8 @@ Implement physical WX HMR where:
 1. **Ordinary HMR must change only `hmr/patches.js`.**
    Wider output changes may make DevTools restart the entire App.
 
-2. **Use direct `fs.writeFile`.**
-   Temporary-file atomic rename caused DevTools to classify the change as an App reload. A complete close-write produced the desired Page-level re-execution.
+2. **Atomic writes**
+   Temporary-file atomic rename caused DevTools to classify the change as an App reload. A complete close-write produced the desired Page-level re-execution. should write to temp folder then rename back.
 
 3. **Executable patches cannot travel over HTTP.**
    HTTP is metadata-only. Patch JavaScript remains physical.
@@ -90,7 +90,7 @@ A simple `isRebuilding` boolean was rejected because a delayed old callback coul
 
 ---
 
-## Final protocol
+## Proposed protocol
 
 ```text
 runtime reports { buildId, version V }
@@ -198,7 +198,7 @@ Current important facts are:
 
 ```text
 rebuild-requested
-full-build-finished
+build-finished
 patch-produced
 patches-written
 runtime-requested
@@ -218,8 +218,8 @@ A full build is one composite operation:
 
 1. generate fresh `buildId`;
 2. run DevEngine complete output;
-3. write `hmr/info.js`;
-4. write inert `hmr/patches.js`;
+3. write inert `hmr/patches.js`;
+4. write `hmr/info.js`;
 5. emit `full-build-finished`.
 
 Running and materializing a full build must not be separate topology commands.
@@ -230,75 +230,17 @@ Running and materializing a full build must not be separate topology commands.
 
 Every edge receives the shared `facts$` and publishes its own observations. Callback-style plumbing such as `reportFailure`, `requestPatches`, `onChanged`, and `onError` was removed.
 
-### `edges/control.ts`
+These files are subjected to be changed. and is encouraged to be changed towards a more declarative design.
 
-- metadata-only HTTP endpoint;
-- validates token;
-- registers modules under `buildId`;
-- publishes `runtime-requested`;
-- publishes `runtime-failed`;
-- immediately completes HTTP requests;
-- retains no runtime/session/version state.
+The current design is fragile and error prone. do not use these files split and structure and names and logic. only see them for how to interact with vite / rolldown
 
-### `edges/dev-engine.ts`
-
-- installs Vite bundled-development DevEngine;
-- emits rebuild facts for unsafe changes/full reloads/errors;
-- emits `patch-produced` directly;
-- treats Rolldown `clientId` as `buildId`;
-- does not select physical ranges.
-
-### `edges/output.ts`
-
-- writes `hmr/info.js`;
-- writes inert `hmr/patches.js` after a full build;
-- directly close-writes active patch modules;
-- publishes `patches-written` success/failure facts.
-
-### `edges/public-files.ts`
-
-- mirrors public files serially;
-- emits a full-rebuild fact after a physical public-file change or synchronization failure.
-
-### `dev-host.ts`
-
-Should only:
-
-- create `facts$`;
-- construct the edges;
-- construct topology;
-- serialize commands through `concatMap`;
-- execute the two command kinds;
-- close resources.
+### `abandon/*.ts`
 
 ---
 
 ## React Refresh findings
 
-The necessary narrow transforms are currently preserved under the abandoned implementation:
-
-1. `/@react-refresh`
-    - append `injectIntoGlobalHook(global)`;
-    - rewrite the two exact `window.__*` integration hooks to `global.__*`;
-    - wrap `enqueueUpdate()` and `performReactRefresh()` through the App runtime.
-
-2. React Reconciler
-    - rewrite free `__REACT_DEVTOOLS_GLOBAL_HOOK__` references to `global.__REACT_DEVTOOLS_GLOBAL_HOOK__`.
-
-3. Vite component boundaries
-    - rewrite only `window.$Refresh*` members to `global.$Refresh*`.
-
-Requirements:
-
-- no broad Vite `define` replacement;
-- no matching Vite error-message text;
-- install Refresh globals and the DevTools hook before React executes;
-- capture asynchronous Refresh exceptions and report runtime failure;
-- report the new runtime version only after Refresh/reconciliation succeeds.
-
-`reactRefreshRuntimeId` and the resolved React Reconciler root live in `wx/module.ts`. `react-reconciler` is now a direct package dependency.
-
-A remaining semantic question is the exact visible-completion boundary: `performReactRefresh()` returning proves Refresh dispatch, not necessarily a committed Taro/WX render.
+mainly needs to fix window undefined error. nothing special here.
 
 ---
 
@@ -322,45 +264,6 @@ A remaining semantic question is the exact visible-completion boundary: `perform
 
 ---
 
-## Current implementation state
-
-The new work exists at:
-
-```text
-wx/dev/topology.ts
-wx/dev/dev-host.ts
-wx/dev/edges/control.ts
-wx/dev/edges/dev-engine.ts
-wx/dev/edges/files.ts
-wx/dev/edges/output.ts
-wx/dev/edges/public-files.ts
-```
-
-However, it is not integrated yet:
-
-1. `wx/dev/plugin.ts` still imports:
-    - `./abandon/dev-host.ts`
-    - `./abandon/react-refresh.ts`
-
-2. The new App-owned development runtime source is absent:
-    - `src/runtime/wx/dev/dev-runtime.ts` is deleted.
-    - DevEngine currently attempts to read its built `dist` path.
-    - A clean plugin build therefore cannot supply the new runtime.
-
-3. The runtime still needs to be designed around:
-    - construction with `buildId` as Rolldown client ID;
-    - `storePatches()`;
-    - deferred reconciliation;
-    - version/failure reporting;
-    - React Refresh completion;
-    - App ownership across Page re-execution.
-
-4. New topology/edge tests have not yet been added.
-
-5. Package typecheck currently fails because the moved `wx/dev/abandon/` files remain included and reference deleted legacy APIs. The new files themselves currently produce no reported TypeScript diagnostics.
-
----
-
 ## Known unresolved correctness issues
 
 ### 1. Protocol liveness
@@ -378,29 +281,28 @@ One liveness mechanism is still required:
 
 The latter two were explicitly rejected, and runtime timers were also rejected. This needs a final decision.
 
+This is solved. The server should send message to runtime when a new patch arrives. the mechanism can be long-pulling or others.
+
 ### 2. Queued old writes across rebuilds
 
 `concatMap` can retain an old `write-patches` command while a rebuild command is queued. It must be impossible for an old Build’s `patches.js` write to execute after a new full build and overwrite its inert patch file.
 
 Command cancellation or build validation at execution time is still needed.
 
-### 3. Patch-limit behavior
+no hard requirement for `concatMap`, you can use whatever it fit.
+This doesn not matter. since patches.js contains build id. if patch is invalid, the page will rerurn, but can just discard the patches when it sees a different build id.
 
-Current `createBuild()` uses:
-
-```ts
-take(maximumPatchPerBuild)
-```
-
-Therefore it stops appending at the limit. Its comments currently say patches continue appending while rebuild runs; implementation and documentation disagree.
-
-### 4. Initial build readiness
+### 3. Initial build readiness
 
 `bundledDev.listen()` currently observes DevEngine completion before DevHost finishes writing `hmr/info.js` and inert `hmr/patches.js`. Full-build readiness should include both steps.
 
-### 5. Runtime/client initialization
+refactor the whole thing to make it more declarative and readable.
+
+### 4. Runtime/client initialization
 
 Using `buildId` as Rolldown client ID requires constructing the runtime with information from `hmr/info.js` before application modules register. That bootstrap order is not implemented yet.
+
+just do it.
 
 ---
 
@@ -426,3 +328,4 @@ Still pending:
 - Refresh exception → full rebuild;
 - full-build reset;
 - final tests/build/typecheck.
+- complete hmr flow tests: dev load genius → input edit → button click → result header render → button click navigate route → source edit previous page → button click navigate back → the edit okay ans state preserved
