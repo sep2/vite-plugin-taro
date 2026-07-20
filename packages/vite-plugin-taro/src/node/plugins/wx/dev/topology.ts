@@ -74,7 +74,7 @@ export type Build = {
 export type WxHostFact =
     | Readonly<{ type: 'rebuild-requested'; reason: BuildReason }>
     | Readonly<{ type: 'full-build-finished'; result: FullBuildResult }>
-    | Readonly<{ type: 'patch-produced'; buildId: string; clientId: string; patch: HostPatch }>
+    | Readonly<{ type: 'patch-produced'; buildId: string; patch: HostPatch }>
     | Readonly<{
           type: 'patches-written'
           buildId: string
@@ -83,8 +83,8 @@ export type WxHostFact =
           ok: boolean
           error?: unknown
       }>
-    | Readonly<{ type: 'runtime-requested'; buildId: string; clientId: string; version: number }>
-    | Readonly<{ type: 'runtime-failed'; buildId: string; clientId: string; version: number; reason: string }>
+    | Readonly<{ type: 'runtime-requested'; buildId: string; version: number }>
+    | Readonly<{ type: 'runtime-failed'; buildId: string; version: number; reason: string }>
 
 /** The only host effects: rebuild the entire physical project or write one patch suffix. */
 export type WxHostCommand =
