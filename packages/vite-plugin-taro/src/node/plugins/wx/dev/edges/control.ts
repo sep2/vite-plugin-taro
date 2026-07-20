@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { Subject } from 'rxjs'
 import type { ViteDevServer } from 'vite'
-import type { RuntimeFailure, RuntimePatchRequest } from '../topology.ts'
+import type { WxHostFact } from '../topology.ts'
 
 /** Metadata-only control endpoint; executable code is always delivered by the physical patches.js file. */
 export const hmrControlPath = '/__vpt_hmr__'
@@ -19,20 +20,18 @@ type ControlRequest = Readonly<{
 }>
 
 /**
- * Adapts App-runtime reports into topology inputs.
+ * Converts App-runtime reports directly into host facts.
  *
- * Each request is complete and immediately consumed: the endpoint retains no runtime identity, version, pending
- * response, or delivery state. The host topology combines the request's version with its current patch history.
+ * Every request is independently complete. This edge retains no runtime version, session, pending response, or delivery
+ * state; the topology combines a report with its private current Build.
  */
 export function createControlEdge({
+    facts$,
     registerModules,
-    reportFailure,
-    requestPatches,
     server
 }: {
+    facts$: Subject<WxHostFact>
     registerModules(clientId: string, modules: string[]): Promise<boolean>
-    reportFailure(failure: RuntimeFailure): void
-    requestPatches(request: RuntimePatchRequest): void
     server: ViteDevServer
 }): Readonly<{
     close(): void
@@ -72,12 +71,18 @@ export function createControlEdge({
             return
         }
         if (body.action === 'version' && typeof body.version === 'number' && Number.isSafeInteger(body.version)) {
-            requestPatches({ buildId: body.buildId, clientId: body.clientId, version: body.version })
+            facts$.next({
+                type: 'runtime-requested',
+                buildId: body.buildId,
+                clientId: body.clientId,
+                version: body.version
+            })
             respond(response, 204)
             return
         }
         if (body.action === 'failure' && typeof body.version === 'number' && Number.isSafeInteger(body.version)) {
-            reportFailure({
+            facts$.next({
+                type: 'runtime-failed',
                 buildId: body.buildId,
                 clientId: body.clientId,
                 reason: typeof body.reason === 'string' ? body.reason : 'Unknown runtime failure.',
