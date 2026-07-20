@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import type { PatchProjection } from '../topology.ts'
+import type { Build } from '../topology.ts'
 
 export const hmrInfoFileName = 'hmr/info.js'
 export const hmrPatchesFileName = 'hmr/patches.js'
@@ -28,22 +28,18 @@ export function renderInitialHmrPatches(): string {
  * DevTools re-executes the Page because this file changed. The module captures the literal Rolldown factories in the
  * persistent App runtime but does not execute them; the runtime reconciles only after that Page evaluation returns.
  */
-export function renderHmrPatches(projection: PatchProjection): string {
-    if (
-        !Number.isSafeInteger(projection.fromVersion) ||
-        !Number.isSafeInteger(projection.targetVersion) ||
-        projection.targetVersion <= projection.fromVersion ||
-        projection.patches.length !== projection.targetVersion - projection.fromVersion
-    ) {
-        throw new Error('Cannot render an empty or non-contiguous WX patch range.')
+export function renderHmrPatches(build: Build, fromVersion: number): string {
+    if (!Number.isSafeInteger(fromVersion) || fromVersion < 0 || fromVersion >= build.patches.length) {
+        throw new Error('Cannot render an empty or invalid WX patch range.')
     }
 
+    const patches = build.patches.slice(fromVersion)
     const metadata = {
-        buildId: projection.buildId,
-        fromVersion: projection.fromVersion,
-        targetVersion: projection.targetVersion
+        buildId: build.buildId,
+        fromVersion,
+        targetVersion: build.patches.length
     }
-    const patchSource = projection.patches.map((patch) => patch.code).join('\n')
+    const patchSource = patches.map((patch) => patch.code).join('\n')
 
     return `const __rolldown_runtime__ = global.__rolldown_runtime__;\nmodule.exports = __rolldown_runtime__.storePatches(${JSON.stringify(metadata)}, () => {\n${indent(patchSource, 4)}\n});\n`
 }

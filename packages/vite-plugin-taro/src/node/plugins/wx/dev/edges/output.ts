@@ -1,8 +1,8 @@
 import path from 'node:path'
 import colors from 'picocolors'
-import { firstValueFrom, ReplaySubject, take } from 'rxjs'
+import { firstValueFrom, ReplaySubject, type Subject, take } from 'rxjs'
 import type { ViteDevServer } from 'vite'
-import type { PatchProjection } from '../topology.ts'
+import type { Build, WxHostFact } from '../topology.ts'
 import { hmrControlPath } from './control.ts'
 import {
     hmrInfoFileName,
@@ -14,23 +14,25 @@ import {
 } from './files.ts'
 
 /**
- * Owns physical development artifacts only.
+ * Owns physical development artifacts and publishes patch-write result facts itself.
  *
- * Complete output is written by the DevEngine. This edge materializes its App metadata and inert patches dependency,
- * then later overwrites only hmr/patches.js for ordinary HMR delivery.
+ * Complete output comes from DevEngine. DevHost combines that output with `writeBootstrap()` into the single full-build
+ * operation; ordinary patch delivery is self-contained here because its success/failure is a topology fact.
  */
 export function createPhysicalOutputEdge({
+    facts$,
     outDir,
     server,
     token
 }: {
+    facts$: Subject<WxHostFact>
     outDir: string
     server: ViteDevServer
     token: string
 }): Readonly<{
     close(): void
     writeBootstrap(build: Readonly<{ buildId: string }>): Promise<void>
-    writePatches(projection: PatchProjection): Promise<void>
+    writePatches(build: Build, fromVersion: number): Promise<void>
 }> {
     const origins$ = new ReplaySubject<string>(1)
     const httpServer = server.httpServer
@@ -74,8 +76,26 @@ export function createPhysicalOutputEdge({
                 printDevToolsPath(server, outDir)
             }
         },
-        async writePatches(projection): Promise<void> {
-            await writeHmrFile(outDir, hmrPatchesFileName, renderHmrPatches(projection))
+        async writePatches(build, fromVersion): Promise<void> {
+            try {
+                await writeHmrFile(outDir, hmrPatchesFileName, renderHmrPatches(build, fromVersion))
+                facts$.next({
+                    type: 'patches-written',
+                    buildId: build.buildId,
+                    fromVersion,
+                    ok: true,
+                    targetVersion: build.patches.length
+                })
+            } catch (error) {
+                facts$.next({
+                    type: 'patches-written',
+                    buildId: build.buildId,
+                    error,
+                    fromVersion,
+                    ok: false,
+                    targetVersion: build.patches.length
+                })
+            }
         }
     }
 }

@@ -1,12 +1,14 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { InputOptions, OutputOptions, RolldownOutput } from 'rolldown'
-import { type BindingClientHmrUpdate, type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
-import { firstValueFrom, ReplaySubject, Subject, take } from 'rxjs'
+import { type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
+import { type Subject as FactSubject, firstValueFrom, ReplaySubject, Subject, take } from 'rxjs'
 import type { ViteDevServer } from 'vite'
 import { resolvePackageFile } from '../../../../utils/packages.ts'
-import type { FullBuildRequest, FullBuildResult } from '../topology.ts'
+import type { BuildRequest, FullBuildResult, WxHostFact } from '../topology.ts'
 import { hmrInfoFileName, hmrPatchesFileName } from './files.ts'
+
+const safeJavaScriptExtensions = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx'])
 
 type BundledDevRolldownOptions = InputOptions & {
     experimental?: {
@@ -25,38 +27,29 @@ type BundledDev = {
 
 type OutputAddon = string | ((chunk: { fileName: string }) => string | Promise<string>)
 
-export type DevEngineHmrResult =
-    | Error
-    | Readonly<{
-          changedFiles: string[]
-          updates: BindingClientHmrUpdate[]
-      }>
-
 /**
  * Vite-private DevEngine edge.
  *
- * Its output streams contain observations only. The topology chooses whether those observations append a safe patch or
- * request a complete build; this edge never selects a physical patch range itself.
+ * It turns native engine callbacks into host facts directly. The topology already owns the current Build, so this edge
+ * emits HostPatches without retaining build or runtime state and never selects physical patch ranges.
  */
 export type DevEngineEdge = Readonly<{
-    additionalAssets$: Subject<void>
-    hmrResults$: Subject<DevEngineHmrResult>
     registerModules(clientId: string, modules: string[]): Promise<boolean>
-    runBuild(request: FullBuildRequest): Promise<FullBuildResult>
+    runBuild(request: BuildRequest): Promise<FullBuildResult>
 }>
 
 export function createDevEngineEdge({
+    facts$,
     pageFiles,
     server
 }: {
+    facts$: FactSubject<WxHostFact>
     pageFiles: ReadonlySet<string>
     server: ViteDevServer
 }): DevEngineEdge {
     const bundledDev = getBundledDev(server)
     const outputResults$ = new Subject<Error | RolldownOutput>()
     const initialBuildResults$ = new ReplaySubject<FullBuildResult>(1)
-    const hmrResults$ = new Subject<DevEngineHmrResult>()
-    const additionalAssets$ = new Subject<void>()
     let engine: DevEngine | undefined
 
     installRolldownOptions()
@@ -69,8 +62,6 @@ export function createDevEngineEdge({
     }
 
     return {
-        additionalAssets$,
-        hmrResults$,
         async registerModules(clientId, modules): Promise<boolean> {
             if (!engine) {
                 return false
@@ -107,8 +98,8 @@ export function createDevEngineEdge({
         }
 
         engine = await dev(options, output, {
-            onAdditionalAssets: () => additionalAssets$.next(),
-            onHmrUpdates: (result) => hmrResults$.next(result),
+            onAdditionalAssets: () => facts$.next({ type: 'rebuild-requested', reason: 'source-requires-full-build' }),
+            onHmrUpdates: (result) => publishHmrResult(result),
             onOutput: (result) => outputResults$.next(result),
             rebuildStrategy: 'never',
             watch: { skipWrite: false }
@@ -126,6 +117,40 @@ export function createDevEngineEdge({
         const output = firstValueFrom(outputResults$.pipe(take(1)))
         engine?.triggerFullBuild()
         return output
+    }
+
+    /** Converts DevEngine output into facts while preserving its native safety classification boundary. */
+    function publishHmrResult(result: unknown): void {
+        if (result instanceof Error) {
+            facts$.next({ type: 'rebuild-requested', reason: 'patch-generation-failed' })
+            return
+        }
+        if (!isHmrResult(result)) {
+            facts$.next({ type: 'rebuild-requested', reason: 'patch-generation-failed' })
+            return
+        }
+        if (
+            !result.changedFiles.every(isSafeJavaScriptChange) ||
+            result.updates.some(({ update }) => update.type === 'FullReload')
+        ) {
+            facts$.next({ type: 'rebuild-requested', reason: 'source-requires-full-build' })
+            return
+        }
+        for (const { clientId, update } of result.updates) {
+            if (update.type !== 'Patch') {
+                continue
+            }
+            facts$.next({
+                type: 'patch-produced',
+                clientId,
+                patch: {
+                    code: update.code,
+                    fileName: update.filename,
+                    sourcemap: update.sourcemap,
+                    sourcemapFileName: update.sourcemapFilename
+                }
+            })
+        }
     }
 
     /** Replaces Vite's browser-development output conventions with stable physical WX paths. */
@@ -193,6 +218,28 @@ function createHmrRequire(fileName: string, pageFiles: ReadonlySet<string>): str
         return `require(${JSON.stringify(`${root}${hmrPatchesFileName}`)});`
     }
     return ''
+}
+
+function isHmrResult(value: unknown): value is Readonly<{
+    changedFiles: string[]
+    updates: Array<{
+        clientId: string
+        update:
+            | Readonly<{ type: 'FullReload' }>
+            | Readonly<{
+                  type: 'Patch'
+                  code: string
+                  filename: string
+                  sourcemap?: string
+                  sourcemapFilename?: string
+              }>
+    }>
+}> {
+    return typeof value === 'object' && value !== null && 'changedFiles' in value && 'updates' in value
+}
+
+function isSafeJavaScriptChange(fileName: string): boolean {
+    return safeJavaScriptExtensions.has(path.extname(fileName.split('?', 1)[0]).toLowerCase())
 }
 
 function createStableFileNames<T>(addon: unknown, fallback: string): string | ((value: T) => string) {

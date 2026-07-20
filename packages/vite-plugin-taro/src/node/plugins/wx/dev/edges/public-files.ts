@@ -1,6 +1,17 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { catchError, concatMap, EMPTY, endWith, firstValueFrom, from, ignoreElements, Subject } from 'rxjs'
+import {
+    catchError,
+    concatMap,
+    EMPTY,
+    endWith,
+    type Subject as FactSubject,
+    firstValueFrom,
+    from,
+    ignoreElements,
+    Subject
+} from 'rxjs'
+import type { WxHostFact } from '../topology.ts'
 
 type Watcher = Readonly<{
     off(event: 'all', listener: (event: string, filePath: string) => void): unknown
@@ -39,19 +50,17 @@ export async function preparePublicFiles({
 }
 
 /**
- * Mirrors public files through one serialized edge lane, then asks the topology for a complete build.
+ * Mirrors public files through one serialized edge lane and publishes a rebuild fact after each physical change.
  *
- * Public files are outside Rolldown's module graph, so a successful copy/delete cannot be represented as a patch.
+ * Public files are outside Rolldown's graph, so they cannot produce HostPatches.
  */
 export function watchPublicFiles({
-    onChanged,
-    onError,
+    facts$,
     outDir,
     publicDir,
     watcher
 }: {
-    onChanged(): void
-    onError(error: unknown): void
+    facts$: FactSubject<WxHostFact>
     outDir: string
     publicDir: string
     watcher: Watcher
@@ -66,12 +75,13 @@ export function watchPublicFiles({
             return from(syncPublicFile(event, filePath, destination)).pipe(
                 concatMap((changed) => {
                     if (changed) {
-                        onChanged()
+                        facts$.next({ type: 'rebuild-requested', reason: 'source-requires-full-build' })
                     }
                     return EMPTY
                 }),
                 catchError((error: unknown) => {
-                    onError(error)
+                    console.error('[vite-plugin-taro] WX public-file synchronization failed', error)
+                    facts$.next({ type: 'rebuild-requested', reason: 'source-requires-full-build' })
                     return EMPTY
                 })
             )
