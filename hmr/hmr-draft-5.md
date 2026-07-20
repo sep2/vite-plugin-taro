@@ -92,6 +92,8 @@ A simple `isRebuilding` boolean was rejected because a delayed old callback coul
 
 ## Proposed protocol
 
+The design is not final and is subjected to change. make your own decision.
+
 ```text
 runtime reports { buildId, version V }
         │
