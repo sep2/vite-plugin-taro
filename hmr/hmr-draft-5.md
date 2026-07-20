@@ -304,6 +304,8 @@ Using `buildId` as Rolldown client ID requires constructing the runtime with inf
 
 just do it.
 
+### 5. All other repo docs and code are stale. No need to read.
+
 ---
 
 ## Validation evidence
