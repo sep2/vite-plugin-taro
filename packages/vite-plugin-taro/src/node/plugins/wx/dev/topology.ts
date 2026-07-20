@@ -116,7 +116,7 @@ export type WxHostCommand =
 type FactOf<Type extends WxHostFact['type']> = Extract<WxHostFact, { type: Type }>
 
 export type WxHostTopologyOptions = Readonly<{
-    maximumPatchCount?: number
+    maximumPatchPerBuild: number
 }>
 
 type PatchHistory = {
@@ -130,15 +130,17 @@ type PatchHistory = {
  */
 export function createWxHostTopology(
     facts$: Observable<WxHostFact>,
-    { maximumPatchCount = 100 }: WxHostTopologyOptions = {}
+    options: WxHostTopologyOptions
 ): Observable<WxHostCommand> {
-    if (!Number.isSafeInteger(maximumPatchCount) || maximumPatchCount < 1) {
+    if (!Number.isSafeInteger(options.maximumPatchPerBuild) || options.maximumPatchPerBuild < 1) {
         throw new RangeError('maximumPatchCount must be a positive safe integer.')
     }
 
-    const patchHistory$ = createPatchHistory(facts$)
+    const sharedFacts = facts$.pipe(share())
 
-    return createCommands(facts$, patchHistory$, maximumPatchCount).pipe(share())
+    const patchHistory$ = createPatchHistory(sharedFacts, options)
+
+    return createCommands(sharedFacts, patchHistory$, options).pipe(share())
 }
 
 /** Selects one discriminated stream from the topology fact bus. */
@@ -155,7 +157,7 @@ function factsOf<Type extends WxHostFact['type']>(
  * A successful full-build result replaces the entire switchMap branch and releases its old buffer. Crossing the limit
  * emits one rebuild reason, but patches continue to append while that rebuild runs.
  */
-function createPatchHistory(facts$: Observable<WxHostFact>): Observable<PatchHistory> {
+function createPatchHistory(facts$: Observable<WxHostFact>, options: WxHostTopologyOptions): Observable<PatchHistory> {
     const successfulBuilds$ = factsOf(facts$, 'full-build-finished').pipe(
         map(({ result }) => result),
         filter((result): result is Extract<FullBuildResult, { ok: true }> => result.ok)
@@ -188,7 +190,7 @@ function createPatchHistory(facts$: Observable<WxHostFact>): Observable<PatchHis
 function createCommands(
     facts$: Observable<WxHostFact>,
     patchHistory$: Observable<PatchHistory>,
-    maximumPatchCount: number
+    options: WxHostTopologyOptions
 ): Observable<WxHostCommand> {
     return merge(
         factsOf(facts$, 'runtime-requested').pipe(
@@ -199,7 +201,7 @@ function createCommands(
             map(({ reason }): WxHostCommand => ({ kind: 'request-rebuild', reason }))
         ),
         patchHistory$.pipe(
-            map((history) => history.patches.length >= maximumPatchCount),
+            map((history) => history.patches.length >= options.maximumPatchPerBuild),
             distinctUntilChanged(),
             filter(Boolean),
             map((): WxHostCommand => ({ kind: 'request-rebuild', reason: 'history-limit' }))

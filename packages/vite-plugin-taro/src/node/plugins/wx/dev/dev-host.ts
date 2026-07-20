@@ -57,7 +57,7 @@ export async function createDevHost(
         server
     })
     const physicalOutput = createPhysicalOutputEdge({ outDir, server, token: control.token })
-    const commands$ = createWxHostTopology(facts$)
+    const commands$ = createWxHostTopology(facts$, { maximumPatchPerBuild: 100 })
 
     // DevEngine HMR facts require the current baseline ID, derived from full-build result facts rather than host state.
     const activeBuildId$ = fullBuildResults$.pipe(
@@ -73,14 +73,14 @@ export async function createDevHost(
         devEngine.hmrResults$.pipe(withLatestFrom(activeBuildId$)).subscribe(([result, buildId]) => {
             if (result instanceof Error) {
                 reportError('HMR generation', result)
-                facts$.next({ type: 'full-build-requested', reason: 'patch-generation-failed' })
+                facts$.next({ type: 'rebuild-requested', reason: 'patch-generation-failed' })
                 return
             }
             if (
                 !result.changedFiles.every(isSafeJavaScriptChange) ||
                 result.updates.some(({ update }) => update.type === 'FullReload')
             ) {
-                facts$.next({ type: 'full-build-requested', reason: 'source-requires-full-build' })
+                facts$.next({ type: 'rebuild-requested', reason: 'source-requires-full-build' })
                 return
             }
             for (const { clientId, update } of result.updates) {
@@ -101,12 +101,12 @@ export async function createDevHost(
             }
         }),
         devEngine.additionalAssets$.subscribe(() => {
-            facts$.next({ type: 'full-build-requested', reason: 'source-requires-full-build' })
+            facts$.next({ type: 'rebuild-requested', reason: 'source-requires-full-build' })
         })
     )
 
     const publicFiles = watchPublicFiles({
-        onChanged: () => facts$.next({ type: 'full-build-requested', reason: 'source-requires-full-build' }),
+        onChanged: () => facts$.next({ type: 'rebuild-requested', reason: 'source-requires-full-build' }),
         onError: (error) => reportError('public file synchronization', error),
         outDir,
         publicDir: server.config.publicDir,
@@ -114,7 +114,7 @@ export async function createDevHost(
     })
 
     // Attach all command and result consumers before starting the first complete physical build.
-    facts$.next({ type: 'full-build-requested', reason: 'initial' })
+    facts$.next({ type: 'rebuild-requested', reason: 'initial' })
 
     return {
         async close(): Promise<void> {
@@ -129,7 +129,7 @@ export async function createDevHost(
 
     async function executeCommand(command: WxHostCommand): Promise<WxHostFact> {
         switch (command.kind) {
-            case 'run-full-build': {
+            case 'request-rebuild': {
                 const request: FullBuildRequest = { buildId: randomUUID(), reason: command.reason }
                 let result: FullBuildResult = await devEngine.runBuild(request)
                 if (result.ok) {
