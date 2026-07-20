@@ -24,7 +24,7 @@ import {
  *   └──────────── operation results ───────┘
  * ```
  *
- * The only retained topology value is the current build's bounded patch history:
+ * The only retained topology value is the current build's patch history:
  *
  * ```text
  * full-build-finished ──▶ fresh history
@@ -34,7 +34,8 @@ import {
  * ```
  *
  * A rebuild is one edge operation: generate a fresh buildId, run DevEngine's complete output, then write hmr/info.js
- * and inert hmr/patches.js. The resulting full-build fact resets patch numbering to zero.
+ * and inert hmr/patches.js. The resulting full-build fact resets patch numbering to zero. Reaching the retained-history
+ * limit requests this rebuild once, but does not stop later patches from appending while it runs.
  */
 
 export type RebuildReason =
@@ -115,14 +116,14 @@ export type WxHostCommand =
     | Readonly<{ kind: 'request-rebuild'; reason: RebuildReason }>
     | Readonly<{ kind: 'write-patches'; projection: PatchProjection }>
 
+type FactOf<Type extends WxHostFact['type']> = Extract<WxHostFact, { type: Type }>
+
 export type WxHostTopologyOptions = Readonly<{
     maximumPatchCount?: number
 }>
 
-type FactOf<Type extends WxHostFact['type']> = Extract<WxHostFact, { type: Type }>
 type PatchHistory = {
     buildId: string
-    limitReached: boolean
     patches: SafePatch[]
 }
 
@@ -139,9 +140,9 @@ export function createWxHostTopology(
     }
 
     const fullBuildFinished$ = factsOf(facts$, 'full-build-finished').pipe(share())
-    const patchHistory$ = createPatchHistory(factsOf(facts$, 'patch-produced'), fullBuildFinished$, maximumPatchCount)
+    const patchHistory$ = createPatchHistory(factsOf(facts$, 'patch-produced'), fullBuildFinished$)
     const runtimeCommands$ = createRuntimeCommands(factsOf(facts$, 'runtime-requested'), patchHistory$)
-    const rebuildReasons$ = createRebuildReasons(facts$, patchHistory$, runtimeCommands$)
+    const rebuildReasons$ = createRebuildReasons(facts$, patchHistory$, runtimeCommands$, maximumPatchCount)
 
     return merge(
         createRebuildCommands(rebuildReasons$, fullBuildFinished$),
@@ -158,15 +159,14 @@ function factsOf<Type extends WxHostFact['type']>(
 }
 
 /**
- * Maintains the sole private value: a bounded O(1)-append patch buffer.
+ * Maintains the sole private value: an O(1)-append patch buffer.
  *
- * A successful rebuild replaces the entire switchMap branch. When capacity is reached, the buffer freezes until the
- * rebuild command completes; the limit transition itself becomes a rebuild reason below.
+ * A successful full-build result replaces the entire switchMap branch and releases its old buffer. Crossing the limit
+ * emits one rebuild reason, but patches continue to append while that rebuild runs.
  */
 function createPatchHistory(
     patchProduced$: Observable<FactOf<'patch-produced'>>,
-    fullBuildFinished$: Observable<FactOf<'full-build-finished'>>,
-    maximumPatchCount: number
+    fullBuildFinished$: Observable<FactOf<'full-build-finished'>>
 ): Observable<PatchHistory> {
     const successfulBuilds$ = fullBuildFinished$.pipe(
         map(({ result }) => result),
@@ -175,14 +175,12 @@ function createPatchHistory(
 
     return successfulBuilds$.pipe(
         switchMap(({ buildId }) => {
-            const history: PatchHistory = { buildId, limitReached: false, patches: [] }
+            const history: PatchHistory = { buildId, patches: [] }
+
             return patchProduced$.pipe(
                 filter(({ patch }) => patch.buildId === buildId),
                 scan((current, { patch }) => {
-                    if (!current.limitReached) {
-                        current.patches.push(patch.patch)
-                        current.limitReached = current.patches.length >= maximumPatchCount
-                    }
+                    current.patches.push(patch.patch)
                     return current
                 }, history),
                 startWith(history)
@@ -212,12 +210,13 @@ function createRuntimeCommands(
 function createRebuildReasons(
     facts$: Observable<WxHostFact>,
     patchHistory$: Observable<PatchHistory>,
-    runtimeCommands$: Observable<WxHostCommand>
+    runtimeCommands$: Observable<WxHostCommand>,
+    maximumPatchCount: number
 ): Observable<RebuildReason> {
     return merge(
         factsOf(facts$, 'rebuild-requested').pipe(map(({ reason }) => reason)),
         patchHistory$.pipe(
-            map((history) => history.limitReached),
+            map((history) => history.patches.length >= maximumPatchCount),
             distinctUntilChanged(),
             filter(Boolean),
             map((): RebuildReason => 'history-limit')
