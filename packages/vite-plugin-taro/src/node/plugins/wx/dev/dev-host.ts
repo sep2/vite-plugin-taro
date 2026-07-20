@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
-import { EMPTY, from, merge, type Observable, Subject, type Subscription } from 'rxjs'
+import { EMPTY, from, Subject, type Subscription } from 'rxjs'
 import { catchError, concatMap, filter, map, shareReplay, withLatestFrom } from 'rxjs/operators'
 import type { ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
@@ -10,31 +10,28 @@ import { createPhysicalOutputEdge } from './edges/output.ts'
 import { preparePublicFiles, watchPublicFiles } from './edges/public-files.ts'
 import {
     createWxHostTopology,
-    type FullBuildReason,
     type FullBuildRequest,
     type FullBuildResult,
     type PatchProjection,
     type ProducedPatch,
-    type RuntimeFailure,
-    type RuntimePatchRequest
+    type WxHostCommand,
+    type WxHostFact
 } from './topology.ts'
 
 const safeJavaScriptExtensions = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx'])
 
-type Effect = () => Promise<void>
-
 /**
- * Wires Vite's effectful WX development edges around the RxJS host topology.
+ * Wires Vite's effectful WX development edges around the pure topology.
  *
  * ```text
- * runtime version/failure ─┐
- * DevEngine patch/full ────┼──▶ createWxHostTopology ─┬─ fullBuildReasons$ ───▶ DevEngine full build
- * physical write failure ──┘                          ├─ fullMaterializations$ ▶ bootstrap/info writer
- *                                                      └─ patchProjections$ ───▶ patches.js writer
- *
- * Every edge result returns as an input stream. The topology itself has no subscriptions, runtime registry, pending
- * delivery, or last runtime version.
+ * facts$ ──> createWxHostTopology ──> commands$ ──> concatMap(execute edge)
+ *   ▲                                                           │
+ *   └────────────────────── operation-result facts ────────────┘
  * ```
+ *
+ * `run-full-build` is one edge operation: DevEngine output plus hmr/info.js and inert hmr/patches.js publication.
+ * DevHost contains no host decisions. It only converts Vite, runtime-control, and filesystem observations into facts,
+ * then converts topology commands into serialized edge calls.
  */
 export async function createDevHost(
     server: ViteDevServer,
@@ -42,13 +39,8 @@ export async function createDevHost(
 ): Promise<Readonly<{ close(): Promise<void> }>> {
     const outDir = path.resolve(server.config.root, server.config.build.outDir)
     const pageFiles = new Set(options.pages.map((page) => `${page.path}.js`))
-    const fullBuildReasons$ = new Subject<FullBuildReason>()
+    const facts$ = new Subject<WxHostFact>()
     const fullBuildResults$ = new Subject<FullBuildResult>()
-    const fullMaterializationFailures$ = new Subject<Readonly<{ buildId: string }>>()
-    const patchesWriteFailures$ = new Subject<Readonly<{ buildId: string }>>()
-    const producedPatches$ = new Subject<ProducedPatch>()
-    const runtimeFailures$ = new Subject<RuntimeFailure>()
-    const runtimeRequests$ = new Subject<RuntimePatchRequest>()
     const subscriptions: Subscription[] = []
     let closed = false
 
@@ -61,80 +53,42 @@ export async function createDevHost(
     const devEngine = createDevEngineEdge({ pageFiles, server })
     const control = createControlEdge({
         registerModules: devEngine.registerModules,
-        reportFailure: (failure) => runtimeFailures$.next(failure),
-        requestPatches: (request) => runtimeRequests$.next(request),
+        reportFailure: (failure) => facts$.next({ type: 'runtime-failed', failure }),
+        requestPatches: (request) => facts$.next({ type: 'runtime-requested', request }),
         server
     })
     const physicalOutput = createPhysicalOutputEdge({ outDir, server, token: control.token })
-    const topology = createWxHostTopology({
-        fullBuildReasons$,
-        fullBuildResults$,
-        fullMaterializationFailures$,
-        patchesWriteFailures$,
-        producedPatches$,
-        runtimeFailures$,
-        runtimeRequests$
-    })
+    const commands$ = createWxHostTopology(facts$)
 
-    // This derives the build identity from the topology input stream; no mutable runtime/session record is retained.
+    // DevEngine HMR facts require the current baseline ID, derived from full-build result facts rather than host state.
     const activeBuildId$ = fullBuildResults$.pipe(
         filter((result): result is Extract<FullBuildResult, { ok: true }> => result.ok),
         map((result) => result.buildId),
         shareReplay({ bufferSize: 1, refCount: true })
     )
 
-    const effects$: Observable<Effect> = merge(
-        topology.fullBuildReasons$.pipe(
-            map(
-                (reason): Effect =>
-                    () =>
-                        runFullBuild(reason)
-            )
-        ),
-        topology.fullMaterializations$.pipe(
-            map(
-                (build): Effect =>
-                    () =>
-                        materializeFull(build)
-            )
-        ),
-        topology.patchProjections$.pipe(
-            map(
-                (projection): Effect =>
-                    () =>
-                        materializePatches(projection)
-            )
-        )
-    )
     subscriptions.push(
-        effects$
-            .pipe(
-                // Physical writes and full builds share one lane. Patches may accumulate in topology history while it
-                // is busy; the next stateless runtime version request selects the complete latest suffix.
-                concatMap((effect) => from(effect()).pipe(catchError((error: unknown) => reportEffectFailure(error))))
-            )
-            .subscribe()
-    )
-
-    subscriptions.push(
+        commands$
+            .pipe(concatMap((command) => from(executeCommand(command)).pipe(catchError(commandFailure))))
+            .subscribe(facts$),
         devEngine.hmrResults$.pipe(withLatestFrom(activeBuildId$)).subscribe(([result, buildId]) => {
             if (result instanceof Error) {
                 reportError('HMR generation', result)
-                fullBuildReasons$.next('patch-generation-failed')
+                facts$.next({ type: 'full-build-requested', reason: 'patch-generation-failed' })
                 return
             }
             if (
                 !result.changedFiles.every(isSafeJavaScriptChange) ||
                 result.updates.some(({ update }) => update.type === 'FullReload')
             ) {
-                fullBuildReasons$.next('source-requires-full-build')
+                facts$.next({ type: 'full-build-requested', reason: 'source-requires-full-build' })
                 return
             }
             for (const { clientId, update } of result.updates) {
                 if (update.type !== 'Patch') {
                     continue
                 }
-                producedPatches$.next({
+                const patch: ProducedPatch = {
                     buildId,
                     clientId,
                     patch: {
@@ -143,22 +97,25 @@ export async function createDevHost(
                         sourcemap: update.sourcemap,
                         sourcemapFileName: update.sourcemapFilename
                     }
-                })
+                }
+                facts$.next({ type: 'patch-produced', patch })
             }
         }),
-        devEngine.additionalAssets$.subscribe(() => fullBuildReasons$.next('source-requires-full-build'))
+        devEngine.additionalAssets$.subscribe(() => {
+            facts$.next({ type: 'full-build-requested', reason: 'source-requires-full-build' })
+        })
     )
 
     const publicFiles = watchPublicFiles({
-        onChanged: () => fullBuildReasons$.next('source-requires-full-build'),
+        onChanged: () => facts$.next({ type: 'full-build-requested', reason: 'source-requires-full-build' }),
         onError: (error) => reportError('public file synchronization', error),
         outDir,
         publicDir: server.config.publicDir,
         watcher: server.watcher
     })
 
-    // Every stream consumer is attached before the initial full-build reason enters the topology.
-    fullBuildReasons$.next('initial')
+    // Attach all command and result consumers before starting the first complete physical build.
+    facts$.next({ type: 'full-build-requested', reason: 'initial' })
 
     return {
         async close(): Promise<void> {
@@ -172,42 +129,53 @@ export async function createDevHost(
         }
     }
 
-    async function runFullBuild(reason: FullBuildReason): Promise<void> {
-        const request: FullBuildRequest = { buildId: randomUUID(), reason }
-        const result = await devEngine.runBuild(request)
-        if (!result.ok) {
-            reportError('complete build', result.error)
-        }
-        if (!closed) {
-            fullBuildResults$.next(result)
-        }
-    }
-
-    async function materializeFull(build: Readonly<{ buildId: string }>): Promise<void> {
-        try {
-            await physicalOutput.writeBootstrap(build)
-        } catch (error) {
-            reportError('full WX materialization', error)
-            if (!closed) {
-                fullMaterializationFailures$.next(build)
+    async function executeCommand(command: WxHostCommand): Promise<WxHostFact> {
+        switch (command.kind) {
+            case 'run-full-build': {
+                const request: FullBuildRequest = { buildId: randomUUID(), reason: command.reason }
+                let result: FullBuildResult = await devEngine.runBuild(request)
+                if (result.ok) {
+                    try {
+                        await physicalOutput.writeBootstrap({ buildId: result.buildId })
+                    } catch (error) {
+                        reportError('full WX materialization', error)
+                        result = { buildId: result.buildId, error, ok: false }
+                    }
+                }
+                if (!result.ok) {
+                    reportError('complete build', result.error)
+                }
+                if (!closed) {
+                    fullBuildResults$.next(result)
+                }
+                return { type: 'full-build-finished', result }
+            }
+            case 'write-patches': {
+                try {
+                    await physicalOutput.writePatches(command.projection)
+                    return patchesWritten(command.projection, true)
+                } catch (error) {
+                    reportError('patches.js materialization', error)
+                    return patchesWritten(command.projection, false, error)
+                }
             }
         }
     }
 
-    async function materializePatches(projection: PatchProjection): Promise<void> {
-        try {
-            await physicalOutput.writePatches(projection)
-        } catch (error) {
-            reportError('patches.js materialization', error)
-            if (!closed) {
-                patchesWriteFailures$.next({ buildId: projection.buildId })
-            }
-        }
-    }
-
-    function reportEffectFailure(error: unknown): Observable<never> {
-        reportError('WX development effect', error)
+    function commandFailure(error: unknown) {
+        reportError('WX development command', error)
         return EMPTY
+    }
+}
+
+function patchesWritten(projection: PatchProjection, ok: boolean, error?: unknown): WxHostFact {
+    return {
+        type: 'patches-written',
+        buildId: projection.buildId,
+        error,
+        fromVersion: projection.fromVersion,
+        ok,
+        targetVersion: projection.targetVersion
     }
 }
 
