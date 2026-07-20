@@ -1,5 +1,7 @@
 # WX HMR redesign — current handoff
 
+we already have many impl. check then before proceed.
+
 ## Objective
 
 Implement physical WX HMR where:
@@ -92,7 +94,7 @@ A simple `isRebuilding` boolean was rejected because a delayed old callback coul
 
 ## Proposed protocol
 
-The design is not final and is subjected to change. make your own decision.
+The design is final and is not subjected to change.
 
 ```text
 runtime reports { buildId, version V }
@@ -225,18 +227,6 @@ A full build is one composite operation:
 5. emit `full-build-finished`.
 
 Running and materializing a full build must not be separate topology commands.
-
----
-
-## Edge design
-
-Every edge receives the shared `facts$` and publishes its own observations. Callback-style plumbing such as `reportFailure`, `requestPatches`, `onChanged`, and `onError` was removed.
-
-These files are subjected to be changed. and is encouraged to be changed towards a more declarative design.
-
-The current design is fragile and error prone. do not use these files split and structure and names and logic. only see them for how to interact with vite / rolldown
-
-### `abandon/*.ts`
 
 ---
 
