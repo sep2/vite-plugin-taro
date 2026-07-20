@@ -1,39 +1,31 @@
-import { merge, type Observable } from 'rxjs'
-import { filter, map, scan, share, shareReplay, startWith, switchMap, withLatestFrom } from 'rxjs/operators'
+import { EMPTY, merge, type Observable, of } from 'rxjs'
+import { filter, map, mergeMap, scan, share, shareReplay, startWith, switchMap, withLatestFrom } from 'rxjs/operators'
 
 /**
- * WX development host topology.
- *
- * The host retains only a build's append-only patch history. It does not retain runtime/session objects, a last runtime
- * version, pending requests, delivery acknowledgements, or an execution state. A runtime request carries all input
- * needed to project the current patch suffix.
+ * Pure WX HMR topology.
  *
  * ```text
- * full-build result ──────┐
- *                          ▼
- * safe patches ─────▶ current patch-history$ ◀──── runtime request { buildId, version }
- *                          │                                      │
- *                          │                                      ▼
- *                          │                         patches[version..current]
- *                          │                                      │
- *                          ▼                                      ▼
- *                    materialize full                      write hmr/patches.js
- *                                                               │
- *                                                               ▼
- *                                                DevTools re-executes the page
- *                                                               │
- *                                             patches.js stores patch factories
- *                                                               │
- *                                            App runtime reconciles and reports
+ * facts ──> topology ──> commands ──> edge consumers
+ *   ▲                                      │
+ *   └──────────── operation results ───────┘
  * ```
  *
- * `hmr/patches.js` is delivery-only. It stores patch factories in the App-owned runtime and never executes them. The
- * runtime reconciles after synchronous page evaluation returns, then makes its next version request.
+ * Patch history is the only private value retained by the stream graph. The host stores no runtime/session object, last
+ * runtime version, delivery acknowledgement, build phase, or command queue. Each runtime request carries all input
+ * needed to project its missing suffix from the current history snapshot.
  *
- * A full build generates a new `buildId` and resets patch numbering to zero. It has no version of its own.
+ * ```text
+ * successful full build ── switchMap ──▶ patch history scan
+ *                                            │
+ * runtime request { buildId, version } ──────┼── withLatestFrom ──▶ physical patch projection
+ *                                            │
+ * runtime/write failure ─────────────────────┴── withLatestFrom ──▶ complete build command
+ * ```
+ *
+ * A full build has a fresh `buildId`, not a version, and starts patch numbering at zero. `hmr/patches.js` only stores
+ * factories in the persistent App runtime; that runtime reconciles them after Page evaluation returns.
  */
 
-/** Reasons that require a fresh complete physical WX build. */
 export type FullBuildReason =
     | 'initial'
     | 'full-materialization-failed'
@@ -43,18 +35,16 @@ export type FullBuildReason =
     | 'runtime-failed'
     | 'source-requires-full-build'
 
-/** An edge-generated complete-build request. Its identity changes on every full build. */
+/** An edge-generated full-build request. Every complete build gets a fresh identity. */
 export type FullBuildRequest = Readonly<{
     buildId: string
     reason: FullBuildReason
 }>
 
-/** The DevEngine edge's result for one complete physical build. */
 export type FullBuildResult =
     | Readonly<{ buildId: string; ok: true }>
     | Readonly<{ buildId: string; error: unknown; ok: false }>
 
-/** One safe, executable Rolldown patch. */
 export type SafePatch = Readonly<{
     code: string
     fileName: string
@@ -62,21 +52,20 @@ export type SafePatch = Readonly<{
     sourcemapFileName?: string
 }>
 
-/** A DevEngine patch is tied to the physical build that emitted it. */
+/** DevEngine patch provenance. The client ID is never retained as host runtime/session state. */
 export type ProducedPatch = Readonly<{
     buildId: string
     clientId: string
     patch: SafePatch
 }>
 
-/** A runtime request is complete range-selection input; the host never stores its version. */
+/** A stateless version report from the persistent App runtime. */
 export type RuntimePatchRequest = Readonly<{
     buildId: string
     clientId: string
     version: number
 }>
 
-/** A runtime error causes a complete rebuild, which lets DevTools destroy all old App state naturally. */
 export type RuntimeFailure = Readonly<{
     buildId: string
     clientId: string
@@ -84,7 +73,7 @@ export type RuntimeFailure = Readonly<{
     version: number
 }>
 
-/** The exact contiguous physical patch file to write for one runtime request. */
+/** One complete contiguous patch suffix for physical hmr/patches.js output. */
 export type PatchProjection = Readonly<{
     buildId: string
     fromVersion: number
@@ -92,77 +81,62 @@ export type PatchProjection = Readonly<{
     targetVersion: number
 }>
 
-/** Identifies the current full baseline and the patches produced after it. This stays private to the stream graph. */
+/** All edge observations entering the topology. */
+export type WxHostFact =
+    | Readonly<{ type: 'full-build-requested'; reason: FullBuildReason }>
+    | Readonly<{ type: 'full-build-finished'; result: FullBuildResult }>
+    | Readonly<{ type: 'full-materialized'; buildId: string; ok: boolean; error?: unknown }>
+    | Readonly<{ type: 'patch-produced'; patch: ProducedPatch }>
+    | Readonly<{
+          type: 'patches-written'
+          buildId: string
+          fromVersion: number
+          targetVersion: number
+          ok: boolean
+          error?: unknown
+      }>
+    | Readonly<{ type: 'runtime-requested'; request: RuntimePatchRequest }>
+    | Readonly<{ type: 'runtime-failed'; failure: RuntimeFailure }>
+
+/** Effects selected by topology and performed by DevHost edges. */
+export type WxHostCommand =
+    | Readonly<{ kind: 'run-full-build'; reason: FullBuildReason }>
+    | Readonly<{ kind: 'materialize-full'; buildId: string }>
+    | Readonly<{ kind: 'write-patches'; projection: PatchProjection }>
+
 type PatchHistory = Readonly<{
     buildId: string
     patches: readonly SafePatch[]
 }>
 
-type Projection =
-    | Readonly<{ kind: 'idle' }>
-    | Readonly<{ kind: 'materialize-full'; buildId: string }>
-    | Readonly<{ kind: 'patches'; projection: PatchProjection }>
-    | Readonly<{ kind: 'runtime-ahead-of-history' }>
-
-/** Inputs supplied by Vite/DevEngine, the control endpoint, and physical-output edges. */
-export type WxHostTopologyInput = Readonly<{
-    /** Initial startup plus unsafe source changes and DevEngine full-reload results. */
-    fullBuildReasons$: Observable<FullBuildReason>
-    /** Results from the complete-build edge. Failed builds are logged by that edge and produce no baseline. */
-    fullBuildResults$: Observable<FullBuildResult>
-    /** Safe Rolldown patches emitted after a complete build. */
-    producedPatches$: Observable<ProducedPatch>
-    /** Version reports from the persistent App runtime. */
-    runtimeFailures$: Observable<RuntimeFailure>
-    runtimeRequests$: Observable<RuntimePatchRequest>
-    /** Physical-output failures are terminal for the current build and require a new full build. */
-    fullMaterializationFailures$: Observable<Readonly<{ buildId: string }>>
-    patchesWriteFailures$: Observable<Readonly<{ buildId: string }>>
-}>
+type SuccessfulBuild = Extract<FullBuildResult, { ok: true }>
+type RuntimeRequestFact = Extract<WxHostFact, { type: 'runtime-requested' }>
 
 /**
- * Effect streams selected by the topology. They are intentionally specific operations rather than a generic command
- * language: the DevHost wires each stream directly to its corresponding edge.
- */
-export type WxHostTopology = Readonly<{
-    /** Reasons for the DevEngine edge to create a fresh build ID and run a complete build. */
-    fullBuildReasons$: Observable<FullBuildReason>
-    /** Complete physical baselines to materialize after a successful full build or stale runtime request. */
-    fullMaterializations$: Observable<Readonly<{ buildId: string }>>
-    /** Contiguous suffixes to render and direct-close-write into hmr/patches.js. */
-    patchProjections$: Observable<PatchProjection>
-}>
-
-/**
- * Creates the complete host stream graph.
+ * Derives one command stream from edge facts. No subscription or effect occurs here.
  *
- * ```text
- *                     fullBuildResults$
- *                           │ switchMap resets history
- *                           ▼
- * producedPatches$ → scan(append patch) → patchHistory$ ─┐
- *                                                         ├─ runtime requests → projections
- * runtime failures / invalid projections / write failures ┘
- *                           │
- *                           ▼
- *                    fullBuildReasons$
- * ```
- *
- * No stream here performs filesystem, HTTP, DevEngine, or timer work. Consumers execute the three returned effect
- * streams and feed their concrete results back through the input observables.
+ * The returned stream can be consumed directly by one serialized DevHost edge lane. Every full-build, materialization,
+ * and patch-write result returns to `facts$` as another fact, closing the topology loop without a mutable reducer.
  */
-export function createWxHostTopology(input: WxHostTopologyInput): WxHostTopology {
-    const successfulBuilds$ = input.fullBuildResults$.pipe(
-        filter((result): result is Extract<FullBuildResult, { ok: true }> => result.ok),
+export function createWxHostTopology(facts$: Observable<WxHostFact>): Observable<WxHostCommand> {
+    const successfulBuilds$ = facts$.pipe(
+        filter(
+            (fact): fact is Extract<WxHostFact, { type: 'full-build-finished' }> => fact.type === 'full-build-finished'
+        ),
+        map(({ result }) => result),
+        filter((result): result is SuccessfulBuild => result.ok),
         share()
     )
 
-    // Every successful full build replaces the baseline and starts a fresh patch sequence at version zero.
+    // A new complete build replaces the baseline and cancels the previous patch-history branch automatically.
     const patchHistory$ = successfulBuilds$.pipe(
         switchMap(({ buildId }) =>
-            input.producedPatches$.pipe(
-                filter((patch) => patch.buildId === buildId),
-                map((patch) => patch.patch),
+            facts$.pipe(
+                filter(
+                    (fact): fact is Extract<WxHostFact, { type: 'patch-produced' }> =>
+                        fact.type === 'patch-produced' && fact.patch.buildId === buildId
+                ),
+                map(({ patch }) => patch.patch),
                 scan((patches, patch) => [...patches, patch] as readonly SafePatch[], [] as readonly SafePatch[]),
                 startWith([] as readonly SafePatch[]),
                 map((patches): PatchHistory => ({ buildId, patches }))
@@ -171,80 +145,73 @@ export function createWxHostTopology(input: WxHostTopologyInput): WxHostTopology
         shareReplay({ bufferSize: 1, refCount: true })
     )
 
-    const projections$ = input.runtimeRequests$.pipe(
-        withLatestFrom(patchHistory$),
-        map(([request, history]): Projection => projectPatches(history, request)),
-        share()
+    const fullBuildCommands$ = merge(
+        facts$.pipe(
+            filter(
+                (fact): fact is Extract<WxHostFact, { type: 'full-build-requested' }> =>
+                    fact.type === 'full-build-requested'
+            ),
+            map(({ reason }): WxHostCommand => ({ kind: 'run-full-build', reason }))
+        ),
+        facts$.pipe(
+            filter(
+                (fact): fact is Extract<WxHostFact, { type: 'full-materialized' }> =>
+                    fact.type === 'full-materialized' && !fact.ok
+            ),
+            withLatestFrom(patchHistory$),
+            filter(([{ buildId }, history]) => buildId === history.buildId),
+            map((): WxHostCommand => ({ kind: 'run-full-build', reason: 'full-materialization-failed' }))
+        ),
+        facts$.pipe(
+            filter(
+                (fact): fact is Extract<WxHostFact, { type: 'patches-written' }> =>
+                    fact.type === 'patches-written' && !fact.ok
+            ),
+            withLatestFrom(patchHistory$),
+            filter(([{ buildId }, history]) => buildId === history.buildId),
+            map((): WxHostCommand => ({ kind: 'run-full-build', reason: 'patch-write-failed' }))
+        ),
+        facts$.pipe(
+            filter((fact): fact is Extract<WxHostFact, { type: 'runtime-failed' }> => fact.type === 'runtime-failed'),
+            withLatestFrom(patchHistory$),
+            filter(([{ failure }, history]) => failure.buildId === history.buildId),
+            map((): WxHostCommand => ({ kind: 'run-full-build', reason: 'runtime-failed' }))
+        )
     )
 
-    const fullBuildReasons$ = merge(
-        input.fullBuildReasons$,
-        projections$.pipe(
-            filter(
-                (projection): projection is Extract<Projection, { kind: 'runtime-ahead-of-history' }> =>
-                    projection.kind === 'runtime-ahead-of-history'
-            ),
-            map((): FullBuildReason => 'runtime-ahead-of-history')
-        ),
-        input.runtimeFailures$.pipe(
-            withLatestFrom(patchHistory$),
-            filter(([failure, history]) => failure.buildId === history.buildId),
-            map((): FullBuildReason => 'runtime-failed')
-        ),
-        input.fullMaterializationFailures$.pipe(
-            withLatestFrom(patchHistory$),
-            filter(([failure, history]) => failure.buildId === history.buildId),
-            map((): FullBuildReason => 'full-materialization-failed')
-        ),
-        input.patchesWriteFailures$.pipe(
-            withLatestFrom(patchHistory$),
-            filter(([failure, history]) => failure.buildId === history.buildId),
-            map((): FullBuildReason => 'patch-write-failed')
-        )
-    ).pipe(share())
+    const requestCommands$ = facts$.pipe(
+        filter((fact): fact is RuntimeRequestFact => fact.type === 'runtime-requested'),
+        withLatestFrom(patchHistory$),
+        mergeMap(([{ request }, history]) => projectRequest(request, history))
+    )
 
-    return {
-        fullBuildReasons$,
-        fullMaterializations$: merge(
-            successfulBuilds$.pipe(map(({ buildId }) => ({ buildId }))),
-            projections$.pipe(
-                filter(
-                    (projection): projection is Extract<Projection, { kind: 'materialize-full' }> =>
-                        projection.kind === 'materialize-full'
-                ),
-                map(({ buildId }) => ({ buildId }))
-            )
-        ).pipe(share()),
-        patchProjections$: projections$.pipe(
-            filter(
-                (projection): projection is Extract<Projection, { kind: 'patches' }> => projection.kind === 'patches'
-            ),
-            map(({ projection }) => projection),
-            share()
-        )
-    }
+    return merge(
+        fullBuildCommands$,
+        successfulBuilds$.pipe(map(({ buildId }): WxHostCommand => ({ buildId, kind: 'materialize-full' }))),
+        requestCommands$
+    ).pipe(share())
 }
 
-/** Selects a full baseline or the exact missing patch suffix from one stateless runtime request. */
-function projectPatches(history: PatchHistory, request: RuntimePatchRequest): Projection {
+/** Projects exactly one runtime request against the latest private patch-history value. */
+function projectRequest(request: RuntimePatchRequest, history: PatchHistory): Observable<WxHostCommand> {
     if (request.buildId !== history.buildId) {
-        return { buildId: history.buildId, kind: 'materialize-full' }
+        return of({ buildId: history.buildId, kind: 'materialize-full' })
     }
     if (!Number.isSafeInteger(request.version) || request.version < 0 || request.version > history.patches.length) {
-        return { kind: 'runtime-ahead-of-history' }
+        return of({ kind: 'run-full-build', reason: 'runtime-ahead-of-history' })
     }
 
     const patches = history.patches.slice(request.version)
     if (patches.length === 0) {
-        return { kind: 'idle' }
+        return EMPTY
     }
-    return {
-        kind: 'patches',
+    return of({
+        kind: 'write-patches',
         projection: {
             buildId: history.buildId,
             fromVersion: request.version,
             patches,
             targetVersion: history.patches.length
         }
-    }
+    })
 }
