@@ -7,7 +7,7 @@ WeChat target. It is based on the probes and conclusions recorded in
 [`systemjs-probe-result.md`](./systemjs-probe-result.md).
 
 Where this document conflicts with the current WX CommonJS or finalized-Rolldown-patch descriptions in
-[`core-architecture.md`](./core-architecture.md) or [`hmr-architecture.md`](./hmr-architecture.md), this document is
+[`core-architecture.md`](./core-architecture.md) or [`../hmr/hmr-draft-1.md`](../hmr/hmr-draft-1.md), this document is
 the intended replacement. The native hot-reload boundary established by [`hmr-probe-result.md`](./hmr-probe-result.md)
 remains valid and is reused; the payload applied through that boundary changes from finalized Rolldown patches to
 ordered System-definition transactions.

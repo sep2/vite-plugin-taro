@@ -24,7 +24,7 @@ where practical:
 - **Prototype behavior**: behavior of the discarded working implementation.
 - **Hypothesis**: plausible but not yet isolated by a deterministic probe.
 
-The existing `docs/hmr-plan.md`, `draft/hmr-architecture.md`, and `draft/hmr-probe-result.md` are separate documents.
+The existing `hmr-draft-3.md`, `hmr-draft-1.md`, and `../draft/hmr-probe-result.md` are separate documents.
 This notebook neither supersedes nor approves them.
 
 ## Historical product target
@@ -60,7 +60,7 @@ The HTTP response never carried executable patch source.
 
 ### 1.2 Page-scoped file changes can retain the App heap
 
-The bare probes in `draft/hmr-probe-result.md` established, with `compileHotReLoad: true`, that automatically rewriting
+The bare probes in `../draft/hmr-probe-result.md` established, with `compileHotReLoad: true`, that automatically rewriting
 an active `page.js` preserved the existing App identity and `globalData`. The same probe did **not** establish React,
 Taro, Page-instance, input, or navigation-stack retention.
 

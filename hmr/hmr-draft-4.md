@@ -802,7 +802,7 @@ to ES2018 syntax.
 
 The generated WeChat project configuration disables DevTools' JavaScript-to-ES5 compilation. Development, preview, and production
 therefore execute plugin-generated ES2018 semantics rather than relying on a user or DevTools transpilation setting. The plugin does not
-inject general language polyfills; ES2018 runtime capabilities are part of the target baseline. `tsconfig.json`'s `target` does not
+inject general language polyfills; ES2018 runtime capabilities are part of the target baseline. `../tsconfig.json`'s `target` does not
 override this architecture target.
 
 ### Production JavaScript

@@ -1,4 +1,4 @@
-# Bare WeChat hot-reload probes
+  # Bare WeChat hot-reload probes
 
 Date: 2026-07-14
 

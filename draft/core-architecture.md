@@ -165,7 +165,7 @@ supported soon.
 During JavaScript HMR, a patch may reuse utility classes already present in the current WXSS. Introducing a new Tailwind
 candidate requires a full native rebuild so JavaScript class names and WXSS cannot diverge. A future state-preserving
 page-style path would also need explicit ownership for page-local, shared, and global rules. The detailed update
-protocol is described in `draft/hmr-architecture.md`.
+protocol is described in `../hmr/hmr-draft-1.md`.
 
 ### Why styles need a shared pipeline
 

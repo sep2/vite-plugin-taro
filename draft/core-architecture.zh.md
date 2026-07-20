@@ -164,7 +164,7 @@ Vite 收集到的应用 CSS 目前会输出到原生 `app.wxss`。Taro 原生组
 JavaScript HMR 期间，patch 可以继续使用当前 WXSS 中已经存在的 utility classes。如果引入新的 Tailwind
 candidate，就必须执行完整原生构建，避免 JavaScript class names 与 WXSS 不一致。未来若要实现保留状态的
 页面样式更新，还需要明确页面局部、共享和全局规则的 ownership。详细更新协议见
-`draft/hmr-architecture.md`。
+`../hmr/hmr-draft-1.md`。
 
 ### 为什么样式需要共享 pipeline
 
