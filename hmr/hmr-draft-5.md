@@ -330,4 +330,4 @@ Still pending:
 - Refresh exception → full rebuild;
 - full-build reset;
 - final tests/build/typecheck.
-- complete hmr flow tests: dev load genius → input edit → button click → result header render → button click navigate route → source edit previous page → button click navigate back → the edit okay ans state preserved
+- complete hmr flow tests: dev wx loan genius → input edit → button click → result header render → button click navigate route → source edit previous page → button click navigate back → the edit okay and state preserved
