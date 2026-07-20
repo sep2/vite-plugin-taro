@@ -1,15 +1,5 @@
-import { EMPTY, merge, of, type Observable } from 'rxjs'
-import {
-    filter,
-    map,
-    mergeMap,
-    scan,
-    share,
-    shareReplay,
-    startWith,
-    switchMap,
-    withLatestFrom
-} from 'rxjs/operators'
+import { EMPTY, merge, type Observable, of } from 'rxjs'
+import { filter, map, mergeMap, scan, share, shareReplay, startWith, switchMap, withLatestFrom } from 'rxjs/operators'
 
 /**
  * Pure WX HMR topology.
@@ -129,7 +119,9 @@ type RuntimeRequestFact = Extract<WxHostFact, { type: 'runtime-requested' }>
  */
 export function createWxHostTopology(facts$: Observable<WxHostFact>): Observable<WxHostCommand> {
     const successfulBuilds$ = facts$.pipe(
-        filter((fact): fact is Extract<WxHostFact, { type: 'full-build-finished' }> => fact.type === 'full-build-finished'),
+        filter(
+            (fact): fact is Extract<WxHostFact, { type: 'full-build-finished' }> => fact.type === 'full-build-finished'
+        ),
         map(({ result }) => result),
         filter((result): result is SuccessfulBuild => result.ok),
         share()
@@ -170,9 +162,7 @@ export function createWxHostTopology(facts$: Observable<WxHostFact>): Observable
             map((): WxHostCommand => ({ kind: 'run-full-build', reason: 'patch-write-failed' }))
         ),
         facts$.pipe(
-            filter(
-                (fact): fact is Extract<WxHostFact, { type: 'runtime-failed' }> => fact.type === 'runtime-failed'
-            ),
+            filter((fact): fact is Extract<WxHostFact, { type: 'runtime-failed' }> => fact.type === 'runtime-failed'),
             withLatestFrom(patchHistory$),
             filter(([{ failure }, history]) => failure.buildId === history.buildId),
             map((): WxHostCommand => ({ kind: 'run-full-build', reason: 'runtime-failed' }))
