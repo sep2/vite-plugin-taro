@@ -1,10 +1,11 @@
-import { concat, merge, type Observable, of } from 'rxjs'
+import { concat, EMPTY, merge, type Observable, of } from 'rxjs'
 import {
     distinctUntilChanged,
     exhaustMap,
     filter,
     ignoreElements,
     map,
+    mergeMap,
     scan,
     share,
     shareReplay,
@@ -124,10 +125,6 @@ type PatchHistory = {
     limitReached: boolean
     patches: SafePatch[]
 }
-type RuntimeRequestOutcome =
-    | Readonly<{ kind: 'rebuild'; reason: RebuildReason }>
-    | Readonly<{ kind: 'idle' }>
-    | Readonly<{ kind: 'patches'; projection: PatchProjection }>
 
 /**
  * Composes the stream branches below into one command stream. The fact bus remains the sole input boundary; helpers
@@ -143,12 +140,12 @@ export function createWxHostTopology(
 
     const fullBuildFinished$ = factsOf(facts$, 'full-build-finished').pipe(share())
     const patchHistory$ = createPatchHistory(factsOf(facts$, 'patch-produced'), fullBuildFinished$, maximumPatchCount)
-    const runtimeOutcomes$ = createRuntimeOutcomes(factsOf(facts$, 'runtime-requested'), patchHistory$)
-    const rebuildReasons$ = createRebuildReasons(facts$, patchHistory$, runtimeOutcomes$)
+    const runtimeCommands$ = createRuntimeCommands(factsOf(facts$, 'runtime-requested'), patchHistory$)
+    const rebuildReasons$ = createRebuildReasons(facts$, patchHistory$, runtimeCommands$)
 
     return merge(
         createRebuildCommands(rebuildReasons$, fullBuildFinished$),
-        createPatchWriteCommands(runtimeOutcomes$)
+        createPatchWriteCommands(runtimeCommands$)
     ).pipe(share())
 }
 
@@ -195,14 +192,18 @@ function createPatchHistory(
     )
 }
 
-/** Projects each runtime request against the latest private patch history without retaining the runtime version. */
-function createRuntimeOutcomes(
+/**
+ * Projects each runtime request against the latest private patch history without retaining the runtime version.
+ *
+ * A request already at the current version produces EMPTY. That is normal steady state, not a protocol state.
+ */
+function createRuntimeCommands(
     runtimeRequested$: Observable<FactOf<'runtime-requested'>>,
     patchHistory$: Observable<PatchHistory>
-): Observable<RuntimeRequestOutcome> {
+): Observable<WxHostCommand> {
     return runtimeRequested$.pipe(
         withLatestFrom(patchHistory$),
-        map(([{ request }, history]) => projectRequest(request, history)),
+        mergeMap(([{ request }, history]) => projectRequest(request, history)),
         share()
     )
 }
@@ -211,7 +212,7 @@ function createRuntimeOutcomes(
 function createRebuildReasons(
     facts$: Observable<WxHostFact>,
     patchHistory$: Observable<PatchHistory>,
-    runtimeOutcomes$: Observable<RuntimeRequestOutcome>
+    runtimeCommands$: Observable<WxHostCommand>
 ): Observable<RebuildReason> {
     return merge(
         factsOf(facts$, 'rebuild-requested').pipe(map(({ reason }) => reason)),
@@ -232,9 +233,10 @@ function createRebuildReasons(
             filter(([{ failure }, history]) => failure.buildId === history.buildId),
             map((): RebuildReason => 'runtime-failed')
         ),
-        runtimeOutcomes$.pipe(
+        runtimeCommands$.pipe(
             filter(
-                (outcome): outcome is Extract<RuntimeRequestOutcome, { kind: 'rebuild' }> => outcome.kind === 'rebuild'
+                (command): command is Extract<WxHostCommand, { kind: 'request-rebuild' }> =>
+                    command.kind === 'request-rebuild'
             ),
             map(({ reason }) => reason)
         )
@@ -262,34 +264,35 @@ function createRebuildCommands(
     )
 }
 
-/** Converts valid runtime range projections into physical patch-file commands. */
-function createPatchWriteCommands(runtimeOutcomes$: Observable<RuntimeRequestOutcome>): Observable<WxHostCommand> {
-    return runtimeOutcomes$.pipe(
-        filter((outcome): outcome is Extract<RuntimeRequestOutcome, { kind: 'patches' }> => outcome.kind === 'patches'),
-        map(({ projection }): WxHostCommand => ({ kind: 'write-patches', projection }))
+/** Rebuild commands are coalesced above; this branch retains only physical patch writes. */
+function createPatchWriteCommands(runtimeCommands$: Observable<WxHostCommand>): Observable<WxHostCommand> {
+    return runtimeCommands$.pipe(
+        filter(
+            (command): command is Extract<WxHostCommand, { kind: 'write-patches' }> => command.kind === 'write-patches'
+        )
     )
 }
 
-/** Pure one-request range selection. */
-function projectRequest(request: RuntimePatchRequest, history: PatchHistory): RuntimeRequestOutcome {
+/** Pure one-request range selection. A current runtime emits no command. */
+function projectRequest(request: RuntimePatchRequest, history: PatchHistory): Observable<WxHostCommand> {
     if (request.buildId !== history.buildId) {
-        return { kind: 'rebuild', reason: 'runtime-build-mismatch' }
+        return of({ kind: 'request-rebuild', reason: 'runtime-build-mismatch' })
     }
     if (!Number.isSafeInteger(request.version) || request.version < 0 || request.version > history.patches.length) {
-        return { kind: 'rebuild', reason: 'runtime-ahead-of-history' }
+        return of({ kind: 'request-rebuild', reason: 'runtime-ahead-of-history' })
     }
 
     const patches = history.patches.slice(request.version)
     if (patches.length === 0) {
-        return { kind: 'idle' }
+        return EMPTY
     }
-    return {
-        kind: 'patches',
+    return of({
+        kind: 'write-patches',
         projection: {
             buildId: history.buildId,
             fromVersion: request.version,
             patches,
             targetVersion: history.patches.length
         }
-    }
+    })
 }
