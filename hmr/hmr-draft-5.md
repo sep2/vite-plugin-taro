@@ -1,6 +1,8 @@
 # WX HMR redesign — current handoff
 
-we already have many impl. check then before proceed.
+we already have many impl. check them before proceeding.
+
+read hmr-important-note.md
 
 ## Objective
 
@@ -254,52 +256,6 @@ mainly needs to fix window undefined error. nothing special here.
 - Temporary-file atomic rename.
 - Broad React global rewrites.
 
----
-
-## Known unresolved correctness issues
-
-### 1. Protocol liveness
-
-Current topology writes patches only when it receives `runtime-requested`.
-
-If the runtime reports version `N` while host version is also `N`, the request completes with no write. If a new HostPatch arrives later, nothing currently causes another runtime request or patch write.
-
-One liveness mechanism is still required:
-
-- runtime repeats requests;
-- host notifies runtime to report;
-- host holds a request;
-- or host remembers runtime version.
-
-The latter two were explicitly rejected, and runtime timers were also rejected. This needs a final decision.
-
-This is solved. The server should send message to runtime when a new patch arrives. the mechanism can be long-pulling or others.
-
-### 2. Queued old writes across rebuilds
-
-`concatMap` can retain an old `write-patches` command while a rebuild command is queued. It must be impossible for an old Build’s `patches.js` write to execute after a new full build and overwrite its inert patch file.
-
-Command cancellation or build validation at execution time is still needed.
-
-no hard requirement for `concatMap`, you can use whatever it fit.
-This doesn not matter. since patches.js contains build id. if patch is invalid, the page will rerurn, but can just discard the patches when it sees a different build id.
-
-### 3. Initial build readiness
-
-`bundledDev.listen()` currently observes DevEngine completion before DevHost finishes writing `hmr/info.js` and inert `hmr/patches.js`. Full-build readiness should include both steps.
-
-refactor the whole thing to make it more declarative and readable.
-
-### 4. Runtime/client initialization
-
-Using `buildId` as Rolldown client ID requires constructing the runtime with information from `hmr/info.js` before application modules register. That bootstrap order is not implemented yet.
-
-just do it.
-
-### 5. All other repo docs and code are stale. No need to read.
-
----
-
 ## Validation evidence
 
 The previous architecture was live-tested successfully in DevTools:
@@ -314,12 +270,4 @@ The previous architecture was live-tested successfully in DevTools:
 Those results established the platform constraints, especially direct close-write and App ownership, but they do not validate the newly redesigned topology/runtime.
 
 Still pending:
-
-- new end-to-end physical `patches.js` protocol;
-- rapid edits;
-- delayed stale callbacks;
-- input/component state retention;
-- Refresh exception → full rebuild;
-- full-build reset;
-- final tests/build/typecheck.
 - complete hmr flow tests: dev wx loan genius → input edit → button click → result header render → button click navigate route → source edit previous page → button click navigate back → the edit okay and state preserved
