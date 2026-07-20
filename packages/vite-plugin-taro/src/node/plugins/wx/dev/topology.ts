@@ -23,19 +23,20 @@ import {
  *   └──────────── operation results ───────┘
  * ```
  *
- * A full build is one edge operation: create a fresh buildId, let DevEngine write complete output, then write
- * hmr/info.js and inert hmr/patches.js. It starts patch numbering at zero and has no version of its own.
+ * The only retained topology value is the current build's bounded patch history:
  *
  * ```text
- * full-build result ──▶ private bounded patch history
- *                                 │
- * runtime version request ───────┼──▶ write missing hmr/patches.js range
- *                                 │
- * failures / limit / bad version ┴──▶ run one complete build
+ * full-build-finished ──▶ fresh history
+ * patch-produced ───────▶ append patch
+ * runtime-requested ────▶ write missing patches
+ * failure / bad range ──▶ request rebuild
  * ```
+ *
+ * A rebuild is one edge operation: generate a fresh buildId, run DevEngine's complete output, then write hmr/info.js
+ * and inert hmr/patches.js. The resulting full-build fact resets patch numbering to zero.
  */
 
-export type FullBuildReason =
+export type RebuildReason =
     | 'history-limit'
     | 'initial'
     | 'patch-generation-failed'
@@ -45,13 +46,13 @@ export type FullBuildReason =
     | 'runtime-failed'
     | 'source-requires-full-build'
 
-/** An edge-generated full-build request. Every complete build gets a fresh identity. */
+/** An edge-created rebuild request. Every complete build gets a fresh identity. */
 export type FullBuildRequest = Readonly<{
     buildId: string
-    reason: FullBuildReason
+    reason: RebuildReason
 }>
 
-/** Result of the complete operation: DevEngine output plus physical HMR bootstrap files. */
+/** Result of the one complete rebuild operation. */
 export type FullBuildResult =
     | Readonly<{ buildId: string; ok: true }>
     | Readonly<{ buildId: string; error: unknown; ok: false }>
@@ -92,9 +93,9 @@ export type PatchProjection = Readonly<{
     targetVersion: number
 }>
 
-/** All edge observations entering the topology. */
+/** All observations entering the topology from DevEngine, physical output, and runtime-control edges. */
 export type WxHostFact =
-    | Readonly<{ type: 'full-build-requested'; reason: FullBuildReason }>
+    | Readonly<{ type: 'rebuild-requested'; reason: RebuildReason }>
     | Readonly<{ type: 'full-build-finished'; result: FullBuildResult }>
     | Readonly<{ type: 'patch-produced'; patch: ProducedPatch }>
     | Readonly<{
@@ -108,9 +109,9 @@ export type WxHostFact =
     | Readonly<{ type: 'runtime-requested'; request: RuntimePatchRequest }>
     | Readonly<{ type: 'runtime-failed'; failure: RuntimeFailure }>
 
-/** Effects selected by topology and performed by DevHost edges. */
+/** The only host effects: rebuild the entire physical project or write one patch file. */
 export type WxHostCommand =
-    | Readonly<{ kind: 'run-full-build'; reason: FullBuildReason }>
+    | Readonly<{ kind: 'request-rebuild'; reason: RebuildReason }>
     | Readonly<{ kind: 'write-patches'; projection: PatchProjection }>
 
 export type WxHostTopologyOptions = Readonly<{
@@ -123,16 +124,14 @@ type PatchHistory = {
     limitReached: boolean
     patches: SafePatch[]
 }
-type RuntimeRequestEffect =
-    | Readonly<{ kind: 'full-build'; reason: FullBuildReason }>
+type RuntimeRequestOutcome =
+    | Readonly<{ kind: 'rebuild'; reason: RebuildReason }>
     | Readonly<{ kind: 'idle' }>
     | Readonly<{ kind: 'patches'; projection: PatchProjection }>
 
 /**
- * Composes the named stream branches below into the one topology command stream.
- *
- * The fact bus remains the sole input boundary. Helpers only split its logic into readable flows; none subscribes or
- * performs effects.
+ * Composes the stream branches below into one command stream. The fact bus remains the sole input boundary; helpers
+ * split its logic for readability but neither subscribe nor perform effects.
  */
 export function createWxHostTopology(
     facts$: Observable<WxHostFact>,
@@ -144,16 +143,16 @@ export function createWxHostTopology(
 
     const fullBuildFinished$ = factsOf(facts$, 'full-build-finished').pipe(share())
     const patchHistory$ = createPatchHistory(factsOf(facts$, 'patch-produced'), fullBuildFinished$, maximumPatchCount)
-    const runtimeEffects$ = createRuntimeRequestEffects(factsOf(facts$, 'runtime-requested'), patchHistory$)
-    const fullBuildReasons$ = createFullBuildReasons(facts$, patchHistory$, runtimeEffects$)
+    const runtimeOutcomes$ = createRuntimeOutcomes(factsOf(facts$, 'runtime-requested'), patchHistory$)
+    const rebuildReasons$ = createRebuildReasons(facts$, patchHistory$, runtimeOutcomes$)
 
     return merge(
-        createFullBuildCommands(fullBuildReasons$, fullBuildFinished$),
-        createPatchWriteCommands(runtimeEffects$)
+        createRebuildCommands(rebuildReasons$, fullBuildFinished$),
+        createPatchWriteCommands(runtimeOutcomes$)
     ).pipe(share())
 }
 
-/** Selects one discriminated fact stream from the topology input bus. */
+/** Selects one discriminated stream from the topology fact bus. */
 function factsOf<Type extends WxHostFact['type']>(
     facts$: Observable<WxHostFact>,
     type: Type
@@ -162,13 +161,10 @@ function factsOf<Type extends WxHostFact['type']>(
 }
 
 /**
- * Maintains the sole private topology value: the current build's bounded append-only patch buffer.
+ * Maintains the sole private value: a bounded O(1)-append patch buffer.
  *
- * ```text
- * successful full build → replace buffer
- * matching patch        → O(1) append
- * limit reached         → freeze buffer until next full build
- * ```
+ * A successful rebuild replaces the entire switchMap branch. When capacity is reached, the buffer freezes until the
+ * rebuild command completes; the limit transition itself becomes a rebuild reason below.
  */
 function createPatchHistory(
     patchProduced$: Observable<FactOf<'patch-produced'>>,
@@ -199,15 +195,11 @@ function createPatchHistory(
     )
 }
 
-/**
- * Projects each stateless runtime request against the latest retained history.
- *
- * No runtime version is saved after this projection. Repeated requests therefore independently select the same suffix.
- */
-function createRuntimeRequestEffects(
+/** Projects each runtime request against the latest private patch history without retaining the runtime version. */
+function createRuntimeOutcomes(
     runtimeRequested$: Observable<FactOf<'runtime-requested'>>,
     patchHistory$: Observable<PatchHistory>
-): Observable<RuntimeRequestEffect> {
+): Observable<RuntimeRequestOutcome> {
     return runtimeRequested$.pipe(
         withLatestFrom(patchHistory$),
         map(([{ request }, history]) => projectRequest(request, history)),
@@ -215,40 +207,34 @@ function createRuntimeRequestEffects(
     )
 }
 
-/**
- * Merges every terminal condition that requires a new complete build.
- *
- * The history-limit branch emits once per build because the boolean transition is observed through
- * `distinctUntilChanged()`.
- */
-function createFullBuildReasons(
+/** Merges every source that asks the host to replace the complete physical project. */
+function createRebuildReasons(
     facts$: Observable<WxHostFact>,
     patchHistory$: Observable<PatchHistory>,
-    runtimeEffects$: Observable<RuntimeRequestEffect>
-): Observable<FullBuildReason> {
+    runtimeOutcomes$: Observable<RuntimeRequestOutcome>
+): Observable<RebuildReason> {
     return merge(
-        factsOf(facts$, 'full-build-requested').pipe(map(({ reason }) => reason)),
+        factsOf(facts$, 'rebuild-requested').pipe(map(({ reason }) => reason)),
         patchHistory$.pipe(
             map((history) => history.limitReached),
             distinctUntilChanged(),
             filter(Boolean),
-            map((): FullBuildReason => 'history-limit')
+            map((): RebuildReason => 'history-limit')
         ),
         factsOf(facts$, 'patches-written').pipe(
             filter(({ ok }) => !ok),
             withLatestFrom(patchHistory$),
             filter(([{ buildId }, history]) => buildId === history.buildId),
-            map((): FullBuildReason => 'patch-write-failed')
+            map((): RebuildReason => 'patch-write-failed')
         ),
         factsOf(facts$, 'runtime-failed').pipe(
             withLatestFrom(patchHistory$),
             filter(([{ failure }, history]) => failure.buildId === history.buildId),
-            map((): FullBuildReason => 'runtime-failed')
+            map((): RebuildReason => 'runtime-failed')
         ),
-        runtimeEffects$.pipe(
+        runtimeOutcomes$.pipe(
             filter(
-                (effect): effect is Extract<RuntimeRequestEffect, { kind: 'full-build' }> =>
-                    effect.kind === 'full-build'
+                (outcome): outcome is Extract<RuntimeRequestOutcome, { kind: 'rebuild' }> => outcome.kind === 'rebuild'
             ),
             map(({ reason }) => reason)
         )
@@ -256,41 +242,41 @@ function createFullBuildReasons(
 }
 
 /**
- * Coalesces full-build reasons without a mutable DevHost flag.
+ * Coalesces rebuild requests declaratively.
  *
  * ```text
- * reason → run-full-build command → await full-build-finished fact → next reason
+ * rebuild reason → request-rebuild command → await full-build-finished fact → next reason
  * ```
  */
-function createFullBuildCommands(
-    fullBuildReasons$: Observable<FullBuildReason>,
+function createRebuildCommands(
+    rebuildReasons$: Observable<RebuildReason>,
     fullBuildFinished$: Observable<FactOf<'full-build-finished'>>
 ): Observable<WxHostCommand> {
-    return fullBuildReasons$.pipe(
+    return rebuildReasons$.pipe(
         exhaustMap((reason) =>
             concat(
-                of<WxHostCommand>({ kind: 'run-full-build', reason }),
+                of<WxHostCommand>({ kind: 'request-rebuild', reason }),
                 fullBuildFinished$.pipe(take(1), ignoreElements())
             )
         )
     )
 }
 
-/** Converts successful runtime range projections into physical patch-file commands. */
-function createPatchWriteCommands(runtimeEffects$: Observable<RuntimeRequestEffect>): Observable<WxHostCommand> {
-    return runtimeEffects$.pipe(
-        filter((effect): effect is Extract<RuntimeRequestEffect, { kind: 'patches' }> => effect.kind === 'patches'),
+/** Converts valid runtime range projections into physical patch-file commands. */
+function createPatchWriteCommands(runtimeOutcomes$: Observable<RuntimeRequestOutcome>): Observable<WxHostCommand> {
+    return runtimeOutcomes$.pipe(
+        filter((outcome): outcome is Extract<RuntimeRequestOutcome, { kind: 'patches' }> => outcome.kind === 'patches'),
         map(({ projection }): WxHostCommand => ({ kind: 'write-patches', projection }))
     )
 }
 
 /** Pure one-request range selection. */
-function projectRequest(request: RuntimePatchRequest, history: PatchHistory): RuntimeRequestEffect {
+function projectRequest(request: RuntimePatchRequest, history: PatchHistory): RuntimeRequestOutcome {
     if (request.buildId !== history.buildId) {
-        return { kind: 'full-build', reason: 'runtime-build-mismatch' }
+        return { kind: 'rebuild', reason: 'runtime-build-mismatch' }
     }
     if (!Number.isSafeInteger(request.version) || request.version < 0 || request.version > history.patches.length) {
-        return { kind: 'full-build', reason: 'runtime-ahead-of-history' }
+        return { kind: 'rebuild', reason: 'runtime-ahead-of-history' }
     }
 
     const patches = history.patches.slice(request.version)
