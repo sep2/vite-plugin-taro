@@ -1,4 +1,4 @@
-import { EMPTY, merge, type Observable, of } from 'rxjs'
+import { EMPTY, merge, type Observable, of, take } from 'rxjs'
 import {
     distinctUntilChanged,
     filter,
@@ -56,47 +56,25 @@ export type FullBuildResult =
     | Readonly<{ buildId: string; ok: true }>
     | Readonly<{ buildId: string; error: unknown; ok: false }>
 
-export type SafePatch = Readonly<{
+/** One Rolldown HMR program admitted into host history. */
+export type HostPatch = Readonly<{
     code: string
     fileName: string
     sourcemap?: string
     sourcemapFileName?: string
 }>
 
-/** DevEngine patch provenance. The client ID is not retained as host runtime/session state. */
-export type ProducedPatch = Readonly<{
+/** The current physical baseline and every HostPatch emitted after it. */
+export type Build = {
     buildId: string
-    clientId: string
-    patch: SafePatch
-}>
-
-/** A complete stateless version report from the persistent App runtime. */
-export type RuntimePatchRequest = Readonly<{
-    buildId: string
-    clientId: string
-    version: number
-}>
-
-export type RuntimeFailure = Readonly<{
-    buildId: string
-    clientId: string
-    reason: string
-    version: number
-}>
-
-/** One contiguous suffix rendered into physical hmr/patches.js. */
-export type PatchProjection = Readonly<{
-    buildId: string
-    fromVersion: number
-    patches: readonly SafePatch[]
-    targetVersion: number
-}>
+    patches: HostPatch[]
+}
 
 /** All observations entering the topology from DevEngine, physical output, and runtime-control edges. */
 export type WxHostFact =
     | Readonly<{ type: 'rebuild-requested'; reason: BuildReason }>
     | Readonly<{ type: 'full-build-finished'; result: FullBuildResult }>
-    | Readonly<{ type: 'patch-produced'; patch: ProducedPatch }>
+    | Readonly<{ type: 'patch-produced'; buildId: string; clientId: string; patch: HostPatch }>
     | Readonly<{
           type: 'patches-written'
           buildId: string
@@ -105,24 +83,19 @@ export type WxHostFact =
           ok: boolean
           error?: unknown
       }>
-    | Readonly<{ type: 'runtime-requested'; request: RuntimePatchRequest }>
-    | Readonly<{ type: 'runtime-failed'; failure: RuntimeFailure }>
+    | Readonly<{ type: 'runtime-requested'; buildId: string; clientId: string; version: number }>
+    | Readonly<{ type: 'runtime-failed'; buildId: string; clientId: string; version: number; reason: string }>
 
-/** The only host effects: rebuild the entire physical project or write one patch file. */
+/** The only host effects: rebuild the entire physical project or write one patch suffix. */
 export type WxHostCommand =
     | Readonly<{ kind: 'request-rebuild'; reason: BuildReason }>
-    | Readonly<{ kind: 'write-patches'; projection: PatchProjection }>
+    | Readonly<{ kind: 'write-patches'; build: Build; fromVersion: number }>
 
 type FactOf<Type extends WxHostFact['type']> = Extract<WxHostFact, { type: Type }>
 
 export type WxHostTopologyOptions = Readonly<{
     maximumPatchPerBuild: number
 }>
-
-type Build = {
-    buildId: string
-    patches: SafePatch[]
-}
 
 /**
  * Composes the stream branches below into one command stream. The fact bus remains the sole input boundary; helpers
@@ -133,14 +106,13 @@ export function createWxHostTopology(
     options: WxHostTopologyOptions
 ): Observable<WxHostCommand> {
     if (!Number.isSafeInteger(options.maximumPatchPerBuild) || options.maximumPatchPerBuild < 1) {
-        throw new RangeError('maximumPatchCount must be a positive safe integer.')
+        throw new RangeError('maximumPatchPerBuild must be a positive safe integer.')
     }
 
-    const sharedFacts = facts$.pipe(share())
+    const sharedFacts$ = facts$.pipe(share())
+    const build$ = createBuild(sharedFacts$, options)
 
-    const build$ = createBuild(sharedFacts, options)
-
-    return createCommands(sharedFacts, build$, options).pipe(share())
+    return createCommands(sharedFacts$, build$, options).pipe(share())
 }
 
 /** Selects one discriminated stream from the topology fact bus. */
@@ -152,25 +124,23 @@ function factsOf<Type extends WxHostFact['type']>(
 }
 
 /**
- * Maintains the sole private value: an O(1)-append patch buffer.
+ * Maintains the sole private value: an O(1)-append HostPatch buffer.
  *
  * A successful full-build result replaces the entire switchMap branch and releases its old buffer. Crossing the limit
- * emits one rebuild reason, but patches continue to append while that rebuild runs.
+ * emits one rebuild reason, but HostPatches continue to append while that rebuild runs.
  */
 function createBuild(facts$: Observable<WxHostFact>, options: WxHostTopologyOptions): Observable<Build> {
-    const successfulBuilds$ = factsOf(facts$, 'full-build-finished').pipe(
+    return factsOf(facts$, 'full-build-finished').pipe(
         map(({ result }) => result),
-        filter((result): result is Extract<FullBuildResult, { ok: true }> => result.ok)
-    )
-
-    return successfulBuilds$.pipe(
+        filter((result): result is Extract<FullBuildResult, { ok: true }> => result.ok),
         switchMap(({ buildId }) => {
             const build: Build = { buildId, patches: [] }
 
             return factsOf(facts$, 'patch-produced').pipe(
-                filter(({ patch }) => patch.buildId === buildId),
+                filter((fact) => fact.buildId === buildId),
+                take(options.maximumPatchPerBuild),
                 scan((current, { patch }) => {
-                    current.patches.push(patch.patch)
+                    current.patches.push(patch)
                     return current
                 }, build),
                 startWith(build)
@@ -195,7 +165,7 @@ function createCommands(
     return merge(
         factsOf(facts$, 'runtime-requested').pipe(
             withLatestFrom(build$),
-            mergeMap(([{ request }, build]) => projectRequest(request, build))
+            mergeMap(([request, build]) => projectRequest(request, build))
         ),
         factsOf(facts$, 'rebuild-requested').pipe(
             map(({ reason }): WxHostCommand => ({ kind: 'request-rebuild', reason }))
@@ -214,32 +184,22 @@ function createCommands(
         ),
         factsOf(facts$, 'runtime-failed').pipe(
             withLatestFrom(build$),
-            filter(([{ failure }, build]) => failure.buildId === build.buildId),
+            filter(([{ buildId }, build]) => buildId === build.buildId),
             map((): WxHostCommand => ({ kind: 'request-rebuild', reason: 'runtime-failed' }))
         )
     )
 }
 
 /** Pure one-request range selection. A current runtime emits no command. */
-function projectRequest(request: RuntimePatchRequest, build: Build): Observable<WxHostCommand> {
+function projectRequest(request: FactOf<'runtime-requested'>, build: Build): Observable<WxHostCommand> {
     if (request.buildId !== build.buildId) {
         return of({ kind: 'request-rebuild', reason: 'runtime-build-mismatch' })
     }
     if (!Number.isSafeInteger(request.version) || request.version < 0 || request.version > build.patches.length) {
         return of({ kind: 'request-rebuild', reason: 'runtime-ahead-of-history' })
     }
-
-    const patches = build.patches.slice(request.version)
-    if (patches.length === 0) {
+    if (request.version === build.patches.length) {
         return EMPTY
     }
-    return of({
-        kind: 'write-patches',
-        projection: {
-            buildId: build.buildId,
-            fromVersion: request.version,
-            patches,
-            targetVersion: build.patches.length
-        }
-    })
+    return of({ kind: 'write-patches', build, fromVersion: request.version })
 }
