@@ -30,8 +30,8 @@ type OutputAddon = string | ((chunk: { fileName: string }) => string | Promise<s
 /**
  * Vite-private DevEngine edge.
  *
- * It turns native engine callbacks into host facts directly. The topology already owns the current Build, so this edge
- * emits HostPatches without retaining build or runtime state and never selects physical patch ranges.
+ * It turns native engine callbacks into host facts directly. Rolldown's client ID is the build ID, so every HostPatch
+ * arrives already correlated to its Build without retaining runtime state or selecting physical patch ranges.
  */
 export type DevEngineEdge = Readonly<{
     registerModules(clientId: string, modules: string[]): Promise<boolean>
@@ -142,7 +142,7 @@ export function createDevEngineEdge({
             }
             facts$.next({
                 type: 'patch-produced',
-                clientId,
+                buildId: clientId,
                 patch: {
                     code: update.code,
                     fileName: update.filename,

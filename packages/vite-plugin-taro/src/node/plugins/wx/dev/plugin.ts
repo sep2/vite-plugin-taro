@@ -1,7 +1,6 @@
 import type { Plugin } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { createDevHost } from './dev-host.ts'
-import { rewriteReactRefresh } from './react-refresh.ts'
 
 /** Adds the serve-only bundled-development adapter for the wx target. */
 export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugin {
@@ -28,9 +27,7 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
 
         transform: {
             order: 'post',
-            handler(code, id) {
-                return rewriteReactRefresh(code, id, Boolean(this.environment.config.build.sourcemap))
-            }
+            handler(code, id) {}
         },
 
         configureServer: {

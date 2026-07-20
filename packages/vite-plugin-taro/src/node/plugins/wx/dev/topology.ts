@@ -126,8 +126,7 @@ function factsOf<Type extends WxHostFact['type']>(
 /**
  * Maintains the sole private value: an O(1)-append HostPatch buffer.
  *
- * A successful full-build result replaces the entire switchMap branch and releases its old buffer. Crossing the limit
- * emits one rebuild reason, but HostPatches continue to append while that rebuild runs.
+ * A successful full-build result replaces the entire switchMap branch and releases its old buffer.
  */
 function createBuild(facts$: Observable<WxHostFact>, options: WxHostTopologyOptions): Observable<Build> {
     return factsOf(facts$, 'full-build-finished').pipe(

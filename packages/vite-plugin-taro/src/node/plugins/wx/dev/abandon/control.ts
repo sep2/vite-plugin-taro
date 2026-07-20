@@ -12,7 +12,6 @@ const maximumBodyBytes = 64 * 1024
 type ControlRequest = Readonly<{
     action?: unknown
     buildId?: unknown
-    clientId?: unknown
     modules?: unknown
     reason?: unknown
     token?: unknown
@@ -64,19 +63,14 @@ export function createControlEdge({
 
         if (body.action === 'modules' && isModuleRegistration(body)) {
             try {
-                respond(response, (await registerModules(body.clientId, body.modules)) ? 204 : 409)
+                respond(response, (await registerModules(body.buildId, body.modules)) ? 204 : 409)
             } catch {
                 respond(response, 500, { type: 'registration-failed' })
             }
             return
         }
         if (body.action === 'version' && typeof body.version === 'number' && Number.isSafeInteger(body.version)) {
-            facts$.next({
-                type: 'runtime-requested',
-                buildId: body.buildId,
-                clientId: body.clientId,
-                version: body.version
-            })
+            facts$.next({ type: 'runtime-requested', buildId: body.buildId, version: body.version })
             respond(response, 204)
             return
         }
@@ -84,7 +78,6 @@ export function createControlEdge({
             facts$.next({
                 type: 'runtime-failed',
                 buildId: body.buildId,
-                clientId: body.clientId,
                 reason: typeof body.reason === 'string' ? body.reason : 'Unknown runtime failure.',
                 version: body.version
             })
@@ -102,13 +95,13 @@ export function createControlEdge({
     }
 }
 
-function isRuntimeIdentity(value: ControlRequest): value is ControlRequest & { buildId: string; clientId: string } {
-    return typeof value.buildId === 'string' && typeof value.clientId === 'string'
+function isRuntimeIdentity(value: ControlRequest): value is ControlRequest & { buildId: string } {
+    return typeof value.buildId === 'string'
 }
 
 function isModuleRegistration(
-    value: ControlRequest & { buildId: string; clientId: string }
-): value is ControlRequest & { buildId: string; clientId: string; modules: string[] } {
+    value: ControlRequest & { buildId: string }
+): value is ControlRequest & { buildId: string; modules: string[] } {
     return Array.isArray(value.modules) && value.modules.every((module) => typeof module === 'string')
 }
 

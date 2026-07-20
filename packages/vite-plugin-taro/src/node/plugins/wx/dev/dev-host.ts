@@ -4,10 +4,10 @@ import { EMPTY, from, Subject, type Subscription } from 'rxjs'
 import { catchError, concatMap } from 'rxjs/operators'
 import type { ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
-import { createControlEdge } from './edges/control.ts'
-import { createDevEngineEdge } from './edges/dev-engine.ts'
-import { createPhysicalOutputEdge } from './edges/output.ts'
-import { preparePublicFiles, watchPublicFiles } from './edges/public-files.ts'
+import { createControlEdge } from './abandon/control.ts'
+import { createDevEngineEdge } from './abandon/dev-engine.ts'
+import { createPhysicalOutputEdge } from './abandon/output.ts'
+import { preparePublicFiles, watchPublicFiles } from './abandon/public-files.ts'
 import {
     type BuildRequest,
     createWxHostTopology,
