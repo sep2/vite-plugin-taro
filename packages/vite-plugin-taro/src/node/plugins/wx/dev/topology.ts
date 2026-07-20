@@ -1,9 +1,7 @@
-import { concat, EMPTY, merge, type Observable, of } from 'rxjs'
+import { EMPTY, merge, type Observable, of } from 'rxjs'
 import {
     distinctUntilChanged,
-    exhaustMap,
     filter,
-    ignoreElements,
     map,
     mergeMap,
     scan,
@@ -11,7 +9,6 @@ import {
     shareReplay,
     startWith,
     switchMap,
-    take,
     withLatestFrom
 } from 'rxjs/operators'
 
@@ -139,15 +136,9 @@ export function createWxHostTopology(
         throw new RangeError('maximumPatchCount must be a positive safe integer.')
     }
 
-    const fullBuildFinished$ = factsOf(facts$, 'full-build-finished').pipe(share())
-    const patchHistory$ = createPatchHistory(factsOf(facts$, 'patch-produced'), fullBuildFinished$)
-    const runtimeCommands$ = createRuntimeCommands(factsOf(facts$, 'runtime-requested'), patchHistory$)
-    const rebuildReasons$ = createRebuildReasons(facts$, patchHistory$, runtimeCommands$, maximumPatchCount)
+    const patchHistory$ = createPatchHistory(facts$)
 
-    return merge(
-        createRebuildCommands(rebuildReasons$, fullBuildFinished$),
-        createPatchWriteCommands(runtimeCommands$)
-    ).pipe(share())
+    return createCommands(facts$, patchHistory$, maximumPatchCount).pipe(share())
 }
 
 /** Selects one discriminated stream from the topology fact bus. */
@@ -164,11 +155,8 @@ function factsOf<Type extends WxHostFact['type']>(
  * A successful full-build result replaces the entire switchMap branch and releases its old buffer. Crossing the limit
  * emits one rebuild reason, but patches continue to append while that rebuild runs.
  */
-function createPatchHistory(
-    patchProduced$: Observable<FactOf<'patch-produced'>>,
-    fullBuildFinished$: Observable<FactOf<'full-build-finished'>>
-): Observable<PatchHistory> {
-    const successfulBuilds$ = fullBuildFinished$.pipe(
+function createPatchHistory(facts$: Observable<WxHostFact>): Observable<PatchHistory> {
+    const successfulBuilds$ = factsOf(facts$, 'full-build-finished').pipe(
         map(({ result }) => result),
         filter((result): result is Extract<FullBuildResult, { ok: true }> => result.ok)
     )
@@ -177,7 +165,7 @@ function createPatchHistory(
         switchMap(({ buildId }) => {
             const history: PatchHistory = { buildId, patches: [] }
 
-            return patchProduced$.pipe(
+            return factsOf(facts$, 'patch-produced').pipe(
                 filter(({ patch }) => patch.buildId === buildId),
                 scan((current, { patch }) => {
                     current.patches.push(patch.patch)
@@ -191,83 +179,41 @@ function createPatchHistory(
 }
 
 /**
- * Projects each runtime request against the latest private patch history without retaining the runtime version.
+ * Projects runtime requests and every independent rebuild trigger into one command stream.
  *
- * A request already at the current version produces EMPTY. That is normal steady state, not a protocol state.
+ * A runtime request already at the current version produces EMPTY. That is normal steady state, not a protocol state.
+ * Rebuild commands are emitted immediately; edge serialization, rather than topology feedback waiting, orders their
+ * physical execution.
  */
-function createRuntimeCommands(
-    runtimeRequested$: Observable<FactOf<'runtime-requested'>>,
-    patchHistory$: Observable<PatchHistory>
-): Observable<WxHostCommand> {
-    return runtimeRequested$.pipe(
-        withLatestFrom(patchHistory$),
-        mergeMap(([{ request }, history]) => projectRequest(request, history)),
-        share()
-    )
-}
-
-/** Merges every source that asks the host to replace the complete physical project. */
-function createRebuildReasons(
+function createCommands(
     facts$: Observable<WxHostFact>,
     patchHistory$: Observable<PatchHistory>,
-    runtimeCommands$: Observable<WxHostCommand>,
     maximumPatchCount: number
-): Observable<RebuildReason> {
+): Observable<WxHostCommand> {
     return merge(
-        factsOf(facts$, 'rebuild-requested').pipe(map(({ reason }) => reason)),
+        factsOf(facts$, 'runtime-requested').pipe(
+            withLatestFrom(patchHistory$),
+            mergeMap(([{ request }, history]) => projectRequest(request, history))
+        ),
+        factsOf(facts$, 'rebuild-requested').pipe(
+            map(({ reason }): WxHostCommand => ({ kind: 'request-rebuild', reason }))
+        ),
         patchHistory$.pipe(
             map((history) => history.patches.length >= maximumPatchCount),
             distinctUntilChanged(),
             filter(Boolean),
-            map((): RebuildReason => 'history-limit')
+            map((): WxHostCommand => ({ kind: 'request-rebuild', reason: 'history-limit' }))
         ),
         factsOf(facts$, 'patches-written').pipe(
             filter(({ ok }) => !ok),
             withLatestFrom(patchHistory$),
             filter(([{ buildId }, history]) => buildId === history.buildId),
-            map((): RebuildReason => 'patch-write-failed')
+            map((): WxHostCommand => ({ kind: 'request-rebuild', reason: 'patch-write-failed' }))
         ),
         factsOf(facts$, 'runtime-failed').pipe(
             withLatestFrom(patchHistory$),
             filter(([{ failure }, history]) => failure.buildId === history.buildId),
-            map((): RebuildReason => 'runtime-failed')
-        ),
-        runtimeCommands$.pipe(
-            filter(
-                (command): command is Extract<WxHostCommand, { kind: 'request-rebuild' }> =>
-                    command.kind === 'request-rebuild'
-            ),
-            map(({ reason }) => reason)
-        )
-    ).pipe(share())
-}
-
-/**
- * Coalesces rebuild requests declaratively.
- *
- * ```text
- * rebuild reason → request-rebuild command → await full-build-finished fact → next reason
- * ```
- */
-function createRebuildCommands(
-    rebuildReasons$: Observable<RebuildReason>,
-    fullBuildFinished$: Observable<FactOf<'full-build-finished'>>
-): Observable<WxHostCommand> {
-    return rebuildReasons$.pipe(
-        exhaustMap((reason) =>
-            concat(
-                of<WxHostCommand>({ kind: 'request-rebuild', reason }),
-                fullBuildFinished$.pipe(take(1), ignoreElements())
-            )
-        )
-    )
-}
-
-/** Rebuild commands are coalesced above; this branch retains only physical patch writes. */
-function createPatchWriteCommands(runtimeCommands$: Observable<WxHostCommand>): Observable<WxHostCommand> {
-    return runtimeCommands$.pipe(
-        filter(
-            (command): command is Extract<WxHostCommand, { kind: 'write-patches' }> => command.kind === 'write-patches'
+            map((): WxHostCommand => ({ kind: 'request-rebuild', reason: 'runtime-failed' }))
         )
     )
 }
