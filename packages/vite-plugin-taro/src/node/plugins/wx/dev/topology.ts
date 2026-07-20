@@ -36,7 +36,7 @@ import {
  */
 
 export type RebuildReason =
-    | 'history-limit'
+    | 'patch-limit'
     | 'initial'
     | 'patch-generation-failed'
     | 'patch-write-failed'
@@ -119,7 +119,7 @@ export type WxHostTopologyOptions = Readonly<{
     maximumPatchPerBuild: number
 }>
 
-type PatchHistory = {
+type Build = {
     buildId: string
     patches: SafePatch[]
 }
@@ -138,9 +138,9 @@ export function createWxHostTopology(
 
     const sharedFacts = facts$.pipe(share())
 
-    const patchHistory$ = createPatchHistory(sharedFacts, options)
+    const build$ = createBuild(sharedFacts, options)
 
-    return createCommands(sharedFacts, patchHistory$, options).pipe(share())
+    return createCommands(sharedFacts, build$, options).pipe(share())
 }
 
 /** Selects one discriminated stream from the topology fact bus. */
@@ -157,7 +157,7 @@ function factsOf<Type extends WxHostFact['type']>(
  * A successful full-build result replaces the entire switchMap branch and releases its old buffer. Crossing the limit
  * emits one rebuild reason, but patches continue to append while that rebuild runs.
  */
-function createPatchHistory(facts$: Observable<WxHostFact>, options: WxHostTopologyOptions): Observable<PatchHistory> {
+function createBuild(facts$: Observable<WxHostFact>, options: WxHostTopologyOptions): Observable<Build> {
     const successfulBuilds$ = factsOf(facts$, 'full-build-finished').pipe(
         map(({ result }) => result),
         filter((result): result is Extract<FullBuildResult, { ok: true }> => result.ok)
@@ -165,15 +165,15 @@ function createPatchHistory(facts$: Observable<WxHostFact>, options: WxHostTopol
 
     return successfulBuilds$.pipe(
         switchMap(({ buildId }) => {
-            const history: PatchHistory = { buildId, patches: [] }
+            const build: Build = { buildId, patches: [] }
 
             return factsOf(facts$, 'patch-produced').pipe(
                 filter(({ patch }) => patch.buildId === buildId),
                 scan((current, { patch }) => {
                     current.patches.push(patch.patch)
                     return current
-                }, history),
-                startWith(history)
+                }, build),
+                startWith(build)
             )
         }),
         shareReplay({ bufferSize: 1, refCount: true })
@@ -189,57 +189,57 @@ function createPatchHistory(facts$: Observable<WxHostFact>, options: WxHostTopol
  */
 function createCommands(
     facts$: Observable<WxHostFact>,
-    patchHistory$: Observable<PatchHistory>,
+    build$: Observable<Build>,
     options: WxHostTopologyOptions
 ): Observable<WxHostCommand> {
     return merge(
         factsOf(facts$, 'runtime-requested').pipe(
-            withLatestFrom(patchHistory$),
-            mergeMap(([{ request }, history]) => projectRequest(request, history))
+            withLatestFrom(build$),
+            mergeMap(([{ request }, build]) => projectRequest(request, build))
         ),
         factsOf(facts$, 'rebuild-requested').pipe(
             map(({ reason }): WxHostCommand => ({ kind: 'request-rebuild', reason }))
         ),
-        patchHistory$.pipe(
-            map((history) => history.patches.length >= options.maximumPatchPerBuild),
+        build$.pipe(
+            map((build) => build.patches.length >= options.maximumPatchPerBuild),
             distinctUntilChanged(),
             filter(Boolean),
-            map((): WxHostCommand => ({ kind: 'request-rebuild', reason: 'history-limit' }))
+            map((): WxHostCommand => ({ kind: 'request-rebuild', reason: 'patch-limit' }))
         ),
         factsOf(facts$, 'patches-written').pipe(
             filter(({ ok }) => !ok),
-            withLatestFrom(patchHistory$),
-            filter(([{ buildId }, history]) => buildId === history.buildId),
+            withLatestFrom(build$),
+            filter(([{ buildId }, build]) => buildId === build.buildId),
             map((): WxHostCommand => ({ kind: 'request-rebuild', reason: 'patch-write-failed' }))
         ),
         factsOf(facts$, 'runtime-failed').pipe(
-            withLatestFrom(patchHistory$),
-            filter(([{ failure }, history]) => failure.buildId === history.buildId),
+            withLatestFrom(build$),
+            filter(([{ failure }, build]) => failure.buildId === build.buildId),
             map((): WxHostCommand => ({ kind: 'request-rebuild', reason: 'runtime-failed' }))
         )
     )
 }
 
 /** Pure one-request range selection. A current runtime emits no command. */
-function projectRequest(request: RuntimePatchRequest, history: PatchHistory): Observable<WxHostCommand> {
-    if (request.buildId !== history.buildId) {
+function projectRequest(request: RuntimePatchRequest, build: Build): Observable<WxHostCommand> {
+    if (request.buildId !== build.buildId) {
         return of({ kind: 'request-rebuild', reason: 'runtime-build-mismatch' })
     }
-    if (!Number.isSafeInteger(request.version) || request.version < 0 || request.version > history.patches.length) {
+    if (!Number.isSafeInteger(request.version) || request.version < 0 || request.version > build.patches.length) {
         return of({ kind: 'request-rebuild', reason: 'runtime-ahead-of-history' })
     }
 
-    const patches = history.patches.slice(request.version)
+    const patches = build.patches.slice(request.version)
     if (patches.length === 0) {
         return EMPTY
     }
     return of({
         kind: 'write-patches',
         projection: {
-            buildId: history.buildId,
+            buildId: build.buildId,
             fromVersion: request.version,
             patches,
-            targetVersion: history.patches.length
+            targetVersion: build.patches.length
         }
     })
 }
