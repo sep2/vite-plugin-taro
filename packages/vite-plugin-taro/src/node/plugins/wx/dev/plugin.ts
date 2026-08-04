@@ -4,7 +4,7 @@ import { createDevHost } from './dev-host.ts'
 import { rewriteReactRefresh } from './react-refresh.ts'
 
 /** Adds the serve-only bundled-development adapter for the wx target. */
-export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugin {
+export function createWxDevelopmentPlugin(_options: VitePluginTaroOptions): Plugin {
     let devHost: { close(): Promise<void> } | null = null
 
     return {

@@ -1,9 +1,11 @@
+import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { InputOptions, OutputOptions } from 'rolldown'
 import { type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
 import { resolvePackageFile } from '../../../utils/packages.ts'
+import { type HmrInfo, hmrControlPath, hmrInfoFileName, renderHmrInfo, writeHmrFile } from './hmr-files.ts'
 
 export type WxDevEngine = Readonly<{
     close: () => Promise<void>
@@ -12,6 +14,7 @@ export type WxDevEngine = Readonly<{
 export async function createWxDevEngine({ server }: { server: ViteDevServer }): Promise<WxDevEngine> {
     const bundledDev = getBundledDev(server)
 
+    // Must install rolldown options before create engine
     installRolldownOptions()
     const engine: DevEngine = await createEngine()
 
@@ -26,6 +29,13 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
         await engine.ensureCurrentBuildFinish()
     }
 
+    // Vite binds the port only after initServer (and therefore the initial build) completes, so
+    // the actual port is not observable while onOutput runs for the first build. The App metadata
+    // is written once the port is real; later full builds rewrite it from onOutput.
+    server.httpServer?.once('listening', () => {
+        writeHmrInfo(server)
+    })
+
     return {
         close: async () => {
             await engine.close()
@@ -39,9 +49,6 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
         }
 
         return dev(options, options.output, {
-            onAdditionalAssets: () => {
-                console.log('onAdditionalAssets')
-            },
             onHmrUpdates: (result) => {
                 if (result instanceof Error) {
                     console.error('[vite-plugin-taro] wx HMR update failed', result)
@@ -50,7 +57,12 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
             onOutput: (result) => {
                 if (result instanceof Error) {
                     console.error('[vite-plugin-taro] wx dev build failed', result)
+                    return
                 }
+                // A fresh build identity per complete physical build; the App runtime reads it from
+                // hmr/info.js before any module registers. The initial build's onOutput runs before
+                // the port is bound, so the listening listener performs that first write.
+                writeHmrInfo(server)
             },
             rebuildStrategy: 'never',
             watch: { skipWrite: false }
@@ -95,6 +107,33 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
             return options
         }
     }
+}
+
+/** Writes the immutable App metadata every full build starts from. */
+async function writeHmrInfo(server: ViteDevServer): Promise<void> {
+    const httpServer = server.httpServer
+    if (!httpServer) {
+        return
+    }
+    const address = httpServer.address()
+    if (!address || typeof address === 'string') {
+        // Port not bound yet (initial build); the listening listener writes the file.
+        return
+    }
+    const info: HmrInfo = {
+        buildId: randomUUID(),
+        endpoint: `${server.config.server.https ? 'https' : 'http'}://${resolveEndpointHost(server)}:${address.port}${hmrControlPath}`
+    }
+    await writeHmrFile(server.config.build.outDir, hmrInfoFileName, renderHmrInfo(info))
+}
+
+/** The bound address host, or the loopback address for wildcard/default hosts. */
+function resolveEndpointHost(server: ViteDevServer): string {
+    const host = server.config.server.host
+    if (!host || host === true || host === 'localhost' || host === '0.0.0.0' || host === '::') {
+        return '127.0.0.1'
+    }
+    return host
 }
 
 function createStableFileNames<Value>(addon: unknown, fallback: string): string | ((value: Value) => string) {
