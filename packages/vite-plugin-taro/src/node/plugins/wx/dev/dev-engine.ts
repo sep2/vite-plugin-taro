@@ -13,6 +13,12 @@ export type WxDevEngine = Readonly<{
     close: () => Promise<void>
 }>
 
+/** One Rolldown HMR program admitted into the current build's patch history. */
+type HostPatch = Readonly<{
+    code: string
+    fileName: string
+}>
+
 /** One metadata-only runtime report; executable code never travels over HTTP. */
 type RuntimeReport = Readonly<{
     buildId: string
@@ -23,9 +29,10 @@ type RuntimeReport = Readonly<{
 export async function createWxDevEngine({ server }: { server: ViteDevServer }): Promise<WxDevEngine> {
     const bundledDev = getBundledDev(server)
 
-    // Per-server build state: the identity of the current full build. writeHmrInfo returns a
-    // fresh buildId per full build; Rolldown correlates updates and registrations by this ID.
+    // Per-server build state: the identity of the current full build and its patch history.
+    // writeHmrInfo returns a fresh state per full build; ordinary edits append one HostPatch.
     let currentBuildId: string | undefined
+    let patches: HostPatch[] = []
 
     // Must install rolldown options before create engine
     installRolldownOptions()
@@ -59,10 +66,11 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
         }
     }
 
-    /** Adopts the fresh buildId returned by writeHmrInfo. */
-    function adoptBuild(buildId: string | undefined): void {
-        if (buildId) {
-            currentBuildId = buildId
+    /** Adopts the fresh build state returned by writeHmrInfo. */
+    function adoptBuild(state: BuildState | undefined): void {
+        if (state) {
+            currentBuildId = state.buildId
+            patches = state.patches
         }
     }
 
@@ -101,6 +109,18 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
             onHmrUpdates: (result) => {
                 if (result instanceof Error) {
                     server.config.logger.error(`[vite-plugin-taro] wx HMR update failed`, { error: result })
+                    return
+                }
+                for (const { clientId, update } of result.updates) {
+                    if (update.type === 'Noop') {
+                        continue
+                    }
+                    if (update.type === 'Patch' && clientId === currentBuildId) {
+                        patches.push({ code: update.code, fileName: update.filename })
+                        server.config.logger.info(`[vite-plugin-taro] wx patch produced version ${patches.length}`)
+                        continue
+                    }
+                    server.config.logger.info(`[vite-plugin-taro] wx unhandled update ${update.type}`)
                 }
             },
             onOutput: (result) => {
@@ -159,8 +179,14 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
     }
 }
 
+/** Fresh per-full-build state; a patch's version is its index plus one. */
+type BuildState = Readonly<{
+    buildId: string
+    patches: HostPatch[]
+}>
+
 /** Writes the immutable App metadata every full build starts from. */
-async function writeHmrInfo(server: ViteDevServer): Promise<string | undefined> {
+async function writeHmrInfo(server: ViteDevServer): Promise<BuildState | undefined> {
     try {
         const httpServer = server.httpServer
         if (!httpServer) {
@@ -171,13 +197,16 @@ async function writeHmrInfo(server: ViteDevServer): Promise<string | undefined> 
             // Port not bound yet (initial build); the listening listener writes the file.
             return undefined
         }
-        const buildId = randomUUID()
+        const state: BuildState = {
+            buildId: randomUUID(),
+            patches: []
+        }
         const info: HmrInfo = {
-            buildId,
+            buildId: state.buildId,
             endpoint: `${server.config.server.https ? 'https' : 'http'}://${resolveEndpointHost(server)}:${address.port}${hmrControlPath}`
         }
         await writeHmrFile(server.config.build.outDir, hmrInfoFileName, renderHmrInfo(info))
-        return buildId
+        return state
     } catch (e) {
         if (Error.isError(e)) {
             server.config.logger.error(`[vite-plugin-taro] wx HMR write failed`, { error: e })
