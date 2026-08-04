@@ -33,13 +33,24 @@ type PatchProgram = Readonly<{
     factory: () => void
 }>
 
-/** Per-module hot state */
+/** Per-module hot state: holds the generated accept callback for the update propagation. */
 class WxHotContext {
     readonly _internal = {
         updateStyle(): void {},
         removeStyle(): void {}
     }
-    accept() {}
+
+    private acceptCallback: ((nextExports: unknown) => void) | undefined
+
+    accept(callback?: (nextExports: unknown) => void): void {
+        this.acceptCallback = callback
+    }
+
+    /** Invokes the registered accept callback with the module's fresh exports. */
+    runAccept(nextExports: unknown): void {
+        this.acceptCallback?.(nextExports)
+    }
+
     acceptExports() {}
     dispose() {}
     prune() {}
@@ -58,6 +69,9 @@ class WxDevRuntime extends DevRuntime {
 
     /** Delivered: the highest version the runtime has stored; the host compares its own count against this. */
     private storedVersion = 0
+
+    /** The shared module hot context; per-program pairing is preserved by microtask FIFO order. */
+    private readonly hotContext = new WxHotContext()
 
     /** Executed: the highest version whose factory has run; advanced by the apply walk. */
     private appliedVersion = 0
@@ -80,11 +94,27 @@ class WxDevRuntime extends DevRuntime {
     }
 
     /**
-     * Generated code always calls this before registerModule and reads `_internal` from the return
-     * value. Dummy context for now: no per-module state is tracked yet.
+     * Generated code always calls this before registerModule and reads `_internal` from the
+     * return value. One shared context: each program's accept registration is queued before
+     * its own propagation microtask, so the callback is consumed before the next program
+     * overwrites it.
      */
     override createModuleHotContext(_moduleId: string): WxHotContext {
-        return new WxHotContext()
+        return this.hotContext
+    }
+
+    /**
+     * HMR propagation entry called at the end of every patch program. The program already
+     * re-registered the changed modules, so the fresh exports are live in the registry; the
+     * accept callback (which enqueues React Refresh) is registered in a microtask queued
+     * during the body, so the propagation is queued after it and runs in FIFO order.
+     */
+    override applyUpdates(boundaries: [string, string][]): void {
+        queueMicrotask(() => {
+            for (const [changedId] of boundaries) {
+                this.hotContext.runAccept(this.loadExports(changedId))
+            }
+        })
     }
 
     /** Consumed once per App heap from hmr/info.js; the host buildId is the Rolldown client ID. */
@@ -181,3 +211,35 @@ class WxDevRuntime extends DevRuntime {
 
 const runtime = new WxDevRuntime()
 ;(globalThis as { __rolldown_runtime__?: WxDevRuntime }).__rolldown_runtime__ = runtime
+
+// Install the React DevTools hook before the Taro renderer injects itself: the runtime chunk
+// is the first module of the App heap, and the renderer checks the hook when it evaluates at
+// App mount. The refresh runtime's own injection (see react-refresh.ts) replays this hook's
+// renderers, so the hook must store what inject receives — a real DevTools hook keeps the
+// renderer in the renderers Map; without the stored renderer the replay captures nothing and
+// Refresh has no renderer helpers to schedule re-renders on.
+//
+// The hook lives on `global`, and every free `__REACT_DEVTOOLS_GLOBAL_HOOK__` reference in
+// react-family modules is rewritten to `global.__REACT_DEVTOOLS_GLOBAL_HOOK__`: the
+// AppService scope does not resolve free variables against `global` (verified: the free
+// lookup is undefined while the member access exists), so the renderer would never inject
+// otherwise. `??=` keeps a pre-installed hook (e.g. a real DevTools integration) intact.
+const reactDevtoolsHook = {
+    renderers: new Map<number, unknown>(),
+    supportsFiber: true,
+    inject: (injected: unknown) => {
+        const id = reactDevtoolsHook.renderers.size
+        reactDevtoolsHook.renderers.set(id, injected)
+        return id
+    },
+    onScheduleFiberRoot: () => {},
+    onCommitFiberRoot: () => {},
+    onCommitFiberUnmount: () => {}
+}
+// node types declare `global` as typeof globalThis, so the AppService global needs a cast.
+;(
+    global as {
+        /** React DevTools hook installed by the dev runtime; free-variable reads never resolve it. */
+        __REACT_DEVTOOLS_GLOBAL_HOOK__?: unknown
+    }
+).__REACT_DEVTOOLS_GLOBAL_HOOK__ ??= reactDevtoolsHook
