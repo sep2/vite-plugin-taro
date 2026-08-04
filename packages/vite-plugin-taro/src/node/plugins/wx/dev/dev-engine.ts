@@ -52,12 +52,12 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
         return dev(options, options.output, {
             onHmrUpdates: (result) => {
                 if (result instanceof Error) {
-                    console.error('[vite-plugin-taro] wx HMR update failed', result)
+                    server.config.logger.error(`[vite-plugin-taro] wx HMR update failed`, { error: result })
                 }
             },
             onOutput: (result) => {
                 if (result instanceof Error) {
-                    console.error('[vite-plugin-taro] wx dev build failed', result)
+                    server.config.logger.error(`[vite-plugin-taro] wx dev build failed`, { error: result })
                     return
                 }
                 // A fresh build identity per complete physical build; the App runtime reads it from
@@ -129,7 +129,11 @@ async function writeHmrInfo(server: ViteDevServer): Promise<void> {
         }
         await writeHmrFile(server.config.build.outDir, hmrInfoFileName, renderHmrInfo(info))
     } catch (e) {
-        console.error('[vite-plugin-taro] wx HMR write failed', e)
+        if (Error.isError(e)) {
+            server.config.logger.error(`[vite-plugin-taro] wx HMR write failed`, { error: e })
+        } else {
+            server.config.logger.error(`[vite-plugin-taro] wx HMR write failed with unknown error: ${e}`)
+        }
     }
 }
 
