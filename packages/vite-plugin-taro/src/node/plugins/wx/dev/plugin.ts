@@ -4,7 +4,7 @@ import { createDevHost } from './dev-host.ts'
 import { rewriteReactRefresh } from './react-refresh.ts'
 
 /** Adds the serve-only bundled-development adapter for the wx target. */
-export function createWxDevelopmentPlugin(_options: VitePluginTaroOptions): Plugin {
+export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugin {
     let devHost: { close(): Promise<void> } | null = null
 
     return {
@@ -38,7 +38,7 @@ export function createWxDevelopmentPlugin(_options: VitePluginTaroOptions): Plug
             // asks bundledDev to create its hard-coded skip-write DevEngine.
             order: 'post',
             async handler(server) {
-                devHost = await createDevHost(server)
+                devHost = await createDevHost(server, options)
             }
         },
 

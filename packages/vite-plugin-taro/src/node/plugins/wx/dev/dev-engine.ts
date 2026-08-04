@@ -5,9 +5,18 @@ import path from 'node:path'
 import type { InputOptions, OutputOptions } from 'rolldown'
 import { type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
 import type { Connect, ViteDevServer } from 'vite'
+import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { resolvePackageFile } from '../../../utils/packages.ts'
 import { appShellFileName } from '../module.ts'
-import { type HmrInfo, hmrControlPath, hmrInfoFileName, renderHmrInfo, writeHmrFile } from './hmr-files.ts'
+import {
+    type HmrInfo,
+    hmrControlPath,
+    hmrInfoFileName,
+    hmrPatchesFileName,
+    renderHmrInfo,
+    renderInitialHmrPatches,
+    writeHmrFile
+} from './hmr-files.ts'
 
 export type WxDevEngine = Readonly<{
     close: () => Promise<void>
@@ -26,7 +35,13 @@ type RuntimeReport = Readonly<{
     modules: string[]
 }>
 
-export async function createWxDevEngine({ server }: { server: ViteDevServer }): Promise<WxDevEngine> {
+export async function createWxDevEngine({
+    server,
+    options
+}: {
+    server: ViteDevServer
+    options: VitePluginTaroOptions
+}): Promise<WxDevEngine> {
     const bundledDev = getBundledDev(server)
 
     // Per-server build state: the identity of the current full build and its patch history.
@@ -144,21 +159,26 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
         const runtimeSource = readFileSync(resolvePackageFile('dist/runtime/wx/dev/dev-runtime.js'), 'utf8')
 
         bundledDev.getRolldownOptions = async () => {
-            const options = await original()
-            if (Array.isArray(options.output)) {
+            const rolldownOptions = await original()
+            if (Array.isArray(rolldownOptions.output)) {
                 throw new Error('wx development requires one configured Rolldown output.')
             }
-            options.output ??= {}
-            const output = options.output
+            rolldownOptions.output ??= {}
+            const output = rolldownOptions.output
             const configuredOutput = server.config.build.rolldownOptions.output
             if (Array.isArray(configuredOutput)) {
                 throw new Error('wx development supports one configured Rolldown output.')
             }
 
+            // Every page entry must depend on hmr/patches.js: DevTools classifies a changed Page
+            // dependency as Page JavaScript hot reload and re-executes live Pages, which is the only
+            // trigger that delivers physical patches while keeping the App heap alive.
+            const pageFiles = new Set(options.pages.map((page) => `${page.path}.js`))
+
             const configured = (configuredOutput ?? {}) as Record<string, unknown>
             Object.assign(output, configured, {
                 assetFileNames: createStableFileNames(configured.assetFileNames, 'assets/[name][extname]'),
-                banner: createHmrInfoBanner(),
+                banner: createEntryBanner(pageFiles),
                 chunkFileNames: createStableFileNames(configured.chunkFileNames, 'assets/[name].js'),
                 entryFileNames: createStableFileNames(configured.entryFileNames, '[name]'),
                 format: 'es',
@@ -166,15 +186,17 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
                 sourcemap: false
             })
 
-            options.experimental ??= {}
-            options.experimental.devMode = {
-                ...(typeof options.experimental.devMode === 'object' ? options.experimental.devMode : {}),
+            rolldownOptions.experimental ??= {}
+            rolldownOptions.experimental.devMode = {
+                ...(typeof rolldownOptions.experimental.devMode === 'object'
+                    ? rolldownOptions.experimental.devMode
+                    : {}),
                 implement: runtimeSource,
                 lazy: false
             }
-            options.plugins = [options.plugins, createViteReporter(server)]
-            disableViteOxcSourcemap(options.plugins)
-            return options
+            rolldownOptions.plugins = [rolldownOptions.plugins, createViteReporter(server)]
+            disableViteOxcSourcemap(rolldownOptions.plugins)
+            return rolldownOptions
         }
     }
 }
@@ -205,7 +227,11 @@ async function writeHmrInfo(server: ViteDevServer): Promise<BuildState | undefin
             buildId: state.buildId,
             endpoint: `${server.config.server.https ? 'https' : 'http'}://${resolveEndpointHost(server)}:${address.port}${hmrControlPath}`
         }
+
         await writeHmrFile(server.config.build.outDir, hmrInfoFileName, renderHmrInfo(info))
+
+        // Pages require hmr/patches.js at boot, so the file must exist before the first publish.
+        await writeHmrFile(server.config.build.outDir, hmrPatchesFileName, renderInitialHmrPatches())
         return state
     } catch (e) {
         if (Error.isError(e)) {
@@ -247,15 +273,24 @@ function resolveEndpointHost(server: ViteDevServer): string {
 }
 
 /**
- * Prepends the app entry with the info.js require and the runtime initialization. Banners are
- * plain text appended after Rolldown's analysis, so the require never becomes a chunk dependency
- * (a bare require inside the injected runtime source would stall the build), and the wx render
- * pipeline keeps this text after the hoisted chunk requires — so the runtime chunk exists before
- * initialize runs, and initialize runs before any module registers.
+ * Prepends entry banners. Banners are plain text appended after Rolldown's analysis, so the
+ * requires never become chunk dependencies (a bare require inside the injected runtime source
+ * would stall the build), and the wx render pipeline keeps this text after the hoisted chunk
+ * requires — so the runtime chunk exists before these run:
+ * - the app entry loads hmr/info.js and initializes the runtime before any module registers;
+ * - every page requires hmr/patches.js, the changed dependency that makes DevTools re-execute
+ *   live Pages and thereby load physical updates.
  */
-function createHmrInfoBanner(): (chunk: { name: string }) => string {
-    return (chunk) =>
-        chunk.name === appShellFileName ? "__rolldown_runtime__.initialize(require('./hmr/info.js'));\n" : ''
+function createEntryBanner(pageFiles: ReadonlySet<string>): (chunk: { name: string }) => string {
+    return (chunk) => {
+        if (chunk.name === appShellFileName) {
+            return "__rolldown_runtime__.initialize(require('./hmr/info.js'));\n"
+        }
+        if (pageFiles.has(chunk.name)) {
+            return "require('./hmr/patches.js');\n"
+        }
+        return ''
+    }
 }
 
 function createStableFileNames<Value>(addon: unknown, fallback: string): string | ((value: Value) => string) {
