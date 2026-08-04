@@ -1,68 +1,45 @@
 // WX AppService dev runtime — injected verbatim at the end of the shared Rolldown runtime chunk
-// (`assets/rolldown-runtime.js`, required first by every chunk). Must stay a self-contained plain
-// script: no imports, no exports, no module syntax. Defines the App-global `__rolldown_runtime__`
-// that generated modules call; nothing else (no HMR protocol yet).
+// (`assets/rolldown-runtime.js`, required first by every chunk). Defines the App-global
+// `__rolldown_runtime__` that generated modules call.
+//
+// The `DevRuntime` base class is injected into the chunk by Rolldown's dev-mode transform
+// (verified: `typeof DevRuntime` is `function`), so the WX host only extends it — the minimum
+// skeleton, no reimplementation.
 
+import type { Messenger, DevRuntime as RolldownDevRuntime } from 'rolldown/experimental/runtime-types'
+
+/** Lexical base class injected into the runtime chunk by Rolldown; typed via the contract. */
+declare const DevRuntime: new (messenger: Messenger, clientId: string) => RolldownDevRuntime
+
+/** Per-module hot state */
 class WxHotContext {
-    readonly data: Record<string, unknown> = {}
     readonly _internal = {
         updateStyle(): void {},
         removeStyle(): void {}
     }
-
-    accept(..._args: unknown[]): void {}
-    acceptExports(..._args: unknown[]): void {}
-    dispose(..._args: unknown[]): void {}
-    prune(..._args: unknown[]): void {}
-    invalidate(): void {}
-    on(): void {}
-    off(): void {}
-    send(): void {}
+    accept() {}
+    acceptExports() {}
+    dispose() {}
+    prune() {}
+    invalidate() {}
+    on() {}
+    off() {}
+    send() {}
 }
 
-class WxDevRuntime {
-    /** Rolldown module table: module id to its live exports holder. */
-    readonly modules: Record<string, { exportsHolder: { exports: unknown } }> = {}
-
-    /** Rolldown client ID; will become the host buildId once the HMR protocol lands. */
-    clientId = ''
-
-    createModuleHotContext(moduleId: string): WxHotContext {
-        let context = this.hotContexts.get(moduleId)
-        if (!context) {
-            context = new WxHotContext()
-            this.hotContexts.set(moduleId, context)
-        }
-        return context
+/** The WX host: extends the Rolldown contract instead of reimplementing it. */
+class WxDevRuntime extends DevRuntime {
+    constructor() {
+        super({ send(): void {} }, '')
     }
 
-    registerModule(id: string, exportsHolder: { exports: unknown }): void {
-        this.modules[id] = { exportsHolder }
+    /**
+     * Generated code always calls this before registerModule and reads `_internal` from the return
+     * value. Dummy context for now: no per-module state is tracked yet.
+     */
+    override createModuleHotContext(_moduleId: string): WxHotContext {
+        return new WxHotContext()
     }
-
-    loadExports(id: string): unknown {
-        return this.modules[id]?.exportsHolder.exports ?? {}
-    }
-
-    applyUpdates(): void {}
-
-    createEsmInitializer<T>(_id: string, fn: (() => T) | undefined, _dedup: unknown, res: T): () => T {
-        return () => (fn ? (res = fn()) : res)
-    }
-
-    createCjsInitializer<T extends { exports: unknown }>(
-        _id: string,
-        cb: (exports: unknown, mod: { exports: unknown }) => void,
-        _dedup: unknown,
-        mod: { exports: unknown } | undefined
-    ): () => T {
-        return () => (
-            mod || cb((mod = { exports: {} }).exports, mod),
-            (mod as { exports: T }).exports
-        )
-    }
-
-    private readonly hotContexts = new Map<string, WxHotContext>()
 }
 
 const runtime = new WxDevRuntime()
