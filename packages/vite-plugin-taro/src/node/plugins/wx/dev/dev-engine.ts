@@ -11,13 +11,25 @@ export type WxDevEngine = Readonly<{
 
 export async function createWxDevEngine({ server }: { server: ViteDevServer }): Promise<WxDevEngine> {
     const bundledDev = getBundledDev(server)
-    const engine: DevEngine = await createEngine()
 
     installRolldownOptions()
+    const engine: DevEngine = await createEngine()
+
+    // The WX adapter owns the only DevEngine. Vite's default listen() would create a second
+    // skip-write engine that renders into memory for browser HMR; instead the physical
+    // engine's initial build must finish before the HTTP server becomes ready, because
+    // DevTools opens the output directory directly and the app requires its files on disk.
+    bundledDev._devEngine = engine
     bundledDev.triggerBundleRegenerationIfStale = async () => false
+    bundledDev.listen = async () => {
+        await engine.run()
+        await engine.ensureCurrentBuildFinish()
+    }
 
     return {
-        close: async () => {}
+        close: async () => {
+            await engine.close()
+        }
     }
 
     async function createEngine(): Promise<DevEngine> {
@@ -30,11 +42,15 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
             onAdditionalAssets: () => {
                 console.log('onAdditionalAssets')
             },
-            onHmrUpdates: () => {
-                console.log('onHmrUpdates')
+            onHmrUpdates: (result) => {
+                if (result instanceof Error) {
+                    console.error('[vite-plugin-taro] wx HMR update failed', result)
+                }
             },
-            onOutput: () => {
-                console.log('onOutput')
+            onOutput: (result) => {
+                if (result instanceof Error) {
+                    console.error('[vite-plugin-taro] wx dev build failed', result)
+                }
             },
             rebuildStrategy: 'never',
             watch: { skipWrite: false }
