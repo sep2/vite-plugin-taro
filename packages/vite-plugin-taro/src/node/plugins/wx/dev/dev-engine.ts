@@ -281,13 +281,16 @@ function resolveEndpointHost(server: ViteDevServer): string {
  * - every page requires hmr/patches.js, the changed dependency that makes DevTools re-execute
  *   live Pages and thereby load physical updates.
  */
-function createEntryBanner(pageFiles: ReadonlySet<string>): (chunk: { name: string }) => string {
+function createEntryBanner(pageFiles: ReadonlySet<string>): (chunk: { name: string; fileName: string }) => string {
     return (chunk) => {
         if (chunk.name === appShellFileName) {
             return "__rolldown_runtime__.initialize(require('./hmr/info.js'));\n"
         }
         if (pageFiles.has(chunk.name)) {
-            return "require('./hmr/patches.js');\n"
+            // Page files live at `pages/<route>/index.js`, so the dependency path must be
+            // computed relative to each page's own directory.
+            const patchesPath = path.posix.relative(path.posix.dirname(chunk.fileName), 'hmr/patches.js')
+            return `require('${patchesPath}');\n`
         }
         return ''
     }
