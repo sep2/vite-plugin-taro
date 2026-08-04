@@ -52,14 +52,24 @@ class WxHotContext {
 class WxDevRuntime extends DevRuntime {
     private hmrInfo: HmrInfo | undefined
 
-    /** Module ids executed since the last report; flushed with every report request. */
-    private readonly pendingModules = new Set<string>()
-
     /** Stored HostPatch factories keyed by absolute version; the apply step walks versions upward. */
     private readonly patches = new Map<number, () => void>()
 
     constructor() {
-        super({ send(): void {} }, '')
+        // The base batches executed-module ids and hands them to this messenger; each batch is
+        // one modules report.
+        super(
+            {
+                send: ({ modules }) => {
+                    if (modules.length > 0) {
+                        // Snapshot the batch: the base clears its internal cache array right
+                        // after send(), and wx.request may serialize the payload later.
+                        this.reportModules([...modules])
+                    }
+                }
+            },
+            ''
+        )
     }
 
     /**
@@ -70,11 +80,6 @@ class WxDevRuntime extends DevRuntime {
         return new WxHotContext()
     }
 
-    /** The base registerModule funnels every executed module here; the next report carries them. */
-    override sendModuleRegisteredMessage = (module: string): void => {
-        this.pendingModules.add(module)
-    }
-
     /** Consumed once per App heap from hmr/info.js; the host buildId is the Rolldown client ID. */
     initialize(info: HmrInfo): void {
         if (this.hmrInfo) {
@@ -82,7 +87,7 @@ class WxDevRuntime extends DevRuntime {
         }
         this.hmrInfo = info
         this.clientId = info.buildId
-        this.report(0)
+        this.reportVersion(0)
     }
 
     /** The only direct effect of hmr/patches.js: validate and store for a later apply step. */
@@ -98,25 +103,39 @@ class WxDevRuntime extends DevRuntime {
         }
     }
 
-    private report(version: number): void {
+    /** Reports executed module ids so the host can register them with the Rolldown engine. */
+    private reportModules(modules: string[]): void {
+        void this.sendReport({ kind: 'modules', modules })
+    }
+
+    /** Reports the applied version; the host publishes the missing patch suffix when behind. */
+    private reportVersion(version: number): void {
+        void this.sendReport({ kind: 'version', version })
+    }
+
+    /** Sends one metadata-only report to the host; executable code never travels over HTTP. */
+    private sendReport(data: Record<string, unknown>): Promise<void> {
         const info = this.hmrInfo
         if (!info) {
-            return
+            // A report without initialize is a programming error; fail loudly instead of
+            // silently dropping the sync traffic.
+            throw new Error('WX dev runtime is not initialized')
         }
-        const modules = [...this.pendingModules]
-        this.pendingModules.clear()
-        wx.request({
-            url: info.endpoint,
-            method: 'POST',
-            data: {
-                buildId: info.buildId,
-                version,
-                modules
-            },
-            header: { 'content-type': 'application/json' },
-            success(): void {},
-            fail(): void {},
-            complete(): void {}
+
+        return new Promise((resolve, reject) => {
+            wx.request({
+                url: info.endpoint,
+                method: 'POST',
+                data: { buildId: info.buildId, ...data },
+                header: { 'content-type': 'application/json' },
+                success(): void {
+                    resolve()
+                },
+                fail(error: unknown): void {
+                    reject(error)
+                },
+                complete(): void {}
+            })
         })
     }
 }
