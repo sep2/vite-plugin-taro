@@ -13,6 +13,12 @@ export type HmrInfo = Readonly<{
     endpoint: string
 }>
 
+/** One Rolldown HMR program admitted into the current build's patch history. */
+export type HostPatch = Readonly<{
+    code: string
+    fileName: string
+}>
+
 /** Renders the synchronous CommonJS metadata module loaded by the runtime chunk. */
 export function renderHmrInfo(info: HmrInfo): string {
     return `module.exports = Object.freeze(${JSON.stringify(info)});\n`
@@ -21,6 +27,28 @@ export function renderHmrInfo(info: HmrInfo): string {
 /** Provides a valid dependency before the host has a patch range to publish. */
 export function renderInitialHmrPatches(): string {
     return 'module.exports = undefined;\n'
+}
+
+/**
+ * Renders the missing patch suffix as a passive physical delivery module.
+ *
+ * DevTools re-executes the Page because this file changed. The module only stores the literal
+ * Rolldown factories in the persistent App runtime; the runtime applies them after the Page
+ * evaluation returns, one factory per HostPatch (version = index + 1).
+ */
+export function renderHmrPatches(buildId: string, patches: readonly HostPatch[], fromVersion: number): string {
+    if (!Number.isSafeInteger(fromVersion) || fromVersion < 0 || fromVersion >= patches.length) {
+        throw new Error('Cannot render an invalid WX patch range.')
+    }
+
+    const suffix = patches.slice(fromVersion)
+
+    const rendered = suffix.map((patch, index) => {
+        const version = fromVersion + index + 1
+        return `{version: ${version}, factory: () => {\n${patch.code}\n}}`
+    })
+
+    return `__rolldown_runtime__.storePatches({buildId: ${JSON.stringify(buildId)}, patches: [${rendered.join(',')}]});\n`
 }
 
 /** Publishes one physical HMR file (direct write; atomic rename is reserved for later analysis). */

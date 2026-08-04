@@ -10,10 +10,12 @@ import { resolvePackageFile } from '../../../utils/packages.ts'
 import { appShellFileName } from '../module.ts'
 import {
     type HmrInfo,
+    type HostPatch,
     hmrControlPath,
     hmrInfoFileName,
     hmrPatchesFileName,
     renderHmrInfo,
+    renderHmrPatches,
     renderInitialHmrPatches,
     writeHmrFile
 } from './hmr-files.ts'
@@ -22,17 +24,17 @@ export type WxDevEngine = Readonly<{
     close: () => Promise<void>
 }>
 
-/** One Rolldown HMR program admitted into the current build's patch history. */
-type HostPatch = Readonly<{
-    code: string
-    fileName: string
+/** One metadata-only runtime report; executable code never travels over HTTP. */
+type ModulesReport = Readonly<{
+    kind: 'modules'
+    buildId: string
+    modules: string[]
 }>
 
-/** One metadata-only runtime report; executable code never travels over HTTP. */
-type RuntimeReport = Readonly<{
+type VersionReport = Readonly<{
+    kind: 'version'
     buildId: string
     version: number
-    modules: string[]
 }>
 
 export async function createWxDevEngine({
@@ -97,18 +99,32 @@ export async function createWxDevEngine({
         }
 
         try {
-            const report = JSON.parse(await readBody(req)) as RuntimeReport
-            server.config.logger.info(
-                `[vite-plugin-taro] wx runtime report build ${report.buildId} version ${report.version}`
-            )
-            // Only the current build's reports register modules; delayed reports from older
-            // builds are ignored so they can never influence the live build's boundaries.
-            if (report.buildId === currentBuildId) {
+            const report = JSON.parse(await readBody(req)) as ModulesReport | VersionReport
+            // Only the current build's reports register modules or publish patches; delayed
+            // reports from older builds are ignored so they can never influence the live build.
+            if (report.buildId !== currentBuildId) {
+                res.setHeader('content-type', 'application/json')
+                res.end(JSON.stringify({ type: 'ok' }))
+                return
+            }
+            if (report.kind === 'modules') {
                 await engine.registerModules(report.buildId, report.modules)
+            } else if (report.version < patches.length) {
+                // Render the missing suffix only when the reported version is behind.
+                await writeHmrFile(
+                    server.config.build.outDir,
+                    hmrPatchesFileName,
+                    renderHmrPatches(report.buildId, patches, report.version)
+                )
             }
             res.setHeader('content-type', 'application/json')
             res.end(JSON.stringify({ type: 'ok' }))
-        } catch {
+        } catch (e) {
+            if (Error.isError(e)) {
+                server.config.logger.error(`[vite-plugin-taro] wx patches write failed`, { error: e })
+            } else {
+                server.config.logger.error(`[vite-plugin-taro] wx patches write failed with unknown error: ${e}`)
+            }
             res.statusCode = 400
             res.end()
         }
