@@ -137,13 +137,17 @@ async function writeHmrInfo(server: ViteDevServer): Promise<void> {
     }
 }
 
-/** The bound address host, or the loopback address for wildcard/default hosts. */
+/** The bound address host, or loopback for wildcard binds; IPv6 literals are bracketed. */
 function resolveEndpointHost(server: ViteDevServer): string {
-    const host = server.config.server.host
-    if (!host || host === true || host === 'localhost' || host === '0.0.0.0' || host === '::') {
+    const address = server.httpServer?.address()
+    if (!address || typeof address === 'string') {
         return '127.0.0.1'
     }
-    return host
+    if (address.address === '0.0.0.0' || address.address === '::') {
+        // Wildcard binds accept loopback connections; 127.0.0.1 is the address DevTools can reach.
+        return '127.0.0.1'
+    }
+    return address.address.includes(':') ? `[${address.address}]` : address.address
 }
 
 /**
