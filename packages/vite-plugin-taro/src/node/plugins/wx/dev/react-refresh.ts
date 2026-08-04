@@ -5,14 +5,14 @@ import { reactRefreshRuntimeId } from '../module.ts'
 const reactRefreshPreambleGuard = 'window.$RefreshReg$'
 
 /**
- * Removes the two browser assumptions of @vitejs/plugin-react's generated refresh code, each in
- * its own target module:
- * - the refresh runtime stores `__registerBeforePerformReactRefresh` on `window`;
+ * Removes the browser assumptions of @vitejs/plugin-react's generated refresh code:
+ * - the refresh runtime reads and assigns `window` protocol globals;
+ * - the refresh runtime needs an explicit hook injection (the web HTML preamble does it);
  * - boundary modules guard on `window.$RefreshReg$`, which only an HTML preamble would install.
  */
 export function rewriteReactRefresh(code: string, id: string, sourcemap = true) {
     if (id.split('?', 1)[0] === reactRefreshRuntimeId) {
-        return transformWithBabel(code, id, [rewriteRefreshRuntimeWindowAssignment], sourcemap)
+        return transformWithBabel(code, id, [rewriteRefreshRuntimeWindowAccess, injectRefreshGlobalHook], sourcemap)
     }
     // Vite's documented refresh protocol global; the generated guard is its only occurrence.
     if (code.includes(reactRefreshPreambleGuard)) {
@@ -21,24 +21,47 @@ export function rewriteReactRefresh(code: string, id: string, sourcemap = true) 
     return
 }
 
-/** Runtime module: the top-level `window.__registerBeforePerformReactRefresh = ...` assignment. */
-function rewriteRefreshRuntimeWindowAssignment(): PluginObject {
+/** Runtime module: self-inject at evaluation — the wx App heap has no HTML preamble. */
+function injectRefreshGlobalHook(): PluginObject {
     return {
-        name: 'vite-plugin-taro:wx-refresh-runtime-window-assignment',
+        name: 'vite-plugin-taro:wx-refresh-global-hook-injection',
+        visitor: {
+            Program(programPath) {
+                // The renderer already injected into the hook (created by the dev runtime
+                // chunk) when the App mounted; injectIntoGlobalHook replays its renderers.
+                programPath.pushContainer(
+                    'body',
+                    types.expressionStatement(
+                        types.callExpression(types.identifier('injectIntoGlobalHook'), [types.identifier('global')])
+                    )
+                )
+            }
+        }
+    }
+}
+
+/** Runtime module: rewrites only the exact known `window.<global>` protocol accesses. */
+function rewriteRefreshRuntimeWindowAccess(): PluginObject {
+    /** Refresh protocol globals on `window` that AppService must see on `global`; add names one by one. */
+    const refreshRuntimeWindowGlobals = ['__registerBeforePerformReactRefresh', '__getReactRefreshIgnoredExports']
+
+    return {
+        name: 'vite-plugin-taro:wx-refresh-runtime-window-access',
         visitor: {
             MemberExpression(memberPath) {
                 const member = memberPath.node
-                // Only the exact generated assignment is rewritten; every other window access
-                // (user or library code) stays untouched.
                 if (
                     !types.isIdentifier(member.object, { name: 'window' }) ||
-                    !types.isIdentifier(member.property, { name: '__registerBeforePerformReactRefresh' })
+                    !types.isIdentifier(member.property) ||
+                    !refreshRuntimeWindowGlobals.includes(member.property.name)
                 ) {
                     return
                 }
-                // AppService has no browser `window` (free `window` is undefined, so the top-level
-                // assignment throws at module evaluation). `global` is the AppService global object:
-                // the assignment then lands on the App heap like any other global hook.
+                // AppService has no browser `window` (free `window` is undefined, so the
+                // top-level assignment throws at module evaluation). `global` is the
+                // AppService global object: the protocol globals then land on the App heap
+                // like any other global hook. This transform runs only on the refresh
+                // runtime module, whose window accesses are all generated protocol code.
                 member.object = types.identifier('global')
             }
         }
