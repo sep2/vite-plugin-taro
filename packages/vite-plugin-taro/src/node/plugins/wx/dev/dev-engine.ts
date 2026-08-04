@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { readFileSync } from 'node:fs'
 import type { ServerResponse } from 'node:http'
 import path from 'node:path'
 import type { InputOptions, OutputOptions } from 'rolldown'
+import { build } from 'rolldown'
 import { type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
 import type { Connect, ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
@@ -156,7 +156,6 @@ export async function createWxDevEngine({
     /** Restores physical Mini Program output conventions after Vite applies browser bundled-dev defaults. */
     function installRolldownOptions(): void {
         const original = bundledDev.getRolldownOptions.bind(bundledDev)
-        const runtimeSource = readFileSync(resolvePackageFile('dist/runtime/wx/dev/dev-runtime.js'), 'utf8')
 
         bundledDev.getRolldownOptions = async () => {
             const rolldownOptions = await original()
@@ -191,7 +190,7 @@ export async function createWxDevEngine({
                 ...(typeof rolldownOptions.experimental.devMode === 'object'
                     ? rolldownOptions.experimental.devMode
                     : {}),
-                implement: runtimeSource,
+                implement: await bundleRuntimeSource(),
                 lazy: false
             }
             rolldownOptions.plugins = [rolldownOptions.plugins, createViteReporter(server)]
@@ -243,7 +242,17 @@ async function writeHmrInfo(server: ViteDevServer): Promise<BuildState | undefin
     }
 }
 
+/** Bundles the runtime host and state machine into one plain script for injection. */
+async function bundleRuntimeSource(): Promise<string> {
+    const result = await build({
+        input: resolvePackageFile('dist/runtime/wx/dev/dev-runtime.js'),
+        output: { format: 'iife', minify: true, sourcemap: false }
+    })
+    return result.output[0].code
+}
+
 const maximumBodyBytes = 64 * 1024
+
 function readBody(req: Connect.IncomingMessage): Promise<string> {
     return new Promise((resolve, reject) => {
         let body = ''

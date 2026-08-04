@@ -1,11 +1,13 @@
-// WX AppService dev runtime — injected verbatim at the end of the shared Rolldown runtime chunk
-// (`assets/rolldown-runtime.js`, required first by every chunk). Defines the App-global
-// `__rolldown_runtime__` that generated modules call.
+// WX AppService dev runtime — bundled and injected verbatim at the end of the shared Rolldown
+// runtime chunk (`assets/rolldown-runtime.js`, required first by every chunk). Defines the
+// App-global `__rolldown_runtime__` that generated modules call.
 //
 // The `DevRuntime` base class is injected into the chunk by Rolldown's dev-mode transform
 // (verified: `typeof DevRuntime` is `function`), so the WX host only extends it.
 //
-// This step: consume hmr/info.js and send the one startup report `{ buildId, version: 0 }`.
+// This step only stores patches: every valid hmr/patches.js payload is merged into a
+// version-keyed map for a later step to apply. Storing the same version twice (a second Page
+// requiring the same patches.js) is idempotent.
 
 import type { Messenger, DevRuntime as RolldownDevRuntime } from 'rolldown/experimental/runtime-types'
 
@@ -16,6 +18,18 @@ declare const DevRuntime: new (messenger: Messenger, clientId: string) => Rolldo
 type HmrInfo = Readonly<{
     buildId: string
     endpoint: string
+}>
+
+/** One physical hmr/patches.js payload: the build identity plus one factory per HostPatch. */
+type PatchPayload = Readonly<{
+    buildId: string
+    patches: readonly PatchProgram[]
+}>
+
+/** One HostPatch: its absolute version and the Rolldown factory to run. */
+type PatchProgram = Readonly<{
+    version: number
+    factory: () => void
 }>
 
 /** Per-module hot state */
@@ -41,6 +55,9 @@ class WxDevRuntime extends DevRuntime {
     /** Module ids executed since the last report; flushed with every report request. */
     private readonly pendingModules = new Set<string>()
 
+    /** Stored HostPatch factories keyed by absolute version; the apply step walks versions upward. */
+    private readonly patches = new Map<number, () => void>()
+
     constructor() {
         super({ send(): void {} }, '')
     }
@@ -60,12 +77,28 @@ class WxDevRuntime extends DevRuntime {
 
     /** Consumed once per App heap from hmr/info.js; the host buildId is the Rolldown client ID. */
     initialize(info: HmrInfo): void {
+        if (this.hmrInfo) {
+            return
+        }
         this.hmrInfo = info
         this.clientId = info.buildId
-        this.report()
+        this.report(0)
     }
 
-    private report(): void {
+    /** The only direct effect of hmr/patches.js: validate and store for a later apply step. */
+    storePatches(payload: PatchPayload): void {
+        const info = this.hmrInfo
+        if (!info || payload.buildId !== info.buildId) {
+            console.warn('[vite-plugin-taro] patches for a stale build')
+            return
+        }
+
+        for (const patch of payload.patches) {
+            this.patches.set(patch.version, patch.factory)
+        }
+    }
+
+    private report(version: number): void {
         const info = this.hmrInfo
         if (!info) {
             return
@@ -77,7 +110,7 @@ class WxDevRuntime extends DevRuntime {
             method: 'POST',
             data: {
                 buildId: info.buildId,
-                version: 0,
+                version,
                 modules
             },
             header: { 'content-type': 'application/json' },
