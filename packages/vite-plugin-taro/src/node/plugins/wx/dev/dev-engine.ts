@@ -111,20 +111,24 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
 
 /** Writes the immutable App metadata every full build starts from. */
 async function writeHmrInfo(server: ViteDevServer): Promise<void> {
-    const httpServer = server.httpServer
-    if (!httpServer) {
-        return
+    try {
+        const httpServer = server.httpServer
+        if (!httpServer) {
+            return
+        }
+        const address = httpServer.address()
+        if (!address || typeof address === 'string') {
+            // Port not bound yet (initial build); the listening listener writes the file.
+            return
+        }
+        const info: HmrInfo = {
+            buildId: randomUUID(),
+            endpoint: `${server.config.server.https ? 'https' : 'http'}://${resolveEndpointHost(server)}:${address.port}${hmrControlPath}`
+        }
+        await writeHmrFile(server.config.build.outDir, hmrInfoFileName, renderHmrInfo(info))
+    } catch (e) {
+        console.error('[vite-plugin-taro] wx HMR write failed', e)
     }
-    const address = httpServer.address()
-    if (!address || typeof address === 'string') {
-        // Port not bound yet (initial build); the listening listener writes the file.
-        return
-    }
-    const info: HmrInfo = {
-        buildId: randomUUID(),
-        endpoint: `${server.config.server.https ? 'https' : 'http'}://${resolveEndpointHost(server)}:${address.port}${hmrControlPath}`
-    }
-    await writeHmrFile(server.config.build.outDir, hmrInfoFileName, renderHmrInfo(info))
 }
 
 /** The bound address host, or the loopback address for wildcard/default hosts. */
