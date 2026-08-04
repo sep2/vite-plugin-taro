@@ -5,6 +5,8 @@ export async function createDevHost(server: ViteDevServer): Promise<Readonly<{ c
     const devEngine = await createWxDevEngine({ server })
 
     return {
-        async close(): Promise<void> {}
+        async close(): Promise<void> {
+            await devEngine.close()
+        }
     }
 }

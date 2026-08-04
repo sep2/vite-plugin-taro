@@ -5,7 +5,9 @@ import { type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
 import { resolvePackageFile } from '../../../utils/packages.ts'
 
-export type WxDevEngine = Readonly<{}>
+export type WxDevEngine = Readonly<{
+    close: () => Promise<void>
+}>
 
 export async function createWxDevEngine({ server }: { server: ViteDevServer }): Promise<WxDevEngine> {
     const bundledDev = getBundledDev(server)
@@ -14,12 +16,14 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
     installRolldownOptions()
     bundledDev.triggerBundleRegenerationIfStale = async () => false
 
-    return {}
+    return {
+        close: async () => {}
+    }
 
     async function createEngine(): Promise<DevEngine> {
         const options = await bundledDev.getRolldownOptions()
         if (!options.output || Array.isArray(options.output)) {
-            throw new Error('WX development requires exactly one Rolldown output.')
+            throw new Error('wx development requires exactly one Rolldown output.')
         }
 
         return dev(options, options.output, {
@@ -45,13 +49,13 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
         bundledDev.getRolldownOptions = async () => {
             const options = await original()
             if (Array.isArray(options.output)) {
-                throw new Error('WX development requires one configured Rolldown output.')
+                throw new Error('wx development requires one configured Rolldown output.')
             }
             options.output ??= {}
             const output = options.output
             const configuredOutput = server.config.build.rolldownOptions.output
             if (Array.isArray(configuredOutput)) {
-                throw new Error('WX development supports one configured Rolldown output.')
+                throw new Error('wx development supports one configured Rolldown output.')
             }
 
             const configured = (configuredOutput ?? {}) as Record<string, unknown>
@@ -142,7 +146,7 @@ type BundledDev = {
 function getBundledDev(server: ViteDevServer): BundledDev {
     const bundledDev = server.environments.client.bundledDev as unknown as BundledDev | undefined
     if (!bundledDev) {
-        throw new Error('Vite did not create the WX bundled-development environment.')
+        throw new Error('Vite did not create the wx bundled-development environment.')
     }
     return bundledDev
 }
