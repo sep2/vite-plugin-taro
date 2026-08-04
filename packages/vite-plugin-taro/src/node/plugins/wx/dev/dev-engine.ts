@@ -96,8 +96,9 @@ export async function createWxDevEngine({
 
         try {
             const report = JSON.parse(await readBody(req)) as ModulesReport | VersionReport
-            // Only the current build's reports register modules or hold version polls; delayed
-            // reports from older builds are ignored so they can never influence the live build.
+            // Only the current build's reports register modules or record the stored version;
+            // delayed reports from older builds are ignored so they can never influence the
+            // live build.
             if (!publisher.isCurrentBuild(report.buildId)) {
                 res.end()
                 return
@@ -107,12 +108,11 @@ export async function createWxDevEngine({
                 res.end()
                 return
             }
-            // The version report is the long poll: hold it until a publication happens, so the
-            // runtime's re-opened request always carries its current version. The response
-            // carries no information — it is only a latch release.
-            publisher.hold(report.version, () => {
-                res.end()
-            })
+            // The version report records the runtime's stored position; the publisher writes
+            // the missing suffix immediately when behind. Reports are one-shot receipts, so
+            // no long poll is held.
+            publisher.report(report.version)
+            res.end()
         } catch (e) {
             logWxError(server.config.logger, 'wx HMR report failed', e)
             res.statusCode = 400

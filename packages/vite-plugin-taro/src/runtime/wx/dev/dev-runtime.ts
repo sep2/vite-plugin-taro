@@ -52,11 +52,11 @@ class WxHotContext {
 class WxDevRuntime extends DevRuntime {
     private hmrInfo: HmrInfo | undefined
 
-    /** Stored HostPatch factories keyed by absolute version; the apply step walks versions upward. */
+    /** Stored HostPatch factories keyed by absolute version; delivered, not yet executed. */
     private readonly patches = new Map<number, () => void>()
 
-    /** Version of the newest applied publication; the host compares it with its own count. */
-    private appliedVersion = 0
+    /** Delivered: the highest version the runtime has stored; the host compares its own count against this. */
+    private storedVersion = 0
 
     constructor() {
         // The base batches executed-module ids and hands them to this messenger; each batch is
@@ -90,10 +90,12 @@ class WxDevRuntime extends DevRuntime {
         }
         this.hmrInfo = info
         this.clientId = info.buildId
+        // Anchor: the host publishes only after a version report, so the first report must
+        // exist before the first edit can publish anything.
         this.reportVersion()
     }
 
-    /** The only direct effect of hmr/patches.js: validate and store for a later apply step. */
+    /** The only direct effect of hmr/patches.js: validate and store. */
     storePatches(payload: PatchPayload): void {
         const info = this.hmrInfo
         if (!info || payload.buildId !== info.buildId) {
@@ -103,7 +105,14 @@ class WxDevRuntime extends DevRuntime {
 
         for (const patch of payload.patches) {
             this.patches.set(patch.version, patch.factory)
+            if (patch.version > this.storedVersion) {
+                this.storedVersion = patch.version
+            }
         }
+
+        // Delivery receipt: the report carries the stored version, so the host stops
+        // publishing once the runtime has received the suffix.
+        this.reportVersion()
     }
 
     /** Reports executed module ids so the host can register them with the Rolldown engine. */
@@ -111,13 +120,9 @@ class WxDevRuntime extends DevRuntime {
         void this.sendReport({ kind: 'modules', modules })
     }
 
-    /** Reports the applied version; the host publishes the missing patch suffix when behind. */
+    /** Reports the stored version; the host publishes the missing suffix when it is behind. */
     private reportVersion(): void {
-        // The promise chain serializes the polls: every response (or failure) re-opens, so
-        // exactly one version report stays in flight at all times.
-        void this.sendReport({ kind: 'version', version: this.appliedVersion })
-            .then(() => this.reportVersion())
-            .catch(() => this.reportVersion())
+        void this.sendReport({ kind: 'version', version: this.storedVersion })
     }
 
     /** Sends one metadata-only report to the host; executable code never travels over HTTP. */
@@ -128,8 +133,6 @@ class WxDevRuntime extends DevRuntime {
             // silently dropping the sync traffic.
             throw new Error('WX dev runtime is not initialized')
         }
-        // The report promise chain serializes version polls; the wx.request timeout bounds
-        // each held request, so no host timer or in-flight flag is needed.
         return new Promise((resolve, reject) => {
             wx.request({
                 url: info.endpoint,
