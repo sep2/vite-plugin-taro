@@ -35,7 +35,7 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
             // asks bundledDev to create its hard-coded skip-write DevEngine.
             order: 'post',
             async handler(server) {
-                devHost = await createDevHost(server, options)
+                devHost = await createDevHost(server)
             }
         },
 
