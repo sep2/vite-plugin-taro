@@ -55,6 +55,9 @@ class WxDevRuntime extends DevRuntime {
     /** Stored HostPatch factories keyed by absolute version; the apply step walks versions upward. */
     private readonly patches = new Map<number, () => void>()
 
+    /** Version of the newest applied publication; the host compares it with its own count. */
+    private appliedVersion = 0
+
     constructor() {
         // The base batches executed-module ids and hands them to this messenger; each batch is
         // one modules report.
@@ -87,7 +90,7 @@ class WxDevRuntime extends DevRuntime {
         }
         this.hmrInfo = info
         this.clientId = info.buildId
-        this.reportVersion(0)
+        this.reportVersion()
     }
 
     /** The only direct effect of hmr/patches.js: validate and store for a later apply step. */
@@ -109,8 +112,12 @@ class WxDevRuntime extends DevRuntime {
     }
 
     /** Reports the applied version; the host publishes the missing patch suffix when behind. */
-    private reportVersion(version: number): void {
-        void this.sendReport({ kind: 'version', version })
+    private reportVersion(): void {
+        // The promise chain serializes the polls: every response (or failure) re-opens, so
+        // exactly one version report stays in flight at all times.
+        void this.sendReport({ kind: 'version', version: this.appliedVersion })
+            .then(() => this.reportVersion())
+            .catch(() => this.reportVersion())
     }
 
     /** Sends one metadata-only report to the host; executable code never travels over HTTP. */
@@ -121,7 +128,8 @@ class WxDevRuntime extends DevRuntime {
             // silently dropping the sync traffic.
             throw new Error('WX dev runtime is not initialized')
         }
-
+        // The report promise chain serializes version polls; the wx.request timeout bounds
+        // each held request, so no host timer or in-flight flag is needed.
         return new Promise((resolve, reject) => {
             wx.request({
                 url: info.endpoint,
@@ -133,8 +141,7 @@ class WxDevRuntime extends DevRuntime {
                 },
                 fail(error: unknown): void {
                     reject(error)
-                },
-                complete(): void {}
+                }
             })
         })
     }

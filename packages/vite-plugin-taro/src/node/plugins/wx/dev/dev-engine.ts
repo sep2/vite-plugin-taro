@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import type { ServerResponse } from 'node:http'
 import path from 'node:path'
 import type { InputOptions, OutputOptions } from 'rolldown'
@@ -15,10 +14,10 @@ import {
     hmrInfoFileName,
     hmrPatchesFileName,
     renderHmrInfo,
-    renderHmrPatches,
     renderInitialHmrPatches,
     writeHmrFile
 } from './hmr-files.ts'
+import { PatchPublisher } from './patch-publisher.ts'
 
 export type WxDevEngine = Readonly<{
     close: () => Promise<void>
@@ -46,10 +45,11 @@ export async function createWxDevEngine({
 }): Promise<WxDevEngine> {
     const bundledDev = getBundledDev(server)
 
-    // Per-server build state: the identity of the current full build and its patch history.
-    // writeHmrInfo returns a fresh state per full build; ordinary edits append one HostPatch.
-    let currentBuildId: string | undefined
-    let patches: HostPatch[] = []
+    // All build/patch/hold state lives in the publisher; the engine keeps no mutable state.
+    // The publisher is pure — the physical write is this injected callback.
+    const publisher = new PatchPublisher((content) =>
+        writeHmrFile(server.config.build.outDir, hmrPatchesFileName, content)
+    )
 
     // Must install rolldown options before create engine
     installRolldownOptions()
@@ -69,9 +69,7 @@ export async function createWxDevEngine({
     // Vite binds the port only after initServer (and therefore the initial build) completes, so
     // the actual port is not observable while onOutput runs for the first build. The App metadata
     // is written once the port is real; later full builds rewrite it from onOutput.
-    server.httpServer?.once('listening', () => {
-        void writeHmrInfo(server).then(adoptBuild)
-    })
+    server.httpServer?.once('listening', startFreshBuild)
 
     // The runtime's metadata-only reports land on the control path; the buildId in each report
     // IS the Rolldown client ID.
@@ -83,12 +81,10 @@ export async function createWxDevEngine({
         }
     }
 
-    /** Adopts the fresh build state returned by writeHmrInfo. */
-    function adoptBuild(state: BuildState | undefined): void {
-        if (state) {
-            currentBuildId = state.buildId
-            patches = state.patches
-        }
+    /** Rotates the build identity and materializes the App metadata for it. */
+    async function startFreshBuild(): Promise<void> {
+        const buildId = publisher.startBuild()
+        await writeHmrInfo(server, buildId)
     }
 
     async function handleReport(req: Connect.IncomingMessage, res: ServerResponse): Promise<void> {
@@ -100,69 +96,71 @@ export async function createWxDevEngine({
 
         try {
             const report = JSON.parse(await readBody(req)) as ModulesReport | VersionReport
-            // Only the current build's reports register modules or publish patches; delayed
+            // Only the current build's reports register modules or hold version polls; delayed
             // reports from older builds are ignored so they can never influence the live build.
-            if (report.buildId !== currentBuildId) {
-                res.setHeader('content-type', 'application/json')
-                res.end(JSON.stringify({ type: 'ok' }))
+            if (!publisher.isCurrentBuild(report.buildId)) {
+                res.end()
                 return
             }
             if (report.kind === 'modules') {
                 await engine.registerModules(report.buildId, report.modules)
-            } else if (report.version < patches.length) {
-                // Render the missing suffix only when the reported version is behind.
-                await writeHmrFile(
-                    server.config.build.outDir,
-                    hmrPatchesFileName,
-                    renderHmrPatches(report.buildId, patches, report.version)
-                )
+                res.end()
+                return
             }
-            res.setHeader('content-type', 'application/json')
-            res.end(JSON.stringify({ type: 'ok' }))
+            // The version report is the long poll: hold it until a publication happens, so the
+            // runtime's re-opened request always carries its current version. The response
+            // carries no information — it is only a latch release.
+            publisher.hold(report.version, () => {
+                res.end()
+            })
         } catch (e) {
-            if (Error.isError(e)) {
-                server.config.logger.error(`[vite-plugin-taro] wx patches write failed`, { error: e })
-            } else {
-                server.config.logger.error(`[vite-plugin-taro] wx patches write failed with unknown error: ${e}`)
-            }
+            logWxError(server.config.logger, 'wx HMR report failed', e)
             res.statusCode = 400
             res.end()
         }
     }
 
+    /** Creates the physical DevEngine with the WX adapter hooks. */
     async function createEngine(): Promise<DevEngine> {
-        const options = await bundledDev.getRolldownOptions()
-        if (!options.output || Array.isArray(options.output)) {
+        const rolldownOptions = await bundledDev.getRolldownOptions()
+        if (!rolldownOptions.output || Array.isArray(rolldownOptions.output)) {
             throw new Error('wx development requires exactly one Rolldown output.')
         }
 
-        return dev(options, options.output, {
-            onHmrUpdates: (result) => {
+        return dev(rolldownOptions, rolldownOptions.output, {
+            onHmrUpdates: async (result) => {
                 if (result instanceof Error) {
-                    server.config.logger.error(`[vite-plugin-taro] wx HMR update failed`, { error: result })
+                    logWxError(server.config.logger, 'wx HMR update failed', result)
                     return
                 }
-                for (const { clientId, update } of result.updates) {
+                // Collect the batch first: one HMR event can carry several patches, and they
+                // must be appended and published as a single unit. The DevEngine is the sole
+                // producer and only emits updates for the current build, so no build gate is
+                // needed here.
+                const batch: HostPatch[] = []
+                for (const { update } of result.updates) {
                     if (update.type === 'Noop') {
                         continue
                     }
-                    if (update.type === 'Patch' && clientId === currentBuildId) {
-                        patches.push({ code: update.code, fileName: update.filename })
-                        server.config.logger.info(`[vite-plugin-taro] wx patch produced version ${patches.length}`)
+                    if (update.type === 'Patch') {
+                        batch.push({ code: update.code, fileName: update.filename })
                         continue
                     }
                     server.config.logger.info(`[vite-plugin-taro] wx unhandled update ${update.type}`)
                 }
+                if (batch.length > 0) {
+                    publisher.produce(batch)
+                    server.config.logger.info(`[vite-plugin-taro] wx patch produced version ${batch.length}`)
+                }
             },
-            onOutput: (result) => {
+            onOutput: async (result) => {
                 if (result instanceof Error) {
-                    server.config.logger.error(`[vite-plugin-taro] wx dev build failed`, { error: result })
+                    logWxError(server.config.logger, 'wx dev build failed', result)
                     return
                 }
-                // A fresh build identity per complete physical build; the App runtime reads it from
-                // hmr/info.js before any module registers. The initial build's onOutput runs before
-                // the port is bound, so the listening listener performs that first write.
-                void writeHmrInfo(server).then(adoptBuild)
+                // A fresh build identity per complete physical build; the App runtime reads it
+                // from hmr/info.js before any module registers.
+                await startFreshBuild()
             },
             rebuildStrategy: 'never',
             watch: { skipWrite: false }
@@ -216,45 +214,48 @@ export async function createWxDevEngine({
     }
 }
 
-/** Fresh per-full-build state; a patch's version is its index plus one. */
-type BuildState = Readonly<{
-    buildId: string
-    patches: HostPatch[]
-}>
+/** The bound HTTP port, or undefined before Vite's server is listening. */
+function boundPort(server: ViteDevServer): number | undefined {
+    const httpServer = server.httpServer
+    if (!httpServer) {
+        return undefined
+    }
+    const address = httpServer.address()
+    if (!address || typeof address === 'string') {
+        return undefined
+    }
+    return address.port
+}
 
 /** Writes the immutable App metadata every full build starts from. */
-async function writeHmrInfo(server: ViteDevServer): Promise<BuildState | undefined> {
+async function writeHmrInfo(server: ViteDevServer, buildId: string): Promise<void> {
     try {
-        const httpServer = server.httpServer
-        if (!httpServer) {
-            return undefined
-        }
-        const address = httpServer.address()
-        if (!address || typeof address === 'string') {
+        const port = boundPort(server)
+        if (port === undefined) {
             // Port not bound yet (initial build); the listening listener writes the file.
-            return undefined
+            return
         }
-        const state: BuildState = {
-            buildId: randomUUID(),
-            patches: []
-        }
+
         const info: HmrInfo = {
-            buildId: state.buildId,
-            endpoint: `${server.config.server.https ? 'https' : 'http'}://${resolveEndpointHost(server)}:${address.port}${hmrControlPath}`
+            buildId,
+            endpoint: `${server.config.server.https ? 'https' : 'http'}://${resolveEndpointHost(server)}:${port}${hmrControlPath}`
         }
 
         await writeHmrFile(server.config.build.outDir, hmrInfoFileName, renderHmrInfo(info))
 
         // Pages require hmr/patches.js at boot, so the file must exist before the first publish.
         await writeHmrFile(server.config.build.outDir, hmrPatchesFileName, renderInitialHmrPatches())
-        return state
     } catch (e) {
-        if (Error.isError(e)) {
-            server.config.logger.error(`[vite-plugin-taro] wx HMR write failed`, { error: e })
-        } else {
-            server.config.logger.error(`[vite-plugin-taro] wx HMR write failed with unknown error: ${e}`)
-        }
-        return undefined
+        logWxError(server.config.logger, 'wx HMR write failed', e)
+    }
+}
+
+/** Logs an error with the plugin prefix, distinguishing Error values from unknowns. */
+function logWxError(logger: ViteDevServer['config']['logger'], prefix: string, error: unknown): void {
+    if (Error.isError(error)) {
+        logger.error(`[vite-plugin-taro] ${prefix}`, { error })
+    } else {
+        logger.error(`[vite-plugin-taro] ${prefix} with unknown error: ${error}`)
     }
 }
 

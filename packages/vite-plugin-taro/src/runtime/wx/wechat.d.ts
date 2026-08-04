@@ -13,7 +13,6 @@ type WeChatRequestOptions = Readonly<{
     timeout?: number
     success(result: unknown): void
     fail(error: unknown): void
-    complete(): void
 }>
 
 /** Native HTTP request API available in the Mini Program JavaScript environment. */
