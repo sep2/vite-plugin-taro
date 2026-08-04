@@ -15,6 +15,9 @@ export class PatchPublisher {
     private readonly patches: HostPatch[] = []
 
     /** The runtime's last reported stored version; the write suffix starts after it. */
+    // The produce-write needs this position to render only the missing suffix: without it,
+    // produce would have to write the full history (rejected) or wait for a report that can
+    // only arrive after a write (deadlock). The report is the only source of this number.
     private knownVersion = 0
 
     // Explicit field assignment: node --test strips types and does not support parameter properties.
@@ -39,13 +42,25 @@ export class PatchPublisher {
         return this.buildId
     }
 
-    /** Appends a batch of patches; publishes once when the runtime is behind. */
+    /**
+     * Appends a batch of patches; publishes once when the runtime is behind.
+     *
+     * The produce-write is the loop's engine: the runtime only reports after a re-execution,
+     * and a re-execution only happens after patches.js changes, so the first (and every)
+     * write must come from here, triggered directly by the edit.
+     */
     produce(patches: readonly HostPatch[]): void {
         this.patches.push(...patches)
         void this.publishIfBehind()
     }
 
-    /** Records the runtime's stored version; publishes the missing suffix when behind. */
+    /**
+     * Records the runtime's stored version; publishes the missing suffix when behind.
+     *
+     * The report-write is the catch-up path: a delayed report (network reordering, a missed
+     * re-execution) re-publishes whatever the runtime has not acknowledged yet. Storing is
+     * idempotent, so the redundant refresh it causes is harmless.
+     */
     report(version: number): void {
         this.knownVersion = version
         void this.publishIfBehind()
