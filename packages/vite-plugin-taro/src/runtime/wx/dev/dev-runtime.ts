@@ -5,9 +5,10 @@
 // The `DevRuntime` base class is injected into the chunk by Rolldown's dev-mode transform
 // (verified: `typeof DevRuntime` is `function`), so the WX host only extends it.
 //
-// This step only stores patches: every valid hmr/patches.js payload is merged into a
-// version-keyed map for a later step to apply. Storing the same version twice (a second Page
-// requiring the same patches.js) is idempotent.
+// Delivery is passive: every valid hmr/patches.js payload is merged into a version-keyed
+// store and acknowledged with the stored version. After the re-executing Page finishes its
+// synchronous evaluation, the stored factories run in version order (the apply walk);
+// storing the same version twice (a second Page requiring the same patches.js) is idempotent.
 
 import type { Messenger, DevRuntime as RolldownDevRuntime } from 'rolldown/experimental/runtime-types'
 
@@ -57,6 +58,9 @@ class WxDevRuntime extends DevRuntime {
 
     /** Delivered: the highest version the runtime has stored; the host compares its own count against this. */
     private storedVersion = 0
+
+    /** Executed: the highest version whose factory has run; advanced by the apply walk. */
+    private appliedVersion = 0
 
     constructor() {
         // The base batches executed-module ids and hands them to this messenger; each batch is
@@ -113,6 +117,31 @@ class WxDevRuntime extends DevRuntime {
         // Delivery receipt: the report carries the stored version, so the host stops
         // publishing once the runtime has received the suffix.
         this.reportVersion()
+
+        // Apply synchronously: the page's imports below the require resolve against the
+        // freshly registered modules, so the re-executed Page evaluates with the new code.
+        this.applyPatches()
+    }
+
+    /**
+     * Runs every stored factory from appliedVersion upward. Programs register the new module
+     * code with the base runtime, and the re-executing Page's imports (which follow the
+     * patches.js require) resolve against it. Synchronous and atomic: WX patch programs have
+     * no async, so no checkpoints or concurrency guard are needed.
+     */
+    private applyPatches(): void {
+        while (this.appliedVersion < this.patches.size) {
+            const version = this.appliedVersion + 1
+            const factory = this.patches.get(version)
+            if (!factory) {
+                // A gap can only come from a corrupted payload; stop and surface it instead
+                // of spinning. A reload re-syncs from the host.
+                console.warn(`[vite-plugin-taro] patch version ${version} missing; apply stopped`)
+                break
+            }
+            factory()
+            this.appliedVersion = version
+        }
     }
 
     /** Reports executed module ids so the host can register them with the Rolldown engine. */
