@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
+import type { ServerResponse } from 'node:http'
 import path from 'node:path'
 import type { InputOptions, OutputOptions } from 'rolldown'
 import { type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
-import type { ViteDevServer } from 'vite'
+import type { Connect, ViteDevServer } from 'vite'
 import { resolvePackageFile } from '../../../utils/packages.ts'
 import { appShellFileName } from '../module.ts'
 import { type HmrInfo, hmrControlPath, hmrInfoFileName, renderHmrInfo, writeHmrFile } from './hmr-files.ts'
@@ -12,8 +13,19 @@ export type WxDevEngine = Readonly<{
     close: () => Promise<void>
 }>
 
+/** One metadata-only runtime report; executable code never travels over HTTP. */
+type RuntimeReport = Readonly<{
+    buildId: string
+    version: number
+    modules: string[]
+}>
+
 export async function createWxDevEngine({ server }: { server: ViteDevServer }): Promise<WxDevEngine> {
     const bundledDev = getBundledDev(server)
+
+    // Per-server build state: the identity of the current full build. writeHmrInfo returns a
+    // fresh buildId per full build; Rolldown correlates updates and registrations by this ID.
+    let currentBuildId: string | undefined
 
     // Must install rolldown options before create engine
     installRolldownOptions()
@@ -34,12 +46,48 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
     // the actual port is not observable while onOutput runs for the first build. The App metadata
     // is written once the port is real; later full builds rewrite it from onOutput.
     server.httpServer?.once('listening', () => {
-        writeHmrInfo(server)
+        void writeHmrInfo(server).then(adoptBuild)
     })
+
+    // The runtime's metadata-only reports land on the control path; the buildId in each report
+    // IS the Rolldown client ID.
+    server.middlewares.use(hmrControlPath, (req, res) => void handleReport(req, res))
 
     return {
         close: async () => {
             await engine.close()
+        }
+    }
+
+    /** Adopts the fresh buildId returned by writeHmrInfo. */
+    function adoptBuild(buildId: string | undefined): void {
+        if (buildId) {
+            currentBuildId = buildId
+        }
+    }
+
+    async function handleReport(req: Connect.IncomingMessage, res: ServerResponse): Promise<void> {
+        if (req.method !== 'POST') {
+            res.statusCode = 404
+            res.end()
+            return
+        }
+
+        try {
+            const report = JSON.parse(await readBody(req)) as RuntimeReport
+            server.config.logger.info(
+                `[vite-plugin-taro] wx runtime report build ${report.buildId} version ${report.version}`
+            )
+            // Only the current build's reports register modules; delayed reports from older
+            // builds are ignored so they can never influence the live build's boundaries.
+            if (report.buildId === currentBuildId) {
+                await engine.registerModules(report.buildId, report.modules)
+            }
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ type: 'ok' }))
+        } catch {
+            res.statusCode = 400
+            res.end()
         }
     }
 
@@ -63,7 +111,7 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
                 // A fresh build identity per complete physical build; the App runtime reads it from
                 // hmr/info.js before any module registers. The initial build's onOutput runs before
                 // the port is bound, so the listening listener performs that first write.
-                writeHmrInfo(server)
+                void writeHmrInfo(server).then(adoptBuild)
             },
             rebuildStrategy: 'never',
             watch: { skipWrite: false }
@@ -112,29 +160,48 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
 }
 
 /** Writes the immutable App metadata every full build starts from. */
-async function writeHmrInfo(server: ViteDevServer): Promise<void> {
+async function writeHmrInfo(server: ViteDevServer): Promise<string | undefined> {
     try {
         const httpServer = server.httpServer
         if (!httpServer) {
-            return
+            return undefined
         }
         const address = httpServer.address()
         if (!address || typeof address === 'string') {
             // Port not bound yet (initial build); the listening listener writes the file.
-            return
+            return undefined
         }
+        const buildId = randomUUID()
         const info: HmrInfo = {
-            buildId: randomUUID(),
+            buildId,
             endpoint: `${server.config.server.https ? 'https' : 'http'}://${resolveEndpointHost(server)}:${address.port}${hmrControlPath}`
         }
         await writeHmrFile(server.config.build.outDir, hmrInfoFileName, renderHmrInfo(info))
+        return buildId
     } catch (e) {
         if (Error.isError(e)) {
             server.config.logger.error(`[vite-plugin-taro] wx HMR write failed`, { error: e })
         } else {
             server.config.logger.error(`[vite-plugin-taro] wx HMR write failed with unknown error: ${e}`)
         }
+        return undefined
     }
+}
+
+const maximumBodyBytes = 64 * 1024
+function readBody(req: Connect.IncomingMessage): Promise<string> {
+    return new Promise((resolve, reject) => {
+        let body = ''
+        req.on('data', (chunk: Buffer) => {
+            body += chunk.toString('utf8')
+            if (body.length > maximumBodyBytes) {
+                reject(new Error('report body too large'))
+                req.destroy()
+            }
+        })
+        req.on('end', () => resolve(body))
+        req.on('error', reject)
+    })
 }
 
 /** The bound address host, or loopback for wildcard binds; IPv6 literals are bracketed. */

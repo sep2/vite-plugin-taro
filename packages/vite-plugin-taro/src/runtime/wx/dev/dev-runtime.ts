@@ -38,6 +38,9 @@ class WxHotContext {
 class WxDevRuntime extends DevRuntime {
     private hmrInfo: HmrInfo | undefined
 
+    /** Module ids executed since the last report; flushed with every report request. */
+    private readonly pendingModules = new Set<string>()
+
     constructor() {
         super({ send(): void {} }, '')
     }
@@ -48,6 +51,11 @@ class WxDevRuntime extends DevRuntime {
      */
     override createModuleHotContext(_moduleId: string): WxHotContext {
         return new WxHotContext()
+    }
+
+    /** The base registerModule funnels every executed module here; the next report carries them. */
+    override sendModuleRegisteredMessage = (module: string): void => {
+        this.pendingModules.add(module)
     }
 
     /** Consumed once per App heap from hmr/info.js; the host buildId is the Rolldown client ID. */
@@ -62,12 +70,15 @@ class WxDevRuntime extends DevRuntime {
         if (!info) {
             return
         }
+        const modules = [...this.pendingModules]
+        this.pendingModules.clear()
         wx.request({
             url: info.endpoint,
             method: 'POST',
             data: {
                 buildId: info.buildId,
-                version: 0
+                version: 0,
+                modules
             },
             header: { 'content-type': 'application/json' },
             success(): void {},
