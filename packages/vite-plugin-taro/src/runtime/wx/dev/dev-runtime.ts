@@ -33,22 +33,31 @@ type PatchProgram = Readonly<{
     factory: () => void
 }>
 
-/** Per-module hot state: holds the generated accept callback for the update propagation. */
+/**
+ * Per-module hot state, mirroring Rolldown's web runtime: accept is a passive registration;
+ * the propagation (applyUpdates) invokes the stored callbacks with the module's fresh
+ * exports.
+ */
 class WxHotContext {
     readonly _internal = {
         updateStyle(): void {},
         removeStyle(): void {}
     }
 
-    private acceptCallback: ((nextExports: unknown) => void) | undefined
+    /** Registered accept callbacks; the propagation invokes them with the fresh exports. */
+    private readonly acceptCallbacks: Array<(moduleExports: unknown) => void> = []
 
-    accept(callback?: (nextExports: unknown) => void): void {
-        this.acceptCallback = callback
+    accept(callback?: (moduleExports: unknown) => void): void {
+        if (callback) {
+            this.acceptCallbacks.push(callback)
+        }
     }
 
-    /** Invokes the registered accept callback with the module's fresh exports. */
-    runAccept(nextExports: unknown): void {
-        this.acceptCallback?.(nextExports)
+    /** Invokes every registered accept callback with the module's fresh exports. */
+    runAccept(moduleExports: unknown): void {
+        for (const callback of this.acceptCallbacks) {
+            callback(moduleExports)
+        }
     }
 
     acceptExports() {}
@@ -70,8 +79,11 @@ class WxDevRuntime extends DevRuntime {
     /** Delivered: the highest version the runtime has stored; the host compares its own count against this. */
     private storedVersion = 0
 
-    /** The shared module hot context; per-program pairing is preserved by microtask FIFO order. */
-    private readonly hotContext = new WxHotContext()
+    /** Active hot contexts per module id; the propagation invokes their callbacks. */
+    private readonly moduleHotContexts = new Map<string, WxHotContext>()
+
+    /** Contexts created during an update; they replace the active ones after the propagation. */
+    private readonly moduleHotContextsToBeUpdated = new Map<string, WxHotContext>()
 
     /** Executed: the highest version whose factory has run; advanced by the apply walk. */
     private appliedVersion = 0
@@ -95,26 +107,35 @@ class WxDevRuntime extends DevRuntime {
 
     /**
      * Generated code always calls this before registerModule and reads `_internal` from the
-     * return value. One shared context: each program's accept registration is queued before
-     * its own propagation microtask, so the callback is consumed before the next program
-     * overwrites it.
+     * return value. Mirrors Rolldown's web runtime: an update creates a fresh context that
+     * only becomes active after the propagation, so the active context still holds the
+     * callbacks registered before the update.
      */
-    override createModuleHotContext(_moduleId: string): WxHotContext {
-        return this.hotContext
+    override createModuleHotContext(moduleId: string): WxHotContext {
+        const hotContext = new WxHotContext()
+        if (this.moduleHotContexts.has(moduleId)) {
+            this.moduleHotContextsToBeUpdated.set(moduleId, hotContext)
+        } else {
+            this.moduleHotContexts.set(moduleId, hotContext)
+        }
+        return hotContext
     }
 
     /**
-     * HMR propagation entry called at the end of every patch program. The program already
-     * re-registered the changed modules, so the fresh exports are live in the registry; the
-     * accept callback (which enqueues React Refresh) is registered in a microtask queued
-     * during the body, so the propagation is queued after it and runs in FIFO order.
+     * HMR propagation entry, implemented exactly like Rolldown's web runtime: synchronous,
+     * invoking the active context's previously registered accept callbacks with the module's
+     * fresh exports (the program re-registered the module synchronously), then swapping the
+     * update's fresh contexts in. The program's own registration microtask lands on the new
+     * context after the swap, ready for the next update.
      */
     override applyUpdates(boundaries: [string, string][]): void {
-        queueMicrotask(() => {
-            for (const [changedId] of boundaries) {
-                this.hotContext.runAccept(this.loadExports(changedId))
-            }
+        for (const [moduleId] of boundaries) {
+            this.moduleHotContexts.get(moduleId)?.runAccept(this.loadExports(moduleId))
+        }
+        this.moduleHotContextsToBeUpdated.forEach((hotContext, moduleId) => {
+            this.moduleHotContexts.set(moduleId, hotContext)
         })
+        this.moduleHotContextsToBeUpdated.clear()
     }
 
     /** Consumed once per App heap from hmr/info.js; the host buildId is the Rolldown client ID. */
