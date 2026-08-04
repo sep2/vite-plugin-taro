@@ -5,6 +5,7 @@ import type { InputOptions, OutputOptions } from 'rolldown'
 import { type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
 import { resolvePackageFile } from '../../../utils/packages.ts'
+import { appShellFileName } from '../module.ts'
 import { type HmrInfo, hmrControlPath, hmrInfoFileName, renderHmrInfo, writeHmrFile } from './hmr-files.ts'
 
 export type WxDevEngine = Readonly<{
@@ -89,6 +90,7 @@ export async function createWxDevEngine({ server }: { server: ViteDevServer }): 
             const configured = (configuredOutput ?? {}) as Record<string, unknown>
             Object.assign(output, configured, {
                 assetFileNames: createStableFileNames(configured.assetFileNames, 'assets/[name][extname]'),
+                banner: createHmrInfoBanner(),
                 chunkFileNames: createStableFileNames(configured.chunkFileNames, 'assets/[name].js'),
                 entryFileNames: createStableFileNames(configured.entryFileNames, '[name]'),
                 format: 'es',
@@ -138,6 +140,18 @@ function resolveEndpointHost(server: ViteDevServer): string {
         return '127.0.0.1'
     }
     return host
+}
+
+/**
+ * Prepends the app entry with the info.js require and the runtime initialization. Banners are
+ * plain text appended after Rolldown's analysis, so the require never becomes a chunk dependency
+ * (a bare require inside the injected runtime source would stall the build), and the wx render
+ * pipeline keeps this text after the hoisted chunk requires — so the runtime chunk exists before
+ * initialize runs, and initialize runs before any module registers.
+ */
+function createHmrInfoBanner(): (chunk: { name: string }) => string {
+    return (chunk) =>
+        chunk.name === appShellFileName ? "__rolldown_runtime__.initialize(require('./hmr/info.js'));\n" : ''
 }
 
 function createStableFileNames<Value>(addon: unknown, fallback: string): string | ((value: Value) => string) {

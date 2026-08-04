@@ -3,13 +3,20 @@
 // `__rolldown_runtime__` that generated modules call.
 //
 // The `DevRuntime` base class is injected into the chunk by Rolldown's dev-mode transform
-// (verified: `typeof DevRuntime` is `function`), so the WX host only extends it — the minimum
-// skeleton, no reimplementation.
+// (verified: `typeof DevRuntime` is `function`), so the WX host only extends it.
+//
+// This step: consume hmr/info.js and send the one startup report `{ buildId, version: 0 }`.
 
 import type { Messenger, DevRuntime as RolldownDevRuntime } from 'rolldown/experimental/runtime-types'
 
 /** Lexical base class injected into the runtime chunk by Rolldown; typed via the contract. */
 declare const DevRuntime: new (messenger: Messenger, clientId: string) => RolldownDevRuntime
+
+/** Identity and report endpoint, materialized by the host into hmr/info.js for every full build. */
+type HmrInfo = Readonly<{
+    buildId: string
+    endpoint: string
+}>
 
 /** Per-module hot state */
 class WxHotContext {
@@ -29,6 +36,8 @@ class WxHotContext {
 
 /** The WX host: extends the Rolldown contract instead of reimplementing it. */
 class WxDevRuntime extends DevRuntime {
+    private hmrInfo: HmrInfo | undefined
+
     constructor() {
         super({ send(): void {} }, '')
     }
@@ -39,6 +48,32 @@ class WxDevRuntime extends DevRuntime {
      */
     override createModuleHotContext(_moduleId: string): WxHotContext {
         return new WxHotContext()
+    }
+
+    /** Consumed once per App heap from hmr/info.js; the host buildId is the Rolldown client ID. */
+    initialize(info: HmrInfo): void {
+        this.hmrInfo = info
+        this.clientId = info.buildId
+        this.report()
+    }
+
+    private report(): void {
+        const info = this.hmrInfo
+        if (!info) {
+            return
+        }
+        wx.request({
+            url: info.endpoint,
+            method: 'POST',
+            data: {
+                buildId: info.buildId,
+                version: 0
+            },
+            header: { 'content-type': 'application/json' },
+            success(): void {},
+            fail(): void {},
+            complete(): void {}
+        })
     }
 }
 
