@@ -6,6 +6,45 @@ If the new features intersect with old behaviors, design it more general that th
 the old codes are no longer needed. You should never propose "minimalistic change". Suggest as elegant and simply as possible.
 Never be conservative, always be progressive.
 
+# Global rules
+
+## Programming Paradigms
+- Compose functions, build abstractions, separate concerns, but not over-engineering.
+- Minimize side effects.
+- Prefer functional programming but keep performance in mind. Keep mutable states local or as less as possible.
+- Analyze O-notion complexity.
+- Keep it DRY.
+- Choose declarative programming over imperative programming.
+
+## Code styles
+
+- Prefer small descriptive composable functions. Do NOT write mega functions.
+- Should use comments. Especially EVERY mutable states must be documented and explained and be justified.
+- TypeScript v7 strict mode. Use `tsc`, not `tsgo`.
+- Prefer `import type` for type-only imports.
+- Do not use wide type casts. In particular, never use `as any` or `as never`.
+  but narrow down cast like `as const` is allowed.
+- Do not use default arguments in functions or React components.
+- 4 spaces, single quotes, no trailing commas. Use biome to fix files directly.
+- File names are kebab-case.
+- React components are PascalCase.
+- Functions and variables are camelCase.
+- Hooks are camelCase and must start with `use`.
+- If a file has exactly one export, the file name must match that export in kebab-case.
+
+## Git
+Multiple pi sessions may be running in this cwd at the same time, each modifying different files.
+Git operations that touch unstaged, staged, or untracked files outside your own changes will stomp on other sessions' work.
+Resolve conflicts only in files you modified.
+If a conflict is in a file you did not modify, abort and ask the user.
+Ignore unrelated files' changes.
+
+## bash timeout
+bash timeout should never be longer than 60 seconds.
+
+# User Override
+If the user's instructions conflict with any rule in AGENTS.md files, ask for explicit confirmation before overriding. Only then execute their instructions.
+
 # Monorepo context
 
 This repository is a pnpm v11 workspace for `vite-plugin-taro`, a Vite 8 / React 19 / Taro integration that builds
@@ -57,12 +96,3 @@ Node.js v26+ is available and can execute TypeScript natively.
   `pnpm prepare:taro`.
 - The generated Taro package `package.json` and `README.md` files are local metadata and are preserved by
   `pnpm prepare:taro`.
-
-# Code style
-
-- TypeScript v7 strict mode. Use `tsc` for typechecking.
-- Prefer `import type` for type-only imports.
-- 4 spaces, line width 120, single quotes, semicolons as needed, no trailing commas. Use Biome to format files.
-- File names are kebab-case.
-- React components are PascalCase.
-- Functions and variables are camelCase.
