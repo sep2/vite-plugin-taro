@@ -131,6 +131,8 @@ function createTaroDefines(): Record<string, string> {
         'process.env.TARO_ENV': JSON.stringify('weapp'),
         'process.env.TARO_PLATFORM': JSON.stringify('mini'),
         'process.env.TARO_VERSION': JSON.stringify(taroVersion),
+        // React's development-only Suspense diagnostics call this browser API without guards.
+        'performance.now': 'Date.now',
         ENABLE_ADJACENT_HTML: 'false',
         ENABLE_CLONE_NODE: 'false',
         ENABLE_CONTAINS: 'false',
