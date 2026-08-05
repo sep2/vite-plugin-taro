@@ -62,10 +62,10 @@ export function createPlacer() {
          * Complete Rolldown fragment required to preserve package placement and native entry semantics.
          *
          * ```text
-         * native App/Page entry
-         *   └─ import() ─▶ eager App/Page capsule [main]
-         *                    └─ import() ─▶ lazy-a [package A]
-         *                                      └─ static import ─▶ lazy-b [package B after size splitting]
+         * native App/Page/Component entry
+         *   └─ source import() / runtime importSync() ─▶ eager capsule + static closure [main, no TLA]
+         *                                                └─ System.import() ─▶ lazy-a [package A, TLA allowed]
+         *                                                                      └─ static import ─▶ lazy-b [package B]
          *
          * name()                              assigns lazy-a and lazy-b to their planned package groups
          * includeDependenciesRecursively      false: does not pull lazy-b back into package A
@@ -77,8 +77,9 @@ export function createPlacer() {
          *                                └─ main transport obtains registration with require.async()
          * ```
          *
-         * The physical fetch is asynchronous, but SystemJS links the complete static graph before execution, so splitting
-         * a static edge or cycle across packages does not turn it into an application-level dynamic import.
+         * The entry split point is only a build-graph marker and executes synchronously from main. Once a genuine nested
+         * dynamic boundary is crossed, physical fetches may be asynchronous and modules may use top-level await. SystemJS
+         * still links that complete static lazy graph before execution, even when an edge or cycle spans packages.
          */
         rolldownOptions: {
             output: {
@@ -94,9 +95,9 @@ export function createPlacer() {
                                 const location = plan.get(moduleId)
                                 return location?.kind === 'subpackage' ? getSubpackageName(location.root) : null
                             },
-                            // Do not let Rolldown pull a group's static closure into the same chunk. Lazy static edges may
-                            // cross physical packages because transport obtains registrations asynchronously before
-                            // SystemJS links and executes the original static graph, including cycles.
+                            // Do not let Rolldown pull a lazy group's static closure into one chunk. Past the nested dynamic
+                            // boundary, transport may obtain registrations from several packages asynchronously before
+                            // SystemJS links and executes the original graph, including cycles and top-level await.
                             includeDependenciesRecursively: false
                         }
                     ]

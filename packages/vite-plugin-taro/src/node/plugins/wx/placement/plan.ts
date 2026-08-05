@@ -62,13 +62,13 @@ export const mainPackage = { kind: 'main' } as const
  * Creates one deterministic subpackage placement plan:
  *
  * 1. Snapshot Rolldown's transformed module graph.
- * 2. Reserve every explicit entry and its eager capsule closure for main.
- * 3. Annotate remaining modules with dynamic-root and static-edge affinity.
+ * 2. Reserve each native entry, its direct capsule root, and that root's static closure for synchronous importSync() in main.
+ * 3. Treat only nested dynamic imports as genuine asynchronous roots, then annotate their modules with affinity.
  * 4. Pack those lazy modules independently under the planning budget.
  * 5. Return only module ownership; chunks and native manifests are reconciled later.
  *
- * Static cycles are deliberately not atomic. Once a dynamic boundary has been crossed, SystemJS may obtain registrations
- * from multiple physical packages asynchronously and still link the original static ESM graph before execution.
+ * Static cycles are deliberately not atomic only after a genuine nested dynamic boundary. System.import() may obtain their
+ * registrations from several packages and await top-level execution while preserving the original static ESM graph.
  */
 export function createPlacementPlan({
     moduleIds,
@@ -114,8 +114,9 @@ export function createPlacementPlan({
 
 /**
  * Finds modules that must remain in main. Explicit native entries seed the traversal, their static imports remain eager,
- * and their direct dynamic imports are also eager because App and Page shells use import() only as a SystemJS capsule
- * activation mechanism. Dynamic imports below those capsule roots remain genuine lazy boundaries.
+ * and their direct dynamic imports are also eager because native shells use source-level import() only to identify capsule
+ * roots that the renderer activates with System.importSync(). Their static closures must remain synchronous; imports below
+ * those roots are genuine lazy boundaries whose asynchronously loaded graphs may use subpackages and top-level await.
  */
 function findEagerModules(infos: ReadonlyMap<string, Rolldown.ModuleInfo>): Set<string> {
     const eagerModules = new Set<string>()
@@ -132,7 +133,8 @@ function findEagerModules(infos: ReadonlyMap<string, Rolldown.ModuleInfo>): Set<
         }
         eagerModules.add(moduleId)
         pending.push(...info.importedIds)
-        // Native App and Page shells use import() to request their eager capsules.
+        // This source import() is a chunk marker: native rendering turns it into importSync(), so only direct entry
+        // targets join the eager main-package closure. Dynamic imports discovered inside those capsules remain lazy.
         if (info.isEntry) {
             pending.push(...info.dynamicallyImportedIds)
         }
@@ -141,9 +143,9 @@ function findEagerModules(infos: ReadonlyMap<string, Rolldown.ModuleInfo>): Set<
 }
 
 /**
- * Records dynamic-root demand for each lazy module. Every non-eager dynamic target starts one root traversal; that
- * traversal follows static edges only, stopping before nested dynamic boundaries. A shared module accumulates every root
- * that can request it. These consumer sets improve co-location but never prevent subpackage splitting.
+ * Records demand after the eager importSync closure has been removed. Every remaining dynamic target starts one lazy root
+ * traversal; that traversal follows static edges only and stops before another dynamic boundary. A shared module records
+ * every root that can request it. These consumer sets improve co-location but never prevent subpackage splitting.
  */
 function findLazyConsumers({
     infos,

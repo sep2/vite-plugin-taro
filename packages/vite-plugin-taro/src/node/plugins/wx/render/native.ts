@@ -16,14 +16,17 @@ export function renderNative(code: string, chunk: Rolldown.RenderedChunk, source
 
 /**
  * Preserves Rolldown's ESM graph while adapting its final native chunks to WeChat's synchronous CommonJS runtime.
- * Capsule chunks remain asynchronous SystemJS registrations, so native dynamic imports cross that boundary explicitly.
+ * Only a native entry's direct capsule split point reaches this renderer and becomes importSync(). Dynamic imports inside
+ * that capsule are rendered separately as System.import(), so their lazy graphs may use subpackages and top-level await.
  */
 function connectNativeImportPlugin(fileName: string): PluginObject {
     return {
         name: 'vite-plugin-taro:connect-native-import',
         visitor: {
             ImportExpression(importPath) {
-                // Rolldown owns the dynamic graph edge; SystemJS owns loading the emitted capsule at runtime.
+                // In source, import() is only a Rolldown split-point marker for the native entry's capsule. Placement keeps
+                // that root and its static closure in main, and importSync rejects top-level await anywhere in that eager
+                // closure. Nested dynamic imports cross a new boundary and retain normal asynchronous System.import().
                 if (!types.isStringLiteral(importPath.node.source)) {
                     throw new Error(`Expected a literal module import in ${fileName}`)
                 }
@@ -35,7 +38,7 @@ function connectNativeImportPlugin(fileName: string): PluginObject {
                     types.callExpression(
                         types.memberExpression(
                             types.memberExpression(types.identifier('global'), types.identifier('System')),
-                            types.identifier('import')
+                            types.identifier('importSync')
                         ),
                         [types.stringLiteral(chunkId)]
                     )

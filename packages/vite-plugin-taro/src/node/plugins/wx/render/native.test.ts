@@ -33,17 +33,18 @@ export { instantiate }`
     assert.deepEqual(result.map.sources, ['assets/bootstrap-a.js'])
 })
 
-test('keeps the native Vite preload identity wrapper around dynamic imports', async () => {
+test('synchronously activates an eager native capsule through the Vite preload identity wrapper', () => {
     const source = `import { createAppShell, __vitePreload } from "./assets/bootstrap-a.js"
 App(createAppShell(() => __vitePreload(() => import("./assets/module-b.js"), void 0)))`
     const result = renderNative(source, { fileName: 'app.js' } as Rolldown.RenderedChunk)
-    const importedModuleUrls: string[] = []
+    const importedModuleIds: string[] = []
     const requiredPaths: string[] = []
     const registrations: unknown[] = []
+    const capsule = {}
     const system = {
-        import(moduleUrl: string) {
-            importedModuleUrls.push(moduleUrl)
-            return Promise.resolve({})
+        importSync(moduleId: string) {
+            importedModuleIds.push(moduleId)
+            return capsule
         }
     }
 
@@ -56,7 +57,7 @@ App(createAppShell(() => __vitePreload(() => import("./assets/module-b.js"), voi
         (id: string) => {
             requiredPaths.push(id)
             return {
-                createAppShell(loadCapsule: () => Promise<unknown>) {
+                createAppShell(loadCapsule: () => unknown) {
                     return { loadCapsule }
                 },
                 __vitePreload(load: () => unknown) {
@@ -67,11 +68,11 @@ App(createAppShell(() => __vitePreload(() => import("./assets/module-b.js"), voi
         { System: system },
         (config: unknown) => registrations.push(config)
     )
-    const registration = registrations[0] as { loadCapsule: () => Promise<unknown> }
-    await registration.loadCapsule()
+    const registration = registrations[0] as { loadCapsule: () => unknown }
+    assert.strictEqual(registration.loadCapsule(), capsule)
 
     assert.deepEqual(requiredPaths, ['./assets/bootstrap-a.js'])
-    assert.deepEqual(importedModuleUrls, ['assets/module-b.js'])
+    assert.deepEqual(importedModuleIds, ['assets/module-b.js'])
     assert.match(result.code, /vitePreload/)
     assert.ok(result.map)
     assert.deepEqual(result.map.sources, ['app.js'])
