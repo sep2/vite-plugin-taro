@@ -25,10 +25,10 @@ export type WxDevHost = Readonly<{
     close: () => Promise<void>
 }>
 
-type VersionReport = Readonly<{
-    kind: 'version'
+type DeliveryReport = Readonly<{
+    kind: 'delivery'
     buildId: string
-    version: number
+    seq: number
 }>
 
 /** The runtime hit an unrecoverable state (e.g. a corrupted patch range) and needs a full rebuild. */
@@ -125,8 +125,8 @@ export async function createWxDevHost({
         }
 
         try {
-            const report = JSON.parse(await readBody(req)) as VersionReport | RebuildReport
-            // Only the current build's reports register modules or record the stored version;
+            const report = JSON.parse(await readBody(req)) as DeliveryReport | RebuildReport
+            // Only the current build's reports can advance physical delivery;
             // delayed reports from older builds are ignored so they can never influence the
             // live build.
             if (!publisher.isCurrentBuild(report.buildId)) {
@@ -138,9 +138,8 @@ export async function createWxDevHost({
                 res.end()
                 return
             }
-            // The version report is the physical delivery receipt. Advance the publisher and
-            // commit every newly acknowledged Rolldown payload to this client's ship map.
-            const deliveredFiles = publisher.report(report.version)
+            // Commit every newly acknowledged Rolldown payload to this client's ship map.
+            const deliveredFiles = publisher.acknowledge(report.seq)
             await Promise.all(deliveredFiles.map((fileName) => engine.notifyPayloadDelivered(fileName)))
             res.end()
         } catch (e) {

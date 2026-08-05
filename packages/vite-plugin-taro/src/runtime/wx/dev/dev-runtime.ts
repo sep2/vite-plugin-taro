@@ -5,11 +5,9 @@
 // The `DevRuntime` base class is injected into the chunk by Rolldown's dev-mode
 // transform, so the WX host only extends it.
 //
-// Delivery is passive: every valid hmr/patches.js payload is merged into a version-keyed
-// store and acknowledged with the stored version. The apply walk then commits the stored
-// factories synchronously — the page's imports below the patches.js require resolve against
-// the freshly registered modules — and propagates to the accepting boundaries; storing the
-// same version twice (a second Page requiring the same patches.js) is idempotent.
+// Delivery is passive: every valid hmr/patches.js suffix is acknowledged by Rolldown
+// sequence, then applied synchronously before the Page continues evaluating. Already-applied
+// sequences are ignored when another Page requires the same physical file.
 
 import type { DevRuntime as RolldownDevRuntime } from 'rolldown/experimental/runtime-types'
 
@@ -28,9 +26,9 @@ type PatchPayload = Readonly<{
     patches: readonly PatchProgram[]
 }>
 
-/** One patch: its absolute version, the changed module ids, and the Rolldown factory to run. */
+/** One patch: its Rolldown sequence, changed module ids, and factory program. */
 type PatchProgram = Readonly<{
-    version: number
+    seq: number
     /** Stable ids of the changed modules; the sync apply walks the graph from these. */
     changedIds: string[]
     factory: () => void
@@ -88,14 +86,8 @@ class WxHotContext {
 class WxDevRuntime extends DevRuntime {
     private hmrInfo: HmrInfo | undefined
 
-    /** Stored patch programs keyed by absolute version; delivered, not yet applied. */
-    private readonly patches = new Map<number, PatchProgram>()
-
-    /** Delivered: the highest version the runtime has stored; the host compares its own count against this. */
-    private storedVersion = 0
-
-    /** Executed: the highest version whose factory has run; advanced by the apply walk. */
-    private appliedVersion = 0
+    /** Highest Rolldown sequence successfully applied. */
+    private appliedSeq = 0
 
     /** Active hot contexts per module id; the propagation invokes their callbacks. */
     private readonly moduleHotContexts = new Map<string, WxHotContext>()
@@ -209,9 +201,8 @@ class WxDevRuntime extends DevRuntime {
             return
         }
         this.hmrInfo = info
-        // Anchor: the host publishes only after a version report, so the first report must
-        // exist before the first edit can publish anything.
-        void this.sendReport({ kind: 'version', version: this.storedVersion })
+        // Anchor: the host publishes only after the runtime reports its delivery position.
+        void this.sendReport({ kind: 'delivery', seq: this.appliedSeq })
     }
 
     /** True between a patch delivery and the next page show: a hot reload is in progress. */
@@ -235,16 +226,8 @@ class WxDevRuntime extends DevRuntime {
             return
         }
 
-        for (const patch of payload.patches) {
-            this.patches.set(patch.version, patch)
-            if (patch.version > this.storedVersion) {
-                this.storedVersion = patch.version
-            }
-        }
-
-        // Delivery receipt: the report carries the stored version, so the host stops
-        // publishing once the runtime has received the suffix.
-        void this.sendReport({ kind: 'version', version: this.storedVersion })
+        const deliveredSeq = Math.max(this.appliedSeq, payload.patches.at(-1)?.seq ?? 0)
+        void this.sendReport({ kind: 'delivery', seq: deliveredSeq })
 
         // A delivered patch means DevTools is about to replay the page lifecycle on the
         // re-executing Pages; the capsule wrapper suppresses the synthetic unmount/mount so
@@ -253,31 +236,24 @@ class WxDevRuntime extends DevRuntime {
 
         // Apply synchronously: the page's imports below the require resolve against the
         // freshly registered modules, so the re-executed Page evaluates with the new code.
-        this.applyPatches()
+        this.applyPatches(payload.patches)
     }
 
-    /**
-     * Applies stored patch programs in version order. Each program first registers its graph
-     * and factories, then its changed ids are propagated as one HMR update before the next
-     * version can replace those factories.
-     */
-    private applyPatches(): void {
-        while (this.appliedVersion < this.patches.size) {
-            const version = this.appliedVersion + 1
-            const patch = this.patches.get(version)
+    /** Applies one physical suffix in Rolldown sequence order. */
+    private applyPatches(patches: readonly PatchProgram[]): void {
+        for (const patch of patches) {
+            if (patch.seq <= this.appliedSeq) continue
 
             try {
-                if (!patch) {
-                    // A gap can only come from a corrupted payload; stop and request a full
-                    // rebuild rather than advancing over an update that was never delivered.
-                    throw new Error(`missing patch version ${version}`)
+                const expectedSeq = this.appliedSeq + 1
+                if (patch.seq !== expectedSeq) {
+                    throw new Error(`missing patch sequence ${expectedSeq}`)
                 }
-
                 patch.factory()
                 this.applyHmrUpdate(patch.changedIds)
-                this.appliedVersion = version
+                this.appliedSeq = patch.seq
             } catch (error) {
-                console.warn(`[vite-plugin-taro] patch version ${version} failed; apply stopped`, error)
+                console.warn(`[vite-plugin-taro] patch sequence ${patch.seq} failed; apply stopped`, error)
                 void this.sendReport({ kind: 'rebuild' })
                 return
             }

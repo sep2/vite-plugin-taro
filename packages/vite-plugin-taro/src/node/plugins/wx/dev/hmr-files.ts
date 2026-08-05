@@ -32,20 +32,17 @@ export function renderInitialHmrPatches(): string {
  *
  * DevTools re-executes the Page because this file changed. The module only stores the literal
  * Rolldown factories in the persistent App runtime; storePatches applies them synchronously,
- * so the Page's imports below the require resolve against the freshly registered modules, one
- * factory per patch (version = index + 1).
+ * so the Page's imports below the require resolve against the freshly registered modules.
  */
-export function renderHmrPatches(buildId: string, patches: readonly PatchUpdate[], fromVersion: number): string {
-    if (!Number.isSafeInteger(fromVersion) || fromVersion < 0 || fromVersion >= patches.length) {
-        throw new Error('Cannot render an invalid WX patch range.')
+export function renderHmrPatches(buildId: string, patches: readonly PatchUpdate[]): string {
+    if (patches.length === 0) {
+        throw new Error('Cannot render an empty WX patch range.')
     }
 
-    const suffix = patches.slice(fromVersion)
-
-    const rendered = suffix.map((patch, index) => {
-        const version = fromVersion + index + 1
-        return `{version: ${version}, changedIds: ${JSON.stringify(patch.changedIds)}, factory: () => {\n${patch.code}\n}}`
-    })
+    const rendered = patches.map(
+        (patch) =>
+            `{seq: ${patch.seq}, changedIds: ${JSON.stringify(patch.changedIds)}, factory: () => {\n${patch.code}\n}}`
+    )
 
     return `__rolldown_runtime__.storePatches({buildId: ${JSON.stringify(buildId)}, patches: [${rendered.join(',')}]});\n`
 }

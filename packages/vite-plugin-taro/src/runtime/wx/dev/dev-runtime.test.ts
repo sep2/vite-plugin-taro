@@ -13,7 +13,7 @@ type TestRuntime = DevRuntime &
         storePatches: (payload: {
             buildId: string
             patches: Array<{
-                version: number
+                seq: number
                 changedIds: string[]
                 factory: () => void
             }>
@@ -51,12 +51,12 @@ function registerInitialModule(moduleId: string, moduleExports: unknown, callbac
 }
 
 function createPatch(
-    version: number,
+    seq: number,
     moduleId: string,
     moduleExports: unknown
-): { version: number; changedIds: string[]; factory: () => void } {
+): { seq: number; changedIds: string[]; factory: () => void } {
     return {
-        version,
+        seq,
         changedIds: [moduleId],
         factory(): void {
             runtime.registerGraph({ ids: [moduleId], localCount: 1, edges: [[]], dynamicEdges: [[]] })

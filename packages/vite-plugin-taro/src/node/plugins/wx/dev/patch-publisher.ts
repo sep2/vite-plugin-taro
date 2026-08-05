@@ -4,14 +4,13 @@ import { type PatchUpdate, renderHmrPatches } from './hmr-files.ts'
 /** Abstracts the physical patches write; the engine owns the file destination. */
 export type WritePatches = (content: string) => Promise<void>
 
-/** Owns one build's patch history, runtime position, and physical publish decision. */
+/** Owns one build's unacknowledged patches and physical publish decision. */
 export class PatchPublisher {
     private readonly writePatches: WritePatches
     private buildId: string | undefined
-    private readonly patches: PatchUpdate[] = []
 
-    /** Runtime delivery position; the next physical write begins after it. */
-    private knownVersion = 0
+    /** Executable updates retained only until the runtime acknowledges physical delivery. */
+    private readonly pendingPatches: PatchUpdate[] = []
 
     // Explicit field assignment: node --test strips types and does not support parameter properties.
     constructor(writePatches: WritePatches) {
@@ -28,33 +27,23 @@ export class PatchPublisher {
         const previousBuildId = this.buildId
         const buildId = randomUUID()
         this.buildId = buildId
-        this.patches.length = 0
-        this.knownVersion = 0
+        this.pendingPatches.length = 0
         return { buildId, previousBuildId }
     }
 
-    /** Appends a batch and publishes the suffix the runtime has not acknowledged. */
+    /** Appends a Rolldown batch and publishes every unacknowledged patch. */
     async produce(patches: readonly PatchUpdate[]): Promise<void> {
-        this.patches.push(...patches)
-        if (this.buildId === undefined || this.knownVersion >= this.patches.length) return
-        await this.writePatches(renderHmrPatches(this.buildId, this.patches, this.knownVersion))
+        if (this.buildId === undefined || patches.length === 0) return
+        this.pendingPatches.push(...patches)
+        await this.writePatches(renderHmrPatches(this.buildId, this.pendingPatches))
     }
 
-    /**
-     * Advances the runtime's stored version and returns the newly delivered Rolldown files.
-     * The host commits those filenames to the engine's per-client ship map. Delayed reports
-     * cannot move the monotonic delivery position backwards.
-     */
-    report(version: number): string[] {
-        if (!Number.isSafeInteger(version) || version < 0 || version > this.patches.length) {
-            throw new Error('Cannot report an invalid WX patch version.')
+    /** Removes the pending prefix covered by the runtime's Rolldown sequence receipt. */
+    acknowledge(seq: number): string[] {
+        let deliveredCount = 0
+        while (deliveredCount < this.pendingPatches.length && this.pendingPatches[deliveredCount].seq <= seq) {
+            deliveredCount++
         }
-        if (version <= this.knownVersion) {
-            return []
-        }
-
-        const previousVersion = this.knownVersion
-        this.knownVersion = version
-        return this.patches.slice(previousVersion, version).map((patch) => patch.filename)
+        return this.pendingPatches.splice(0, deliveredCount).map((patch) => patch.filename)
     }
 }
