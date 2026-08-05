@@ -11,7 +11,7 @@ declare const __VITE_PLUGIN_TARO_PAGE_CONFIG__: Record<string, unknown>
 const config = createPageConfig(
     PageComponent,
     __VITE_PLUGIN_TARO_PAGE_PATH__,
-    undefined,
+    { root: { cn: [] } },
     __VITE_PLUGIN_TARO_PAGE_CONFIG__
 )
 

@@ -1,3 +1,4 @@
-import { createAppShell } from '../amphibious/bootstrap.ts'
+import { loadCapsuleConfig } from '../amphibious/bootstrap.ts'
 
-App(createAppShell(() => import('../capsule/app.ts')))
+// This source import() only marks the eager App capsule split; native rendering replaces it with System.importSync().
+App(loadCapsuleConfig('App', () => import('../capsule/app.ts')))

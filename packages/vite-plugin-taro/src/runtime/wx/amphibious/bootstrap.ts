@@ -1,47 +1,33 @@
-// Install the minimal SystemJS loader and its synchronous-import extension before any shell requests a capsule.
+// Install the minimal SystemJS loader and its synchronous-import extension before any native entry requests a capsule.
 import '../systemjs/system-core.js'
-import { loadCapsuleConfig } from '../native/load-capsule-config.ts'
 import { transport } from './transport.ts'
 
 declare const __VITE_PLUGIN_TARO_APP_CONFIG__: Record<string, unknown>
 
-/** Shares one App configuration object between native shells and capsules. */
+interface CapsuleNamespace {
+    default: unknown
+}
+
+type CapsuleLoader = () => CapsuleNamespace | PromiseLike<CapsuleNamespace>
+
+/** Shares one App configuration object between the specialized bootstrap and App capsule. */
 export const appConfig = __VITE_PLUGIN_TARO_APP_CONFIG__
 
-type CapsuleLoader = Parameters<typeof loadCapsuleConfig>[1]
-
-/** Activates the eager App capsule before registration and adds its shared build configuration. */
-export function createAppShell(loadCapsule: CapsuleLoader) {
-    return {
-        ...loadCapsuleConfig('App', loadCapsule),
-        config: appConfig
+/** Unwraps one eager capsule without changing the complete native configuration created inside it. */
+export function loadCapsuleConfig(shellName: 'App' | 'Page' | 'Component', loadCapsule: CapsuleLoader): object {
+    const capsule = loadCapsule()
+    if (isThenable(capsule)) {
+        throw new Error(`${shellName} capsule must load synchronously`)
     }
+    if (!capsule.default || typeof capsule.default !== 'object' || Array.isArray(capsule.default)) {
+        throw new Error(`Expected a ${shellName} configuration`)
+    }
+    return capsule.default
 }
 
-/** Activates the route-specific eager Page capsule before registration and supplies Taro's initial root. */
-export function createPageShell(loadCapsule: CapsuleLoader) {
-    return {
-        ...loadCapsuleConfig('Page', loadCapsule),
-        data: {
-            root: {
-                cn: []
-            }
-        }
-    }
-}
-
-/** Activates the eager recursive Component capsule and installs its configuration directly as native methods. */
-export function createComponentShell(loadCapsule: CapsuleLoader) {
-    return {
-        properties: {
-            i: Object,
-            l: String
-        },
-        options: {
-            virtualHost: true
-        },
-        methods: loadCapsuleConfig('Component', loadCapsule)
-    }
+/** Recognizes native and custom thenables returned by misplaced eager capsules. */
+function isThenable(value: CapsuleNamespace | PromiseLike<CapsuleNamespace>): value is PromiseLike<CapsuleNamespace> {
+    return 'then' in value && typeof value.then === 'function'
 }
 
 // Vite wraps dynamic imports with this browser preload hook. WX has no modulepreload transport: native entry split points

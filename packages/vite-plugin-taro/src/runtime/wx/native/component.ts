@@ -1,3 +1,4 @@
-import { createComponentShell } from '../amphibious/bootstrap.ts'
+import { loadCapsuleConfig } from '../amphibious/bootstrap.ts'
 
-Component(createComponentShell(() => import('../capsule/component.ts')))
+// This source import() only marks the eager Component capsule split; native rendering replaces it with System.importSync().
+Component(loadCapsuleConfig('Component', () => import('../capsule/component.ts')))
