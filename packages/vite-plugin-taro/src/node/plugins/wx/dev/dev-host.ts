@@ -184,7 +184,7 @@ export async function createWxDevHost({
                 }
                 if (batch.length > 0) {
                     await publisher.produce(batch)
-                    server.config.logger.info('[vite-plugin-taro] wx patch produced')
+                    // server.config.logger.info('[vite-plugin-taro] wx patch produced')
                 }
             },
             onOutput: async (result) => {
