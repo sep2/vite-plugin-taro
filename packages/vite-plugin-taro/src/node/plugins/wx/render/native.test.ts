@@ -71,7 +71,7 @@ App(createAppShell(() => __vitePreload(() => import("./assets/module-b.js"), voi
     await registration.loadCapsule()
 
     assert.deepEqual(requiredPaths, ['./assets/bootstrap-a.js'])
-    assert.deepEqual(importedModuleUrls, ['vpt:/assets/module-b.js'])
+    assert.deepEqual(importedModuleUrls, ['assets/module-b.js'])
     assert.match(result.code, /vitePreload/)
     assert.ok(result.map)
     assert.deepEqual(result.map.sources, ['app.js'])

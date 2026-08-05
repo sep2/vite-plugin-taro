@@ -4,7 +4,6 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { type Rolldown, transformWithOxc } from 'vite'
 import { esTarget } from '../../../utils/constant.ts'
-import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
 import { bootstrapPath, rolldownRuntimeId, transportPath } from '../module.ts'
 import { renderNative } from './native.ts'
 import { materializeTransport } from './transport.ts'
@@ -92,6 +91,12 @@ function evaluateTransport(source: string, loadFile: (path: string) => unknown) 
         requiredPaths.push(id)
         return loadFile(id)
     }
+    Object.assign(nativeRequire, {
+        async(id: string): Promise<unknown> {
+            requiredPaths.push(id)
+            return Promise.resolve(loadFile(id))
+        }
+    })
 
     Function('require', 'module', 'exports', source)(nativeRequire, commonJsModule, commonJsModule.exports)
     return {
@@ -121,12 +126,9 @@ test('materializes capsule switch cases with literal physical paths', async () =
     const evaluated = evaluateTransport(source, () => capsule)
     const transport = evaluated.runtime.transport
 
-    assert.strictEqual(transport(chunkIdToModuleUrl('assets/chunks/lazy-b.js')), capsule)
+    assert.strictEqual(transport('assets/chunks/lazy-b.js'), capsule)
     assert.deepEqual(evaluated.requiredPaths, ['./assets/chunks/lazy-b.js'])
-    assert.throws(
-        () => transport(chunkIdToModuleUrl('assets/missing.js')),
-        /Unknown System module: vpt:\/assets\/missing\.js/
-    )
+    assert.throws(() => transport('assets/missing.js'), /Unknown System module: assets\/missing\.js/)
 
     const requireArguments = [...source.matchAll(/\brequire\(([^)]+)\)/g)].map((match) => JSON.parse(match[1]))
     assert.deepEqual(requireArguments, [
@@ -154,21 +156,27 @@ test('bridges amphibious bootstrap and Rolldown runtime namespaces lazily', asyn
 
     // Creating transport must not recursively require bootstrap while bootstrap itself imports transport.
     assert.deepEqual(evaluated.requiredPaths, [])
-    const publishedBootstrap = executeAmphibiousRegistration(transport(chunkIdToModuleUrl('assets/bootstrap.js')))
-    const publishedRuntime = executeAmphibiousRegistration(transport(chunkIdToModuleUrl(runtimeChunkId)))
+    const publishedBootstrap = executeAmphibiousRegistration(transport('assets/bootstrap.js'))
+    const publishedRuntime = executeAmphibiousRegistration(transport(runtimeChunkId))
 
     assert.deepEqual(evaluated.requiredPaths, ['./assets/bootstrap.js', './assets/rolldown-runtime-a.js'])
     assert.strictEqual(publishedBootstrap.appConfig, bootstrapNamespace.appConfig)
     assert.strictEqual(publishedRuntime.n, runtimeNamespace.n)
 })
 
-test('materializes subpackage capsules with literal asynchronous requires', async () => {
+test('loads subpackage capsules by canonical ID through asynchronous native require', async () => {
     const source = await materializeTestTransport({
         code: transportCode,
         fileName: 'transport.js',
         capsuleChunkIds: ['sub/p_account/page.js']
     })
+    const capsule = {}
+    const evaluated = evaluateTransport(source, () => capsule)
 
+    const loaded = await evaluated.runtime.transport('sub/p_account/page.js')
+
+    assert.strictEqual(loaded, capsule)
+    assert.deepEqual(evaluated.requiredPaths, ['./sub/p_account/page.js'])
     assert.match(source, /require\.async\(['"]\.\/sub\/p_account\/page\.js['"]\)/)
 })
 

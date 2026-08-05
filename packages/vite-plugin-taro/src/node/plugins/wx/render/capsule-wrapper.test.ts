@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { transformSync } from '@babel/core'
+import { type PluginTarget, transformSync } from '@babel/core'
 import { wrapCapsulePlugin } from './capsule-wrapper.ts'
 
 /** Applies the capsule rewrite to a test registration. */
@@ -9,7 +9,7 @@ function transformRegistration(code: string): string {
         babelrc: false,
         configFile: false,
         filename: 'chunk.js',
-        plugins: [wrapCapsulePlugin],
+        plugins: [wrapCapsulePlugin('chunk.js') as PluginTarget],
         sourceType: 'script'
     })
 
@@ -19,15 +19,16 @@ function transformRegistration(code: string): string {
 
 test('rewrites one anonymous System registration as an inert CommonJS tuple', () => {
     const code = transformRegistration(`System.register(['./dependency.js'], function (_export, _context) {
-        throw new Error('the declaration must remain inert')
+        return { execute: () => _context.import('./lazy.js') }
     })`)
     const commonJsModule: { exports?: unknown } = {}
 
     Function('module', code)(commonJsModule)
 
     assert.ok(Array.isArray(commonJsModule.exports))
-    assert.deepEqual(commonJsModule.exports[0], ['./dependency.js'])
+    assert.deepEqual(commonJsModule.exports[0], ['dependency.js'])
     assert.equal(typeof commonJsModule.exports[1], 'function')
+    assert.match(code, /_context\.import\(['"]lazy\.js['"]\)/)
     assert.doesNotMatch(code, /System\.register/)
 })
 

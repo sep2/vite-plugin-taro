@@ -1,8 +1,7 @@
-import path from 'node:path'
 import { type PluginObject, type PluginTarget, types } from '@babel/core'
 import transformModulesCommonjs from '@babel/plugin-transform-modules-commonjs'
 import type { Rolldown } from 'vite'
-import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
+import { resolveChunkReference } from '../../../utils/modules.ts'
 import { type AstTransformResult, transformWithBabel } from '../../../utils/transform.ts'
 
 /** Renders a synchronous native module. */
@@ -29,8 +28,8 @@ function connectNativeImportPlugin(fileName: string): PluginObject {
                     throw new Error(`Expected a literal module import in ${fileName}`)
                 }
 
-                // Resolve the final relative chunk reference before converting it to the canonical vpt:/ module URL.
-                const chunkId = path.posix.join(path.posix.dirname(fileName), importPath.node.source.value)
+                // Resolve the final relative reference once at build time; the runtime accepts only canonical chunk IDs.
+                const chunkId = resolveChunkReference(fileName, importPath.node.source.value)
 
                 importPath.replaceWith(
                     types.callExpression(
@@ -38,7 +37,7 @@ function connectNativeImportPlugin(fileName: string): PluginObject {
                             types.memberExpression(types.identifier('global'), types.identifier('System')),
                             types.identifier('import')
                         ),
-                        [types.stringLiteral(chunkIdToModuleUrl(chunkId))]
+                        [types.stringLiteral(chunkId)]
                     )
                 )
             }

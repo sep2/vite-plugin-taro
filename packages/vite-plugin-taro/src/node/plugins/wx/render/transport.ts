@@ -1,7 +1,6 @@
 import path from 'node:path'
 import { types } from '@babel/core'
 import type { Rolldown } from 'vite'
-import { chunkIdToModuleUrl } from '../../../utils/modules.ts'
 import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
 import { getWxModuleKind } from '../module.ts'
 
@@ -40,9 +39,9 @@ export async function materializeTransport({
     // (moduleId) => {
     //     let namespace
     //     switch (moduleId) {
-    //         case 'vpt:/assets/app.js': return require('./app.js')
-    //         case 'vpt:/sub/p_account/page.js': return require.async('../sub/p_account/page.js')
-    //         case 'vpt:/assets/bootstrap.js':
+    //         case 'assets/app.js': return require('./app.js')
+    //         case 'sub/p_account/page.js': return require.async('../sub/p_account/page.js')
+    //         case 'assets/bootstrap.js':
     //             namespace = require('./bootstrap.js')
     //             break
     //         default: throw new Error(`Unknown System module: ${moduleId}`)
@@ -99,7 +98,7 @@ function getTransportedChunks(chunks: Readonly<Record<string, Rolldown.RenderedC
     return transportedChunks
 }
 
-/** Creates one URL-keyed switch case while keeping its native require argument literal. */
+/** Creates one canonical-ID switch case while keeping its native require argument literal. */
 function createTransportCase({
     chunkId,
     transportFileName,
@@ -130,7 +129,7 @@ function createTransportCase({
                   types.breakStatement()
               ]
 
-    return types.switchCase(types.stringLiteral(chunkIdToModuleUrl(chunkId)), statements)
+    return types.switchCase(types.stringLiteral(chunkId), statements)
 }
 
 /** Creates a SystemJS registration that publishes one already-executed CommonJS namespace. */

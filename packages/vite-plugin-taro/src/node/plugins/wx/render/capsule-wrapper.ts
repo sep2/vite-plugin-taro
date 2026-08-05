@@ -1,7 +1,8 @@
 import { type PluginObject, types } from '@babel/core'
+import { resolveChunkReference } from '../../../utils/modules.ts'
 
-/** Wraps System.register as an inert CommonJS capsule tuple. */
-export function wrapCapsulePlugin(): PluginObject {
+/** Wraps System.register as an inert CommonJS capsule tuple with canonical final dependency IDs. */
+export function wrapCapsulePlugin(fileName: string): PluginObject {
     return {
         name: 'vite-plugin-taro:wrap-capsule',
         visitor: {},
@@ -10,7 +11,6 @@ export function wrapCapsulePlugin(): PluginObject {
             const program = file.ast.program
             const [statement] = program.body
             const registration = statement && types.isExpressionStatement(statement) ? statement.expression : undefined
-            const fileName = file.opts.filename ?? 'unknown chunk'
 
             if (
                 program.body.length !== 1 ||
@@ -32,6 +32,30 @@ export function wrapCapsulePlugin(): PluginObject {
                 throw new Error(`Expected System.register(dependencies, declaration) in ${fileName}`)
             }
 
+            dependencies.elements.forEach((dependency) => {
+                canonicalizeReference(dependency, fileName, 'System.register dependency')
+            })
+
+            const context = declaration.params[1]
+            if (types.isIdentifier(context)) {
+                file.path.traverse({
+                    CallExpression(callPath) {
+                        const callee = callPath.node.callee
+                        if (
+                            !types.isMemberExpression(callee) ||
+                            callee.computed ||
+                            !types.isIdentifier(callee.object, { name: context.name }) ||
+                            !types.isIdentifier(callee.property, { name: 'import' })
+                        ) {
+                            return
+                        }
+
+                        const [dependency] = callPath.node.arguments
+                        canonicalizeReference(dependency, fileName, 'dynamic import')
+                    }
+                })
+            }
+
             program.directives = []
             program.body = [
                 types.expressionStatement(
@@ -44,4 +68,12 @@ export function wrapCapsulePlugin(): PluginObject {
             ]
         }
     }
+}
+
+/** Resolves one generated reference while the final importing chunk filename is known. */
+function canonicalizeReference(reference: types.Node | null | undefined, fileName: string, kind: string): void {
+    if (!types.isStringLiteral(reference)) {
+        throw new Error(`Expected a literal ${kind} in ${fileName}`)
+    }
+    reference.value = resolveChunkReference(fileName, reference.value)
 }

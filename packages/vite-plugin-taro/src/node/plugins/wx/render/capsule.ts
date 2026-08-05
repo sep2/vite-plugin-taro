@@ -14,7 +14,7 @@ export function renderCapsule(code: string, chunk: Rolldown.RenderedChunk, sourc
             transformDynamicImport,
             // Erase Babel's internal plugin pass type.
             transformModulesSystemjs as PluginTarget,
-            wrapCapsulePlugin
+            wrapCapsulePlugin(chunk.fileName) as PluginTarget
         ],
         sourcemap
     )

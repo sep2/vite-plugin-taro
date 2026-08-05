@@ -10,9 +10,12 @@ type PageComponentPathOptions = {
     projectRoot: string
 }
 
-/** Converts a final chunk ID to its canonical runtime module URL. */
-export function chunkIdToModuleUrl(chunkId: string): `vpt:/${string}` {
-    return `vpt:/${chunkId}`
+/** Resolves a final relative reference to the canonical output chunk ID used by the WX module registry. */
+export function resolveChunkReference(importerChunkId: string, reference: string): string {
+    if (!reference.startsWith('./') && !reference.startsWith('../')) {
+        throw new Error(`Expected a relative chunk reference in ${importerChunkId}: ${reference}`)
+    }
+    return path.posix.join(path.posix.dirname(importerChunkId), reference)
 }
 
 /** Resolves the source file for the configured App component. */
