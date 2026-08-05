@@ -99,7 +99,7 @@ export async function createWxDevHost({
         await writeHmrInfo(server, buildId)
     }
 
-    async function triggerRebuild() {
+    async function triggerFullRebuild() {
         engine.triggerFullBuild()
     }
 
@@ -125,7 +125,7 @@ export async function createWxDevHost({
                 return
             }
             if (report.kind === 'rebuild') {
-                await triggerRebuild()
+                await triggerFullRebuild()
                 res.end()
                 return
             }
