@@ -16,8 +16,12 @@
  * Core comes with no System.prototype.resolve or
  * System.prototype.instantiate implementations
  */
-import { global, hasSymbol } from './common.js'
-import { errMsg } from './err-msg.js'
+var envGlobal = global
+var hasSymbol = typeof Symbol !== 'undefined'
+
+function errMsg(errCode, msg) {
+    return (msg || '') + ' (SystemJS https://github.com/systemjs/systemjs/blob/main/docs/errors.md#' + errCode + ')'
+}
 
 export { REGISTRY, systemJSPrototype }
 
@@ -316,6 +320,6 @@ function postOrderExec(loader, load, seen) {
     }
 }
 
-global.System = new SystemJS()
+envGlobal.System = new SystemJS()
 
 // biome-ignore-end lint: vendored SystemJS core
