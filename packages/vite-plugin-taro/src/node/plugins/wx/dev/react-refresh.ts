@@ -1,6 +1,7 @@
 import type { Plugin } from 'vite'
 import { type PluginObject, types } from '@babel/core'
 import { transformWithBabel } from '../../../utils/transform.ts'
+import { memoize } from '../../../utils/memoize.ts'
 
 /** The React DevTools hook protocol name; free references must target `global` in wx. */
 const reactDevtoolsHookProtocol = '__REACT_DEVTOOLS_GLOBAL_HOOK__'
@@ -33,7 +34,7 @@ export function createWxReactRefreshTransforms(): Plugin[] {
                 // The vendored refresh runtime module; id-filtered, so no code scan.
                 filter: { id: /^\/@react-refresh(?:\?|$)/ },
                 handler(code, id) {
-                    return transformWithBabel(code, id, [rewriteRefreshRuntimeWindowAccess, injectRefreshGlobalHook], false)
+                    return fixRefreshRuntime({ code, id })
                 }
             }
         },
@@ -47,7 +48,7 @@ export function createWxReactRefreshTransforms(): Plugin[] {
                 // id exclusion.
                 filter: { code: /(^|[^.\w$])__REACT_DEVTOOLS_GLOBAL_HOOK__/ },
                 handler(code, id) {
-                    return transformWithBabel(code, id, [rewriteReactDevtoolsHookGlobal], false)
+                    return fixReactDevtoolsHook({ code, id })
                 }
             }
         },
@@ -209,3 +210,18 @@ function removeRefreshPreambleGuard(): PluginObject {
         }
     }
 }
+
+// The refresh runtime module and the react-family modules are immutable for the server's
+// lifetime (they only change when the plugin is rebuilt), so their Babel transforms run once
+// per module and every build reuses the output.
+const fixRefreshRuntime = memoize(
+    ({ code, id }: { code: string; id: string }) =>
+        transformWithBabel(code, id, [rewriteRefreshRuntimeWindowAccess, injectRefreshGlobalHook], false),
+    { getCacheKey: ({ code }) => code }
+)
+
+const fixReactDevtoolsHook = memoize(
+    ({ code, id }: { code: string; id: string }) =>
+        transformWithBabel(code, id, [rewriteReactDevtoolsHookGlobal], false),
+    { getCacheKey: ({ code }) => code }
+)
