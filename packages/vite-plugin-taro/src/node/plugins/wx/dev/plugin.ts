@@ -2,7 +2,8 @@ import type { PluginOption } from 'vite'
 import { transformWithOxc } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { esTarget } from '../../../utils/constant.ts'
-import { type WxDevHost, createWxDevHost } from './dev-host.ts'
+import { once } from '../../../utils/once.ts'
+import { createWxDevHost, type WxDevHost } from './dev-host.ts'
 import { createWxReactRefreshTransforms } from './react-refresh.ts'
 
 /**
@@ -46,12 +47,7 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
                     // The `setPublicClassFields` assumption emits plain `this.x = ...`
                     // assignments instead of external helpers, whose references the later
                     // minifier would mangle.
-                    return transformWithOxc(code, id, {
-                        lang: 'js',
-                        target: esTarget,
-                        sourcemap: false,
-                        assumptions: { setPublicClassFields: true }
-                    })
+                    return fixRolldownRuntime(code, id)
                 }
             },
 
@@ -71,3 +67,15 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
         ...createWxReactRefreshTransforms()
     ]
 }
+
+// The assembled runtime chunk is byte-identical on every build (the base runtime and the
+// bundled implement are immutable for the server's lifetime), so the lowering runs once
+// and every build reuses it.
+const fixRolldownRuntime = once((code: string, id: string) => {
+    return transformWithOxc(code, id, {
+        lang: 'js',
+        target: esTarget,
+        sourcemap: false,
+        assumptions: { setPublicClassFields: true }
+    })
+})

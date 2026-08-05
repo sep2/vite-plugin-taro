@@ -6,6 +6,7 @@ import { build } from 'rolldown'
 import { type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
 import type { Connect, ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
+import { once } from '../../../utils/once.ts'
 import { resolvePackageFile } from '../../../utils/packages.ts'
 import { appShellFileName } from '../module.ts'
 import {
@@ -302,17 +303,21 @@ function logWxError(logger: ViteDevServer['config']['logger'], prefix: string, e
     }
 }
 
-/** Bundles the runtime host and state machine into one plain script for injection. */
-async function bundleRuntimeSource(): Promise<string> {
-    // write: false — only the code is consumed; without it rolldown drops the bundle into
-    // the default dist/ of the running project.
-    const result = await build({
-        input: resolvePackageFile('dist/runtime/wx/dev/dev-runtime.js'),
-        output: { format: 'iife', minify: true, sourcemap: false },
-        write: false
-    })
-    return result.output[0].code
-}
+// The runtime source is immutable for the host's lifetime (it changes only when the
+// plugin is rebuilt), so the nested bundle runs once and every build reuses it.
+const bundleRuntimeSource = once(
+    /** Bundles the runtime host and state machine into one plain script for injection. */
+    async function bundleRuntimeSource(): Promise<string> {
+        // write: false — only the code is consumed; without it rolldown drops the bundle into
+        // the default dist/ of the running project.
+        const result = await build({
+            input: resolvePackageFile('dist/runtime/wx/dev/dev-runtime.js'),
+            output: { format: 'iife', minify: true, sourcemap: false },
+            write: false
+        })
+        return result.output[0].code
+    }
+)
 
 const maximumBodyBytes = 64 * 1024
 
