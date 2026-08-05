@@ -54,7 +54,7 @@ const TaroLinearGradient: FunctionComponent<PropsWithChildren<LinearGradientType
     return (
         <View
             className={clsx('relative z-2 w-full', className)}
-            style={{ ...(!src ? { background } : {}), ...(style as object) }}
+            style={{ background, ...(style as object) }}
             onClick={onClick}
         >
             {src && (
