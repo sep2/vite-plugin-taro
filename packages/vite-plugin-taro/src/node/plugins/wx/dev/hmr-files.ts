@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import type { BindingClientHmrUpdate } from 'rolldown/experimental'
 
 export const hmrInfoFileName = 'hmr/info.js'
 export const hmrPatchesFileName = 'hmr/patches.js'
@@ -13,11 +14,8 @@ export type HmrInfo = Readonly<{
     endpoint: string
 }>
 
-/** One Rolldown HMR program admitted into the current build's patch history. */
-export type HostPatch = Readonly<{
-    code: string
-    fileName: string
-}>
+/** The Patch variant of Rolldown's per-client HMR update, admitted into the patch history. */
+export type PatchUpdate = Extract<BindingClientHmrUpdate['update'], { type: 'Patch' }>
 
 /** Renders the synchronous CommonJS metadata module loaded by the runtime chunk. */
 export function renderHmrInfo(info: HmrInfo): string {
@@ -33,10 +31,11 @@ export function renderInitialHmrPatches(): string {
  * Renders the missing patch suffix as a passive physical delivery module.
  *
  * DevTools re-executes the Page because this file changed. The module only stores the literal
- * Rolldown factories in the persistent App runtime; the runtime applies them after the Page
- * evaluation returns, one factory per HostPatch (version = index + 1).
+ * Rolldown factories in the persistent App runtime; storePatches applies them synchronously,
+ * so the Page's imports below the require resolve against the freshly registered modules, one
+ * factory per patch (version = index + 1).
  */
-export function renderHmrPatches(buildId: string, patches: readonly HostPatch[], fromVersion: number): string {
+export function renderHmrPatches(buildId: string, patches: readonly PatchUpdate[], fromVersion: number): string {
     if (!Number.isSafeInteger(fromVersion) || fromVersion < 0 || fromVersion >= patches.length) {
         throw new Error('Cannot render an invalid WX patch range.')
     }
@@ -45,7 +44,7 @@ export function renderHmrPatches(buildId: string, patches: readonly HostPatch[],
 
     const rendered = suffix.map((patch, index) => {
         const version = fromVersion + index + 1
-        return `{version: ${version}, factory: () => {\n${patch.code}\n}}`
+        return `{version: ${version}, changedIds: ${JSON.stringify(patch.changedIds)}, factory: () => {\n${patch.code}\n}}`
     })
 
     return `__rolldown_runtime__.storePatches({buildId: ${JSON.stringify(buildId)}, patches: [${rendered.join(',')}]});\n`

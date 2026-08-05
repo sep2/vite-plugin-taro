@@ -2,18 +2,19 @@
 // runtime chunk (`assets/rolldown-runtime.js`, required first by every chunk). Defines the
 // App-global `__rolldown_runtime__` that generated modules call.
 //
-// The `DevRuntime` base class is injected into the chunk by Rolldown's dev-mode transform
-// (verified: `typeof DevRuntime` is `function`), so the WX host only extends it.
+// The `DevRuntime` base class is injected into the chunk by Rolldown's dev-mode
+// transform, so the WX host only extends it.
 //
 // Delivery is passive: every valid hmr/patches.js payload is merged into a version-keyed
-// store and acknowledged with the stored version. After the re-executing Page finishes its
-// synchronous evaluation, the stored factories run in version order (the apply walk);
-// storing the same version twice (a second Page requiring the same patches.js) is idempotent.
+// store and acknowledged with the stored version. The apply walk then commits the stored
+// factories synchronously — the page's imports below the patches.js require resolve against
+// the freshly registered modules — and propagates to the accepting boundaries; storing the
+// same version twice (a second Page requiring the same patches.js) is idempotent.
 
-import type { Messenger, DevRuntime as RolldownDevRuntime } from 'rolldown/experimental/runtime-types'
+import type { DevRuntime as RolldownDevRuntime } from 'rolldown/experimental/runtime-types'
 
 /** Lexical base class injected into the runtime chunk by Rolldown; typed via the contract. */
-declare const DevRuntime: new (messenger: Messenger, clientId: string) => RolldownDevRuntime
+declare const DevRuntime: new (clientId: string) => RolldownDevRuntime
 
 /** Identity and report endpoint, materialized by the host into hmr/info.js for every full build. */
 type HmrInfo = Readonly<{
@@ -21,22 +22,30 @@ type HmrInfo = Readonly<{
     endpoint: string
 }>
 
-/** One physical hmr/patches.js payload: the build identity plus one factory per HostPatch. */
+/** One physical hmr/patches.js payload: the build identity plus one patch program per update. */
 type PatchPayload = Readonly<{
     buildId: string
     patches: readonly PatchProgram[]
 }>
 
-/** One HostPatch: its absolute version and the Rolldown factory to run. */
+/** One patch: its absolute version, the changed module ids, and the Rolldown factory to run. */
 type PatchProgram = Readonly<{
     version: number
+    /** Stable ids of the changed modules; the sync apply walks the graph from these. */
+    changedIds: string[]
     factory: () => void
 }>
 
+type HmrUpdate = Readonly<{
+    boundaries: readonly string[]
+    updateSet: ReadonlySet<string>
+}>
+
+type AcceptCallback = (moduleExports: unknown) => void
+
 /**
  * Per-module hot state, mirroring Rolldown's web runtime: accept is a passive registration;
- * the propagation (applyUpdates) invokes the stored callbacks with the module's fresh
- * exports.
+ * the propagation invokes the previous execution's callbacks with the fresh exports.
  */
 class WxHotContext {
     readonly _internal = {
@@ -44,110 +53,165 @@ class WxHotContext {
         removeStyle(): void {}
     }
 
-    /** Registered accept callbacks; the propagation invokes them with the fresh exports. */
-    private readonly acceptCallbacks: Array<(moduleExports: unknown) => void> = []
+    /** Registered self-accept callbacks; a bare accept is represented by a no-op callback. */
+    private readonly acceptCallbacks: AcceptCallback[] = []
 
-    accept(callback?: (moduleExports: unknown) => void): void {
-        if (callback) {
-            this.acceptCallbacks.push(callback)
-        }
+    /** Set when a callback rejects a Refresh boundary; the current update then rebuilds. */
+    private invalidationReason: string | undefined
+
+    accept(callback?: AcceptCallback): void {
+        this.acceptCallbacks.push(callback ?? (() => {}))
     }
 
-    /** Invokes every registered accept callback with the module's fresh exports. */
-    runAccept(moduleExports: unknown): void {
+    hasAccepts(): boolean {
+        return this.acceptCallbacks.length > 0
+    }
+
+    /** Invokes this old context's callbacks and returns any requested invalidation. */
+    runAccept(moduleExports: unknown): string | undefined {
         for (const callback of this.acceptCallbacks) {
             callback(moduleExports)
         }
+        return this.invalidationReason
     }
 
-    acceptExports() {}
-    dispose() {}
-    prune() {}
-    invalidate() {}
-    on() {}
-    off() {}
-    send() {}
+    invalidate(reason?: string): void {
+        this.invalidationReason = reason ?? 'the accepting module invalidated the update'
+    }
+
+    // Vite's generated CSS module calls hot.prune with its style teardown; the physical
+    // rebuild replaces styles wholesale, so it is a no-op.
+    prune(_callback?: () => void): void {}
 }
 
 /** The WX host: extends the Rolldown contract instead of reimplementing it. */
 class WxDevRuntime extends DevRuntime {
     private hmrInfo: HmrInfo | undefined
 
-    /** Stored HostPatch factories keyed by absolute version; delivered, not yet executed. */
-    private readonly patches = new Map<number, () => void>()
+    /** Stored patch programs keyed by absolute version; delivered, not yet applied. */
+    private readonly patches = new Map<number, PatchProgram>()
 
     /** Delivered: the highest version the runtime has stored; the host compares its own count against this. */
     private storedVersion = 0
 
-    /** Active hot contexts per module id; the propagation invokes their callbacks. */
-    private readonly moduleHotContexts = new Map<string, WxHotContext>()
-
-    /** Contexts created during an update; they replace the active ones after the propagation. */
-    private readonly moduleHotContextsToBeUpdated = new Map<string, WxHotContext>()
-
     /** Executed: the highest version whose factory has run; advanced by the apply walk. */
     private appliedVersion = 0
 
+    /** Active hot contexts per module id; the propagation invokes their callbacks. */
+    private readonly moduleHotContexts = new Map<string, WxHotContext>()
+
     constructor() {
-        // The base batches executed-module ids and hands them to this messenger; each batch is
-        // one modules report.
-        super(
-            {
-                send: ({ modules }) => {
-                    if (modules.length > 0) {
-                        // Snapshot the batch: the base clears its internal cache array right
-                        // after send(), and wx.request may serialize the payload later.
-                        this.reportModules([...modules])
-                    }
-                }
-            },
-            ''
-        )
+        // The base has no messenger: the engine tracks per-client shipped payloads instead
+        // of executed module ids, so the wx host registers the client session itself.
+        super('')
     }
 
     /**
      * Generated code always calls this before registerModule and reads `_internal` from the
-     * return value. Mirrors Rolldown's web runtime: an update creates a fresh context that
-     * only becomes active after the propagation, so the active context still holds the
-     * callbacks registered before the update.
+     * return value. Mirrors Rolldown's web runtime: each execution immediately replaces the
+     * module's hot context; the apply plan has already captured the previous callbacks.
      */
     override createModuleHotContext(moduleId: string): WxHotContext {
         const hotContext = new WxHotContext()
-        if (this.moduleHotContexts.has(moduleId)) {
-            this.moduleHotContextsToBeUpdated.set(moduleId, hotContext)
-        } else {
-            this.moduleHotContexts.set(moduleId, hotContext)
-        }
+        this.moduleHotContexts.set(moduleId, hotContext)
         return hotContext
     }
 
-    /**
-     * HMR propagation entry, implemented exactly like Rolldown's web runtime: synchronous,
-     * invoking the active context's previously registered accept callbacks with the module's
-     * fresh exports (the program re-registered the module synchronously), then swapping the
-     * update's fresh contexts in. The program's own registration microtask lands on the new
-     * context after the swap, ready for the next update.
-     */
-    override applyUpdates(boundaries: [string, string][]): void {
-        for (const [moduleId] of boundaries) {
-            this.moduleHotContexts.get(moduleId)?.runAccept(this.loadExports(moduleId))
+    /** Computes accepting boundaries and every executed module that must be re-armed. */
+    private computeHmrUpdate(changedIds: readonly string[]): HmrUpdate | undefined {
+        // Mutable traversal accumulators are confined to one synchronous update plan.
+        const boundaries: string[] = []
+        const updateSet = new Set<string>()
+
+        for (const changedId of changedIds) {
+            if (!this.isExecuted(changedId)) continue
+
+            // Mutable only for the current DFS path, providing O(1) cycle checks.
+            const path = new Set([changedId])
+            const fullReloadReason = this.bubble(changedId, path, updateSet, boundaries)
+            if (fullReloadReason) {
+                throw new Error(fullReloadReason)
+            }
         }
-        this.moduleHotContextsToBeUpdated.forEach((hotContext, moduleId) => {
-            this.moduleHotContexts.set(moduleId, hotContext)
-        })
-        this.moduleHotContextsToBeUpdated.clear()
+
+        return boundaries.length > 0 ? { boundaries, updateSet } : undefined
     }
 
-    /** Consumed once per App heap from hmr/info.js; the host buildId is the Rolldown client ID. */
+    /** Walks executed importers until an accepting boundary is found. */
+    private bubble(
+        moduleId: string,
+        path: Set<string>,
+        updateSet: Set<string>,
+        boundaries: string[]
+    ): string | undefined {
+        if (updateSet.has(moduleId)) return undefined
+        updateSet.add(moduleId)
+
+        if (this.moduleHotContexts.get(moduleId)?.hasAccepts()) {
+            boundaries.push(moduleId)
+            return undefined
+        }
+
+        const importers = this.getImporters(moduleId).filter((importer) => this.isExecuted(importer))
+        if (importers.length === 0) {
+            return `no HMR boundary found for module ${moduleId}`
+        }
+
+        for (const importer of importers) {
+            if (path.has(importer)) {
+                return `circular HMR propagation between ${moduleId} and ${importer}`
+            }
+
+            path.add(importer)
+            const fullReloadReason = this.bubble(importer, path, updateSet, boundaries)
+            path.delete(importer)
+            if (fullReloadReason) return fullReloadReason
+        }
+        return undefined
+    }
+
+    /**
+     * Applies one patch in three phases: capture old contexts, evict the whole update set,
+     * then re-run accepting modules and pass their fresh exports to the old contexts.
+     */
+    private applyHmrUpdate(changedIds: readonly string[]): void {
+        const update = this.computeHmrUpdate(changedIds)
+        if (!update) return
+
+        for (const moduleId of update.updateSet) {
+            if (!this.hasFactory(moduleId)) {
+                throw new Error(`no HMR factory for module ${moduleId}`)
+            }
+        }
+
+        const applies = update.boundaries.map((moduleId) => ({
+            moduleId,
+            hotContext: this.moduleHotContexts.get(moduleId)
+        }))
+
+        // This eviction must happen before initModule: otherwise its cache gate returns the
+        // old exports and the freshly registered factory never executes.
+        for (const moduleId of update.updateSet) {
+            this.removeModuleCache(moduleId)
+        }
+
+        for (const { moduleId, hotContext } of applies) {
+            const invalidationReason = hotContext?.runAccept(this.initModule(moduleId))
+            if (invalidationReason) {
+                throw new Error(`${moduleId}: ${invalidationReason}`)
+            }
+        }
+    }
+
+    /** Consumed once per App heap from hmr/info.js; the host buildId is the delivery identity. */
     initialize(info: HmrInfo): void {
         if (this.hmrInfo) {
             return
         }
         this.hmrInfo = info
-        this.clientId = info.buildId
         // Anchor: the host publishes only after a version report, so the first report must
         // exist before the first edit can publish anything.
-        this.reportVersion()
+        void this.sendReport({ kind: 'version', version: this.storedVersion })
     }
 
     /** True between a patch delivery and the next page show: a hot reload is in progress. */
@@ -163,7 +227,7 @@ class WxDevRuntime extends DevRuntime {
         this.hotReloading = false
     }
 
-    /** The only direct effect of hmr/patches.js: validate and store. */
+    /** The only direct effect of hmr/patches.js: validate, store, acknowledge, and apply. */
     storePatches(payload: PatchPayload): void {
         const info = this.hmrInfo
         if (!info || payload.buildId !== info.buildId) {
@@ -172,7 +236,7 @@ class WxDevRuntime extends DevRuntime {
         }
 
         for (const patch of payload.patches) {
-            this.patches.set(patch.version, patch.factory)
+            this.patches.set(patch.version, patch)
             if (patch.version > this.storedVersion) {
                 this.storedVersion = patch.version
             }
@@ -180,7 +244,7 @@ class WxDevRuntime extends DevRuntime {
 
         // Delivery receipt: the report carries the stored version, so the host stops
         // publishing once the runtime has received the suffix.
-        this.reportVersion()
+        void this.sendReport({ kind: 'version', version: this.storedVersion })
 
         // A delivered patch means DevTools is about to replay the page lifecycle on the
         // re-executing Pages; the capsule wrapper suppresses the synthetic unmount/mount so
@@ -193,45 +257,31 @@ class WxDevRuntime extends DevRuntime {
     }
 
     /**
-     * Runs every stored factory from appliedVersion upward. Programs register the new module
-     * code with the base runtime, and the re-executing Page's imports (which follow the
-     * patches.js require) resolve against it. Synchronous and atomic: WX patch programs have
-     * no async, so no checkpoints or concurrency guard are needed.
+     * Applies stored patch programs in version order. Each program first registers its graph
+     * and factories, then its changed ids are propagated as one HMR update before the next
+     * version can replace those factories.
      */
     private applyPatches(): void {
         while (this.appliedVersion < this.patches.size) {
             const version = this.appliedVersion + 1
-            const factory = this.patches.get(version)
+            const patch = this.patches.get(version)
 
             try {
-                if (!factory) {
-                    // A gap can only come from a corrupted payload; stop and surface it instead
-                    // of spinning, and request a full rebuild — the draft's recovery rule for an
-                    // invalid range. A reload re-syncs from the host.
+                if (!patch) {
+                    // A gap can only come from a corrupted payload; stop and request a full
+                    // rebuild rather than advancing over an update that was never delivered.
                     throw new Error(`missing patch version ${version}`)
                 }
 
-                factory()
+                patch.factory()
+                this.applyHmrUpdate(patch.changedIds)
+                this.appliedVersion = version
             } catch (error) {
-                // A program failed (its dependencies missing on a fresh heap, or broken
-                // code); stop and request a full rebuild — the draft's recovery rule for an
-                // update failure. A reload re-syncs from the host.
                 console.warn(`[vite-plugin-taro] patch version ${version} failed; apply stopped`, error)
-                this.sendReport({ kind: 'rebuild' })
-                break
+                void this.sendReport({ kind: 'rebuild' })
+                return
             }
-            this.appliedVersion = version
         }
-    }
-
-    /** Reports executed module ids so the host can register them with the Rolldown engine. */
-    private reportModules(modules: string[]): void {
-        void this.sendReport({ kind: 'modules', modules })
-    }
-
-    /** Reports the stored version; the host publishes the missing suffix when it is behind. */
-    private reportVersion(): void {
-        void this.sendReport({ kind: 'version', version: this.storedVersion })
     }
 
     /** Sends one metadata-only report to the host; executable code never travels over HTTP. */

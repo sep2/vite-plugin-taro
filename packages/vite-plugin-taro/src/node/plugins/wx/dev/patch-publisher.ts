@@ -1,23 +1,16 @@
 import { randomUUID } from 'node:crypto'
-import { type HostPatch, renderHmrPatches } from './hmr-files.ts'
+import { type PatchUpdate, renderHmrPatches } from './hmr-files.ts'
 
 /** Abstracts the physical patches write; the engine owns the file destination. */
 export type WritePatches = (content: string) => Promise<void>
 
-/**
- * Owns the per-build patch history and the runtime's stored version — the two states the
- * write decision reads. All I/O is externalized: the rendered payload goes through the
- * injected WritePatches callback, so the class is pure and testable without the file system.
- */
+/** Owns one build's patch history, runtime position, and physical publish decision. */
 export class PatchPublisher {
     private readonly writePatches: WritePatches
     private buildId: string | undefined
-    private readonly patches: HostPatch[] = []
+    private readonly patches: PatchUpdate[] = []
 
-    /** The runtime's last reported stored version; the write suffix starts after it. */
-    // The produce-write needs this position to render only the missing suffix: without it,
-    // produce would have to write the full history (rejected) or wait for a report that can
-    // only arrive after a write (deadlock). The report is the only source of this number.
+    /** Runtime delivery position; the next physical write begins after it. */
     private knownVersion = 0
 
     // Explicit field assignment: node --test strips types and does not support parameter properties.
@@ -30,47 +23,38 @@ export class PatchPublisher {
         return buildId === this.buildId
     }
 
-    /**
-     * Begins a fresh full build: a new build identity, a reset history, and the runtime
-     * position back to zero. Returns the new identity so the caller can write it into the
-     * App metadata.
-     */
-    startBuild(): string {
-        this.buildId = randomUUID()
+    /** Begins a fresh build and returns both sides of the client-session rotation. */
+    startBuild(): Readonly<{ buildId: string; previousBuildId: string | undefined }> {
+        const previousBuildId = this.buildId
+        const buildId = randomUUID()
+        this.buildId = buildId
         this.patches.length = 0
         this.knownVersion = 0
-        return this.buildId
+        return { buildId, previousBuildId }
     }
 
-    /**
-     * Appends a batch of patches; publishes once when the runtime is behind.
-     *
-     * The produce-write is the loop's engine: the runtime only reports after a re-execution,
-     * and a re-execution only happens after patches.js changes, so the first (and every)
-     * write must come from here, triggered directly by the edit.
-     */
-    produce(patches: readonly HostPatch[]): void {
+    /** Appends a batch and publishes the suffix the runtime has not acknowledged. */
+    async produce(patches: readonly PatchUpdate[]): Promise<void> {
         this.patches.push(...patches)
-        void this.publishIfBehind()
+        if (this.buildId === undefined || this.knownVersion >= this.patches.length) return
+        await this.writePatches(renderHmrPatches(this.buildId, this.patches, this.knownVersion))
     }
 
     /**
-     * Records the runtime's stored version; publishes the missing suffix when behind.
-     *
-     * The report-write is the catch-up path: a delayed report (network reordering, a missed
-     * re-execution) re-publishes whatever the runtime has not acknowledged yet. Storing is
-     * idempotent, so the redundant refresh it causes is harmless.
+     * Advances the runtime's stored version and returns the newly delivered Rolldown files.
+     * The host commits those filenames to the engine's per-client ship map. Delayed reports
+     * cannot move the monotonic delivery position backwards.
      */
-    report(version: number): void {
-        this.knownVersion = version
-        void this.publishIfBehind()
-    }
-
-    /** Writes the missing suffix when the runtime's stored version is behind. */
-    private async publishIfBehind(): Promise<void> {
-        if (this.buildId === undefined || this.knownVersion >= this.patches.length) {
-            return
+    report(version: number): string[] {
+        if (!Number.isSafeInteger(version) || version < 0 || version > this.patches.length) {
+            throw new Error('Cannot report an invalid WX patch version.')
         }
-        await this.writePatches(renderHmrPatches(this.buildId, this.patches, this.knownVersion))
+        if (version <= this.knownVersion) {
+            return []
+        }
+
+        const previousVersion = this.knownVersion
+        this.knownVersion = version
+        return this.patches.slice(previousVersion, version).map((patch) => patch.filename)
     }
 }

@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { HostPatch } from './hmr-files.ts'
+import type { PatchUpdate } from './hmr-files.ts'
 import { PatchPublisher } from './patch-publisher.ts'
 
-const patch = (code: string): HostPatch => ({ code, fileName: 'pages/a/index.js' })
-
-/** Resolves after pending microtasks and the voided publishIfBehind chain. */
-const flush = () => new Promise<void>((resolve) => setImmediate(resolve))
+const patch = (code: string, fileName?: string): PatchUpdate => ({
+    type: 'Patch',
+    code,
+    filename: fileName ?? 'pages/a/index.js',
+    changedIds: ['pages/a/index'],
+    seq: 0
+})
 
 function createPublisher(): { publisher: PatchPublisher; writes: string[] } {
     const writes: string[] = []
@@ -21,105 +24,69 @@ test('before any build no report is current and nothing is published', async () 
 
     assert.equal(publisher.isCurrentBuild('anything'), false)
     publisher.report(0)
-    publisher.produce([patch('p1')])
+    await publisher.produce([patch('p1')])
 
-    await flush()
     assert.equal(writes.length, 0)
 })
 
 test('each produce writes only the missing suffix from the reported version', async () => {
     const { publisher, writes } = createPublisher()
     publisher.startBuild()
-    publisher.report(0)
 
-    publisher.produce([patch('p1'), patch('p2')])
-    await flush()
+    await publisher.produce([patch('p1'), patch('p2')])
     assert.equal(writes.length, 1)
-    assert.match(writes[0], /storePatches/)
     assert.match(writes[0], /version: 1/)
     assert.match(writes[0], /version: 2/)
 
-    // The runtime stored the suffix and reported the new position: the next batch writes
-    // only its own missing suffix.
     publisher.report(2)
-    publisher.produce([patch('p3')])
-    await flush()
+    await publisher.produce([patch('p3')])
     assert.equal(writes.length, 2)
     assert.match(writes[1], /version: 3/)
     assert.doesNotMatch(writes[1], /p2/)
 })
 
-test('a report at the patch count publishes nothing', async () => {
+test('a partial delivery advances the next write suffix', async () => {
     const { publisher, writes } = createPublisher()
     publisher.startBuild()
-    publisher.produce([patch('p1')])
-    await flush()
-    assert.equal(writes.length, 1)
+    await publisher.produce([patch('p1'), patch('p2'), patch('p3')])
 
     publisher.report(1)
-    await flush()
-    assert.equal(writes.length, 1)
-})
+    await publisher.produce([patch('p4')])
 
-test('the reported version advances the write suffix', async () => {
-    const { publisher, writes } = createPublisher()
-    publisher.startBuild()
-    publisher.report(1)
-    publisher.produce([patch('p1'), patch('p2'), patch('p3')])
-
-    await flush()
-    assert.equal(writes.length, 1)
-    assert.doesNotMatch(writes[0], /p1/)
-    assert.match(writes[0], /p2/)
-    assert.match(writes[0], /p3/)
-    assert.doesNotMatch(writes[0], /version: 1/)
-    assert.match(writes[0], /version: 2/)
-    assert.match(writes[0], /version: 3/)
-})
-
-test('a report behind the patch count re-publishes the missing suffix', async () => {
-    const { publisher, writes } = createPublisher()
-    publisher.startBuild()
-    publisher.produce([patch('p1'), patch('p2')])
-    await flush()
-    assert.equal(writes.length, 1)
-
-    // A delayed report from before the store: the host re-publishes what the runtime
-    // has not acknowledged yet. Storing is idempotent, so this only costs a refresh.
-    publisher.report(0)
-    await flush()
     assert.equal(writes.length, 2)
-    assert.match(writes[1], /version: 1/)
-    assert.match(writes[1], /version: 2/)
+    assert.doesNotMatch(writes[1], /p1/)
+    assert.match(writes[1], /p2/)
+    assert.match(writes[1], /p3/)
+    assert.match(writes[1], /p4/)
+})
+
+test('reports return each newly delivered Rolldown filename once', async () => {
+    const { publisher } = createPublisher()
+    publisher.startBuild()
+    await publisher.produce([patch('p1', 'patch-1.js'), patch('p2', 'patch-2.js')])
+
+    assert.deepEqual(publisher.report(1), ['patch-1.js'])
+    assert.deepEqual(publisher.report(2), ['patch-2.js'])
+    assert.deepEqual(publisher.report(1), [])
+})
+
+test('rejects reports outside the current patch history', () => {
+    const { publisher } = createPublisher()
+    publisher.startBuild()
+
+    assert.throws(() => publisher.report(-1), /invalid WX patch version/)
+    assert.throws(() => publisher.report(1), /invalid WX patch version/)
 })
 
 test('startBuild resets the history and the reported version', async () => {
     const { publisher, writes } = createPublisher()
-    const b1 = publisher.startBuild()
-    assert.equal(publisher.isCurrentBuild(b1), true)
+    const { buildId: firstBuild } = publisher.startBuild()
+    await publisher.produce([patch('p1')])
 
-    publisher.report(0)
-    publisher.produce([patch('p1')])
-    await flush()
-    assert.equal(writes.length, 1)
+    const { buildId: secondBuild } = publisher.startBuild()
+    assert.equal(publisher.isCurrentBuild(firstBuild), false)
+    assert.equal(publisher.isCurrentBuild(secondBuild), true)
 
-    const b2 = publisher.startBuild()
-    assert.equal(publisher.isCurrentBuild(b1), false)
-    assert.equal(publisher.isCurrentBuild(b2), true)
-
-    // The history and position were reset: the same produce publishes exactly once.
-    publisher.report(0)
-    publisher.produce([patch('p1')])
-    await flush()
+    await publisher.produce([patch('p1')])
     assert.equal(writes.length, 2)
-})
-
-test('an empty batch is a no-op', async () => {
-    const { publisher, writes } = createPublisher()
-    publisher.startBuild()
-    publisher.report(0)
-    publisher.produce([])
-
-    await flush()
-    assert.equal(writes.length, 0)
 })
