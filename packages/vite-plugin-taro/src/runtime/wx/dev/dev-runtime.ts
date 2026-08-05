@@ -150,6 +150,19 @@ class WxDevRuntime extends DevRuntime {
         this.reportVersion()
     }
 
+    /** True between a patch delivery and the next page show: a hot reload is in progress. */
+    private hotReloading = false
+
+    /** The capsule wrapper asks this during the synthetic lifecycle of a hot reload. */
+    isHotReloading(): boolean {
+        return this.hotReloading
+    }
+
+    /** The wrapped onShow ends the hot reload after the replacement cycle. */
+    clearHotReloading(): void {
+        this.hotReloading = false
+    }
+
     /** The only direct effect of hmr/patches.js: validate and store. */
     storePatches(payload: PatchPayload): void {
         const info = this.hmrInfo
@@ -168,6 +181,11 @@ class WxDevRuntime extends DevRuntime {
         // Delivery receipt: the report carries the stored version, so the host stops
         // publishing once the runtime has received the suffix.
         this.reportVersion()
+
+        // A delivered patch means DevTools is about to replay the page lifecycle on the
+        // re-executing Pages; the capsule wrapper suppresses the synthetic unmount/mount so
+        // the React tree survives and Refresh swaps the code in place.
+        this.hotReloading = true
 
         // Apply synchronously: the page's imports below the require resolve against the
         // freshly registered modules, so the re-executed Page evaluates with the new code.

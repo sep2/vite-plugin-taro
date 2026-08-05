@@ -1,6 +1,14 @@
 // biome-ignore lint/complexity/noBannedTypes: WeChat defined object
 type WeChatAppServiceGlobal = {}
 
+/** The App-global Rolldown dev runtime; present only in wx development builds. */
+declare const __rolldown_runtime__:
+    | {
+          isHotReloading(): boolean
+          clearHotReloading(): void
+      }
+    | undefined
+
 // This object is available everywhere, but no globalThis, window on WeChat Mini Program
 declare const global: WeChatAppServiceGlobal
 
