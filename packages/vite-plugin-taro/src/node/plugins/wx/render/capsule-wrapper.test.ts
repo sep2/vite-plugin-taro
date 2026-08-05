@@ -32,6 +32,14 @@ test('rewrites one anonymous System registration as an inert CommonJS tuple', ()
     assert.doesNotMatch(code, /System\.register/)
 })
 
+test('preserves runtime-computed dynamic module IDs', () => {
+    const code = transformRegistration(`System.register([], function (_export, _context) {
+        return { execute: () => _context.import(moduleId) }
+    })`)
+
+    assert.match(code, /_context\.import\(moduleId\)/)
+})
+
 test('rejects executable statements beside the registration', () => {
     assert.throws(
         () =>

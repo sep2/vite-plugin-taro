@@ -33,7 +33,7 @@ export function wrapCapsulePlugin(fileName: string): PluginObject {
             }
 
             dependencies.elements.forEach((dependency) => {
-                canonicalizeReference(dependency, fileName, 'System.register dependency')
+                canonicalizeStaticReference(dependency, fileName)
             })
 
             const context = declaration.params[1]
@@ -51,7 +51,7 @@ export function wrapCapsulePlugin(fileName: string): PluginObject {
                         }
 
                         const [dependency] = callPath.node.arguments
-                        canonicalizeReference(dependency, fileName, 'dynamic import')
+                        canonicalizeDynamicReference(dependency, fileName)
                     }
                 })
             }
@@ -70,10 +70,17 @@ export function wrapCapsulePlugin(fileName: string): PluginObject {
     }
 }
 
-/** Resolves one generated reference while the final importing chunk filename is known. */
-function canonicalizeReference(reference: types.Node | null | undefined, fileName: string, kind: string): void {
+/** Resolves one generated static reference while the final importing chunk filename is known. */
+function canonicalizeStaticReference(reference: types.Node | null | undefined, fileName: string): void {
     if (!types.isStringLiteral(reference)) {
-        throw new Error(`Expected a literal ${kind} in ${fileName}`)
+        throw new Error(`Expected a literal System.register dependency in ${fileName}`)
     }
     reference.value = resolveChunkReference(fileName, reference.value)
+}
+
+/** Resolves application literals while preserving runtime-computed IDs injected by the development runtime. */
+function canonicalizeDynamicReference(reference: types.Node | null | undefined, fileName: string): void {
+    if (types.isStringLiteral(reference) && (reference.value.startsWith('./') || reference.value.startsWith('../'))) {
+        reference.value = resolveChunkReference(fileName, reference.value)
+    }
 }
