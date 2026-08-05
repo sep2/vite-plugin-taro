@@ -19,7 +19,6 @@ const wxStyleOptions = {
 /** Creates the target-aware Tailwind CSS plugins. */
 export function createCssPlugins(target: VitePluginTaroTarget): PluginOption[] {
     const wx = target === 'wx'
-    const wxStyleAsset = wx ? createWxStyleAssetCapture() : undefined
 
     return [
         ...(WeappTailwindcss({
@@ -42,34 +41,10 @@ export function createCssPlugins(target: VitePluginTaroTarget): PluginOption[] {
                 ...wxStyleOptions,
                 autoprefixer: !wx
             },
-            // The adapter can replace Rolldown's `app.wxss` filename with a source-relative path such as
-            // `src/app.wxss`. Capture that exact mutation here so the finalizer can restore only the global asset.
-            onUpdate: wxStyleAsset?.capture,
             logLevel: 'warn'
         }) ?? []),
-        wxStyleAsset ? createWxssCompatibilityFinalizer(wxStyleAsset.get) : undefined
+        wx ? createWxssCompatibilityFinalizer() : undefined
     ]
-}
-
-/**
- * Captures the global style path from the Tailwind adapter's own mutation callback.
- *
- * Rolldown reconstructs output objects between plugin hooks in bundled development, so object identity cannot correlate
- * the asset across hooks. The callback path remains stable. With `cssCodeSplit: false`, Tailwind reports one global style,
- * while native Page companions are emitted later by the wx plugin and never pass through this callback.
- */
-function createWxStyleAssetCapture(): { capture(fileName: string): void; get(): string | undefined } {
-    let styleFileName: string | undefined
-
-    return {
-        capture(fileName) {
-            const normalized = fileName.replaceAll('\\', '/')
-            if (normalized.endsWith('.css') || normalized.endsWith('.wxss')) styleFileName = normalized
-        },
-        get() {
-            return styleFileName
-        }
-    }
 }
 
 /**
@@ -84,7 +59,7 @@ function createWxStyleAssetCapture(): { capture(fileName: string): void; get(): 
  * global asset to WeChat's required `app.wxss` path. Exact path correlation leaves Page WXSS companions untouched.
  * Remove it when upstream both completes adaptation and preserves the bundler-selected filename.
  */
-function createWxssCompatibilityFinalizer(getStyleFileName: () => string | undefined): Plugin {
+function createWxssCompatibilityFinalizer(): Plugin {
     const context = createContext({
         appType: 'weapp-vite',
         generator: {
@@ -100,34 +75,34 @@ function createWxssCompatibilityFinalizer(getStyleFileName: () => string | undef
         generateBundle: {
             order: 'post',
             async handler(_, bundle) {
-                const styleFileName = getStyleFileName()
-                const styleAsset = styleFileName
-                    ? Object.values(bundle).find(
-                          (output): output is Rolldown.OutputAsset =>
-                              output.type === 'asset' && output.fileName.replaceAll('\\', '/') === styleFileName
-                      )
-                    : undefined
+                // With cssCodeSplit: false there is exactly one .css asset — the global style.
+                // The Tailwind adapter may also report page wxss companions, so a captured
+                // path would be unreliable; the suffix is unambiguous.
+                const styleAsset = Object.values(bundle).find(
+                    (output): output is Rolldown.OutputAsset =>
+                        output.type === 'asset' && output.fileName.replaceAll('\\', '/').endsWith('.css')
+                )
                 // Both finalizers use a post-ordered generateBundle hook. Array order places this hook after the
-                // upstream finalizer, where every Vite-produced WXSS asset has its final contents and filename.
+                // upstream finalizer, where every Vite-produced style asset has its final contents and filename.
                 await Promise.all(
                     Object.values(bundle)
-                        .filter(isWxssAsset)
+                        .filter(isStyleAsset)
                         .map(async (asset) => {
-                            // Process every Vite-produced WXSS asset visible in this hook rather than coupling the
-                            // workaround to `app.wxss`; non-style assets remain outside this compatibility pass.
+                            // Transform every style asset visible in this hook — the .css global
+                            // style (browser-shaped, skipped by upstream) and the .wxss page
+                            // companions; non-style assets remain outside this compatibility pass.
                             const source =
                                 typeof asset.source === 'string' ? asset.source : new TextDecoder().decode(asset.source)
 
                             asset.source = (await context.transformWxss(source)).css
                         })
                 )
-                // Rename only the path reported by Tailwind; never infer the global asset from all final `.wxss` files.
                 if (styleAsset) styleAsset.fileName = 'app.wxss'
             }
         }
     }
 }
 
-function isWxssAsset(output: Rolldown.OutputAsset | Rolldown.OutputChunk): output is Rolldown.OutputAsset {
-    return output.type === 'asset' && output.fileName.endsWith('.wxss')
+function isStyleAsset(output: Rolldown.OutputAsset | Rolldown.OutputChunk): output is Rolldown.OutputAsset {
+    return output.type === 'asset' && (output.fileName.endsWith('.css') || output.fileName.endsWith('.wxss'))
 }
