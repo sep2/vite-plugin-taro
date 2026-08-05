@@ -110,8 +110,12 @@ export async function createWxDevEngine({
             }
             // The version report records the runtime's stored position; the publisher writes
             // the missing suffix immediately when behind. Reports are one-shot receipts, so
-            // no long poll is held.
-            publisher.report(report.version)
+            // no long poll is held. A backward version means a fresh App heap (DevTools
+            // restart): the persisted patches would replay against a half-loaded heap, so a
+            // full rebuild resets everything and DevTools reloads the app.
+            if (publisher.report(report.version)) {
+                engine.triggerFullBuild()
+            }
             res.end()
         } catch (e) {
             logWxError(server.config.logger, 'wx HMR report failed', e)

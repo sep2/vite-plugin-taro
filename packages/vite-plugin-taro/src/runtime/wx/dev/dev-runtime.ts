@@ -189,7 +189,24 @@ class WxDevRuntime extends DevRuntime {
 
         // Apply synchronously: the page's imports below the require resolve against the
         // freshly registered modules, so the re-executed Page evaluates with the new code.
-        this.applyPatches()
+        // On a fresh App heap the page can re-execute with the persisted patch before the
+        // lazy chunk with the refresh runtime loads; the patch programs call $RefreshSig$,
+        // which would crash on the empty exports of an unregistered module. The host is
+        // rebuilding in that case (the backward boot report), so skipping the apply is safe.
+        if (this.isRefreshRuntimeReady()) {
+            this.applyPatches()
+        }
+    }
+
+    /** True when the refresh runtime module (identified by its signature export) is registered. */
+    private isRefreshRuntimeReady(): boolean {
+        for (const module of Object.values(this.modules)) {
+            const exports = module.exportsHolder.exports
+            if (exports && typeof exports.createSignatureFunctionForTransform === 'function') {
+                return true
+            }
+        }
+        return false
     }
 
     /**

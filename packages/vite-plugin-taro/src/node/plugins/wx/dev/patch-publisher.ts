@@ -60,10 +60,15 @@ export class PatchPublisher {
      * The report-write is the catch-up path: a delayed report (network reordering, a missed
      * re-execution) re-publishes whatever the runtime has not acknowledged yet. Storing is
      * idempotent, so the redundant refresh it causes is harmless.
+     *
+     * Returns true when the version went backward — a fresh App heap (DevTools restart)
+     * starts at zero, so the caller can trigger a full rebuild instead of replaying patches.
      */
-    report(version: number): void {
+    report(version: number): boolean {
+        const restarting = version < this.knownVersion
         this.knownVersion = version
         void this.publishIfBehind()
+        return restarting
     }
 
     /** Writes the missing suffix when the runtime's stored version is behind. */
