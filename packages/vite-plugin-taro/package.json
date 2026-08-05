@@ -78,7 +78,6 @@
         "react-reconciler": "0.33.0",
         "react-refresh": "^0.18.0",
         "rolldown": "~1.2.2",
-        "systemjs": "6.15.1",
         "tailwindcss": "^4.3.3",
         "weapp-tailwindcss": "^5.2.11"
     },

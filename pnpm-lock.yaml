@@ -200,9 +200,6 @@ importers:
       rolldown:
         specifier: ~1.2.2
         version: 1.2.2
-      systemjs:
-        specifier: 6.15.1
-        version: 6.15.1
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
@@ -3231,9 +3228,6 @@ packages:
     resolution: {integrity: sha512-IzWeU34WwC7gbhjKsjkImTuCRf+lRbO6cnxMGs88iVNKDwV+xQpBCJxZ4bNH6gSrIbbyVJ1kuGzo3JTtz//CBw==}
     engines: {node: '>= 4.7.0'}
 
-  systemjs@6.15.1:
-    resolution: {integrity: sha512-Nk8c4lXvMB98MtbmjX7JwJRgJOL8fluecYCfCeYBznwmpOs8Bf15hLM6z4z71EDAhQVrQrI+wt1aLWSXZq+hXA==}
-
   tailwindcss-config@2.0.2:
     resolution: {integrity: sha512-qHFUE1k24k14Dc3Wk3js5IIr2ncYBudly09H7b1eZE4KNPQ1zNhVhZNOcXCsQg5cYPOap0ayzpkMxcdHBl9SEA==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -6244,8 +6238,6 @@ snapshots:
   supports-preserve-symlinks-flag@1.0.0: {}
 
   swiper@11.1.15: {}
-
-  systemjs@6.15.1: {}
 
   tailwindcss-config@2.0.2:
     dependencies:

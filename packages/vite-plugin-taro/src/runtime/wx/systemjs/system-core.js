@@ -4,14 +4,13 @@
  * SystemJS Core
  *
  * Provides
- * - System.import
+ * - System.import and System.importSync
  * - System.register support for
  *     live bindings, function hoisting through circular references,
  *     reexports, dynamic import, import.meta.url, top-level await
  * - System.getRegister to get the registration
  * - Symbol.toStringTag support in Module objects
  * - Hookable System.createContext to customize import.meta
- * - System.onload(err, id, deps) handler for tracing / hot-reloading
  *
  * Core comes with no System.prototype.resolve or
  * System.prototype.instantiate implementations
@@ -34,38 +33,132 @@ function SystemJS() {
 
 var systemJSPrototype = SystemJS.prototype
 
-systemJSPrototype.import = function (id, parentUrl, meta) {
+systemJSPrototype.import = function (id, parentId, meta) {
     var loader = this
-    parentUrl && typeof parentUrl === 'object' && ((meta = parentUrl), (parentUrl = undefined))
-    return Promise.resolve(loader.prepareImport())
-        .then(function () {
-            return loader.resolve(id, parentUrl, meta)
-        })
-        .then(function (id) {
-            var load = getOrCreateLoad(loader, id, undefined, meta)
-            return load.C || topLevelLoad(loader, load)
-        })
+    if (parentId && typeof parentId === 'object') meta = parentId
+    var load = getOrCreateLoad(loader, id, undefined, meta)
+    return Promise.resolve(load.C || topLevelLoad(loader, load))
+}
+
+/**
+ * Instantiates, links, and evaluates a graph without yielding the current JavaScript turn.
+ *
+ * WX placement guarantees that every registration in a synchronous graph uses the main-package transport. Encountering
+ * a thenable therefore indicates a fatal placement invariant violation. No rollback is attempted: rows already published
+ * to the shared registry remain there and the current runtime heap must not be reused.
+ */
+systemJSPrototype.importSync = function (id) {
+    var loader = this
+    var load = linkLoadSync(loader, id)
+    var execution = postOrderExec(loader, load, {})
+    if (isThenable(execution)) throw createAsyncGraphError(id)
+
+    // Share completion and namespace identity with normal System.import calls.
+    load.C = load.n
+    return load.n
 }
 
 // Hookable createContext function -> allowing eg custom import meta
 systemJSPrototype.createContext = function (parentId) {
-    var loader = this
-    return {
-        url: parentId,
-        resolve: function (id, parentUrl) {
-            return Promise.resolve(loader.resolve(id, parentUrl || parentId))
+    return { url: parentId }
+}
+
+/** Publishes one synchronous row before linking dependencies so cycles observe the same live namespace. */
+function linkLoadSync(loader, id) {
+    var existing = loader[REGISTRY][id]
+    if (existing) return existing
+
+    var registration = loader.instantiate(id)
+    if (isThenable(registration)) throw createAsyncGraphError(id)
+    if (!registration) throw Error(errMsg(2, id))
+
+    // This row is intentionally mutable SystemJS-owned linking and execution state.
+    var load = {
+        id: id,
+        i: [],
+        n: createModuleNamespace(),
+        h: false,
+        d: undefined,
+        e: undefined,
+        C: undefined
+    }
+    loader[REGISTRY][id] = load
+
+    var declared = registration[1](
+        createExport(load),
+        registration[1].length === 2 ? createDeclarationContext(loader, id) : undefined
+    )
+    load.e = declared.execute || function () {}
+    var setters = declared.setters || []
+    load.d = registration[0].map(function (dependency, index) {
+        var dependencyLoad = linkLoadSync(loader, dependency)
+        var setter = setters[index]
+        if (setter) {
+            dependencyLoad.i.push(setter)
+            if (dependencyLoad.h || dependencyLoad.C === dependencyLoad.n) setter(dependencyLoad.n)
         }
+        return dependencyLoad
+    })
+    return load
+}
+
+/** Supplies dynamic import and import.meta using the canonical IDs emitted at build time. */
+function createDeclarationContext(loader, id) {
+    return {
+        import: function (dependency, meta) {
+            return loader.import(dependency, undefined, meta)
+        },
+        meta: loader.createContext(id)
     }
 }
 
-// onLoad(err, id, deps) provided for tracing / hot-reloading
-if (!process.env.SYSTEM_PRODUCTION) systemJSPrototype.onload = function () {}
-function loadToId(load) {
-    return load.id
+/** Creates a live module namespace shared by both completion policies. */
+function createModuleNamespace() {
+    var namespace = Object.create(null)
+    if (toStringTag) Object.defineProperty(namespace, toStringTag, { value: 'Module' })
+    return namespace
 }
-function triggerOnload(loader, load, err, isErrSource) {
-    loader.onload(err, load.id, load.d && load.d.map(loadToId), !!isErrSource)
-    if (err) throw err
+
+/** Creates the shared live-binding publisher used by synchronous and asynchronous load records. */
+function createExport(load) {
+    return function (name, value) {
+        load.h = true
+        // This flag coalesces object-form exports into one importer notification pass.
+        var changed = false
+        if (typeof name === 'string') {
+            if (!(name in load.n) || load.n[name] !== value) {
+                load.n[name] = value
+                changed = true
+            }
+        } else {
+            for (var property in name) {
+                var propertyValue = name[property]
+                if (!(property in load.n) || load.n[property] !== propertyValue) {
+                    load.n[property] = propertyValue
+                    changed = true
+                }
+            }
+            if (name && name.__esModule) load.n.__esModule = name.__esModule
+        }
+        if (changed) {
+            for (var i = 0; i < load.i.length; i++) {
+                var setter = load.i[i]
+                if (setter) setter(load.n)
+            }
+        }
+        return value
+    }
+}
+
+/** Accepts cross-realm and custom thenables rather than only native Promises. */
+function isThenable(value) {
+    return (
+        value !== null && (typeof value === 'object' || typeof value === 'function') && typeof value.then === 'function'
+    )
+}
+
+function createAsyncGraphError(id) {
+    return Error('Cannot synchronously import ' + id + ': module graph is asynchronous')
 }
 
 var lastRegister
@@ -87,8 +180,7 @@ export function getOrCreateLoad(loader, id, firstParentUrl, meta) {
     if (load) return load
 
     var importerSetters = []
-    var ns = Object.create(null)
-    if (toStringTag) Object.defineProperty(ns, toStringTag, { value: 'Module' })
+    var ns = createModuleNamespace()
 
     var instantiatePromise = Promise.resolve()
         .then(function () {
@@ -96,47 +188,10 @@ export function getOrCreateLoad(loader, id, firstParentUrl, meta) {
         })
         .then(
             function (registration) {
-                if (!registration)
-                    throw Error(errMsg(2, process.env.SYSTEM_PRODUCTION ? id : 'Module ' + id + ' did not instantiate'))
-                function _export(name, value) {
-                    // note if we have hoisted exports (including reexports)
-                    load.h = true
-                    var changed = false
-                    if (typeof name === 'string') {
-                        if (!(name in ns) || ns[name] !== value) {
-                            ns[name] = value
-                            changed = true
-                        }
-                    } else {
-                        for (var p in name) {
-                            var value = name[p]
-                            if (!(p in ns) || ns[p] !== value) {
-                                ns[p] = value
-                                changed = true
-                            }
-                        }
-
-                        if (name && name.__esModule) {
-                            ns.__esModule = name.__esModule
-                        }
-                    }
-                    if (changed)
-                        for (var i = 0; i < importerSetters.length; i++) {
-                            var setter = importerSetters[i]
-                            if (setter) setter(ns)
-                        }
-                    return value
-                }
+                if (!registration) throw Error(errMsg(2, id))
                 var declared = registration[1](
-                    _export,
-                    registration[1].length === 2
-                        ? {
-                              import: function (importId, meta) {
-                                  return loader.import(importId, id, meta)
-                              },
-                              meta: loader.createContext(id)
-                          }
-                        : undefined
+                    createExport(load),
+                    registration[1].length === 2 ? createDeclarationContext(loader, id) : undefined
                 )
                 load.e = declared.execute || function () {}
                 return [registration[0], declared.setters || [], registration[2] || []]
@@ -144,7 +199,6 @@ export function getOrCreateLoad(loader, id, firstParentUrl, meta) {
             function (err) {
                 load.e = null
                 load.er = err
-                if (!process.env.SYSTEM_PRODUCTION) triggerOnload(loader, load, err, true)
                 throw err
             }
         )
@@ -154,25 +208,22 @@ export function getOrCreateLoad(loader, id, firstParentUrl, meta) {
             instantiation[0].map(function (dep, i) {
                 var setter = instantiation[1][i]
                 var meta = instantiation[2][i]
-                return Promise.resolve(loader.resolve(dep, id)).then(function (depId) {
-                    var depLoad = getOrCreateLoad(loader, depId, id, meta)
-                    // depLoad.I may be undefined for already-evaluated
-                    return Promise.resolve(depLoad.I).then(function () {
-                        if (setter) {
-                            depLoad.i.push(setter)
-                            // only run early setters when there are hoisted exports of that module
-                            // the timing works here as pending hoisted export calls will trigger through importerSetters
-                            if (depLoad.h || !depLoad.I) setter(depLoad.n)
-                        }
-                        return depLoad
-                    })
+                var depLoad = getOrCreateLoad(loader, dep, id, meta)
+                // depLoad.I may be undefined for already-evaluated
+                return Promise.resolve(depLoad.I).then(function () {
+                    if (setter) {
+                        depLoad.i.push(setter)
+                        // only run early setters when there are hoisted exports of that module
+                        // the timing works here as pending hoisted export calls will trigger through importerSetters
+                        if (depLoad.h || !depLoad.I) setter(depLoad.n)
+                    }
+                    return depLoad
                 })
             })
         ).then(function (depLoads) {
             load.d = depLoads
         })
     })
-    if (!process.env.SYSTEM_BROWSER) linkPromise.catch(function () {})
 
     // Capital letter = a promise function
     return (load = loader[REGISTRY][id] =
@@ -232,7 +283,6 @@ function instantiateAll(loader, load, parent, loaded) {
             .catch(function (err) {
                 if (load.er) throw err
                 load.e = null
-                if (!process.env.SYSTEM_PRODUCTION) triggerOnload(loader, load, err, false)
                 throw err
             })
     }
@@ -281,7 +331,6 @@ function postOrderExec(loader, load, seen) {
             if (depLoadPromise) (depLoadPromises = depLoadPromises || []).push(depLoadPromise)
         } catch (err) {
             load.er = err
-            if (!process.env.SYSTEM_PRODUCTION) triggerOnload(loader, load, err, false)
             throw err
         }
     })
@@ -297,12 +346,10 @@ function postOrderExec(loader, load, seen) {
                     function () {
                         load.C = load.n
                         load.E = null // indicates completion
-                        if (!process.env.SYSTEM_PRODUCTION) triggerOnload(loader, load, null, true)
                     },
                     function (err) {
                         load.er = err
                         load.E = null
-                        if (!process.env.SYSTEM_PRODUCTION) triggerOnload(loader, load, err, true)
                         throw err
                     }
                 )
@@ -314,8 +361,6 @@ function postOrderExec(loader, load, seen) {
         } catch (err) {
             load.er = err
             throw err
-        } finally {
-            if (!process.env.SYSTEM_PRODUCTION) triggerOnload(loader, load, load.er, true)
         }
     }
 }
