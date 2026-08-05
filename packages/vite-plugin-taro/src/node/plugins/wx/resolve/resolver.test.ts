@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import path from 'node:path'
 import test from 'node:test'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { appComponentId } from '../../client/constant.ts'
@@ -38,7 +39,7 @@ const options: VitePluginTaroOptions = {
 
 test('resolves fixed and route-specific private IDs', () => {
     const resolver = createResolver(options)
-    const projectRoot = '/project'
+    const projectRoot = path.resolve('/project')
 
     assert.deepEqual(resolver.input, {
         'app.js': appShellPath,
@@ -47,11 +48,14 @@ test('resolves fixed and route-specific private IDs', () => {
         'pages/home/index.js': `${pageShellPath}?route=pages%2Fhome%2Findex`
     })
     assert.equal(resolver.resolveId(vitePreloadId, undefined, projectRoot), bootstrapPath)
-    assert.equal(resolver.resolveId(appComponentId, undefined, projectRoot), '/project/src/app.tsx')
+    assert.equal(resolver.resolveId(appComponentId, undefined, projectRoot), path.resolve(projectRoot, 'src/app.tsx'))
 
     const pageCapsule = resolver.resolveId(pageCapsuleId, '/runtime/page.js?route=pages%2Fhome%2Findex', projectRoot)
     assert.equal(pageCapsule, `${pageCapsulePath}?route=pages%2Fhome%2Findex`)
-    assert.equal(resolver.resolveId(pageComponentId, pageCapsule, projectRoot), '/project/src/pages/home/index.tsx')
+    assert.equal(
+        resolver.resolveId(pageComponentId, pageCapsule, projectRoot),
+        path.resolve(projectRoot, 'src/pages/home/index.tsx')
+    )
 })
 
 test('specializes bootstrap with the configured App JSON', async () => {

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import path from 'node:path'
 import test from 'node:test'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { transformH5App } from './transform-app.ts'
@@ -25,6 +26,7 @@ const options: VitePluginTaroOptions = {
 }
 
 const id = '/plugin/runtime/h5/app.js'
+const projectRoot = path.resolve('/project')
 const source = `const config = __VITE_PLUGIN_TARO_H5_APP_CONFIG__
 config.routes = __VITE_PLUGIN_TARO_H5_ROUTES__
 `
@@ -34,7 +36,7 @@ test('specializes the physical H5 App configuration and routes', async () => {
         code: source,
         id,
         options,
-        projectRoot: '/project'
+        projectRoot
     })
 
     assert.match(result.code, /router: \{\}/)
@@ -42,7 +44,8 @@ test('specializes the physical H5 App configuration and routes', async () => {
     assert.doesNotMatch(result.code, /stale\/page/)
     assert.match(result.code, /path: ["']pages\/home\/index["']/)
     assert.match(result.code, /navigationBarTitleText: ["']Home["']/)
-    assert.match(result.code, /import\(["']\/@fs\/\/project\/src\/pages\/home\/index\.tsx["']\)/)
+    const pageComponentPath = path.resolve(projectRoot, 'src/pages/home/index.tsx').replaceAll('\\', '/')
+    assert.ok(result.code.includes(`import(${JSON.stringify(`/@fs/${pageComponentPath}`)})`))
     assert.ok(result.map)
     assert.equal(result.map.sources?.[0], id)
 })
@@ -54,7 +57,7 @@ test('rejects an H5 App missing its specialization placeholders', async () => {
                 code: 'export default {}',
                 id,
                 options,
-                projectRoot: '/project'
+                projectRoot
             }),
         /Expected one placeholder __VITE_PLUGIN_TARO_H5_APP_CONFIG__, found 0/
     )
