@@ -2,7 +2,8 @@ import type { PluginOption } from 'vite'
 import { transformWithOxc } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { esTarget } from '../../../utils/constant.ts'
-import { once } from '../../../utils/once.ts'
+import { rolldownRuntimeId } from '../module.ts'
+import { memoize } from '../../../utils/memoize.ts'
 import { createWxDevHost, type WxDevHost } from './dev-host.ts'
 import { createWxReactRefreshTransforms } from './react-refresh.ts'
 
@@ -47,7 +48,7 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
                     // The `setPublicClassFields` assumption emits plain `this.x = ...`
                     // assignments instead of external helpers, whose references the later
                     // minifier would mangle.
-                    return fixRolldownRuntime(code, id)
+                    return fixRolldownRuntime(code)
                 }
             },
 
@@ -71,8 +72,8 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
 // The assembled runtime chunk is byte-identical on every build (the base runtime and the
 // bundled implement are immutable for the server's lifetime), so the lowering runs once
 // and every build reuses it.
-const fixRolldownRuntime = once((code: string, id: string) => {
-    return transformWithOxc(code, id, {
+const fixRolldownRuntime = memoize((code: string) => {
+    return transformWithOxc(code, rolldownRuntimeId, {
         lang: 'js',
         target: esTarget,
         sourcemap: false,
