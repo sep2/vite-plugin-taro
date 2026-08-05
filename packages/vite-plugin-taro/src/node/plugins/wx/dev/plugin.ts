@@ -1,5 +1,8 @@
 import type { Plugin } from 'vite'
+import { transformWithOxc } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
+import { esTarget } from '../../../utils/constant.ts'
+import { rolldownRuntimeId } from '../module.ts'
 import { createDevHost } from './dev-host.ts'
 import { rewriteReactRefresh } from './react-refresh.ts'
 
@@ -29,6 +32,22 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
         transform: {
             order: 'post',
             handler(code, id) {
+                if (id.split('?', 1)[0] === rolldownRuntimeId) {
+                    // The dev-mode transform assembles the runtime chunk (Rolldown's base
+                    // runtime plus our injected implement) as this module's transform output,
+                    // which bypasses the build's es2018 lowering. Real-device engines and
+                    // WeChat's upload parser predate class fields and nullish operators, so
+                    // the assembled runtime is lowered here — the only module that needs it.
+                    // The `setPublicClassFields` assumption emits plain `this.x = ...`
+                    // assignments instead of external helpers, whose references the later
+                    // minifier would mangle.
+                    return transformWithOxc(code, id, {
+                        lang: 'js',
+                        target: esTarget,
+                        sourcemap: false,
+                        assumptions: { setPublicClassFields: true }
+                    })
+                }
                 return rewriteReactRefresh(code, id, Boolean(this.environment.config.build.sourcemap))
             }
         },

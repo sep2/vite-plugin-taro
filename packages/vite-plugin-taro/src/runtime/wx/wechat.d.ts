@@ -1,5 +1,12 @@
-// biome-ignore lint/complexity/noBannedTypes: WeChat defined object
-type WeChatAppServiceGlobal = {}
+/**
+ * The AppService global. Free-variable reads never resolve its properties (verified: the
+ * free lookup is undefined while `global.X` exists), so everything stored here must be
+ * accessed as an explicit member expression.
+ */
+type WeChatAppServiceGlobal = {
+    /** React DevTools hook installed by the dev runtime; the renderer reads it via `global.`. */
+    __REACT_DEVTOOLS_GLOBAL_HOOK__?: unknown
+}
 
 /** The App-global Rolldown dev runtime; present only in wx development builds. */
 declare const __rolldown_runtime__:

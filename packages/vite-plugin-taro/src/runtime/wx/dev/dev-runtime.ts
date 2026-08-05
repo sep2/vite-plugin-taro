@@ -262,7 +262,8 @@ const runtime = new WxDevRuntime()
 // react-family modules is rewritten to `global.__REACT_DEVTOOLS_GLOBAL_HOOK__`: the
 // AppService scope does not resolve free variables against `global` (verified: the free
 // lookup is undefined while the member access exists), so the renderer would never inject
-// otherwise. `??=` keeps a pre-installed hook (e.g. a real DevTools integration) intact.
+// otherwise. `??=` keeps a pre-installed hook (e.g. a real DevTools integration) intact; the
+// runtime chunk's own lowering keeps the operator es2018-compatible.
 const reactDevtoolsHook = {
     renderers: new Map<number, unknown>(),
     supportsFiber: true,
@@ -276,9 +277,4 @@ const reactDevtoolsHook = {
     onCommitFiberUnmount: () => {}
 }
 // node types declare `global` as typeof globalThis, so the AppService global needs a cast.
-;(
-    global as {
-        /** React DevTools hook installed by the dev runtime; free-variable reads never resolve it. */
-        __REACT_DEVTOOLS_GLOBAL_HOOK__?: unknown
-    }
-).__REACT_DEVTOOLS_GLOBAL_HOOK__ ??= reactDevtoolsHook
+;(global as WeChatAppServiceGlobal).__REACT_DEVTOOLS_GLOBAL_HOOK__ ??= reactDevtoolsHook
