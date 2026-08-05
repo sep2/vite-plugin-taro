@@ -276,9 +276,12 @@ function logWxError(logger: ViteDevServer['config']['logger'], prefix: string, e
 
 /** Bundles the runtime host and state machine into one plain script for injection. */
 async function bundleRuntimeSource(): Promise<string> {
+    // write: false — only the code is consumed; without it rolldown drops the bundle into
+    // the default dist/ of the running project.
     const result = await build({
         input: resolvePackageFile('dist/runtime/wx/dev/dev-runtime.js'),
-        output: { format: 'iife', minify: true, sourcemap: false }
+        output: { format: 'iife', minify: true, sourcemap: false },
+        write: false
     })
     return result.output[0].code
 }
