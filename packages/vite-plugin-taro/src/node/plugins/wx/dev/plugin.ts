@@ -2,7 +2,7 @@ import type { PluginOption } from 'vite'
 import { transformWithOxc } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { esTarget } from '../../../utils/constant.ts'
-import { createDevHost } from './dev-host.ts'
+import { type WxDevHost, createWxDevHost } from './dev-host.ts'
 import { createWxReactRefreshTransforms } from './react-refresh.ts'
 
 /**
@@ -10,7 +10,7 @@ import { createWxReactRefreshTransforms } from './react-refresh.ts'
  * (config, runtime lowering, dev host) plus the React Refresh adaptation transforms.
  */
 export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): PluginOption[] {
-    let devHost: { close(): Promise<void> } | null = null
+    let host: WxDevHost | null = null
 
     return [
         {
@@ -60,12 +60,12 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
                 // asks bundledDev to create its hard-coded skip-write DevEngine.
                 order: 'post',
                 async handler(server) {
-                    devHost = await createDevHost(server, options)
+                    host = await createWxDevHost({ server, options })
                 }
             },
 
             closeBundle() {
-                return devHost?.close()
+                return host?.close()
             }
         },
         ...createWxReactRefreshTransforms()
