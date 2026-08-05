@@ -47,6 +47,10 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
                     // Let weapp-tailwindcss own final WXSS transformation.
                     cssMinify: false,
 
+                    // No base64 assets: Taro warns on image srcs above ~2KB, and inlined
+                    // images bloat the JS bundle toward the mini program package limit.
+                    assetsInlineLimit: 0,
+
                     target: esTarget,
 
                     rolldownOptions: {
