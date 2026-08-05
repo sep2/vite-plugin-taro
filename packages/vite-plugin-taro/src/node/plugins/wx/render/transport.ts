@@ -6,7 +6,6 @@ import { getWxModuleKind } from '../module.ts'
 
 const transportPlaceholder = '__VITE_PLUGIN_TARO_TRANSPORT__'
 const moduleIdParameter = 'moduleId'
-const namespaceVariable = 'namespace'
 const exportBindingParameter = 'exportBinding'
 
 type TransportedChunk = {
@@ -37,16 +36,13 @@ export async function materializeTransport({
 }): Promise<AstTransformResult> {
     // Babel constructs and safely serializes an expression shaped like:
     // (moduleId) => {
-    //     let namespace
     //     switch (moduleId) {
     //         case 'assets/app.js': return require('./app.js')
     //         case 'sub/p_account/page.js': return require.async('../sub/p_account/page.js')
     //         case 'assets/bootstrap.js':
-    //             namespace = require('./bootstrap.js')
-    //             break
+    //             return [[], (exportBinding) => ({ execute() { exportBinding(require('./bootstrap.js')) } })]
     //         default: throw new Error(`Unknown System module: ${moduleId}`)
     //     }
-    //     return [[], (exportBinding) => ({ execute() { exportBinding(namespace) } })]
     // }
     const cases = getTransportedChunks(chunks)
         .sort((left, right) => left.chunk.fileName.localeCompare(right.chunk.fileName))
@@ -71,12 +67,10 @@ export async function materializeTransport({
             [transportPlaceholder]: types.arrowFunctionExpression(
                 [types.identifier(moduleIdParameter)],
                 types.blockStatement([
-                    types.variableDeclaration('let', [types.variableDeclarator(types.identifier(namespaceVariable))]),
                     types.switchStatement(types.identifier(moduleIdParameter), [
                         ...cases,
                         createUnknownModuleCase(moduleIdParameter)
-                    ]),
-                    types.returnStatement(createAmphibiousRegistrationExpression(namespaceVariable))
+                    ])
                 ])
             )
         },
@@ -117,23 +111,14 @@ function createTransportCase({
             ? types.identifier('require')
             : types.memberExpression(types.identifier('require'), types.identifier('async'))
 
-    const registration = types.callExpression(requireCallee, [types.stringLiteral(requirePath)])
+    const loadedModule = types.callExpression(requireCallee, [types.stringLiteral(requirePath)])
+    const registration = kind === 'capsule' ? loadedModule : createAmphibiousRegistrationExpression(loadedModule)
 
-    const statements =
-        kind === 'capsule'
-            ? [types.returnStatement(registration)]
-            : [
-                  types.expressionStatement(
-                      types.assignmentExpression('=', types.identifier(namespaceVariable), registration)
-                  ),
-                  types.breakStatement()
-              ]
-
-    return types.switchCase(types.stringLiteral(chunkId), statements)
+    return types.switchCase(types.stringLiteral(chunkId), [types.returnStatement(registration)])
 }
 
-/** Creates a SystemJS registration that publishes one already-executed CommonJS namespace. */
-function createAmphibiousRegistrationExpression(namespace: string): ReturnType<typeof types.arrayExpression> {
+/** Creates a registration that loads and publishes an amphibious CommonJS namespace only when executed. */
+function createAmphibiousRegistrationExpression(namespace: types.Expression): ReturnType<typeof types.arrayExpression> {
     return types.arrayExpression([
         types.arrayExpression([]),
         types.arrowFunctionExpression(
@@ -145,9 +130,7 @@ function createAmphibiousRegistrationExpression(namespace: string): ReturnType<t
                     [],
                     types.blockStatement([
                         types.expressionStatement(
-                            types.callExpression(types.identifier(exportBindingParameter), [
-                                types.identifier(namespace)
-                            ])
+                            types.callExpression(types.identifier(exportBindingParameter), [namespace])
                         )
                     ])
                 )

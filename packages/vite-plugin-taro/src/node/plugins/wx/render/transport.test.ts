@@ -154,11 +154,15 @@ test('bridges amphibious bootstrap and Rolldown runtime namespaces lazily', asyn
     })
     const transport = evaluated.runtime.transport
 
-    // Creating transport must not recursively require bootstrap while bootstrap itself imports transport.
+    // Neither creating nor selecting transport may recursively require bootstrap while bootstrap imports transport.
+    const bootstrapRegistration = transport('assets/bootstrap.js')
+    const runtimeRegistration = transport(runtimeChunkId)
     assert.deepEqual(evaluated.requiredPaths, [])
-    const publishedBootstrap = executeAmphibiousRegistration(transport('assets/bootstrap.js'))
-    const publishedRuntime = executeAmphibiousRegistration(transport(runtimeChunkId))
 
+    const publishedBootstrap = executeAmphibiousRegistration(bootstrapRegistration)
+    const publishedRuntime = executeAmphibiousRegistration(runtimeRegistration)
+
+    assert.doesNotMatch(source, /\blet namespace\b/)
     assert.deepEqual(evaluated.requiredPaths, ['./assets/bootstrap.js', './assets/rolldown-runtime-a.js'])
     assert.strictEqual(publishedBootstrap.appConfig, bootstrapNamespace.appConfig)
     assert.strictEqual(publishedRuntime.n, runtimeNamespace.n)
