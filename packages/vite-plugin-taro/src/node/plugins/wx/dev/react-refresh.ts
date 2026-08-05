@@ -1,42 +1,70 @@
+import type { Plugin } from 'vite'
 import { type PluginObject, types } from '@babel/core'
 import { transformWithBabel } from '../../../utils/transform.ts'
-import { reactRefreshRuntimeId } from '../module.ts'
 
-const reactRefreshPreambleGuard = 'window.$RefreshReg$'
-const reactDevtoolsGlobalHook = '__REACT_DEVTOOLS_GLOBAL_HOOK__'
+/** The React DevTools hook protocol name; free references must target `global` in wx. */
+const reactDevtoolsHookProtocol = '__REACT_DEVTOOLS_GLOBAL_HOOK__'
 
 /**
- * Removes the web assumptions of @vitejs/plugin-react's generated refresh code. The web HTML
- * preamble has two independent responsibilities; wx has no preamble, so each is handled
- * separately:
- * - the preamble defines the `$RefreshReg$`/`$RefreshSig$` globals -> not needed: boundary
- *   modules define local wrappers over the imported refresh runtime, so the guard that
- *   checks for the globals is removed instead;
- * - the preamble calls `injectIntoGlobalHook` -> needed: the refresh runtime module injects
- *   itself at evaluation (see injectRefreshGlobalHook).
+ * Creates the serve-only React Refresh adaptation transforms for the wx target.
  *
- * Two further AppService quirks are fixed: the refresh runtime reads and assigns `window`
- * protocol globals (rewritten to `global`), and react-family modules read the DevTools hook
- * as a free variable, which the AppService scope never resolves against `global` (rewritten
- * to explicit member access).
+ * @vitejs/plugin-react's generated refresh code assumes the web HTML preamble and a browser
+ * global scope; wx has neither. Each transform adapts one piece of that contract:
+ * - the refresh runtime module (id-filtered): the vendored runtime reads and assigns
+ *   `window` protocol globals (rewritten to `global`) and must inject itself at evaluation
+ *   — the preamble's `injectIntoGlobalHook` call has no HTML home in wx;
+ * - react-family modules (filtered on free references): the DevTools hook is read as a free
+ *   variable, which the AppService scope never resolves against `global` — every free
+ *   reference becomes an explicit member access;
+ * - boundary modules (filtered on the guard): the preamble's `$RefreshReg$` global is not
+ *   needed because the transform generates local wrappers over the imported refresh
+ *   runtime, so the guard that checks for the global is removed.
+ *
+ * Each transform's filter is its routing: the three domains are disjoint, so a module is
+ * transformed by at most one of them, and modules outside all three never reach a handler.
  */
-export function rewriteReactRefresh(code: string, id: string, sourcemap = true) {
-    if (id.split('?', 1)[0] === reactRefreshRuntimeId) {
-        return transformWithBabel(code, id, [rewriteRefreshRuntimeWindowAccess, injectRefreshGlobalHook], sourcemap)
-    }
-
-    // The DevTools hook protocol name is unique to react-family modules; the AppService free
-    // scope never sees `global` properties, so every free reference must become an explicit
-    // member access.
-    if (code.includes(reactDevtoolsGlobalHook)) {
-        return transformWithBabel(code, id, [rewriteReactDevtoolsHookGlobal], sourcemap)
-    }
-
-    // Vite's documented refresh protocol global; the generated guard is its only occurrence.
-    if (code.includes(reactRefreshPreambleGuard)) {
-        return transformWithBabel(code, id, [removeRefreshPreambleGuard], sourcemap)
-    }
-    return
+export function createWxReactRefreshTransforms(): Plugin[] {
+    return [
+        {
+            name: 'vite-plugin-taro:wx-react-refresh-runtime',
+            apply: 'serve',
+            transform: {
+                order: 'post',
+                // The vendored refresh runtime module; id-filtered, so no code scan.
+                filter: { id: /^\/@react-refresh(?:\?|$)/ },
+                handler(code, id) {
+                    return transformWithBabel(code, id, [rewriteRefreshRuntimeWindowAccess, injectRefreshGlobalHook], false)
+                }
+            }
+        },
+        {
+            name: 'vite-plugin-taro:wx-react-devtools-hook',
+            apply: 'serve',
+            transform: {
+                order: 'post',
+                // Matches only free references (react-family modules). The member accesses in
+                // the refresh runtime and the dev runtime chunk never match, so they need no
+                // id exclusion.
+                filter: { code: /(^|[^.\w$])__REACT_DEVTOOLS_GLOBAL_HOOK__/ },
+                handler(code, id) {
+                    return transformWithBabel(code, id, [rewriteReactDevtoolsHookGlobal], false)
+                }
+            }
+        },
+        {
+            name: 'vite-plugin-taro:wx-refresh-preamble-guard',
+            apply: 'serve',
+            transform: {
+                order: 'post',
+                // Vite's documented refresh protocol global; the generated guard is its only
+                // occurrence, in boundary modules.
+                filter: { code: /window\.\$RefreshReg\$/ },
+                handler(code, id) {
+                    return transformWithBabel(code, id, [removeRefreshPreambleGuard], false)
+                }
+            }
+        }
+    ]
 }
 
 /**
@@ -58,7 +86,7 @@ function rewriteReactDevtoolsHookGlobal(): PluginObject {
         visitor: {
             Identifier(identifierPath) {
                 const node = identifierPath.node
-                if (!types.isIdentifier(node, { name: reactDevtoolsGlobalHook })) {
+                if (!types.isIdentifier(node, { name: reactDevtoolsHookProtocol })) {
                     return
                 }
                 const parent = identifierPath.parentPath

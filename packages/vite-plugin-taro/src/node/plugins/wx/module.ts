@@ -6,9 +6,6 @@ import { packageRequire, resolvePackageFile } from '../../utils/packages.ts'
 /** Identifies Rolldown's generated helper module independently of its unstable output filename. */
 export const rolldownRuntimeId = '\0rolldown/runtime.js'
 
-/** Identifies Vite's virtual React Refresh runtime across WX development transforms. */
-export const reactRefreshRuntimeId = '/@react-refresh'
-
 /** Resolves the direct React Reconciler dependency without assuming pnpm's layout. */
 export const reactReconcilerRoot = normalizeModuleId(
     path.dirname(packageRequire.resolve('react-reconciler/package.json'))
