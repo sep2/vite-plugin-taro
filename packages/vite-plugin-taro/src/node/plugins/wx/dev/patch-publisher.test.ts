@@ -20,7 +20,7 @@ test('before any build no report is current and nothing is published', async () 
     const { publisher, writes } = createPublisher()
 
     assert.equal(publisher.isCurrentBuild('anything'), false)
-    assert.equal(publisher.report(0), false)
+    publisher.report(0)
     publisher.produce([patch('p1')])
 
     await flush()
@@ -86,24 +86,11 @@ test('a report behind the patch count re-publishes the missing suffix', async ()
 
     // A delayed report from before the store: the host re-publishes what the runtime
     // has not acknowledged yet. Storing is idempotent, so this only costs a refresh.
-    assert.equal(publisher.report(0), false)
+    publisher.report(0)
     await flush()
     assert.equal(writes.length, 2)
     assert.match(writes[1], /version: 1/)
     assert.match(writes[1], /version: 2/)
-})
-
-test('a backward report flags a fresh App heap', async () => {
-    const { publisher, writes } = createPublisher()
-    publisher.startBuild()
-    publisher.produce([patch('p1'), patch('p2')])
-    assert.equal(publisher.report(2), false)
-    await flush()
-    assert.equal(writes.length, 1)
-
-    // The runtime restarted and starts at zero: the report is a restart signal, not a
-    // catch-up position.
-    assert.equal(publisher.report(0), true)
 })
 
 test('startBuild resets the history and the reported version', async () => {

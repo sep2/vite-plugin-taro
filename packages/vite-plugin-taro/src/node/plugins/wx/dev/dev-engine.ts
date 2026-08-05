@@ -36,6 +36,12 @@ type VersionReport = Readonly<{
     version: number
 }>
 
+/** The runtime hit an unrecoverable state (e.g. a corrupted patch range) and needs a full rebuild. */
+type RebuildReport = Readonly<{
+    kind: 'rebuild'
+    buildId: string
+}>
+
 export async function createWxDevEngine({
     server,
     options
@@ -87,6 +93,10 @@ export async function createWxDevEngine({
         await writeHmrInfo(server, buildId)
     }
 
+    async function triggerRebuild() {
+        engine.triggerFullBuild()
+    }
+
     async function handleReport(req: Connect.IncomingMessage, res: ServerResponse): Promise<void> {
         if (req.method !== 'POST') {
             res.statusCode = 404
@@ -95,7 +105,7 @@ export async function createWxDevEngine({
         }
 
         try {
-            const report = JSON.parse(await readBody(req)) as ModulesReport | VersionReport
+            const report = JSON.parse(await readBody(req)) as ModulesReport | VersionReport | RebuildReport
             // Only the current build's reports register modules or record the stored version;
             // delayed reports from older builds are ignored so they can never influence the
             // live build.
@@ -108,14 +118,15 @@ export async function createWxDevEngine({
                 res.end()
                 return
             }
+            if (report.kind === 'rebuild') {
+                await triggerRebuild()
+                res.end()
+                return
+            }
             // The version report records the runtime's stored position; the publisher writes
             // the missing suffix immediately when behind. Reports are one-shot receipts, so
-            // no long poll is held. A backward version means a fresh App heap (DevTools
-            // restart): the persisted patches would replay against a half-loaded heap, so a
-            // full rebuild resets everything and DevTools reloads the app.
-            if (publisher.report(report.version)) {
-                engine.triggerFullBuild()
-            }
+            // no long poll is held.
+            publisher.report(report.version)
             res.end()
         } catch (e) {
             logWxError(server.config.logger, 'wx HMR report failed', e)

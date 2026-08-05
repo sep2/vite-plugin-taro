@@ -189,24 +189,7 @@ class WxDevRuntime extends DevRuntime {
 
         // Apply synchronously: the page's imports below the require resolve against the
         // freshly registered modules, so the re-executed Page evaluates with the new code.
-        // On a fresh App heap the page can re-execute with the persisted patch before the
-        // lazy chunk with the refresh runtime loads; the patch programs call $RefreshSig$,
-        // which would crash on the empty exports of an unregistered module. The host is
-        // rebuilding in that case (the backward boot report), so skipping the apply is safe.
-        if (this.isRefreshRuntimeReady()) {
-            this.applyPatches()
-        }
-    }
-
-    /** True when the refresh runtime module (identified by its signature export) is registered. */
-    private isRefreshRuntimeReady(): boolean {
-        for (const module of Object.values(this.modules)) {
-            const exports = module.exportsHolder.exports
-            if (exports && typeof exports.createSignatureFunctionForTransform === 'function') {
-                return true
-            }
-        }
-        return false
+        this.applyPatches()
     }
 
     /**
@@ -219,13 +202,24 @@ class WxDevRuntime extends DevRuntime {
         while (this.appliedVersion < this.patches.size) {
             const version = this.appliedVersion + 1
             const factory = this.patches.get(version)
-            if (!factory) {
-                // A gap can only come from a corrupted payload; stop and surface it instead
-                // of spinning. A reload re-syncs from the host.
-                console.warn(`[vite-plugin-taro] patch version ${version} missing; apply stopped`)
+
+            try {
+                if (!factory) {
+                    // A gap can only come from a corrupted payload; stop and surface it instead
+                    // of spinning, and request a full rebuild — the draft's recovery rule for an
+                    // invalid range. A reload re-syncs from the host.
+                    throw new Error(`missing patch version ${version}`)
+                }
+
+                factory()
+            } catch (error) {
+                // A program failed (its dependencies missing on a fresh heap, or broken
+                // code); stop and request a full rebuild — the draft's recovery rule for an
+                // update failure. A reload re-syncs from the host.
+                console.warn(`[vite-plugin-taro] patch version ${version} failed; apply stopped`, error)
+                this.sendReport({ kind: 'rebuild' })
                 break
             }
-            factory()
             this.appliedVersion = version
         }
     }
