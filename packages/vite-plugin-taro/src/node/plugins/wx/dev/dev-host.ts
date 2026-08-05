@@ -1,5 +1,6 @@
 import type { ServerResponse } from 'node:http'
 import path from 'node:path'
+import colors from 'picocolors'
 import type { InputOptions, OutputOptions } from 'rolldown'
 import { build } from 'rolldown'
 import { type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
@@ -86,6 +87,16 @@ export async function createWxDevHost({
     // The runtime's metadata-only reports land on the control path; the buildId in each report
     // IS the Rolldown client ID.
     server.middlewares.use(hmrControlPath, (req, res) => void handleReport(req, res))
+
+    // Append the DevTools project directory line after Vite's own startup banner: DevTools
+    // opens the output directory directly, so the printed path is the one to select.
+    const originalPrintUrls = server.printUrls.bind(server)
+    server.printUrls = () => {
+        originalPrintUrls()
+        server.config.logger.info(
+            `  ${colors.green('➜')}  ${colors.bold('WeChat DevTools')}: ${colors.cyan(relativeToViteConfig(server.config.build.outDir, server.config.configFile, server.config.root))}`
+        )
+    }
 
     return {
         close: async () => {
@@ -269,6 +280,17 @@ async function writeHmrInfo(server: ViteDevServer, buildId: string): Promise<voi
     } catch (e) {
         logWxError(server.config.logger, 'wx HMR write failed', e)
     }
+}
+
+/**
+ * The project directory shown in the DevTools banner, relative to the Vite config:
+ * `dist/wx` instead of the absolute output path, so it can be pasted into DevTools.
+ */
+function relativeToViteConfig(outDir: string, configFile: string | undefined, root: string): string {
+    const configDirectory = configFile ? path.dirname(configFile) : root
+    const relativePath = path.relative(configDirectory, outDir).replaceAll('\\', '/')
+    if (!relativePath) return '.'
+    return relativePath.startsWith('.') ? relativePath : `./${relativePath}`
 }
 
 /** Logs an error with the plugin prefix, distinguishing Error values from unknowns. */
