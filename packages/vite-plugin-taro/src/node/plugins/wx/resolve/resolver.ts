@@ -15,6 +15,7 @@ import {
     transportPath,
     vitePreloadId
 } from '../module.ts'
+import { patchSystemJs, systemJsPath } from '../transform/systemjs.ts'
 import { specializeBootstrap } from './specialize-bootstrap.ts'
 import { specializePageCapsule } from './specialize-page-capsule.ts'
 
@@ -25,6 +26,7 @@ type PrivateIdResolver = (importer: string | undefined, projectRoot: string) => 
 export function createResolver(options: VitePluginTaroOptions) {
     const normalizedBootstrapPath = normalizeModuleId(bootstrapPath)
     const normalizedPageCapsulePath = normalizeModuleId(pageCapsulePath)
+    const normalizedSystemJsPath = normalizeModuleId(systemJsPath)
 
     // Provide constant-time route validation and access to each configured Page JSON object.
     const pageByPath = new Map(options.pages.map((page) => [page.path, page]))
@@ -77,6 +79,10 @@ export function createResolver(options: VitePluginTaroOptions) {
 
             if (normalizedId === normalizedBootstrapPath) {
                 return specializeBootstrap({ code, id, appConfig: createAppConfig(options), sourcemap })
+            }
+
+            if (normalizedId === normalizedSystemJsPath) {
+                return patchSystemJs({ code, id, sourcemap })
             }
 
             if (normalizedId === normalizedPageCapsulePath) {

@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -13,6 +12,7 @@ import { renderCapsule } from './render/capsule.ts'
 import { renderNative } from './render/native.ts'
 import { materializeTransport } from './render/transport.ts'
 import { specializeBootstrap } from './resolve/specialize-bootstrap.ts'
+import { patchSystemJs, systemJsPath } from './transform/systemjs.ts'
 
 /** A test SystemJS module namespace. */
 type SystemModule = Readonly<Record<string, unknown>>
@@ -25,6 +25,7 @@ interface TransportExports {
 /** The SystemJS surface used by runtime tests. */
 interface SystemJsInstance {
     import(id: string, parentId?: string): Promise<SystemModule>
+    importSync(id: string, parentId?: string): SystemModule
     instantiate(id: string, parentId?: string): unknown
     resolve(specifier: string, parentId?: string): string
 }
@@ -54,8 +55,19 @@ interface SystemJsGlobal {
 
 const transportFileName = 'transport.js'
 const testAppConfig = { pages: ['pages/index/index'] }
-const packageRequire = createRequire(import.meta.url)
-const systemSource = readFileSync(packageRequire.resolve('systemjs/s.js'), 'utf8')
+const systemSource = patchSystemJs({
+    code: readFileSync(systemJsPath, 'utf8'),
+    id: systemJsPath,
+    sourcemap: false
+}).code
+const systemPatchTypeScript = readFileSync(
+    fileURLToPath(new URL('../../../runtime/system/patch-systemjs.ts', import.meta.url)),
+    'utf8'
+)
+const compiledSystemPatch = (
+    await transformWithOxc(systemPatchTypeScript, 'patch-systemjs.ts', { sourcemap: false, target: esTarget })
+).code.replace(/^import ['"]systemjs\/dist\/s\.js['"];\s*/m, '')
+const systemPatchCode = `(function () {\n${compiledSystemPatch}\n})();`
 const bootstrapTypeScript = readFileSync(
     fileURLToPath(new URL('../../../runtime/wx/amphibious/bootstrap.ts', import.meta.url)),
     'utf8'
@@ -70,7 +82,7 @@ const bootstrapJavaScript = (
         appConfig: testAppConfig
     })
 ).code
-    .replace(/^import ['"]systemjs\/s\.js['"];\s*/m, '')
+    .replace(/^import ['"][^'"]*system\/patch-systemjs\.(?:ts|js)['"];\s*/m, '')
     .replace(
         /^import \{ createNativeShell \} from ['"]\.\.\/native\/shell\.(?:ts|js)['"];\s*/m,
         'const createNativeShell = () => ({})\n'
@@ -170,6 +182,7 @@ async function createTestSystem(
     sandbox.global = {}
     const context = vm.createContext(sandbox)
     vm.runInContext(systemSource, context)
+    vm.runInContext(systemPatchCode, context)
     vm.runInContext(bootstrapCode, context)
     return (sandbox.global as SystemJsGlobal).System!
 }
@@ -267,8 +280,9 @@ export const current = value`
     assert.equal(system.resolve(rootId), rootId)
     assert.equal(system.resolve('./state.js', rootId), chunkIdToModuleUrl('chunks/state.js'))
 
-    const root = await system.import(rootId)
+    const root = system.importSync(rootId)
 
+    assert.strictEqual(await system.import(rootId), root)
     assert.equal(callExport(root, 'read'), 1)
     assert.equal(root.moduleUrl, chunkIdToModuleUrl('chunks/root.js'))
     assert.equal(instantiations.get('chunks/lazy.js'), undefined)
@@ -367,11 +381,65 @@ test('links circular dependencies through declaration-time exports', async () =>
     ])
     const system = await createTestSystem(registrations)
 
-    const a = await system.import(chunkIdToModuleUrl('a.js'))
-    const b = await system.import(chunkIdToModuleUrl('b.js'))
+    const a = system.importSync(chunkIdToModuleUrl('a.js'))
+    const b = system.importSync(chunkIdToModuleUrl('b.js'))
 
+    assert.strictEqual(await system.import(chunkIdToModuleUrl('a.js')), a)
     assert.equal(a.value, 'ba')
     assert.equal(b.value, 'ab')
+})
+
+test('throws immediately when instantiation is asynchronous', async () => {
+    let instantiations = 0
+    const system = await createTestSystem(
+        new Map([
+            [
+                'entry.js',
+                [
+                    [],
+                    (exportBinding) => ({
+                        execute() {
+                            exportBinding('value', 42)
+                        }
+                    })
+                ]
+            ]
+        ]),
+        (id) => {
+            if (id === 'entry.js') {
+                instantiations++
+            }
+        }
+    )
+    const instantiate = system.instantiate.bind(system)
+    system.instantiate = (id, parentId) => Promise.resolve(instantiate(id, parentId))
+    const entryId = chunkIdToModuleUrl('entry.js')
+
+    assert.throws(() => system.importSync(entryId), /module graph is asynchronous/)
+    assert.equal(instantiations, 1)
+})
+
+test('throws immediately when module execution is asynchronous', async () => {
+    let executions = 0
+    const system = await createTestSystem(
+        new Map([
+            [
+                'entry.js',
+                [
+                    [],
+                    () => ({
+                        execute() {
+                            executions++
+                            return Promise.resolve()
+                        }
+                    })
+                ]
+            ]
+        ])
+    )
+
+    assert.throws(() => system.importSync(chunkIdToModuleUrl('entry.js')), /module graph is asynchronous/)
+    assert.equal(executions, 1)
 })
 
 test('waits for asynchronous dependency execution before executing importers', async () => {
@@ -413,7 +481,6 @@ test('waits for asynchronous dependency execution before executing importers', a
         ]
     ])
     const system = await createTestSystem(registrations)
-
     const root = await system.import(chunkIdToModuleUrl('root.js'))
 
     assert.deepEqual(order, ['dependency:start', 'dependency:end', 'root'])

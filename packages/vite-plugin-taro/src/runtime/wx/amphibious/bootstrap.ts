@@ -1,5 +1,5 @@
-// Install the stock minimal SystemJS loader before any native shell can request its capsule.
-import 'systemjs/s.js'
+// Install the minimal SystemJS loader and its synchronous-import extension before any shell requests a capsule.
+import '../../system/patch-systemjs.ts'
 import { createNativeShell } from '../native/shell.ts'
 import { transport } from './transport.ts'
 

@@ -1,4 +1,4 @@
-declare module 'systemjs/s.js' {
+declare module 'systemjs/dist/s.js' {
     global {
         namespace System {
             /** A live SystemJS module namespace. */
@@ -37,7 +37,18 @@ declare module 'systemjs/s.js' {
 
             /** A hookable SystemJS loader instance. */
             interface Loader {
+                /** Creates the import.meta context supplied to a registration declaration. */
+                createContext(parentId: string): Meta
+
+                /** Resolves, links, and evaluates through the normal asynchronous SystemJS pipeline. */
                 import(id: string, parentId?: string): Promise<Module>
+
+                /**
+                 * Uses the same registry and evaluator but requires every unresolved registration and execute function in
+                 * the static closure to complete synchronously. An asynchronous phase throws without rollback and must be
+                 * treated as a fatal placement invariant violation for the current runtime heap.
+                 */
+                importSync(id: string, parentId?: string): Module
                 instantiate(id: string, parentId?: string): Registration | PromiseLike<Registration>
                 resolve(specifier: string, parentId?: string): string
             }
