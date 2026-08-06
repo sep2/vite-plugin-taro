@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
-import { parseNativeComponentSchemas } from './native-component-schema.ts'
+import { parseNativeComponentSchemas, transformNativeComponentFacades } from './native-component-schema.ts'
 
 const moduleId = path.resolve('/project/src/native-counter.ts')
 
@@ -41,6 +41,28 @@ test('parses an aliased static native component schema', () => {
         }
     ])
     assert.equal(typeof definitions[0]?.callStart, 'number')
+})
+
+test('replaces facade calls with native tag strings and removes only the macro import', () => {
+    const transformed = transformNativeComponentFacades(
+        `
+            import { defineNativeComponent as defineNative, type NativeSchema } from 'virtual:taro/native'
+
+            const schema: NativeSchema = Number
+            export const NativeCounter = defineNative('./native/native-counter', {
+                properties: { count: Number },
+                events: { increment: { value: Number } }
+            })
+            console.log(schema)
+        `,
+        moduleId,
+        false
+    )
+
+    assert.match(transformed.code, /NativeCounter\s*=\s*['"]native-counter['"]/)
+    assert.doesNotMatch(transformed.code, /defineNativeComponent|defineNative|properties:/)
+    assert.match(transformed.code, /import\s*{\s*type NativeSchema\s*}/)
+    assert.equal(transformed.definitions[0]?.folder, './native/native-counter')
 })
 
 test('ignores unrelated and shadowed functions with the same name', () => {

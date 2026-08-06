@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { transformSync, types } from '@babel/core'
+import type { Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { clientTaroNativeId } from '../../client/constant.ts'
 
@@ -15,42 +16,98 @@ export type NativeComponentSchemaDefinition = {
     events: readonly string[]
 }
 
+export type NativeComponentFacadeTransform = {
+    code: string
+    map: Rolldown.ExistingRawSourceMap | null
+    definitions: readonly NativeComponentSchemaDefinition[]
+}
+
+type SchemaPass = {
+    transformed: ReturnType<typeof transformSync>
+    definitions: readonly NativeComponentSchemaDefinition[]
+}
+
 /** Parses compile-time native component schemas without transforming application code. */
 export function parseNativeComponentSchemas(code: string, id: string): readonly NativeComponentSchemaDefinition[] {
-    const moduleId = normalizeModuleId(id)
-    // Collection is local to this parse and preserves declaration order for deterministic later transforms.
-    const definitions: NativeComponentSchemaDefinition[] = []
+    return runSchemaPass(code, id, false, false).definitions
+}
 
-    transformSync(code, {
+/** Replaces native facade calls with their folder basename and removes the compile-time import. */
+export function transformNativeComponentFacades(
+    code: string,
+    id: string,
+    sourcemap: boolean
+): NativeComponentFacadeTransform {
+    const { transformed, definitions } = runSchemaPass(code, id, true, sourcemap)
+    if (!transformed?.code || (sourcemap && !transformed.map)) {
+        throw new Error(`Failed to transform native component facades in ${id}`)
+    }
+    return {
+        code: transformed.code,
+        map: sourcemap ? (transformed.map as Rolldown.ExistingRawSourceMap) : null,
+        definitions
+    }
+}
+
+/** Runs one schema traversal in inspection or replacement mode. */
+function runSchemaPass(code: string, id: string, replaceFacades: boolean, sourcemap: boolean): SchemaPass {
+    const moduleId = normalizeModuleId(id)
+    // Collection is local to this parse and preserves declaration order for deterministic later stages.
+    const definitions: NativeComponentSchemaDefinition[] = []
+    const transformed = transformSync(code, {
         ast: false,
         babelrc: false,
-        code: false,
+        code: replaceFacades,
         configFile: false,
         filename: moduleId,
         parserOpts: {
             plugins: ['jsx', 'typescript']
         },
         plugins: [
-            function collectNativeComponentSchemas() {
+            function processNativeComponentSchemas() {
                 return {
                     visitor: {
                         CallExpression(callPath) {
                             if (!isDefineNativeComponentCall(callPath)) {
                                 return
                             }
-                            definitions.push(
-                                parseDefinition(callPath.node, moduleId, (message) =>
-                                    callPath.buildCodeFrameError(message)
-                                )
+                            const definition = parseDefinition(callPath.node, moduleId, (message) =>
+                                callPath.buildCodeFrameError(message)
                             )
+                            definitions.push(definition)
+                            if (replaceFacades) {
+                                callPath.replaceWith(types.stringLiteral(path.posix.basename(definition.folder)))
+                            }
+                        },
+                        Program: {
+                            exit(programPath) {
+                                if (replaceFacades) {
+                                    removeDefineNativeComponentImports(programPath.node)
+                                }
+                            }
                         }
                     }
                 }
             }
-        ]
+        ],
+        sourceFileName: moduleId,
+        sourceMaps: replaceFacades && sourcemap,
+        sourceType: 'module'
     })
+    return { transformed, definitions }
+}
 
-    return definitions
+/** Removes the compile-time macro while preserving other named and type imports. */
+function removeDefineNativeComponentImports(program: types.Program): void {
+    program.body = program.body.flatMap((statement) => {
+        if (!types.isImportDeclaration(statement) || statement.source.value !== clientTaroNativeId) {
+            return statement
+        }
+        statement.specifiers = statement.specifiers.filter((specifier) => {
+            return !types.isImportSpecifier(specifier) || getStaticName(specifier.imported) !== 'defineNativeComponent'
+        })
+        return statement.specifiers.length === 0 ? [] : [statement]
+    })
 }
 
 /** Identifies the imported macro through its lexical binding, including import aliases. */
