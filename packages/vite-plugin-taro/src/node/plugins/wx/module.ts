@@ -26,11 +26,17 @@ export const appShellFileName = 'app.js'
 /** Identifies the synchronous native App shell source. */
 export const appShellPath = resolvePackageFile('dist/runtime/wx/native/app.js')
 
+/** Identifies the App capsule kept behind the native shell boundary. */
+export const appCapsulePath = resolvePackageFile('dist/runtime/wx/capsule/app.js')
+
 /** Forces Taro's recursive native Component entry to emit at its configured root path. */
 export const componentShellFileName = 'comp.js'
 
 /** Identifies the synchronous recursive Component shell source. */
 export const componentShellPath = resolvePackageFile('dist/runtime/wx/native/component.js')
+
+/** Identifies the recursive Component capsule kept behind the native shell boundary. */
+export const componentCapsulePath = resolvePackageFile('dist/runtime/wx/capsule/component.js')
 
 /** Resolves the configured Page component from its route-qualified capsule importer. */
 export const pageComponentId = '\0vpt:page-component'
@@ -46,12 +52,27 @@ export const pageShellPath = resolvePackageFile('dist/runtime/wx/native/page.js'
 
 export type WxChunk = Rolldown.PreRenderedChunk | Rolldown.RenderedChunk
 
-/** The execution domains in which one final wx JavaScript module participates. */
-export type WxModuleKind = 'native' | 'capsule' | 'amphibious'
+/** Build-graph role of an explicit native lifecycle entry. */
+export type WxEntryRole = 'shell' | 'capsule'
 
-// Cross-boundary identity is centralized here so future plugin-owned native runtimes join both rendering domains by
-// adding one source module ID, without teaching transport or render hooks about another special case.
+/** Runtime domain in which one final wx JavaScript chunk executes. */
+export type WxExecutionKind = 'native' | 'capsule' | 'amphibious'
+
+// These fixed source identities describe entry roles independently from the final execution kind. A capsule entry may,
+// for example, become amphibious when Rolldown coalesces its generated runtime into the same output chunk.
+const shellModuleIds: ReadonlySet<string> = new Set([appShellPath, componentShellPath, pageShellPath])
+const capsuleModuleIds: ReadonlySet<string> = new Set([appCapsulePath, componentCapsulePath, pageCapsulePath])
 const amphibiousModuleIds: ReadonlySet<string> = new Set([bootstrapPath, rolldownRuntimeId])
+
+/** Returns the one explicit lifecycle role owned by a chunk. */
+export function getWxEntryRole(chunk: WxChunk): WxEntryRole | undefined {
+    const ownsShell = containsModule(chunk, shellModuleIds)
+    const ownsCapsule = containsModule(chunk, capsuleModuleIds)
+    if (ownsShell && ownsCapsule) {
+        throw new Error(`wx chunk mixes shell and capsule entries: ${chunk.moduleIds.join(', ')}`)
+    }
+    return ownsShell ? 'shell' : ownsCapsule ? 'capsule' : undefined
+}
 
 /** Tests whether a chunk contains the physical transport implementation. */
 export function isTransportModule(chunk: WxChunk): boolean {
@@ -59,23 +80,18 @@ export function isTransportModule(chunk: WxChunk): boolean {
 }
 
 /**
- * Classifies one final output module by execution domain:
- *
- * - native modules execute only through WeChat CommonJS;
- * - capsules are inert SystemJS registrations;
- * - amphibious modules execute through CommonJS and publish that same namespace to SystemJS.
- *
- * Amphibious identity takes precedence over entry identity. This keeps the classification correct if Rolldown ever
- * coalesces an amphibious implementation into an entry chunk: the chunk still needs native rendering and a transport
- * registration. New plugin-owned cross-boundary modules join the amphibious ID set above without changing rendering or
- * transport code.
+ * Classifies one final output chunk by execution domain. Entry role is deliberately independent: explicit capsule entries
+ * normally fall through to capsule rendering, but a capsule containing an amphibious runtime executes in both domains.
  */
-export function getWxModuleKind(chunk: WxChunk): WxModuleKind {
-    if (chunk.moduleIds.some((moduleId) => amphibiousModuleIds.has(moduleId))) {
+export function getWxExecutionKind(chunk: WxChunk): WxExecutionKind {
+    const entryRole = getWxEntryRole(chunk)
+    if (containsModule(chunk, amphibiousModuleIds)) {
         return 'amphibious'
     }
-    if (chunk.isEntry || isTransportModule(chunk)) {
-        return 'native'
-    }
-    return 'capsule'
+    return entryRole === 'shell' || isTransportModule(chunk) ? 'native' : 'capsule'
+}
+
+/** Tests normalized chunk module IDs against one fixed identity set. */
+function containsModule(chunk: WxChunk, moduleIds: ReadonlySet<string>): boolean {
+    return chunk.moduleIds.some((moduleId) => moduleIds.has(normalizeModuleId(moduleId)))
 }

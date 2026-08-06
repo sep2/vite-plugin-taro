@@ -1,5 +1,3 @@
-import { defineNativeComponent } from './src/runtime/client/taro/define-native-component.ts'
-
 declare module 'virtual:taro/api' {
     import Taro = require('@tarojs/taro')
     export = Taro
@@ -11,5 +9,5 @@ declare module 'virtual:taro/components' {
 }
 
 declare module 'virtual:taro/native' {
-    export { defineNativeComponent }
+    export { defineNativeComponent } from './src/runtime/client/taro/define-native-component.ts'
 }

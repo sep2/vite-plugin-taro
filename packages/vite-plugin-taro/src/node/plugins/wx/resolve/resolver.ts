@@ -3,9 +3,11 @@ import { normalizeModuleId, resolveAppComponentPath, resolvePageComponentPath } 
 import { createAppConfig } from '../../../utils/project-config.ts'
 import { appComponentId } from '../../client/constant.ts'
 import {
+    appCapsulePath,
     appShellFileName,
     appShellPath,
     bootstrapPath,
+    componentCapsulePath,
     componentShellFileName,
     componentShellPath,
     pageCapsuleId,
@@ -54,18 +56,7 @@ export function createResolver(options: VitePluginTaroOptions) {
     ])
 
     return {
-        // Make every native file a distinct entry, so Rolldown preserves WeChat's exact synchronous boundaries.
-        input: {
-            [appShellFileName]: appShellPath,
-            [componentShellFileName]: componentShellPath,
-            transport: transportPath,
-
-            ...Object.fromEntries(
-                options.pages.map((page) => {
-                    return [`${page.path}.js`, createRouteModuleId({ moduleId: pageShellPath, pagePath: page.path })]
-                })
-            )
-        },
+        input: createInput(options.pages),
 
         resolveId(id: string, importer: string | undefined, projectRoot: string): string | undefined {
             // Unknown IDs fall through so Vite and other plugins retain normal resolution.
@@ -89,6 +80,24 @@ export function createResolver(options: VitePluginTaroOptions) {
             }
         }
     }
+}
+
+/** Declares native shells, infrastructure, and capsules as independent output entries. */
+function createInput(pages: readonly VitePluginTaroPageOption[]): Record<string, string> {
+    return Object.fromEntries([
+        ['bootstrap', bootstrapPath],
+        ['transport', transportPath],
+        [appShellFileName, appShellPath],
+        ['app-capsule', appCapsulePath],
+        [componentShellFileName, componentShellPath],
+        ['component-capsule', componentCapsulePath],
+        ...pages.flatMap((page) => {
+            return [
+                [`${page.path}.js`, createRouteModuleId({ moduleId: pageShellPath, pagePath: page.path })],
+                [`${page.path}-capsule`, createRouteModuleId({ moduleId: pageCapsulePath, pagePath: page.path })]
+            ]
+        })
+    ])
 }
 
 /** Creates one route-qualified module ID. */

@@ -4,7 +4,7 @@ import { esTarget } from '../../utils/constant.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { clientTaroNativeId } from '../client/constant.ts'
 import { createWxDevelopmentPlugin } from './dev/plugin.ts'
-import { getWxModuleKind, isTransportModule } from './module.ts'
+import { getWxExecutionKind, isTransportModule } from './module.ts'
 import { compileNativeComponentFacade } from './native/compile-native-component-facade.ts'
 import { getNativeComponentAssetBytes } from './native/native-component-assets.ts'
 import { createOutputFiles } from './output/files.ts'
@@ -97,16 +97,16 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
         renderChunk: {
             order: 'post',
             async handler(code, chunk, outputOptions, meta) {
-                const moduleKind = getWxModuleKind(chunk)
+                const executionKind = getWxExecutionKind(chunk)
                 const sourcemap = Boolean(outputOptions.sourcemap)
 
-                if (moduleKind === 'capsule') {
+                if (executionKind === 'capsule') {
                     return renderCapsule(code, chunk, sourcemap)
                 }
 
                 // Native and amphibious modules share the CommonJS renderer. Amphibious transport exposure is a
                 // separate concern materialized from final output paths after the physical transport itself is rendered.
-                const native = renderNative(code, chunk, sourcemap)
+                const native = renderNative({ code, chunk, chunks: meta.chunks, sourcemap })
 
                 if (isTransportModule(chunk)) {
                     return materializeTransport({

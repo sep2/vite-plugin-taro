@@ -4,8 +4,10 @@ import test from 'node:test'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { appComponentId } from '../../client/constant.ts'
 import {
+    appCapsulePath,
     appShellPath,
     bootstrapPath,
+    componentCapsulePath,
     componentShellPath,
     pageCapsuleId,
     pageCapsulePath,
@@ -44,8 +46,12 @@ test('resolves fixed and route-specific private IDs', () => {
     assert.deepEqual(resolver.input, {
         'app.js': appShellPath,
         'comp.js': componentShellPath,
+        bootstrap: bootstrapPath,
         transport: transportPath,
-        'pages/home/index.js': `${pageShellPath}?route=pages%2Fhome%2Findex`
+        'app-capsule': appCapsulePath,
+        'component-capsule': componentCapsulePath,
+        'pages/home/index.js': `${pageShellPath}?route=pages%2Fhome%2Findex`,
+        'pages/home/index-capsule': `${pageCapsulePath}?route=pages%2Fhome%2Findex`
     })
     assert.equal(resolver.resolveId(vitePreloadId, undefined, projectRoot), bootstrapPath)
     assert.equal(resolver.resolveId(appComponentId, undefined, projectRoot), path.resolve(projectRoot, 'src/app.tsx'))

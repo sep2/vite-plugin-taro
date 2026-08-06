@@ -1,78 +1,84 @@
-import { type NodePath, type PluginObject, type PluginTarget, types } from '@babel/core'
+import { type PluginObject, type PluginTarget, types } from '@babel/core'
 import transformModulesCommonjs from '@babel/plugin-transform-modules-commonjs'
 import type { Rolldown } from 'vite'
 import { resolveChunkReference } from '../../../utils/modules.ts'
 import { type AstTransformResult, transformWithBabel } from '../../../utils/transform.ts'
+import { getWxEntryRole } from '../module.ts'
 
-/** Renders a synchronous native module. */
-export function renderNative(code: string, chunk: Rolldown.RenderedChunk, sourcemap = true): AstTransformResult {
+/** Renders a native module while activating its statically imported capsules through SystemJS. */
+export function renderNative({
+    code,
+    chunk,
+    chunks,
+    sourcemap
+}: {
+    code: string
+    chunk: Rolldown.RenderedChunk
+    chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
+    sourcemap: boolean
+}): AstTransformResult {
     return transformWithBabel(
         code,
         chunk.fileName,
-        [connectNativeImportPlugin(chunk.fileName) as PluginTarget, transformModulesCommonjs as PluginTarget],
+        [connectNativeCapsulesPlugin(chunk.fileName, chunks) as PluginTarget, transformModulesCommonjs as PluginTarget],
         sourcemap
     )
 }
 
-/**
- * Preserves Rolldown's ESM graph while adapting its final native chunks to WeChat's synchronous CommonJS runtime.
- * Only a native entry's direct capsule split point reaches this renderer and becomes importSync(). Dynamic imports inside
- * that capsule are rendered separately as System.import(), so their lazy graphs may use subpackages and top-level await.
- */
-function connectNativeImportPlugin(fileName: string): PluginObject {
+/** Converts only cross-runtime static imports; ordinary native dependencies remain CommonJS imports. */
+function connectNativeCapsulesPlugin(
+    fileName: string,
+    chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
+): PluginObject {
     return {
-        name: 'vite-plugin-taro:connect-native-import',
+        name: 'vite-plugin-taro:connect-native-capsules',
         visitor: {
-            ImportExpression(importPath) {
-                // In source, import() is only a Rolldown split-point marker for the native entry's capsule. Placement keeps
-                // that root and its static closure in main, and importSync rejects top-level await anywhere in that eager
-                // closure. Nested dynamic imports cross a new boundary and retain normal asynchronous System.import().
-                if (!types.isStringLiteral(importPath.node.source)) {
-                    throw new Error(`Expected a literal module import in ${fileName}`)
+            ImportDeclaration(importPath) {
+                const reference = importPath.node.source.value
+                if (!reference.startsWith('./') && !reference.startsWith('../')) {
+                    return
                 }
 
-                // Resolve the final relative reference once at build time; the runtime accepts only canonical chunk IDs.
-                const chunkId = resolveChunkReference(fileName, importPath.node.source.value)
+                const chunkId = resolveChunkReference(fileName, reference)
+                const importedChunk = chunks[chunkId]
+                if (!importedChunk || getWxEntryRole(importedChunk) !== 'capsule') {
+                    return
+                }
 
-                replaceNativeImport(
-                    importPath,
-                    types.callExpression(
-                        types.memberExpression(
-                            types.memberExpression(types.identifier('global'), types.identifier('System')),
-                            types.identifier('importSync')
-                        ),
-                        [types.stringLiteral(chunkId)]
-                    ),
-                    fileName
+                const [specifier] = importPath.node.specifiers
+                if (
+                    importPath.node.specifiers.length !== 1 ||
+                    !specifier ||
+                    types.isImportNamespaceSpecifier(specifier)
+                ) {
+                    throw new Error(`Expected one capsule value import from ${chunkId} in ${fileName}`)
+                }
+
+                const imported = types.isImportDefaultSpecifier(specifier)
+                    ? types.identifier('default')
+                    : specifier.imported
+                const importedConfig = types.memberExpression(
+                    createSyncImport(chunkId),
+                    types.cloneNode(imported),
+                    types.isStringLiteral(imported)
+                )
+                importPath.replaceWith(
+                    types.variableDeclaration('const', [
+                        types.variableDeclarator(types.cloneNode(specifier.local), importedConfig)
+                    ])
                 )
             }
         }
     }
 }
 
-/** Preserves a bundler-generated namespace selector while making the eager import fully synchronous. */
-function replaceNativeImport(
-    importPath: NodePath<types.ImportExpression>,
-    syncImport: types.CallExpression,
-    fileName: string
-): void {
-    const memberPath = importPath.parentPath
-    const callPath = memberPath?.parentPath
-    if (
-        memberPath?.isMemberExpression() &&
-        memberPath.node.object === importPath.node &&
-        !memberPath.node.computed &&
-        types.isIdentifier(memberPath.node.property, { name: 'then' }) &&
-        callPath?.isCallExpression() &&
-        callPath.node.callee === memberPath.node
-    ) {
-        const [selectNamespace] = callPath.node.arguments
-        if (callPath.node.arguments.length !== 1 || !types.isExpression(selectNamespace)) {
-            throw new Error(`Expected one namespace selector for native module import in ${fileName}`)
-        }
-        callPath.replaceWith(types.callExpression(selectNamespace, [syncImport]))
-        return
-    }
-
-    importPath.replaceWith(syncImport)
+/** Creates one synchronous lookup through the canonical output chunk ID. */
+function createSyncImport(chunkId: string): types.CallExpression {
+    return types.callExpression(
+        types.memberExpression(
+            types.memberExpression(types.identifier('global'), types.identifier('System')),
+            types.identifier('importSync')
+        ),
+        [types.stringLiteral(chunkId)]
+    )
 }

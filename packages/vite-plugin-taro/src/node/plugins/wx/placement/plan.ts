@@ -64,8 +64,8 @@ export const mainPackage = { kind: 'main' } as const
  * Creates one deterministic subpackage placement plan:
  *
  * 1. Snapshot Rolldown's transformed module graph.
- * 2. Reserve each native entry, its direct capsule root, and that root's static closure for synchronous importSync() in main.
- * 3. Treat only nested dynamic imports as genuine asynchronous roots, then annotate their modules with affinity.
+ * 2. Reserve every explicit shell and capsule entry together with its static closure in main.
+ * 3. Treat dynamic imports as asynchronous roots, then annotate their modules with affinity.
  * 4. Pack those lazy modules independently under the planning budget.
  * 5. Return only module ownership; chunks and native manifests are reconciled later.
  *
@@ -116,10 +116,9 @@ export function createPlacementPlan({
 }
 
 /**
- * Finds modules that must remain in main. Explicit native entries seed the traversal, their static imports remain eager,
- * and their direct dynamic imports are also eager because native shells use source-level import() only to identify capsule
- * roots that the renderer activates with System.importSync(). Their static closures must remain synchronous; imports below
- * those roots are genuine lazy boundaries whose asynchronously loaded graphs may use subpackages and top-level await.
+ * Finds modules that must remain in main. Native shells and capsules are explicit entries, and static traversal keeps their
+ * complete eager closures synchronous. Every dynamic import is therefore a genuine lazy boundary whose graph may use
+ * subpackages and top-level await.
  */
 function findEagerModules(infos: ReadonlyMap<string, Rolldown.ModuleInfo>): Set<string> {
     const eagerModules = new Set<string>()
@@ -136,11 +135,6 @@ function findEagerModules(infos: ReadonlyMap<string, Rolldown.ModuleInfo>): Set<
         }
         eagerModules.add(moduleId)
         pending.push(...info.importedIds)
-        // This source import() is a chunk marker: native rendering turns it into importSync(), so only direct entry
-        // targets join the eager main-package closure. Dynamic imports discovered inside those capsules remain lazy.
-        if (info.isEntry) {
-            pending.push(...info.dynamicallyImportedIds)
-        }
     }
     return eagerModules
 }

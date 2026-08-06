@@ -1,12 +1,30 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
+import { appCapsulePath, bootstrapPath, rolldownRuntimeId } from '../module.ts'
 import { renderNative } from './native.ts'
+
+function chunk({
+    fileName,
+    moduleIds,
+    isEntry
+}: {
+    fileName: string
+    moduleIds: readonly string[]
+    isEntry: boolean
+}): Rolldown.RenderedChunk {
+    return { fileName, moduleIds, isEntry } as Rolldown.RenderedChunk
+}
 
 test('renders native require and CommonJS exports', () => {
     const source = `import { instantiate } from "../transport.js"
 export { instantiate }`
-    const result = renderNative(source, { fileName: 'assets/bootstrap-a.js' } as Rolldown.RenderedChunk)
+    const result = renderNative({
+        code: source,
+        chunk: chunk({ fileName: 'assets/bootstrap-a.js', moduleIds: [bootstrapPath], isEntry: false }),
+        chunks: {},
+        sourcemap: true
+    })
     const requiredPaths: string[] = []
     const commonJsModule: { exports: Record<string, unknown> } = {
         exports: {}
@@ -33,10 +51,24 @@ export { instantiate }`
     assert.deepEqual(result.map.sources, ['assets/bootstrap-a.js'])
 })
 
-test('synchronously activates an eager native capsule through Vite namespace selection and preloading', () => {
-    const source = `import { loadCapsuleConfig, __vitePreload } from "./assets/bootstrap-a.js"
-App(loadCapsuleConfig("App", () => __vitePreload(() => import("./assets/module-b.js").then(module => module.capsule), void 0)))`
-    const result = renderNative(source, { fileName: 'app.js' } as Rolldown.RenderedChunk)
+test('synchronously activates a statically imported capsule even when its chunk is amphibious', () => {
+    const source = `import "./assets/bootstrap-a.js"
+import config from "./assets/module-b.js"
+Page(config)`
+    const nativeChunk = chunk({ fileName: 'app.js', moduleIds: ['/native-app'], isEntry: true })
+    const chunks = {
+        'assets/bootstrap-a.js': chunk({
+            fileName: 'assets/bootstrap-a.js',
+            moduleIds: [bootstrapPath],
+            isEntry: false
+        }),
+        'assets/module-b.js': chunk({
+            fileName: 'assets/module-b.js',
+            moduleIds: [appCapsulePath, rolldownRuntimeId],
+            isEntry: true
+        })
+    }
+    const result = renderNative({ code: source, chunk: nativeChunk, chunks, sourcemap: true })
     const importedModuleIds: string[] = []
     const requiredPaths: string[] = []
     const registrations: unknown[] = []
@@ -44,26 +76,19 @@ App(loadCapsuleConfig("App", () => __vitePreload(() => import("./assets/module-b
     const system = {
         importSync(moduleId: string) {
             importedModuleIds.push(moduleId)
-            return { capsule: { default: config } }
+            return { default: config }
         }
     }
 
     Function(
         'require',
         'global',
-        'App',
+        'Page',
         result.code
     )(
         (id: string) => {
             requiredPaths.push(id)
-            return {
-                loadCapsuleConfig(_name: string, loadCapsule: () => { default: object }) {
-                    return loadCapsule().default
-                },
-                __vitePreload(load: () => unknown) {
-                    return load()
-                }
-            }
+            return {}
         },
         { System: system },
         (registeredConfig: unknown) => registrations.push(registeredConfig)
@@ -72,8 +97,29 @@ App(loadCapsuleConfig("App", () => __vitePreload(() => import("./assets/module-b
     assert.strictEqual(registrations[0], config)
     assert.deepEqual(requiredPaths, ['./assets/bootstrap-a.js'])
     assert.deepEqual(importedModuleIds, ['assets/module-b.js'])
-    assert.match(result.code, /vitePreload/)
-    assert.doesNotMatch(result.code, /\.then/)
+    assert.doesNotMatch(result.code, /import\(/)
     assert.ok(result.map)
     assert.deepEqual(result.map.sources, ['app.js'])
+})
+
+test('rejects a capsule namespace import from a native shell', () => {
+    const nativeChunk = chunk({ fileName: 'app.js', moduleIds: ['/native-app'], isEntry: true })
+    const chunks = {
+        'assets/module-b.js': chunk({
+            fileName: 'assets/module-b.js',
+            moduleIds: [appCapsulePath],
+            isEntry: true
+        })
+    }
+
+    assert.throws(
+        () =>
+            renderNative({
+                code: 'import * as capsule from "./assets/module-b.js"\nApp(capsule.default)',
+                chunk: nativeChunk,
+                chunks,
+                sourcemap: false
+            }),
+        /Expected one capsule value import/
+    )
 })

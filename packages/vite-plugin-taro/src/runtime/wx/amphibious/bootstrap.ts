@@ -4,35 +4,11 @@ import { transport } from './transport.ts'
 
 declare const __VITE_PLUGIN_TARO_APP_CONFIG__: Record<string, unknown>
 
-interface CapsuleNamespace {
-    default: unknown
-}
-
-type CapsuleLoader = () => CapsuleNamespace | PromiseLike<CapsuleNamespace>
-
 /** Shares one App configuration object between the specialized bootstrap and App capsule. */
 export const appConfig = __VITE_PLUGIN_TARO_APP_CONFIG__
 
-/** Unwraps one eager capsule without changing the complete native configuration created inside it. */
-export function loadCapsuleConfig(shellName: 'App' | 'Page' | 'Component', loadCapsule: CapsuleLoader): object {
-    const capsule = loadCapsule()
-    if (isThenable(capsule)) {
-        throw new Error(`${shellName} capsule must load synchronously`)
-    }
-    if (!capsule.default || typeof capsule.default !== 'object' || Array.isArray(capsule.default)) {
-        throw new Error(`Expected a ${shellName} configuration`)
-    }
-    return capsule.default
-}
-
-/** Recognizes native and custom thenables returned by misplaced eager capsules. */
-function isThenable(value: CapsuleNamespace | PromiseLike<CapsuleNamespace>): value is PromiseLike<CapsuleNamespace> {
-    return 'then' in value && typeof value.then === 'function'
-}
-
-// Vite wraps dynamic imports with this browser preload hook. WX has no modulepreload transport: native entry split points
-// become importSync() and must have synchronous static closures, while dynamic imports inside capsules retain System.import()
-// and may load asynchronous subpackage or top-level-await graphs through this identity wrapper.
+// WX has no modulepreload transport. Genuine application import() boundaries retain System.import() and may load
+// asynchronous subpackage or top-level-await graphs through this identity wrapper.
 export const __vitePreload = <Value>(load: () => Value): Value => load()
 
 // SystemJS installs on WeChat's `global` object; its properties are not lexical bindings.

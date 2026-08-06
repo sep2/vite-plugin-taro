@@ -20,9 +20,12 @@ const transportTypeScript = readFileSync(
 const transportJavaScript = (
     await transformWithOxc(transportTypeScript, 'transport.ts', { sourcemap: false, target: esTarget })
 ).code
-const transportCode = renderNative(transportJavaScript, {
-    fileName: 'transport.js'
-} as Rolldown.RenderedChunk).code
+const transportCode = renderNative({
+    code: transportJavaScript,
+    chunk: { fileName: 'transport.js' } as Rolldown.RenderedChunk,
+    chunks: {},
+    sourcemap: false
+}).code
 
 /** Materializes transport with the requested capsules and optional amphibious Rolldown runtime. */
 async function materializeTestTransport({

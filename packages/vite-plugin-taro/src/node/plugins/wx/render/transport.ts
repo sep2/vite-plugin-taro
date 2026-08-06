@@ -2,7 +2,7 @@ import path from 'node:path'
 import { types } from '@babel/core'
 import type { Rolldown } from 'vite'
 import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
-import { getWxModuleKind } from '../module.ts'
+import { getWxExecutionKind } from '../module.ts'
 
 const transportPlaceholder = '__VITE_PLUGIN_TARO_TRANSPORT__'
 const moduleIdParameter = 'moduleId'
@@ -83,7 +83,7 @@ function getTransportedChunks(chunks: Readonly<Record<string, Rolldown.RenderedC
     const transportedChunks: TransportedChunk[] = []
 
     for (const chunk of Object.values(chunks)) {
-        const kind = getWxModuleKind(chunk)
+        const kind = getWxExecutionKind(chunk)
         if (kind !== 'native') {
             transportedChunks.push({ chunk, kind })
         }

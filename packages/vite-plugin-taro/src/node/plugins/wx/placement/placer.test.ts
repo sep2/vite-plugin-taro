@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
-import { bootstrapPath, getWxModuleKind, rolldownRuntimeId, transportPath } from '../module.ts'
+import {
+    appCapsulePath,
+    appShellPath,
+    bootstrapPath,
+    getWxExecutionKind,
+    rolldownRuntimeId,
+    transportPath
+} from '../module.ts'
 import { createPlacer } from './placer.ts'
 
 function chunk(...moduleIds: string[]): Rolldown.PreRenderedChunk {
@@ -55,8 +62,8 @@ test('places the eager graph and output-only modules in main', () => {
 test('places dynamic-only modules in a generated asynchronous subpackage', () => {
     const placer = createPlacer()
     analyze(placer, {
-        '/entry': { isEntry: true, dynamicImports: ['/application'] },
-        '/application': { dynamicImports: ['/lazy'] },
+        '/entry': { isEntry: true, imports: ['/application'] },
+        '/application': { isEntry: true, dynamicImports: ['/lazy'] },
         '/lazy': { imports: ['/dependency'] },
         '/dependency': {}
     })
@@ -103,12 +110,13 @@ test('supports an optional amphibious Rolldown runtime without choosing strict o
     const placer = createPlacer()
 
     assert.equal('strictExecutionOrder' in placer.rolldownOptions.output, false)
-    assert.equal(getWxModuleKind(chunk(rolldownRuntimeId)), 'amphibious')
+    assert.equal(getWxExecutionKind(chunk(rolldownRuntimeId)), 'amphibious')
 })
 
-test('hashes transport while preserving exact native entry paths', () => {
+test('hashes transport and capsules while preserving exact native shell paths', () => {
     const placer = createPlacer()
 
     assert.equal(placer.rolldownOptions.output.entryFileNames(chunk(transportPath)), 'assets/[name]-[hash].js')
-    assert.equal(placer.rolldownOptions.output.entryFileNames(chunk('/native-shell')), '[name]')
+    assert.equal(placer.rolldownOptions.output.entryFileNames(chunk(appCapsulePath)), 'assets/[name]-[hash].js')
+    assert.equal(placer.rolldownOptions.output.entryFileNames(chunk(appShellPath)), '[name]')
 })

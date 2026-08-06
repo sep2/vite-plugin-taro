@@ -1,5 +1,5 @@
 import type { Rolldown } from 'vite'
-import { isTransportModule } from '../module.ts'
+import { getWxExecutionKind, isTransportModule } from '../module.ts'
 import {
     createPlacementPlan,
     getSubpackageName,
@@ -62,8 +62,8 @@ export function createPlacer() {
          * Complete Rolldown fragment required to preserve package placement and native entry semantics.
          *
          * ```text
-         * native App/Page/Component entry
-         *   └─ source import() / runtime importSync() ─▶ eager capsule + static closure [main, no TLA]
+         * native App/Page/Component shell entry
+         *   └─ static import / runtime importSync() ─▶ explicit capsule entry + static closure [main, no TLA]
          *                                                └─ System.import() ─▶ lazy-a [package A, TLA allowed]
          *                                                                      └─ static import ─▶ lazy-b [package B]
          *
@@ -77,9 +77,9 @@ export function createPlacer() {
          *                                └─ main transport obtains registration with require.async()
          * ```
          *
-         * The entry split point is only a build-graph marker and executes synchronously from main. Once a genuine nested
-         * dynamic boundary is crossed, physical fetches may be asynchronous and modules may use top-level await. SystemJS
-         * still links that complete static lazy graph before execution, even when an edge or cycle spans packages.
+         * Explicit entries preserve the shell/capsule rendering boundary while their static edge executes synchronously
+         * from main. Once a dynamic boundary is crossed, physical fetches may be asynchronous and modules may use
+         * top-level await. SystemJS still links that complete static lazy graph before execution, even across packages.
          */
         rolldownOptions: {
             output: {
@@ -105,9 +105,11 @@ export function createPlacer() {
                 // strictExecutionOrder deliberately has no plugin default. When an application enables it through normal
                 // Rolldown output options, the generated helper runtime becomes amphibious: CommonJS evaluates it once and
                 // transport publishes that cached namespace to SystemJS.
-                /** Preserves exact native entries while allowing transport to participate in content hashing. */
+                /** Preserves exact native shell paths while hashing transport and explicit capsule entries. */
                 entryFileNames(chunk: Rolldown.PreRenderedChunk): string {
-                    return isTransportModule(chunk) ? 'assets/[name]-[hash].js' : '[name]'
+                    return getWxExecutionKind(chunk) === 'native' && !isTransportModule(chunk)
+                        ? '[name]'
+                        : 'assets/[name]-[hash].js'
                 },
                 /** Converts the planned owner into its physical main or generated subpackage filename template. */
                 chunkFileNames(chunk: Rolldown.PreRenderedChunk): string {
