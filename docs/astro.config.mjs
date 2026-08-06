@@ -1,16 +1,25 @@
 // @ts-check
 
+import { unified } from '@astrojs/markdown-remark'
 import starlight from '@astrojs/starlight'
 import { defineConfig } from 'astro/config'
+import { externalLinks } from './src/plugins/external-links.mjs'
 
 // https://astro.build/config
 export default defineConfig({
     site: 'https://sep2.github.io',
     base: '/vite-plugin-taro',
+    markdown: {
+        processor: unified({ rehypePlugins: [externalLinks] })
+    },
     integrations: [
         starlight({
             title: 'vite-plugin-taro',
             customCss: ['./src/styles/custom.css'],
+            components: {
+                SocialIcons: './src/components/social-icons.astro',
+                ThemeSelect: './src/components/theme-select.astro'
+            },
             locales: {
                 root: {
                     label: '简体中文',

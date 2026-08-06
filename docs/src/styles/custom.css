@@ -2,4 +2,39 @@
     --sl-font:
         "Segoe UI", "Segoe UI Web (West European)", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto,
         "Helvetica Neue", sans-serif;
+    --sl-color-accent-low: rgb(11, 58, 33);
+    --sl-color-accent: rgb(42, 174, 103);
+    --sl-color-accent-high: rgb(183, 235, 207);
+}
+
+:root[data-theme="light"] {
+    --sl-color-accent-low: rgb(221, 245, 232);
+    --sl-color-accent: rgb(42, 174, 103);
+    --sl-color-accent-high: rgb(21, 105, 60);
+}
+
+.demo-video {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 2052 / 1642;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 0.75rem;
+    background: var(--sl-color-bg-nav);
+}
+
+html[data-has-hero]:not([data-has-sidebar]) {
+    --sl-content-width: 80rem;
+}
+
+@media (min-width: 50rem) {
+    .hero {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+        gap: 4rem;
+    }
+
+    .hero > .hero-html {
+        width: 100%;
+        max-width: none;
+    }
 }

@@ -1,0 +1,93 @@
+---
+import { Icon } from '@astrojs/starlight/components'
+---
+
+<theme-toggle role="group" aria-label="颜色主题">
+    <button type="button" data-theme-value="auto" aria-label="跟随系统主题" title="跟随系统主题">
+        <Icon name="laptop" />
+    </button>
+    <button type="button" data-theme-value="light" aria-label="浅色主题" title="浅色主题">
+        <Icon name="sun" />
+    </button>
+    <button type="button" data-theme-value="dark" aria-label="深色主题" title="深色主题">
+        <Icon name="moon" />
+    </button>
+</theme-toggle>
+
+<script>
+    type Theme = 'auto' | 'dark' | 'light'
+
+    const storageKey = 'starlight-theme'
+    const colorScheme = matchMedia('(prefers-color-scheme: light)')
+
+    function parseTheme(value: string | null | undefined): Theme {
+        return value === 'dark' || value === 'light' ? value : 'auto'
+    }
+
+    function loadTheme(): Theme {
+        return parseTheme(localStorage.getItem(storageKey))
+    }
+
+    function resolveTheme(theme: Theme): Exclude<Theme, 'auto'> {
+        return theme === 'auto' ? (colorScheme.matches ? 'light' : 'dark') : theme
+    }
+
+    function updateButtons(theme: Theme): void {
+        document.querySelectorAll('theme-toggle button').forEach((button) => {
+            if (!(button instanceof HTMLButtonElement)) return
+            button.ariaPressed = String(button.dataset.themeValue === theme)
+        })
+    }
+
+    function applyTheme(theme: Theme): void {
+        document.documentElement.dataset.theme = resolveTheme(theme)
+        localStorage.setItem(storageKey, theme === 'auto' ? '' : theme)
+        updateButtons(theme)
+    }
+
+    class ThemeToggle extends HTMLElement {
+        constructor() {
+            super()
+            this.querySelectorAll('button').forEach((button) => {
+                button.addEventListener('click', () => applyTheme(parseTheme(button.dataset.themeValue)))
+            })
+        }
+    }
+
+    colorScheme.addEventListener('change', () => {
+        if (loadTheme() === 'auto') applyTheme('auto')
+    })
+
+    if (!customElements.get('theme-toggle')) customElements.define('theme-toggle', ThemeToggle)
+    applyTheme(loadTheme())
+</script>
+
+<style>
+    theme-toggle {
+        display: flex;
+        gap: 0.125rem;
+        padding: 0.125rem;
+        border: 1px solid var(--sl-color-hairline-light);
+        border-radius: 0.5rem;
+    }
+
+    button {
+        display: flex;
+        padding: 0.375rem;
+        border: 0;
+        border-radius: 0.375rem;
+        background: transparent;
+        color: var(--sl-color-gray-2);
+        font-size: 1rem;
+        cursor: pointer;
+    }
+
+    button:hover {
+        color: var(--sl-color-white);
+    }
+
+    button[aria-pressed='true'] {
+        background: var(--sl-color-accent-low);
+        color: var(--sl-color-text-accent);
+    }
+</style>

@@ -1,0 +1,274 @@
+---
+title: 快速开始
+description: 从创建项目到运行微信小程序与 Web 应用。
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components'
+
+本指南使用 `create-vite-taro` 创建一个同时支持微信小程序和 Web 的应用。默认模板已经配置好 Vite 8、React 19、Taro 4、TypeScript 和 Tailwind CSS v4。
+
+## 准备工作
+
+开始前请准备：
+
+- Node.js 22 或更高版本。
+- npm、pnpm 或 Bun。
+- 开发微信小程序时需要安装[微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)。
+- 一个微信小程序 App ID。没有 App ID 时也可以先使用测试号体验部分功能。
+
+## 1. 创建项目
+
+<Tabs syncKey="package-manager">
+    <TabItem label="npm">
+
+```sh
+npm create vite-taro@latest my-app
+cd my-app
+npm install
+```
+
+    </TabItem>
+    <TabItem label="pnpm">
+
+```sh
+pnpm --config.minimum-release-age=0 create vite-taro@latest my-app
+cd my-app
+pnpm install
+```
+
+    </TabItem>
+    <TabItem label="Bun">
+
+```sh
+bun create vite-taro my-app
+cd my-app
+bun install
+```
+
+    </TabItem>
+</Tabs>
+
+生成的核心文件如下：
+
+```text
+my-app/
+├── .env.local
+├── index.html
+├── package.json
+├── vite.config.ts
+└── src/
+    ├── app.css
+    ├── app.ts
+    ├── components/
+    └── pages/
+        └── index/
+            └── index.tsx
+```
+
+- `vite.config.ts` 配置构建目标、页面、应用和微信项目。
+- `src/app.ts` 是两个目标共享的应用入口。
+- `src/app.css` 包含全局样式和 Tailwind CSS v4 配置。
+- `src/pages/index/index.tsx` 是模板的首页。
+
+## 2. 配置微信 App ID
+
+创建工具会在 `.env.local` 中生成一个占位 App ID。开发自己的小程序前，请替换为真实值：
+
+```dotenv
+VITE_PLUGIN_TARO_WECHAT_APP_ID=wx1234567890abcdef
+```
+
+`.env.local` 已被 Git 忽略，不会提交到仓库。
+
+## 3. 运行微信小程序
+
+启动 Vite 微信开发模式：
+
+<Tabs syncKey="package-manager">
+    <TabItem label="npm">
+
+```sh
+npm run dev:wx
+```
+
+    </TabItem>
+    <TabItem label="pnpm">
+
+```sh
+pnpm dev:wx
+```
+
+    </TabItem>
+    <TabItem label="Bun">
+
+```sh
+bun run dev:wx
+```
+
+    </TabItem>
+</Tabs>
+
+等待终端显示 Vite 已准备完成，然后在微信开发者工具中导入：
+
+```text
+dist/wx
+```
+
+请打开生成的 `dist/wx`，不要打开项目源码根目录。模板已经启用 `compileHotReLoad`，修改 JavaScript 或 TypeScript 组件时会热更新，并尽可能保留：
+
+- App 与 `globalData`
+- 当前原生页面
+- React 组件状态
+- 原生输入状态
+
+<video
+    class="demo-video"
+    src="https://github.com/user-attachments/assets/cd4e6d97-6bc7-40e0-9ba9-206c9fe369f1"
+    aria-label="微信开发者工具中的 React 热更新演示"
+    width="2052"
+    height="1642"
+    preload="metadata"
+    controls
+    autoplay
+    muted
+    loop
+    playsinline
+></video>
+
+## 4. 运行 Web 应用
+
+在另一个终端中启动 H5 开发服务器：
+
+<Tabs syncKey="package-manager">
+    <TabItem label="npm">
+
+```sh
+npm run dev:h5
+```
+
+    </TabItem>
+    <TabItem label="pnpm">
+
+```sh
+pnpm dev:h5
+```
+
+    </TabItem>
+    <TabItem label="Bun">
+
+```sh
+bun run dev:h5
+```
+
+    </TabItem>
+</Tabs>
+
+浏览器访问终端显示的地址，默认为 [http://localhost:5173](http://localhost:5173)。`dev:wx` 和 `dev:h5` 可以同时运行，修改同一份源码后分别查看两个目标的结果。
+
+## 5. 编辑第一个页面
+
+页面组件位于 `src/pages/index/index.tsx`。应用代码通过插件提供的虚拟模块使用 Taro 组件和 API：
+
+```tsx
+import Taro from 'virtual:taro/api'
+import { Button, Text, View } from 'virtual:taro/components'
+import { useState } from 'react'
+
+function IndexPage() {
+    const [count, setCount] = useState(0)
+
+    return (
+        <View className="flex min-h-screen flex-col gap-4 p-6">
+            <Text className="text-2xl font-bold">你好，vite-plugin-taro</Text>
+            <Text>计数：{count}</Text>
+            <Button onClick={() => setCount((currentCount) => currentCount + 1)}>增加</Button>
+            <Button onClick={() => Taro.showToast({ title: '来自 Taro' })}>显示提示</Button>
+        </View>
+    )
+}
+
+export default IndexPage
+```
+
+| 导入 | 用途 |
+| --- | --- |
+| `virtual:taro/components` | `View`、`Text`、`Button`、`Image`、`ScrollView` 等 Taro React 组件。 |
+| `virtual:taro/api` | `Taro.navigateTo`、`Taro.getWindowInfo`、`Taro.useLaunch` 等 API 和 hooks。 |
+
+:::caution
+不要安装或直接导入 `@tarojs/*` 包。插件会为 `wx` 和 `h5` 目标解析正确的 Taro 运行时。
+:::
+
+组件和 API 的使用方式与 Taro 一致，完整接口请参考 [Taro 官方文档](https://docs.taro.zone)。
+
+## 6. 构建与检查
+
+<Tabs syncKey="package-manager">
+    <TabItem label="npm">
+
+```sh
+npm run build:wx     # 构建微信小程序到 dist/wx
+npm run build:h5     # 构建 Web 应用到 dist/h5
+npm run preview:h5   # 预览 Web 生产构建
+npm run typecheck    # 使用 tsc 检查类型
+```
+
+    </TabItem>
+    <TabItem label="pnpm">
+
+```sh
+pnpm build:wx        # 构建微信小程序到 dist/wx
+pnpm build:h5        # 构建 Web 应用到 dist/h5
+pnpm preview:h5      # 预览 Web 生产构建
+pnpm typecheck       # 使用 tsc 检查类型
+```
+
+    </TabItem>
+    <TabItem label="Bun">
+
+```sh
+bun run build:wx     # 构建微信小程序到 dist/wx
+bun run build:h5     # 构建 Web 应用到 dist/h5
+bun run preview:h5   # 预览 Web 生产构建
+bun run typecheck    # 使用 tsc 检查类型
+```
+
+    </TabItem>
+</Tabs>
+
+每次 Vite 运行只构建一个目标：
+
+| 目标 | 开发脚本 | 生产构建脚本 | 输出目录 |
+| --- | --- | --- | --- |
+| 微信小程序（`wx`） | `dev:wx` | `build:wx` | `dist/wx` |
+| Web（`h5`） | `dev:h5` | `build:h5` | `dist/h5` |
+
+## 常见问题
+
+### 微信开发者工具无法打开项目
+
+确认导入的是 `dist/wx`，并检查 `.env.local` 中的 App ID 是否属于当前微信开发者账号。
+
+### Tailwind 工具类没有生效
+
+确认 `src/app.css` 仍包含 Tailwind 的三个导入和源码扫描配置：
+
+```css
+@import "tailwindcss/theme.css";
+@import "tailwindcss/preflight.css";
+@import "tailwindcss/utilities.css";
+
+@source "./";
+```
+
+移动源码文件或修改扫描范围后，请重新启动开发服务器。
+
+### pnpm 忽略了依赖构建脚本
+
+运行 `pnpm approve-builds`，按提示批准需要执行构建脚本的依赖，然后重新安装。
+
+## 下一步
+
+- 阅读[配置选项](../../reference/configuration/)，添加页面并调整应用与微信项目配置。
+- 查看完整的 [`loan-genius` 示例应用](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius)。
+- 深入了解[微信小程序 HMR 架构](https://github.com/sep2/vite-plugin-taro/blob/main/draft/hmr-architecture.zh.md)。
