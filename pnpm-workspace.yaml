@@ -1,5 +1,6 @@
 packages:
   - packages/*
+  - docs
 
 overrides:
   react: '^19.2.7'
@@ -15,3 +16,4 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - '@weapp-tailwindcss/postcss@3.1.10 || 3.2.8'
   - weapp-tailwindcss@5.1.14 || 5.2.11
+  - '@astrojs/starlight@0.41.7'

@@ -19,6 +19,7 @@
         "dev:loan-genius:h5": "pnpm --filter loan-genius dev-h5",
         "dev:loan-genius:wx": "pnpm --filter loan-genius dev-wx",
         "preview:loan-genius:h5": "pnpm --filter loan-genius preview-h5",
+        "dev:docs": "pnpm --filter docs dev",
         "typecheck": "pnpm --filter vite-plugin-taro typecheck && pnpm --filter loan-genius typecheck",
         "test": "pnpm --filter vite-plugin-taro test",
         "lint": "biome check .",
