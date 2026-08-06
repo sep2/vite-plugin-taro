@@ -1,0 +1,4 @@
+<view class="native-counter">
+    <text class="native-counter__label">Native count: {{ count }}</text>
+    <button class="native-counter__button" bindtap="increment">Increment from native</button>
+</view>

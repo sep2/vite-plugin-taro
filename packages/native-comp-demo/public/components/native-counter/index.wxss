@@ -1,0 +1,21 @@
+.native-counter {
+    display: flex;
+    flex-direction: column;
+    gap: 20rpx;
+    padding: 32rpx;
+    border: 2rpx solid #2aae67;
+    border-radius: 20rpx;
+    background: #ffffff;
+}
+
+.native-counter__label {
+    color: #16251c;
+    font-size: 32rpx;
+    font-weight: 600;
+}
+
+.native-counter__button {
+    margin: 0;
+    background: #2aae67;
+    color: #ffffff;
+}
