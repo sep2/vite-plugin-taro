@@ -11,7 +11,7 @@ import { Tabs, TabItem } from '@astrojs/starlight/components'
 
 开始前请准备：
 
-- Node.js 22 或更高版本。
+- Node.js 24 或更高版本。
 - npm、pnpm 或 bun。
 - 开发微信小程序时需要安装[微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)。
 - 一个微信小程序 App ID。没有 App ID 时也可以先使用测试号体验部分功能。
@@ -163,11 +163,11 @@ bun run dev:h5
     </TabItem>
 </Tabs>
 
-浏览器访问终端显示的地址，默认为 [http://localhost:5173](http://localhost:5173)。`dev:wx` 和 `dev:h5` 可以同时运行，修改同一份源码后分别查看两个目标的结果。
+浏览器访问终端显示的地址。Vite 默认从 [http://localhost:5173](http://localhost:5173) 开始选择端口；如果该端口已被微信开发服务占用，会自动使用下一个可用端口。`dev:wx` 和 `dev:h5` 可以同时运行，修改同一份源码后分别查看两个目标的结果。
 
 ## 5. 编辑第一个页面
 
-模板的默认首页组件位于 `src/pages/index/index.tsx`。应用代码通过插件提供的虚拟模块使用 Taro 组件和 API：
+模板的默认首页组件位于 `src/pages/index/index.tsx`。应用代码通过 vpt 提供的模块使用 Taro 组件和 API：
 
 ```tsx
 import Taro from 'virtual:taro/api'
@@ -196,7 +196,7 @@ export default IndexPage
 | `virtual:taro/api` | `Taro.navigateTo`、`Taro.getWindowInfo`、`Taro.useLaunch` 等 API 和 hooks。 |
 
 :::caution
-不要安装或直接导入 `@tarojs/*` 包。插件会为 `wx` 和 `h5` 目标解析正确的 Taro 运行时。
+不要安装或直接导入 `@tarojs/*` 包。vpt 会为微信和 Web 目标解析正确的 Taro 运行时。
 :::
 
 组件和 API 的使用方式与 Taro 一致，完整接口请参考 [Taro 官方文档](https://docs.taro.zone)。
@@ -271,6 +271,6 @@ bun run typecheck    # 使用 tsc 检查类型
 
 - 了解[全自动分包](/vite-plugin-taro/guides/automatic-subpackages/)，使用动态导入减小微信小程序主包。
 - 配置和调试[Skyline 模式](/vite-plugin-taro/guides/skyline-mode/)。
-- 阅读[配置选项](/reference/configuration/)，添加页面并调整应用与微信项目配置。
+- 阅读[配置选项](/vite-plugin-taro/reference/configuration/)，添加页面并调整应用与微信项目配置。
 - 查看完整的 [`loan-genius` 示例应用](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius)。
 - 深入了解[开发者工具热更新](/vite-plugin-taro/guides/hot-module-replacement/)。
