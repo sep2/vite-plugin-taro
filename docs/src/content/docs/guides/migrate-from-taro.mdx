@@ -1,0 +1,410 @@
+---
+title: 从 Taro CLI 迁移
+description: 将现有 Taro React 项目迁移到 vite-plugin-taro。
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components'
+
+本指南适用于使用 Taro 3 或 Taro 4 的 React 项目。迁移后继续使用 Taro 组件、API、生命周期和页面路径，但构建入口、配置位置与导入路径会改变。vpt 使用 Taro 4 运行时，来自 Taro 3 的项目还需要处理已经废弃或改变的 Taro API。
+
+:::note[适用范围]
+vpt 当前构建 **React 19 + 微信小程序 + Web**。Vue、Preact、Solid、React Native 以及其他小程序目标不能直接迁移。本指南对照了 [Taro 4.2.0 官方项目模板](https://github.com/NervJS/taro/tree/v4.2.0/packages/taro-cli/templates/default)及 vpt 的实际构建实现。
+:::
+
+## 推荐使用 AI 完成迁移
+
+请先完整阅读 vpt 的文档，了解配置、页面约定、全自动分包和当前支持范围，再开始迁移。
+
+迁移涉及配置拆分、导入替换、React 19 兼容性和构建插件清理，推荐让 AI 编程助手直接读取新旧两个项目并执行迁移。AI 可以根据实际源码逐文件修改，比照着通用步骤手动批量替换更可靠。
+
+可以把本指南链接和下面的任务说明交给 AI：
+
+```text
+请将旁边的 Taro React 项目迁移到这个 create-vite-taro 项目。
+
+开始修改前：
+1. 请先完整阅读 vpt 的文档。
+2. 阅读旧项目的 package.json、config、app.config、所有页面配置和构建插件。
+3. 阅读新项目的 vite.config.ts、package.json 和现有页面约定。
+4. 列出不能直接迁移的能力和需要我确认的行为变化。
+
+迁移时：
+1. 保留新项目的 Vite 构建结构，逐项迁移业务源码和配置。
+2. 将项目源码中的 Taro 导入改为 virtual:taro/api 和 virtual:taro/components。
+3. 不要批量修改第三方依赖或生成文件。
+4. 每完成一个阶段就运行 typecheck、微信构建和 Web 构建。
+5. 对照旧项目逐页检查路由、样式、资源、生命周期和 Taro API。
+```
+
+让 AI 分阶段提交修改，并要求它解释删除的每一项 Taro CLI 配置。涉及原生页面分包、自定义原生组件、Taro 插件或 webpack 定制时，应先确认替代方案，不要让 AI 静默删除。
+
+## 迁移思路
+
+建议先创建一个新的 vpt 项目，再逐步复制业务源码，而不是直接修改原项目的构建配置。这样可以保留一份可运行的 Taro CLI 项目，用于逐页比较结果。
+
+主要变化如下：
+
+| Taro CLI 项目 | vpt 项目 |
+| --- | --- |
+| `taro build --type weapp` | `vite`，目标为 `wx` |
+| `taro build --type h5` | `vite`，目标为 `h5` |
+| `config/index.ts`、`config/dev.ts`、`config/prod.ts` | `vite.config.ts` 与 Vite 配置 |
+| `src/app.config.ts` 或 `.js` | `vitePluginTaro({ appJson, pages })` |
+| 页面旁的 `*.config.ts` 或 `.js` | 对应 `pages[].config` |
+| `project.config.json`、`project.private.config.json`、`sitemap.json` | 对应的插件选项 |
+| `src/index.html` | 项目根目录的 `index.html` |
+| `@tarojs/taro` | `virtual:taro/api` |
+| `@tarojs/components` | `virtual:taro/components` |
+| 手动维护代码分包 | vpt全自动分包 |
+
+## 1. 创建迁移项目
+
+在原项目旁创建一个新目录：
+
+<Tabs syncKey="package-manager">
+    <TabItem label="npm">
+
+```sh
+npm create vite-taro@latest my-app-vpt
+cd my-app-vpt
+npm install
+```
+
+    </TabItem>
+    <TabItem label="pnpm">
+
+```sh
+pnpm --config.minimum-release-age=0 create vite-taro@latest my-app-vpt
+cd my-app-vpt
+pnpm install
+```
+
+    </TabItem>
+    <TabItem label="bun">
+
+```sh
+bun create vite-taro my-app-vpt
+cd my-app-vpt
+bun install
+```
+
+    </TabItem>
+</Tabs>
+
+先运行模板，确认微信和 Web 两个目标都能启动，再复制业务代码：
+
+<Tabs syncKey="package-manager">
+    <TabItem label="npm">
+
+```sh
+npm run dev:wx
+npm run dev:h5
+```
+
+    </TabItem>
+    <TabItem label="pnpm">
+
+```sh
+pnpm dev:wx
+pnpm dev:h5
+```
+
+    </TabItem>
+    <TabItem label="bun">
+
+```sh
+bun run dev:wx
+bun run dev:h5
+```
+
+    </TabItem>
+</Tabs>
+
+两个开发命令需要在不同终端运行。微信开发者工具应导入新项目的 `dist/wx`。
+
+## 2. 复制业务源码
+
+从原项目复制以下内容：
+
+- `src/app.tsx` 与全局样式。
+- `src/pages` 中的 React 页面。
+- 业务组件、hooks、状态管理、请求模块和工具函数。
+- 图片、字体等业务资源。
+
+保留新项目生成的以下文件，再按需合并内容：
+
+- 根目录 `index.html`。
+- `vite.config.ts`。
+- `tsconfig.json`、`tsconfig.app.json` 与 `tsconfig.node.json`。
+- `.env.local`。
+- `package.json` 中的开发和构建脚本。
+
+:::caution[页面文件约定]
+每个配置页面必须位于 `src/${path}.tsx`。例如 `pages/order/detail` 必须对应 `src/pages/order/detail.tsx`。如果原项目使用 `.js`、`.jsx`、目录别名或自定义 `sourceRoot`，请先将页面转换为 TSX 并调整为这个结构。
+:::
+
+Taro 官方模板把 Web HTML 放在 `src/index.html`，vpt 使用根目录的 Vite `index.html`。不要用旧文件覆盖新项目的根入口；如果旧文件包含标题、meta 或其他标签，只合并需要的部分，并保留：
+
+```html
+<div id="app"></div>
+```
+
+## 3. 更新 Taro 导入
+
+业务代码不再直接导入 `@tarojs/*`。将组件导入改为 `virtual:taro/components`，将 API 和生命周期导入改为 `virtual:taro/api`。
+
+迁移前：
+
+```tsx
+import { Button, Text, View } from '@tarojs/components'
+import Taro, { useDidShow, useLoad } from '@tarojs/taro'
+```
+
+迁移后：
+
+```tsx
+import Taro, { useDidShow, useLoad } from 'virtual:taro/api'
+import { Button, Text, View } from 'virtual:taro/components'
+```
+
+`Taro.request()`、`Taro.navigateTo()`、`useLaunch()`、`useLoad()` 等调用方式不变。`process.env.TARO_ENV` 也可以继续用于目标判断，微信构建中的值仍为 `weapp`，Web 构建中的值仍为 `h5`。
+
+:::caution
+不要把第三方包内部的 `@tarojs/*` 导入做全局文本替换。只修改项目自己维护的源码，并单独验证每个 Taro UI 库或构建插件是否兼容 React 19 和 vpt。
+:::
+
+## 4. 迁移应用与页面配置
+
+Taro CLI 会读取 `app.config.ts` 和每个页面旁边的 `*.config.ts`。vpt 不读取这些文件，配置必须写入 `vite.config.ts`。
+
+假设原来的 `src/app.config.ts` 为：
+
+```ts
+export default defineAppConfig({
+    pages: ['pages/index/index', 'pages/profile/index'],
+    window: {
+        navigationBarTitleText: '示例应用'
+    },
+    tabBar: {
+        color: '#64748b',
+        selectedColor: '#16a34a',
+        list: [
+            { pagePath: 'pages/index/index', text: '首页' },
+            { pagePath: 'pages/profile/index', text: '我的' }
+        ]
+    }
+})
+```
+
+页面配置为：
+
+```ts
+export default definePageConfig({
+    navigationBarTitleText: '个人中心',
+    enablePullDownRefresh: true
+})
+```
+
+将页面顺序和页面配置合并到 `pages`，其余应用配置放入 `appJson`。在新模板现有的 `vitePluginTaro()` 调用中替换这两个字段，保留其他字段：
+
+```ts
+pages: [
+    {
+        path: 'pages/index/index',
+        config: {}
+    },
+    {
+        path: 'pages/profile/index',
+        config: {
+            navigationBarTitleText: '个人中心',
+            enablePullDownRefresh: true
+        }
+    }
+],
+appJson: {
+    window: {
+        navigationBarTitleText: '示例应用'
+    },
+    tabBar: {
+        color: '#64748b',
+        selectedColor: '#16a34a',
+        list: [
+            { pagePath: 'pages/index/index', text: '首页' },
+            { pagePath: 'pages/profile/index', text: '我的' }
+        ]
+    }
+}
+```
+
+配置迁移规则：
+
+- `pages` 的顺序就是生成的 `app.json.pages` 顺序，也是 Web 路由顺序。
+- `appJson.pages` 会被 `pages` 覆盖，不要重复填写。
+- `appJson.subPackages` 和 `appJson.subpackages` 会被移除，不要从旧配置复制。
+- 每个页面的 `config` 会生成微信页面 JSON，同时参与 Web 路由配置。
+- `window`、普通 `tabBar`、权限与 Skyline 等应用配置可以保留在 `appJson`。
+- `defineAppConfig()` 与 `definePageConfig()` 包装函数不再需要。
+
+### 页面分包不能原样迁移
+
+vpt全自动分包处理的是通过动态 `import()` 加载的 **JavaScript 模块**，不是微信原生页面分包。所有 `pages` 条目都会生成到主包页面列表。
+
+如果原项目使用以下能力，不能直接复制对应配置：
+
+- `subPackages` 或 `subpackages` 中的页面。
+- 独立分包。
+- 指向手动分包根目录的 `preloadRule`。
+
+请先把页面整理为普通主包页面，再使用动态 `import()` 延迟加载页面内部的大型功能。具体行为参见[全自动分包](/vite-plugin-taro/guides/automatic-subpackages/)。
+
+## 5. 迁移微信项目配置
+
+以新模板的 `projectConfigJson` 为基础，迁移旧 `project.config.json` 中仍然需要的字段，例如 `projectname`、`description` 和 `setting`。
+
+注意以下区别：
+
+- App ID 建议继续从 `.env.local` 读取，不要提交到仓库。
+- 不要复制旧的 `miniprogramRoot`；微信开发者工具直接打开 `dist/wx`。
+- 保留模板的 `compileHotReLoad: true` 才能使用开发者工具热更新。
+- `project.private.config.json` 的内容放入 `projectPrivateConfigJson`。
+- `sitemap.json` 的内容放入 `sitemapJson`。
+
+`projectConfigJson` 和 `sitemapJson` 在类型上始终需要提供，但只会在微信构建中写出。
+
+## 6. 迁移构建配置
+
+`config/index.ts`、`config/dev.ts` 和 `config/prod.ts` 不会再执行。按下面的对应关系迁移真正需要的配置：
+
+| Taro 配置 | vpt / Vite 中的做法 |
+| --- | --- |
+| `sourceRoot` | 页面源码固定放在 `src` 下。 |
+| `outputRoot` | 使用 Vite 的 `build.outDir`，建议保持 `dist/${target}`。 |
+| `alias` | 使用 Vite 的 `resolve.alias`，并同步 TypeScript 路径配置。 |
+| `defineConstants` | 使用 Vite 的 `define`。 |
+| `copy.patterns` | 将原样复制的文件放入 `public`，或使用普通 Vite 复制插件。 |
+| `mini.postcss`、`h5.postcss` | 使用 Vite 的 `css.postcss` 或 PostCSS 配置。 |
+| `mini.webpackChain`、`h5.webpackChain` | 删除并改写为 Vite 插件或 Vite 配置。 |
+| H5 history 与 `publicPath` | Web 固定使用 hash 路由；资源路径交给 Vite 的 `base`。 |
+| Taro CLI `plugins` | 不会运行；确认用途后改写为 Vite 插件或业务代码。 |
+| `compiler`、`framework` | 删除；vpt 已确定使用 Vite 与 React。 |
+
+`designWidth`、`deviceRatio` 和 Taro `pxtransform` 配置没有可直接复制的选项。vpt 会为微信样式转换 `px` 和 `rem`，迁移后应逐页检查尺寸，不要假设旧的自定义换算比例仍然生效。
+
+### 环境变量
+
+Vite 客户端代码只会公开以 `VITE_` 开头的环境变量。将旧环境变量改名后通过 `import.meta.env` 使用：
+
+```ts
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
+```
+
+`vite.config.ts` 中的变量通过 `loadEnv()` 读取。不要继续依赖 Taro CLI 在构建配置中注入的自定义环境变量。
+
+### 条件编译
+
+构建时仍会替换 `process.env.TARO_ENV`：微信构建中的值为 `weapp`，Web 构建中的值为 `h5`。如果迁移后的 TypeScript 配置不再声明 `process`，优先改用下面的注释指令；也可以在项目自己的类型文件中为 `process.env.TARO_ENV` 添加窄类型声明。
+
+注释指令中的微信目标需要从 `WEAPP` 改为 `wx`：
+
+```ts
+// #ifdef wx
+console.log('微信小程序')
+// #endif
+
+// #ifdef h5
+console.log('Web')
+// #endif
+```
+
+vpt 支持 `#ifdef`、`#ifndef`、`#else` 和 `#endif`，不支持 `#if` 与 `#elif`。
+
+## 7. 迁移样式与资源
+
+- 保留 `src/app.tsx` 对全局样式的导入。
+- 页面和组件可以继续导入 CSS、Sass、Less 或 Stylus；对应预处理器需要作为项目依赖安装。
+- CSS Modules 使用 Vite 的 `*.module.css`、`*.module.scss` 等文件约定。
+- 由源码 `import` 的图片和字体继续交给 Vite 处理。
+- 原来通过 `copy.patterns` 复制且不参与模块构建的文件，移到 `public` 后检查最终路径。
+
+新模板默认启用 Tailwind CSS v4。如果原项目不使用 Tailwind，可以删除 `app.css` 中的 Tailwind 导入和 `@source`，再保留迁移过来的普通全局样式。不要在未检查页面效果前同时引入旧 reset 样式和 Tailwind Preflight。
+
+## 8. 清理依赖和脚本
+
+迁移项目应保留新模板中的 React 19、Vite、TypeScript 和 `vite-plugin-taro` 版本。将旧项目的业务依赖逐个安装，不要整段复制旧 `dependencies` 与 `devDependencies`。
+
+通常可以删除仅服务于 Taro CLI 构建链的直接依赖：
+
+- `@tarojs/cli`
+- `@tarojs/webpack5-runner`
+- `@tarojs/vite-runner`
+- `@tarojs/plugin-framework-react`
+- `@tarojs/plugin-platform-*`
+- `@tarojs/taro-loader`
+- `babel-preset-taro`
+- webpack 专用 loader 和插件
+
+也不要在应用中直接安装 `@tarojs/taro` 或 `@tarojs/components`。它们由 vpt 统一提供。
+
+:::caution[第三方 Taro 库]
+依赖 `@tarojs/*` peer dependency、Taro CLI 插件、webpack loader 或 React 18 内部行为的第三方库不一定兼容。先确认库支持 React 19，再在微信和 Web 两端分别验证。无法兼容的构建插件需要替换，而不是继续保留旧 Taro CLI。
+:::
+
+## 当前不能直接迁移的能力
+
+以下能力没有一对一迁移路径：
+
+- Vue、Preact、Solid 和非微信小程序目标。
+- 原生页面分包、独立分包和手动代码分包配置。
+- `taro new`、Taro 插件钩子以及 Taro generator。
+- webpack loader、webpack plugin 和 `webpackChain` 定制。
+- 依赖组件级 `*.config.ts` 自动生成原生文件的功能。
+- 自定义原生 tab bar、原生组件目录或 WXS 文件的自动编译与复制。
+
+页面 JSON 中的 `usingComponents` 会被保留，但对应原生文件必须通过 `public` 或其他 Vite 插件出现在正确的输出路径。迁移这类混合项目时，应先制作一个最小页面验证原生组件，再继续迁移其余页面。
+
+## 9. 逐项验证
+
+完成迁移后按以下顺序检查：
+
+1. 运行 TypeScript 检查，修复所有旧导入和类型错误。
+2. 启动 Web，逐个访问 `pages` 中的路由。
+3. 启动微信开发构建，在开发者工具中导入 `dist/wx`。
+4. 检查 App 生命周期、页面生命周期、路由参数和 `globalData`。
+5. 检查 tab bar、导航栏、下拉刷新和授权配置。
+6. 检查图片、字体、全局样式、CSS Modules 和各页面尺寸。
+7. 检查网络请求、登录、支付、订阅消息等微信 API。
+8. 修改一个深层 React 组件，确认热更新保留当前页面状态。
+9. 分别执行微信和 Web 生产构建。
+10. 使用微信开发者工具检查最终主包、分包和上传体积。
+
+<Tabs syncKey="package-manager">
+    <TabItem label="npm">
+
+```sh
+npm run typecheck
+npm run build:wx
+npm run build:h5
+```
+
+    </TabItem>
+    <TabItem label="pnpm">
+
+```sh
+pnpm typecheck
+pnpm build:wx
+pnpm build:h5
+```
+
+    </TabItem>
+    <TabItem label="bun">
+
+```sh
+bun run typecheck
+bun run build:wx
+bun run build:h5
+```
+
+    </TabItem>
+</Tabs>
+
+迁移完成后可以删除旧的 `config` 目录、`app.config.ts`、页面 `*.config.ts`、旧构建脚本与不再使用的依赖。删除前先确认新项目的两个生产构建都通过。

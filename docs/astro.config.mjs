@@ -35,7 +35,8 @@ export default defineConfig({
                         { label: '快速开始', slug: 'guides/quick-start' },
                         { label: '全自动分包', slug: 'guides/automatic-subpackages' },
                         { label: '开发者工具热更新', slug: 'guides/hot-module-replacement' },
-                        { label: 'Skyline 模式', slug: 'guides/skyline-mode' }
+                        { label: 'Skyline 模式', slug: 'guides/skyline-mode' },
+                        { label: '从 Taro CLI 迁移', slug: 'guides/migrate-from-taro' }
                     ]
                 },
                 {
