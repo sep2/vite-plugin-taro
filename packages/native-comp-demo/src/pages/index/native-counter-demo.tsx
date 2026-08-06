@@ -2,7 +2,7 @@ import { Button, Text, View } from 'virtual:taro/components'
 import { defineNativeComponent } from 'virtual:taro/native'
 import { useState } from 'react'
 
-const NativeCounter = defineNativeComponent('./native/native-counter', {
+const NativeCounter = defineNativeComponent('../../native/native-counter', {
     properties: {
         count: Number
     },

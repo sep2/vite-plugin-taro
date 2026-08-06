@@ -1,7 +1,7 @@
 import { Text } from 'virtual:taro/components'
 import { lazy, Suspense } from 'react'
 
-const NativeCounterDemo = lazy(() => import('../../native-counter-demo.tsx'))
+const NativeCounterDemo = lazy(() => import('./native-counter-demo.tsx'))
 
 export default function Index() {
     return (
