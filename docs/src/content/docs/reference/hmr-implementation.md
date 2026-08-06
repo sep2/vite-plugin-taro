@@ -1,5 +1,5 @@
 ---
-title: HMR 实现原理
+title: 热更新实现原理
 description: 微信开发者工具热更新的物理交付边界、模块替换、React Refresh 与页面状态保留机制。
 ---
 

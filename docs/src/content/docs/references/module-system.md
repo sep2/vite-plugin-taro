@@ -3,73 +3,79 @@ title: 模块系统
 description: vpt 在 H5 与微信小程序目标中解析、切分、放置和执行 JavaScript 模块的完整机制。
 ---
 
-vpt 让应用源码继续使用标准 ESM：同步依赖写 `import`，按需边界写 `import()`。H5 目标直接使用浏览器和 Vite 的模块流水线；微信小程序目标则在构建后增加一层运行时模块系统，把 Rolldown 生成的 ESM chunk 接到微信原生 CommonJS、主包和代码分包上。
+vpt 让应用始终使用 ESM：同步依赖写 `import`，按需加载写 `import()`。H5 继续使用 Vite 和浏览器的模块机制；微信目标则把 Rolldown 的构建结果转换为微信可以同步启动、按需加载和自动分包的应用。
 
-本文中的“模块”可能指源码模块，也可能指最终 chunk。两者并不一一对应：Rolldown 仍然负责解析、tree shaking、scope hoisting 和 chunk 切分；微信运行时以**最终 chunk 文件名**作为 SystemJS 模块 ID。
+本文涉及两种模块：
+
+- **源码模块**：Vite/Rolldown 解析的源码文件；
+- **输出模块**：Rolldown 切分出的最终 chunk。
+
+它们不一一对应。Rolldown 负责解析、转换、删除未使用代码（tree shaking）、合并模块作用域（scope hoisting）和切分 chunk；vpt 在最终输出阶段处理微信入口、运行时加载和物理分包。
 
 ## 这套设计解决了什么
 
-Vite/Rolldown 面向 ESM 和异步 chunk 加载，而微信小程序的启动入口、模块格式与分包加载方式完全不同。vpt 的模块系统负责消除这组差异，让业务源码不必同时维护一套“Web 模块图”和一套“微信模块图”。
+Vite/Rolldown 面向 ESM 和异步 chunk 加载，微信小程序却要求同步注册原生入口，并通过不同 API 加载主包与分包文件。如果把这些限制直接暴露给应用，业务代码就必须维护微信专用入口、包路径、共享依赖和加载顺序。
 
-| 问题 | 设计如何解决 |
+| 冲突 | vpt 的解决方式 |
 | --- | --- |
-| 微信要求 `App()`、`Page()`、`Component()` 在入口执行时同步注册，普通动态 chunk 却是异步的 | 保留极小的 native CommonJS shell，并用 `System.importSync()` 激活位于主包的 eager capsule |
-| 主包和分包使用不同的物理加载方式，业务模块不应知道自己最终位于哪里 | transport 根据最终文件位置生成字面量 `require()` 或 `require.async()`；源码仍只写 `import` 和 `import()` |
-| 一个静态依赖图可能跨主包、多个分包甚至形成循环 | 使用一个全局 SystemJS registry 按规范 chunk ID 链接完整逻辑图，保留依赖顺序、live bindings、共享 namespace 和循环语义 |
-| Bootstrap 等模块既要被 native shell 执行，又要被应用图导入 | 将其标记为 amphibious：CommonJS 只执行一次，SystemJS 发布同一个缓存 namespace，避免重复初始化 |
-| 手工分包会把物理目录、容量调整和共享依赖处理泄漏进业务架构 | 根据同步与动态边界自动规划唯一 package owner，在体积预算内生成稳定的代码分包，并从最终 bundle 生成 `app.json` |
-| 内容哈希只有在所有跨 chunk 连接都参与计算时才可信 | 在 Rolldown 确定最终哈希前物化完整 transport，使生成的物理引用进入 chunk 内容和哈希计算 |
-| 微信开发工具通过物理文件变化交付更新，而应用模块状态需要跨页面重执行存活 | 初始代码仍由 SystemJS 加载物理 capsules；开发时另由 App 级 Rolldown runtime 管理 source-module factories、缓存和 HMR 边界 |
+| `App()`、`Page()`、`Component()` 必须同步注册 | 生成固定路径的极小原生入口，并把启动所需的完整依赖放在主包 |
+| 主包和分包使用不同的物理加载 API | 根据最终文件位置生成加载代码，业务模块不接触微信加载 API |
+| 一个 ESM 依赖图可能跨多个物理包，并包含共享依赖或循环 | 使用一套共享模块运行时连接完整依赖图，而不是为各分包复制依赖 |
+| 手工分包会把目录和体积管理泄漏进业务架构 | 根据静态与动态导入关系自动分配模块位置，并生成分包和 `app.json` |
+| 内容哈希必须包含构建生成的跨文件引用 | 在最终哈希确定前生成完整加载关系，让所有物理引用参与哈希计算 |
+| 微信开发工具通过物理文件变化交付更新 | 初次构建加载物理 chunks，开发补丁则由 App 级模块运行时在原环境中应用 |
 
-最终效果是：
-
-- 业务代码只表达**同步依赖**和**异步边界**，不表达微信包路径；
-- 微信原生入口始终同步、路径固定且足够小；
-- lazy 代码可以跨物理分包共享依赖，而不复制模块；
-- H5 继续使用 Vite 与浏览器原生模块机制，不承担微信 runtime 的复杂度。
+应用最终只表达**同步依赖**与**异步加载边界**，不表达微信包路径，也不维护第二套模块图。
 
 ## 总览
 
-微信要求 `App()`、`Page()` 和 `Component()` 同步注册，但应用又需要 ESM、动态导入和跨分包依赖。vpt 将这两个执行世界分开：
-
 ```text
-源码 ESM
+应用源码
    │
-   │ Vite + Rolldown：解析、转换、tree shaking、切分
+   │ 静态 import：同步依赖
+   │ 动态 import()：按需加载边界
    ▼
-最终 ESM chunks
+Vite + Rolldown 模块图
    │
-   ├─ native      → 微信 CommonJS
-   ├─ capsule     → 惰性的 SystemJS registration
-   └─ amphibious  → 微信 CommonJS + 同一 namespace 的 SystemJS registration
+   ├─ 启动时同步可达的模块 ──────────────→ 主包
+   │
+   └─ 只在动态边界后可达的模块
+          │
+          └─ vpt 按体积和依赖关系分组 ──→ 生成分包
 
-微信原生 App / Page / Component shell
-   │
-   │ System.importSync(eagerCapsuleId)
-   ▼
-主包中的同步 capsule 图
-   │
-   │ 应用源码中的 import()
-   ▼
-System.import(lazyCapsuleId)
-   │
-   ├─ 主包：require()
-   └─ 生成分包：require.async()
+最终微信输出
+   ├─ 固定路径的 App / Page / Component 原生入口
+   ├─ 主包 JavaScript chunks
+   ├─ sub/p_*/assets/* 按需 chunks
+   ├─ 构建生成的模块加载表
+   └─ 与实际分包一致的 app.json
 ```
 
-整个微信应用只有一个安装在 `global.System` 上的 loader 和一个共享 registry。主包与所有生成分包都通过它链接同一张模块图。
+运行时遵守三个规则：
 
-## 应用源码看到的规则
+1. 原生入口必须同步完成注册；
+2. 静态依赖保持同步模块语义；
+3. 动态 `import()` 才能触发按需文件加载。
+
+模块在不同阶段使用不同身份：
+
+| 身份 | 用途 |
+| --- | --- |
+| Vite/Rolldown 源码模块 ID | 源码转换、删除未使用代码、位置规划和开发补丁 |
+| 最终 chunk 文件名 | 运行时模块 ID，以及 chunk 之间的静态和动态依赖 ID |
+| 相对于模块加载表文件的路径 | 仅供构建生成的微信文件加载代码使用 |
+
+## 应用源码语义
 
 ### 静态导入
 
-静态 `import` 表达同步依赖关系：
+静态 `import` 表达同步依赖：
 
 ```ts
 import { calculate } from './calculate'
 ```
 
-如果该依赖从 App、页面或其他启动代码同步可达，它会留在主包的 eager 图中。如果静态边位于一个真正的动态边界之后，依赖也可以被放到生成分包；跨分包静态边由 SystemJS 链接，不需要修改源码路径。
+从 App、页面或其他启动代码同步可达的模块属于**同步启动图**，必须留在主包。动态导入之后的静态依赖可以分布在一个或多个生成分包中；vpt 的运行时负责连接跨包依赖，源码路径不需要变化。
 
 ### 动态导入
 
@@ -79,111 +85,146 @@ import { calculate } from './calculate'
 const { createReport } = await import('./features/report')
 ```
 
-动态导入进入 capsule 后会被转换为 SystemJS context 的 `import()`。它可以加载主包中的另一个 chunk，也可以通过 `require.async()` 取得生成分包中的 registration。
+目标可能仍在主包，也可能从生成分包加载。物理位置由构建结果决定，不改变 `import()` 的使用方式。
 
-:::caution[同步图不能包含异步执行]
-App、Page 和 Component 的 native shell 必须同步取得完整配置。它们的 eager capsule 及静态闭包不能使用顶层 `await`，也不能依赖异步 transport。顶层 `await` 只能出现在应用动态 `import()` 边界之后的 lazy 图中。
-:::
+## 微信构建流水线
 
-### 不要依赖生成路径
+### 1. 建立原生入口和配置模块
 
-`assets/<name>-<hash>.js` 和 `sub/p_<hash>/assets/<hash>.js` 都是构建产物，不是源码可导入的公共 ID。应用不应调用 `global.System`、`require.async()`，也不应手写生成分包路径；这些连接由 vpt 根据最终输出图生成。
-
-## 微信构建如何建立入口
-
-vpt 不把业务页面直接做成微信原生入口。解析器先建立以下 plugin-owned 输入：
+vpt 为微信生成以下内部入口：
 
 ```text
-app.js                         → native App shell
-comp.js                        → native recursive Component shell
-pages/<route>.js               → route-specific native Page shell
-transport                     → native module transport
+app.js                         → App 原生入口
+comp.js                        → 递归 Component 原生入口
+pages/<route>.js               → 对应 route 的 Page 原生入口
 ```
 
-每个页面 shell 的源码 ID 带有 route query。解析页面 capsule 和页面组件时，vpt 从该 query 找回配置中的页面路径，因此同一个 Page runtime source 会在模块图中保留多个互不混淆的页面身份。
+每个 Page 原生入口的源码 ID 都带有 route 查询参数。vpt 通过它找到对应的 Page 配置模块、`src/<page-path>.tsx` 和页面配置，使每条 route 在依赖图中拥有独立 ID。
 
-native shell 只负责两件事：
+原生入口只负责加载共享启动代码、同步取得配置对象，并调用微信的 `App()`、`Page()` 或 `Component()`。配置对象由 vpt 的配置模块创建：
 
-1. 加载共享 bootstrap；
-2. 同步加载对应 capsule 的默认导出，并传给微信的 `App()`、`Page()` 或 `Component()`。
+- App 模块初始化 Taro React 运行时，并调用 `createReactApp()`；
+- Page 模块先确保 App 已初始化，再调用 `createPageConfig()`；
+- Component 模块同样先确保 App 已初始化，再创建递归组件配置。
 
-例如，App shell 的源码动态导入只是一个 Rolldown split-point 标记。最终 native renderer 会把它改写为等价的同步调用：
+配置模块必须同步返回一个非数组对象，否则原生入口无法完成注册。
 
-```js
-App(loadCapsuleConfig('App', () => global.System.importSync('assets/app-<hash>.js')))
+### 2. 规划主包和分包
+
+位置规划发生在 Rolldown 的 `renderStart` 阶段：源码模块已经完成转换，最终 chunks 还没有生成。
+
+以下内容必须留在主包：
+
+1. 每个原生入口；
+2. 原生入口递归静态导入的全部模块；
+3. 原生入口直接指向的配置模块；
+4. 配置模块递归静态导入的全部模块。
+
+```text
+原生入口
+   └─ 配置模块 [主包]
+          ├─ 静态 import → 主包
+          └─ 业务 import() → 按需加载边界
 ```
 
-这不是应用 `import()` 的通用改写。只有 native entry 直接指向其 eager capsule 的内部边界会变成 `importSync()`；capsule 内的动态导入仍然是异步 `System.import()`。
+其他源码模块可以进入生成分包。规划器按照以下确定性规则分组：
 
-## 三种最终模块
+1. 以转换后源码的 UTF-8 字节数估算模块大小；
+2. 从大到小处理，大小相同时按源码模块 ID 排序；
+3. 优先放入容纳该模块后剩余空间最小的现有分包；
+4. 剩余空间相同时，优先放入使用相同动态入口或直接互相静态导入的模块所在分包；
+5. 没有现有分包可容纳时创建新分包。
 
-模块种类在 **Rolldown 完成 chunk 切分之后**判定。
+每个分包的规划预算为 `1,900,000` 字节，为运行时包装和 Rolldown 生成代码预留空间。单个超预算源码模块会独占一个分包；规划器不会拆分源码模块，也不保证最终上传体积必然低于微信限制。
 
-| 种类 | 判定 | 物理格式 | 执行者 |
-| --- | --- | --- | --- |
-| `native` | native entry，或 transport chunk | CommonJS | 微信原生模块系统 |
-| `capsule` | 普通非 entry chunk | 导出 SystemJS registration tuple 的 CommonJS 文件 | SystemJS |
-| `amphibious` | 包含 bootstrap 或 Rolldown helper runtime 的 chunk | CommonJS，并由 transport 暴露同一 namespace | 微信 CommonJS 与 SystemJS 共享一次执行结果 |
+每个按需加载模块只归属一个物理包，不会为了跨包引用复制共享模块。规划器会尽量把相关模块放在一起，但大型静态依赖图或循环依赖可以拆到多个分包，由模块运行时保持原依赖关系和循环语义。
 
-`amphibious` 身份优先于 entry 身份。如果 Rolldown 把其他模块合并进含有 amphibious runtime 的 chunk，整个最终 chunk 都按 amphibious 模块处理。
+分包目录名来自该分包内排序后的源码模块 IDs：对它们计算 SHA-256，并取前 8 位。
 
-### Native 模块
+```text
+sub/p_<8位哈希>
+```
 
-Native renderer 将最终 ESM chunk 转成微信可以同步执行的 CommonJS。普通静态边成为字面量 `require()`；native shell 的 capsule split point 成为 `global.System.importSync()`。
+Rolldown 的 chunk 分组配置会阻止不同物理包中的模块合并。如果最终 chunk 同时包含属于不同物理包的源码模块，构建会直接失败。
 
-`app.js`、`comp.js` 和每个 `pages/<route>.js` 使用微信要求的精确输出路径。transport 自身也是 native entry，但使用带内容哈希的 `assets/transport-<hash>.js` 文件名。
+### 3. 生成最终文件和分包声明
 
-### Capsule
+主包普通 chunk 使用 `assets/<name>-<content-hash>.js`；分包 chunk 使用 `sub/p_<hash>/assets/<content-hash>.js`。删除未使用代码后没有实际输出的分包不会进入 `app.json`。
 
-普通应用 chunk 会先从 ESM 转为一个匿名 `System.register()`，然后再包成惰性的 CommonJS 值：
+vpt 对最终存在的分包目录去重、排序，并生成分包声明：
+
+```json
+{
+    "subPackages": [
+        {
+            "name": "p_abcd1234",
+            "root": "sub/p_abcd1234",
+            "pages": []
+        }
+    ]
+}
+```
+
+这些分包只存放 JavaScript，所以 `pages` 为空。传入 `appJson` 的 `subPackages` 或 `subpackages` 会被移除，最终声明完全来自实际输出。
+
+:::note[位置规划只管理 JavaScript]
+图片、字体、其他构建资源和全局 `app.wxss` 不参与 JavaScript 模块的位置规划。
+:::
+
+## 微信运行时实现：SystemJS
+
+前面的源码和构建规则不要求应用了解具体加载器。当前微信目标使用内置的精简 SystemJS 来实现这些规则；这是 vpt 的内部实现，不是应用 API。
+
+### 三种输出模块
+
+源码中的 `native`、`capsule` 和 `amphibious` 是最终 chunk 的内部分类：
+
+| 文档名称 | 源码名称 | 输出和执行方式 |
+| --- | --- | --- |
+| 原生模块 | `native` | 转为 CommonJS，只由微信原生模块系统执行 |
+| SystemJS 注册模块 | `capsule` | CommonJS 文件只导出一份 SystemJS 注册数据，等待 SystemJS 执行 |
+| 桥接模块 | `amphibious` | 作为 CommonJS 执行，并向 SystemJS 发布同一组缓存导出 |
+
+原生入口和模块加载表属于原生模块。普通非入口 chunk 属于 SystemJS 注册模块。包含共享启动代码或 Rolldown 辅助运行时的 chunk 属于桥接模块；桥接判定优先级最高。
+
+#### SystemJS 注册模块
+
+普通 chunk 先变成匿名 `System.register()`，再包装成一份不会立即执行的数据：
 
 ```js
 module.exports = [
     ['assets/dependency-<hash>.js'],
     function (exportBinding, context) {
         return {
-            setters: [/* live-binding setters */],
+            setters: [/* 接收依赖导出更新的函数 */],
             execute() {
-                // 原 chunk 的执行体
+                // 原 chunk 执行体
             }
         }
     }
 ]
 ```
 
-`require()` 一个 capsule 只返回 registration，不会执行应用模块体。声明、链接、依赖顺序、循环处理和执行都由 SystemJS registry 统一拥有。
+微信 `require()` 这个文件时只会取得 `[依赖列表, 声明函数]`，不会执行应用模块体。SystemJS 负责连接依赖、处理循环和执行模块。
 
-wrapper 还会在最终 importing chunk 文件名已知时，把 Rolldown 产生的相对静态引用和字面量动态引用转换为相对输出根的规范 ID：
+#### 桥接模块
+
+共享启动模块必须先作为 CommonJS 安装模块运行时，随后又会被应用依赖图导入。Rolldown 辅助运行时出现时也有相同需求。
+
+模块加载表会为桥接模块生成一份 SystemJS 注册数据。SystemJS 执行它时，才通过 `require()` 取得 CommonJS 已缓存的导出，并发布给 SystemJS。这样模块体只执行一次。延迟这次 `require()` 也避免了共享启动模块与模块加载表互相加载时产生初始化循环。
+
+### 模块 ID 和加载表
+
+SystemJS 使用相对于微信输出根目录的 chunk 文件名作为模块 ID。构建时，vpt 会把 chunk 之间的相对引用转换成这种统一 ID：
 
 ```text
 ../../assets/shared.js  → assets/shared.js
 ./lazy.js                → sub/p_abcd1234/lazy.js
 ```
 
-运行时计算出的动态 ID 不会被 wrapper 猜测或重写。
+这项转换只处理构建产物中确定的字符串路径，不猜测运行时计算出的动态 ID。`import.meta.url` 也使用当前 chunk 的统一 ID。
 
-### Amphibious 模块
-
-Bootstrap 同时被 native shell 和 capsule 图引用。它必须先作为 CommonJS 安装 SystemJS，又必须在 SystemJS 图中提供同一组导出。Rolldown helper runtime 在出现时也具有相同的跨边界需求。
-
-vpt 不执行两份模块体。transport 为 amphibious chunk 合成一个 registration；该 registration 的 `execute()` 才通过字面量 `require()` 取得已经由微信缓存的 CommonJS namespace，并将整组绑定发布给 SystemJS。
-
-延迟 `require()` 也避免了 bootstrap 加载 transport、transport 又在创建 bootstrap registration 时立即加载 bootstrap 的递归环。
-
-## Bootstrap、transport 与 registry
-
-Bootstrap 是所有 native shell 共享的初始化屏障。它按以下顺序工作：
-
-1. 安装带同步扩展的精简 SystemJS core；
-2. 取得安装在微信 `global` 对象上的 `System`；
-3. 把生成的 transport 设置为 `System.instantiate`；
-4. 导出构建时写入的 App 配置、capsule 配置校验器和 Vite preload identity wrapper。
-
-微信目标没有浏览器 `modulepreload`。Vite 注入的 preload helper 被解析到 bootstrap 中的 identity wrapper：它只调用 loader，不创建另一条预加载或执行通道。
-
-### Transport 是闭合的字面量映射
-
-构建时，vpt 根据最终 output graph 为每个 capsule 和 amphibious chunk 生成一个 switch case。概念上类似：
+模块加载表在源码中名为 `transport`。它根据最终 chunk 列表生成：每个可加载 chunk 都有一个固定的 `case`，模块 ID 和 `require` 路径直接写入构建产物，未知 ID 会被拒绝。
 
 ```js
 function transport(moduleId) {
@@ -200,170 +241,81 @@ function transport(moduleId) {
 }
 ```
 
-加载方式由 chunk 的**最终物理路径**决定：`sub/p_` 下的文件使用异步 `require.async()`，其他 capsule 使用同步 `require()`。Amphibious 模块必须位于主包，否则构建失败。
+加载方式只由最终文件位置决定：`sub/p_` 下的 SystemJS 注册模块使用 `require.async()`，其他注册模块使用 `require()`；桥接模块必须位于主包。
 
-所有 native require 参数都是构建时生成的字面量。transport 在 Rolldown 尚未确定最终内容哈希时写入这些引用，因此 transport、bootstrap 和引用它们的 chunk 的最终哈希都真实包含完整连接关系。一个 capsule 改名可能造成较广的哈希级联，这是当前设计的预期结果。
+模块加载表会在 Rolldown 确定最终内容哈希之前写入全部文件引用，因此这些引用会参与模块加载表、共享启动模块及其引用方的哈希计算。一个 chunk 变化可能引起多个关联文件改名，这是完整加载关系参与内容哈希后的预期结果。
 
-### 规范模块 ID
+### 启动过程
 
-微信生产构建中，SystemJS ID 就是最终 chunk 文件名，统一相对于输出根：
+每个原生入口首先通过 CommonJS 加载共享启动模块，源码中名为 `bootstrap`。它会：
 
-```text
-assets/page-a.js
-sub/p_abcd1234/assets/lazy-b.js
+1. 安装带 `importSync()` 扩展的精简 SystemJS；
+2. 取得 `global.System`；
+3. 将模块加载表设为 `System.instantiate`；
+4. 导出 App 配置、配置对象校验函数，以及 Vite preload 包装器。
+
+微信没有浏览器 `modulepreload`。这个 preload 包装器不会建立另一条加载通道，只会调用真正的模块加载函数。
+
+原生入口源码中的直接 `import()` 仅用于告诉 Rolldown 在这里切分配置 chunk。输出转换器会把它改成同步加载：
+
+```js
+App(loadCapsuleConfig('App', () => global.System.importSync('assets/app-<hash>.js')))
 ```
 
-SystemJS 不解析 native 相对路径。相对路径只存在于 transport 内部生成的 `require()` 参数中。`import.meta.url` 也使用当前规范 chunk ID。
+这条改写只用于 vpt 生成的原生入口；业务动态导入仍使用异步 `System.import()`。
 
-| 身份 | 用途 |
-| --- | --- |
-| Vite/Rolldown source module ID | 转换、tree shaking、放置规划与开发补丁 |
-| 最终 chunk 文件名 | SystemJS registry key 和 chunk 间依赖 ID |
-| transport-relative 文件路径 | 仅供生成的 native `require()` / `require.async()` 使用 |
+### 同步加载：`System.importSync()`
 
-## 同步与异步加载
+同步加载会：
 
-### `System.importSync()`
+1. 通过模块加载表取得目标模块的 SystemJS 注册数据；
+2. 为目标模块和它递归静态依赖的模块创建注册表条目；
+3. 连接用于实时更新导出值的回调；
+4. 按依赖优先顺序执行；
+5. 返回包含模块全部导出的命名空间对象。
 
-vpt 的 SystemJS core 增加了同步加载路径。它会在当前 JavaScript turn 内：
+同步和异步加载共用同一个 SystemJS 注册表。同一 ID 只会初始化和执行一次，并返回同一个模块命名空间；静态循环、声明阶段导出和实时绑定（live bindings）也通过这张注册表处理。
 
-1. 通过 transport 取得 root registration；
-2. 为 root 和静态闭包创建共享 registry record；
-3. 连接 live-binding setter；
-4. 以依赖优先顺序执行；
-5. 返回 live module namespace。
+如果文件加载或任一模块执行函数返回 Promise，或者返回其他带 `.then()` 的值，`importSync()` 会立即抛出 `module graph is asynchronous`。它不会撤销已经创建的注册表条目，因此当前 App JavaScript 环境已经处于不完整状态，不能继续作为正常运行基线。
 
-同步和异步 import 共用同一个 registry，因此同一 ID 只实例化、执行一次，并返回同一个 namespace。同步路径同样支持静态循环、声明阶段导出和 live bindings。
+### 异步加载：`System.import()`
 
-如果任一 registration 的 transport 或 `execute()` 返回 thenable，`importSync()` 会立即抛出“module graph is asynchronous”。它不会回滚已经写入 registry 的 record；这表示当前构建违反了 eager placement 不变量，该运行时堆不能继续当作正常基线使用。
+应用动态导入最终使用异步加载。它会：
 
-### `System.import()`
+- 等待 `require.async()` 返回分包中的 SystemJS 注册数据；
+- 在执行引用方之前连接完整静态依赖图；
+- 等待依赖中的顶层 `await`；
+- 保留实时绑定、共享模块命名空间、循环依赖和单次执行语义。
 
-异步路径用于应用动态导入。它可以：
+即使一个按需加载的循环依赖跨越多个物理分包，SystemJS 仍会按统一 ID 复用同一注册表条目，并把它们作为一张逻辑依赖图完成连接和执行。
 
-- 等待 `require.async()` 返回分包 registration；
-- 在执行 importer 前加载并链接完整静态依赖图；
-- 等待依赖的顶层 `await`；
-- 保留 live bindings、共享依赖、循环依赖与单次执行语义；
-- 让跨主包和多个生成分包的静态图继续保持一个逻辑图。
+## 开发模式
 
-即使 lazy 静态循环的不同模块被放到不同物理分包，SystemJS 也会先创建和复用规范 ID 对应的 record，再完成链接与执行。
-
-## 自动放置到主包和生成分包
-
-放置规划发生在 `renderStart`：此时所有源码模块已经转换，但 Rolldown 还没有创建最终 chunks。规划结果是从 source module ID 到一个物理 package owner 的不可变映射。
-
-### Eager 主包闭包
-
-以下模块必须位于主包：
-
-1. 每个 native entry；
-2. native entry 的完整静态闭包；
-3. native entry 直接动态导入的 eager capsule root；
-4. 这些 eager capsule root 的完整静态闭包。
-
-```text
-native entry
-   └─ direct import() marker → eager capsule root [main]
-                                  ├─ static import → main
-                                  └─ nested import() → genuine lazy boundary
-```
-
-第一个 `import()` 是 vpt native shell 内部的同步 capsule 标记。只有进入 capsule 后遇到的动态导入，才是应用可观察的异步边界。
-
-### Lazy 模块打包
-
-不属于 eager 集合的 transformed modules 会成为可放置的 lazy modules。当前 planner 使用以下确定性策略：
-
-1. 用转换后源码的 UTF-8 字节数估算每个模块大小；
-2. 按大小从大到小处理，module ID 作为稳定 tie-breaker；
-3. 采用 best-fit，把模块放入仍可容纳它且剩余空间最小的 bin；
-4. 剩余空间相同时，优先共享同一动态 root，其次优先直接静态相邻的模块；
-5. 没有 bin 可容纳时创建新分包。
-
-规划预算是 `1,900,000` 字节，为 capsule wrapper 和 bundler 生成代码预留空间。单个已经超过预算的模块仍会独占一个 bin；planner 不会拆分一个 source module，也不保证微信最终统计体积一定低于限制。
-
-静态闭包和静态循环只是 co-location 偏好，不是不可拆分单元。大型 lazy 图可以跨多个分包，由 SystemJS 维持原有依赖方向和循环语义。
-
-### 稳定归属与最终 chunk
-
-每个 lazy source module 只有一个 package owner，不会为了跨分包引用复制共享模块。分包 root 由该 bin 中**排序后的 module IDs**计算 SHA-256 并取前 8 位：
-
-```text
-sub/p_<8位哈希>
-```
-
-Rolldown code-splitting groups 防止不同 owner 的模块合并成一个 chunk；如果最终 chunk 混入多个已知 owner，构建会直接报错。组不会递归吞入静态依赖，因此一个 lazy 静态闭包可以按规划分布在多个分包。
-
-主包普通 chunk 使用 `assets/<name>-<content-hash>.js`；生成分包中的 chunk 使用 `sub/p_<hash>/assets/<content-hash>.js`。只有 tree shaking 后真正含有输出模块的分包才会写入 `app.json`，root 会去重并排序：
-
-```json
-{
-    "subPackages": [
-        {
-            "name": "p_abcd1234",
-            "root": "sub/p_abcd1234",
-            "pages": []
-        }
-    ]
-}
-```
-
-这些是只包含代码的分包，所以 `pages` 为空。`appJson` 中传入的 `subPackages` 或 `subpackages` 会被移除；最终声明完全来自当前输出图。
-
-:::note[规划只管理 JavaScript module]
-图片、字体、普通构建资源和全局 `app.wxss` 不参与这套 JavaScript module placement。
-:::
-
-## App、Page 和 Component capsule
-
-三个 native 配置都在 capsule 内创建，而不是在 shell 中拼装：
-
-- App capsule 初始化 Taro React runtime，解析配置的 App component，并调用 `createReactApp()`；
-- Page capsule 先确保 App capsule 已初始化，再解析 route-specific Page component 并调用 `createPageConfig()`；
-- Component capsule 同样经过 App 初始化屏障，再创建 Taro recursive component config。
-
-native shell 只接受 capsule namespace 的 `default`。该值必须是非数组对象，而且 capsule 必须同步完成；否则 bootstrap 会立即拒绝注册。
-
-这种分层让微信原生入口保持很小、路径固定且同步，同时让 Taro、React 和业务代码继续留在 Rolldown/SystemJS 管理的应用图中。
-
-## 开发模式中的两层模块图
-
-微信开发模式的第一次完整物理构建仍使用同一套 native、capsule、amphibious、transport 和 placement 架构，但文件名会去掉内容哈希以保持物理依赖稳定。Rolldown DevEngine 还会在输出中注入开发模块 runtime。
-
-两层职责不同：
+第一次微信开发构建仍使用相同的物理输出和位置规划，但移除内容哈希以保持文件路径稳定。Rolldown DevEngine 同时注入源码模块开发运行时。
 
 | 层 | 责任 |
 | --- | --- |
-| SystemJS 外层 chunk 图 | 初次取得物理 capsule，连接最终 chunks，处理分包与 eager/lazy 加载 |
-| Rolldown 开发 source-module 图 | 注册可重新执行的 source module factories、缓存、反向 importer 和 HMR accept 边界 |
+| SystemJS chunk 依赖图 | 初次加载物理文件，连接最终 chunks，处理主包与分包 |
+| Rolldown 源码模块依赖图 | 管理可重新执行的模块函数、缓存、反向引用关系和 HMR 接受边界 |
 
-普通 JavaScript 更新不会重写和重新导入全部 capsule。DevEngine 把 source-module factory patch 写入所有页面预先直接依赖的 `hmr/patches.js`；App 级 Rolldown runtime 在原有堆中同步替换受影响 source modules。只有无法安全接受的更新才触发完整物理构建，并重新建立两层图。
+普通 JavaScript 更新只改写所有页面预先直接依赖的 `hmr/patches.js`。App 级 Rolldown 运行时在原有 JavaScript 环境中同步应用源码模块执行函数补丁；SystemJS 不重新加载整套物理 chunks。无法安全接受的更新才触发完整物理构建，并重新建立两层依赖图。
 
-因此，生产模块 ID 与开发补丁 ID 不应混为一谈：生产 SystemJS registry 以最终 chunk 文件名为键；HMR 的 `changedIds` 属于 Rolldown 开发 source-module 图。
+因此，SystemJS 使用的最终 chunk ID 与 HMR `changedIds` 中的源码模块 ID 属于不同层次。
 
 ## H5 目标
 
-H5 不使用上述微信 transport 或 SystemJS core。vpt 会：
+H5 不使用上述微信模块运行时或生成分包。vpt 会：
 
-1. 在 `index.html` 注入 plugin-owned H5 App 模块；
-2. 把 App 配置和页面 routes 写入该模块；
-3. 为每个 route 生成浏览器动态 `import()`，加载对应 `src/<page-path>.tsx`；
-4. 继续交给 Vite/Rolldown 和浏览器原生模块机制执行。
+1. 在 `index.html` 注入 vpt 生成的 H5 App 入口；
+2. 将 App 配置和页面路由写入该入口；
+3. 为每条路由生成浏览器动态 `import()`，加载 `src/<page-path>.tsx`；
+4. 交给 Vite/Rolldown 和浏览器原生模块机制执行。
 
-因此，`native`、`capsule`、`amphibious`、`importSync()` 和生成代码分包都是微信目标的实现。共享应用源码仍然使用同一套静态 `import` 与动态 `import()` 表达同步和异步关系。
+共享源码仍然只使用静态 `import` 和动态 `import()`；微信专用运行时代码不会进入 H5 输出。
 
-## 实现不变量
+## 关键约束
 
-维护或排查当前模块系统时，可以用以下不变量判断行为是否正确：
-
-1. 微信应用只有一个 `global.System` registry。
-2. App、Page 和 Component 必须从主包同步取得完整 capsule 配置。
-3. Capsule 的 native `require()` 只能返回 registration，不能提前执行应用模块体。
-4. 所有 SystemJS 依赖都使用相对输出根的最终 chunk ID。
-5. Amphibious 模块的 CommonJS 模块体只能执行一次，SystemJS 必须发布同一个缓存 namespace。
-6. Transport 只接受最终 output graph 中生成的 ID，并且每个 native 加载路径都是字面量。
-7. 不同 package owner 不能被合并进同一个最终 chunk。
-8. `sub/p_` 下的 capsule 异步加载；主包 capsule 同步加载。
-9. Eager 静态闭包不能返回 thenable；lazy 图可以使用异步 transport 和顶层 `await`。
-10. HMR source-module factories 不会创建第二套初始物理 chunk loader。
+1. App、Page 和 Component 配置必须从主包同步取得。
+2. 每个按需加载源码模块只归属一个物理包。
+3. 属于不同物理包的源码模块不能进入同一个最终 chunk。
+4. 微信运行时只有一张模块注册表；同一个输出模块只执行一次。
