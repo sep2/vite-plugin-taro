@@ -30,7 +30,10 @@ export default defineConfig({
             sidebar: [
                 {
                     label: '开始使用',
-                    items: [{ label: '快速开始', slug: 'guides/quick-start' }]
+                    items: [
+                        { label: '快速开始', slug: 'guides/quick-start' },
+                        { label: '全自动分包', slug: 'guides/automatic-subpackages' }
+                    ]
                 },
                 {
                     label: '参考',
