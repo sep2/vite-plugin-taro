@@ -3,7 +3,7 @@ import { resolvePackageFile } from '../../utils/packages.ts'
 
 export const clientTaroApiId = 'virtual:taro/api'
 const clientTaroComponentId = 'virtual:taro/components'
-const clientTaroNativeId = 'virtual:taro/native'
+export const clientTaroNativeId = 'virtual:taro/native'
 
 const clientTaroModules = new Map([
     [clientTaroApiId, resolvePackageFile('dist/runtime/client/taro/api.js')],
