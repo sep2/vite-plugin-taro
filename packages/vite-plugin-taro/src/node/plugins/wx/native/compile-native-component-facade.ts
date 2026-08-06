@@ -1,14 +1,5 @@
-import type { Rolldown } from 'vite'
-import { collectNativeComponentAssets, type NativeComponentSource } from './native-component-assets.ts'
+import { collectNativeComponentAssets, nativeComponentMetaKey } from './native-component-assets.ts'
 import { transformNativeComponentFacades } from './native-component-schema.ts'
-
-export const nativeComponentMetaKey = 'vite-plugin-taro:native-components'
-
-type CompileNativeComponentFacadeResult = {
-    code: string
-    map: Rolldown.ExistingRawSourceMap | null
-    meta: Record<typeof nativeComponentMetaKey, readonly NativeComponentSource[]>
-}
 
 /** Compiles one facade module and attaches its opaque native sources to Rolldown metadata. */
 export async function compileNativeComponentFacade({
@@ -21,24 +12,31 @@ export async function compileNativeComponentFacade({
     id: string
     sourcemap: boolean
     addWatchFile: (file: string) => void
-}): Promise<CompileNativeComponentFacadeResult> {
+}) {
     const transformed = transformNativeComponentFacades(code, id, sourcemap)
 
     const nativeComponents = await Promise.all(transformed.definitions.map(collectNativeComponentAssets))
 
     nativeComponents.forEach((source) => {
-        addWatchFile(source.sourceDirectory)
+        addWatchFile(source.folder)
 
         source.assets.forEach((asset) => {
             addWatchFile(asset.sourcePath)
         })
     })
 
+    const assetBytes = nativeComponents.reduce((sourceTotal, source) => {
+        return sourceTotal + source.assets.reduce((assetTotal, asset) => assetTotal + asset.byteLength, 0)
+    }, 0)
+
     return {
         code: transformed.code,
         map: transformed.map,
         meta: {
-            [nativeComponentMetaKey]: nativeComponents
+            [nativeComponentMetaKey]: {
+                sources: nativeComponents,
+                assetBytes
+            }
         }
     }
 }

@@ -14,10 +14,7 @@ test('collects an opaque native folder recursively without validating its files'
         await writeFile(path.join(sourceDirectory, 'a.custom'), 'native source')
         await writeFile(path.join(sourceDirectory, 'nested', 'data.bin'), Uint8Array.from([0, 1, 2]))
         const definition: NativeComponentSchemaDefinition = {
-            moduleId: '/project/src/native-counter.ts',
-            callStart: 42,
-            folder: './native/native-counter',
-            sourceDirectory,
+            folder: sourceDirectory,
             properties: ['count'],
             events: ['increment']
         }
@@ -28,9 +25,10 @@ test('collects an opaque native folder recursively without validating its files'
             source.assets.map(({ relativePath }) => relativePath),
             ['a.custom', 'nested/data.bin', 'z.invalid-json']
         )
-        assert.equal(Buffer.from(source.assets[0]?.content ?? []).toString(), 'native source')
-        assert.deepEqual(Array.from(source.assets[1]?.content ?? []), [0, 1, 2])
-        assert.equal(Buffer.from(source.assets[2]?.content ?? []).toString(), '{')
+        assert.deepEqual(
+            source.assets.map(({ byteLength }) => byteLength),
+            [13, 3, 1]
+        )
         const { assets: _assets, ...actualDefinition } = source
         assert.deepEqual(actualDefinition, definition)
     } finally {

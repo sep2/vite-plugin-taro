@@ -1,14 +1,12 @@
 import type { ComponentType } from 'react'
 
-export type NativeSchema =
+type NativeSchema =
     | StringConstructor
     | NumberConstructor
     | BooleanConstructor
     | ObjectConstructor
     | ArrayConstructor
     | { readonly [name: string]: NativeSchema }
-
-export type NativeEventHandler<Detail> = (event: { readonly detail: Detail }) => void
 
 type SchemaValue<Schema> = Schema extends StringConstructor
     ? string
@@ -29,7 +27,7 @@ type PropertyProps<Properties> = {
 }
 
 type EventProps<Events> = {
-    [Name in keyof Events]?: NativeEventHandler<SchemaValue<Events[Name]>>
+    [Name in keyof Events]?: (event: { readonly detail: SchemaValue<Events[Name]> }) => void
 }
 
 /** Defines a typed native facade that the target compiler must replace before runtime. */

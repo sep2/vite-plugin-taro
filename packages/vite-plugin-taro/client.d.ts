@@ -1,8 +1,4 @@
-import {
-    defineNativeComponent,
-    type NativeEventHandler,
-    type NativeSchema
-} from './src/runtime/client/taro/define-native-component.ts'
+import { defineNativeComponent } from './src/runtime/client/taro/define-native-component.ts'
 
 declare module 'virtual:taro/api' {
     import Taro = require('@tarojs/taro')
@@ -15,5 +11,5 @@ declare module 'virtual:taro/components' {
 }
 
 declare module 'virtual:taro/native' {
-    export { defineNativeComponent, type NativeEventHandler, type NativeSchema }
+    export { defineNativeComponent }
 }

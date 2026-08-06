@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
+import { nativeComponentMetaKey } from '../native/native-component-assets.ts'
 import { createPlacementPlan, type ModuleGraph, type PlacementPlan } from './plan.ts'
 
 type TestModule = {
@@ -8,6 +9,7 @@ type TestModule = {
     isEntry?: boolean
     imports?: readonly string[]
     dynamicImports?: readonly string[]
+    nativeAssetBytes?: number
 }
 
 function subpackageRoots(plan: PlacementPlan): string[] {
@@ -29,7 +31,16 @@ function graph(modules: Readonly<Record<string, TestModule>>): ModuleGraph {
                 code: module.code ?? '',
                 isEntry: module.isEntry ?? false,
                 importedIds: module.imports ?? [],
-                dynamicallyImportedIds: module.dynamicImports ?? []
+                dynamicallyImportedIds: module.dynamicImports ?? [],
+                meta:
+                    module.nativeAssetBytes === undefined
+                        ? {}
+                        : {
+                              [nativeComponentMetaKey]: {
+                                  sources: [],
+                                  assetBytes: module.nativeAssetBytes
+                              }
+                          }
             } as unknown as Rolldown.ModuleInfo
         }
     }
@@ -88,6 +99,27 @@ test('co-locates a lazy root and static dependencies when size permits', () => {
     assert.equal(lazy?.kind, 'subpackage')
     assert.equal(dependency?.kind, 'subpackage')
     assert.equal(
+        lazy?.kind === 'subpackage' ? lazy.root : undefined,
+        dependency?.kind === 'subpackage' ? dependency.root : undefined
+    )
+})
+
+test('includes native component assets in the subpackage budget', () => {
+    const plan = createPlacementPlan({
+        ...graph({
+            '/entry': { isEntry: true, imports: ['/application'] },
+            '/application': { dynamicImports: ['/lazy'] },
+            '/lazy': { code: 'a'.repeat(40), imports: ['/dependency'] },
+            '/dependency': { code: 'b'.repeat(40), nativeAssetBytes: 30 }
+        }),
+        planningBudgetBytes: 100
+    })
+
+    const lazy = plan.get('/lazy')
+    const dependency = plan.get('/dependency')
+    assert.equal(lazy?.kind, 'subpackage')
+    assert.equal(dependency?.kind, 'subpackage')
+    assert.notEqual(
         lazy?.kind === 'subpackage' ? lazy.root : undefined,
         dependency?.kind === 'subpackage' ? dependency.root : undefined
     )

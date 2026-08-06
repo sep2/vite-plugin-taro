@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { transformSync, types } from '@babel/core'
+import { type NodePath, transformSync, types } from '@babel/core'
 import type { Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { clientTaroNativeId } from '../../client/constant.ts'
@@ -8,63 +8,27 @@ const schemaConstructors = new Set(['String', 'Number', 'Boolean', 'Object', 'Ar
 const schemaSectionNames = new Set(['properties', 'events'])
 
 export type NativeComponentSchemaDefinition = {
-    moduleId: string
-    callStart: number
     folder: string
-    sourceDirectory: string
     properties: readonly string[]
     events: readonly string[]
 }
 
-export type NativeComponentFacadeTransform = {
-    code: string
-    map: Rolldown.ExistingRawSourceMap | null
-    definitions: readonly NativeComponentSchemaDefinition[]
-}
-
-type SchemaPass = {
-    transformed: ReturnType<typeof transformSync>
-    definitions: readonly NativeComponentSchemaDefinition[]
-}
-
-/** Parses compile-time native component schemas without transforming application code. */
-export function parseNativeComponentSchemas(code: string, id: string): readonly NativeComponentSchemaDefinition[] {
-    return runSchemaPass(code, id, false, false).definitions
-}
-
-/** Replaces native facade calls with their folder basename and removes the compile-time import. */
-export function transformNativeComponentFacades(
-    code: string,
-    id: string,
-    sourcemap: boolean
-): NativeComponentFacadeTransform {
-    const { transformed, definitions } = runSchemaPass(code, id, true, sourcemap)
-    if (!transformed?.code || (sourcemap && !transformed.map)) {
-        throw new Error(`Failed to transform native component facades in ${id}`)
-    }
-    return {
-        code: transformed.code,
-        map: sourcemap ? (transformed.map as Rolldown.ExistingRawSourceMap) : null,
-        definitions
-    }
-}
-
-/** Runs one schema traversal in inspection or replacement mode. */
-function runSchemaPass(code: string, id: string, replaceFacades: boolean, sourcemap: boolean): SchemaPass {
+/** Replaces native facade calls with their folder basename and returns their static metadata. */
+export function transformNativeComponentFacades(code: string, id: string, sourcemap: boolean) {
     const moduleId = normalizeModuleId(id)
-    // Collection is local to this parse and preserves declaration order for deterministic later stages.
+    // Collection is local to this transform and preserves declaration order for deterministic later stages.
     const definitions: NativeComponentSchemaDefinition[] = []
     const transformed = transformSync(code, {
         ast: false,
         babelrc: false,
-        code: replaceFacades,
+        code: true,
         configFile: false,
         filename: moduleId,
         parserOpts: {
             plugins: ['jsx', 'typescript']
         },
         plugins: [
-            function processNativeComponentSchemas() {
+            function transformNativeComponentSchemas() {
                 return {
                     visitor: {
                         CallExpression(callPath) {
@@ -75,15 +39,11 @@ function runSchemaPass(code: string, id: string, replaceFacades: boolean, source
                                 callPath.buildCodeFrameError(message)
                             )
                             definitions.push(definition)
-                            if (replaceFacades) {
-                                callPath.replaceWith(types.stringLiteral(path.posix.basename(definition.folder)))
-                            }
+                            callPath.replaceWith(types.stringLiteral(path.posix.basename(definition.folder)))
                         },
                         Program: {
                             exit(programPath) {
-                                if (replaceFacades) {
-                                    removeDefineNativeComponentImports(programPath.node)
-                                }
+                                removeDefineNativeComponentImports(programPath.node)
                             }
                         }
                     }
@@ -91,10 +51,17 @@ function runSchemaPass(code: string, id: string, replaceFacades: boolean, source
             }
         ],
         sourceFileName: moduleId,
-        sourceMaps: replaceFacades && sourcemap,
+        sourceMaps: sourcemap,
         sourceType: 'module'
     })
-    return { transformed, definitions }
+    if (!transformed?.code || (sourcemap && !transformed.map)) {
+        throw new Error(`Failed to transform native component facades in ${id}`)
+    }
+    return {
+        code: transformed.code,
+        map: sourcemap ? (transformed.map as Rolldown.ExistingRawSourceMap) : null,
+        definitions
+    }
 }
 
 /** Removes the compile-time macro while preserving other named and type imports. */
@@ -111,21 +78,7 @@ function removeDefineNativeComponentImports(program: types.Program): void {
 }
 
 /** Identifies the imported macro through its lexical binding, including import aliases. */
-function isDefineNativeComponentCall(callPath: {
-    node: types.CallExpression
-    scope: {
-        getBinding: (name: string) =>
-            | {
-                  path: {
-                      node: types.Node
-                      parentPath: {
-                          node: types.Node
-                      }
-                  }
-              }
-            | undefined
-    }
-}): boolean {
+function isDefineNativeComponentCall(callPath: NodePath<types.CallExpression>): boolean {
     const callee = callPath.node.callee
     if (!types.isIdentifier(callee)) {
         return false
@@ -168,15 +121,8 @@ function parseDefinition(
         throw buildError(`Native component field ${collision} is both a property and an event`)
     }
 
-    const callStart = call.start
-    if (callStart === null || callStart === undefined) {
-        throw buildError('Native component declaration has no source position')
-    }
     return {
-        moduleId,
-        callStart,
-        folder: folderNode.value,
-        sourceDirectory: normalizeModuleId(path.resolve(path.dirname(moduleId), folderNode.value)),
+        folder: normalizeModuleId(path.resolve(path.dirname(moduleId), folderNode.value)),
         properties,
         events
     }

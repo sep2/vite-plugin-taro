@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Rolldown } from 'vite'
+import { getNativeComponentAssetBytes } from '../native/native-component-assets.ts'
 
 // Leave headroom below WeChat's 2M subpackage limit for capsule wrappers and bundler-generated code.
 const subpackagePlanningBudget = 1_900_000
@@ -92,7 +93,7 @@ export function createPlacementPlan({
         .filter(([moduleId]) => !eagerModules.has(moduleId))
         .map(([moduleId, info]) => ({
             moduleId,
-            estimatedBytes: Buffer.byteLength(info.code ?? '', 'utf8'),
+            estimatedBytes: Buffer.byteLength(info.code ?? '', 'utf8') + getNativeComponentAssetBytes(info.meta),
             consumers: consumersByModule.get(moduleId) ?? new Set([moduleId]),
             neighbors: neighborsByModule.get(moduleId) ?? new Set<string>()
         }))
