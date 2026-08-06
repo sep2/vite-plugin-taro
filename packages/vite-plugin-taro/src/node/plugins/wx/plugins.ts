@@ -2,14 +2,19 @@ import type { Plugin, PluginOption } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
 import { packageRequire } from '../../utils/packages.ts'
+import { clientTaroNativeId } from '../client/constant.ts'
 import { createWxDevelopmentPlugin } from './dev/plugin.ts'
 import { getWxModuleKind, isTransportModule } from './module.ts'
+import { collectNativeComponentAssets, type NativeComponentSource } from './native/native-component-assets.ts'
+import { parseNativeComponentSchemas } from './native/native-component-schema.ts'
 import { createOutputFiles } from './output/files.ts'
 import { createPlacer } from './placement/placer.ts'
 import { renderCapsule } from './render/capsule.ts'
 import { renderNative } from './render/native.ts'
 import { materializeTransport } from './render/transport.ts'
 import { createResolver } from './resolve/resolver.ts'
+
+const nativeComponentsMetaKey = 'vite-plugin-taro:native-components'
 
 /** Creates the complete plugin set for the wx target. */
 export function createWxTargetPlugins(options: VitePluginTaroOptions): PluginOption[] {
@@ -67,8 +72,22 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
 
         transform: {
             order: 'pre',
-            handler(code, id) {
-                return resolver.specialize(code, id, Boolean(this.environment.config.build.sourcemap))
+            async handler(code, id) {
+                const specialized = await resolver.specialize(
+                    code,
+                    id,
+                    Boolean(this.environment.config.build.sourcemap)
+                )
+                const nativeComponents = await loadNativeComponentSources(code, id, (file) => this.addWatchFile(file))
+                if (!nativeComponents) {
+                    return specialized
+                }
+                return {
+                    ...specialized,
+                    meta: {
+                        [nativeComponentsMetaKey]: nativeComponents
+                    }
+                }
             }
         },
 
@@ -119,6 +138,26 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
             }
         }
     }
+}
+
+/** Loads native sources into module metadata while delegating rebuild lifecycle to Rolldown. */
+async function loadNativeComponentSources(
+    code: string,
+    id: string,
+    addWatchFile: (file: string) => void
+): Promise<readonly NativeComponentSource[] | undefined> {
+    if (!code.includes(clientTaroNativeId)) {
+        return
+    }
+    const definitions = parseNativeComponentSchemas(code, id)
+    const sources = await Promise.all(definitions.map(collectNativeComponentAssets))
+    sources.forEach((source) => {
+        addWatchFile(source.sourceDirectory)
+        source.assets.forEach((asset) => {
+            addWatchFile(asset.sourcePath)
+        })
+    })
+    return sources
 }
 
 /** Creates the build-time constants required by Taro's legacy feature gates. */

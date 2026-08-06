@@ -1,10 +1,9 @@
 import type { Plugin } from 'vite'
 import { resolvePackageFile } from '../../utils/packages.ts'
+import { clientTaroNativeId } from './constant.ts'
 
 export const clientTaroApiId = 'virtual:taro/api'
 const clientTaroComponentId = 'virtual:taro/components'
-export const clientTaroNativeId = 'virtual:taro/native'
-
 const clientTaroModules = new Map([
     [clientTaroApiId, resolvePackageFile('dist/runtime/client/taro/api.js')],
     [clientTaroComponentId, resolvePackageFile('dist/runtime/client/taro/component.js')],

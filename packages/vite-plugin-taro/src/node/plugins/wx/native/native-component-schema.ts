@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { transformSync, types } from '@babel/core'
 import { normalizeModuleId } from '../../../utils/modules.ts'
-import { clientTaroNativeId } from '../../client/client-taro.ts'
+import { clientTaroNativeId } from '../../client/constant.ts'
 
 const schemaConstructors = new Set(['String', 'Number', 'Boolean', 'Object', 'Array'])
 const schemaSectionNames = new Set(['properties', 'events'])
