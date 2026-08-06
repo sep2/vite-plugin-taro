@@ -4,7 +4,7 @@ import { transformNativeComponentFacades } from './native-component-schema.ts'
 
 export const nativeComponentMetaKey = 'vite-plugin-taro:native-components'
 
-type NativeComponentFacadeCompilation = {
+type CompileNativeComponentFacadeResult = {
     code: string
     map: Rolldown.ExistingRawSourceMap | null
     meta: Record<typeof nativeComponentMetaKey, readonly NativeComponentSource[]>
@@ -21,7 +21,7 @@ export async function compileNativeComponentFacade({
     id: string
     sourcemap: boolean
     addWatchFile: (file: string) => void
-}): Promise<NativeComponentFacadeCompilation> {
+}): Promise<CompileNativeComponentFacadeResult> {
     const transformed = transformNativeComponentFacades(code, id, sourcemap)
 
     const nativeComponents = await Promise.all(transformed.definitions.map(collectNativeComponentAssets))
