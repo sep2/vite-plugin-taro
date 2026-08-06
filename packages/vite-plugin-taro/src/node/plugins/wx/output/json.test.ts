@@ -13,6 +13,9 @@ const options: VitePluginTaroOptions = {
                 navigationBarTitleText: 'Home',
                 usingComponents: {
                     custom: '../../custom'
+                },
+                componentPlaceholder: {
+                    custom: 'text'
                 }
             }
         },
@@ -78,6 +81,9 @@ test('creates configured native JSON assets at exact output paths', () => {
             'native-counter': '/components/native-counter/index',
             'native-card': '/sub/p_card/components/native-card/index',
             comp: '../../comp'
+        },
+        componentPlaceholder: {
+            'native-card': 'view'
         }
     })
     assert.deepEqual(assets.get('pages/account/index.json'), {
@@ -86,6 +92,9 @@ test('creates configured native JSON assets at exact output paths', () => {
             'native-counter': '/components/native-counter/index',
             'native-card': '/sub/p_card/components/native-card/index',
             comp: '../../comp'
+        },
+        componentPlaceholder: {
+            'native-card': 'view'
         }
     })
     assert.deepEqual(assets.get('project.config.json'), options.projectConfigJson)

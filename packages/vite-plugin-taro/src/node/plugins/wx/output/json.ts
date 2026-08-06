@@ -2,6 +2,7 @@ import type { Rolldown } from 'vite'
 import type { JsonObject, VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../../options.ts'
 import { createAppConfig } from '../../../utils/project-config.ts'
 import type { GeneratedSubpackage } from '../placement/placer.ts'
+import { isGeneratedSubpackageFile } from '../placement/plan.ts'
 import { toRootRelativePath } from './relative-root.ts'
 
 /** Creates every configured native JSON asset. */
@@ -38,8 +39,18 @@ function createPageJson(
     nativeComponents: readonly { name: string; componentPath: string }[]
 ): JsonObject {
     const usingComponents = isJsonObject(page.config.usingComponents) ? page.config.usingComponents : {}
+
+    // Cross-package components require a placeholder while WeChat downloads their generated subpackage. Paths are
+    // root-absolute, so remove the leading slash before testing the output-relative subpackage prefix.
+    // https://developers.weixin.qq.com/miniprogram/dev/framework/subpackages/async.html
+    // https://developers.weixin.qq.com/miniprogram/dev/framework/custom-component/placeholder.html
+    const placeholderEntries = nativeComponents.flatMap(({ name, componentPath }) =>
+        isGeneratedSubpackageFile(componentPath.slice(1)) ? ([[name, 'view']] as const) : []
+    )
+
     return {
         ...page.config,
+        ...(placeholderEntries.length > 0 ? { componentPlaceholder: Object.fromEntries(placeholderEntries) } : {}),
         usingComponents: {
             ...usingComponents,
             ...Object.fromEntries(nativeComponents.map(({ name, componentPath }) => [name, componentPath])),
