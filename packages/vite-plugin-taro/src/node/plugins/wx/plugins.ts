@@ -124,9 +124,15 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
 
         generateBundle: {
             order: 'post',
-            handler(_, bundle) {
+            async handler(_, bundle) {
                 const subpackages = placer.getSubpackages(bundle)
-                const outputFiles = createOutputFiles({ bundle, options, subpackages })
+
+                const outputFiles = await createOutputFiles({
+                    bundle,
+                    options,
+                    subpackages,
+                    getModuleInfo: (moduleId) => this.getModuleInfo(moduleId)
+                })
 
                 outputFiles.forEach((file) => {
                     this.emitFile(file)

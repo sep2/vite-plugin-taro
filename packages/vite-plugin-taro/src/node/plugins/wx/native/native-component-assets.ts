@@ -1,30 +1,44 @@
 import { readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
-import { normalizeModuleId } from '../../../utils/modules.ts'
+import type { Rolldown } from 'vite'
 import type { NativeComponentSchemaDefinition } from './native-component-schema.ts'
 
 type NativeComponentAsset = {
-    sourcePath: string
     relativePath: string
     byteLength: number
 }
 
 export const nativeComponentMetaKey = 'vite-plugin-taro:native-components'
 
-/** Reads the native contribution to a transformed module's package weight. */
-export function getNativeComponentAssetBytes(meta: Readonly<Record<string, unknown>> | undefined): number {
-    const metadata: unknown = meta?.[nativeComponentMetaKey]
-    if (typeof metadata !== 'object' || metadata === null) {
-        return 0
+type NativeComponentSource = NativeComponentSchemaDefinition & {
+    assets: readonly NativeComponentAsset[]
+}
+
+type NativeComponentMetadata = {
+    sources: readonly NativeComponentSource[]
+    assetBytes: number
+}
+
+declare module 'rolldown' {
+    interface CustomPluginOptions {
+        [nativeComponentMetaKey]?: NativeComponentMetadata
     }
+}
 
-    const assetBytes: unknown = Reflect.get(metadata, 'assetBytes')
+/** Reads the native contribution to a transformed module's package weight. */
+export function getNativeComponentAssetBytes(meta: Rolldown.CustomPluginOptions | undefined): number {
+    return meta?.[nativeComponentMetaKey]?.assetBytes ?? 0
+}
 
-    return typeof assetBytes === 'number' ? assetBytes : 0
+/** Reads native sources attached to one transformed facade module. */
+export function getNativeComponentSources(meta: Rolldown.CustomPluginOptions | undefined) {
+    return meta?.[nativeComponentMetaKey]?.sources ?? []
 }
 
 /** Collects a native component folder as opaque, recursively ordered assets. */
-export async function collectNativeComponentAssets(definition: NativeComponentSchemaDefinition) {
+export async function collectNativeComponentAssets(
+    definition: NativeComponentSchemaDefinition
+): Promise<NativeComponentSource> {
     // This mutable accumulator is local to one traversal and avoids repeatedly copying growing asset arrays.
     const assets: NativeComponentAsset[] = []
 
@@ -54,7 +68,6 @@ async function collectDirectory(
         }
         const sourcePath = path.join(folder, ...entrySegments)
         assets.push({
-            sourcePath: normalizeModuleId(sourcePath),
             relativePath: entrySegments.join('/'),
             byteLength: (await stat(sourcePath)).size
         })

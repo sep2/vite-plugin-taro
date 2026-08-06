@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { collectNativeComponentAssets, nativeComponentMetaKey } from './native-component-assets.ts'
 import { transformNativeComponentFacades } from './native-component-schema.ts'
 
@@ -21,7 +22,7 @@ export async function compileNativeComponentFacade({
         addWatchFile(source.folder)
 
         source.assets.forEach((asset) => {
-            addWatchFile(asset.sourcePath)
+            addWatchFile(path.join(source.folder, asset.relativePath))
         })
     })
 
