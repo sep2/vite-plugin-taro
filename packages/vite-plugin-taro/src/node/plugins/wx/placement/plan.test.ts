@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
-import { nativeComponentMetaKey } from '../native/native-component-assets.ts'
 import { createPlacementPlan, type ModuleGraph, type PlacementPlan } from './plan.ts'
 
 type TestModule = {
@@ -9,7 +8,7 @@ type TestModule = {
     isEntry?: boolean
     imports?: readonly string[]
     dynamicImports?: readonly string[]
-    nativeAssetBytes?: number
+    additionalBytes?: number
 }
 
 function subpackageRoots(plan: PlacementPlan): string[] {
@@ -31,17 +30,11 @@ function graph(modules: Readonly<Record<string, TestModule>>): ModuleGraph {
                 code: module.code ?? '',
                 isEntry: module.isEntry ?? false,
                 importedIds: module.imports ?? [],
-                dynamicallyImportedIds: module.dynamicImports ?? [],
-                meta:
-                    module.nativeAssetBytes === undefined
-                        ? {}
-                        : {
-                              [nativeComponentMetaKey]: {
-                                  sources: [],
-                                  assetBytes: module.nativeAssetBytes
-                              }
-                          }
+                dynamicallyImportedIds: module.dynamicImports ?? []
             } as unknown as Rolldown.ModuleInfo
+        },
+        getAdditionalModuleBytes(info) {
+            return modules[info.id]?.additionalBytes ?? 0
         }
     }
 }
@@ -104,13 +97,13 @@ test('co-locates a lazy root and static dependencies when size permits', () => {
     )
 })
 
-test('includes native component assets in the subpackage budget', () => {
+test('includes additional module output in the subpackage budget', () => {
     const plan = createPlacementPlan({
         ...graph({
             '/entry': { isEntry: true, imports: ['/application'] },
             '/application': { dynamicImports: ['/lazy'] },
             '/lazy': { code: 'a'.repeat(40), imports: ['/dependency'] },
-            '/dependency': { code: 'b'.repeat(40), nativeAssetBytes: 30 }
+            '/dependency': { code: 'b'.repeat(40), additionalBytes: 30 }
         }),
         planningBudgetBytes: 100
     })

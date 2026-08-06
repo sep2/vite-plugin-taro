@@ -6,6 +6,7 @@ import { clientTaroNativeId } from '../client/constant.ts'
 import { createWxDevelopmentPlugin } from './dev/plugin.ts'
 import { getWxModuleKind, isTransportModule } from './module.ts'
 import { compileNativeComponentFacade } from './native/compile-native-component-facade.ts'
+import { getNativeComponentAssetBytes } from './native/native-component-assets.ts'
 import { createOutputFiles } from './output/files.ts'
 import { createPlacer } from './placement/placer.ts'
 import { renderCapsule } from './render/capsule.ts'
@@ -88,7 +89,8 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
         renderStart() {
             placer.analyze({
                 moduleIds: this.getModuleIds(),
-                getModuleInfo: (moduleId) => this.getModuleInfo(moduleId)
+                getModuleInfo: (moduleId) => this.getModuleInfo(moduleId),
+                getAdditionalModuleBytes: (info) => getNativeComponentAssetBytes(info.meta)
             })
         },
 

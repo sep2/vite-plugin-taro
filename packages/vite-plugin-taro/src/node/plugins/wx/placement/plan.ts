@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto'
 import type { Rolldown } from 'vite'
-import { getNativeComponentAssetBytes } from '../native/native-component-assets.ts'
 
 // Leave headroom below WeChat's 2M subpackage limit for capsule wrappers and bundler-generated code.
 const subpackagePlanningBudget = 1_900_000
@@ -26,6 +25,8 @@ export type ModuleGraph = {
     moduleIds: Iterable<string>
     /** Reads static edges, dynamic edges, transformed code, and entry ownership. */
     getModuleInfo(moduleId: string): Rolldown.ModuleInfo | null
+    /** Adds non-JavaScript output owned by a transformed module to its package weight. */
+    getAdditionalModuleBytes?: (info: Rolldown.ModuleInfo) => number
 }
 
 /** One independently placeable lazy module together with size and co-location preferences. */
@@ -74,6 +75,7 @@ export const mainPackage = { kind: 'main' } as const
 export function createPlacementPlan({
     moduleIds,
     getModuleInfo,
+    getAdditionalModuleBytes,
     planningBudgetBytes = subpackagePlanningBudget
 }: ModuleGraph & { planningBudgetBytes?: number }): PlacementPlan {
     // Materialize the iterable once because every later phase needs stable random access by module ID.
@@ -93,7 +95,7 @@ export function createPlacementPlan({
         .filter(([moduleId]) => !eagerModules.has(moduleId))
         .map(([moduleId, info]) => ({
             moduleId,
-            estimatedBytes: Buffer.byteLength(info.code ?? '', 'utf8') + getNativeComponentAssetBytes(info.meta),
+            estimatedBytes: Buffer.byteLength(info.code ?? '', 'utf8') + (getAdditionalModuleBytes?.(info) ?? 0),
             consumers: consumersByModule.get(moduleId) ?? new Set([moduleId]),
             neighbors: neighborsByModule.get(moduleId) ?? new Set<string>()
         }))
