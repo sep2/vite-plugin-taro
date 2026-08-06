@@ -35,8 +35,8 @@ function isThenable(value: CapsuleNamespace | PromiseLike<CapsuleNamespace>): va
 // and may load asynchronous subpackage or top-level-await graphs through this identity wrapper.
 export const __vitePreload = <Value>(load: () => Value): Value => load()
 
-// SystemJS installs on WeChat's `global` object; its properties are not lexical App-service bindings.
-const installedSystem = (global as unknown as WeChatAppServiceGlobal & { System: System.Loader }).System
+// SystemJS installs on WeChat's `global` object; its properties are not lexical bindings.
+const installedSystem = (global as unknown as WeChatGlobal & { System: System.Loader }).System
 if (!installedSystem) {
     throw new Error('SystemJS failed to initialize in the WeChat runtime')
 }

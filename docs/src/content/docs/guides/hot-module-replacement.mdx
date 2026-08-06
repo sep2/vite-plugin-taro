@@ -5,13 +5,15 @@ description: 了解 vpt 如何在微信开发者工具中更新模块并保留�
 
 import { Tabs, TabItem } from '@astrojs/starlight/components'
 
-vpt 为微信小程序提供基于 Vite、Rolldown 和 React Refresh 的热模块替换（HMR）。保存源码后，变更会直接写入微信项目输出目录，由微信开发者工具触发页面更新。
+vpt 为微信小程序提供基于 Vite、Rolldown 和 React Refresh 的热模块替换（HMR）。
 
-对于可接受的 React 更新，App 运行环境和当前 React 树会继续存活，因此组件状态不会因为页面脚本重新执行而自动丢失。
+热更新让你在保存代码后立刻看到修改，无需刷新或重新进入页面。当前页面、导航参数、App 数据以及深层 React 组件状态都会尽可能保留，让你可以停留在当前交互位置继续开发，而不必反复导航、填写表单或恢复操作上下文。
 
-## 开启热更新
+## 默认无需配置
 
-默认模板已经包含所需的微信项目设置：
+默认模板已经启用热更新。如果没有修改模板生成的微信项目设置，不需要添加任何特殊配置，可以直接运行开发命令。
+
+如果项目迁移自其他模板，或曾经修改过微信项目设置，可以确认以下配置：
 
 ```ts
 vitePluginTaro({
@@ -115,7 +117,7 @@ React Refresh 更新组件
 
 尚未执行的延迟模块不需要立即刷新。补丁会更新它的模块实现，首次动态导入时自然执行新代码。
 
-vpt 内置 `@vitejs/plugin-react`，并把它生成的浏览器 Refresh 协议适配到微信 AppService 环境。React 渲染器、Refresh 运行时和组件边界使用同一个全局 Hook，因此不需要在应用中手动编写 `import.meta.hot.accept()`。
+vpt 内置 `@vitejs/plugin-react`，并把它生成的浏览器 Refresh 协议适配到微信全局环境。React 渲染器、Refresh 运行时和组件边界使用同一个全局 Hook，因此不需要在应用中手动编写 `import.meta.hot.accept()`。
 
 ## 为什么连续快速保存不会漏更新
 

@@ -259,7 +259,7 @@ Running and materializing a full build must not be separate topology commands.
 
 ## React Refresh findings
 
-React Refresh needs both exact AppService-global rewrites and transaction integration. Generated `window.$Refresh*` and
+React Refresh needs both exact WeChat-global rewrites and transaction integration. Generated `window.$Refresh*` and
 free React DevTools-hook references become `global.*`; the timer debounce becomes a promise owned by `WxDevRuntime` so
 version advancement waits for Refresh and any thrown exception crosses the full-build recovery boundary.
 
@@ -398,7 +398,7 @@ The implementation follows the exact capabilities exposed by the pinned toolchai
 | --- | --- |
 | WebSocket tells a browser to import an HMR URL. | HTTP carries only reports; executable code must appear in a watched physical file. |
 | The page/global runtime survives a module import naturally. | Page code is re-executed, so the runtime must belong to the longer-lived App heap. |
-| `window`, `globalThis`, script globals, and a DOM are available. | AppService has `global` but no browser lexical globals; exact generated identifiers must be rewritten. |
+| `window`, `globalThis`, script globals, and a DOM are available. | The WeChat runtime has `global` but no browser lexical globals; exact generated identifiers must be rewritten. |
 | A JS import applies the update directly. | `patches.js` loading must be passive until DevTools finishes the current Page evaluation. |
 | Browser page lifecycle is not replayed for HMR. | DevTools synthesizes native Page replacement lifecycle that would make Taro unmount React. |
 | React DOM remains attached to the same page object. | Taro's retained root must be rebound and rehydrated against a replacement native Page receiver. |
@@ -490,7 +490,7 @@ do not repeat impl detail. record the reason that it makes to hmr works.
   retains Rolldown exports, HotContext data, React families, native Page journals, and the committed version together.
 - Taro's normal `onUnload` destroys context and unmounts the React root. DevTools replays that lifecycle for code reload,
   so retaining React state requires suppressing only that synthetic cycle and reattaching Taro's root to the new receiver.
-- AppService properties are not browser lexical globals. Targeted AST replacement is required for generated `window` and
+- WeChat global properties are not browser lexical globals. Targeted AST replacement is required for generated `window` and
   React DevTools-hook probes; assigning aliases on `global` does not make free identifiers resolve.
 - React Refresh's debounce is not observable by the publication protocol. Promise-backed scheduling makes Refresh and its
   before-hooks part of the commit, so a thrown exception cannot advance the runtime version past visible React state.

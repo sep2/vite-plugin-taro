@@ -1,9 +1,9 @@
 /**
- * The AppService global. Free-variable reads never resolve its properties (verified: the
+ * The WeChat global. Free-variable reads never resolve its properties (verified: the
  * free lookup is undefined while `global.X` exists), so everything stored here must be
  * accessed as an explicit member expression.
  */
-type WeChatAppServiceGlobal = {
+type WeChatGlobal = {
     /** React DevTools hook installed by the dev runtime; the renderer reads it via `global.`. */
     __REACT_DEVTOOLS_GLOBAL_HOOK__?: unknown
 }
@@ -17,7 +17,7 @@ declare const __rolldown_runtime__:
     | undefined
 
 // This object is available everywhere, but no globalThis, window on WeChat Mini Program
-declare const global: WeChatAppServiceGlobal
+declare const global: WeChatGlobal
 
 /** Minimal wx.request surface used by the DevRuntime; application API types remain owned by Taro/WeChat packages. */
 type WeChatRequestOptions = Readonly<{

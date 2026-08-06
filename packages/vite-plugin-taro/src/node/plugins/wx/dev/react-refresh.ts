@@ -1,7 +1,7 @@
-import type { Plugin } from 'vite'
 import { type PluginObject, types } from '@babel/core'
-import { transformWithBabel } from '../../../utils/transform.ts'
+import type { Plugin } from 'vite'
 import { memoize } from '../../../utils/memoize.ts'
+import { transformWithBabel } from '../../../utils/transform.ts'
 
 /** The React DevTools hook protocol name; free references must target `global` in wx. */
 const reactDevtoolsHookProtocol = '__REACT_DEVTOOLS_GLOBAL_HOOK__'
@@ -15,7 +15,7 @@ const reactDevtoolsHookProtocol = '__REACT_DEVTOOLS_GLOBAL_HOOK__'
  *   `window` protocol globals (rewritten to `global`) and must inject itself at evaluation
  *   — the preamble's `injectIntoGlobalHook` call has no HTML home in wx;
  * - react-family modules (filtered on free references): the DevTools hook is read as a free
- *   variable, which the AppService scope never resolves against `global` — every free
+ *   variable, which the WeChat runtime scope never resolves against `global` — every free
  *   reference becomes an explicit member access;
  * - boundary modules (filtered on the guard): the preamble's `$RefreshReg$` global is not
  *   needed because the transform generates local wrappers over the imported refresh
@@ -72,7 +72,7 @@ export function createWxReactRefreshTransforms(): Plugin[] {
  * React-family modules: free `__REACT_DEVTOOLS_GLOBAL_HOOK__` reads must target `global`.
  *
  * The renderer checks the hook with `typeof __REACT_DEVTOOLS_GLOBAL_HOOK__` and injects via
- * `hook.inject(...)` — but in the AppService, free-variable reads never resolve against
+ * `hook.inject(...)` — but in the WeChat runtime, free-variable reads never resolve against
  * `global`'s properties (verified: the free lookup is undefined while
  * `global.__REACT_DEVTOOLS_GLOBAL_HOOK__` exists), so the renderer would silently skip
  * injection and React Refresh would have no renderer to schedule re-renders on.
@@ -146,7 +146,7 @@ function injectRefreshGlobalHook(): PluginObject {
  * Refresh runtime module: rewrites the generated `window.<protocol>` accesses to `global`.
  *
  * The vendored refresh runtime is written for browsers and uses `window` for its protocol
- * globals, but AppService has no `window` — the free identifier is undefined — so the
+ * globals, but the WeChat runtime has no `window` — the free identifier is undefined — so the
  * top-level assignment would throw at module evaluation, and the ignored-exports read
  * inside the refresh validator would crash every update pass.
  *
@@ -155,7 +155,7 @@ function injectRefreshGlobalHook(): PluginObject {
  */
 function rewriteRefreshRuntimeWindowAccess(): PluginObject {
     /**
-     * Refresh protocol globals that must land on the AppService `global`:
+     * Refresh protocol globals that must land on the WeChat `global`:
      * - `__registerBeforePerformReactRefresh`: assigned at module scope; in web, the HMR
      *   client registers pre-refresh callbacks through it — the assignment throws on
      *   undefined `window`;
@@ -176,7 +176,7 @@ function rewriteRefreshRuntimeWindowAccess(): PluginObject {
                 ) {
                     return
                 }
-                // `global` is the AppService global object — the same one the hook injection
+                // `global` is the WeChat global object — the same one the hook injection
                 // and the rest of the wx glue speak — so the protocol globals land on the
                 // App heap like any other global hook.
                 member.object = types.identifier('global')

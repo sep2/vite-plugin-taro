@@ -1,4 +1,4 @@
-// WX AppService dev runtime — bundled and injected verbatim at the end of the shared Rolldown
+// WX dev runtime — bundled and injected verbatim at the end of the shared Rolldown
 // runtime chunk (`assets/rolldown-runtime.js`, required first by every chunk). Defines the
 // App-global `__rolldown_runtime__` that generated modules call.
 //
@@ -297,7 +297,7 @@ const runtime = new WxDevRuntime()
 //
 // The hook lives on `global`, and every free `__REACT_DEVTOOLS_GLOBAL_HOOK__` reference in
 // react-family modules is rewritten to `global.__REACT_DEVTOOLS_GLOBAL_HOOK__`: the
-// AppService scope does not resolve free variables against `global` (verified: the free
+// The WeChat runtime scope does not resolve free variables against `global` (verified: the free
 // lookup is undefined while the member access exists), so the renderer would never inject
 // otherwise. `??=` keeps a pre-installed hook (e.g. a real DevTools integration) intact; the
 // runtime chunk's own lowering keeps the operator es2018-compatible.
@@ -313,5 +313,5 @@ const reactDevtoolsHook = {
     onCommitFiberRoot: () => {},
     onCommitFiberUnmount: () => {}
 }
-// node types declare `global` as typeof globalThis, so the AppService global needs a cast.
-;(global as WeChatAppServiceGlobal).__REACT_DEVTOOLS_GLOBAL_HOOK__ ??= reactDevtoolsHook
+// node types declare `global` as typeof globalThis, so the WeChat global needs a cast.
+;(global as WeChatGlobal).__REACT_DEVTOOLS_GLOBAL_HOOK__ ??= reactDevtoolsHook
