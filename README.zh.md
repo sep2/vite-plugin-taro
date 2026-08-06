@@ -20,7 +20,7 @@
 - **基于 Taro，超越 Taro** 使用 Taro 组件和 API，摆脱旧式 webpack 链路。
 - **Skyline 就绪** 支持微信 Skyline 渲染模式。
 - **条件编译** 用 Taro 风格 `#ifdef` / `#ifndef` 条件块拆分代码和样式。
-- **工作区友好** 支持普通项目与 monorepo，兼容 `npm`、`pnpm`、`Yarn`、`Bun`。
+- **工作区友好** 支持普通项目与 monorepo，兼容 `npm`、`pnpm`、`yarn`、`bun`。
 - **TypeScript 友好** 从配置到应用代码都有类型支持。
 
 `vite-plugin-taro` 面向希望用 Vite 构建 Taro React 应用的团队：保留 Taro 跨平台组件和 API，告别 Taro webpack，并修复/规避官方 Taro Vite 的常见坑。一个插件即可构建微信小程序与 Web。

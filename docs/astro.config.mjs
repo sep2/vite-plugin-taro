@@ -17,6 +17,7 @@ export default defineConfig({
             title: 'vite-plugin-taro',
             customCss: ['./src/styles/custom.css'],
             components: {
+                Hero: './src/components/hero.astro',
                 SocialIcons: './src/components/social-icons.astro',
                 ThemeSelect: './src/components/theme-select.astro'
             },

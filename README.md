@@ -20,7 +20,7 @@ Chinese documentation: <https://sep2.github.io/vite-plugin-taro>. See [Sample ap
 - **Built on Taro, beyond Taro** Use Taro components and APIs while leaving the old webpack pipeline behind.
 - **Skyline ready** Support WeChat Skyline rendering mode perfectly.
 - **Conditional compilation** Split code and styles with Taro-style `#ifdef` / `#ifndef` blocks.
-- **Workspace friendly** Supports standalone apps and monorepos, compatible with `npm`, `pnpm`, `Yarn`, and `Bun`.
+- **Workspace friendly** Supports standalone apps and monorepos, compatible with `npm`, `pnpm`, `yarn`, and `bun`.
 - **TypeScript friendly** Type support from config to app code.
 
 `vite-plugin-taro` is for teams building Taro React apps with Vite: keep Taro's cross-platform components and APIs, leave Taro webpack behind, and fix/avoid common official Taro Vite pitfalls. One plugin builds WeChat Mini Program and Web.

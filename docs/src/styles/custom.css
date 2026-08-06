@@ -33,6 +33,12 @@ html[data-has-hero] .hero > .hero-html {
     max-width: none;
 }
 
+@media (max-width: 49.999rem) {
+    html[data-has-hero] .hero > .hero-html {
+        margin-top: 1rem;
+    }
+}
+
 @media (min-width: 50rem) {
     .hero {
         grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
