@@ -48,7 +48,7 @@ test('creates shared Taro templates and native companions for every Page', () =>
     assert.match(assets.get('base.wxml') ?? '', /<template name="tmpl_0_native-counter">/)
     assert.match(
         assets.get('base.wxml') ?? '',
-        /<native-counter\s+count="{{i\.count}}" label="{{i\.label}}" bind:increment="eh"/
+        /<native-counter\s+count="{{i\.count}}" label="{{i\.label}}" bindincrement="eh"/
     )
     assert.ok(assets.get('utils.wxs'))
     assert.ok(assets.get('comp.wxml'))

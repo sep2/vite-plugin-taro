@@ -100,7 +100,7 @@ function collectTemplateComponentConfig(
     for (const component of nativeComponents) {
         config.thirdPartyComponents.set(
             component.name,
-            new Set([...component.properties, ...component.events.map((name) => `bind:${name}`)])
+            new Set([...component.properties, ...component.events.map(toReactEventName)])
         )
     }
     return config
@@ -118,6 +118,11 @@ function findBundleModule(bundle: Rolldown.OutputBundle, resolvedId: string): Ro
             return found[1]
         }
     }
+}
+
+/** Converts a native event into the React handler name consumed by Taro's event bridge. */
+function toReactEventName(value: string): string {
+    return `on${value.charAt(0).toUpperCase()}${value.slice(1)}`
 }
 
 /** Converts a React component export to Taro's dashed host-component name. */

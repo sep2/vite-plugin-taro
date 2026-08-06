@@ -10,9 +10,9 @@ pnpm --filter native-comp-demo dev-wx
 
 Open `packages/native-comp-demo/dist/wx` in WeChat DevTools.
 
-The native component source is intentionally kept as a prebuilt component family under
-`public/components/native-counter`. The React page registers it through `usingComponents` and exercises property updates
-from React and custom events from the native component.
+The native component source lives under `src/native/native-counter`. A feature module declares its typed facade with
+`defineNativeComponent()` and is loaded through `React.lazy()`, so this fixture exercises automatic subpackage placement,
+component registration, property updates, and native events without adding a wrapper around the native tag.
 
 ## Validate
 

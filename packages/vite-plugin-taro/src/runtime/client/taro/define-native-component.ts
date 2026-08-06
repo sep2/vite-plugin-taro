@@ -27,7 +27,9 @@ type PropertyProps<Properties> = {
 }
 
 type EventProps<Events> = {
-    [Name in keyof Events]?: (event: { readonly detail: SchemaValue<Events[Name]> }) => void
+    [Name in keyof Events as Name extends string ? `on${Capitalize<Name>}` : never]?: (event: {
+        readonly detail: SchemaValue<Events[Name]>
+    }) => void
 }
 
 /** Defines a typed native facade that the target compiler must replace before runtime. */

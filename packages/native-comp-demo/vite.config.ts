@@ -25,14 +25,12 @@ export default defineConfig(({ mode }) => {
                     {
                         path: 'pages/index/index',
                         config: {
-                            navigationBarTitleText: 'Native component demo',
-                            usingComponents: {
-                                'native-counter': '../../components/native-counter/index'
-                            }
+                            navigationBarTitleText: 'Native component demo'
                         }
                     }
                 ],
                 appJson: {
+                    lazyCodeLoading: 'requiredComponents',
                     window: {
                         navigationBarTitleText: 'Native component demo'
                     }

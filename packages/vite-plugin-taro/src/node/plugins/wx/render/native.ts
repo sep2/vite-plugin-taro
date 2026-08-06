@@ -1,4 +1,4 @@
-import { type PluginObject, type PluginTarget, types } from '@babel/core'
+import { type NodePath, type PluginObject, type PluginTarget, types } from '@babel/core'
 import transformModulesCommonjs from '@babel/plugin-transform-modules-commonjs'
 import type { Rolldown } from 'vite'
 import { resolveChunkReference } from '../../../utils/modules.ts'
@@ -34,16 +34,45 @@ function connectNativeImportPlugin(fileName: string): PluginObject {
                 // Resolve the final relative reference once at build time; the runtime accepts only canonical chunk IDs.
                 const chunkId = resolveChunkReference(fileName, importPath.node.source.value)
 
-                importPath.replaceWith(
+                replaceNativeImport(
+                    importPath,
                     types.callExpression(
                         types.memberExpression(
                             types.memberExpression(types.identifier('global'), types.identifier('System')),
                             types.identifier('importSync')
                         ),
                         [types.stringLiteral(chunkId)]
-                    )
+                    ),
+                    fileName
                 )
             }
         }
     }
+}
+
+/** Preserves a bundler-generated namespace selector while making the eager import fully synchronous. */
+function replaceNativeImport(
+    importPath: NodePath<types.ImportExpression>,
+    syncImport: types.CallExpression,
+    fileName: string
+): void {
+    const memberPath = importPath.parentPath
+    const callPath = memberPath?.parentPath
+    if (
+        memberPath?.isMemberExpression() &&
+        memberPath.node.object === importPath.node &&
+        !memberPath.node.computed &&
+        types.isIdentifier(memberPath.node.property, { name: 'then' }) &&
+        callPath?.isCallExpression() &&
+        callPath.node.callee === memberPath.node
+    ) {
+        const [selectNamespace] = callPath.node.arguments
+        if (callPath.node.arguments.length !== 1 || !types.isExpression(selectNamespace)) {
+            throw new Error(`Expected one namespace selector for native module import in ${fileName}`)
+        }
+        callPath.replaceWith(types.callExpression(selectNamespace, [syncImport]))
+        return
+    }
+
+    importPath.replaceWith(syncImport)
 }

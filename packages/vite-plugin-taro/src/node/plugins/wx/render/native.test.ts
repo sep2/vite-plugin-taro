@@ -33,9 +33,9 @@ export { instantiate }`
     assert.deepEqual(result.map.sources, ['assets/bootstrap-a.js'])
 })
 
-test('synchronously activates an eager native capsule through the Vite preload identity wrapper', () => {
+test('synchronously activates an eager native capsule through Vite namespace selection and preloading', () => {
     const source = `import { loadCapsuleConfig, __vitePreload } from "./assets/bootstrap-a.js"
-App(loadCapsuleConfig("App", () => __vitePreload(() => import("./assets/module-b.js"), void 0)))`
+App(loadCapsuleConfig("App", () => __vitePreload(() => import("./assets/module-b.js").then(module => module.capsule), void 0)))`
     const result = renderNative(source, { fileName: 'app.js' } as Rolldown.RenderedChunk)
     const importedModuleIds: string[] = []
     const requiredPaths: string[] = []
@@ -44,7 +44,7 @@ App(loadCapsuleConfig("App", () => __vitePreload(() => import("./assets/module-b
     const system = {
         importSync(moduleId: string) {
             importedModuleIds.push(moduleId)
-            return { default: config }
+            return { capsule: { default: config } }
         }
     }
 
@@ -73,6 +73,7 @@ App(loadCapsuleConfig("App", () => __vitePreload(() => import("./assets/module-b
     assert.deepEqual(requiredPaths, ['./assets/bootstrap-a.js'])
     assert.deepEqual(importedModuleIds, ['assets/module-b.js'])
     assert.match(result.code, /vitePreload/)
+    assert.doesNotMatch(result.code, /\.then/)
     assert.ok(result.map)
     assert.deepEqual(result.map.sources, ['app.js'])
 })
