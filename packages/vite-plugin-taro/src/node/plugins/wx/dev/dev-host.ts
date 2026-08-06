@@ -1,7 +1,7 @@
 import type { ServerResponse } from 'node:http'
 import path from 'node:path'
 import colors from 'picocolors'
-import type { InputOptions, OutputOptions } from 'rolldown'
+import type { InputOptions, OutputOptions, Plugin } from 'rolldown'
 import { build } from 'rolldown'
 import { type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
 import type { Connect, ViteDevServer } from 'vite'
@@ -51,6 +51,16 @@ export async function createWxDevHost({
     options: VitePluginTaroOptions
 }): Promise<WxDevHost> {
     const bundledDev = getBundledDev(server)
+    // DevEngine does not reject run() after an initial plugin failure, so settle startup from its first buildEnd result.
+    // Later build errors belong to the running server and continue through onOutput/onHmrUpdates.
+    const initialBuild = Promise.withResolvers<void>()
+    const settleInitialBuild = once((error: Error | undefined): void => {
+        if (error) {
+            initialBuild.reject(error)
+        } else {
+            initialBuild.resolve()
+        }
+    })
 
     const publisher = new PatchPublisher((content) =>
         writeHmrFile(server.config.build.outDir, hmrPatchesFileName, content)
@@ -67,7 +77,7 @@ export async function createWxDevHost({
     bundledDev._devEngine = engine
     bundledDev.triggerBundleRegenerationIfStale = async () => false
     bundledDev.listen = async () => {
-        await engine.run()
+        await Promise.all([engine.run(), initialBuild.promise])
         await engine.ensureCurrentBuildFinish()
     }
 
@@ -241,7 +251,13 @@ export async function createWxDevHost({
                 implement: await bundleRuntimeSource(),
                 lazy: false
             }
-            rolldownOptions.plugins = [rolldownOptions.plugins, createViteReporter(server)]
+
+            const reportInitialBuildPlugin: Plugin = {
+                name: 'vite-plugin-taro:wx-report-initial-build',
+                buildEnd: settleInitialBuild
+            }
+
+            rolldownOptions.plugins = [rolldownOptions.plugins, reportInitialBuildPlugin, createViteReporter(server)]
             disableViteOxcSourcemap(rolldownOptions.plugins)
             return rolldownOptions
         }
