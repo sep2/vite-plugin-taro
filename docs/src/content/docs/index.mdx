@@ -1,40 +1,41 @@
 ---
-title: Welcome to Starlight
-description: Get started building your docs site with Starlight.
-template: splash # Remove or comment out this line to display the site sidebar on this page.
+title: vite-plugin-taro
+description: 使用 Vite 8、React 19 和 Taro 4 构建微信小程序与 Web 应用。
+template: splash
 hero:
-  tagline: Congrats on setting up a new Starlight project!
-  image:
-    file: ../../assets/houston.webp
+  tagline: 用一套现代前端代码，同时构建微信小程序与 Web 应用。
   actions:
-    - text: Example Guide
-      link: ./guides/example/
+    - text: 快速开始
+      link: ./guides/quick-start/
       icon: right-arrow
-    - text: Read the Starlight docs
-      link: https://starlight.astro.build
+    - text: 查看 GitHub
+      link: https://github.com/sep2/vite-plugin-taro
       icon: external
       variant: minimal
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid } from '@astrojs/starlight/components'
 
-## Next steps
+## 为现代 Taro 应用而生
 
 <CardGrid stagger>
-	<Card title="Update content" icon="pencil">
-		Edit `src/content/docs/index.mdx` to see this page change.
-	</Card>
-	<Card title="Change page layout" icon="document">
-		Delete `template: splash` in `src/content/docs/index.mdx` to display a
-		sidebar on this page.
-	</Card>
-	<Card title="Add new content" icon="add-document">
-		Add Markdown or MDX files to `src/content/docs` to create new pages.
-	</Card>
-	<Card title="Configure your site" icon="setting">
-		Edit your `sidebar` and other config in `astro.config.mjs`.
-	</Card>
-	<Card title="Read the docs" icon="open-book">
-		Learn more in [the Starlight Docs](https://starlight.astro.build/).
-	</Card>
+    <Card title="Vite 8 + React 19" icon="setting">
+        基于 Vite 生态，一套代码同时构建微信小程序与 Web，不再依赖旧式 webpack 构建链路。
+    </Card>
+    <Card title="微信小程序热更新" icon="pencil">
+        基于 Vite 模块图和 React Refresh，在修改组件时保留 App、页面、React 组件与输入状态。
+    </Card>
+    <Card title="Taro 组件与 API" icon="document">
+        通过虚拟模块继续使用熟悉的 Taro 组件和 API，同时由插件负责不同目标的运行时解析。
+    </Card>
+    <Card title="Tailwind CSS v4" icon="open-book">
+        默认模板开箱即用，工具类会自动适配微信小程序与 Web 样式输出。
+    </Card>
 </CardGrid>
+
+## 支持目标
+
+| 目标 | 开发方式 | 默认输出 |
+| --- | --- | --- |
+| 微信小程序（`wx`） | Vite 热更新 + 微信开发者工具 | `dist/wx` |
+| Web（`h5`） | 标准 Vite 开发服务器 | `dist/h5` |

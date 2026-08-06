@@ -1,49 +1,22 @@
-# Starlight Starter Kit: Basics
+# vite-plugin-taro 文档站
 
-[![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
+本目录包含基于 [Astro Starlight](https://starlight.astro.build/) 构建的中文文档站。
 
-```
-pnpm create astro@latest -- --template starlight
-```
+## 本地开发
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+在仓库根目录运行：
 
-## 🚀 Project Structure
-
-Inside of your Astro + Starlight project, you'll see the following folders and files:
-
-```
-.
-├── public/
-├── src/
-│   ├── assets/
-│   ├── content/
-│   │   └── docs/
-│   └── content.config.ts
-├── astro.config.mjs
-├── package.json
-└── tsconfig.json
+```sh
+pnpm dev:docs
 ```
 
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
+开发服务器默认运行在 <http://localhost:4321/vite-plugin-taro/>。
 
-Images can be added to `src/assets/` and embedded in Markdown with a relative link.
+## 构建
 
-Static assets, like favicons, can be placed in the `public/` directory.
+```sh
+pnpm --filter docs build
+pnpm --filter docs preview
+```
 
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `pnpm install`             | Installs dependencies                            |
-| `pnpm dev`             | Starts local dev server at `localhost:4321`      |
-| `pnpm build`           | Build your production site to `./dist/`          |
-| `pnpm preview`         | Preview your build locally, before deploying     |
-| `pnpm astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `pnpm astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+文档内容位于 `src/content/docs`。推送到 `main` 的 `docs/**` 变更会通过 GitHub Actions 部署到 <https://sep2.github.io/vite-plugin-taro/>。
