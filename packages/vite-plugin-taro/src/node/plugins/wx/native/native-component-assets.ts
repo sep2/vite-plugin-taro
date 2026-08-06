@@ -39,12 +39,28 @@ export function getNativeComponentSources(meta: Rolldown.CustomPluginOptions | u
 export async function collectNativeComponentAssets(
     definition: NativeComponentSchemaDefinition
 ): Promise<NativeComponentSource> {
+    await requireNativeComponentDirectory(definition.folder)
+
     // This mutable accumulator is local to one traversal and avoids repeatedly copying growing asset arrays.
     const assets: NativeComponentAsset[] = []
-
     await collectDirectory(definition.folder, [], assets)
 
     return { ...definition, assets }
+}
+
+/** Rejects a missing or non-directory source before Rolldown starts its recursive traversal. */
+async function requireNativeComponentDirectory(folder: string): Promise<void> {
+    try {
+        if ((await stat(folder)).isDirectory()) {
+            return
+        }
+    } catch (error) {
+        if (Error.isError(error) && 'code' in error && error.code === 'ENOENT') {
+            throw new Error(`Native component folder does not exist: ${folder}`, { cause: error })
+        }
+        throw error
+    }
+    throw new Error(`Native component source is not a directory: ${folder}`)
 }
 
 /** Traverses entries lexically so output remains deterministic across filesystems. */

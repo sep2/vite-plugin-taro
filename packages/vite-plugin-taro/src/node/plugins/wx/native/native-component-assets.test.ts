@@ -6,6 +6,24 @@ import test from 'node:test'
 import { collectNativeComponentAssets } from './native-component-assets.ts'
 import type { NativeComponentSchemaDefinition } from './native-component-schema.ts'
 
+test('rejects a missing native component folder with its resolved path', async () => {
+    const sourceDirectory = await mkdtemp(path.join(tmpdir(), 'vpt-missing-native-assets-'))
+    const missingDirectory = path.join(sourceDirectory, 'missing')
+    try {
+        await assert.rejects(
+            () =>
+                collectNativeComponentAssets({
+                    folder: missingDirectory,
+                    properties: [],
+                    events: []
+                }),
+            new Error(`Native component folder does not exist: ${missingDirectory}`)
+        )
+    } finally {
+        await rm(sourceDirectory, { force: true, recursive: true })
+    }
+})
+
 test('collects an opaque native folder recursively without validating its files', async () => {
     const sourceDirectory = await mkdtemp(path.join(tmpdir(), 'vpt-native-assets-'))
     try {
