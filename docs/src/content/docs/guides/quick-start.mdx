@@ -172,6 +172,7 @@ export default IndexPage
 | --- | --- |
 | `virtual:taro/components` | `View`、`Text`、`Button`、`Image`、`ScrollView` 等 Taro React 组件。 |
 | `virtual:taro/api` | `Taro.navigateTo`、`Taro.getWindowInfo`、`Taro.useLaunch` 等 API 和 hooks。 |
+| `virtual:taro/native` | 为微信小程序声明带类型的原生组件属性和事件。 |
 
 :::caution
 不要安装或直接导入 `@tarojs/*` 包。vpt 会为微信和 Web 目标解析正确的 Taro 运行时。
@@ -272,6 +273,7 @@ my-app/
 ## 下一步
 
 - 了解[全自动分包](/vite-plugin-taro/guides/automatic-subpackages/)，使用动态导入减小微信小程序主包。
+- 接入带有属性和事件类型的[微信原生组件](/vite-plugin-taro/guides/native-components/)。
 - 配置和调试[Skyline 模式](/vite-plugin-taro/guides/skyline-mode/)。
 - 阅读[配置选项](/vite-plugin-taro/references/configuration/)，添加页面并调整应用与微信项目配置。
 - 已有 Taro React 项目时，阅读[从 Taro CLI 迁移](/vite-plugin-taro/guides/migrate-from-taro/)。

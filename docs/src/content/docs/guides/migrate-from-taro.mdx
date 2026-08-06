@@ -302,7 +302,7 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
 
 构建时仍会替换 `process.env.TARO_ENV`：微信构建中的值为 `weapp`，Web 构建中的值为 `h5`。如果迁移后的 TypeScript 配置不再声明 `process`，优先改用下面的注释指令；也可以在项目自己的类型文件中为 `process.env.TARO_ENV` 添加窄类型声明。
 
-注释指令中的微信目标需要从 `WEAPP` 改为 `wx`：
+注释指令中的微信小程序需要从 `WEAPP` 改为 `wx`：
 
 ```ts
 // #ifdef wx
