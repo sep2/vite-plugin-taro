@@ -285,7 +285,7 @@ Page 和 Component 使用相同过程。业务动态导入仍使用异步加载�
 
 第一次微信开发构建仍使用相同的物理输出和位置规划，但移除内容哈希以保持文件路径稳定。后续 JavaScript 更新由 Rolldown 开发运行时应用源码模块补丁，不会重新加载整套物理 chunks；无法安全接受的更新才触发完整构建。
 
-完整过程参见[热更新原理](/vite-plugin-taro/references/hmr-implementation/)。
+完整过程参见[热更新原理](/references/hmr-implementation/)。
 
 ## Web 输出
 

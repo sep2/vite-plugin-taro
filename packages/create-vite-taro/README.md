@@ -2,6 +2,8 @@
 
 Create a Vite 8 + React 19 + Taro app for WeChat Mini Program and Web/H5 targets.
 
+Documentation: <https://vpt.js.org/>
+
 ## Quick start
 
 ```sh

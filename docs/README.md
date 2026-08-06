@@ -10,7 +10,7 @@
 pnpm dev:docs
 ```
 
-开发服务器默认运行在 <http://localhost:4321/vite-plugin-taro/>。
+开发服务器默认运行在 <http://localhost:4321/>。
 
 ## 构建
 
@@ -19,4 +19,4 @@ pnpm --filter docs build
 pnpm --filter docs preview
 ```
 
-文档内容位于 `src/content/docs`。推送到 `main` 的 `docs/**` 变更会通过 GitHub Actions 部署到 <https://sep2.github.io/vite-plugin-taro/>。
+文档内容位于 `src/content/docs`。推送到 `main` 的 `docs/**` 变更会通过 GitHub Actions 部署到 <https://vpt.js.org/>。

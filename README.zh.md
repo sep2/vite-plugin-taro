@@ -12,7 +12,7 @@
 
 <video src="https://github.com/user-attachments/assets/cd4e6d97-6bc7-40e0-9ba9-206c9fe369f1" controls autoplay muted loop playsinline width="100%"></video>
 
-中文文档：<https://sep2.github.io/vite-plugin-taro>。如何在本地运行示例，请参见[示例应用](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.zh.md)。
+中文文档：<https://vpt.js.org>。如何在本地运行示例，请参见[示例应用](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.zh.md)。
 
 - **Vite 8 + React 19** 基于 Vite 生态，一份代码覆盖微信小程序与 Web。
 - **热更新** 基于 Vite 重构的热更新，微信小程序完美支持，页面编辑不再丢失状态。
