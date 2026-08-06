@@ -41,7 +41,10 @@ export default defineConfig({
                 },
                 {
                     label: '参考',
-                    items: [{ label: '配置选项', slug: 'reference/configuration' }]
+                    items: [
+                        { label: '配置选项', slug: 'reference/configuration' },
+                        { label: 'HMR 实现原理', slug: 'reference/hmr-implementation' }
+                    ]
                 }
             ]
         })
