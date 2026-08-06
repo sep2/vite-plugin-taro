@@ -118,6 +118,70 @@ vpt全自动分包不会把已有的静态依赖偷偷改成异步依赖。如�
     └── import('./feature-b') ────▶ 新的延迟加载边界
 ```
 
+## 分包策略
+
+应用通过静态 `import` 和动态 `import()` 控制模块的加载时机，vpt全自动分包再根据这些边界决定模块归属和物理分包。你控制的是同步或按需加载关系，不需要指定分包名称、目录或大小。
+
+### 让模块留在主包
+
+从 App、页面或它们的同步依赖中静态导入模块，该模块就会留在主包：
+
+```ts
+import { initializeSession } from './session'
+
+initializeSession()
+```
+
+只要存在一条从同步入口到该模块的静态引用路径，主包所有权就会优先。延迟功能也可以直接复用这个模块，不会生成副本。
+
+### 让功能按需进入分包
+
+确保功能只能通过动态 `import()` 到达。该功能静态导入的专属依赖会一起成为分包候选：
+
+```ts
+async function openEditor() {
+    const { mountEditor } = await import('./features/editor')
+    return mountEditor()
+}
+```
+
+适合延迟加载的边界通常是低频页面、大型编辑器、图表、报表、导出工具或仅在特定操作后使用的功能。不要为了拆包而逐个动态导入很小的工具模块，应围绕完整业务功能创建边界。
+
+### 创建多级加载边界
+
+延迟功能内部可以继续使用动态导入，形成下一阶段的按需加载：
+
+```ts
+// features/report.ts
+export async function exportReport() {
+    const { exportToPdf } = await import('./report-pdf')
+    return exportToPdf()
+}
+```
+
+`report` 和 `report-pdf` 是两个独立的逻辑加载阶段。规划器可能根据大小把它们放在同一物理分包或不同分包；`report-pdf` 的导入与执行只会在调用 `exportReport()` 后发生。
+
+### 避免意外进入主包
+
+如果一个本应延迟加载的模块同时被同步代码静态导入，它会回到主包。检查公共入口文件和聚合导出，避免从同步路径重新导出大型功能：
+
+```ts
+// 不要在同步入口中重新导出延迟功能
+export { mountEditor } from './features/editor'
+```
+
+仅用于 TypeScript 类型的依赖应使用 `import type`。类型导入会在构建时移除，不会影响模块归属：
+
+```ts
+import type { EditorOptions } from './features/editor'
+```
+
+### 物理分包由 vpt 管理
+
+vpt 不提供手动指定 `package`、分包根目录或模块清单的选项。一个动态导入边界也不保证对应一个物理分包；规划器可以合并较小的延迟功能，也可以把过大的延迟依赖图拆到多个分包。
+
+这种分工让应用只表达标准模块关系和加载时机，同时由 vpt 负责满足微信的分包大小与引用要求。构建后可以检查 `dist/wx/app.json` 和 `dist/wx/sub`，确认最终布局是否符合预期。
+
 ## 如何规划分包
 
 模块图分析完成后，规划器使用确定性的 best-fit decreasing 策略打包候选模块：
