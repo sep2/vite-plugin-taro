@@ -169,8 +169,6 @@ vpt 对最终存在的分包目录去重、排序，并生成分包声明：
 
 这些分包只声明代码入口，所以 `pages` 为空。传入 `appJson` 的 `subPackages` 或 `subpackages` 会被移除，最终声明完全来自实际输出。
 
-[微信原生组件](/vite-plugin-taro/guides/native-components/)目录的文件体积会计入其声明模块的规划重量，并随该模块进入主包或生成分包。图片、字体和其他普通构建资源暂不参与位置规划；全局 `app.wxss` 也始终位于主包。
-
 ## 微信运行时：SystemJS Core
 
 微信小程序内置定制版 SystemJS Core。vpt 在上游 Core 基础上增加同步 `importSync()`，并接入主包与分包文件加载。它属于 vpt 的构建产物，不是应用 API。
