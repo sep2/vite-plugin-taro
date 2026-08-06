@@ -72,17 +72,17 @@ interface VitePluginTaroOptions {
 
 ## 选项
 
-| 选项 | 说明 |
-| --- | --- |
-| `target` | 当前 Vite 调用的构建目标。微信小程序使用 `wx`，Web 使用 `h5`。 |
-| `app` | 默认导出 React 根应用组件的源码模块，例如 `src/app.tsx`。 |
-| `pages` | 有序页面列表。顺序会成为 `app.json.pages` 和 Web 路由顺序。 |
+| 选项 | 说明                                                                                                       |
+| --- |------------------------------------------------------------------------------------------------------------|
+| `target` | 当前 Vite 调用的构建目标。微信小程序使用 `wx`，Web 使用 `h5`。                                             |
+| `app` | 默认导出 React 根应用组件的源码模块，例如 `src/app.tsx`。                                                  |
+| `pages` | 有序页面列表。顺序会成为 `app.json.pages` 和 Web 路由顺序。                                                |
 | `pages[].path` | 不带扩展名的 Taro 路由与输出路径，例如 `pages/index/index`。对应文件必须位于 `src/pages/index/index.tsx`。 |
-| `pages[].config` | 合并到微信页面 JSON 和 Web 路由配置的页面配置。 |
-| `appJson` | 两个目标共享的应用配置。插件会根据 `pages` 生成并覆盖其中的 `pages` 字段。 |
-| `projectConfigJson` | 微信构建输出的 `project.config.json`。即使当前目标为 `h5`，也必须提供。 |
-| `projectPrivateConfigJson` | 可选的微信私有项目配置，输出为 `project.private.config.json`。 |
-| `sitemapJson` | 微信构建输出的 `sitemap.json`。即使当前目标为 `h5`，也必须提供。 |
+| `pages[].config` | 合并到微信页面 JSON 和 Web 路由配置的页面配置。                                                            |
+| `appJson` | 微信应用配置。vpt 会根据 `pages` 生成并覆盖 `pages`，并自行管理代码分包声明。                              |
+| `projectConfigJson` | 微信构建时原样输出为 `project.config.json`。接口要求始终提供，Web 构建不会写出该文件。                     |
+| `projectPrivateConfigJson` | 可选的微信私有项目配置；提供时原样输出为 `project.private.config.json`。                                   |
+| `sitemapJson` | 微信构建时原样输出为 `sitemap.json`。接口要求始终提供，Web 构建不会写出该文件。                            |
 
 ## 入口与页面约定
 
