@@ -19,7 +19,7 @@ test('compiles a facade and returns watched native sources as module metadata', 
         const compiled = await compileNativeComponentFacade({
             code: `
                 import { defineNativeComponent } from 'virtual:taro/native'
-                export const NativeCounter = defineNativeComponent('./native-counter', {
+                export const NativeCounter = defineNativeComponent(import('./native-counter'), {
                     properties: { count: Number },
                     events: { increment: { value: Number } }
                 })

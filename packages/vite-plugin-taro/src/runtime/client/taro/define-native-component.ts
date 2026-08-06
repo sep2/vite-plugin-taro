@@ -32,16 +32,18 @@ type EventProps<Events> = {
     }) => void
 }
 
-/** Defines a typed native facade that the target compiler must replace before runtime. */
+/** Defines a typed native facade from an `import('./relative-folder')` reference replaced before runtime. */
 export function defineNativeComponent<
     const Properties extends Readonly<Record<string, NativeSchema>>,
     const Events extends Readonly<Record<string, NativeSchema>>
 >(
-    folder: string,
-    _schema: {
+    folder: Promise<unknown>,
+    schema: {
         readonly properties: Properties
         readonly events: Events
     }
 ): ComponentType<PropertyProps<Properties> & EventProps<Events>> {
-    throw new Error(`Native component facade was not compiled: ${folder}`)
+    void folder
+    void schema
+    throw new Error('Native component facade was not compiled')
 }

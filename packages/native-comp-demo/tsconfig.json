@@ -9,6 +9,7 @@
 
         "moduleResolution": "bundler",
         "allowImportingTsExtensions": true,
+        "allowJs": true,
         "verbatimModuleSyntax": true,
         "moduleDetection": "force",
         "noEmit": true,

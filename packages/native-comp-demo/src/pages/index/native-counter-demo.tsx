@@ -1,17 +1,6 @@
 import { Button, Text, View } from 'virtual:taro/components'
-import { defineNativeComponent } from 'virtual:taro/native'
 import { useState } from 'react'
-
-const NativeCounter = defineNativeComponent('../../native/native-counter', {
-    properties: {
-        count: Number
-    },
-    events: {
-        increment: {
-            value: Number
-        }
-    }
-})
+import { NativeCounter } from './native-counter.tsx'
 
 export default function NativeCounterDemo() {
     const [count, setCount] = useState(0)

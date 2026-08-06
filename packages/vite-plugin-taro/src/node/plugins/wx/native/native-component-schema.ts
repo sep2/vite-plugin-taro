@@ -105,8 +105,9 @@ function parseDefinition(
         throw buildError('defineNativeComponent() requires a folder and one schema object')
     }
     const [folderNode, schemaNode] = call.arguments
-    if (!types.isStringLiteral(folderNode) || !isLocalFolder(folderNode.value)) {
-        throw buildError('Native component folder must be a static relative string')
+    const folder = readStaticFolderImport(folderNode)
+    if (!folder) {
+        throw buildError('Native component folder must use import() with a static relative path')
     }
     if (!types.isObjectExpression(schemaNode)) {
         throw buildError('Native component schema must be an inline object')
@@ -122,7 +123,7 @@ function parseDefinition(
     }
 
     return {
-        folder: normalizeModuleId(path.resolve(path.dirname(moduleId), folderNode.value)),
+        folder: normalizeModuleId(path.resolve(path.dirname(moduleId), folder)),
         properties,
         events
     }
@@ -228,6 +229,19 @@ function getStaticName(node: types.Node): string | undefined {
     if (types.isStringLiteral(node)) {
         return node.value
     }
+}
+
+/** Reads a dynamic import used only as a statically resolvable folder reference. */
+function readStaticFolderImport(node: types.Node | null | undefined): string | undefined {
+    if (
+        !types.isImportExpression(node) ||
+        !types.isStringLiteral(node.source) ||
+        node.options !== null ||
+        !isLocalFolder(node.source.value)
+    ) {
+        return undefined
+    }
+    return node.source.value
 }
 
 /** Limits component sources to folders reachable from their facade module. */
