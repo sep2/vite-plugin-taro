@@ -3,8 +3,9 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
+import type { Rolldown } from 'vite'
 import { compileNativeComponentFacade } from './compile-native-component-facade.ts'
-import { createNativeComponentOutputFiles } from './create-native-component-output-files.ts'
+import { createNativeComponentOutput } from './create-native-component-output.ts'
 
 test('emits surviving native folders into their planned packages', async () => {
     const projectFolder = await mkdtemp(path.join(tmpdir(), 'vpt-native-output-'))
@@ -16,14 +17,10 @@ test('emits surviving native folders into their planned packages', async () => {
             [subpackage.moduleId, subpackage.meta]
         ])
 
-        const files = await createNativeComponentOutputFiles({
+        const output = await createNativeComponentOutput({
             bundle: {
-                main: { type: 'chunk', fileName: 'assets/main.js', moduleIds: [main.moduleId] },
-                subpackage: {
-                    type: 'chunk',
-                    fileName: 'sub/p_test/assets/subpackage.js',
-                    moduleIds: [subpackage.moduleId]
-                }
+                main: createChunk('assets/main.js', [main.moduleId]),
+                subpackage: createChunk('sub/p_test/assets/subpackage.js', [subpackage.moduleId])
             },
             getModuleInfo: (moduleId) => {
                 const meta = metadata.get(moduleId)
@@ -32,17 +29,52 @@ test('emits surviving native folders into their planned packages', async () => {
         })
 
         assert.deepEqual(
-            files.map(({ fileName }) => fileName),
+            output.files.map(({ fileName }) => fileName),
             ['components/native-counter/index.wxml', 'sub/p_test/components/native-card/index.wxml']
         )
         assert.deepEqual(
-            files.map((file) => String(file.source)),
+            output.files.map((file) => String(file.source)),
             ['counter', 'card']
         )
+        assert.deepEqual(output.registrations, [
+            {
+                name: 'native-counter',
+                componentPath: '/components/native-counter/index',
+                properties: ['value'],
+                events: ['change']
+            },
+            {
+                name: 'native-card',
+                componentPath: '/sub/p_test/components/native-card/index',
+                properties: ['value'],
+                events: ['change']
+            }
+        ])
     } finally {
         await rm(projectFolder, { force: true, recursive: true })
     }
 })
+
+function createChunk(fileName: string, moduleIds: string[]): Rolldown.OutputChunk {
+    return {
+        __rolldown_external_memory_handle__: () => ({ freed: false }),
+        type: 'chunk',
+        code: '',
+        name: path.posix.basename(fileName, '.js'),
+        isEntry: false,
+        isDynamicEntry: false,
+        facadeModuleId: null,
+        moduleIds,
+        exports: [],
+        fileName,
+        preliminaryFileName: fileName,
+        modules: {},
+        imports: [],
+        dynamicImports: [],
+        map: null,
+        sourcemapFileName: null
+    }
+}
 
 async function createFacade(projectFolder: string, name: string, content: string) {
     const folder = path.join(projectFolder, name)
@@ -53,8 +85,8 @@ async function createFacade(projectFolder: string, name: string, content: string
         code: `
             import { defineNativeComponent } from 'virtual:taro/native'
             export const Component = defineNativeComponent('./${name}', {
-                properties: {},
-                events: {}
+                properties: { value: Number },
+                events: { change: String }
             })
         `,
         id: moduleId,

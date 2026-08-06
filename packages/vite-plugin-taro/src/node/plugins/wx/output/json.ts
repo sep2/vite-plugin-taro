@@ -7,10 +7,12 @@ import { toRootRelativePath } from './relative-root.ts'
 /** Creates every configured native JSON asset. */
 export function createJsonAssets({
     options,
-    subpackages
+    subpackages,
+    nativeComponents
 }: {
     options: VitePluginTaroOptions
     subpackages: readonly GeneratedSubpackage[]
+    nativeComponents: readonly { name: string; componentPath: string }[]
 }): Rolldown.EmittedAsset[] {
     return [
         createJsonAsset('app.json', {
@@ -18,7 +20,7 @@ export function createJsonAssets({
             ...(subpackages.length > 0 ? { subPackages: subpackages } : {})
         }),
 
-        ...options.pages.map((page) => createJsonAsset(`${page.path}.json`, createPageJson(page))),
+        ...options.pages.map((page) => createJsonAsset(`${page.path}.json`, createPageJson(page, nativeComponents))),
 
         createJsonAsset('project.config.json', options.projectConfigJson),
 
@@ -30,13 +32,17 @@ export function createJsonAssets({
     ]
 }
 
-/** Creates Page JSON with Taro's recursive root component alongside user components. */
-function createPageJson(page: VitePluginTaroPageOption): JsonObject {
+/** Creates Page JSON with generated Taro and native component registrations. */
+function createPageJson(
+    page: VitePluginTaroPageOption,
+    nativeComponents: readonly { name: string; componentPath: string }[]
+): JsonObject {
     const usingComponents = isJsonObject(page.config.usingComponents) ? page.config.usingComponents : {}
     return {
         ...page.config,
         usingComponents: {
             ...usingComponents,
+            ...Object.fromEntries(nativeComponents.map(({ name, componentPath }) => [name, componentPath])),
             comp: toRootRelativePath(page.path, 'comp')
         }
     }

@@ -19,12 +19,20 @@ const taroComponentsModulePath = packageRequire.resolve('@tarojs/plugin-platform
 /** Creates Taro's shared WeChat templates and native WXML/WXSS companions for every Page. */
 export function createTemplateAssets(
     bundle: Rolldown.OutputBundle,
-    options: VitePluginTaroOptions
+    options: VitePluginTaroOptions,
+    nativeComponents: readonly {
+        name: string
+        properties: readonly string[]
+        events: readonly string[]
+    }[]
 ): Rolldown.EmittedAsset[] {
     const templateBuilder = createTemplateBuilder()
 
     return [
-        createAsset('base.wxml', templateBuilder.buildTemplate(collectTemplateComponentConfig(bundle))),
+        createAsset(
+            'base.wxml',
+            templateBuilder.buildTemplate(collectTemplateComponentConfig(bundle, nativeComponents))
+        ),
         createAsset('utils.wxs', templateBuilder.buildXScript()),
         createAsset('comp.wxml', templateBuilder.buildBaseComponentTemplate('.wxml')),
         createAsset('comp.json', renderJson(createComponentJson())),
@@ -58,8 +66,16 @@ function createTemplateBuilder() {
     return platform.template
 }
 
-/** Collects the Taro host components reachable from the final bundle. */
-function collectTemplateComponentConfig(bundle: Rolldown.OutputBundle): TemplateComponentConfig {
+/** Creates template metadata from the reachable Taro hosts and native schemas. */
+function collectTemplateComponentConfig(
+    bundle: Rolldown.OutputBundle,
+    nativeComponents: readonly {
+        name: string
+        properties: readonly string[]
+        events: readonly string[]
+    }[]
+): TemplateComponentConfig {
+    // This local config accumulates names in output order before the template builder consumes it.
     const config: TemplateComponentConfig = {
         includes: new Set([
             'view',
@@ -80,6 +96,12 @@ function collectTemplateComponentConfig(bundle: Rolldown.OutputBundle): Template
     const components = findBundleModule(bundle, taroComponentsModulePath)
     for (const name of components?.renderedExports ?? []) {
         config.includes.add(toDashed(name))
+    }
+    for (const component of nativeComponents) {
+        config.thirdPartyComponents.set(
+            component.name,
+            new Set([...component.properties, ...component.events.map((name) => `bind:${name}`)])
+        )
     }
     return config
 }

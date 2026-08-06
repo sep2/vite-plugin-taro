@@ -44,10 +44,14 @@ const options: VitePluginTaroOptions = {
 
 test('creates configured native JSON assets at exact output paths', () => {
     const assets = new Map(
-        createJsonAssets({ options, subpackages: [] }).map((asset) => [
-            asset.fileName,
-            JSON.parse(String(asset.source))
-        ])
+        createJsonAssets({
+            options,
+            subpackages: [],
+            nativeComponents: [
+                { name: 'native-counter', componentPath: '/components/native-counter/index' },
+                { name: 'native-card', componentPath: '/sub/p_card/components/native-card/index' }
+            ]
+        }).map((asset) => [asset.fileName, JSON.parse(String(asset.source))])
     )
 
     assert.deepEqual(
@@ -71,12 +75,16 @@ test('creates configured native JSON assets at exact output paths', () => {
         navigationBarTitleText: 'Home',
         usingComponents: {
             custom: '../../custom',
+            'native-counter': '/components/native-counter/index',
+            'native-card': '/sub/p_card/components/native-card/index',
             comp: '../../comp'
         }
     })
     assert.deepEqual(assets.get('pages/account/index.json'), {
         navigationBarTitleText: 'Account',
         usingComponents: {
+            'native-counter': '/components/native-counter/index',
+            'native-card': '/sub/p_card/components/native-card/index',
             comp: '../../comp'
         }
     })
@@ -88,7 +96,8 @@ test('creates configured native JSON assets at exact output paths', () => {
 test('adds generated code-only subpackages to app.json', () => {
     const assets = createJsonAssets({
         options,
-        subpackages: [{ name: 'p_example', root: 'sub/p_example', pages: [] }]
+        subpackages: [{ name: 'p_example', root: 'sub/p_example', pages: [] }],
+        nativeComponents: []
     })
     const appJson = assets.find((asset) => asset.fileName === 'app.json')
 
@@ -103,7 +112,8 @@ test('omits project.private.config.json when it is not configured', () => {
             ...options,
             projectPrivateConfigJson: undefined
         },
-        subpackages: []
+        subpackages: [],
+        nativeComponents: []
     })
 
     assert.equal(

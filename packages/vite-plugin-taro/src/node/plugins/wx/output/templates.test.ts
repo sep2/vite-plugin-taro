@@ -23,7 +23,13 @@ const options: VitePluginTaroOptions = {
 }
 
 test('creates shared Taro templates and native companions for every Page', () => {
-    const templateAssets = createTemplateAssets({} as Rolldown.OutputBundle, options)
+    const templateAssets = createTemplateAssets({} as Rolldown.OutputBundle, options, [
+        {
+            name: 'native-counter',
+            properties: ['count', 'label'],
+            events: ['increment']
+        }
+    ])
     const assets = new Map(templateAssets.map((asset) => [asset.fileName, String(asset.source)]))
 
     assert.deepEqual(
@@ -39,7 +45,11 @@ test('creates shared Taro templates and native companions for every Page', () =>
             'pages/account/index.wxss'
         ]
     )
-    assert.ok(assets.get('base.wxml'))
+    assert.match(assets.get('base.wxml') ?? '', /<template name="tmpl_0_native-counter">/)
+    assert.match(
+        assets.get('base.wxml') ?? '',
+        /<native-counter\s+count="{{i\.count}}" label="{{i\.label}}" bind:increment="eh"/
+    )
     assert.ok(assets.get('utils.wxs'))
     assert.ok(assets.get('comp.wxml'))
     assert.deepEqual(JSON.parse(assets.get('comp.json') ?? ''), {
