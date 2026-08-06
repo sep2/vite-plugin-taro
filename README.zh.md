@@ -131,7 +131,7 @@ my-app/
 ├── vite.config.ts
 └── src/
     ├── app.css
-    ├── app.ts
+    ├── app.tsx
     └── pages/
         └── index/
             └── index.tsx
@@ -181,7 +181,7 @@ export default defineConfig(({ mode }) => {
         plugins: [
             vitePluginTaro({
                 target,
-                app: 'src/app.ts',
+                app: 'src/app.tsx',
                 pages: [{ path: 'pages/index/index', config: { navigationBarTitleText: 'Home' } }],
                 appJson: {
                     window: { navigationBarTitleText: 'Demo' }
@@ -211,7 +211,7 @@ export default defineConfig(({ mode }) => {
 
 ### 3. 创建应用组件
 
-`src/app.ts` 是共享应用包装组件。它会通过 `children` 接收当前页面。
+`src/app.tsx` 是共享应用包装组件。它会通过 `children` 接收当前页面。
 
 ```tsx
 import type { PropsWithChildren } from 'react'
@@ -330,7 +330,7 @@ type VitePluginTaroOptions = {
 | 选项 | 描述 |
 | --- | --- |
 | `target` | 本次 Vite 调用的活动目标。微信小程序使用 `wx`，Web 使用 `h5`。 |
-| `app` | 默认导出根 React 应用组件的源码文件，例如 `src/app.ts` 或 `src/app.tsx`。 |
+| `app` | 默认导出根 React 应用组件的源码文件，例如 `src/app.tsx`。 |
 | `pages` | 有序页面列表。该顺序会成为 `app.json.pages` 和 Web 路由顺序。 |
 | `pages[].path` | 不带扩展名的 Taro 风格路由和输出路径，例如 `pages/index/index`。页面组件必须存在于 `src/${path}.tsx`。 |
 | `pages[].config` | 合并到生成的微信页面 JSON 和 Web 路由配置中的页面配置。 |

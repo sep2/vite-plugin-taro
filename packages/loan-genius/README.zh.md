@@ -109,7 +109,7 @@ packages/loan-genius/
 ├── index.html
 ├── vite.config.ts
 └── src/
-    ├── app.ts
+    ├── app.tsx
     ├── app.css
     ├── components/
     ├── pages/
@@ -122,7 +122,7 @@ packages/loan-genius/
 | 文件 | 用途 |
 | --- | --- |
 | `vite.config.ts` | 选择目标，配置别名、输出目录、页面、应用配置和微信项目元数据。 |
-| `src/app.ts` | 传给 `vite-plugin-taro` 的 React 根应用组件。 |
+| `src/app.tsx` | 传给 `vite-plugin-taro` 的 React 根应用组件。 |
 | `src/app.css` | 全局 Tailwind CSS v4 引入和应用样式。 |
 | `src/pages/calculator/index.tsx` | 首页和默认路由。 |
 | `src/pages/calculator/monthly-payments/index.tsx` | 月供明细页面。 |

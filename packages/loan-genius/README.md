@@ -109,7 +109,7 @@ packages/loan-genius/
 ├── index.html
 ├── vite.config.ts
 └── src/
-    ├── app.ts
+    ├── app.tsx
     ├── app.css
     ├── components/
     ├── pages/
@@ -122,7 +122,7 @@ Important files:
 | File | Purpose |
 | --- | --- |
 | `vite.config.ts` | Selects the target, configures aliases, output directory, pages, app config, and WeChat project metadata. |
-| `src/app.ts` | Root React app component passed to `vite-plugin-taro`. |
+| `src/app.tsx` | Root React app component passed to `vite-plugin-taro`. |
 | `src/app.css` | Global Tailwind CSS v4 imports and app styles. |
 | `src/pages/calculator/index.tsx` | First page and default route. |
 | `src/pages/calculator/monthly-payments/index.tsx` | Monthly payment detail page. |

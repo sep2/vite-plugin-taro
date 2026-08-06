@@ -58,7 +58,7 @@ my-app/
 ├── vite.config.ts
 └── src/
     ├── app.css
-    ├── app.ts
+    ├── app.tsx
     ├── components/
     └── pages/
         └── index/
@@ -66,9 +66,9 @@ my-app/
 ```
 
 - `vite.config.ts` 配置构建目标、页面、应用和微信项目。
-- `src/app.ts` 是两个目标共享的应用入口。
+- `src/app.tsx` 是两个目标共享的应用入口。
 - `src/app.css` 包含全局样式和 Tailwind CSS v4 配置。
-- `src/pages/index/index.tsx` 是模板的首页。
+- `src/pages/index/index.tsx` 是模板的默认首页组件。
 
 ## 2. 配置微信 App ID
 
@@ -167,7 +167,7 @@ bun run dev:h5
 
 ## 5. 编辑第一个页面
 
-页面组件位于 `src/pages/index/index.tsx`。应用代码通过插件提供的虚拟模块使用 Taro 组件和 API：
+模板的默认首页组件位于 `src/pages/index/index.tsx`。应用代码通过插件提供的虚拟模块使用 Taro 组件和 API：
 
 ```tsx
 import Taro from 'virtual:taro/api'

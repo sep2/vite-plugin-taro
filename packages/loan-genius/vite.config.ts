@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => {
         plugins: [
             vitePluginTaro({
                 target,
-                app: 'src/app.ts',
+                app: 'src/app.tsx',
                 pages: [
                     {
                         path: 'pages/calculator/index',

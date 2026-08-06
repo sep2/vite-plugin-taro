@@ -12,7 +12,7 @@ Build WeChat Mini Program and Web apps with the latest standards-based frontend 
 
 <video src="https://github.com/user-attachments/assets/cd4e6d97-6bc7-40e0-9ba9-206c9fe369f1" controls autoplay muted loop playsinline width="100%"></video>
 
-Live demo: <https://sep2.github.io/vite-plugin-taro>. See [Sample app](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.md) for how to run it locally.
+Chinese documentation: <https://sep2.github.io/vite-plugin-taro>. See [Sample app](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius/README.md) for how to run it locally.
 
 - **Vite 8 + React 19** Build one codebase for WeChat Mini Program and Web with the Vite ecosystem.
 - **Hot reload** Re-engineered on Vite with seamless WeChat Mini Program support, so page edits no longer lose state.
@@ -132,7 +132,7 @@ my-app/
 ├── vite.config.ts
 └── src/
     ├── app.css
-    ├── app.ts
+    ├── app.tsx
     └── pages/
         └── index/
             └── index.tsx
@@ -182,7 +182,7 @@ export default defineConfig(({ mode }) => {
         plugins: [
             vitePluginTaro({
                 target,
-                app: 'src/app.ts',
+                app: 'src/app.tsx',
                 pages: [{ path: 'pages/index/index', config: { navigationBarTitleText: 'Home' } }],
                 appJson: {
                     window: { navigationBarTitleText: 'Demo' }
@@ -212,7 +212,7 @@ Important conventions:
 
 ### 3. Create the app component
 
-`src/app.ts` is the shared application wrapper. It receives the current page as `children`.
+`src/app.tsx` is the shared application wrapper. It receives the current page as `children`.
 
 ```tsx
 import type { PropsWithChildren } from 'react'
@@ -332,7 +332,7 @@ type VitePluginTaroOptions = {
 | Option | Description |
 | --- | --- |
 | `target` | Active target for this Vite invocation. Use `wx` for WeChat Mini Program and `h5` for Web. |
-| `app` | Source file that default-exports the root React app component, for example `src/app.ts` or `src/app.tsx`. |
+| `app` | Source file that default-exports the root React app component, for example `src/app.tsx`. |
 | `pages` | Ordered page list. The order becomes `app.json.pages` and the Web route order. |
 | `pages[].path` | Taro-style route and output path without extension, for example `pages/index/index`. The page component must exist at `src/${path}.tsx`. |
 | `pages[].config` | Page config merged into the generated WeChat page JSON and Web route config. |

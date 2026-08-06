@@ -27,14 +27,14 @@ html[data-has-hero]:not([data-has-sidebar]) {
     --sl-content-width: 80rem;
 }
 
+html[data-has-hero] .hero > .hero-html {
+    width: 100%;
+    max-width: none;
+}
+
 @media (min-width: 50rem) {
     .hero {
         grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
         gap: 4rem;
-    }
-
-    .hero > .hero-html {
-        width: 100%;
-        max-width: none;
     }
 }
