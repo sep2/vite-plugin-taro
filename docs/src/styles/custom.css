@@ -28,6 +28,7 @@ html[data-has-hero]:not([data-has-sidebar]) {
 }
 
 html[data-has-hero] .hero > .hero-html {
+    order: 2;
     width: 100%;
     max-width: none;
 }
