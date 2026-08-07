@@ -3,11 +3,7 @@ title: 微信原生组件
 description: 在 React 中类型安全地使用微信原生组件，并让原生资源参与全自动分包。
 ---
 
-使用 `defineNativeComponent()` 为已有的微信原生组件声明一个 JSX 接口。vpt 会自动复制原生文件、注册组件并规划分包。
-
-:::note
-原生组件仅适用于 `wx`。H5 需要提供单独的 Web 实现。
-:::
+使用 `defineNativeComponent()` 为已有的微信原生组件声明一个 React 接口。vpt 会自动复制原生文件、注册组件并规划分包。
 
 ## 在 React 中使用
 
@@ -33,9 +29,9 @@ export const NativeCounter = defineNativeComponent<NativeCounterProps>(
 )
 ```
 
-此文件可以放在任意位置。`() => import(...)` 只是供编译器识别原生组件入口的标记，不会导入原生代码。事实上，此文件会被编译器完全移除。
+`() => import(...)` 只是供编译器识别原生组件入口的标记，不会导入原生代码。事实上，此文件会被编译器完全移除。
 
-然后在 JSX 中使用这个接口即可：
+此文件可以放在任意位置，在 React 中使用这个接口即可：
 
 ```tsx
 // src/pages/index/index.tsx
@@ -55,8 +51,6 @@ export default function CounterDemo() {
     )
 }
 ```
-
-属性和事件都有完整类型，事件数据位于 `event.detail`。组件注册和文件复制由 vpt 自动完成。
 
 `NativeCounter` 组件只存在于编译时，不是 React 运行时组件，也不会生成额外代码或带来性能开销。
 
@@ -88,7 +82,7 @@ vpt 会递归复制目录中的文件并保留相对路径。WXS、图片、字�
 
 ## TypeScript 类型
 
-TypeScript 接口描述可以在 JSX 中传入的属性和事件：
+TypeScript 接口描述可以在 React 中传入的属性和事件：
 
 ```tsx
 import type { NativeComponentEvent } from 'virtual:taro/native'
@@ -173,12 +167,14 @@ export default function Index() {
 
 `native-counter-demo.tsx` 再导入 `NativeCounter`。完整规则参见[全自动分包](/guides/automatic-subpackages/)。
 
-## 同时构建 WX 与 H5
+## 同时构建微信 与 Web
 
-H5 代码不能导入使用 `virtual:taro/native` 的接口文件。共享组件可以通过条件编译选择实现：
+Web 代码不能导入使用 `virtual:taro/native` 的接口文件。共享组件可以通过条件编译选择实现：
 
 ```tsx
-import WebCounter from './web-counter.tsx'
+// #ifdef h5
+import { WebCounter } from './web-counter.tsx'
+// #endif
 
 // #ifdef wx
 import { NativeCounter } from './native-counter.tsx'
@@ -213,19 +209,6 @@ src/towxml-adapter/
 ```
 
 React 和原生组件不共享 CommonJS 模块实例。使用属性和事件通信，再由 adapter 调用原生 API。
-
-## 属性传输
-
-不要在流式更新中反复传递不断增长的完整内容：
-
-```tsx
-// 不推荐
-<NativeMarkdown markdown={accumulatedMarkdown} />
-```
-
-应传递大小受限的有序数据块，并在原生组件中累积。对高频更新进行批量和节流，完整内容保存在 JavaScript 内存或原生状态中。
-
-[`towxml-stream-demo`](https://github.com/sep2/vite-plugin-taro/tree/main/packages/towxml-stream-demo) 展示了分块 Markdown、ready 握手和滚动处理。
 
 ## 排查问题
 
