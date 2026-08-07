@@ -99,7 +99,7 @@ function createH5IndexHtmlTags(): HtmlTagDescriptor[] {
     ]
 }
 
-/** Creates H5-only Babel transforms for Stencil CSS ordering and Taro API imports. */
+/** Creates H5-only transforms for Stencil CSS ordering and Taro API imports. */
 function createH5SupportPlugins(): PluginOption[] {
     return [
         createStencilClientAdapter(),

@@ -1,7 +1,8 @@
-import type { types as BabelTypes } from '@babel/core'
-import { type NodePath, type PluginObj, transformAsync, types } from '@babel/core'
+import type { WalkerEnter } from 'oxc-walker'
+import type { RolldownMagicString } from 'rolldown'
 import type { Plugin } from 'vite'
 import { normalizeModuleId } from '../../utils/modules.ts'
+import { transformWithOxcWalker } from '../../utils/oxc-transform.ts'
 import { packageRequire } from '../../utils/packages.ts'
 
 const stencilClientPath = packageRequire.resolve('@stencil/core/internal/client', {
@@ -25,85 +26,85 @@ export function createStencilClientAdapter(): Plugin {
     }
 }
 
-/** Applies the shared Stencil adaptation in either the application or dependency-optimization pipeline. */
-export async function adaptStencilClient(code: string, id: string) {
+/**
+ * Applies the shared Stencil adaptation with one Oxc parse and one range edit.
+ *
+ * The physical module check is essential because the optimizer and application pipelines can
+ * present query-suffixed or platform-normalized IDs. Transforming by source text alone could
+ * modify user code that happens to contain the same insertion expression. Source maps remain
+ * enabled because this adapter runs before Vite/Rolldown's later transforms in both pipelines;
+ * dropping the map would attribute downstream diagnostics to the edited generated positions.
+ */
+export function adaptStencilClient(code: string, id: string) {
     if (normalizeModuleId(id) !== normalizedStencilClientPath) {
         return
     }
 
-    const transformed = await transformAsync(code, {
-        babelrc: false,
-        configFile: false,
-        filename: stencilClientPath,
-        plugins: [rewriteStencilStyleInsertion],
-        sourceFileName: stencilClientPath,
-        sourceMaps: true
+    return transformWithOxcWalker({
+        code,
+        filename: id,
+        sourcemap: true,
+        createVisitor: createStencilVisitor
     })
-
-    if (transformed?.code === undefined || transformed.code === null) {
-        throw new Error(`Failed to adapt Stencil client: ${stencilClientPath}`)
-    }
-
-    return {
-        code: transformed.code,
-        map: transformed.map
-    }
 }
 
-/** Keeps Stencil-injected Taro component styles before application stylesheets. */
-function rewriteStencilStyleInsertion(): PluginObj {
-    return {
-        name: 'vpt:rewrite-stencil-style-insertion',
-        visitor: {
-            CallExpression(callPath) {
-                if (!isStencilStyleInsertBeforeCall(callPath)) {
-                    return
-                }
-
-                callPath
-                    .get('arguments.1')
-                    .replaceWith(
-                        types.conditionalExpression(
-                            types.callExpression(
-                                types.memberExpression(types.identifier('scopeId'), types.identifier('startsWith')),
-                                [types.stringLiteral('sc-taro-')]
-                            ),
-                            createStyleQuery('style,link[rel="stylesheet"]'),
-                            createStyleQuery('link')
-                        )
-                    )
-            }
+/**
+ * Finds Stencil's exact default style insertion call and replaces only its insertion anchor.
+ *
+ * Stencil normally inserts `styleElm` before the first stylesheet link. During Vite development,
+ * application CSS is commonly represented by a `<style>` element instead, so that link-only
+ * lookup returns `null` and Taro component defaults are appended after application CSS. Those
+ * defaults then override the application's selectors despite having the same specificity.
+ *
+ * Taro Stencil components are identified by the `sc-taro-` scope prefix. For those components,
+ * the replacement anchors before the first `<style>` or stylesheet `<link>`, keeping component
+ * defaults before application rules. The original link-only lookup is preserved for every other
+ * Stencil component so VPT does not globally redefine upstream style-ordering behavior.
+ */
+function createStencilVisitor(editor: RolldownMagicString): WalkerEnter {
+    return function enter(node) {
+        if (
+            node.type !== 'CallExpression' ||
+            node.callee.type !== 'MemberExpression' ||
+            node.callee.computed ||
+            node.callee.object.type !== 'Identifier' ||
+            node.callee.object.name !== 'styleContainerNode' ||
+            node.callee.property.type !== 'Identifier' ||
+            node.callee.property.name !== 'insertBefore'
+        ) {
+            return
         }
+
+        // Match the complete upstream call, not merely `insertBefore`: range edits have no
+        // generated-AST type safety, so a broad match could silently alter unrelated runtime
+        // behavior when Stencil changes its implementation.
+        const [style, query] = node.arguments
+        const selector = query?.type === 'CallExpression' ? query.arguments[0] : undefined
+        if (
+            node.arguments.length !== 2 ||
+            style?.type !== 'Identifier' ||
+            style.name !== 'styleElm' ||
+            query?.type !== 'CallExpression' ||
+            query.callee.type !== 'MemberExpression' ||
+            query.callee.computed ||
+            query.callee.object.type !== 'Identifier' ||
+            query.callee.object.name !== 'styleContainerNode' ||
+            query.callee.property.type !== 'Identifier' ||
+            query.callee.property.name !== 'querySelector' ||
+            selector?.type !== 'Literal' ||
+            selector.value !== 'link'
+        ) {
+            return
+        }
+
+        // Replace only the second argument expression. Preserving the surrounding Stencil
+        // source avoids Babel-style whole-file regeneration and keeps its formatting, comments,
+        // and source positions stable. Removing this edit restores the H5 cascade bug described
+        // above; applying it unconditionally would change non-Taro Stencil components.
+        editor.overwrite(
+            query.start,
+            query.end,
+            'scopeId.startsWith("sc-taro-") ? styleContainerNode.querySelector("style,link[rel=\\"stylesheet\\"]") : styleContainerNode.querySelector("link")'
+        )
     }
-}
-
-/** Identifies Stencil's default component-style insertion call. */
-function isStencilStyleInsertBeforeCall(callPath: NodePath<BabelTypes.CallExpression>): boolean {
-    const { callee, arguments: callArguments } = callPath.node
-    return (
-        types.isMemberExpression(callee) &&
-        types.isIdentifier(callee.object, { name: 'styleContainerNode' }) &&
-        types.isIdentifier(callee.property, { name: 'insertBefore' }) &&
-        types.isIdentifier(callArguments[0], { name: 'styleElm' }) &&
-        isStyleQuery(callArguments[1], 'link')
-    )
-}
-
-/** Identifies one style-container querySelector call. */
-function isStyleQuery(node: BabelTypes.Node | null | undefined, selector: string): boolean {
-    return (
-        types.isCallExpression(node) &&
-        types.isMemberExpression(node.callee) &&
-        types.isIdentifier(node.callee.object, { name: 'styleContainerNode' }) &&
-        types.isIdentifier(node.callee.property, { name: 'querySelector' }) &&
-        types.isStringLiteral(node.arguments[0], { value: selector })
-    )
-}
-
-/** Creates one style-container querySelector call. */
-function createStyleQuery(selector: string): ReturnType<typeof types.callExpression> {
-    return types.callExpression(
-        types.memberExpression(types.identifier('styleContainerNode'), types.identifier('querySelector')),
-        [types.stringLiteral(selector)]
-    )
 }

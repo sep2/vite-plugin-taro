@@ -1,10 +1,23 @@
-import { type PluginObj, types } from '@babel/core'
+import { isReferenceIdentifier, type WalkerEnter } from 'oxc-walker'
+import type { RolldownMagicString } from 'rolldown'
 import type { Plugin } from 'vite'
 import { memoize } from '../../../utils/memoize.ts'
-import { transformWithBabel } from '../../../utils/transform.ts'
+import { transformWithOxcWalker } from '../../../utils/oxc-transform.ts'
 
 /** The React DevTools hook protocol name; free references must target `global` in wx. */
 const reactDevtoolsHookProtocol = '__REACT_DEVTOOLS_GLOBAL_HOOK__'
+
+/**
+ * Refresh protocol globals that must live on the WeChat `global` object:
+ * - `__registerBeforePerformReactRefresh` is assigned at module evaluation so the HMR client can register work that
+ *   must finish before a refresh. Leaving it on `window` throws before the refresh runtime can initialize.
+ * - `__getReactRefreshIgnoredExports` is an optional extension point read while validating a refresh boundary.
+ *   Leaving that read on the nonexistent `window` crashes every update validation pass.
+ *
+ * Keeping this list explicit prevents the adapter from rewriting unrelated browser accesses if the vendored runtime
+ * gains new code. Any future React Refresh protocol addition therefore requires a deliberate compatibility decision.
+ */
+const refreshRuntimeWindowGlobals = ['__registerBeforePerformReactRefresh', '__getReactRefreshIgnoredExports'] as const
 
 /**
  * Creates the serve-only React Refresh adaptation transforms for the wx target.
@@ -61,7 +74,7 @@ export function createWxReactRefreshTransforms(): Plugin[] {
                 // occurrence, in boundary modules.
                 filter: { code: /window\.\$RefreshReg\$/ },
                 handler(code, id) {
-                    return transformWithBabel(code, id, [removeRefreshPreambleGuard], false)
+                    return removeRefreshPreambleGuard({ code, id })
                 }
             }
         }
@@ -74,154 +87,137 @@ export function createWxReactRefreshTransforms(): Plugin[] {
  * The renderer checks the hook with `typeof __REACT_DEVTOOLS_GLOBAL_HOOK__` and injects via
  * `hook.inject(...)` — but in the WeChat runtime, free-variable reads never resolve against
  * `global`'s properties (verified: the free lookup is undefined while
- * `global.__REACT_DEVTOOLS_GLOBAL_HOOK__` exists), so the renderer would silently skip
- * injection and React Refresh would have no renderer to schedule re-renders on.
+ * `global.__REACT_DEVTOOLS_GLOBAL_HOOK__` exists). The renderer would therefore silently
+ * skip injection, leaving React Refresh with no renderer on which to schedule re-renders.
  *
- * The name is unique to the React DevTools protocol, so rewriting every free reference to an
- * explicit member access is precise. The hook itself is created on `global` by the dev
- * runtime chunk (see dev-runtime.ts).
+ * The protocol name is unique, but only reference identifiers are rewritten. Declaration
+ * keys and explicit members such as `global.__REACT_DEVTOOLS_GLOBAL_HOOK__` must remain
+ * untouched; rewriting those would either produce invalid syntax or double-prefix the hook.
+ * The hook itself is created on `global` by the dev runtime chunk in `dev-runtime.ts`.
  */
-function rewriteReactDevtoolsHookGlobal(): PluginObj {
-    return {
-        name: 'vpt:wx-react-devtools-hook-global',
-        visitor: {
-            Identifier(identifierPath) {
-                const node = identifierPath.node
-                if (!types.isIdentifier(node, { name: reactDevtoolsHookProtocol })) {
-                    return
-                }
-                const parent = identifierPath.parentPath
-                // A member expression property (e.g. `global.__REACT_DEVTOOLS_GLOBAL_HOOK__`)
-                // is already explicit and must not be rewritten again.
-                if (parent.isMemberExpression() && parent.node.property === node) {
-                    return
-                }
-                identifierPath.replaceWith(
-                    types.memberExpression(types.identifier('global'), types.identifier(node.name))
-                )
-            }
+function createReactDevtoolsHookVisitor(editor: RolldownMagicString): WalkerEnter {
+    return function enter(node, parent) {
+        if (
+            node.type !== 'Identifier' ||
+            node.name !== reactDevtoolsHookProtocol ||
+            !isReferenceIdentifier(node, parent)
+        ) {
+            return
         }
+
+        // An explicit member access is required because WeChat does not expose properties of
+        // its global object as free lexical bindings. Removing this edit disables renderer
+        // registration even though the hook object itself still exists.
+        editor.overwrite(node.start, node.end, `global.${reactDevtoolsHookProtocol}`)
     }
 }
 
 /**
- * Refresh runtime module: self-inject at evaluation — the wx App heap has no HTML preamble.
+ * Refresh runtime module: self-inject at evaluation and rewrite its browser protocol globals.
  *
- * In web Vite, the HTML preamble calls `injectIntoGlobalHook(window)` before any module
- * loads; nothing does that in wx. The call must live in this module itself:
- * - its closure owns the refresh state (helpersByRendererID, mountedRoots), so the same
- *   instance that the generated boundary code imports must bootstrap itself;
- * - the dev runtime chunk cannot reach it: the module is in a lazily-loaded chunk that
- *   requires the runtime chunk first, so it does not exist when the runtime evaluates.
+ * In web Vite, an HTML preamble calls `injectIntoGlobalHook(window)` before application
+ * modules load. wx has no HTML document or preamble, so nothing performs that bootstrap.
+ * The call must live in the refresh runtime module itself:
+ * - this module's closure owns `helpersByRendererID`, mounted roots, and the update helpers;
+ * - the wx dev-runtime chunk cannot call into it because the refresh module is in a later,
+ *   lazily loaded chunk and does not exist when the dev-runtime chunk evaluates.
  *
- * Unlike the preamble's `$RefreshReg$` globals (removed by removeRefreshPreambleGuard
- * because boundary modules define local wrappers), the hook machinery has no local
- * equivalent — without it the refresh runtime never learns the renderer or the mounted
- * roots, so the injection is the one preamble responsibility that must be replicated.
+ * Unlike the preamble's `$RefreshReg$` globals, which boundary modules replace with local
+ * wrappers, the renderer-hook machinery has no local equivalent. Without this injected call,
+ * the runtime never learns about the renderer or mounted roots and updates cannot refresh UI.
  *
- * Timing is safe because injectIntoGlobalHook replays hook.renderers: the renderer already
- * injected into the hook (created by the dev runtime chunk) when the App mounted, and the
- * replay captures it; the patched commit hooks then track every later mount, including the
- * remounts on re-execution.
+ * Appending the call is safe even when React has already registered its renderer: the refresh
+ * runtime replays `hook.renderers` during injection, then its patched commit hooks observe all
+ * later mounts and remounts. The same module also contains two browser-only `window` protocol
+ * accesses; those must point at `global` or evaluation/update validation throws in WeChat.
  */
-function injectRefreshGlobalHook(): PluginObj {
-    return {
-        name: 'vpt:wx-refresh-global-hook-injection',
-        visitor: {
-            Program(programPath) {
-                // The renderer already injected into the hook (created by the dev runtime
-                // chunk) when the App mounted; injectIntoGlobalHook replays its renderers.
-                programPath.pushContainer(
-                    'body',
-                    types.expressionStatement(
-                        types.callExpression(types.identifier('injectIntoGlobalHook'), [types.identifier('global')])
-                    )
-                )
-            }
+function createRefreshRuntimeVisitor(editor: RolldownMagicString): WalkerEnter {
+    // The declarations must execute before self-injection, so the call is appended instead of
+    // prepended. Removing it would leave the web preamble's only essential responsibility
+    // unimplemented in wx.
+    editor.append('\ninjectIntoGlobalHook(global);')
+
+    return function enter(node) {
+        if (
+            node.type !== 'MemberExpression' ||
+            node.computed ||
+            node.object.type !== 'Identifier' ||
+            node.object.name !== 'window' ||
+            node.property.type !== 'Identifier' ||
+            !refreshRuntimeWindowGlobals.some((globalName) => globalName === node.property.name)
+        ) {
+            return
         }
+
+        // `global` is the shared wx App heap used by the dev runtime and hook injection. Only
+        // replacing the object range preserves the vendored runtime byte-for-byte otherwise
+        // and prevents unrelated `window` expressions from being silently adapted.
+        editor.overwrite(node.object.start, node.object.end, 'global')
     }
 }
 
 /**
- * Refresh runtime module: rewrites the generated `window.<protocol>` accesses to `global`.
+ * Removes the web-only `if (!window.$RefreshReg$) throw Error(...)` assertion from boundary modules.
  *
- * The vendored refresh runtime is written for browsers and uses `window` for its protocol
- * globals, but the WeChat runtime has no `window` — the free identifier is undefined — so the
- * top-level assignment would throw at module evaluation, and the ignored-exports read
- * inside the refresh validator would crash every update pass.
- *
- * Only the exact known protocol names are rewritten, one by one, so unrelated `window`
- * accesses are never touched and future protocol additions are deliberate.
+ * The assertion verifies that Vite's HTML preamble installed global registration helpers.
+ * wx has no preamble and evaluating `window` itself fails. The assertion is unnecessary here:
+ * @vitejs/plugin-react generates local `$RefreshReg$` and `$RefreshSig$` wrappers that delegate
+ * directly to the imported refresh runtime. Removing the whole statement therefore removes
+ * only an invalid platform check; component registration continues through those local wrappers.
+ * If this edit is removed, every transformed refresh boundary crashes before its module body runs.
  */
-function rewriteRefreshRuntimeWindowAccess(): PluginObj {
-    /**
-     * Refresh protocol globals that must land on the WeChat `global`:
-     * - `__registerBeforePerformReactRefresh`: assigned at module scope; in web, the HMR
-     *   client registers pre-refresh callbacks through it — the assignment throws on
-     *   undefined `window`;
-     * - `__getReactRefreshIgnoredExports`: read in validateRefreshBoundaryAndEnqueueUpdate
-     *   as an optional extension point — a read on undefined `window` crashes.
-     */
-    const refreshRuntimeWindowGlobals = ['__registerBeforePerformReactRefresh', '__getReactRefreshIgnoredExports']
-
-    return {
-        name: 'vpt:wx-refresh-runtime-window-access',
-        visitor: {
-            MemberExpression(memberPath) {
-                const member = memberPath.node
-                if (
-                    !types.isIdentifier(member.object, { name: 'window' }) ||
-                    !types.isIdentifier(member.property) ||
-                    !refreshRuntimeWindowGlobals.includes(member.property.name)
-                ) {
-                    return
-                }
-                // `global` is the WeChat global object — the same one the hook injection
-                // and the rest of the wx glue speak — so the protocol globals land on the
-                // App heap like any other global hook.
-                member.object = types.identifier('global')
-            }
+function createRefreshPreambleGuardVisitor(editor: RolldownMagicString): WalkerEnter {
+    return function enter(node) {
+        if (
+            node.type !== 'IfStatement' ||
+            node.test.type !== 'UnaryExpression' ||
+            node.test.operator !== '!' ||
+            node.test.argument.type !== 'MemberExpression' ||
+            node.test.argument.computed ||
+            node.test.argument.object.type !== 'Identifier' ||
+            node.test.argument.object.name !== 'window' ||
+            node.test.argument.property.type !== 'Identifier' ||
+            node.test.argument.property.name !== '$RefreshReg$'
+        ) {
+            return
         }
+
+        // Matching the complete AST shape prevents an unrelated `$RefreshReg$` use from being
+        // removed. Skipping descendants is required because their ranges disappear with the
+        // parent and must not receive overlapping MagicString edits.
+        editor.remove(node.start, node.end)
+        this.skip()
     }
 }
 
-/** Boundary modules: remove the generated `if (!window.$RefreshReg$) throw Error(...)` guard. */
-function removeRefreshPreambleGuard(): PluginObj {
-    return {
-        name: 'vpt:wx-refresh-preamble-guard',
-        visitor: {
-            IfStatement(ifPath) {
-                // The guard is a web-only sanity check that the HTML preamble installed the
-                // `$RefreshReg$` global. wx has no preamble and no such global — but the
-                // boundary module does not need it: the plugin transform generates local
-                // `$RefreshReg$`/`$RefreshSig$` wrappers that delegate to the imported
-                // refresh runtime, so registration works without the global. The guard
-                // itself only crashes on the undefined `window`, so it is removed.
-                const test = ifPath.node.test
-                if (
-                    types.isUnaryExpression(test, { operator: '!' }) &&
-                    types.isMemberExpression(test.argument) &&
-                    types.isIdentifier(test.argument.object, { name: 'window' }) &&
-                    types.isIdentifier(test.argument.property, { name: '$RefreshReg$' })
-                ) {
-                    ifPath.remove()
-                }
-            }
-        }
-    }
+export function transformRefreshRuntime({ code, id }: { code: string; id: string }) {
+    return transformWithOxcWalker({
+        code,
+        filename: id,
+        sourcemap: false,
+        createVisitor: createRefreshRuntimeVisitor
+    })
+}
+
+export function transformReactDevtoolsHook({ code, id }: { code: string; id: string }) {
+    return transformWithOxcWalker({
+        code,
+        filename: id,
+        sourcemap: false,
+        createVisitor: createReactDevtoolsHookVisitor
+    })
+}
+
+export function removeRefreshPreambleGuard({ code, id }: { code: string; id: string }) {
+    return transformWithOxcWalker({
+        code,
+        filename: id,
+        sourcemap: false,
+        createVisitor: createRefreshPreambleGuardVisitor
+    })
 }
 
 // The refresh runtime module and the react-family modules are immutable for the server's
-// lifetime (they only change when the plugin is rebuilt), so their Babel transforms run once
-// per module and every build reuses the output.
-const fixRefreshRuntime = memoize(
-    ({ code, id }: { code: string; id: string }) =>
-        transformWithBabel(code, id, [rewriteRefreshRuntimeWindowAccess, injectRefreshGlobalHook], false),
-    { getCacheKey: ({ code }) => code }
-)
-
-const fixReactDevtoolsHook = memoize(
-    ({ code, id }: { code: string; id: string }) =>
-        transformWithBabel(code, id, [rewriteReactDevtoolsHookGlobal], false),
-    { getCacheKey: ({ code }) => code }
-)
+// lifetime, so their Oxc parses run once per module and every build reuses the output.
+const fixRefreshRuntime = memoize(transformRefreshRuntime, { getCacheKey: ({ code }) => code })
+const fixReactDevtoolsHook = memoize(transformReactDevtoolsHook, { getCacheKey: ({ code }) => code })

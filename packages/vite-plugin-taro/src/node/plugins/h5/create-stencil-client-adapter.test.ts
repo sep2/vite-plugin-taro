@@ -13,6 +13,9 @@ test('adapts Stencil component style insertion', async () => {
     const transformed = await adaptStencilClient(source, stencilClientPath)
 
     assert.ok(transformed)
+    assert.ok(transformed.map)
+    assert.deepEqual(transformed.map.sources, [stencilClientPath])
+    assert.deepEqual(transformed.map.sourcesContent, [source])
     assert.match(transformed.code, /scopeId\.startsWith\("sc-taro-"\)/)
     assert.match(transformed.code, /querySelector\("style,link\[rel=\\"stylesheet\\"\]"\)/)
 })
