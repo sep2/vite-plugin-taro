@@ -63,6 +63,7 @@
         "@babel/plugin-transform-modules-systemjs": "^8.0.1",
         "@rolldown/plugin-babel": "^0.2.3",
         "@tailwindcss-mangle/engine": "0.2.0",
+        "@weapp-tailwindcss/postcss": "3.2.8",
         "@tarojs/components": "^4.2.0",
         "@tarojs/helper": "^4.2.0",
         "@tarojs/plugin-framework-react": "workspace:vite-plugin-taro-plugin-framework-react@*",

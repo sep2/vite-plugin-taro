@@ -1,6 +1,6 @@
 import path from 'node:path'
+import { createStyleHandler } from '@weapp-tailwindcss/postcss'
 import type { Plugin, PluginOption, Rolldown } from 'vite'
-import { createContext } from 'weapp-tailwindcss/core'
 import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
 import type { VitePluginTaroTarget } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
@@ -60,14 +60,9 @@ export function createCssPlugins(target: VitePluginTaroTarget): PluginOption[] {
  * Remove it when upstream both completes adaptation and preserves the bundler-selected filename.
  */
 function createWxssCompatibilityFinalizer(): Plugin {
-    const context = createContext({
-        appType: 'weapp-vite',
-        generator: {
-            target: 'weapp'
-        },
-        ...wxStyleOptions,
-        logLevel: 'silent'
-    })
+    // This compatibility pass only needs the PostCSS style pipeline. Creating a complete weapp-tailwindcss context here
+    // would initialize another Tailwind compiler and source scanner for CSS that the upstream Vite plugin already generated.
+    const transformWxss = createStyleHandler(wxStyleOptions)
 
     return {
         name: 'vite-plugin-taro:wxss-compatibility-finalizer',
@@ -83,27 +78,19 @@ function createWxssCompatibilityFinalizer(): Plugin {
                         (output.fileName.replaceAll('\\', '/').endsWith('.css') ||
                             output.names.some((name) => name.replaceAll('\\', '/').endsWith('.css')))
                 )
-                // Both finalizers use a post-ordered generateBundle hook. Array order places this hook after the
-                // upstream finalizer, where every Vite-produced style asset has its final contents and filename.
-                await Promise.all(
-                    Object.values(bundle)
-                        .filter(isStyleAsset)
-                        .map(async (asset) => {
-                            // Transform every style asset visible in this hook — the global
-                            // style (browser-shaped, skipped by upstream) and the .wxss page
-                            // companions; non-style assets remain outside this compatibility pass.
-                            const source =
-                                typeof asset.source === 'string' ? asset.source : new TextDecoder().decode(asset.source)
+                if (!globalStyleAsset) return
 
-                            asset.source = (await context.transformWxss(source)).css
-                        })
-                )
-                if (globalStyleAsset) globalStyleAsset.fileName = 'app.wxss'
+                // Both finalizers use a post-ordered generateBundle hook. Array order places this hook after the
+                // upstream finalizer, where the single Vite global style asset has its final contents and filename.
+                const source =
+                    typeof globalStyleAsset.source === 'string'
+                        ? globalStyleAsset.source
+                        : new TextDecoder().decode(globalStyleAsset.source)
+                if (source.length > 0) {
+                    globalStyleAsset.source = (await transformWxss(source)).css
+                }
+                globalStyleAsset.fileName = 'app.wxss'
             }
         }
     }
-}
-
-function isStyleAsset(output: Rolldown.OutputAsset | Rolldown.OutputChunk): output is Rolldown.OutputAsset {
-    return output.type === 'asset' && (output.fileName.endsWith('.css') || output.fileName.endsWith('.wxss'))
 }
