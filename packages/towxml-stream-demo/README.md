@@ -11,8 +11,8 @@ A WeChat Mini Program demo with a React/Tailwind chat shell and the native Towxm
 - `src/native/towxml-adapter/towxml-adapter.*`: a small native property/event adapter. It accumulates bounded, ordered Markdown
   chunks inside the native layer and bridges stream state and scroll position while preserving Towxml's cross-message virtual
   rendering without changing the copied implementation.
-- `src/pages/index/towxml-message.tsx`: the typed `defineNativeComponent()` facade, loaded lazily so its native assets can
-  be placed in an automatic subpackage.
+- `src/pages/index/towxml-message.tsx`: the typed JSX interface declared with `defineNativeComponent()`, loaded lazily so its
+  native assets can be placed in an automatic subpackage.
 
 The demo is WX-only because Towxml is a native WeChat component.
 
