@@ -1,4 +1,4 @@
-import babel from '@rolldown/plugin-babel'
+import babel, { defineRolldownBabelPreset } from '@rolldown/plugin-babel'
 import type { HtmlTagDescriptor, Plugin, PluginOption } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
@@ -99,22 +99,51 @@ function createH5IndexHtmlTags(): HtmlTagDescriptor[] {
     ]
 }
 
+/**
+ * Coarse source prefilter for the upstream Taro API transform.
+ *
+ * The plugin has two independent responsibilities: adapting imports from the compiler facade and normalizing camel-case
+ * H5 ARIA attributes. Matching `aria` followed by any uppercase letter is intentionally broader than Taro's current
+ * attribute table. A duplicated exact list would silently stop routing files through Babel when upstream adds another
+ * attribute, while a broad false positive costs only one unnecessary transform. Ordinary application modules match
+ * neither branch and remain entirely outside Babel's parser and generator.
+ */
+export const h5TaroApiTransformCodeFilter = /virtual:taro\/api|\baria[A-Z]/
+
+/** Creates a filterable Babel preset containing Taro's upstream, scope-aware API transform. */
+function createH5TaroApiPreset() {
+    const transformTaroApiPath = packageRequire.resolve('babel-plugin-transform-taroapi')
+    const definition = packageRequire(packageRequire.resolve('@tarojs/plugin-platform-h5/dist/definition.json'))
+
+    return defineRolldownBabelPreset({
+        preset: function h5TaroApiPreset() {
+            return {
+                plugins: [
+                    [
+                        transformTaroApiPath,
+                        {
+                            packageName: clientTaroApiId,
+                            definition
+                        }
+                    ]
+                ]
+            }
+        },
+        rolldown: {
+            // @rolldown/plugin-babel can lift a preset filter into its native transform hook. The Taro plugin must be
+            // nested in this preset rather than passed through Babel's top-level `plugins`: explicit plugins may apply
+            // to every module, so their presence deliberately disables Rolldown's preset-level code filtering.
+            filter: { code: h5TaroApiTransformCodeFilter }
+        }
+    })
+}
+
 /** Creates H5-only transforms for Stencil CSS ordering and Taro API imports. */
 function createH5SupportPlugins(): PluginOption[] {
     return [
         createStencilClientAdapter(),
         babel({
-            plugins: [
-                [
-                    packageRequire.resolve('babel-plugin-transform-taroapi'),
-                    {
-                        packageName: clientTaroApiId,
-                        definition: packageRequire(
-                            packageRequire.resolve('@tarojs/plugin-platform-h5/dist/definition.json')
-                        )
-                    }
-                ]
-            ]
+            presets: [createH5TaroApiPreset()]
         })
     ]
 }

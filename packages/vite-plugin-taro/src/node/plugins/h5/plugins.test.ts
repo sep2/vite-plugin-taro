@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { resolveConfig } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
-import { createH5TargetPlugins } from './plugins.ts'
+import { createH5TargetPlugins, h5TaroApiTransformCodeFilter } from './plugins.ts'
 
 const options: VitePluginTaroOptions = {
     target: 'h5',
@@ -24,7 +24,34 @@ test('prebundles CommonJS dependencies loaded by the injected H5 runtime', async
 
     assert.deepEqual(config.optimizeDeps.include, ['@tarojs/plugin-platform-h5/dist/runtime/apis', 'react-dom/client'])
     assert.deepEqual(config.optimizeDeps.exclude, [])
+
+    const babelPlugin = config.plugins.find((plugin) => plugin.name === '@rolldown/plugin-babel')
+    assert.ok(babelPlugin)
+    assert.ok(babelPlugin.transform && typeof babelPlugin.transform === 'object')
+    assert.deepEqual(babelPlugin.transform.filter?.code, [h5TaroApiTransformCodeFilter])
+
     const optimizerPlugins = config.optimizeDeps.rolldownOptions?.plugins
     assert.ok(Array.isArray(optimizerPlugins))
     assert.equal(optimizerPlugins.length, 1)
+})
+
+test('routes only Taro API and possible H5 ARIA modules through Babel', () => {
+    const transformedSources = [
+        "import Taro from 'virtual:taro/api'",
+        "import { useLaunch } from 'virtual:taro/api'",
+        'const view = <View ariaLabel="Navigation" />',
+        'const view = <View ariaFutureAttribute />'
+    ]
+    const bypassedSources = [
+        "import { View } from 'virtual:taro/components'",
+        'export function Calculator() { return <View className="calculator" /> }',
+        "const label = 'aria-label'"
+    ]
+
+    transformedSources.forEach((code) => {
+        assert.match(code, h5TaroApiTransformCodeFilter)
+    })
+    bypassedSources.forEach((code) => {
+        assert.doesNotMatch(code, h5TaroApiTransformCodeFilter)
+    })
 })
