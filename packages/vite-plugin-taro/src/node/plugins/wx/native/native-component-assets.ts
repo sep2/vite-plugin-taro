@@ -9,7 +9,7 @@ type NativeComponentAsset = {
     byteLength: number
 }
 
-export const nativeComponentMetaKey = 'vite-plugin-taro:native-components'
+export const nativeComponentMetaKey = 'vpt:native-components'
 
 type NativeComponentSource = NativeComponentDefinition & {
     assets: readonly NativeComponentAsset[]

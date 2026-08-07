@@ -4,7 +4,7 @@ import { resolveChunkReference } from '../../../utils/modules.ts'
 /** Wraps System.register as an inert CommonJS capsule tuple with canonical final dependency IDs. */
 export function wrapCapsulePlugin(fileName: string): PluginObject {
     return {
-        name: 'vite-plugin-taro:wrap-capsule',
+        name: 'vpt:wrap-capsule',
         visitor: {},
 
         post(file) {

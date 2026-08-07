@@ -5,7 +5,7 @@ import { normalizeModuleId } from '../../utils/modules.ts'
 /** Creates source-level target conditional handling shared by H5 and WX. */
 export function createConditionalDirectivePlugin(target: VitePluginTaroTarget): Plugin {
     return {
-        name: 'vite-plugin-taro:conditional-directives',
+        name: 'vpt:conditional-directives',
         enforce: 'pre',
         transform(code, id) {
             if (!isConditionalDirectiveSource(id) || !code.includes('#if')) {
@@ -84,7 +84,7 @@ function parseDirective(line: string): Directive | undefined {
     }
     const name = match[1]
     if (name === 'if' || name === 'elif') {
-        throw new Error(`vite-plugin-taro no longer supports #${name}; use #ifdef, #ifndef, or #else`)
+        throw new Error(`vpt no longer supports #${name}; use #ifdef, #ifndef, or #else`)
     }
     if (name !== 'ifdef' && name !== 'ifndef' && name !== 'else' && name !== 'endif') {
         return

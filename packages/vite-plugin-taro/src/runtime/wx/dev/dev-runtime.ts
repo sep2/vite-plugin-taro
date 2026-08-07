@@ -222,7 +222,7 @@ class WxDevRuntime extends DevRuntime {
     storePatches(payload: PatchPayload): void {
         const info = this.hmrInfo
         if (!info || payload.buildId !== info.buildId) {
-            console.warn('[vite-plugin-taro] patches for a stale build')
+            console.warn('[vpt] patches for a stale build')
             return
         }
 
@@ -253,7 +253,7 @@ class WxDevRuntime extends DevRuntime {
                 this.applyHmrUpdate(patch.changedIds)
                 this.appliedSeq = patch.seq
             } catch (error) {
-                console.warn(`[vite-plugin-taro] patch sequence ${patch.seq} failed; apply stopped`, error)
+                console.warn(`[vpt] patch sequence ${patch.seq} failed; apply stopped`, error)
                 void this.sendReport({ kind: 'rebuild' })
                 return
             }

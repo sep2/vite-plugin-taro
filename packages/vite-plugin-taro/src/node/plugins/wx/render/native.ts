@@ -31,7 +31,7 @@ function connectNativeCapsulesPlugin(
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
 ): PluginObject {
     return {
-        name: 'vite-plugin-taro:connect-native-capsules',
+        name: 'vpt:connect-native-capsules',
         visitor: {
             ImportDeclaration(importPath) {
                 const reference = importPath.node.source.value

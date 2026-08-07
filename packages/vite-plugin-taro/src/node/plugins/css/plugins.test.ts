@@ -8,7 +8,7 @@ import { packageRequire } from '../../utils/packages.ts'
 import { createCssPlugins } from './plugins.ts'
 
 test('finalizes split Tailwind imports as WXSS', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'vite-plugin-taro-wxss-'))
+    const root = await mkdtemp(path.join(os.tmpdir(), 'vpt-wxss-'))
 
     try {
         const nodeModules = path.join(root, 'node_modules')

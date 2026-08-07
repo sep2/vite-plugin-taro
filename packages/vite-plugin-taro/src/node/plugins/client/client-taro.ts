@@ -13,7 +13,7 @@ const clientTaroModules = new Map([
 /** Creates the target-neutral Taro facade plugin. */
 export function createClientTaroPlugin(): Plugin {
     return {
-        name: 'vite-plugin-taro:client-taro',
+        name: 'vpt:client-taro',
         enforce: 'pre',
 
         resolveId(id) {

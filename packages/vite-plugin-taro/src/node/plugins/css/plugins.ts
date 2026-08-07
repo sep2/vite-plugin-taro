@@ -25,7 +25,7 @@ export function createCssPlugins(target: VitePluginTaroTarget): PluginOption[] {
             appType: 'weapp-vite',
             // WX must enable this for split Tailwind imports such as `tailwindcss/theme.css`. Otherwise Vite's
             // PostCSS resolver tries to resolve those imports from the application and fails when Tailwind is owned
-            // by vite-plugin-taro. The web generator consumes the imports before that resolver runs, so H5 keeps the
+            // by vpt. The web generator consumes the imports before that resolver runs, so H5 keeps the
             // upstream default.
             rewriteCssImports: wx,
             // Tailwind is a plugin dependency, not an application dependency. Give weapp-tailwindcss the owning package
@@ -65,7 +65,7 @@ function createWxssCompatibilityFinalizer(): Plugin {
     const transformWxss = createStyleHandler(wxStyleOptions)
 
     return {
-        name: 'vite-plugin-taro:wxss-compatibility-finalizer',
+        name: 'vpt:wxss-compatibility-finalizer',
         enforce: 'post',
         generateBundle: {
             order: 'post',

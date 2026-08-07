@@ -27,7 +27,7 @@ const reactDevtoolsHookProtocol = '__REACT_DEVTOOLS_GLOBAL_HOOK__'
 export function createWxReactRefreshTransforms(): Plugin[] {
     return [
         {
-            name: 'vite-plugin-taro:wx-react-refresh-runtime',
+            name: 'vpt:wx-react-refresh-runtime',
             apply: 'serve',
             transform: {
                 order: 'post',
@@ -39,7 +39,7 @@ export function createWxReactRefreshTransforms(): Plugin[] {
             }
         },
         {
-            name: 'vite-plugin-taro:wx-react-devtools-hook',
+            name: 'vpt:wx-react-devtools-hook',
             apply: 'serve',
             transform: {
                 order: 'post',
@@ -53,7 +53,7 @@ export function createWxReactRefreshTransforms(): Plugin[] {
             }
         },
         {
-            name: 'vite-plugin-taro:wx-refresh-preamble-guard',
+            name: 'vpt:wx-refresh-preamble-guard',
             apply: 'serve',
             transform: {
                 order: 'post',
@@ -83,7 +83,7 @@ export function createWxReactRefreshTransforms(): Plugin[] {
  */
 function rewriteReactDevtoolsHookGlobal(): PluginObject {
     return {
-        name: 'vite-plugin-taro:wx-react-devtools-hook-global',
+        name: 'vpt:wx-react-devtools-hook-global',
         visitor: {
             Identifier(identifierPath) {
                 const node = identifierPath.node
@@ -126,7 +126,7 @@ function rewriteReactDevtoolsHookGlobal(): PluginObject {
  */
 function injectRefreshGlobalHook(): PluginObject {
     return {
-        name: 'vite-plugin-taro:wx-refresh-global-hook-injection',
+        name: 'vpt:wx-refresh-global-hook-injection',
         visitor: {
             Program(programPath) {
                 // The renderer already injected into the hook (created by the dev runtime
@@ -165,7 +165,7 @@ function rewriteRefreshRuntimeWindowAccess(): PluginObject {
     const refreshRuntimeWindowGlobals = ['__registerBeforePerformReactRefresh', '__getReactRefreshIgnoredExports']
 
     return {
-        name: 'vite-plugin-taro:wx-refresh-runtime-window-access',
+        name: 'vpt:wx-refresh-runtime-window-access',
         visitor: {
             MemberExpression(memberPath) {
                 const member = memberPath.node
@@ -188,7 +188,7 @@ function rewriteRefreshRuntimeWindowAccess(): PluginObject {
 /** Boundary modules: remove the generated `if (!window.$RefreshReg$) throw Error(...)` guard. */
 function removeRefreshPreambleGuard(): PluginObject {
     return {
-        name: 'vite-plugin-taro:wx-refresh-preamble-guard',
+        name: 'vpt:wx-refresh-preamble-guard',
         visitor: {
             IfStatement(ifPath) {
                 // The guard is a web-only sanity check that the HTML preamble installed the

@@ -25,7 +25,7 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
     const placer = createPlacer()
 
     return {
-        name: 'vite-plugin-taro:wx',
+        name: 'vpt:wx',
 
         config(_config, _env) {
             return {

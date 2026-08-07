@@ -16,7 +16,7 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
 
     return [
         {
-            name: 'vite-plugin-taro:wx-dev',
+            name: 'vpt:wx-dev',
             apply: 'serve',
 
             config() {

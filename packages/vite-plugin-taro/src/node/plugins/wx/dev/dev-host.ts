@@ -187,14 +187,14 @@ export async function createWxDevHost({
                     }
 
                     server.config.logger.info(
-                        `[vite-plugin-taro] wx full rebuild required${update.reason ? `: ${update.reason}` : ''}`
+                        `[vpt] wx full rebuild required${update.reason ? `: ${update.reason}` : ''}`
                     )
                     engine.triggerFullBuild()
                     return
                 }
                 if (batch.length > 0) {
                     await publisher.produce(batch)
-                    // server.config.logger.info('[vite-plugin-taro] wx patch produced')
+                    // server.config.logger.info('[vpt] wx patch produced')
                 }
             },
             onOutput: async (result) => {
@@ -253,7 +253,7 @@ export async function createWxDevHost({
             }
 
             const reportInitialBuildPlugin: Plugin = {
-                name: 'vite-plugin-taro:wx-report-initial-build',
+                name: 'vpt:wx-report-initial-build',
                 buildEnd: settleInitialBuild
             }
 
@@ -301,9 +301,9 @@ function relativeToViteConfig(outDir: string, configFile: string | undefined, ro
 /** Logs an error with the plugin prefix, distinguishing Error values from unknowns. */
 function logWxError(logger: ViteDevServer['config']['logger'], prefix: string, error: unknown): void {
     if (Error.isError(error)) {
-        logger.error(`[vite-plugin-taro] ${prefix}`, { error })
+        logger.error(`[vpt] ${prefix}`, { error })
     } else {
-        logger.error(`[vite-plugin-taro] ${prefix} with unknown error: ${error}`)
+        logger.error(`[vpt] ${prefix} with unknown error: ${error}`)
     }
 }
 

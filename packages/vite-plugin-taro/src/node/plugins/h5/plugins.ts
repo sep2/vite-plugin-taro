@@ -20,7 +20,7 @@ function createH5TargetPlugin(options: VitePluginTaroOptions): Plugin {
     const moduleResolver = createModuleResolver(options)
 
     return {
-        name: 'vite-plugin-taro:h5',
+        name: 'vpt:h5',
 
         config() {
             return {
@@ -129,7 +129,7 @@ function createH5SupportPlugins(): PluginOption[] {
 /** Keeps Stencil-injected Taro component styles before application stylesheets. */
 function rewriteStencilStyleInsertion(): PluginObject {
     return {
-        name: 'vite-plugin-taro:rewrite-stencil-style-insertion',
+        name: 'vpt:rewrite-stencil-style-insertion',
         visitor: {
             CallExpression(callPath) {
                 if (!isStencilStyleInsertBeforeCall(callPath)) {
