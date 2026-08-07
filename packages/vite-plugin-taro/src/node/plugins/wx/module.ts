@@ -63,6 +63,7 @@ export type WxExecutionKind = 'native' | 'capsule' | 'amphibious'
 const shellModuleIds: ReadonlySet<string> = new Set([appShellPath, componentShellPath, pageShellPath])
 const capsuleModuleIds: ReadonlySet<string> = new Set([appCapsulePath, componentCapsulePath, pageCapsulePath])
 const amphibiousModuleIds: ReadonlySet<string> = new Set([bootstrapPath, rolldownRuntimeId])
+const transportModuleIds: ReadonlySet<string> = new Set([transportPath])
 
 /** Returns the one explicit lifecycle role owned by a chunk. */
 export function getWxEntryRole(chunk: WxChunk): WxEntryRole | undefined {
@@ -76,7 +77,7 @@ export function getWxEntryRole(chunk: WxChunk): WxEntryRole | undefined {
 
 /** Tests whether a chunk contains the physical transport implementation. */
 export function isTransportModule(chunk: WxChunk): boolean {
-    return chunk.moduleIds.includes(transportPath)
+    return containsModule(chunk, transportModuleIds)
 }
 
 /**

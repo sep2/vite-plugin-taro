@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
+import { normalizeModuleId } from '../../../utils/modules.ts'
 import { transformNativeComponentInterfaces } from './native-component-interface.ts'
 
-const moduleId = path.resolve('/project/src/native-counter.ts')
+const moduleId = normalizeModuleId(path.resolve('/project/src/native-counter.ts'))
 
 test('extracts fields from a local native component type', () => {
     const { definitions } = transformNativeComponentInterfaces(
@@ -30,7 +31,7 @@ test('extracts fields from a local native component type', () => {
 
     assert.deepEqual(definitions, [
         {
-            folder: path.resolve('/project/src/native/native-counter'),
+            folder: normalizeModuleId(path.resolve('/project/src/native/native-counter')),
             entry: 'counter',
             fields: ['count', 'label', 'options', 'onIncrement', 'onReady']
         }
@@ -80,7 +81,7 @@ test('replaces interface calls while preserving unrelated source', () => {
     assert.doesNotMatch(transformed.code, /defineNativeComponent|defineNative|onIncrement/)
     assert.doesNotMatch(transformed.code, /virtual:taro\/native/)
     assert.deepEqual(transformed.definitions[0], {
-        folder: path.resolve('/project/src/native/native-counter'),
+        folder: normalizeModuleId(path.resolve('/project/src/native/native-counter')),
         entry: 'index',
         fields: ['count', 'onIncrement']
     })
@@ -110,7 +111,7 @@ test('supports native components without fields', () => {
     )
 
     assert.deepEqual(definitions[0], {
-        folder: path.resolve('/project/src/native-divider'),
+        folder: normalizeModuleId(path.resolve('/project/src/native-divider')),
         entry: 'divider',
         fields: []
     })

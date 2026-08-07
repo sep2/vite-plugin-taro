@@ -26,7 +26,7 @@ export async function compileNativeComponentInterface({
         addWatchFile(source.folder)
 
         source.assets.forEach((asset) => {
-            addWatchFile(path.join(source.folder, asset.relativePath))
+            addWatchFile(normalizeModuleId(path.join(source.folder, asset.relativePath)))
         })
     })
 

@@ -2,8 +2,6 @@ name: Windows CI
 
 on:
   push:
-    tags:
-      - 'v*.*.*'
   pull_request:
   workflow_dispatch:
 
