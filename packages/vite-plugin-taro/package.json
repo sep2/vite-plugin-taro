@@ -12,7 +12,7 @@
     "bugs": {
         "url": "https://github.com/sep2/vite-plugin-taro/issues"
     },
-    "homepage": "https://github.com/sep2/vite-plugin-taro/tree/main/packages/vite-plugin-taro#readme",
+    "homepage": "https://vpt.js.org",
     "main": "./dist/vite.js",
     "module": "./dist/vite.js",
     "types": "./dist/vite.d.ts",

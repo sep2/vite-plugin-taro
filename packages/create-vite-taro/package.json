@@ -20,7 +20,7 @@
     "bugs": {
         "url": "https://github.com/sep2/vite-plugin-taro/issues"
     },
-    "homepage": "https://github.com/sep2/vite-plugin-taro/tree/main/packages/create-vite-taro#readme",
+    "homepage": "https://vpt.js.org",
     "keywords": [
         "vite",
         "taro",

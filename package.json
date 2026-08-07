@@ -10,7 +10,7 @@
     "bugs": {
         "url": "https://github.com/sep2/vite-plugin-taro/issues"
     },
-    "homepage": "https://github.com/sep2/vite-plugin-taro#readme",
+    "homepage": "https://vpt.js.org",
     "scripts": {
         "prepare:taro": "node scripts/build-patched-taro-packages.ts",
         "build:plugin": "pnpm --filter vite-plugin-taro build",

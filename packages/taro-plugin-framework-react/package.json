@@ -19,7 +19,7 @@
     "bugs": {
         "url": "https://github.com/sep2/vite-plugin-taro/issues"
     },
-    "homepage": "https://github.com/sep2/vite-plugin-taro/tree/main/packages/taro-plugin-framework-react#readme",
+    "homepage": "https://vpt.js.org",
     "engines": {
         "node": ">=22"
     },
