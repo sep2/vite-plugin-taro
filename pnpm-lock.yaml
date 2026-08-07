@@ -138,6 +138,31 @@ importers:
         specifier: 0.33.0
         version: 0.33.0(react@19.2.7)
 
+  packages/towxml-stream-demo:
+    dependencies:
+      react:
+        specifier: ^19.2.7
+        version: 19.2.7
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.7(react@19.2.7)
+      vite-plugin-taro:
+        specifier: workspace:*
+        version: link:../vite-plugin-taro
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.17
+        version: 19.2.17
+      cross-env:
+        specifier: ^10.1.0
+        version: 10.1.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: ^8.2.0
+        version: 8.2.0(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(yaml@2.9.0)
+
   packages/vite-plugin-taro:
     dependencies:
       '@babel/core':

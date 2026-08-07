@@ -1,0 +1,11 @@
+<view class="towxml-host" data-towxmlid="{{towxmlId}}">
+    <towxml
+        wx:if="{{renderTowxml}}"
+        towxmlId="{{towxmlId}}"
+        speed="{{speed}}"
+        openTyper="{{openTyper}}"
+        theme="{{theme}}"
+        bindfinish="handleFinish"
+        bindhistoryMessageFinish="handleHistoryMessageFinish"
+    />
+</view>

@@ -7,7 +7,11 @@
         "defaultBranch": "main"
     },
     "files": {
-        "includes": ["**", "!packages/loan-genius/src/index.html"]
+        "includes": [
+            "**",
+            "!packages/loan-genius/src/index.html",
+            "!packages/towxml-stream-demo/src/native/towxml-adapter/towxml"
+        ]
     },
     "formatter": {
         "enabled": true,

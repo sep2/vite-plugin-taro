@@ -1,0 +1,21 @@
+@import "tailwindcss/theme.css";
+@import "tailwindcss/preflight.css";
+@import "tailwindcss/utilities.css";
+
+@source "./";
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+page {
+    height: 100%;
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+button::after {
+    border: none;
+}
