@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import type { ComponentType, PropsWithChildren } from 'react'
 
 type NativeSchema =
     | StringConstructor
@@ -42,7 +42,7 @@ export function defineNativeComponent<
         readonly properties: Properties
         readonly events: Events
     }
-): ComponentType<PropertyProps<Properties> & EventProps<Events>> {
+): ComponentType<PropsWithChildren<PropertyProps<Properties> & EventProps<Events>>> {
     void loadEntry
     void schema
     throw new Error('Native component interface was not compiled')

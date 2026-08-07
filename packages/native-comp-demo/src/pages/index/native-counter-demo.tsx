@@ -1,4 +1,4 @@
-import { Button, Text, View } from 'virtual:taro/components'
+import { Button, Slot, Text, View } from 'virtual:taro/components'
 import { useState } from 'react'
 import { NativeCounter } from './native-counter.tsx'
 
@@ -17,7 +17,14 @@ export default function NativeCounterDemo() {
                 onIncrement={(event) => {
                     setCount(event.detail.value)
                 }}
-            />
+            >
+                <Slot name="title">
+                    <View className="flex items-center justify-between gap-3">
+                        <Text className="font-semibold text-emerald-950">Named slot from React</Text>
+                        <Text className="text-sm text-emerald-700">Count × 2: {count * 2}</Text>
+                    </View>
+                </Slot>
+            </NativeCounter>
 
             <Button
                 className="rounded-lg bg-emerald-600 px-4 py-2 text-white"

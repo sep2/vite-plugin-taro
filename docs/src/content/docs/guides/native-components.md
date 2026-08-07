@@ -137,6 +137,40 @@ export const NativeDivider = defineNativeComponent(
 
 原生组件中的 `properties` 和 `triggerEvent()` 名称必须与 schema 一致。
 
+## 使用 Slot
+
+在原生 WXML 中声明 slot：
+
+```xml
+<!-- src/native-counter/counter.wxml -->
+<slot name="title"></slot>
+```
+
+命名 slot 需要在原生组件中启用 `multipleSlots`：
+
+```js
+// src/native-counter/counter.js
+Component({
+    options: {
+        multipleSlots: true
+    }
+})
+```
+
+然后通过 Taro 的 `Slot` 传入内容：
+
+```tsx
+import { Slot, Text } from 'virtual:taro/components'
+
+<NativeCounter count={count}>
+    <Slot name="title">
+        <Text>Title from React</Text>
+    </Slot>
+</NativeCounter>
+```
+
+完整示例见 [`native-comp-demo`](https://github.com/sep2/vite-plugin-taro/tree/main/packages/native-comp-demo)。
+
 ## 全自动分包
 
 vpt 只输出实际使用的原生组件。原生文件会跟随使用该接口的代码进入主包或自动分包。

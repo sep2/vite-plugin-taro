@@ -8,6 +8,12 @@
     background: #ffffff;
 }
 
+.native-counter__title {
+    padding: 20rpx;
+    border-radius: 12rpx;
+    background: #ecfdf5;
+}
+
 .native-counter__label {
     color: #16251c;
     font-size: 32rpx;

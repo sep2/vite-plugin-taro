@@ -1,4 +1,8 @@
 Component({
+    options: {
+        multipleSlots: true
+    },
+
     properties: {
         count: {
             type: Number,
