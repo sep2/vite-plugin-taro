@@ -34,6 +34,17 @@ html[data-has-hero] .hero > .hero-html {
 }
 
 @media (max-width: 49.999rem) {
+    header.header > .header > .right-group {
+        display: flex;
+        align-items: center;
+    }
+
+    header.header > .header > .right-group > .social-icons,
+    header.header > .header > .right-group > starlight-lang-select,
+    .mobile-preferences theme-toggle {
+        display: none;
+    }
+
     html[data-has-hero] .hero > .hero-html {
         margin-top: 1rem;
     }
