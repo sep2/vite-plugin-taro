@@ -37,6 +37,7 @@ npm create vite-taro@latest my-app
 - [Skyline 模式](https://vite-plugin-taro.netlify.app/guides/skyline-mode/)
 - [从 Taro CLI 迁移](https://vite-plugin-taro.netlify.app/guides/migrate-from-taro/)
 - [配置参考](https://vite-plugin-taro.netlify.app/references/configuration/)
+- [仓库维护](https://vite-plugin-taro.netlify.app/references/repository-management/)
 
 ## 许可证
 

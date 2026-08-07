@@ -37,6 +37,7 @@ Continue with the [Quick Start guide](https://vite-plugin-taro.netlify.app/guide
 - [Skyline mode](https://vite-plugin-taro.netlify.app/guides/skyline-mode/)
 - [Migrate from Taro CLI](https://vite-plugin-taro.netlify.app/guides/migrate-from-taro/)
 - [Configuration reference](https://vite-plugin-taro.netlify.app/references/configuration/)
+- [Repository management](https://vite-plugin-taro.netlify.app/references/repository-management/)
 
 ## License
 
