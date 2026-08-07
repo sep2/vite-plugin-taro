@@ -9,6 +9,7 @@ import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { once } from '../../../utils/once.ts'
 import { resolvePackageFile } from '../../../utils/packages.ts'
 import { appShellFileName } from '../module.ts'
+import { createWxDevMode } from './create-wx-dev-mode.ts'
 import { emptyOutputDirectory } from './empty-output-directory.ts'
 import {
     type HmrInfo,
@@ -245,13 +246,10 @@ export async function createWxDevHost({
             })
 
             rolldownOptions.experimental ??= {}
-            rolldownOptions.experimental.devMode = {
-                ...(typeof rolldownOptions.experimental.devMode === 'object'
-                    ? rolldownOptions.experimental.devMode
-                    : {}),
-                implement: await bundleRuntimeSource(),
-                lazy: false
-            }
+            rolldownOptions.experimental.devMode = createWxDevMode(
+                rolldownOptions.experimental.devMode,
+                await bundleRuntimeSource()
+            )
 
             const emptyOutputDirectoryPlugin: Plugin = {
                 name: 'vpt:wx-empty-output-directory',
