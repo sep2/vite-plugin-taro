@@ -8,7 +8,7 @@
 
 Build WeChat Mini Program and Web apps with Vite 8, React 19, Taro 4, and Tailwind CSS v4.
 
-Documentation website: <https://vite-plugin-taro.netlify.app>
+Documentation website: <https://vpt.js.org>
 
 ### React Hot Reload in WeChat DevTools
 
@@ -27,17 +27,17 @@ Documentation website: <https://vite-plugin-taro.netlify.app>
 npm create vite-taro@latest my-app
 ```
 
-Continue with the [Quick Start guide](https://vite-plugin-taro.netlify.app/guides/quick-start/).
+Continue with the [Quick Start guide](https://vpt.js.org/guides/quick-start/).
 
 ## Documentation
 
-- [Automatic subpackages](https://vite-plugin-taro.netlify.app/guides/automatic-subpackages/)
-- [Native WeChat components](https://vite-plugin-taro.netlify.app/guides/native-components/)
-- [Hot module replacement](https://vite-plugin-taro.netlify.app/guides/hot-module-replacement/)
-- [Skyline mode](https://vite-plugin-taro.netlify.app/guides/skyline-mode/)
-- [Migrate from Taro CLI](https://vite-plugin-taro.netlify.app/guides/migrate-from-taro/)
-- [Configuration reference](https://vite-plugin-taro.netlify.app/references/configuration/)
-- [Repository management](https://vite-plugin-taro.netlify.app/references/repository-management/)
+- [Automatic subpackages](https://vpt.js.org/guides/automatic-subpackages/)
+- [Native WeChat components](https://vpt.js.org/guides/native-components/)
+- [Hot module replacement](https://vpt.js.org/guides/hot-module-replacement/)
+- [Skyline mode](https://vpt.js.org/guides/skyline-mode/)
+- [Migrate from Taro CLI](https://vpt.js.org/guides/migrate-from-taro/)
+- [Configuration reference](https://vpt.js.org/references/configuration/)
+- [Repository management](https://vpt.js.org/references/repository-management/)
 
 ## License
 

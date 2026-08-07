@@ -19,4 +19,4 @@ pnpm --filter docs build
 pnpm --filter docs preview
 ```
 
-文档内容位于 `src/content/docs`。线上文档部署在 <https://vite-plugin-taro.netlify.app>。
+文档内容位于 `src/content/docs`。线上文档部署在 <https://vpt.js.org>。

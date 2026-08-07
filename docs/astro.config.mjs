@@ -7,7 +7,7 @@ import { externalLinks } from './src/plugins/external-links.mjs'
 
 // https://astro.build/config
 export default defineConfig({
-    site: 'https://vite-plugin-taro.netlify.app',
+    site: 'https://vpt.js.org',
     markdown: {
         processor: unified({ rehypePlugins: [externalLinks] })
     },

@@ -8,7 +8,7 @@
 
 使用 Vite 8、React 19、Taro 4 和 Tailwind CSS v4 构建微信小程序与 Web 应用。
 
-文档网站：<https://vite-plugin-taro.netlify.app>
+文档网站：<https://vpt.js.org>
 
 ### 已支持微信开发者工具的 React 热更新
 
@@ -27,17 +27,17 @@
 npm create vite-taro@latest my-app
 ```
 
-接下来阅读[快速开始](https://vite-plugin-taro.netlify.app/guides/quick-start/)。
+接下来阅读[快速开始](https://vpt.js.org/guides/quick-start/)。
 
 ## 文档
 
-- [全自动分包](https://vite-plugin-taro.netlify.app/guides/automatic-subpackages/)
-- [微信原生组件](https://vite-plugin-taro.netlify.app/guides/native-components/)
-- [开发者工具热更新](https://vite-plugin-taro.netlify.app/guides/hot-module-replacement/)
-- [Skyline 模式](https://vite-plugin-taro.netlify.app/guides/skyline-mode/)
-- [从 Taro CLI 迁移](https://vite-plugin-taro.netlify.app/guides/migrate-from-taro/)
-- [配置参考](https://vite-plugin-taro.netlify.app/references/configuration/)
-- [仓库维护](https://vite-plugin-taro.netlify.app/references/repository-management/)
+- [全自动分包](https://vpt.js.org/guides/automatic-subpackages/)
+- [微信原生组件](https://vpt.js.org/guides/native-components/)
+- [开发者工具热更新](https://vpt.js.org/guides/hot-module-replacement/)
+- [Skyline 模式](https://vpt.js.org/guides/skyline-mode/)
+- [从 Taro CLI 迁移](https://vpt.js.org/guides/migrate-from-taro/)
+- [配置参考](https://vpt.js.org/references/configuration/)
+- [仓库维护](https://vpt.js.org/references/repository-management/)
 
 ## 许可证
 
