@@ -8,7 +8,16 @@
 
 使用 Vite 8、React 19、Taro 4 和 Tailwind CSS v4 构建微信小程序与 Web 应用。
 
-文档网站：<https://vpt.js.org>
+官网：<https://vpt.js.org>
+
+## 快速开始
+
+```sh
+npm create vite-taro@latest my-app
+```
+
+接下来阅读[快速开始](https://vpt.js.org/guides/quick-start/)。
+
 
 ### 已支持微信开发者工具的 React 热更新
 
@@ -20,14 +29,6 @@
 - **Tailwind CSS v4 开箱即用** 直接书写工具类，微信与 Web 样式自动适配。
 - **基于 Taro，超越 Taro** 使用 Taro 组件和 API，摆脱旧式 webpack 链路。
 - **Skyline 就绪** 支持全局或按页面启用微信 Skyline 渲染模式。
-
-## 创建应用
-
-```sh
-npm create vite-taro@latest my-app
-```
-
-接下来阅读[快速开始](https://vpt.js.org/guides/quick-start/)。
 
 ## 文档
 

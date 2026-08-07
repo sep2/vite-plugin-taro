@@ -7,7 +7,7 @@ Loan Genius is the sample app for `vite-plugin-taro`. It is a React 19 + Taro lo
 The app is forked from [`wuba/Taro-Mortgage-Calculator`](https://github.com/wuba/Taro-Mortgage-Calculator) and adapted to demonstrate `vite-plugin-taro`.
 
 - Source: [`packages/loan-genius`](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius)
-- Documentation website: <https://vpt.js.org>
+- Official Website: <https://vpt.js.org>
 
 ## Requirements
 

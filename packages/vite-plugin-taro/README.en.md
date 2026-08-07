@@ -8,7 +8,15 @@
 
 Build WeChat Mini Program and Web apps with Vite 8, React 19, Taro 4, and Tailwind CSS v4.
 
-Documentation website: <https://vpt.js.org>
+Website: <https://vpt.js.org>
+
+## Quick Start
+
+```sh
+npm create vite-taro@latest my-app
+```
+
+Continue with the [Quick Start guide](https://vpt.js.org/guides/quick-start/).
 
 ### React Hot Reload in WeChat DevTools
 
@@ -20,14 +28,6 @@ Documentation website: <https://vpt.js.org>
 - **Tailwind CSS v4 ready** Write utility classes directly; WeChat and Web styles adapt automatically.
 - **Built on Taro, beyond Taro** Use Taro components and APIs without the old webpack pipeline.
 - **Skyline ready** Use WeChat Skyline rendering globally or per page.
-
-## Create an app
-
-```sh
-npm create vite-taro@latest my-app
-```
-
-Continue with the [Quick Start guide](https://vpt.js.org/guides/quick-start/).
 
 ## Documentation
 
