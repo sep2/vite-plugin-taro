@@ -19,4 +19,4 @@ pnpm --filter docs build
 pnpm --filter docs preview
 ```
 
-文档内容位于 `src/content/docs`。推送到 `main` 的 `docs/**` 变更会通过 GitHub Actions 部署到 <https://vpt.js.org/>。
+文档内容位于 `src/content/docs`。线上文档部署在 <https://vite-plugin-taro.netlify.app>。

@@ -33,7 +33,7 @@
         "client.d.ts",
         "LICENSE",
         "README.md",
-        "README.zh.md"
+        "README.en.md"
     ],
     "scripts": {
         "build": "node ../../scripts/sync-plugin-readme.ts && node ../../scripts/clean-directory.ts dist && tsc --project tsconfig.build.json",
