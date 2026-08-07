@@ -121,8 +121,7 @@ export function createPlacer() {
                     // into every physical chunk filename; content identity alone is sufficient beneath that root.
                     return `${location.root}/assets/[hash].js`
                 },
-                // Keep generic assets independent of stylesheet conventions. The CSS adapter sees Tailwind's final
-                // mutation and owns the exact global `app.wxss` identity without confusing native Page companions.
+                // Keep generic assets independent of native output identities assigned after bundling.
                 assetFileNames: 'assets/[name]-[hash][extname]'
             },
             // Rolldown rejects strict entry signatures when code-splitting groups disable recursive dependency capture.

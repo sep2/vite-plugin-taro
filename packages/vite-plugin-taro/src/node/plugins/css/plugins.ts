@@ -5,10 +5,24 @@ import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
 import type { VitePluginTaroTarget } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
 
-// Keep the Vite plugin and the compatibility finalizer on identical WX conversion settings. A difference here can
-// make the second pass preserve browser units or apply a transformation that the first pass did not expect.
+/*
+ * CSS output order for WX:
+ *
+ *   weapp-tailwindcss output hooks
+ *       → vpt:wx-style-finalizer
+ *       → vpt:wx native companion emission
+ *
+ * All three generateBundle hooks retain hook-level `order: 'post'` and therefore execute in registration order. The
+ * upstream plugin normally also uses plugin-level `enforce: 'post'`, which would move it behind both VPT plugins and
+ * break this sequence. `alignWxGenerateBundleOrder` removes only that broader phase from upstream output hooks.
+ */
+
+// Tailwind belongs to VPT, not necessarily to the application. Resolving from VPT keeps strict package managers and
+// bundled development from looking for Tailwind in the application's node_modules.
 const tailwindcssBasedir = path.dirname(packageRequire.resolve('tailwindcss/package.json'))
 
+// Both upstream generation and VPT's final whole-file pass use one conversion policy. If these options diverge, the
+// second pass can preserve browser units or reinterpret syntax that the first pass generated.
 const wxStyleOptions = {
     cssCalc: false,
     autoprefixer: false,
@@ -16,84 +30,106 @@ const wxStyleOptions = {
     px2rpx: true
 } as const
 
-const transformWxss = createStyleHandler(wxStyleOptions)
+// The handler is immutable and reusable across builds; only each emitted asset's source is replaced.
+const transformWxStyle = createStyleHandler(wxStyleOptions)
 
-/** Completes the final compatibility pass required by generated WXSS. */
-export async function adaptWxss(source: string): Promise<string> {
-    return (await transformWxss(source)).css
-}
-
-/** Creates the target-aware Tailwind CSS plugins. */
+/** Creates the target-aware Tailwind pipeline. */
 export function createCssPlugins(target: VitePluginTaroTarget): PluginOption[] {
     const wx = target === 'wx'
 
-    return [
-        ...(WeappTailwindcss({
+    const tailwindPlugins =
+        WeappTailwindcss({
+            // VPT is a custom Vite compiler. Using Taro's adapter would import Taro-specific CSS ownership rules.
             appType: 'weapp-vite',
-            // WX must enable this for split Tailwind imports such as `tailwindcss/theme.css`. Otherwise Vite's
-            // PostCSS resolver tries to resolve those imports from the application and fails when Tailwind is owned
-            // by vpt. The web generator consumes the imports before that resolver runs, so H5 keeps the
-            // upstream default.
+            // WX generation rewrites Tailwind's split package imports before Vite tries to resolve them in the app.
+            // Without this, strict workspaces fail on imports such as `tailwindcss/theme.css`.
             rewriteCssImports: wx,
-            // Tailwind is a plugin dependency, not an application dependency. Give weapp-tailwindcss the owning package
-            // directory explicitly so bundled development and strict package managers resolve split CSS imports equally.
+            platform: wx ? 'weapp' : 'web',
             tailwindcssBasedir,
             generator: {
                 target: wx ? 'weapp' : 'web'
-                // webCompat: {
-                //     preset: 'legacy-web'
-                // }
             },
             cssOptions: {
                 ...wxStyleOptions,
+                // Browser output still needs vendor prefixes; WXSS does not support or need that browser pass.
                 autoprefixer: !wx
             },
             logLevel: 'warn'
-        }) ?? []),
-        wx ? createWxssCompatibilityFinalizer() : undefined
+        }) ?? []
+
+    return [
+        ...(wx ? tailwindPlugins.map(alignWxGenerateBundleOrder) : tailwindPlugins),
+        wx ? createWxStyleFinalizer() : undefined
     ]
 }
 
 /**
- * Completes WXSS adaptation that weapp-tailwindcss leaves pending after rewriting split Tailwind imports.
+ * Finalizes the one global stylesheet after upstream Tailwind generation.
  *
- * `rewriteCssImports: true` makes the early Vite transform generate the Tailwind CSS, but the non-web generator
- * also defers CSS adaptation. The generated asset is consequently browser-shaped
- * CSS containing values and syntax such as `rem`, escaped class selectors, and `@property`. It is then recorded as a
- * processed Vite asset, so the upstream output finalizer does not perform the missing complete WXSS adaptation.
- *
- * This plugin runs after the upstream finalizer, repeats only the compatibility transform, and restores the captured
- * global asset to WeChat's required `app.wxss` path. Exact path correlation leaves Page WXSS companions untouched.
- * Remove it when upstream both completes adaptation and preserves the bundler-selected filename.
+ * `cssCodeSplit: false` makes the compiler style global, but upstream can name it `.css` or `.wxss` depending on build
+ * mode. This hook converts its complete final contents once and gives it the root `app.wxss` identity required by
+ * WeChat. Running earlier loses CSS from dynamic chunks; running after native companion emission would also see Page
+ * and native-component WXSS files that must remain opaque.
  */
-function createWxssCompatibilityFinalizer(): Plugin {
+function createWxStyleFinalizer(): Plugin {
     return {
-        name: 'vpt:wxss-compatibility-finalizer',
-        enforce: 'post',
+        name: 'vpt:wx-style-finalizer',
         generateBundle: {
             order: 'post',
             async handler(_, bundle) {
-                // With cssCodeSplit: false the global style is the only asset with a logical
-                // .css source name, even when an earlier hook already changed its final suffix.
-                const globalStyleAsset = Object.values(bundle).find(
-                    (output): output is Rolldown.OutputAsset =>
-                        output.type === 'asset' &&
-                        (output.fileName.replaceAll('\\', '/').endsWith('.css') ||
-                            output.names.some((name) => name.replaceAll('\\', '/').endsWith('.css')))
-                )
-                if (!globalStyleAsset) return
-
-                // Both finalizers use a post-ordered generateBundle hook. Array order places this hook after the
-                // upstream finalizer, where the single Vite global style asset has its final contents and filename.
-                const source =
-                    typeof globalStyleAsset.source === 'string'
-                        ? globalStyleAsset.source
-                        : new TextDecoder().decode(globalStyleAsset.source)
-                if (source.length > 0) {
-                    globalStyleAsset.source = await adaptWxss(source)
+                const styles = Object.values(bundle).filter(isStyleAsset)
+                // More than one compiler style means cssCodeSplit was re-enabled. Choosing one would silently lose CSS.
+                if (styles.length > 1) {
+                    throw new Error('WX builds require one global compiler-emitted stylesheet')
                 }
-                globalStyleAsset.fileName = 'app.wxss'
+                // CSS is optional; applications without styles do not need an empty app.wxss.
+                if (styles.length === 0) return
+
+                const [style] = styles
+                const source = typeof style.source === 'string' ? style.source : new TextDecoder().decode(style.source)
+                // generateBundle exposes the final asset as mutable so conversion and native placement remain atomic.
+                // Without the compatibility pass, browser-only selectors, escaped classes, rem and @property can reach
+                // WeChat. Without the rename, bundled development writes paths such as src/app.wxss, which WeChat does
+                // not load as the application's global stylesheet.
+                style.source = (await transformWxStyle(source)).css
+                style.fileName = 'app.wxss'
             }
         }
     }
+}
+
+/**
+ * Adapts upstream plugin descriptors without mutating `weapp-tailwindcss` or patching node_modules.
+ *
+ * Vite first groups whole plugins by `enforce`, then orders individual hooks. Upstream's output plugins specify both
+ * `enforce: 'post'` and `generateBundle.order: 'post'`. The plugin-level phase overrides their earlier registration and
+ * places them after VPT's normal plugins, so VPT observes incomplete CSS. Making all of VPT post-enforced would fix that
+ * one hook while unnecessarily reordering resolution and transforms.
+ *
+ * For upstream plugins that actually own generateBundle, clone the descriptor without plugin-level enforcement. Keep
+ * hook-level `order: 'post'`: it still waits for ordinary bundle generation, while registration order becomes the sole
+ * tie-breaker between upstream generation, VPT finalization and native output. H5 descriptors remain untouched.
+ */
+function alignWxGenerateBundleOrder(pluginOption: PluginOption): PluginOption {
+    // PluginOption permits nested arrays. Preserve their shape while adapting every concrete plugin recursively.
+    if (Array.isArray(pluginOption)) return pluginOption.map(alignWxGenerateBundleOrder)
+
+    if (
+        !pluginOption ||
+        typeof pluginOption !== 'object' ||
+        !('enforce' in pluginOption) ||
+        pluginOption.enforce !== 'post' ||
+        !('generateBundle' in pluginOption) ||
+        pluginOption.generateBundle === undefined
+    ) {
+        return pluginOption
+    }
+
+    // Clone rather than mutate: upstream may retain or reuse the descriptor returned by its factory.
+    return { ...pluginOption, enforce: undefined }
+}
+
+/** Selects only the compiler stylesheet; native WXSS assets are emitted by the later WX hook. */
+function isStyleAsset(output: Rolldown.OutputBundle[string]): output is Rolldown.OutputAsset {
+    return output.type === 'asset' && /\.(?:css|wxss)$/.test(output.fileName)
 }

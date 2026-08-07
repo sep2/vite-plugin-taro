@@ -46,8 +46,11 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
 
                 build: {
                     modulePreload: false,
+                    // Mini Program styles are intentionally global. This guarantees one compiler stylesheet for the CSS
+                    // finalizer; enabling splitting would require Page ownership and must not be silently flattened.
                     cssCodeSplit: false,
-                    // Let weapp-tailwindcss own final WXSS transformation.
+                    // Preserve readable source for the final WX compatibility pass; browser minification can emit syntax
+                    // unsupported by WeChat and would make the subsequent whole-file conversion harder to reason about.
                     cssMinify: false,
 
                     // No base64 assets: Taro warns on image srcs above ~2KB, and inlined
@@ -123,6 +126,12 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
         },
 
         generateBundle: {
+            /*
+             * This hook is registered after createCssPlugins() and shares hook-level `order: 'post'` with the adapted
+             * upstream hooks and VPT style finalizer. Registration order therefore guarantees that app.wxss is complete
+             * before native Page/component companions are emitted. Without this order, the CSS finalizer could consume
+             * incomplete Tailwind output or mistake native WXSS companions for additional compiler styles.
+             */
             order: 'post',
             async handler(_, bundle) {
                 const subpackages = placer.getSubpackages(bundle)
