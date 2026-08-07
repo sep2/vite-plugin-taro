@@ -84,7 +84,7 @@ async function createFacade(projectFolder: string, name: string, entry: string) 
     const compiled = await compileNativeComponentFacade({
         code: `
             import { defineNativeComponent } from 'virtual:taro/native'
-            export const Component = defineNativeComponent(import('./${name}/${entry}.js'), {
+            export const Component = defineNativeComponent(() => import('./${name}/${entry}.js'), {
                 properties: { value: Number },
                 events: { change: String }
             })

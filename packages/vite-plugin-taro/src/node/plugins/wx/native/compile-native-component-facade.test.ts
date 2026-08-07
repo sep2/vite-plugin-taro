@@ -22,7 +22,7 @@ test('compiles a co-located facade without treating it as an opaque native asset
         const compiled = await compileNativeComponentFacade({
             code: `
                 import { defineNativeComponent } from 'virtual:taro/native'
-                export const NativeCounter = defineNativeComponent(import('./counter.js'), {
+                export const NativeCounter = defineNativeComponent(() => import('./counter.js'), {
                     properties: { count: Number },
                     events: { increment: { value: Number } }
                 })

@@ -32,18 +32,18 @@ type EventProps<Events> = {
     }) => void
 }
 
-/** Defines a typed native facade from an `import('./relative-entry.js')` reference replaced before runtime. */
+/** Defines a typed JSX interface from a static `() => import('./relative-entry.js')` reference. */
 export function defineNativeComponent<
     const Properties extends Readonly<Record<string, NativeSchema>>,
     const Events extends Readonly<Record<string, NativeSchema>>
 >(
-    entry: Promise<unknown>,
+    loadEntry: () => Promise<unknown>,
     schema: {
         readonly properties: Properties
         readonly events: Events
     }
 ): ComponentType<PropertyProps<Properties> & EventProps<Events>> {
-    void entry
+    void loadEntry
     void schema
-    throw new Error('Native component facade was not compiled')
+    throw new Error('Native component interface was not compiled')
 }

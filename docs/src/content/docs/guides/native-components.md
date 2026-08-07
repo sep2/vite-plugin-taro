@@ -20,7 +20,7 @@ description: 在 React 中类型安全地使用微信原生组件，并让原生
 import { defineNativeComponent } from 'virtual:taro/native'
 
 export const NativeCounter = defineNativeComponent(
-    import('../native-counter/counter.js'),
+    () => import('../native-counter/counter.js'),
 {
     properties: {
         count: Number
@@ -33,11 +33,12 @@ export const NativeCounter = defineNativeComponent(
 })
 ```
 
-接口文件可以放在任意位置。`import()` 只在编译时指定原生 `.js` 入口，路径相对于当前文件。
+接口文件可以放在任意位置。`() => import(...)` 只是供编译器识别原生组件入口的标记，不会把原生代码导入 React bundle，编译后会被完全移除。其中的路径必须是相对于当前文件的静态路径，并指向原生组件的 `.js` 入口。
 
-然后在 JSX 中使用这个接口：
+然后在 JSX 中使用这个接口即可：
 
 ```tsx
+// src/pages/index/index.tsx
 import { useState } from 'react'
 import { NativeCounter } from '../../components/native-counter'
 
@@ -57,7 +58,7 @@ export default function CounterDemo() {
 
 属性和事件都有完整类型，事件数据位于 `event.detail`。组件注册和文件复制由 vpt 自动完成。
 
-这个接口只存在于编译时，不是 React 运行时组件，也不会生成额外代码或带来性能开销。
+`NativeCounter` 组件只存在于编译时，不是 React 运行时组件，也不会生成额外代码或带来性能开销。
 
 ## 原生组件目录
 
@@ -91,7 +92,7 @@ vpt 会递归复制目录中的文件并保留相对路径。WXS、图片、字�
 
 ```tsx
 export const NativeProfile = defineNativeComponent(
-    import('../native-profile/profile.js'),
+    () => import('../native-profile/profile.js'),
 {
     properties: {
         profile: {
@@ -126,7 +127,7 @@ schema 必须直接写在调用中：
 
 ```tsx
 export const NativeDivider = defineNativeComponent(
-    import('../native-divider/divider.js'),
+    () => import('../native-divider/divider.js'),
 {
     properties: {},
     events: {}
@@ -139,7 +140,7 @@ export const NativeDivider = defineNativeComponent(
 
 vpt 只输出实际使用的原生组件。原生文件会跟随使用该接口的代码进入主包或自动分包。
 
-`defineNativeComponent()` 中的 `import()` 不会创建分包。需要按需加载时，使用普通的动态导入：
+`defineNativeComponent()` 中的 `() => import(...)` 不会创建分包。需要按需加载时，使用普通的动态导入：
 
 ```tsx
 import { lazy, Suspense } from 'react'
@@ -220,10 +221,10 @@ React 和原生组件不共享 CommonJS 模块实例。使用属性和事件通�
 
 ```tsx
 // 正确
-import('../native-counter/counter.js')
+() => import('../native-counter/counter.js')
 
 // 错误：只指向目录
-import('../native-counter')
+() => import('../native-counter')
 ```
 
 ### 页面没有注册组件

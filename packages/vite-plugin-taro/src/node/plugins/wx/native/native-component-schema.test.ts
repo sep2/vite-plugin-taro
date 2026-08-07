@@ -10,7 +10,7 @@ test('extracts an aliased static native component schema', () => {
         `
             import { defineNativeComponent as defineNative } from 'virtual:taro/native'
 
-            export const NativeCounter = defineNative(import('./native/native-counter/counter.js'), {
+            export const NativeCounter = defineNative(() => import('./native/native-counter/counter.js'), {
                 properties: {
                     count: Number,
                     label: String,
@@ -47,7 +47,7 @@ test('replaces facade calls with native tag strings and removes only the macro i
             import { defineNativeComponent as defineNative } from 'virtual:taro/native'
 
             const schema = Number
-            export const NativeCounter = defineNative(import('./native/native-counter/index.js'), {
+            export const NativeCounter = defineNative(() => import('./native/native-counter/index.js'), {
                 properties: { count: Number },
                 events: { increment: { value: Number } }
             })
@@ -84,6 +84,8 @@ test('ignores unrelated and shadowed functions with the same name', () => {
     assert.deepEqual(definitions, [])
 })
 
+const invalidEntryMessage = /entry must use \(\) => import\(\.\.\.\) with a static relative \.js path/
+
 const invalidSchemas = [
     {
         name: 'plain entry strings',
@@ -91,29 +93,37 @@ const invalidSchemas = [
             import { defineNativeComponent } from 'virtual:taro/native'
             defineNativeComponent('./counter.js', { properties: {}, events: {} })
         `,
-        message: /entry must use import\(\) with a static relative \.js path/
+        message: invalidEntryMessage
+    },
+    {
+        name: 'direct imports',
+        source: `
+            import { defineNativeComponent } from 'virtual:taro/native'
+            defineNativeComponent(import('./counter.js'), { properties: {}, events: {} })
+        `,
+        message: invalidEntryMessage
     },
     {
         name: 'dynamic entries',
         source: `
             import { defineNativeComponent } from 'virtual:taro/native'
-            defineNativeComponent(import(entry), { properties: {}, events: {} })
+            defineNativeComponent(() => import(entry), { properties: {}, events: {} })
         `,
-        message: /entry must use import\(\) with a static relative \.js path/
+        message: invalidEntryMessage
     },
     {
         name: 'folder imports without a JavaScript entry',
         source: `
             import { defineNativeComponent } from 'virtual:taro/native'
-            defineNativeComponent(import('./counter'), { properties: {}, events: {} })
+            defineNativeComponent(() => import('./counter'), { properties: {}, events: {} })
         `,
-        message: /entry must use import\(\) with a static relative \.js path/
+        message: invalidEntryMessage
     },
     {
         name: 'missing sections',
         source: `
             import { defineNativeComponent } from 'virtual:taro/native'
-            defineNativeComponent(import('./counter.js'), { properties: {} })
+            defineNativeComponent(() => import('./counter.js'), { properties: {} })
         `,
         message: /schema is missing events/
     },
@@ -121,7 +131,7 @@ const invalidSchemas = [
         name: 'spread fields',
         source: `
             import { defineNativeComponent } from 'virtual:taro/native'
-            defineNativeComponent(import('./counter.js'), { properties: { ...properties }, events: {} })
+            defineNativeComponent(() => import('./counter.js'), { properties: { ...properties }, events: {} })
         `,
         message: /properties cannot use spread fields/
     },
@@ -129,7 +139,7 @@ const invalidSchemas = [
         name: 'computed fields',
         source: `
             import { defineNativeComponent } from 'virtual:taro/native'
-            defineNativeComponent(import('./counter.js'), { properties: { [name]: Number }, events: {} })
+            defineNativeComponent(() => import('./counter.js'), { properties: { [name]: Number }, events: {} })
         `,
         message: /properties must use static fields/
     },
@@ -137,7 +147,7 @@ const invalidSchemas = [
         name: 'unsupported schema expressions',
         source: `
             import { defineNativeComponent } from 'virtual:taro/native'
-            defineNativeComponent(import('./counter.js'), { properties: { count: number() }, events: {} })
+            defineNativeComponent(() => import('./counter.js'), { properties: { count: number() }, events: {} })
         `,
         message: /Unsupported native component schema at properties.count/
     },
@@ -145,7 +155,7 @@ const invalidSchemas = [
         name: 'property and event collisions',
         source: `
             import { defineNativeComponent } from 'virtual:taro/native'
-            defineNativeComponent(import('./counter.js'), {
+            defineNativeComponent(() => import('./counter.js'), {
                 properties: { increment: Number },
                 events: { increment: { value: Number } }
             })

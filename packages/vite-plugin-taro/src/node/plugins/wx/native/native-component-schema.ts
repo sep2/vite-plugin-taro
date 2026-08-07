@@ -103,12 +103,12 @@ function parseDefinition(
     buildError: (message: string) => Error
 ): NativeComponentSchemaDefinition {
     if (call.arguments.length !== 2) {
-        throw buildError('defineNativeComponent() requires an entry file and one schema object')
+        throw buildError('defineNativeComponent() requires an entry loader and one schema object')
     }
     const [entryNode, schemaNode] = call.arguments
     const entryReference = readStaticEntryImport(entryNode)
     if (!entryReference) {
-        throw buildError('Native component entry must use import() with a static relative .js path')
+        throw buildError('Native component entry must use () => import(...) with a static relative .js path')
     }
     if (!types.isObjectExpression(schemaNode)) {
         throw buildError('Native component schema must be an inline object')
@@ -234,17 +234,20 @@ function getStaticName(node: types.Node): string | undefined {
     }
 }
 
-/** Reads a dynamic import used only as a statically resolvable native `.js` entry reference. */
+/** Reads a zero-argument entry loader containing one statically resolvable native `.js` import. */
 function readStaticEntryImport(node: types.Node | null | undefined): string | undefined {
+    if (!types.isArrowFunctionExpression(node) || node.params.length !== 0 || !types.isImportExpression(node.body)) {
+        return undefined
+    }
+    const importExpression = node.body
     if (
-        !types.isImportExpression(node) ||
-        !types.isStringLiteral(node.source) ||
-        node.options !== null ||
-        !isLocalJavaScriptEntry(node.source.value)
+        !types.isStringLiteral(importExpression.source) ||
+        importExpression.options !== null ||
+        !isLocalJavaScriptEntry(importExpression.source.value)
     ) {
         return undefined
     }
-    return node.source.value
+    return importExpression.source.value
 }
 
 /** Limits component entries to JavaScript files reachable from their facade module. */
