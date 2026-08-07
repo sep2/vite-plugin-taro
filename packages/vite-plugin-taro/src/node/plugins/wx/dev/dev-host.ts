@@ -9,6 +9,7 @@ import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { once } from '../../../utils/once.ts'
 import { resolvePackageFile } from '../../../utils/packages.ts'
 import { appShellFileName } from '../module.ts'
+import { emptyOutputDirectory } from './empty-output-directory.ts'
 import {
     type HmrInfo,
     hmrControlPath,
@@ -252,12 +253,26 @@ export async function createWxDevHost({
                 lazy: false
             }
 
+            const emptyOutputDirectoryPlugin: Plugin = {
+                name: 'vpt:wx-empty-output-directory',
+                renderStart: {
+                    order: 'pre',
+                    // DevEngine bypasses Vite's build-only output preparation. Clear stale files before every complete
+                    // physical render while retaining the directory watched by WeChat DevTools.
+                    handler: () => emptyOutputDirectory(server.config.build.outDir)
+                }
+            }
             const reportInitialBuildPlugin: Plugin = {
                 name: 'vpt:wx-report-initial-build',
                 buildEnd: settleInitialBuild
             }
 
-            rolldownOptions.plugins = [rolldownOptions.plugins, reportInitialBuildPlugin, createViteReporter(server)]
+            rolldownOptions.plugins = [
+                emptyOutputDirectoryPlugin,
+                rolldownOptions.plugins,
+                reportInitialBuildPlugin,
+                createViteReporter(server)
+            ]
             disableViteOxcSourcemap(rolldownOptions.plugins)
             return rolldownOptions
         }
