@@ -22,6 +22,7 @@ import {
     writeHmrFile
 } from './hmr-files.ts'
 import { PatchPublisher } from './patch-publisher.ts'
+import { publishWxDevStyle } from './publish-wx-dev-style.ts'
 
 export type WxDevHost = Readonly<{
     close: () => Promise<void>
@@ -169,6 +170,7 @@ export async function createWxDevHost({
         }
 
         return dev(rolldownOptions, rolldownOptions.output, {
+            onAdditionalAssets: (output) => publishWxDevStyle(output, server.config.build.outDir),
             onHmrUpdates: async (result) => {
                 if (result instanceof Error) {
                     logWxError(server.config.logger, 'wx HMR update failed', result)
@@ -204,6 +206,7 @@ export async function createWxDevHost({
                     logWxError(server.config.logger, 'wx dev build failed', result)
                     return
                 }
+                await publishWxDevStyle(result, server.config.build.outDir)
                 // A fresh build identity per complete physical build; the App runtime reads it
                 // from hmr/info.js before any module registers.
                 await startFreshBuild()

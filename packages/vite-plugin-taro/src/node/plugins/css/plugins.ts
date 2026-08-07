@@ -16,6 +16,13 @@ const wxStyleOptions = {
     px2rpx: true
 } as const
 
+const transformWxss = createStyleHandler(wxStyleOptions)
+
+/** Completes the final compatibility pass required by generated WXSS. */
+export async function adaptWxss(source: string): Promise<string> {
+    return (await transformWxss(source)).css
+}
+
 /** Creates the target-aware Tailwind CSS plugins. */
 export function createCssPlugins(target: VitePluginTaroTarget): PluginOption[] {
     const wx = target === 'wx'
@@ -60,10 +67,6 @@ export function createCssPlugins(target: VitePluginTaroTarget): PluginOption[] {
  * Remove it when upstream both completes adaptation and preserves the bundler-selected filename.
  */
 function createWxssCompatibilityFinalizer(): Plugin {
-    // This compatibility pass only needs the PostCSS style pipeline. Creating a complete weapp-tailwindcss context here
-    // would initialize another Tailwind compiler and source scanner for CSS that the upstream Vite plugin already generated.
-    const transformWxss = createStyleHandler(wxStyleOptions)
-
     return {
         name: 'vpt:wxss-compatibility-finalizer',
         enforce: 'post',
@@ -87,7 +90,7 @@ function createWxssCompatibilityFinalizer(): Plugin {
                         ? globalStyleAsset.source
                         : new TextDecoder().decode(globalStyleAsset.source)
                 if (source.length > 0) {
-                    globalStyleAsset.source = (await transformWxss(source)).css
+                    globalStyleAsset.source = await adaptWxss(source)
                 }
                 globalStyleAsset.fileName = 'app.wxss'
             }
