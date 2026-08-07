@@ -4,6 +4,13 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.4.2] - 2026-08-07
+
+### Fixed
+
+- align Babel dependencies with Taro (014e986)
+- clear wx output before rebuilds (4ff7982)
+
 ## [0.4.1] - 2026-08-07
 
 ### Fixed
