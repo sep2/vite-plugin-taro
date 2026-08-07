@@ -6,22 +6,23 @@ import test from 'node:test'
 import { compileNativeComponentFacade } from './compile-native-component-facade.ts'
 import { nativeComponentMetaKey } from './native-component-assets.ts'
 
-test('compiles a facade and returns watched native sources as module metadata', async () => {
+test('compiles a co-located facade without treating it as an opaque native asset', async () => {
     const projectDirectory = await mkdtemp(path.join(tmpdir(), 'vpt-native-facade-'))
     try {
         const sourceDirectory = path.join(projectDirectory, 'native-counter')
         const sourcePath = path.join(sourceDirectory, 'component.data')
         const entryPath = path.join(sourceDirectory, 'counter.js')
-        const moduleId = path.join(projectDirectory, 'native-counter.ts')
+        const moduleId = path.join(sourceDirectory, 'native-counter.ts')
         await mkdir(sourceDirectory)
         await writeFile(sourcePath, 'native source')
         await writeFile(entryPath, '')
+        await writeFile(moduleId, 'facade source')
         const watchedFiles = new Set<string>()
 
         const compiled = await compileNativeComponentFacade({
             code: `
                 import { defineNativeComponent } from 'virtual:taro/native'
-                export const NativeCounter = defineNativeComponent(import('./native-counter/counter.js'), {
+                export const NativeCounter = defineNativeComponent(import('./counter.js'), {
                     properties: { count: Number },
                     events: { increment: { value: Number } }
                 })

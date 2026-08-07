@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { normalizeModuleId } from '../../../utils/modules.ts'
 import { collectNativeComponentAssets, nativeComponentMetaKey } from './native-component-assets.ts'
 import { transformNativeComponentFacades } from './native-component-schema.ts'
 
@@ -15,8 +16,11 @@ export async function compileNativeComponentFacade({
     addWatchFile: (file: string) => void
 }) {
     const transformed = transformNativeComponentFacades(code, id, sourcemap)
+    const facadePath = normalizeModuleId(id)
 
-    const nativeComponents = await Promise.all(transformed.definitions.map(collectNativeComponentAssets))
+    const nativeComponents = await Promise.all(
+        transformed.definitions.map((definition) => collectNativeComponentAssets(definition, facadePath))
+    )
 
     nativeComponents.forEach((source) => {
         addWatchFile(source.folder)

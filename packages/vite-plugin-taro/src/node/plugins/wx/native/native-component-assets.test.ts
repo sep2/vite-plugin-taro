@@ -12,12 +12,15 @@ test('rejects a missing native component folder with its resolved path', async (
     try {
         await assert.rejects(
             () =>
-                collectNativeComponentAssets({
-                    folder: missingDirectory,
-                    entry: 'index',
-                    properties: [],
-                    events: []
-                }),
+                collectNativeComponentAssets(
+                    {
+                        folder: missingDirectory,
+                        entry: 'index',
+                        properties: [],
+                        events: []
+                    },
+                    path.join(sourceDirectory, 'facade.tsx')
+                ),
             new Error(`Native component folder does not exist: ${missingDirectory}`)
         )
     } finally {
@@ -31,12 +34,15 @@ test('rejects a missing native component entry with its resolved path', async ()
     try {
         await assert.rejects(
             () =>
-                collectNativeComponentAssets({
-                    folder: sourceDirectory,
-                    entry: 'counter',
-                    properties: [],
-                    events: []
-                }),
+                collectNativeComponentAssets(
+                    {
+                        folder: sourceDirectory,
+                        entry: 'counter',
+                        properties: [],
+                        events: []
+                    },
+                    path.join(sourceDirectory, 'facade.tsx')
+                ),
             new Error(`Native component entry file does not exist: ${missingEntry}`)
         )
     } finally {
@@ -44,13 +50,15 @@ test('rejects a missing native component entry with its resolved path', async ()
     }
 })
 
-test('collects an opaque native folder recursively without validating its companion files', async () => {
+test('collects an opaque native folder recursively while excluding its co-located facade', async () => {
     const sourceDirectory = await mkdtemp(path.join(tmpdir(), 'vpt-native-assets-'))
     try {
         await mkdir(path.join(sourceDirectory, 'nested'))
         await writeFile(path.join(sourceDirectory, 'z.invalid-json'), '{')
         await writeFile(path.join(sourceDirectory, 'a.custom'), 'native source')
         await writeFile(path.join(sourceDirectory, 'renderer.js'), '')
+        const facadePath = path.join(sourceDirectory, 'renderer.tsx')
+        await writeFile(facadePath, 'facade source')
         await writeFile(path.join(sourceDirectory, 'nested', 'data.bin'), Uint8Array.from([0, 1, 2]))
         const definition: NativeComponentSchemaDefinition = {
             folder: sourceDirectory,
@@ -59,7 +67,7 @@ test('collects an opaque native folder recursively without validating its compan
             events: ['increment']
         }
 
-        const source = await collectNativeComponentAssets(definition)
+        const source = await collectNativeComponentAssets(definition, facadePath)
 
         assert.deepEqual(
             source.assets.map(({ relativePath }) => relativePath),

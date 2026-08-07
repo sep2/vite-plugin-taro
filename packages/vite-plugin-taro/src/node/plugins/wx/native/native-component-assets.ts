@@ -1,6 +1,7 @@
 import { readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import type { Rolldown } from 'vite'
+import { normalizeModuleId } from '../../../utils/modules.ts'
 import type { NativeComponentSchemaDefinition } from './native-component-schema.ts'
 
 type NativeComponentAsset = {
@@ -35,16 +36,17 @@ export function getNativeComponentSources(meta: Rolldown.CustomPluginOptions | u
     return meta?.[nativeComponentMetaKey]?.sources ?? []
 }
 
-/** Collects a native component folder as opaque, recursively ordered assets. */
+/** Collects a native component folder as opaque, recursively ordered assets without copying its facade module. */
 export async function collectNativeComponentAssets(
-    definition: NativeComponentSchemaDefinition
+    definition: NativeComponentSchemaDefinition,
+    facadePath: string
 ): Promise<NativeComponentSource> {
     await requireNativeComponentDirectory(definition.folder)
     await requireNativeComponentEntry(definition)
 
     // This mutable accumulator is local to one traversal and avoids repeatedly copying growing asset arrays.
     const assets: NativeComponentAsset[] = []
-    await collectDirectory(definition.folder, [], assets)
+    await collectDirectory(definition.folder, [], assets, normalizeModuleId(facadePath))
 
     return { ...definition, assets }
 }
@@ -84,7 +86,8 @@ async function requireNativeComponentEntry(definition: NativeComponentSchemaDefi
 async function collectDirectory(
     folder: string,
     segments: readonly string[],
-    assets: NativeComponentAsset[]
+    assets: NativeComponentAsset[],
+    facadePath: string
 ): Promise<void> {
     const directory = path.join(folder, ...segments)
     const entries = await readdir(directory, { withFileTypes: true })
@@ -93,13 +96,16 @@ async function collectDirectory(
     for (const entry of entries) {
         const entrySegments = [...segments, entry.name]
         if (entry.isDirectory()) {
-            await collectDirectory(folder, entrySegments, assets)
+            await collectDirectory(folder, entrySegments, assets, facadePath)
             continue
         }
         if (!entry.isFile()) {
             continue
         }
         const sourcePath = path.join(folder, ...entrySegments)
+        if (normalizeModuleId(sourcePath) === facadePath) {
+            continue
+        }
         assets.push({
             relativePath: entrySegments.join('/'),
             byteLength: (await stat(sourcePath)).size
