@@ -2,6 +2,8 @@ name: Deploy documentation to GitHub Pages
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*.*.*'
     paths:
