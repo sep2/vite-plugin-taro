@@ -3,17 +3,23 @@ title: 全自动分包
 description: 使用动态导入，让 vpt 自动管理微信小程序的主包与分包。
 ---
 
-import { Tabs, TabItem } from '@astrojs/starlight/components'
-
 开发者不再需要关心微信小程序的单包限制。
 
-只需要使用 Web 标准的静态 `import` 或者动态 `import()`。具体分包情况完全由 vpt 的规划算法决定。
+遵循 Web 规则，应用代码间的互相导入没有任何限制。
 
-总而言之，应用代码间的互相导入没有任何限制。
+## 静态导入
 
-## 快速使用
+需要随 App 或页面一起启动的代码照常使用静态 `import`：
 
-### 按需加载一个功能
+```ts
+import { initializeStore } from './store'
+
+initializeStore()
+```
+
+从 App、页面及其依赖通过静态导入可达的模块会保留在主包。
+
+## 按需加载
 
 在功能入口使用 `import()`：
 
@@ -23,14 +29,6 @@ async function openReport() {
     return await createReport()
 }
 ```
-
-`import()` 控制**何时加载**，不指定分包名称或目录。
-
-- 如果 `./features/report` 只从这个动态导入到达，它会参与全自动位置规划；
-- 如果启动代码也静态导入了它，它会留在主包；
-- 无论最终位置如何，业务代码都正常使用 `await import()`。
-
-### 功能内部继续使用静态 `import`
 
 只需要在功能入口使用一次动态 `import()`。该功能内部继续使用普通静态导入：
 
@@ -48,7 +46,7 @@ export function createReport() {
 
 实际上，vpt 会分析所有依赖的引用关系，无论是动态还是静态，并据此实现全自动分包。
 
-### 使用 `React.lazy`
+## 使用 `React.lazy`
 
 React 组件可以直接使用 `lazy()`：
 
@@ -88,7 +86,9 @@ function ReportEntry() {
 
 vpt 根据完整应用决定最终位置，并自动处理跨包加载与执行顺序。
 
-因此，在实际产物中，主包引用分包，分包引用主包，分包引用分包，全部都没有问题，当然，应用代码不需要关心分包信息。
+因此，在实际产物中，主包引用分包，分包引用主包，分包引用分包，全部都没有问题。
+
+当然，应用代码不需要关心分包信息，
 
 ## 设计加载边界
 
