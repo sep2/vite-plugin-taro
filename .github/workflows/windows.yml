@@ -2,7 +2,11 @@ name: Windows CI
 
 on:
   push:
+    paths:
+      - 'packages/vite-plugin-taro/**'
   pull_request:
+      paths:
+      - 'packages/vite-plugin-taro/**'
   workflow_dispatch:
 
 permissions:
