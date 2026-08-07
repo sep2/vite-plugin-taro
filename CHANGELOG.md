@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.5.1] - 2026-08-07
+
+### Fixed
+
+- publish wx styles during development (70eb7dc)
+
 ## [0.5.0] - 2026-08-07
 
 ### Changed
