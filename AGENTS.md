@@ -69,7 +69,9 @@ Node.js v26+ is available and can execute TypeScript natively.
 - `pnpm build:plugin`: build `packages/vite-plugin-taro`.
 - `pnpm build:native-comp-demo:wx`: build the native-component project.
 - `pnpm dev:native-comp-demo:wx`: start the native-component project with hot reload.
-- `pnpm typecheck`: typecheck the plugin and sample app.
+- `pnpm typecheck:plugin`: typecheck plugin.
+- `pnpm typecheck:loan-genius`: typecheck loan-genius.
+- `pnpm typecheck:native-comp-demo`: typecheck native-comp-demo.
 - `pnpm lint`: run Biome checks.
 - `pnpm format`: run Biome checks with safe writes.
 - `pnpm build:loan-genius:h5`: build the sample H5 target.
