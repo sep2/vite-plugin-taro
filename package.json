@@ -39,6 +39,7 @@
         "publish:dry": "node scripts/publish-packages.ts --dry-run"
     },
     "devDependencies": {
+        "@babel/core": "^7.29.7",
         "@biomejs/biome": "^2.5.3",
         "typescript": "^7.0.2"
     },

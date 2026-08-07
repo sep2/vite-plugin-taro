@@ -1,4 +1,4 @@
-import { type PluginObject, types } from '@babel/core'
+import { type PluginObj, types } from '@babel/core'
 import type { Plugin } from 'vite'
 import { memoize } from '../../../utils/memoize.ts'
 import { transformWithBabel } from '../../../utils/transform.ts'
@@ -81,7 +81,7 @@ export function createWxReactRefreshTransforms(): Plugin[] {
  * explicit member access is precise. The hook itself is created on `global` by the dev
  * runtime chunk (see dev-runtime.ts).
  */
-function rewriteReactDevtoolsHookGlobal(): PluginObject {
+function rewriteReactDevtoolsHookGlobal(): PluginObj {
     return {
         name: 'vpt:wx-react-devtools-hook-global',
         visitor: {
@@ -124,7 +124,7 @@ function rewriteReactDevtoolsHookGlobal(): PluginObject {
  * replay captures it; the patched commit hooks then track every later mount, including the
  * remounts on re-execution.
  */
-function injectRefreshGlobalHook(): PluginObject {
+function injectRefreshGlobalHook(): PluginObj {
     return {
         name: 'vpt:wx-refresh-global-hook-injection',
         visitor: {
@@ -153,7 +153,7 @@ function injectRefreshGlobalHook(): PluginObject {
  * Only the exact known protocol names are rewritten, one by one, so unrelated `window`
  * accesses are never touched and future protocol additions are deliberate.
  */
-function rewriteRefreshRuntimeWindowAccess(): PluginObject {
+function rewriteRefreshRuntimeWindowAccess(): PluginObj {
     /**
      * Refresh protocol globals that must land on the WeChat `global`:
      * - `__registerBeforePerformReactRefresh`: assigned at module scope; in web, the HMR
@@ -186,7 +186,7 @@ function rewriteRefreshRuntimeWindowAccess(): PluginObject {
 }
 
 /** Boundary modules: remove the generated `if (!window.$RefreshReg$) throw Error(...)` guard. */
-function removeRefreshPreambleGuard(): PluginObject {
+function removeRefreshPreambleGuard(): PluginObj {
     return {
         name: 'vpt:wx-refresh-preamble-guard',
         visitor: {

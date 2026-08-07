@@ -1,4 +1,4 @@
-import { type PluginObject, type PluginTarget, types } from '@babel/core'
+import { type PluginObj, type PluginTarget, types } from '@babel/core'
 import transformModulesCommonjs from '@babel/plugin-transform-modules-commonjs'
 import type { Rolldown } from 'vite'
 import { resolveChunkReference } from '../../../utils/modules.ts'
@@ -29,7 +29,7 @@ export function renderNative({
 function connectNativeCapsulesPlugin(
     fileName: string,
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
-): PluginObject {
+): PluginObj {
     return {
         name: 'vpt:connect-native-capsules',
         visitor: {

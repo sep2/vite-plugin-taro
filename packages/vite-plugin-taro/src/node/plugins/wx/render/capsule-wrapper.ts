@@ -1,8 +1,8 @@
-import { type PluginObject, types } from '@babel/core'
+import { type PluginObj, types } from '@babel/core'
 import { resolveChunkReference } from '../../../utils/modules.ts'
 
 /** Wraps System.register as an inert CommonJS capsule tuple with canonical final dependency IDs. */
-export function wrapCapsulePlugin(fileName: string): PluginObject {
+export function wrapCapsulePlugin(fileName: string): PluginObj {
     return {
         name: 'vpt:wrap-capsule',
         visitor: {},

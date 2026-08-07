@@ -56,14 +56,13 @@
         "node": "^22.18.0 || >=24.11.0"
     },
     "dependencies": {
-        "@babel/core": "^8.0.1",
-        "@babel/generator": "^8.0.0",
-        "@babel/plugin-transform-dynamic-import": "^8.0.1",
-        "@babel/plugin-transform-modules-commonjs": "^8.0.1",
-        "@babel/plugin-transform-modules-systemjs": "^8.0.1",
+        "@babel/core": "^7.29.7",
+        "@babel/generator": "^7.29.8",
+        "@babel/plugin-transform-dynamic-import": "^7.29.7",
+        "@babel/plugin-transform-modules-commonjs": "^7.29.7",
+        "@babel/plugin-transform-modules-systemjs": "^7.29.8",
         "@rolldown/plugin-babel": "^0.2.3",
         "@tailwindcss-mangle/engine": "0.2.0",
-        "@weapp-tailwindcss/postcss": "3.2.8",
         "@tarojs/components": "^4.2.0",
         "@tarojs/helper": "^4.2.0",
         "@tarojs/plugin-framework-react": "workspace:vite-plugin-taro-plugin-framework-react@*",
@@ -74,6 +73,7 @@
         "@tarojs/runtime": "^4.2.0",
         "@tarojs/taro": "^4.2.0",
         "@vitejs/plugin-react": "^6.0.5",
+        "@weapp-tailwindcss/postcss": "3.2.8",
         "babel-plugin-transform-taroapi": "^4.2.0",
         "picocolors": "^1.1.1",
         "react-reconciler": "0.33.0",
@@ -88,6 +88,8 @@
         "vite": "^8.2.0"
     },
     "devDependencies": {
+        "@types/babel__core": "^7.20.5",
+        "@types/babel__generator": "^7.27.0",
         "@types/node": "^26.1.1",
         "@types/react": "^19.2.17",
         "@types/react-dom": "^19.2.3",

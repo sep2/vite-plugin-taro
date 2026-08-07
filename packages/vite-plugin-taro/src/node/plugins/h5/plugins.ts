@@ -1,5 +1,5 @@
 import type { types as BabelTypes } from '@babel/core'
-import { type NodePath, type PluginObject, types } from '@babel/core'
+import { type NodePath, type PluginObj, types } from '@babel/core'
 import babel from '@rolldown/plugin-babel'
 import type { HtmlTagDescriptor, Plugin, PluginOption } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
@@ -127,7 +127,7 @@ function createH5SupportPlugins(): PluginOption[] {
 }
 
 /** Keeps Stencil-injected Taro component styles before application stylesheets. */
-function rewriteStencilStyleInsertion(): PluginObject {
+function rewriteStencilStyleInsertion(): PluginObj {
     return {
         name: 'vpt:rewrite-stencil-style-insertion',
         visitor: {
