@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.5.3] - 2026-08-07
+
+### Changed
+
+- docs (0a2fb6e)
+- use vpt.js.org (8a6f7f6)
+
+### Fixed
+
+- fix ci (27c12b9)
+
 ## [0.5.2] - 2026-08-07
 
 ### Changed
