@@ -39,7 +39,7 @@ export async function createNativeComponentOutput({
 
                 registrations.push({
                     name,
-                    componentPath: `/${path.posix.join(outputFolder, 'index')}`,
+                    componentPath: `/${path.posix.join(outputFolder, source.entry)}`,
                     properties: source.properties,
                     events: source.events
                 })

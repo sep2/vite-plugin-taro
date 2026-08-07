@@ -4,7 +4,7 @@ import type { AnswerMessage, ChatState, QuestionMessage } from './chat-model.ts'
 
 const sampleMarkdownUrl =
     'https://raw.githubusercontent.com/sep2/vite-plugin-taro/refs/heads/main/docs/src/content/docs/references/hmr-implementation.md'
-const streamIntervalMilliseconds = 40
+const streamIntervalMilliseconds = 15
 const streamChunkCodePoints = 24
 const firstScrollTop = 1_000_000
 const secondScrollTop = firstScrollTop + 1

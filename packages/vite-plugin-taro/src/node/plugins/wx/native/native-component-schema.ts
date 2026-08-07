@@ -9,11 +9,12 @@ const schemaSectionNames = new Set(['properties', 'events'])
 
 export type NativeComponentSchemaDefinition = {
     folder: string
+    entry: string
     properties: readonly string[]
     events: readonly string[]
 }
 
-/** Replaces native facade calls with their folder basename and returns their static metadata. */
+/** Replaces native facade calls with their source-folder basename and returns their static metadata. */
 export function transformNativeComponentFacades(code: string, id: string, sourcemap: boolean) {
     const moduleId = normalizeModuleId(id)
     // Collection is local to this transform and preserves declaration order for deterministic later stages.
@@ -95,19 +96,19 @@ function isDefineNativeComponentCall(callPath: NodePath<types.CallExpression>): 
     )
 }
 
-/** Parses one folder and its two required schema namespaces. */
+/** Parses one component entry and its two required schema namespaces. */
 function parseDefinition(
     call: types.CallExpression,
     moduleId: string,
     buildError: (message: string) => Error
 ): NativeComponentSchemaDefinition {
     if (call.arguments.length !== 2) {
-        throw buildError('defineNativeComponent() requires a folder and one schema object')
+        throw buildError('defineNativeComponent() requires an entry file and one schema object')
     }
-    const [folderNode, schemaNode] = call.arguments
-    const folder = readStaticFolderImport(folderNode)
-    if (!folder) {
-        throw buildError('Native component folder must use import() with a static relative path')
+    const [entryNode, schemaNode] = call.arguments
+    const entryReference = readStaticEntryImport(entryNode)
+    if (!entryReference) {
+        throw buildError('Native component entry must use import() with a static relative .js path')
     }
     if (!types.isObjectExpression(schemaNode)) {
         throw buildError('Native component schema must be an inline object')
@@ -122,8 +123,10 @@ function parseDefinition(
         throw buildError(`Native component field ${collision} is both a property and an event`)
     }
 
+    const entryPath = normalizeModuleId(path.resolve(path.dirname(moduleId), entryReference))
     return {
-        folder: normalizeModuleId(path.resolve(path.dirname(moduleId), folder)),
+        folder: path.posix.dirname(entryPath),
+        entry: path.posix.basename(entryPath, '.js'),
         properties,
         events
     }
@@ -231,20 +234,20 @@ function getStaticName(node: types.Node): string | undefined {
     }
 }
 
-/** Reads a dynamic import used only as a statically resolvable folder reference. */
-function readStaticFolderImport(node: types.Node | null | undefined): string | undefined {
+/** Reads a dynamic import used only as a statically resolvable native `.js` entry reference. */
+function readStaticEntryImport(node: types.Node | null | undefined): string | undefined {
     if (
         !types.isImportExpression(node) ||
         !types.isStringLiteral(node.source) ||
         node.options !== null ||
-        !isLocalFolder(node.source.value)
+        !isLocalJavaScriptEntry(node.source.value)
     ) {
         return undefined
     }
     return node.source.value
 }
 
-/** Limits component sources to folders reachable from their facade module. */
-function isLocalFolder(folder: string): boolean {
-    return folder.startsWith('./') || folder.startsWith('../')
+/** Limits component entries to JavaScript files reachable from their facade module. */
+function isLocalJavaScriptEntry(entry: string): boolean {
+    return (entry.startsWith('./') || entry.startsWith('../')) && path.posix.extname(entry) === '.js'
 }

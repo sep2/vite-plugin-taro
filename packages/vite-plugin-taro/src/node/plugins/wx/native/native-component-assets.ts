@@ -40,6 +40,7 @@ export async function collectNativeComponentAssets(
     definition: NativeComponentSchemaDefinition
 ): Promise<NativeComponentSource> {
     await requireNativeComponentDirectory(definition.folder)
+    await requireNativeComponentEntry(definition)
 
     // This mutable accumulator is local to one traversal and avoids repeatedly copying growing asset arrays.
     const assets: NativeComponentAsset[] = []
@@ -61,6 +62,22 @@ async function requireNativeComponentDirectory(folder: string): Promise<void> {
         throw error
     }
     throw new Error(`Native component source is not a directory: ${folder}`)
+}
+
+/** Rejects a missing or non-file JavaScript entry before native output registration. */
+async function requireNativeComponentEntry(definition: NativeComponentSchemaDefinition): Promise<void> {
+    const entryPath = path.join(definition.folder, `${definition.entry}.js`)
+    try {
+        if ((await stat(entryPath)).isFile()) {
+            return
+        }
+    } catch (error) {
+        if (Error.isError(error) && 'code' in error && error.code === 'ENOENT') {
+            throw new Error(`Native component entry file does not exist: ${entryPath}`, { cause: error })
+        }
+        throw error
+    }
+    throw new Error(`Native component entry is not a file: ${entryPath}`)
 }
 
 /** Traverses entries lexically so output remains deterministic across filesystems. */

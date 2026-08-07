@@ -14,6 +14,7 @@ test('rejects a missing native component folder with its resolved path', async (
             () =>
                 collectNativeComponentAssets({
                     folder: missingDirectory,
+                    entry: 'index',
                     properties: [],
                     events: []
                 }),
@@ -24,15 +25,36 @@ test('rejects a missing native component folder with its resolved path', async (
     }
 })
 
-test('collects an opaque native folder recursively without validating its files', async () => {
+test('rejects a missing native component entry with its resolved path', async () => {
+    const sourceDirectory = await mkdtemp(path.join(tmpdir(), 'vpt-missing-native-entry-'))
+    const missingEntry = path.join(sourceDirectory, 'counter.js')
+    try {
+        await assert.rejects(
+            () =>
+                collectNativeComponentAssets({
+                    folder: sourceDirectory,
+                    entry: 'counter',
+                    properties: [],
+                    events: []
+                }),
+            new Error(`Native component entry file does not exist: ${missingEntry}`)
+        )
+    } finally {
+        await rm(sourceDirectory, { force: true, recursive: true })
+    }
+})
+
+test('collects an opaque native folder recursively without validating its companion files', async () => {
     const sourceDirectory = await mkdtemp(path.join(tmpdir(), 'vpt-native-assets-'))
     try {
         await mkdir(path.join(sourceDirectory, 'nested'))
         await writeFile(path.join(sourceDirectory, 'z.invalid-json'), '{')
         await writeFile(path.join(sourceDirectory, 'a.custom'), 'native source')
+        await writeFile(path.join(sourceDirectory, 'renderer.js'), '')
         await writeFile(path.join(sourceDirectory, 'nested', 'data.bin'), Uint8Array.from([0, 1, 2]))
         const definition: NativeComponentSchemaDefinition = {
             folder: sourceDirectory,
+            entry: 'renderer',
             properties: ['count'],
             events: ['increment']
         }
@@ -41,11 +63,11 @@ test('collects an opaque native folder recursively without validating its files'
 
         assert.deepEqual(
             source.assets.map(({ relativePath }) => relativePath),
-            ['a.custom', 'nested/data.bin', 'z.invalid-json']
+            ['a.custom', 'nested/data.bin', 'renderer.js', 'z.invalid-json']
         )
         assert.deepEqual(
             source.assets.map(({ byteLength }) => byteLength),
-            [13, 3, 1]
+            [13, 3, 0, 1]
         )
         const { assets: _assets, ...actualDefinition } = source
         assert.deepEqual(actualDefinition, definition)

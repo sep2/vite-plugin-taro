@@ -8,7 +8,7 @@ A WeChat Mini Program demo with a React/Tailwind chat shell and the native Towxm
 - `src/pages/index`: React chat page, message list, composer, request flow, and stream feeder; all UI styling uses Tailwind.
 - `src/native/towxml-adapter/towxml`: an unmodified direct copy of the upstream `pages/towxml` folder at commit
   `8708a702f7f651f0cf4f2f7a357804c62e428a81`.
-- `src/native/towxml-adapter/index.*`: a small native property/event adapter. It accumulates bounded, ordered Markdown
+- `src/native/towxml-adapter/towxml-adapter.*`: a small native property/event adapter. It accumulates bounded, ordered Markdown
   chunks inside the native layer and bridges stream state and scroll position while preserving Towxml's cross-message virtual
   rendering without changing the copied implementation.
 - `src/pages/index/towxml-message.tsx`: the typed `defineNativeComponent()` facade, loaded lazily so its native assets can

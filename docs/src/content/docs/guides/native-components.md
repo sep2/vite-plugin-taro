@@ -13,17 +13,17 @@ vpt 可以把一个微信原生自定义组件目录直接接入 React。原生�
 
 ### 1. 创建原生组件目录
 
-一个可以直接接入的目录以 `index` 为组件入口：
+创建一个以 `counter` 为入口的原生组件：
 
 ```text
 src/native/native-counter/
-├── index.js
-├── index.json
-├── index.wxml
-└── index.wxss
+├── counter.js
+├── counter.json
+├── counter.wxml
+└── counter.wxss
 ```
 
-`index.json` 声明原生组件：
+`counter.json` 声明原生组件：
 
 ```json
 {
@@ -32,7 +32,7 @@ src/native/native-counter/
 }
 ```
 
-`index.js` 定义属性并发出事件：
+`counter.js` 定义属性并发出事件：
 
 ```js
 Component({
@@ -53,7 +53,7 @@ Component({
 })
 ```
 
-`index.wxml` 正常使用微信原生模板：
+`counter.wxml` 正常使用微信原生模板：
 
 ```xml
 <view class="native-counter">
@@ -71,7 +71,7 @@ Component({
 ```tsx
 import { defineNativeComponent } from 'virtual:taro/native'
 
-export const NativeCounter = defineNativeComponent(import('../../native/native-counter'), {
+export const NativeCounter = defineNativeComponent(import('../../native/native-counter/counter.js'), {
     properties: {
         count: Number
     },
@@ -83,12 +83,12 @@ export const NativeCounter = defineNativeComponent(import('../../native/native-c
 })
 ```
 
-这里的 `import('../../native/native-counter')` 是 `defineNativeComponent()` 的**编译期目录引用**，不是运行时加载边界。目录必须是静态的相对路径。
+这里的 `import('../../native/native-counter/counter.js')` 是 `defineNativeComponent()` 的**编译期组件入口引用**，不是运行时加载边界。它必须使用静态相对路径并明确指向原生 `.js` 入口。
 
 schema 必须直接写在调用中，并同时包含 `properties` 与 `events`；没有属性或事件时也要写空对象：
 
 ```tsx
-const NativeDivider = defineNativeComponent(import('../../native/native-divider'), {
+const NativeDivider = defineNativeComponent(import('../../native/native-divider/divider.js'), {
     properties: {},
     events: {}
 })
@@ -141,7 +141,7 @@ schema 支持以下静态构造器。它只描述 React 桥接类型和生成模
 优先使用嵌套对象表达已知结构：
 
 ```tsx
-const NativeProfile = defineNativeComponent(import('../../native/native-profile'), {
+const NativeProfile = defineNativeComponent(import('../../native/native-profile/profile.js'), {
     properties: {
         profile: {
             name: String,
@@ -185,27 +185,38 @@ schema 是构建宏，不是普通运行时对象，因此有意限制为完全�
 - 两个顶层字段只能是 `properties` 和 `events`；
 - 不支持变量、函数调用、spread 或计算属性名；
 - 属性与事件不能使用同一个名称；
-- `import()` 参数必须是静态相对路径。
+- `import()` 参数必须是指向 `.js` 组件入口的静态相对路径。
 
 不符合约束时，构建会在 facade 调用位置给出错误。
 
 ## 原生目录约定
 
-`defineNativeComponent(import('./native-card'), ...)` 使用目录名 `native-card` 作为生成的原生标签名，并把组件注册到：
+`defineNativeComponent(import('./native-card/card.js'), ...)` 使用目录名 `native-card` 作为生成的原生标签名，使用入口 basename `card` 作为微信组件路径，并注册到：
 
 ```text
-/components/native-card/index
+/components/native-card/card
 ```
 
-因此需要遵守以下约定：
+入口的同名伴随文件由微信按正常规则读取：
 
-1. 传入的路径必须指向真实目录；
-2. 根目录必须包含可注册的 `index.js`、`index.json`、`index.wxml`，需要样式时再添加 `index.wxss`；
-3. 不同原生组件目录的 basename 必须在应用中保持唯一；
-4. 原生文件按原样复制，不经过 Vite 的 JavaScript、CSS 或资源转换；
-5. 原生运行时依赖应一并放入目录，并使用复制后仍然有效的相对路径。
+```text
+src/native/native-card/
+├── card.js
+├── card.json
+├── card.wxml
+└── card.wxss
+```
 
-React 导出名不需要等于目录名；真正决定原生标签与输出目录的是原生目录 basename。
+需要遵守以下规则：
+
+1. `import()` 必须明确指向真实的原生 `.js` 入口文件；
+2. `.json`、`.wxml` 和可选 `.wxss` 与入口使用相同 basename；
+3. vpt 会复制入口所在的整个目录，嵌套组件与运行时文件应放在该目录内；
+4. 不同原生组件目录的 basename 必须在应用中保持唯一；
+5. 原生文件按原样复制，不经过 Vite 的 JavaScript、CSS 或资源转换；
+6. 原生运行时依赖应使用复制后仍然有效的相对路径。
+
+React 导出名不需要等于目录名或入口名；目录 basename 决定原生标签与输出目录，入口 basename 决定 `usingComponents` 路径。
 
 ## 构建时会发生什么
 
@@ -233,7 +244,7 @@ React 导出名不需要等于目录名；真正决定原生标签与输出目�
 
 ## 与全自动分包一起使用
 
-facade 参数中的 `import()` 不会创建分包。要按需加载原生组件，应在功能入口建立正常的 JavaScript 动态导入边界，例如使用 `React.lazy()`：
+facade 参数中指向原生 `.js` 入口的 `import()` 不会创建分包。要按需加载原生组件，应在功能入口建立正常的 JavaScript 动态导入边界，例如使用 `React.lazy()`：
 
 ```tsx
 import { lazy, Suspense } from 'react'
@@ -280,13 +291,12 @@ facade 文件本身只需要被 WX 代码引用。条件语法详见[配置选�
 
 如果第三方组件已经满足以下条件，可以直接声明 facade，不需要 adapter：
 
-- 组件入口位于目录根部的 `index.*`；
+- 可以明确指向组件的 `.js` 入口，且运行文件位于同一自包含目录；
 - 所有交互都能表达为原生属性和事件；
 - 目录内依赖可以随目录一起复制。
 
 以下情况适合增加一个很薄的原生 adapter：
 
-- 第三方组件入口不是 `index.*`；
 - 第三方组件依赖同一原生 CommonJS 模块实例中的命令式状态；
 - React 需要发送命令、增量数据或桥接滚动信息；
 - 必须保持第三方目录完全不修改。
@@ -295,14 +305,14 @@ facade 文件本身只需要被 WX 代码引用。条件语法详见[配置选�
 
 ```text
 src/native/towxml-adapter/
-├── index.js       # 属性、事件和增量数据桥
-├── index.json
-├── index.wxml
-├── index.wxss
-└── towxml/        # 未修改的第三方原生目录
+├── towxml-adapter.js       # 属性、事件和增量数据桥
+├── towxml-adapter.json
+├── towxml-adapter.wxml
+├── towxml-adapter.wxss
+└── towxml/                 # 未修改的第三方原生目录
 ```
 
-React 声明的是 `towxml-adapter` facade；adapter 再通过自己的 `index.json` 和 `index.wxml` 使用内部第三方组件。
+React 声明的是 `towxml-adapter` facade；adapter 再通过自己的同名 JSON 和 WXML 使用内部第三方组件。
 
 不要从 React 直接导入第三方原生目录中的 CommonJS 状态模块。React bundle 与原生组件并不共享同一个模块执行边界，导入后得到的状态未必是原生组件正在读取的实例。用属性和事件跨越边界，adapter 内部再调用第三方原生 API。
 
@@ -320,7 +330,7 @@ React 声明的是 `towxml-adapter` facade；adapter 再通过自己的 `index.j
 更好的方式是传递有序的小块，并在原生 adapter 内累积：
 
 ```tsx
-const NativeMarkdown = defineNativeComponent(import('../../native/markdown-adapter'), {
+const NativeMarkdown = defineNativeComponent(import('../../native/markdown-adapter/markdown-adapter.js'), {
     properties: {
         chunk: {
             sequence: Number,
@@ -350,14 +360,17 @@ const NativeMarkdown = defineNativeComponent(import('../../native/markdown-adapt
 
 ### 构建提示找不到目录
 
-确认 `import()` 相对于 facade 文件，并且指向目录而不是 `index.js`：
+确认 `import()` 相对于 facade 文件，并明确指向原生 `.js` 入口：
 
 ```tsx
-// 正确
-import('../../native/native-counter')
+// 正确：任意微信组件 basename
+import('../../native/native-counter/counter.js')
 
-// 错误
-import('../../native/native-counter/index.js')
+// 另一个组件入口
+import('../../native/towxml/towxml.js')
+
+// 错误：只指向目录
+import('../../native/native-counter')
 ```
 
 ### 页面没有注册组件

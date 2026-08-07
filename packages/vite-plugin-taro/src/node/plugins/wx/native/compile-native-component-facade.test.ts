@@ -11,15 +11,17 @@ test('compiles a facade and returns watched native sources as module metadata', 
     try {
         const sourceDirectory = path.join(projectDirectory, 'native-counter')
         const sourcePath = path.join(sourceDirectory, 'component.data')
+        const entryPath = path.join(sourceDirectory, 'counter.js')
         const moduleId = path.join(projectDirectory, 'native-counter.ts')
         await mkdir(sourceDirectory)
         await writeFile(sourcePath, 'native source')
+        await writeFile(entryPath, '')
         const watchedFiles = new Set<string>()
 
         const compiled = await compileNativeComponentFacade({
             code: `
                 import { defineNativeComponent } from 'virtual:taro/native'
-                export const NativeCounter = defineNativeComponent(import('./native-counter'), {
+                export const NativeCounter = defineNativeComponent(import('./native-counter/counter.js'), {
                     properties: { count: Number },
                     events: { increment: { value: Number } }
                 })
@@ -32,7 +34,7 @@ test('compiles a facade and returns watched native sources as module metadata', 
         })
 
         assert.match(compiled.code, /NativeCounter\s*=\s*['"]native-counter['"]/)
-        assert.deepEqual(watchedFiles, new Set([sourceDirectory, sourcePath]))
+        assert.deepEqual(watchedFiles, new Set([sourceDirectory, sourcePath, entryPath]))
         assert.equal(compiled.meta[nativeComponentMetaKey].sources[0]?.assets[0]?.relativePath, 'component.data')
         assert.equal(compiled.meta[nativeComponentMetaKey].assetBytes, 13)
     } finally {

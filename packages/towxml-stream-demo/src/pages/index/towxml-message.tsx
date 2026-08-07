@@ -1,7 +1,7 @@
 import { defineNativeComponent } from 'virtual:taro/native'
 import type { AnswerMessage } from './chat-model.ts'
 
-const Towxml = defineNativeComponent(import('../../native/towxml-adapter'), {
+const Towxml = defineNativeComponent(import('../../native/towxml-adapter/towxml-adapter.js'), {
     properties: {
         towxmlId: String,
         initialMarkdown: String,
