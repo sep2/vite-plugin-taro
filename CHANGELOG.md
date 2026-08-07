@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.5.2] - 2026-08-07
+
+### Changed
+
+- unify WX stylesheet output (5100147)
+
+### Fixed
+
+- compose Taro framework APIs (c9a90a4)
+
 ## [0.5.1] - 2026-08-07
 
 ### Fixed
