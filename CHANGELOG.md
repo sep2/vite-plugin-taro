@@ -4,6 +4,20 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.5.4] - 2026-08-07
+
+### Changed
+
+- docs (86ef48f)
+- update package homepages (98e6543)
+- ci (da2789c)
+- website (6db8907)
+
+### Fixed
+
+- stabilize H5 dependency optimization (4a93f2d)
+- fix docs (a4ddc77)
+
 ## [0.5.3] - 2026-08-07
 
 ### Changed
