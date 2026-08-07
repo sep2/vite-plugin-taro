@@ -1,23 +1,66 @@
 import type { Plugin } from 'vite'
-import { resolvePackageFile } from '../../utils/packages.ts'
+import type { VitePluginTaroTarget } from '../../../options.ts'
+import { normalizeModuleId } from '../../utils/modules.ts'
+import { packageRequire, resolvePackageFile } from '../../utils/packages.ts'
 import { clientTaroNativeId } from './constant.ts'
+import { injectTaroFrameworkApis } from './inject-taro-framework-apis.ts'
 
+/*
+ * Taro API resolution uses one public facade while avoiding a recursive `@tarojs/taro` import:
+ *
+ * 1. Application imports of `virtual:taro/api` or `@tarojs/taro` resolve to the physical `api.js` facade.
+ * 2. The facade itself imports `@tarojs/taro`; its importer identifies that request as the platform implementation.
+ * 3. H5 receives `@tarojs/plugin-platform-h5` APIs, while WX receives the generic `@tarojs/taro` implementation.
+ * 4. React's framework API loader transforms the facade, assigning lifecycle hooks such as `useLaunch` to the same
+ *    platform object and exposing them as named exports.
+ *
+ * The importer-sensitive second step removes the need for another public-looking virtual module while retaining one
+ * facade object for platform APIs and framework lifecycles.
+ */
+/** Public facade used by transformed application API imports. */
 export const clientTaroApiId = 'virtual:taro/api'
+
+const clientTaroApiPath = resolvePackageFile('dist/runtime/client/taro/api.js')
+const normalizedClientTaroApiPath = normalizeModuleId(clientTaroApiPath)
+
 const clientTaroComponentId = 'virtual:taro/components'
+
 const clientTaroModules = new Map([
-    [clientTaroApiId, resolvePackageFile('dist/runtime/client/taro/api.js')],
+    [clientTaroApiId, clientTaroApiPath],
     [clientTaroComponentId, resolvePackageFile('dist/runtime/client/taro/component.js')],
     [clientTaroNativeId, resolvePackageFile('dist/runtime/client/taro/define-native-component.js')]
 ])
 
-/** Creates the target-neutral Taro facade plugin. */
-export function createClientTaroPlugin(): Plugin {
+/** Creates the shared Taro facade backed by the selected target's API implementation. */
+export function createClientTaroPlugin(target: VitePluginTaroTarget): Plugin {
+    const platformTaroPath = resolvePlatformTaroPath(target)
+
     return {
         name: 'vpt:client-taro',
         enforce: 'pre',
 
-        resolveId(id) {
+        resolveId(id, importer) {
+            if (id === '@tarojs/taro') {
+                return isClientTaroFacade(importer) ? platformTaroPath : clientTaroApiPath
+            }
             return clientTaroModules.get(id)
+        },
+
+        // Taro's framework loader transforms source code, so apply it only to the shared physical facade.
+        transform(code, id) {
+            if (normalizeModuleId(id) === normalizedClientTaroApiPath) {
+                return injectTaroFrameworkApis(code)
+            }
         }
     }
+}
+
+function resolvePlatformTaroPath(target: VitePluginTaroTarget): string {
+    return target === 'h5'
+        ? packageRequire.resolve('@tarojs/plugin-platform-h5/dist/runtime/apis')
+        : packageRequire.resolve('@tarojs/taro')
+}
+
+function isClientTaroFacade(importer: string | undefined): boolean {
+    return importer !== undefined && normalizeModuleId(importer) === normalizedClientTaroApiPath
 }

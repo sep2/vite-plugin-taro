@@ -11,7 +11,7 @@ import { createWxTargetPlugins } from './plugins/wx/plugins.ts'
 export default function vitePluginTaro(options: VitePluginTaroOptions): PluginOption[] {
     return [
         createConditionalDirectivePlugin(options.target),
-        createClientTaroPlugin(),
+        createClientTaroPlugin(options.target),
         ...createCssPlugins(options.target),
         ...react(),
         ...(options.target === 'wx' ? createWxTargetPlugins(options) : []),

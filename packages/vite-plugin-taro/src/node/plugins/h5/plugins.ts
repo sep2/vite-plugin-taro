@@ -41,10 +41,6 @@ function createH5TargetPlugin(options: VitePluginTaroOptions): Plugin {
                         {
                             find: /^@tarojs\/components\/dist\/components$/,
                             replacement: packageRequire.resolve('@tarojs/components/dist/components')
-                        },
-                        {
-                            find: /^@tarojs\/taro$/,
-                            replacement: packageRequire.resolve('@tarojs/plugin-platform-h5/dist/runtime/apis')
                         }
                     ]
                 },
