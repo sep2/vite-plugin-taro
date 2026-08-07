@@ -58,12 +58,12 @@ test('supports local TypeScript interface declarations', () => {
     assert.deepEqual(definitions[0]?.fields, ['value', 'onChange'])
 })
 
-test('replaces interface calls with native tag strings and removes only the macro import', () => {
+test('replaces interface calls while preserving unrelated source', () => {
     const transformed = transformNativeComponentInterfaces(
         `
             import { defineNativeComponent as defineNative } from 'virtual:taro/native'
 
-            const untouched = 1
+            const untouched = '😀'
             export const NativeCounter = defineNative<{
                 count: number
                 onIncrement?: (event: { detail: { value: number } }) => void
@@ -75,6 +75,8 @@ test('replaces interface calls with native tag strings and removes only the macr
     )
 
     assert.match(transformed.code, /NativeCounter\s*=\s*['"]native-counter['"]/)
+    assert.match(transformed.code, /const untouched = '😀'/)
+    assert.match(transformed.code, /console\.log\(untouched\)/)
     assert.doesNotMatch(transformed.code, /defineNativeComponent|defineNative|onIncrement/)
     assert.doesNotMatch(transformed.code, /virtual:taro\/native/)
     assert.deepEqual(transformed.definitions[0], {
@@ -82,6 +84,19 @@ test('replaces interface calls with native tag strings and removes only the macr
         entry: 'index',
         fields: ['count', 'onIncrement']
     })
+})
+
+test('generates a source map for native interface edits', () => {
+    const source = `
+        import { defineNativeComponent } from 'virtual:taro/native'
+        export const NativeDivider = defineNativeComponent(() => import('./native-divider/divider.js'))
+    `
+    const transformed = transformNativeComponentInterfaces(source, moduleId, true)
+
+    assert.equal(transformed.map?.version, 3)
+    assert.deepEqual(transformed.map?.sources, [moduleId])
+    assert.deepEqual(transformed.map?.sourcesContent, [source])
+    assert.notEqual(transformed.map?.mappings, '')
 })
 
 test('supports native components without fields', () => {
