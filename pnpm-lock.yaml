@@ -14,9 +14,6 @@ importers:
 
   .:
     devDependencies:
-      '@babel/core':
-        specifier: ^7.29.7
-        version: 7.29.7
       '@biomejs/biome':
         specifier: ^2.5.3
         version: 2.5.3
