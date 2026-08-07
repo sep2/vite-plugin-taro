@@ -146,26 +146,85 @@ import { Slot, Text } from 'virtual:taro/components'
 
 ## 全自动分包
 
-vpt 只输出实际使用的原生组件。原生文件会跟随使用该接口的代码进入主包或自动分包。
+vpt 只输出实际使用的原生组件，并将其资源纳入主包和分包的位置规划。
 
-`defineNativeComponent()` 中的 `() => import(...)` 不会创建分包。需要按需加载时，使用普通的动态导入：
+`defineNativeComponent()` 及其接口文件会被编译为空，其中的 `import()` 只用于定位原生入口，不会创建分包。`React.lazy()` 需要运行时组件，因此按需加载时要增加一个普通 React 包装组件：
+
+```text
+src/pages/counter/
+├── native-counter.tsx
+├── native-counter-wrap.tsx
+└── page.tsx
+```
+
+`native-counter.tsx` 只声明原生组件接口：
 
 ```tsx
-import { lazy, Suspense } from 'react'
-import { Text } from 'virtual:taro/components'
+// src/pages/counter/native-counter.tsx
+import {
+    defineNativeComponent,
+    type NativeComponentEvent
+} from 'virtual:taro/native'
 
-const NativeCounterDemo = lazy(() => import('./native-counter-demo.tsx'))
+type NativeCounterProps = {
+    count: number
+    onIncrement?: (event: NativeComponentEvent<{ value: number }>) => void
+}
 
-export default function Index() {
+export const NativeCounter = defineNativeComponent<NativeCounterProps>(
+    () => import('../../native-counter/counter.js')
+)
+```
+
+`native-counter-wrap.tsx` 提供运行时组件：
+
+```tsx
+// src/pages/counter/native-counter-wrap.tsx
+import { useState } from 'react'
+import { NativeCounter } from './native-counter.tsx'
+
+export default function NativeCounterWrap() {
+    const [count, setCount] = useState(0)
+
     return (
-        <Suspense fallback={<Text>Loading…</Text>}>
-            <NativeCounterDemo />
-        </Suspense>
+        <NativeCounter
+            count={count}
+            onIncrement={(event) => {
+                setCount(event.detail.value)
+            }}
+        />
     )
 }
 ```
 
-`native-counter-demo.tsx` 再导入 `NativeCounter`。完整规则参见[全自动分包](/guides/automatic-subpackages/)。
+`page.tsx` 动态导入包装组件：
+
+```tsx
+// src/pages/counter/page.tsx
+import { lazy, Suspense, useState } from 'react'
+import { Button, Text } from 'virtual:taro/components'
+
+const NativeCounterWrap = lazy(() => import('./native-counter-wrap.tsx'))
+
+export default function Page() {
+    const [visible, setVisible] = useState(false)
+
+    return (
+        <>
+            <Button onClick={() => setVisible(true)}>打开原生计数器</Button>
+            {visible ? (
+                <Suspense fallback={<Text>加载中…</Text>}>
+                    <NativeCounterWrap />
+                </Suspense>
+            ) : null}
+        </>
+    )
+}
+```
+
+首次渲染 `NativeCounterWrap` 时会触发动态导入，包装组件及其使用的原生资源随之参与全自动位置规划。
+
+完整规划规则参见[全自动分包](/guides/automatic-subpackages/)。
 
 ## 同时构建微信 与 Web
 
