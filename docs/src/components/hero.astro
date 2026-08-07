@@ -1,17 +1,25 @@
 ---
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
 import { Code, LinkButton, TabItem, Tabs } from '@astrojs/starlight/components'
+import pluginPackage from '../../../packages/vite-plugin-taro/package.json'
 
 const { data } = Astro.locals.starlightRoute.entry
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
 const { title = data.title, tagline, image, actions = [] } = data.hero ?? {}
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
 const rawHtml = image && 'html' in image ? image.html : undefined
+const latestVersion = pluginPackage.version
+// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
+const latestPackageUrl = `https://www.npmjs.com/package/${pluginPackage.name}/v/${latestVersion}`
 ---
 
 <div class="hero">
     <div class="sl-flex stack">
         <div class="sl-flex copy">
+            <a class="latest-version" href={latestPackageUrl} target="_blank" rel="noopener noreferrer">
+                <span>最新版本</span>
+                <strong>v{latestVersion}</strong>
+            </a>
             <h1 id="_top" data-page-title set:html={title} />
             {tagline && <div class="tagline" set:html={tagline} />}
         </div>
@@ -69,6 +77,38 @@ const rawHtml = image && 'html' in image ? image.html : undefined
 
         .copy > * {
             max-width: 50ch;
+        }
+
+        .latest-version {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.3rem 0.65rem;
+            border: 1px solid var(--sl-color-hairline-light);
+            border-radius: 999px;
+            background: var(--sl-color-bg-nav);
+            color: var(--sl-color-gray-2);
+            font-size: var(--sl-text-sm);
+            line-height: 1;
+            text-decoration: none;
+            transition:
+                border-color 160ms ease,
+                color 160ms ease;
+        }
+
+        .latest-version strong {
+            color: var(--sl-color-accent);
+            font-weight: 600;
+        }
+
+        .latest-version:hover {
+            border-color: var(--sl-color-accent);
+            color: var(--sl-color-white);
+        }
+
+        .latest-version:focus-visible {
+            outline: 2px solid var(--sl-color-accent-high);
+            outline-offset: 2px;
         }
 
         h1 {
