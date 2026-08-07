@@ -160,7 +160,6 @@ src/pages/counter/
 
 ```tsx
 // src/pages/counter/native-counter.tsx
-import { useState } from 'react'
 import {
     defineNativeComponent,
     type NativeComponentEvent
@@ -171,21 +170,14 @@ type NativeCounterElementProps = {
     onIncrement?: (event: NativeComponentEvent<{ value: number }>) => void
 }
 
+// 这是编译时接口，会被编译器消除
 const NativeCounterElement = defineNativeComponent<NativeCounterElementProps>(
     () => import('../../native-counter/counter.js')
 )
 
-export default function NativeCounter() {
-    const [count, setCount] = useState(0)
-
-    return (
-        <NativeCounterElement
-            count={count}
-            onIncrement={(event) => {
-                setCount(event.detail.value)
-            }}
-        />
-    )
+// 这是运行时实际存在、供 React.lazy() 加载的组件
+export default function NativeCounter(props: NativeCounterElementProps) {
+    return <NativeCounterElement {...props} />
 }
 ```
 
@@ -200,13 +192,19 @@ const NativeCounter = lazy(() => import('./native-counter.tsx'))
 
 export default function Page() {
     const [visible, setVisible] = useState(false)
+    const [count, setCount] = useState(0)
 
     return (
         <>
             <Button onClick={() => setVisible(true)}>打开原生计数器</Button>
             {visible ? (
                 <Suspense fallback={<Text>加载中…</Text>}>
-                    <NativeCounter />
+                    <NativeCounter
+                        count={count}
+                        onIncrement={(event) => {
+                            setCount(event.detail.value)
+                        }}
+                    />
                 </Suspense>
             ) : null}
         </>
