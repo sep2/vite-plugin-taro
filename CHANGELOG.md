@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.4.1] - 2026-08-07
+
+### Fixed
+
+- fix windows build (4cd3719)
+
 ## [0.4.0] - 2026-08-07
 
 ### Added
