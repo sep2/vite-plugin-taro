@@ -29,7 +29,7 @@ export const NativeCounter = defineNativeComponent<NativeCounterProps>(
 )
 ```
 
-`() => import(...)` 只是供编译器识别原生组件入口的标记，不会导入原生代码。事实上，此文件会被编译器完全移除。
+`() => import(...)` 只是供编译器识别原生组件入口的标记，不会导入原生代码。`defineNativeComponent()` 调用会在编译时被消除，文件中的其他代码不受影响。
 
 此文件可以放在任意位置，在 React 中使用这个接口即可：
 
@@ -148,46 +148,38 @@ import { Slot, Text } from 'virtual:taro/components'
 
 vpt 只输出实际使用的原生组件，并将其资源纳入主包和分包的位置规划。
 
-`defineNativeComponent()` 及其接口文件会被编译为空，其中的 `import()` 只用于定位原生入口，不会创建分包。`React.lazy()` 需要运行时组件，因此按需加载时要增加一个普通 React 包装组件：
+`defineNativeComponent()` 会被编译器消除，不会生成可供 `React.lazy()` 加载的运行时组件；其中的 `import()` 只用于定位原生入口，也不会创建分包。按需加载时，在同一文件中默认导出一个普通 React 组件：
 
 ```text
 src/pages/counter/
 ├── native-counter.tsx
-├── native-counter-wrap.tsx
 └── page.tsx
 ```
 
-`native-counter.tsx` 只声明原生组件接口：
+`native-counter.tsx` 同时声明原生接口和运行时组件：
 
 ```tsx
 // src/pages/counter/native-counter.tsx
+import { useState } from 'react'
 import {
     defineNativeComponent,
     type NativeComponentEvent
 } from 'virtual:taro/native'
 
-type NativeCounterProps = {
+type NativeCounterElementProps = {
     count: number
     onIncrement?: (event: NativeComponentEvent<{ value: number }>) => void
 }
 
-export const NativeCounter = defineNativeComponent<NativeCounterProps>(
+const NativeCounterElement = defineNativeComponent<NativeCounterElementProps>(
     () => import('../../native-counter/counter.js')
 )
-```
 
-`native-counter-wrap.tsx` 提供运行时组件：
-
-```tsx
-// src/pages/counter/native-counter-wrap.tsx
-import { useState } from 'react'
-import { NativeCounter } from './native-counter.tsx'
-
-export default function NativeCounterWrap() {
+export default function NativeCounter() {
     const [count, setCount] = useState(0)
 
     return (
-        <NativeCounter
+        <NativeCounterElement
             count={count}
             onIncrement={(event) => {
                 setCount(event.detail.value)
@@ -197,14 +189,14 @@ export default function NativeCounterWrap() {
 }
 ```
 
-`page.tsx` 动态导入包装组件：
+`page.tsx` 动态导入默认导出的 React 组件：
 
 ```tsx
 // src/pages/counter/page.tsx
 import { lazy, Suspense, useState } from 'react'
 import { Button, Text } from 'virtual:taro/components'
 
-const NativeCounterWrap = lazy(() => import('./native-counter-wrap.tsx'))
+const NativeCounter = lazy(() => import('./native-counter.tsx'))
 
 export default function Page() {
     const [visible, setVisible] = useState(false)
@@ -214,7 +206,7 @@ export default function Page() {
             <Button onClick={() => setVisible(true)}>打开原生计数器</Button>
             {visible ? (
                 <Suspense fallback={<Text>加载中…</Text>}>
-                    <NativeCounterWrap />
+                    <NativeCounter />
                 </Suspense>
             ) : null}
         </>
@@ -222,7 +214,7 @@ export default function Page() {
 }
 ```
 
-首次渲染 `NativeCounterWrap` 时会触发动态导入，包装组件及其使用的原生资源随之参与全自动位置规划。
+首次渲染 `NativeCounter` 时会触发动态导入，React 组件及其使用的原生资源随之参与全自动位置规划。
 
 完整规划规则参见[全自动分包](/guides/automatic-subpackages/)。
 
