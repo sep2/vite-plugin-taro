@@ -1,5 +1,3 @@
-import type { types as BabelTypes } from '@babel/core'
-import { type NodePath, type PluginObj, types } from '@babel/core'
 import babel from '@rolldown/plugin-babel'
 import type { HtmlTagDescriptor, Plugin, PluginOption } from 'vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
@@ -8,6 +6,7 @@ import { toViteFileImportPath } from '../../utils/modules.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { clientTaroApiId } from '../client/client-taro.ts'
 import { h5AppPath } from './constant.ts'
+import { createStencilClientAdapter } from './create-stencil-client-adapter.ts'
 import { createModuleResolver } from './resolver/module-resolver.ts'
 
 /** Creates the plugins that own the H5 target. */
@@ -29,12 +28,6 @@ function createH5TargetPlugin(options: VitePluginTaroOptions): Plugin {
                     mainFields: ['main:h5', 'browser', 'module', 'jsnext:main', 'jsnext'],
                     alias: [
                         {
-                            find: /^@stencil\/core\/internal\/client$/,
-                            replacement: packageRequire.resolve('@stencil/core/internal/client', {
-                                paths: [packageRequire.resolve('@tarojs/components/package.json')]
-                            })
-                        },
-                        {
                             find: /^@tarojs\/components$/,
                             replacement: packageRequire.resolve('@tarojs/components/lib/react')
                         },
@@ -45,7 +38,15 @@ function createH5TargetPlugin(options: VitePluginTaroOptions): Plugin {
                     ]
                 },
                 optimizeDeps: {
-                    exclude: ['@stencil/core/internal/client']
+                    // The compiler-owned H5 app and Taro facade are injected after Vite's initial HTML scan. Prebundle
+                    // the facade's platform backend as one boundary so its CommonJS implementation details receive
+                    // interop without duplicating their package list. ReactDOM needs the same treatment for the H5 app.
+                    include: ['@tarojs/plugin-platform-h5/dist/runtime/apis', 'react-dom/client'],
+                    // Dependency optimization is its own Rolldown build and does not run application transform plugins.
+                    // Register the same adapter there so optimized Taro components cannot embed Stencil's original client.
+                    rolldownOptions: {
+                        plugins: [createStencilClientAdapter()]
+                    }
                 },
                 build: {
                     target: esTarget
@@ -101,11 +102,7 @@ function createH5IndexHtmlTags(): HtmlTagDescriptor[] {
 /** Creates H5-only Babel transforms for Stencil CSS ordering and Taro API imports. */
 function createH5SupportPlugins(): PluginOption[] {
     return [
-        babel({
-            include: /[\\/]@stencil[\\/]core[\\/]internal[\\/]client[\\/]index\.js(?:\?.*)?$/,
-            exclude: [],
-            plugins: [rewriteStencilStyleInsertion]
-        }),
+        createStencilClientAdapter(),
         babel({
             plugins: [
                 [
@@ -120,64 +117,6 @@ function createH5SupportPlugins(): PluginOption[] {
             ]
         })
     ]
-}
-
-/** Keeps Stencil-injected Taro component styles before application stylesheets. */
-function rewriteStencilStyleInsertion(): PluginObj {
-    return {
-        name: 'vpt:rewrite-stencil-style-insertion',
-        visitor: {
-            CallExpression(callPath) {
-                if (!isStencilStyleInsertBeforeCall(callPath)) {
-                    return
-                }
-
-                callPath
-                    .get('arguments.1')
-                    .replaceWith(
-                        types.conditionalExpression(
-                            types.callExpression(
-                                types.memberExpression(types.identifier('scopeId'), types.identifier('startsWith')),
-                                [types.stringLiteral('sc-taro-')]
-                            ),
-                            createStyleQuery('style,link[rel="stylesheet"]'),
-                            createStyleQuery('link')
-                        )
-                    )
-            }
-        }
-    }
-}
-
-/** Identifies Stencil's default component-style insertion call. */
-function isStencilStyleInsertBeforeCall(callPath: NodePath<BabelTypes.CallExpression>): boolean {
-    const { callee, arguments: callArguments } = callPath.node
-    return (
-        types.isMemberExpression(callee) &&
-        types.isIdentifier(callee.object, { name: 'styleContainerNode' }) &&
-        types.isIdentifier(callee.property, { name: 'insertBefore' }) &&
-        types.isIdentifier(callArguments[0], { name: 'styleElm' }) &&
-        isStyleQuery(callArguments[1], 'link')
-    )
-}
-
-/** Identifies one style-container querySelector call. */
-function isStyleQuery(node: BabelTypes.Node | null | undefined, selector: string): boolean {
-    return (
-        types.isCallExpression(node) &&
-        types.isMemberExpression(node.callee) &&
-        types.isIdentifier(node.callee.object, { name: 'styleContainerNode' }) &&
-        types.isIdentifier(node.callee.property, { name: 'querySelector' }) &&
-        types.isStringLiteral(node.arguments[0], { value: selector })
-    )
-}
-
-/** Creates one style-container querySelector call. */
-function createStyleQuery(selector: string): ReturnType<typeof types.callExpression> {
-    return types.callExpression(
-        types.memberExpression(types.identifier('styleContainerNode'), types.identifier('querySelector')),
-        [types.stringLiteral(selector)]
-    )
 }
 
 /** Creates H5 Taro compile-time constants. */

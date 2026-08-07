@@ -1,7 +1,7 @@
 import type { Plugin } from 'vite'
 import type { VitePluginTaroTarget } from '../../../options.ts'
 import { normalizeModuleId } from '../../utils/modules.ts'
-import { packageRequire, resolvePackageFile } from '../../utils/packages.ts'
+import { resolvePackageFile } from '../../utils/packages.ts'
 import { clientTaroNativeId } from './constant.ts'
 import { injectTaroFrameworkApis } from './inject-taro-framework-apis.ts'
 
@@ -33,15 +33,22 @@ const clientTaroModules = new Map([
 
 /** Creates the shared Taro facade backed by the selected target's API implementation. */
 export function createClientTaroPlugin(target: VitePluginTaroTarget): Plugin {
-    const platformTaroPath = resolvePlatformTaroPath(target)
+    const platformTaroId = resolvePlatformTaroId(target)
 
     return {
         name: 'vpt:client-taro',
         enforce: 'pre',
 
-        resolveId(id, importer) {
+        async resolveId(id, importer) {
             if (id === '@tarojs/taro') {
-                return isClientTaroFacade(importer) ? platformTaroPath : clientTaroApiPath
+                if (!isClientTaroFacade(importer)) {
+                    return clientTaroApiPath
+                }
+
+                // Delegate the platform backend to Vite instead of returning an absolute dependency path. H5 marks this
+                // backend as an optimization root, so delegation lets Vite substitute its prebundled facade. Removing it
+                // bypasses CommonJS interop and exposes backend details such as base64-js directly to the browser.
+                return this.resolve(platformTaroId, importer, { skipSelf: true })
             }
             return clientTaroModules.get(id)
         },
@@ -55,10 +62,8 @@ export function createClientTaroPlugin(target: VitePluginTaroTarget): Plugin {
     }
 }
 
-function resolvePlatformTaroPath(target: VitePluginTaroTarget): string {
-    return target === 'h5'
-        ? packageRequire.resolve('@tarojs/plugin-platform-h5/dist/runtime/apis')
-        : packageRequire.resolve('@tarojs/taro')
+function resolvePlatformTaroId(target: VitePluginTaroTarget): string {
+    return target === 'h5' ? '@tarojs/plugin-platform-h5/dist/runtime/apis' : '@tarojs/taro'
 }
 
 function isClientTaroFacade(importer: string | undefined): boolean {

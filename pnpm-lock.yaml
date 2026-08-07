@@ -191,31 +191,31 @@ importers:
         specifier: 0.2.0
         version: 0.2.0(tailwindcss@4.3.3)
       '@tarojs/components':
-        specifier: ^4.2.0
+        specifier: 4.2.0
         version: 4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.25)
       '@tarojs/helper':
-        specifier: ^4.2.0
+        specifier: 4.2.0
         version: 4.2.0
       '@tarojs/plugin-framework-react':
         specifier: workspace:vite-plugin-taro-plugin-framework-react@*
         version: link:../taro-plugin-framework-react
       '@tarojs/plugin-platform-h5':
-        specifier: ^4.2.0
+        specifier: 4.2.0
         version: 4.2.0(@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.25))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.25))(@types/react@19.2.17)(postcss@8.5.25)(react@19.2.7)(solid-js@1.9.13)
       '@tarojs/plugin-platform-weapp':
-        specifier: ^4.2.0
+        specifier: 4.2.0
         version: 4.2.0(@tarojs/service@4.2.0)(@tarojs/shared@4.2.0)
       '@tarojs/react':
         specifier: workspace:vite-plugin-taro-react@*
         version: link:../taro-react
       '@tarojs/router':
-        specifier: ^4.2.0
+        specifier: 4.2.0
         version: 4.2.0(@tarojs/runtime@4.2.0)(@tarojs/shared@4.2.0)(@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.25))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.25))
       '@tarojs/runtime':
-        specifier: ^4.2.0
+        specifier: 4.2.0
         version: 4.2.0
       '@tarojs/taro':
-        specifier: ^4.2.0
+        specifier: 4.2.0
         version: 4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.25))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.25)
       '@vitejs/plugin-react':
         specifier: ^6.0.5
@@ -224,7 +224,7 @@ importers:
         specifier: 3.2.8
         version: 3.2.8(jiti@2.7.0)(tailwindcss@4.3.3)(yaml@2.9.0)
       babel-plugin-transform-taroapi:
-        specifier: ^4.2.0
+        specifier: 4.2.0
         version: 4.2.0(@babel/core@7.29.7)
       picocolors:
         specifier: ^1.1.1
