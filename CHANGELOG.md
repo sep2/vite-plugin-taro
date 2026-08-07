@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.5.0] - 2026-08-07
+
+### Changed
+
+- docs (5b706bb)
+
+### Fixed
+
+- fix rolldown (fe303a4)
+
 ## [0.4.2] - 2026-08-07
 
 ### Fixed
