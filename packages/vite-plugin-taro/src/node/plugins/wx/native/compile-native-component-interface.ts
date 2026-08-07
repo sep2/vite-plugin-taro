@@ -1,10 +1,10 @@
 import path from 'node:path'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { collectNativeComponentAssets, nativeComponentMetaKey } from './native-component-assets.ts'
-import { transformNativeComponentFacades } from './native-component-schema.ts'
+import { transformNativeComponentInterfaces } from './native-component-interface.ts'
 
-/** Compiles one facade module and attaches its opaque native sources to Rolldown metadata. */
-export async function compileNativeComponentFacade({
+/** Compiles one JSX interface module and attaches its opaque native sources to Rolldown metadata. */
+export async function compileNativeComponentInterface({
     code,
     id,
     sourcemap,
@@ -15,11 +15,11 @@ export async function compileNativeComponentFacade({
     sourcemap: boolean
     addWatchFile: (file: string) => void
 }) {
-    const transformed = transformNativeComponentFacades(code, id, sourcemap)
-    const facadePath = normalizeModuleId(id)
+    const transformed = transformNativeComponentInterfaces(code, id, sourcemap)
+    const interfacePath = normalizeModuleId(id)
 
     const nativeComponents = await Promise.all(
-        transformed.definitions.map((definition) => collectNativeComponentAssets(definition, facadePath))
+        transformed.definitions.map((definition) => collectNativeComponentAssets(definition, interfacePath))
     )
 
     nativeComponents.forEach((source) => {

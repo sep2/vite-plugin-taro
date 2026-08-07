@@ -4,7 +4,7 @@ import type { Rolldown } from 'vite'
 import { isGeneratedSubpackageFile } from '../placement/plan.ts'
 import { getNativeComponentSources } from './native-component-assets.ts'
 
-/** Creates opaque native files and their registrations from each surviving facade module. */
+/** Creates opaque native files and their registrations from each surviving JSX interface module. */
 export async function createNativeComponentOutput({
     bundle,
     getModuleInfo
@@ -18,8 +18,7 @@ export async function createNativeComponentOutput({
     const registrations: {
         name: string
         componentPath: string
-        properties: readonly string[]
-        events: readonly string[]
+        fields: readonly string[]
     }[] = []
 
     for (const output of Object.values(bundle)) {
@@ -40,8 +39,7 @@ export async function createNativeComponentOutput({
                 registrations.push({
                     name,
                     componentPath: `/${path.posix.join(outputFolder, source.entry)}`,
-                    properties: source.properties,
-                    events: source.events
+                    fields: source.fields
                 })
 
                 for (const asset of source.assets) {

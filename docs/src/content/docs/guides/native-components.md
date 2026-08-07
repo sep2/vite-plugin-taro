@@ -13,25 +13,24 @@ description: 在 React 中类型安全地使用微信原生组件，并让原生
 
 假设原生组件入口是 `src/native-counter/counter.js`：
 
-先为它定义一个 JSX 接口：
+先为它定义一个 TypeScript 接口：
 
 ```tsx
 // src/components/native-counter.tsx
-import { defineNativeComponent } from 'virtual:taro/native'
+import {
+    defineNativeComponent,
+    type NativeComponentEvent
+} from 'virtual:taro/native'
 
-export const NativeCounter = defineNativeComponent(
+type NativeCounterProps = {
+    count: number
+    onIncrement?: (event: NativeComponentEvent<{ value: number }>) => void
+}
+
+export const NativeCounter = defineNativeComponent<NativeCounterProps>(
     // 路径相对于当前文件，并指向原生组件的 .js 入口
-    () => import('../native-counter/counter.js'),
-{
-    properties: {
-        count: Number
-    },
-    events: {
-        increment: {
-            value: Number
-        }
-    }
-})
+    () => import('../native-counter/counter.js')
+)
 ```
 
 此文件可以放在任意位置。`() => import(...)` 只是供编译器识别原生组件入口的标记，不会导入原生代码。事实上，此文件会被编译器完全移除。
@@ -87,55 +86,35 @@ vpt 会递归复制目录中的文件并保留相对路径。WXS、图片、字�
 - 原生文件不会经过 Vite 转换，因此不能使用 Vite alias；
 - 每个原生组件的目录名必须唯一。
 
-## Schema 与类型
+## TypeScript 类型
 
-`properties` 定义 React props，`events` 定义事件：
+TypeScript 接口描述可以在 JSX 中传入的属性和事件：
 
 ```tsx
-export const NativeProfile = defineNativeComponent(
-    () => import('../native-profile/profile.js'),
-{
-    properties: {
-        profile: {
-            name: String,
-            age: Number,
-            verified: Boolean
-        }
-    },
-    events: {
-        select: {
-            id: String
-        }
-    }
-})
+import type { NativeComponentEvent } from 'virtual:taro/native'
+import type { Profile } from './profile.ts'
+
+type NativeProfileProps = {
+    profile: Profile
+    onSelect?: (event: NativeComponentEvent<{ id: string }>) => void
+}
+
+export const NativeProfile = defineNativeComponent<NativeProfileProps>(
+    () => import('../native-profile/profile.js')
+)
 ```
 
-| Schema | React 类型 |
-| --- | --- |
-| `String` | `string` |
-| `Number` | `number` |
-| `Boolean` | `boolean` |
-| `Object` | `Readonly<Record<string, unknown>>` |
-| `Array` | `readonly unknown[]` |
-| 嵌套对象 | 对应的精确对象类型 |
+是否必填由 TypeScript 接口决定：没有 `?` 的属性必填，带 `?` 的属性可选。字段可以使用任意 TypeScript 类型，包括导入的类型。类型声明必须与 `defineNativeComponent()` 位于同一个文件，以便编译器生成原生模板。
 
-schema 必须直接写在调用中：
+普通字段对应原生 `properties`。`onSelect` 对应 `triggerEvent('select')`，事件数据位于 `event.detail`。
 
-- 同时提供 `properties` 和 `events`；
-- 没有字段时使用空对象；
-- 不使用变量、函数调用、spread 或计算属性名；
-- 属性和事件不能同名。
+没有字段时不需要声明类型：
 
 ```tsx
 export const NativeDivider = defineNativeComponent(
-    () => import('../native-divider/divider.js'),
-{
-    properties: {},
-    events: {}
-})
+    () => import('../native-divider/divider.js')
+)
 ```
-
-原生组件中的 `properties` 和 `triggerEvent()` 名称必须与 schema 一致。
 
 ## 使用 Slot
 
@@ -268,7 +247,7 @@ React 和原生组件不共享 CommonJS 模块实例。使用属性和事件通�
 
 ### 属性或事件没有传递
 
-确认原生 `properties`、`triggerEvent()` 名称与 schema 一致。
+确认原生 `properties`、`triggerEvent()` 名称与 TypeScript 字段一致。
 
 ### 原生组件内部找不到文件
 

@@ -5,7 +5,7 @@ import { packageRequire } from '../../utils/packages.ts'
 import { clientTaroNativeId } from '../client/constant.ts'
 import { createWxDevelopmentPlugin } from './dev/plugin.ts'
 import { getWxExecutionKind, isTransportModule } from './module.ts'
-import { compileNativeComponentFacade } from './native/compile-native-component-facade.ts'
+import { compileNativeComponentInterface } from './native/compile-native-component-interface.ts'
 import { getNativeComponentAssetBytes } from './native/native-component-assets.ts'
 import { createOutputFiles } from './output/files.ts'
 import { createPlacer } from './placement/placer.ts'
@@ -74,7 +74,7 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
                 const sourcemap = Boolean(this.environment.config.build.sourcemap)
 
                 if (code.includes(clientTaroNativeId)) {
-                    return compileNativeComponentFacade({
+                    return compileNativeComponentInterface({
                         code,
                         id,
                         sourcemap,

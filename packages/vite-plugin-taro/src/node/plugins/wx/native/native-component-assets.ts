@@ -2,7 +2,7 @@ import { readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import type { Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
-import type { NativeComponentSchemaDefinition } from './native-component-schema.ts'
+import type { NativeComponentDefinition } from './native-component-interface.ts'
 
 type NativeComponentAsset = {
     relativePath: string
@@ -11,7 +11,7 @@ type NativeComponentAsset = {
 
 export const nativeComponentMetaKey = 'vite-plugin-taro:native-components'
 
-type NativeComponentSource = NativeComponentSchemaDefinition & {
+type NativeComponentSource = NativeComponentDefinition & {
     assets: readonly NativeComponentAsset[]
 }
 
@@ -31,22 +31,22 @@ export function getNativeComponentAssetBytes(meta: Rolldown.CustomPluginOptions 
     return meta?.[nativeComponentMetaKey]?.assetBytes ?? 0
 }
 
-/** Reads native sources attached to one transformed facade module. */
+/** Reads native sources attached to one transformed JSX interface module. */
 export function getNativeComponentSources(meta: Rolldown.CustomPluginOptions | undefined) {
     return meta?.[nativeComponentMetaKey]?.sources ?? []
 }
 
-/** Collects a native component folder as opaque, recursively ordered assets without copying its facade module. */
+/** Collects a native component folder as opaque, recursively ordered assets without copying its interface module. */
 export async function collectNativeComponentAssets(
-    definition: NativeComponentSchemaDefinition,
-    facadePath: string
+    definition: NativeComponentDefinition,
+    interfacePath: string
 ): Promise<NativeComponentSource> {
     await requireNativeComponentDirectory(definition.folder)
     await requireNativeComponentEntry(definition)
 
     // This mutable accumulator is local to one traversal and avoids repeatedly copying growing asset arrays.
     const assets: NativeComponentAsset[] = []
-    await collectDirectory(definition.folder, [], assets, normalizeModuleId(facadePath))
+    await collectDirectory(definition.folder, [], assets, normalizeModuleId(interfacePath))
 
     return { ...definition, assets }
 }
@@ -67,7 +67,7 @@ async function requireNativeComponentDirectory(folder: string): Promise<void> {
 }
 
 /** Rejects a missing or non-file JavaScript entry before native output registration. */
-async function requireNativeComponentEntry(definition: NativeComponentSchemaDefinition): Promise<void> {
+async function requireNativeComponentEntry(definition: NativeComponentDefinition): Promise<void> {
     const entryPath = path.join(definition.folder, `${definition.entry}.js`)
     try {
         if ((await stat(entryPath)).isFile()) {
@@ -87,7 +87,7 @@ async function collectDirectory(
     folder: string,
     segments: readonly string[],
     assets: NativeComponentAsset[],
-    facadePath: string
+    interfacePath: string
 ): Promise<void> {
     const directory = path.join(folder, ...segments)
     const entries = await readdir(directory, { withFileTypes: true })
@@ -96,14 +96,14 @@ async function collectDirectory(
     for (const entry of entries) {
         const entrySegments = [...segments, entry.name]
         if (entry.isDirectory()) {
-            await collectDirectory(folder, entrySegments, assets, facadePath)
+            await collectDirectory(folder, entrySegments, assets, interfacePath)
             continue
         }
         if (!entry.isFile()) {
             continue
         }
         const sourcePath = path.join(folder, ...entrySegments)
-        if (normalizeModuleId(sourcePath) === facadePath) {
+        if (normalizeModuleId(sourcePath) === interfacePath) {
             continue
         }
         assets.push({

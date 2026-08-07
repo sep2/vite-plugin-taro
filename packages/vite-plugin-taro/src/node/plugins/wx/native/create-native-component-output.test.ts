@@ -4,14 +4,14 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
-import { compileNativeComponentFacade } from './compile-native-component-facade.ts'
+import { compileNativeComponentInterface } from './compile-native-component-interface.ts'
 import { createNativeComponentOutput } from './create-native-component-output.ts'
 
 test('emits surviving native folders into their planned packages', async () => {
     const projectFolder = await mkdtemp(path.join(tmpdir(), 'vpt-native-output-'))
     try {
-        const main = await createFacade(projectFolder, 'native-counter', 'counter')
-        const subpackage = await createFacade(projectFolder, 'native-card', 'card')
+        const main = await createInterface(projectFolder, 'native-counter', 'counter')
+        const subpackage = await createInterface(projectFolder, 'native-card', 'card')
         const metadata = new Map([
             [main.moduleId, main.meta],
             [subpackage.moduleId, subpackage.meta]
@@ -40,14 +40,12 @@ test('emits surviving native folders into their planned packages', async () => {
             {
                 name: 'native-counter',
                 componentPath: '/components/native-counter/counter',
-                properties: ['value'],
-                events: ['change']
+                fields: ['value', 'onChange']
             },
             {
                 name: 'native-card',
                 componentPath: '/sub/p_test/components/native-card/card',
-                properties: ['value'],
-                events: ['change']
+                fields: ['value', 'onChange']
             }
         ])
     } finally {
@@ -76,18 +74,18 @@ function createChunk(fileName: string, moduleIds: string[]): Rolldown.OutputChun
     }
 }
 
-async function createFacade(projectFolder: string, name: string, entry: string) {
+async function createInterface(projectFolder: string, name: string, entry: string) {
     const folder = path.join(projectFolder, name)
     const moduleId = path.join(projectFolder, `${name}.ts`)
     await mkdir(folder)
     await writeFile(path.join(folder, `${entry}.js`), entry)
-    const compiled = await compileNativeComponentFacade({
+    const compiled = await compileNativeComponentInterface({
         code: `
             import { defineNativeComponent } from 'virtual:taro/native'
-            export const Component = defineNativeComponent(() => import('./${name}/${entry}.js'), {
-                properties: { value: Number },
-                events: { change: String }
-            })
+            export const Component = defineNativeComponent<{
+                value: number
+                onChange?: (event: { detail: string }) => void
+            }>(() => import('./${name}/${entry}.js'))
         `,
         id: moduleId,
         sourcemap: false,

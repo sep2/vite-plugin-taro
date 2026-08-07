@@ -3,11 +3,11 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { compileNativeComponentFacade } from './compile-native-component-facade.ts'
+import { compileNativeComponentInterface } from './compile-native-component-interface.ts'
 import { nativeComponentMetaKey } from './native-component-assets.ts'
 
-test('compiles a co-located facade without treating it as an opaque native asset', async () => {
-    const projectDirectory = await mkdtemp(path.join(tmpdir(), 'vpt-native-facade-'))
+test('compiles a co-located interface without treating it as an opaque native asset', async () => {
+    const projectDirectory = await mkdtemp(path.join(tmpdir(), 'vpt-native-interface-'))
     try {
         const sourceDirectory = path.join(projectDirectory, 'native-counter')
         const sourcePath = path.join(sourceDirectory, 'component.data')
@@ -16,16 +16,16 @@ test('compiles a co-located facade without treating it as an opaque native asset
         await mkdir(sourceDirectory)
         await writeFile(sourcePath, 'native source')
         await writeFile(entryPath, '')
-        await writeFile(moduleId, 'facade source')
+        await writeFile(moduleId, 'interface source')
         const watchedFiles = new Set<string>()
 
-        const compiled = await compileNativeComponentFacade({
+        const compiled = await compileNativeComponentInterface({
             code: `
                 import { defineNativeComponent } from 'virtual:taro/native'
-                export const NativeCounter = defineNativeComponent(() => import('./counter.js'), {
-                    properties: { count: Number },
-                    events: { increment: { value: Number } }
-                })
+                export const NativeCounter = defineNativeComponent<{
+                    count: number
+                    onIncrement?: (event: { detail: { value: number } }) => void
+                }>(() => import('./counter.js'))
             `,
             id: moduleId,
             sourcemap: false,

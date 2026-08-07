@@ -22,8 +22,7 @@ export function createTemplateAssets(
     options: VitePluginTaroOptions,
     nativeComponents: readonly {
         name: string
-        properties: readonly string[]
-        events: readonly string[]
+        fields: readonly string[]
     }[]
 ): Rolldown.EmittedAsset[] {
     const templateBuilder = createTemplateBuilder()
@@ -66,13 +65,12 @@ function createTemplateBuilder() {
     return platform.template
 }
 
-/** Creates template metadata from the reachable Taro hosts and native schemas. */
+/** Creates template metadata from reachable Taro hosts and native component JSX fields. */
 function collectTemplateComponentConfig(
     bundle: Rolldown.OutputBundle,
     nativeComponents: readonly {
         name: string
-        properties: readonly string[]
-        events: readonly string[]
+        fields: readonly string[]
     }[]
 ): TemplateComponentConfig {
     // This local config accumulates names in output order before the template builder consumes it.
@@ -98,10 +96,7 @@ function collectTemplateComponentConfig(
         config.includes.add(toDashed(name))
     }
     for (const component of nativeComponents) {
-        config.thirdPartyComponents.set(
-            component.name,
-            new Set([...component.properties, ...component.events.map(toReactEventName)])
-        )
+        config.thirdPartyComponents.set(component.name, new Set(component.fields))
     }
     return config
 }
@@ -118,11 +113,6 @@ function findBundleModule(bundle: Rolldown.OutputBundle, resolvedId: string): Ro
             return found[1]
         }
     }
-}
-
-/** Converts a native event into the React handler name consumed by Taro's event bridge. */
-function toReactEventName(value: string): string {
-    return `on${value.charAt(0).toUpperCase()}${value.slice(1)}`
 }
 
 /** Converts a React component export to Taro's dashed host-component name. */

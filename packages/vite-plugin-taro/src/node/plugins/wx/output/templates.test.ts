@@ -26,8 +26,7 @@ test('creates shared Taro templates and native companions for every Page', () =>
     const templateAssets = createTemplateAssets({} as Rolldown.OutputBundle, options, [
         {
             name: 'native-counter',
-            properties: ['count', 'label'],
-            events: ['increment']
+            fields: ['count', 'label', 'onIncrement']
         }
     ])
     const assets = new Map(templateAssets.map((asset) => [asset.fileName, String(asset.source)]))

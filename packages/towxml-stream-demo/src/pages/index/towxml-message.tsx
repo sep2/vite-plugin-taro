@@ -1,34 +1,23 @@
-import { defineNativeComponent } from 'virtual:taro/native'
+import { defineNativeComponent, type NativeComponentEvent } from 'virtual:taro/native'
 import type { AnswerMessage } from './chat-model.ts'
 
-const Towxml = defineNativeComponent(() => import('../../native/towxml-adapter/towxml-adapter.js'), {
-    properties: {
-        towxmlId: String,
-        initialMarkdown: String,
-        markdownChunk: {
-            sequence: Number,
-            value: String
-        },
-        speed: Number,
-        openTyper: Boolean,
-        theme: String,
-        streamFinished: Boolean,
-        stopRequested: Boolean,
-        scrollTop: Number,
-        trackScroll: Boolean
-    },
-    events: {
-        finish: {
-            message: String
-        },
-        historyMessageFinish: {
-            message: String
-        },
-        ready: {
-            towxmlId: String
-        }
-    }
-})
+type TowxmlProps = {
+    towxmlId: string
+    initialMarkdown: string
+    markdownChunk: AnswerMessage['markdownChunk']
+    speed: number
+    openTyper: boolean
+    theme: string
+    streamFinished: boolean
+    stopRequested: boolean
+    scrollTop: number
+    trackScroll: boolean
+    onFinish?: (event: NativeComponentEvent<{ message: string }>) => void
+    onHistoryMessageFinish?: (event: NativeComponentEvent<{ message: string }>) => void
+    onReady?: (event: NativeComponentEvent<{ towxmlId: string }>) => void
+}
+
+const Towxml = defineNativeComponent<TowxmlProps>(() => import('../../native/towxml-adapter/towxml-adapter.js'))
 
 type TowxmlMessageProps = {
     readonly answer: AnswerMessage
