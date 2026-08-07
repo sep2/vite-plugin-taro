@@ -2,8 +2,8 @@ name: Windows CI
 
 on:
   push:
-      tags:
-          - 'v*.*.*'
+    tags:
+      - 'v*.*.*'
   pull_request:
   workflow_dispatch:
 
@@ -38,7 +38,7 @@ jobs:
         run: pnpm build:plugin
 
       - name: Typecheck
-        run: pnpm typecheck:loan-genius
+        run: pnpm typecheck
 
       - name: Test
         run: pnpm test

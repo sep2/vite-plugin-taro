@@ -38,9 +38,11 @@ pnpm build:plugin
 
 ```sh
 pnpm build:plugin
-pnpm typecheck:plugin
+pnpm typecheck
 pnpm test
 ```
+
+`pnpm typecheck` 会运行所有工作区中声明的类型检查。需要只检查插件时，运行 `pnpm typecheck:plugin`。
 
 ### 示例应用
 

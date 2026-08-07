@@ -24,6 +24,7 @@
         "dev:loan-genius:wx": "pnpm --filter loan-genius dev-wx",
         "preview:loan-genius:h5": "pnpm --filter loan-genius preview-h5",
         "dev:docs": "pnpm --filter docs dev",
+        "typecheck": "pnpm --recursive --if-present typecheck",
         "typecheck:plugin": "pnpm --filter vite-plugin-taro typecheck",
         "typecheck:native-comp-demo": "pnpm --filter native-comp-demo typecheck",
         "typecheck:towxml-stream-demo": "pnpm --filter towxml-stream-demo typecheck",
