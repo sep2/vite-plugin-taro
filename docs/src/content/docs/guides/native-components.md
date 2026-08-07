@@ -75,7 +75,7 @@ src/native-counter/
 vpt 会递归复制目录中的文件并保留相对路径。WXS、图片、字体、子组件和 CommonJS 模块都可以放在里面。
 
 - `defineNativeComponent()` 必须指向真实的 `.js` 入口；
-- `.json`、`.wxml` 和可选 `.wxss` 必须与 `.js` 入口同名；
+- `.json`、`.wxml` 和 `.wxss` 必须与 `.js` 入口同名；
 - 所有运行时依赖必须在该目录内，并使用相对路径；
 - 原生文件不会经过 Vite 转换，因此不能使用 Vite alias；
 - 每个原生组件的目录名必须唯一。
