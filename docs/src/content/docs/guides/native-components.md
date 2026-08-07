@@ -20,6 +20,7 @@ description: 在 React 中类型安全地使用微信原生组件，并让原生
 import { defineNativeComponent } from 'virtual:taro/native'
 
 export const NativeCounter = defineNativeComponent(
+    // 路径相对于当前文件，并指向原生组件的 .js 入口
     () => import('../native-counter/counter.js'),
 {
     properties: {
@@ -33,14 +34,14 @@ export const NativeCounter = defineNativeComponent(
 })
 ```
 
-接口文件可以放在任意位置。`() => import(...)` 只是供编译器识别原生组件入口的标记，不会把原生代码导入 React bundle，编译后会被完全移除。其中的路径必须是相对于当前文件的静态路径，并指向原生组件的 `.js` 入口。
+此文件可以放在任意位置。`() => import(...)` 只是供编译器识别原生组件入口的标记，不会导入原生代码。事实上，此文件会被编译器完全移除。
 
 然后在 JSX 中使用这个接口即可：
 
 ```tsx
 // src/pages/index/index.tsx
 import { useState } from 'react'
-import { NativeCounter } from '../../components/native-counter'
+import { NativeCounter } from '../../components/native-counter.tsx'
 
 export default function CounterDemo() {
     const [count, setCount] = useState(0)
@@ -146,7 +147,7 @@ vpt 只输出实际使用的原生组件。原生文件会跟随使用该接口�
 import { lazy, Suspense } from 'react'
 import { Text } from 'virtual:taro/components'
 
-const NativeCounterDemo = lazy(() => import('./native-counter-demo'))
+const NativeCounterDemo = lazy(() => import('./native-counter-demo.tsx'))
 
 export default function Index() {
     return (
@@ -164,10 +165,10 @@ export default function Index() {
 H5 代码不能导入使用 `virtual:taro/native` 的接口文件。共享组件可以通过条件编译选择实现：
 
 ```tsx
-import WebCounter from './web-counter'
+import WebCounter from './web-counter.tsx'
 
 // #ifdef wx
-import { NativeCounter } from './native-counter'
+import { NativeCounter } from './native-counter.tsx'
 // #endif
 
 export default function Counter(props: { count: number }) {
