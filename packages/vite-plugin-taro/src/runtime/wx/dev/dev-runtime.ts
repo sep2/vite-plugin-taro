@@ -26,8 +26,8 @@ type HmrSession = {
     /** Fixed control URL discovered from the Vite server that produced this full build. */
     readonly endpoint: string
     /**
-     * Highest contiguous Rolldown sequence whose factories, graph propagation, and accept
-     * callbacks all succeeded. Replayed Page shells read this watermark; it advances only
+     * Highest contiguous application sequence whose factories, graph propagation, and accept callbacks all succeeded.
+     * Host-filtered native asset updates consume no sequence. Replayed Page shells read this watermark; it advances only
      * after an atomic batch succeeds and resets only with a new App heap.
      */
     appliedSeq: number
@@ -39,7 +39,7 @@ type PatchPayload = Readonly<{
     patches: readonly PatchProgram[]
 }>
 
-/** One patch: its Rolldown sequence, changed module ids, and factory program. */
+/** One patch: its physical application sequence, changed module ids, and Rolldown factory program. */
 type PatchProgram = Readonly<{
     seq: number
     /** Stable ids of the changed modules; the sync apply walks the graph from these. */
@@ -415,7 +415,7 @@ class WxDevRuntime extends DevRuntime {
     /**
      * Folds one cumulative physical patch file into a single logical HMR update.
      *
-     * `hmr/patches.js` can contain several unacknowledged Rolldown patches and can be required by several Page shells. The
+     * `hmr/patches.js` can contain several unacknowledged application patches and can be required by several Page shells. The
      * runtime must therefore ignore replayed sequences, reject a missing sequence, and move directly from the currently live
      * module generation to the latest published generation without rendering intermediate generations.
      *
