@@ -59,6 +59,7 @@ shared apps for WeChat Mini Program (`wx`) and H5 targets.
   published as `vite-plugin-taro-plugin-framework-react`.
 - `packages/loan-genius`: sample app used to test the plugin against `h5` and `wx` targets.
 - `packages/native-comp-demo`: wx-only development project for native custom-component integration.
+- `packages/hmr-stress-demo`: wx-only deep React tree fixture for paced and burst HMR stress tests.
 - `patches`: local patches applied to upstream Taro 4.2.0 packages when regenerating the generated packages.
 
 Node.js v26+ is available and can execute TypeScript natively.
@@ -69,9 +70,14 @@ Node.js v26+ is available and can execute TypeScript natively.
 - `pnpm build:plugin`: build `packages/vite-plugin-taro`.
 - `pnpm build:native-comp-demo:wx`: build the native-component project.
 - `pnpm dev:native-comp-demo:wx`: start the native-component project with hot reload.
+- `pnpm build:hmr-stress-demo:wx`: build the deep-tree HMR stress fixture.
+- `pnpm dev:hmr-stress-demo:wx`: start the deep-tree HMR stress fixture with hot reload.
+- `pnpm stress:hmr-stress-demo`: publish paced source edits against the running stress fixture.
+- `pnpm stress:hmr-stress-demo:burst`: publish a rapid source-edit burst against the running stress fixture.
 - `pnpm typecheck:plugin`: typecheck plugin.
 - `pnpm typecheck:loan-genius`: typecheck loan-genius.
 - `pnpm typecheck:native-comp-demo`: typecheck native-comp-demo.
+- `pnpm typecheck:hmr-stress-demo`: typecheck hmr-stress-demo.
 - `pnpm lint`: run Biome checks.
 - `pnpm format`: run Biome checks with safe writes.
 - `pnpm build:loan-genius:h5`: build the sample H5 target.

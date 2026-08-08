@@ -29,6 +29,7 @@ pnpm build:plugin
 | `packages/taro-plugin-framework-react` | 生成的 React 19 兼容框架插件 |
 | `packages/loan-genius` | WX 与 H5 综合示例 |
 | `packages/native-comp-demo` | 微信原生组件示例 |
+| `packages/hmr-stress-demo` | 深层 React 树与页面栈 HMR 压力测试项目 |
 | `packages/towxml-stream-demo` | Towxml 原生组件与流式渲染示例 |
 | `docs` | Astro Starlight 文档站 |
 
@@ -54,6 +55,9 @@ pnpm build:loan-genius:h5
 pnpm typecheck:native-comp-demo
 pnpm build:native-comp-demo:wx
 
+pnpm typecheck:hmr-stress-demo
+pnpm build:hmr-stress-demo:wx
+
 pnpm typecheck:towxml-stream-demo
 pnpm build:towxml-stream-demo:wx
 ```
@@ -75,10 +79,11 @@ pnpm --filter docs build
 pnpm dev:loan-genius:wx
 pnpm dev:loan-genius:h5
 pnpm dev:native-comp-demo:wx
+pnpm dev:hmr-stress-demo:wx
 pnpm dev:towxml-stream-demo:wx
 ```
 
-运行微信目标后，在微信开发者工具中打开对应项目的 `dist/wx`。运行 H5 目标后，使用 Vite 输出的本地地址。
+运行微信目标后，在微信开发者工具中打开对应项目的 `dist/wx`。HMR 压力项目启动后，可运行 `pnpm stress:hmr-stress-demo` 发送 30 次定时编辑，或运行 `pnpm stress:hmr-stress-demo:burst` 发送 60 次快速编辑。运行 H5 目标后，使用 Vite 输出的本地地址。
 
 ## 生成文件
 

@@ -154,10 +154,10 @@ dist/wx/hmr/patches.js
 
 ## 补丁文件的实际内容
 
-一个补丁文件包含当前 `buildId` 和一个或多个尚未确认交付的补丁：
+一个补丁文件导出当前 `buildId` 和一个或多个尚未确认应用的补丁：
 
 ```ts
-__rolldown_runtime__.storePatches({
+module.exports = {
     buildId,
     patches: [
         {
@@ -168,10 +168,10 @@ __rolldown_runtime__.storePatches({
             }
         }
     ]
-})
+}
 ```
 
-`require()` 该文件时会同步调用 `storePatches()`。补丁不会从 HTTP 响应中取回，也没有 WebSocket JavaScript 传输。
+Page shell 同步 `require()` 这个惰性数据模块，再调用 `applyPatches(payload, route)`。补丁不会从 HTTP 响应中取回，也没有 WebSocket JavaScript 传输。
 
 ## 页面为什么会执行补丁
 
@@ -182,7 +182,7 @@ __rolldown_runtime__.storePatches({
 3. 新模块实现同步注册并应用。
 4. 页面剩余代码随后看到的是更新后的模块状态。
 
-同一个补丁文件可能被多个存活页面依次加载。运行时使用序号忽略已经应用的补丁，但每次 `storePatches()` 仍会打开对应页面的替换生命周期窗口，让每个被开发者工具替换的页面都能重新绑定。
+同一个补丁文件可能被多个存活页面依次加载。运行时使用序号忽略已经应用的补丁，但每次 `applyPatches(payload, route)` 仍会为调用方路由建立替换事务，让每个被开发者工具替换的页面都能重新绑定。
 
 ## 运行时如何应用模块补丁
 
@@ -192,27 +192,11 @@ App 模块运行时扩展 Rolldown 的开发运行时，直接复用它维护的
 
 `payload.buildId` 必须与 App 启动时读取的 `hmr/info.js` 一致。旧构建补丁只会产生警告，不会修改当前模块图。
 
-### 2. 报告物理交付
+### 2. 建立路由替换事务
 
-运行时取得文件中最大的补丁序号，并发送：
+构建身份有效时，`applyPatches(payload, route)` 先为该路由建立短期事务。即使另一个 Page 已经应用同一补丁序号，本次物理 Page 仍会被开发者工具替换，因此它需要自己的生命周期交接。
 
-```ts
-{
-    kind: 'delivery',
-    buildId,
-    seq
-}
-```
-
-这个报告表示补丁文件已经被微信执行，不表示 React 已经完成渲染。主机据此释放已交付补丁并调用 DevEngine 的 `notifyPayloadDelivered()`。
-
-模块应用失败使用单独的 `rebuild` 报告处理，因此“文件已到达”和“模块应用成功”是两个不同事实。
-
-### 3. 打开页面替换窗口
-
-`storePatches()` 在应用模块前设置热更新标记。开发者工具随后触发的页面替换生命周期会检查该标记，以区分代码热重载和真实用户导航。
-
-### 4. 严格检查序号
+### 3. 严格检查序号
 
 运行时维护 `appliedSeq`：
 
@@ -220,11 +204,11 @@ App 模块运行时扩展 Rolldown 的开发运行时，直接复用它维护的
 - 新补丁必须等于 `appliedSeq + 1`。
 - 序号缺失会立即停止当前范围并请求完整构建。
 
-### 5. 注册模块图与新工厂
+### 4. 注册模块图与新工厂
 
 执行补丁的 `factory()` 会更新 Rolldown 模块图，并为能够重新执行的模块注册新工厂。此时只安装新实现，还没有清除旧模块缓存。
 
-### 6. 计算接受边界
+### 5. 计算接受边界
 
 运行时从每个 `changedId` 开始：
 
@@ -236,31 +220,35 @@ App 模块运行时扩展 Rolldown 的开发运行时，直接复用它维护的
 
 Rolldown 的反向索引同时包含静态和动态导入关系。遍历只处理已经执行的受影响子图，复杂度为 `O(V + E)`。
 
-### 7. 验证并清除缓存
+### 6. 验证并清除缓存
 
 更新集合中的每个模块都必须存在可重新执行工厂。运行时先保存旧接受边界及其回调，再统一删除整个更新集合的模块缓存。
 
 统一清除发生在任何新模块执行之前，避免一个边界重新执行时读到另一个受影响模块的旧导出。
 
-### 8. 重新执行接受边界
+### 7. 重新执行接受边界
 
 运行时重新初始化每个接受边界。初始化会从已注册工厂执行新的模块实现及其失效依赖，并得到最新导出。
 
-随后调用上一代热上下文中的接受回调，把最新导出交给它。新执行产生的新热上下文将供下一次更新使用。
+随后调用上一代热上下文中的接受回调，把最新导出交给它。新执行产生的新热上下文只有在首次调用 `accept()` 时才进入运行时的边界映射；不接受更新的普通模块不占用持久热上下文条目。
 
 如果接受回调调用 `invalidate()`，或任意工厂、边界回调抛出异常，本次范围停止，运行时发送 `rebuild` 报告。只有模块更新成功后，`appliedSeq` 才会增加。
+
+### 8. 确认应用前沿
+
+模块更新成功后，运行时发送 `{ kind: 'applied', buildId, seq }`。主机据此从累计补丁历史中删除已应用前缀。DevEngine 的物理交付确认由主机在发布文件时独立完成，不依赖微信运行时报告。
 
 ## React Refresh 如何参与
 
 vpt 使用 `@vitejs/plugin-react` 生成组件签名、类型注册和接受边界，不实现自己的 React 状态复制。
 
-浏览器版本的 Refresh 代码依赖 HTML 前置脚本、`window` 和自由变量形式的 React DevTools Hook。微信环境没有相同的词法全局，因此开发构建只改写三个确定的协议位置：
+浏览器版本的 Refresh 代码依赖 HTML 前置脚本、`window` 和自由变量形式的 React DevTools Hook。微信环境没有相同的词法全局，因此 serve-only App capsule 先导入 Refresh 运行时，让它在 React 渲染器求值前直接安装正式 Hook。运行时不需要预装占位 Hook，也不需要保存渲染器供稍后重放。
+
+开发构建另外只改写三个确定的协议位置：
 
 1. Refresh 运行时中的已知 `window` 协议属性改为微信全局环境。
 2. React 相关模块中的自由 `__REACT_DEVTOOLS_GLOBAL_HOOK__` 改为显式访问 `global.__REACT_DEVTOOLS_GLOBAL_HOOK__`。
 3. 依赖浏览器前置脚本的 `$RefreshReg$` 检查被移除，因为模块已经包含局部注册包装器。
-
-App 开发运行时会在 Taro React 渲染器加载前，在 `WeChatGlobal` 上安装最小 React DevTools Hook。Refresh 运行时加载后会取得已经注册的渲染器，从而能够调度现有 Fiber 根更新。
 
 React 组件边界的接受回调验证新旧导出，并安排 React Refresh。兼容组件复用现有 Fiber 与 Hook 状态；不兼容边界调用 `invalidate()`，进入完整构建恢复路径。
 
@@ -274,7 +262,31 @@ vpt 不把 Fiber 序列化到补丁文件，也不创建第二棵 React 树。�
 - `onLoad` 会创建新的页面身份和渲染连接。
 - Hook 状态和原生输入状态都会随旧树消失。
 
-vpt 只在热更新标记存在时调整这组替换生命周期。
+vpt 只在对应路由存在替换事务时调整这组生命周期，不使用跨页面的全局热更新布尔值。
+
+### 开发插件如何注入页面 HMR
+
+源码中的 `runtime/wx/capsule/page.ts` 只创建并导出普通 Taro Page 配置，不包含 HMR 分支。serve-only 开发插件在路由专属 Page capsule 完成特化后只追加：
+
+```ts
+__rolldown_runtime__.injectPageHmr(config, route)
+```
+
+`WxDevRuntime` 本身拥有页面替换生命周期逻辑。它不能直接导入 Taro：全局运行时由 Rolldown 单独组装，直接打包 `@tarojs/runtime` 会制造与应用图不同的 Taro 实例。因此同一个开发插件在应用图的 `taro-runtime` facade 中注入一次连接：
+
+```ts
+import { Current, document, injectPageInstance } from '@tarojs/runtime'
+__rolldown_runtime__.connectTaro(Current, document, injectPageInstance)
+```
+
+这只把应用已经使用的三个绑定交给全局运行时，不增加第二个 HMR 对象。每个 Page shell 在补丁有效时用自身路由开启一个替换事务；`WxDevRuntime` 直接提供：
+
+```text
+applyPatches(payload, route)   应用补丁并开启路由专属替换事务
+injectPageHmr(config, route)   注入一个 Page 配置的替换生命周期
+```
+
+Page 模板仍不携带开发逻辑。生产构建不会执行这些注入，因此最终模块图中没有页面 HMR 代码或 Taro 连接。
 
 ### `onUnload`
 
@@ -286,27 +298,66 @@ $taroParams
 data
 ```
 
-其中 `data` 是微信原生视图当前使用的可序列化节点投影。这里只保留引用，不深拷贝整棵递归节点树。随后跳过原始 Taro `onUnload`，因此现有 React 页面子树仍在 App 根中。
+其中 `data` 是微信原生视图当前使用的可序列化节点投影。这里只保留引用，不深拷贝整棵递归节点树。引用仅存在于该路由的短期替换事务中；紧接着的 `onLoad` 会消费并清空它。随后跳过原始 Taro `onUnload`，因此现有 React 页面子树仍在 App 根中。
 
 ### `onLoad`
 
-新页面实例首先直接调用 `setData()` 恢复保存的原生投影。Taro 的完整同步会通过定时任务执行，把快照作为第一个原生桥操作可以缩短替换页面显示空数据的时间。然后：
+新页面实例先从对应路由的事务取出快照，并立即用无快照事务替换映射项，再调用 `setData()` 恢复保存的原生投影。这个调用必须是替换实例上的第一个原生桥操作；它负责填满原本为空的页面。然后：
 
 1. 将保存的路径和参数写入新页面实例。
 2. 把新实例重新注入 Taro 的页面映射。
 3. 更新 `Current.page`。
 4. 找到原 `$taroPath` 对应的 Taro 页面根。
-5. 把该根的 `ctx` 改为新的微信页面实例。
-6. 调用 `updateChildNodes()` 生成当前完整节点树。
-7. 调用 `performUpdate(true)` 把当前 UI 同步到新页面实例。
+5. 把该根的 `ctx` 改为新的微信页面实例，让后续 Refresh 增量指向新接收者。
 
-快照只负责覆盖替换开始时的空白窗口，不能取代完整同步。旧页面此前产生的增量更新已经被消费，并且 React Refresh 可能已经改变保留树，替换页面最终仍必须从当前 Taro 树重新发送完整数据。
+这里不会遍历并重新发布完整 Taro 树。之后 React Refresh 在保留的 App React 根中完成正常协调，Taro 只把实际 Host 变更增量发送给已经重新绑定的接收者。
 
-### `onShow`
+### `onShow` 与当前页面
 
-首次替换 `onShow` 清除热更新标记，并跳过业务 `onShow`。这样热更新不会重复请求数据或重置业务状态。
+`WxDevRuntime` 不复制一份“当前可见页面”状态。Taro 已经用 `Current.page` 维护这个事实：普通 `onShow` 设置它，`onHide` 清除它，热替换 `onLoad` 重新绑定时也会设置它。
 
-没有热更新标记时，`onLoad`、`onShow`、`onUnload` 全部原样转发。正常跳转、返回和关闭页面不受影响。
+替换 `onUnload` 不修改 `Current.page`。React/Taro 增量实际由页面根的 `ctx` 寻址，清空 `Current.page` 不能改变投递目标，反而会让 `Current.page` 与 `Current.router` 在替换间隙不一致。替换 `onLoad` 一次性把页面映射、`Current.page` 和根 `ctx` 切换到新实例。
+
+替换 `onShow` 只删除该路由的替换事务并跳过业务 `onShow`，避免重复请求或重置业务状态；`onLoad` 已经完成绑定，不再重复执行。
+
+普通 `onShow` 和 `onHide` 不需要 HMR 工作，继续完全使用 Taro 原始实现。
+
+普通业务生命周期仍按原语义转发。唯一例外是开发者工具产生的替换 `onUnload`、`onLoad` 和 `onShow`。
+
+## React Refresh 如何更新页面投影
+
+Taro 把所有已挂载 Page 保存在同一个 App React 根下。React Refresh 调度这个根后，只有使用了变化组件家族的子树重新协调；Taro Host 节点再通过各自 `TaroRootElement.ctx` 向对应微信 Page 发送增量 `setData`。
+
+因此“开发者工具只物理替换当前 Page”和“React 更新所有受影响 Page”并不冲突：
+
+- 当前 Page 的原生接收者被替换，所以 vpt 必须恢复快照并重新绑定 `ctx`。
+- 隐藏 Page 的原生接收者仍然存活，Taro 直接把实际变化增量发送给它。
+- 没有使用变化组件的 Page 不产生 Host 变更，也不产生额外原生负载。
+
+vpt 不包装 `performReactRefresh()`，不扫描页面栈，也不调用 `updateChildNodes()` 发布完整树。唯一新增的页面状态是短期路由事务：
+
+```text
+Map<route, PageSnapshot | null>
+```
+
+它只在 `applyPatches` 与替换 `onShow` 之间存在：`onUnload` 写入快照，`onLoad` 立即释放大 `data` 引用，`onShow` 删除条目。普通显示、隐藏和 React Refresh 都不读写这个映射。
+
+### 完整时序
+
+```text
+Page shell 执行 applyPatches(payload, route)
+    ↓
+DevTools 替换当前 Page
+    ├─ onUnload：把 data 保存到该路由事务，跳过 React 卸载
+    ├─ onLoad：立即 setData(data)，恢复路径并绑定新 Page
+    └─ onShow：删除事务，跳过业务 onShow
+    ↓
+防抖后的 performReactRefresh 更新 App React 根
+    ↓
+Taro 只向实际变化的 Page 根发送增量 setData
+```
+
+快照在 `onLoad` 的第一个操作中恢复旧 UI，因此等待 Refresh 不会形成空页面。Refresh 提交后，增量 Host 变更直接覆盖快照中受影响的路径；没有第二次完整树序列化或页面栈遍历。
 
 ## 连续保存与重复交付
 
@@ -317,7 +368,7 @@ data
 1. 保存一次产生补丁 `4`，文件写入 `[4]`。
 2. 开发者工具尚未加载时再次保存，文件改写为 `[4, 5]`。
 3. 页面加载后按顺序应用 `4` 和 `5`。
-4. 运行时报告交付到 `5`。
+4. 运行时报告应用前沿 `5`。
 5. 主机删除待发布队列中不大于 `5` 的前缀。
 
 如果开发者工具重复执行同一文件，`appliedSeq` 会跳过已经成功应用的序号。如果运行时看到 `[5]` 但自己的 `appliedSeq` 仍为 `3`，缺少序号 `4` 会请求完整构建，而不是猜测中间状态。
@@ -327,8 +378,8 @@ data
 当前控制接口只有一个路径，并只接受 `POST`。运行时发送两类报告：
 
 ```ts
-type DeliveryReport = {
-    kind: 'delivery'
+type AppliedReport = {
+    kind: 'applied'
     buildId: string
     seq: number
 }
@@ -336,13 +387,14 @@ type DeliveryReport = {
 type RebuildReport = {
     kind: 'rebuild'
     buildId: string
+    reason: string
 }
 ```
 
 主机只接受当前 `buildId` 的报告：
 
-- `delivery`：释放已到达运行时的补丁，并通知 DevEngine。
-- `rebuild`：触发一次完整构建。
+- `applied`：释放运行时已经成功应用的累计补丁前缀。
+- `rebuild`：携带失败原因并触发一次完整构建。
 
 接口不保存可执行源码，不返回补丁，不进行轮询，也不维护另一套运行时会话协议。
 
