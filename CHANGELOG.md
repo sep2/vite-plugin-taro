@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.5.6] - 2026-08-08
+
+### Changed
+
+- faster hmr (7b04de5)
+- prompt (c06880f)
+- prompt (335fd02)
+
 ## [0.5.5] - 2026-08-08
 
 ### Changed
