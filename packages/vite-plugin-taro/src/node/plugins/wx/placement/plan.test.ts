@@ -76,6 +76,53 @@ test('splits an oversized lazy static cycle across subpackages', () => {
     )
 })
 
+test('plans nested static and dynamic imports without collapsing lazy boundaries into main', () => {
+    const plan = createPlacementPlan({
+        ...graph({
+            '/entry': { isEntry: true, imports: ['/application'] },
+            '/application': { imports: ['/main-shared'], dynamicImports: ['/feature'] },
+            '/main-shared': {},
+            '/feature': {
+                code: 'a'.repeat(60),
+                imports: ['/feature-static'],
+                dynamicImports: ['/nested-dynamic']
+            },
+            '/feature-static': { imports: ['/cycle-peer'] },
+            '/cycle-peer': { code: 'b'.repeat(60), imports: ['/feature'] },
+            '/nested-dynamic': {
+                imports: ['/nested-static'],
+                dynamicImports: ['/deep-dynamic']
+            },
+            '/nested-static': { imports: ['/cycle-peer', '/main-shared'] },
+            '/deep-dynamic': { imports: ['/deep-static'] },
+            '/deep-static': { imports: ['/feature', '/main-shared'] }
+        }),
+        planningBudgetBytes: 100
+    })
+
+    for (const moduleId of ['/entry', '/application', '/main-shared']) {
+        assert.equal(plan.get(moduleId)?.kind, 'main')
+    }
+    for (const moduleId of [
+        '/feature',
+        '/feature-static',
+        '/cycle-peer',
+        '/nested-dynamic',
+        '/nested-static',
+        '/deep-dynamic',
+        '/deep-static'
+    ]) {
+        assert.equal(plan.get(moduleId)?.kind, 'subpackage')
+    }
+
+    const feature = plan.get('/feature')
+    const cyclePeer = plan.get('/cycle-peer')
+    assert.notEqual(
+        feature?.kind === 'subpackage' ? feature.root : undefined,
+        cyclePeer?.kind === 'subpackage' ? cyclePeer.root : undefined
+    )
+})
+
 test('co-locates a lazy root and static dependencies when size permits', () => {
     const plan = createPlacementPlan({
         ...graph({

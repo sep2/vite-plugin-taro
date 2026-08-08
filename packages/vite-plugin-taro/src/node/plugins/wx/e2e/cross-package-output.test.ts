@@ -1,0 +1,324 @@
+import assert from 'node:assert/strict'
+import path from 'node:path'
+import test from 'node:test'
+import { build, type OutputChunk, type Plugin } from 'rolldown'
+import '../../../../runtime/wx/systemjs/system-core.js'
+import { getWxExecutionKind, isTransportModule, transportPath } from '../module.ts'
+import { createPlacer } from '../placement/placer.ts'
+import { renderCapsule } from '../render/capsule.ts'
+import { renderNative } from '../render/native.ts'
+import { materializeTransport } from '../render/transport.ts'
+
+const applicationId = '/cross-package/application.js'
+const mainDependencyId = '/cross-package/main-dependency.js'
+const subpackageAId = '/cross-package/subpackage-a.js'
+const subpackageAStaticId = '/cross-package/subpackage-a-static.js'
+const subpackageBId = '/cross-package/subpackage-b.js'
+const nestedDynamicId = '/cross-package/nested-dynamic.js'
+const nestedStaticId = '/cross-package/nested-static.js'
+const deepDynamicId = '/cross-package/deep-dynamic.js'
+const deepStaticId = '/cross-package/deep-static.js'
+
+const largeLazyModuleIds: ReadonlySet<string> = new Set([subpackageAId, subpackageBId, nestedDynamicId, deepDynamicId])
+
+const modules: Readonly<Record<string, string>> = {
+    [applicationId]: `
+        import { mainName } from './main-dependency.js'
+        export const readMain = () => mainName
+        export const loadSubpackage = () => import('./subpackage-a.js')
+    `,
+    [mainDependencyId]: `
+        export const mainName = 'main'
+    `,
+    [subpackageAId]: `
+        import { mainName } from './main-dependency.js'
+        import { readCycleName, readPeerName } from './subpackage-a-static.js'
+        export const name = 'a'
+        export const readMainDependency = () => mainName
+        export const readNestedStatic = () => readPeerName()
+        export const readCycle = () => readCycleName()
+        export const loadNestedDynamic = () => import('./nested-dynamic.js')
+    `,
+    [subpackageAStaticId]: `
+        import { name as peerName, readImporter } from './subpackage-b.js'
+        export const readPeerName = () => peerName
+        export const readCycleName = () => readImporter()
+    `,
+    [subpackageBId]: `
+        import { name as importerName } from './subpackage-a.js'
+        export const name = 'b'
+        export const readImporter = () => importerName
+    `,
+    [nestedDynamicId]: `
+        import { mainName } from './main-dependency.js'
+        import { loadDeepDynamic, readNestedStatic } from './nested-static.js'
+        export const readMainDependency = () => mainName
+        export { loadDeepDynamic, readNestedStatic }
+    `,
+    [nestedStaticId]: `
+        import { name as peerName } from './subpackage-b.js'
+        export const readNestedStatic = () => peerName
+        export const loadDeepDynamic = () => import('./deep-dynamic.js')
+    `,
+    [deepDynamicId]: `
+        import { readDeepStatic } from './deep-static.js'
+        export { readDeepStatic }
+    `,
+    [deepStaticId]: `
+        import { mainName } from './main-dependency.js'
+        import { name as cycleName } from './subpackage-a.js'
+        export const readDeepStatic = () => mainName + ':' + cycleName
+    `
+}
+
+type CrossPackageOutput = {
+    readonly chunks: readonly OutputChunk[]
+    readonly application: OutputChunk
+    readonly mainDependency: OutputChunk
+    readonly subpackageA: OutputChunk
+    readonly subpackageB: OutputChunk
+    readonly nestedDynamic: OutputChunk
+    readonly deepDynamic: OutputChunk
+    readonly transport: OutputChunk
+}
+
+type NativeLoad = {
+    readonly fileName: string
+    readonly mode: 'async' | 'sync'
+}
+
+type NativeEvaluator = {
+    readonly loads: readonly NativeLoad[]
+    evaluate(fileName: string): unknown
+}
+
+interface TransportExports {
+    transport(moduleId: string): System.Registration | PromiseLike<System.Registration>
+}
+
+/** Resolves the compact in-memory application without introducing filesystem fixtures. */
+function createVirtualModulesPlugin(): Plugin {
+    return {
+        name: 'test:cross-package-modules',
+        resolveId(source, importer) {
+            if (source in modules) {
+                return source
+            }
+            if (!importer || !source.startsWith('.')) {
+                return null
+            }
+            const resolved = path.posix.resolve(path.posix.dirname(importer), source)
+            return resolved in modules ? resolved : null
+        },
+        load(id) {
+            return modules[id] ?? null
+        }
+    }
+}
+
+/** Runs the same placement and final rendering stages used by the production wx plugin. */
+function createWxOutputPlugin(placer: ReturnType<typeof createPlacer>): Plugin {
+    return {
+        name: 'test:cross-package-output',
+        renderStart() {
+            placer.analyze({
+                moduleIds: this.getModuleIds(),
+                getModuleInfo: (moduleId) => this.getModuleInfo(moduleId),
+                // Model large lazy modules without putting megabytes of inert text in the test fixture.
+                getAdditionalModuleBytes: (info) => (largeLazyModuleIds.has(info.id) ? 1_000_000 : 0)
+            })
+        },
+        async renderChunk(code, chunk, outputOptions, meta) {
+            const sourcemap = Boolean(outputOptions.sourcemap)
+            if (getWxExecutionKind(chunk) === 'capsule') {
+                return renderCapsule(code, chunk, sourcemap)
+            }
+
+            const native = renderNative({ code, chunk, chunks: meta.chunks, sourcemap })
+            if (!isTransportModule(chunk)) {
+                return native
+            }
+            return materializeTransport({
+                code: native.code,
+                transportChunk: chunk,
+                chunks: meta.chunks,
+                getLoadMode: placer.getLoadMode,
+                sourcemap
+            })
+        }
+    }
+}
+
+/** Builds a production-shaped output whose lazy cycle must span two generated subpackages. */
+async function buildCrossPackageOutput(): Promise<CrossPackageOutput> {
+    const placer = createPlacer()
+    const result = await build({
+        input: {
+            application: applicationId,
+            transport: transportPath
+        },
+        plugins: [createVirtualModulesPlugin(), createWxOutputPlugin(placer)],
+        preserveEntrySignatures: placer.rolldownOptions.preserveEntrySignatures,
+        output: {
+            ...placer.rolldownOptions.output,
+            format: 'es',
+            sourcemap: false,
+            strictExecutionOrder: true
+        },
+        write: false
+    })
+    const chunks = result.output.filter((output): output is OutputChunk => output.type === 'chunk')
+
+    return {
+        chunks,
+        application: findEntryChunk(chunks, 'application'),
+        mainDependency: findChunk(chunks, mainDependencyId),
+        subpackageA: findChunk(chunks, subpackageAId),
+        subpackageB: findChunk(chunks, subpackageBId),
+        nestedDynamic: findChunk(chunks, nestedDynamicId),
+        deepDynamic: findChunk(chunks, deepDynamicId),
+        transport: findChunk(chunks, transportPath)
+    }
+}
+
+/** Finds one explicit output entry by its configured input name. */
+function findEntryChunk(chunks: readonly OutputChunk[], name: string): OutputChunk {
+    const chunk = chunks.find((candidate) => candidate.isEntry && candidate.name === name)
+    assert.ok(chunk, `Missing output entry: ${name}`)
+    return chunk
+}
+
+/** Finds the final physical chunk containing one source module. */
+function findChunk(chunks: readonly OutputChunk[], moduleId: string): OutputChunk {
+    const chunk = chunks.find((candidate) => candidate.moduleIds.includes(moduleId))
+    assert.ok(chunk, `Missing output chunk for ${moduleId}`)
+    return chunk
+}
+
+/** Evaluates generated CommonJS files with WeChat-shaped sync and async native require functions. */
+function createNativeEvaluator(chunks: readonly OutputChunk[]): NativeEvaluator {
+    const chunksByFileName = new Map(chunks.map((chunk) => [chunk.fileName, chunk]))
+    // Mutable cache reproduces CommonJS' single module identity across repeated native requires.
+    const cache = new Map<string, { exports: unknown }>()
+    // Mutable trace records the physical API selected for every generated file load.
+    const loads: NativeLoad[] = []
+
+    function evaluate(fileName: string): unknown {
+        const cached = cache.get(fileName)
+        if (cached) {
+            return cached.exports
+        }
+
+        const chunk = chunksByFileName.get(fileName)
+        assert.ok(chunk, `Unknown generated file: ${fileName}`)
+        // CommonJS evaluation mutates this export cell before the completed namespace enters the cache.
+        const commonJsModule: { exports: unknown } = { exports: {} }
+        cache.set(fileName, commonJsModule)
+
+        function load(specifier: string, mode: NativeLoad['mode']): unknown {
+            const dependencyFileName = path.posix.normalize(path.posix.join(path.posix.dirname(fileName), specifier))
+            loads.push({ fileName: dependencyFileName, mode })
+            return evaluate(dependencyFileName)
+        }
+
+        const nativeRequire = Object.assign((specifier: string) => load(specifier, 'sync'), {
+            async: async (specifier: string) => load(specifier, 'async')
+        })
+        Function('require', 'module', 'exports', chunk.code)(nativeRequire, commonJsModule, commonJsModule.exports)
+        return commonJsModule.exports
+    }
+
+    return { loads, evaluate }
+}
+
+/** Narrows the generated transport CommonJS namespace. */
+function requireTransportExports(value: unknown): asserts value is TransportExports {
+    assert.ok(value && typeof value === 'object' && 'transport' in value)
+    assert.equal(typeof value.transport, 'function')
+}
+
+/** Reads the generated package root from one lazy capsule filename. */
+function requireSubpackageRoot(chunk: OutputChunk): string {
+    const match = /^(sub\/p_[a-f0-9]{8})\//.exec(chunk.fileName)
+    assert.ok(match, `Expected generated subpackage output, received ${chunk.fileName}`)
+    return match[1]
+}
+
+test('executes a complex nested static and dynamic graph across production wx subpackages', async () => {
+    const output = await buildCrossPackageOutput()
+    const lazyRoots = new Set([
+        requireSubpackageRoot(output.subpackageA),
+        requireSubpackageRoot(output.subpackageB),
+        requireSubpackageRoot(output.nestedDynamic),
+        requireSubpackageRoot(output.deepDynamic)
+    ])
+
+    assert.equal(lazyRoots.size, 4)
+    assert.doesNotMatch(output.application.fileName, /^sub\//)
+    assert.doesNotMatch(output.mainDependency.fileName, /^sub\//)
+
+    const native = createNativeEvaluator(output.chunks)
+    const transportExports = native.evaluate(output.transport.fileName)
+    requireTransportExports(transportExports)
+
+    const system = (global as unknown as { System: System.Loader }).System
+    // The production bootstrap installs this mutable transport hook once for the application heap.
+    system.instantiate = transportExports.transport
+
+    const application = system.importSync(output.application.fileName)
+    const readMain = application.readMain
+    const loadSubpackage = application.loadSubpackage
+    if (typeof readMain !== 'function' || typeof loadSubpackage !== 'function') {
+        assert.fail('Application entry did not publish its expected exports')
+    }
+    assert.equal(readMain(), 'main')
+
+    // Calling the main entry's dynamic import proves the main-package to subpackage edge.
+    const subpackageA = await loadSubpackage()
+    const readMainDependency = subpackageA.readMainDependency
+    const readNestedStatic = subpackageA.readNestedStatic
+    const readCycle = subpackageA.readCycle
+    const loadNestedDynamic = subpackageA.loadNestedDynamic
+    if (
+        typeof readMainDependency !== 'function' ||
+        typeof readNestedStatic !== 'function' ||
+        typeof readCycle !== 'function' ||
+        typeof loadNestedDynamic !== 'function'
+    ) {
+        assert.fail('Subpackage A did not publish its cross-package readers')
+    }
+
+    assert.equal(readMainDependency(), 'main')
+    assert.equal(readNestedStatic(), 'b')
+    assert.equal(readCycle(), 'a')
+
+    const nestedDynamic = await loadNestedDynamic()
+    const readNestedMainDependency = nestedDynamic.readMainDependency
+    const readSecondStaticLevel = nestedDynamic.readNestedStatic
+    const loadDeepDynamic = nestedDynamic.loadDeepDynamic
+    if (
+        typeof readNestedMainDependency !== 'function' ||
+        typeof readSecondStaticLevel !== 'function' ||
+        typeof loadDeepDynamic !== 'function'
+    ) {
+        assert.fail('Nested dynamic module did not publish its static closure')
+    }
+
+    assert.equal(readNestedMainDependency(), 'main')
+    assert.equal(readSecondStaticLevel(), 'b')
+
+    const deepDynamic = await loadDeepDynamic()
+    const readDeepStatic = deepDynamic.readDeepStatic
+    if (typeof readDeepStatic !== 'function') {
+        assert.fail('Deep dynamic module did not publish its static dependency')
+    }
+    assert.equal(readDeepStatic(), 'main:a')
+
+    const loadModeByFileName = new Map(native.loads.map((load) => [load.fileName, load.mode]))
+    assert.equal(loadModeByFileName.get(output.application.fileName), 'sync')
+    assert.equal(loadModeByFileName.get(output.mainDependency.fileName), 'sync')
+    assert.equal(loadModeByFileName.get(output.subpackageA.fileName), 'async')
+    assert.equal(loadModeByFileName.get(output.subpackageB.fileName), 'async')
+    assert.equal(loadModeByFileName.get(output.nestedDynamic.fileName), 'async')
+    assert.equal(loadModeByFileName.get(output.deepDynamic.fileName), 'async')
+})
