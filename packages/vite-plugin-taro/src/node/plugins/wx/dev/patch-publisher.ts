@@ -4,12 +4,12 @@ import { type PatchUpdate, renderHmrPatches } from './hmr-files.ts'
 /** Abstracts the physical patches write; the engine owns the file destination. */
 export type WritePatches = (content: string) => Promise<void>
 
-/** Owns one build's unacknowledged patches and physical publish decision. */
+/** Owns the cumulative range between the host's published frontier and the runtime's applied frontier. */
 export class PatchPublisher {
     private readonly writePatches: WritePatches
     private buildId: string | undefined
 
-    /** Executable updates retained only until the runtime acknowledges physical delivery. */
+    /** Executable updates retained until the runtime confirms successful application. */
     private readonly pendingPatches: PatchUpdate[] = []
 
     // Explicit field assignment: node --test strips types and does not support parameter properties.
@@ -38,12 +38,12 @@ export class PatchPublisher {
         await this.writePatches(renderHmrPatches(this.buildId, this.pendingPatches))
     }
 
-    /** Removes the pending prefix covered by the runtime's Rolldown sequence receipt. */
-    acknowledge(seq: number): string[] {
-        let deliveredCount = 0
-        while (deliveredCount < this.pendingPatches.length && this.pendingPatches[deliveredCount].seq <= seq) {
-            deliveredCount++
+    /** Removes the pending prefix covered by the runtime's applied sequence. */
+    acknowledge(seq: number): void {
+        let appliedCount = 0
+        while (appliedCount < this.pendingPatches.length && this.pendingPatches[appliedCount].seq <= seq) {
+            appliedCount++
         }
-        return this.pendingPatches.splice(0, deliveredCount).map((patch) => patch.filename)
+        this.pendingPatches.splice(0, appliedCount)
     }
 }

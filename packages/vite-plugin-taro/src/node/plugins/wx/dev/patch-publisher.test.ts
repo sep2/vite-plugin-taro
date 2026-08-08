@@ -3,10 +3,10 @@ import test from 'node:test'
 import type { PatchUpdate } from './hmr-files.ts'
 import { PatchPublisher } from './patch-publisher.ts'
 
-const patch = (seq: number, code: string, fileName?: string): PatchUpdate => ({
+const patch = (seq: number, code: string): PatchUpdate => ({
     type: 'Patch',
     code,
-    filename: fileName ?? 'pages/a/index.js',
+    filename: 'pages/a/index.js',
     changedIds: ['pages/a/index'],
     seq
 })
@@ -19,7 +19,7 @@ function createPublisher(): { publisher: PatchPublisher; writes: string[] } {
     return { publisher, writes }
 }
 
-test('before any build no delivery is current and nothing is published', async () => {
+test('before any build no session is current and nothing is published', async () => {
     const { publisher, writes } = createPublisher()
 
     assert.equal(publisher.isCurrentBuild('anything'), false)
@@ -58,14 +58,23 @@ test('retains an unacknowledged suffix across later edits', async () => {
     assert.match(writes[1], /p4/)
 })
 
-test('acknowledges each delivered Rolldown filename once', async () => {
-    const { publisher } = createPublisher()
+test('application acknowledgements prune only their covered prefix', async () => {
+    const { publisher, writes } = createPublisher()
     publisher.startBuild()
-    await publisher.produce([patch(1, 'p1', 'patch-1.js'), patch(2, 'p2', 'patch-2.js')])
+    await publisher.produce([patch(1, 'p1'), patch(2, 'p2')])
 
-    assert.deepEqual(publisher.acknowledge(1), ['patch-1.js'])
-    assert.deepEqual(publisher.acknowledge(2), ['patch-2.js'])
-    assert.deepEqual(publisher.acknowledge(1), [])
+    publisher.acknowledge(1)
+    await publisher.produce([patch(3, 'p3')])
+    assert.doesNotMatch(writes[1], /p1/)
+    assert.match(writes[1], /p2/)
+    assert.match(writes[1], /p3/)
+
+    publisher.acknowledge(2)
+    publisher.acknowledge(1)
+    await publisher.produce([patch(4, 'p4')])
+    assert.doesNotMatch(writes[2], /p2/)
+    assert.match(writes[2], /p3/)
+    assert.match(writes[2], /p4/)
 })
 
 test('a fresh build restarts the Rolldown sequence', async () => {
