@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.5.7] - 2026-08-08
+
+### Changed
+
+- update wx HMR implementation guide (8041bae)
+- add wx HMR stress demo (4a59893)
+- simplify wx page HMR runtime (be21aed)
+
 ## [0.5.6] - 2026-08-08
 
 ### Changed
