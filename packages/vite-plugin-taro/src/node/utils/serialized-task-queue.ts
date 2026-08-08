@@ -9,14 +9,14 @@ export class SerializedTaskQueue {
     }
 
     /** Schedules a background task and reports its failure. */
-    enqueue(operation: string, task: () => Promise<void>): void {
+    enqueue(operation: string, task: () => void | PromiseLike<void>): void {
         void this.run(task).catch((error) => {
             this.reportError(operation, error)
         })
     }
 
     /** Schedules a task whose result and failure belong to the caller. */
-    run<Result>(task: () => Promise<Result>): Promise<Result> {
+    run<Result>(task: () => Result | PromiseLike<Result>): Promise<Result> {
         const result = this.tail.then(task)
         this.tail = result.then(
             () => undefined,
