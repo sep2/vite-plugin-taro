@@ -4,6 +4,32 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.5.5] - 2026-08-08
+
+### Changed
+
+- prompts (f3369e4)
+- separate wx HMR frontiers (45b976d)
+- hmr (c2accaf)
+- hmr (39b049f)
+- hmr (cc13646)
+- website (f8ebe48)
+- typo (414fcbc)
+- deps (b42ddbb)
+- deps (a366ae5)
+- docs (880b724)
+- filter H5 Babel transforms (2557aef)
+- docs (2b26f1a)
+- show package version on homepage (bb995f5)
+- use Oxc for range transforms (5babe0f)
+- improve mobile navigation controls (74f1b7c)
+
+### Fixed
+
+- fix hmr (5796f09)
+- coalesce wx runtime patches (03edf47)
+- stabilize wx HMR patch delivery (7aaad6d)
+
 ## [0.5.4] - 2026-08-07
 
 ### Changed
