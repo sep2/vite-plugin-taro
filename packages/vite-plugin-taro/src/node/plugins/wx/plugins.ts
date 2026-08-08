@@ -128,8 +128,8 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
         generateBundle: {
             /*
              * This hook is registered after createCssPlugins() and shares hook-level `order: 'post'` with the adapted
-             * upstream hooks and VPT style finalizer. Registration order therefore guarantees that app.wxss is complete
-             * before native Page/component companions are emitted. Without this order, the CSS finalizer could consume
+             * upstream hooks and VPT style finalizer. Registration order therefore guarantees that the imported global
+             * stylesheet is complete before native Page/component companions are emitted. Without this order, the finalizer could consume
              * incomplete Tailwind output or mistake native WXSS companions for additional compiler styles.
              */
             order: 'post',
