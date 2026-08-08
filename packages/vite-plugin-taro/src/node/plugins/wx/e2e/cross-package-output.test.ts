@@ -247,7 +247,8 @@ function createNativeEvaluator(chunks: readonly OutputChunk[]): NativeEvaluator 
         }
 
         const nativeRequire = Object.assign((specifier: string) => load(specifier, 'sync'), {
-            async: async (specifier: string) => load(specifier, 'async')
+            // A microtask boundary mocks WeChat's promise-returning require.async instead of evaluating the file eagerly.
+            async: (specifier: string) => Promise.resolve().then(() => load(specifier, 'async'))
         })
         Function('require', 'module', 'exports', chunk.code)(nativeRequire, commonJsModule, commonJsModule.exports)
         return commonJsModule.exports
@@ -299,8 +300,19 @@ test('executes a complex nested static and dynamic graph across production wx su
     }
     assert.equal(readMain(), 'main')
 
-    // Calling the main entry's dynamic import proves the main-package to subpackage edge.
-    const subpackageA = await loadSubpackage()
+    // Calling the main entry's dynamic import proves the main-package to subpackage edge. The mocked require.async must
+    // return before native evaluation starts, rather than behaving like a synchronous require wrapped in Promise.resolve.
+    const loadingSubpackageA = loadSubpackage()
+    assert.ok(loadingSubpackageA instanceof Promise)
+    assert.equal(
+        native.loads.some((load) => load.fileName === output.subpackageA.fileName),
+        false
+    )
+    const subpackageA = await loadingSubpackageA
+    assert.equal(
+        native.loads.some((load) => load.fileName === output.subpackageA.fileName && load.mode === 'async'),
+        true
+    )
     const readMainDependency = subpackageA.readMainDependency
     const readNestedStatic = subpackageA.readNestedStatic
     const readCycle = subpackageA.readCycle
@@ -319,8 +331,15 @@ test('executes a complex nested static and dynamic graph across production wx su
     assert.equal(readNestedStatic(), 'b')
     assert.equal(readCycle(), 'a')
 
-    // This is the second dynamic boundary: main ⇢ A ⇢ C. C then traverses static edges to main and B.
-    const nestedDynamic = await loadNestedDynamic()
+    // This is the second dynamic boundary: main ⇢ A ⇢ C. It must cross require.async again before C traverses static
+    // edges to main and B.
+    const loadingNestedDynamic = loadNestedDynamic()
+    assert.ok(loadingNestedDynamic instanceof Promise)
+    assert.equal(
+        native.loads.some((load) => load.fileName === output.nestedDynamic.fileName),
+        false
+    )
+    const nestedDynamic = await loadingNestedDynamic
     const readNestedMainDependency = nestedDynamic.readMainDependency
     const readSecondStaticLevel = nestedDynamic.readNestedStatic
     const loadDeepDynamic = nestedDynamic.loadDeepDynamic
@@ -335,8 +354,15 @@ test('executes a complex nested static and dynamic graph across production wx su
     assert.equal(readNestedMainDependency(), 'main')
     assert.equal(readSecondStaticLevel(), 'b')
 
-    // This is the third dynamic boundary: C's static dependency dynamically loads D, whose static leaf reaches main and A.
-    const deepDynamic = await loadDeepDynamic()
+    // This is the third require.async boundary: C's static dependency dynamically loads D, whose static leaf reaches
+    // main and A.
+    const loadingDeepDynamic = loadDeepDynamic()
+    assert.ok(loadingDeepDynamic instanceof Promise)
+    assert.equal(
+        native.loads.some((load) => load.fileName === output.deepDynamic.fileName),
+        false
+    )
+    const deepDynamic = await loadingDeepDynamic
     const readDeepStatic = deepDynamic.readDeepStatic
     if (typeof readDeepStatic !== 'function') {
         assert.fail('Deep dynamic module did not publish its static dependency')

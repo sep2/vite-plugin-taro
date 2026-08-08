@@ -84,19 +84,25 @@ async function materializeTestTransport({
     return materialized.code
 }
 
-/** Evaluates transport with a fake native require. */
+/** Evaluates transport with mocked synchronous and asynchronous WeChat require APIs. */
 function evaluateTransport(source: string, loadFile: (path: string) => unknown) {
+    // Mutable traces distinguish physical API selection while retaining total invocation order.
     const requiredPaths: string[] = []
+    const synchronouslyRequiredPaths: string[] = []
+    const asynchronouslyRequiredPaths: string[] = []
+    // The generated CommonJS transport mutates this module export cell during evaluation.
     const commonJsModule: { exports: unknown } = { exports: {} }
 
-    /** Loads and records one native file path. */
+    /** Loads and records one synchronous native file path. */
     function nativeRequire(id: string): unknown {
         requiredPaths.push(id)
+        synchronouslyRequiredPaths.push(id)
         return loadFile(id)
     }
     Object.assign(nativeRequire, {
         async(id: string): Promise<unknown> {
             requiredPaths.push(id)
+            asynchronouslyRequiredPaths.push(id)
             return Promise.resolve(loadFile(id))
         }
     })
@@ -104,6 +110,8 @@ function evaluateTransport(source: string, loadFile: (path: string) => unknown) 
     Function('require', 'module', 'exports', source)(nativeRequire, commonJsModule, commonJsModule.exports)
     return {
         requiredPaths,
+        synchronouslyRequiredPaths,
+        asynchronouslyRequiredPaths,
         runtime: commonJsModule.exports as TransportExports
     }
 }
@@ -171,19 +179,30 @@ test('bridges amphibious bootstrap and Rolldown runtime namespaces lazily', asyn
     assert.strictEqual(publishedRuntime.n, runtimeNamespace.n)
 })
 
-test('loads subpackage capsules by canonical ID through asynchronous native require', async () => {
+test('waits for mocked require.async before resolving a subpackage capsule', async () => {
     const source = await materializeTestTransport({
         code: transportCode,
         fileName: 'transport.js',
         capsuleChunkIds: ['sub/p_account/page.js']
     })
     const capsule = {}
-    const evaluated = evaluateTransport(source, () => capsule)
+    const deferredLoad = Promise.withResolvers<unknown>()
+    const evaluated = evaluateTransport(source, () => deferredLoad.promise)
 
-    const loaded = await evaluated.runtime.transport('sub/p_account/page.js')
+    const loading = Promise.resolve(evaluated.runtime.transport('sub/p_account/page.js'))
+    // Mutable observation proves the transport promise cannot settle before mocked native download completion.
+    let settled = false
+    void loading.then(() => {
+        settled = true
+    })
+    await Promise.resolve()
 
-    assert.strictEqual(loaded, capsule)
-    assert.deepEqual(evaluated.requiredPaths, ['./sub/p_account/page.js'])
+    assert.equal(settled, false)
+    assert.deepEqual(evaluated.synchronouslyRequiredPaths, [])
+    assert.deepEqual(evaluated.asynchronouslyRequiredPaths, ['./sub/p_account/page.js'])
+    deferredLoad.resolve(capsule)
+    assert.strictEqual(await loading, capsule)
+    assert.equal(settled, true)
     assert.match(source, /require\.async\(['"]\.\/sub\/p_account\/page\.js['"]\)/)
 })
 
