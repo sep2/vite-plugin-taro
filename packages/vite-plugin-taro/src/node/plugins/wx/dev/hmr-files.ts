@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { BindingClientHmrUpdate } from 'rolldown/experimental'
@@ -47,9 +48,21 @@ export function renderHmrPatches(buildId: string, patches: readonly PatchUpdate[
     return `__rolldown_runtime__.storePatches({buildId: ${JSON.stringify(buildId)}, patches: [${rendered.join(',')}]});\n`
 }
 
-/** Publishes one physical HMR file (direct write; atomic rename is reserved for later analysis). */
+/** Atomically publishes one physical HMR module so DevTools can observe only complete JavaScript generations. */
 export async function writeHmrFile(outDir: string, fileName: string, source: string): Promise<void> {
     const filePath = path.join(outDir, fileName)
-    await fs.mkdir(path.dirname(filePath), { recursive: true })
-    await fs.writeFile(filePath, source)
+    const directory = path.dirname(filePath)
+
+    await fs.mkdir(directory, { recursive: true })
+
+    const temporaryPath = path.join(directory, `.${path.basename(filePath)}.${randomUUID()}.txt`)
+
+    try {
+        // DevTools ignores the temporary .txt file; keeping it beside the destination guarantees a same-filesystem rename.
+        await fs.writeFile(temporaryPath, source)
+        await fs.rename(temporaryPath, filePath)
+    } finally {
+        // rename removes the source path on success; force cleanup covers interrupted writes and failed replacements.
+        await fs.rm(temporaryPath, { force: true })
+    }
 }
