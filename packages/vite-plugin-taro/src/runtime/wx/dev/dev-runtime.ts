@@ -244,6 +244,12 @@ class WxDevRuntime extends DevRuntime {
      * `hmr/patches.js` can contain several unacknowledged Rolldown patches and can be required by several Page shells. The
      * runtime must therefore ignore replayed sequences, reject a missing sequence, and move directly from the currently live
      * module generation to the latest published generation without rendering intermediate generations.
+     *
+     * For an appliedSeq of 4:
+     *
+     * - [5, 6, 7] registers every factory, performs one update using their unioned changedIds, commits appliedSeq 7, and reports 7;
+     * - a second Page evaluating [5, 6, 7] skips the complete replay and leaves the latest factories untouched;
+     * - [5, 7] fails at the expected sequence 6, keeps appliedSeq 4, and requests a full rebuild because factory 6 is unrecoverable.
      */
     private applyPatches(patches: readonly PatchProgram[]): boolean {
         // Keep the initial watermark immutable throughout the fold. Comparing replays against a moving watermark would allow

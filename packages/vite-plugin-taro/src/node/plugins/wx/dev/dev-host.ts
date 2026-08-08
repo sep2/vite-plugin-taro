@@ -1,17 +1,10 @@
 import type { ServerResponse } from 'node:http'
 import path from 'node:path'
 import colors from 'picocolors'
-import type { InputOptions, OutputOptions, Plugin } from 'rolldown'
-import { build } from 'rolldown'
-import { type DevEngine, dev, viteReporterPlugin } from 'rolldown/experimental'
+import { type DevEngine, type DevOptions, dev } from 'rolldown/experimental'
 import type { Connect, ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
-import { once } from '../../../utils/once.ts'
-import { resolvePackageFile } from '../../../utils/packages.ts'
 import { SerializedTaskQueue } from '../../../utils/serialized-task-queue.ts'
-import { appShellFileName } from '../module.ts'
-import { createWxDevMode } from './create-wx-dev-mode.ts'
-import { emptyOutputDirectory } from './empty-output-directory.ts'
 import {
     type HmrInfo,
     hmrControlPath,
@@ -23,13 +16,14 @@ import {
     writeHmrFile
 } from './hmr-files.ts'
 import { PatchPublisher } from './patch-publisher.ts'
+import { type BundledDev, installWxDevOptions, requireSingleOutput } from './wx-dev-options.ts'
 
 export type WxDevHost = Readonly<{
     close: () => Promise<void>
 }>
 
-type DeliveryReport = Readonly<{
-    kind: 'delivery'
+type AppliedReport = Readonly<{
+    kind: 'applied'
     buildId: string
     seq: number
 }>
@@ -40,6 +34,11 @@ type RebuildReport = Readonly<{
     buildId: string
     reason: string
 }>
+
+type HmrReport = AppliedReport | RebuildReport
+type HmrUpdatesResult = Parameters<NonNullable<DevOptions['onHmrUpdates']>>[0]
+type HmrUpdates = Exclude<HmrUpdatesResult, Error>
+type DevOutputResult = Parameters<NonNullable<DevOptions['onOutput']>>[0]
 
 /**
  * Creates the wx dev host: the adapter that owns the physical Rolldown DevEngine (created
@@ -59,23 +58,13 @@ export async function createWxDevHost({
     // state and physical metadata writes, preventing a later patch or build identity from being overwritten by older work.
     const hostTasks = new SerializedTaskQueue((operation, error) => logWxError(server.config.logger, operation, error))
 
-    // DevEngine does not reject run() after an initial plugin failure, so settle startup from its first buildEnd result.
-    // Later build errors belong to the running server and continue through onOutput/onHmrUpdates.
-    const initialBuild = Promise.withResolvers<void>()
-    const settleInitialBuild = once((error: Error | undefined): void => {
-        if (error) {
-            initialBuild.reject(error)
-        } else {
-            initialBuild.resolve()
-        }
-    })
-
     const publisher = new PatchPublisher((content) =>
         writeHmrFile(server.config.build.outDir, hmrPatchesFileName, content)
     )
 
-    // Must install rolldown options before create engine
-    installRolldownOptions()
+    // DevEngine does not reject run() after an initial plugin failure. The options layer owns a first-build buildEnd barrier
+    // and exposes only its result; later build errors continue independently through onOutput and onHmrUpdates.
+    const initialBuild = installWxDevOptions({ bundledDev, server, options })
     const engine: DevEngine = await createEngine()
 
     // The wx dev host owns the only DevEngine. Vite's default listen() would create a second
@@ -85,7 +74,7 @@ export async function createWxDevHost({
     bundledDev._devEngine = engine
     bundledDev.triggerBundleRegenerationIfStale = async () => false
     bundledDev.listen = async () => {
-        await Promise.all([engine.run(), initialBuild.promise])
+        await Promise.all([engine.run(), initialBuild])
         await engine.ensureCurrentBuildFinish()
     }
 
@@ -93,22 +82,14 @@ export async function createWxDevHost({
     // the actual port is not observable while onOutput runs for the first build. The App metadata
     // is written once the port is real; later full builds rewrite it from onOutput.
     server.httpServer?.once('listening', () => {
-        hostTasks.enqueue('wx HMR initialization failed', startFreshBuild)
+        hostTasks.enqueue('wx HMR initialization failed', rotateBuildSession)
     })
 
     // The runtime's metadata-only reports land on the control path; the buildId in each report
     // IS the Rolldown client ID.
     server.middlewares.use(hmrControlPath, (req, res) => void handleReport(req, res))
 
-    // Append the DevTools project directory line after Vite's own startup banner: DevTools
-    // opens the output directory directly, so the printed path is the one to select.
-    const originalPrintUrls = server.printUrls.bind(server)
-    server.printUrls = () => {
-        originalPrintUrls()
-        server.config.logger.info(
-            `  ${colors.green('➜')}  ${colors.bold('WeChat DevTools')}: ${colors.cyan(relativeToViteConfig(server.config.build.outDir, server.config.configFile, server.config.root))}`
-        )
-    }
+    installDevToolsPrinter(server)
 
     return {
         close: async () => {
@@ -118,7 +99,7 @@ export async function createWxDevHost({
     }
 
     /** Rotates the build identity and materializes the App metadata for it. */
-    async function startFreshBuild(): Promise<void> {
+    async function rotateBuildSession(): Promise<void> {
         const port = boundPort(server)
         if (port === undefined) {
             // The initial output finishes before Vite binds its port. The listening listener
@@ -132,10 +113,7 @@ export async function createWxDevHost({
         }
         await engine.registerClient(buildId)
 
-        // Publish info last: a heap that observes the new identity is guaranteed to see the
-        // matching reset patch file.
-        await writeHmrFile(server.config.build.outDir, hmrPatchesFileName, renderInitialHmrPatches())
-        await writeHmrInfo(server, buildId, port)
+        await publishBuildMetadata(server, buildId, port)
     }
 
     async function handleReport(req: Connect.IncomingMessage, res: ServerResponse): Promise<void> {
@@ -146,23 +124,8 @@ export async function createWxDevHost({
         }
 
         try {
-            const report = JSON.parse(await readBody(req)) as DeliveryReport | RebuildReport
-
-            await hostTasks.run(async () => {
-                // Only the current build's reports can advance physical delivery;
-                // delayed reports from older builds are ignored so they can never influence the
-                // live build.
-                if (!publisher.isCurrentBuild(report.buildId)) return
-                if (report.kind === 'rebuild') {
-                    server.config.logger.info(`[vpt] wx runtime requested a full rebuild: ${report.reason}`)
-                    engine.triggerFullBuild()
-                    return
-                }
-                // Commit every newly acknowledged Rolldown payload to this client's ship map.
-                const deliveredFiles = publisher.acknowledge(report.seq)
-                await Promise.all(deliveredFiles.map((fileName) => engine.notifyPayloadDelivered(fileName)))
-            })
-
+            const report = JSON.parse(await readBody(req)) as HmrReport
+            await hostTasks.run(() => processReport(report))
             res.end()
         } catch (e) {
             logWxError(server.config.logger, 'wx HMR report failed', e)
@@ -171,121 +134,101 @@ export async function createWxDevHost({
         }
     }
 
+    /** Applies one runtime receipt to the active physical patch history. */
+    function processReport(report: HmrReport): void {
+        // Delayed reports from older builds must never prune the live build's cumulative patch history.
+        if (!publisher.isCurrentBuild(report.buildId)) {
+            return
+        }
+
+        switch (report.kind) {
+            case 'rebuild': {
+                server.config.logger.info(`[vpt] wx runtime requested a full rebuild: ${report.reason}`)
+                engine.triggerFullBuild()
+                return
+            }
+            case 'applied': {
+                publisher.acknowledge(report.seq)
+                return
+            }
+        }
+    }
+
     /** Creates the physical DevEngine with the wx dev host hooks. */
     async function createEngine(): Promise<DevEngine> {
         const rolldownOptions = await bundledDev.getRolldownOptions()
-        if (!rolldownOptions.output || Array.isArray(rolldownOptions.output)) {
-            throw new Error('wx development requires exactly one Rolldown output.')
-        }
+        const output = requireSingleOutput(rolldownOptions)
 
-        return dev(rolldownOptions, rolldownOptions.output, {
-            onHmrUpdates: (result) => {
-                if (result instanceof Error) {
-                    logWxError(server.config.logger, 'wx HMR update failed', result)
-                    return
-                }
-
-                hostTasks.enqueue('wx HMR publication failed', async () => {
-                    // Collect the current client's batch first: one HMR event can carry several
-                    // client envelopes, while only the active build may enter its patch history.
-                    const batch: PatchUpdate[] = []
-                    for (const { clientId, update } of result.updates) {
-                        // Removed and delayed client sessions can still appear in a completed
-                        // engine batch; they must never enter the current build's patch history.
-                        if (!publisher.isCurrentBuild(clientId) || update.type === 'Noop') {
-                            continue
-                        }
-                        if (update.type === 'Patch') {
-                            batch.push(update)
-                            continue
-                        }
-
-                        server.config.logger.info(
-                            `[vpt] wx full rebuild required${update.reason ? `: ${update.reason}` : ''}`
-                        )
-                        engine.triggerFullBuild()
-                        return
-                    }
-                    if (batch.length > 0) {
-                        await publisher.produce(batch)
-                    }
-                })
-            },
-            onOutput: (result) => {
-                if (result instanceof Error) {
-                    logWxError(server.config.logger, 'wx dev build failed', result)
-                    return
-                }
-                // A fresh build identity per complete physical build; the App runtime reads it
-                // from hmr/info.js before any module registers.
-                hostTasks.enqueue('wx dev build finalization failed', startFreshBuild)
-            },
+        return dev(rolldownOptions, output, {
+            onHmrUpdates: handleHmrUpdates,
+            onOutput: handleDevOutput,
             rebuildStrategy: 'never',
             watch: { skipWrite: false }
         })
     }
 
-    /** Restores physical Mini Program output conventions after Vite applies browser bundled-dev defaults. */
-    function installRolldownOptions(): void {
-        const original = bundledDev.getRolldownOptions.bind(bundledDev)
-
-        bundledDev.getRolldownOptions = async () => {
-            const rolldownOptions = await original()
-            if (Array.isArray(rolldownOptions.output)) {
-                throw new Error('wx development requires one configured Rolldown output.')
-            }
-            rolldownOptions.output ??= {}
-            const output = rolldownOptions.output
-            const configuredOutput = server.config.build.rolldownOptions.output
-            if (Array.isArray(configuredOutput)) {
-                throw new Error('wx development supports one configured Rolldown output.')
-            }
-
-            // Every page entry must depend on hmr/patches.js: DevTools classifies a changed Page
-            // dependency as Page JavaScript hot reload and re-executes live Pages, which is the only
-            // trigger that delivers physical patches while keeping the App heap alive.
-            const pageFiles = new Set(options.pages.map((page) => `${page.path}.js`))
-
-            const configured = (configuredOutput ?? {}) as Record<string, unknown>
-            Object.assign(output, configured, {
-                assetFileNames: createStableFileNames(configured.assetFileNames, 'assets/[name][extname]'),
-                banner: createEntryBanner(pageFiles),
-                chunkFileNames: createStableFileNames(configured.chunkFileNames, 'assets/[name].js'),
-                entryFileNames: createStableFileNames(configured.entryFileNames, '[name]'),
-                format: 'es',
-                minify: true,
-                sourcemap: false
-            })
-
-            rolldownOptions.experimental ??= {}
-            rolldownOptions.experimental.devMode = createWxDevMode(
-                rolldownOptions.experimental.devMode,
-                await bundleRuntimeSource()
-            )
-
-            const emptyOutputDirectoryPlugin: Plugin = {
-                name: 'vpt:wx-empty-output-directory',
-                renderStart: {
-                    order: 'pre',
-                    // DevEngine bypasses Vite's build-only output preparation. Clear stale files before every complete
-                    // physical render while retaining the directory watched by WeChat DevTools.
-                    handler: () => emptyOutputDirectory(server.config.build.outDir)
-                }
-            }
-            const reportInitialBuildPlugin: Plugin = {
-                name: 'vpt:wx-report-initial-build',
-                buildEnd: settleInitialBuild
-            }
-
-            rolldownOptions.plugins = [
-                emptyOutputDirectoryPlugin,
-                rolldownOptions.plugins,
-                reportInitialBuildPlugin,
-                createViteReporter(server)
-            ]
-            disableViteOxcSourcemap(rolldownOptions.plugins)
-            return rolldownOptions
+    /** Converts Rolldown's non-awaited callback into one ordered host publication task. */
+    function handleHmrUpdates(result: HmrUpdatesResult): void {
+        if (result instanceof Error) {
+            logWxError(server.config.logger, 'wx HMR update failed', result)
+            return
         }
+        hostTasks.enqueue('wx HMR publication failed', () => publishUpdates(result))
+    }
+
+    /** Publishes only the active client's patches or requests the complete build required by Rolldown. */
+    async function publishUpdates(result: HmrUpdates): Promise<void> {
+        const batch: PatchUpdate[] = []
+        for (const { clientId, update } of result.updates) {
+            if (!publisher.isCurrentBuild(clientId) || update.type === 'Noop') {
+                continue
+            }
+
+            if (update.type === 'Patch') {
+                batch.push(update)
+                continue
+            }
+
+            server.config.logger.info(`[vpt] wx full rebuild required${update.reason ? `: ${update.reason}` : ''}`)
+            engine.triggerFullBuild()
+            return
+        }
+
+        if (batch.length === 0) {
+            return
+        }
+
+        // The physical file must exist before Rolldown advances: once committed, later patches may be generated relative to
+        // this batch even if DevTools has not observed its file event yet. PatchPublisher keeps the unapplied range cumulative,
+        // so any later file generation still carries every factory needed to bridge the runtime's older application frontier.
+        await publisher.produce(batch)
+
+        await commitPublishedBatch(batch)
+    }
+
+    /**
+     * Advances Rolldown's published frontier in the same sequence order materialized in the cumulative physical file.
+     *
+     * Given a batch [5, 6], publisher.produce has already made factories [5, 6] visible in hmr/patches.js. This method then
+     * commits payload 5 followed by payload 6. If DevTools observes neither event before sequence 7 is published, the next
+     * physical file contains [5, 6, 7], while Rolldown is free to generate 7 relative to its already-published sequence 6.
+     */
+    async function commitPublishedBatch(batch: readonly PatchUpdate[]): Promise<void> {
+        // Do not use Promise.all or deduplicate filenames. Multiple sequential payloads may target the same output filename,
+        // and each notification commits one distinct Rolldown payload. Awaiting in order preserves the exact frontier encoded
+        // by PatchUpdate.seq and prevents a later payload from becoming visible to the engine before its predecessor.
+        for (const patch of batch) {
+            await engine.notifyPayloadDelivered(patch.filename)
+        }
+    }
+
+    /** Rotates metadata after each successful complete output. */
+    function handleDevOutput(result: DevOutputResult): void {
+        if (result instanceof Error) {
+            logWxError(server.config.logger, 'wx dev build failed', result)
+            return
+        }
+        hostTasks.enqueue('wx dev build finalization failed', rotateBuildSession)
     }
 }
 
@@ -302,14 +245,26 @@ function boundPort(server: ViteDevServer): number | undefined {
     return address.port
 }
 
-/** Writes the immutable App metadata every full build starts from. */
-async function writeHmrInfo(server: ViteDevServer, buildId: string, port: number): Promise<void> {
+/** Resets physical patches before exposing the matching immutable build identity to a new App heap. */
+async function publishBuildMetadata(server: ViteDevServer, buildId: string, port: number): Promise<void> {
     const info: HmrInfo = {
         buildId,
         endpoint: `${server.config.server.https ? 'https' : 'http'}://${resolveEndpointHost(server)}:${port}${hmrControlPath}`
     }
 
+    await writeHmrFile(server.config.build.outDir, hmrPatchesFileName, renderInitialHmrPatches())
     await writeHmrFile(server.config.build.outDir, hmrInfoFileName, renderHmrInfo(info))
+}
+
+/** Appends the physical project directory after Vite's normal server URLs. */
+function installDevToolsPrinter(server: ViteDevServer): void {
+    const originalPrintUrls = server.printUrls.bind(server)
+    server.printUrls = () => {
+        originalPrintUrls()
+        server.config.logger.info(
+            `  ${colors.green('➜')}  ${colors.bold('WeChat DevTools')}: ${colors.cyan(relativeToViteConfig(server.config.build.outDir, server.config.configFile, server.config.root))}`
+        )
+    }
 }
 
 /**
@@ -331,22 +286,6 @@ function logWxError(logger: ViteDevServer['config']['logger'], prefix: string, e
         logger.error(`[vpt] ${prefix} with unknown error: ${error}`)
     }
 }
-
-// The runtime source is immutable for the host's lifetime (it changes only when the
-// plugin is rebuilt), so the nested bundle runs once and every build reuses it.
-const bundleRuntimeSource = once(
-    /** Bundles the runtime host and state machine into one plain script for injection. */
-    async function bundleRuntimeSource(): Promise<string> {
-        // write: false — only the code is consumed; without it rolldown drops the bundle into
-        // the default dist/ of the running project.
-        const result = await build({
-            input: resolvePackageFile('dist/runtime/wx/dev/dev-runtime.js'),
-            output: { format: 'iife', minify: true, sourcemap: false },
-            write: false
-        })
-        return result.output[0].code
-    }
-)
 
 const maximumBodyBytes = 64 * 1024
 
@@ -376,92 +315,6 @@ function resolveEndpointHost(server: ViteDevServer): string {
         return '127.0.0.1'
     }
     return address.address.includes(':') ? `[${address.address}]` : address.address
-}
-
-/**
- * Prepends entry banners. Banners are plain text appended after Rolldown's analysis, so the
- * requires never become chunk dependencies (a bare require inside the injected runtime source
- * would stall the build), and the wx render pipeline keeps this text after the hoisted chunk
- * requires — so the runtime chunk exists before these run:
- * - the app entry loads hmr/info.js and initializes the runtime before any module registers;
- * - every page requires hmr/patches.js, the changed dependency that makes DevTools re-execute
- *   live Pages and thereby load physical updates.
- */
-function createEntryBanner(pageFiles: ReadonlySet<string>): (chunk: { name: string; fileName: string }) => string {
-    return (chunk) => {
-        if (chunk.name === appShellFileName) {
-            return "__rolldown_runtime__.initialize(require('./hmr/info.js'));\n"
-        }
-        if (pageFiles.has(chunk.name)) {
-            // Page files live at `pages/<route>/index.js`, so the dependency path must be
-            // computed relative to each page's own directory.
-            const patchesPath = path.posix.relative(path.posix.dirname(chunk.fileName), 'hmr/patches.js')
-            return `require('${patchesPath}');\n`
-        }
-        return ''
-    }
-}
-
-function createStableFileNames<Value>(addon: unknown, fallback: string): string | ((value: Value) => string) {
-    if (typeof addon === 'function') {
-        return (value) => toStableFileName(String(addon(value)))
-    }
-    return toStableFileName(typeof addon === 'string' ? addon : fallback)
-}
-
-function toStableFileName(fileName: string): string {
-    return fileName
-        .replace(/(^|\/)\[hash(?::\d+)?\](?=\.|$)/g, '$1[name]')
-        .replace(/[-_.]\[hash(?::\d+)?\]/g, '')
-        .replace(/\[hash(?::\d+)?\]/g, '[name]')
-}
-
-type ViteTransformPlugin = {
-    _options?: { transformOptions?: { sourcemap?: boolean } }
-    name?: string
-}
-
-function disableViteOxcSourcemap(pluginOption: unknown): void {
-    if (Array.isArray(pluginOption)) {
-        pluginOption.forEach(disableViteOxcSourcemap)
-        return
-    }
-    if (!pluginOption || typeof pluginOption !== 'object') {
-        return
-    }
-    const plugin = pluginOption as ViteTransformPlugin
-    if (plugin.name === 'builtin:vite-transform' && plugin._options?.transformOptions) {
-        plugin._options.transformOptions.sourcemap = false
-    }
-}
-
-function createViteReporter(server: ViteDevServer) {
-    const { build, logger, root } = server.config
-    return viteReporterPlugin({
-        assetsDir: path.join(build.assetsDir, '/'),
-        chunkLimit: 2000,
-        isLib: Boolean(build.lib),
-        isTty: Boolean(process.stdout.isTTY && !process.env.CI),
-        logInfo: (message) => logger.info(message),
-        reportCompressedSize: false,
-        root,
-        warnLargeChunks: false
-    })
-}
-
-type BundledDevRolldownOptions = InputOptions & {
-    experimental?: {
-        [key: string]: unknown
-        devMode?: boolean | Record<string, unknown>
-    }
-    output?: OutputOptions | OutputOptions[]
-}
-
-type BundledDev = {
-    _devEngine?: DevEngine
-    getRolldownOptions(): Promise<BundledDevRolldownOptions>
-    listen(): Promise<void>
-    triggerBundleRegenerationIfStale(): Promise<boolean>
 }
 
 function getBundledDev(server: ViteDevServer): BundledDev {
