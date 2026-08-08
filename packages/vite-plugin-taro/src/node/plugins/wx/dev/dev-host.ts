@@ -8,6 +8,7 @@ import type { Connect, ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { once } from '../../../utils/once.ts'
 import { resolvePackageFile } from '../../../utils/packages.ts'
+import { SerializedTaskQueue } from '../../../utils/serialized-task-queue.ts'
 import { appShellFileName } from '../module.ts'
 import { createWxDevMode } from './create-wx-dev-mode.ts'
 import { emptyOutputDirectory } from './empty-output-directory.ts'
@@ -37,6 +38,7 @@ type DeliveryReport = Readonly<{
 type RebuildReport = Readonly<{
     kind: 'rebuild'
     buildId: string
+    reason: string
 }>
 
 /**
@@ -53,6 +55,10 @@ export async function createWxDevHost({
     options: VitePluginTaroOptions
 }): Promise<WxDevHost> {
     const bundledDev = getBundledDev(server)
+    // Rolldown invokes output callbacks without awaiting their promises. This queue is the single owner of mutable HMR host
+    // state and physical metadata writes, preventing a later patch or build identity from being overwritten by older work.
+    const hostTasks = new SerializedTaskQueue((operation, error) => logWxError(server.config.logger, operation, error))
+
     // DevEngine does not reject run() after an initial plugin failure, so settle startup from its first buildEnd result.
     // Later build errors belong to the running server and continue through onOutput/onHmrUpdates.
     const initialBuild = Promise.withResolvers<void>()
@@ -86,7 +92,9 @@ export async function createWxDevHost({
     // Vite binds the port only after initServer (and therefore the initial build) completes, so
     // the actual port is not observable while onOutput runs for the first build. The App metadata
     // is written once the port is real; later full builds rewrite it from onOutput.
-    server.httpServer?.once('listening', startFreshBuild)
+    server.httpServer?.once('listening', () => {
+        hostTasks.enqueue('wx HMR initialization failed', startFreshBuild)
+    })
 
     // The runtime's metadata-only reports land on the control path; the buildId in each report
     // IS the Rolldown client ID.
@@ -104,6 +112,7 @@ export async function createWxDevHost({
 
     return {
         close: async () => {
+            await hostTasks.waitForIdle()
             await engine.close()
         }
     }
@@ -138,21 +147,22 @@ export async function createWxDevHost({
 
         try {
             const report = JSON.parse(await readBody(req)) as DeliveryReport | RebuildReport
-            // Only the current build's reports can advance physical delivery;
-            // delayed reports from older builds are ignored so they can never influence the
-            // live build.
-            if (!publisher.isCurrentBuild(report.buildId)) {
-                res.end()
-                return
-            }
-            if (report.kind === 'rebuild') {
-                engine.triggerFullBuild()
-                res.end()
-                return
-            }
-            // Commit every newly acknowledged Rolldown payload to this client's ship map.
-            const deliveredFiles = publisher.acknowledge(report.seq)
-            await Promise.all(deliveredFiles.map((fileName) => engine.notifyPayloadDelivered(fileName)))
+
+            await hostTasks.run(async () => {
+                // Only the current build's reports can advance physical delivery;
+                // delayed reports from older builds are ignored so they can never influence the
+                // live build.
+                if (!publisher.isCurrentBuild(report.buildId)) return
+                if (report.kind === 'rebuild') {
+                    server.config.logger.info(`[vpt] wx runtime requested a full rebuild: ${report.reason}`)
+                    engine.triggerFullBuild()
+                    return
+                }
+                // Commit every newly acknowledged Rolldown payload to this client's ship map.
+                const deliveredFiles = publisher.acknowledge(report.seq)
+                await Promise.all(deliveredFiles.map((fileName) => engine.notifyPayloadDelivered(fileName)))
+            })
+
             res.end()
         } catch (e) {
             logWxError(server.config.logger, 'wx HMR report failed', e)
@@ -169,44 +179,46 @@ export async function createWxDevHost({
         }
 
         return dev(rolldownOptions, rolldownOptions.output, {
-            onHmrUpdates: async (result) => {
+            onHmrUpdates: (result) => {
                 if (result instanceof Error) {
                     logWxError(server.config.logger, 'wx HMR update failed', result)
                     return
                 }
-                // Collect the current client's batch first: one HMR event can carry several
-                // client envelopes, while only the active build may enter its patch history.
-                const batch: PatchUpdate[] = []
-                for (const { clientId, update } of result.updates) {
-                    // Removed and delayed client sessions can still appear in a completed
-                    // engine batch; they must never enter the current build's patch history.
-                    if (!publisher.isCurrentBuild(clientId) || update.type === 'Noop') {
-                        continue
-                    }
-                    if (update.type === 'Patch') {
-                        batch.push(update)
-                        continue
-                    }
 
-                    server.config.logger.info(
-                        `[vpt] wx full rebuild required${update.reason ? `: ${update.reason}` : ''}`
-                    )
-                    engine.triggerFullBuild()
-                    return
-                }
-                if (batch.length > 0) {
-                    await publisher.produce(batch)
-                    // server.config.logger.info('[vpt] wx patch produced')
-                }
+                hostTasks.enqueue('wx HMR publication failed', async () => {
+                    // Collect the current client's batch first: one HMR event can carry several
+                    // client envelopes, while only the active build may enter its patch history.
+                    const batch: PatchUpdate[] = []
+                    for (const { clientId, update } of result.updates) {
+                        // Removed and delayed client sessions can still appear in a completed
+                        // engine batch; they must never enter the current build's patch history.
+                        if (!publisher.isCurrentBuild(clientId) || update.type === 'Noop') {
+                            continue
+                        }
+                        if (update.type === 'Patch') {
+                            batch.push(update)
+                            continue
+                        }
+
+                        server.config.logger.info(
+                            `[vpt] wx full rebuild required${update.reason ? `: ${update.reason}` : ''}`
+                        )
+                        engine.triggerFullBuild()
+                        return
+                    }
+                    if (batch.length > 0) {
+                        await publisher.produce(batch)
+                    }
+                })
             },
-            onOutput: async (result) => {
+            onOutput: (result) => {
                 if (result instanceof Error) {
                     logWxError(server.config.logger, 'wx dev build failed', result)
                     return
                 }
                 // A fresh build identity per complete physical build; the App runtime reads it
                 // from hmr/info.js before any module registers.
-                await startFreshBuild()
+                hostTasks.enqueue('wx dev build finalization failed', startFreshBuild)
             },
             rebuildStrategy: 'never',
             watch: { skipWrite: false }

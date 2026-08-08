@@ -110,7 +110,7 @@ class WxDevRuntime extends DevRuntime {
     }
 
     /** Computes accepting boundaries and every executed module that must be re-armed. */
-    private computeHmrUpdate(changedIds: readonly string[]): HmrUpdate | undefined {
+    private computeHmrUpdate(changedIds: Iterable<string>): HmrUpdate | undefined {
         // Mutable traversal accumulators are confined to one synchronous update plan.
         const boundaries: string[] = []
         const updateSet = new Set<string>()
@@ -166,7 +166,7 @@ class WxDevRuntime extends DevRuntime {
      * Applies one patch in three phases: capture old contexts, evict the whole update set,
      * then re-run accepting modules and pass their fresh exports to the old contexts.
      */
-    private applyHmrUpdate(changedIds: readonly string[]): void {
+    private applyHmrUpdate(changedIds: Iterable<string>): void {
         const update = this.computeHmrUpdate(changedIds)
         if (!update) return
 
@@ -239,24 +239,67 @@ class WxDevRuntime extends DevRuntime {
         this.applyPatches(payload.patches)
     }
 
-    /** Applies one physical suffix in Rolldown sequence order. */
+    /**
+     * Folds one cumulative physical patch file into a single logical HMR update.
+     *
+     * `hmr/patches.js` can contain several unacknowledged Rolldown patches and can be required by several Page shells. The
+     * runtime must therefore ignore replayed sequences, reject a missing sequence, and move directly from the currently live
+     * module generation to the latest delivered generation without rendering intermediate generations.
+     */
     private applyPatches(patches: readonly PatchProgram[]): void {
-        for (const patch of patches) {
-            if (patch.seq <= this.appliedSeq) continue
+        // Keep the initial watermark immutable throughout the fold. Comparing replays against a moving watermark would allow
+        // a duplicate new sequence in the same payload to masquerade as an already-applied patch.
+        const previousSeq = this.appliedSeq
 
-            try {
-                const expectedSeq = this.appliedSeq + 1
-                if (patch.seq !== expectedSeq) {
-                    throw new Error(`missing patch sequence ${expectedSeq}`)
+        // Mutable only during this synchronous pass. `nextSeq` validates continuity while `changedIds` unions every incremental
+        // patch's roots for the one final graph traversal; neither value escapes into persistent runtime state.
+        let nextSeq = previousSeq + 1
+        const changedIds = new Set<string>()
+
+        try {
+            for (const patch of patches) {
+                // The same physical file is evaluated once per affected Page. Those later evaluations replay its prefix and
+                // must not let an old factory overwrite the newer factory already stored in the Rolldown runtime.
+                if (patch.seq <= previousSeq) {
+                    continue
                 }
+
+                // Every patch is incremental: if one physical write was missed, later factories cannot reconstruct modules
+                // changed only by that missing patch. Rebuilding is safer than silently running a mixed module generation.
+                if (patch.seq !== nextSeq) {
+                    throw new Error(`missing patch sequence ${nextSeq}`)
+                }
+
+                // A patch factory only registers module graphs and module factories; it does not execute application modules.
+                // Running all of them first leaves the registry at the latest generation while avoiding intermediate renders.
                 patch.factory()
-                this.applyHmrUpdate(patch.changedIds)
-                this.appliedSeq = patch.seq
-            } catch (error) {
-                console.warn(`[vpt] patch sequence ${patch.seq} failed; apply stopped`, error)
-                void this.sendReport({ kind: 'rebuild' })
+
+                for (const changedId of patch.changedIds) {
+                    changedIds.add(changedId)
+                }
+
+                nextSeq++
+            }
+
+            // A payload containing only replayed sequences requires no graph work and must not alter the delivery watermark.
+            if (nextSeq === previousSeq + 1) {
                 return
             }
+
+            // Apply once after every factory is registered. React Refresh arms a newly executed module's hot.accept callback
+            // in a microtask; applying consecutive patches separately would inspect that intermediate context too early and
+            // incorrectly bubble through the capsule to the native Page shell as though no HMR boundary existed.
+            this.applyHmrUpdate(changedIds)
+
+            // Commit delivery only after graph propagation and boundary callbacks succeed. A failure leaves the old watermark
+            // intact and requests a full rebuild below, so a partially applied batch is never acknowledged as healthy.
+            this.appliedSeq = nextSeq - 1
+        } catch (error) {
+            console.warn('[vpt] patch batch failed; apply stopped', error)
+            void this.sendReport({
+                kind: 'rebuild',
+                reason: Error.isError(error) ? error.message : String(error)
+            })
         }
     }
 
