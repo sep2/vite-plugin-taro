@@ -9,6 +9,31 @@ import { renderCapsule } from '../render/capsule.ts'
 import { renderNative } from '../render/native.ts'
 import { materializeTransport } from '../render/transport.ts'
 
+/**
+ * Logical graph exercised by this production-output test (`──▶` static, `┄┄▶` dynamic):
+ *
+ * ```text
+ * application [main]
+ * ├──▶ main-dependency [main]
+ * └┄┄▶ subpackage-a [A]
+ *      ├──▶ main-dependency [main]
+ *      ├──▶ subpackage-a-static
+ *      │    └──▶ subpackage-b [B]
+ *      │          └──▶ subpackage-a [A]       cycle B → A
+ *      └┄┄▶ nested-dynamic [C]
+ *            ├──▶ main-dependency [main]
+ *            └──▶ nested-static
+ *                  ├──▶ subpackage-b [B]
+ *                  └┄┄▶ deep-dynamic [D]
+ *                        └──▶ deep-static
+ *                              ├──▶ main-dependency [main]
+ *                              └──▶ subpackage-a [A]
+ * ```
+ *
+ * A, B, C, and D each contribute one simulated megabyte, forcing four physical subpackages under the 1.9 MB
+ * planning budget. Their smaller static dependencies remain independently placeable, so the test does not rely on a
+ * static closure being collapsed into one package.
+ */
 const applicationId = '/cross-package/application.js'
 const mainDependencyId = '/cross-package/main-dependency.js'
 const subpackageAId = '/cross-package/subpackage-a.js'
@@ -253,6 +278,7 @@ test('executes a complex nested static and dynamic graph across production wx su
         requireSubpackageRoot(output.deepDynamic)
     ])
 
+    // These assertions validate the physical placement before any generated JavaScript executes.
     assert.equal(lazyRoots.size, 4)
     assert.doesNotMatch(output.application.fileName, /^sub\//)
     assert.doesNotMatch(output.mainDependency.fileName, /^sub\//)
@@ -288,10 +314,12 @@ test('executes a complex nested static and dynamic graph across production wx su
         assert.fail('Subpackage A did not publish its cross-package readers')
     }
 
+    // A → main, A → static bridge → B, and the B → A back edge all retain their original ESM values.
     assert.equal(readMainDependency(), 'main')
     assert.equal(readNestedStatic(), 'b')
     assert.equal(readCycle(), 'a')
 
+    // This is the second dynamic boundary: main ⇢ A ⇢ C. C then traverses static edges to main and B.
     const nestedDynamic = await loadNestedDynamic()
     const readNestedMainDependency = nestedDynamic.readMainDependency
     const readSecondStaticLevel = nestedDynamic.readNestedStatic
@@ -307,6 +335,7 @@ test('executes a complex nested static and dynamic graph across production wx su
     assert.equal(readNestedMainDependency(), 'main')
     assert.equal(readSecondStaticLevel(), 'b')
 
+    // This is the third dynamic boundary: C's static dependency dynamically loads D, whose static leaf reaches main and A.
     const deepDynamic = await loadDeepDynamic()
     const readDeepStatic = deepDynamic.readDeepStatic
     if (typeof readDeepStatic !== 'function') {
@@ -314,6 +343,7 @@ test('executes a complex nested static and dynamic graph across production wx su
     }
     assert.equal(readDeepStatic(), 'main:a')
 
+    // The native trace proves placement controls the physical API: main is synchronous and every generated package is async.
     const loadModeByFileName = new Map(native.loads.map((load) => [load.fileName, load.mode]))
     assert.equal(loadModeByFileName.get(output.application.fileName), 'sync')
     assert.equal(loadModeByFileName.get(output.mainDependency.fileName), 'sync')

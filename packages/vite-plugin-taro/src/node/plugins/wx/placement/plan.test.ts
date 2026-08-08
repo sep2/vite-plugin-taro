@@ -76,6 +76,21 @@ test('splits an oversized lazy static cycle across subpackages', () => {
     )
 })
 
+/**
+ * Ownership-only counterpart to the output E2E graph (`──▶` static, `┄┄▶` dynamic):
+ *
+ * ```text
+ * entry ──▶ application ──▶ main-shared
+ *                   └┄┄▶ feature ──▶ feature-static ──▶ cycle-peer
+ *                          ▲                              │
+ *                          └──────────────────────────────┘
+ *                          └┄┄▶ nested-dynamic ──▶ nested-static ──▶ main-shared
+ *                                      └┄┄▶ deep-dynamic ──▶ deep-static ──▶ feature
+ * ```
+ *
+ * This test isolates the planner: only the entry's static closure may be main. Every module reached after any dynamic
+ * boundary must remain eligible for subpackage placement, including later static closures and cycle back-edges.
+ */
 test('plans nested static and dynamic imports without collapsing lazy boundaries into main', () => {
     const plan = createPlacementPlan({
         ...graph({
