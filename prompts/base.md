@@ -1,1 +1,1 @@
-follow prompt under ./prompt.md
+follow prompt under prompts/prompt.md
