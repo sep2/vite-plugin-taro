@@ -126,7 +126,8 @@ function ensureSingleOutput(rolldownOptions: BundledDevRolldownOptions): OutputO
 
 /**
  * Prepends entry banners after Rolldown's analysis so their native requires remain physical dependencies rather than chunk
- * graph edges. The App initializes the runtime identity, while every Page loads the file DevTools watches for patch delivery.
+ * graph edges. The App initializes the runtime identity, while every Page explicitly applies the watched patch data before its
+ * capsule import continues.
  */
 function createEntryBanner(pageFiles: ReadonlySet<string>): (chunk: { name: string; fileName: string }) => string {
     return (chunk) => {
@@ -135,7 +136,7 @@ function createEntryBanner(pageFiles: ReadonlySet<string>): (chunk: { name: stri
         }
         if (pageFiles.has(chunk.name)) {
             const patchesPath = path.posix.relative(path.posix.dirname(chunk.fileName), 'hmr/patches.js')
-            return `require('${patchesPath}');\n`
+            return `__rolldown_runtime__.applyPatches(require('${patchesPath}'));\n`
         }
         return ''
     }

@@ -29,11 +29,10 @@ export function renderInitialHmrPatches(): string {
 }
 
 /**
- * Renders the missing patch suffix as a passive physical delivery module.
+ * Renders the cumulative patch suffix as inert CommonJS data.
  *
- * DevTools re-executes the Page because this file changed. The module only stores the literal
- * Rolldown factories in the persistent App runtime; storePatches applies them synchronously,
- * so the Page's imports below the require resolve against the freshly registered modules.
+ * DevTools re-executes the Page because this dependency changed. The Page entry passes the exported payload to the persistent
+ * App runtime synchronously before importing its capsule, keeping delivery explicit and leaving this file free of side effects.
  */
 export function renderHmrPatches(buildId: string, patches: readonly PatchUpdate[]): string {
     if (patches.length === 0) {
@@ -45,7 +44,7 @@ export function renderHmrPatches(buildId: string, patches: readonly PatchUpdate[
             `{seq: ${patch.seq}, changedIds: ${JSON.stringify(patch.changedIds)}, factory: () => {\n${patch.code}\n}}`
     )
 
-    return `__rolldown_runtime__.storePatches({buildId: ${JSON.stringify(buildId)}, patches: [${rendered.join(',')}]});\n`
+    return `module.exports = {buildId: ${JSON.stringify(buildId)}, patches: [${rendered.join(',')}]};\n`
 }
 
 /** Atomically publishes one physical HMR module so DevTools can observe only complete JavaScript generations. */

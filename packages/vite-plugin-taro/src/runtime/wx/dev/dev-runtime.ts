@@ -5,9 +5,8 @@
 // The `DevRuntime` base class is injected into the chunk by Rolldown's dev-mode
 // transform, so the WX host only extends it.
 //
-// Delivery is passive: every valid hmr/patches.js suffix is applied synchronously before the Page continues evaluating, then
-// its successful application frontier is reported to the host. Already-applied sequences are ignored when another Page
-// requires the same cumulative physical file.
+// Every Page explicitly passes the inert hmr/patches.js export here before importing its capsule. The runtime applies that
+// cumulative suffix synchronously, reports its successful application frontier, and ignores sequences replayed by other Pages.
 
 import type { DevRuntime as RolldownDevRuntime } from 'rolldown/experimental/runtime-types'
 
@@ -216,8 +215,11 @@ class WxDevRuntime extends DevRuntime {
         this.hotReloading = false
     }
 
-    /** The only direct effect of hmr/patches.js: apply its cumulative suffix and report the resulting frontier. */
-    storePatches(payload: PatchPayload): void {
+    /** Applies one Page-delivered payload before that Page imports its capsule. */
+    applyPatches(payload: PatchPayload | undefined): void {
+        // The initial physical dependency exports undefined until the host has a patch range.
+        if (!payload) return
+
         const info = this.hmrInfo
         if (!info || payload.buildId !== info.buildId) {
             console.warn('[vpt] patches for a stale build')
@@ -231,7 +233,7 @@ class WxDevRuntime extends DevRuntime {
 
         // Apply synchronously: the page's imports below the require resolve against the
         // freshly registered modules, so the re-executed Page evaluates with the new code.
-        if (this.applyPatches(payload.patches)) {
+        if (this.applyPatchBatch(payload.patches)) {
             // The host may publish later generations while this synchronous apply runs. Reporting only afterward makes this
             // the application frontier: publisher history is never pruned merely because its JavaScript file was observed.
             void this.sendReport({ kind: 'applied', seq: this.appliedSeq })
@@ -251,7 +253,7 @@ class WxDevRuntime extends DevRuntime {
      * - a second Page evaluating [5, 6, 7] skips the complete replay and leaves the latest factories untouched;
      * - [5, 7] fails at the expected sequence 6, keeps appliedSeq 4, and requests a full rebuild because factory 6 is unrecoverable.
      */
-    private applyPatches(patches: readonly PatchProgram[]): boolean {
+    private applyPatchBatch(patches: readonly PatchProgram[]): boolean {
         // Keep the initial watermark immutable throughout the fold. Comparing replays against a moving watermark would allow
         // a duplicate new sequence in the same payload to masquerade as an already-applied patch.
         const previousSeq = this.appliedSeq

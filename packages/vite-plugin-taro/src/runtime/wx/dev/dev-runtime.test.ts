@@ -16,7 +16,8 @@ type TestRuntime = DevRuntime &
     Readonly<{
         createModuleHotContext: (moduleId: string) => TestHotContext
         initialize: (info: { buildId: string; endpoint: string }) => void
-        storePatches: (payload: { buildId: string; patches: TestPatch[] }) => void
+        isHotReloading: () => boolean
+        applyPatches: (payload: { buildId: string; patches: TestPatch[] } | undefined) => void
     }>
 
 type TestHarness = Readonly<{
@@ -120,6 +121,16 @@ test('initialization does not report an application frontier before patches run'
     assert.deepEqual(reports, [])
 })
 
+test('ignores the initial empty physical patch module', async () => {
+    const { reports, runtime } = await createTestHarness()
+    const reportCount = reports.length
+
+    runtime.applyPatches(undefined)
+
+    assert.equal(runtime.isHotReloading(), false)
+    assert.deepEqual(getNewReports(reports, reportCount), [])
+})
+
 test('evicts an accepted module before running its new factory', async () => {
     const { reports, runtime } = await createTestHarness()
     // Written by the old generation's accept callback; it must observe the new exports.
@@ -134,7 +145,7 @@ test('evicts an accepted module before running its new factory', async () => {
     })
     const reportCount = reports.length
 
-    runtime.storePatches({
+    runtime.applyPatches({
         buildId: 'build',
         patches: [
             createPatch({
@@ -159,7 +170,7 @@ test('treats a bare accept as a self-accepting boundary', async () => {
     registerInitialModule({ runtime, moduleId: 'bare', moduleExports: { value: 'old' } })
     const reportCount = reports.length
 
-    runtime.storePatches({
+    runtime.applyPatches({
         buildId: 'build',
         patches: [
             createPatch({
@@ -192,7 +203,7 @@ test('coalesces consecutive patches before deferred accept registration', async 
     })
     const reportCount = reports.length
 
-    runtime.storePatches({
+    runtime.applyPatches({
         buildId: 'build',
         patches: [
             createPatch({
@@ -241,7 +252,7 @@ test('coalesces a burst of deferred React Refresh patches into its latest genera
         })
     )
 
-    runtime.storePatches({ buildId: 'build', patches })
+    runtime.applyPatches({ buildId: 'build', patches })
 
     assert.equal(factoryRuns, 20)
     assert.equal(moduleExecutions, 1)
@@ -274,7 +285,7 @@ test('unions changed modules from separate patches into one apply', async () => 
     })
     const reportCount = reports.length
 
-    runtime.storePatches({
+    runtime.applyPatches({
         buildId: 'build',
         patches: [
             createPatch({
@@ -311,10 +322,10 @@ test('ignores a cumulative payload prefix already applied by another Page shell'
         moduleExports: { value: 'first' },
         deferAccept: false
     })
-    runtime.storePatches({ buildId: 'build', patches: [firstPatch] })
+    runtime.applyPatches({ buildId: 'build', patches: [firstPatch] })
     const reportCount = reports.length
 
-    runtime.storePatches({
+    runtime.applyPatches({
         buildId: 'build',
         patches: [
             {
@@ -348,7 +359,7 @@ test('detects a sequence gap after skipping a replayed physical prefix', async (
     // The replayed prefix must be ignored, while the later incremental factory must be rejected because sequence 2 is absent.
     let laterFactoryRuns = 0
     registerInitialModule({ runtime, moduleId: 'page', moduleExports: { value: 'old' } })
-    runtime.storePatches({
+    runtime.applyPatches({
         buildId: 'build',
         patches: [
             createPatch({
@@ -362,7 +373,7 @@ test('detects a sequence gap after skipping a replayed physical prefix', async (
     })
     const reportCount = reports.length
 
-    runtime.storePatches({
+    runtime.applyPatches({
         buildId: 'build',
         patches: [
             {
@@ -400,7 +411,7 @@ test('requests a rebuild before mutating registries when a sequence is missing',
     registerInitialModule({ runtime, moduleId: 'page', moduleExports: { value: 'old' } })
     const reportCount = reports.length
 
-    runtime.storePatches({
+    runtime.applyPatches({
         buildId: 'build',
         patches: [
             createPatch({
@@ -433,7 +444,7 @@ test('rejects a duplicate new sequence instead of treating it as a replay', asyn
     registerInitialModule({ runtime, moduleId: 'page', moduleExports: { value: 'old' } })
     const reportCount = reports.length
 
-    runtime.storePatches({
+    runtime.applyPatches({
         buildId: 'build',
         patches: [
             createPatch({
@@ -475,7 +486,7 @@ test('ignores patches for a stale build before running their factories', async (
     registerInitialModule({ runtime, moduleId: 'page', moduleExports: { value: 'old' } })
     const reportCount = reports.length
 
-    runtime.storePatches({
+    runtime.applyPatches({
         buildId: 'stale-build',
         patches: [
             createPatch({

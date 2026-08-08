@@ -3,7 +3,24 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { writeHmrFile } from './hmr-files.ts'
+import { type PatchUpdate, renderHmrPatches, renderInitialHmrPatches, writeHmrFile } from './hmr-files.ts'
+
+const patch: PatchUpdate = {
+    type: 'Patch',
+    code: 'registerLatestFactory()',
+    filename: 'pages/index.js',
+    changedIds: ['src/page.tsx'],
+    seq: 1
+}
+
+test('renders initial and cumulative patches as inert CommonJS data', () => {
+    assert.equal(renderInitialHmrPatches(), 'module.exports = undefined;\n')
+
+    const source = renderHmrPatches('build', [patch])
+    assert.match(source, /^module\.exports = \{buildId: "build", patches:/)
+    assert.match(source, /registerLatestFactory\(\)/)
+    assert.doesNotMatch(source, /^__rolldown_runtime__/)
+})
 
 test('atomically replaces a complete HMR module without leaving temporary files', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-hmr-file-'))
