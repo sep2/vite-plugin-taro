@@ -136,7 +136,8 @@ function createEntryBanner(pageFiles: ReadonlySet<string>): (chunk: { name: stri
         }
         if (pageFiles.has(chunk.name)) {
             const patchesPath = path.posix.relative(path.posix.dirname(chunk.fileName), 'hmr/patches.js')
-            return `__rolldown_runtime__.applyPatches(require('${patchesPath}'));\n`
+            const route = chunk.name.slice(0, -'.js'.length)
+            return `__rolldown_runtime__.applyPatches(require('${patchesPath}'), ${JSON.stringify(route)});\n`
         }
         return ''
     }

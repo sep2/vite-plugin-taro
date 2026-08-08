@@ -47,6 +47,9 @@ export const pageCapsuleId = '\0vpt:page-capsule'
 /** Provides the Page capsule source specialized through a stable route query. */
 export const pageCapsulePath = resolvePackageFile('dist/runtime/wx/capsule/page.js')
 
+/** Identifies the Taro facade shared by the App, Page, and recursive Component capsules. */
+export const taroRuntimePath = resolvePackageFile('dist/runtime/wx/capsule/taro-runtime.js')
+
 /** Identifies the reusable synchronous native Page shell source. */
 export const pageShellPath = resolvePackageFile('dist/runtime/wx/native/page.js')
 

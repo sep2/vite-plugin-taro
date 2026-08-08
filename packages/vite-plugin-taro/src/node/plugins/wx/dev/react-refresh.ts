@@ -25,8 +25,7 @@ const refreshRuntimeWindowGlobals = ['__registerBeforePerformReactRefresh', '__g
  * @vitejs/plugin-react's generated refresh code assumes the web HTML preamble and a browser
  * global scope; wx has neither. Each transform adapts one piece of that contract:
  * - the refresh runtime module (id-filtered): the vendored runtime reads and assigns
- *   `window` protocol globals (rewritten to `global`) and must inject itself at evaluation
- *   — the preamble's `injectIntoGlobalHook` call has no HTML home in wx;
+ *   `window` protocol globals (rewritten to `global`) and must inject itself at evaluation;
  * - react-family modules (filtered on free references): the DevTools hook is read as a free
  *   variable, which the WeChat runtime scope never resolves against `global` — every free
  *   reference becomes an explicit member access;
@@ -93,7 +92,7 @@ export function createWxReactRefreshTransforms(): Plugin[] {
  * The protocol name is unique, but only reference identifiers are rewritten. Declaration
  * keys and explicit members such as `global.__REACT_DEVTOOLS_GLOBAL_HOOK__` must remain
  * untouched; rewriting those would either produce invalid syntax or double-prefix the hook.
- * The hook itself is created on `global` by the dev runtime chunk in `dev-runtime.ts`.
+ * The eagerly evaluated refresh runtime creates the hook on `global` before the renderer loads.
  */
 function createReactDevtoolsHookVisitor(editor: RolldownMagicString): WalkerEnter {
     return function enter(node, parent) {
@@ -139,20 +138,18 @@ function createRefreshRuntimeVisitor(editor: RolldownMagicString): WalkerEnter {
 
     return function enter(node) {
         if (
-            node.type !== 'MemberExpression' ||
-            node.computed ||
-            node.object.type !== 'Identifier' ||
-            node.object.name !== 'window' ||
-            node.property.type !== 'Identifier' ||
-            !refreshRuntimeWindowGlobals.some((globalName) => globalName === node.property.name)
+            node.type === 'MemberExpression' &&
+            !node.computed &&
+            node.object.type === 'Identifier' &&
+            node.object.name === 'window' &&
+            node.property.type === 'Identifier' &&
+            refreshRuntimeWindowGlobals.some((globalName) => globalName === node.property.name)
         ) {
-            return
+            // `global` is the shared wx App heap used by the dev runtime and hook injection. Only
+            // replacing the object range preserves the vendored runtime byte-for-byte otherwise
+            // and prevents unrelated `window` expressions from being silently adapted.
+            editor.overwrite(node.object.start, node.object.end, 'global')
         }
-
-        // `global` is the shared wx App heap used by the dev runtime and hook injection. Only
-        // replacing the object range preserves the vendored runtime byte-for-byte otherwise
-        // and prevents unrelated `window` expressions from being silently adapted.
-        editor.overwrite(node.object.start, node.object.end, 'global')
     }
 }
 

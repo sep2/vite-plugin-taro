@@ -6,8 +6,10 @@ test('adapts the refresh runtime to the WeChat global object', () => {
     const transformed = transformRefreshRuntime({
         code: `
             function injectIntoGlobalHook(target) { return target }
+            function performReactRefresh() {}
             window.__registerBeforePerformReactRefresh = callback
             const ignored = window.__getReactRefreshIgnoredExports
+            performReactRefresh()
         `,
         id: '/@react-refresh'
     })
@@ -15,6 +17,8 @@ test('adapts the refresh runtime to the WeChat global object', () => {
     assert.doesNotMatch(transformed.code, /window\.__/)
     assert.match(transformed.code, /global\.__registerBeforePerformReactRefresh/)
     assert.match(transformed.code, /global\.__getReactRefreshIgnoredExports/)
+    assert.match(transformed.code, /performReactRefresh\(\)/)
+    assert.doesNotMatch(transformed.code, /finishReactRefresh/)
     assert.match(transformed.code, /injectIntoGlobalHook\(global\);$/)
 })
 

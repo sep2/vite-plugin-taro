@@ -4,6 +4,7 @@ import { DevRuntime } from 'rolldown/experimental/runtime'
 
 type TestHotContext = Readonly<{
     accept: (callback?: (moduleExports: unknown) => void) => void
+    invalidate: (reason?: string) => never
 }>
 
 type TestPatch = Readonly<{
@@ -15,8 +16,8 @@ type TestPatch = Readonly<{
 type TestRuntime = DevRuntime &
     Readonly<{
         createModuleHotContext: (moduleId: string) => TestHotContext
+        moduleHotContexts: ReadonlyMap<string, TestHotContext>
         initialize: (info: { buildId: string; endpoint: string }) => void
-        isHotReloading: () => boolean
         applyPatches: (payload: { buildId: string; patches: TestPatch[] } | undefined) => void
     }>
 
@@ -127,8 +128,20 @@ test('ignores the initial empty physical patch module', async () => {
 
     runtime.applyPatches(undefined)
 
-    assert.equal(runtime.isHotReloading(), false)
     assert.deepEqual(getNewReports(reports, reportCount), [])
+})
+
+test('retains hot contexts only after they become accepting boundaries', async () => {
+    const { runtime } = await createTestHarness()
+    const passiveContext = runtime.createModuleHotContext('passive')
+
+    assert.equal(runtime.moduleHotContexts.has('passive'), false)
+
+    passiveContext.accept()
+    assert.equal(runtime.moduleHotContexts.get('passive'), passiveContext)
+
+    runtime.createModuleHotContext('passive')
+    assert.equal(runtime.moduleHotContexts.has('passive'), false)
 })
 
 test('evicts an accepted module before running its new factory', async () => {
@@ -476,6 +489,34 @@ test('rejects a duplicate new sequence instead of treating it as a replay', asyn
     assert.deepEqual(runtime.loadExports('page'), { value: 'old' })
     assert.match(JSON.stringify(newReports), /"kind":"rebuild"/)
     assert.match(JSON.stringify(newReports), /missing patch sequence 2/)
+})
+
+test('turns boundary invalidation directly into a rebuild', async (context) => {
+    context.mock.method(console, 'warn', () => {})
+    const { reports, runtime } = await createTestHarness()
+    runtime.registerGraph({ ids: ['page'], localCount: 1, edges: [[]], dynamicEdges: [[]] })
+    const hotContext = runtime.createModuleHotContext('page')
+    hotContext.accept(() => hotContext.invalidate('incompatible boundary'))
+    runtime.registerModule('page', { exports: { value: 'old' } })
+    const reportCount = reports.length
+
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            createPatch({
+                runtime,
+                seq: 1,
+                moduleId: 'page',
+                moduleExports: { value: 'new' },
+                deferAccept: false
+            })
+        ]
+    })
+
+    const newReports = getNewReports(reports, reportCount)
+    assert.match(JSON.stringify(newReports), /"kind":"rebuild"/)
+    assert.match(JSON.stringify(newReports), /incompatible boundary/)
+    assert.doesNotMatch(JSON.stringify(newReports), /"kind":"applied"/)
 })
 
 test('ignores patches for a stale build before running their factories', async (context) => {

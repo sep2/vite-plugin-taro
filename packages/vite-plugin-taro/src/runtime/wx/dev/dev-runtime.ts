@@ -19,6 +19,20 @@ type HmrInfo = Readonly<{
     endpoint: string
 }>
 
+/** App-heap HMR identity; only the committed application frontier mutates. */
+type HmrSession = {
+    /** Rejects delayed patch files and identifies reports after a newer full build exists. */
+    readonly buildId: string
+    /** Fixed control URL discovered from the Vite server that produced this full build. */
+    readonly endpoint: string
+    /**
+     * Highest contiguous Rolldown sequence whose factories, graph propagation, and accept
+     * callbacks all succeeded. Replayed Page shells read this watermark; it advances only
+     * after an atomic batch succeeds and resets only with a new App heap.
+     */
+    appliedSeq: number
+}
+
 /** One physical hmr/patches.js payload: the build identity plus one patch program per update. */
 type PatchPayload = Readonly<{
     buildId: string
@@ -40,40 +54,108 @@ type HmrUpdate = Readonly<{
 
 type AcceptCallback = (moduleExports: unknown) => void
 
+type PageSnapshot = Readonly<{
+    $taroPath: string
+    $taroParams: Record<string, unknown>
+    data: Record<string, unknown>
+}>
+
+type NativePage = {
+    $taroPath: string
+    $taroParams: Record<string, unknown>
+    data: Record<string, unknown>
+    setData(data: Record<string, unknown>): void
+}
+
+type HmrPageConfig = {
+    onUnload?: unknown
+    onLoad?: unknown
+    onShow?: unknown
+}
+
+type TaroRoot = {
+    ctx: unknown
+}
+
+/** Immutable bridge references plus replacement transactions owned by one Taro singleton. */
+type TaroState = {
+    /** Taro's existing current-page source of truth; replacement onLoad switches its receiver. */
+    readonly current: { page: NativePage | null }
+    /** Taro's virtual document, used to find the retained root by its preserved unique path. */
+    readonly document: { getElementById(path: string): unknown }
+    /** Replaces Taro's native lifecycle receiver without remounting the retained React subtree. */
+    readonly injectPageInstance: (instance: unknown, path: string) => void
+    /**
+     * Short-lived route transactions. Absence means ordinary lifecycle; null means armed
+     * before onUnload or snapshot-consumed before onShow; a snapshot exists only between
+     * replacement onUnload and onLoad. The large data reference is therefore released in
+     * onLoad, while the null marker remains just long enough to suppress synthetic onShow.
+     */
+    readonly pageReplacements: Map<string, PageSnapshot | null>
+}
+
+/** Forwards a native lifecycle with its original Page receiver. */
+function forward(handler: unknown, receiver: unknown, args: unknown[]): void {
+    if (typeof handler === 'function') handler.apply(receiver, args)
+}
+
+/** Narrows the untyped element returned across the Taro connection boundary. */
+function isTaroRoot(value: unknown): value is TaroRoot {
+    return typeof value === 'object' && value !== null && 'ctx' in value
+}
+
+/** Shared no-op CSS contract because physical rebuilds replace styles wholesale. */
+const hotContextInternals = Object.freeze({
+    updateStyle(): void {},
+    removeStyle(): void {}
+})
+
 /**
  * Per-module hot state, mirroring Rolldown's web runtime: accept is a passive registration;
  * the propagation invokes the previous execution's callbacks with the fresh exports.
  */
 class WxHotContext {
-    readonly _internal = {
-        updateStyle(): void {},
-        removeStyle(): void {}
+    readonly _internal = hotContextInternals
+
+    /**
+     * Callbacks registered by this module execution. The array is allocated on first accept,
+     * remains attached to the old execution across cache eviction, and is invoked by the next
+     * boundary execution. Undefined means this context stays passive.
+     */
+    private acceptCallbacks: Array<AcceptCallback | undefined> | undefined
+
+    /** Stable module identity and shared sparse index used only when this context accepts. */
+    private readonly moduleId: string
+    private readonly acceptingContexts: Map<string, WxHotContext>
+
+    constructor(moduleId: string, acceptingContexts: Map<string, WxHotContext>) {
+        this.moduleId = moduleId
+        this.acceptingContexts = acceptingContexts
     }
-
-    /** Registered self-accept callbacks; a bare accept is represented by a no-op callback. */
-    private readonly acceptCallbacks: AcceptCallback[] = []
-
-    /** Set when a callback rejects a Refresh boundary; the current update then rebuilds. */
-    private invalidationReason: string | undefined
 
     accept(callback?: AcceptCallback): void {
-        this.acceptCallbacks.push(callback ?? (() => {}))
-    }
-
-    hasAccepts(): boolean {
-        return this.acceptCallbacks.length > 0
-    }
-
-    /** Invokes this old context's callbacks and returns any requested invalidation. */
-    runAccept(moduleExports: unknown): string | undefined {
-        for (const callback of this.acceptCallbacks) {
-            callback(moduleExports)
+        if (!this.acceptCallbacks) {
+            this.acceptCallbacks = [callback]
+            this.acceptingContexts.set(this.moduleId, this)
+            return
         }
-        return this.invalidationReason
+        this.acceptCallbacks.push(callback)
     }
 
-    invalidate(reason?: string): void {
-        this.invalidationReason = reason ?? 'the accepting module invalidated the update'
+    /** Invokes this old context's callbacks; invalidation aborts the update synchronously. */
+    runAccept(moduleExports: unknown): void {
+        const callbacks = this.acceptCallbacks
+        if (!callbacks) {
+            throw new Error(`passive hot context reached as boundary: ${this.moduleId}`)
+        }
+
+        for (const callback of callbacks) {
+            callback?.(moduleExports)
+        }
+    }
+
+    invalidate(reason?: string): never {
+        throw new Error(reason ?? 'the accepting module invalidated the update')
     }
 
     // Vite's generated CSS module calls hot.prune with its style teardown; the physical
@@ -83,12 +165,18 @@ class WxHotContext {
 
 /** The WX host: extends the Rolldown contract instead of reimplementing it. */
 class WxDevRuntime extends DevRuntime {
-    private hmrInfo: HmrInfo | undefined
+    /**
+     * One session for this App heap. Undefined only before app.js consumes hmr/info.js; its
+     * identity and endpoint then stay fixed while appliedSeq records the committed frontier.
+     */
+    private session: HmrSession | undefined
 
-    /** Highest Rolldown sequence successfully applied. */
-    private appliedSeq = 0
-
-    /** Active hot contexts per module id; the propagation invokes their callbacks. */
+    /**
+     * Sparse current-generation accepting boundaries keyed by module id. Entries alone must
+     * outlive Rolldown module-cache eviction so old callbacks can receive fresh exports.
+     * createModuleHotContext removes the prior generation immediately; first accept inserts
+     * the new one. Passive contexts are never retained, so space is O(number of boundaries).
+     */
     private readonly moduleHotContexts = new Map<string, WxHotContext>()
 
     constructor() {
@@ -99,13 +187,13 @@ class WxDevRuntime extends DevRuntime {
 
     /**
      * Generated code always calls this before registerModule and reads `_internal` from the
-     * return value. Mirrors Rolldown's web runtime: each execution immediately replaces the
-     * module's hot context; the apply plan has already captured the previous callbacks.
+     * return value. Each execution immediately retires its previous accepting boundary;
+     * calling accept registers the new context after the apply plan captured old callbacks.
      */
     override createModuleHotContext(moduleId: string): WxHotContext {
-        const hotContext = new WxHotContext()
-        this.moduleHotContexts.set(moduleId, hotContext)
-        return hotContext
+        // A new execution supersedes the old boundary before it decides whether to accept.
+        this.moduleHotContexts.delete(moduleId)
+        return new WxHotContext(moduleId, this.moduleHotContexts)
     }
 
     /** Computes accepting boundaries and every executed module that must be re-armed. */
@@ -138,7 +226,7 @@ class WxDevRuntime extends DevRuntime {
         if (updateSet.has(moduleId)) return undefined
         updateSet.add(moduleId)
 
-        if (this.moduleHotContexts.get(moduleId)?.hasAccepts()) {
+        if (this.moduleHotContexts.has(moduleId)) {
             boundaries.push(moduleId)
             return undefined
         }
@@ -187,56 +275,140 @@ class WxDevRuntime extends DevRuntime {
         }
 
         for (const { moduleId, hotContext } of applies) {
-            const invalidationReason = hotContext?.runAccept(this.initModule(moduleId))
-            if (invalidationReason) {
-                throw new Error(`${moduleId}: ${invalidationReason}`)
-            }
+            hotContext?.runAccept(this.initModule(moduleId))
         }
     }
 
     /** Consumed once per App heap from hmr/info.js; the host buildId identifies its cumulative patch history. */
     initialize(info: HmrInfo): void {
-        if (this.hmrInfo) {
+        if (this.session) return
+        this.session = { ...info, appliedSeq: 0 }
+    }
+
+    /**
+     * One-shot bridge to the application's Taro singleton. It cannot be imported into this
+     * separately bundled global runtime without creating a second Taro identity. Undefined
+     * only before the serve-only facade connection; route transactions share its lifetime.
+     */
+    private taro: TaroState | undefined
+
+    /** Connects HMR to the same Taro singleton used by the application module graph. */
+    connectTaro(
+        current: TaroState['current'],
+        document: TaroState['document'],
+        injectPageInstance: TaroState['injectPageInstance']
+    ): void {
+        if (this.taro) {
             return
         }
-        this.hmrInfo = info
+
+        this.taro = {
+            current,
+            document,
+            injectPageInstance,
+            pageReplacements: new Map()
+        }
     }
 
-    /** True between a patch delivery and the next page show: a hot reload is in progress. */
-    private hotReloading = false
+    /** Injects snapshot-preserving behavior into one route-specific Taro Page configuration. */
+    injectPageHmr(config: HmrPageConfig, route: string): void {
+        const originalOnUnload = config.onUnload
+        const originalOnLoad = config.onLoad
+        const originalOnShow = config.onShow
+        const runtime = this
 
-    /** The capsule wrapper asks this during the synthetic lifecycle of a hot reload. */
-    isHotReloading(): boolean {
-        return this.hotReloading
+        config.onUnload = function (this: NativePage, ...args: unknown[]) {
+            const taro = runtime.requireTaro()
+            if (taro.pageReplacements.has(route)) {
+                taro.pageReplacements.set(route, {
+                    $taroPath: this.$taroPath,
+                    $taroParams: this.$taroParams,
+                    // WeChat owns this serializable view-model. Keeping its reference is O(1),
+                    // unlike cloning the complete recursive projection before every edit.
+                    data: this.data
+                })
+                return
+            }
+            forward(originalOnUnload, this, args)
+        }
+
+        config.onLoad = function (this: NativePage, ...args: unknown[]) {
+            const taro = runtime.requireTaro()
+            const snapshot = taro.pageReplacements.get(route)
+            if (snapshot) {
+                // Replace the transaction before native work so exceptions cannot retain the
+                // large data snapshot while the route waits for its synthetic onShow.
+                taro.pageReplacements.set(route, null)
+
+                // Snapshot paint is the first bridge operation and removes the empty-page gap.
+                this.setData(snapshot.data)
+                this.$taroPath = snapshot.$taroPath
+                this.$taroParams = snapshot.$taroParams
+                runtime.bindPage(this, snapshot.$taroPath)
+                return
+            }
+            forward(originalOnLoad, this, args)
+        }
+
+        config.onShow = function (this: NativePage, ...args: unknown[]) {
+            if (runtime.requireTaro().pageReplacements.delete(route)) {
+                // Synthetic shows must not repeat requests or reset application state.
+                return
+            }
+
+            forward(originalOnShow, this, args)
+        }
     }
 
-    /** The wrapped onShow ends the hot reload after the replacement cycle. */
-    clearHotReloading(): void {
-        this.hotReloading = false
+    /** Returns the Taro connection or fails at the first incorrectly ordered use. */
+    private requireTaro(): TaroState {
+        if (!this.taro) throw new Error('[vpt] WX HMR used before the Taro runtime was connected')
+        return this.taro
     }
 
-    /** Applies one Page-delivered payload before that Page imports its capsule. */
-    applyPatches(payload: PatchPayload | undefined): void {
+    /** Returns a retained Taro root after normal Page mount has created it. */
+    private findRoot(path: string): TaroRoot | undefined {
+        const root = this.requireTaro().document.getElementById(path)
+        return isTaroRoot(root) ? root : undefined
+    }
+
+    /** Rebinds a retained Taro tree to one replacement native Page without repainting. */
+    private bindPage(instance: NativePage, path: string): void {
+        const taro = this.requireTaro()
+        taro.injectPageInstance(instance, path)
+        taro.current.page = instance
+
+        const pageElement = this.findRoot(path)
+        if (!pageElement) {
+            throw new Error(`[vpt] retained Taro page not found: ${path}`)
+        }
+
+        pageElement.ctx = instance
+    }
+
+    /** Applies one Page-delivered payload and arms its route for native replacement. */
+    applyPatches(payload: PatchPayload | undefined, route?: string): void {
         // The initial physical dependency exports undefined until the host has a patch range.
         if (!payload) return
 
-        const info = this.hmrInfo
-        if (!info || payload.buildId !== info.buildId) {
+        const session = this.session
+        if (!session || payload.buildId !== session.buildId) {
             console.warn('[vpt] patches for a stale build')
             return
         }
 
-        // A delivered patch means DevTools is about to replay the page lifecycle on the
-        // re-executing Pages; the capsule wrapper suppresses the synthetic unmount/mount so
-        // the React tree survives and Refresh swaps the code in place.
-        this.hotReloading = true
+        // A replayed payload still causes DevTools to replace this physical Page. Arm the
+        // route independently of whether this App heap already applied its patch sequence.
+        if (route) {
+            this.requireTaro().pageReplacements.set(route, null)
+        }
 
         // Apply synchronously: the page's imports below the require resolve against the
         // freshly registered modules, so the re-executed Page evaluates with the new code.
-        if (this.applyPatchBatch(payload.patches)) {
+        if (this.applyPatchBatch(session, payload.patches)) {
             // The host may publish later generations while this synchronous apply runs. Reporting only afterward makes this
             // the application frontier: publisher history is never pruned merely because its JavaScript file was observed.
-            void this.sendReport({ kind: 'applied', seq: this.appliedSeq })
+            void this.sendReport({ kind: 'applied', seq: session.appliedSeq })
         }
     }
 
@@ -253,10 +425,10 @@ class WxDevRuntime extends DevRuntime {
      * - a second Page evaluating [5, 6, 7] skips the complete replay and leaves the latest factories untouched;
      * - [5, 7] fails at the expected sequence 6, keeps appliedSeq 4, and requests a full rebuild because factory 6 is unrecoverable.
      */
-    private applyPatchBatch(patches: readonly PatchProgram[]): boolean {
+    private applyPatchBatch(session: HmrSession, patches: readonly PatchProgram[]): boolean {
         // Keep the initial watermark immutable throughout the fold. Comparing replays against a moving watermark would allow
         // a duplicate new sequence in the same payload to masquerade as an already-applied patch.
-        const previousSeq = this.appliedSeq
+        const previousSeq = session.appliedSeq
 
         // Mutable only during this synchronous pass. `nextSeq` validates continuity while `changedIds` unions every incremental
         // patch's roots for the one final graph traversal; neither value escapes into persistent runtime state.
@@ -300,7 +472,7 @@ class WxDevRuntime extends DevRuntime {
 
             // Commit application only after graph propagation and boundary callbacks succeed. A failure leaves the old watermark
             // intact and requests a full rebuild below, so a partially applied batch is never acknowledged as healthy.
-            this.appliedSeq = nextSeq - 1
+            session.appliedSeq = nextSeq - 1
             return true
         } catch (error) {
             console.warn('[vpt] patch batch failed; apply stopped', error)
@@ -314,17 +486,17 @@ class WxDevRuntime extends DevRuntime {
 
     /** Sends one metadata-only report to the host; executable code never travels over HTTP. */
     private sendReport(data: Record<string, unknown>): Promise<void> {
-        const info = this.hmrInfo
-        if (!info) {
+        const session = this.session
+        if (!session) {
             // A report without initialize is a programming error; fail loudly instead of
             // silently dropping the sync traffic.
             throw new Error('WX dev runtime is not initialized')
         }
         return new Promise((resolve, reject) => {
             wx.request({
-                url: info.endpoint,
+                url: session.endpoint,
                 method: 'POST',
-                data: { buildId: info.buildId, ...data },
+                data: { buildId: session.buildId, ...data },
                 header: { 'content-type': 'application/json' },
                 success(): void {
                     resolve()
@@ -339,31 +511,3 @@ class WxDevRuntime extends DevRuntime {
 
 const runtime = new WxDevRuntime()
 ;(globalThis as { __rolldown_runtime__?: WxDevRuntime }).__rolldown_runtime__ = runtime
-
-// Install the React DevTools hook before the Taro renderer injects itself: the runtime chunk
-// is the first module of the App heap, and the renderer checks the hook when it evaluates at
-// App mount. The refresh runtime's own injection (see react-refresh.ts) replays this hook's
-// renderers, so the hook must store what inject receives — a real DevTools hook keeps the
-// renderer in the renderers Map; without the stored renderer the replay captures nothing and
-// Refresh has no renderer helpers to schedule re-renders on.
-//
-// The hook lives on `global`, and every free `__REACT_DEVTOOLS_GLOBAL_HOOK__` reference in
-// react-family modules is rewritten to `global.__REACT_DEVTOOLS_GLOBAL_HOOK__`: the
-// The WeChat runtime scope does not resolve free variables against `global` (verified: the free
-// lookup is undefined while the member access exists), so the renderer would never inject
-// otherwise. `??=` keeps a pre-installed hook (e.g. a real DevTools integration) intact; the
-// runtime chunk's own lowering keeps the operator es2018-compatible.
-const reactDevtoolsHook = {
-    renderers: new Map<number, unknown>(),
-    supportsFiber: true,
-    inject: (injected: unknown) => {
-        const id = reactDevtoolsHook.renderers.size
-        reactDevtoolsHook.renderers.set(id, injected)
-        return id
-    },
-    onScheduleFiberRoot: () => {},
-    onCommitFiberRoot: () => {},
-    onCommitFiberUnmount: () => {}
-}
-// node types declare `global` as typeof globalThis, so the WeChat global needs a cast.
-;(global as WeChatGlobal).__REACT_DEVTOOLS_GLOBAL_HOOK__ ??= reactDevtoolsHook

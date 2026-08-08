@@ -3,16 +3,13 @@
  * free lookup is undefined while `global.X` exists), so everything stored here must be
  * accessed as an explicit member expression.
  */
-type WeChatGlobal = {
-    /** React DevTools hook installed by the dev runtime; the renderer reads it via `global.`. */
-    __REACT_DEVTOOLS_GLOBAL_HOOK__?: unknown
-}
+type WeChatGlobal = object
 
 /** The App-global Rolldown dev runtime; present only in wx development builds. */
 declare const __rolldown_runtime__:
     | {
-          isHotReloading(): boolean
-          clearHotReloading(): void
+          connectTaro(current: object, document: object, injectPageInstance: (...args: unknown[]) => unknown): void
+          injectPageHmr(config: object, route: string): void
       }
     | undefined
 
