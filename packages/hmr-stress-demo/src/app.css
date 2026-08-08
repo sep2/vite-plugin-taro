@@ -1,0 +1,266 @@
+@import "tailwindcss/theme.css";
+@import "tailwindcss/preflight.css";
+@import "tailwindcss/utilities.css";
+
+@source "./";
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+/* biome-ignore lint/correctness/noUnknownTypeSelector: `page` is the WeChat Mini Program host element. */
+page {
+    height: 100%;
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+button::after {
+    border: none;
+}
+
+.stress-dashboard {
+    display: flex;
+    height: 100vh;
+    flex-direction: column;
+    overflow: hidden;
+    background: #e2e8f0;
+}
+
+.stress-header {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24rpx;
+    border-bottom: 1px solid #334155;
+    background: #0f172a;
+    padding: 24rpx 28rpx;
+    color: #f8fafc;
+}
+
+.stress-title,
+.stress-subtitle,
+.stress-section-title,
+.deep-marker-title,
+.deep-marker-state,
+.deep-marker-token,
+.tree-node-path,
+.tree-node-score,
+.stateful-leaf-label,
+.stateful-leaf-value,
+.metric-cell-index,
+.metric-cell-value,
+.dashboard-help {
+    display: block;
+}
+
+.stress-title {
+    font-size: 34rpx;
+    font-weight: 700;
+}
+
+.stress-subtitle {
+    margin-top: 6rpx;
+    color: #94a3b8;
+    font-size: 20rpx;
+}
+
+.navigation-button {
+    min-width: 150rpx;
+    margin: 0;
+    border-radius: 12rpx;
+    background: #334155;
+    padding: 12rpx 18rpx;
+    color: #f8fafc;
+    font-size: 22rpx;
+    line-height: 1.4;
+}
+
+.dashboard-controls {
+    flex-shrink: 0;
+    border-bottom: 1px solid #cbd5e1;
+    background: #ffffff;
+    padding: 20rpx 28rpx;
+}
+
+.stress-input {
+    height: 72rpx;
+    border: 1px solid #94a3b8;
+    border-radius: 12rpx;
+    background: #f8fafc;
+    padding: 0 20rpx;
+    color: #0f172a;
+    font-size: 26rpx;
+}
+
+.dashboard-buttons {
+    display: flex;
+    gap: 16rpx;
+    margin-top: 16rpx;
+}
+
+.stress-button {
+    flex: 1;
+    margin: 0;
+    border-radius: 12rpx;
+    background: #e2e8f0;
+    padding: 14rpx 16rpx;
+    color: #334155;
+    font-size: 22rpx;
+    line-height: 1.4;
+}
+
+.stress-button-primary {
+    background: #2563eb;
+    color: #ffffff;
+}
+
+.dashboard-help {
+    margin-top: 12rpx;
+    color: #64748b;
+    font-size: 20rpx;
+}
+
+.stress-scroll {
+    min-height: 0;
+    flex: 1;
+}
+
+.stress-section {
+    margin: 22rpx;
+    border: 1px solid #cbd5e1;
+    border-radius: 16rpx;
+    background: #ffffff;
+    padding: 20rpx;
+    box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.08);
+}
+
+.stress-section-title {
+    margin-bottom: 16rpx;
+    color: #475569;
+    font-size: 24rpx;
+    font-weight: 700;
+}
+
+.deep-chain-even,
+.deep-chain-odd {
+    border-left: 2rpx solid rgba(37, 99, 235, 0.22);
+    padding-left: 3rpx;
+}
+
+.deep-chain-odd {
+    border-left-color: rgba(124, 58, 237, 0.22);
+}
+
+.deep-chain-core {
+    padding: 10rpx;
+}
+
+.deep-marker-card {
+    border-radius: 12rpx;
+    background: linear-gradient(135deg, #dbeafe, #ede9fe);
+    padding: 18rpx;
+}
+
+.deep-marker-title {
+    color: #1d4ed8;
+    font-size: 28rpx;
+    font-weight: 700;
+}
+
+.deep-marker-state {
+    margin-top: 8rpx;
+    color: #0f172a;
+    font-size: 24rpx;
+}
+
+.deep-marker-token {
+    margin-top: 4rpx;
+    color: #64748b;
+    font-size: 18rpx;
+}
+
+.tree-node {
+    margin-top: 4rpx;
+    border-left: 1px solid #cbd5e1;
+    padding-left: 6rpx;
+}
+
+.tree-node-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 6rpx;
+    background: #f1f5f9;
+    padding: 4rpx 8rpx;
+}
+
+.tree-node-path,
+.tree-node-score {
+    color: #475569;
+    font-family: monospace;
+    font-size: 16rpx;
+}
+
+.tree-node-children {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4rpx;
+}
+
+.stateful-leaf {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px solid #dbeafe;
+    border-radius: 6rpx;
+    background: #eff6ff;
+    padding: 5rpx;
+}
+
+.stateful-leaf-selected {
+    border-color: #2563eb;
+    background: #bfdbfe;
+}
+
+.stateful-leaf-label,
+.stateful-leaf-value {
+    overflow: hidden;
+    color: #1e3a8a;
+    font-size: 14rpx;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.stress-dashboard-dense .tree-node {
+    margin-top: 2rpx;
+    padding-left: 3rpx;
+}
+
+.activity-grid {
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 6rpx;
+}
+
+.metric-cell {
+    border-radius: 8rpx;
+    background: #f1f5f9;
+    padding: 8rpx 4rpx;
+    text-align: center;
+}
+
+.metric-cell-index {
+    color: #94a3b8;
+    font-size: 14rpx;
+}
+
+.metric-cell-value {
+    margin-top: 2rpx;
+    color: #0f172a;
+    font-size: 18rpx;
+    font-weight: 700;
+}

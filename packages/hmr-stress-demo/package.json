@@ -1,0 +1,26 @@
+{
+    "name": "hmr-stress-demo",
+    "version": "0.5.6",
+    "private": true,
+    "author": "sep2",
+    "type": "module",
+    "scripts": {
+        "build-wx": "cross-env NODE_ENV=production vite build",
+        "dev-wx": "cross-env NODE_ENV=development vite",
+        "stress-hmr": "node scripts/run-hmr-stress.ts",
+        "stress-hmr:burst": "cross-env VPT_HMR_STRESS_UPDATES=60 VPT_HMR_STRESS_INTERVAL_MS=8 node scripts/run-hmr-stress.ts",
+        "typecheck": "tsc --project tsconfig.json"
+    },
+    "dependencies": {
+        "vite-plugin-taro": "workspace:*",
+        "react": "^19.2.7",
+        "react-dom": "^19.2.7"
+    },
+    "devDependencies": {
+        "@types/node": "^26.0.0",
+        "@types/react": "^19.2.17",
+        "cross-env": "^10.1.0",
+        "typescript": "^7.0.2",
+        "vite": "^8.2.0"
+    }
+}
