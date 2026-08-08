@@ -26,18 +26,23 @@ function forward(handler: unknown, receiver: unknown, args: unknown[]): void {
     ;(handler as LifecycleHandler | undefined)?.apply(receiver, args)
 }
 
-/** The surviving page identity: its unique path and params. */
-type PageIdentity = {
+/** The old native projection retained while DevTools replaces its Page instance. */
+type PageSnapshot = {
     $taroPath: string
     $taroParams: Record<string, unknown>
+    data: Record<string, unknown>
+}
+
+type NativePage = PageSnapshot & {
+    setData(data: Record<string, unknown>): void
 }
 
 // DevTools re-executes the page and replays the replacement lifecycle on every edit. Taro's
 // onUnload unmounts the React tree and onLoad mounts a fresh one, destroying state. While
 // the runtime says a patch was just delivered, the pair is intercepted instead: onUnload
-// captures the surviving page identity, and onLoad restores it onto the replacement native
-// instance and rebinds the retained tree to it (pageElement.ctx + a full re-render). The
-// capsule module is cached across re-executions, so this closure holds the capture.
+// captures the surviving page identity and its current native render data, and onLoad
+// immediately paints that snapshot before rebinding and fully synchronizing the retained
+// tree. The capsule module is cached across re-executions, so this closure holds the capture.
 // Ordinary navigation (no patch) passes through unchanged. The wrappers are regular
 // functions so the native page instance (`this`) reaches the original handlers.
 if (typeof __rolldown_runtime__ !== 'undefined') {
@@ -45,14 +50,19 @@ if (typeof __rolldown_runtime__ !== 'undefined') {
     const originalOnLoad = config.onLoad
     const originalOnShow = config.onShow
 
-    let captured: PageIdentity | undefined
+    // This is the sole cross-instance handoff. It is mutable because DevTools destroys the
+    // old native Page before creating its replacement; ordinary navigation never reads it.
+    let captured: PageSnapshot | undefined
 
     config.onUnload = function (this: unknown, ...args: unknown[]) {
         if (__rolldown_runtime__.isHotReloading()) {
-            const instance = this as unknown as PageIdentity
+            const instance = this as unknown as NativePage
             captured = {
                 $taroPath: instance.$taroPath,
-                $taroParams: instance.$taroParams
+                $taroParams: instance.$taroParams,
+                // WeChat owns this serializable view-model snapshot. Retaining it is cheaper
+                // than deep-cloning the complete recursive Taro node tree before every edit.
+                data: instance.data
             }
             return
         }
@@ -60,10 +70,14 @@ if (typeof __rolldown_runtime__ !== 'undefined') {
     }
     config.onLoad = function (this: unknown, ...args: unknown[]) {
         if (__rolldown_runtime__.isHotReloading() && captured) {
+            const instance = this as unknown as NativePage
+            // Paint the last native projection as the first bridge operation. Taro's full
+            // performUpdate below runs in a timer, so this direct setData removes most of the
+            // empty-page interval without delaying synchronization to the current tree.
+            instance.setData(captured.data)
             // Restore the surviving page identity onto the replacement native instance: the
             // re-loaded $taroPath embeds a fresh timestamp, so without this the tree and the
             // native side would disagree on the page key.
-            const instance = this as unknown as PageIdentity
             instance.$taroPath = captured.$taroPath
             instance.$taroParams = captured.$taroParams
             // Rebind the retained tree to the replacement receiver and resync the native
