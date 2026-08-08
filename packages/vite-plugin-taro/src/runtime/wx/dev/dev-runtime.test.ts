@@ -111,6 +111,15 @@ function assertNoRebuild(reports: readonly unknown[]): void {
     assert.doesNotMatch(JSON.stringify(reports), /"kind":"rebuild"/)
 }
 
+function assertApplied(reports: readonly unknown[], seq: number): void {
+    assert.match(JSON.stringify(reports), new RegExp(`"kind":"applied","seq":${seq}`))
+}
+
+test('initialization does not report an application frontier before patches run', async () => {
+    const { reports } = await createTestHarness()
+    assert.deepEqual(reports, [])
+})
+
 test('evicts an accepted module before running its new factory', async () => {
     const { reports, runtime } = await createTestHarness()
     // Written by the old generation's accept callback; it must observe the new exports.
@@ -140,7 +149,9 @@ test('evicts an accepted module before running its new factory', async () => {
 
     assert.deepEqual(acceptedExports, { value: 'new' })
     assert.deepEqual(runtime.loadExports('accepted'), { value: 'new' })
-    assertNoRebuild(getNewReports(reports, reportCount))
+    const newReports = getNewReports(reports, reportCount)
+    assertApplied(newReports, 1)
+    assertNoRebuild(newReports)
 })
 
 test('treats a bare accept as a self-accepting boundary', async () => {
@@ -235,7 +246,9 @@ test('coalesces a burst of deferred React Refresh patches into its latest genera
     assert.equal(factoryRuns, 20)
     assert.equal(moduleExecutions, 1)
     assert.deepEqual(runtime.loadExports('page'), { value: 20 })
-    assertNoRebuild(getNewReports(reports, reportCount))
+    const newReports = getNewReports(reports, reportCount)
+    assertApplied(newReports, 20)
+    assertNoRebuild(newReports)
 })
 
 test('unions changed modules from separate patches into one apply', async () => {
@@ -407,6 +420,7 @@ test('requests a rebuild before mutating registries when a sequence is missing',
     assert.equal(factoryRuns, 0)
     assert.deepEqual(runtime.loadExports('page'), { value: 'old' })
     assert.match(JSON.stringify(newReports), /"kind":"rebuild"/)
+    assert.doesNotMatch(JSON.stringify(newReports), /"kind":"applied"/)
     assert.match(JSON.stringify(newReports), /missing patch sequence 1/)
 })
 

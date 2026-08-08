@@ -5,9 +5,9 @@
 // The `DevRuntime` base class is injected into the chunk by Rolldown's dev-mode
 // transform, so the WX host only extends it.
 //
-// Delivery is passive: every valid hmr/patches.js suffix is acknowledged by Rolldown
-// sequence, then applied synchronously before the Page continues evaluating. Already-applied
-// sequences are ignored when another Page requires the same physical file.
+// Delivery is passive: every valid hmr/patches.js suffix is applied synchronously before the Page continues evaluating, then
+// its successful application frontier is reported to the host. Already-applied sequences are ignored when another Page
+// requires the same cumulative physical file.
 
 import type { DevRuntime as RolldownDevRuntime } from 'rolldown/experimental/runtime-types'
 
@@ -195,14 +195,12 @@ class WxDevRuntime extends DevRuntime {
         }
     }
 
-    /** Consumed once per App heap from hmr/info.js; the host buildId is the delivery identity. */
+    /** Consumed once per App heap from hmr/info.js; the host buildId identifies its cumulative patch history. */
     initialize(info: HmrInfo): void {
         if (this.hmrInfo) {
             return
         }
         this.hmrInfo = info
-        // Anchor: the host publishes only after the runtime reports its delivery position.
-        void this.sendReport({ kind: 'delivery', seq: this.appliedSeq })
     }
 
     /** True between a patch delivery and the next page show: a hot reload is in progress. */
@@ -218,16 +216,13 @@ class WxDevRuntime extends DevRuntime {
         this.hotReloading = false
     }
 
-    /** The only direct effect of hmr/patches.js: validate, store, acknowledge, and apply. */
+    /** The only direct effect of hmr/patches.js: apply its cumulative suffix and report the resulting frontier. */
     storePatches(payload: PatchPayload): void {
         const info = this.hmrInfo
         if (!info || payload.buildId !== info.buildId) {
             console.warn('[vpt] patches for a stale build')
             return
         }
-
-        const deliveredSeq = Math.max(this.appliedSeq, payload.patches.at(-1)?.seq ?? 0)
-        void this.sendReport({ kind: 'delivery', seq: deliveredSeq })
 
         // A delivered patch means DevTools is about to replay the page lifecycle on the
         // re-executing Pages; the capsule wrapper suppresses the synthetic unmount/mount so
@@ -236,7 +231,11 @@ class WxDevRuntime extends DevRuntime {
 
         // Apply synchronously: the page's imports below the require resolve against the
         // freshly registered modules, so the re-executed Page evaluates with the new code.
-        this.applyPatches(payload.patches)
+        if (this.applyPatches(payload.patches)) {
+            // The host may publish later generations while this synchronous apply runs. Reporting only afterward makes this
+            // the application frontier: publisher history is never pruned merely because its JavaScript file was observed.
+            void this.sendReport({ kind: 'applied', seq: this.appliedSeq })
+        }
     }
 
     /**
@@ -244,9 +243,9 @@ class WxDevRuntime extends DevRuntime {
      *
      * `hmr/patches.js` can contain several unacknowledged Rolldown patches and can be required by several Page shells. The
      * runtime must therefore ignore replayed sequences, reject a missing sequence, and move directly from the currently live
-     * module generation to the latest delivered generation without rendering intermediate generations.
+     * module generation to the latest published generation without rendering intermediate generations.
      */
-    private applyPatches(patches: readonly PatchProgram[]): void {
+    private applyPatches(patches: readonly PatchProgram[]): boolean {
         // Keep the initial watermark immutable throughout the fold. Comparing replays against a moving watermark would allow
         // a duplicate new sequence in the same payload to masquerade as an already-applied patch.
         const previousSeq = this.appliedSeq
@@ -281,9 +280,9 @@ class WxDevRuntime extends DevRuntime {
                 nextSeq++
             }
 
-            // A payload containing only replayed sequences requires no graph work and must not alter the delivery watermark.
+            // A payload containing only replayed sequences requires no graph work and must not alter the application watermark.
             if (nextSeq === previousSeq + 1) {
-                return
+                return true
             }
 
             // Apply once after every factory is registered. React Refresh arms a newly executed module's hot.accept callback
@@ -291,15 +290,17 @@ class WxDevRuntime extends DevRuntime {
             // incorrectly bubble through the capsule to the native Page shell as though no HMR boundary existed.
             this.applyHmrUpdate(changedIds)
 
-            // Commit delivery only after graph propagation and boundary callbacks succeed. A failure leaves the old watermark
+            // Commit application only after graph propagation and boundary callbacks succeed. A failure leaves the old watermark
             // intact and requests a full rebuild below, so a partially applied batch is never acknowledged as healthy.
             this.appliedSeq = nextSeq - 1
+            return true
         } catch (error) {
             console.warn('[vpt] patch batch failed; apply stopped', error)
             void this.sendReport({
                 kind: 'rebuild',
                 reason: Error.isError(error) ? error.message : String(error)
             })
+            return false
         }
     }
 
