@@ -347,19 +347,6 @@ vpt 支持 `#ifdef`、`#ifndef`、`#else` 和 `#endif`，不支持 `#if` 与 `#e
 依赖 `@tarojs/*` peer dependency、Taro CLI 插件、webpack loader 或 React 18 内部行为的第三方库不一定兼容。先确认库支持 React 19，再在微信和 Web 两端分别验证。无法兼容的构建插件需要替换，而不是继续保留旧 Taro CLI。
 :::
 
-## 当前不能直接迁移的能力
-
-以下能力没有一对一迁移路径：
-
-- Vue、Preact、Solid 和非微信小程序目标。
-- 原生页面分包、独立分包和手动代码分包配置。
-- `taro new`、Taro 插件钩子以及 Taro generator。
-- webpack loader、webpack plugin 和 `webpackChain` 定制。
-- 依赖组件级 `*.config.ts` 自动生成原生文件的功能。
-- 自定义原生 tab bar、原生组件目录或 WXS 文件的自动编译与复制。
-
-页面 JSON 中的 `usingComponents` 会被保留，但对应原生文件必须通过 `public` 或其他 Vite 插件出现在正确的输出路径。迁移这类混合项目时，应先制作一个最小页面验证原生组件，再继续迁移其余页面。
-
 ## 9. 逐项验证
 
 完成迁移后按以下顺序检查：
