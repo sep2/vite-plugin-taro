@@ -828,7 +828,7 @@ import HomeSectionHeading from './home-section-heading.astro'
 
     @supports (animation-timeline: view()) and (view-timeline-name: --tailwind-phone-scroll) {
         .phone-shell {
-            transform: perspective(90rem) rotateX(3deg) rotateY(-9deg);
+            transform: perspective(90rem) rotateX(6deg) rotateY(-18deg);
             view-timeline-axis: block;
             view-timeline-name: --tailwind-phone-scroll;
             animation: tailwind-phone-scroll linear both;
@@ -839,7 +839,7 @@ import HomeSectionHeading from './home-section-heading.astro'
 
     @keyframes tailwind-phone-scroll {
         0% {
-            transform: perspective(90rem) rotateX(3deg) rotateY(-9deg);
+            transform: perspective(90rem) rotateX(6deg) rotateY(-18deg);
         }
 
         44%,
@@ -848,7 +848,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         }
 
         100% {
-            transform: perspective(90rem) rotateX(-3deg) rotateY(9deg);
+            transform: perspective(90rem) rotateX(-6deg) rotateY(18deg);
         }
     }
 
