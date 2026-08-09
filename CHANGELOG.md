@@ -4,6 +4,13 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.5.10] - 2026-08-09
+
+### Fixed
+
+- preserve wx outputs across dev restarts (41ca99d)
+- skip duplicate Windows tag runs (d2d868d)
+
 ## [0.5.9] - 2026-08-09
 
 ### Fixed
