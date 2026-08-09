@@ -27,16 +27,16 @@ import { Icon } from '@astrojs/starlight/components'
             <div class="package-card">
                 <div class="package-tab"><Icon name="seti:folder" /> 自动包 7f3a</div>
                 <div class="package-content">
-                    <span class="module-chip"><b>入口模块</b><small>0.2M</small></span>
-                    <span class="module-chip"><b>图表</b><small>1.5M</small></span>
+                    <span class="module-chip"><b>动态入口</b><small>0.2M</small></span>
+                    <span class="module-chip"><b>图表渲染</b><small>1.5M</small></span>
                 </div>
                 <small>1.7M · 自动分配</small>
             </div>
             <div class="package-card">
                 <div class="package-tab"><Icon name="seti:folder" /> 自动包 c921</div>
                 <div class="package-content">
-                    <span class="module-chip"><b>PDF 导出</b><small>1.3M</small></span>
-                    <span class="module-chip"><b>原生组件</b><small>0.6M</small></span>
+                    <span class="module-chip"><b>原生组件</b><small>1.3M</small></span>
+                    <span class="module-chip"><b>PDF 导出</b><small>0.6M</small></span>
                 </div>
                 <small>1.9M · 自动分配</small>
             </div>
@@ -117,9 +117,10 @@ import { Icon } from '@astrojs/starlight/components'
         font-size: var(--home-font-size-label);
     }
 
-    .module-chip {
+    .package-content > .module-chip {
         display: inline-flex;
         min-width: 6rem;
+        padding-inline: 0.6rem;
         align-items: baseline;
         justify-content: space-between;
         gap: 0.5rem;
@@ -161,6 +162,7 @@ import { Icon } from '@astrojs/starlight/components'
         align-items: flex-start;
         flex-direction: column;
     }
+
 
     .cross-package-note {
         display: flex;

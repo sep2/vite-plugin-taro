@@ -148,6 +148,7 @@ import HomeSectionHeading from './home-section-heading.astro'
     </div>
 </section>
 
+
 <style>
     .tailwind-stage {
         --tailwind-demo-height: 40rem;
@@ -408,6 +409,10 @@ import HomeSectionHeading from './home-section-heading.astro'
         box-shadow:
             0 1.5rem 3rem rgba(19, 73, 40, 0.2),
             inset 0 0 0 0.22rem #1e4930;
+        transform: none;
+        transform-box: border-box;
+        transform-style: preserve-3d;
+        transform-origin: center;
     }
 
     .phone-speaker {
@@ -780,6 +785,42 @@ import HomeSectionHeading from './home-section-heading.astro'
         background: var(--vpt-chip-background);
         color: var(--vpt-chip-text);
         font-size: 0.6rem;
+    }
+
+    @supports (animation-timeline: view()) and (view-timeline-name: --tailwind-phone-scroll) {
+        .phone-shell {
+            transform: perspective(90rem) rotateX(3deg) rotateY(-9deg);
+            view-timeline-axis: block;
+            view-timeline-name: --tailwind-phone-scroll;
+            will-change: transform;
+            animation: tailwind-phone-scroll linear both;
+            /* Keep the named timeline separate from the optimizer's animation shorthand. */
+            animation-timeline: --tailwind-phone-scroll !important;
+        }
+    }
+
+    @keyframes tailwind-phone-scroll {
+        0% {
+            transform: perspective(90rem) rotateX(3deg) rotateY(-9deg);
+        }
+
+        44%,
+        56% {
+            transform: perspective(90rem) rotateX(0) rotateY(0);
+        }
+
+        100% {
+            transform: perspective(90rem) rotateX(-3deg) rotateY(9deg);
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .phone-shell {
+            transform: none;
+            will-change: auto;
+            animation: none;
+            animation-timeline: auto !important;
+        }
     }
 
     @media (max-width: 52rem) {
