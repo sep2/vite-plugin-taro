@@ -226,8 +226,8 @@ const proofPoints = [
             const canvas = this.querySelector<HTMLCanvasElement>('.rocket-confetti')
             if (flight === null || canvas === null) return
 
-            // Randomize the deterministic GPU path once, avoiding a continuous JavaScript animation loop.
-            flight.style.animationDelay = `${-Math.random() * 19}s`
+            // Vary duration and direction without offsetting the initial resting keyframe, which prevents a startup jump.
+            flight.style.animationDuration = `${17 + Math.random() * 6}s`
             flight.style.animationDirection = Math.random() < 0.5 ? 'normal' : 'reverse'
             this.cannon = confetti.create(canvas, {
                 resize: true,
