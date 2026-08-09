@@ -1,4 +1,4 @@
-# vite-plugin-taro 文档站
+# VPT 文档站
 
 本目录包含基于 [Astro Starlight](https://starlight.astro.build/) 构建的中文文档站。
 

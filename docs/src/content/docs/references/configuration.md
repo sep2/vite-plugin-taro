@@ -1,6 +1,6 @@
 ---
 title: 配置选项
-description: vite-plugin-taro 的 Vite 配置与插件选项参考。
+description: VPT 的 Vite 配置与插件选项参考。
 ---
 
 在 `vite.config.ts` 中调用 `vitePluginTaro()`。每次 Vite 运行只构建一个目标，目标由环境变量或其他配置逻辑决定。

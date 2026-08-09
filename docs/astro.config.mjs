@@ -13,7 +13,7 @@ export default defineConfig({
     },
     integrations: [
         starlight({
-            title: 'vite-plugin-taro',
+            title: 'VPT',
             customCss: ['./src/styles/custom.css'],
             components: {
                 Hero: './src/components/hero.astro',

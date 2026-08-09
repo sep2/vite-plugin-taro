@@ -1,6 +1,6 @@
 ---
 title: 仓库维护
-description: vite-plugin-taro monorepo 的安装、构建、验证与发布流程。
+description: VPT monorepo 的安装、构建、验证与发布流程。
 ---
 
 本页面向仓库贡献者，因此命令统一使用 pnpm。应用开发者请从[快速开始](/guides/quick-start/)进入。
