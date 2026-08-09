@@ -62,7 +62,7 @@ import HomeSectionHeading from './home-section-heading.astro'
 <script>
     import { connectResponsiveDiagrams } from './diagrams/connect-responsive-diagrams'
 
-    connectResponsiveDiagrams([
+    const disconnectDiagrams = connectResponsiveDiagrams([
         {
             name: 'source',
             selector: '[data-diagram="source-graph"]',
@@ -83,6 +83,8 @@ import HomeSectionHeading from './home-section-heading.astro'
             ]
         }
     ])
+
+    document.addEventListener('astro:before-swap', disconnectDiagrams, { once: true })
 </script>
 
 <style>

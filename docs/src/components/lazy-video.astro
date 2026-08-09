@@ -1,0 +1,97 @@
+---
+interface Props {
+    class: string
+    src: string
+    ariaLabel: string
+    width: number
+    height: number
+    captionSrc: string
+    captionLanguage: string
+    captionLabel: string
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
+const { class: className, src, ariaLabel, width, height, captionSrc, captionLanguage, captionLabel } = Astro.props
+---
+
+<vpt-lazy-video>
+    <video
+        class={className}
+        data-src={src}
+        aria-label={ariaLabel}
+        width={width}
+        height={height}
+        preload="none"
+        controls
+        muted
+        loop
+        playsinline
+    >
+        <track
+            kind="captions"
+            data-src={captionSrc}
+            srclang={captionLanguage}
+            label={captionLabel}
+            default
+        />
+    </video>
+</vpt-lazy-video>
+
+<script>
+    class VptLazyVideoElement extends HTMLElement {
+        // The observer is the sole mutable resource and is retained only for deterministic cleanup on disconnect.
+        private observer: IntersectionObserver | null = null
+
+        connectedCallback(): void {
+            if (this.observer !== null) return
+
+            const video = this.querySelector<HTMLVideoElement>('video[data-src]')
+            if (video === null) return
+
+            this.observer = new IntersectionObserver(
+                (entries) => {
+                    if (!entries.some((entry) => entry.isIntersecting)) {
+                        video.pause()
+                        return
+                    }
+
+                    if (!video.hasAttribute('src')) {
+                        const source = video.dataset.src
+                        if (source === undefined) return
+
+                        const track = video.querySelector<HTMLTrackElement>('track[data-src]')
+                        if (track?.dataset.src !== undefined) {
+                            track.src = track.dataset.src
+                        }
+                        video.src = source
+                    }
+                    void video.play().catch(() => undefined)
+                },
+                { rootMargin: '64px 0px', threshold: 0.01 }
+            )
+            this.observer.observe(this)
+        }
+
+        disconnectedCallback(): void {
+            this.observer?.disconnect()
+            this.observer = null
+
+            const video = this.querySelector<HTMLVideoElement>('video')
+            if (video === null) return
+            video.pause()
+            video.removeAttribute('src')
+            video.querySelector('track')?.removeAttribute('src')
+            video.load()
+        }
+    }
+
+    if (customElements.get('vpt-lazy-video') === undefined) {
+        customElements.define('vpt-lazy-video', VptLazyVideoElement)
+    }
+</script>
+
+<style>
+    vpt-lazy-video {
+        display: block;
+    }
+</style>

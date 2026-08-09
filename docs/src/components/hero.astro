@@ -511,7 +511,7 @@ const proofPoints = [
             inset: 4% -2% auto auto;
             width: min(100%, 31rem);
             filter: drop-shadow(0 24px 20px rgba(19, 89, 50, 0.18));
-            animation: hover 5s ease-in-out infinite;
+            transform: rotate(-0.5deg);
         }
 
         .rocket-body {
@@ -611,9 +611,10 @@ const proofPoints = [
 
         .botanical-exhaust {
             filter: drop-shadow(0 4px 4px rgba(27, 105, 57, 0.08));
+            opacity: 0.92;
+            transform: scale(0.99);
             transform-box: fill-box;
             transform-origin: center top;
-            animation: exhaust-breathe 2.8s ease-in-out infinite;
         }
 
         .trail-leaf {
@@ -666,14 +667,12 @@ const proofPoints = [
             width: 25rem;
             height: 25rem;
             transform: rotate(-20deg);
-            animation: orbit-one-drift 12s ease-in-out infinite;
         }
 
         .orbit-two {
             inset: 26% 14% auto auto;
             width: 17rem;
             height: 17rem;
-            animation: orbit-two-drift 9s ease-in-out infinite;
         }
 
         .spark {
@@ -760,48 +759,6 @@ const proofPoints = [
             font-size: 0.72rem;
         }
 
-        @keyframes hover {
-            0%,
-            100% {
-                transform: translate3d(0, 0, 0) rotate(-0.5deg);
-            }
-            50% {
-                transform: translate3d(-4px, -12px, 0) rotate(0.8deg);
-            }
-        }
-
-        @keyframes exhaust-breathe {
-            0%,
-            100% {
-                opacity: 0.88;
-                transform: scale(0.98, 0.96);
-            }
-            50% {
-                opacity: 1;
-                transform: scale(1.02, 1.035);
-            }
-        }
-
-        @keyframes orbit-one-drift {
-            0%,
-            100% {
-                transform: rotate(-20deg) scale(1);
-            }
-            50% {
-                transform: rotate(-14deg) scale(1.025);
-            }
-        }
-
-        @keyframes orbit-two-drift {
-            0%,
-            100% {
-                transform: translate3d(0, 0, 0) scale(1);
-            }
-            50% {
-                transform: translate3d(8px, -5px, 0) scale(0.97);
-            }
-        }
-
         @media (max-width: 60rem) {
             .hero-grid {
                 grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.7fr);
@@ -875,12 +832,5 @@ const proofPoints = [
             }
         }
 
-        @media (prefers-reduced-motion: reduce) {
-            .rocket,
-            .botanical-exhaust,
-            .orbit {
-                animation: none;
-            }
-        }
     }
 </style>

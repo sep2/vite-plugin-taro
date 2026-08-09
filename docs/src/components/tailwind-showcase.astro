@@ -831,7 +831,6 @@ import HomeSectionHeading from './home-section-heading.astro'
             transform: perspective(90rem) rotateX(3deg) rotateY(-9deg);
             view-timeline-axis: block;
             view-timeline-name: --tailwind-phone-scroll;
-            will-change: transform;
             animation: tailwind-phone-scroll linear both;
             /* Keep the named timeline separate from the optimizer's animation shorthand. */
             animation-timeline: --tailwind-phone-scroll !important;
@@ -856,7 +855,6 @@ import HomeSectionHeading from './home-section-heading.astro'
     @media (prefers-reduced-motion: reduce) {
         .phone-shell {
             transform: none;
-            will-change: auto;
             animation: none;
             animation-timeline: auto !important;
         }

@@ -205,7 +205,10 @@ html[data-has-hero] .actions .sl-link-button.primary {
     border-color: var(--vpt-button-background);
     background-color: var(--vpt-button-background);
     background-image: none;
-    box-shadow: 0 8px 18px color-mix(in srgb, var(--vpt-button-glow) 24%, transparent);
+    box-shadow:
+        0 0 0 2px color-mix(in srgb, #8de3a1 58%, transparent),
+        0 0 20px 5px color-mix(in srgb, #8de3a1 28%, transparent),
+        0 10px 24px color-mix(in srgb, var(--vpt-button-glow) 34%, transparent);
     padding: 0.9375rem 1.25rem;
     padding-inline-start: 1.5rem;
     color: var(--vpt-button-text);
@@ -213,12 +216,10 @@ html[data-has-hero] .actions .sl-link-button.primary {
     line-height: 1.5rem;
     gap: 0.5rem;
     touch-action: manipulation;
-    animation: vpt-button-glow 3.6s ease-in-out infinite;
     transition: transform 180ms ease;
 }
 
 html[data-has-hero] .actions .sl-link-button.primary:hover {
-    animation-duration: 2.8s;
     transform: translateY(-2px);
 }
 
@@ -232,38 +233,7 @@ html[data-has-hero] .actions .sl-link-button.primary:active {
         0 3px 9px color-mix(in srgb, var(--vpt-button-glow) 28%, transparent),
         inset 0 2px 5px rgba(0, 0, 0, 0.18);
     transform: translateY(1px) scale(0.97);
-    animation: none;
     transition-duration: 60ms;
-}
-
-@keyframes vpt-button-glow {
-    0%,
-    100% {
-        box-shadow:
-            0 0 0 2px color-mix(in srgb, #8de3a1 58%, transparent),
-            0 0 20px 5px color-mix(in srgb, #8de3a1 28%, transparent),
-            0 10px 24px color-mix(in srgb, var(--vpt-button-glow) 34%, transparent);
-    }
-
-    33% {
-        box-shadow:
-            0 0 0 2px color-mix(in srgb, #f2d675 62%, transparent),
-            0 0 22px 6px color-mix(in srgb, #f2d675 30%, transparent),
-            0 11px 26px color-mix(in srgb, var(--vpt-button-glow) 38%, transparent);
-    }
-
-    66% {
-        box-shadow:
-            0 0 0 2px color-mix(in srgb, #ef957a 58%, transparent),
-            0 0 22px 6px color-mix(in srgb, #ef957a 28%, transparent),
-            0 11px 26px color-mix(in srgb, var(--vpt-button-glow) 38%, transparent);
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    html[data-has-hero] .actions .sl-link-button.primary {
-        animation: none;
-    }
 }
 
 @media (max-width: 49.999rem) {

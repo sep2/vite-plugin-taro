@@ -1,5 +1,3 @@
-import { select } from 'd3'
-
 type LinkKind = 'static' | 'dynamic' | 'dependency' | 'flow'
 
 interface DiagramLink {
@@ -148,6 +146,53 @@ const renderLinks = (container: HTMLElement, frame: DOMRect, links: readonly Dia
     })
 }
 
+const svgNamespace = 'http://www.w3.org/2000/svg'
+
+const createSvgElement = <Name extends keyof SVGElementTagNameMap>(
+    name: Name,
+    attributes: Readonly<Record<string, string>>
+): SVGElementTagNameMap[Name] => {
+    const element = document.createElementNS(svgNamespace, name)
+    Object.entries(attributes).forEach(([attribute, value]) => {
+        element.setAttribute(attribute, value)
+    })
+    return element
+}
+
+const createMarker = (markerId: string): SVGMarkerElement => {
+    const marker = createSvgElement('marker', {
+        id: markerId,
+        viewBox: '0 0 10 10',
+        refX: '9',
+        refY: '5',
+        markerWidth: '5',
+        markerHeight: '5',
+        orient: 'auto-start-reverse'
+    })
+    marker.append(createSvgElement('path', { d: 'M 0 0 L 10 5 L 0 10 z' }))
+    return marker
+}
+
+const createLinkPath = (link: RenderedLink, markerId: string): SVGPathElement =>
+    createSvgElement('path', {
+        class: `diagram-link diagram-link-${link.kind}`,
+        'data-from': link.from,
+        'data-to': link.to,
+        d: link.path,
+        ...(link.kind === 'flow' ? { 'marker-end': `url(#${markerId})` } : {})
+    })
+
+const createLinkLabel = (link: RenderedLink): SVGTextElement => {
+    const label = createSvgElement('text', {
+        class: `diagram-link-label diagram-link-label-${link.kind}`,
+        x: String(link.labelPosition.x),
+        y: String(link.labelPosition.y - 6),
+        'text-anchor': 'middle'
+    })
+    label.textContent = link.label ?? ''
+    return label
+}
+
 const renderDiagram = ({ name, selector, links }: DiagramSpec): void => {
     const container = document.querySelector<HTMLElement>(selector)
     const svgElement = container?.querySelector<SVGSVGElement>(':scope > [data-diagram-links]')
@@ -161,52 +206,43 @@ const renderDiagram = ({ name, selector, links }: DiagramSpec): void => {
     }
 
     const renderedLinks = renderLinks(container, frame, links)
-    const svg = select(svgElement).attr('viewBox', `0 0 ${frame.width} ${frame.height}`)
     const markerId = `diagram-arrow-${name}`
-    const marker = svg
-        .selectAll<SVGMarkerElement, null>(`#${markerId}`)
-        .data([null])
-        .join('marker')
-        .attr('id', markerId)
-        .attr('viewBox', '0 0 10 10')
-        .attr('refX', 9)
-        .attr('refY', 5)
-        .attr('markerWidth', 5)
-        .attr('markerHeight', 5)
-        .attr('orient', 'auto-start-reverse')
+    const paths = renderedLinks.map((link) => createLinkPath(link, markerId))
+    const labels = renderedLinks.filter((link) => link.label !== undefined).map(createLinkLabel)
 
-    marker.selectAll('path').data([null]).join('path').attr('d', 'M 0 0 L 10 5 L 0 10 z')
-
-    svg.selectAll<SVGPathElement, RenderedLink>('path.diagram-link')
-        .data(renderedLinks, (link) => `${link.from}-${link.to}`)
-        .join('path')
-        .attr('class', (link) => `diagram-link diagram-link-${link.kind}`)
-        .attr('data-from', (link) => link.from)
-        .attr('data-to', (link) => link.to)
-        .attr('d', (link) => link.path)
-        .attr('marker-end', (link) => (link.kind === 'flow' ? `url(#${markerId})` : null))
-
-    const labels = renderedLinks.filter((link) => link.label !== undefined)
-    svg.selectAll<SVGTextElement, RenderedLink>('text.diagram-link-label')
-        .data(labels, (link) => `${link.from}-${link.to}`)
-        .join('text')
-        .attr('class', (link) => `diagram-link-label diagram-link-label-${link.kind}`)
-        .attr('x', (link) => link.labelPosition.x)
-        .attr('y', (link) => link.labelPosition.y - 6)
-        .attr('text-anchor', 'middle')
-        .text((link) => link.label ?? '')
+    svgElement.setAttribute('viewBox', `0 0 ${frame.width} ${frame.height}`)
+    svgElement.replaceChildren(createMarker(markerId), ...paths, ...labels)
 }
 
-export function connectResponsiveDiagrams(diagramSpecs: readonly DiagramSpec[]): void {
+export function connectResponsiveDiagrams(diagramSpecs: readonly DiagramSpec[]): () => void {
     const renderDiagrams = (): void => diagramSpecs.forEach(renderDiagram)
     const diagramElements = diagramSpecs
         .map(({ selector }) => document.querySelector<HTMLElement>(selector))
         .filter((element): element is HTMLElement => element !== null)
-    const resizeObserver = new ResizeObserver(() => requestAnimationFrame(renderDiagrams))
 
+    // One mutable frame handle coalesces font and resize events into a single geometry pass per paint.
+    let renderFrame: number | undefined
+    // This lifecycle flag prevents a resolved font promise from reviving a disconnected diagram.
+    let isConnected = true
+
+    const scheduleRender = (): void => {
+        if (!isConnected || renderFrame !== undefined) return
+        renderFrame = requestAnimationFrame(() => {
+            renderFrame = undefined
+            renderDiagrams()
+        })
+    }
+
+    const resizeObserver = new ResizeObserver(scheduleRender)
     diagramElements.forEach((element) => {
         resizeObserver.observe(element)
     })
-    document.fonts.ready.then(renderDiagrams)
-    requestAnimationFrame(renderDiagrams)
+    void document.fonts.ready.then(scheduleRender)
+    scheduleRender()
+
+    return () => {
+        isConnected = false
+        resizeObserver.disconnect()
+        if (renderFrame !== undefined) cancelAnimationFrame(renderFrame)
+    }
 }
