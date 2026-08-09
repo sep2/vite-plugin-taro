@@ -79,7 +79,7 @@ interface VitePluginTaroOptions {
 | `pages` | 有序页面列表。顺序会成为 `app.json.pages` 和 Web 路由顺序。                                                |
 | `pages[].path` | 不带扩展名的 Taro 路由与输出路径，例如 `pages/index/index`。对应文件必须位于 `src/pages/index/index.tsx`。 |
 | `pages[].config` | 合并到微信页面 JSON 和 Web 路由配置的页面配置。                                                            |
-| `appJson` | 微信应用配置。vpt 会根据 `pages` 生成并覆盖 `pages`，并自行管理代码分包声明。                              |
+| `appJson` | 微信应用配置。vpt 会根据 `pages` 生成并覆盖 `pages`，并自行管理分包声明。                                  |
 | `projectConfigJson` | 微信构建时原样输出为 `project.config.json`。接口要求始终提供，Web 构建不会写出该文件。                     |
 | `projectPrivateConfigJson` | 可选的微信私有项目配置；提供时原样输出为 `project.private.config.json`。                                   |
 | `sitemapJson` | 微信构建时原样输出为 `sitemap.json`。接口要求始终提供，Web 构建不会写出该文件。                            |
