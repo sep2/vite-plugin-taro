@@ -195,6 +195,7 @@ const proofPoints = [
     import confetti from 'canvas-confetti'
 
     const exhaustColors = ['#4aa95f', '#78c66d', '#b8d99e', '#f2d675', '#ef957a']
+    const exhaustCanvasOrigin = { x: 0.68, y: 0.34 } as const
 
     interface ExhaustOrigin {
         x: number
@@ -227,18 +228,19 @@ const proofPoints = [
                 useWorker: true,
                 disableForReducedMotion: true
             })
-            this.geometryObserver = new ResizeObserver(this.updateOrigin)
+            this.geometryObserver = new ResizeObserver(this.updateExhaustGeometry)
             this.geometryObserver.observe(this)
-            this.updateOrigin()
+            this.updateExhaustGeometry()
             this.observer = new IntersectionObserver(
                 (entries) => {
                     this.isVisible = entries.some((entry) => entry.isIntersecting)
                     this.syncEmission()
                 },
-                { threshold: 0.05 }
+                { threshold: 0.25 }
             )
             this.observer.observe(this)
             this.reducedMotion.addEventListener('change', this.syncEmission)
+            document.addEventListener('visibilitychange', this.syncEmission)
         }
 
         disconnectedCallback(): void {
@@ -247,6 +249,7 @@ const proofPoints = [
             this.geometryObserver?.disconnect()
             this.geometryObserver = null
             this.reducedMotion.removeEventListener('change', this.syncEmission)
+            document.removeEventListener('visibilitychange', this.syncEmission)
             this.stopEmission()
             this.cannon?.reset()
             this.cannon = null
@@ -255,7 +258,7 @@ const proofPoints = [
         }
 
         private readonly syncEmission = (): void => {
-            if (this.isVisible && !this.reducedMotion.matches) {
+            if (this.isVisible && !document.hidden && !this.reducedMotion.matches) {
                 this.startEmission()
                 return
             }
@@ -264,9 +267,9 @@ const proofPoints = [
 
         private startEmission(): void {
             if (this.emissionTimer !== null) return
-            this.updateOrigin()
+            this.updateExhaustGeometry()
             this.emitExhaust()
-            this.emissionTimer = window.setInterval(() => this.emitExhaust(), 140)
+            this.emissionTimer = window.setInterval(() => this.emitExhaust(), 280)
         }
 
         private stopEmission(): void {
@@ -275,19 +278,21 @@ const proofPoints = [
             this.emissionTimer = null
         }
 
-        private readonly updateOrigin = (): void => {
+        private readonly updateExhaustGeometry = (): void => {
             const originElement = this.querySelector<SVGGraphicsElement>('.rocket-confetti-origin')
             const canvas = this.querySelector<HTMLCanvasElement>('.rocket-confetti')
             if (originElement === null || canvas === null) return
 
+            const stageBounds = this.getBoundingClientRect()
             const originBounds = originElement.getBoundingClientRect()
             const canvasBounds = canvas.getBoundingClientRect()
             if (canvasBounds.width === 0 || canvasBounds.height === 0) return
 
-            this.origin = {
-                x: (originBounds.left + originBounds.width / 2 - canvasBounds.left) / canvasBounds.width,
-                y: (originBounds.top + originBounds.height / 2 - canvasBounds.top) / canvasBounds.height
-            }
+            const nozzleX = originBounds.left + originBounds.width / 2 - stageBounds.left
+            const nozzleY = originBounds.top + originBounds.height / 2 - stageBounds.top
+            canvas.style.left = `${nozzleX - canvasBounds.width * exhaustCanvasOrigin.x}px`
+            canvas.style.top = `${nozzleY - canvasBounds.height * exhaustCanvasOrigin.y}px`
+            this.origin = exhaustCanvasOrigin
         }
 
         private emitExhaust(): void {
@@ -304,8 +309,8 @@ const proofPoints = [
                 flat: true,
                 gravity: 0.03,
                 origin: nozzleOrigin,
-                particleCount: 16,
-                scalar: 1,
+                particleCount: 14,
+                scalar: 1.1,
                 shapes: ['circle', 'square', 'star'],
                 spread: 140,
                 startVelocity: 2,
@@ -560,9 +565,10 @@ const proofPoints = [
         .rocket-confetti {
             position: absolute;
             z-index: 1;
-            inset: 0;
-            width: 100%;
-            height: 100%;
+            top: 0;
+            left: 0;
+            width: 15rem;
+            height: 15rem;
             pointer-events: none;
         }
 
