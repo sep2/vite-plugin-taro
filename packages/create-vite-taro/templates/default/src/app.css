@@ -34,7 +34,8 @@ button {
 .starter-canvas {
     background:
         radial-gradient(ellipse at 12% 5%, rgba(101, 190, 119, 0.11), rgba(101, 190, 119, 0.04) 28%, transparent 62%),
-        radial-gradient(ellipse at 90% 18%, rgba(234, 139, 115, 0.08), rgba(234, 139, 115, 0.03) 32%, transparent 68%);
+        radial-gradient(ellipse at 90% 18%, rgba(234, 139, 115, 0.08), rgba(234, 139, 115, 0.03) 32%, transparent 68%),
+        #fbfaf1;
 }
 
 .botanical-sprig {

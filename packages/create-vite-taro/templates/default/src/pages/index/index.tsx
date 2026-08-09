@@ -52,9 +52,9 @@ function IndexPage() {
     const [count, setCount] = useState(0)
 
     return (
-        <View className="flex h-screen flex-col overflow-hidden bg-[#fbfaf1] text-[#315f44]">
+        <View className="starter-canvas flex h-screen flex-col overflow-hidden text-[#315f44]">
             <NavigationBar title="VPT" />
-            <ScrollView scrollY className="starter-canvas flex min-h-0 flex-1 flex-col bg-[#fbfaf1]">
+            <ScrollView scrollY className="flex min-h-0 flex-1 flex-col">
                 <View className="relative flex shrink-0 flex-col items-center overflow-hidden px-5 pb-12 pt-10">
                     <BotanicalSprig className="botanical-sprig-top" />
                     <BotanicalSprig className="botanical-sprig-side" />

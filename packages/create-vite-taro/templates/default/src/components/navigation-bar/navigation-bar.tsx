@@ -18,10 +18,7 @@ export function NavigationBar({ title }: NavigationBarProps) {
     const sideStyle: CSSProperties = { flexBasis: px(menuInfo.width), width: px(menuInfo.width) }
 
     return (
-        <View
-            className="flex w-full flex-col border-b border-[#1e663d]/10 bg-[#fbfaf1] text-[#17673d]"
-            style={containerStyle}
-        >
+        <View className="flex w-full flex-col text-[#17673d]" style={containerStyle}>
             <View className="shrink-0" style={statusBarStyle} />
             <View className="flex w-full flex-1 flex-row items-center" style={contentStyle}>
                 <View className="flex h-full shrink-0" style={sideStyle} />
