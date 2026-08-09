@@ -48,6 +48,10 @@ const deepStaticId = '/cross-package/deep-static.js'
 const largeLazyModuleIds: ReadonlySet<string> = new Set([subpackageAId, subpackageBId, nestedDynamicId, deepDynamicId])
 
 const modules: Readonly<Record<string, string>> = {
+    // The package's built runtime is intentionally virtualized so this source-level test does not require a prebuilt dist.
+    [transportPath]: `
+        export const transport = __VITE_PLUGIN_TARO_TRANSPORT__
+    `,
     [applicationId]: `
         import { mainName } from './main-dependency.js'
         export const readMain = () => mainName
