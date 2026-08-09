@@ -39,6 +39,9 @@ html[data-theme="light"][data-has-hero] {
     --vpt-muted: #64786a;
     --vpt-accent: #207344;
     --vpt-accent-strong: #197342;
+    --vpt-button-background: #197342;
+    --vpt-button-text: #fffdf5;
+    --vpt-button-glow: rgba(50, 170, 89, 0.42);
     --vpt-border: rgba(30, 102, 61, 0.14);
     --vpt-border-strong: rgba(37, 137, 74, 0.35);
     --vpt-surface: rgba(255, 255, 249, 0.78);
@@ -80,6 +83,9 @@ html[data-theme="dark"][data-has-hero] {
     --vpt-muted: #91a796;
     --vpt-accent: #6fd087;
     --vpt-accent-strong: #74dc8f;
+    --vpt-button-background: #74dc8f;
+    --vpt-button-text: #0d2b18;
+    --vpt-button-glow: rgba(101, 207, 128, 0.42);
     --vpt-border: rgba(140, 207, 151, 0.16);
     --vpt-border-strong: rgba(112, 211, 134, 0.42);
     --vpt-surface: rgba(21, 38, 27, 0.84);
@@ -140,6 +146,99 @@ html[data-has-hero] .sl-markdown-content > :not(:where(.not-content *)) {
 
 html[data-has-hero] .content-panel > .sl-container > footer {
     display: none;
+}
+
+html[data-has-hero] .actions .sl-link-button.primary {
+    position: relative;
+    isolation: isolate;
+    border-color: var(--vpt-button-background);
+    background: var(--vpt-button-background);
+    box-shadow: 0 8px 18px color-mix(in srgb, var(--vpt-button-glow) 24%, transparent);
+    color: var(--vpt-button-text);
+    touch-action: manipulation;
+    transition:
+        box-shadow 180ms ease,
+        transform 180ms ease;
+}
+
+html[data-has-hero] .actions .sl-link-button.primary::before,
+html[data-has-hero] .actions .sl-link-button.primary::after {
+    content: "";
+    position: absolute;
+    border-radius: inherit;
+    background: linear-gradient(110deg, #8de3a1, #f2d675, #ef957a, #68d68a, #8de3a1);
+    background-size: 300% 100%;
+    pointer-events: none;
+    animation: vpt-button-glow 4s linear infinite;
+}
+
+html[data-has-hero] .actions .sl-link-button.primary::before {
+    z-index: -1;
+    inset: -0.25rem;
+    filter: blur(0.65rem);
+    opacity: 0.16;
+    transition: opacity 180ms ease;
+}
+
+html[data-has-hero] .actions .sl-link-button.primary::after {
+    z-index: 1;
+    inset: -2px;
+    padding: 2px;
+    -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+    mask-composite: exclude;
+}
+
+html[data-has-hero] .actions .sl-link-button.primary:hover {
+    box-shadow: 0 12px 26px color-mix(in srgb, var(--vpt-button-glow) 42%, transparent);
+    transform: translateY(-2px);
+}
+
+html[data-has-hero] .actions .sl-link-button.primary:hover::before {
+    opacity: 0.34;
+}
+
+html[data-has-hero] .actions .sl-link-button.primary:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--vpt-button-glow) 78%, white);
+    outline-offset: 4px;
+}
+
+html[data-has-hero] .actions .sl-link-button.primary:active {
+    box-shadow:
+        0 3px 9px color-mix(in srgb, var(--vpt-button-glow) 28%, transparent),
+        inset 0 2px 5px rgba(0, 0, 0, 0.18);
+    transform: translateY(1px) scale(0.97);
+    transition-duration: 60ms;
+}
+
+html[data-has-hero] .actions .sl-link-button.primary:active::before {
+    opacity: 0.1;
+}
+
+html[data-has-hero] .actions .sl-link-button.primary:active::after {
+    opacity: 0.72;
+}
+
+@keyframes vpt-button-glow {
+    from {
+        background-position: 0 0;
+    }
+
+    to {
+        background-position: 300% 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html[data-has-hero] .actions .sl-link-button.primary::before,
+    html[data-has-hero] .actions .sl-link-button.primary::after {
+        animation: none;
+    }
 }
 
 @media (max-width: 49.999rem) {
