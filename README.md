@@ -21,7 +21,7 @@ npm create vite-taro@latest my-app
 
 ### 已支持微信开发者工具的 React 热更新
 
-<video src="https://github.com/user-attachments/assets/cd4e6d97-6bc7-40e0-9ba9-206c9fe369f1" controls autoplay muted loop playsinline width="100%"></video>
+<video src="https://github.com/user-attachments/assets/4d8648b0-534c-4a77-bfa5-84ca7cc7fb00" controls autoplay muted loop playsinline width="100%"></video>
 
 - **Vite 8 + React 19** 基于 Vite 生态，一份代码覆盖微信小程序与 Web。
 - **热更新** 编辑代码时保留 App 数据、当前页面、React 组件状态与输入状态。

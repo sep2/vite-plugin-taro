@@ -20,7 +20,7 @@ Continue with the [Quick Start guide](https://vpt.js.org/guides/quick-start/).
 
 ### React Hot Reload in WeChat DevTools
 
-<video src="https://github.com/user-attachments/assets/cd4e6d97-6bc7-40e0-9ba9-206c9fe369f1" controls autoplay muted loop playsinline width="100%"></video>
+<video src="https://github.com/user-attachments/assets/4d8648b0-534c-4a77-bfa5-84ca7cc7fb00" controls autoplay muted loop playsinline width="100%"></video>
 
 - **Vite 8 + React 19** Build one codebase for WeChat Mini Program and Web with the Vite ecosystem.
 - **Hot reload** Preserve App data, the active page, React component state, and input state while editing.
