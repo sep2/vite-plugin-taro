@@ -29,6 +29,14 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
             config() {
                 return {
                     build: {
+                        // The development output is the live Mini Program project opened by WeChat DevTools, not a disposable
+                        // build artifact. Deleting and recreating its directory tree during a dev-server restart disrupts
+                        // DevTools' hot-reload watcher; recreating the same paths does not reliably attach that watcher again.
+                        // The host then continues writing hmr/patches.js, but DevTools no longer observes it and therefore never
+                        // re-executes the Page shell that consumes and acknowledges the patches. Keep the watched paths present
+                        // across host restarts and let the initial complete build overwrite active outputs. This plugin applies
+                        // only to `serve`; production builds retain Vite's normal output cleanup.
+                        emptyOutDir: false,
                         // Disable maps in resolved environment config as well as final output so Oxc and Babel skip producing
                         // intermediate maps that Rolldown would discard.
                         sourcemap: false

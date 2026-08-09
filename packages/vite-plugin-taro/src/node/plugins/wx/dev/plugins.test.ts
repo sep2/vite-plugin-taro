@@ -1,6 +1,34 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { injectPageHmr, injectReactRefreshBootstrap, injectTaroConnection } from './plugins.ts'
+import { resolveConfig } from 'vite'
+import type { VitePluginTaroOptions } from '../../../../options.ts'
+import {
+    createWxDevelopmentPlugin,
+    injectPageHmr,
+    injectReactRefreshBootstrap,
+    injectTaroConnection
+} from './plugins.ts'
+
+const options: VitePluginTaroOptions = {
+    target: 'wx',
+    app: 'src/app.tsx',
+    pages: [],
+    appJson: {},
+    projectConfigJson: {},
+    sitemapJson: {}
+}
+
+test('preserves physical outputs across development host restarts', async () => {
+    const config = await resolveConfig(
+        {
+            configFile: false,
+            plugins: createWxDevelopmentPlugin(options)
+        },
+        'serve'
+    )
+
+    assert.equal(config.build.emptyOutDir, false)
+})
 
 test('evaluates React Refresh before the App dependency graph', () => {
     const result = injectReactRefreshBootstrap("import App from './app.tsx'")

@@ -8,7 +8,6 @@ import { once } from '../../../utils/once.ts'
 import { resolvePackageFile } from '../../../utils/packages.ts'
 import { appShellFileName } from '../module.ts'
 import { createWxDevMode } from './create-wx-dev-mode.ts'
-import { createInitialOutputDirectoryCleaner } from './empty-output-directory.ts'
 
 export type BundledDevRolldownOptions = InputOptions & {
     experimental?: {
@@ -77,28 +76,14 @@ export function installWxDevOptions({
             await bundleRuntimeSource()
         )
 
-        const initializeOutputDirectory = createInitialOutputDirectoryCleaner(server.config.build.outDir)
-        const initializeOutputDirectoryPlugin: Plugin = {
-            name: 'vpt:wx-initialize-output-directory',
-            renderStart: {
-                order: 'pre',
-                // DevEngine bypasses Vite's build-only output preparation. Remove stale startup contents once, before
-                // Rolldown starts treating its in-memory incremental output as authoritative for later complete builds.
-                handler: initializeOutputDirectory
-            }
-        }
-
         const reportInitialBuildPlugin: Plugin = {
             name: 'vpt:wx-report-initial-build',
             buildEnd: settleInitialBuild
         }
 
-        rolldownOptions.plugins = [
-            initializeOutputDirectoryPlugin,
-            rolldownOptions.plugins,
-            reportInitialBuildPlugin,
-            createViteReporter(server)
-        ]
+        // Preserve the physical paths watched by WeChat DevTools across host restarts; the complete build overwrites every
+        // active output without disrupting the hot-reload watcher.
+        rolldownOptions.plugins = [rolldownOptions.plugins, reportInitialBuildPlugin, createViteReporter(server)]
         disableViteOxcSourcemap(rolldownOptions.plugins)
 
         return rolldownOptions
