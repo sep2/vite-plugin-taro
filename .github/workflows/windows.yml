@@ -2,10 +2,15 @@ name: Windows CI
 
 on:
   push:
+    # Release pushes update main and create a tag for the same commit. Run once for the branch; tag workflows publish it.
+    branches:
+      - '**'
     paths:
+      - '.github/workflows/windows.yml'
       - 'packages/vite-plugin-taro/**'
   pull_request:
-      paths:
+    paths:
+      - '.github/workflows/windows.yml'
       - 'packages/vite-plugin-taro/**'
   workflow_dispatch:
 
