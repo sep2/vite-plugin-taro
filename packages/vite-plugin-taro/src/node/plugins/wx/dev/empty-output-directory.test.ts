@@ -3,7 +3,8 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { emptyOutputDirectory } from './empty-output-directory.ts'
+import { dev } from 'rolldown/experimental'
+import { createInitialOutputDirectoryCleaner, emptyOutputDirectory } from './empty-output-directory.ts'
 
 test('empties an existing output directory without replacing it', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-empty-output-'))
@@ -34,6 +35,52 @@ test('creates a missing output directory', async () => {
     try {
         await emptyOutputDirectory(outputDirectory)
         assert.deepEqual(await fs.readdir(outputDirectory), [])
+    } finally {
+        await fs.rm(root, { force: true, recursive: true })
+    }
+})
+
+test('preserves unchanged emitted assets across incremental full builds', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-incremental-output-'))
+    const outputDirectory = path.join(root, 'dist')
+    await fs.writeFile(path.join(root, 'main.js'), "console.log('stable')\n")
+
+    try {
+        const initializeOutputDirectory = createInitialOutputDirectoryCleaner(outputDirectory)
+        const engine = await dev(
+            {
+                cwd: root,
+                input: 'main.js',
+                experimental: { devMode: true },
+                plugins: [
+                    {
+                        name: 'test:stable-emitted-asset',
+                        renderStart: initializeOutputDirectory,
+                        generateBundle() {
+                            this.emitFile({ type: 'asset', fileName: 'stable.json', source: '{}' })
+                        }
+                    }
+                ]
+            },
+            { dir: outputDirectory, entryFileNames: 'main.js' },
+            {
+                rebuildStrategy: 'never',
+                watch: { enabled: false, skipWrite: false }
+            }
+        )
+
+        try {
+            await engine.run()
+            assert.equal(await fs.readFile(path.join(outputDirectory, 'stable.json'), 'utf8'), '{}')
+
+            engine.triggerFullBuild()
+            await engine.ensureLatestBuildOutput()
+
+            // Rolldown invokes generateBundle again but suppresses the byte-identical asset write from its incremental output.
+            assert.equal(await fs.readFile(path.join(outputDirectory, 'stable.json'), 'utf8'), '{}')
+        } finally {
+            await engine.close()
+        }
     } finally {
         await fs.rm(root, { force: true, recursive: true })
     }

@@ -8,7 +8,7 @@ import { once } from '../../../utils/once.ts'
 import { resolvePackageFile } from '../../../utils/packages.ts'
 import { appShellFileName } from '../module.ts'
 import { createWxDevMode } from './create-wx-dev-mode.ts'
-import { emptyOutputDirectory } from './empty-output-directory.ts'
+import { createInitialOutputDirectoryCleaner } from './empty-output-directory.ts'
 
 export type BundledDevRolldownOptions = InputOptions & {
     experimental?: {
@@ -77,13 +77,14 @@ export function installWxDevOptions({
             await bundleRuntimeSource()
         )
 
-        const emptyOutputDirectoryPlugin: Plugin = {
-            name: 'vpt:wx-empty-output-directory',
+        const initializeOutputDirectory = createInitialOutputDirectoryCleaner(server.config.build.outDir)
+        const initializeOutputDirectoryPlugin: Plugin = {
+            name: 'vpt:wx-initialize-output-directory',
             renderStart: {
                 order: 'pre',
-                // DevEngine bypasses Vite's build-only output preparation. Preserve the watched directory itself while
-                // removing stale contents before each complete physical render.
-                handler: () => emptyOutputDirectory(server.config.build.outDir)
+                // DevEngine bypasses Vite's build-only output preparation. Remove stale startup contents once, before
+                // Rolldown starts treating its in-memory incremental output as authoritative for later complete builds.
+                handler: initializeOutputDirectory
             }
         }
 
@@ -93,7 +94,7 @@ export function installWxDevOptions({
         }
 
         rolldownOptions.plugins = [
-            emptyOutputDirectoryPlugin,
+            initializeOutputDirectoryPlugin,
             rolldownOptions.plugins,
             reportInitialBuildPlugin,
             createViteReporter(server)
