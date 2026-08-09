@@ -4,6 +4,13 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.5.9] - 2026-08-09
+
+### Fixed
+
+- virtualize wx transport entry (c96aa45)
+- normalize wx chunk IDs on Windows (48a535c)
+
 ## [0.5.8] - 2026-08-09
 
 ### Changed
