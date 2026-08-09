@@ -151,7 +151,7 @@ const proofPoints = [
                         </radialGradient>
                     </defs>
                     <g transform="rotate(38 220 215)">
-                        <circle class="rocket-confetti-origin" cx="220" cy="330" r="1" />
+                        <circle class="rocket-confetti-origin" cx="220" cy="286" r="1" />
                         <path class="rocket-nozzle-back" d="M188 280L252 280L249 325C231 334 209 334 191 325Z" />
                         <path class="rocket-nozzle-band" d="M190 298C210 306 230 306 250 298L249 315C230 323 210 323 190 315Z" />
                         <path class="rocket-fin" d="M178 205C143 220 119 257 118 309C142 291 163 285 185 276Z" />
@@ -196,7 +196,36 @@ const proofPoints = [
 <script>
     import confetti from 'canvas-confetti'
 
-    const exhaustColors = ['#4aa95f', '#78c66d', '#b8d99e', '#f2d675', '#ef957a']
+    const flowerShapes = [
+        confetti.shapeFromPath(
+            'M11 11C7 10 4 6 6 3C8 0 12 4 12 8C13 4 18 1 20 4C23 8 18 11 15 12C20 13 21 18 18 20C14 23 12 18 12 15C10 20 5 21 3 17C1 13 6 11 11 11Z'
+        ),
+        confetti.shapeFromPath(
+            'M10 10C5 11 2 7 4 4C6 1 10 4 11 8C10 3 15 0 18 2C22 5 18 10 14 11C19 9 23 13 21 17C19 21 14 18 12 14C14 19 10 23 6 21C2 19 5 14 10 12Z'
+        ),
+        confetti.shapeFromPath(
+            'M12 11C7 9 3 4 6 2C9 0 13 5 13 9C16 5 21 4 23 7C25 11 18 14 14 13C18 16 19 21 15 23C11 25 9 18 11 14C7 18 2 19 1 15C0 11 7 10 12 11Z'
+        ),
+        confetti.shapeFromPath(
+            'M5 3C9 0 16 1 19 5L22 14C18 13 17 18 13 15C10 20 7 15 4 17C2 12 2 7 5 3ZM11 15L14 15L14 23L11 23Z'
+        ),
+        confetti.shapeFromPath(
+            'M12 12C6 12 4 7 7 3C10 0 13 6 12 10C14 5 20 3 22 7C25 12 18 14 14 13C18 17 16 22 12 23C8 23 8 16 12 12Z'
+        ),
+        confetti.shapeFromPath(
+            'M12 9C10 5 11 1 14 1C17 2 16 7 14 9C17 6 22 7 22 11C21 14 17 14 15 12C19 15 17 20 14 21C10 22 10 17 11 14C9 19 4 18 3 15C1 11 7 10 10 11C6 9 6 5 9 3C12 2 13 6 12 9Z'
+        )
+    ]
+    const leafShape = confetti.shapeFromPath('M12 1C4 3 0 10 4 19C12 17 18 9 12 1Z')
+    const grassShape = confetti.shapeFromPath(
+        'M10 22C8 14 7 7 9 1C13 8 12 15 11 22ZM10 22C5 17 2 12 2 6C8 10 10 16 10 22ZM11 22C14 14 18 9 22 7C21 14 17 20 11 22Z'
+    )
+    const starShape = confetti.shapeFromPath({
+        path: 'M5 0L6.12 3.45L9.76 3.45L6.82 5.59L7.94 9.05L5 6.91L2.06 9.05L3.18 5.59L0.24 3.45L3.88 3.45Z',
+        matrix: new DOMMatrix([0.56, 0, 0, 0.56, -2.8, -2.8])
+    })
+    const botanicalColors = ['#e98169', '#f0b84f', '#f3a085', '#4aa95f', '#78c66d', '#b8d99e', '#3c9654', '#6fbe69']
+    const botanicalShapes = [...flowerShapes, leafShape, grassShape, starShape]
     const exhaustCanvasOrigin = { x: 0.68, y: 0.34 } as const
 
     interface ExhaustOrigin {
@@ -279,7 +308,7 @@ const proofPoints = [
             if (this.emissionTimer !== null) return
             this.updateExhaustGeometry()
             this.emitExhaust()
-            this.emissionTimer = window.setInterval(() => this.emitExhaust(), 280)
+            this.emissionTimer = window.setInterval(() => this.emitExhaust(), 560)
         }
 
         private stopEmission(): void {
@@ -318,22 +347,26 @@ const proofPoints = [
             const nozzleOrigin = this.origin
             if (cannon === null || nozzleOrigin === null) return
 
-            void cannon({
-                angle: 225,
-                colors: exhaustColors,
-                decay: 0.985,
+            const options = {
+                angle: 232,
+                colors: botanicalColors,
+                decay: 0.9995,
                 disableForReducedMotion: true,
                 drift: 0,
                 flat: true,
-                gravity: 0.03,
+                gravity: 0.001,
                 origin: nozzleOrigin,
-                particleCount: 14,
-                scalar: 1.1,
-                shapes: ['circle', 'square', 'star'],
-                spread: 140,
-                startVelocity: 2,
-                ticks: 60
-            })
+                particleCount: 5,
+                scalar: 2,
+                shapes: botanicalShapes,
+                spread: 68,
+                startVelocity: 0.6,
+                rotationSpeed: 0.03,
+                tiltAmplitude: 0.8,
+                tiltSpeed: 0.012,
+                ticks: 480
+            }
+            void cannon(options)
         }
     }
 
@@ -653,8 +686,10 @@ const proofPoints = [
             z-index: 1;
             top: 0;
             left: 0;
-            width: 15rem;
-            height: 15rem;
+            width: 18rem;
+            height: 18rem;
+            mask-image: radial-gradient(ellipse 72% 78% at 68% 34%, #000 52%, transparent 100%);
+            mask-repeat: no-repeat;
             pointer-events: none;
         }
 

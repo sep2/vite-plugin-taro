@@ -19,3 +19,6 @@ minimumReleaseAgeExclude:
   - weapp-tailwindcss@5.1.14 || 5.2.11
   - '@astrojs/starlight@0.41.7'
   - vite@8.2.1
+
+patchedDependencies:
+  canvas-confetti@1.9.4: patches/canvas-confetti@1.9.4.patch
