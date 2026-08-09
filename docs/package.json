@@ -13,10 +13,12 @@
         "@astrojs/markdown-remark": "^7.2.2",
         "@astrojs/starlight": "^0.41.7",
         "astro": "^7.1.6",
+        "canvas-confetti": "^1.9.4",
         "d3": "^7.9.0",
         "sharp": "^0.35.3"
     },
     "devDependencies": {
+        "@types/canvas-confetti": "^1.9.0",
         "@types/d3": "^7.4.3"
     }
 }
