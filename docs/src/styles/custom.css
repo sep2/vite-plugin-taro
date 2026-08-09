@@ -101,6 +101,11 @@ html[data-theme="dark"][data-has-hero] {
     color-scheme: dark;
 }
 
+html[data-has-hero],
+html[data-has-hero] body {
+    overflow-x: clip;
+}
+
 html[data-has-hero] body {
     background-color: var(--vpt-page-bg);
 }
@@ -132,6 +137,10 @@ html[data-has-hero] .sl-container {
     max-width: none;
 }
 
+html[data-has-hero] main {
+    padding-bottom: 0;
+}
+
 html[data-has-hero] .content-panel > .sl-container {
     padding-inline: 0;
 }
@@ -149,58 +158,24 @@ html[data-has-hero] .content-panel > .sl-container > footer {
 }
 
 html[data-has-hero] .actions .sl-link-button.primary {
-    position: relative;
-    isolation: isolate;
     border-color: var(--vpt-button-background);
-    background: var(--vpt-button-background);
+    background-color: var(--vpt-button-background);
+    background-image: none;
     box-shadow: 0 8px 18px color-mix(in srgb, var(--vpt-button-glow) 24%, transparent);
+    padding: 0.9375rem 1.25rem;
+    padding-inline-start: 1.5rem;
     color: var(--vpt-button-text);
+    font-size: 1rem;
+    line-height: 1.5rem;
+    gap: 0.5rem;
     touch-action: manipulation;
-    transition:
-        box-shadow 180ms ease,
-        transform 180ms ease;
-}
-
-html[data-has-hero] .actions .sl-link-button.primary::before,
-html[data-has-hero] .actions .sl-link-button.primary::after {
-    content: "";
-    position: absolute;
-    border-radius: inherit;
-    background: linear-gradient(110deg, #8de3a1, #f2d675, #ef957a, #68d68a, #8de3a1);
-    background-size: 300% 100%;
-    pointer-events: none;
-    animation: vpt-button-glow 4s linear infinite;
-}
-
-html[data-has-hero] .actions .sl-link-button.primary::before {
-    z-index: -1;
-    inset: -0.25rem;
-    filter: blur(0.65rem);
-    opacity: 0.16;
-    transition: opacity 180ms ease;
-}
-
-html[data-has-hero] .actions .sl-link-button.primary::after {
-    z-index: 1;
-    inset: -2px;
-    padding: 2px;
-    -webkit-mask:
-        linear-gradient(#000 0 0) content-box,
-        linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask:
-        linear-gradient(#000 0 0) content-box,
-        linear-gradient(#000 0 0);
-    mask-composite: exclude;
+    animation: vpt-button-glow 3.6s ease-in-out infinite;
+    transition: transform 180ms ease;
 }
 
 html[data-has-hero] .actions .sl-link-button.primary:hover {
-    box-shadow: 0 12px 26px color-mix(in srgb, var(--vpt-button-glow) 42%, transparent);
+    animation-duration: 2.8s;
     transform: translateY(-2px);
-}
-
-html[data-has-hero] .actions .sl-link-button.primary:hover::before {
-    opacity: 0.34;
 }
 
 html[data-has-hero] .actions .sl-link-button.primary:focus-visible {
@@ -213,30 +188,36 @@ html[data-has-hero] .actions .sl-link-button.primary:active {
         0 3px 9px color-mix(in srgb, var(--vpt-button-glow) 28%, transparent),
         inset 0 2px 5px rgba(0, 0, 0, 0.18);
     transform: translateY(1px) scale(0.97);
+    animation: none;
     transition-duration: 60ms;
 }
 
-html[data-has-hero] .actions .sl-link-button.primary:active::before {
-    opacity: 0.1;
-}
-
-html[data-has-hero] .actions .sl-link-button.primary:active::after {
-    opacity: 0.72;
-}
-
 @keyframes vpt-button-glow {
-    from {
-        background-position: 0 0;
+    0%,
+    100% {
+        box-shadow:
+            0 0 0 2px color-mix(in srgb, #8de3a1 58%, transparent),
+            0 0 20px 5px color-mix(in srgb, #8de3a1 28%, transparent),
+            0 10px 24px color-mix(in srgb, var(--vpt-button-glow) 34%, transparent);
     }
 
-    to {
-        background-position: 300% 0;
+    33% {
+        box-shadow:
+            0 0 0 2px color-mix(in srgb, #f2d675 62%, transparent),
+            0 0 22px 6px color-mix(in srgb, #f2d675 30%, transparent),
+            0 11px 26px color-mix(in srgb, var(--vpt-button-glow) 38%, transparent);
+    }
+
+    66% {
+        box-shadow:
+            0 0 0 2px color-mix(in srgb, #ef957a 58%, transparent),
+            0 0 22px 6px color-mix(in srgb, #ef957a 28%, transparent),
+            0 11px 26px color-mix(in srgb, var(--vpt-button-glow) 38%, transparent);
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    html[data-has-hero] .actions .sl-link-button.primary::before,
-    html[data-has-hero] .actions .sl-link-button.primary::after {
+    html[data-has-hero] .actions .sl-link-button.primary {
         animation: none;
     }
 }

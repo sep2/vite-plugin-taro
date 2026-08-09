@@ -1,6 +1,8 @@
 ---
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
 import { Icon } from '@astrojs/starlight/components'
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import AutomaticSubpackagesShowcase from './automatic-subpackages-showcase.astro'
 
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
 const features = [
@@ -51,34 +53,15 @@ const features = [
         icon: 'pencil',
         description: '默认模板开箱即用，候选类和样式输出自动适配微信小程序与 Web。',
         tags: ['零配置', '跨端样式']
+    },
+    {
+        title: '广泛测试覆盖',
+        icon: 'approve-check-circle',
+        description: '覆盖编译、分包、热更新、样式生成与运行时边界；大量单元测试和回归用例让每次迭代都有可靠保障。',
+        tags: ['单元测试', '回归保障']
     }
 ] as const
 ---
-
-<section class="home-features" aria-labelledby="features-title">
-    <header class="section-heading">
-        <span class="section-kicker">从开发体验到生产交付</span>
-        <h2 id="features-title">为现代微信小程序而生</h2>
-        <p>熟悉的 React 开发方式，完整的微信小程序能力，不再被传统工具链拖慢。</p>
-    </header>
-
-    <div class="feature-grid">
-        {
-            features.map(({ title, icon, description, tags }, index) => (
-                <article class:list={['feature-card', { 'feature-card-wide': index >= features.length - 2 }]}>
-                    <div class="feature-heading">
-                        <span class="feature-icon"><Icon name={icon} /></span>
-                        <h3>{title}</h3>
-                    </div>
-                    <p>{description}</p>
-                    <div class="feature-tags">
-                        {tags.map((tag) => <span>{tag}</span>)}
-                    </div>
-                </article>
-            ))
-        }
-    </div>
-</section>
 
 <section class="demo-section" aria-labelledby="demo-title">
     <div class="demo-copy">
@@ -115,7 +98,54 @@ const features = [
     </div>
 </section>
 
+<AutomaticSubpackagesShowcase />
+
+<section class="home-features" aria-labelledby="features-title">
+    <svg class="lower-botanical lower-botanical-left" viewBox="-24 -24 288 190" aria-hidden="true">
+        <use href="#botanical-sprig-bloom" />
+    </svg>
+    <svg class="lower-botanical lower-botanical-right" viewBox="-24 -24 288 190" aria-hidden="true">
+        <use href="#botanical-sprig" />
+    </svg>
+
+    <header class="section-heading">
+        <span class="section-kicker">从开发体验到生产交付</span>
+        <h2 id="features-title">为现代微信小程序而生</h2>
+        <p>熟悉的 React 开发方式，完整的微信小程序能力，不再被传统工具链拖慢。</p>
+    </header>
+
+    <div class="feature-grid">
+        {
+            features.map(({ title, icon, description, tags }) => (
+                <article class="feature-card">
+                    <div class="feature-heading">
+                        <span class="feature-icon"><Icon name={icon} /></span>
+                        <h3>{title}</h3>
+                    </div>
+                    <p>{description}</p>
+                    <div class="feature-tags">
+                        {tags.map((tag) => <span>{tag}</span>)}
+                    </div>
+                </article>
+            ))
+        }
+    </div>
+
+    <a class="feature-docs-link" href="/guides/quick-start/">
+        <Icon name="open-book" />
+        <span>查看文档</span>
+        <Icon name="right-arrow" />
+    </a>
+</section>
+
 <section class="open-source" aria-label="开源协作">
+    <svg class="source-botanical source-botanical-left" viewBox="-24 -24 288 190" aria-hidden="true">
+        <use href="#botanical-sprig-airy" />
+    </svg>
+    <svg class="source-botanical source-botanical-right" viewBox="-24 -24 288 190" aria-hidden="true">
+        <use href="#botanical-sprig-bloom" />
+    </svg>
+
     <span class="source-leaf">⌁</span>
     <div>
         <p><strong>全部开源</strong><em>MIT</em><strong>协议</strong></p>
@@ -136,7 +166,37 @@ const features = [
     }
 
     .home-features {
-        padding: clamp(3.5rem, 6vw, 5.5rem) 0 clamp(2.5rem, 4vw, 3.5rem);
+        --feature-cta-space: clamp(4rem, 7vw, 6rem);
+        position: relative;
+        padding: clamp(3.5rem, 6vw, 5.5rem) 0 var(--feature-cta-space);
+    }
+
+    .section-heading,
+    .feature-grid,
+    .feature-docs-link {
+        position: relative;
+        z-index: 1;
+    }
+
+    .lower-botanical {
+        position: absolute;
+        z-index: 0;
+        width: clamp(11rem, 18vw, 16rem);
+        height: auto;
+        opacity: 0.2;
+        pointer-events: none;
+    }
+
+    .lower-botanical-left {
+        top: 28%;
+        left: clamp(-7rem, -6vw, -4rem);
+        transform: rotate(-16deg);
+    }
+
+    .lower-botanical-right {
+        right: clamp(-7rem, -6vw, -4rem);
+        bottom: 14%;
+        transform: scaleX(-1) rotate(-12deg);
     }
 
     .section-heading {
@@ -190,11 +250,6 @@ const features = [
             border-color 180ms ease,
             box-shadow 180ms ease,
             transform 180ms ease;
-    }
-
-    .feature-card-wide {
-        grid-column: span 3;
-        min-height: 15.5rem;
     }
 
     .feature-card:nth-child(3n + 1) {
@@ -267,13 +322,48 @@ const features = [
         font-size: 0.7rem;
     }
 
+    .feature-docs-link {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        width: fit-content;
+        margin: var(--feature-cta-space) auto 0;
+        padding: 0.8rem 1.15rem;
+        border: 1px solid var(--vpt-border-strong);
+        border-radius: 999px;
+        background: var(--vpt-surface);
+        box-shadow: 0 12px 28px var(--vpt-shadow);
+        color: var(--vpt-accent-strong);
+        font-weight: 700;
+        text-decoration: none;
+        transition:
+            border-color 180ms ease,
+            box-shadow 180ms ease,
+            transform 180ms ease;
+    }
+
+    .feature-docs-link :global(svg) {
+        width: 1.05rem;
+        height: 1.05rem;
+    }
+
+    .feature-docs-link:hover {
+        border-color: var(--vpt-border-strong);
+        box-shadow: 0 16px 34px var(--vpt-shadow-strong);
+        transform: translateY(-2px);
+    }
+
+    .feature-docs-link:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--vpt-accent) 45%, transparent);
+        outline-offset: 4px;
+    }
+
     .demo-section {
         display: grid;
         grid-template-columns: minmax(0, 0.8fr) minmax(25rem, 1.2fr);
         align-items: center;
         gap: clamp(2rem, 6vw, 5rem);
         padding-block: clamp(2.75rem, 4.5vw, 4.5rem);
-        border-top: 1px solid var(--vpt-border);
     }
 
     .demo-copy h2 {
@@ -381,17 +471,47 @@ const features = [
 
     .open-source {
         display: flex;
+        position: relative;
+        isolation: isolate;
         align-items: center;
         justify-content: center;
         gap: clamp(1rem, 4vw, 3rem);
-        margin-top: 1rem;
+        margin-top: 0;
         padding: clamp(1.5rem, 4vw, 2.5rem);
         border: 1px solid var(--vpt-border);
+        border-block-end: 0;
         border-radius: 1.25rem 1.25rem 0 0;
         background:
             linear-gradient(90deg, transparent, rgba(239, 150, 123, 0.08), transparent),
             var(--vpt-surface);
         text-align: center;
+        overflow: hidden;
+    }
+
+    .open-source > :not(.source-botanical) {
+        position: relative;
+        z-index: 1;
+    }
+
+    .source-botanical {
+        position: absolute;
+        z-index: 0;
+        width: clamp(11rem, 19vw, 16rem);
+        height: auto;
+        opacity: 0.14;
+        pointer-events: none;
+    }
+
+    .source-botanical-left {
+        bottom: -1.5rem;
+        left: -1.5rem;
+        transform: rotate(-8deg);
+    }
+
+    .source-botanical-right {
+        right: -1.5rem;
+        bottom: -1.5rem;
+        transform: scaleX(-1) rotate(-10deg);
     }
 
     .source-leaf {
@@ -440,9 +560,12 @@ const features = [
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
-        .feature-card,
-        .feature-card-wide {
+        .feature-card {
             grid-column: span 1;
+        }
+
+        .feature-card:last-child:nth-child(odd) {
+            grid-column: 1 / -1;
         }
 
         .demo-section {
@@ -459,11 +582,35 @@ const features = [
     }
 
     @media (max-width: 40rem) {
+        .home-features {
+            --feature-cta-space: 4.5rem;
+        }
+
+        .lower-botanical {
+            width: 10rem;
+            opacity: 0.14;
+        }
+
+        .lower-botanical-left {
+            left: -4.5rem;
+        }
+
+        .lower-botanical-right {
+            right: -4.5rem;
+        }
+
+        .source-botanical {
+            width: 10rem;
+            opacity: 0.11;
+        }
+
         .feature-grid {
             grid-template-columns: 1fr;
         }
 
-        .feature-card {
+        .feature-card,
+        .feature-card:last-child:nth-child(odd) {
+            grid-column: span 1;
             min-height: auto;
         }
 
@@ -477,7 +624,8 @@ const features = [
     }
 
     @media (prefers-reduced-motion: reduce) {
-        .feature-card {
+        .feature-card,
+        .feature-docs-link {
             transition: none;
         }
     }

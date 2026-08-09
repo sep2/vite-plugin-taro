@@ -1,0 +1,199 @@
+---
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import { Icon } from '@astrojs/starlight/components'
+---
+
+<article class="diagram-panel source-panel" data-node="flow-source" aria-labelledby="source-diagram-title">
+    <header class="diagram-heading">
+        <span>01 · 开发视角</span>
+        <h3 id="source-diagram-title">标准模块关系</h3>
+    </header>
+
+    <div
+        class="source-graph"
+        data-diagram="source-graph"
+        role="img"
+        aria-label="App 和页面静态导入启动依赖，并通过动态 import 加载报表功能"
+    >
+        <svg class="d3-links" data-diagram-links aria-hidden="true"></svg>
+        <div class="graph-node source-root" data-node="source-entry">
+            <span class="node-icon"><Icon name="rocket" /></span>
+            <div><small>同步入口</small><strong>App / 页面</strong></div>
+        </div>
+
+        <div class="source-branches">
+            <div class="source-branch">
+                <div class="graph-node" data-node="startup-dependencies">
+                    <span class="node-icon"><Icon name="setting" /></span>
+                    <div><small>启动依赖</small><strong>状态 · UI</strong></div>
+                </div>
+            </div>
+            <div class="source-branch">
+                <div class="graph-node async-node" data-node="report-feature">
+                    <span class="node-icon"><Icon name="analytics" /></span>
+                    <div><small>按需功能</small><strong>报表中心</strong></div>
+                </div>
+                <div class="feature-dependencies">
+                    <div class="mini-node" data-node="chart-dependency">图表</div>
+                    <div class="mini-node" data-node="pdf-dependency">PDF 导出</div>
+                    <div class="mini-node" data-node="native-dependency">原生组件</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="diagram-footer diagram-legend">
+        <span><i class="solid-swatch"></i>同步启动链</span>
+        <span><i class="dashed-swatch"></i>异步加载边界</span>
+    </footer>
+</article>
+
+<style>
+    .source-graph {
+        display: flex;
+        position: relative;
+        flex-direction: column;
+        align-items: center;
+        margin: var(--diagram-content-gap) 0 0;
+        padding-bottom: var(--diagram-footer-gap);
+    }
+
+    .graph-node {
+        display: flex;
+        position: relative;
+        z-index: 1;
+        align-items: center;
+        gap: 0.75rem;
+        min-width: 0;
+        margin: 0;
+        padding: 0.85rem;
+        border: 1px solid var(--vpt-border);
+        border-radius: 1rem;
+        background: var(--vpt-surface);
+        box-shadow: 0 10px 28px var(--vpt-shadow);
+    }
+
+    .source-root {
+        width: min(13rem, 72%);
+    }
+
+    .node-icon {
+        display: grid;
+        flex: 0 0 auto;
+        width: 2.35rem;
+        height: 2.35rem;
+        border-radius: 0.75rem;
+        background: var(--vpt-icon-background);
+        color: var(--vpt-accent);
+        place-items: center;
+    }
+
+    .node-icon :global(svg) {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    .graph-node div {
+        display: grid;
+        min-width: 0;
+    }
+
+    .graph-node small {
+        color: var(--vpt-muted);
+        font-size: 0.65rem;
+    }
+
+    .graph-node strong {
+        color: var(--vpt-heading-strong);
+        font-size: 0.88rem;
+    }
+
+    .source-branches {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+        width: 100%;
+        margin: var(--diagram-branch-gap) 0 0;
+    }
+
+    .source-branch {
+        position: relative;
+        z-index: 1;
+        min-width: 0;
+        margin: 0;
+    }
+
+    .source-branch > .graph-node {
+        width: 100%;
+        min-height: 4.6rem;
+    }
+
+    .async-node {
+        border-color: rgba(232, 136, 112, 0.45);
+    }
+
+    .feature-dependencies {
+        display: grid;
+        position: relative;
+        z-index: 1;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.45rem;
+        margin: var(--diagram-branch-gap) 0 0;
+    }
+
+    .mini-node {
+        position: relative;
+        margin: 0;
+        padding: 0.45rem 0.25rem;
+        border: 1px solid rgba(232, 136, 112, 0.32);
+        border-radius: 0.65rem;
+        background: color-mix(in srgb, var(--vpt-surface) 92%, #ef957a);
+        color: var(--vpt-text);
+        font-size: 0.6rem;
+        text-align: center;
+    }
+
+    .diagram-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        color: var(--vpt-muted);
+        font-size: 0.65rem;
+    }
+
+    .diagram-legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .diagram-legend i {
+        width: 1.5rem;
+        border-top: 2px solid var(--vpt-border-strong);
+    }
+
+    .diagram-legend .dashed-swatch {
+        border-color: #e88870;
+        border-top-style: dashed;
+    }
+
+    @media (max-width: 40rem) {
+        .graph-node {
+            gap: 0.5rem;
+            padding: 0.65rem;
+        }
+
+        .node-icon {
+            width: 2rem;
+            height: 2rem;
+        }
+
+        .graph-node strong {
+            font-size: 0.74rem;
+        }
+
+        .mini-node {
+            font-size: 0.52rem;
+        }
+    }
+</style>

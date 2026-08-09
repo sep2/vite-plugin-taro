@@ -275,7 +275,8 @@ const proofPoints = [
             isolation: isolate;
             width: 100%;
             padding: clamp(3rem, 7vw, 7rem) clamp(1.25rem, 4vw, 4rem) 0;
-            overflow: hidden;
+            overflow-x: clip;
+            overflow-y: visible;
             color: var(--vpt-text);
         }
 
@@ -315,18 +316,20 @@ const proofPoints = [
         }
 
         .botanical-bottom-left {
+            z-index: 1;
             bottom: -1.8rem;
             left: 0;
             width: clamp(10rem, 17vw, 15.5rem);
-            opacity: 0.68;
+            opacity: 0.38;
             transform: scaleY(-1) rotate(4deg);
         }
 
         .botanical-bottom-right {
+            z-index: 1;
             right: -0.35rem;
             bottom: -2.5rem;
             width: clamp(14rem, 24vw, 22rem);
-            opacity: 0.76;
+            opacity: 0.42;
             transform: scale(-1) rotate(-3deg);
         }
 
@@ -720,6 +723,8 @@ const proofPoints = [
 
         .proof-point {
             display: flex;
+            position: relative;
+            z-index: 2;
             align-items: center;
             justify-content: center;
             gap: 0.8rem;

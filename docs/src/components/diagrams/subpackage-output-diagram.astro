@@ -1,0 +1,168 @@
+---
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import { Icon } from '@astrojs/starlight/components'
+---
+
+<article class="diagram-panel output-panel" data-node="flow-output" aria-labelledby="output-diagram-title">
+    <header class="diagram-heading">
+        <span>02 · 构建结果</span>
+        <h3 id="output-diagram-title">微信小程序产物</h3>
+    </header>
+
+    <div
+        class="package-stack"
+        data-diagram="package-output"
+        role="img"
+        aria-label="启动代码进入主包，报表及其依赖和编辑器分别进入自动生成的分包"
+    >
+        <svg class="d3-links" data-diagram-links aria-hidden="true"></svg>
+        <div class="package-card main-package" data-node="main-package">
+            <div class="package-tab"><Icon name="seti:folder" /> 主包</div>
+            <div class="package-content">
+                <strong>启动代码</strong>
+                <span>App</span><span>页面</span><span>状态 · UI</span>
+            </div>
+            <small>同步可达</small>
+        </div>
+
+        <div class="subpackage-grid">
+            <div class="package-card" data-node="subpackage-a">
+                <div class="package-tab"><Icon name="seti:folder" /> 分包 A</div>
+                <div class="package-content">
+                    <strong>报表中心</strong>
+                    <span>图表</span><span>PDF</span><span>原生组件</span>
+                </div>
+                <small>自动归组</small>
+            </div>
+            <div class="package-card" data-node="subpackage-b">
+                <div class="package-tab"><Icon name="seti:folder" /> 分包 B</div>
+                <div class="package-content">
+                    <strong>编辑器</strong>
+                    <span>编辑内核</span><span>低频工具</span>
+                </div>
+                <small>按需下载</small>
+            </div>
+        </div>
+    </div>
+
+    <footer class="diagram-footer cross-package-note">
+        <Icon name="random" />
+        <span>主包与分包、分包与分包之间可互相调用</span>
+    </footer>
+</article>
+
+<style>
+    .package-stack {
+        position: relative;
+        margin: var(--diagram-content-gap) 0 0;
+        padding-bottom: var(--diagram-footer-gap);
+    }
+
+    .package-card {
+        position: relative;
+        z-index: 1;
+        margin: 0;
+        padding: 1.4rem 1rem 1rem;
+        border: 1px solid var(--vpt-border);
+        border-radius: 0.35rem 1rem 1rem;
+        background: var(--vpt-surface);
+        box-shadow: 0 10px 25px var(--vpt-shadow);
+    }
+
+    .main-package {
+        border-color: var(--vpt-border-strong);
+    }
+
+    .package-tab {
+        display: inline-flex;
+        position: absolute;
+        bottom: calc(100% - 0.55rem);
+        left: -1px;
+        align-items: center;
+        gap: 0.35rem;
+        margin: 0;
+        padding: 0.3rem 0.65rem;
+        border: 1px solid var(--vpt-border);
+        border-bottom: 0;
+        border-radius: 0.65rem 0.65rem 0 0;
+        background: var(--vpt-surface);
+        color: var(--vpt-accent);
+        font-size: 0.65rem;
+        font-weight: 750;
+    }
+
+    .package-tab :global(svg) {
+        width: 0.85rem;
+        height: 0.85rem;
+    }
+
+    .package-content {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.4rem;
+        margin: 0;
+    }
+
+    .package-content strong {
+        flex-basis: 100%;
+        margin-bottom: 0.2rem;
+        color: var(--vpt-heading-strong);
+        font-size: 0.85rem;
+    }
+
+    .package-content span {
+        padding: 0.25rem 0.45rem;
+        border-radius: 999px;
+        background: var(--vpt-chip-background);
+        color: var(--vpt-chip-text);
+        font-size: 0.6rem;
+    }
+
+    .package-card > small {
+        display: block;
+        margin-top: 0.7rem;
+        color: var(--vpt-muted);
+        font-size: 0.65rem;
+        text-align: right;
+    }
+
+    .subpackage-grid {
+        display: grid;
+        position: relative;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+        margin: var(--diagram-branch-gap) 0 0;
+    }
+
+    .subpackage-grid .package-card {
+        min-height: 8.5rem;
+        border-color: rgba(232, 136, 112, 0.35);
+    }
+
+    .cross-package-note {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        color: var(--vpt-muted);
+        font-size: 0.65rem;
+        text-align: center;
+    }
+
+    .cross-package-note :global(svg) {
+        flex: 0 0 auto;
+        width: 1rem;
+        color: var(--vpt-accent);
+    }
+
+    @media (max-width: 40rem) {
+        .subpackage-grid {
+            gap: 0.45rem;
+        }
+
+        .package-card {
+            padding-inline: 0.75rem;
+        }
+    }
+</style>

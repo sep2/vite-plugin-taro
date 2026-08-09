@@ -1,0 +1,437 @@
+---
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import { Icon } from '@astrojs/starlight/components'
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import SubpackageOutputDiagram from './diagrams/subpackage-output-diagram.astro'
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import SubpackageSourceDiagram from './diagrams/subpackage-source-diagram.astro'
+---
+
+<section class="subpackage-showcase" aria-labelledby="subpackage-title">
+    <header class="section-heading">
+        <span class="section-kicker">只决定何时加载，不再关心放在哪个包</span>
+        <h2 id="subpackage-title">一个 import()，自动分包</h2>
+        <p>
+            像 Web 应用一样组织源码。VPT 沿着模块图识别同步启动链与按需边界，再自动生成符合微信限制的主包和分包。
+        </p>
+    </header>
+
+    <div class="package-flow" data-diagram="package-flow">
+        <svg class="d3-links flow-links" data-diagram-links aria-hidden="true"></svg>
+        <SubpackageSourceDiagram />
+
+        <div class="package-planner" aria-label="VPT 自动规划模块位置">
+            <div class="planner-anchor" data-node="flow-planner">
+                <div class="planner-core">
+                    <span>VPT</span>
+                    <small>自动规划</small>
+                </div>
+            </div>
+            <ul>
+                <li>模块图</li>
+                <li>引用关系</li>
+                <li>包体积</li>
+            </ul>
+        </div>
+
+        <SubpackageOutputDiagram />
+    </div>
+
+    <div class="subpackage-benefits">
+        <article class="benefit-card">
+            <span class="benefit-icon"><Icon name="approve-check-circle" /></span>
+            <span><strong>零手写配置</strong><small>无需维护 subPackages</small></span>
+        </article>
+        <article class="benefit-card">
+            <span class="benefit-icon"><Icon name="code-branch" /></span>
+            <span><strong>依赖自动跟随</strong><small>功能内部继续静态 import</small></span>
+        </article>
+        <article class="benefit-card">
+            <span class="benefit-icon"><Icon name="puzzle" /></span>
+            <span><strong>自动满足包限制</strong><small>位置与拆分由构建器规划</small></span>
+        </article>
+    </div>
+
+    <a class="subpackage-link" href="/guides/automatic-subpackages/">
+        查看全自动分包指南 <span aria-hidden="true">→</span>
+    </a>
+</section>
+
+<script>
+    import { connectResponsiveDiagrams } from './diagrams/connect-responsive-diagrams'
+
+    connectResponsiveDiagrams([
+        {
+            name: 'source',
+            selector: '[data-diagram="source-graph"]',
+            links: [
+                { from: 'source-entry', to: 'startup-dependencies', kind: 'static', label: 'static import' },
+                { from: 'source-entry', to: 'report-feature', kind: 'dynamic', label: 'import()' },
+                { from: 'report-feature', to: 'chart-dependency', kind: 'dependency' },
+                { from: 'report-feature', to: 'pdf-dependency', kind: 'dependency' },
+                { from: 'report-feature', to: 'native-dependency', kind: 'dependency' }
+            ]
+        },
+        {
+            name: 'packages',
+            selector: '[data-diagram="package-output"]',
+            links: [
+                { from: 'main-package', to: 'subpackage-a', kind: 'package' },
+                { from: 'main-package', to: 'subpackage-b', kind: 'package' }
+            ]
+        },
+        {
+            name: 'flow',
+            selector: '[data-diagram="package-flow"]',
+            links: [
+                { from: 'flow-source', to: 'flow-planner', kind: 'flow' },
+                { from: 'flow-planner', to: 'flow-output', kind: 'flow' }
+            ]
+        }
+    ])
+</script>
+
+<style>
+    .subpackage-showcase {
+        --diagram-content-gap: clamp(2.25rem, 4vw, 3rem);
+        --diagram-branch-gap: clamp(3rem, 4vw, 3.5rem);
+        --diagram-footer-gap: clamp(2.25rem, 4vw, 3rem);
+        width: min(calc(100% - 2rem), 76rem);
+        margin-inline: auto;
+        padding-block: clamp(3.5rem, 7vw, 6rem);
+    }
+
+    .section-heading {
+        max-width: 48rem;
+        margin: 0 auto clamp(2.5rem, 5vw, 4rem);
+        text-align: center;
+    }
+
+    .section-kicker {
+        color: var(--vpt-accent);
+        font-size: 0.78rem;
+        font-weight: 750;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+
+    .section-heading h2 {
+        margin: 0.65rem 0 0;
+        color: var(--vpt-heading);
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: clamp(1.65rem, 5vw, 3.5rem);
+        font-weight: 600;
+        letter-spacing: -0.035em;
+        line-height: 1.08;
+        white-space: nowrap;
+    }
+
+    .section-heading p {
+        max-width: 44rem;
+        margin: 1rem auto 0;
+        color: var(--vpt-muted);
+        line-height: 1.8;
+        text-wrap: balance;
+    }
+
+    .package-flow {
+        display: grid;
+        position: relative;
+        grid-template-columns: minmax(0, 1fr) 9.5rem minmax(0, 1fr);
+        align-items: stretch;
+        gap: clamp(1rem, 2vw, 1.5rem);
+        margin: 0;
+    }
+
+    .subpackage-showcase :global(.diagram-panel),
+    .package-planner {
+        position: relative;
+        z-index: 1;
+        margin: 0;
+    }
+
+    .subpackage-showcase :global(.diagram-panel) {
+        display: flex;
+        min-width: 0;
+        height: 100%;
+        flex-direction: column;
+        padding: clamp(1.25rem, 3vw, 2rem);
+        border: 1px solid var(--vpt-border);
+        border-radius: 1.5rem;
+        background: var(--vpt-card-background);
+        box-shadow: 0 24px 60px var(--vpt-shadow);
+    }
+
+    .subpackage-showcase :global(.diagram-heading) {
+        text-align: left;
+    }
+
+    .subpackage-showcase :global(.diagram-heading span) {
+        color: var(--vpt-accent);
+        font-size: 0.68rem;
+        font-weight: 750;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+    }
+
+    .subpackage-showcase :global(.diagram-heading h3) {
+        margin: 0.35rem 0 0;
+        color: var(--vpt-heading);
+        font-size: clamp(1.2rem, 2vw, 1.55rem);
+    }
+
+    .subpackage-showcase :global(.diagram-footer) {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 3rem;
+        margin: auto 0 0;
+        padding-top: 1.15rem;
+        border-top: 1px solid var(--vpt-border);
+        text-align: center;
+    }
+
+    .package-planner {
+        display: grid;
+        place-items: center;
+    }
+
+    .planner-anchor {
+        display: grid;
+        width: 9.5rem;
+        height: 9.5rem;
+        margin: 0;
+        place-items: center;
+    }
+
+    .planner-core {
+        display: grid;
+        position: relative;
+        width: 5.5rem;
+        height: 5.5rem;
+        margin: 0;
+        border: 1px solid var(--vpt-border-strong);
+        border-radius: 50%;
+        background: var(--vpt-icon-background);
+        box-shadow:
+            0 0 0 0.65rem color-mix(in srgb, var(--vpt-icon-background) 58%, transparent),
+            0 18px 35px var(--vpt-shadow-strong);
+        place-content: center;
+        text-align: center;
+    }
+
+    .planner-core::before,
+    .planner-core::after {
+        content: '';
+        position: absolute;
+        border: 1px dashed var(--vpt-border-strong);
+        border-radius: 50%;
+        inset: -1.25rem;
+    }
+
+    .planner-core::after {
+        border-color: rgba(232, 136, 112, 0.45);
+        inset: -2rem;
+    }
+
+    .planner-core span {
+        color: var(--vpt-heading-strong);
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 1.4rem;
+        font-weight: 700;
+    }
+
+    .planner-core small {
+        color: var(--vpt-accent);
+        font-size: 0.6rem;
+        font-weight: 700;
+    }
+
+    .package-planner ul {
+        display: flex;
+        position: absolute;
+        top: calc(50% + 5.25rem);
+        left: 50%;
+        width: 9.5rem;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.3rem;
+        margin: 0;
+        padding: 0;
+        color: var(--vpt-muted);
+        font-size: 0.58rem;
+        list-style: none;
+        transform: translateX(-50%);
+    }
+
+    .package-planner li {
+        padding: 0.18rem 0.35rem;
+        border: 1px solid var(--vpt-border);
+        border-radius: 999px;
+        background: var(--vpt-surface);
+    }
+
+    .subpackage-benefits {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-auto-rows: 1fr;
+        gap: 0.75rem;
+        margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
+    }
+
+    .benefit-card {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 0.85rem;
+        height: 100%;
+        min-height: 6.5rem;
+        margin: 0;
+        padding: 1.15rem;
+        border: 1px solid var(--vpt-border);
+        border-radius: 1.15rem;
+        background:
+            radial-gradient(circle at 100% 0, color-mix(in srgb, var(--vpt-icon-background) 72%, transparent), transparent 55%),
+            var(--vpt-surface);
+        box-shadow: 0 12px 30px var(--vpt-shadow);
+    }
+
+    .benefit-icon {
+        display: grid;
+        width: 2.65rem;
+        height: 2.65rem;
+        border: 1px solid var(--vpt-border);
+        border-radius: 0.85rem;
+        background: var(--vpt-icon-background);
+        color: var(--vpt-accent);
+        place-items: center;
+        transform: rotate(-3deg);
+    }
+
+    .benefit-icon :global(svg) {
+        width: 1.3rem;
+        height: 1.3rem;
+    }
+
+    .benefit-card > span:last-child {
+        display: grid;
+        min-width: 0;
+        gap: 0.2rem;
+    }
+
+    .benefit-card strong {
+        color: var(--vpt-heading-strong);
+        font-size: 0.8rem;
+    }
+
+    .benefit-card small {
+        color: var(--vpt-muted);
+        font-size: 0.67rem;
+        line-height: 1.5;
+    }
+
+    .subpackage-link {
+        display: block;
+        width: fit-content;
+        margin: 1.75rem auto 0;
+        color: var(--vpt-accent-strong);
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .subpackage-link:hover {
+        text-decoration: underline;
+    }
+
+    .subpackage-showcase :global(.d3-links) {
+        position: absolute;
+        z-index: 0;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        overflow: visible;
+    }
+
+    .subpackage-showcase :global(.diagram-link) {
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.5;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .subpackage-showcase :global(.diagram-link-static) {
+        stroke: var(--vpt-border-strong);
+    }
+
+    .subpackage-showcase :global(.diagram-link-dynamic) {
+        stroke: #e88870;
+        stroke-dasharray: 5 5;
+    }
+
+    .subpackage-showcase :global(.diagram-link-dependency),
+    .subpackage-showcase :global(.diagram-link-package) {
+        stroke: rgba(232, 136, 112, 0.55);
+    }
+
+    .subpackage-showcase :global(.diagram-link-flow) {
+        stroke: var(--vpt-border-strong);
+        stroke-dasharray: 3 4;
+    }
+
+    .subpackage-showcase :global(.d3-links marker path) {
+        fill: var(--vpt-border-strong);
+    }
+
+    .subpackage-showcase :global(.diagram-link-label) {
+        fill: var(--vpt-muted);
+        stroke: var(--vpt-card-background);
+        stroke-width: 0.65rem;
+        paint-order: stroke;
+        font-size: 0.58rem;
+    }
+
+    .subpackage-showcase :global(.diagram-link-label-dynamic) {
+        fill: #d9725d;
+    }
+
+    @media (max-width: 64rem) {
+        .package-flow {
+            grid-template-columns: 1fr;
+            max-width: 42rem;
+            margin-inline: auto;
+            gap: 3rem;
+        }
+
+        .subpackage-showcase :global(.diagram-panel) {
+            height: auto;
+        }
+
+        .package-planner {
+            min-height: 9.5rem;
+        }
+
+        .package-planner ul {
+            display: none;
+        }
+    }
+
+    @media (max-width: 40rem) {
+        .subpackage-showcase {
+            --diagram-content-gap: 2.25rem;
+            --diagram-branch-gap: 3rem;
+            --diagram-footer-gap: 2.5rem;
+            padding-block: 3.75rem;
+        }
+
+        .subpackage-showcase :global(.diagram-panel) {
+            padding: 1.1rem;
+            border-radius: 1.15rem;
+        }
+
+        .subpackage-benefits {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
