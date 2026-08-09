@@ -150,6 +150,8 @@ html[data-has-hero] .sl-markdown-content {
 }
 
 html[data-has-hero] {
+    --home-page-gutter: clamp(1rem, 4vw, 4rem);
+    --home-content-width: 76rem;
     --home-font-size-display: clamp(1.8rem, 4.5vw, 3.25rem);
     --home-font-size-title: clamp(1.25rem, 2vw, 1.55rem);
     --home-font-size-body: 1rem;
@@ -188,7 +190,7 @@ html[data-has-hero] .home-section {
     --home-panel-radius: 1.5rem;
     --home-card-radius: 1.25rem;
     --home-panel-shadow: 0 24px 60px var(--vpt-shadow);
-    width: min(calc(100% - 2rem), 76rem);
+    width: min(100%, var(--home-content-width));
     margin-inline: auto;
     padding-block: var(--home-section-space);
 }

@@ -11,8 +11,16 @@ import OpenSourceBanner from './open-source-banner.astro'
 import TailwindShowcase from './tailwind-showcase.astro'
 ---
 
-<HmrShowcase />
-<AutomaticSubpackagesShowcase />
-<TailwindShowcase />
-<HomeFeatures />
-<OpenSourceBanner />
+<div class="home-content-rail">
+    <HmrShowcase />
+    <AutomaticSubpackagesShowcase />
+    <TailwindShowcase />
+    <HomeFeatures />
+    <OpenSourceBanner />
+</div>
+
+<style>
+    .home-content-rail {
+        padding-inline: var(--home-page-gutter);
+    }
+</style>

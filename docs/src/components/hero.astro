@@ -393,7 +393,7 @@ const proofPoints = [
             position: relative;
             isolation: isolate;
             width: 100%;
-            padding: clamp(3rem, 7vw, 7rem) clamp(1.25rem, 4vw, 4rem) 0;
+            padding: clamp(3rem, 7vw, 7rem) var(--home-page-gutter) 0;
             overflow-x: clip;
             overflow-y: visible;
             color: var(--vpt-text);
@@ -435,7 +435,6 @@ const proofPoints = [
         }
 
         .botanical-bottom-left {
-            z-index: 1;
             bottom: -1.8rem;
             left: 0;
             width: clamp(10rem, 17vw, 15.5rem);
@@ -444,7 +443,6 @@ const proofPoints = [
         }
 
         .botanical-bottom-right {
-            z-index: 1;
             right: -0.35rem;
             bottom: -2.5rem;
             width: clamp(14rem, 24vw, 22rem);
@@ -558,6 +556,30 @@ const proofPoints = [
             text-box-edge: cap alphabetic;
             text-box-trim: trim-both;
             text-shadow: 0 5px 0 var(--vpt-shadow);
+            user-select: none;
+        }
+
+        @supports (background-clip: text) or (-webkit-background-clip: text) {
+            h1 {
+                background: linear-gradient(
+                    155deg,
+                    var(--vpt-heading-strong) 0 38%,
+                    color-mix(in srgb, var(--vpt-heading-strong) 95%, var(--vpt-page-bg)) 58%,
+                    var(--vpt-heading-strong) 100%
+                );
+                background-clip: text;
+                color: transparent;
+                mask-image: url('/stamp-texture.svg');
+                mask-position: center;
+                mask-repeat: repeat;
+                mask-size: 15rem 10rem;
+                text-shadow: none;
+                -webkit-background-clip: text;
+                -webkit-mask-image: url('/stamp-texture.svg');
+                -webkit-mask-position: center;
+                -webkit-mask-repeat: repeat;
+                -webkit-mask-size: 15rem 10rem;
+            }
         }
 
         .technology-line {
@@ -841,6 +863,7 @@ const proofPoints = [
             position: absolute;
             color: #e98a72;
             font-size: 1.6rem;
+            user-select: none;
         }
 
         .spark-one {
@@ -875,7 +898,7 @@ const proofPoints = [
         .proof-row {
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
-            width: min(100%, 76rem);
+            width: min(100%, var(--home-content-width));
             margin: 3.5rem auto 0;
             border: 1px solid var(--vpt-border);
             border-radius: 1.25rem;
@@ -886,8 +909,6 @@ const proofPoints = [
 
         .proof-point {
             display: grid;
-            position: relative;
-            z-index: 2;
             container-type: inline-size;
             padding: 1.5rem 1rem;
             place-items: center;
@@ -978,7 +999,7 @@ const proofPoints = [
 
         @media (max-width: 44rem) {
             .hero {
-                padding: 7rem 1rem 0;
+                padding: 7rem var(--home-page-gutter) 0;
             }
 
             .hero-grid {

@@ -28,6 +28,7 @@ import { Icon } from '@astrojs/starlight/components'
             const options = { signal: this.listeners.signal }
             this.button.addEventListener('click', this.toggleExpanded, options)
             this.closest('nav')?.addEventListener('keyup', this.closeOnEscape, options)
+            document.addEventListener('pointerdown', this.closeOnOutsidePointer, options)
         }
 
         disconnectedCallback(): void {
@@ -44,6 +45,17 @@ import { Icon } from '@astrojs/starlight/components'
             if (event.code !== 'Escape') return
             this.setExpanded(false)
             this.button?.focus()
+        }
+
+        private readonly closeOnOutsidePointer = (event: PointerEvent): void => {
+            if (!this.hasAttribute('data-expanded')) return
+
+            const controlledId = this.button?.getAttribute('aria-controls')
+            const drawer = controlledId === null || controlledId === undefined ? null : document.getElementById(controlledId)
+            const eventPath = event.composedPath()
+            if (eventPath.includes(this) || (drawer !== null && eventPath.includes(drawer))) return
+
+            this.setExpanded(false)
         }
 
         private setExpanded(expanded: boolean): void {
