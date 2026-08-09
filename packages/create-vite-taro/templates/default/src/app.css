@@ -15,8 +15,144 @@ button::after {
     border: none;
 }
 
+/* biome-ignore lint/correctness/noUnknownTypeSelector: WeChat Mini Program uses page as its document root. */
+page,
 body {
     margin: 0;
-    background: #f8fafc;
-    color: #0f172a;
+    background: #fbfaf1;
+    color: #315f44;
+}
+
+button {
+    line-height: inherit;
+}
+
+.brand-serif {
+    font-family: Georgia, "Times New Roman", serif;
+}
+
+.starter-canvas {
+    background:
+        radial-gradient(ellipse at 12% 5%, rgba(101, 190, 119, 0.11), rgba(101, 190, 119, 0.04) 28%, transparent 62%),
+        radial-gradient(ellipse at 90% 18%, rgba(234, 139, 115, 0.08), rgba(234, 139, 115, 0.03) 32%, transparent 68%);
+}
+
+.botanical-sprig {
+    position: absolute;
+    z-index: 0;
+    width: 15rem;
+    height: 10rem;
+    opacity: 0.68;
+    pointer-events: none;
+}
+
+.botanical-sprig-top {
+    top: -2.25rem;
+    left: -4.25rem;
+    transform: rotate(-7deg);
+}
+
+.botanical-sprig-side {
+    right: -5rem;
+    bottom: -1.75rem;
+    opacity: 0.42;
+    transform: scaleX(-1) rotate(-11deg);
+}
+
+.botanical-sprig-cta {
+    z-index: 0;
+    right: -3rem;
+    bottom: -2.5rem;
+    opacity: 0.18;
+    transform: scale(1.15) rotate(-8deg);
+}
+
+.botanical-stem {
+    position: absolute;
+    top: 7rem;
+    left: 0.5rem;
+    width: 14rem;
+    height: 0.3rem;
+    border-radius: 999px;
+    background: #237648;
+    transform: rotate(-24deg);
+    transform-origin: left center;
+}
+
+.botanical-leaf {
+    position: absolute;
+    width: 3.2rem;
+    height: 1.55rem;
+    border-radius: 72% 28% 70% 30%;
+    background: linear-gradient(145deg, #9cd88b, #43a760);
+}
+
+.botanical-leaf-one {
+    top: 5.65rem;
+    left: 3rem;
+    transform: rotate(28deg);
+}
+
+.botanical-leaf-two {
+    top: 3.95rem;
+    left: 6.1rem;
+    transform: rotate(-20deg);
+}
+
+.botanical-leaf-three {
+    top: 2.55rem;
+    left: 9.1rem;
+    transform: rotate(25deg);
+}
+
+.botanical-leaf-four {
+    top: 0.85rem;
+    left: 11.8rem;
+    transform: rotate(-17deg);
+}
+
+.botanical-flower {
+    position: absolute;
+    top: 4.9rem;
+    left: 4.35rem;
+    width: 2.8rem;
+    height: 2.8rem;
+}
+
+.botanical-petal,
+.botanical-flower-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    border-radius: 999px;
+    transform: translate(-50%, -50%);
+}
+
+.botanical-petal {
+    width: 1.05rem;
+    height: 1.55rem;
+    background: #ef977f;
+}
+
+.botanical-petal-one {
+    transform: translate(-50%, -100%);
+}
+
+.botanical-petal-two {
+    transform: translate(0, -50%) rotate(90deg);
+}
+
+.botanical-petal-three {
+    transform: translate(-50%, 0);
+}
+
+.botanical-petal-four {
+    transform: translate(-100%, -50%) rotate(90deg);
+}
+
+.botanical-flower-center {
+    z-index: 1;
+    width: 0.7rem;
+    height: 0.7rem;
+    background: #fff1bd;
 }
