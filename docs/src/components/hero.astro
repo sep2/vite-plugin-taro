@@ -1,173 +1,885 @@
 ---
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
-import { Code, LinkButton, TabItem, Tabs } from '@astrojs/starlight/components'
+import { LinkButton } from '@astrojs/starlight/components'
 import pluginPackage from '../../../packages/vite-plugin-taro/package.json'
 
 const { data } = Astro.locals.starlightRoute.entry
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
-const { title = data.title, tagline, image, actions = [] } = data.hero ?? {}
-// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
-const rawHtml = image && 'html' in image ? image.html : undefined
+const { title = data.title, tagline, actions = [] } = data.hero ?? {}
 const latestVersion = pluginPackage.version
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
 const latestPackageUrl = `https://www.npmjs.com/package/${pluginPackage.name}/v/${latestVersion}`
+
+// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
+const proofPoints = [
+    { icon: '↗', title: '极速启动', detail: 'Vite 8 + Rolldown' },
+    { icon: '↻', title: '状态保留', detail: 'React Refresh' },
+    { icon: '◇', title: '全自动分包', detail: '动态 import()' },
+    { icon: '⌁', title: '现代工具链', detail: '面向未来' }
+]
 ---
 
 <div class="hero">
-    <div class="sl-flex stack">
-        <div class="sl-flex copy">
+    <svg class="botanical-definitions" aria-hidden="true">
+        <defs>
+            <linearGradient id="botanical-leaf-gradient" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#9cd88b" />
+                <stop offset=".48" stop-color="#54b86a" />
+                <stop offset="1" stop-color="#27874e" />
+            </linearGradient>
+            <linearGradient id="botanical-flower-gradient" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#ffc0a7" />
+                <stop offset="1" stop-color="#e97f6c" />
+            </linearGradient>
+            <g id="botanical-sprig">
+                <path d="M-20 140C72 118 135 71 224-18" fill="none" stroke="#187044" stroke-linecap="round" stroke-width="5" />
+                <path d="M53 118C38 78 51 52 87 49C94 84 82 108 53 118Z" fill="url('#botanical-leaf-gradient')" />
+                <path d="M92 94C107 56 132 43 162 59C145 88 121 101 92 94Z" fill="url('#botanical-leaf-gradient')" />
+                <path d="M126 66C116 31 133 8 165 7C169 37 155 58 126 66Z" fill="url('#botanical-leaf-gradient')" />
+                <path d="M166 36C187 7 212 1 236 21C215 44 192 49 166 36Z" fill="url('#botanical-leaf-gradient')" />
+                <path d="M54 114C66 89 76 69 85 53M59 101L48 91M67 84L81 80M94 91C118 78 139 67 158 61M116 79L112 68M132 71L143 76M129 62C141 43 151 25 161 10M140 45L130 39M149 31L162 34M170 34C189 29 208 25 231 22M194 28L188 18M210 25L218 31" fill="none" stroke="#d5edc3" stroke-linecap="round" stroke-width="2" opacity=".72" />
+                <path d="M202 9C209-7 222-11 235-3C227 11 216 15 202 9Z" fill="url('#botanical-leaf-gradient')" />
+                <g fill="url('#botanical-flower-gradient')" transform="translate(76 101) scale(1.15)">
+                    <ellipse cx="0" cy="-11" rx="7" ry="13" />
+                    <ellipse cx="10" cy="-2" rx="7" ry="13" transform="rotate(72 10 -2)" />
+                    <ellipse cx="6" cy="10" rx="7" ry="13" transform="rotate(144 6 10)" />
+                    <ellipse cx="-6" cy="10" rx="7" ry="13" transform="rotate(216 -6 10)" />
+                    <ellipse cx="-10" cy="-2" rx="7" ry="13" transform="rotate(288 -10 -2)" />
+                    <circle r="5" fill="#fff3cf" />
+                </g>
+            </g>
+            <g id="botanical-sprig-airy">
+                <path d="M-24 134C46 146 108 96 205-17" fill="none" stroke="#237b49" stroke-linecap="round" stroke-width="4" />
+                <path d="M28 137C14 111 23 88 49 82C59 105 52 127 28 137Z" fill="url('#botanical-leaf-gradient')" />
+                <path d="M68 120C74 88 94 74 120 84C109 111 91 124 68 120Z" fill="url('#botanical-leaf-gradient')" />
+                <path d="M107 91C98 61 113 40 141 39C146 66 134 85 107 91Z" fill="url('#botanical-leaf-gradient')" />
+                <path d="M145 52C158 25 180 17 201 32C185 55 165 62 145 52Z" fill="url('#botanical-leaf-gradient')" />
+                <path d="M31 133C35 114 42 98 48 86M70 117C86 106 101 96 116 87M110 88C120 71 131 56 139 43M149 50C165 42 181 36 197 34" fill="none" stroke="#d9efca" stroke-linecap="round" stroke-width="1.8" opacity=".72" />
+                <g fill="url('#botanical-flower-gradient')" transform="translate(66 119) scale(.72)">
+                    <circle cy="-8" r="6" /><circle cx="8" r="6" /><circle cy="8" r="6" /><circle cx="-8" r="6" /><circle r="4" fill="#fff1be" />
+                </g>
+                <circle cx="165" cy="31" r="6" fill="#ef967e" />
+                <circle cx="177" cy="23" r="3.5" fill="#f4b098" />
+            </g>
+            <g id="botanical-sprig-berries">
+                <path d="M-22 144C54 126 108 102 193 17" fill="none" stroke="#1d7344" stroke-linecap="round" stroke-width="4.5" />
+                <path d="M42 128C23 109 27 87 50 76C65 95 62 116 42 128Z" fill="url('#botanical-leaf-gradient')" />
+                <path d="M75 115C78 86 97 70 122 77C114 103 96 117 75 115Z" fill="url('#botanical-leaf-gradient')" />
+                <path d="M108 91C102 65 116 47 140 47C143 71 132 87 108 91Z" fill="url('#botanical-leaf-gradient')" />
+                <path d="M141 59C153 37 171 30 188 42C174 61 158 67 141 59Z" fill="url('#botanical-leaf-gradient')" />
+                <path d="M44 124C47 107 49 92 50 80M77 112C91 100 105 88 118 79M111 88C120 73 130 59 138 50M144 57C159 51 172 46 185 43" fill="none" stroke="#d4ebc3" stroke-linecap="round" stroke-width="1.8" opacity=".7" />
+                <circle cx="62" cy="119" r="5" fill="#ef8f78" /><circle cx="72" cy="113" r="3" fill="#f7b19b" />
+                <circle cx="128" cy="72" r="4" fill="#ed927b" /><circle cx="137" cy="65" r="2.5" fill="#f7c19e" />
+                <circle cx="188" cy="26" r="5.5" fill="#70be73" />
+            </g>
+            <g id="botanical-sprig-bloom">
+                <path d="M-26 148C59 137 132 91 238-5" fill="none" stroke="#1d7544" stroke-linecap="round" stroke-width="4.5" />
+                <path d="M30 138C16 111 27 89 53 85C61 110 52 130 30 138Z" fill="url('#botanical-leaf-gradient')" />
+                <path d="M72 121C77 89 99 76 125 88C111 115 92 126 72 121Z" fill="url('#botanical-leaf-gradient')" />
+                <path d="M119 92C109 61 125 39 154 40C158 69 145 88 119 92Z" fill="url('#botanical-leaf-gradient')" />
+                <path d="M164 55C182 28 207 24 228 43C207 64 184 68 164 55Z" fill="url('#botanical-leaf-gradient')" />
+                <path d="M33 135C40 115 47 99 52 89M75 118C92 108 107 98 122 90M122 89C133 72 144 57 152 44M168 53C186 48 204 45 223 44" fill="none" stroke="#dbefca" stroke-linecap="round" stroke-width="1.9" opacity=".72" />
+                <g fill="url('#botanical-flower-gradient')" transform="translate(91 108) scale(.82)">
+                    <ellipse cy="-9" rx="6" ry="10" /><ellipse cx="8" rx="6" ry="10" transform="rotate(72 8 0)" /><ellipse cx="5" cy="8" rx="6" ry="10" transform="rotate(145 5 8)" /><ellipse cx="-6" cy="7" rx="6" ry="10" transform="rotate(215 -6 7)" /><ellipse cx="-8" rx="6" ry="10" transform="rotate(288 -8 0)" /><circle r="4" fill="#fff0bd" />
+                </g>
+                <path d="M193 34C196 17 208 10 220 18C214 32 205 38 193 34Z" fill="#f09a82" />
+            </g>
+        </defs>
+    </svg>
+    <svg class="botanical-branch botanical-top-left" viewBox="-24 -24 288 190" aria-hidden="true"><use href="#botanical-sprig" /></svg>
+    <svg class="botanical-branch botanical-top-right" viewBox="-24 -24 288 190" aria-hidden="true"><use href="#botanical-sprig-airy" /></svg>
+    <svg class="botanical-branch botanical-bottom-left" viewBox="-24 -24 288 190" aria-hidden="true"><use href="#botanical-sprig-berries" /></svg>
+    <svg class="botanical-branch botanical-bottom-right" viewBox="-24 -24 288 190" aria-hidden="true"><use href="#botanical-sprig-bloom" /></svg>
+    <span class="background-mark petal petal-one" aria-hidden="true"></span>
+    <span class="background-mark petal petal-two" aria-hidden="true"></span>
+    <span class="background-mark petal petal-three" aria-hidden="true"></span>
+    <span class="background-mark dot dot-one" aria-hidden="true"></span>
+    <span class="background-mark dot dot-two" aria-hidden="true"></span>
+
+    <div class="hero-grid">
+        <div class="hero-copy">
+            <div class="eyebrow">— 用现代化前端工具链开发微信小程序 —</div>
             <a class="latest-version" href={latestPackageUrl} target="_blank" rel="noopener noreferrer">
                 <span>最新版本</span>
                 <strong>v{latestVersion}</strong>
             </a>
             <h1 id="_top" data-page-title set:html={title} />
-            {tagline && <div class="tagline" set:html={tagline} />}
+            <div class="technology-line">
+                <span>Vite 8</span><i>✿</i><span>React 19</span><i>✿</i><span>Tailwind 4</span>
+            </div>
+            {tagline && <div class="tagline"><span set:html={tagline} /></div>}
+            {
+                actions.length > 0 && (
+                    <div class="actions">
+                        {actions.map(({ attrs: { class: className, ...attrs } = {}, icon, link: href, text, variant }) => (
+                            <LinkButton {href} {variant} icon={icon?.name} class:list={[className]} {...attrs}>
+                                {text}
+                                {icon?.html && <Fragment set:html={icon.html} />}
+                            </LinkButton>
+                        ))}
+                    </div>
+                )
+            }
         </div>
-        {
-            actions.length > 0 && (
-                <div class="sl-flex actions">
-                    {actions.map(({ attrs: { class: className, ...attrs } = {}, icon, link: href, text, variant }) => (
-                        <LinkButton {href} {variant} icon={icon?.name} class:list={[className]} {...attrs}>
-                            {text}
-                            {icon?.html && <Fragment set:html={icon.html} />}
-                        </LinkButton>
-                    ))}
-                </div>
-            )
-        }
-        <div class="create-command">
-            <Tabs syncKey="package-manager">
-                <TabItem label="npm">
-                    <Code code="npm create vite-taro@latest" lang="sh" />
-                </TabItem>
-                <TabItem label="pnpm">
-                    <Code code="pnpm create vite-taro@latest" lang="sh" />
-                </TabItem>
-                <TabItem label="bun">
-                    <Code code="bun create vite-taro" lang="sh" />
-                </TabItem>
-            </Tabs>
+
+        <div class="rocket-stage" aria-hidden="true">
+            <div class="orbit orbit-one"></div>
+            <div class="orbit orbit-two"></div>
+            <svg class="rocket" viewBox="0 0 440 500">
+                <defs>
+                    <linearGradient id="rocket-body-gradient" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0" stop-color="#fffef8" />
+                        <stop offset=".56" stop-color="#f5f2df" />
+                        <stop offset="1" stop-color="#dce9cf" />
+                    </linearGradient>
+                    <linearGradient id="rocket-green-gradient" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0" stop-color="#9bd681" />
+                        <stop offset=".48" stop-color="#51b660" />
+                        <stop offset="1" stop-color="#267f48" />
+                    </linearGradient>
+                    <linearGradient id="rocket-dark-green-gradient" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0" stop-color="#1a683d" />
+                        <stop offset=".5" stop-color="#3b9853" />
+                        <stop offset="1" stop-color="#145b37" />
+                    </linearGradient>
+                    <radialGradient id="rocket-window-gradient" cx="35%" cy="28%" r="75%">
+                        <stop offset="0" stop-color="#a5e68e" />
+                        <stop offset=".48" stop-color="#55b967" />
+                        <stop offset="1" stop-color="#238048" />
+                    </radialGradient>
+                    <g id="trail-leaf">
+                        <path d="M0-14C8-10 10-2 6 6C3 11 0 14 0 14C-5 9-8 2-6-5C-5-10 0-14 0-14Z" fill="currentColor" stroke="#2b874a" stroke-width="1.4" />
+                        <path d="M0-11C1-4 1 4 0 11M0-3L4-7M0 3L-4-1M0 7L3 4" fill="none" stroke="#e2efca" stroke-linecap="round" stroke-width="1" opacity=".85" />
+                    </g>
+                    <g id="trail-leaf-wide">
+                        <path d="M0-11C10-8 13-1 8 7C4 12-2 13-7 8C-12 3-10-5 0-11Z" fill="currentColor" stroke="#2b874a" stroke-width="1.4" />
+                        <path d="M-6 7C-1 3 3-2 7-7M0 2L-5 0M3-2L7 0" fill="none" stroke="#e2efca" stroke-linecap="round" stroke-width="1" opacity=".82" />
+                    </g>
+                    <g id="trail-blade">
+                        <path d="M0 12C-5 3-4-6 2-13C5-5 4 5 0 12Z" fill="currentColor" />
+                        <path d="M0 9L1-9" fill="none" stroke="#fff5c8" stroke-linecap="round" stroke-width=".9" opacity=".65" />
+                    </g>
+                    <path id="trail-wisp" d="M0-11C5-6 5 4 0 12C-5 4-4-6 0-11Z" />
+                    <g id="trail-flower">
+                        <path d="M0-7C4-7 5-3 3 0C7-1 9 3 6 6C3 8 1 6 0 3C-1 7-5 8-7 5C-9 2-6 0-3-1C-6-3-4-7 0-7Z" fill="#ef957a" stroke="#dc765f" stroke-width=".8" />
+                        <circle r="2.1" fill="#fff2b8" />
+                        <circle cx="-.6" cy="-.6" r=".7" fill="#d9a13e" />
+                    </g>
+                    <path id="trail-grass" d="M0 7C-1 1-4-3-7-7M0 7C1 0 4-4 8-8M0 7C-4 3-8 2-11 3" />
+                </defs>
+                <g transform="rotate(38 220 215)">
+                    <g class="botanical-exhaust">
+                        <use class="trail-leaf trail-leaf-light" href="#trail-leaf" transform="translate(210 304) rotate(-8) scale(.42)" />
+                        <use class="trail-wisp" href="#trail-wisp" transform="translate(226 307) rotate(8) scale(.42)" />
+                        <use href="#trail-flower" transform="translate(235 313) scale(.3)" />
+                        <circle class="trail-seed" cx="218" cy="317" r="2.2" />
+
+                        <use class="trail-leaf" href="#trail-leaf-wide" transform="translate(197 325) rotate(-18) scale(.7)" />
+                        <use class="trail-wisp trail-wisp-gold" href="#trail-wisp" transform="translate(216 328) rotate(3) scale(.65)" />
+                        <use class="trail-leaf trail-leaf-light" href="#trail-leaf" transform="translate(238 326) rotate(20) scale(.68)" />
+                        <use href="#trail-flower" transform="translate(184 333) scale(.45)" />
+                        <circle class="trail-seed trail-seed-coral" cx="249" cy="337" r="2.2" />
+
+                        <use class="trail-leaf trail-leaf-pale" href="#trail-blade" transform="translate(180 348) rotate(-24) scale(.68)" />
+                        <use class="trail-leaf" href="#trail-leaf" transform="translate(201 351) rotate(-10) scale(.9)" />
+                        <use class="trail-leaf trail-leaf-light" href="#trail-leaf-wide" transform="translate(228 350) rotate(12) scale(.78)" />
+                        <use class="trail-leaf" href="#trail-leaf" transform="translate(253 349) rotate(27) scale(.82)" />
+                        <use class="trail-wisp" href="#trail-wisp" transform="translate(267 358) rotate(31) scale(.55)" />
+                        <use href="#trail-flower" transform="translate(217 361) scale(.4)" />
+                        <use class="trail-grass" href="#trail-grass" transform="translate(168 363) rotate(-12) scale(.55)" />
+
+                        <use class="trail-leaf" href="#trail-leaf-wide" transform="translate(160 374) rotate(-32) scale(.62)" />
+                        <use class="trail-wisp trail-wisp-gold" href="#trail-wisp" transform="translate(181 378) rotate(-20) scale(.72)" />
+                        <use class="trail-leaf trail-leaf-light" href="#trail-leaf" transform="translate(204 379) rotate(-7) scale(.94)" />
+                        <use class="trail-leaf" href="#trail-leaf-wide" transform="translate(232 379) rotate(10) scale(.82)" />
+                        <use class="trail-wisp" href="#trail-wisp" transform="translate(256 378) rotate(22) scale(.7)" />
+                        <use class="trail-leaf trail-leaf-pale" href="#trail-blade" transform="translate(279 375) rotate(36) scale(.6)" />
+                        <use href="#trail-flower" transform="translate(148 387) scale(.38)" />
+                        <use href="#trail-flower" transform="translate(271 391) scale(.46)" />
+                        <circle class="trail-seed trail-seed-gold" cx="219" cy="393" r="2.2" />
+
+                        <use class="trail-leaf trail-leaf-pale" href="#trail-blade" transform="translate(151 400) rotate(-35) scale(.5)" />
+                        <use class="trail-leaf" href="#trail-leaf-wide" transform="translate(176 405) rotate(-22) scale(.78)" />
+                        <use class="trail-wisp" href="#trail-wisp" transform="translate(198 407) rotate(-10) scale(.72)" />
+                        <use class="trail-leaf trail-leaf-light" href="#trail-leaf" transform="translate(221 406) rotate(2) scale(.88)" />
+                        <use class="trail-leaf" href="#trail-leaf-wide" transform="translate(247 405) rotate(17) scale(.74)" />
+                        <use class="trail-wisp trail-wisp-gold" href="#trail-wisp" transform="translate(270 405) rotate(25) scale(.63)" />
+                        <use class="trail-leaf" href="#trail-blade" transform="translate(291 400) rotate(39) scale(.48)" />
+                        <use href="#trail-flower" transform="translate(190 418) scale(.35)" />
+                        <use href="#trail-flower" transform="translate(255 418) scale(.38)" />
+                        <use class="trail-grass" href="#trail-grass" transform="translate(286 419) rotate(16) scale(.46)" />
+
+                        <use class="trail-leaf trail-leaf-pale" href="#trail-blade" transform="translate(170 428) rotate(-29) scale(.38)" />
+                        <use class="trail-wisp trail-wisp-gold" href="#trail-wisp" transform="translate(197 428) rotate(-13) scale(.5)" />
+                        <use class="trail-leaf trail-leaf-light" href="#trail-leaf" transform="translate(223 427) rotate(3) scale(.62)" />
+                        <use class="trail-wisp" href="#trail-wisp" transform="translate(249 428) rotate(17) scale(.48)" />
+                        <use class="trail-leaf" href="#trail-leaf-wide" transform="translate(275 428) rotate(31) scale(.36)" />
+                        <circle class="trail-seed" cx="153" cy="420" r="2" />
+                        <circle class="trail-seed trail-seed-coral" cx="300" cy="417" r="2" />
+
+                        <use class="trail-leaf" href="#trail-leaf-wide" transform="translate(185 451) rotate(-24) scale(.48)" />
+                        <use class="trail-wisp trail-wisp-gold" href="#trail-wisp" transform="translate(207 450) rotate(-11) scale(.55)" />
+                        <use class="trail-leaf trail-leaf-light" href="#trail-leaf" transform="translate(231 451) rotate(7) scale(.58)" />
+                        <use class="trail-wisp" href="#trail-wisp" transform="translate(254 450) rotate(19) scale(.48)" />
+                        <use href="#trail-flower" transform="translate(271 447) scale(.3)" />
+                        <use class="trail-leaf trail-leaf-pale" href="#trail-blade" transform="translate(201 472) rotate(-18) scale(.38)" />
+                        <use class="trail-leaf" href="#trail-leaf-wide" transform="translate(223 473) rotate(2) scale(.46)" />
+                        <use class="trail-leaf trail-leaf-light" href="#trail-leaf" transform="translate(246 471) rotate(20) scale(.38)" />
+                        <circle class="trail-seed trail-seed-gold" cx="213" cy="486" r="1.8" />
+                        <use class="trail-leaf trail-leaf-pale" href="#trail-blade" transform="translate(232 486) rotate(8) scale(.28)" />
+                    </g>
+                    <path class="rocket-nozzle-back" d="M188 280L252 280L249 325C231 334 209 334 191 325Z" />
+                    <path class="rocket-nozzle-band" d="M190 298C210 306 230 306 250 298L249 315C230 323 210 323 190 315Z" />
+                    <path class="rocket-fin" d="M178 205C143 220 119 257 118 309C142 291 163 285 185 276Z" />
+                    <path class="rocket-fin" d="M262 205C297 220 321 257 322 309C298 291 277 285 255 276Z" />
+                    <path class="rocket-fin-detail" d="M166 229C145 246 136 267 132 289C147 280 160 274 177 269" />
+                    <path class="rocket-fin-detail" d="M274 229C295 246 304 267 308 289C293 280 280 274 263 269" />
+                    <path class="rocket-body" d="M220 34C174 75 157 169 176 281C187 300 202 311 220 311C238 311 253 300 264 281C283 169 266 75 220 34Z" />
+                    <path class="rocket-nose" d="M184 93C193 67 205 47 220 34C235 47 247 67 256 93C234 84 206 84 184 93Z" />
+                    <path class="rocket-panel" d="M176 281C187 300 202 311 220 311C238 311 253 300 264 281L260 251C235 261 205 261 180 251Z" />
+                    <path class="rocket-panel-highlight" d="M186 271C207 280 233 280 254 271" />
+                    <circle class="rocket-rivet" cx="194" cy="286" r="3" />
+                    <circle class="rocket-rivet" cx="246" cy="286" r="3" />
+                    <circle class="rocket-window-outer" cx="220" cy="157" r="49" />
+                    <circle class="rocket-window-ring" cx="220" cy="157" r="43" />
+                    <circle class="rocket-window" cx="220" cy="157" r="34" />
+                    <path class="rocket-window-shine" d="M198 143C205 129 221 123 234 129" />
+                    <path class="bolt" d="M227 125L201 160H218L210 189L240 150H222Z" />
+                    <path class="rocket-shine" d="M205 69C185 102 177 151 181 202" />
+                    <path class="rocket-shine rocket-shine-small" d="M188 217C190 230 194 241 199 250" />
+                </g>
+            </svg>
+            <span class="spark spark-one">✦</span>
+            <span class="spark spark-two">✦</span>
+            <span class="spark spark-three">•</span>
+            <span class="hand-note">Fast · Modern<br />Efficient</span>
         </div>
     </div>
-    {rawHtml && <div class="hero-html sl-flex" set:html={rawHtml} />}
+
+    <div class="proof-row">
+        {
+            proofPoints.map(({ icon, title, detail }) => (
+                <div class="proof-point">
+                    <span class="proof-icon">{icon}</span>
+                    <span><strong>{title}</strong><small>{detail}</small></span>
+                </div>
+            ))
+        }
+    </div>
 </div>
 
 <style>
     @layer starlight.core {
         .hero {
-            display: grid;
-            grid-template-columns: 100%;
-            align-items: center;
-            gap: 1rem;
-            padding-bottom: 1rem;
+            position: relative;
+            isolation: isolate;
+            width: 100%;
+            padding: clamp(3rem, 7vw, 7rem) clamp(1.25rem, 4vw, 4rem) 0;
+            overflow: hidden;
+            color: var(--vpt-text);
         }
 
-        .stack {
-            flex-direction: column;
-            gap: clamp(1.5rem, calc(1.5rem + 1vw), 2rem);
+        .botanical-definitions {
+            position: absolute;
+            width: 0;
+            height: 0;
+        }
+
+        .botanical-branch,
+        .background-mark {
+            position: absolute;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .botanical-branch {
+            height: auto;
+            fill: #4aa95f;
+            transform-origin: center;
+        }
+
+        .botanical-top-left {
+            top: -2.4rem;
+            left: -0.25rem;
+            width: clamp(13rem, 23vw, 21rem);
+            opacity: 0.82;
+            transform: rotate(-1.5deg);
+        }
+
+        .botanical-top-right {
+            top: -1.7rem;
+            right: -0.15rem;
+            width: clamp(10rem, 18vw, 16rem);
+            opacity: 0.72;
+            transform: scaleX(-1) rotate(3deg);
+        }
+
+        .botanical-bottom-left {
+            bottom: -1.8rem;
+            left: 0;
+            width: clamp(10rem, 17vw, 15.5rem);
+            opacity: 0.68;
+            transform: scaleY(-1) rotate(4deg);
+        }
+
+        .botanical-bottom-right {
+            right: -0.35rem;
+            bottom: -2.5rem;
+            width: clamp(14rem, 24vw, 22rem);
+            opacity: 0.76;
+            transform: scale(-1) rotate(-3deg);
+        }
+
+        .background-mark {
+            display: block;
+        }
+
+        .petal {
+            width: 0.8rem;
+            height: 1.35rem;
+            border-radius: 70% 30% 70% 30%;
+            background: #ee8a70;
+            opacity: 0.78;
+        }
+
+        .petal-one {
+            top: 9%;
+            left: 32%;
+            transform: rotate(38deg);
+        }
+
+        .petal-two {
+            top: 14%;
+            right: 32%;
+            transform: rotate(-48deg);
+        }
+
+        .petal-three {
+            right: 11%;
+            bottom: 17%;
+            transform: rotate(32deg);
+        }
+
+        .dot {
+            width: 0.8rem;
+            height: 0.8rem;
+            border-radius: 50%;
+            background: #64bb73;
+            opacity: 0.8;
+        }
+
+        .dot-one {
+            top: 7%;
+            right: 24%;
+        }
+
+        .dot-two {
+            bottom: 12%;
+            left: 17%;
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.15fr) minmax(20rem, 0.85fr);
             align-items: center;
+            gap: clamp(2rem, 6vw, 6rem);
+            width: min(100%, 74rem);
+            margin-inline: auto;
+        }
+
+        .hero-copy {
+            display: flex;
+            align-items: center;
+            flex-direction: column;
             text-align: center;
         }
 
-        .copy {
-            flex-direction: column;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        .copy > * {
-            max-width: 50ch;
+        .eyebrow {
+            margin-bottom: 1rem;
+            color: var(--vpt-accent);
+            font-size: clamp(0.78rem, 1.3vw, 1rem);
+            font-weight: 650;
+            letter-spacing: 0.12em;
         }
 
         .latest-version {
             display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
-            padding: 0.3rem 0.65rem;
-            border: 1px solid var(--sl-color-hairline-light);
+            gap: 0.45rem;
+            margin-bottom: 0.7rem;
+            padding: 0.32rem 0.7rem;
+            border: 1px solid var(--vpt-border);
             border-radius: 999px;
-            background: var(--sl-color-bg-nav);
-            color: var(--sl-color-gray-2);
-            font-size: var(--sl-text-sm);
+            background: var(--vpt-surface);
+            color: var(--vpt-muted);
+            font-size: 0.78rem;
             line-height: 1;
             text-decoration: none;
-            transition:
-                border-color 160ms ease,
-                color 160ms ease;
         }
 
         .latest-version strong {
-            color: var(--sl-color-accent);
-            font-weight: 600;
-        }
-
-        .latest-version:hover {
-            border-color: var(--sl-color-accent);
-            color: var(--sl-color-white);
-        }
-
-        .latest-version:focus-visible {
-            outline: 2px solid var(--sl-color-accent-high);
-            outline-offset: 2px;
+            color: var(--vpt-accent-strong);
         }
 
         h1 {
-            color: var(--sl-color-white);
+            margin: 0;
+            color: var(--vpt-heading-strong);
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: clamp(7rem, 16vw, 13.5rem);
             font-weight: 600;
-            font-size: clamp(var(--sl-text-3xl), calc(0.25rem + 5vw), var(--sl-text-6xl));
-            line-height: var(--sl-line-height-headings);
+            letter-spacing: -0.08em;
+            line-height: 0.72;
+            text-shadow: 0 5px 0 var(--vpt-shadow);
+        }
+
+        .technology-line {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: clamp(0.55rem, 1.4vw, 1.15rem);
+            margin-top: clamp(2.3rem, 5vw, 3.5rem);
+            color: var(--vpt-heading);
+            font-size: clamp(0.85rem, 1.8vw, 1.15rem);
+            font-weight: 700;
+        }
+
+        .technology-line i {
+            color: #ee8f75;
+            font-style: normal;
+            font-size: 0.85em;
         }
 
         .tagline {
-            color: var(--sl-color-gray-2);
-            font-size: clamp(var(--sl-text-base), calc(0.0625rem + 2vw), var(--sl-text-xl));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.8rem;
+            width: min(100%, 31rem);
+            margin-top: 1.4rem;
+            color: var(--vpt-accent-strong);
+            font-size: clamp(0.8rem, 1.4vw, 0.95rem);
+            font-weight: 650;
+            letter-spacing: 0.06em;
+            text-align: center;
+        }
+
+        .tagline::before,
+        .tagline::after {
+            content: '';
+            flex: 1;
+            max-width: 2.5rem;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--vpt-border-strong));
+        }
+
+        .tagline::after {
+            background: linear-gradient(90deg, var(--vpt-border-strong), transparent);
+        }
+
+        .tagline span::before {
+            content: '✦';
+            margin-right: 0.55rem;
+            color: #ee8f75;
+            font-size: 0.78em;
         }
 
         .actions {
+            display: flex;
             flex-wrap: wrap;
             justify-content: center;
-            gap: 1rem 2rem;
+            gap: 1rem clamp(1.5rem, 3vw, 2.25rem);
+            margin-top: 1.75rem;
         }
 
-        .create-command {
-            width: min(100%, 32rem);
-            margin-top: 1rem;
-            text-align: start;
+        .actions :global(.sl-link-button) {
+            border-radius: 999px;
         }
 
-        .hero-html {
-            object-fit: contain;
-            height: auto;
-            margin-inline: auto;
+        .actions :global(.sl-link-button.primary) {
+            border-color: var(--vpt-accent-strong);
+            background: var(--vpt-accent-strong);
+            color: #fffdf5;
         }
 
-        @media (min-width: 50rem) {
+        .rocket-stage {
+            position: relative;
+            min-height: 35rem;
+        }
+
+        .rocket {
+            position: absolute;
+            z-index: 2;
+            inset: 4% -2% auto auto;
+            width: min(100%, 31rem);
+            filter: drop-shadow(0 24px 20px rgba(19, 89, 50, 0.18));
+            animation: hover 5s ease-in-out infinite;
+        }
+
+        .rocket-body {
+            fill: url('#rocket-body-gradient');
+            stroke: #145f3a;
+            stroke-linejoin: round;
+            stroke-width: 5;
+        }
+
+        .rocket-nose,
+        .rocket-fin {
+            fill: url('#rocket-green-gradient');
+            stroke: #145f3a;
+            stroke-linejoin: round;
+            stroke-width: 5;
+        }
+
+        .rocket-fin-detail {
+            fill: none;
+            stroke: #b8e5a3;
+            stroke-linecap: round;
+            stroke-width: 3;
+            opacity: 0.72;
+        }
+
+        .rocket-nozzle-back,
+        .rocket-panel {
+            fill: url('#rocket-dark-green-gradient');
+            stroke: #145f3a;
+            stroke-linejoin: round;
+            stroke-width: 5;
+        }
+
+        .rocket-nozzle-band {
+            fill: #5bb564;
+            stroke: #145f3a;
+            stroke-width: 3;
+        }
+
+        .rocket-panel-highlight {
+            fill: none;
+            stroke: #8bd180;
+            stroke-linecap: round;
+            stroke-width: 3;
+            opacity: 0.7;
+        }
+
+        .rocket-rivet {
+            fill: #b5e29b;
+            stroke: #145f3a;
+            stroke-width: 1.5;
+        }
+
+        .rocket-window-outer {
+            fill: #164f33;
+            opacity: 0.96;
+        }
+
+        .rocket-window-ring {
+            fill: #2c8f50;
+            stroke: #77c873;
+            stroke-width: 4;
+        }
+
+        .rocket-window {
+            fill: url('#rocket-window-gradient');
+            stroke: #145f3a;
+            stroke-width: 2;
+        }
+
+        .rocket-window-shine {
+            fill: none;
+            stroke: #c8efb7;
+            stroke-linecap: round;
+            stroke-width: 5;
+            opacity: 0.75;
+        }
+
+        .bolt {
+            fill: #fffdf2;
+            filter: drop-shadow(0 2px 1px rgba(17, 80, 46, 0.22));
+        }
+
+        .rocket-shine {
+            fill: none;
+            stroke: #f8f6df;
+            stroke-linecap: round;
+            stroke-width: 8;
+            opacity: 0.82;
+        }
+
+        .rocket-shine-small {
+            stroke: #d5eac5;
+            stroke-width: 5;
+            opacity: 0.66;
+        }
+
+        .botanical-exhaust {
+            filter: drop-shadow(0 4px 4px rgba(27, 105, 57, 0.08));
+            transform-box: fill-box;
+            transform-origin: center top;
+            animation: exhaust-breathe 2.8s ease-in-out infinite;
+        }
+
+        .trail-leaf {
+            color: #55b666;
+        }
+
+        .trail-leaf-light {
+            color: #94cf82;
+        }
+
+        .trail-leaf-pale,
+        .trail-wisp {
+            color: #d7e9bd;
+            fill: #d7e9bd;
+            opacity: 0.78;
+        }
+
+        .trail-wisp-gold {
+            fill: #f3e6a4;
+            opacity: 0.68;
+        }
+
+        .trail-grass {
+            fill: none;
+            stroke: #43a95d;
+            stroke-linecap: round;
+            stroke-width: 2;
+        }
+
+        .trail-seed {
+            fill: #67bf72;
+        }
+
+        .trail-seed-coral {
+            fill: #ef957a;
+        }
+
+        .trail-seed-gold {
+            fill: #e8c65f;
+        }
+
+        .orbit {
+            position: absolute;
+            border: 1px dashed rgba(40, 126, 72, 0.22);
+            border-radius: 50%;
+        }
+
+        .orbit-one {
+            inset: 12% 2% auto auto;
+            width: 25rem;
+            height: 25rem;
+            transform: rotate(-20deg);
+            animation: orbit-one-drift 12s ease-in-out infinite;
+        }
+
+        .orbit-two {
+            inset: 26% 14% auto auto;
+            width: 17rem;
+            height: 17rem;
+            animation: orbit-two-drift 9s ease-in-out infinite;
+        }
+
+        .spark {
+            position: absolute;
+            color: #e98a72;
+            font-size: 1.6rem;
+        }
+
+        .spark-one {
+            top: 13%;
+            left: 12%;
+        }
+
+        .spark-two {
+            top: 53%;
+            right: 0;
+            color: #4aac65;
+        }
+
+        .spark-three {
+            top: 30%;
+            right: 10%;
+            color: #6bbf78;
+            font-size: 2.4rem;
+        }
+
+        .hand-note {
+            position: absolute;
+            right: 0;
+            bottom: 12%;
+            color: var(--vpt-accent);
+            font-family: 'Segoe Print', 'Bradley Hand', cursive;
+            font-size: 1rem;
+            line-height: 1.5;
+            transform: rotate(-7deg);
+        }
+
+        .proof-row {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            width: min(100%, 76rem);
+            margin: 3.5rem auto 0;
+            border: 1px solid var(--vpt-border);
+            border-radius: 1.25rem;
+            background: var(--vpt-surface-soft);
+            box-shadow: 0 16px 45px var(--vpt-shadow);
+            overflow: hidden;
+        }
+
+        .proof-point {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.8rem;
+            min-height: 5.5rem;
+            padding: 1rem;
+        }
+
+        .proof-point + .proof-point {
+            border-inline-start: 1px solid var(--vpt-border);
+        }
+
+        .proof-icon {
+            color: var(--vpt-accent);
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .proof-point span:last-child {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .proof-point strong {
+            color: var(--vpt-heading);
+            font-size: 0.9rem;
+        }
+
+        .proof-point small {
+            margin-top: 0.15rem;
+            color: var(--vpt-muted);
+            font-size: 0.72rem;
+        }
+
+        @keyframes hover {
+            0%,
+            100% {
+                transform: translate3d(0, 0, 0) rotate(-0.5deg);
+            }
+            50% {
+                transform: translate3d(-4px, -12px, 0) rotate(0.8deg);
+            }
+        }
+
+        @keyframes exhaust-breathe {
+            0%,
+            100% {
+                opacity: 0.88;
+                transform: scale(0.98, 0.96);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.02, 1.035);
+            }
+        }
+
+        @keyframes orbit-one-drift {
+            0%,
+            100% {
+                transform: rotate(-20deg) scale(1);
+            }
+            50% {
+                transform: rotate(-14deg) scale(1.025);
+            }
+        }
+
+        @keyframes orbit-two-drift {
+            0%,
+            100% {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+            50% {
+                transform: translate3d(8px, -5px, 0) scale(0.97);
+            }
+        }
+
+        @media (max-width: 60rem) {
+            .hero-grid {
+                grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.7fr);
+                gap: 1rem;
+            }
+
+            .rocket-stage {
+                min-height: 29rem;
+            }
+
+            .proof-row {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .proof-point:nth-child(3) {
+                border-inline-start: 0;
+            }
+
+            .proof-point:nth-child(n + 3) {
+                border-top: 1px solid var(--vpt-border);
+            }
+        }
+
+        @media (max-width: 44rem) {
             .hero {
-                padding-block: clamp(2.5rem, calc(1rem + 10vmin), 10rem);
+                padding: 7rem 1rem 0;
             }
 
-            .stack {
-                align-items: flex-start;
-                text-align: start;
+            .hero-grid {
+                display: flex;
+                flex-direction: column;
             }
 
-            .copy {
-                align-items: flex-start;
+            h1 {
+                font-size: clamp(6.5rem, 38vw, 10rem);
             }
 
-            .actions {
-                justify-content: flex-start;
+            .technology-line {
+                flex-wrap: wrap;
+            }
+
+            .rocket-stage {
+                width: min(100%, 24rem);
+                min-height: 25rem;
+                margin-top: -1rem;
+            }
+
+            .rocket {
+                inset-inline: 0;
+                margin-inline: auto;
+            }
+
+            .hand-note {
+                right: 1rem;
+                bottom: 5%;
+            }
+
+            .proof-row {
+                margin-top: 1rem;
             }
         }
-    }
 
-    .create-command :global(.expressive-code) {
-        margin-block: 0;
-    }
+        @media (max-width: 30rem) {
+            .proof-row {
+                grid-template-columns: 1fr;
+            }
 
-    @media (max-width: 49.999rem) {
-        .create-command {
-            display: none;
+            .proof-point + .proof-point {
+                border-top: 1px solid var(--vpt-border);
+                border-inline-start: 0;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .rocket,
+            .botanical-exhaust,
+            .orbit {
+                animation: none;
+            }
         }
     }
 </style>
