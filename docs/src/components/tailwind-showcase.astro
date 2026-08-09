@@ -1,0 +1,869 @@
+<section class="tailwind-showcase" aria-labelledby="tailwind-title">
+    <header class="section-heading">
+        <span class="section-kicker">Tailwind CSS v4 · 开箱即用</span>
+        <h2 id="tailwind-title">Tailwind，直达小程序</h2>
+        <p>保留熟悉的 className、任意值与状态变体。VPT 自动收集候选类，并为微信小程序和 Web 生成对应样式。</p>
+    </header>
+
+    <div class="tailwind-stage">
+        <article class="code-window" aria-label="使用 Tailwind CSS 编写的 React 组件">
+            <header class="code-toolbar">
+                <span class="window-controls" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="code-file">src/pages/index.tsx</span>
+                <span class="tailwind-badge"><i aria-hidden="true"></i> v4</span>
+            </header>
+
+            <pre class="code-editor"><code><span class="code-line"><i>01</i><span><b class="token-keyword">import</b> {'{'} View, Text {'}'} <b class="token-keyword">from</b> <em class="token-string">'virtual:taro/components'</em></span></span>
+<span class="code-line"><i>02</i><span></span></span>
+<span class="code-line"><i>03</i><span><b class="token-keyword">export function</b> <b class="token-function">Dashboard</b>() {'{'}</span></span>
+<span class="code-line"><i>04</i><span>  <b class="token-keyword">return</b> (</span></span>
+<span class="code-line"><i>05</i><span>    <b class="token-tag">&lt;View</b> <b class="token-attribute">className</b>=<em class="token-string">"min-h-screen bg-[#f4f7ec] p-5"</em><b class="token-tag">></b></span></span>
+<span class="code-line"><i>06</i><span>      <b class="token-tag">&lt;View</b> <b class="token-attribute">className</b>=<em class="token-string">"flex items-center justify-between"</em><b class="token-tag">></b></span></span>
+<span class="code-line"><i>07</i><span>        <b class="token-tag">&lt;View></b></span></span>
+<span class="code-line"><i>08</i><span>          <b class="token-tag">&lt;Text</b> <b class="token-attribute">className</b>=<em class="token-string">"block text-xs text-slate-500"</em><b class="token-tag">></b>早上好<b class="token-tag">&lt;/Text></b></span></span>
+<span class="code-line"><i>09</i><span>          <b class="token-tag">&lt;Text</b> <b class="token-attribute">className</b>=<em class="token-string">"mt-1 block text-2xl font-semibold"</em><b class="token-tag">></b>今天也向前一点<b class="token-tag">&lt;/Text></b></span></span>
+<span class="code-line"><i>10</i><span>        <b class="token-tag">&lt;/View></b></span></span>
+<span class="code-line"><i>11</i><span>        <b class="token-tag">&lt;Text</b> <b class="token-attribute">className</b>=<em class="token-string">"text-lg font-semibold text-emerald-950"</em><b class="token-tag">></b>VPT<b class="token-tag">&lt;/Text></b></span></span>
+<span class="code-line"><i>12</i><span>      <b class="token-tag">&lt;/View></b></span></span>
+<span class="code-line active"><i>13</i><span>      <b class="token-tag">&lt;View</b> <b class="token-attribute">className</b>=<em class="token-string">"mt-5 rounded-3xl bg-emerald-900 p-6 text-white shadow-xl"</em><b class="token-tag">></b></span></span>
+<span class="code-line"><i>14</i><span>        <b class="token-tag">&lt;Text</b> <b class="token-attribute">className</b>=<em class="token-string">"text-xs uppercase tracking-widest text-emerald-200"</em><b class="token-tag">></b>今日步数<b class="token-tag">&lt;/Text></b></span></span>
+<span class="code-line"><i>15</i><span>        <b class="token-tag">&lt;Text</b> <b class="token-attribute">className</b>=<em class="token-string">"mt-3 block text-4xl font-semibold"</em><b class="token-tag">></b>12,680<b class="token-tag">&lt;/Text></b></span></span>
+<span class="code-line"><i>16</i><span>        <b class="token-tag">&lt;Text</b> <b class="token-attribute">className</b>=<em class="token-string">"mt-2 block text-xs text-emerald-200/70"</em><b class="token-tag">></b>目标 16,000 步<b class="token-tag">&lt;/Text></b></span></span>
+<span class="code-line"><i>17</i><span>        <b class="token-tag">&lt;View</b> <b class="token-attribute">className</b>=<em class="token-string">"mt-6 h-2 overflow-hidden rounded-full bg-white/20"</em><b class="token-tag">></b></span></span>
+<span class="code-line"><i>18</i><span>          <b class="token-tag">&lt;View</b> <b class="token-attribute">className</b>=<em class="token-string">"h-full w-3/4 rounded-full bg-lime-300"</em> <b class="token-tag">/></b></span></span>
+<span class="code-line"><i>19</i><span>        <b class="token-tag">&lt;/View></b></span></span>
+<span class="code-line"><i>20</i><span>      <b class="token-tag">&lt;/View></b></span></span>
+<span class="code-line active"><i>21</i><span>      <b class="token-tag">&lt;View</b> <b class="token-attribute">className</b>=<em class="token-string">"mt-4 grid grid-cols-2 gap-3"</em><b class="token-tag">></b></span></span>
+<span class="code-line"><i>22</i><span>        {'{'}stats.map(({'{'} label, value, unit {'}'}) => (</span></span>
+<span class="code-line"><i>23</i><span>          <b class="token-tag">&lt;View</b> <b class="token-attribute">className</b>=<em class="token-string">"rounded-2xl bg-white p-4 ring-1 ring-emerald-900/10"</em><b class="token-tag">></b></span></span>
+<span class="code-line"><i>24</i><span>            <b class="token-tag">&lt;Text</b> <b class="token-attribute">className</b>=<em class="token-string">"block text-xs text-slate-500"</em><b class="token-tag">></b>{'{'}label{'}'}<b class="token-tag">&lt;/Text></b></span></span>
+<span class="code-line"><i>25</i><span>            <b class="token-tag">&lt;Text</b> <b class="token-attribute">className</b>=<em class="token-string">"mt-2 block text-xl font-semibold"</em><b class="token-tag">></b>{'{'}value{'}'} {'{'}unit{'}'}<b class="token-tag">&lt;/Text></b></span></span>
+<span class="code-line"><i>26</i><span>          <b class="token-tag">&lt;/View></b></span></span>
+<span class="code-line"><i>27</i><span>        )){'}'}</span></span>
+<span class="code-line"><i>28</i><span>      <b class="token-tag">&lt;/View></b></span></span>
+<span class="code-line"><i>29</i><span>      <b class="token-tag">&lt;ActivityChart</b> <b class="token-attribute">className</b>=<em class="token-string">"mt-4 rounded-2xl bg-white p-4"</em> <b class="token-tag">/></b></span></span>
+<span class="code-line"><i>30</i><span>    <b class="token-tag">&lt;/View></b></span></span>
+<span class="code-line"><i>31</i><span>  )</span></span>
+<span class="code-line"><i>32</i><span>{'}'}</span></span>
+<span class="code-line"><i>33</i><span></span></span>
+<span class="code-line"><i>34</i><span><b class="token-keyword">const</b> stats = [</span></span>
+<span class="code-line"><i>35</i><span>  {'{'} label: <em class="token-string">'活跃能量'</em>, value: <em class="token-string">'486'</em>, unit: <em class="token-string">'kcal'</em> {'}'},</span></span>
+<span class="code-line"><i>36</i><span>  {'{'} label: <em class="token-string">'行走距离'</em>, value: <em class="token-string">'8.7'</em>, unit: <em class="token-string">'km'</em> {'}'}</span></span>
+<span class="code-line"><i>37</i><span>]</span></span></code></pre>
+
+            <footer class="code-status">
+                <span><i class="status-ready"></i> WXSS ready</span>
+                <span><i class="status-ready"></i> H5 ready</span>
+            </footer>
+        </article>
+
+        <article class="phone-preview" aria-label="Tailwind CSS 样式在小程序中的效果">
+            <span class="preview-label">微信小程序</span>
+            <div class="phone-shell">
+                <div class="phone-speaker" aria-hidden="true"></div>
+                <div class="phone-screen">
+                    <div class="phone-status">
+                        <strong>9:41</strong>
+                        <span class="phone-indicators" aria-hidden="true">
+                            <svg class="signal-icon" viewBox="0 0 18 16">
+                                <rect x="1" y="11" width="2.5" height="4" rx="0.7" />
+                                <rect x="5.5" y="8" width="2.5" height="7" rx="0.7" />
+                                <rect x="10" y="5" width="2.5" height="10" rx="0.7" />
+                                <rect x="14.5" y="2" width="2.5" height="13" rx="0.7" />
+                            </svg>
+                            <svg class="wifi-icon" viewBox="0 0 20 16">
+                                <path d="M2 5.5C6.7 1.7 13.3 1.7 18 5.5M5 9C7.9 6.8 12.1 6.8 15 9M8.2 12.3C9.3 11.5 10.7 11.5 11.8 12.3" />
+                                <circle cx="10" cy="14.2" r="1" />
+                            </svg>
+                            <svg class="battery-icon" viewBox="0 0 25 14">
+                                <rect x="1" y="1" width="20" height="12" rx="3" />
+                                <path d="M23 5V9" />
+                                <rect class="battery-level" x="3" y="3" width="15" height="8" rx="1.5" />
+                            </svg>
+                        </span>
+                    </div>
+                    <header class="app-header">
+                        <span class="app-mark"><i></i><i></i></span>
+                        <strong>VPT</strong>
+                        <span class="wechat-capsule" aria-hidden="true">
+                            <span class="capsule-dots"><i></i><i></i><i></i></span>
+                            <i class="capsule-divider"></i>
+                            <span class="capsule-close"></span>
+                        </span>
+                    </header>
+
+                    <div class="app-content">
+                        <p class="welcome">早上好</p>
+                        <h3>今天也向前一点</h3>
+
+                        <section class="steps-card">
+                            <div class="steps-orbit" aria-hidden="true"></div>
+                            <span class="metric-label">今日步数</span>
+                            <strong>12,680</strong>
+                            <small>目标 16,000 步</small>
+                            <div class="progress-track"><span></span></div>
+                            <p><span>已完成 79%</span><b>↗ 12%</b></p>
+                        </section>
+
+                        <div class="metric-grid">
+                            <article>
+                                <span class="metric-icon coral">✦</span>
+                                <small>活跃能量</small>
+                                <strong>486 <i>kcal</i></strong>
+                            </article>
+                            <article>
+                                <span class="metric-icon green">⌁</span>
+                                <small>行走距离</small>
+                                <strong>8.7 <i>km</i></strong>
+                            </article>
+                        </div>
+
+                        <section class="activity-card">
+                            <header><strong>本周活跃度</strong><span>查看全部</span></header>
+                            <div class="activity-bars" aria-hidden="true">
+                                <i style="--bar-height: 42%"></i>
+                                <i style="--bar-height: 64%"></i>
+                                <i style="--bar-height: 48%"></i>
+                                <i style="--bar-height: 82%"></i>
+                                <i style="--bar-height: 70%"></i>
+                                <i class="today" style="--bar-height: 94%"></i>
+                                <i style="--bar-height: 58%"></i>
+                            </div>
+                            <div class="activity-days"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+            <div class="preview-chips" aria-label="支持的 Tailwind CSS 能力">
+                <span>任意值</span><span>透明度</span><span>Grid</span><span>状态变体</span>
+            </div>
+        </article>
+    </div>
+</section>
+
+<style>
+    .tailwind-showcase :where(*) {
+        box-sizing: border-box;
+        margin: 0;
+    }
+
+    .tailwind-showcase {
+        width: min(calc(100% - 2rem), 76rem);
+        margin-inline: auto;
+        padding-block: clamp(3.5rem, 7vw, 6rem);
+    }
+
+    .section-heading {
+        max-width: 48rem;
+        margin: 0 auto clamp(2.5rem, 5vw, 4rem);
+        text-align: center;
+    }
+
+    .section-kicker {
+        color: var(--vpt-accent);
+        font-size: 0.78rem;
+        font-weight: 750;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+
+    .section-heading h2 {
+        margin: 0.65rem 0 0;
+        color: var(--vpt-heading);
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: clamp(1.8rem, 5vw, 3.5rem);
+        font-weight: 600;
+        letter-spacing: -0.035em;
+        line-height: 1.08;
+        white-space: nowrap;
+    }
+
+    .section-heading p {
+        max-width: 44rem;
+        margin: 1rem auto 0;
+        color: var(--vpt-muted);
+        line-height: 1.8;
+        text-wrap: balance;
+    }
+
+    .tailwind-stage {
+        --tailwind-demo-height: 40rem;
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(22rem, 0.8fr);
+        align-items: center;
+        gap: clamp(1.25rem, 3vw, 2rem);
+    }
+
+    .code-window,
+    .phone-preview {
+        min-width: 0;
+        margin: 0;
+    }
+
+    .code-window {
+        display: grid;
+        border: 1px solid var(--vpt-border);
+        border-radius: 1.5rem;
+        box-shadow: 0 24px 60px var(--vpt-shadow);
+        overflow: hidden;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        height: var(--tailwind-demo-height);
+        min-height: 0;
+        background: #10251a;
+        color: #dce9de;
+    }
+
+    .code-toolbar {
+        display: grid;
+        position: relative;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        min-height: 3.25rem;
+        padding-inline: 1rem;
+        border-bottom: 1px solid rgba(190, 224, 197, 0.12);
+        background: #142c1f;
+    }
+
+    .window-controls {
+        display: flex;
+        gap: 0.4rem;
+    }
+
+    .window-controls i {
+        width: 0.62rem;
+        height: 0.62rem;
+        margin: 0;
+        border-radius: 50%;
+        background: #ed967c;
+    }
+
+    .window-controls i:nth-child(2) {
+        background: #e5c65c;
+    }
+
+    .window-controls i:nth-child(3) {
+        background: #57b870;
+    }
+
+    .code-file {
+        color: #a9b9ad;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.72rem;
+        text-align: center;
+    }
+
+    .tailwind-badge {
+        display: flex;
+        align-items: center;
+        justify-self: end;
+        gap: 0.35rem;
+        color: #8fcea0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.68rem;
+    }
+
+    .tailwind-badge i,
+    .app-mark i {
+        display: block;
+        width: 0.7rem;
+        height: 0.32rem;
+        margin: 0;
+        border-top: 0.14rem solid currentColor;
+        border-radius: 50%;
+        transform: skewX(-28deg);
+    }
+
+    .tailwind-badge i::after {
+        display: block;
+        width: 0.7rem;
+        height: 0.32rem;
+        margin: 0.08rem 0 0 0.35rem;
+        border-top: 0.14rem solid currentColor;
+        border-radius: 50%;
+        content: '';
+    }
+
+    .code-editor {
+        padding: 1.15rem 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        color: #d8e4da;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: clamp(0.68rem, 1vw, 0.78rem);
+        line-height: 1.8;
+        overflow: auto;
+        scrollbar-color: rgba(144, 198, 155, 0.35) transparent;
+    }
+
+    .code-editor code {
+        display: grid;
+        min-width: max-content;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        color: inherit;
+        font: inherit;
+    }
+
+    .code-line {
+        display: grid;
+        grid-template-columns: 2.7rem auto;
+        min-height: 1.55rem;
+        padding-right: 1.5rem;
+    }
+
+    .code-line.active {
+        background: linear-gradient(90deg, rgba(103, 196, 124, 0.11), transparent 88%);
+        box-shadow: inset 2px 0 #62c47b;
+    }
+
+    .code-line > i {
+        padding-right: 0.85rem;
+        color: #546b5b;
+        font-style: normal;
+        text-align: right;
+        user-select: none;
+    }
+
+    .code-line > span {
+        white-space: pre;
+    }
+
+    .code-line b,
+    .code-line em {
+        font-style: normal;
+        font-weight: 500;
+    }
+
+    .token-keyword {
+        color: #ef987f;
+    }
+
+    .token-function {
+        color: #e7cf75;
+    }
+
+    .token-tag {
+        color: #80d696;
+    }
+
+    .token-attribute {
+        color: #9bc4ee;
+    }
+
+    .token-string {
+        color: #d9e78a;
+    }
+
+    .code-status {
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        min-height: 2.65rem;
+        padding: 0.75rem 1rem;
+        border-top: 1px solid rgba(190, 224, 197, 0.12);
+        background: #142c1f;
+        color: #91a697;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.65rem;
+    }
+
+    .code-status span {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .status-ready {
+        width: 0.45rem;
+        height: 0.45rem;
+        margin: 0;
+        border-radius: 50%;
+        background: #72d58b;
+        box-shadow: 0 0 0 0.2rem rgba(114, 213, 139, 0.12);
+    }
+
+    .phone-preview {
+        display: flex;
+        position: relative;
+        isolation: isolate;
+        align-items: center;
+        flex-direction: column;
+        justify-content: center;
+        padding-block: 0.5rem;
+    }
+
+    .phone-preview::before,
+    .phone-preview::after {
+        position: absolute;
+        z-index: -1;
+        border: 1px dashed var(--vpt-border-strong);
+        border-radius: 50%;
+        content: '';
+        pointer-events: none;
+    }
+
+    .phone-preview::before {
+        top: 9%;
+        right: -5rem;
+        width: 13rem;
+        height: 13rem;
+    }
+
+    .phone-preview::after {
+        bottom: 8%;
+        left: -3rem;
+        width: 8rem;
+        height: 8rem;
+        border-color: rgba(232, 136, 112, 0.32);
+    }
+
+    .preview-label {
+        margin-bottom: 0.9rem;
+        color: var(--vpt-accent);
+        font-size: 0.68rem;
+        font-weight: 750;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+    }
+
+    .phone-shell {
+        position: relative;
+        width: min(100%, 22rem);
+        height: var(--tailwind-demo-height);
+        padding: 0.55rem;
+        border: 1px solid rgba(202, 231, 207, 0.28);
+        border-radius: 2.65rem;
+        background: #102a1c;
+        box-shadow:
+            0 1.5rem 3rem rgba(19, 73, 40, 0.2),
+            inset 0 0 0 0.22rem #1e4930;
+    }
+
+    .phone-speaker {
+        position: absolute;
+        z-index: 2;
+        top: 0.95rem;
+        left: 50%;
+        width: 4.5rem;
+        height: 1.25rem;
+        border-radius: 999px;
+        background: #0b1d13;
+        transform: translateX(-50%);
+    }
+
+    .phone-screen {
+        height: 100%;
+        min-height: 0;
+        border-radius: 2.15rem;
+        background: #f4f7ec;
+        color: #143c27;
+        overflow: hidden;
+    }
+
+    .phone-status {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.8rem 1.25rem 0.35rem;
+        color: #2c4e39;
+        font-size: 0.58rem;
+    }
+
+    .phone-indicators {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        color: #244a33;
+    }
+
+    .phone-indicators svg {
+        display: block;
+        margin: 0;
+        overflow: visible;
+    }
+
+    .signal-icon {
+        width: 0.72rem;
+        fill: currentColor;
+    }
+
+    .wifi-icon {
+        width: 0.8rem;
+        fill: currentColor;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-width: 1.5;
+    }
+
+    .wifi-icon path {
+        fill: none;
+    }
+
+    .battery-icon {
+        width: 1rem;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-width: 1.5;
+    }
+
+    .battery-icon .battery-level {
+        fill: currentColor;
+        stroke: none;
+    }
+
+    .app-header {
+        display: flex;
+        align-items: center;
+        margin: 0;
+        padding: 0.85rem 1.15rem 0.75rem;
+    }
+
+    .app-mark {
+        display: grid;
+        width: 1.6rem;
+        height: 1.6rem;
+        margin-right: 0.45rem;
+        border-radius: 0.55rem;
+        background: #dff1c5;
+        color: #26754a;
+        place-content: center;
+    }
+
+    .app-mark i:last-child {
+        margin-left: 0.28rem;
+    }
+
+    .app-header > strong {
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 1.05rem;
+    }
+
+    .wechat-capsule {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        width: 4.75rem;
+        height: 2rem;
+        margin-left: auto;
+        border: 1px solid rgba(28, 61, 40, 0.14);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.72);
+        box-shadow: 0 0.15rem 0.4rem rgba(20, 54, 34, 0.06);
+    }
+
+    .capsule-dots {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.18rem;
+    }
+
+    .capsule-dots i {
+        width: 0.22rem;
+        height: 0.22rem;
+        margin: 0;
+        border-radius: 50%;
+        background: #183c28;
+    }
+
+    .capsule-divider {
+        width: 1px;
+        height: 1.05rem;
+        margin: 0;
+        background: rgba(28, 61, 40, 0.12);
+    }
+
+    .capsule-close {
+        display: grid;
+        width: 1rem;
+        height: 1rem;
+        margin: auto;
+        border: 0.13rem solid #183c28;
+        border-radius: 50%;
+        place-items: center;
+    }
+
+    .capsule-close::after {
+        width: 0.38rem;
+        height: 0.38rem;
+        border-radius: 50%;
+        background: #183c28;
+        content: '';
+    }
+
+    .app-content {
+        padding: 0.65rem 1rem 1rem;
+    }
+
+    .welcome {
+        margin: 0;
+        color: #6d806f;
+        font-size: 0.62rem;
+    }
+
+    .app-content > h3 {
+        margin: 0.18rem 0 1rem;
+        color: #173e29;
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 1.35rem;
+        font-weight: 600;
+    }
+
+    .steps-card {
+        position: relative;
+        padding: 1.3rem;
+        border-radius: 1.7rem;
+        background: linear-gradient(145deg, #174d30, #0d3320);
+        box-shadow: 0 1rem 2rem rgba(20, 75, 43, 0.18);
+        color: #f9fff1;
+        overflow: hidden;
+    }
+
+    .steps-card::after {
+        position: absolute;
+        top: -2.5rem;
+        right: -1.4rem;
+        width: 7rem;
+        height: 7rem;
+        border: 1px solid rgba(205, 239, 175, 0.2);
+        border-radius: 50%;
+        content: '';
+    }
+
+    .steps-orbit {
+        position: absolute;
+        top: -0.8rem;
+        right: 1.6rem;
+        width: 3.8rem;
+        height: 3.8rem;
+        border: 0.8rem solid rgba(181, 230, 132, 0.08);
+        border-radius: 50%;
+    }
+
+    .metric-label {
+        display: block;
+        color: #bce5b1;
+        font-size: 0.58rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+
+    .steps-card > strong {
+        display: block;
+        margin-top: 0.3rem;
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 2.35rem;
+        font-weight: 600;
+        letter-spacing: -0.04em;
+        line-height: 1;
+    }
+
+    .steps-card > small {
+        color: #9bb8a2;
+        font-size: 0.55rem;
+    }
+
+    .progress-track {
+        height: 0.45rem;
+        margin-top: 1.15rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.14);
+        overflow: hidden;
+    }
+
+    .progress-track span {
+        display: block;
+        width: 79%;
+        height: 100%;
+        border-radius: inherit;
+        background: #c9eb78;
+    }
+
+    .steps-card > p {
+        display: flex;
+        justify-content: space-between;
+        margin: 0.5rem 0 0;
+        color: #a9b9ad;
+        font-size: 0.52rem;
+    }
+
+    .steps-card > p b {
+        color: #c9eb78;
+    }
+
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.65rem;
+        margin-top: 0.7rem;
+    }
+
+    .metric-grid article {
+        display: grid;
+        padding: 0.85rem;
+        border: 1px solid #e0e7d8;
+        border-radius: 1.15rem;
+        background: #fffef8;
+    }
+
+    .metric-icon {
+        display: grid;
+        width: 1.45rem;
+        height: 1.45rem;
+        margin-bottom: 0.65rem;
+        border-radius: 0.5rem;
+        color: #fffef8;
+        font-size: 0.65rem;
+        place-items: center;
+    }
+
+    .metric-icon.coral {
+        background: #ed987e;
+    }
+
+    .metric-icon.green {
+        background: #58a76c;
+    }
+
+    .metric-grid small {
+        color: #748579;
+        font-size: 0.52rem;
+    }
+
+    .metric-grid strong {
+        margin-top: 0.15rem;
+        color: #153c27;
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 1.05rem;
+    }
+
+    .metric-grid strong i {
+        color: #819084;
+        font-family: inherit;
+        font-size: 0.48rem;
+        font-style: normal;
+        font-weight: 500;
+    }
+
+    .activity-card {
+        margin-top: 0.7rem;
+        padding: 0.9rem;
+        border: 1px solid #e0e7d8;
+        border-radius: 1.15rem;
+        background: #fffef8;
+    }
+
+    .activity-card header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.6rem;
+    }
+
+    .activity-card header span {
+        color: #57926a;
+        font-size: 0.5rem;
+    }
+
+    .activity-bars {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        height: 3.6rem;
+        margin-top: 0.65rem;
+    }
+
+    .activity-bars i {
+        width: 0.65rem;
+        height: var(--bar-height);
+        margin: 0;
+        border-radius: 999px 999px 0.35rem 0.35rem;
+        background: #dce9d5;
+    }
+
+    .activity-bars .today {
+        background: linear-gradient(#c9eb78, #4aa467);
+    }
+
+    .activity-days {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 0.3rem;
+        color: #8b998e;
+        font-size: 0.45rem;
+    }
+
+    .preview-chips {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.4rem;
+        margin-top: 1rem;
+    }
+
+    .preview-chips span {
+        padding: 0.3rem 0.55rem;
+        border: 1px solid var(--vpt-border);
+        border-radius: 999px;
+        background: var(--vpt-chip-background);
+        color: var(--vpt-chip-text);
+        font-size: 0.6rem;
+    }
+
+    @media (max-width: 52rem) {
+        .tailwind-stage {
+            grid-template-columns: 1fr;
+            max-width: 42rem;
+            margin-inline: auto;
+        }
+
+        .phone-preview {
+            min-height: 44rem;
+        }
+    }
+
+    @media (max-width: 40rem) {
+        .tailwind-showcase {
+            padding-block: 3.75rem;
+        }
+
+        .section-heading h2 {
+            font-size: clamp(1.55rem, 8vw, 1.8rem);
+        }
+
+        .code-window {
+            border-radius: 1.15rem;
+        }
+
+        .code-toolbar {
+            grid-template-columns: 1fr auto;
+        }
+
+        .code-file {
+            justify-self: start;
+            order: -1;
+        }
+
+        .window-controls {
+            display: none;
+        }
+
+        .code-editor {
+            font-size: 0.68rem;
+        }
+
+        .phone-preview {
+            min-height: 42rem;
+        }
+
+        .phone-shell {
+            width: min(100%, 20rem);
+        }
+    }
+</style>
