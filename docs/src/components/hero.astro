@@ -310,7 +310,6 @@ const proofPoints = [
             }
             this.classList.remove('is-live')
             this.stopEmission()
-            this.cannon?.reset()
         }
 
         private startEmission(): void {
@@ -519,6 +518,8 @@ const proofPoints = [
             font-size: clamp(0.78rem, 1.3vw, 1rem);
             font-weight: 650;
             letter-spacing: 0.12em;
+            text-box-edge: cap alphabetic;
+            text-box-trim: trim-both;
         }
 
         .latest-version {
@@ -549,7 +550,9 @@ const proofPoints = [
             font-size: clamp(7rem, 16vw, 13.5rem);
             font-weight: 600;
             letter-spacing: -0.08em;
-            line-height: 0.72;
+            line-height: 1;
+            text-box-edge: cap alphabetic;
+            text-box-trim: trim-both;
             text-shadow: 0 5px 0 var(--vpt-shadow);
         }
 
@@ -558,7 +561,7 @@ const proofPoints = [
             align-items: center;
             justify-content: center;
             gap: clamp(0.55rem, 1.4vw, 1.15rem);
-            margin-top: clamp(2.3rem, 5vw, 3.5rem);
+            margin-top: clamp(1.3rem, 3vw, 2rem);
             color: var(--vpt-heading);
             font-size: clamp(0.85rem, 1.8vw, 1.15rem);
             font-weight: 700;
