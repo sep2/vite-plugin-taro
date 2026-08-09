@@ -4,6 +4,50 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.5.8] - 2026-08-09
+
+### Changed
+
+- redesign starter template (969be6c)
+- refine homepage layout and interactions (b134385)
+- add responsive homepage navigation drawer (d8b5de3)
+- redesign responsive proof points (98ecb3f)
+- increase phone showcase tilt (5950f88)
+- refine hero spacing and exhaust continuity (b3a1930)
+- optimize botanical exhaust rendering (7f10142)
+- refine botanical rocket exhaust (d17836d)
+- prevent rocket startup jump (ea01510)
+- text (85546d1)
+- add 3d rocket roll (5eb320a)
+- animate rocket flight (685b26c)
+- optimize rocket confetti rendering (a80a190)
+- animate rocket exhaust (be85b4a)
+- optimize website runtime performance (85aac71)
+- text (42b314d)
+- add dark mode to phone preview (1b01b3d)
+- polish homepage showcase motion (8b6bc26)
+- harmonize homepage sections (53877f9)
+- add Tailwind showcase (092e5e0)
+- expand homepage showcases (ea6e7eb)
+- polish homepage primary action (1bf3c00)
+- redesign VPT homepage (8509a29)
+- rebrand website as VPT (b006146)
+- docs (9a02a0b)
+- mock wx require.async loading (87f22e6)
+- comments (bd2ab74)
+- comments (5d5f818)
+- document wx subpackage graph coverage (c3f0a05)
+- cover complex wx subpackage graphs (5c36cdc)
+- docs (4ae4e5e)
+- docs (097f4b9)
+- docs (a48670d)
+- docs (481b84b)
+- docs (e104577)
+
+### Fixed
+
+- preserve wx outputs across full rebuilds (a35b34b)
+
 ## [0.5.7] - 2026-08-08
 
 ### Changed
