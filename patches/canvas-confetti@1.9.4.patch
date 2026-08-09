@@ -33,28 +33,71 @@ diff --git a/dist/confetti.browser.js b/dist/confetti.browser.js
 +      fetti.tiltCos = 0;
 +      fetti.random = 1;
 +    } else if (fetti.flat) {
-@@ -413 +438 @@
+@@ -406 +431,2 @@
+-      context.fill(transformPath2D(
++      drawPath2D(
++        context,
+@@ -413,2 +439,2 @@
 -        Math.PI / 10 * fetti.wobble
+-      ));
 +        getFettiRotation(fetti)
-@@ -416 +441 @@
++      );
+@@ -416 +442 @@
 -      var rotation = Math.PI / 10 * fetti.wobble;
 +      var rotation = getFettiRotation(fetti);
-@@ -448,2 +473,2 @@
+@@ -448,2 +474,2 @@
 -        context.ellipse(fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, Math.PI / 10 * fetti.wobble, 0, 2 * Math.PI) :
 -        ellipse(context, fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, Math.PI / 10 * fetti.wobble, 0, 2 * Math.PI);
 +        context.ellipse(fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, getFettiRotation(fetti), 0, 2 * Math.PI) :
 +        ellipse(context, fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, getFettiRotation(fetti), 0, 2 * Math.PI);
-@@ -573,0 +599,3 @@
+@@ -573,0 +600,3 @@
 +      var rotationSpeed = prop(options, 'rotationSpeed');
 +      var tiltAmplitude = prop(options, 'tiltAmplitude');
 +      var tiltSpeed = prop(options, 'tiltSpeed');
-@@ -597 +625,4 @@
+@@ -597 +626,4 @@
 -            flat: flat
 +            flat: flat,
 +            rotationSpeed: rotationSpeed,
 +            tiltAmplitude: tiltAmplitude,
 +            tiltSpeed: tiltSpeed
-@@ -763 +794,3 @@
+@@ -730,18 +762,18 @@
+-  function transformPath2D(pathString, pathMatrix, x, y, scaleX, scaleY, rotation) {
+-    var path2d = new Path2D(pathString);
+-
+-    var t1 = new Path2D();
+-    t1.addPath(path2d, new DOMMatrix(pathMatrix));
+-
+-    var t2 = new Path2D();
+-    // see https://developer.mozilla.org/en-US/docs/Web/API/DOMMatrix/DOMMatrix
+-    t2.addPath(t1, new DOMMatrix([
+-      Math.cos(rotation) * scaleX,
+-      Math.sin(rotation) * scaleX,
+-      -Math.sin(rotation) * scaleY,
+-      Math.cos(rotation) * scaleY,
+-      x,
+-      y
+-    ]));
+-
+-    return t2;
++  // Cached normalized paths are immutable and avoid rebuilding geometry for every particle frame.
++  var normalizedPathCache = new Map();
++
++  function drawPath2D(context, pathString, pathMatrix, x, y, scaleX, scaleY, rotation) {
++    var cacheKey = pathString + pathMatrix.join(',');
++    var path2d = normalizedPathCache.get(cacheKey);
++    if (!path2d) {
++      path2d = new Path2D();
++      path2d.addPath(new Path2D(pathString), new DOMMatrix(pathMatrix));
++      normalizedPathCache.set(cacheKey, path2d);
++    }
++
++    context.save();
++    context.translate(x, y);
++    context.rotate(rotation);
++    context.scale(scaleX, scaleY);
++    context.fill(path2d);
++    context.restore();
+@@ -763 +795,3 @@
 -
 +    if (matrix && !Array.isArray(matrix)) {
 +      matrix = [matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f];
@@ -94,28 +137,71 @@ diff --git a/dist/confetti.module.mjs b/dist/confetti.module.mjs
 +      fetti.tiltCos = 0;
 +      fetti.random = 1;
 +    } else if (fetti.flat) {
-@@ -414 +439 @@
+@@ -407 +432,2 @@
+-      context.fill(transformPath2D(
++      drawPath2D(
++        context,
+@@ -414,2 +440,2 @@
 -        Math.PI / 10 * fetti.wobble
+-      ));
 +        getFettiRotation(fetti)
-@@ -417 +442 @@
++      );
+@@ -417 +443 @@
 -      var rotation = Math.PI / 10 * fetti.wobble;
 +      var rotation = getFettiRotation(fetti);
-@@ -449,2 +474,2 @@
+@@ -449,2 +475,2 @@
 -        context.ellipse(fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, Math.PI / 10 * fetti.wobble, 0, 2 * Math.PI) :
 -        ellipse(context, fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, Math.PI / 10 * fetti.wobble, 0, 2 * Math.PI);
 +        context.ellipse(fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, getFettiRotation(fetti), 0, 2 * Math.PI) :
 +        ellipse(context, fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, getFettiRotation(fetti), 0, 2 * Math.PI);
-@@ -574,0 +600,3 @@
+@@ -574,0 +601,3 @@
 +      var rotationSpeed = prop(options, 'rotationSpeed');
 +      var tiltAmplitude = prop(options, 'tiltAmplitude');
 +      var tiltSpeed = prop(options, 'tiltSpeed');
-@@ -598 +626,4 @@
+@@ -598 +627,4 @@
 -            flat: flat
 +            flat: flat,
 +            rotationSpeed: rotationSpeed,
 +            tiltAmplitude: tiltAmplitude,
 +            tiltSpeed: tiltSpeed
-@@ -764 +795,3 @@
+@@ -731,18 +763,18 @@
+-  function transformPath2D(pathString, pathMatrix, x, y, scaleX, scaleY, rotation) {
+-    var path2d = new Path2D(pathString);
+-
+-    var t1 = new Path2D();
+-    t1.addPath(path2d, new DOMMatrix(pathMatrix));
+-
+-    var t2 = new Path2D();
+-    // see https://developer.mozilla.org/en-US/docs/Web/API/DOMMatrix/DOMMatrix
+-    t2.addPath(t1, new DOMMatrix([
+-      Math.cos(rotation) * scaleX,
+-      Math.sin(rotation) * scaleX,
+-      -Math.sin(rotation) * scaleY,
+-      Math.cos(rotation) * scaleY,
+-      x,
+-      y
+-    ]));
+-
+-    return t2;
++  // Cached normalized paths are immutable and avoid rebuilding geometry for every particle frame.
++  var normalizedPathCache = new Map();
++
++  function drawPath2D(context, pathString, pathMatrix, x, y, scaleX, scaleY, rotation) {
++    var cacheKey = pathString + pathMatrix.join(',');
++    var path2d = normalizedPathCache.get(cacheKey);
++    if (!path2d) {
++      path2d = new Path2D();
++      path2d.addPath(new Path2D(pathString), new DOMMatrix(pathMatrix));
++      normalizedPathCache.set(cacheKey, path2d);
++    }
++
++    context.save();
++    context.translate(x, y);
++    context.rotate(rotation);
++    context.scale(scaleX, scaleY);
++    context.fill(path2d);
++    context.restore();
+@@ -764 +796,3 @@
 -
 +    if (matrix && !Array.isArray(matrix)) {
 +      matrix = [matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f];
@@ -155,28 +241,71 @@ diff --git a/src/confetti.js b/src/confetti.js
 +      fetti.tiltCos = 0;
 +      fetti.random = 1;
 +    } else if (fetti.flat) {
-@@ -410 +435 @@
+@@ -403 +428,2 @@
+-      context.fill(transformPath2D(
++      drawPath2D(
++        context,
+@@ -410,2 +436,2 @@
 -        Math.PI / 10 * fetti.wobble
+-      ));
 +        getFettiRotation(fetti)
-@@ -413 +438 @@
++      );
+@@ -413 +439 @@
 -      var rotation = Math.PI / 10 * fetti.wobble;
 +      var rotation = getFettiRotation(fetti);
-@@ -445,2 +470,2 @@
+@@ -445,2 +471,2 @@
 -        context.ellipse(fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, Math.PI / 10 * fetti.wobble, 0, 2 * Math.PI) :
 -        ellipse(context, fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, Math.PI / 10 * fetti.wobble, 0, 2 * Math.PI);
 +        context.ellipse(fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, getFettiRotation(fetti), 0, 2 * Math.PI) :
 +        ellipse(context, fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, getFettiRotation(fetti), 0, 2 * Math.PI);
-@@ -570,0 +596,3 @@
+@@ -570,0 +597,3 @@
 +      var rotationSpeed = prop(options, 'rotationSpeed');
 +      var tiltAmplitude = prop(options, 'tiltAmplitude');
 +      var tiltSpeed = prop(options, 'tiltSpeed');
-@@ -594 +622,4 @@
+@@ -594 +623,4 @@
 -            flat: flat
 +            flat: flat,
 +            rotationSpeed: rotationSpeed,
 +            tiltAmplitude: tiltAmplitude,
 +            tiltSpeed: tiltSpeed
-@@ -760 +791,3 @@
+@@ -727,18 +759,18 @@
+-  function transformPath2D(pathString, pathMatrix, x, y, scaleX, scaleY, rotation) {
+-    var path2d = new Path2D(pathString);
+-
+-    var t1 = new Path2D();
+-    t1.addPath(path2d, new DOMMatrix(pathMatrix));
+-
+-    var t2 = new Path2D();
+-    // see https://developer.mozilla.org/en-US/docs/Web/API/DOMMatrix/DOMMatrix
+-    t2.addPath(t1, new DOMMatrix([
+-      Math.cos(rotation) * scaleX,
+-      Math.sin(rotation) * scaleX,
+-      -Math.sin(rotation) * scaleY,
+-      Math.cos(rotation) * scaleY,
+-      x,
+-      y
+-    ]));
+-
+-    return t2;
++  // Cached normalized paths are immutable and avoid rebuilding geometry for every particle frame.
++  var normalizedPathCache = new Map();
++
++  function drawPath2D(context, pathString, pathMatrix, x, y, scaleX, scaleY, rotation) {
++    var cacheKey = pathString + pathMatrix.join(',');
++    var path2d = normalizedPathCache.get(cacheKey);
++    if (!path2d) {
++      path2d = new Path2D();
++      path2d.addPath(new Path2D(pathString), new DOMMatrix(pathMatrix));
++      normalizedPathCache.set(cacheKey, path2d);
++    }
++
++    context.save();
++    context.translate(x, y);
++    context.rotate(rotation);
++    context.scale(scaleX, scaleY);
++    context.fill(path2d);
++    context.restore();
+@@ -760 +792,3 @@
 -
 +    if (matrix && !Array.isArray(matrix)) {
 +      matrix = [matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f];
