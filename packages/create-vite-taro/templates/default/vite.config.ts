@@ -33,14 +33,16 @@ export default defineConfig(({ mode }) => {
                     {
                         path: 'pages/index/index',
                         config: {
-                            navigationStyle: 'custom'
+                            navigationStyle: 'custom',
+                            navigationBarTextStyle: 'black'
                         }
                     }
                 ],
                 appJson: {
                     lazyCodeLoading: 'requiredComponents',
                     window: {
-                        navigationStyle: 'custom'
+                        navigationStyle: 'custom',
+                        navigationBarTextStyle: 'black'
                     },
                     renderer: 'skyline',
                     componentFramework: 'glass-easel',
