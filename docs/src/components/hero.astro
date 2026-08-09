@@ -125,53 +125,55 @@ const proofPoints = [
         <vpt-rocket-stage class="rocket-stage" aria-hidden="true">
             <div class="orbit orbit-one"></div>
             <div class="orbit orbit-two"></div>
-            <canvas class="rocket-confetti"></canvas>
-            <svg class="rocket" viewBox="0 0 440 500">
-                <defs>
-                    <linearGradient id="rocket-body-gradient" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0" stop-color="#fffef8" />
-                        <stop offset=".56" stop-color="#f5f2df" />
-                        <stop offset="1" stop-color="#dce9cf" />
-                    </linearGradient>
-                    <linearGradient id="rocket-green-gradient" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0" stop-color="#9bd681" />
-                        <stop offset=".48" stop-color="#51b660" />
-                        <stop offset="1" stop-color="#267f48" />
-                    </linearGradient>
-                    <linearGradient id="rocket-dark-green-gradient" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0" stop-color="#1a683d" />
-                        <stop offset=".5" stop-color="#3b9853" />
-                        <stop offset="1" stop-color="#145b37" />
-                    </linearGradient>
-                    <radialGradient id="rocket-window-gradient" cx="35%" cy="28%" r="75%">
-                        <stop offset="0" stop-color="#a5e68e" />
-                        <stop offset=".48" stop-color="#55b967" />
-                        <stop offset="1" stop-color="#238048" />
-                    </radialGradient>
-                </defs>
-                <g transform="rotate(38 220 215)">
-                    <circle class="rocket-confetti-origin" cx="220" cy="330" r="1" />
-                    <path class="rocket-nozzle-back" d="M188 280L252 280L249 325C231 334 209 334 191 325Z" />
-                    <path class="rocket-nozzle-band" d="M190 298C210 306 230 306 250 298L249 315C230 323 210 323 190 315Z" />
-                    <path class="rocket-fin" d="M178 205C143 220 119 257 118 309C142 291 163 285 185 276Z" />
-                    <path class="rocket-fin" d="M262 205C297 220 321 257 322 309C298 291 277 285 255 276Z" />
-                    <path class="rocket-fin-detail" d="M166 229C145 246 136 267 132 289C147 280 160 274 177 269" />
-                    <path class="rocket-fin-detail" d="M274 229C295 246 304 267 308 289C293 280 280 274 263 269" />
-                    <path class="rocket-body" d="M220 34C174 75 157 169 176 281C187 300 202 311 220 311C238 311 253 300 264 281C283 169 266 75 220 34Z" />
-                    <path class="rocket-nose" d="M184 93C193 67 205 47 220 34C235 47 247 67 256 93C234 84 206 84 184 93Z" />
-                    <path class="rocket-panel" d="M176 281C187 300 202 311 220 311C238 311 253 300 264 281L260 251C235 261 205 261 180 251Z" />
-                    <path class="rocket-panel-highlight" d="M186 271C207 280 233 280 254 271" />
-                    <circle class="rocket-rivet" cx="194" cy="286" r="3" />
-                    <circle class="rocket-rivet" cx="246" cy="286" r="3" />
-                    <circle class="rocket-window-outer" cx="220" cy="157" r="49" />
-                    <circle class="rocket-window-ring" cx="220" cy="157" r="43" />
-                    <circle class="rocket-window" cx="220" cy="157" r="34" />
-                    <path class="rocket-window-shine" d="M198 143C205 129 221 123 234 129" />
-                    <path class="bolt" d="M227 125L201 160H218L210 189L240 150H222Z" />
-                    <path class="rocket-shine" d="M205 69C185 102 177 151 181 202" />
-                    <path class="rocket-shine rocket-shine-small" d="M188 217C190 230 194 241 199 250" />
-                </g>
-            </svg>
+            <div class="rocket-flight">
+                <canvas class="rocket-confetti"></canvas>
+                <svg class="rocket" viewBox="0 0 440 500">
+                    <defs>
+                        <linearGradient id="rocket-body-gradient" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0" stop-color="#fffef8" />
+                            <stop offset=".56" stop-color="#f5f2df" />
+                            <stop offset="1" stop-color="#dce9cf" />
+                        </linearGradient>
+                        <linearGradient id="rocket-green-gradient" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0" stop-color="#9bd681" />
+                            <stop offset=".48" stop-color="#51b660" />
+                            <stop offset="1" stop-color="#267f48" />
+                        </linearGradient>
+                        <linearGradient id="rocket-dark-green-gradient" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0" stop-color="#1a683d" />
+                            <stop offset=".5" stop-color="#3b9853" />
+                            <stop offset="1" stop-color="#145b37" />
+                        </linearGradient>
+                        <radialGradient id="rocket-window-gradient" cx="35%" cy="28%" r="75%">
+                            <stop offset="0" stop-color="#a5e68e" />
+                            <stop offset=".48" stop-color="#55b967" />
+                            <stop offset="1" stop-color="#238048" />
+                        </radialGradient>
+                    </defs>
+                    <g transform="rotate(38 220 215)">
+                        <circle class="rocket-confetti-origin" cx="220" cy="330" r="1" />
+                        <path class="rocket-nozzle-back" d="M188 280L252 280L249 325C231 334 209 334 191 325Z" />
+                        <path class="rocket-nozzle-band" d="M190 298C210 306 230 306 250 298L249 315C230 323 210 323 190 315Z" />
+                        <path class="rocket-fin" d="M178 205C143 220 119 257 118 309C142 291 163 285 185 276Z" />
+                        <path class="rocket-fin" d="M262 205C297 220 321 257 322 309C298 291 277 285 255 276Z" />
+                        <path class="rocket-fin-detail" d="M166 229C145 246 136 267 132 289C147 280 160 274 177 269" />
+                        <path class="rocket-fin-detail" d="M274 229C295 246 304 267 308 289C293 280 280 274 263 269" />
+                        <path class="rocket-body" d="M220 34C174 75 157 169 176 281C187 300 202 311 220 311C238 311 253 300 264 281C283 169 266 75 220 34Z" />
+                        <path class="rocket-nose" d="M184 93C193 67 205 47 220 34C235 47 247 67 256 93C234 84 206 84 184 93Z" />
+                        <path class="rocket-panel" d="M176 281C187 300 202 311 220 311C238 311 253 300 264 281L260 251C235 261 205 261 180 251Z" />
+                        <path class="rocket-panel-highlight" d="M186 271C207 280 233 280 254 271" />
+                        <circle class="rocket-rivet" cx="194" cy="286" r="3" />
+                        <circle class="rocket-rivet" cx="246" cy="286" r="3" />
+                        <circle class="rocket-window-outer" cx="220" cy="157" r="49" />
+                        <circle class="rocket-window-ring" cx="220" cy="157" r="43" />
+                        <circle class="rocket-window" cx="220" cy="157" r="34" />
+                        <path class="rocket-window-shine" d="M198 143C205 129 221 123 234 129" />
+                        <path class="bolt" d="M227 125L201 160H218L210 189L240 150H222Z" />
+                        <path class="rocket-shine" d="M205 69C185 102 177 151 181 202" />
+                        <path class="rocket-shine rocket-shine-small" d="M188 217C190 230 194 241 199 250" />
+                    </g>
+                </svg>
+            </div>
             <span class="spark spark-one">✦</span>
             <span class="spark spark-two">✦</span>
             <span class="spark spark-three">•</span>
@@ -220,9 +222,13 @@ const proofPoints = [
         connectedCallback(): void {
             if (this.observer !== null) return
 
+            const flight = this.querySelector<HTMLElement>('.rocket-flight')
             const canvas = this.querySelector<HTMLCanvasElement>('.rocket-confetti')
-            if (canvas === null) return
+            if (flight === null || canvas === null) return
 
+            // Randomize the deterministic GPU path once, avoiding a continuous JavaScript animation loop.
+            flight.style.animationDelay = `${-Math.random() * 19}s`
+            flight.style.animationDirection = Math.random() < 0.5 ? 'normal' : 'reverse'
             this.cannon = confetti.create(canvas, {
                 resize: true,
                 useWorker: true,
@@ -234,13 +240,13 @@ const proofPoints = [
             this.observer = new IntersectionObserver(
                 (entries) => {
                     this.isVisible = entries.some((entry) => entry.isIntersecting)
-                    this.syncEmission()
+                    this.syncRocketActivity()
                 },
                 { threshold: 0.25 }
             )
             this.observer.observe(this)
-            this.reducedMotion.addEventListener('change', this.syncEmission)
-            document.addEventListener('visibilitychange', this.syncEmission)
+            this.reducedMotion.addEventListener('change', this.syncRocketActivity)
+            document.addEventListener('visibilitychange', this.syncRocketActivity)
         }
 
         disconnectedCallback(): void {
@@ -248,8 +254,9 @@ const proofPoints = [
             this.observer = null
             this.geometryObserver?.disconnect()
             this.geometryObserver = null
-            this.reducedMotion.removeEventListener('change', this.syncEmission)
-            document.removeEventListener('visibilitychange', this.syncEmission)
+            this.reducedMotion.removeEventListener('change', this.syncRocketActivity)
+            document.removeEventListener('visibilitychange', this.syncRocketActivity)
+            this.classList.remove('is-live')
             this.stopEmission()
             this.cannon?.reset()
             this.cannon = null
@@ -257,11 +264,14 @@ const proofPoints = [
             this.isVisible = false
         }
 
-        private readonly syncEmission = (): void => {
-            if (this.isVisible && !document.hidden && !this.reducedMotion.matches) {
+        private readonly syncRocketActivity = (): void => {
+            const isActive = this.isVisible && !document.hidden && !this.reducedMotion.matches
+            if (isActive) {
                 this.startEmission()
+                this.classList.add('is-live')
                 return
             }
+            this.classList.remove('is-live')
             this.stopEmission()
         }
 
@@ -279,20 +289,28 @@ const proofPoints = [
         }
 
         private readonly updateExhaustGeometry = (): void => {
+            const flight = this.querySelector<HTMLElement>('.rocket-flight')
             const originElement = this.querySelector<SVGGraphicsElement>('.rocket-confetti-origin')
             const canvas = this.querySelector<HTMLCanvasElement>('.rocket-confetti')
-            if (originElement === null || canvas === null) return
+            if (flight === null || originElement === null || canvas === null) return
 
-            const stageBounds = this.getBoundingClientRect()
-            const originBounds = originElement.getBoundingClientRect()
-            const canvasBounds = canvas.getBoundingClientRect()
-            if (canvasBounds.width === 0 || canvasBounds.height === 0) return
+            // Measure at rest so the wrapper rotation cannot distort its local nozzle coordinates.
+            const isLive = this.classList.contains('is-live')
+            this.classList.remove('is-live')
+            try {
+                const flightBounds = flight.getBoundingClientRect()
+                const originBounds = originElement.getBoundingClientRect()
+                const canvasBounds = canvas.getBoundingClientRect()
+                if (canvasBounds.width === 0 || canvasBounds.height === 0) return
 
-            const nozzleX = originBounds.left + originBounds.width / 2 - stageBounds.left
-            const nozzleY = originBounds.top + originBounds.height / 2 - stageBounds.top
-            canvas.style.left = `${nozzleX - canvasBounds.width * exhaustCanvasOrigin.x}px`
-            canvas.style.top = `${nozzleY - canvasBounds.height * exhaustCanvasOrigin.y}px`
-            this.origin = exhaustCanvasOrigin
+                const nozzleX = originBounds.left + originBounds.width / 2 - flightBounds.left
+                const nozzleY = originBounds.top + originBounds.height / 2 - flightBounds.top
+                canvas.style.left = `${nozzleX - canvasBounds.width * exhaustCanvasOrigin.x}px`
+                canvas.style.top = `${nozzleY - canvasBounds.height * exhaustCanvasOrigin.y}px`
+                this.origin = exhaustCanvasOrigin
+            } finally {
+                this.classList.toggle('is-live', isLive)
+            }
         }
 
         private emitExhaust(): void {
@@ -562,6 +580,71 @@ const proofPoints = [
             min-height: 35rem;
         }
 
+        .rocket-flight {
+            position: absolute;
+            inset: 0;
+        }
+
+        .rocket-stage.is-live .rocket-flight {
+            animation: rocket-live-wander 19s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+            will-change: transform;
+        }
+
+        @keyframes rocket-live-wander {
+            0%,
+            100% {
+                transform: translate3d(0, 0, 0) rotate(0deg);
+            }
+
+            6% {
+                transform: translate3d(0.5rem, -0.38rem, 0) rotate(1.9deg);
+            }
+
+            14% {
+                transform: translate3d(-0.42rem, -1.7rem, 0) rotate(-3.1deg);
+            }
+
+            23% {
+                transform: translate3d(0.98rem, -1.1rem, 0) rotate(3.6deg);
+            }
+
+            31% {
+                transform: translate3d(0.18rem, 0.28rem, 0) rotate(0.8deg);
+            }
+
+            39% {
+                transform: translate3d(-0.88rem, -0.65rem, 0) rotate(-2.5deg);
+            }
+
+            48% {
+                transform: translate3d(-0.25rem, -2rem, 0) rotate(-4deg);
+            }
+
+            57% {
+                transform: translate3d(0.75rem, -1.47rem, 0) rotate(2deg);
+            }
+
+            66% {
+                transform: translate3d(1.05rem, -0.18rem, 0) rotate(4deg);
+            }
+
+            74% {
+                transform: translate3d(-0.63rem, 0.37rem, 0) rotate(-1.2deg);
+            }
+
+            83% {
+                transform: translate3d(-1rem, -1.35rem, 0) rotate(-3.6deg);
+            }
+
+            91% {
+                transform: translate3d(0.45rem, -1.82rem, 0) rotate(3.1deg);
+            }
+
+            96% {
+                transform: translate3d(0.7rem, -0.58rem, 0) rotate(1.1deg);
+            }
+        }
+
         .rocket-confetti {
             position: absolute;
             z-index: 1;
@@ -782,6 +865,12 @@ const proofPoints = [
             margin-top: 0.15rem;
             color: var(--vpt-muted);
             font-size: 0.72rem;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .rocket-stage.is-live .rocket-flight {
+                animation: none;
+            }
         }
 
         @media (max-width: 60rem) {
