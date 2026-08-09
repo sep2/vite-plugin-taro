@@ -1,0 +1,112 @@
+---
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import { Icon } from '@astrojs/starlight/components'
+---
+
+<vpt-navigation-menu class="print:hidden">
+    <button
+        type="button"
+        aria-expanded="false"
+        aria-label={Astro.locals.t('menuButton.accessibleLabel')}
+        aria-controls="starlight__sidebar"
+    >
+        <Icon name="bars" class="open-menu" />
+        <Icon name="close" class="close-menu" />
+    </button>
+</vpt-navigation-menu>
+
+<script>
+    class VptNavigationMenuElement extends HTMLElement {
+        // The controller owns this connection's listeners so view transitions cannot duplicate them.
+        private listeners: AbortController | null = null
+        private readonly button = this.querySelector<HTMLButtonElement>('button')
+
+        connectedCallback(): void {
+            if (this.listeners !== null || this.button === null) return
+
+            this.listeners = new AbortController()
+            const options = { signal: this.listeners.signal }
+            this.button.addEventListener('click', this.toggleExpanded, options)
+            this.closest('nav')?.addEventListener('keyup', this.closeOnEscape, options)
+        }
+
+        disconnectedCallback(): void {
+            this.listeners?.abort()
+            this.listeners = null
+            this.setExpanded(false)
+        }
+
+        private readonly toggleExpanded = (): void => {
+            this.setExpanded(this.button?.getAttribute('aria-expanded') !== 'true')
+        }
+
+        private readonly closeOnEscape = (event: KeyboardEvent): void => {
+            if (event.code !== 'Escape') return
+            this.setExpanded(false)
+            this.button?.focus()
+        }
+
+        private setExpanded(expanded: boolean): void {
+            this.toggleAttribute('data-expanded', expanded)
+            this.button?.setAttribute('aria-expanded', String(expanded))
+            document.body.toggleAttribute('data-navigation-drawer-expanded', expanded)
+            document.querySelectorAll<HTMLElement>('.main-frame, .sl-skip-link').forEach((element) => {
+                element.toggleAttribute('inert', expanded)
+            })
+        }
+    }
+
+    if (customElements.get('vpt-navigation-menu') === undefined) {
+        customElements.define('vpt-navigation-menu', VptNavigationMenuElement)
+    }
+</script>
+
+<style>
+    @layer starlight.core {
+        button {
+            display: flex;
+            position: fixed;
+            z-index: var(--sl-z-index-navbar);
+            top: calc((var(--sl-nav-height) - var(--sl-menu-button-size) - 1px) / 2);
+            inset-inline-end: var(--sl-nav-pad-x);
+            align-items: center;
+            justify-content: center;
+            width: var(--sl-menu-button-size);
+            height: var(--sl-menu-button-size);
+            padding: 0.5rem;
+            border: 0;
+            border-radius: 50%;
+            background-color: var(--sl-color-white);
+            box-shadow: var(--sl-shadow-md);
+            color: var(--sl-color-black);
+            cursor: pointer;
+        }
+
+        [data-expanded] button {
+            background-color: var(--sl-color-gray-2);
+            box-shadow: none;
+        }
+
+        vpt-navigation-menu[data-expanded] .open-menu,
+        vpt-navigation-menu:not([data-expanded]) .close-menu {
+            display: none;
+        }
+
+        :global([data-theme='light']) button {
+            background-color: var(--sl-color-black);
+            color: var(--sl-color-white);
+        }
+
+        :global([data-theme='light']) [data-expanded] button {
+            background-color: var(--sl-color-gray-5);
+        }
+    }
+</style>
+
+<style is:global>
+    @layer starlight.utils {
+        body[data-navigation-drawer-expanded] {
+            overflow: hidden;
+        }
+    }
+</style>
