@@ -1,0 +1,73 @@
+---
+interface Props {
+    id: string
+    kicker: string
+    title: string
+    description: string
+    align: 'center' | 'start'
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
+const { id, kicker, title, description, align } = Astro.props
+---
+
+<header class:list={['home-section-heading', `home-section-heading-${align}`]}>
+    <span class="home-section-kicker">{kicker}</span>
+    <h2 id={id}>{title}</h2>
+    <p>{description}</p>
+</header>
+
+<style>
+    .home-section-heading {
+        width: 100%;
+        max-width: 48rem;
+        margin: 0 auto var(--home-section-heading-gap, clamp(2.5rem, 5vw, 4rem));
+        text-align: center;
+    }
+
+    .home-section-heading-start {
+        max-width: 42rem;
+        margin-inline: 0;
+        margin-bottom: 1.6rem;
+        text-align: start;
+    }
+
+    .home-section-kicker {
+        color: var(--vpt-accent);
+        font-size: var(--home-font-size-label, 0.75rem);
+        font-weight: 750;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+
+    h2 {
+        margin: 0.65rem 0 0;
+        color: var(--vpt-heading);
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: var(--home-font-size-display, clamp(1.8rem, 4.5vw, 3.25rem));
+        font-weight: 600;
+        letter-spacing: -0.035em;
+        line-height: 1.08;
+        white-space: nowrap;
+    }
+
+    .home-section-heading-start h2 {
+        white-space: normal;
+        text-wrap: balance;
+    }
+
+    p {
+        max-width: 44rem;
+        margin: 1rem auto 0;
+        color: var(--vpt-muted);
+        font-size: var(--home-font-size-body, 1rem);
+        line-height: var(--home-line-height-body, 1.8);
+        text-wrap: balance;
+    }
+
+    .home-section-heading-start p {
+        margin-inline: 0;
+        text-wrap: pretty;
+    }
+
+</style>

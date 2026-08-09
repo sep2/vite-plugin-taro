@@ -5,15 +5,15 @@ import { Icon } from '@astrojs/starlight/components'
 
 <article class="diagram-panel source-panel" data-node="flow-source" aria-labelledby="source-diagram-title">
     <header class="diagram-heading">
-        <span>01 · 开发视角</span>
-        <h3 id="source-diagram-title">标准模块关系</h3>
+        <span>01 · 源码关系</span>
+        <h3 id="source-diagram-title">一次动态导入</h3>
     </header>
 
     <div
         class="source-graph"
         data-diagram="source-graph"
         role="img"
-        aria-label="App 和页面静态导入启动依赖，并通过动态 import 加载报表功能"
+        aria-label="App 和页面通过动态 import 加载功能入口，入口继续静态导入图表、PDF 导出和原生组件"
     >
         <svg class="d3-links" data-diagram-links aria-hidden="true"></svg>
         <div class="graph-node source-root" data-node="source-entry">
@@ -31,20 +31,20 @@ import { Icon } from '@astrojs/starlight/components'
             <div class="source-branch">
                 <div class="graph-node async-node" data-node="report-feature">
                     <span class="node-icon"><Icon name="analytics" /></span>
-                    <div><small>按需功能</small><strong>报表中心</strong></div>
+                    <div><small>动态入口 0.2M</small><strong>报表中心</strong></div>
                 </div>
                 <div class="feature-dependencies">
-                    <div class="mini-node" data-node="chart-dependency">图表</div>
-                    <div class="mini-node" data-node="pdf-dependency">PDF 导出</div>
-                    <div class="mini-node" data-node="native-dependency">原生组件</div>
+                    <div class="mini-node" data-node="chart-dependency"><span>图表</span><small>1.5M</small></div>
+                    <div class="mini-node" data-node="pdf-dependency"><span>PDF 导出</span><small>1.3M</small></div>
+                    <div class="mini-node" data-node="native-dependency"><span>原生组件</span><small>0.6M</small></div>
                 </div>
             </div>
         </div>
     </div>
 
     <footer class="diagram-footer diagram-legend">
-        <span><i class="solid-swatch"></i>同步启动链</span>
-        <span><i class="dashed-swatch"></i>异步加载边界</span>
+        <span><i class="dashed-swatch"></i>异步边界</span>
+        <span><i class="solid-swatch"></i>后续静态依赖 3.6M</span>
     </footer>
 </article>
 
@@ -100,12 +100,12 @@ import { Icon } from '@astrojs/starlight/components'
 
     .graph-node small {
         color: var(--vpt-muted);
-        font-size: 0.65rem;
+        font-size: var(--home-font-size-caption);
     }
 
     .graph-node strong {
         color: var(--vpt-heading-strong);
-        font-size: 0.88rem;
+        font-size: var(--home-font-size-body);
     }
 
     .source-branches {
@@ -142,15 +142,24 @@ import { Icon } from '@astrojs/starlight/components'
     }
 
     .mini-node {
+        display: grid;
         position: relative;
+        min-height: 3.25rem;
+        align-content: center;
+        gap: 0.15rem;
         margin: 0;
         padding: 0.45rem 0.25rem;
         border: 1px solid rgba(232, 136, 112, 0.32);
         border-radius: 0.65rem;
         background: color-mix(in srgb, var(--vpt-surface) 92%, #ef957a);
         color: var(--vpt-text);
-        font-size: 0.6rem;
+        font-size: var(--home-font-size-label);
         text-align: center;
+    }
+
+    .mini-node small {
+        color: var(--vpt-muted);
+        font-size: var(--home-font-size-caption);
     }
 
     .diagram-legend {
@@ -158,7 +167,7 @@ import { Icon } from '@astrojs/starlight/components'
         flex-wrap: wrap;
         gap: 1rem;
         color: var(--vpt-muted);
-        font-size: 0.65rem;
+        font-size: var(--home-font-size-caption);
     }
 
     .diagram-legend span {
@@ -188,12 +197,6 @@ import { Icon } from '@astrojs/starlight/components'
             height: 2rem;
         }
 
-        .graph-node strong {
-            font-size: 0.74rem;
-        }
 
-        .mini-node {
-            font-size: 0.52rem;
-        }
     }
 </style>

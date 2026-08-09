@@ -1,0 +1,130 @@
+---
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import { Icon } from '@astrojs/starlight/components'
+---
+
+<section class="open-source" aria-label="开源协作">
+    <svg class="source-botanical source-botanical-left" viewBox="-24 -24 288 190" aria-hidden="true">
+        <use href="#botanical-sprig-airy" />
+    </svg>
+    <svg class="source-botanical source-botanical-right" viewBox="-24 -24 288 190" aria-hidden="true">
+        <use href="#botanical-sprig-bloom" />
+    </svg>
+
+    <span class="source-leaf">⌁</span>
+    <div>
+        <p><strong>全部开源</strong><em>MIT</em><strong>协议</strong></p>
+        <small>用 Web 开放标准，避免平台锁定，欢迎 fork 和 PR</small>
+    </div>
+    <a href="https://github.com/sep2/vite-plugin-taro" target="_blank" rel="noopener noreferrer">
+        <Icon name="github" />
+        <span>github.com/sep2/vite-plugin-taro</span>
+    </a>
+</section>
+
+<style>
+    .open-source {
+        display: flex;
+        position: relative;
+        isolation: isolate;
+        align-items: center;
+        justify-content: center;
+        width: min(calc(100% - 2rem), 76rem);
+        gap: clamp(1rem, 4vw, 3rem);
+        margin: 0 auto;
+        padding: clamp(1.5rem, 4vw, 2.5rem);
+        border: 1px solid var(--vpt-border);
+        border-block-end: 0;
+        border-radius: var(--home-card-radius, 1.25rem) var(--home-card-radius, 1.25rem) 0 0;
+        background:
+            linear-gradient(90deg, transparent, rgba(239, 150, 123, 0.08), transparent),
+            var(--vpt-surface);
+        text-align: center;
+        overflow: hidden;
+    }
+
+    .open-source > :not(.source-botanical) {
+        position: relative;
+        z-index: 1;
+    }
+
+    .source-botanical {
+        position: absolute;
+        z-index: 0;
+        width: clamp(11rem, 19vw, 16rem);
+        height: auto;
+        opacity: 0.14;
+        pointer-events: none;
+    }
+
+    .source-botanical-left {
+        bottom: -1.5rem;
+        left: -1.5rem;
+        transform: rotate(-8deg);
+    }
+
+    .source-botanical-right {
+        right: -1.5rem;
+        bottom: -1.5rem;
+        transform: scaleX(-1) rotate(-10deg);
+    }
+
+    .source-leaf {
+        color: #45a75e;
+        font-size: 3rem;
+    }
+
+    .open-source p {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.8rem;
+        margin: 0;
+        color: var(--vpt-heading-strong);
+        font-size: var(--home-font-size-title);
+    }
+
+    .open-source em {
+        color: #e8866e;
+        font-style: normal;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+    }
+
+    .open-source small {
+        display: block;
+        margin-top: 0.35rem;
+        color: var(--vpt-muted);
+        font-size: var(--home-font-size-caption);
+    }
+
+    .open-source > a {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        color: var(--vpt-text);
+        font-size: var(--home-font-size-body);
+        text-decoration: none;
+    }
+
+    .open-source > a :global(svg) {
+        width: 1.35rem;
+    }
+
+    @media (max-width: 64rem) {
+        .open-source {
+            flex-direction: column;
+        }
+    }
+
+    @media (max-width: 40rem) {
+        .source-botanical {
+            width: 10rem;
+            opacity: 0.11;
+        }
+
+        .open-source > a span {
+            overflow-wrap: anywhere;
+        }
+    }
+</style>

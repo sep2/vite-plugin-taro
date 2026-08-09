@@ -1,0 +1,159 @@
+---
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import HomeSectionHeading from './home-section-heading.astro'
+---
+
+<section class="home-section demo-section" aria-labelledby="demo-title">
+    <div class="demo-copy">
+        <HomeSectionHeading
+            id="demo-title"
+            kicker="不是重新加载，是热更新"
+            title="状态原地保留"
+            description="修改任意深度的 React 组件，VPT 会把最小更新送进微信开发者工具。当前页面、表单输入和组件状态继续留在原位。"
+            align="start"
+        />
+        <ul>
+            <li><span>✓</span> 深层 React 组件即时更新</li>
+            <li><span>✓</span> App、页面与输入状态保留</li>
+            <li><span>✓</span> Tailwind 样式同步刷新</li>
+        </ul>
+        <a href="/guides/hot-module-replacement/">了解热更新机制 <span aria-hidden="true">→</span></a>
+    </div>
+
+    <div class="demo-frame">
+        <div class="window-bar">
+            <span class="window-controls" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="window-title">微信开发者工具 · VPT</span>
+        </div>
+        <video
+            class="demo-video"
+            src="https://github.com/user-attachments/assets/cd4e6d97-6bc7-40e0-9ba9-206c9fe369f1"
+            aria-label="微信开发者工具中的 React 热更新演示"
+            width="2052"
+            height="1642"
+            preload="metadata"
+            controls
+            autoplay
+            muted
+            loop
+            playsinline
+        >
+            <track kind="captions" src="/hmr-demo.zh-CN.vtt" srclang="zh-CN" label="简体中文" default />
+        </video>
+    </div>
+</section>
+
+<style>
+    .demo-section {
+        display: grid;
+        grid-template-columns: minmax(0, 0.8fr) minmax(25rem, 1.2fr);
+        align-items: center;
+        gap: clamp(2rem, 6vw, 5rem);
+    }
+
+    .demo-copy ul {
+        display: grid;
+        gap: 0.65rem;
+        margin: 0 0 1.6rem;
+        padding: 0;
+        color: var(--vpt-text);
+        font-size: var(--home-font-size-body);
+        line-height: 1.7;
+        list-style: none;
+    }
+
+    .demo-copy li span {
+        display: inline-grid;
+        width: 1.35rem;
+        height: 1.35rem;
+        margin-right: 0.45rem;
+        border-radius: 50%;
+        background: var(--vpt-chip-background);
+        color: var(--vpt-accent);
+        font-size: var(--home-font-size-label);
+        place-items: center;
+    }
+
+    .demo-copy > a {
+        color: var(--vpt-accent-strong);
+        font-size: var(--home-font-size-body);
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .demo-copy > a:hover {
+        text-decoration: underline;
+    }
+
+    .demo-frame {
+        border: 1px solid var(--vpt-border);
+        border-radius: var(--home-panel-radius);
+        background: var(--vpt-surface);
+        box-shadow: var(--home-panel-shadow);
+        line-height: 0;
+        overflow: hidden;
+        transform: rotate(0.65deg);
+    }
+
+    .window-bar {
+        display: grid;
+        position: relative;
+        min-height: 2.5rem;
+        padding-inline: 0.85rem;
+        border-bottom: 1px solid var(--vpt-border);
+        color: var(--vpt-muted);
+        font-size: var(--home-font-size-label);
+        line-height: normal;
+        place-items: center;
+    }
+
+    .window-controls {
+        display: flex;
+        position: absolute;
+        left: 0.85rem;
+        gap: 0.32rem;
+    }
+
+    .window-bar i {
+        display: block;
+        width: 0.55rem;
+        height: 0.55rem;
+        margin: 0;
+        border-radius: 50%;
+        background: #ed967c;
+    }
+
+    .window-bar i:nth-child(2) {
+        background: #e5c65c;
+    }
+
+    .window-bar i:nth-child(3) {
+        background: #57b870;
+    }
+
+    .window-title {
+        padding-inline: 4rem;
+        text-align: center;
+    }
+
+    .demo-video {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 2052 / 1642;
+        margin: 0;
+        border: 0;
+        border-radius: 0;
+        background: var(--vpt-video-background);
+    }
+
+    @media (max-width: 64rem) {
+        .demo-section {
+            grid-template-columns: 1fr;
+        }
+
+        .demo-copy {
+            max-width: 42rem;
+        }
+    }
+</style>

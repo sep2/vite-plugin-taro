@@ -5,18 +5,16 @@ import { Icon } from '@astrojs/starlight/components'
 
 <article class="diagram-panel output-panel" data-node="flow-output" aria-labelledby="output-diagram-title">
     <header class="diagram-heading">
-        <span>02 · 构建结果</span>
-        <h3 id="output-diagram-title">微信小程序产物</h3>
+        <span>02 · VPT 产物</span>
+        <h3 id="output-diagram-title">静态依赖自动拆包</h3>
     </header>
 
     <div
         class="package-stack"
-        data-diagram="package-output"
         role="img"
-        aria-label="启动代码进入主包，报表及其依赖和编辑器分别进入自动生成的分包"
+        aria-label="启动代码保留在主包，动态入口后的静态依赖按体积拆入两个自动命名的分包"
     >
-        <svg class="d3-links" data-diagram-links aria-hidden="true"></svg>
-        <div class="package-card main-package" data-node="main-package">
+        <div class="package-card main-package">
             <div class="package-tab"><Icon name="seti:folder" /> 主包</div>
             <div class="package-content">
                 <strong>启动代码</strong>
@@ -26,21 +24,21 @@ import { Icon } from '@astrojs/starlight/components'
         </div>
 
         <div class="subpackage-grid">
-            <div class="package-card" data-node="subpackage-a">
-                <div class="package-tab"><Icon name="seti:folder" /> 分包 A</div>
+            <div class="package-card">
+                <div class="package-tab"><Icon name="seti:folder" /> 自动包 7f3a</div>
                 <div class="package-content">
-                    <strong>报表中心</strong>
-                    <span>图表</span><span>PDF</span><span>原生组件</span>
+                    <span class="module-chip"><b>入口模块</b><small>0.2M</small></span>
+                    <span class="module-chip"><b>图表</b><small>1.5M</small></span>
                 </div>
-                <small>自动归组</small>
+                <small>1.7M · 自动分配</small>
             </div>
-            <div class="package-card" data-node="subpackage-b">
-                <div class="package-tab"><Icon name="seti:folder" /> 分包 B</div>
+            <div class="package-card">
+                <div class="package-tab"><Icon name="seti:folder" /> 自动包 c921</div>
                 <div class="package-content">
-                    <strong>编辑器</strong>
-                    <span>编辑内核</span><span>低频工具</span>
+                    <span class="module-chip"><b>PDF 导出</b><small>1.3M</small></span>
+                    <span class="module-chip"><b>原生组件</b><small>0.6M</small></span>
                 </div>
-                <small>按需下载</small>
+                <small>1.9M · 自动分配</small>
             </div>
         </div>
     </div>
@@ -87,7 +85,7 @@ import { Icon } from '@astrojs/starlight/components'
         border-radius: 0.65rem 0.65rem 0 0;
         background: var(--vpt-surface);
         color: var(--vpt-accent);
-        font-size: 0.65rem;
+        font-size: var(--home-font-size-caption);
         font-weight: 750;
     }
 
@@ -108,22 +106,41 @@ import { Icon } from '@astrojs/starlight/components'
         flex-basis: 100%;
         margin-bottom: 0.2rem;
         color: var(--vpt-heading-strong);
-        font-size: 0.85rem;
+        font-size: var(--home-font-size-body);
     }
 
-    .package-content span {
+    .package-content > span {
         padding: 0.25rem 0.45rem;
         border-radius: 999px;
         background: var(--vpt-chip-background);
         color: var(--vpt-chip-text);
-        font-size: 0.6rem;
+        font-size: var(--home-font-size-label);
+    }
+
+    .module-chip {
+        display: inline-flex;
+        min-width: 6rem;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.5rem;
+        white-space: nowrap;
+    }
+
+    .module-chip b {
+        font-size: var(--home-font-size-label);
+        font-weight: 600;
+    }
+
+    .module-chip small {
+        color: var(--vpt-muted);
+        font-size: var(--home-font-size-caption);
     }
 
     .package-card > small {
         display: block;
         margin-top: 0.7rem;
         color: var(--vpt-muted);
-        font-size: 0.65rem;
+        font-size: var(--home-font-size-caption);
         text-align: right;
     }
 
@@ -140,13 +157,18 @@ import { Icon } from '@astrojs/starlight/components'
         border-color: rgba(232, 136, 112, 0.35);
     }
 
+    .subpackage-grid .package-content {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
     .cross-package-note {
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 0.5rem;
         color: var(--vpt-muted);
-        font-size: 0.65rem;
+        font-size: var(--home-font-size-caption);
         text-align: center;
     }
 

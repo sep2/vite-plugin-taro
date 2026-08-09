@@ -1,6 +1,6 @@
 import { select } from 'd3'
 
-type LinkKind = 'static' | 'dynamic' | 'dependency' | 'package' | 'flow'
+type LinkKind = 'static' | 'dynamic' | 'dependency' | 'flow'
 
 interface DiagramLink {
     from: string
@@ -123,8 +123,7 @@ const renderVerticalLink = (
     drawsSharedTrunk: boolean
 ): RenderedLink => {
     const nearestEndY = Math.min(...group.map(({ end }) => end.y))
-    const junctionRatio = group[0].kind === 'package' ? 0.25 : 0.5
-    const middleY = link.start.y + (nearestEndY - link.start.y) * junctionRatio
+    const middleY = link.start.y + (nearestEndY - link.start.y) * 0.5
     const pathStart = drawsSharedTrunk
         ? `M ${link.start.x} ${link.start.y} V ${middleY}`
         : `M ${link.start.x} ${middleY}`

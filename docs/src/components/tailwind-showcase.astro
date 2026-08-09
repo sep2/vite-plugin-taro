@@ -1,9 +1,16 @@
-<section class="tailwind-showcase" aria-labelledby="tailwind-title">
-    <header class="section-heading">
-        <span class="section-kicker">Tailwind CSS v4 · 开箱即用</span>
-        <h2 id="tailwind-title">Tailwind，直达小程序</h2>
-        <p>保留熟悉的 className、任意值与状态变体。VPT 自动收集候选类，并为微信小程序和 Web 生成对应样式。</p>
-    </header>
+---
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import HomeSectionHeading from './home-section-heading.astro'
+---
+
+<section class="home-section tailwind-showcase" aria-labelledby="tailwind-title">
+    <HomeSectionHeading
+        id="tailwind-title"
+        kicker="Tailwind CSS v4 · 开箱即用"
+        title="Tailwind，直达小程序"
+        description="保留熟悉的 className、任意值与状态变体。VPT 自动收集候选类，并为微信小程序和 Web 生成对应样式。"
+        align="center"
+    />
 
     <div class="tailwind-stage">
         <article class="code-window" aria-label="使用 Tailwind CSS 编写的 React 组件">
@@ -142,50 +149,6 @@
 </section>
 
 <style>
-    .tailwind-showcase :where(*) {
-        box-sizing: border-box;
-        margin: 0;
-    }
-
-    .tailwind-showcase {
-        width: min(calc(100% - 2rem), 76rem);
-        margin-inline: auto;
-        padding-block: clamp(3.5rem, 7vw, 6rem);
-    }
-
-    .section-heading {
-        max-width: 48rem;
-        margin: 0 auto clamp(2.5rem, 5vw, 4rem);
-        text-align: center;
-    }
-
-    .section-kicker {
-        color: var(--vpt-accent);
-        font-size: 0.78rem;
-        font-weight: 750;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-    }
-
-    .section-heading h2 {
-        margin: 0.65rem 0 0;
-        color: var(--vpt-heading);
-        font-family: Georgia, 'Times New Roman', serif;
-        font-size: clamp(1.8rem, 5vw, 3.5rem);
-        font-weight: 600;
-        letter-spacing: -0.035em;
-        line-height: 1.08;
-        white-space: nowrap;
-    }
-
-    .section-heading p {
-        max-width: 44rem;
-        margin: 1rem auto 0;
-        color: var(--vpt-muted);
-        line-height: 1.8;
-        text-wrap: balance;
-    }
-
     .tailwind-stage {
         --tailwind-demo-height: 40rem;
         display: grid;
@@ -202,9 +165,11 @@
 
     .code-window {
         display: grid;
+        position: relative;
+        z-index: 1;
         border: 1px solid var(--vpt-border);
-        border-radius: 1.5rem;
-        box-shadow: 0 24px 60px var(--vpt-shadow);
+        border-radius: var(--home-panel-radius);
+        box-shadow: var(--home-panel-shadow);
         overflow: hidden;
         grid-template-rows: auto minmax(0, 1fr) auto;
         height: var(--tailwind-demo-height);
@@ -390,6 +355,7 @@
     .phone-preview {
         display: flex;
         position: relative;
+        z-index: 0;
         isolation: isolate;
         align-items: center;
         flex-direction: column;
@@ -829,18 +795,6 @@
     }
 
     @media (max-width: 40rem) {
-        .tailwind-showcase {
-            padding-block: 3.75rem;
-        }
-
-        .section-heading h2 {
-            font-size: clamp(1.55rem, 8vw, 1.8rem);
-        }
-
-        .code-window {
-            border-radius: 1.15rem;
-        }
-
         .code-toolbar {
             grid-template-columns: 1fr auto;
         }

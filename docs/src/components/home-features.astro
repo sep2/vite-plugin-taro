@@ -2,9 +2,7 @@
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
 import { Icon } from '@astrojs/starlight/components'
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
-import AutomaticSubpackagesShowcase from './automatic-subpackages-showcase.astro'
-// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
-import TailwindShowcase from './tailwind-showcase.astro'
+import HomeSectionHeading from './home-section-heading.astro'
 
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
 const features = [
@@ -65,46 +63,7 @@ const features = [
 ] as const
 ---
 
-<section class="demo-section" aria-labelledby="demo-title">
-    <div class="demo-copy">
-        <span class="section-kicker">不是重新加载，是热更新</span>
-        <h2 id="demo-title">开发者工具中，状态原地保留</h2>
-        <p>修改任意深度的 React 组件，VPT 会把最小更新送进微信开发者工具。当前页面、表单输入和组件状态继续留在原位。</p>
-        <ul>
-            <li><span>✓</span> 深层 React 组件即时更新</li>
-            <li><span>✓</span> App、页面与输入状态保留</li>
-            <li><span>✓</span> Tailwind 样式同步刷新</li>
-        </ul>
-        <a href="/guides/hot-module-replacement/">了解热更新机制 <span aria-hidden="true">→</span></a>
-    </div>
-    <div class="demo-frame">
-        <div class="window-bar">
-            <span class="window-controls" aria-hidden="true"><i></i><i></i><i></i></span>
-            <span class="window-title">微信开发者工具 · VPT</span>
-        </div>
-        <video
-            class="demo-video"
-            src="https://github.com/user-attachments/assets/cd4e6d97-6bc7-40e0-9ba9-206c9fe369f1"
-            aria-label="微信开发者工具中的 React 热更新演示"
-            width="2052"
-            height="1642"
-            preload="metadata"
-            controls
-            autoplay
-            muted
-            loop
-            playsinline
-        >
-            <track kind="captions" src="/hmr-demo.zh-CN.vtt" srclang="zh-CN" label="简体中文" default />
-        </video>
-    </div>
-</section>
-
-<AutomaticSubpackagesShowcase />
-
-<TailwindShowcase />
-
-<section class="home-features" aria-labelledby="features-title">
+<section class="home-section home-features" aria-labelledby="features-title">
     <svg class="lower-botanical lower-botanical-left" viewBox="-24 -24 288 190" aria-hidden="true">
         <use href="#botanical-sprig-bloom" />
     </svg>
@@ -112,11 +71,13 @@ const features = [
         <use href="#botanical-sprig" />
     </svg>
 
-    <header class="section-heading">
-        <span class="section-kicker">从开发体验到生产交付</span>
-        <h2 id="features-title">为现代微信小程序而生</h2>
-        <p>熟悉的 React 开发方式，完整的微信小程序能力，不再被传统工具链拖慢。</p>
-    </header>
+    <HomeSectionHeading
+        id="features-title"
+        kicker="从开发体验到生产交付"
+        title="为现代微信小程序而生"
+        description="熟悉的 React 开发方式，完整的微信小程序能力，不再被传统工具链拖慢。"
+        align="center"
+    />
 
     <div class="feature-grid">
         {
@@ -142,40 +103,13 @@ const features = [
     </a>
 </section>
 
-<section class="open-source" aria-label="开源协作">
-    <svg class="source-botanical source-botanical-left" viewBox="-24 -24 288 190" aria-hidden="true">
-        <use href="#botanical-sprig-airy" />
-    </svg>
-    <svg class="source-botanical source-botanical-right" viewBox="-24 -24 288 190" aria-hidden="true">
-        <use href="#botanical-sprig-bloom" />
-    </svg>
-
-    <span class="source-leaf">⌁</span>
-    <div>
-        <p><strong>全部开源</strong><em>MIT</em><strong>协议</strong></p>
-        <small>用 Web 开放标准，避免平台锁定，欢迎 fork 和 PR</small>
-    </div>
-    <a href="https://github.com/sep2/vite-plugin-taro" target="_blank" rel="noopener noreferrer">
-        <Icon name="github" />
-        <span>github.com/sep2/vite-plugin-taro</span>
-    </a>
-</section>
-
 <style>
-    .home-features,
-    .demo-section,
-    .open-source {
-        width: min(calc(100% - 2rem), 76rem);
-        margin-inline: auto;
-    }
-
     .home-features {
-        --feature-cta-space: clamp(4rem, 7vw, 6rem);
+        --feature-cta-space: var(--home-section-space);
         position: relative;
-        padding: clamp(3.5rem, 6vw, 5.5rem) 0 var(--feature-cta-space);
     }
 
-    .section-heading,
+    .home-features :global(.home-section-heading),
     .feature-grid,
     .feature-docs-link {
         position: relative;
@@ -203,37 +137,6 @@ const features = [
         transform: scaleX(-1) rotate(-12deg);
     }
 
-    .section-heading {
-        max-width: 43rem;
-        margin: 0 auto clamp(2rem, 5vw, 3.5rem);
-        text-align: center;
-    }
-
-    .section-kicker {
-        color: var(--vpt-accent);
-        font-size: 0.78rem;
-        font-weight: 750;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-    }
-
-    .section-heading h2,
-    .demo-copy h2 {
-        margin: 0.65rem 0 0;
-        color: var(--vpt-heading);
-        font-family: Georgia, 'Times New Roman', serif;
-        font-size: clamp(2rem, 5vw, 3.5rem);
-        font-weight: 600;
-        letter-spacing: -0.035em;
-        line-height: 1.08;
-    }
-
-    .section-heading p {
-        margin: 1rem auto 0;
-        color: var(--vpt-muted);
-        line-height: 1.8;
-    }
-
     .feature-grid {
         display: grid;
         grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -247,7 +150,7 @@ const features = [
         min-height: 18rem;
         padding: clamp(1.25rem, 3vw, 2rem);
         border: 1px solid var(--vpt-border);
-        border-radius: 1.25rem;
+        border-radius: var(--home-card-radius);
         background: var(--vpt-card-background);
         box-shadow: 0 18px 50px var(--vpt-shadow);
         transition:
@@ -300,14 +203,14 @@ const features = [
     .feature-heading h3 {
         margin: 0;
         color: var(--vpt-heading);
-        font-size: clamp(1.05rem, 2vw, 1.35rem);
+        font-size: var(--home-font-size-title);
     }
 
     .feature-card > p {
         margin: 1.35rem 0 1.5rem;
         color: var(--vpt-text);
-        font-size: 0.92rem;
-        line-height: 1.85;
+        font-size: var(--home-font-size-body);
+        line-height: var(--home-line-height-body);
     }
 
     .feature-tags {
@@ -323,7 +226,7 @@ const features = [
         border-radius: 999px;
         background: var(--vpt-chip-background);
         color: var(--vpt-chip-text);
-        font-size: 0.7rem;
+        font-size: var(--home-font-size-label);
     }
 
     .feature-docs-link {
@@ -362,203 +265,6 @@ const features = [
         outline-offset: 4px;
     }
 
-    .demo-section {
-        display: grid;
-        grid-template-columns: minmax(0, 0.8fr) minmax(25rem, 1.2fr);
-        align-items: center;
-        gap: clamp(2rem, 6vw, 5rem);
-        padding-block: clamp(2.75rem, 4.5vw, 4.5rem);
-    }
-
-    .demo-copy h2 {
-        font-size: clamp(2rem, 4vw, 3rem);
-    }
-
-    .demo-copy > p {
-        margin: 1.25rem 0;
-        color: var(--vpt-muted);
-        line-height: 1.85;
-    }
-
-    .demo-copy ul {
-        display: grid;
-        gap: 0.65rem;
-        margin: 0 0 1.6rem;
-        padding: 0;
-        color: var(--vpt-text);
-        list-style: none;
-    }
-
-    .demo-copy li span {
-        display: inline-grid;
-        width: 1.35rem;
-        height: 1.35rem;
-        margin-right: 0.45rem;
-        border-radius: 50%;
-        background: var(--vpt-chip-background);
-        color: var(--vpt-accent);
-        font-size: 0.72rem;
-        place-items: center;
-    }
-
-    .demo-copy > a {
-        color: var(--vpt-accent-strong);
-        font-weight: 700;
-        text-decoration: none;
-    }
-
-    .demo-copy > a:hover {
-        text-decoration: underline;
-    }
-
-    .demo-frame {
-        border: 1px solid var(--vpt-border);
-        border-radius: 1.15rem;
-        background: var(--vpt-surface);
-        box-shadow: 0 28px 70px var(--vpt-shadow-strong);
-        line-height: 0;
-        overflow: hidden;
-        transform: rotate(0.65deg);
-    }
-
-    .window-bar {
-        display: grid;
-        position: relative;
-        min-height: 2.5rem;
-        padding-inline: 0.85rem;
-        line-height: normal;
-        place-items: center;
-        border-bottom: 1px solid var(--vpt-border);
-        color: var(--vpt-muted);
-        font-size: 0.7rem;
-    }
-
-    .window-controls {
-        display: flex;
-        position: absolute;
-        left: 0.85rem;
-        gap: 0.32rem;
-    }
-
-    .window-bar i {
-        display: block;
-        width: 0.55rem;
-        height: 0.55rem;
-        margin: 0;
-        border-radius: 50%;
-        background: #ed967c;
-    }
-
-    .window-bar i:nth-child(2) {
-        background: #e5c65c;
-    }
-
-    .window-bar i:nth-child(3) {
-        background: #57b870;
-    }
-
-    .window-title {
-        padding-inline: 4rem;
-        text-align: center;
-    }
-
-    .demo-video {
-        display: block;
-        width: 100%;
-        height: auto;
-        aspect-ratio: 2052 / 1642;
-        border: 0;
-        margin: 0;
-        border-radius: 0;
-        background: var(--vpt-video-background);
-    }
-
-    .open-source {
-        display: flex;
-        position: relative;
-        isolation: isolate;
-        align-items: center;
-        justify-content: center;
-        gap: clamp(1rem, 4vw, 3rem);
-        margin-top: 0;
-        padding: clamp(1.5rem, 4vw, 2.5rem);
-        border: 1px solid var(--vpt-border);
-        border-block-end: 0;
-        border-radius: 1.25rem 1.25rem 0 0;
-        background:
-            linear-gradient(90deg, transparent, rgba(239, 150, 123, 0.08), transparent),
-            var(--vpt-surface);
-        text-align: center;
-        overflow: hidden;
-    }
-
-    .open-source > :not(.source-botanical) {
-        position: relative;
-        z-index: 1;
-    }
-
-    .source-botanical {
-        position: absolute;
-        z-index: 0;
-        width: clamp(11rem, 19vw, 16rem);
-        height: auto;
-        opacity: 0.14;
-        pointer-events: none;
-    }
-
-    .source-botanical-left {
-        bottom: -1.5rem;
-        left: -1.5rem;
-        transform: rotate(-8deg);
-    }
-
-    .source-botanical-right {
-        right: -1.5rem;
-        bottom: -1.5rem;
-        transform: scaleX(-1) rotate(-10deg);
-    }
-
-    .source-leaf {
-        color: #45a75e;
-        font-size: 3rem;
-    }
-
-    .open-source p {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.8rem;
-        margin: 0;
-        color: var(--vpt-heading-strong);
-        font-size: clamp(1.15rem, 3vw, 1.8rem);
-    }
-
-    .open-source em {
-        color: #e8866e;
-        font-style: normal;
-        font-weight: 800;
-        letter-spacing: 0.1em;
-    }
-
-    .open-source small {
-        display: block;
-        margin-top: 0.35rem;
-        color: var(--vpt-muted);
-    }
-
-    .open-source > a {
-        display: flex;
-        align-items: center;
-        gap: 0.55rem;
-        color: var(--vpt-text);
-        font-size: 0.85rem;
-        text-decoration: none;
-    }
-
-    .open-source > a :global(svg) {
-        width: 1.35rem;
-    }
-
     @media (max-width: 64rem) {
         .feature-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -571,25 +277,9 @@ const features = [
         .feature-card:last-child:nth-child(odd) {
             grid-column: 1 / -1;
         }
-
-        .demo-section {
-            grid-template-columns: 1fr;
-        }
-
-        .demo-copy {
-            max-width: 42rem;
-        }
-
-        .open-source {
-            flex-direction: column;
-        }
     }
 
     @media (max-width: 40rem) {
-        .home-features {
-            --feature-cta-space: 4.5rem;
-        }
-
         .lower-botanical {
             width: 10rem;
             opacity: 0.14;
@@ -603,11 +293,6 @@ const features = [
             right: -4.5rem;
         }
 
-        .source-botanical {
-            width: 10rem;
-            opacity: 0.11;
-        }
-
         .feature-grid {
             grid-template-columns: 1fr;
         }
@@ -616,14 +301,6 @@ const features = [
         .feature-card:last-child:nth-child(odd) {
             grid-column: span 1;
             min-height: auto;
-        }
-
-        .demo-section {
-            padding-bottom: 4rem;
-        }
-
-        .open-source > a span {
-            overflow-wrap: anywhere;
         }
     }
 

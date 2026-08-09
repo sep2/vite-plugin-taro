@@ -149,6 +149,50 @@ html[data-has-hero] .sl-markdown-content {
     color: var(--vpt-text);
 }
 
+html[data-has-hero] {
+    --home-font-size-display: clamp(1.8rem, 4.5vw, 3.25rem);
+    --home-font-size-title: clamp(1.25rem, 2vw, 1.55rem);
+    --home-font-size-body: 1rem;
+    --home-font-size-label: 0.75rem;
+    --home-font-size-caption: 0.7rem;
+    --home-line-height-body: 1.8;
+}
+
+:where(html[data-has-hero] .home-section *) {
+    box-sizing: border-box;
+    margin: 0;
+}
+
+:where(html[data-has-hero] .home-section ul, html[data-has-hero] .home-section ol) {
+    padding: 0;
+    list-style: none;
+}
+
+:where(html[data-has-hero] .home-section li) {
+    display: block;
+}
+
+:where(html[data-has-hero] .home-section pre, html[data-has-hero] .home-section code) {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: inherit;
+    font: inherit;
+}
+
+html[data-has-hero] .home-section {
+    --home-section-space: clamp(4.5rem, 7vw, 6rem);
+    --home-section-heading-gap: clamp(2.5rem, 5vw, 4rem);
+    --home-panel-radius: 1.5rem;
+    --home-card-radius: 1.25rem;
+    --home-panel-shadow: 0 24px 60px var(--vpt-shadow);
+    width: min(calc(100% - 2rem), 76rem);
+    margin-inline: auto;
+    padding-block: var(--home-section-space);
+}
+
 html[data-has-hero] .sl-markdown-content > :not(:where(.not-content *)) {
     margin-top: 0;
 }
@@ -165,7 +209,7 @@ html[data-has-hero] .actions .sl-link-button.primary {
     padding: 0.9375rem 1.25rem;
     padding-inline-start: 1.5rem;
     color: var(--vpt-button-text);
-    font-size: 1rem;
+    font-size: var(--home-font-size-body);
     line-height: 1.5rem;
     gap: 0.5rem;
     touch-action: manipulation;
@@ -223,6 +267,13 @@ html[data-has-hero] .actions .sl-link-button.primary:active {
 }
 
 @media (max-width: 49.999rem) {
+    html[data-has-hero] .home-section {
+        --home-section-space: 4.5rem;
+        --home-section-heading-gap: 2.75rem;
+        --home-panel-radius: 1.15rem;
+        --home-card-radius: 1rem;
+    }
+
     header.header > .header > .right-group {
         display: flex;
         align-items: center;
@@ -232,5 +283,11 @@ html[data-has-hero] .actions .sl-link-button.primary:active {
     header.header > .header > .right-group > starlight-lang-select,
     .mobile-preferences theme-toggle {
         display: none;
+    }
+}
+
+@media (max-width: 22rem) {
+    html[data-has-hero] {
+        --home-font-size-display: 1.55rem;
     }
 }

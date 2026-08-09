@@ -5,16 +5,18 @@ import { Icon } from '@astrojs/starlight/components'
 import SubpackageOutputDiagram from './diagrams/subpackage-output-diagram.astro'
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
 import SubpackageSourceDiagram from './diagrams/subpackage-source-diagram.astro'
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import HomeSectionHeading from './home-section-heading.astro'
 ---
 
-<section class="subpackage-showcase" aria-labelledby="subpackage-title">
-    <header class="section-heading">
-        <span class="section-kicker">只决定何时加载，不再关心放在哪个包</span>
-        <h2 id="subpackage-title">动态 import()，自动分包</h2>
-        <p>
-            像 Web 应用一样组织源码。VPT 沿着模块图识别同步启动链与按需边界，再自动生成符合微信限制的主包和分包。
-        </p>
-    </header>
+<section class="home-section subpackage-showcase" aria-labelledby="subpackage-title">
+    <HomeSectionHeading
+        id="subpackage-title"
+        kicker="只决定何时加载，不再关心放在哪个包"
+        title="动态 import()，自动分包"
+        description="像 Web 应用一样组织源码。VPT 沿着模块图识别同步启动链与按需边界，再自动生成符合微信限制的主包和分包。"
+        align="center"
+    />
 
     <div class="package-flow" data-diagram="package-flow">
         <svg class="d3-links flow-links" data-diagram-links aria-hidden="true"></svg>
@@ -44,7 +46,7 @@ import SubpackageSourceDiagram from './diagrams/subpackage-source-diagram.astro'
         </article>
         <article class="benefit-card">
             <span class="benefit-icon"><Icon name="code-branch" /></span>
-            <span><strong>依赖自动跟随</strong><small>功能内部继续静态 import</small></span>
+            <span><strong>依赖自动分包</strong><small>功能内部继续静态 import</small></span>
         </article>
         <article class="benefit-card">
             <span class="benefit-icon"><Icon name="puzzle" /></span>
@@ -73,14 +75,6 @@ import SubpackageSourceDiagram from './diagrams/subpackage-source-diagram.astro'
             ]
         },
         {
-            name: 'packages',
-            selector: '[data-diagram="package-output"]',
-            links: [
-                { from: 'main-package', to: 'subpackage-a', kind: 'package' },
-                { from: 'main-package', to: 'subpackage-b', kind: 'package' }
-            ]
-        },
-        {
             name: 'flow',
             selector: '[data-diagram="package-flow"]',
             links: [
@@ -96,42 +90,6 @@ import SubpackageSourceDiagram from './diagrams/subpackage-source-diagram.astro'
         --diagram-content-gap: clamp(2.25rem, 4vw, 3rem);
         --diagram-branch-gap: clamp(3rem, 4vw, 3.5rem);
         --diagram-footer-gap: clamp(2.25rem, 4vw, 3rem);
-        width: min(calc(100% - 2rem), 76rem);
-        margin-inline: auto;
-        padding-block: clamp(3.5rem, 7vw, 6rem);
-    }
-
-    .section-heading {
-        max-width: 48rem;
-        margin: 0 auto clamp(2.5rem, 5vw, 4rem);
-        text-align: center;
-    }
-
-    .section-kicker {
-        color: var(--vpt-accent);
-        font-size: 0.78rem;
-        font-weight: 750;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-    }
-
-    .section-heading h2 {
-        margin: 0.65rem 0 0;
-        color: var(--vpt-heading);
-        font-family: Georgia, 'Times New Roman', serif;
-        font-size: clamp(1.65rem, 5vw, 3.5rem);
-        font-weight: 600;
-        letter-spacing: -0.035em;
-        line-height: 1.08;
-        white-space: nowrap;
-    }
-
-    .section-heading p {
-        max-width: 44rem;
-        margin: 1rem auto 0;
-        color: var(--vpt-muted);
-        line-height: 1.8;
-        text-wrap: balance;
     }
 
     .package-flow {
@@ -157,9 +115,9 @@ import SubpackageSourceDiagram from './diagrams/subpackage-source-diagram.astro'
         flex-direction: column;
         padding: clamp(1.25rem, 3vw, 2rem);
         border: 1px solid var(--vpt-border);
-        border-radius: 1.5rem;
+        border-radius: var(--home-panel-radius);
         background: var(--vpt-card-background);
-        box-shadow: 0 24px 60px var(--vpt-shadow);
+        box-shadow: var(--home-panel-shadow);
     }
 
     .subpackage-showcase :global(.diagram-heading) {
@@ -168,7 +126,7 @@ import SubpackageSourceDiagram from './diagrams/subpackage-source-diagram.astro'
 
     .subpackage-showcase :global(.diagram-heading span) {
         color: var(--vpt-accent);
-        font-size: 0.68rem;
+        font-size: var(--home-font-size-label);
         font-weight: 750;
         letter-spacing: 0.14em;
         text-transform: uppercase;
@@ -177,7 +135,7 @@ import SubpackageSourceDiagram from './diagrams/subpackage-source-diagram.astro'
     .subpackage-showcase :global(.diagram-heading h3) {
         margin: 0.35rem 0 0;
         color: var(--vpt-heading);
-        font-size: clamp(1.2rem, 2vw, 1.55rem);
+        font-size: var(--home-font-size-title);
     }
 
     .subpackage-showcase :global(.diagram-footer) {
@@ -237,13 +195,13 @@ import SubpackageSourceDiagram from './diagrams/subpackage-source-diagram.astro'
     .planner-core span {
         color: var(--vpt-heading-strong);
         font-family: Georgia, 'Times New Roman', serif;
-        font-size: 1.4rem;
+        font-size: var(--home-font-size-title);
         font-weight: 700;
     }
 
     .planner-core small {
         color: var(--vpt-accent);
-        font-size: 0.6rem;
+        font-size: var(--home-font-size-caption);
         font-weight: 700;
     }
 
@@ -259,7 +217,7 @@ import SubpackageSourceDiagram from './diagrams/subpackage-source-diagram.astro'
         margin: 0;
         padding: 0;
         color: var(--vpt-muted);
-        font-size: 0.58rem;
+        font-size: var(--home-font-size-caption);
         list-style: none;
         transform: translateX(-50%);
     }
@@ -289,7 +247,7 @@ import SubpackageSourceDiagram from './diagrams/subpackage-source-diagram.astro'
         margin: 0;
         padding: 1.15rem;
         border: 1px solid var(--vpt-border);
-        border-radius: 1.15rem;
+        border-radius: var(--home-card-radius);
         background:
             radial-gradient(circle at 100% 0, color-mix(in srgb, var(--vpt-icon-background) 72%, transparent), transparent 55%),
             var(--vpt-surface);
@@ -321,12 +279,12 @@ import SubpackageSourceDiagram from './diagrams/subpackage-source-diagram.astro'
 
     .benefit-card strong {
         color: var(--vpt-heading-strong);
-        font-size: 0.8rem;
+        font-size: var(--home-font-size-body);
     }
 
     .benefit-card small {
         color: var(--vpt-muted);
-        font-size: 0.67rem;
+        font-size: var(--home-font-size-caption);
         line-height: 1.5;
     }
 
@@ -370,8 +328,7 @@ import SubpackageSourceDiagram from './diagrams/subpackage-source-diagram.astro'
         stroke-dasharray: 5 5;
     }
 
-    .subpackage-showcase :global(.diagram-link-dependency),
-    .subpackage-showcase :global(.diagram-link-package) {
+    .subpackage-showcase :global(.diagram-link-dependency) {
         stroke: rgba(232, 136, 112, 0.55);
     }
 
@@ -389,7 +346,7 @@ import SubpackageSourceDiagram from './diagrams/subpackage-source-diagram.astro'
         stroke: var(--vpt-card-background);
         stroke-width: 0.65rem;
         paint-order: stroke;
-        font-size: 0.58rem;
+        font-size: var(--home-font-size-caption);
     }
 
     .subpackage-showcase :global(.diagram-link-label-dynamic) {
@@ -422,12 +379,10 @@ import SubpackageSourceDiagram from './diagrams/subpackage-source-diagram.astro'
             --diagram-content-gap: 2.25rem;
             --diagram-branch-gap: 3rem;
             --diagram-footer-gap: 2.5rem;
-            padding-block: 3.75rem;
         }
 
         .subpackage-showcase :global(.diagram-panel) {
             padding: 1.1rem;
-            border-radius: 1.15rem;
         }
 
         .subpackage-benefits {
