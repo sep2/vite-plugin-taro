@@ -583,6 +583,9 @@ const proofPoints = [
         .rocket-flight {
             position: absolute;
             inset: 0;
+            backface-visibility: hidden;
+            transform-origin: center;
+            transform-style: preserve-3d;
         }
 
         .rocket-stage.is-live .rocket-flight {
@@ -593,55 +596,55 @@ const proofPoints = [
         @keyframes rocket-live-wander {
             0%,
             100% {
-                transform: translate3d(0, 0, 0) rotate(0deg);
+                transform: perspective(40rem) translate3d(0, 0, 0) rotateZ(0deg) rotate3d(0.62, -0.79, 0, 0deg);
             }
 
             6% {
-                transform: translate3d(0.5rem, -0.38rem, 0) rotate(1.9deg);
+                transform: perspective(40rem) translate3d(0.5rem, -0.38rem, 0) rotateZ(1.9deg) rotate3d(0.62, -0.79, 0, -6.6deg);
             }
 
             14% {
-                transform: translate3d(-0.42rem, -1.7rem, 0) rotate(-3.1deg);
+                transform: perspective(40rem) translate3d(-0.42rem, -1.7rem, 0) rotateZ(-3.1deg) rotate3d(0.62, -0.79, 0, 9.4deg);
             }
 
             23% {
-                transform: translate3d(0.98rem, -1.1rem, 0) rotate(3.6deg);
+                transform: perspective(40rem) translate3d(0.98rem, -1.1rem, 0) rotateZ(3.6deg) rotate3d(0.62, -0.79, 0, -11deg);
             }
 
             31% {
-                transform: translate3d(0.18rem, 0.28rem, 0) rotate(0.8deg);
+                transform: perspective(40rem) translate3d(0.18rem, 0.28rem, 0) rotateZ(0.8deg) rotate3d(0.62, -0.79, 0, 4deg);
             }
 
             39% {
-                transform: translate3d(-0.88rem, -0.65rem, 0) rotate(-2.5deg);
+                transform: perspective(40rem) translate3d(-0.88rem, -0.65rem, 0) rotateZ(-2.5deg) rotate3d(0.62, -0.79, 0, 7.9deg);
             }
 
             48% {
-                transform: translate3d(-0.25rem, -2rem, 0) rotate(-4deg);
+                transform: perspective(40rem) translate3d(-0.25rem, -2rem, 0) rotateZ(-4deg) rotate3d(0.62, -0.79, 0, -9.4deg);
             }
 
             57% {
-                transform: translate3d(0.75rem, -1.47rem, 0) rotate(2deg);
+                transform: perspective(40rem) translate3d(0.75rem, -1.47rem, 0) rotateZ(2deg) rotate3d(0.62, -0.79, 0, -11deg);
             }
 
             66% {
-                transform: translate3d(1.05rem, -0.18rem, 0) rotate(4deg);
+                transform: perspective(40rem) translate3d(1.05rem, -0.18rem, 0) rotateZ(4deg) rotate3d(0.62, -0.79, 0, 9.4deg);
             }
 
             74% {
-                transform: translate3d(-0.63rem, 0.37rem, 0) rotate(-1.2deg);
+                transform: perspective(40rem) translate3d(-0.63rem, 0.37rem, 0) rotateZ(-1.2deg) rotate3d(0.62, -0.79, 0, 11deg);
             }
 
             83% {
-                transform: translate3d(-1rem, -1.35rem, 0) rotate(-3.6deg);
+                transform: perspective(40rem) translate3d(-1rem, -1.35rem, 0) rotateZ(-3.6deg) rotate3d(0.62, -0.79, 0, -7.9deg);
             }
 
             91% {
-                transform: translate3d(0.45rem, -1.82rem, 0) rotate(3.1deg);
+                transform: perspective(40rem) translate3d(0.45rem, -1.82rem, 0) rotateZ(3.1deg) rotate3d(0.62, -0.79, 0, -5.3deg);
             }
 
             96% {
-                transform: translate3d(0.7rem, -0.58rem, 0) rotate(1.1deg);
+                transform: perspective(40rem) translate3d(0.7rem, -0.58rem, 0) rotateZ(1.1deg) rotate3d(0.62, -0.79, 0, 6.6deg);
             }
         }
 
