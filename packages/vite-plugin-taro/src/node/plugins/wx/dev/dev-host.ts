@@ -256,11 +256,9 @@ async function publishBuildMetadata(server: ViteDevServer, buildId: string, port
     await writeHmrFile(server.config.build.outDir, hmrInfoFileName, renderHmrInfo(info))
 }
 
-/** Appends the physical project directory after Vite's normal server URLs. */
+/** Replaces browser server URLs with the physical project directory consumed by WeChat DevTools. */
 function installDevToolsPrinter(server: ViteDevServer): void {
-    const originalPrintUrls = server.printUrls.bind(server)
     server.printUrls = () => {
-        originalPrintUrls()
         server.config.logger.info(
             `  ${colors.green('➜')}  ${colors.bold('WeChat DevTools')}: ${colors.cyan(relativeToViteConfig(server.config.build.outDir, server.config.configFile, server.config.root))}`
         )
