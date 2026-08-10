@@ -24,6 +24,7 @@
 - Functions and variables are camelCase.
 - Hooks are camelCase and must start with `use`.
 - If a file has exactly one export, the file name must match that export in kebab-case.
+- { code block should start newline.
 
 
 ## Git
