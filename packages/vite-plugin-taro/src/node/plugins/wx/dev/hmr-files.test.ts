@@ -3,7 +3,13 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { type PatchUpdate, renderHmrPatches, renderInitialHmrPatches, writeHmrFile } from './hmr-files.ts'
+import {
+    type PatchUpdate,
+    renderDevelopmentAppWxss,
+    renderHmrPatches,
+    renderInitialHmrPatches,
+    writeHmrFile
+} from './hmr-files.ts'
 
 const patch: PatchUpdate = {
     type: 'Patch',
@@ -20,6 +26,11 @@ test('renders initial and cumulative patches as inert CommonJS data', () => {
     assert.match(source, /^module\.exports = \{buildId: "build", patches:/)
     assert.match(source, /registerLatestFactory\(\)/)
     assert.doesNotMatch(source, /^__rolldown_runtime__/)
+})
+
+test('revises the development App style entry for each complete build', () => {
+    assert.equal(renderDevelopmentAppWxss('build-one'), '@import "./assets/global.wxss";\n/* vpt-build:build-one */\n')
+    assert.notEqual(renderDevelopmentAppWxss('build-one'), renderDevelopmentAppWxss('build-two'))
 })
 
 test('atomically replaces a complete HMR module without leaving temporary files', async () => {

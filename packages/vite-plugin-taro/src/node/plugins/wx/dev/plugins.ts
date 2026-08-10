@@ -1,11 +1,11 @@
-import type { PluginOption } from 'vite'
-import { transformWithOxc } from 'vite'
+import { type PluginOption, transformWithOxc } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { appCapsulePath, pageCapsulePath, rolldownRuntimeId, taroRuntimePath } from '../module.ts'
 import { createWxDevHost, type WxDevHost } from './dev-host.ts'
+import { developmentAppWxssFileName } from './hmr-files.ts'
 import { createWxReactRefreshTransforms } from './react-refresh.ts'
 
 const taroRuntimeId = '@tarojs/runtime'
@@ -66,6 +66,16 @@ export function createWxDevelopmentPlugin(
                         options: options,
                         applicationEntryIds: applicationEntryIds
                     })
+                }
+            },
+
+            generateBundle: {
+                order: 'post',
+                handler(_, bundle) {
+                    // `vpt:wx` emits the production App wrapper during every complete build: initial startup and each
+                    // recovery build, not just once when this plugin instance is created. Development transfers that file
+                    // to the host so its only physical write happens after the matching build identity is durable.
+                    removeDevelopmentAppWxss(bundle)
                 }
             },
 
@@ -132,6 +142,25 @@ export function createWxDevelopmentPlugin(
         },
         ...createWxReactRefreshTransforms()
     ]
+}
+
+/**
+ * Transfers development ownership of `app.wxss` from complete output to the dev host.
+ *
+ * The ordinary WX output hook emits the static production wrapper during every complete build. In development, the existing
+ * physical wrapper instead contains the previous build ID. If the static asset remained in this bundle, the DevEngine would:
+ *
+ * 1. replace the versioned wrapper with static production bytes while JavaScript and HMR metadata are still being finalized;
+ * 2. let DevTools observe that root-style change and reload the App against the previous build identity;
+ * 3. let the host replace the wrapper again with the new build ID, causing a second App reload.
+ *
+ * Deleting only the in-memory bundle entry avoids both premature writes. Development sets `emptyOutDir: false`, so the prior
+ * physical `app.wxss` remains available while the complete output is written. The host replaces it exactly once after
+ * `hmr/patches.js` and `hmr/info.js` are durable. Incremental HMR never enters this complete-output hook and continues changing
+ * only `assets/global.wxss`, which preserves the App heap. The serve-only plugin leaves production output unchanged.
+ */
+export function removeDevelopmentAppWxss(bundle: Record<string, unknown>): void {
+    delete bundle[developmentAppWxssFileName]
 }
 
 /** Ensures the Refresh hook exists before React's renderer evaluates and injects itself. */

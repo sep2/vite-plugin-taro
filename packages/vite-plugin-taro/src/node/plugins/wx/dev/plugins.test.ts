@@ -6,7 +6,8 @@ import {
     createWxDevelopmentPlugin,
     injectPageHmr,
     injectReactRefreshBootstrap,
-    injectTaroConnection
+    injectTaroConnection,
+    removeDevelopmentAppWxss
 } from './plugins.ts'
 
 const options: VitePluginTaroOptions = {
@@ -28,6 +29,19 @@ test('preserves physical outputs across development host restarts', async () => 
     )
 
     assert.equal(config.build.emptyOutDir, false)
+})
+
+test('transfers the App style entry from complete output to the development host', () => {
+    const appStyle = { type: 'asset', source: '@import "./assets/global.wxss";\n' }
+    const globalStyle = { type: 'asset', source: '.app {}' }
+    const bundle = {
+        'app.wxss': appStyle,
+        'assets/global.wxss': globalStyle
+    }
+
+    removeDevelopmentAppWxss(bundle)
+
+    assert.deepEqual(bundle, { 'assets/global.wxss': globalStyle })
 })
 
 test('evaluates React Refresh before the App dependency graph', () => {

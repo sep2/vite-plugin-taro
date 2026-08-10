@@ -9,11 +9,13 @@ import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { SerializedTaskQueue } from '../../../utils/serialized-task-queue.ts'
 import { createGraphStylePlan, isGlobalStyleRequest } from '../styles/utils.ts'
 import {
+    developmentAppWxssFileName,
     type HmrInfo,
     hmrControlPath,
     hmrInfoFileName,
     hmrPatchesFileName,
     type PatchUpdate,
+    renderDevelopmentAppWxss,
     renderHmrInfo,
     renderInitialHmrPatches,
     writeHmrFile
@@ -319,7 +321,7 @@ function boundPort(server: ViteDevServer): number | undefined {
     return address.port
 }
 
-/** Resets physical patches before exposing the matching immutable build identity to a new App heap. */
+/** Resets physical patches and then exposes one coherent build identity to a freshly compiled App heap. */
 async function publishBuildMetadata(server: ViteDevServer, buildId: string, port: number): Promise<void> {
     const info: HmrInfo = {
         buildId,
@@ -328,6 +330,12 @@ async function publishBuildMetadata(server: ViteDevServer, buildId: string, port
 
     await writeHmrFile(server.config.build.outDir, hmrPatchesFileName, renderInitialHmrPatches())
     await writeHmrFile(server.config.build.outDir, hmrInfoFileName, renderHmrInfo(info))
+    // `removeDevelopmentAppWxss` kept the previous physical wrapper in place while the complete output was written. Replace
+    // it only now, after the empty patch frontier and matching identity are durable. DevTools treats `app.wxss` as an App root,
+    // so this write intentionally causes the one full refresh allowed at a complete-build boundary; the refreshed App reads
+    // the new info above. Incremental updates must never write this file because an App refresh could destroy the heap while
+    // its JavaScript patch is being acknowledged. They publish only the imported `assets/global.wxss` stylesheet instead.
+    await writeHmrFile(server.config.build.outDir, developmentAppWxssFileName, renderDevelopmentAppWxss(buildId))
 }
 
 /** Replaces browser server URLs with the physical project directory consumed by WeChat DevTools. */

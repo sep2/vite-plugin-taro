@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { BindingClientHmrUpdate } from 'rolldown/experimental'
 
+export const developmentAppWxssFileName = 'app.wxss'
 export const hmrInfoFileName = 'hmr/info.js'
 export const hmrPatchesFileName = 'hmr/patches.js'
 
@@ -26,6 +27,17 @@ export function renderHmrInfo(info: HmrInfo): string {
 /** Provides a valid dependency before the host has a patch range to publish. */
 export function renderInitialHmrPatches(): string {
     return 'module.exports = undefined;\n'
+}
+
+/**
+ * Renders the native App style entry for one complete development build.
+ *
+ * Imported global CSS can change while the entry remains byte-identical. DevTools may then reuse an older persistent compile
+ * cache after it restarts. Tying this inert comment to the build identity invalidates that cache once per complete build,
+ * while incremental style updates continue changing only the imported file and therefore preserve the App heap.
+ */
+export function renderDevelopmentAppWxss(buildId: string): string {
+    return `@import "./assets/global.wxss";\n/* vpt-build:${buildId} */\n`
 }
 
 /**
