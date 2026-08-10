@@ -152,11 +152,11 @@ function IndexPage() {
                             </Text>
                         </View>
 
-                        <View className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <View className="mt-8 flex flex-row flex-wrap gap-4">
                             {featureCards.map((feature) => (
                                 <View
                                     key={feature.number}
-                                    className={`flex min-h-52 flex-col rounded-3xl border border-[#1e663d]/15 bg-white/80 p-6 shadow-lg ${feature.tiltClass}`}
+                                    className={`flex min-h-52 min-w-64 flex-1 flex-col rounded-3xl border border-[#1e663d]/15 bg-white/80 p-6 shadow-lg ${feature.tiltClass}`}
                                 >
                                     <View className="brand-serif flex h-11 w-11 items-center justify-center rounded-2xl bg-[#e3f4df] text-base font-bold text-[#197342]">
                                         {feature.number}
