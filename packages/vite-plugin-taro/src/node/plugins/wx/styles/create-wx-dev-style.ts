@@ -1,6 +1,9 @@
 import { readFile } from 'node:fs/promises'
 import type { Plugin, ViteDevServer } from 'vite'
+import { normalizeModuleId } from '../../../utils/modules.ts'
 import { createTailwindSidecarId, extractViteCss } from './utils.ts'
+
+const javaScriptSourcePattern = /\.(?:[cm]?[jt]s|[jt]sx)$/
 
 type WxDevStyleApi = Readonly<{
     getTailwindCss: () => ReadonlyMap<string, string>
@@ -16,6 +19,21 @@ export function createWxDevStyle(getTailwindRoots: () => ReadonlySet<string>): P
     // Root transforms are the sole writers. The live cache retains complete generated fragments for later WXSS composition.
     const tailwindCss = new Map<string, string>()
 
+    /*
+     * A complete build invokes moduleParsed for every JS/TSX module while Tailwind is still accumulating candidates, and its
+     * normal bundle pipeline already owns final stylesheet generation. Refreshing here would perform roots × parsed scripts
+     * transformations and repeatedly cache partial candidate snapshots. Rolldown's incremental HMR path does not invoke
+     * buildStart/buildEnd; it invokes moduleParsed after transforming the changed source. Keeping this flag true from
+     * buildStart through buildEnd therefore suppresses complete-build work while allowing only later HMR parses to refresh.
+     */
+    let isCompleteBuild = false
+
+    const transformAndCacheTailwindRoot = async (rootId: string): Promise<string> => {
+        const css = await transformTailwindRoot(server, rootId)
+        tailwindCss.set(rootId, css)
+        return css
+    }
+
     return {
         name: 'vpt:wx-dev-style',
         apply: 'serve',
@@ -23,14 +41,23 @@ export function createWxDevStyle(getTailwindRoots: () => ReadonlySet<string>): P
         api: {
             getTailwindCss: () => tailwindCss,
             getTailwindRoots,
-            async transformTailwindRoot(rootId) {
-                const css = await transformTailwindRoot(server, rootId)
-                tailwindCss.set(rootId, css)
-                return css
-            }
+            transformTailwindRoot: transformAndCacheTailwindRoot
+        },
+        buildStart() {
+            isCompleteBuild = true
+        },
+        buildEnd() {
+            isCompleteBuild = false
         },
         configureServer(configuredServer) {
             server = configuredServer
+        },
+        async moduleParsed(moduleInfo) {
+            if (isCompleteBuild || !javaScriptSourcePattern.test(normalizeModuleId(moduleInfo.id))) {
+                return
+            }
+
+            await Promise.all([...getTailwindRoots()].map(transformAndCacheTailwindRoot))
         }
     }
 }

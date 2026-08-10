@@ -3,19 +3,23 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { createServer } from 'vite'
+import { build, type ModuleInfo } from 'rolldown'
+import { createServer, type Plugin } from 'vite'
 import { createWxDevStyle } from './create-wx-dev-style.ts'
 
-test('transforms one tracked root for WX development', async () => {
+test('refreshes tracked roots after a JavaScript HMR parse', async () => {
     const projectRoot = await mkdtemp(path.join(tmpdir(), 'vpt-wx-dev-style-'))
     const rootId = path.join(projectRoot, 'app.css')
+    const scriptId = path.join(projectRoot, 'component.tsx')
     const rootSource = `@import 'tailwindcss';`
-    await writeFile(rootId, rootSource)
+    await Promise.all([writeFile(rootId, rootSource), writeFile(scriptId, 'export const component = true')])
 
     // This models the live registry owned and updated by the root tracker.
     const rootIds = new Set([rootId])
     const getTailwindRoots = () => rootIds
     const plugin = createWxDevStyle(getTailwindRoots)
+    const api = plugin.api
+    if (!api) throw new Error('Expected the WX development style API')
     const server = await createServer({ configFile: false, logLevel: 'silent', plugins: [plugin] })
     const pluginContainer = server.environments.client.pluginContainer
     const originalTransform = pluginContainer.transform
@@ -29,13 +33,36 @@ test('transforms one tracked root for WX development', async () => {
             map: null
         }
     }
+    // The capture supplies a real Rolldown ModuleInfo for the incremental moduleParsed invocation below.
+    let parsedScript: ModuleInfo | undefined
+    const captureParsedScript: Plugin = {
+        name: 'test:capture-parsed-script',
+        moduleParsed(moduleInfo) {
+            parsedScript = moduleInfo
+        }
+    }
 
     try {
+        await build({
+            input: scriptId,
+            output: { format: 'es' },
+            plugins: [plugin, captureParsedScript],
+            write: false
+        })
+
+        assert.deepEqual(requests, [])
+        assert.deepEqual([...api.getTailwindCss()], [])
+
+        const moduleParsed = plugin.moduleParsed
+        if (typeof moduleParsed !== 'function' || parsedScript === undefined) {
+            throw new Error('Expected a parsed script and a moduleParsed handler')
+        }
+        await Reflect.apply(moduleParsed, undefined, [parsedScript])
+
         assert.equal(plugin.apply, 'serve')
-        assert.equal(plugin.api?.getTailwindRoots, getTailwindRoots)
-        assert.equal(plugin.api.getTailwindRoots(), rootIds)
-        assert.equal(await plugin.api.transformTailwindRoot(rootId), generatedCss)
-        assert.deepEqual([...plugin.api.getTailwindCss()], [[rootId, generatedCss]])
+        assert.equal(api.getTailwindRoots, getTailwindRoots)
+        assert.equal(api.getTailwindRoots(), rootIds)
+        assert.deepEqual([...api.getTailwindCss()], [[rootId, generatedCss]])
         assert.deepEqual(requests, [
             {
                 code: rootSource,
