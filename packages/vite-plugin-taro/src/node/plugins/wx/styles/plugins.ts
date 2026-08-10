@@ -1,7 +1,9 @@
 import { createStyleHandler } from '@weapp-tailwindcss/postcss'
 import type { Plugin, PluginOption, Rolldown } from 'vite'
 import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
+import { transformVitePlugin } from '../../../utils/vite.ts'
 import { tailwindcssBasedir } from '../../tailwind/tailwind-css.ts'
+import { createTailwindRootTracker } from './create-tailwind-root-tracker.ts'
 
 /*
  * WX style output order:
@@ -26,7 +28,7 @@ const wxStyleOptions = {
 
 /** Creates the complete WX Tailwind and global-style pipeline. */
 export function createWxStylePlugins(): PluginOption[] {
-    const tailwindPlugins =
+    const { plugins: tailwindPlugins } = createTailwindRootTracker(
         WeappTailwindcss({
             // VPT is a custom Vite compiler.
             // Using Taro's adapter would import Taro-specific CSS ownership rules which we don't need.
@@ -42,8 +44,9 @@ export function createWxStylePlugins(): PluginOption[] {
             cssOptions: wxStyleOptions,
             logLevel: 'warn'
         }) ?? []
+    )
 
-    return [...tailwindPlugins.map(alignGenerateBundleOrder), createWxStyleFinalizer()]
+    return [transformVitePlugin(tailwindPlugins, alignGenerateBundleOrder), createWxStyleFinalizer()]
 }
 
 /**
@@ -101,23 +104,13 @@ function createWxStyleFinalizer(): Plugin {
  * hook-level `order: 'post'`: it still waits for ordinary bundle generation, while registration order becomes the sole
  * tie-breaker between upstream generation, VPT finalization and native output.
  */
-function alignGenerateBundleOrder(pluginOption: PluginOption): PluginOption {
-    // PluginOption permits nested arrays. Preserve their shape while adapting every concrete plugin recursively.
-    if (Array.isArray(pluginOption)) return pluginOption.map(alignGenerateBundleOrder)
-
-    if (
-        !pluginOption ||
-        typeof pluginOption !== 'object' ||
-        !('enforce' in pluginOption) ||
-        pluginOption.enforce !== 'post' ||
-        !('generateBundle' in pluginOption) ||
-        pluginOption.generateBundle === undefined
-    ) {
-        return pluginOption
+function alignGenerateBundleOrder(plugin: Plugin): Plugin {
+    if (plugin.enforce !== 'post' || plugin.generateBundle === undefined) {
+        return plugin
     }
 
     // Clone rather than mutate: upstream may retain or reuse the descriptor returned by its factory.
-    return { ...pluginOption, enforce: undefined }
+    return { ...plugin, enforce: undefined }
 }
 
 /** Selects only the compiler stylesheet; native WXSS assets are emitted by the later WX hook. */
