@@ -40,9 +40,9 @@ import HomeSectionHeading from './home-section-heading.astro'
 <span class="code-line"><i>18</i><span>          <b class="token-tag">&lt;View</b> <b class="token-attribute">className</b>=<em class="token-string">"h-full w-3/4 rounded-full bg-lime-300"</em> <b class="token-tag">/></b></span></span>
 <span class="code-line"><i>19</i><span>        <b class="token-tag">&lt;/View></b></span></span>
 <span class="code-line"><i>20</i><span>      <b class="token-tag">&lt;/View></b></span></span>
-<span class="code-line active"><i>21</i><span>      <b class="token-tag">&lt;View</b> <b class="token-attribute">className</b>=<em class="token-string">"mt-4 grid grid-cols-2 gap-3"</em><b class="token-tag">></b></span></span>
+<span class="code-line active"><i>21</i><span>      <b class="token-tag">&lt;View</b> <b class="token-attribute">className</b>=<em class="token-string">"mt-4 flex gap-3"</em><b class="token-tag">></b></span></span>
 <span class="code-line"><i>22</i><span>        {'{'}stats.map(({'{'} label, value, unit {'}'}) => (</span></span>
-<span class="code-line"><i>23</i><span>          <b class="token-tag">&lt;View</b> <b class="token-attribute">className</b>=<em class="token-string">"rounded-2xl bg-white p-4 ring-1 ring-emerald-900/10"</em><b class="token-tag">></b></span></span>
+<span class="code-line"><i>23</i><span>          <b class="token-tag">&lt;View</b> <b class="token-attribute">className</b>=<em class="token-string">"flex-1 rounded-2xl bg-white p-4 ring-1 ring-emerald-900/10"</em><b class="token-tag">></b></span></span>
 <span class="code-line"><i>24</i><span>            <b class="token-tag">&lt;Text</b> <b class="token-attribute">className</b>=<em class="token-string">"block text-xs text-slate-500"</em><b class="token-tag">></b>{'{'}label{'}'}<b class="token-tag">&lt;/Text></b></span></span>
 <span class="code-line"><i>25</i><span>            <b class="token-tag">&lt;Text</b> <b class="token-attribute">className</b>=<em class="token-string">"mt-2 block text-xl font-semibold"</em><b class="token-tag">></b>{'{'}value{'}'} {'{'}unit{'}'}<b class="token-tag">&lt;/Text></b></span></span>
 <span class="code-line"><i>26</i><span>          <b class="token-tag">&lt;/View></b></span></span>
@@ -142,7 +142,7 @@ import HomeSectionHeading from './home-section-heading.astro'
                 </div>
             </div>
             <div class="preview-chips" aria-label="支持的 Tailwind CSS 能力">
-                <span>任意值</span><span>透明度</span><span>Grid</span><span>状态变体</span>
+                <span>任意值</span><span>透明度</span><span>Flex</span><span>Variants</span>
             </div>
         </article>
     </div>
