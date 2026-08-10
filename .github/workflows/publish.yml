@@ -14,7 +14,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  windows:
+    uses: ./.github/workflows/windows.yml
+
   publish:
+    needs: windows
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

@@ -2,7 +2,7 @@ name: Windows CI
 
 on:
   push:
-    # Release pushes update main and create a tag for the same commit. Run once for the branch; tag workflows publish it.
+    # Branch pushes run this CI directly; the release tag workflow also calls it as a publish prerequisite.
     branches:
       - '**'
     paths:
@@ -13,6 +13,7 @@ on:
       - '.github/workflows/windows.yml'
       - 'packages/vite-plugin-taro/**'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
