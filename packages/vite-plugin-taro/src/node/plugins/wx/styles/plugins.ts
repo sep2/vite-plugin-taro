@@ -1,10 +1,10 @@
-import { createStyleHandler } from '@weapp-tailwindcss/postcss'
 import type { Plugin, PluginOption, Rolldown } from 'vite'
 import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
 import { transformVitePlugin } from '../../../utils/vite.ts'
 import { tailwindcssBasedir } from '../../tailwind/tailwind-css.ts'
 import { createTailwindRootTracker } from './create-tailwind-root-tracker.ts'
 import { createWxDevStyle, type WxStyleTransformer } from './create-wx-dev-style.ts'
+import { transformWxStyle, wxStyleOptions } from './transform-wx-style.ts'
 
 /*
  * WX style output order:
@@ -18,24 +18,12 @@ import { createWxDevStyle, type WxStyleTransformer } from './create-wx-dev-style
  * break this sequence. `alignGenerateBundleOrder` removes only that broader phase from upstream output hooks.
  */
 
-// Both upstream generation and VPT's final whole-file pass use one conversion policy. If these options diverge, the
-// second pass can preserve browser units or reinterpret syntax that the first pass generated.
-const wxStyleOptions = {
-    cssCalc: false,
-    autoprefixer: false,
-    rem2rpx: true,
-    px2rpx: true
-} as const
-
 type WxStylePluginOptions = Readonly<{
     applicationEntryIds: readonly string[]
 }>
 
 /** Creates the complete WX Tailwind and global-style pipeline. */
 export function createWxStylePlugins({ applicationEntryIds }: WxStylePluginOptions): PluginOption[] {
-    // Complete builds and development regeneration share this one immutable conversion policy and handler instance.
-    const transformWxStyle = createStyleHandler(wxStyleOptions)
-
     const { plugins: tailwindPlugins, getTailwindRoots } = createTailwindRootTracker(
         WeappTailwindcss({
             // VPT is a custom Vite compiler.
