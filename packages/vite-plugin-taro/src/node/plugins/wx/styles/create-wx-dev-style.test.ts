@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { build, type ModuleInfo } from 'rolldown'
+import { build, type GetModuleInfo, type ModuleInfo } from 'rolldown'
 import { createServer, type Plugin } from 'vite'
 import { createWxDevStyle } from './create-wx-dev-style.ts'
 
@@ -17,9 +17,11 @@ test('refreshes tracked roots after a JavaScript HMR parse', async () => {
     // This models the live registry owned and updated by the root tracker.
     const rootIds = new Set([rootId])
     const getTailwindRoots = () => rootIds
-    const plugin = createWxDevStyle(getTailwindRoots)
+    const plugin = createWxDevStyle({ applicationEntryIds: [scriptId], getTailwindRoots })
     const api = plugin.api
-    if (!api) throw new Error('Expected the WX development style API')
+    if (!api) {
+        throw new Error('Expected the WX development style API')
+    }
     const server = await createServer({ configFile: false, logLevel: 'silent', plugins: [plugin] })
     const pluginContainer = server.environments.client.pluginContainer
     const originalTransform = pluginContainer.transform
@@ -33,11 +35,13 @@ test('refreshes tracked roots after a JavaScript HMR parse', async () => {
             map: null
         }
     }
-    // The capture supplies a real Rolldown ModuleInfo for the incremental moduleParsed invocation below.
+    // The capture supplies real Rolldown graph data and context for the incremental moduleParsed invocation below.
+    let getModuleInfo: GetModuleInfo | undefined
     let parsedScript: ModuleInfo | undefined
     const captureParsedScript: Plugin = {
         name: 'test:capture-parsed-script',
         moduleParsed(moduleInfo) {
+            getModuleInfo = (moduleId) => this.getModuleInfo(moduleId)
             parsedScript = moduleInfo
         }
     }
@@ -54,10 +58,10 @@ test('refreshes tracked roots after a JavaScript HMR parse', async () => {
         assert.deepEqual([...api.getStyleCss()], [])
 
         const moduleParsed = plugin.moduleParsed
-        if (typeof moduleParsed !== 'function' || parsedScript === undefined) {
-            throw new Error('Expected a parsed script and a moduleParsed handler')
+        if (typeof moduleParsed !== 'function' || parsedScript === undefined || getModuleInfo === undefined) {
+            throw new Error('Expected parsed graph context and a moduleParsed handler')
         }
-        await Reflect.apply(moduleParsed, undefined, [parsedScript])
+        await Reflect.apply(moduleParsed, { getModuleInfo }, [parsedScript])
 
         assert.equal(plugin.apply, 'serve')
         assert.equal(api.getTailwindRoots, getTailwindRoots)
@@ -82,30 +86,51 @@ test('captures processed ordinary CSS before Vite wraps it in JavaScript', async
     const source: Plugin = {
         name: 'test:ordinary-css-source',
         resolveId(id) {
-            if (id === 'virtual:page-css') return cssId
+            if (id === 'virtual:page-css') {
+                return cssId
+            }
         },
         load(id) {
-            if (id === cssId) return { code: css, moduleType: 'js' }
+            if (id === cssId) {
+                return { code: css, moduleType: 'js' }
+            }
         }
     }
     const consumeCss: Plugin = {
         name: 'test:ordinary-css-consumer',
         transform(_, id) {
-            if (id === cssId) return 'export {}'
+            if (id === cssId) {
+                return 'export {}'
+            }
         }
     }
     // This fixture has no Tailwind roots because it isolates ordinary CSS capture.
     const tailwindRoots = new Set<string>()
-    const plugin = createWxDevStyle(() => tailwindRoots)
+    const plugin = createWxDevStyle({ applicationEntryIds: [cssId], getTailwindRoots: () => tailwindRoots })
     const api = plugin.api
-    if (!api) throw new Error('Expected the WX development style API')
+    if (!api) {
+        throw new Error('Expected the WX development style API')
+    }
+
+    // This captures graph access at the build boundary where Rolldown guarantees complete module information.
+    let getModuleInfo: GetModuleInfo | undefined
+    const captureGraph: Plugin = {
+        name: 'test:capture-style-graph',
+        buildEnd() {
+            getModuleInfo = (moduleId) => this.getModuleInfo(moduleId)
+        }
+    }
 
     await build({
         input: 'virtual:page-css',
         output: { format: 'es' },
-        plugins: [source, plugin, consumeCss],
+        plugins: [source, plugin, consumeCss, captureGraph],
         write: false
     })
 
+    if (!getModuleInfo) {
+        throw new Error('Expected complete style graph access')
+    }
     assert.deepEqual([...api.getStyleCss()], [[cssId, css]])
+    assert.deepEqual(api.collectStyleIds(getModuleInfo), [cssId])
 })

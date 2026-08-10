@@ -27,8 +27,12 @@ const wxStyleOptions = {
     px2rpx: true
 } as const
 
+type WxStylePluginOptions = Readonly<{
+    applicationEntryIds: readonly string[]
+}>
+
 /** Creates the complete WX Tailwind and global-style pipeline. */
-export function createWxStylePlugins(): PluginOption[] {
+export function createWxStylePlugins({ applicationEntryIds }: WxStylePluginOptions): PluginOption[] {
     const { plugins: tailwindPlugins, getTailwindRoots } = createTailwindRootTracker(
         WeappTailwindcss({
             // VPT is a custom Vite compiler.
@@ -49,7 +53,7 @@ export function createWxStylePlugins(): PluginOption[] {
 
     return [
         transformVitePlugin(tailwindPlugins, alignGenerateBundleOrder),
-        createWxDevStyle(getTailwindRoots),
+        createWxDevStyle({ applicationEntryIds, getTailwindRoots }),
         createWxStyleFinalizer()
     ]
 }

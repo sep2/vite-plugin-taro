@@ -17,10 +17,14 @@ export function createTailwindSidecarId(rootId: string): string {
 
 /** Selects imported style modules whose Vite development output owns a runtime CSS payload. */
 export function isGlobalStyleRequest(id: string): boolean {
-    if (!isCSSRequest(id)) return false
+    if (!isCSSRequest(id)) {
+        return false
+    }
 
     const queryStart = id.indexOf('?')
-    if (queryStart < 0) return true
+    if (queryStart < 0) {
+        return true
+    }
 
     const fragmentStart = id.indexOf('#', queryStart)
     const query = id.slice(queryStart + 1, fragmentStart < 0 ? undefined : fragmentStart)
@@ -29,6 +33,44 @@ export function isGlobalStyleRequest(id: string): boolean {
     return (
         !parameters.has('weapp-vite-sidecar') && nonRuntimeStyleQueries.every((parameter) => !parameters.has(parameter))
     )
+}
+
+/** Collects cached styles in deterministic dependency-evaluation order across all application entries. */
+export function collectOrderedStyleIds(
+    entryIds: readonly string[],
+    getModuleInfo: (
+        moduleId: string
+    ) => Readonly<{ importedIds: readonly string[]; dynamicallyImportedIds: readonly string[] }> | null,
+    toStyleId: (moduleId: string) => string | undefined
+): string[] {
+    // These local sets make graph traversal O(modules + edges) and collapse both module cycles and shared style ownership.
+    const visitedModuleIds = new Set<string>()
+    const visitedStyleIds = new Set<string>()
+    const styleIds: string[] = []
+
+    const visit = (moduleId: string): void => {
+        if (visitedModuleIds.has(moduleId)) {
+            return
+        }
+        visitedModuleIds.add(moduleId)
+
+        const moduleInfo = getModuleInfo(moduleId)
+        if (!moduleInfo) {
+            return
+        }
+
+        moduleInfo.importedIds.forEach(visit)
+        moduleInfo.dynamicallyImportedIds.forEach(visit)
+
+        const styleId = toStyleId(moduleId)
+        if (styleId && !visitedStyleIds.has(styleId)) {
+            visitedStyleIds.add(styleId)
+            styleIds.push(styleId)
+        }
+    }
+
+    entryIds.forEach(visit)
+    return styleIds
 }
 
 /**

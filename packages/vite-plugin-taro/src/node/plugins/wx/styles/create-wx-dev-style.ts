@@ -1,24 +1,35 @@
 import { readFile } from 'node:fs/promises'
-import type { Plugin, ViteDevServer } from 'vite'
+import type { GetModuleInfo } from 'rolldown'
+import { normalizePath, type Plugin, type ViteDevServer } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
-import { createTailwindSidecarId, extractViteCss, isGlobalStyleRequest } from './utils.ts'
+import { collectOrderedStyleIds, createTailwindSidecarId, extractViteCss, isGlobalStyleRequest } from './utils.ts'
 
 const javaScriptSourcePattern = /\.(?:[cm]?[jt]s|[jt]sx)$/
 
 type WxDevStyleApi = Readonly<{
+    collectStyleIds: (getModuleInfo: GetModuleInfo) => readonly string[]
     getStyleCss: () => ReadonlyMap<string, string>
     getTailwindRoots: () => ReadonlySet<string>
     transformTailwindRoot: (rootId: string) => Promise<string>
 }>
 
+type WxDevStyleOptions = Readonly<{
+    applicationEntryIds: readonly string[]
+    getTailwindRoots: () => ReadonlySet<string>
+}>
+
 /** Creates the serve-only WX style owner, including Tailwind root regeneration. */
-export function createWxDevStyle(getTailwindRoots: () => ReadonlySet<string>): Plugin<WxDevStyleApi> {
+export function createWxDevStyle({ applicationEntryIds, getTailwindRoots }: WxDevStyleOptions): Plugin<WxDevStyleApi> {
     // Vite assigns this once during serve configuration, before any later regeneration hook can request a root transform.
     let server: ViteDevServer
 
     // Post-transform capture and explicit Tailwind refreshes are the sole writers. This live cache retains one complete,
     // already-transformed fragment per physical style module for later deterministic WXSS composition.
     const styleCacheMap = new Map<string, string>()
+
+    // The WX resolver owns this semantic order. Keeping only its normalized immutable value avoids reconstructing entry
+    // identity from concurrent Rolldown parsing or caching derived graph state between HMR updates.
+    const normalizedApplicationEntryIds = applicationEntryIds.map(normalizePath)
 
     /*
      * A complete build invokes moduleParsed for every JS/TSX module while Tailwind is still accumulating candidates, and its
@@ -34,12 +45,24 @@ export function createWxDevStyle(getTailwindRoots: () => ReadonlySet<string>): P
         styleCacheMap.set(rootId, css)
         return css
     }
+    /*
+     * Derive order only when the global-style composer requests it. The traversal is O(modules + edges), but avoiding an
+     * eagerly maintained order means ordinary moduleParsed events pay no graph cost and HMR bursts can be coalesced before
+     * one composition. Do not cache this result: current graph topology is the source of truth for added or removed imports.
+     */
+    const collectStyleIds = (getModuleInfo: GetModuleInfo): readonly string[] => {
+        return collectOrderedStyleIds(normalizedApplicationEntryIds, getModuleInfo, (moduleId) => {
+            const styleId = normalizeModuleId(moduleId)
+            return styleCacheMap.has(styleId) ? styleId : undefined
+        })
+    }
 
     return {
         name: 'vpt:wx-dev-style',
         apply: 'serve',
         // Keep access to the live dependencies attached until the regeneration hook consumes them.
         api: {
+            collectStyleIds,
             getStyleCss: () => styleCacheMap,
             getTailwindRoots,
             transformTailwindRoot: transformAndCacheTailwindRoot

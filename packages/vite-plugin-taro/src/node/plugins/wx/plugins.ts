@@ -15,14 +15,21 @@ import { materializeTransport } from './render/transport.ts'
 import { createResolver } from './resolve/resolver.ts'
 import { createWxStylePlugins } from './styles/plugins.ts'
 
+type WxResolver = ReturnType<typeof createResolver>
+
 /** Creates the complete plugin set for the wx target. */
 export function createWxTargetPlugins(options: VitePluginTaroOptions): PluginOption[] {
-    return [createWxStylePlugins(), createWxPlugin(options), createWxDevelopmentPlugin(options)]
+    const resolver = createResolver(options)
+
+    return [
+        createWxStylePlugins({ applicationEntryIds: resolver.applicationEntryIds }),
+        createWxPlugin(options, resolver),
+        createWxDevelopmentPlugin(options)
+    ]
 }
 
 /** Configures the complete wx target build pipeline. */
-function createWxPlugin(options: VitePluginTaroOptions): Plugin {
-    const resolver = createResolver(options)
+function createWxPlugin(options: VitePluginTaroOptions, resolver: WxResolver): Plugin {
     const placer = createPlacer()
 
     return {

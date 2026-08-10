@@ -12,7 +12,9 @@ test('records only generated Tailwind roots as physical module IDs', async () =>
         transform: {
             order: 'pre',
             handler(code) {
-                if (!code.includes('@tailwind-root')) return
+                if (!code.includes('@tailwind-root')) {
+                    return
+                }
                 return { code: 'export const generated = true', map: null }
             }
         }
@@ -20,12 +22,20 @@ test('records only generated Tailwind roots as physical module IDs', async () =>
     const sources: Plugin = {
         name: 'test:tailwind-root-sources',
         resolveId(id) {
-            if (id === 'virtual:app') return '/project/src/app.css?weapp-vite-sidecar=style'
-            if (id === 'virtual:page') return '/project/src/page.css'
+            if (id === 'virtual:app') {
+                return '/project/src/app.css?weapp-vite-sidecar=style'
+            }
+            if (id === 'virtual:page') {
+                return '/project/src/page.css'
+            }
         },
         load(id) {
-            if (id.startsWith('/project/src/app.css')) return { code: '@tailwind-root', moduleType: 'js' }
-            if (id === '/project/src/page.css') return { code: 'export const page = true', moduleType: 'js' }
+            if (id.startsWith('/project/src/app.css')) {
+                return { code: '@tailwind-root', moduleType: 'js' }
+            }
+            if (id === '/project/src/page.css') {
+                return { code: 'export const page = true', moduleType: 'js' }
+            }
         }
     }
     const tracker = createTailwindRootTracker([upstream])

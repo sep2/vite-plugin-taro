@@ -47,7 +47,10 @@ test('finalizes the compiler stylesheet after upstream generation', async () => 
         await build({
             root,
             logLevel: 'silent',
-            plugins: [...createWxStylePlugins(), verifyAssetOwnership],
+            plugins: [
+                ...createWxStylePlugins({ applicationEntryIds: [path.join(sourceRoot, 'app.ts')] }),
+                verifyAssetOwnership
+            ],
             build: {
                 cssCodeSplit: false,
                 cssMinify: false,
@@ -86,7 +89,7 @@ test('emits an empty global stylesheet when the application has no styles', asyn
         await build({
             root,
             logLevel: 'silent',
-            plugins: createWxStylePlugins(),
+            plugins: createWxStylePlugins({ applicationEntryIds: [appPath] }),
             build: {
                 outDir: 'dist',
                 rolldownOptions: {

@@ -28,6 +28,9 @@ export function createResolver(options: VitePluginTaroOptions) {
     const normalizedBootstrapPath = normalizeModuleId(bootstrapPath)
     const normalizedPageCapsulePath = normalizeModuleId(pageCapsulePath)
 
+    // Construct output input and application traversal roots together once so style order cannot drift from route order.
+    const entryGraph = createEntryGraph(options.pages)
+
     // Provide constant-time route validation and access to each configured Page JSON object.
     const pageByPath = new Map(options.pages.map((page) => [page.path, page]))
 
@@ -56,7 +59,7 @@ export function createResolver(options: VitePluginTaroOptions) {
     ])
 
     return {
-        input: createInput(options.pages),
+        ...entryGraph,
 
         resolveId(id: string, importer: string | undefined, projectRoot: string): string | undefined {
             // Unknown IDs fall through so Vite and other plugins retain normal resolution.
@@ -82,22 +85,35 @@ export function createResolver(options: VitePluginTaroOptions) {
     }
 }
 
-/** Declares native shells, infrastructure, and capsules as independent output entries. */
-function createInput(pages: readonly VitePluginTaroPageOption[]): Record<string, string> {
-    return Object.fromEntries([
-        ['bootstrap', bootstrapPath],
-        ['transport', transportPath],
-        [appShellFileName, appShellPath],
-        ['app-capsule', appCapsulePath],
-        [componentShellFileName, componentShellPath],
-        ['component-capsule', componentCapsulePath],
-        ...pages.flatMap((page) => {
-            return [
-                [`${page.path}.js`, createRouteModuleId({ moduleId: pageShellPath, pagePath: page.path })],
-                [`${page.path}-capsule`, createRouteModuleId({ moduleId: pageCapsulePath, pagePath: page.path })]
-            ]
-        })
-    ])
+/** Declares output entries and the ordered application subset that can own user styles. */
+function createEntryGraph(pages: readonly VitePluginTaroPageOption[]) {
+    const pageEntries = pages.map((page) => {
+        return {
+            capsuleId: createRouteModuleId({ moduleId: pageCapsulePath, pagePath: page.path }),
+            capsuleName: `${page.path}-capsule`,
+            shellId: createRouteModuleId({ moduleId: pageShellPath, pagePath: page.path }),
+            shellName: `${page.path}.js`
+        }
+    })
+
+    return {
+        // The App owns the first global cascade layer; configured Pages follow in their declared route order.
+        applicationEntryIds: [appCapsulePath, ...pageEntries.map((entry) => entry.capsuleId)],
+        input: Object.fromEntries([
+            ['bootstrap', bootstrapPath],
+            ['transport', transportPath],
+            [appShellFileName, appShellPath],
+            ['app-capsule', appCapsulePath],
+            [componentShellFileName, componentShellPath],
+            ['component-capsule', componentCapsulePath],
+            ...pageEntries.flatMap((entry) => {
+                return [
+                    [entry.shellName, entry.shellId],
+                    [entry.capsuleName, entry.capsuleId]
+                ]
+            })
+        ])
+    }
 }
 
 /** Creates one route-qualified module ID. */

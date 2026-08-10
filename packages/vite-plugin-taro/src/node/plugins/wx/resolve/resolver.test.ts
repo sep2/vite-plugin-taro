@@ -43,6 +43,7 @@ test('resolves fixed and route-specific private IDs', () => {
     const resolver = createResolver(options)
     const projectRoot = path.resolve('/project')
 
+    assert.deepEqual(resolver.applicationEntryIds, [appCapsulePath, `${pageCapsulePath}?route=pages%2Fhome%2Findex`])
     assert.deepEqual(resolver.input, {
         'app.js': appShellPath,
         'comp.js': componentShellPath,
