@@ -35,6 +35,7 @@ test('transforms one tracked root as a serve-only sidecar request', async () => 
         assert.equal(plugin.api?.getTailwindRoots, getTailwindRoots)
         assert.equal(plugin.api.getTailwindRoots(), rootIds)
         assert.equal(await plugin.api.transformTailwindRoot(rootId), generatedCss)
+        assert.deepEqual([...plugin.api.getTailwindCss()], [[rootId, generatedCss]])
         assert.deepEqual(requests, [
             {
                 code: rootSource,

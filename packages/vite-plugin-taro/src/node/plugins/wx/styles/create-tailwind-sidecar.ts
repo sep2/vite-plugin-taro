@@ -3,6 +3,7 @@ import type { Plugin, ViteDevServer } from 'vite'
 import { createTailwindSidecarId, extractViteCss } from './utils.ts'
 
 type TailwindSidecarApi = Readonly<{
+    getTailwindCss: () => ReadonlyMap<string, string>
     getTailwindRoots: () => ReadonlySet<string>
     transformTailwindRoot: (rootId: string) => Promise<string>
 }>
@@ -12,13 +13,21 @@ export function createTailwindSidecar(getTailwindRoots: () => ReadonlySet<string
     // Vite assigns this once during serve configuration, before any later regeneration hook can request a root transform.
     let server: ViteDevServer
 
+    // Root transforms are the sole writers. The live cache retains complete generated fragments for later WXSS composition.
+    const tailwindCss = new Map<string, string>()
+
     return {
         name: 'vpt:wx-tailwind-sidecar',
         apply: 'serve',
         // Keep access to the live dependencies attached until the regeneration hook consumes them.
         api: {
+            getTailwindCss: () => tailwindCss,
             getTailwindRoots,
-            transformTailwindRoot: (rootId) => transformTailwindRoot(server, rootId)
+            async transformTailwindRoot(rootId) {
+                const css = await transformTailwindRoot(server, rootId)
+                tailwindCss.set(rootId, css)
+                return css
+            }
         },
         configureServer(configuredServer) {
             server = configuredServer
