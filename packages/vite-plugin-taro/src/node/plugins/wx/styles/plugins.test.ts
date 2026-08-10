@@ -6,7 +6,7 @@ import test from 'node:test'
 import { build, type Plugin } from 'vite'
 import { createWxStylePlugins } from './plugins.ts'
 
-test('renames the compiler stylesheet behind an emitted app wrapper', async () => {
+test('finalizes the compiler stylesheet after upstream generation', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'vpt-wxss-'))
 
     try {
@@ -37,11 +37,8 @@ test('renames the compiler stylesheet behind an emitted app wrapper', async () =
                 order: 'post',
                 handler(_, bundle) {
                     const globalStyle = bundle['assets/global.wxss']
-                    const appStyle = bundle['app.wxss']
                     assert.equal(globalStyle?.type, 'asset')
-                    assert.equal(appStyle?.type, 'asset')
                     assert.ok(globalStyle.names.length > 0)
-                    assert.deepEqual(appStyle.names, [])
                 }
             }
         }
@@ -64,10 +61,7 @@ test('renames the compiler stylesheet behind an emitted app wrapper', async () =
         const styleFileNames = (await readdir(outputRoot, { recursive: true }))
             .filter((fileName) => fileName.endsWith('.wxss'))
             .sort()
-        assert.deepEqual(styleFileNames, ['app.wxss', 'assets/global.wxss'])
-
-        const appStyle = await readFile(path.join(outputRoot, 'app.wxss'), 'utf8')
-        assert.equal(appStyle, '@import "./assets/global.wxss";\n')
+        assert.deepEqual(styleFileNames, ['assets/global.wxss'])
 
         const globalStyle = await readFile(path.join(outputRoot, 'assets/global.wxss'), 'utf8')
         assert.match(globalStyle, /\.mt-2_d5\s*\{/)
@@ -75,6 +69,31 @@ test('renames the compiler stylesheet behind an emitted app wrapper', async () =
         assert.match(globalStyle, /\.page-marker\s*\{/)
         assert.doesNotMatch(globalStyle, /\drem\b/)
         assert.doesNotMatch(globalStyle, /@property|:where|::file-selector-button|\\\.|\*,/)
+    } finally {
+        await rm(root, { recursive: true, force: true })
+    }
+})
+
+test('emits an empty global stylesheet when the application has no styles', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'vpt-empty-wxss-'))
+
+    try {
+        const appPath = path.join(root, 'app.ts')
+        await writeFile(appPath, 'export {}\n')
+
+        await build({
+            root,
+            logLevel: 'silent',
+            plugins: createWxStylePlugins(),
+            build: {
+                outDir: 'dist',
+                rolldownOptions: {
+                    input: appPath
+                }
+            }
+        })
+
+        assert.equal(await readFile(path.join(root, 'dist/assets/global.wxss'), 'utf8'), '')
     } finally {
         await rm(root, { recursive: true, force: true })
     }

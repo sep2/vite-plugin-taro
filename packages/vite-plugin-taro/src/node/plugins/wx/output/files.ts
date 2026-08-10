@@ -5,7 +5,7 @@ import type { GeneratedSubpackage } from '../placement/placer.ts'
 import { createJsonAssets } from './json.ts'
 import { createTemplateAssets } from './templates.ts'
 
-/** Creates every native companion file derived from the final Rolldown bundle. */
+/** Creates every compiler-owned WX file derived from the final Rolldown bundle. */
 export async function createOutputFiles({
     bundle,
     options,
@@ -20,6 +20,11 @@ export async function createOutputFiles({
     const nativeOutput = await createNativeComponentOutput({ bundle, getModuleInfo })
 
     return [
+        {
+            type: 'asset',
+            fileName: 'app.wxss',
+            source: '@import "./assets/global.wxss";\n'
+        },
         ...createJsonAssets({ options, subpackages, nativeComponents: nativeOutput.registrations }),
         ...createTemplateAssets(bundle, options, nativeOutput.registrations),
         ...nativeOutput.files

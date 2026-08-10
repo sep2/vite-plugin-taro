@@ -50,9 +50,10 @@ export function createWxStylePlugins(): PluginOption[] {
  * Finalizes the one global stylesheet after upstream Tailwind generation.
  *
  * `cssCodeSplit: false` makes the compiler style global, but upstream can name it `.css` or `.wxss` depending on build
- * mode. This hook converts its complete final contents once, renames that compiler asset to `assets/global.wxss`, and
- * emits the root `app.wxss` wrapper that imports it. Running earlier loses CSS from dynamic chunks; running after native
- * companion emission would also see Page and native-component WXSS files that must remain opaque.
+ * mode. This hook converts its complete final contents once and renames that compiler asset to `assets/global.wxss`. An
+ * application without styles receives an empty global asset at the same stable path. Running earlier loses CSS from
+ * dynamic chunks; running after native companion emission would also see Page and native-component WXSS files that must
+ * remain opaque.
  */
 function createWxStyleFinalizer(): Plugin {
     // The handler is immutable and reusable across builds; only each emitted asset's source is replaced.
@@ -65,13 +66,15 @@ function createWxStyleFinalizer(): Plugin {
             async handler(_, bundle) {
                 const styles = Object.values(bundle).filter(isStyleAsset)
 
-                // More than one compiler style means cssCodeSplit was re-enabled. Choosing one would silently lose CSS.
+                // Multiple compiler styles mean cssCodeSplit was re-enabled. Choosing one would silently lose CSS.
                 if (styles.length > 1) {
-                    throw new Error('WX builds require one global compiler-emitted stylesheet')
+                    throw new Error('WX builds support at most one compiler-emitted stylesheet')
                 }
 
-                // CSS is optional; applications without styles do not need an empty app.wxss.
-                if (styles.length === 0) return
+                if (styles.length === 0) {
+                    this.emitFile({ type: 'asset', fileName: 'assets/global.wxss', source: '' })
+                    return
+                }
 
                 const [style] = styles
                 const source = typeof style.source === 'string' ? style.source : new TextDecoder().decode(style.source)
@@ -81,9 +84,6 @@ function createWxStyleFinalizer(): Plugin {
                 // intact. Only its finalized contents and stable WXSS identity change.
                 style.source = transformedResult.css
                 style.fileName = 'assets/global.wxss'
-
-                // app.wxss is a generated native entrypoint whose content and path are identical in every WX build.
-                this.emitFile({ type: 'asset', fileName: 'app.wxss', source: '@import "./assets/global.wxss";\n' })
             }
         }
     }
