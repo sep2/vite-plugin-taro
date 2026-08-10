@@ -28,7 +28,8 @@ const wxStyleOptions = {
 export function createWxStylePlugins(): PluginOption[] {
     const tailwindPlugins =
         WeappTailwindcss({
-            // VPT is a custom Vite compiler. Using Taro's adapter would import Taro-specific CSS ownership rules.
+            // VPT is a custom Vite compiler.
+            // Using Taro's adapter would import Taro-specific CSS ownership rules which we don't need.
             appType: 'weapp-vite',
             // WX generation rewrites Tailwind's split package imports before Vite tries to resolve them in the app.
             // Without this, strict workspaces fail on imports such as `tailwindcss/theme.css`.
