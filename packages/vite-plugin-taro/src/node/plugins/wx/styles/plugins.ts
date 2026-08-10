@@ -4,7 +4,7 @@ import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
 import { transformVitePlugin } from '../../../utils/vite.ts'
 import { tailwindcssBasedir } from '../../tailwind/tailwind-css.ts'
 import { createTailwindRootTracker } from './create-tailwind-root-tracker.ts'
-import { createTailwindSidecar } from './create-tailwind-sidecar.ts'
+import { createWxDevStyle } from './create-wx-dev-style.ts'
 
 /*
  * WX style output order:
@@ -49,7 +49,7 @@ export function createWxStylePlugins(): PluginOption[] {
 
     return [
         transformVitePlugin(tailwindPlugins, alignGenerateBundleOrder),
-        createTailwindSidecar(getTailwindRoots),
+        createWxDevStyle(getTailwindRoots),
         createWxStyleFinalizer()
     ]
 }

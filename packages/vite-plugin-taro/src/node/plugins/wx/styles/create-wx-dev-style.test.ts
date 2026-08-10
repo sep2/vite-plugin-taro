@@ -4,10 +4,10 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { createServer } from 'vite'
-import { createTailwindSidecar } from './create-tailwind-sidecar.ts'
+import { createWxDevStyle } from './create-wx-dev-style.ts'
 
-test('transforms one tracked root as a serve-only sidecar request', async () => {
-    const projectRoot = await mkdtemp(path.join(tmpdir(), 'vpt-tailwind-sidecar-'))
+test('transforms one tracked root for WX development', async () => {
+    const projectRoot = await mkdtemp(path.join(tmpdir(), 'vpt-wx-dev-style-'))
     const rootId = path.join(projectRoot, 'app.css')
     const rootSource = `@import 'tailwindcss';`
     await writeFile(rootId, rootSource)
@@ -15,7 +15,7 @@ test('transforms one tracked root as a serve-only sidecar request', async () => 
     // This models the live registry owned and updated by the root tracker.
     const rootIds = new Set([rootId])
     const getTailwindRoots = () => rootIds
-    const plugin = createTailwindSidecar(getTailwindRoots)
+    const plugin = createWxDevStyle(getTailwindRoots)
     const server = await createServer({ configFile: false, logLevel: 'silent', plugins: [plugin] })
     const pluginContainer = server.environments.client.pluginContainer
     const originalTransform = pluginContainer.transform

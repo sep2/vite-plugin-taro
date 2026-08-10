@@ -2,14 +2,14 @@ import { readFile } from 'node:fs/promises'
 import type { Plugin, ViteDevServer } from 'vite'
 import { createTailwindSidecarId, extractViteCss } from './utils.ts'
 
-type TailwindSidecarApi = Readonly<{
+type WxDevStyleApi = Readonly<{
     getTailwindCss: () => ReadonlyMap<string, string>
     getTailwindRoots: () => ReadonlySet<string>
     transformTailwindRoot: (rootId: string) => Promise<string>
 }>
 
-/** Establishes the serve-only owner of Tailwind root regeneration. */
-export function createTailwindSidecar(getTailwindRoots: () => ReadonlySet<string>): Plugin<TailwindSidecarApi> {
+/** Creates the serve-only WX style owner, including Tailwind root regeneration. */
+export function createWxDevStyle(getTailwindRoots: () => ReadonlySet<string>): Plugin<WxDevStyleApi> {
     // Vite assigns this once during serve configuration, before any later regeneration hook can request a root transform.
     let server: ViteDevServer
 
@@ -17,7 +17,7 @@ export function createTailwindSidecar(getTailwindRoots: () => ReadonlySet<string
     const tailwindCss = new Map<string, string>()
 
     return {
-        name: 'vpt:wx-tailwind-sidecar',
+        name: 'vpt:wx-dev-style',
         apply: 'serve',
         // Keep access to the live dependencies attached until the regeneration hook consumes them.
         api: {
