@@ -1,1 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="VPT" overflow="hidden"><style>svg{display:block}text{dominant-baseline:central;}</style><rect x="0" y="0" width="128" height="128" fill="rgb(42, 174, 103)" /><text x="50%" y="50%" dy="-0.07em" text-anchor="middle" dominant-baseline="central" font-size="52" font-family="sans-serif" fill="#ffffff" font-weight="600">VPT</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="VPT"
+     overflow="hidden">
+    <style>svg{display:block}text{dominant-baseline:central;}</style>
+    <rect x="0" y="0" width="128" height="128" fill="#21834a"/>
+    <text x="49%" y="50%" text-anchor="middle" dominant-baseline="central" font-size="58"
+          font-family="Georgia,sans-serif" fill="#ffffff" font-weight="600" letter-spacing="-3.5">
+        VPT
+    </text>
+</svg>
