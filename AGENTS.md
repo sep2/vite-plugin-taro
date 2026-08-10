@@ -93,8 +93,6 @@ Node.js v26+ is available and can execute TypeScript natively.
 - User-facing documentation should show npm commands by default. Keep repository contributor/development instructions on
   pnpm.
 - Do not manually edit `packages/vite-plugin-taro/dist`; rebuild it with `pnpm build:plugin`.
-- Do not manually edit `CHANGELOG.md`; regenerate it with `pnpm changelog`, or let `pnpm release ...` update it for a
-  release.
 - Do not manually edit generated Taro package implementation files under `packages/taro-react` or
   `packages/taro-plugin-framework-react`. Change the relevant file in `patches/*@4.2.0-react19.patch`, then run
   `pnpm prepare:taro`.
