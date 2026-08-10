@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { collectOrderedStyleIds, createTailwindSidecarId, extractViteCss, isGlobalStyleRequest } from './utils.ts'
+import { composeGraphStyleCss, createTailwindSidecarId, extractViteCss, isGlobalStyleRequest } from './utils.ts'
 
 test('creates the stable upstream Tailwind sidecar request', () => {
     assert.equal(createTailwindSidecarId('/project/src/app.css'), '/project/src/app.css?weapp-vite-sidecar=style')
@@ -17,35 +17,33 @@ test('selects only runtime global style requests', () => {
     assert.equal(isGlobalStyleRequest('/project/src/app.css?weapp-vite-sidecar=style'), false)
 })
 
-test('collects current styles in entry and dependency order with shared modules deduplicated', () => {
+test('composes current graph styles in dependency order with shared modules deduplicated', () => {
     // This mutable graph models Rolldown replacing import topology between HMR updates.
     const graph = new Map([
         ['app', { importedIds: ['app.css', 'feature'], dynamicallyImportedIds: ['lazy'] }],
-        ['feature', { importedIds: ['feature.css', 'shared.css'], dynamicallyImportedIds: [] }],
-        ['lazy', { importedIds: ['shared.css', 'lazy.css'], dynamicallyImportedIds: [] }],
+        ['feature', { importedIds: ['feature.css', 'shared.css?graph'], dynamicallyImportedIds: [] }],
+        ['lazy', { importedIds: ['shared.css?graph', 'lazy.css'], dynamicallyImportedIds: [] }],
         ['app.css', { importedIds: [], dynamicallyImportedIds: [] }],
         ['feature.css', { importedIds: [], dynamicallyImportedIds: [] }],
-        ['shared.css', { importedIds: [], dynamicallyImportedIds: [] }],
+        ['shared.css?graph', { importedIds: [], dynamicallyImportedIds: [] }],
         ['lazy.css', { importedIds: [], dynamicallyImportedIds: [] }]
     ])
+    const styleCacheMap: ReadonlyMap<string, string> = new Map([
+        ['app.css', '.app {}'],
+        ['feature.css', '.feature {}'],
+        ['shared.css', '.shared {}'],
+        ['lazy.css', '.lazy {}']
+    ])
 
-    assert.deepEqual(
-        collectOrderedStyleIds(
-            ['app'],
-            (moduleId) => graph.get(moduleId) ?? null,
-            (moduleId) => (moduleId.endsWith('.css') ? moduleId : undefined)
-        ),
-        ['app.css', 'feature.css', 'shared.css', 'lazy.css']
+    assert.equal(
+        composeGraphStyleCss(['app'], (moduleId) => graph.get(moduleId) ?? null, styleCacheMap),
+        '.app {}\n.feature {}\n.shared {}\n.lazy {}'
     )
 
     graph.set('app', { importedIds: ['app.css'], dynamicallyImportedIds: [] })
-    assert.deepEqual(
-        collectOrderedStyleIds(
-            ['app'],
-            (moduleId) => graph.get(moduleId) ?? null,
-            (moduleId) => (moduleId.endsWith('.css') ? moduleId : undefined)
-        ),
-        ['app.css']
+    assert.equal(
+        composeGraphStyleCss(['app'], (moduleId) => graph.get(moduleId) ?? null, styleCacheMap),
+        '.app {}'
     )
 })
 

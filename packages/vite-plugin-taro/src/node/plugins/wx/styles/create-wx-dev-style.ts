@@ -2,12 +2,14 @@ import { readFile } from 'node:fs/promises'
 import type { GetModuleInfo } from 'rolldown'
 import { normalizePath, type Plugin, type ViteDevServer } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
-import { collectOrderedStyleIds, createTailwindSidecarId, extractViteCss, isGlobalStyleRequest } from './utils.ts'
+import { composeGraphStyleCss, createTailwindSidecarId, extractViteCss, isGlobalStyleRequest } from './utils.ts'
 
 const javaScriptSourcePattern = /\.(?:[cm]?[jt]s|[jt]sx)$/
 
+export type WxStyleTransformer = (css: string) => Promise<Readonly<{ css: string }>>
+
 type WxDevStyleApi = Readonly<{
-    collectStyleIds: (getModuleInfo: GetModuleInfo) => readonly string[]
+    renderGlobalWxss: (getModuleInfo: GetModuleInfo) => Promise<string>
     getStyleCss: () => ReadonlyMap<string, string>
     getTailwindRoots: () => ReadonlySet<string>
     transformTailwindRoot: (rootId: string) => Promise<string>
@@ -16,10 +18,15 @@ type WxDevStyleApi = Readonly<{
 type WxDevStyleOptions = Readonly<{
     applicationEntryIds: readonly string[]
     getTailwindRoots: () => ReadonlySet<string>
+    transformWxStyle: WxStyleTransformer
 }>
 
 /** Creates the serve-only WX style owner, including Tailwind root regeneration. */
-export function createWxDevStyle({ applicationEntryIds, getTailwindRoots }: WxDevStyleOptions): Plugin<WxDevStyleApi> {
+export function createWxDevStyle({
+    applicationEntryIds,
+    getTailwindRoots,
+    transformWxStyle
+}: WxDevStyleOptions): Plugin<WxDevStyleApi> {
     // Vite assigns this once during serve configuration, before any later regeneration hook can request a root transform.
     let server: ViteDevServer
 
@@ -46,15 +53,13 @@ export function createWxDevStyle({ applicationEntryIds, getTailwindRoots }: WxDe
         return css
     }
     /*
-     * Derive order only when the global-style composer requests it. The traversal is O(modules + edges), but avoiding an
-     * eagerly maintained order means ordinary moduleParsed events pay no graph cost and HMR bursts can be coalesced before
-     * one composition. Do not cache this result: current graph topology is the source of truth for added or removed imports.
+     * Traverse and compose only when global WXSS is requested. This keeps ordinary moduleParsed events free of graph work,
+     * lets HMR bursts coalesce before one O(modules + edges) pass, and always reads current import topology without retaining
+     * an invalidation-sensitive intermediate style order.
      */
-    const collectStyleIds = (getModuleInfo: GetModuleInfo): readonly string[] => {
-        return collectOrderedStyleIds(normalizedApplicationEntryIds, getModuleInfo, (moduleId) => {
-            const styleId = normalizeModuleId(moduleId)
-            return styleCacheMap.has(styleId) ? styleId : undefined
-        })
+    const renderGlobalWxss = async (getModuleInfo: GetModuleInfo): Promise<string> => {
+        const css = composeGraphStyleCss(normalizedApplicationEntryIds, getModuleInfo, styleCacheMap)
+        return (await transformWxStyle(css)).css
     }
 
     return {
@@ -62,8 +67,8 @@ export function createWxDevStyle({ applicationEntryIds, getTailwindRoots }: WxDe
         apply: 'serve',
         // Keep access to the live dependencies attached until the regeneration hook consumes them.
         api: {
-            collectStyleIds,
             getStyleCss: () => styleCacheMap,
+            renderGlobalWxss,
             getTailwindRoots,
             transformTailwindRoot: transformAndCacheTailwindRoot
         },

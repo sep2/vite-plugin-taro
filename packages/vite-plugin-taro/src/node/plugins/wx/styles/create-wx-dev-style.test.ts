@@ -7,6 +7,8 @@ import { build, type GetModuleInfo, type ModuleInfo } from 'rolldown'
 import { createServer, type Plugin } from 'vite'
 import { createWxDevStyle } from './create-wx-dev-style.ts'
 
+const transformWxStyle = async (css: string) => ({ css: `finalized:${css}` })
+
 test('refreshes tracked roots after a JavaScript HMR parse', async () => {
     const projectRoot = await mkdtemp(path.join(tmpdir(), 'vpt-wx-dev-style-'))
     const rootId = path.join(projectRoot, 'app.css')
@@ -17,7 +19,7 @@ test('refreshes tracked roots after a JavaScript HMR parse', async () => {
     // This models the live registry owned and updated by the root tracker.
     const rootIds = new Set([rootId])
     const getTailwindRoots = () => rootIds
-    const plugin = createWxDevStyle({ applicationEntryIds: [scriptId], getTailwindRoots })
+    const plugin = createWxDevStyle({ applicationEntryIds: [scriptId], getTailwindRoots, transformWxStyle })
     const api = plugin.api
     if (!api) {
         throw new Error('Expected the WX development style API')
@@ -106,7 +108,11 @@ test('captures processed ordinary CSS before Vite wraps it in JavaScript', async
     }
     // This fixture has no Tailwind roots because it isolates ordinary CSS capture.
     const tailwindRoots = new Set<string>()
-    const plugin = createWxDevStyle({ applicationEntryIds: [cssId], getTailwindRoots: () => tailwindRoots })
+    const plugin = createWxDevStyle({
+        applicationEntryIds: [cssId],
+        getTailwindRoots: () => tailwindRoots,
+        transformWxStyle
+    })
     const api = plugin.api
     if (!api) {
         throw new Error('Expected the WX development style API')
@@ -132,5 +138,5 @@ test('captures processed ordinary CSS before Vite wraps it in JavaScript', async
         throw new Error('Expected complete style graph access')
     }
     assert.deepEqual([...api.getStyleCss()], [[cssId, css]])
-    assert.deepEqual(api.collectStyleIds(getModuleInfo), [cssId])
+    assert.equal(await api.renderGlobalWxss(getModuleInfo), `finalized:${css}`)
 })

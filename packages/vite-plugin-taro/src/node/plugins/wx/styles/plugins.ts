@@ -4,7 +4,7 @@ import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
 import { transformVitePlugin } from '../../../utils/vite.ts'
 import { tailwindcssBasedir } from '../../tailwind/tailwind-css.ts'
 import { createTailwindRootTracker } from './create-tailwind-root-tracker.ts'
-import { createWxDevStyle } from './create-wx-dev-style.ts'
+import { createWxDevStyle, type WxStyleTransformer } from './create-wx-dev-style.ts'
 
 /*
  * WX style output order:
@@ -33,6 +33,9 @@ type WxStylePluginOptions = Readonly<{
 
 /** Creates the complete WX Tailwind and global-style pipeline. */
 export function createWxStylePlugins({ applicationEntryIds }: WxStylePluginOptions): PluginOption[] {
+    // Complete builds and development regeneration share this one immutable conversion policy and handler instance.
+    const transformWxStyle = createStyleHandler(wxStyleOptions)
+
     const { plugins: tailwindPlugins, getTailwindRoots } = createTailwindRootTracker(
         WeappTailwindcss({
             // VPT is a custom Vite compiler.
@@ -53,8 +56,8 @@ export function createWxStylePlugins({ applicationEntryIds }: WxStylePluginOptio
 
     return [
         transformVitePlugin(tailwindPlugins, alignGenerateBundleOrder),
-        createWxDevStyle({ applicationEntryIds, getTailwindRoots }),
-        createWxStyleFinalizer()
+        createWxDevStyle({ applicationEntryIds, getTailwindRoots, transformWxStyle }),
+        createWxStyleFinalizer(transformWxStyle)
     ]
 }
 
@@ -67,10 +70,7 @@ export function createWxStylePlugins({ applicationEntryIds }: WxStylePluginOptio
  * dynamic chunks; running after native companion emission would also see Page and native-component WXSS files that must
  * remain opaque.
  */
-function createWxStyleFinalizer(): Plugin {
-    // The handler is immutable and reusable across builds; only each emitted asset's source is replaced.
-    const transformWxStyle = createStyleHandler(wxStyleOptions)
-
+function createWxStyleFinalizer(transformWxStyle: WxStyleTransformer): Plugin {
     return {
         name: 'vpt:wx-style-finalizer',
         generateBundle: {

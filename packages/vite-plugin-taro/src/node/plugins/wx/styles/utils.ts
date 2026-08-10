@@ -1,4 +1,5 @@
 import { isCSSRequest } from 'vite'
+import { normalizeModuleId } from '../../../utils/modules.ts'
 
 const nonRuntimeStyleQueries = ['direct', 'inline', 'inline-css', 'raw', 'style-attr', 'transform-only', 'url'] as const
 
@@ -35,18 +36,35 @@ export function isGlobalStyleRequest(id: string): boolean {
     )
 }
 
-/** Collects cached styles in deterministic dependency-evaluation order across all application entries. */
-export function collectOrderedStyleIds(
+/**
+ * Renders the complete development stylesheet directly from the current Rolldown graph and transformed-style cache.
+ *
+ * `entryIds` carries semantic cascade ownership from the WX resolver: the App capsule first, followed by Page capsules in
+ * configured route order. Each entry is traversed depth-first. Static imports retain their source order and are visited
+ * before dynamic imports; dynamic branches are deliberately included because WX has no browser runtime that can inject a
+ * lazy chunk's CSS later. A module's cached CSS is appended after its dependencies, matching dependency evaluation order.
+ *
+ * Graph IDs may contain route or plugin queries, while `styleCacheMap` is keyed by physical module ID. Normalizing before
+ * lookup lets multiple graph identities share one physical style and allows `visitedStyleIds` to emit it exactly once.
+ * Cache membership is also the style-ownership test: JavaScript and non-runtime CSS requests are traversed for their
+ * dependencies but contribute no bytes. Cached styles that are no longer reachable are naturally excluded.
+ *
+ * All traversal state is local to this call. Recomputing from current ModuleInfo avoids fragile topology invalidation after
+ * HMR adds or removes imports. Complexity is O(modules + edges + emitted CSS bytes), with O(modules + styles) temporary
+ * memory. Newline separators provide safe token boundaries between independently transformed fragments.
+ */
+export function composeGraphStyleCss(
     entryIds: readonly string[],
     getModuleInfo: (
         moduleId: string
     ) => Readonly<{ importedIds: readonly string[]; dynamicallyImportedIds: readonly string[] }> | null,
-    toStyleId: (moduleId: string) => string | undefined
-): string[] {
-    // These local sets make graph traversal O(modules + edges) and collapse both module cycles and shared style ownership.
+    styleCacheMap: ReadonlyMap<string, string>
+): string {
+    // These local collections make traversal O(modules + edges), collapse cycles and shared styles, and avoid retaining
+    // derived graph state between HMR updates.
     const visitedModuleIds = new Set<string>()
     const visitedStyleIds = new Set<string>()
-    const styleIds: string[] = []
+    const cssFragments: string[] = []
 
     const visit = (moduleId: string): void => {
         if (visitedModuleIds.has(moduleId)) {
@@ -62,15 +80,16 @@ export function collectOrderedStyleIds(
         moduleInfo.importedIds.forEach(visit)
         moduleInfo.dynamicallyImportedIds.forEach(visit)
 
-        const styleId = toStyleId(moduleId)
-        if (styleId && !visitedStyleIds.has(styleId)) {
+        const styleId = normalizeModuleId(moduleId)
+        const css = styleCacheMap.get(styleId)
+        if (css !== undefined && !visitedStyleIds.has(styleId)) {
             visitedStyleIds.add(styleId)
-            styleIds.push(styleId)
+            cssFragments.push(css)
         }
     }
 
     entryIds.forEach(visit)
-    return styleIds
+    return cssFragments.join('\n')
 }
 
 /**
