@@ -3,21 +3,29 @@ import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
+import type { GetModuleInfo } from 'rolldown'
 import { dev } from 'rolldown/experimental'
 import { createServer } from 'vite'
 import type { BundledDev } from '../wx-dev-options.ts'
 import { createStyleCapturePlugin, type ProcessedStyle } from './create-style-capture-plugin.ts'
 
-test('captures PostCSS output from initial and incremental DevEngine transforms', async () => {
+test('captures processed CSS and a live graph across DevEngine updates', async () => {
     const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-host-css-capture-')))
     const appId = path.join(root, 'app.js')
     const cssId = path.join(root, 'app.css')
-    await writeFile(appId, "import './app.css'\nexport const value = true\n")
-    await writeFile(cssId, '.app { color: red; }\n')
+    const extraCssId = path.join(root, 'extra.css')
+    const initialSource = "import './app.css'\nexport const value = 'initial'\n"
+    await Promise.all([
+        writeFile(appId, initialSource),
+        writeFile(cssId, '.app { color: red; }\n'),
+        writeFile(extraCssId, '.extra {}\n')
+    ])
 
-    // These mutable journals synchronize non-awaited DevEngine callbacks and retain each captured generation for assertions.
+    // These mutable journals synchronize non-awaited DevEngine callbacks and retain captured lifecycle generations.
     const captures: ProcessedStyle[] = []
+    const graphReaders: GetModuleInfo[] = []
     const hmrResults: unknown[] = []
+    const outputResults: unknown[] = []
     const server = await createServer({
         root: root,
         configFile: false,
@@ -47,8 +55,13 @@ test('captures PostCSS output from initial and incremental DevEngine transforms'
     const rolldownOptions = await bundledDev.getRolldownOptions()
     rolldownOptions.plugins = [
         rolldownOptions.plugins,
-        createStyleCapturePlugin((_id, style) => {
-            captures.push(style)
+        createStyleCapturePlugin({
+            captureGraph(reader) {
+                graphReaders.push(reader)
+            },
+            captureStyle(_id, style) {
+                captures.push(style)
+            }
         })
     ]
     const output = rolldownOptions.output
@@ -60,26 +73,64 @@ test('captures PostCSS output from initial and incremental DevEngine transforms'
         watch: { skipWrite: true },
         onHmrUpdates(result) {
             hmrResults.push(result)
+        },
+        onOutput(result) {
+            outputResults.push(result)
         }
     })
 
     try {
         await engine.run()
         await engine.ensureCurrentBuildFinish()
+        await waitForEventCount(outputResults, 1)
         assert.equal(captures.at(-1)?.css, '.app { color: #ff0000; }\n')
+        assert.equal(graphReaders.length, 1)
+        const initialReader = requireLatestGraphReader(graphReaders)
+        assert.deepEqual(readStyleImports(initialReader, appId), [cssId])
         await engine.registerClient('style-capture-test')
 
         await writeFile(cssId, '.app { color: blue; }\n')
         await waitForEventCount(hmrResults, 1)
-
         assert.equal(captures.at(-1)?.css, '.app { color: #0000ff; }\n')
         assert.equal(captures.length, 2)
+        assert.equal(requireLatestGraphReader(graphReaders), initialReader)
+
+        await writeFile(appId, "import './app.css'\nimport './extra.css'\nexport const value = 'added'\n")
+        await waitForEventCount(hmrResults, 2)
+        assert.deepEqual(readStyleImports(initialReader, appId), [cssId, extraCssId])
+        assert.equal(graphReaders.length, 1)
+
+        await writeFile(appId, initialSource)
+        await waitForEventCount(hmrResults, 3)
+        assert.deepEqual(readStyleImports(initialReader, appId), [cssId])
+
+        engine.triggerFullBuild()
+        await waitForEventCount(outputResults, 2)
+        assert.equal(graphReaders.length, 2)
+        assert.notEqual(requireLatestGraphReader(graphReaders), initialReader)
+        assert.deepEqual(readStyleImports(requireLatestGraphReader(graphReaders), appId), [cssId])
     } finally {
         await engine.close()
         await server.close()
         await rm(root, { recursive: true })
     }
 })
+
+function requireLatestGraphReader(graphReaders: readonly GetModuleInfo[]): GetModuleInfo {
+    const reader = graphReaders.at(-1)
+    if (!reader) {
+        throw new Error('Expected a live Rolldown graph reader')
+    }
+    return reader
+}
+
+function readStyleImports(getModuleInfo: GetModuleInfo, moduleId: string): readonly string[] {
+    const moduleInfo = getModuleInfo(moduleId)
+    if (!moduleInfo) {
+        throw new Error(`Expected Rolldown graph module: ${moduleId}`)
+    }
+    return moduleInfo.importedIds.filter((importedId) => importedId.endsWith('.css'))
+}
 
 function requireBundledDev(value: unknown): BundledDev {
     if (!isBundledDev(value)) {

@@ -1,6 +1,7 @@
 import type { ServerResponse } from 'node:http'
 import path from 'node:path'
 import colors from 'picocolors'
+import type { GetModuleInfo } from 'rolldown'
 import { type DevEngine, type DevOptions, dev } from 'rolldown/experimental'
 import type { Connect, ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
@@ -55,11 +56,19 @@ export async function createWxDevHost({
     options: VitePluginTaroOptions
 }): Promise<WxDevHost> {
     const bundledDev = getBundledDev(server)
-    // The host owns processed development CSS that Rolldown's graph does not retain. The trailing capture hook updates one
-    // immutable value per physical style in O(1), ready for graph composition at the HMR transaction boundary.
-    const processedStyles = new Map<string, ProcessedStyle>()
-    const styleCapturePlugin = createStyleCapturePlugin((id, style) => {
-        processedStyles.set(id, style)
+    // This is the host's mutable style projection: CSS absent from Rolldown plus the live graph capability rebound by each
+    // complete build. Style updates remain O(1); derived order and reachability will stay local to each HMR transaction.
+    const styleState: { getModuleInfo: GetModuleInfo | undefined; processedStyles: Map<string, ProcessedStyle> } = {
+        getModuleInfo: undefined,
+        processedStyles: new Map()
+    }
+    const styleCapturePlugin = createStyleCapturePlugin({
+        captureGraph(reader) {
+            styleState.getModuleInfo = reader
+        },
+        captureStyle(id, style) {
+            styleState.processedStyles.set(id, style)
+        }
     })
 
     // Rolldown invokes output callbacks without awaiting their promises. This queue is the single owner of mutable HMR host
