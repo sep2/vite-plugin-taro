@@ -1,12 +1,10 @@
-import path from 'node:path'
 import { createStyleHandler } from '@weapp-tailwindcss/postcss'
 import type { Plugin, PluginOption, Rolldown } from 'vite'
 import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
-import type { VitePluginTaroTarget } from '../../../options.ts'
-import { packageRequire } from '../../utils/packages.ts'
+import { tailwindcssBasedir } from '../../tailwind/tailwind-css.ts'
 
 /*
- * CSS output order for WX:
+ * WX style output order:
  *
  *   weapp-tailwindcss output hooks
  *       → vpt:wx-style-finalizer
@@ -14,12 +12,8 @@ import { packageRequire } from '../../utils/packages.ts'
  *
  * All three generateBundle hooks retain hook-level `order: 'post'` and therefore execute in registration order. The
  * upstream plugin normally also uses plugin-level `enforce: 'post'`, which would move it behind both VPT plugins and
- * break this sequence. `alignWxGenerateBundleOrder` removes only that broader phase from upstream output hooks.
+ * break this sequence. `alignGenerateBundleOrder` removes only that broader phase from upstream output hooks.
  */
-
-// Tailwind belongs to VPT, not necessarily to the application. Resolving from VPT keeps strict package managers and
-// bundled development from looking for Tailwind in the application's node_modules.
-const tailwindcssBasedir = path.dirname(packageRequire.resolve('tailwindcss/package.json'))
 
 // Both upstream generation and VPT's final whole-file pass use one conversion policy. If these options diverge, the
 // second pass can preserve browser units or reinterpret syntax that the first pass generated.
@@ -30,34 +24,25 @@ const wxStyleOptions = {
     px2rpx: true
 } as const
 
-/** Creates the target-aware Tailwind pipeline. */
-export function createCssPlugins(target: VitePluginTaroTarget): PluginOption[] {
-    const wx = target === 'wx'
-
+/** Creates the complete WX Tailwind and global-style pipeline. */
+export function createWxStylePlugins(): PluginOption[] {
     const tailwindPlugins =
         WeappTailwindcss({
             // VPT is a custom Vite compiler. Using Taro's adapter would import Taro-specific CSS ownership rules.
             appType: 'weapp-vite',
             // WX generation rewrites Tailwind's split package imports before Vite tries to resolve them in the app.
             // Without this, strict workspaces fail on imports such as `tailwindcss/theme.css`.
-            rewriteCssImports: wx,
-            platform: wx ? 'weapp' : 'web',
+            rewriteCssImports: true,
+            platform: 'weapp',
             tailwindcssBasedir,
             generator: {
-                target: wx ? 'weapp' : 'web'
+                target: 'weapp'
             },
-            cssOptions: {
-                ...wxStyleOptions,
-                // Browser output still needs vendor prefixes; WXSS does not support or need that browser pass.
-                autoprefixer: !wx
-            },
+            cssOptions: wxStyleOptions,
             logLevel: 'warn'
         }) ?? []
 
-    return [
-        ...(wx ? tailwindPlugins.map(alignWxGenerateBundleOrder) : tailwindPlugins),
-        wx ? createWxStyleFinalizer() : undefined
-    ]
+    return [...tailwindPlugins.map(alignGenerateBundleOrder), createWxStyleFinalizer()]
 }
 
 /**
@@ -88,9 +73,7 @@ function createWxStyleFinalizer(): Plugin {
                 if (styles.length === 0) return
 
                 const [style] = styles
-
                 const source = typeof style.source === 'string' ? style.source : new TextDecoder().decode(style.source)
-
                 const transformedResult = await transformWxStyle(source)
 
                 // Preserve the compiler stylesheet as the real global asset so its bundle metadata and ownership remain
@@ -115,11 +98,11 @@ function createWxStyleFinalizer(): Plugin {
  *
  * For upstream plugins that actually own generateBundle, clone the descriptor without plugin-level enforcement. Keep
  * hook-level `order: 'post'`: it still waits for ordinary bundle generation, while registration order becomes the sole
- * tie-breaker between upstream generation, VPT finalization and native output. H5 descriptors remain untouched.
+ * tie-breaker between upstream generation, VPT finalization and native output.
  */
-function alignWxGenerateBundleOrder(pluginOption: PluginOption): PluginOption {
+function alignGenerateBundleOrder(pluginOption: PluginOption): PluginOption {
     // PluginOption permits nested arrays. Preserve their shape while adapting every concrete plugin recursively.
-    if (Array.isArray(pluginOption)) return pluginOption.map(alignWxGenerateBundleOrder)
+    if (Array.isArray(pluginOption)) return pluginOption.map(alignGenerateBundleOrder)
 
     if (
         !pluginOption ||

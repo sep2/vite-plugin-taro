@@ -13,10 +13,11 @@ import { renderCapsule } from './render/capsule.ts'
 import { renderNative } from './render/native.ts'
 import { materializeTransport } from './render/transport.ts'
 import { createResolver } from './resolve/resolver.ts'
+import { createWxStylePlugins } from './styles/plugins.ts'
 
 /** Creates the complete plugin set for the wx target. */
 export function createWxTargetPlugins(options: VitePluginTaroOptions): PluginOption[] {
-    return [createWxPlugin(options), createWxDevelopmentPlugin(options)]
+    return [createWxStylePlugins(), createWxPlugin(options), createWxDevelopmentPlugin(options)]
 }
 
 /** Configures the complete wx target build pipeline. */
@@ -127,10 +128,10 @@ function createWxPlugin(options: VitePluginTaroOptions): Plugin {
 
         generateBundle: {
             /*
-             * This hook is registered after createCssPlugins() and shares hook-level `order: 'post'` with the adapted
+             * This hook is registered after createWxStylePlugins() and shares hook-level `order: 'post'` with the adapted
              * upstream hooks and VPT style finalizer. Registration order therefore guarantees that the imported global
-             * stylesheet is complete before native Page/component companions are emitted. Without this order, the finalizer could consume
-             * incomplete Tailwind output or mistake native WXSS companions for additional compiler styles.
+             * stylesheet is complete before native Page/component companions are emitted. Without this order, the finalizer
+             * could consume incomplete Tailwind output or mistake native WXSS companions for additional compiler styles.
              */
             order: 'post',
             async handler(_, bundle) {

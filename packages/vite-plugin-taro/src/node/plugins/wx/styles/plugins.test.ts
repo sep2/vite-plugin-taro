@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { build, type Plugin } from 'vite'
-import { createCssPlugins } from './plugins.ts'
+import { createWxStylePlugins } from './plugins.ts'
 
 test('renames the compiler stylesheet behind an emitted app wrapper', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'vpt-wxss-'))
@@ -49,7 +49,7 @@ test('renames the compiler stylesheet behind an emitted app wrapper', async () =
         await build({
             root,
             logLevel: 'silent',
-            plugins: [...createCssPlugins('wx'), verifyAssetOwnership],
+            plugins: [...createWxStylePlugins(), verifyAssetOwnership],
             build: {
                 cssCodeSplit: false,
                 cssMinify: false,

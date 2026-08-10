@@ -1,17 +1,38 @@
 import babel, { defineRolldownBabelPreset } from '@rolldown/plugin-babel'
 import type { HtmlTagDescriptor, Plugin, PluginOption } from 'vite'
+import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
 import type { VitePluginTaroOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
 import { toViteFileImportPath } from '../../utils/modules.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { clientTaroApiId } from '../client/client-taro.ts'
+import { tailwindcssBasedir } from '../tailwind/tailwind-css.ts'
 import { h5AppPath } from './constant.ts'
 import { createStencilClientAdapter } from './create-stencil-client-adapter.ts'
 import { createModuleResolver } from './resolver/module-resolver.ts'
 
 /** Creates the plugins that own the H5 target. */
 export function createH5TargetPlugins(options: VitePluginTaroOptions): PluginOption[] {
-    return [...createH5SupportPlugins(), createH5TargetPlugin(options)]
+    return [
+        WeappTailwindcss({
+            appType: 'weapp-vite',
+            rewriteCssImports: false,
+            platform: 'web',
+            tailwindcssBasedir,
+            generator: {
+                target: 'web'
+            },
+            cssOptions: {
+                cssCalc: false,
+                autoprefixer: true,
+                rem2rpx: true,
+                px2rpx: true
+            },
+            logLevel: 'warn'
+        }),
+        ...createH5SupportPlugins(),
+        createH5TargetPlugin(options)
+    ]
 }
 
 /** Configures H5 resolution and supplies the specialized physical application entry. */
