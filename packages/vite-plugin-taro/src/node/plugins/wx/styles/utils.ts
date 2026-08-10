@@ -37,34 +37,29 @@ export function isGlobalStyleRequest(id: string): boolean {
 }
 
 /**
- * Renders the complete development stylesheet directly from the current Rolldown graph and transformed-style cache.
+ * Creates the ordered style plan for one completed HMR transaction.
  *
  * `entryIds` carries semantic cascade ownership from the WX resolver: the App capsule first, followed by Page capsules in
- * configured route order. Each entry is traversed depth-first. Static imports retain their source order and are visited
- * before dynamic imports; dynamic branches are deliberately included because WX has no browser runtime that can inject a
- * lazy chunk's CSS later. A module's cached CSS is appended after its dependencies, matching dependency evaluation order.
+ * configured route order. Each entry is traversed depth-first. Static imports retain source order and precede dynamic imports;
+ * dynamic branches are included because WX cannot inject lazy CSS at browser runtime. A style follows its dependencies,
+ * matching evaluation order.
  *
- * Graph IDs may contain route or plugin queries, while `getStyleCss` reads by physical module ID. Normalizing before lookup
- * lets multiple graph identities share one physical style and allows `visitedStyleIds` to emit it exactly once.
- * A defined `getStyleCss` result is also the style-ownership test: JavaScript and non-runtime CSS requests are traversed for
- * their dependencies but contribute no bytes. Captured styles that are no longer reachable are naturally excluded.
- *
- * All traversal state is local to this call. Recomputing from current ModuleInfo avoids fragile topology invalidation after
- * HMR adds or removes imports. Complexity is O(modules + edges + emitted CSS bytes), with O(modules + styles) temporary
- * memory. Newline separators provide safe token boundaries between independently transformed fragments.
+ * Graph IDs may contain queries while `hasStyle` reads physical IDs. Normalization lets aliases share one captured style.
+ * JavaScript and non-runtime CSS requests remain traversal nodes but do not enter the plan. All mutable traversal state is
+ * transaction-local, so import additions and removals need no invalidation bookkeeping. Complexity is O(modules + edges),
+ * with O(modules + styles) temporary memory.
  */
-export function composeGraphStyleCss(
+export function createGraphStylePlan(
     entryIds: readonly string[],
     getModuleInfo: (
         moduleId: string
     ) => Readonly<{ importedIds: readonly string[]; dynamicallyImportedIds: readonly string[] }> | null,
-    getStyleCss: (styleId: string) => string | undefined
-): string {
-    // These local collections make traversal O(modules + edges), collapse cycles and shared styles, and avoid retaining
-    // derived graph state between HMR updates.
+    hasStyle: (styleId: string) => boolean
+): readonly string[] {
+    // These local collections collapse cycles, shared modules, and aliases without retaining derived topology between batches.
     const visitedModuleIds = new Set<string>()
     const visitedStyleIds = new Set<string>()
-    const cssFragments: string[] = []
+    const styleIds: string[] = []
 
     const visit = (moduleId: string): void => {
         if (visitedModuleIds.has(moduleId)) {
@@ -81,15 +76,19 @@ export function composeGraphStyleCss(
         moduleInfo.dynamicallyImportedIds.forEach(visit)
 
         const styleId = normalizeModuleId(moduleId)
-        const css = getStyleCss(styleId)
-        if (css !== undefined && !visitedStyleIds.has(styleId)) {
+        if (hasStyle(styleId) && !visitedStyleIds.has(styleId)) {
             visitedStyleIds.add(styleId)
-            cssFragments.push(css)
+            styleIds.push(styleId)
         }
     }
 
     entryIds.forEach(visit)
-    return cssFragments.join('\n')
+    return styleIds
+}
+
+/** Renders one immutable graph plan after any Tailwind roots in that same plan have been refreshed. */
+export function composeGraphStyleCss(styleIds: readonly string[], getStyleCss: (styleId: string) => string): string {
+    return styleIds.map(getStyleCss).join('\n')
 }
 
 /**

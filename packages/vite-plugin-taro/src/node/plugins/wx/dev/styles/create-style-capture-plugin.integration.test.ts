@@ -1,17 +1,17 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import type { GetModuleInfo } from 'rolldown'
 import { dev } from 'rolldown/experimental'
-import { createServer } from 'vite'
-import { isGlobalStyleRequest } from '../../styles/utils.ts'
+import { createServer, isCSSRequest } from 'vite'
+import { createGraphStylePlan, isGlobalStyleRequest } from '../../styles/utils.ts'
 import type { BundledDev } from '../wx-dev-options.ts'
 import { createStyleCapturePlugin, type ProcessedStyle } from './create-style-capture-plugin.ts'
 import { publishStyleHmr } from './publish-style-hmr.ts'
 
-test('captures processed CSS and a live graph across DevEngine updates', async () => {
+test('publishes processed CSS and live topology without identical rewrites', async () => {
     const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-host-css-capture-')))
     const appId = path.join(root, 'app.js')
     const cssId = path.join(root, 'app.css')
@@ -31,6 +31,8 @@ test('captures processed CSS and a live graph across DevEngine updates', async (
     const graphReaders: GetModuleInfo[] = []
     const hmrResults: unknown[] = []
     const outputResults: unknown[] = []
+    // This mutable byte frontier mirrors the serialized host value returned only after a durable publication.
+    let publishedWxss: string | undefined
     const server = await createServer({
         root: root,
         configFile: false,
@@ -85,14 +87,21 @@ test('captures processed CSS and a live graph across DevEngine updates', async (
                     if (
                         !(result instanceof Error) &&
                         result.updates.some(
-                            ({ update }) => update.type === 'Patch' && update.changedIds.some(isGlobalStyleRequest)
+                            ({ update }) =>
+                                update.type === 'Patch' &&
+                                update.changedIds.some((id) => isGlobalStyleRequest(id) || !isCSSRequest(id))
                         )
                     ) {
-                        await publishStyleHmr({
-                            applicationEntryIds: [appId],
-                            getModuleInfo: requireLatestGraphReader(graphReaders),
+                        const styleIds = createGraphStylePlan(
+                            [appId],
+                            requireLatestGraphReader(graphReaders),
+                            (styleId) => processedStyles.has(styleId)
+                        )
+                        publishedWxss = await publishStyleHmr({
+                            styleIds: styleIds,
                             outDir: outDir,
-                            processedStyles: processedStyles
+                            processedStyles: processedStyles,
+                            publishedWxss: publishedWxss
                         })
                     }
                     hmrResults.push(result)
@@ -129,11 +138,21 @@ test('captures processed CSS and a live graph across DevEngine updates', async (
         await writeFile(appId, "import './app.css'\nimport './extra.css'\nexport const value = 'added'\n")
         await waitForEventCount(hmrResults, 2)
         assert.deepEqual(readStyleImports(initialReader, appId), [cssId, extraCssId])
+        assert.match(await readFile(path.join(outDir, 'assets/global.wxss'), 'utf8'), /\.extra \{\}/)
         assert.equal(graphReaders.length, 1)
 
         await writeFile(appId, initialSource)
         await waitForEventCount(hmrResults, 3)
         assert.deepEqual(readStyleImports(initialReader, appId), [cssId])
+        const globalWxssPath = path.join(outDir, 'assets/global.wxss')
+        assert.doesNotMatch(await readFile(globalWxssPath, 'utf8'), /\.extra \{\}/)
+
+        // An unrelated JavaScript generation still renders for candidate and topology correctness, but byte equality must
+        // preserve the destination inode and therefore produce no DevTools filesystem event.
+        const unchangedInode = (await stat(globalWxssPath)).ino
+        await writeFile(appId, "import './app.css'\nexport const value = 'unrelated'\n")
+        await waitForEventCount(hmrResults, 4)
+        assert.equal((await stat(globalWxssPath)).ino, unchangedInode)
 
         engine.triggerFullBuild()
         await waitForEventCount(outputResults, 2)
