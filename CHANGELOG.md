@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.5.12] - 2026-08-10
+
+### Fixed
+
+- hide browser URLs in wx development (7faca51)
+
 ## [0.5.11] - 2026-08-10
 
 ### Changed
