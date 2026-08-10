@@ -153,6 +153,8 @@ Rolldown 的 chunk 分组配置会阻止不同物理包中的模块合并。如�
 
 主包普通 chunk 使用 `assets/<name>-<content-hash>.js`。分包 chunk 使用 `sub/p_<package-hash>/assets/<first-module-name>-<content-hash>.js`：`first-module-name` 来自 Rolldown 最终 chunk 模块列表中的第一个源码文件名，并移除查询参数、片段和扩展名。删除未使用代码后没有实际输出的分包不会进入 `app.json`。
 
+全局样式的实际内容固定输出为 `assets/global.wxss`。根目录下的 `app.wxss` 只包含对该文件的 `@import`，因此两个全局样式路径在生产和开发构建中都保持不变。
+
 vpt 对最终存在的分包目录去重、排序，并生成分包声明：
 
 ```json

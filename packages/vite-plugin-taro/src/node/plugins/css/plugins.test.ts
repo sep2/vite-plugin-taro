@@ -3,10 +3,10 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promis
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { build } from 'vite'
+import { build, type Plugin } from 'vite'
 import { createCssPlugins } from './plugins.ts'
 
-test('finalizes Tailwind imports as one global WXSS asset', async () => {
+test('renames the compiler stylesheet behind an emitted app wrapper', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'vpt-wxss-'))
 
     try {
@@ -31,10 +31,25 @@ test('finalizes Tailwind imports as one global WXSS asset', async () => {
         await writeFile(path.join(pageRoot, 'index.ts'), "import './index.css'\n")
         await writeFile(path.join(pageRoot, 'index.css'), '.page-marker { color: red; }\n')
 
+        const verifyAssetOwnership: Plugin = {
+            name: 'test:verify-wx-style-ownership',
+            generateBundle: {
+                order: 'post',
+                handler(_, bundle) {
+                    const globalStyle = bundle['assets/global.wxss']
+                    const appStyle = bundle['app.wxss']
+                    assert.equal(globalStyle?.type, 'asset')
+                    assert.equal(appStyle?.type, 'asset')
+                    assert.ok(globalStyle.names.length > 0)
+                    assert.deepEqual(appStyle.names, [])
+                }
+            }
+        }
+
         await build({
             root,
             logLevel: 'silent',
-            plugins: createCssPlugins('wx'),
+            plugins: [...createCssPlugins('wx'), verifyAssetOwnership],
             build: {
                 cssCodeSplit: false,
                 cssMinify: false,
@@ -49,16 +64,17 @@ test('finalizes Tailwind imports as one global WXSS asset', async () => {
         const styleFileNames = (await readdir(outputRoot, { recursive: true }))
             .filter((fileName) => fileName.endsWith('.wxss'))
             .sort()
-        assert.deepEqual(styleFileNames, ['app.wxss'])
+        assert.deepEqual(styleFileNames, ['app.wxss', 'assets/global.wxss'])
 
-        const wxss = (
-            await Promise.all(styleFileNames.map((fileName) => readFile(path.join(outputRoot, fileName), 'utf8')))
-        ).join('\n')
-        assert.match(wxss, /\.mt-2_d5\s*\{/)
+        const appStyle = await readFile(path.join(outputRoot, 'app.wxss'), 'utf8')
+        assert.equal(appStyle, '@import "./assets/global.wxss";\n')
+
+        const globalStyle = await readFile(path.join(outputRoot, 'assets/global.wxss'), 'utf8')
+        assert.match(globalStyle, /\.mt-2_d5\s*\{/)
         // Proves upstream generation ran before VPT's finalizer rather than appending dynamic CSS afterward.
-        assert.match(wxss, /\.page-marker\s*\{/)
-        assert.doesNotMatch(wxss, /\drem\b/)
-        assert.doesNotMatch(wxss, /@property|:where|::file-selector-button|\\\.|\*,/)
+        assert.match(globalStyle, /\.page-marker\s*\{/)
+        assert.doesNotMatch(globalStyle, /\drem\b/)
+        assert.doesNotMatch(globalStyle, /@property|:where|::file-selector-button|\\\.|\*,/)
     } finally {
         await rm(root, { recursive: true, force: true })
     }

@@ -30,9 +30,6 @@ const wxStyleOptions = {
     px2rpx: true
 } as const
 
-// The handler is immutable and reusable across builds; only each emitted asset's source is replaced.
-const transformWxStyle = createStyleHandler(wxStyleOptions)
-
 /** Creates the target-aware Tailwind pipeline. */
 export function createCssPlugins(target: VitePluginTaroTarget): PluginOption[] {
     const wx = target === 'wx'
@@ -67,32 +64,42 @@ export function createCssPlugins(target: VitePluginTaroTarget): PluginOption[] {
  * Finalizes the one global stylesheet after upstream Tailwind generation.
  *
  * `cssCodeSplit: false` makes the compiler style global, but upstream can name it `.css` or `.wxss` depending on build
- * mode. This hook converts its complete final contents once and gives it the root `app.wxss` identity required by
- * WeChat. Running earlier loses CSS from dynamic chunks; running after native companion emission would also see Page
- * and native-component WXSS files that must remain opaque.
+ * mode. This hook converts its complete final contents once, renames that compiler asset to `assets/global.wxss`, and
+ * emits the root `app.wxss` wrapper that imports it. Running earlier loses CSS from dynamic chunks; running after native
+ * companion emission would also see Page and native-component WXSS files that must remain opaque.
  */
 function createWxStyleFinalizer(): Plugin {
+    // The handler is immutable and reusable across builds; only each emitted asset's source is replaced.
+    const transformWxStyle = createStyleHandler(wxStyleOptions)
+
     return {
         name: 'vpt:wx-style-finalizer',
         generateBundle: {
             order: 'post',
             async handler(_, bundle) {
                 const styles = Object.values(bundle).filter(isStyleAsset)
+
                 // More than one compiler style means cssCodeSplit was re-enabled. Choosing one would silently lose CSS.
                 if (styles.length > 1) {
                     throw new Error('WX builds require one global compiler-emitted stylesheet')
                 }
+
                 // CSS is optional; applications without styles do not need an empty app.wxss.
                 if (styles.length === 0) return
 
                 const [style] = styles
+
                 const source = typeof style.source === 'string' ? style.source : new TextDecoder().decode(style.source)
-                // generateBundle exposes the final asset as mutable so conversion and native placement remain atomic.
-                // Without the compatibility pass, browser-only selectors, escaped classes, rem and @property can reach
-                // WeChat. Without the rename, bundled development writes paths such as src/app.wxss, which WeChat does
-                // not load as the application's global stylesheet.
-                style.source = (await transformWxStyle(source)).css
-                style.fileName = 'app.wxss'
+
+                const transformedResult = await transformWxStyle(source)
+
+                // Preserve the compiler stylesheet as the real global asset so its bundle metadata and ownership remain
+                // intact. Only its finalized contents and stable WXSS identity change.
+                style.source = transformedResult.css
+                style.fileName = 'assets/global.wxss'
+
+                // app.wxss is a generated native entrypoint whose content and path are identical in every WX build.
+                this.emitFile({ type: 'asset', fileName: 'app.wxss', source: '@import "./assets/global.wxss";\n' })
             }
         }
     }
