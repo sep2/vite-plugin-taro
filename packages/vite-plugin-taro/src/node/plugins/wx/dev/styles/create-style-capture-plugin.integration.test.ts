@@ -6,6 +6,7 @@ import test from 'node:test'
 import type { GetModuleInfo } from 'rolldown'
 import { dev } from 'rolldown/experimental'
 import { createServer, isCSSRequest } from 'vite'
+import { normalizeModuleId } from '../../../../utils/modules.ts'
 import { createGraphStylePlan, isGlobalStyleRequest } from '../../styles/utils.ts'
 import type { BundledDev } from '../wx-dev-options.ts'
 import { createStyleCapturePlugin, type ProcessedStyle } from './create-style-capture-plugin.ts'
@@ -13,9 +14,9 @@ import { publishStyleHmr } from './publish-style-hmr.ts'
 
 test('publishes processed CSS and live topology without identical rewrites', async () => {
     const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-host-css-capture-')))
-    const appId = path.join(root, 'app.js')
-    const cssId = path.join(root, 'app.css')
-    const extraCssId = path.join(root, 'extra.css')
+    const appId = normalizeModuleId(path.join(root, 'app.js'))
+    const cssId = normalizeModuleId(path.join(root, 'app.css'))
+    const extraCssId = normalizeModuleId(path.join(root, 'extra.css'))
     const outDir = path.join(root, 'dist')
     const initialSource = "import './app.css'\nexport const value = 'initial'\n"
     await Promise.all([
