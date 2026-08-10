@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import type { Plugin, ViteDevServer } from 'vite'
+import { createTailwindSidecarId, extractViteCss } from './utils.ts'
 
 type TailwindSidecarApi = Readonly<{
     getTailwindRoots: () => ReadonlySet<string>
@@ -35,16 +36,9 @@ async function transformTailwindRoot(server: ViteDevServer, rootId: string): Pro
      */
     const source = await readFile(rootId, 'utf8')
 
-    /*
-     * `weapp-vite-sidecar` is an upstream protocol marker, not a cache-busting nonce. `weapp-tailwindcss` detects the
-     * query key, strips the complete query when resolving the physical CSS pipeline file, and excludes this synthetic
-     * request from transformed-source candidate collection. That lets the request use the latest candidate state without
-     * feeding its generated CSS back into Tailwind's source memory or replacing the real Rolldown graph module. The
-     * descriptive `style` value is stable; upstream currently treats the presence of the query key as the contract.
-     */
-    const sidecarId = `${rootId}?weapp-vite-sidecar=style`
+    const sidecarId = createTailwindSidecarId(rootId)
 
     const result = await server.environments.client.pluginContainer.transform(source, sidecarId)
 
-    return result.code
+    return extractViteCss(result.code, rootId)
 }
