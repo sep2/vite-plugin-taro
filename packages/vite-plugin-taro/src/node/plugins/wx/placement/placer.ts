@@ -1,3 +1,4 @@
+import path from 'node:path'
 import type { Rolldown } from 'vite'
 import { getWxExecutionKind, isTransportModule } from '../module.ts'
 import {
@@ -117,8 +118,9 @@ export function createPlacer() {
                     if (location.kind === 'main') {
                         return 'assets/[name]-[hash].js'
                     }
-                    // Keep Rolldown's original chunk name for readable output while the hash preserves content identity.
-                    return `${location.root}/assets/[name]-[hash].js`
+                    // The package group replaces Rolldown's [name], so recover the first bundled source file's name from
+                    // the final chunk module list instead of leaking the generated package hash into the filename.
+                    return `${location.root}/assets/${getFirstModuleName(chunk)}-[hash].js`
                 },
                 // Keep generic assets independent of native output identities assigned after bundling.
                 assetFileNames: 'assets/[name]-[hash][extname]'
@@ -162,6 +164,21 @@ export function createPlacer() {
             }))
         }
     }
+}
+
+/** Uses the first bundled source filename as the readable identity of a generated subpackage chunk. */
+function getFirstModuleName(chunk: Rolldown.PreRenderedChunk): string {
+    const firstModuleId = chunk.moduleIds[0]
+    if (!firstModuleId) {
+        throw new Error('wx subpackage chunk has no source modules')
+    }
+
+    const normalizedId = firstModuleId.replaceAll('\\', '/')
+    const suffixIndex = normalizedId.search(/[?#]/)
+    const cleanId = suffixIndex === -1 ? normalizedId : normalizedId.slice(0, suffixIndex)
+    const fileName = path.posix.basename(cleanId)
+    const extension = path.posix.extname(fileName)
+    return extension ? fileName.slice(0, -extension.length) : fileName
 }
 
 /** Compares main by discriminant and generated subpackages by their unique physical root. */

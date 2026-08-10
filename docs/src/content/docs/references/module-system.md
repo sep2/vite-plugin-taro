@@ -151,7 +151,7 @@ Rolldown 的 chunk 分组配置会阻止不同物理包中的模块合并。如�
 
 ### 3. 生成最终文件和分包声明
 
-主包普通 chunk 使用 `assets/<name>-<content-hash>.js`；分包 chunk 使用 `sub/p_<hash>/assets/<content-hash>.js`。删除未使用代码后没有实际输出的分包不会进入 `app.json`。
+主包普通 chunk 使用 `assets/<name>-<content-hash>.js`。分包 chunk 使用 `sub/p_<package-hash>/assets/<first-module-name>-<content-hash>.js`：`first-module-name` 来自 Rolldown 最终 chunk 模块列表中的第一个源码文件名，并移除查询参数、片段和扩展名。删除未使用代码后没有实际输出的分包不会进入 `app.json`。
 
 vpt 对最终存在的分包目录去重、排序，并生成分包声明：
 
@@ -218,8 +218,8 @@ module.exports = [
 SystemJS 使用相对于微信输出根目录的 chunk 文件名作为模块 ID。构建时，vpt 会把 chunk 之间的相对引用转换成统一 ID：
 
 ```text
-../../assets/shared.js  → assets/shared.js
-./lazy.js                → sub/p_abcd1234/lazy.js
+../../assets/shared-<hash>.js  → assets/shared-<hash>.js
+./feature-data-<hash>.js       → sub/p_abcd1234/assets/feature-data-<hash>.js
 ```
 
 转换后的依赖 ID 与模块最终位于主包还是分包无关；`import.meta.url` 也使用当前 chunk 的统一 ID。
@@ -231,8 +231,8 @@ function transport(moduleId) {
     switch (moduleId) {
         case 'assets/page-a.js':
             return require('./page-a.js')
-        case 'sub/p_abcd1234/assets/lazy-b.js':
-            return require.async('../sub/p_abcd1234/assets/lazy-b.js')
+        case 'sub/p_abcd1234/assets/feature-data-<hash>.js':
+            return require.async('../sub/p_abcd1234/assets/feature-data-<hash>.js')
         default:
             throw new Error(`Unknown module: ${moduleId}`)
     }
