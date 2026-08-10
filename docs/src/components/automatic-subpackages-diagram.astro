@@ -15,12 +15,11 @@ const { headingLevel } = Astro.props
 ---
 
 <div class="automatic-subpackages-diagram vpt-theme">
-    <div class="package-flow" data-diagram="package-flow">
-        <svg class="d3-links flow-links" data-diagram-links aria-hidden="true"></svg>
+    <div class="package-flow">
         <SubpackageSourceDiagram headingLevel={headingLevel} />
 
         <div class="package-planner" role="img" aria-label="VPT 自动规划模块位置">
-            <div class="planner-anchor" data-node="flow-planner">
+            <div class="planner-anchor">
                 <div class="planner-core">
                     <span>VPT</span>
                     <small>自动规划</small>
@@ -38,34 +37,6 @@ const { headingLevel } = Astro.props
         <SubpackageOutputDiagram headingLevel={headingLevel} />
     </div>
 </div>
-
-<script>
-    import { connectResponsiveDiagrams } from './diagrams/connect-responsive-diagrams'
-
-    const disconnectDiagrams = connectResponsiveDiagrams([
-        {
-            name: 'source',
-            selector: '[data-diagram="source-graph"]',
-            links: [
-                { from: 'source-entry', to: 'startup-dependencies', kind: 'static', label: 'static import' },
-                { from: 'source-entry', to: 'report-feature', kind: 'dynamic', label: 'import()' },
-                { from: 'report-feature', to: 'chart-dependency', kind: 'dependency' },
-                { from: 'report-feature', to: 'pdf-dependency', kind: 'dependency' },
-                { from: 'report-feature', to: 'native-dependency', kind: 'dependency' }
-            ]
-        },
-        {
-            name: 'flow',
-            selector: '[data-diagram="package-flow"]',
-            links: [
-                { from: 'flow-source', to: 'flow-planner', kind: 'flow' },
-                { from: 'flow-planner', to: 'flow-output', kind: 'flow' }
-            ]
-        }
-    ])
-
-    document.addEventListener('astro:before-swap', disconnectDiagrams, { once: true })
-</script>
 
 <style>
     .automatic-subpackages-diagram {
@@ -153,6 +124,23 @@ const { headingLevel } = Astro.props
         --planner-orbit-rotation: 7deg;
         display: grid;
         place-items: center;
+    }
+
+    .package-planner::before,
+    .package-planner::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        width: clamp(1rem, 2vw, 1.5rem);
+        border-top: 1.5px dashed var(--vpt-border-strong);
+    }
+
+    .package-planner::before {
+        right: 100%;
+    }
+
+    .package-planner::after {
+        left: 100%;
     }
 
     .planner-anchor {
@@ -279,58 +267,6 @@ const { headingLevel } = Astro.props
         --planner-orbit-base-angle: -90deg;
     }
 
-    .automatic-subpackages-diagram :global(.d3-links) {
-        position: absolute;
-        z-index: 0;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        overflow: visible;
-    }
-
-    .automatic-subpackages-diagram :global(.diagram-link) {
-        fill: none;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-        stroke-width: 1.5;
-        vector-effect: non-scaling-stroke;
-    }
-
-    .automatic-subpackages-diagram :global(.diagram-link-static) {
-        stroke: var(--vpt-border-strong);
-    }
-
-    .automatic-subpackages-diagram :global(.diagram-link-dynamic) {
-        stroke: #e88870;
-        stroke-dasharray: 5 5;
-    }
-
-    .automatic-subpackages-diagram :global(.diagram-link-dependency) {
-        stroke: rgba(232, 136, 112, 0.55);
-    }
-
-    .automatic-subpackages-diagram :global(.diagram-link-flow) {
-        stroke: var(--vpt-border-strong);
-        stroke-dasharray: 3 4;
-    }
-
-    .automatic-subpackages-diagram :global(.d3-links marker path) {
-        fill: var(--vpt-border-strong);
-    }
-
-    .automatic-subpackages-diagram :global(.diagram-link-label) {
-        fill: var(--vpt-muted);
-        stroke: var(--vpt-card-background);
-        stroke-width: 0.65rem;
-        paint-order: stroke;
-        font-size: var(--diagram-font-size-caption);
-    }
-
-    .automatic-subpackages-diagram :global(.diagram-link-label-dynamic) {
-        fill: #d9725d;
-    }
-
     @container automatic-subpackages-layout (max-width: 64rem) {
         .package-flow {
             grid-template-columns: 1fr;
@@ -345,6 +281,25 @@ const { headingLevel } = Astro.props
 
         .package-planner {
             min-height: 9.5rem;
+        }
+
+        .package-planner::before,
+        .package-planner::after {
+            left: 50%;
+            width: 0;
+            height: 3rem;
+            border-top: 0;
+            border-left: 1.5px dashed var(--vpt-border-strong);
+        }
+
+        .package-planner::before {
+            top: auto;
+            right: auto;
+            bottom: 100%;
+        }
+
+        .package-planner::after {
+            top: 100%;
         }
     }
 

@@ -11,7 +11,7 @@ const { headingLevel } = Astro.props
 const Heading = headingLevel === 2 ? 'h2' : 'h3'
 ---
 
-<article class="diagram-panel output-panel" data-node="flow-output" aria-labelledby="output-diagram-title">
+<article class="diagram-panel output-panel" aria-labelledby="output-diagram-title">
     <header class="diagram-heading">
         <span>构建产物</span>
         <Heading id="output-diagram-title">静态依赖自动拆包</Heading>
@@ -53,7 +53,7 @@ const Heading = headingLevel === 2 ? 'h2' : 'h3'
 
     <footer class="diagram-footer cross-package-note">
         <Icon name="random" />
-        <span>主包与分包、分包与分包，可互相调用</span>
+        <span>主包与分包、分包与分包，均可互相调用</span>
     </footer>
 </article>
 

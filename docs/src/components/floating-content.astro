@@ -18,6 +18,39 @@ interface Props {
 
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
 const { id, label, description, collapseLabel, collapseText, expandLabel, inlineSize, blockSize } = Astro.props
+// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
+const noScriptStyles = `
+<style>
+    @media (min-width: 84rem) {
+        .floating-content:not([data-collapsed]) {
+            block-size: auto;
+        }
+
+        .floating-content:not([data-collapsed]) > .floating-content-layer {
+            position: static;
+            top: auto;
+            left: auto;
+            z-index: auto;
+            width: auto;
+            pointer-events: auto;
+            transform: none;
+        }
+
+        .floating-content:not([data-collapsed]) > .floating-content-layer .floating-content-viewport {
+            padding: var(--floating-content-padding) 0;
+        }
+
+        .floating-content:not([data-collapsed]) > .floating-content-layer .floating-content-inner {
+            width: auto;
+            margin: 0;
+        }
+
+        .floating-content:not([data-collapsed]) > .floating-content-layer .floating-content-collapse {
+            display: none;
+        }
+    }
+</style>
+`
 ---
 
 <vpt-floating-content
@@ -70,117 +103,86 @@ const { id, label, description, collapseLabel, collapseText, expandLabel, inline
     </button>
 </vpt-floating-content>
 
-<script>
-    import { autoUpdate, computePosition, type Middleware } from '@floating-ui/dom'
-
-    const wideLayoutQuery = '(min-width: 84rem)'
-
-    const alignReferenceTop: Middleware = {
-        name: 'alignReferenceTop',
-        fn({ rects }) {
-            return { y: rects.reference.y }
-        }
-    }
-
-    class VptFloatingContent extends HTMLElement {
-        // This mutable cleanup follows the custom element through Astro page transitions.
-        #disconnect: (() => void) | undefined
-
-        connectedCallback(): void {
-            const layer = this.querySelector<HTMLDivElement>('[data-floating-content-layer]')!
-            const collapseButton = this.querySelector<HTMLButtonElement>('[data-floating-content-collapse]')!
-            const expandButton = this.querySelector<HTMLButtonElement>('[data-floating-content-expand]')!
-            const viewport = this.querySelector<HTMLElement>('.floating-content-viewport')!
-            const wideLayout = matchMedia(wideLayoutQuery)
-            const eventController = new AbortController()
-            // This cleanup handle represents Floating UI's active observers for the portaled layer.
-            let stopAutoUpdate: (() => void) | undefined
-
-            const updatePosition = (): void => {
-                void computePosition(this, layer, {
-                    strategy: 'absolute',
-                    middleware: [alignReferenceTop]
-                }).then(({ y }) => {
-                    if (!layer.hasAttribute('data-floating-content-floating')) return
-                    layer.style.top = `${y}px`
-                    layer.style.visibility = 'visible'
-                })
+<script is:inline data-astro-rerun>
+    if (customElements.get('vpt-floating-content') === undefined) {
+        class VptFloatingContent extends HTMLElement {
+            // These mutable references own the layer's responsive placement and event lifecycle.
+            #layer
+            #wideLayout
+            #events
+            #onResize = () => {
+                this.updateLayout()
+                this.updatePosition()
             }
 
-            const stopPositioning = (): void => {
-                stopAutoUpdate?.()
-                stopAutoUpdate = undefined
+            initialize() {
+                this.#layer = this.querySelector('[data-floating-content-layer]')
+                this.#wideLayout = matchMedia('(min-width: 84rem)')
+                this.#events = new AbortController()
+
+                this.#layer.addEventListener(
+                    'click',
+                    (event) => {
+                        const target = event.target
+                        if (!(target instanceof Element)) return
+                        if (target.closest('[data-floating-content-collapse]') === null) return
+                        this.setCollapsed(true)
+                        this.querySelector('[data-floating-content-expand]').focus()
+                    },
+                    { signal: this.#events.signal }
+                )
+                this.querySelector('[data-floating-content-expand]').addEventListener(
+                    'click',
+                    () => {
+                        this.setCollapsed(false)
+                        this.#layer.querySelector('.floating-content-viewport').focus({ preventScroll: true })
+                    },
+                    { signal: this.#events.signal }
+                )
+                window.addEventListener('resize', this.#onResize, { signal: this.#events.signal })
+                this.updateLayout()
+                this.updatePosition()
             }
 
-            const floatLayer = (): void => {
-                if (layer.hasAttribute('data-floating-content-floating')) return
-                layer.setAttribute('data-floating-content-floating', '')
-                layer.style.visibility = 'hidden'
-                document.body.append(layer)
-                stopAutoUpdate = autoUpdate(this, layer, updatePosition, {
-                    ancestorScroll: false,
-                    elementResize: false,
-                    layoutShift: false
-                })
+            disconnectedCallback() {
+                this.#events?.abort()
+                if (this.#layer?.hasAttribute('data-floating-content-floating')) this.#layer.remove()
             }
 
-            const restoreLayer = (): void => {
-                if (!layer.hasAttribute('data-floating-content-floating')) return
-                stopPositioning()
-                layer.removeAttribute('data-floating-content-floating')
-                layer.style.removeProperty('top')
-                layer.style.removeProperty('visibility')
-                this.prepend(layer)
-            }
-
-            const updatePlacement = (): void => {
-                if (wideLayout.matches && !this.hasAttribute('data-collapsed')) {
-                    floatLayer()
+            updateLayout() {
+                const shouldFloat = this.#wideLayout.matches && !this.hasAttribute('data-collapsed')
+                if (shouldFloat) {
+                    if (this.#layer.hasAttribute('data-floating-content-floating')) return
+                    this.#layer.setAttribute('data-floating-content-floating', '')
+                    document.body.append(this.#layer)
                     return
                 }
-                restoreLayer()
+                if (!this.#layer.hasAttribute('data-floating-content-floating')) return
+                this.#layer.removeAttribute('data-floating-content-floating')
+                this.#layer.style.removeProperty('top')
+                this.prepend(this.#layer)
             }
 
-            const setCollapsed = (collapsed: boolean): void => {
+            updatePosition() {
+                if (!this.#layer.hasAttribute('data-floating-content-floating')) return
+                const anchorTop = this.getBoundingClientRect().top + window.scrollY
+                this.#layer.style.top = `${anchorTop}px`
+            }
+
+            setCollapsed(collapsed) {
                 this.toggleAttribute('data-collapsed', collapsed)
-                layer.hidden = collapsed
-                collapseButton.setAttribute('aria-expanded', String(!collapsed))
-                expandButton.setAttribute('aria-expanded', String(!collapsed))
-                updatePlacement()
+                this.#layer.hidden = collapsed
+                this.#layer.querySelector('[data-floating-content-collapse]').ariaExpanded = String(!collapsed)
+                this.querySelector('[data-floating-content-expand]').ariaExpanded = String(!collapsed)
+                this.updateLayout()
+                this.updatePosition()
             }
-
-            collapseButton.addEventListener(
-                'click',
-                () => {
-                    setCollapsed(true)
-                    expandButton.focus()
-                },
-                { signal: eventController.signal }
-            )
-            expandButton.addEventListener(
-                'click',
-                () => {
-                    setCollapsed(false)
-                    viewport.focus({ preventScroll: true })
-                },
-                { signal: eventController.signal }
-            )
-            wideLayout.addEventListener('change', updatePlacement, { signal: eventController.signal })
-
-            this.#disconnect = () => {
-                eventController.abort()
-                restoreLayer()
-            }
-            updatePlacement()
         }
 
-        disconnectedCallback(): void {
-            this.#disconnect?.()
-            this.#disconnect = undefined
-        }
-    }
-
-    if (customElements.get('vpt-floating-content') === undefined) {
         customElements.define('vpt-floating-content', VptFloatingContent)
     }
+
+    document.currentScript.previousElementSibling.initialize()
 </script>
+
+<noscript set:html={noScriptStyles} />

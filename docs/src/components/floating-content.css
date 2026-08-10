@@ -6,33 +6,15 @@
 .floating-content-layer {
     --floating-content-padding: 4rem;
     --floating-content-outer-size: calc(var(--floating-content-inline-size) + 2 * var(--floating-content-padding));
+    display: block;
 }
 
 .floating-content-layer[hidden] {
     display: none;
 }
 
-.floating-content-layer[data-floating-content-floating] {
-    position: absolute;
-    left: 50%;
-    z-index: calc(var(--sl-z-index-menu) + 1);
-    width: min(var(--floating-content-outer-size), 100vw);
-    pointer-events: none;
-    transform: translateX(-50%);
-}
-
 .floating-content-viewport {
     padding: var(--floating-content-padding) 0;
-}
-
-.floating-content-layer[data-floating-content-floating] .floating-content-viewport {
-    padding: var(--floating-content-padding);
-}
-
-.floating-content-layer[data-floating-content-floating] .floating-content-inner {
-    width: min(var(--floating-content-inline-size), calc(100vw - 2 * var(--floating-content-padding)));
-    margin-inline: auto;
-    pointer-events: auto;
 }
 
 .floating-content-collapse {
@@ -62,10 +44,6 @@
         box-shadow 160ms ease,
         color 160ms ease,
         transform 160ms ease;
-}
-
-.floating-content-layer[data-floating-content-floating] .floating-content-collapse {
-    display: inline-flex;
 }
 
 .floating-content-collapse:hover {
@@ -180,9 +158,35 @@
         block-size: var(--floating-content-block-size);
     }
 
-    .floating-content-layer:not([data-floating-content-floating]) {
+    .floating-content-layer[data-floating-content-floating],
+    .floating-content:not([data-collapsed]) > .floating-content-layer {
         position: absolute;
-        visibility: hidden;
+        left: 50%;
+        z-index: calc(var(--sl-z-index-menu) + 1);
+        width: min(var(--floating-content-outer-size), 100vw);
+        pointer-events: none;
+        transform: translateX(-50%);
+    }
+
+    .floating-content:not([data-collapsed]) > .floating-content-layer {
+        top: 0;
+    }
+
+    .floating-content-layer[data-floating-content-floating] .floating-content-viewport,
+    .floating-content:not([data-collapsed]) > .floating-content-layer .floating-content-viewport {
+        padding: var(--floating-content-padding);
+    }
+
+    .floating-content-layer[data-floating-content-floating] .floating-content-inner,
+    .floating-content:not([data-collapsed]) > .floating-content-layer .floating-content-inner {
+        width: min(var(--floating-content-inline-size), calc(100vw - 2 * var(--floating-content-padding)));
+        margin-inline: auto;
+        pointer-events: auto;
+    }
+
+    .floating-content-layer[data-floating-content-floating] .floating-content-collapse,
+    .floating-content:not([data-collapsed]) > .floating-content-layer .floating-content-collapse {
+        display: inline-flex;
     }
 }
 
