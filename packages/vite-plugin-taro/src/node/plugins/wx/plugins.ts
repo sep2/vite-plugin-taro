@@ -21,7 +21,13 @@ type WxResolver = ReturnType<typeof createResolver>
 export function createWxTargetPlugins(options: VitePluginTaroOptions): PluginOption[] {
     const resolver = createResolver(options)
 
-    return [createWxStylePlugins(), createWxPlugin(options, resolver), createWxDevelopmentPlugin(options)]
+    // Reuse the resolver instance's ordered application subset. Rolldown's complete input also contains bootstrap, transport,
+    // shell, and component entries; entry membership alone cannot recover which roots define the App/Page CSS cascade.
+    return [
+        createWxStylePlugins(),
+        createWxPlugin(options, resolver),
+        createWxDevelopmentPlugin(options, resolver.applicationEntryIds)
+    ]
 }
 
 /** Configures the complete wx target build pipeline. */

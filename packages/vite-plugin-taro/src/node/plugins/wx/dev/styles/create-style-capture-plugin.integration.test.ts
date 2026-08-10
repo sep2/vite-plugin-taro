@@ -1,19 +1,22 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import type { GetModuleInfo } from 'rolldown'
 import { dev } from 'rolldown/experimental'
 import { createServer } from 'vite'
+import { isGlobalStyleRequest } from '../../styles/utils.ts'
 import type { BundledDev } from '../wx-dev-options.ts'
 import { createStyleCapturePlugin, type ProcessedStyle } from './create-style-capture-plugin.ts'
+import { publishStyleHmr } from './publish-style-hmr.ts'
 
 test('captures processed CSS and a live graph across DevEngine updates', async () => {
     const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-host-css-capture-')))
     const appId = path.join(root, 'app.js')
     const cssId = path.join(root, 'app.css')
     const extraCssId = path.join(root, 'extra.css')
+    const outDir = path.join(root, 'dist')
     const initialSource = "import './app.css'\nexport const value = 'initial'\n"
     await Promise.all([
         writeFile(appId, initialSource),
@@ -21,8 +24,10 @@ test('captures processed CSS and a live graph across DevEngine updates', async (
         writeFile(extraCssId, '.extra {}\n')
     ])
 
-    // These mutable journals synchronize non-awaited DevEngine callbacks and retain captured lifecycle generations.
+    // These mutable journals synchronize non-awaited DevEngine callbacks and preserve evidence from each lifecycle generation.
+    // `processedStyles` specifically mirrors the host-owned final-CSS projection used by physical publication.
     const captures: ProcessedStyle[] = []
+    const processedStyles = new Map<string, ProcessedStyle>()
     const graphReaders: GetModuleInfo[] = []
     const hmrResults: unknown[] = []
     const outputResults: unknown[] = []
@@ -59,7 +64,8 @@ test('captures processed CSS and a live graph across DevEngine updates', async (
             captureGraph(reader) {
                 graphReaders.push(reader)
             },
-            captureStyle(_id, style) {
+            captureStyle(id, style) {
+                processedStyles.set(id, style)
                 captures.push(style)
             }
         })
@@ -72,7 +78,28 @@ test('captures processed CSS and a live graph across DevEngine updates', async (
         rebuildStrategy: 'never',
         watch: { skipWrite: true },
         onHmrUpdates(result) {
-            hmrResults.push(result)
+            // Rolldown does not await this callback, exactly like the real host boundary. Defer publication and append the
+            // observable result only afterward, so waiting for `hmrResults` proves global.wxss was durable first.
+            void Promise.resolve()
+                .then(async () => {
+                    if (
+                        !(result instanceof Error) &&
+                        result.updates.some(
+                            ({ update }) => update.type === 'Patch' && update.changedIds.some(isGlobalStyleRequest)
+                        )
+                    ) {
+                        await publishStyleHmr({
+                            applicationEntryIds: [appId],
+                            getModuleInfo: requireLatestGraphReader(graphReaders),
+                            outDir: outDir,
+                            processedStyles: processedStyles
+                        })
+                    }
+                    hmrResults.push(result)
+                })
+                .catch((error: unknown) => {
+                    hmrResults.push(error)
+                })
         },
         onOutput(result) {
             outputResults.push(result)
@@ -89,12 +116,16 @@ test('captures processed CSS and a live graph across DevEngine updates', async (
         assert.deepEqual(readStyleImports(initialReader, appId), [cssId])
         await engine.registerClient('style-capture-test')
 
+        // This edit exercises the complete ordinary-CSS path: PostCSS capture, live-graph composition, WX finalization, and
+        // atomic physical publication. The result journal advances only after all four steps finish.
         await writeFile(cssId, '.app { color: blue; }\n')
         await waitForEventCount(hmrResults, 1)
         assert.equal(captures.at(-1)?.css, '.app { color: #0000ff; }\n')
         assert.equal(captures.length, 2)
+        assert.equal(await readFile(path.join(outDir, 'assets/global.wxss'), 'utf8'), '.app { color: #0000ff; }\n')
         assert.equal(requireLatestGraphReader(graphReaders), initialReader)
 
+        // Import-only edits validate that the captured reader reflects current topology without rebinding or a shadow graph.
         await writeFile(appId, "import './app.css'\nimport './extra.css'\nexport const value = 'added'\n")
         await waitForEventCount(hmrResults, 2)
         assert.deepEqual(readStyleImports(initialReader, appId), [cssId, extraCssId])

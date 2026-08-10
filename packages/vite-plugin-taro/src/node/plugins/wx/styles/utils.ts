@@ -44,10 +44,10 @@ export function isGlobalStyleRequest(id: string): boolean {
  * before dynamic imports; dynamic branches are deliberately included because WX has no browser runtime that can inject a
  * lazy chunk's CSS later. A module's cached CSS is appended after its dependencies, matching dependency evaluation order.
  *
- * Graph IDs may contain route or plugin queries, while `styleCacheMap` is keyed by physical module ID. Normalizing before
- * lookup lets multiple graph identities share one physical style and allows `visitedStyleIds` to emit it exactly once.
- * Cache membership is also the style-ownership test: JavaScript and non-runtime CSS requests are traversed for their
- * dependencies but contribute no bytes. Cached styles that are no longer reachable are naturally excluded.
+ * Graph IDs may contain route or plugin queries, while `getStyleCss` reads by physical module ID. Normalizing before lookup
+ * lets multiple graph identities share one physical style and allows `visitedStyleIds` to emit it exactly once.
+ * A defined `getStyleCss` result is also the style-ownership test: JavaScript and non-runtime CSS requests are traversed for
+ * their dependencies but contribute no bytes. Captured styles that are no longer reachable are naturally excluded.
  *
  * All traversal state is local to this call. Recomputing from current ModuleInfo avoids fragile topology invalidation after
  * HMR adds or removes imports. Complexity is O(modules + edges + emitted CSS bytes), with O(modules + styles) temporary
@@ -58,7 +58,7 @@ export function composeGraphStyleCss(
     getModuleInfo: (
         moduleId: string
     ) => Readonly<{ importedIds: readonly string[]; dynamicallyImportedIds: readonly string[] }> | null,
-    styleCacheMap: ReadonlyMap<string, string>
+    getStyleCss: (styleId: string) => string | undefined
 ): string {
     // These local collections make traversal O(modules + edges), collapse cycles and shared styles, and avoid retaining
     // derived graph state between HMR updates.
@@ -81,7 +81,7 @@ export function composeGraphStyleCss(
         moduleInfo.dynamicallyImportedIds.forEach(visit)
 
         const styleId = normalizeModuleId(moduleId)
-        const css = styleCacheMap.get(styleId)
+        const css = getStyleCss(styleId)
         if (css !== undefined && !visitedStyleIds.has(styleId)) {
             visitedStyleIds.add(styleId)
             cssFragments.push(css)

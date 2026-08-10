@@ -13,8 +13,15 @@ const taroRuntimeId = '@tarojs/runtime'
 /**
  * Adds the serve-only bundled-development plugin set for the wx target: the dev adapter,
  * Page HMR activation, and React Refresh adaptation transforms.
+ *
+ * The ordered application entries cross this configuration boundary unchanged so the host can compose global CSS without
+ * reconstructing the resolver's App/Page ownership policy from unrelated Rolldown shell and transport entries.
  */
-export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): PluginOption[] {
+export function createWxDevelopmentPlugin(
+    options: VitePluginTaroOptions,
+    applicationEntryIds: readonly string[]
+): PluginOption[] {
+    // This mutable handle transfers ownership from configureServer to closeBundle; at most one host exists per plugin instance.
     let host: WxDevHost | null = null
     // Portable hook filters stay broad; these exact identities exclude similarly named user modules.
     const normalizedAppCapsulePath = normalizeModuleId(appCapsulePath)
@@ -54,7 +61,11 @@ export function createWxDevelopmentPlugin(options: VitePluginTaroOptions): Plugi
                 // asks bundledDev to create its hard-coded skip-write DevEngine.
                 order: 'post',
                 async handler(server) {
-                    host = await createWxDevHost({ server, options })
+                    host = await createWxDevHost({
+                        server: server,
+                        options: options,
+                        applicationEntryIds: applicationEntryIds
+                    })
                 }
             },
 

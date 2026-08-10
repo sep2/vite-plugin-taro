@@ -6,6 +6,7 @@ import { type DevEngine, type DevOptions, dev } from 'rolldown/experimental'
 import type { Connect, ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { SerializedTaskQueue } from '../../../utils/serialized-task-queue.ts'
+import { isGlobalStyleRequest } from '../styles/utils.ts'
 import {
     type HmrInfo,
     hmrControlPath,
@@ -18,6 +19,7 @@ import {
 } from './hmr-files.ts'
 import { PatchPublisher } from './patch-publisher.ts'
 import { createStyleCapturePlugin, type ProcessedStyle } from './styles/create-style-capture-plugin.ts'
+import { publishStyleHmr } from './styles/publish-style-hmr.ts'
 import { type BundledDev, installWxDevOptions, requireSingleOutput } from './wx-dev-options.ts'
 
 export type WxDevHost = Readonly<{
@@ -47,13 +49,18 @@ type DevOutputResult = Parameters<NonNullable<DevOptions['onOutput']>>[0]
  * with dev(...)) and the patch publisher, and replaces Vite's bundledDev.listen so the
  * engine writes directly to the Mini Program output directory instead of serving browser
  * HMR over HTTP.
+ *
+ * `applicationEntryIds` is the resolver's immutable cascade policy, not a second graph: it selects the App capsule followed
+ * by configured Page capsules from Rolldown's larger entry set. Rolldown remains the authority for every live import edge.
  */
 export async function createWxDevHost({
     server,
-    options
+    options,
+    applicationEntryIds
 }: {
     server: ViteDevServer
     options: VitePluginTaroOptions
+    applicationEntryIds: readonly string[]
 }): Promise<WxDevHost> {
     const bundledDev = getBundledDev(server)
     // This is the host's mutable style projection: CSS absent from Rolldown plus the live graph capability rebound by each
@@ -215,6 +222,26 @@ export async function createWxDevHost({
             return
         }
 
+        // `onHmrUpdates` is the transaction boundary after every affected style transform has passed through Vite/PostCSS
+        // and the trailing capture plugin. Classifying the accepted batch here therefore avoids transform-order flags and
+        // prevents a CSS event for an inactive client from publishing global state. Ordinary CSS changes are sufficient to
+        // render immediately; non-CSS candidate changes will join this condition when Tailwind roots are refreshed.
+        if (batch.some((patch) => patch.changedIds.some(isGlobalStyleRequest))) {
+            // buildStart installs this reader before Rolldown can produce either a complete output or an incremental batch.
+            // Failing the lifecycle invariant is safer than publishing a partial stylesheet in an apparently valid patch.
+            const getModuleInfo = styleState.getModuleInfo
+            if (!getModuleInfo) {
+                throw new Error('WX style graph is unavailable before HMR publication')
+            }
+            await publishStyleHmr({
+                applicationEntryIds: applicationEntryIds,
+                getModuleInfo: getModuleInfo,
+                outDir: server.config.build.outDir,
+                processedStyles: styleState.processedStyles
+            })
+        }
+
+        // Publish global.wxss before the matching JavaScript patch so DevTools observes a coherent HMR transaction.
         // The physical file must exist before Rolldown advances: once committed, later patches may be generated relative to
         // this batch even if DevTools has not observed its file event yet. PatchPublisher keeps the unapplied range cumulative,
         // so any later file generation still carries every factory needed to bridge the runtime's older application frontier.

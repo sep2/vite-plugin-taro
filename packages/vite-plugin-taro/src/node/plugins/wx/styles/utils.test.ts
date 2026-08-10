@@ -35,14 +35,16 @@ test('composes current graph styles in dependency order with shared modules dedu
         ['lazy.css', '.lazy {}']
     ])
 
+    // Keep CSS storage independent from graph storage, matching the host's two authoritative projections.
+    const getStyleCss = (styleId: string) => styleCacheMap.get(styleId)
     assert.equal(
-        composeGraphStyleCss(['app'], (moduleId) => graph.get(moduleId) ?? null, styleCacheMap),
+        composeGraphStyleCss(['app'], (moduleId) => graph.get(moduleId) ?? null, getStyleCss),
         '.app {}\n.feature {}\n.shared {}\n.lazy {}'
     )
 
     graph.set('app', { importedIds: ['app.css'], dynamicallyImportedIds: [] })
     assert.equal(
-        composeGraphStyleCss(['app'], (moduleId) => graph.get(moduleId) ?? null, styleCacheMap),
+        composeGraphStyleCss(['app'], (moduleId) => graph.get(moduleId) ?? null, getStyleCss),
         '.app {}'
     )
 })
