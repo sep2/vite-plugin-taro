@@ -110,10 +110,6 @@ html[data-has-hero] body {
     background-color: var(--vpt-page-bg);
 }
 
-html[data-has-hero] header.header > .header {
-    backdrop-filter: blur(16px);
-}
-
 html[data-has-hero] .site-title {
     color: var(--vpt-heading-strong);
     font-family: Georgia, "Times New Roman", serif;
