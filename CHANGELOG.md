@@ -4,7 +4,25 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
-## [0.5.10] - 2026-08-09
+## [0.5.11] - 2026-08-10
+
+### Changed
+
+- gate publishing on Windows checks (59f050d)
+- agents.md (4b71ed4)
+- subpackage preserve original names (5be409c)
+- draft docs cleanup (27f8453)
+- text (4e44c8a)
+- refresh HMR demo video (5e55349)
+- styles (2e9f090)
+- css (946cb51)
+- update HMR demo video (eec3ce5)
+
+### Fixed
+
+- preserve source names in subpackage chunks (b332c6f)
+
+## [0.5.10] - 2026-08-10
 
 ### Fixed
 
