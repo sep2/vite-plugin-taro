@@ -9,7 +9,8 @@
     display: block;
 }
 
-.floating-content-layer[hidden] {
+.floating-content-layer[hidden],
+.floating-content-noscript {
     display: none;
 }
 
@@ -21,7 +22,7 @@
     display: none;
     position: absolute;
     z-index: 2;
-    bottom: 1rem;
+    top: 1rem;
     left: 50%;
     align-items: center;
     gap: 0.5rem;
