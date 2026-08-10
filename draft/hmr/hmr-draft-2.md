@@ -24,7 +24,7 @@ where practical:
 - **Prototype behavior**: behavior of the discarded working implementation.
 - **Hypothesis**: plausible but not yet isolated by a deterministic probe.
 
-The existing `hmr-draft-3.md`, `hmr-draft-1.md`, and `../draft/hmr-probe-result.md` are separate documents.
+The existing `hmr-draft-3.md`, `hmr-draft-1.md`, and `../hmr-probe-result.md` are separate documents.
 This notebook neither supersedes nor approves them.
 
 ## Historical product target
@@ -34,7 +34,7 @@ The experiments were trying to obtain this user-visible behavior:
 - one Vite development server, watcher, and Rolldown development graph;
 - an initial physical WeChat Mini Program written to `build.outDir`;
 - executable updates delivered through a physical file compiled by WeChat DevTools;
-- ordinary accepted JavaScript updates changing only `hmr/update.js`;
+- ordinary accepted JavaScript updates changing only `/update.js`;
 - React and Taro state retained when React Refresh considers an update compatible;
 - navigation-stack Pages remaining usable after an update;
 - no use of `eval`, `Function`, network-delivered executable source, or global `window` emulation;
@@ -54,13 +54,13 @@ therefore used as the executable boundary.
 The prototype separated transport into:
 
 - a metadata/control channel over `wx.request`;
-- an execution channel through `hmr/update.js`.
+- an execution channel through `/update.js`.
 
 The HTTP response never carried executable patch source.
 
 ### 1.2 Page-scoped file changes can retain the App heap
 
-The bare probes in `../draft/hmr-probe-result.md` established, with `compileHotReLoad: true`, that automatically rewriting
+The bare probes in `../hmr-probe-result.md` established, with `compileHotReLoad: true`, that automatically rewriting
 an active `page.js` preserved the existing App identity and `globalData`. The same probe did **not** establish React,
 Taro, Page-instance, input, or navigation-stack retention.
 
@@ -87,7 +87,7 @@ A clean implementation should reprobe this boundary instead of assuming every De
 hmr/update.js
 ```
 
-The experiment initially emitted `hmr/update.js.map`, which violated the one-file invariant. Embedding the patch source
+The experiment initially emitted `/update.js.map`, which violated the one-file invariant. Embedding the patch source
 map as an inline data URI fixed that. An `onAdditionalAssets` path also caused unrelated physical writes and was removed.
 
 The initial inert file was:
@@ -336,7 +336,7 @@ assets/app.js  ~558 kB
 
 ### 3.2 Source maps belong inside the one patch file
 
-A sibling `hmr/update.js.map` causes a second physical write and a second DevTools-observed file. Inline source maps kept
+A sibling `/update.js.map` causes a second physical write and a second DevTools-observed file. Inline source maps kept
 the one-file boundary while retaining usable generated-code diagnostics.
 
 ### 3.3 Initial output preparation cannot blindly use Vite's private prepare plugin
@@ -392,7 +392,7 @@ A two-phase handshake was introduced:
 
 1. server reports `prepare(targetVersion)`;
 2. runtime enters its update guard and reports `preparedVersion`;
-3. server writes `hmr/update.js`;
+3. server writes `/update.js`;
 4. DevTools observes and evaluates it.
 
 This removed a race in which DevTools could dispatch Page side effects before the runtime had captured/suppressed the
@@ -536,7 +536,7 @@ native update has completed.
 
 ### 6.3 Page entry rerun is a separate problem from Fiber refresh
 
-Changing `hmr/update.js` can cause DevTools to rerun Page integration code. That can involve:
+Changing `/update.js` can cause DevTools to rerun Page integration code. That can involve:
 
 - executing `Page(...)` again;
 - dispatching synthetic Page lifecycles;
@@ -729,7 +729,7 @@ The bridge exposes a capability, not the document or a persistent root collectio
 
 1. The control protocol announces `prepare(targetVersion)`.
 2. The coordinator records the active Page, starts lifecycle suppression, and assigns a pending generation.
-3. The server writes only `hmr/update.js`.
+3. The server writes only `/update.js`.
 4. Rolldown updates the retained module registry.
 5. React Refresh reconciles the one application Fiber root.
 6. An exact `afterRefresh` hook advances the generation.
@@ -896,7 +896,7 @@ observation before the next layer is added.
 
 - Register one executed module with Rolldown.
 - Obtain one patch.
-- Write only `hmr/update.js`.
+- Write only `/update.js`.
 - Confirm the existing App heap remains.
 - Confirm stale initializers do not overwrite the patched module.
 
@@ -999,9 +999,9 @@ enough.
 
 ### Filesystem
 
-- only `hmr/update.js` changes for ordinary code HMR;
+- only `/update.js` changes for ordinary code HMR;
 - patch source map is inline;
-- no `hmr/update.js.map`;
+- no `/update.js.map`;
 - public add/change/delete ordering;
 - initial cleanup does not delete incrementally omitted generated files;
 - recovery may rewrite the complete project;
@@ -1068,7 +1068,7 @@ Initial output readiness needs a real DevEngine output barrier.
 
 The clean implementation should answer these with evidence:
 
-1. Does one shared `hmr/update.js` invalidate native render data for every loaded Page or only selected Pages?
+1. Does one shared `/update.js` invalidate native render data for every loaded Page or only selected Pages?
 2. Which exact synthetic lifecycle sequence occurs for active and hidden Pages?
 3. Is route registration deduplication necessary if publication begins before DevTools invalidation?
 4. Can a legitimate Page navigation occur during suppression without being lost?

@@ -28,7 +28,7 @@ do not repeat impl detail. record the reason that it makes to hmr works.
 
 Implement physical WX HMR where:
 
-- executable updates travel only through a physical `hmr/patches.js`;
+- executable updates travel only through a physical `/patches.js`;
 - HTTP carries metadata and runtime reports only;
 - DevTools detects `patches.js`, re-executes the Page, and thereby loads patches;
 - the App-owned runtime survives Page re-execution;
@@ -38,7 +38,7 @@ Implement physical WX HMR where:
 
 ## Hard platform findings
 
-1. **Ordinary HMR must change only `hmr/patches.js`.**
+1. **Ordinary HMR must change only `/patches.js`.**
    Wider output changes may make DevTools restart the entire App.
 
 2. **Direct complete writes, not atomic rename**
@@ -249,8 +249,8 @@ A full build is one composite operation:
 
 1. generate fresh `buildId`;
 2. run DevEngine complete output;
-3. write inert `hmr/patches.js`;
-4. write `hmr/info.js`;
+3. write inert `/patches.js`;
+4. write `/info.js`;
 5. emit `full-build-finished`.
 
 Running and materializing a full build must not be separate topology commands.
@@ -345,7 +345,7 @@ The implementation follows the exact capabilities exposed by the pinned toolchai
 2. `createDevHost` prepares public output, creates one shared fact bus, subscribes topology/control/output/public edges,
    and only then emits the initial rebuild fact. No startup observation can be lost.
 3. The output edge generates a fresh `buildId`, asks DevEngine for a complete physical output, then writes immutable
-   `hmr/info.js` and inert `hmr/patches.js`. This entire sequence is one topology operation.
+   `/info.js` and inert `/patches.js`. This entire sequence is one topology operation.
 4. Vite's replaced `bundledDev.listen()` resolves only after that composite result, so HTTP readiness never precedes the
    metadata and patch dependencies required by `app.js`.
 5. Final chunk preparation places `require('./hmr/info.js')` before App dependencies. The generated Rolldown runtime can
@@ -362,7 +362,7 @@ The implementation follows the exact capabilities exposed by the pinned toolchai
    runtime version `V` with host version `N`: equal waits, behind writes `V..N`, mismatch/ahead rebuilds.
 4. The output edge serializes physical effects and verifies the command's Build identity at execution time. An obsolete
    queued write cannot overwrite a newer full build.
-5. The host performs one direct open/write/close of `hmr/patches.js`. It does not rename a temporary sibling, touch normal
+5. The host performs one direct open/write/close of `/patches.js`. It does not rename a temporary sibling, touch normal
    chunks, or send executable JavaScript over HTTP. The HTTP response only says that the physical publication completed.
 6. WeChat sees a changed JavaScript dependency of every Page and re-executes live Page entries. Each entry synchronously
    requires the shared patch file, which only calls `storePatches(metadata, programs)`; no patch executes in `require()`.
@@ -413,7 +413,7 @@ The implementation follows the exact capabilities exposed by the pinned toolchai
   shell interception, App-runtime HotContext/Refresh/error handling, multi-program rapid suffixes, and Taro Page rebinding.
 - Physical host integration: launched `pnpm dev:loan-genius:wx`, registered the 144 executed module identities, held the
   runtime synchronize request, changed/restored the calculator source, and verified both publications. At each edit the
-  only changed output was `hmr/patches.js`; responses were metadata-only `patches-published`.
+  only changed output was `/patches.js`; responses were metadata-only `patches-published`.
 - Rapid suffix integration: reporting version 0 after two retained HostPatches produced one physical range with two
   separate factories and two Rolldown `applyUpdates` checkpoints.
 - Live DevTools flow: input/result state, forward navigation, background Page source edit, back navigation, changed UI,
@@ -471,10 +471,10 @@ do not repeat impl detail. record the reason that it makes to hmr works.
   rendered the result header, clicked through to monthly payments, edited the previous Page source, retained the visible
   monthly-payments route, clicked Back, and observed the edited title with the result header and input value still present.
 - The App runtime and both Page objects retained identity; the build ID stayed fixed and patch version advanced.
-- Ordinary edits changed only `hmr/patches.js`; `hmr/info.js` and all normal output files stayed byte-identical.
+- Ordinary edits changed only `/patches.js`; `/info.js` and all normal output files stayed byte-identical.
 - Two immediate source edits advanced through both versions, rendered the final edit, and retained input state.
 - A CSS edit crossed the full-build boundary: build ID/runtime identity changed, version reset to `0`, and
-  `hmr/patches.js` became inert. Restoring the CSS repeated the clean reset.
+  `/patches.js` became inert. Restoring the CSS repeated the clean reset.
 - An injected runtime reconciliation exception reported failure over HTTP and caused the same successful full-build reset.
 - No HMR errors or warnings remained in the DevTools App console.
 
@@ -506,10 +506,10 @@ After preserving individual HostPatch factories, the complete DevTools flow pass
 
 1. The calculator rendered its result header (`房屋总价`) and retained input value `246`.
 2. Navigation reached `pages/calculator/monthly-payments/index` with both Pages in the native stack.
-3. Editing the background calculator title changed only `hmr/patches.js`.
+3. Editing the background calculator title changed only `/patches.js`.
 4. The active monthly-payments Page stayed visible; App runtime identity, build ID, and both native Page identities stayed
    equal while runtime version advanced `0 → 1`.
 5. Navigating back showed `房贷计算器 HMR-2026`, result header `房屋总价`, and input `246`.
-6. Restoring the source again changed only `hmr/patches.js`; the same App runtime and calculator Page remained, version
+6. Restoring the source again changed only `/patches.js`; the same App runtime and calculator Page remained, version
    advanced `1 → 2`, the original title returned, and both result/input state remained.
 7. The final DevTools console grep for errors, warnings, failed reconciliation, or rebuild requests was empty.
