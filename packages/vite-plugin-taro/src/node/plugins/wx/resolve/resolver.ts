@@ -1,3 +1,4 @@
+import { normalizePath } from 'vite'
 import type { VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../../options.ts'
 import { normalizeModuleId, resolveAppComponentPath, resolvePageComponentPath } from '../../../utils/modules.ts'
 import { createAppConfig } from '../../../utils/project-config.ts'
@@ -25,8 +26,8 @@ type PrivateIdResolver = (importer: string | undefined, projectRoot: string) => 
 
 /** Creates the resolver and source specializer for the wx module graph. */
 export function createResolver(options: VitePluginTaroOptions) {
-    const normalizedBootstrapPath = normalizeModuleId(bootstrapPath)
-    const normalizedPageCapsulePath = normalizeModuleId(pageCapsulePath)
+    const normalizedBootstrapPath = normalizePath(bootstrapPath)
+    const normalizedPageCapsulePath = normalizePath(pageCapsulePath)
 
     // Construct output input and application traversal roots together once so style order cannot drift from route order.
     const entryGraph = createEntryGraph(options.pages)

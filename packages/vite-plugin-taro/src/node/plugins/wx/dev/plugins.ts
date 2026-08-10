@@ -1,4 +1,4 @@
-import { type PluginOption, transformWithOxc } from 'vite'
+import { normalizePath, type PluginOption, transformWithOxc } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
@@ -24,9 +24,9 @@ export function createWxDevelopmentPlugin(
     // This mutable handle transfers ownership from configureServer to closeBundle; at most one host exists per plugin instance.
     let host: WxDevHost | null = null
     // Portable hook filters stay broad; these exact identities exclude similarly named user modules.
-    const normalizedAppCapsulePath = normalizeModuleId(appCapsulePath)
-    const normalizedPageCapsulePath = normalizeModuleId(pageCapsulePath)
-    const normalizedTaroRuntimePath = normalizeModuleId(taroRuntimePath)
+    const normalizedAppCapsulePath = normalizePath(appCapsulePath)
+    const normalizedPageCapsulePath = normalizePath(pageCapsulePath)
+    const normalizedTaroRuntimePath = normalizePath(taroRuntimePath)
 
     return [
         {

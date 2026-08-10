@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { normalizePath } from 'vite'
 
 type AppComponentPathOptions = {
     appPath: string
@@ -33,12 +34,12 @@ export function createPageComponentImportPath(options: PageComponentPathOptions)
     return toViteFileImportPath(resolvePageComponentPath(options))
 }
 
-/** Normalizes a file-backed Vite module ID for stable comparisons. */
+/** Converts a file-backed Vite request ID to its normalized physical path for stable comparisons. */
 export function normalizeModuleId(id: string): string {
-    return id.replaceAll('\\', '/').replace(/\?.*$/, '')
+    return normalizePath(id.replace(/\?.*$/, ''))
 }
 
 /** Converts a local file path into Vite's portable file-system import form. */
 export function toViteFileImportPath(filePath: string): string {
-    return `/@fs/${normalizeModuleId(path.resolve(filePath))}`
+    return `/@fs/${normalizePath(path.resolve(filePath))}`
 }

@@ -3,8 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promis
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { build, type Plugin } from 'vite'
-import { normalizeModuleId } from '../../../utils/modules.ts'
+import { build, normalizePath, type Plugin } from 'vite'
 import { createWxStylePlugins } from './plugins.ts'
 
 test('finalizes the compiler stylesheet after upstream generation', async () => {
@@ -61,7 +60,7 @@ test('finalizes the compiler stylesheet after upstream generation', async () => 
         const outputRoot = path.join(root, 'dist')
         const styleFileNames = (await readdir(outputRoot, { recursive: true }))
             .filter((fileName) => fileName.endsWith('.wxss'))
-            .map(normalizeModuleId)
+            .map(normalizePath)
             .sort()
         assert.deepEqual(styleFileNames, ['assets/global.wxss'])
 

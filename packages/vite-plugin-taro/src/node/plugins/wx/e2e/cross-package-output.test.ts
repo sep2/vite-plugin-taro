@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
 import { build, type OutputChunk, type Plugin } from 'rolldown'
+import { normalizePath } from 'vite'
 import '../../../../runtime/wx/systemjs/system-core.js'
-import { normalizeModuleId } from '../../../utils/modules.ts'
 import { getWxExecutionKind, isTransportModule, transportPath } from '../module.ts'
 import { createPlacer } from '../placement/placer.ts'
 import { renderCapsule } from '../render/capsule.ts'
@@ -220,9 +220,9 @@ function findEntryChunk(chunks: readonly OutputChunk[], name: string): OutputChu
 
 /** Finds the final physical chunk containing one source module across platform-specific Rolldown path separators. */
 function findChunk(chunks: readonly OutputChunk[], moduleId: string): OutputChunk {
-    const normalizedModuleId = normalizeModuleId(moduleId)
+    const normalizedModuleId = normalizePath(moduleId)
     const chunk = chunks.find((candidate) =>
-        candidate.moduleIds.some((candidateId) => normalizeModuleId(candidateId) === normalizedModuleId)
+        candidate.moduleIds.some((candidateId) => normalizePath(candidateId) === normalizedModuleId)
     )
     assert.ok(chunk, `Missing output chunk for ${moduleId}`)
     return chunk

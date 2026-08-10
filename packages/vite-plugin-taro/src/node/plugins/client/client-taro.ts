@@ -1,4 +1,4 @@
-import type { Plugin } from 'vite'
+import { normalizePath, type Plugin } from 'vite'
 import type { VitePluginTaroTarget } from '../../../options.ts'
 import { normalizeModuleId } from '../../utils/modules.ts'
 import { resolvePackageFile } from '../../utils/packages.ts'
@@ -21,7 +21,7 @@ import { injectTaroFrameworkApis } from './inject-taro-framework-apis.ts'
 export const clientTaroApiId = 'virtual:taro/api'
 
 const clientTaroApiPath = resolvePackageFile('dist/runtime/client/taro/api.js')
-const normalizedClientTaroApiPath = normalizeModuleId(clientTaroApiPath)
+const normalizedClientTaroApiPath = normalizePath(clientTaroApiPath)
 
 const clientTaroComponentId = 'virtual:taro/components'
 

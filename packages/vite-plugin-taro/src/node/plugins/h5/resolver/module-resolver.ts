@@ -1,3 +1,4 @@
+import { normalizePath } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { normalizeModuleId, resolveAppComponentPath } from '../../../utils/modules.ts'
 import { appComponentId } from '../../client/constant.ts'
@@ -24,7 +25,7 @@ export function createModuleResolver(options: VitePluginTaroOptions) {
             projectRoot: string
             sourcemap?: boolean
         }) {
-            if (normalizeModuleId(id) === normalizeModuleId(h5AppPath)) {
+            if (normalizeModuleId(id) === normalizePath(h5AppPath)) {
                 return transformH5App({ code, id, options, projectRoot, sourcemap })
             }
         }

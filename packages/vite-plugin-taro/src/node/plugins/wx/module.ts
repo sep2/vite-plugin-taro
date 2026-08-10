@@ -1,5 +1,5 @@
 import path from 'node:path'
-import type { Rolldown } from 'vite'
+import { normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId } from '../../utils/modules.ts'
 import { packageRequire, resolvePackageFile } from '../../utils/packages.ts'
 
@@ -7,9 +7,7 @@ import { packageRequire, resolvePackageFile } from '../../utils/packages.ts'
 export const rolldownRuntimeId = '\0rolldown/runtime.js'
 
 /** Resolves the direct React Reconciler dependency without assuming pnpm's layout. */
-export const reactReconcilerRoot = normalizeModuleId(
-    path.dirname(packageRequire.resolve('react-reconciler/package.json'))
-)
+export const reactReconcilerRoot = normalizePath(path.dirname(packageRequire.resolve('react-reconciler/package.json')))
 
 /** Identifies the amphibious bootstrap that initializes SystemJS and serves every native shell. */
 export const bootstrapPath = resolvePackageFile('dist/runtime/wx/amphibious/bootstrap.js')

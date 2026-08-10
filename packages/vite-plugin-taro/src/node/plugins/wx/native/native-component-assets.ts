@@ -1,7 +1,6 @@
 import { readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
-import type { Rolldown } from 'vite'
-import { normalizeModuleId } from '../../../utils/modules.ts'
+import { normalizePath, type Rolldown } from 'vite'
 import type { NativeComponentDefinition } from './native-component-interface.ts'
 
 type NativeComponentAsset = {
@@ -46,7 +45,7 @@ export async function collectNativeComponentAssets(
 
     // This mutable accumulator is local to one traversal and avoids repeatedly copying growing asset arrays.
     const assets: NativeComponentAsset[] = []
-    await collectDirectory(definition.folder, [], assets, normalizeModuleId(interfacePath))
+    await collectDirectory(definition.folder, [], assets, normalizePath(interfacePath))
 
     return { ...definition, assets }
 }
@@ -103,7 +102,7 @@ async function collectDirectory(
             continue
         }
         const sourcePath = path.join(folder, ...entrySegments)
-        if (normalizeModuleId(sourcePath) === interfacePath) {
+        if (normalizePath(sourcePath) === interfacePath) {
             continue
         }
         assets.push({

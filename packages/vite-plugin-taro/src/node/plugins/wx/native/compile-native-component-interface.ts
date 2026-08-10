@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { normalizePath } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { collectNativeComponentAssets, nativeComponentMetaKey } from './native-component-assets.ts'
 import { transformNativeComponentInterfaces } from './native-component-interface.ts'
@@ -26,7 +27,7 @@ export async function compileNativeComponentInterface({
         addWatchFile(source.folder)
 
         source.assets.forEach((asset) => {
-            addWatchFile(normalizeModuleId(path.join(source.folder, asset.relativePath)))
+            addWatchFile(normalizePath(path.join(source.folder, asset.relativePath)))
         })
     })
 

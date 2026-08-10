@@ -3,6 +3,7 @@ import type { ExistingRawSourceMap } from 'rolldown'
 import { RolldownMagicString } from 'rolldown'
 import { parseAst } from 'rolldown/parseAst'
 import type { ESTree } from 'rolldown/utils'
+import { normalizePath } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { clientTaroNativeId } from '../../client/constant.ts'
 
@@ -138,7 +139,7 @@ function parseDefinition(
         throw buildError('Native component entry must use () => import(...) with a static relative .js path')
     }
 
-    const entryPath = normalizeModuleId(path.resolve(path.dirname(moduleId), entryReference))
+    const entryPath = normalizePath(path.resolve(path.dirname(moduleId), entryReference))
     return {
         folder: path.posix.dirname(entryPath),
         entry: path.posix.basename(entryPath, '.js'),

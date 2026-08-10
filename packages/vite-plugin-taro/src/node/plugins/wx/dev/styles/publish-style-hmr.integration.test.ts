@@ -5,8 +5,7 @@ import path from 'node:path'
 import test from 'node:test'
 import type { GetModuleInfo } from 'rolldown'
 import { dev } from 'rolldown/experimental'
-import { createServer } from 'vite'
-import { normalizeModuleId } from '../../../../utils/modules.ts'
+import { createServer, normalizePath } from 'vite'
 import { createWxStylePlugins } from '../../styles/plugins.ts'
 import { createGraphStylePlan } from '../../styles/utils.ts'
 import type { BundledDev } from '../wx-dev-options.ts'
@@ -15,8 +14,8 @@ import { publishStyleHmr, refreshTailwindStyles } from './publish-style-hmr.ts'
 
 test('publishes Tailwind candidate additions and removals before completing each HMR transaction', async () => {
     const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-tailwind-style-hmr-')))
-    const appId = normalizeModuleId(path.join(root, 'app.js'))
-    const cssId = normalizeModuleId(path.join(root, 'app.css'))
+    const appId = normalizePath(path.join(root, 'app.js'))
+    const cssId = normalizePath(path.join(root, 'app.css'))
     const outDir = path.join(root, 'dist')
     await Promise.all([
         writeFile(appId, renderApplication('mt-2')),

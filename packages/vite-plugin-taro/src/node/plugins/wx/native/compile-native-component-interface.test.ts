@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { normalizeModuleId } from '../../../utils/modules.ts'
+import { normalizePath } from 'vite'
 import { compileNativeComponentInterface } from './compile-native-component-interface.ts'
 import { nativeComponentMetaKey } from './native-component-assets.ts'
 
@@ -36,7 +36,7 @@ test('compiles a co-located interface without treating it as an opaque native as
         })
 
         assert.match(compiled.code, /NativeCounter\s*=\s*['"]native-counter['"]/)
-        assert.deepEqual(watchedFiles, new Set([sourceDirectory, sourcePath, entryPath].map(normalizeModuleId)))
+        assert.deepEqual(watchedFiles, new Set([sourceDirectory, sourcePath, entryPath].map(normalizePath)))
         assert.equal(compiled.meta[nativeComponentMetaKey].sources[0]?.assets[0]?.relativePath, 'component.data')
         assert.equal(compiled.meta[nativeComponentMetaKey].assetBytes, 13)
     } finally {
