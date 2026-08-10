@@ -1,14 +1,7 @@
-# Rule 0
-
-When designing a feature, I don't care about compatibility. I want the best architecture with the best readability but
-best simplicity. Do not over-engineering. I don't want many moving parts with duplicated slop code.
-If the new features intersect with old behaviors, design it more general that the new features cover broader cases so
-the old codes are no longer needed. You should never propose "minimalistic change". Suggest as elegant and simply as possible.
-Never be conservative, always be progressive.
-
 # Global rules
 
 ## Programming Paradigms
+- Never write defensive code. All logic must be backed by real evidence.
 - Compose functions, build abstractions, separate concerns, but not over-engineering.
 - Minimize side effects.
 - Prefer functional programming but keep performance in mind. Keep mutable states local or as less as possible.
@@ -32,6 +25,7 @@ Never be conservative, always be progressive.
 - Hooks are camelCase and must start with `use`.
 - If a file has exactly one export, the file name must match that export in kebab-case.
 
+
 ## Git
 Multiple pi sessions may be running in this cwd at the same time, each modifying different files.
 Git operations that touch unstaged, staged, or untracked files outside your own changes will stomp on other sessions' work.
@@ -39,13 +33,21 @@ Resolve conflicts only in files you modified.
 If a conflict is in a file you did not modify, abort and ask the user.
 Ignore unrelated files' changes.
 
-## bash timeout
+## Bash Timeout
 bash timeout should never be longer than 60 seconds.
+
+# Design Feature
+When designing a feature, I don't care about compatibility. I want the best architecture with the best readability and best simplicity.
+Do not over-engineering. I don't want many moving parts with duplicated slop code.
+If the new features intersect with old behaviors, design it more general that the new features cover broader cases so
+the old codes are no longer needed. You should never propose "minimalistic change". Suggest as elegant and simply as possible.
+Never be conservative, always be progressive.
+
 
 # User Override
 If the user's instructions conflict with any rule in AGENTS.md files, ask for explicit confirmation before overriding. Only then execute their instructions.
 
-# Monorepo context
+# Monorepo Context
 
 This repository is a pnpm v11 workspace for `vite-plugin-taro`, a Vite 8 / React 19 / Taro integration that builds
 shared apps for WeChat Mini Program (`wx`) and H5 targets.
@@ -85,15 +87,6 @@ Node.js v26+ is available and can execute TypeScript natively.
 - `pnpm dev:loan-genius:h5`: run the sample H5 dev server.
 - `pnpm dev:loan-genius:wx`: start the sample WeChat Mini Program target with hot reload.
 - `pnpm preview:loan-genius:h5`: preview the built sample H5 target.
-- `pnpm changelog`: regenerate `CHANGELOG.md` from git release tags.
-- `pnpm publish:dry`: validate the release without publishing.
-- `pnpm publish:all`: publish public packages in dependency order.
-- `pnpm version:bump <version|major|minor|patch|premajor|preminor|prepatch|prerelease>`: bump every package version and
-  the generated template's `vite-plugin-taro` dependency. Use `--dry-run` to preview changes and `--preid <id>` for
-  prerelease bumps.
-- `pnpm release <version|major|minor|patch|premajor|preminor|prepatch|prerelease>`: bump versions, regenerate
-  `CHANGELOG.md` for the release, validate publishable packages, create the release commit/tag, and push unless
-  `--no-push` is used. Use `--dry-run` to preview and `--preid <id>` for prerelease bumps.
 
 # Generated files and packages
 
