@@ -117,9 +117,8 @@ export function createPlacer() {
                     if (location.kind === 'main') {
                         return 'assets/[name]-[hash].js'
                     }
-                    // The containing subpackage already supplies a stable identity. Do not leak the Rolldown group name
-                    // into every physical chunk filename; content identity alone is sufficient beneath that root.
-                    return `${location.root}/assets/[hash].js`
+                    // Keep Rolldown's original chunk name for readable output while the hash preserves content identity.
+                    return `${location.root}/assets/[name]-[hash].js`
                 },
                 // Keep generic assets independent of native output identities assigned after bundling.
                 assetFileNames: 'assets/[name]-[hash][extname]'

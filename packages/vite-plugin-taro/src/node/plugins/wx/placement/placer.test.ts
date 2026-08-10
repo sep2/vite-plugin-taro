@@ -80,7 +80,7 @@ test('places dynamic-only modules in a generated asynchronous subpackage', () =>
         }
     } as unknown as Rolldown.OutputBundle
 
-    assert.match(filePattern, /^sub\/p_[a-f0-9]{8}\/assets\/\[hash]\.js$/)
+    assert.match(filePattern, /^sub\/p_[a-f0-9]{8}\/assets\/\[name]-\[hash]\.js$/)
     assert.equal(placer.getLoadMode(renderedChunk(fileName)), 'async')
     assert.deepEqual(placer.getSubpackages({}), [])
     assert.deepEqual(placer.getSubpackages(bundle), [
