@@ -1,22 +1,45 @@
 import assert from 'node:assert/strict'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import test from 'node:test'
 import { createServer } from 'vite'
 import { createTailwindSidecar } from './create-tailwind-sidecar.ts'
 
-test('owns the tracked roots and Vite server only during serve', async () => {
+test('transforms one tracked root as a serve-only sidecar request', async () => {
+    const projectRoot = await mkdtemp(path.join(tmpdir(), 'vpt-tailwind-sidecar-'))
+    const rootId = path.join(projectRoot, 'app.css')
+    const rootSource = `@import 'tailwindcss';`
+    await writeFile(rootId, rootSource)
+
     // This models the live registry owned and updated by the root tracker.
-    const rootIds = new Set(['/project/src/app.css'])
+    const rootIds = new Set([rootId])
     const getTailwindRoots = () => rootIds
     const plugin = createTailwindSidecar(getTailwindRoots)
-
-    assert.equal(plugin.apply, 'serve')
-    assert.equal(plugin.api?.getTailwindRoots, getTailwindRoots)
-    assert.equal(plugin.api.getTailwindRoots(), rootIds)
-
     const server = await createServer({ configFile: false, logLevel: 'silent', plugins: [plugin] })
+    const pluginContainer = server.environments.client.pluginContainer
+    const originalTransform = pluginContainer.transform
+    // The mock records the exact synthetic request while isolating this unit from Vite's unrelated CSS implementation.
+    const requests: Array<Readonly<{ code: string; id: string }>> = []
+    pluginContainer.transform = async (code, id) => {
+        requests.push({ code, id })
+        return { code: 'const __vite__css = ".generated {}"', map: null }
+    }
+
     try {
-        assert.equal(plugin.api.getServer()?.config, server.config)
+        assert.equal(plugin.apply, 'serve')
+        assert.equal(plugin.api?.getTailwindRoots, getTailwindRoots)
+        assert.equal(plugin.api.getTailwindRoots(), rootIds)
+        assert.equal(await plugin.api.transformTailwindRoot(rootId), 'const __vite__css = ".generated {}"')
+        assert.deepEqual(requests, [
+            {
+                code: rootSource,
+                id: `${rootId}?weapp-vite-sidecar=style`
+            }
+        ])
     } finally {
+        pluginContainer.transform = originalTransform
         await server.close()
+        await rm(projectRoot, { recursive: true })
     }
 })
