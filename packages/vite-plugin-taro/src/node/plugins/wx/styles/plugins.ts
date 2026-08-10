@@ -4,6 +4,7 @@ import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
 import { transformVitePlugin } from '../../../utils/vite.ts'
 import { tailwindcssBasedir } from '../../tailwind/tailwind-css.ts'
 import { createTailwindRootTracker } from './create-tailwind-root-tracker.ts'
+import { createTailwindSidecar } from './create-tailwind-sidecar.ts'
 
 /*
  * WX style output order:
@@ -28,7 +29,7 @@ const wxStyleOptions = {
 
 /** Creates the complete WX Tailwind and global-style pipeline. */
 export function createWxStylePlugins(): PluginOption[] {
-    const { plugins: tailwindPlugins } = createTailwindRootTracker(
+    const { plugins: tailwindPlugins, getTailwindRoots } = createTailwindRootTracker(
         WeappTailwindcss({
             // VPT is a custom Vite compiler.
             // Using Taro's adapter would import Taro-specific CSS ownership rules which we don't need.
@@ -46,7 +47,11 @@ export function createWxStylePlugins(): PluginOption[] {
         }) ?? []
     )
 
-    return [transformVitePlugin(tailwindPlugins, alignGenerateBundleOrder), createWxStyleFinalizer()]
+    return [
+        transformVitePlugin(tailwindPlugins, alignGenerateBundleOrder),
+        createTailwindSidecar(getTailwindRoots),
+        createWxStyleFinalizer()
+    ]
 }
 
 /**
