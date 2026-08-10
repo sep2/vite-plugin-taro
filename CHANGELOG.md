@@ -4,6 +4,49 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.5.13] - 2026-08-10
+
+### Added
+
+- add WX Tailwind sidecar plugin (8ac457b)
+
+### Changed
+
+- complete WX style HMR publication (b334888)
+- css (9c3d235)
+- refine floating diagram controls (322294a)
+- render floating diagram on first frame (b2637f4)
+- publish ordinary WX style HMR (9a8da13)
+- capture live WX style graph in dev host (72ce227)
+- text (22f5e91)
+- move WX style capture into dev host (2071a66)
+- add floating automatic subpackages diagram (838ec32)
+- share WX style transformer (cc586c3)
+- render finalized WXSS from current style graph (73761ed)
+- derive WX style order from application entries (b5cb500)
+- agents.md (befb66d)
+- cache processed WX development styles (94d31e4)
+- refresh Tailwind CSS after WX HMR parsing (a04d339)
+- agents.md (d854b67)
+- rename (4ebbfb5)
+- cache Tailwind sidecar CSS (99d864c)
+- extract CSS from Tailwind sidecar transforms (fbc7e25)
+- transform Tailwind roots through WX sidecar (8999e74)
+- capture Vite server for WX style sidecar (de175b4)
+- track Tailwind CSS roots in WX serve mode (568dca6)
+- favicon (6a1cfd6)
+- emit app WXSS with target output (c5f0440)
+- comments (9378a87)
+- move styles into target pipelines (375f500)
+- agents.md (2e40b08)
+- split global WXSS from app wrapper (1bf84f7)
+
+### Fixed
+
+- fix WXSS cache across development restarts (aa88e4a)
+- fix Windows style HMR test module IDs (bbecf7f)
+- fix windows ci (bd070ca)
+
 ## [0.5.12] - 2026-08-10
 
 ### Fixed
