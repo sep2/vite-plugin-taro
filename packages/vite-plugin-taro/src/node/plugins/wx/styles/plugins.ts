@@ -2,8 +2,6 @@ import type { Plugin, PluginOption, Rolldown } from 'vite'
 import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
 import { transformVitePlugin } from '../../../utils/vite.ts'
 import { tailwindcssBasedir } from '../../tailwind/tailwind-css.ts'
-import { createTailwindRootTracker } from './create-tailwind-root-tracker.ts'
-import { createWxDevStyle, type WxStyleTransformer } from './create-wx-dev-style.ts'
 import { transformWxStyle, wxStyleOptions } from './transform-wx-style.ts'
 
 /*
@@ -18,13 +16,9 @@ import { transformWxStyle, wxStyleOptions } from './transform-wx-style.ts'
  * break this sequence. `alignGenerateBundleOrder` removes only that broader phase from upstream output hooks.
  */
 
-type WxStylePluginOptions = Readonly<{
-    applicationEntryIds: readonly string[]
-}>
-
 /** Creates the complete WX Tailwind and global-style pipeline. */
-export function createWxStylePlugins({ applicationEntryIds }: WxStylePluginOptions): PluginOption[] {
-    const { plugins: tailwindPlugins, getTailwindRoots } = createTailwindRootTracker(
+export function createWxStylePlugins(): PluginOption[] {
+    const tailwindPlugins =
         WeappTailwindcss({
             // VPT is a custom Vite compiler.
             // Using Taro's adapter would import Taro-specific CSS ownership rules which we don't need.
@@ -40,13 +34,8 @@ export function createWxStylePlugins({ applicationEntryIds }: WxStylePluginOptio
             cssOptions: wxStyleOptions,
             logLevel: 'warn'
         }) ?? []
-    )
 
-    return [
-        transformVitePlugin(tailwindPlugins, alignGenerateBundleOrder),
-        createWxDevStyle({ applicationEntryIds, getTailwindRoots, transformWxStyle }),
-        createWxStyleFinalizer(transformWxStyle)
-    ]
+    return [transformVitePlugin(tailwindPlugins, alignGenerateBundleOrder), createWxStyleFinalizer(transformWxStyle)]
 }
 
 /**
@@ -58,7 +47,7 @@ export function createWxStylePlugins({ applicationEntryIds }: WxStylePluginOptio
  * dynamic chunks; running after native companion emission would also see Page and native-component WXSS files that must
  * remain opaque.
  */
-function createWxStyleFinalizer(transformWxStyle: WxStyleTransformer): Plugin {
+function createWxStyleFinalizer(transformStyle: typeof transformWxStyle): Plugin {
     return {
         name: 'vpt:wx-style-finalizer',
         generateBundle: {
@@ -78,7 +67,7 @@ function createWxStyleFinalizer(transformWxStyle: WxStyleTransformer): Plugin {
 
                 const [style] = styles
                 const source = typeof style.source === 'string' ? style.source : new TextDecoder().decode(style.source)
-                const transformedResult = await transformWxStyle(source)
+                const transformedResult = await transformStyle(source)
 
                 // Preserve the compiler stylesheet as the real global asset so its bundle metadata and ownership remain
                 // intact. Only its finalized contents and stable WXSS identity change.

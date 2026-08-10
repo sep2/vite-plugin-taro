@@ -28,11 +28,13 @@ export type BundledDev = {
 export function installWxDevOptions({
     bundledDev,
     server,
-    options
+    options,
+    hostPlugins
 }: {
     bundledDev: BundledDev
     server: ViteDevServer
     options: VitePluginTaroOptions
+    hostPlugins: Plugin[]
 }): Promise<void> {
     // The buildEnd hook and its one-shot result belong to the same abstraction. Consumers can await startup without receiving
     // a resolver capable of settling it externally.
@@ -83,7 +85,12 @@ export function installWxDevOptions({
 
         // Preserve the physical paths watched by WeChat DevTools across host restarts; the complete build overwrites every
         // active output without disrupting the hot-reload watcher.
-        rolldownOptions.plugins = [rolldownOptions.plugins, reportInitialBuildPlugin, createViteReporter(server)]
+        rolldownOptions.plugins = [
+            rolldownOptions.plugins,
+            hostPlugins,
+            reportInitialBuildPlugin,
+            createViteReporter(server)
+        ]
         disableViteOxcSourcemap(rolldownOptions.plugins)
 
         return rolldownOptions

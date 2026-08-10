@@ -21,11 +21,7 @@ type WxResolver = ReturnType<typeof createResolver>
 export function createWxTargetPlugins(options: VitePluginTaroOptions): PluginOption[] {
     const resolver = createResolver(options)
 
-    return [
-        createWxStylePlugins({ applicationEntryIds: resolver.applicationEntryIds }),
-        createWxPlugin(options, resolver),
-        createWxDevelopmentPlugin(options)
-    ]
+    return [createWxStylePlugins(), createWxPlugin(options, resolver), createWxDevelopmentPlugin(options)]
 }
 
 /** Configures the complete wx target build pipeline. */

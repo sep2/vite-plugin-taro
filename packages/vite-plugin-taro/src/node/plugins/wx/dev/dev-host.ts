@@ -16,6 +16,7 @@ import {
     writeHmrFile
 } from './hmr-files.ts'
 import { PatchPublisher } from './patch-publisher.ts'
+import { createStyleCapturePlugin, type ProcessedStyle } from './styles/create-style-capture-plugin.ts'
 import { type BundledDev, installWxDevOptions, requireSingleOutput } from './wx-dev-options.ts'
 
 export type WxDevHost = Readonly<{
@@ -54,6 +55,13 @@ export async function createWxDevHost({
     options: VitePluginTaroOptions
 }): Promise<WxDevHost> {
     const bundledDev = getBundledDev(server)
+    // The host owns processed development CSS that Rolldown's graph does not retain. The trailing capture hook updates one
+    // immutable value per physical style in O(1), ready for graph composition at the HMR transaction boundary.
+    const processedStyles = new Map<string, ProcessedStyle>()
+    const styleCapturePlugin = createStyleCapturePlugin((id, style) => {
+        processedStyles.set(id, style)
+    })
+
     // Rolldown invokes output callbacks without awaiting their promises. This queue is the single owner of mutable HMR host
     // state and physical metadata writes, preventing a later patch or build identity from being overwritten by older work.
     const hostTasks = new SerializedTaskQueue((operation, error) => logWxError(server.config.logger, operation, error))
@@ -64,7 +72,7 @@ export async function createWxDevHost({
 
     // DevEngine does not reject run() after an initial plugin failure. The options layer owns a first-build buildEnd barrier
     // and exposes only its result; later build errors continue independently through onOutput and onHmrUpdates.
-    const initialBuild = installWxDevOptions({ bundledDev, server, options })
+    const initialBuild = installWxDevOptions({ bundledDev, server, options, hostPlugins: [styleCapturePlugin] })
     const engine: DevEngine = await createEngine()
 
     // The wx dev host owns the only DevEngine. Vite's default listen() would create a second
