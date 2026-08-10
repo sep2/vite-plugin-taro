@@ -51,7 +51,7 @@ test('refreshes tracked roots after a JavaScript HMR parse', async () => {
         })
 
         assert.deepEqual(requests, [])
-        assert.deepEqual([...api.getTailwindCss()], [])
+        assert.deepEqual([...api.getStyleCss()], [])
 
         const moduleParsed = plugin.moduleParsed
         if (typeof moduleParsed !== 'function' || parsedScript === undefined) {
@@ -62,7 +62,7 @@ test('refreshes tracked roots after a JavaScript HMR parse', async () => {
         assert.equal(plugin.apply, 'serve')
         assert.equal(api.getTailwindRoots, getTailwindRoots)
         assert.equal(api.getTailwindRoots(), rootIds)
-        assert.deepEqual([...api.getTailwindCss()], [[rootId, generatedCss]])
+        assert.deepEqual([...api.getStyleCss()], [[rootId, generatedCss]])
         assert.deepEqual(requests, [
             {
                 code: rootSource,
@@ -74,4 +74,38 @@ test('refreshes tracked roots after a JavaScript HMR parse', async () => {
         await server.close()
         await rm(projectRoot, { recursive: true })
     }
+})
+
+test('captures processed ordinary CSS before Vite wraps it in JavaScript', async () => {
+    const cssId = '/project/src/page.css'
+    const css = '.page { color: blue; }'
+    const source: Plugin = {
+        name: 'test:ordinary-css-source',
+        resolveId(id) {
+            if (id === 'virtual:page-css') return cssId
+        },
+        load(id) {
+            if (id === cssId) return { code: css, moduleType: 'js' }
+        }
+    }
+    const consumeCss: Plugin = {
+        name: 'test:ordinary-css-consumer',
+        transform(_, id) {
+            if (id === cssId) return 'export {}'
+        }
+    }
+    // This fixture has no Tailwind roots because it isolates ordinary CSS capture.
+    const tailwindRoots = new Set<string>()
+    const plugin = createWxDevStyle(() => tailwindRoots)
+    const api = plugin.api
+    if (!api) throw new Error('Expected the WX development style API')
+
+    await build({
+        input: 'virtual:page-css',
+        output: { format: 'es' },
+        plugins: [source, plugin, consumeCss],
+        write: false
+    })
+
+    assert.deepEqual([...api.getStyleCss()], [[cssId, css]])
 })

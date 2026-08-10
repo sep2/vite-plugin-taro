@@ -1,12 +1,12 @@
 import { readFile } from 'node:fs/promises'
 import type { Plugin, ViteDevServer } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
-import { createTailwindSidecarId, extractViteCss } from './utils.ts'
+import { createTailwindSidecarId, extractViteCss, isGlobalStyleRequest } from './utils.ts'
 
 const javaScriptSourcePattern = /\.(?:[cm]?[jt]s|[jt]sx)$/
 
 type WxDevStyleApi = Readonly<{
-    getTailwindCss: () => ReadonlyMap<string, string>
+    getStyleCss: () => ReadonlyMap<string, string>
     getTailwindRoots: () => ReadonlySet<string>
     transformTailwindRoot: (rootId: string) => Promise<string>
 }>
@@ -16,8 +16,9 @@ export function createWxDevStyle(getTailwindRoots: () => ReadonlySet<string>): P
     // Vite assigns this once during serve configuration, before any later regeneration hook can request a root transform.
     let server: ViteDevServer
 
-    // Root transforms are the sole writers. The live cache retains complete generated fragments for later WXSS composition.
-    const tailwindCss = new Map<string, string>()
+    // Post-transform capture and explicit Tailwind refreshes are the sole writers. This live cache retains one complete,
+    // already-transformed fragment per physical style module for later deterministic WXSS composition.
+    const styleCacheMap = new Map<string, string>()
 
     /*
      * A complete build invokes moduleParsed for every JS/TSX module while Tailwind is still accumulating candidates, and its
@@ -30,7 +31,7 @@ export function createWxDevStyle(getTailwindRoots: () => ReadonlySet<string>): P
 
     const transformAndCacheTailwindRoot = async (rootId: string): Promise<string> => {
         const css = await transformTailwindRoot(server, rootId)
-        tailwindCss.set(rootId, css)
+        styleCacheMap.set(rootId, css)
         return css
     }
 
@@ -39,7 +40,7 @@ export function createWxDevStyle(getTailwindRoots: () => ReadonlySet<string>): P
         apply: 'serve',
         // Keep access to the live dependencies attached until the regeneration hook consumes them.
         api: {
-            getTailwindCss: () => tailwindCss,
+            getStyleCss: () => styleCacheMap,
             getTailwindRoots,
             transformTailwindRoot: transformAndCacheTailwindRoot
         },
@@ -58,6 +59,18 @@ export function createWxDevStyle(getTailwindRoots: () => ReadonlySet<string>): P
             }
 
             await Promise.all([...getTailwindRoots()].map(transformAndCacheTailwindRoot))
+        },
+        transform(code, id) {
+            /*
+             * Vite orders this user plugin after `vite:css` and before `vite:css-post`. At this point `code` is processed CSS:
+             * preprocessors, PostCSS, CSS Modules, and upstream Tailwind generation have run, but Vite has not wrapped the
+             * payload in browser HMR JavaScript. Cache that CSS directly instead of extracting it from `__vite__css` later.
+             */
+            if (!isGlobalStyleRequest(id)) {
+                return
+            }
+
+            styleCacheMap.set(normalizeModuleId(id), code)
         }
     }
 }

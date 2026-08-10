@@ -1,3 +1,7 @@
+import { isCSSRequest } from 'vite'
+
+const nonRuntimeStyleQueries = ['direct', 'inline', 'inline-css', 'raw', 'style-attr', 'transform-only', 'url'] as const
+
 /**
  * Creates an auxiliary style request without replacing the physical Rolldown graph module.
  *
@@ -9,6 +13,22 @@
  */
 export function createTailwindSidecarId(rootId: string): string {
     return `${rootId}?weapp-vite-sidecar=style`
+}
+
+/** Selects imported style modules whose Vite development output owns a runtime CSS payload. */
+export function isGlobalStyleRequest(id: string): boolean {
+    if (!isCSSRequest(id)) return false
+
+    const queryStart = id.indexOf('?')
+    if (queryStart < 0) return true
+
+    const fragmentStart = id.indexOf('#', queryStart)
+    const query = id.slice(queryStart + 1, fragmentStart < 0 ? undefined : fragmentStart)
+    const parameters = new URLSearchParams(query)
+
+    return (
+        !parameters.has('weapp-vite-sidecar') && nonRuntimeStyleQueries.every((parameter) => !parameters.has(parameter))
+    )
 }
 
 /**
