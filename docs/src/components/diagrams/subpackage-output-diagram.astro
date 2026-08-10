@@ -1,12 +1,20 @@
 ---
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
 import { Icon } from '@astrojs/starlight/components'
+
+interface Props {
+    headingLevel: 2 | 3
+}
+
+const { headingLevel } = Astro.props
+// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
+const Heading = headingLevel === 2 ? 'h2' : 'h3'
 ---
 
 <article class="diagram-panel output-panel" data-node="flow-output" aria-labelledby="output-diagram-title">
     <header class="diagram-heading">
         <span>构建产物</span>
-        <h3 id="output-diagram-title">静态依赖自动拆包</h3>
+        <Heading id="output-diagram-title">静态依赖自动拆包</Heading>
     </header>
 
     <div
@@ -63,7 +71,7 @@ import { Icon } from '@astrojs/starlight/components'
         padding: 1.4rem 1rem 1rem;
         border: 1px solid var(--vpt-border);
         border-radius: 0.35rem 1rem 1rem;
-        background: var(--vpt-surface);
+        background: var(--vpt-node-background);
         box-shadow: 0 10px 25px var(--vpt-shadow);
     }
 
@@ -83,9 +91,9 @@ import { Icon } from '@astrojs/starlight/components'
         border: 1px solid var(--vpt-border);
         border-bottom: 0;
         border-radius: 0.65rem 0.65rem 0 0;
-        background: var(--vpt-surface);
+        background: var(--vpt-node-background);
         color: var(--vpt-accent);
-        font-size: var(--home-font-size-caption);
+        font-size: var(--diagram-font-size-caption);
         font-weight: 750;
     }
 
@@ -106,7 +114,7 @@ import { Icon } from '@astrojs/starlight/components'
         flex-basis: 100%;
         margin-bottom: 0.2rem;
         color: var(--vpt-heading-strong);
-        font-size: var(--home-font-size-body);
+        font-size: var(--diagram-font-size-body);
     }
 
     .package-content > span {
@@ -114,7 +122,7 @@ import { Icon } from '@astrojs/starlight/components'
         border-radius: 999px;
         background: var(--vpt-chip-background);
         color: var(--vpt-chip-text);
-        font-size: var(--home-font-size-label);
+        font-size: var(--diagram-font-size-label);
     }
 
     .package-content > .module-chip {
@@ -128,20 +136,20 @@ import { Icon } from '@astrojs/starlight/components'
     }
 
     .module-chip b {
-        font-size: var(--home-font-size-label);
+        font-size: var(--diagram-font-size-label);
         font-weight: 600;
     }
 
     .module-chip small {
-        color: var(--vpt-muted);
-        font-size: var(--home-font-size-caption);
+        color: var(--vpt-chip-text);
+        font-size: var(--diagram-font-size-caption);
     }
 
     .package-card > small {
         display: block;
         margin-top: 0.7rem;
         color: var(--vpt-muted);
-        font-size: var(--home-font-size-caption);
+        font-size: var(--diagram-font-size-caption);
         text-align: right;
     }
 
@@ -170,7 +178,7 @@ import { Icon } from '@astrojs/starlight/components'
         justify-content: center;
         gap: 0.5rem;
         color: var(--vpt-muted);
-        font-size: var(--home-font-size-caption);
+        font-size: var(--diagram-font-size-caption);
         text-align: center;
     }
 
@@ -180,7 +188,7 @@ import { Icon } from '@astrojs/starlight/components'
         color: var(--vpt-accent);
     }
 
-    @media (max-width: 40rem) {
+    @container automatic-subpackages (max-width: 40rem) {
         .subpackage-grid {
             gap: 0.45rem;
         }

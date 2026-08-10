@@ -3,6 +3,9 @@ title: 全自动分包
 description: 使用动态导入，让 vpt 自动管理微信小程序的主包与分包。
 ---
 
+import AutomaticSubpackagesDiagram from '../../../components/automatic-subpackages-diagram.astro'
+import FloatingContent from '../../../components/floating-content.astro'
+
 开发者不再需要关心微信小程序的单包 2M 限制。
 
 应用代码可按照标准 Web 规则互相引用。
@@ -14,6 +17,19 @@ description: 使用动态导入，让 vpt 自动管理微信小程序的主包�
 :::note
 你不需要手动配置任何 `subPackages`。分包是全自动的。
 :::
+
+<FloatingContent
+    id="automatic-subpackages-diagram"
+    label="自动分包规划示意图"
+    description="查看源码依赖如何自动规划为主包与分包"
+    collapseLabel="收起自动分包规划示意图"
+    collapseText="收起示意图"
+    expandLabel="展开自动分包规划示意图"
+    inlineSize="76rem"
+    blockSize="46.6rem"
+>
+    <AutomaticSubpackagesDiagram headingLevel={2} />
+</FloatingContent>
 
 ## 静态引用
 

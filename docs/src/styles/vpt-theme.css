@@ -1,0 +1,51 @@
+.vpt-theme {
+    --vpt-page-bg: #0c1610;
+    --vpt-heading: #d9ebdc;
+    --vpt-heading-strong: #78d58d;
+    --vpt-text: #bed1c1;
+    --vpt-muted: #91a796;
+    --vpt-accent: #6fd087;
+    --vpt-accent-strong: #74dc8f;
+    --vpt-button-background: #74dc8f;
+    --vpt-button-text: #0d2b18;
+    --vpt-button-glow: rgba(101, 207, 128, 0.42);
+    --vpt-border: rgba(140, 207, 151, 0.16);
+    --vpt-border-strong: rgba(112, 211, 134, 0.42);
+    --vpt-surface: rgba(21, 38, 27, 0.84);
+    --vpt-surface-soft: rgba(18, 33, 23, 0.7);
+    --vpt-node-background: #142319;
+    --vpt-card-background:
+        radial-gradient(circle at 100% 0, rgba(86, 178, 104, 0.13), transparent 34%), rgba(19, 35, 24, 0.88);
+    --vpt-chip-background: #1b3021;
+    --vpt-chip-text: #a4d4ae;
+    --vpt-icon-background: linear-gradient(145deg, #1c3b26, #303c25);
+    --vpt-video-background: #111f16;
+    --vpt-shadow: rgba(0, 0, 0, 0.2);
+    --vpt-shadow-strong: rgba(0, 0, 0, 0.38);
+}
+
+:root[data-theme="light"] .vpt-theme {
+    --vpt-page-bg: #fbfaf1;
+    --vpt-heading: #174f32;
+    --vpt-heading-strong: #17673d;
+    --vpt-text: #315f44;
+    --vpt-muted: #64786a;
+    --vpt-accent: #207344;
+    --vpt-accent-strong: #197342;
+    --vpt-button-background: #197342;
+    --vpt-button-text: #fffdf5;
+    --vpt-button-glow: rgba(50, 170, 89, 0.42);
+    --vpt-border: rgba(30, 102, 61, 0.14);
+    --vpt-border-strong: rgba(37, 137, 74, 0.35);
+    --vpt-surface: rgba(255, 255, 249, 0.78);
+    --vpt-surface-soft: rgba(255, 255, 249, 0.56);
+    --vpt-node-background: #fefef7;
+    --vpt-card-background:
+        radial-gradient(circle at 100% 0, rgba(103, 192, 119, 0.12), transparent 34%), rgba(255, 255, 249, 0.78);
+    --vpt-chip-background: #f3f7e9;
+    --vpt-chip-text: #3a704f;
+    --vpt-icon-background: linear-gradient(145deg, #e3f4df, #fff7dc);
+    --vpt-video-background: #eef4e6;
+    --vpt-shadow: rgba(32, 91, 54, 0.06);
+    --vpt-shadow-strong: rgba(31, 92, 53, 0.15);
+}

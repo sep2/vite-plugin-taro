@@ -1,0 +1,186 @@
+---
+import './floating-content.css'
+import '../styles/vpt-theme.css'
+
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import { Icon } from '@astrojs/starlight/components'
+
+interface Props {
+    id: string
+    label: string
+    description: string
+    collapseLabel: string
+    collapseText: string
+    expandLabel: string
+    inlineSize: string
+    blockSize: string
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
+const { id, label, description, collapseLabel, collapseText, expandLabel, inlineSize, blockSize } = Astro.props
+---
+
+<vpt-floating-content
+    class="floating-content not-content vpt-theme"
+    style={`--floating-content-block-size: ${blockSize}`}
+    role="region"
+    aria-label={label}
+    aria-owns={id}
+>
+    <div
+        class="floating-content-layer vpt-theme"
+        style={`--floating-content-inline-size: ${inlineSize}`}
+        data-floating-content-layer
+    >
+        <div id={id} class="floating-content-viewport" tabindex="-1">
+            <div class="floating-content-inner">
+                <slot />
+            </div>
+        </div>
+
+        <button
+            class="floating-content-collapse"
+            type="button"
+            aria-label={collapseLabel}
+            aria-controls={id}
+            aria-expanded="true"
+            data-floating-content-collapse
+        >
+            <span>{collapseText}</span>
+            <Icon name="up-caret" />
+        </button>
+    </div>
+
+    <button
+        class="floating-content-placeholder"
+        type="button"
+        aria-label={expandLabel}
+        aria-controls={id}
+        aria-expanded="false"
+        data-floating-content-expand
+    >
+        <span class="placeholder-icon"><Icon name="code-branch" /></span>
+        <span class="placeholder-copy">
+            <strong>{label}</strong>
+            <small>{description}</small>
+        </span>
+        <span class="placeholder-action">
+            展开 <Icon name="right-arrow" />
+        </span>
+    </button>
+</vpt-floating-content>
+
+<script>
+    import { autoUpdate, computePosition, type Middleware } from '@floating-ui/dom'
+
+    const wideLayoutQuery = '(min-width: 84rem)'
+
+    const alignReferenceTop: Middleware = {
+        name: 'alignReferenceTop',
+        fn({ rects }) {
+            return { y: rects.reference.y }
+        }
+    }
+
+    class VptFloatingContent extends HTMLElement {
+        // This mutable cleanup follows the custom element through Astro page transitions.
+        #disconnect: (() => void) | undefined
+
+        connectedCallback(): void {
+            const layer = this.querySelector<HTMLDivElement>('[data-floating-content-layer]')!
+            const collapseButton = this.querySelector<HTMLButtonElement>('[data-floating-content-collapse]')!
+            const expandButton = this.querySelector<HTMLButtonElement>('[data-floating-content-expand]')!
+            const viewport = this.querySelector<HTMLElement>('.floating-content-viewport')!
+            const wideLayout = matchMedia(wideLayoutQuery)
+            const eventController = new AbortController()
+            // This cleanup handle represents Floating UI's active observers for the portaled layer.
+            let stopAutoUpdate: (() => void) | undefined
+
+            const updatePosition = (): void => {
+                void computePosition(this, layer, {
+                    strategy: 'absolute',
+                    middleware: [alignReferenceTop]
+                }).then(({ y }) => {
+                    if (!layer.hasAttribute('data-floating-content-floating')) return
+                    layer.style.top = `${y}px`
+                    layer.style.visibility = 'visible'
+                })
+            }
+
+            const stopPositioning = (): void => {
+                stopAutoUpdate?.()
+                stopAutoUpdate = undefined
+            }
+
+            const floatLayer = (): void => {
+                if (layer.hasAttribute('data-floating-content-floating')) return
+                layer.setAttribute('data-floating-content-floating', '')
+                layer.style.visibility = 'hidden'
+                document.body.append(layer)
+                stopAutoUpdate = autoUpdate(this, layer, updatePosition, {
+                    ancestorScroll: false,
+                    elementResize: false,
+                    layoutShift: false
+                })
+            }
+
+            const restoreLayer = (): void => {
+                if (!layer.hasAttribute('data-floating-content-floating')) return
+                stopPositioning()
+                layer.removeAttribute('data-floating-content-floating')
+                layer.style.removeProperty('top')
+                layer.style.removeProperty('visibility')
+                this.prepend(layer)
+            }
+
+            const updatePlacement = (): void => {
+                if (wideLayout.matches && !this.hasAttribute('data-collapsed')) {
+                    floatLayer()
+                    return
+                }
+                restoreLayer()
+            }
+
+            const setCollapsed = (collapsed: boolean): void => {
+                this.toggleAttribute('data-collapsed', collapsed)
+                layer.hidden = collapsed
+                collapseButton.setAttribute('aria-expanded', String(!collapsed))
+                expandButton.setAttribute('aria-expanded', String(!collapsed))
+                updatePlacement()
+            }
+
+            collapseButton.addEventListener(
+                'click',
+                () => {
+                    setCollapsed(true)
+                    expandButton.focus()
+                },
+                { signal: eventController.signal }
+            )
+            expandButton.addEventListener(
+                'click',
+                () => {
+                    setCollapsed(false)
+                    viewport.focus({ preventScroll: true })
+                },
+                { signal: eventController.signal }
+            )
+            wideLayout.addEventListener('change', updatePlacement, { signal: eventController.signal })
+
+            this.#disconnect = () => {
+                eventController.abort()
+                restoreLayer()
+            }
+            updatePlacement()
+        }
+
+        disconnectedCallback(): void {
+            this.#disconnect?.()
+            this.#disconnect = undefined
+        }
+    }
+
+    if (customElements.get('vpt-floating-content') === undefined) {
+        customElements.define('vpt-floating-content', VptFloatingContent)
+    }
+</script>

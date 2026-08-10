@@ -2,9 +2,7 @@
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
 import { Icon } from '@astrojs/starlight/components'
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
-import SubpackageOutputDiagram from './diagrams/subpackage-output-diagram.astro'
-// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
-import SubpackageSourceDiagram from './diagrams/subpackage-source-diagram.astro'
+import AutomaticSubpackagesDiagram from './automatic-subpackages-diagram.astro'
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
 import HomeSectionHeading from './home-section-heading.astro'
 ---
@@ -18,26 +16,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         align="center"
     />
 
-    <div class="package-flow" data-diagram="package-flow">
-        <svg class="d3-links flow-links" data-diagram-links aria-hidden="true"></svg>
-        <SubpackageSourceDiagram />
-
-        <div class="package-planner" aria-label="VPT 自动规划模块位置">
-            <div class="planner-anchor" data-node="flow-planner">
-                <div class="planner-core">
-                    <span>VPT</span>
-                    <small>自动规划</small>
-                </div>
-            </div>
-            <ul>
-                <li>模块图</li>
-                <li>引用关系</li>
-                <li>包体积</li>
-            </ul>
-        </div>
-
-        <SubpackageOutputDiagram />
-    </div>
+    <AutomaticSubpackagesDiagram headingLevel={3} />
 
     <div class="subpackage-benefits">
         <article class="benefit-card">
@@ -59,178 +38,7 @@ import HomeSectionHeading from './home-section-heading.astro'
     </a>
 </section>
 
-<script>
-    import { connectResponsiveDiagrams } from './diagrams/connect-responsive-diagrams'
-
-    const disconnectDiagrams = connectResponsiveDiagrams([
-        {
-            name: 'source',
-            selector: '[data-diagram="source-graph"]',
-            links: [
-                { from: 'source-entry', to: 'startup-dependencies', kind: 'static', label: 'static import' },
-                { from: 'source-entry', to: 'report-feature', kind: 'dynamic', label: 'import()' },
-                { from: 'report-feature', to: 'chart-dependency', kind: 'dependency' },
-                { from: 'report-feature', to: 'pdf-dependency', kind: 'dependency' },
-                { from: 'report-feature', to: 'native-dependency', kind: 'dependency' }
-            ]
-        },
-        {
-            name: 'flow',
-            selector: '[data-diagram="package-flow"]',
-            links: [
-                { from: 'flow-source', to: 'flow-planner', kind: 'flow' },
-                { from: 'flow-planner', to: 'flow-output', kind: 'flow' }
-            ]
-        }
-    ])
-
-    document.addEventListener('astro:before-swap', disconnectDiagrams, { once: true })
-</script>
-
 <style>
-    .subpackage-showcase {
-        --diagram-content-gap: clamp(2.25rem, 4vw, 3rem);
-        --diagram-branch-gap: clamp(3rem, 4vw, 3.5rem);
-        --diagram-footer-gap: clamp(2.25rem, 4vw, 3rem);
-    }
-
-    .package-flow {
-        display: grid;
-        position: relative;
-        grid-template-columns: minmax(0, 1fr) 9.5rem minmax(0, 1fr);
-        align-items: stretch;
-        gap: clamp(1rem, 2vw, 1.5rem);
-        margin: 0;
-    }
-
-    .subpackage-showcase :global(.diagram-panel),
-    .package-planner {
-        position: relative;
-        z-index: 1;
-        margin: 0;
-    }
-
-    .subpackage-showcase :global(.diagram-panel) {
-        display: flex;
-        min-width: 0;
-        height: 100%;
-        flex-direction: column;
-        padding: clamp(1.25rem, 3vw, 2rem);
-        border: 1px solid var(--vpt-border);
-        border-radius: var(--home-panel-radius);
-        background: var(--vpt-card-background);
-        box-shadow: var(--home-panel-shadow);
-    }
-
-    .subpackage-showcase :global(.diagram-heading) {
-        text-align: left;
-    }
-
-    .subpackage-showcase :global(.diagram-heading span) {
-        color: var(--vpt-accent);
-        font-size: var(--home-font-size-label);
-        font-weight: 750;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-    }
-
-    .subpackage-showcase :global(.diagram-heading h3) {
-        margin: 0.35rem 0 0;
-        color: var(--vpt-heading);
-        font-size: var(--home-font-size-title);
-    }
-
-    .subpackage-showcase :global(.diagram-footer) {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 3rem;
-        margin: auto 0 0;
-        padding-top: 1.15rem;
-        border-top: 1px solid var(--vpt-border);
-        text-align: center;
-    }
-
-    .package-planner {
-        display: grid;
-        place-items: center;
-    }
-
-    .planner-anchor {
-        display: grid;
-        width: 9.5rem;
-        height: 9.5rem;
-        margin: 0;
-        place-items: center;
-    }
-
-    .planner-core {
-        display: grid;
-        position: relative;
-        width: 5.5rem;
-        height: 5.5rem;
-        margin: 0;
-        border: 1px solid var(--vpt-border-strong);
-        border-radius: 50%;
-        background: var(--vpt-icon-background);
-        box-shadow:
-            0 0 0 0.65rem color-mix(in srgb, var(--vpt-icon-background) 58%, transparent),
-            0 18px 35px var(--vpt-shadow-strong);
-        place-content: center;
-        text-align: center;
-    }
-
-    .planner-core::before,
-    .planner-core::after {
-        content: '';
-        position: absolute;
-        border: 1px dashed var(--vpt-border-strong);
-        border-radius: 50%;
-        inset: -1.25rem;
-    }
-
-    .planner-core::after {
-        border-color: rgba(232, 136, 112, 0.45);
-        inset: -2rem;
-    }
-
-    .planner-core span {
-        color: var(--vpt-heading-strong);
-        font-family: Georgia, 'Times New Roman', serif;
-        font-size: var(--home-font-size-title);
-        font-weight: 700;
-    }
-
-    .planner-core small {
-        color: var(--vpt-accent);
-        font-size: var(--home-font-size-caption);
-        font-weight: 700;
-    }
-
-    .package-planner ul {
-        display: flex;
-        position: absolute;
-        top: calc(50% + 5.25rem);
-        left: 50%;
-        width: 9.5rem;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 0.3rem;
-        margin: 0;
-        padding: 0;
-        color: var(--vpt-muted);
-        font-size: var(--home-font-size-caption);
-        list-style: none;
-        transform: translateX(-50%);
-    }
-
-    .package-planner li {
-        padding: 0.18rem 0.35rem;
-        border: 1px solid var(--vpt-border);
-        border-radius: 999px;
-        background: var(--vpt-surface);
-    }
-
     .subpackage-benefits {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -303,90 +111,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         text-decoration: underline;
     }
 
-    .subpackage-showcase :global(.d3-links) {
-        position: absolute;
-        z-index: 0;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        overflow: visible;
-    }
-
-    .subpackage-showcase :global(.diagram-link) {
-        fill: none;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-        stroke-width: 1.5;
-        vector-effect: non-scaling-stroke;
-    }
-
-    .subpackage-showcase :global(.diagram-link-static) {
-        stroke: var(--vpt-border-strong);
-    }
-
-    .subpackage-showcase :global(.diagram-link-dynamic) {
-        stroke: #e88870;
-        stroke-dasharray: 5 5;
-    }
-
-    .subpackage-showcase :global(.diagram-link-dependency) {
-        stroke: rgba(232, 136, 112, 0.55);
-    }
-
-    .subpackage-showcase :global(.diagram-link-flow) {
-        stroke: var(--vpt-border-strong);
-        stroke-dasharray: 3 4;
-    }
-
-    .subpackage-showcase :global(.d3-links marker path) {
-        fill: var(--vpt-border-strong);
-    }
-
-    .subpackage-showcase :global(.diagram-link-label) {
-        fill: var(--vpt-muted);
-        stroke: var(--vpt-card-background);
-        stroke-width: 0.65rem;
-        paint-order: stroke;
-        font-size: var(--home-font-size-caption);
-    }
-
-    .subpackage-showcase :global(.diagram-link-label-dynamic) {
-        fill: #d9725d;
-    }
-
-    @media (max-width: 64rem) {
-        .package-flow {
-            grid-template-columns: 1fr;
-            max-width: 42rem;
-            margin-inline: auto;
-            gap: 3rem;
-        }
-
-        .subpackage-showcase :global(.diagram-panel) {
-            height: auto;
-        }
-
-        .package-planner {
-            min-height: 9.5rem;
-        }
-
-        .package-planner ul {
-            display: none;
-        }
-    }
-
     @media (max-width: 40rem) {
-        .subpackage-showcase {
-            --diagram-content-gap: 2.25rem;
-            --diagram-branch-gap: 3rem;
-            --diagram-footer-gap: 2.5rem;
-        }
-
-        .subpackage-showcase :global(.diagram-panel) {
-            padding: 1.1rem;
-        }
-
         .subpackage-benefits {
             grid-template-columns: 1fr;
         }

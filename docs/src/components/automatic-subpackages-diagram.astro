@@ -1,0 +1,364 @@
+---
+import '../styles/vpt-theme.css'
+
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import SubpackageOutputDiagram from './diagrams/subpackage-output-diagram.astro'
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import SubpackageSourceDiagram from './diagrams/subpackage-source-diagram.astro'
+
+interface Props {
+    headingLevel: 2 | 3
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
+const { headingLevel } = Astro.props
+---
+
+<div class="automatic-subpackages-diagram vpt-theme">
+    <div class="package-flow" data-diagram="package-flow">
+        <svg class="d3-links flow-links" data-diagram-links aria-hidden="true"></svg>
+        <SubpackageSourceDiagram headingLevel={headingLevel} />
+
+        <div class="package-planner" role="img" aria-label="VPT 自动规划模块位置">
+            <div class="planner-anchor" data-node="flow-planner">
+                <div class="planner-core">
+                    <span>VPT</span>
+                    <small>自动规划</small>
+                </div>
+            </div>
+            <ul>
+                <li>依赖分析</li>
+                <li>体积计算</li>
+                <li>资源类别</li>
+                <li>动态边界</li>
+                <li>拆包合并</li>
+            </ul>
+        </div>
+
+        <SubpackageOutputDiagram headingLevel={headingLevel} />
+    </div>
+</div>
+
+<script>
+    import { connectResponsiveDiagrams } from './diagrams/connect-responsive-diagrams'
+
+    const disconnectDiagrams = connectResponsiveDiagrams([
+        {
+            name: 'source',
+            selector: '[data-diagram="source-graph"]',
+            links: [
+                { from: 'source-entry', to: 'startup-dependencies', kind: 'static', label: 'static import' },
+                { from: 'source-entry', to: 'report-feature', kind: 'dynamic', label: 'import()' },
+                { from: 'report-feature', to: 'chart-dependency', kind: 'dependency' },
+                { from: 'report-feature', to: 'pdf-dependency', kind: 'dependency' },
+                { from: 'report-feature', to: 'native-dependency', kind: 'dependency' }
+            ]
+        },
+        {
+            name: 'flow',
+            selector: '[data-diagram="package-flow"]',
+            links: [
+                { from: 'flow-source', to: 'flow-planner', kind: 'flow' },
+                { from: 'flow-planner', to: 'flow-output', kind: 'flow' }
+            ]
+        }
+    ])
+
+    document.addEventListener('astro:before-swap', disconnectDiagrams, { once: true })
+</script>
+
+<style>
+    .automatic-subpackages-diagram {
+        --diagram-content-gap: clamp(2.25rem, 4vw, 3rem);
+        --diagram-branch-gap: clamp(3rem, 4vw, 3.5rem);
+        --diagram-footer-gap: clamp(2.25rem, 4vw, 3rem);
+        --diagram-font-size-title: var(--home-font-size-title, clamp(1.25rem, 2vw, 1.55rem));
+        --diagram-font-size-body: var(--home-font-size-body, 1rem);
+        --diagram-font-size-label: var(--home-font-size-label, 0.75rem);
+        --diagram-font-size-caption: var(--home-font-size-caption, 0.7rem);
+        --diagram-panel-radius: var(--home-panel-radius, 1.5rem);
+        --diagram-panel-shadow: var(--home-panel-shadow, 0 24px 60px var(--vpt-shadow));
+        container: automatic-subpackages-layout / inline-size;
+    }
+
+    :global(:where(.automatic-subpackages-diagram *)) {
+        box-sizing: border-box;
+        margin: 0;
+    }
+
+    .automatic-subpackages-diagram :global(ul) {
+        padding: 0;
+        list-style: none;
+    }
+
+    .package-flow {
+        display: grid;
+        position: relative;
+        grid-template-columns: minmax(0, 1fr) 9.5rem minmax(0, 1fr);
+        container: automatic-subpackages / inline-size;
+        align-items: stretch;
+        gap: clamp(1rem, 2vw, 1.5rem);
+        margin: 0;
+    }
+
+    .automatic-subpackages-diagram :global(.diagram-panel),
+    .package-planner {
+        position: relative;
+        z-index: 1;
+        margin: 0;
+    }
+
+    .automatic-subpackages-diagram :global(.diagram-panel) {
+        display: flex;
+        min-width: 0;
+        height: 100%;
+        flex-direction: column;
+        padding: clamp(1.25rem, 3vw, 2rem);
+        border: 1px solid var(--vpt-border);
+        border-radius: var(--diagram-panel-radius);
+        background: var(--vpt-card-background);
+        box-shadow: var(--diagram-panel-shadow);
+    }
+
+    .automatic-subpackages-diagram :global(.diagram-heading) {
+        text-align: left;
+    }
+
+    .automatic-subpackages-diagram :global(.diagram-heading span) {
+        color: var(--vpt-accent);
+        font-size: var(--diagram-font-size-label);
+        font-weight: 750;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+    }
+
+    .automatic-subpackages-diagram :global(.diagram-heading :is(h2, h3)) {
+        margin: 0.35rem 0 0;
+        color: var(--vpt-heading);
+        font-size: var(--diagram-font-size-title);
+    }
+
+    .automatic-subpackages-diagram :global(.diagram-footer) {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 3rem;
+        margin: auto 0 0;
+        padding-top: 1.15rem;
+        border-top: 1px solid var(--vpt-border);
+        text-align: center;
+    }
+
+    .package-planner {
+        --planner-orbit-rotation: 7deg;
+        display: grid;
+        place-items: center;
+    }
+
+    .planner-anchor {
+        display: grid;
+        width: 9.5rem;
+        height: 9.5rem;
+        margin: 0;
+        place-items: center;
+    }
+
+    .planner-core {
+        display: block;
+        position: relative;
+        width: 5.5rem;
+        height: 5.5rem;
+        margin: 0;
+        border: 1px solid var(--vpt-border-strong);
+        border-radius: 50%;
+        background: var(--vpt-icon-background);
+        box-shadow:
+            0 0 0 0.65rem color-mix(in srgb, var(--vpt-icon-background) 58%, transparent),
+            0 18px 35px var(--vpt-shadow-strong);
+        text-align: center;
+    }
+
+    .planner-core::before,
+    .planner-core::after {
+        content: '';
+        position: absolute;
+        border: 1px dashed var(--vpt-border-strong);
+        border-radius: 50%;
+        inset: -1.25rem;
+    }
+
+    .planner-core::after {
+        border-color: rgba(232, 136, 112, 0.45);
+        inset: -2rem;
+    }
+
+    .planner-core span {
+        position: absolute;
+        top: calc(50% - 0.15rem);
+        left: 50%;
+        color: var(--vpt-heading-strong);
+        font-family: Georgia, 'Times New Roman', serif;
+        padding-bottom: 0.5rem;
+        font-size: var(--diagram-font-size-title);
+        font-weight: 700;
+        line-height: 1;
+        transform: translate(-50%, -50%);
+    }
+
+    .planner-core small {
+        position: absolute;
+        top: calc(50% + 0.7rem);
+        left: 50%;
+        color: var(--vpt-accent);
+        font-size: var(--diagram-font-size-caption);
+        font-weight: 700;
+        line-height: 1;
+        transform: translateX(-50%);
+        white-space: nowrap;
+    }
+
+    .package-planner ul {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 9.5rem;
+        height: 9.5rem;
+        margin: 0;
+        padding: 0;
+        color: var(--vpt-muted);
+        font-size: var(--diagram-font-size-caption);
+        list-style: none;
+        pointer-events: none;
+        transform: translate(-50%, -50%);
+    }
+
+    .package-planner li {
+        --planner-orbit-angle: calc(
+            var(--planner-orbit-base-angle) + var(--planner-orbit-rotation)
+        );
+        display: flex;
+        position: absolute;
+        z-index: 2;
+        top: calc(50% + (sin(var(--planner-orbit-angle)) * 50%));
+        left: calc(50% + (cos(var(--planner-orbit-angle)) * 50%));
+        align-items: center;
+        justify-content: center;
+        padding: 0.32rem 0.1rem;
+        border: 0;
+        background: transparent;
+        color: color-mix(in srgb, var(--vpt-muted) 68%, var(--vpt-node-background));
+        font-size: 0.625rem;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        line-height: 1;
+        text-shadow:
+            0 0 0.3rem var(--vpt-page-bg),
+            0 0 0.65rem var(--vpt-page-bg),
+            0 0 0.9rem var(--vpt-page-bg);
+        white-space: nowrap;
+        transform: translate(-50%, -50%);
+    }
+
+    .package-planner li:nth-child(1) {
+        --planner-orbit-base-angle: -162deg;
+    }
+
+    .package-planner li:nth-child(2) {
+        --planner-orbit-base-angle: -18deg;
+    }
+
+    .package-planner li:nth-child(3) {
+        --planner-orbit-base-angle: 54deg;
+    }
+
+    .package-planner li:nth-child(4) {
+        --planner-orbit-base-angle: 126deg;
+    }
+
+    .package-planner li:nth-child(5) {
+        --planner-orbit-base-angle: -90deg;
+    }
+
+    .automatic-subpackages-diagram :global(.d3-links) {
+        position: absolute;
+        z-index: 0;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        overflow: visible;
+    }
+
+    .automatic-subpackages-diagram :global(.diagram-link) {
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.5;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .automatic-subpackages-diagram :global(.diagram-link-static) {
+        stroke: var(--vpt-border-strong);
+    }
+
+    .automatic-subpackages-diagram :global(.diagram-link-dynamic) {
+        stroke: #e88870;
+        stroke-dasharray: 5 5;
+    }
+
+    .automatic-subpackages-diagram :global(.diagram-link-dependency) {
+        stroke: rgba(232, 136, 112, 0.55);
+    }
+
+    .automatic-subpackages-diagram :global(.diagram-link-flow) {
+        stroke: var(--vpt-border-strong);
+        stroke-dasharray: 3 4;
+    }
+
+    .automatic-subpackages-diagram :global(.d3-links marker path) {
+        fill: var(--vpt-border-strong);
+    }
+
+    .automatic-subpackages-diagram :global(.diagram-link-label) {
+        fill: var(--vpt-muted);
+        stroke: var(--vpt-card-background);
+        stroke-width: 0.65rem;
+        paint-order: stroke;
+        font-size: var(--diagram-font-size-caption);
+    }
+
+    .automatic-subpackages-diagram :global(.diagram-link-label-dynamic) {
+        fill: #d9725d;
+    }
+
+    @container automatic-subpackages-layout (max-width: 64rem) {
+        .package-flow {
+            grid-template-columns: 1fr;
+            max-width: 42rem;
+            margin-inline: auto;
+            gap: 3rem;
+        }
+
+        .automatic-subpackages-diagram :global(.diagram-panel) {
+            height: auto;
+        }
+
+        .package-planner {
+            min-height: 9.5rem;
+        }
+    }
+
+    @container automatic-subpackages-layout (max-width: 40rem) {
+        .package-flow {
+            --diagram-content-gap: 2.25rem;
+            --diagram-branch-gap: 3rem;
+            --diagram-footer-gap: 2.5rem;
+        }
+
+        .automatic-subpackages-diagram :global(.diagram-panel) {
+            padding: 1.1rem;
+        }
+
+    }
+
+</style>
