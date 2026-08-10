@@ -206,9 +206,15 @@ button::after {
 }
 
 .tree-node-children {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: flex;
     gap: 4rpx;
+}
+
+.tree-node-children > .tree-node {
+    min-width: 0;
+    flex-basis: 0;
+    flex-grow: 1;
+    flex-shrink: 1;
 }
 
 .stateful-leaf {
@@ -241,12 +247,16 @@ button::after {
 }
 
 .activity-grid {
-    display: grid;
-    grid-template-columns: repeat(8, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: 6rpx;
 }
 
 .metric-cell {
+    min-width: 0;
+    flex-basis: 11%;
+    flex-grow: 1;
+    flex-shrink: 0;
     border-radius: 8rpx;
     background: #f1f5f9;
     padding: 8rpx 4rpx;
