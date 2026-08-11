@@ -23,7 +23,10 @@ export type BundledDev = {
     triggerBundleRegenerationIfStale(): Promise<boolean>
 }
 
-/** Installs the physical WX output and runtime conventions over Vite's browser-oriented bundled-development options. */
+/**
+ * Installs physical WX output and runtime conventions over Vite's browser-oriented bundled-development options.
+ * Build completion deliberately remains outside this options adapter: DevEngine onOutput is the single lifecycle authority.
+ */
 export function installWxDevOptions({
     bundledDev,
     server,
@@ -34,17 +37,7 @@ export function installWxDevOptions({
     server: ViteDevServer
     options: VitePluginTaroOptions
     hostPlugins: Plugin[]
-}): Promise<void> {
-    // The buildEnd hook and its one-shot result belong to the same abstraction. Consumers can await startup without receiving
-    // a resolver capable of settling it externally.
-    const initialBuild = Promise.withResolvers<void>()
-    const settleInitialBuild = once((error: Error | undefined): void => {
-        if (error) {
-            initialBuild.reject(error)
-        } else {
-            initialBuild.resolve()
-        }
-    })
+}): void {
     const original = bundledDev.getRolldownOptions.bind(bundledDev)
 
     bundledDev.getRolldownOptions = async () => {
@@ -80,25 +73,13 @@ export function installWxDevOptions({
             skipCommonRuntimeInjection: false
         }
 
-        const reportInitialBuildPlugin: Plugin = {
-            name: 'vpt:wx-report-initial-build',
-            buildEnd: settleInitialBuild
-        }
-
         // Preserve the physical paths watched by WeChat DevTools across host restarts; the complete build overwrites every
         // active output without disrupting the hot-reload watcher.
-        rolldownOptions.plugins = [
-            rolldownOptions.plugins,
-            hostPlugins,
-            reportInitialBuildPlugin,
-            createViteReporter(server)
-        ]
+        rolldownOptions.plugins = [rolldownOptions.plugins, hostPlugins, createViteReporter(server)]
         disableViteOxcSourcemap(rolldownOptions.plugins)
 
         return rolldownOptions
     }
-
-    return initialBuild.promise
 }
 
 /** Returns the configured output after rejecting states unsupported by the physical WX engine. */

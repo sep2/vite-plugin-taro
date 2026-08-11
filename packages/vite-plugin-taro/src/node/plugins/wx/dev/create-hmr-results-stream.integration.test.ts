@@ -7,10 +7,13 @@ import { type DevOptions, dev } from 'rolldown/experimental'
 import { asyncScheduler } from 'rxjs'
 import { createServer } from 'vite'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
+import { createHostActions } from './host-actions.ts'
 import type { BundledDev } from './wx-dev-options.ts'
 
 type HmrUpdatesResult = Parameters<NonNullable<DevOptions['onHmrUpdates']>>[0]
 type HmrUpdates = Exclude<HmrUpdatesResult, Error>
+type DevOutputResult = Parameters<NonNullable<DevOptions['onOutput']>>[0]
+type OutputAction = Readonly<{ kind: 'output'; result: DevOutputResult }>
 
 test('adapts a real DevEngine callback into one publication', async () => {
     const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-hmr-results-stream-')))
@@ -74,6 +77,64 @@ test('adapts a real DevEngine callback into one publication', async () => {
     } finally {
         hmrResults.complete()
         await engine.close()
+        await server.close()
+        await rm(root, { recursive: true })
+    }
+})
+
+test('keeps run fulfilled and reports an initial build failure through host actions', async () => {
+    const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-initial-output-error-')))
+    const appId = path.join(root, 'app.js')
+    await writeFile(appId, 'export const value = 1\n')
+
+    const server = await createServer({
+        root: root,
+        configFile: false,
+        logLevel: 'silent',
+        appType: 'custom',
+        experimental: { bundledDev: true },
+        build: { rolldownOptions: { input: appId } }
+    })
+    const bundledDev = requireBundledDev(server.environments.client.bundledDev)
+    const rolldownOptions = await bundledDev.getRolldownOptions()
+    const output = rolldownOptions.output
+    if (!output || Array.isArray(output)) {
+        throw new Error('Expected one bundled development output')
+    }
+    rolldownOptions.plugins = [
+        rolldownOptions.plugins,
+        {
+            name: 'test:initial-plugin-failure',
+            transform() {
+                throw new Error('expected initial plugin failure')
+            }
+        }
+    ]
+    // This mutable journal proves observing the initial output does not consume it before the reducer applies it.
+    const appliedOutputs: DevOutputResult[] = []
+    const hostActions = createHostActions<OutputAction>(
+        (action) => {
+            appliedOutputs.push(action.result)
+        },
+        (_action, error) => assert.fail(`Host output action failed: ${error}`)
+    )
+    const engine = await dev(rolldownOptions, output, {
+        onOutput(result) {
+            hostActions.next({ kind: 'output', result: result })
+        }
+    })
+
+    try {
+        const initialOutput = hostActions.waitForAction((action): action is OutputAction => action.kind === 'output')
+        await assert.doesNotReject(() => engine.run())
+        const { result } = await initialOutput
+        assert.equal(result instanceof Error, true)
+        assert.match(result instanceof Error ? result.message : '', /expected initial plugin failure/)
+        await hostActions.waitForIdle()
+        assert.equal(appliedOutputs[0], result)
+    } finally {
+        await engine.close()
+        await hostActions.complete()
         await server.close()
         await rm(root, { recursive: true })
     }

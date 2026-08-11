@@ -1,4 +1,4 @@
-import { catchError, concatMap, defer, EMPTY, lastValueFrom, Subject } from 'rxjs'
+import { catchError, concatMap, defer, EMPTY, filter, firstValueFrom, lastValueFrom, map, Subject } from 'rxjs'
 
 type ActionEnvelope<Action> =
     | Readonly<{ kind: 'action'; action: Action }>
@@ -7,6 +7,7 @@ type ActionEnvelope<Action> =
 export type HostActions<Action> = Readonly<{
     complete: () => Promise<void>
     next: (action: Action) => void
+    waitForAction: <Selected extends Action>(select: (action: Action) => action is Selected) => Promise<Selected>
     waitForIdle: () => Promise<void>
 }>
 
@@ -16,7 +17,8 @@ export type HostActions<Action> = Readonly<{
  * `concatMap` is the sole effect serializer: each deferred reducer call starts only after the prior Promise settles. Errors are
  * converted to empty inner streams so one failed physical transaction is reported without terminating later host actions.
  * Barrier envelopes participate in the same ordering but run no effect; resolving one proves every action admitted before it
- * has settled. Completing the source drains already-admitted effects and gives shutdown one Promise for final quiescence.
+ * has settled. `waitForAction` observes this same admission edge for lifecycle gates without introducing a forwarding Subject.
+ * Completing the source drains already-admitted effects and gives shutdown one Promise for final quiescence.
  */
 export function createHostActions<Action>(
     apply: (action: Action) => void | Promise<void>,
@@ -24,6 +26,7 @@ export function createHostActions<Action>(
 ): HostActions<Action> {
     // This Subject is the one mutable action-admission edge. Ordering state itself belongs to concatMap's subscription.
     const envelopes = new Subject<ActionEnvelope<Action>>()
+
     const completion = lastValueFrom(
         envelopes.pipe(
             concatMap((envelope) => {
@@ -51,6 +54,20 @@ export function createHostActions<Action>(
         },
         next(action) {
             envelopes.next({ kind: 'action', action: action })
+        },
+        waitForAction(select) {
+            /*
+             * Subscribe to the multicast admission Subject rather than creating another lifecycle source. Barrier envelopes are
+             * internal ordering controls, so expose only semantic actions and let the caller's type guard select its milestone.
+             * firstValueFrom unsubscribes after the match; concatMap's independent subscription still applies the same action.
+             */
+            return firstValueFrom(
+                envelopes.pipe(
+                    filter((envelope) => envelope.kind === 'action'),
+                    map((envelope) => envelope.action),
+                    filter(select)
+                )
+            )
         },
         waitForIdle() {
             const barrier = Promise.withResolvers<void>()

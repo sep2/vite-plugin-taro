@@ -33,13 +33,15 @@ export type WxDevHost = Readonly<{
 type HmrUpdatesResult = Parameters<NonNullable<DevOptions['onHmrUpdates']>>[0]
 type HmrUpdates = Exclude<HmrUpdatesResult, Error>
 type DevOutputResult = Parameters<NonNullable<DevOptions['onOutput']>>[0]
+/** A complete build callback is a host action whether it carries durable output or an initial/later build failure. */
+type OutputAction = Readonly<{ kind: 'output'; result: DevOutputResult }>
 
 type HostAction =
     | StyleCaptureAction
     | Readonly<{ kind: 'publish'; result: HmrUpdates }>
     | Readonly<{ kind: 'error'; error: Error }>
     | Readonly<{ kind: 'reports'; reports: readonly RuntimeReport[] }>
-    | Readonly<{ kind: 'output'; result: DevOutputResult }>
+    | OutputAction
     | Readonly<{ kind: 'listening' }>
 
 /** One short trailing-edge window absorbs editor bursts before style preparation and physical Page notification. */
@@ -64,10 +66,12 @@ export async function createWxDevHost({
     applicationEntryIds: readonly string[]
 }): Promise<WxDevHost> {
     const bundledDev = getBundledDev(server)
+
     // All callbacks admit typed actions through this edge; concatMap is the sole owner of effect ordering and mutable host state.
     const hostActions = createHostActions<HostAction>(applyHostAction, (action, error) =>
         logWxError(server.config.logger, `wx HMR ${action.kind} failed`, error)
     )
+
     const styleCapture = createStyleCapture({
         applicationEntryIds: applicationEntryIds,
         outDir: server.config.build.outDir,
@@ -80,9 +84,8 @@ export async function createWxDevHost({
         writeHmrFile(server.config.build.outDir, hmrPatchesFileName, content)
     )
 
-    // DevEngine does not reject run() after an initial plugin failure. The options layer owns a first-build buildEnd barrier
-    // and exposes only its result; later build errors continue independently through the host streams below.
-    const initialBuild = installWxDevOptions({ bundledDev, server, options, hostPlugins: [styleCapture.plugin] })
+    // Option installation now configures only Rolldown. Build lifecycle results enter through the engine's output action below.
+    installWxDevOptions({ bundledDev, server, options, hostPlugins: [styleCapture.plugin] })
     const engine: DevEngine = await createEngine()
 
     const hmrResults = createHmrResultsStream(
@@ -116,7 +119,17 @@ export async function createWxDevHost({
     bundledDev._devEngine = engine
     bundledDev.triggerBundleRegenerationIfStale = async () => false
     bundledDev.listen = async () => {
-        await Promise.all([engine.run(), initialBuild])
+        /*
+         * Subscribe before run because DevEngine intentionally fulfills run() after an initial plugin failure and emits that
+         * Error through onOutput. Observing the existing action edge preserves the exact failure without a second buildEnd
+         * Promise or forwarding Subject; waitForAction does not consume the action from concatMap's reducer subscription.
+         */
+        const initialOutput = hostActions.waitForAction((action): action is OutputAction => action.kind === 'output')
+        await engine.run()
+        const { result } = await initialOutput
+        if (result instanceof Error) {
+            throw result
+        }
         await engine.ensureCurrentBuildFinish()
     }
 
@@ -140,7 +153,7 @@ export async function createWxDevHost({
             hmrResults.complete()
             runtimeReports.complete()
             await hostActions.waitForIdle()
-            // Captures and outputs remain open until the rebuild generation has synchronously admitted its callbacks.
+            // Keep the action edge open until the final generation has admitted all capture and output callbacks.
             await engine.ensureCurrentBuildFinish()
             await hostActions.complete()
         }
@@ -245,7 +258,7 @@ export async function createWxDevHost({
             onHmrUpdates: (result: HmrUpdatesResult) => {
                 hmrResults.next(result)
             },
-            // Admission is synchronous, while concatMap defers output finalization behind every prior host effect.
+            // Initial and later complete builds share one admission path; startup merely observes the first OutputAction.
             onOutput: (result: DevOutputResult) => {
                 hostActions.next({ kind: 'output', result: result })
             },

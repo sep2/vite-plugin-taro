@@ -75,6 +75,32 @@ test('reports one failed effect and continues with later actions', async () => {
     await actions.complete()
 })
 
+test('observes a lifecycle action through the existing admission edge', async () => {
+    const { actions } = createProbe()
+    // This journal proves observation does not consume the matching action or bypass its serialized reducer effect.
+    const operations: string[] = []
+    const observed = actions.waitForAction(
+        (action): action is TestAction & Readonly<{ name: 'output' }> => action.name === 'output'
+    )
+    actions.next({
+        name: 'other',
+        run() {
+            operations.push('other')
+        }
+    })
+    actions.next({
+        name: 'output',
+        run() {
+            operations.push('output')
+        }
+    })
+
+    assert.equal((await observed).name, 'output')
+    await actions.waitForIdle()
+    assert.deepEqual(operations, ['other', 'output'])
+    await actions.complete()
+})
+
 test('completion waits for every action admitted before source shutdown', async () => {
     const { actions } = createProbe()
     const gate = Promise.withResolvers<void>()
