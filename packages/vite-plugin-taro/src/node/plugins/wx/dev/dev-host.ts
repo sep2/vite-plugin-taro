@@ -3,12 +3,13 @@ import type { ServerResponse } from 'node:http'
 import path from 'node:path'
 import colors from 'picocolors'
 import { type DevEngine, type DevOptions, dev } from 'rolldown/experimental'
-import { asyncScheduler, Subject } from 'rxjs'
+import { asyncScheduler } from 'rxjs'
 import type { Connect, ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
 import {
     developmentAppWxssFileName,
+    globalWxssFileName,
     type HmrInfo,
     hmrControlPath,
     hmrInfoFileName,
@@ -23,7 +24,6 @@ import { createHostActions } from './host-actions.ts'
 import { PatchPublisher } from './patch-publisher.ts'
 import { createRuntimeReportsStream, type RuntimeReport } from './runtime-reports.ts'
 import { createStyleCapture, type StyleCaptureAction } from './styles/create-style-capture.ts'
-import { globalWxssFileName } from './styles/publish-style-hmr.ts'
 import { type BundledDev, installWxDevOptions, requireSingleOutput } from './wx-dev-options.ts'
 
 export type WxDevHost = Readonly<{
@@ -64,18 +64,18 @@ export async function createWxDevHost({
     applicationEntryIds: readonly string[]
 }): Promise<WxDevHost> {
     const bundledDev = getBundledDev(server)
-    // Plugin hooks emit captures synchronously into this hot source instead of mutating host state from Rolldown's callback
-    // stack. Its subscription is installed before engine.run, so buildStart/transform emission order becomes host action order.
-    const styleCaptureActions = new Subject<StyleCaptureAction>()
-
+    // All callbacks admit typed actions through this edge; concatMap is the sole owner of effect ordering and mutable host state.
+    const hostActions = createHostActions<HostAction>(applyHostAction, (action, error) =>
+        logWxError(server.config.logger, `wx HMR ${action.kind} failed`, error)
+    )
     const styleCapture = createStyleCapture({
         applicationEntryIds: applicationEntryIds,
         outDir: server.config.build.outDir,
-        emit: (action) => styleCaptureActions.next(action),
+        // Capture hooks run only after engine.run, when the host action subscription and all reducer dependencies are ready.
+        emit: (action) => hostActions.next(action),
         transformTailwindRoot: async (rootId, requestId) =>
             server.environments.client.pluginContainer.transform(await readFile(rootId, 'utf8'), requestId)
     })
-
     const publisher = new PatchPublisher((content) =>
         writeHmrFile(server.config.build.outDir, hmrPatchesFileName, content)
     )
@@ -83,21 +83,7 @@ export async function createWxDevHost({
     // DevEngine does not reject run() after an initial plugin failure. The options layer owns a first-build buildEnd barrier
     // and exposes only its result; later build errors continue independently through the host streams below.
     const initialBuild = installWxDevOptions({ bundledDev, server, options, hostPlugins: [styleCapture.plugin] })
-    // This hot Subject is the only admission edge for non-awaited complete-output callbacks. It owns no build state; completion
-    // and errors become ordinary host actions whose effects remain serialized with patch and report transactions.
-    const buildOutputs = new Subject<DevOutputResult>()
     const engine: DevEngine = await createEngine()
-
-    // Migrated sources reduce into this one action/effect pipeline. concatMap is the sole serializer, so source subscriptions
-    // never mutate PatchPublisher, style state, DevEngine, or physical files directly.
-    const hostActions = createHostActions<HostAction>(applyHostAction, (action, error) =>
-        logWxError(server.config.logger, `wx HMR ${action.kind} failed`, error)
-    )
-    styleCaptureActions.subscribe((action) => {
-        // Capture actions share the same serialized pipeline as output and HMR actions. A transform therefore commits before the
-        // transaction callback it causally precedes, without plugin hooks directly touching the mutable style projection.
-        hostActions.next(action)
-    })
 
     const hmrResults = createHmrResultsStream(
         hmrSettleMilliseconds,
@@ -123,12 +109,6 @@ export async function createWxDevHost({
         // build rotation. Reports arriving during publication therefore execute only after that physical transaction commits.
         hostActions.next({ kind: 'reports', reports: reports })
     })
-    buildOutputs.subscribe((result) => {
-        // Do not finalize from Rolldown's callback stack. One output action rotates the session only after every previously
-        // admitted patch/report effect, and a failed output follows the same ordering without mutating build identity.
-        hostActions.next({ kind: 'output', result: result })
-    })
-
     // The wx dev host owns the only DevEngine. Vite's default listen() would create a second
     // skip-write engine that renders into memory for browser HMR; instead the physical
     // engine's initial build must finish before the HTTP server becomes ready, because
@@ -162,8 +142,6 @@ export async function createWxDevHost({
             await hostActions.waitForIdle()
             // Captures and outputs remain open until the rebuild generation has synchronously admitted its callbacks.
             await engine.ensureCurrentBuildFinish()
-            styleCaptureActions.complete()
-            buildOutputs.complete()
             await hostActions.complete()
         }
     }
@@ -221,7 +199,8 @@ export async function createWxDevHost({
                 logWxError(server.config.logger, 'wx HMR update failed', action.error)
                 return
             case 'reports':
-                return processReports(action.reports)
+                action.reports.forEach(processReport)
+                return
             case 'output':
                 if (action.result instanceof Error) {
                     logWxError(server.config.logger, 'wx dev build failed', action.result)
@@ -231,11 +210,6 @@ export async function createWxDevHost({
             case 'listening':
                 return rotateBuildSession()
         }
-    }
-
-    /** Applies one reduced receipt window to the active physical patch history. */
-    function processReports(reports: readonly RuntimeReport[]): void {
-        reports.forEach(processReport)
     }
 
     /** Applies one runtime receipt to the active physical patch history. */
@@ -271,9 +245,9 @@ export async function createWxDevHost({
             onHmrUpdates: (result: HmrUpdatesResult) => {
                 hmrResults.next(result)
             },
-            // Complete outputs are source events, not permission to mutate host state on Rolldown's callback stack.
+            // Admission is synchronous, while concatMap defers output finalization behind every prior host effect.
             onOutput: (result: DevOutputResult) => {
-                buildOutputs.next(result)
+                hostActions.next({ kind: 'output', result: result })
             },
             rebuildStrategy: 'never',
             watch: {

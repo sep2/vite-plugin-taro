@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { BindingClientHmrUpdate } from 'rolldown/experimental'
 
 export const developmentAppWxssFileName = 'app.wxss'
+export const globalWxssFileName = 'assets/global.wxss'
 export const hmrInfoFileName = 'hmr/info.js'
 export const hmrPatchesFileName = 'hmr/patches.js'
 

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { type PatchUpdate, renderHmrPatches } from './hmr-files.ts'
 
 /** Abstracts the physical patches write; the engine owns the file destination. */
-export type WritePatches = (content: string) => Promise<void>
+type WritePatches = (content: string) => Promise<void>
 
 /**
  * Owns the cumulative sequence range between the host's published frontier and the runtime's applied frontier.

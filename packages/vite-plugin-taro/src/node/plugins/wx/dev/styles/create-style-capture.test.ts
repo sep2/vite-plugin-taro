@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import type { ModuleInfo } from 'rolldown'
+import { globalWxssFileName } from '../hmr-files.ts'
 import { createStyleCapture, type StyleCaptureAction } from './create-style-capture.ts'
-import { globalWxssFileName } from './publish-style-hmr.ts'
 
 test('captures final Vite CSS and the live graph through its merged plugin', async () => {
     // This mutable journal observes typed captures without letting plugin hooks mutate the style projection directly.
@@ -104,6 +104,92 @@ function createModuleInfo(id: string, importedIds: readonly string[]): ModuleInf
         moduleSideEffects: true,
         meta: {}
     }
+}
+
+test('refreshes reachable Tailwind roots concurrently through stable sidecars', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'vpt-style-capture-tailwind-'))
+    const appId = '/project/app.js'
+    const firstId = '/project/first.css'
+    const secondId = '/project/second.css'
+    // These transaction-local journals hold both transforms open until the test observes concurrent dispatch.
+    const requests: string[] = []
+    const completions = new Map<string, (result: { code: string }) => void>()
+    const styleCapture = createStyleCapture({
+        applicationEntryIds: [appId],
+        outDir: root,
+        emit: () => assert.fail('Plugin hooks are not active in this state test'),
+        transformTailwindRoot(_rootId, requestId) {
+            requests.push(requestId)
+            return new Promise((resolve) => completions.set(requestId, resolve))
+        }
+    })
+    styleCapture.captureGraph((moduleId) => {
+        if (moduleId === appId) return createModuleInfo(appId, [firstId, secondId])
+        if (moduleId === firstId || moduleId === secondId) return createModuleInfo(moduleId, [])
+        return null
+    })
+    styleCapture.captureStyle(firstId, { css: '.old-first {}', isTailwindRoot: true })
+    styleCapture.captureStyle(secondId, { css: '.old-second {}', isTailwindRoot: true })
+
+    try {
+        const refreshing = styleCapture.publishChanged([appId])
+        assert.deepEqual(requests, [
+            '/project/first.css?weapp-vite-sidecar=style',
+            '/project/second.css?weapp-vite-sidecar=style'
+        ])
+        requireCompletion(completions, requests[0])({ code: renderViteCss('.new-first {}') })
+        requireCompletion(completions, requests[1])({ code: renderViteCss('') })
+
+        await refreshing
+        assert.equal(await readFile(path.join(root, globalWxssFileName), 'utf8'), '.new-first {}\n')
+    } finally {
+        await rm(root, { recursive: true })
+    }
+})
+
+test('retains the prior Tailwind generation when one concurrent root fails', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'vpt-style-capture-failure-'))
+    const appId = '/project/app.js'
+    const firstId = '/project/first.css'
+    const secondId = '/project/second.css'
+    const styleCapture = createStyleCapture({
+        applicationEntryIds: [appId],
+        outDir: root,
+        emit: () => assert.fail('Plugin hooks are not active in this state test'),
+        async transformTailwindRoot(rootId) {
+            return rootId === firstId ? { code: renderViteCss('.new-first {}') } : null
+        }
+    })
+    styleCapture.captureGraph((moduleId) => {
+        if (moduleId === appId) return createModuleInfo(appId, [firstId, secondId])
+        if (moduleId === firstId || moduleId === secondId) return createModuleInfo(moduleId, [])
+        return null
+    })
+    styleCapture.captureStyle(firstId, { css: '.old-first {}', isTailwindRoot: true })
+    styleCapture.captureStyle(secondId, { css: '.old-second {}', isTailwindRoot: true })
+
+    try {
+        await assert.rejects(styleCapture.publishChanged([appId]), /Tailwind sidecar transform produced no result/)
+        await styleCapture.publishChanged([firstId])
+        assert.equal(await readFile(path.join(root, globalWxssFileName), 'utf8'), '.old-first {}\n.old-second {}')
+    } finally {
+        await rm(root, { recursive: true })
+    }
+})
+
+function renderViteCss(css: string): string {
+    return `const __vite__css = ${JSON.stringify(css)}\n`
+}
+
+function requireCompletion(
+    completions: ReadonlyMap<string, (result: { code: string }) => void>,
+    id: string | undefined
+): (result: { code: string }) => void {
+    const complete = id === undefined ? undefined : completions.get(id)
+    if (!complete) {
+        throw new Error(`Expected pending Tailwind transform: ${id}`)
+    }
+    return complete
 }
 
 test('rejects publication before a complete build captures the live graph', async () => {

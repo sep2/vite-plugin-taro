@@ -7,9 +7,8 @@ import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { once } from '../../../utils/once.ts'
 import { resolvePackageFile } from '../../../utils/packages.ts'
 import { appShellFileName } from '../module.ts'
-import { createWxDevMode } from './create-wx-dev-mode.ts'
 
-export type BundledDevRolldownOptions = InputOptions & {
+type BundledDevRolldownOptions = InputOptions & {
     experimental?: {
         [key: string]: unknown
         devMode?: boolean | Record<string, unknown>
@@ -73,10 +72,13 @@ export function installWxDevOptions({
         })
 
         rolldownOptions.experimental ??= {}
-        rolldownOptions.experimental.devMode = createWxDevMode(
-            rolldownOptions.experimental.devMode,
-            await bundleRuntimeSource()
-        )
+        const existingDevMode = rolldownOptions.experimental.devMode
+        rolldownOptions.experimental.devMode = {
+            ...(typeof existingDevMode === 'object' ? existingDevMode : {}),
+            implement: await bundleRuntimeSource(),
+            lazy: false,
+            skipCommonRuntimeInjection: false
+        }
 
         const reportInitialBuildPlugin: Plugin = {
             name: 'vpt:wx-report-initial-build',

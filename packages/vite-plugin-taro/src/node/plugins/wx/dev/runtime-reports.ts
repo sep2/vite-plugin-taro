@@ -1,13 +1,13 @@
 import { buffer, debounceTime, filter, type SchedulerLike, Subject } from 'rxjs'
 
-export type AppliedReport = Readonly<{
+type AppliedReport = Readonly<{
     kind: 'applied'
     buildId: string
     seq: number
 }>
 
 /** The runtime hit an unrecoverable state and needs a complete build. */
-export type RebuildReport = Readonly<{
+type RebuildReport = Readonly<{
     kind: 'rebuild'
     buildId: string
     reason: string

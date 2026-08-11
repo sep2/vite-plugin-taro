@@ -1,10 +1,17 @@
 import type { GetModuleInfo, Plugin } from 'rolldown'
 import { isCSSRequest } from 'vite'
 import { normalizeModuleId } from '../../../../utils/modules.ts'
-import { createGraphStylePlan, extractViteCss, isGlobalStyleRequest } from '../../styles/utils.ts'
-import { publishStyleHmr, refreshTailwindStyles } from './publish-style-hmr.ts'
+import { transformWxStyle } from '../../styles/transform-wx-style.ts'
+import {
+    composeGraphStyleCss,
+    createGraphStylePlan,
+    createTailwindSidecarId,
+    extractViteCss,
+    isGlobalStyleRequest
+} from '../../styles/utils.ts'
+import { globalWxssFileName, writeHmrFile } from '../hmr-files.ts'
 
-export type ProcessedStyle = Readonly<{
+type ProcessedStyle = Readonly<{
     css: string
     isTailwindRoot: boolean
 }>
@@ -93,12 +100,42 @@ export function createStyleCapture({
             if (candidatesChanged) {
                 await refreshTailwindStyles(styleIds, processedStyles, transformTailwindRoot)
             }
-            publishedWxss = await publishStyleHmr({
-                styleIds: styleIds,
-                outDir: outDir,
-                processedStyles: processedStyles,
-                publishedWxss: publishedWxss
-            })
+            const css = composeGraphStyleCss(styleIds, (styleId) => requireProcessedStyle(processedStyles, styleId).css)
+            const wxss = (await transformWxStyle(css)).css
+            if (wxss !== publishedWxss) {
+                await writeHmrFile(outDir, globalWxssFileName, wxss)
+            }
+            publishedWxss = wxss
         }
     }
+}
+
+/** Regenerates all reachable Tailwind roots and commits the cache only when every transform succeeds. */
+async function refreshTailwindStyles(
+    styleIds: readonly string[],
+    processedStyles: Map<string, ProcessedStyle>,
+    transformRoot: (rootId: string, requestId: string) => Promise<Readonly<{ code: string }> | null>
+): Promise<void> {
+    const roots = styleIds.filter((styleId) => requireProcessedStyle(processedStyles, styleId).isTailwindRoot)
+    const refreshedStyles = await Promise.all(
+        roots.map(async (rootId) => {
+            const requestId = createTailwindSidecarId(rootId)
+            const result = await transformRoot(rootId, requestId)
+            if (!result) {
+                throw new Error(`Tailwind sidecar transform produced no result: ${requestId}`)
+            }
+            return [rootId, { css: extractViteCss(result.code, requestId), isTailwindRoot: true }] as const
+        })
+    )
+    refreshedStyles.forEach(([rootId, style]) => {
+        processedStyles.set(rootId, style)
+    })
+}
+
+function requireProcessedStyle(processedStyles: ReadonlyMap<string, ProcessedStyle>, styleId: string): ProcessedStyle {
+    const style = processedStyles.get(styleId)
+    if (!style) {
+        throw new Error(`WX style plan references uncaptured CSS: ${styleId}`)
+    }
+    return style
 }
