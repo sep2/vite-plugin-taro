@@ -14,11 +14,14 @@ interface Props {
 const { headingLevel } = Astro.props
 ---
 
-<div class="automatic-subpackages-diagram vpt-theme">
+<vpt-subpackage-diagram class="automatic-subpackages-diagram vpt-theme">
     <div class="package-flow">
         <SubpackageSourceDiagram headingLevel={headingLevel} />
 
         <div class="package-planner" role="img" aria-label="VPT 自动规划模块位置">
+            <span class="planner-flow planner-flow-in" aria-hidden="true"></span>
+            <span class="planner-flow planner-flow-out planner-flow-out-one" aria-hidden="true"></span>
+            <span class="planner-flow planner-flow-out planner-flow-out-two" aria-hidden="true"></span>
             <div class="planner-anchor">
                 <div class="planner-core">
                     <span>VPT</span>
@@ -36,7 +39,49 @@ const { headingLevel } = Astro.props
 
         <SubpackageOutputDiagram headingLevel={headingLevel} />
     </div>
-</div>
+</vpt-subpackage-diagram>
+
+<script>
+    class VptSubpackageDiagramElement extends HTMLElement {
+        // The observer is retained so animation work exists only while the diagram is visible.
+        private observer: IntersectionObserver | null = null
+        // Visibility is the only mutable presentation state shared by viewport, tab, and motion-preference changes.
+        private isVisible = false
+        private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+
+        connectedCallback(): void {
+            if (this.observer !== null) return
+
+            this.observer = new IntersectionObserver(
+                (entries) => {
+                    this.isVisible = entries.some((entry) => entry.isIntersecting)
+                    this.syncAnimation()
+                },
+                { threshold: 0.15 }
+            )
+            this.observer.observe(this)
+            this.reducedMotion.addEventListener('change', this.syncAnimation)
+            document.addEventListener('visibilitychange', this.syncAnimation)
+        }
+
+        disconnectedCallback(): void {
+            this.observer?.disconnect()
+            this.observer = null
+            this.reducedMotion.removeEventListener('change', this.syncAnimation)
+            document.removeEventListener('visibilitychange', this.syncAnimation)
+            this.isVisible = false
+            this.classList.remove('is-live')
+        }
+
+        private readonly syncAnimation = (): void => {
+            this.classList.toggle('is-live', this.isVisible && !document.hidden && !this.reducedMotion.matches)
+        }
+    }
+
+    if (customElements.get('vpt-subpackage-diagram') === undefined) {
+        customElements.define('vpt-subpackage-diagram', VptSubpackageDiagramElement)
+    }
+</script>
 
 <style>
     .automatic-subpackages-diagram {
@@ -49,6 +94,9 @@ const { headingLevel } = Astro.props
         --diagram-font-size-caption: var(--home-font-size-caption, 0.7rem);
         --diagram-panel-radius: var(--home-panel-radius, 1.5rem);
         --diagram-panel-shadow: var(--home-panel-shadow, 0 24px 60px var(--vpt-shadow));
+        --planner-connector-gap: clamp(1rem, 2vw, 1.5rem);
+        --subpackage-animation-duration: 9s;
+        display: block;
         container: automatic-subpackages-layout / inline-size;
     }
 
@@ -68,7 +116,7 @@ const { headingLevel } = Astro.props
         grid-template-columns: minmax(0, 1fr) 9.5rem minmax(0, 1fr);
         container: automatic-subpackages / inline-size;
         align-items: stretch;
-        gap: clamp(1rem, 2vw, 1.5rem);
+        gap: var(--planner-connector-gap);
         margin: 0;
     }
 
@@ -141,6 +189,34 @@ const { headingLevel } = Astro.props
 
     .package-planner::after {
         left: 100%;
+    }
+
+    .planner-flow {
+        position: absolute;
+        z-index: 3;
+        top: calc(50% - 0.24rem);
+        width: 0.48rem;
+        height: 0.48rem;
+        margin: 0;
+        border: 1px solid color-mix(in srgb, var(--vpt-accent) 55%, white);
+        border-radius: 50%;
+        background: var(--vpt-accent);
+        box-shadow: 0 0 0 0.28rem color-mix(in srgb, var(--vpt-accent) 16%, transparent);
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .planner-flow-in {
+        --planner-flow-x: calc(4.75rem + var(--planner-connector-gap));
+        --planner-flow-y: 0rem;
+        left: calc(0rem - var(--planner-connector-gap));
+        background: #e88870;
+    }
+
+    .planner-flow-out {
+        --planner-flow-x: calc(4.75rem + var(--planner-connector-gap));
+        --planner-flow-y: 0rem;
+        left: calc(50% - 0.24rem);
     }
 
     .planner-anchor {
@@ -267,6 +343,400 @@ const { headingLevel } = Astro.props
         --planner-orbit-base-angle: -90deg;
     }
 
+    .automatic-subpackages-diagram.is-live :global(.source-root) {
+        animation: subpackage-source-root var(--subpackage-animation-duration) ease-in-out infinite;
+    }
+
+    .automatic-subpackages-diagram.is-live :global(.async-node) {
+        animation: subpackage-async-node var(--subpackage-animation-duration) ease-in-out infinite;
+    }
+
+    .automatic-subpackages-diagram.is-live :global(.dynamic-label) {
+        animation: subpackage-dynamic-label var(--subpackage-animation-duration) ease-in-out infinite;
+    }
+
+    .automatic-subpackages-diagram.is-live :global(.report-branch::before),
+    .automatic-subpackages-diagram.is-live :global(.async-node::after),
+    .automatic-subpackages-diagram.is-live :global(.feature-dependencies::before),
+    .automatic-subpackages-diagram.is-live :global(.mini-node::before) {
+        animation: subpackage-source-connector var(--subpackage-animation-duration) ease-in-out infinite;
+    }
+
+    .automatic-subpackages-diagram.is-live :global(.mini-node) {
+        animation: subpackage-source-dependency var(--subpackage-animation-duration) ease-in-out infinite;
+    }
+
+    .automatic-subpackages-diagram.is-live :global(.mini-node:nth-child(2)) {
+        animation-delay: 120ms;
+    }
+
+    .automatic-subpackages-diagram.is-live :global(.mini-node:nth-child(3)) {
+        animation-delay: 240ms;
+    }
+
+    .automatic-subpackages-diagram.is-live .package-planner::before {
+        animation: subpackage-planner-input var(--subpackage-animation-duration) ease-in-out infinite;
+    }
+
+    .automatic-subpackages-diagram.is-live .package-planner::after {
+        animation: subpackage-planner-output var(--subpackage-animation-duration) ease-in-out infinite;
+    }
+
+    .automatic-subpackages-diagram.is-live .planner-flow-in {
+        animation: subpackage-flow-in var(--subpackage-animation-duration) linear infinite;
+    }
+
+    .automatic-subpackages-diagram.is-live .planner-flow-out {
+        animation: subpackage-flow-out var(--subpackage-animation-duration) linear infinite;
+    }
+
+    .automatic-subpackages-diagram.is-live .planner-flow-out-two {
+        animation-delay: 320ms;
+    }
+
+    .automatic-subpackages-diagram.is-live .planner-core {
+        animation: subpackage-planner-core var(--subpackage-animation-duration) ease-in-out infinite;
+    }
+
+    .automatic-subpackages-diagram.is-live .planner-core::before {
+        animation: subpackage-planner-ring var(--subpackage-animation-duration) linear infinite;
+    }
+
+    .automatic-subpackages-diagram.is-live .planner-core::after {
+        animation: subpackage-planner-ring-reverse var(--subpackage-animation-duration) linear infinite;
+    }
+
+    .automatic-subpackages-diagram.is-live .package-planner li {
+        animation: subpackage-planner-criterion var(--subpackage-animation-duration) ease-in-out infinite;
+    }
+
+    .automatic-subpackages-diagram.is-live .package-planner li:nth-child(2) {
+        animation-delay: 100ms;
+    }
+
+    .automatic-subpackages-diagram.is-live .package-planner li:nth-child(3) {
+        animation-delay: 200ms;
+    }
+
+    .automatic-subpackages-diagram.is-live .package-planner li:nth-child(4) {
+        animation-delay: 300ms;
+    }
+
+    .automatic-subpackages-diagram.is-live .package-planner li:nth-child(5) {
+        animation-delay: 400ms;
+    }
+
+    .automatic-subpackages-diagram.is-live :global(.main-package) {
+        animation: subpackage-main-package var(--subpackage-animation-duration) ease-in-out infinite;
+    }
+
+    .automatic-subpackages-diagram.is-live :global(.subpackage-grid .package-card) {
+        animation: subpackage-output-card var(--subpackage-animation-duration) ease-in-out infinite;
+    }
+
+    .automatic-subpackages-diagram.is-live :global(.subpackage-grid .package-card:nth-child(2)) {
+        animation-delay: 220ms;
+    }
+
+    .automatic-subpackages-diagram.is-live :global(.subpackage-grid .module-chip) {
+        animation: subpackage-output-module var(--subpackage-animation-duration) ease-in-out infinite;
+    }
+
+    .automatic-subpackages-diagram.is-live :global(.subpackage-grid .package-card:nth-child(2) .module-chip) {
+        animation-delay: 220ms;
+    }
+
+    .automatic-subpackages-diagram.is-live :global(.cross-package-note svg) {
+        animation: subpackage-cross-package var(--subpackage-animation-duration) ease-in-out infinite;
+        transform-origin: center;
+    }
+
+    @keyframes subpackage-source-root {
+        0%,
+        3%,
+        13%,
+        100% {
+            border-color: var(--vpt-border);
+            box-shadow: 0 10px 28px var(--vpt-shadow);
+            transform: translateY(0) scale(1);
+        }
+
+        7% {
+            border-color: var(--vpt-border-strong);
+            box-shadow: 0 14px 32px var(--vpt-shadow-strong);
+            transform: translateY(-0.16rem) scale(1.015);
+        }
+    }
+
+    @keyframes subpackage-async-node {
+        0%,
+        10%,
+        27%,
+        100% {
+            border-color: rgba(232, 136, 112, 0.45);
+            box-shadow: 0 10px 28px var(--vpt-shadow);
+            transform: translateY(0) scale(1);
+        }
+
+        15%,
+        22% {
+            border-color: #e88870;
+            box-shadow: 0 14px 32px color-mix(in srgb, #e88870 18%, transparent);
+            transform: translateY(-0.16rem) scale(1.018);
+        }
+    }
+
+    @keyframes subpackage-dynamic-label {
+        0%,
+        9%,
+        27%,
+        100% {
+            color: #d9725d;
+            transform: translateX(-50%) scale(1);
+        }
+
+        14%,
+        22% {
+            color: #ef8068;
+            transform: translateX(-50%) scale(1.08);
+        }
+    }
+
+    @keyframes subpackage-source-connector {
+        0%,
+        10%,
+        29%,
+        100% {
+            border-color: rgba(232, 136, 112, 0.55);
+            filter: none;
+        }
+
+        16%,
+        25% {
+            border-color: #e88870;
+            filter: drop-shadow(0 0 0.2rem rgba(232, 136, 112, 0.45));
+        }
+    }
+
+    @keyframes subpackage-source-dependency {
+        0%,
+        15%,
+        30%,
+        100% {
+            border-color: rgba(232, 136, 112, 0.32);
+            box-shadow: none;
+            transform: translateY(0);
+        }
+
+        20%,
+        26% {
+            border-color: rgba(232, 136, 112, 0.72);
+            box-shadow: 0 0.55rem 1.2rem rgba(174, 73, 55, 0.12);
+            transform: translateY(-0.14rem);
+        }
+    }
+
+    @keyframes subpackage-planner-input {
+        0%,
+        19%,
+        34%,
+        100% {
+            border-color: var(--vpt-border-strong);
+            filter: none;
+        }
+
+        23%,
+        31% {
+            border-color: #e88870;
+            filter: drop-shadow(0 0 0.22rem rgba(232, 136, 112, 0.5));
+        }
+    }
+
+    @keyframes subpackage-planner-output {
+        0%,
+        48%,
+        62%,
+        100% {
+            border-color: var(--vpt-border-strong);
+            filter: none;
+        }
+
+        52%,
+        59% {
+            border-color: var(--vpt-accent);
+            filter: drop-shadow(0 0 0.22rem color-mix(in srgb, var(--vpt-accent) 48%, transparent));
+        }
+    }
+
+    @keyframes subpackage-flow-in {
+        0%,
+        20% {
+            opacity: 0;
+            transform: translate(0, 0) scale(0.72);
+        }
+
+        23% {
+            opacity: 1;
+        }
+
+        31% {
+            opacity: 1;
+            transform: translate(var(--planner-flow-x), var(--planner-flow-y)) scale(1);
+        }
+
+        34%,
+        100% {
+            opacity: 0;
+            transform: translate(var(--planner-flow-x), var(--planner-flow-y)) scale(0.72);
+        }
+    }
+
+    @keyframes subpackage-flow-out {
+        0%,
+        49% {
+            opacity: 0;
+            transform: translate(0, 0) scale(0.72);
+        }
+
+        52% {
+            opacity: 1;
+        }
+
+        59% {
+            opacity: 1;
+            transform: translate(var(--planner-flow-x), var(--planner-flow-y)) scale(1);
+        }
+
+        62%,
+        100% {
+            opacity: 0;
+            transform: translate(var(--planner-flow-x), var(--planner-flow-y)) scale(0.72);
+        }
+    }
+
+    @keyframes subpackage-planner-core {
+        0%,
+        27%,
+        51%,
+        100% {
+            transform: scale(1);
+        }
+
+        32%,
+        41% {
+            transform: scale(1.045);
+        }
+
+        36%,
+        46% {
+            transform: scale(0.985);
+        }
+    }
+
+    @keyframes subpackage-planner-ring {
+        0%,
+        27% {
+            transform: rotate(0deg);
+        }
+
+        51%,
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    @keyframes subpackage-planner-ring-reverse {
+        0%,
+        27% {
+            transform: rotate(0deg);
+        }
+
+        51%,
+        100% {
+            transform: rotate(-360deg);
+        }
+    }
+
+    @keyframes subpackage-planner-criterion {
+        0%,
+        28%,
+        51%,
+        100% {
+            color: color-mix(in srgb, var(--vpt-muted) 68%, var(--vpt-node-background));
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        34%,
+        43% {
+            color: var(--vpt-accent);
+            transform: translate(-50%, -50%) scale(1.08);
+        }
+    }
+
+    @keyframes subpackage-main-package {
+        0%,
+        52%,
+        66%,
+        100% {
+            box-shadow: 0 10px 25px var(--vpt-shadow);
+            transform: translateY(0);
+        }
+
+        57%,
+        62% {
+            box-shadow: 0 14px 30px color-mix(in srgb, var(--vpt-accent) 14%, transparent);
+            transform: translateY(-0.12rem);
+        }
+    }
+
+    @keyframes subpackage-output-card {
+        0%,
+        58%,
+        78%,
+        100% {
+            border-color: rgba(232, 136, 112, 0.35);
+            box-shadow: 0 10px 25px var(--vpt-shadow);
+            transform: translateY(0) scale(1);
+        }
+
+        64%,
+        73% {
+            border-color: rgba(232, 136, 112, 0.72);
+            box-shadow: 0 15px 32px rgba(174, 73, 55, 0.14);
+            transform: translateY(-0.18rem) scale(1.012);
+        }
+    }
+
+    @keyframes subpackage-output-module {
+        0%,
+        62%,
+        81%,
+        100% {
+            background: var(--vpt-chip-background);
+            transform: translateX(0);
+        }
+
+        68%,
+        76% {
+            background: color-mix(in srgb, var(--vpt-chip-background) 78%, #ef957a);
+            transform: translateX(0.12rem);
+        }
+    }
+
+    @keyframes subpackage-cross-package {
+        0%,
+        72%,
+        88%,
+        100% {
+            transform: rotate(0deg) scale(1);
+        }
+
+        78%,
+        83% {
+            transform: rotate(180deg) scale(1.16);
+        }
+    }
+
     @container automatic-subpackages-layout (max-width: 64rem) {
         .package-flow {
             grid-template-columns: 1fr;
@@ -300,6 +770,20 @@ const { headingLevel } = Astro.props
 
         .package-planner::after {
             top: 100%;
+        }
+
+        .planner-flow-in {
+            --planner-flow-x: 0rem;
+            --planner-flow-y: 7.75rem;
+            top: -3rem;
+            left: calc(50% - 0.24rem);
+        }
+
+        .planner-flow-out {
+            --planner-flow-x: 0rem;
+            --planner-flow-y: 7.75rem;
+            top: calc(50% - 0.24rem);
+            left: calc(50% - 0.24rem);
         }
     }
 
