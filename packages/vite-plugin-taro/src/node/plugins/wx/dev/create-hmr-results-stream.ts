@@ -10,11 +10,12 @@ type HmrUpdates = Exclude<HmrUpdatesResult, Error>
  * Debouncing the result stream itself would retain only the final callback and lose incremental patch factories that later
  * patches provably do not reproduce. Instead, the debounced view is only a closing notifier for `buffer`: every callback is
  * retained in arrival order, and one configured quiet period emits the complete window to the host's existing serialized
- * writer. This first stream migration deliberately does not own physical state; `publish` and `rebuild` remain synchronous
+ * writer. This first stream migration deliberately does not own physical state; `publish` and `reportError` remain synchronous
  * admission callbacks so the dev host can enqueue both through its single writer.
  *
- * DevEngine failures are values, not Observable errors. One failure dominates its complete window because publishing any
- * neighboring incremental patch before recovery could expose a generation whose missing factory can never be reconstructed.
+ * DevEngine failures are values, not Observable errors. They represent transient editor generations and carry no executable
+ * patch, so the stream reports the final error but otherwise removes them. Successful callbacks on either side remain ordered
+ * and lossless; Rolldown generated each against its unpublished client frontier, and the host delivers every retained payload.
  * Completing the returned Subject flushes its current buffer synchronously, allowing host shutdown to await the resulting
  * serialized task rather than silently dropping an admitted patch.
  *
@@ -24,7 +25,7 @@ export function createHmrResultsStream(
     settleMilliseconds: number,
     scheduler: SchedulerLike,
     publish: (result: HmrUpdates) => void,
-    rebuild: (error: Error) => void
+    reportError: (error: Error) => void
 ): Subject<HmrUpdatesResult> {
     // This hot Subject is the sole mutable admission edge. Both buffer subscriptions observe the same callback identities:
     // one stores them losslessly, while the debounced subscription emits only the signal that closes that stored window.
@@ -36,24 +37,30 @@ export function createHmrResultsStream(
             filter((window) => window.length > 0)
         )
         .subscribe((window) => {
-            // These transaction-local collections retain lossless callback order and first-seen changed-file order. A Set
-            // removes duplicate physical files without changing their semantic order for the later style-invalidation stream.
-            const updates: HmrUpdates['updates'] = []
-            const changedFiles = new Set<string>()
-            for (const result of window) {
-                if (result instanceof Error) {
-                    // Do not publish the successful prefix or suffix. Recovery establishes a new complete build generation.
-                    rebuild(result)
-                    return
-                }
-                updates.push(...result.updates)
-                result.changedFiles.forEach((file) => {
-                    changedFiles.add(file)
+            /*
+             * An Error is one source generation that produced no executable delta; it does not invalidate successful Rolldown
+             * callbacks already admitted on either side of it. Dropping the whole quiet window would therefore discard real
+             * patch factories, while starting a complete build would compile the same known-invalid editor contents. Keep the
+             * old runtime running, report only the latest diagnostic from a repeated parser burst, and continue below with the
+             * successful callback values exactly as if the temporary invalid save had never produced an HMR payload.
+             */
+            const lastFailure = window.findLast((result): result is Error => result instanceof Error)
+            if (lastFailure) {
+                reportError(lastFailure)
+            }
+            const successfulWindow = window.filter((result): result is HmrUpdates => !(result instanceof Error))
+            if (successfulWindow.length > 0) {
+                /*
+                 * flatMap preserves callback arrival order and each callback's internal Rolldown order. Updates must not be
+                 * deduplicated: later undelivered patches are deltas and do not reproduce factories from earlier sequences.
+                 * changedFiles is opaque DevEngine metadata and has no identity semantics in the host, so preserving its raw
+                 * concatenation is both cheaper and more faithful than maintaining a second Set-based interpretation here.
+                 */
+                publish({
+                    updates: successfulWindow.flatMap((result) => result.updates),
+                    changedFiles: successfulWindow.flatMap((result) => result.changedFiles)
                 })
             }
-            // Array append order is callback order and then Rolldown's own per-callback update order; no patch is sorted,
-            // deduplicated, or replaced by a later patch.
-            publish({ updates: updates, changedFiles: [...changedFiles] })
         })
     return results
 }

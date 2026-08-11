@@ -50,9 +50,8 @@ function createProbe(): Readonly<{
     return { failures: failures, publications: publications, scheduler: scheduler, stream: stream }
 }
 
-test('coalesces a quiet HMR window without losing patch order or changed files', () => {
-    // The second callback repeats a.ts deliberately: patches remain lossless, while physical changed-file identities form a
-    // first-seen union for future style invalidation. Eight virtual milliseconds stays within the 32 ms trailing edge.
+test('coalesces a quiet HMR window without losing callback order', () => {
+    // Eight virtual milliseconds stays within the 32 ms trailing edge; callback arrays are concatenated without interpretation.
     const { failures, publications, scheduler, stream } = createProbe()
     stream.next(result(1, ['/src/a.ts']))
     scheduler.schedule(() => stream.next(result(2, ['/src/a.ts', '/src/b.ts'])), 8)
@@ -63,7 +62,7 @@ test('coalesces a quiet HMR window without losing patch order or changed files',
         publications[0]?.updates.map(({ update }) => (update.type === 'Patch' ? update.seq : undefined)),
         [1, 2]
     )
-    assert.deepEqual(publications[0]?.changedFiles, ['/src/a.ts', '/src/b.ts'])
+    assert.deepEqual(publications[0]?.changedFiles, ['/src/a.ts', '/src/a.ts', '/src/b.ts'])
     assert.equal(publications.length, 1)
     assert.deepEqual(failures, [])
     stream.complete()
@@ -86,24 +85,45 @@ test('keeps edits outside the quiet window as separate publications', () => {
     stream.complete()
 })
 
-test('lets one HMR error dominate successful patches in the same window', () => {
-    // The successful prefix must not escape: its following failed generation can require factories unavailable to the runtime.
+test('ignores an error-only editor generation and accepts the next healthy update', () => {
+    // Syntax errors carry no payload and must not start a complete build or terminate the stream used by the corrected save.
     const { failures, publications, scheduler, stream } = createProbe()
     const failure = new Error('broken update')
-    stream.next(result(1, ['/src/a.ts']))
     stream.next(failure)
+    scheduler.flush()
+    assert.equal(publications.length, 0)
+    assert.deepEqual(failures, [failure])
+
+    stream.next(result(1, ['/src/recovered.ts']))
+    scheduler.flush()
+    assert.equal(publications.length, 1)
+    stream.complete()
+})
+
+test('retains a large successful patch range around a transient failure', () => {
+    // The failed callback itself contributes no factory. Every successful callback still does, so filtering the error must not
+    // create a sequence hole between valid editor generations on either side of it.
+    const { failures, publications, scheduler, stream } = createProbe()
+    const failure = new Error('pressure-window transform failure')
+    for (let seq = 1; seq <= 2_500; seq++) {
+        stream.next(result(seq, [`/src/module-${seq}.ts`]))
+    }
+    stream.next(failure)
+    for (let seq = 2_501; seq <= 5_000; seq++) {
+        stream.next(result(seq, [`/src/module-${seq}.ts`]))
+    }
 
     scheduler.flush()
 
-    assert.deepEqual(publications, [])
+    assert.equal(publications.length, 1)
+    assert.equal(publications[0]?.updates.length, 5_000)
     assert.deepEqual(failures, [failure])
     stream.complete()
 })
 
-test('retains a large burst in one bounded publication without reordering or file-set growth', () => {
-    // Five thousand callbacks greatly exceed the DevTools stress fixture while nineteen repeating paths verify that memory for
-    // changed-file classification grows with unique files rather than callback count. Patch entries remain deliberately
-    // lossless because every factory may contain a module generation absent from every later callback.
+test('retains a large burst in one bounded publication without reordering', () => {
+    // Five thousand callbacks greatly exceed the DevTools fixture. Every factory remains lossless because later callbacks do
+    // not reproduce earlier module generations.
     const { failures, publications, scheduler, stream } = createProbe()
     const updateCount = 5_000
     const changedFileCount = 19
@@ -119,7 +139,6 @@ test('retains a large burst in one bounded publication without reordering or fil
         throw new Error('Expected one pressure-test publication')
     }
     assert.equal(publication.updates.length, updateCount)
-    assert.equal(publication.changedFiles.length, changedFileCount)
     const firstUpdate = publication.updates[0]?.update
     const lastUpdate = publication.updates.at(-1)?.update
     assert.equal(firstUpdate?.type === 'Patch' ? firstUpdate.seq : 0, 1)

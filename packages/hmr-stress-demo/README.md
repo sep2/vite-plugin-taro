@@ -29,7 +29,7 @@ Individual cases can be run independently:
 ```bash
 pnpm stress:hmr-stress-demo:burst         # 30 edits at 8 ms
 pnpm test:hmr-stress-demo:rebuild         # mixed ACK/rebuild report storms
-pnpm test:hmr-stress-demo:recovery        # syntax failures and recovery builds
+pnpm test:hmr-stress-demo:recovery        # syntax failures and passive HMR recovery
 ```
 
 No stress edit touches `packages/hmr-stress-demo/src`. The portable harness deliberately avoids RAM-disk provisioning: it confines writes to one fixed temporary project and bounds the strict burst to 30 source generations, plus two restoration writes. Syntax recovery uses one invalid generation plus restoration, and post-recovery health uses five edits. This retains the failure-producing profiles without thousands of filesystem writes or platform-specific mount setup.
@@ -42,8 +42,8 @@ The complete suite checks:
 2. marker restoration and valid two-Page navigation stacks;
 3. duplicate and out-of-order ACK conflation under rebuild-report storms;
 4. build identity rotation and non-empty `assets/global.wxss` after every complete rebuild;
-5. invalid syntax does not start a wedged complete build;
-6. valid source after failure causes exactly one recovery build;
+5. invalid syntax does not start a complete build or alter the live Page heap;
+6. valid source after failure resumes HMR without rotating the build identity;
 7. HMR remains healthy and preserves state after syntax recovery;
 8. the App console remains free of patch, Refresh, reconciliation, and `setData` failures.
 

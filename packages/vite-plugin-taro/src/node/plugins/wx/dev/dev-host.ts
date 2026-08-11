@@ -4,7 +4,7 @@ import path from 'node:path'
 import colors from 'picocolors'
 import type { GetModuleInfo } from 'rolldown'
 import { type DevEngine, type DevOptions, dev } from 'rolldown/experimental'
-import { asyncScheduler } from 'rxjs'
+import { asyncScheduler, Subject } from 'rxjs'
 import { type Connect, isCSSRequest, type ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { SerializedTaskQueue } from '../../../utils/serialized-task-queue.ts'
@@ -23,6 +23,7 @@ import {
     writeHmrFile
 } from './hmr-files.ts'
 import { PatchPublisher } from './patch-publisher.ts'
+import { createRuntimeReportsStream, type RuntimeReport } from './runtime-reports.ts'
 import { createStyleCapturePlugin, type ProcessedStyle } from './styles/create-style-capture-plugin.ts'
 import { globalWxssFileName, publishStyleHmr, refreshTailwindStyles } from './styles/publish-style-hmr.ts'
 import { type BundledDev, installWxDevOptions, requireSingleOutput } from './wx-dev-options.ts'
@@ -31,26 +32,16 @@ export type WxDevHost = Readonly<{
     close: () => Promise<void>
 }>
 
-type AppliedReport = Readonly<{
-    kind: 'applied'
-    buildId: string
-    seq: number
-}>
-
-/** The runtime hit an unrecoverable state (e.g. a corrupted patch range) and needs a full rebuild. */
-type RebuildReport = Readonly<{
-    kind: 'rebuild'
-    buildId: string
-    reason: string
-}>
-
-type HmrReport = AppliedReport | RebuildReport
 type HmrUpdatesResult = Parameters<NonNullable<DevOptions['onHmrUpdates']>>[0]
 type HmrUpdates = Exclude<HmrUpdatesResult, Error>
 type DevOutputResult = Parameters<NonNullable<DevOptions['onOutput']>>[0]
+type HostAction =
+    | Readonly<{ kind: 'publish'; result: HmrUpdates }>
+    | Readonly<{ kind: 'error'; error: Error }>
+    | Readonly<{ kind: 'reports'; reports: readonly RuntimeReport[] }>
 
 /** One short trailing-edge window absorbs editor bursts before style preparation and physical Page notification. */
-const hmrSettleMilliseconds = 16
+const hmrSettleMilliseconds = 32
 
 /**
  * Creates the wx dev host: the adapter that owns the physical Rolldown DevEngine (created
@@ -105,24 +96,38 @@ export async function createWxDevHost({
     const initialBuild = installWxDevOptions({ bundledDev, server, options, hostPlugins: [styleCapturePlugin] })
     const engine: DevEngine = await createEngine()
 
-    // This is intentionally only the first stream migration. RxJS owns callback admission and lossless burst conflation;
-    // hostTasks still owns every mutation of PatchPublisher, style publication, build rotation, and physical output. Keeping
-    // that boundary prevents two concurrency models from writing the same frontier before reports and outputs migrate too.
+    // Migrated sources reduce independently, then merge into this single semantic action edge. Its sole subscription sends
+    // actions through applyHostAction on hostTasks, preserving one state reducer and physical writer until outputs migrate too.
+    // Source subscriptions therefore never mutate PatchPublisher, style state, or DevEngine directly.
+    const hostActions = new Subject<HostAction>()
+    hostActions.subscribe((action) => {
+        hostTasks.enqueue(`wx HMR ${action.kind} failed`, () => applyHostAction(action))
+    })
+
     const hmrResults = createHmrResultsStream(
         hmrSettleMilliseconds,
         asyncScheduler,
         (result) => {
             // One reduced window becomes one existing host transaction: style preparation, one cumulative patch write, then
             // ordered delivery notifications for every original Rolldown payload retained by the stream.
-            hostTasks.enqueue('wx HMR publication failed', () => publishUpdates(result))
+            hostActions.next({ kind: 'publish', result: result })
         },
         (error) => {
-            logWxError(server.config.logger, 'wx HMR update failed', error)
-            // Recovery uses the same serialized writer as publication. Triggering directly from the subscription could overlap
-            // an in-flight Tailwind sidecar or physical rename and recreate the mixed full-build state seen during burst tests.
-            hostTasks.enqueue('wx HMR recovery failed', () => engine.triggerFullBuild())
+            /*
+             * Invalid syntax is a normal intermediate editor generation. Rolldown produced no patch, so neither the published
+             * nor applied runtime frontier needs repair. Triggering a complete build here would immediately compile the same
+             * invalid source and empirically wedges that DevEngine generation. Admit only the diagnostic; when the user saves
+             * valid source, the watch engine emits an ordinary successful callback and resumes the normal publication path.
+             */
+            hostActions.next({ kind: 'error', error: error })
         }
     )
+
+    const runtimeReports = createRuntimeReportsStream(hmrSettleMilliseconds, asyncScheduler, (reports) => {
+        // ACK conflation happens before admission, but publisher validation and mutation remain ordered with patch writes and
+        // build rotation. Reports arriving during publication therefore execute only after that physical transaction commits.
+        hostActions.next({ kind: 'reports', reports: reports })
+    })
 
     // The wx dev host owns the only DevEngine. Vite's default listen() would create a second
     // skip-write engine that renders into memory for browser HMR; instead the physical
@@ -150,9 +155,12 @@ export async function createWxDevHost({
 
     return {
         close: async () => {
-            // Subject completion flushes the final partial quiet window synchronously; waiting afterward includes the host task
-            // admitted by that flush. Closing the engine first would discard its still-undelivered payload filenames.
+            // Source completion flushes each final partial quiet window synchronously; waiting afterward includes every action
+            // admitted by those flushes. Closing the engine first would discard its still-undelivered payload filenames.
             hmrResults.complete()
+            runtimeReports.complete()
+            // Both source completions synchronously flush their partial windows into hostActions; complete it only afterward.
+            hostActions.complete()
             await hostTasks.waitForIdle()
             await engine.close()
         }
@@ -184,8 +192,8 @@ export async function createWxDevHost({
         }
 
         try {
-            const report = JSON.parse(await readBody(req)) as HmrReport
-            await hostTasks.run(() => processReport(report))
+            const report = JSON.parse(await readBody(req)) as RuntimeReport
+            runtimeReports.next(report)
             res.end()
         } catch (e) {
             logWxError(server.config.logger, 'wx HMR report failed', e)
@@ -194,8 +202,26 @@ export async function createWxDevHost({
         }
     }
 
+    /** Reduces one merged source action through the existing authoritative host state. */
+    function applyHostAction(action: HostAction): void | Promise<void> {
+        switch (action.kind) {
+            case 'publish':
+                return publishUpdates(action.result)
+            case 'error':
+                logWxError(server.config.logger, 'wx HMR update failed', action.error)
+                return
+            case 'reports':
+                return processReports(action.reports)
+        }
+    }
+
+    /** Applies one reduced receipt window to the active physical patch history. */
+    function processReports(reports: readonly RuntimeReport[]): void {
+        reports.forEach(processReport)
+    }
+
     /** Applies one runtime receipt to the active physical patch history. */
-    function processReport(report: HmrReport): void {
+    function processReport(report: RuntimeReport): void {
         // Delayed reports from older builds must never prune the live build's cumulative patch history.
         if (!publisher.isCurrentBuild(report.buildId)) {
             return
@@ -331,8 +357,11 @@ export async function createWxDevHost({
         hostTasks.enqueue('wx dev build finalization failed', finalizeDevOutput)
     }
 
-    /** Rebinds the byte frontier after a complete build replaces the physical stylesheet outside HMR publication. */
+    /** Rebinds the byte frontier after a complete build replaces or preserves the physical stylesheet. */
     async function finalizeDevOutput(): Promise<void> {
+        // The style finalizer emits changed CSS but intentionally omits unchanged CSS after its first output. In both cases the
+        // physical file is authoritative, so seeding its bytes is enough; no graph walk, Tailwind transform, or rewrite belongs
+        // on the complete-build path.
         styleState.publishedWxss = await readFile(path.join(server.config.build.outDir, globalWxssFileName), 'utf8')
         await rotateBuildSession()
     }

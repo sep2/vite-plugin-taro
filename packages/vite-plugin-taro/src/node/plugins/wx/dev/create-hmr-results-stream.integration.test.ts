@@ -14,8 +14,8 @@ type HmrUpdates = Exclude<HmrUpdatesResult, Error>
 
 test('coalesces separate real DevEngine callbacks into one lossless publication', async () => {
     // Three independent modules ensure each patch owns a factory that neither later patch can reconstruct. The test waits for
-    // every native callback before editing the next module, defeating Rolldown's filesystem debounce on purpose; all callbacks
-    // still land inside the longer RxJS quiet window and must emerge in one publication.
+    // every native callback before editing the next module while Rolldown debounce is disabled; duplicate filesystem delivery
+    // may add a Noop callback, but every callback still lands inside one RxJS publication.
     const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-hmr-results-stream-')))
     const appId = path.join(root, 'app.js')
     const moduleNames = ['a', 'b', 'c'] as const
@@ -35,7 +35,7 @@ test('coalesces separate real DevEngine callbacks into one lossless publication'
     const publications: HmrUpdates[] = []
     const failures: Error[] = []
     const hmrResults = createHmrResultsStream(
-        80,
+        1_000,
         asyncScheduler,
         (result) => {
             publications.push(result)
@@ -60,7 +60,7 @@ test('coalesces separate real DevEngine callbacks into one lossless publication'
     }
     const engine = await dev(rolldownOptions, output, {
         rebuildStrategy: 'never',
-        watch: { skipWrite: true },
+        watch: { skipWrite: true, useDebounce: false },
         onHmrUpdates(result) {
             rawResults.push(result)
             hmrResults.next(result)
@@ -72,19 +72,19 @@ test('coalesces separate real DevEngine callbacks into one lossless publication'
         await engine.ensureCurrentBuildFinish()
         await engine.registerClient('hmr-results-stream-test')
 
-        // Waiting for rawResults after each write proves the observed count came from DevEngine rather than synthetic Subject
-        // calls. Not notifying payload delivery also exercises Rolldown's real monotonically increasing per-client sequence.
+        // Waiting for the next real Patch after each write prevents duplicate filesystem Noops from satisfying a later edit's
+        // barrier. Not notifying delivery also exercises Rolldown's monotonically increasing per-client sequence.
         for (const [index, moduleId] of moduleIds.entries()) {
             await writeFile(moduleId, `export const ${moduleNames[index]} = 'updated-${index}'\n`)
-            await waitForCount(rawResults, index + 1)
+            await waitFor(() => countPatches(rawResults) >= index + 1)
         }
         await waitForCount(publications, 1)
 
-        // One publication retains all three sequence numbers and physical source identities despite receiving three callbacks.
-        assert.equal(rawResults.length, 3)
+        // One publication retains all three patch sequence numbers and source identities; any real Noop remains harmless data.
+        assert.equal(rawResults.length >= 3, true)
         assert.equal(publications.length, 1)
         assert.deepEqual(
-            publications[0]?.updates.map(({ update }) => (update.type === 'Patch' ? update.seq : undefined)),
+            publications[0]?.updates.flatMap(({ update }) => (update.type === 'Patch' ? [update.seq] : [])),
             [1, 2, 3]
         )
         assert.deepEqual(new Set(publications[0]?.changedFiles), new Set(moduleIds))
@@ -96,6 +96,96 @@ test('coalesces separate real DevEngine callbacks into one lossless publication'
         await rm(root, { recursive: true })
     }
 })
+
+test('surfaces a real transform failure and accepts a later recovery generation', async () => {
+    const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-hmr-recovery-')))
+    const appId = path.join(root, 'app.js')
+    const dependencyId = path.join(root, 'dependency.js')
+    await Promise.all([
+        writeFile(appId, "import { value } from './dependency.js'\nexport const current = value\n"),
+        writeFile(dependencyId, "export const value = 'initial'\n")
+    ])
+
+    // Separate journals prove a transform failure contributes no payload, starts no complete build, and resumes ordinary HMR.
+    const failures: Error[] = []
+    const publications: HmrUpdates[] = []
+    const outputResults: unknown[] = []
+    const hmrResults = createHmrResultsStream(
+        32,
+        asyncScheduler,
+        (result) => {
+            publications.push(result)
+        },
+        (error) => {
+            failures.push(error)
+        }
+    )
+    const server = await createServer({
+        root: root,
+        configFile: false,
+        logLevel: 'silent',
+        appType: 'custom',
+        experimental: { bundledDev: true },
+        build: { rolldownOptions: { input: appId } }
+    })
+    const bundledDev = requireBundledDev(server.environments.client.bundledDev)
+    const rolldownOptions = await bundledDev.getRolldownOptions()
+    const output = rolldownOptions.output
+    if (!output || Array.isArray(output)) {
+        throw new Error('Expected one bundled development output')
+    }
+    const engine = await dev(rolldownOptions, output, {
+        rebuildStrategy: 'never',
+        watch: { skipWrite: true, useDebounce: false },
+        onHmrUpdates(result) {
+            hmrResults.next(result)
+        },
+        onOutput(result) {
+            outputResults.push(result)
+        }
+    })
+
+    try {
+        await engine.run()
+        await engine.ensureCurrentBuildFinish()
+        await waitForCount(outputResults, 1)
+        await engine.registerClient('hmr-recovery-test')
+
+        await writeFile(dependencyId, 'export const value = ;\n')
+        await waitForCount(failures, 1)
+        assert.equal(countPatches(publications), 0)
+
+        // The invalid generation leaves the old runtime frontier healthy. Once the source parses again, Rolldown emits the
+        // ordinary next patch without a complete build or special recovery state.
+        await writeFile(dependencyId, "export const value = 'recovered'\n")
+        await waitFor(() => countPatches(publications) >= 1)
+        await engine.ensureCurrentBuildFinish()
+
+        assert.equal(failures.length, 1)
+        assert.equal(outputResults.length, 1)
+        assert.deepEqual(
+            publications.flatMap(({ updates }) =>
+                updates.flatMap(({ update }) => (update.type === 'Patch' ? [update.seq] : []))
+            ),
+            [1]
+        )
+    } finally {
+        hmrResults.complete()
+        await engine.close()
+        await server.close()
+        await rm(root, { recursive: true })
+    }
+})
+
+function countPatches(results: readonly HmrUpdatesResult[]): number {
+    return results.reduce(
+        (count, result) =>
+            result instanceof Error
+                ? count
+                : count + result.updates.filter(({ update }) => update.type === 'Patch').length,
+        0
+    )
+}
 
 function requireBundledDev(value: unknown): BundledDev {
     if (!isBundledDev(value)) {
@@ -118,10 +208,14 @@ function isBundledDev(value: unknown): value is BundledDev {
 }
 
 async function waitForCount(values: readonly unknown[], expectedCount: number): Promise<void> {
+    await waitFor(() => values.length >= expectedCount)
+}
+
+async function waitFor(predicate: () => boolean): Promise<void> {
     const startedAt = Date.now()
-    while (values.length < expectedCount) {
-        if (Date.now() - startedAt > 10_000) {
-            throw new Error(`Timed out waiting for event ${expectedCount}`)
+    while (!predicate()) {
+        if (Date.now() - startedAt > 20_000) {
+            throw new Error('Timed out waiting for DevEngine state')
         }
         await new Promise((resolve) => setTimeout(resolve, 10))
     }

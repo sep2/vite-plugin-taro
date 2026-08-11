@@ -48,6 +48,15 @@ export function createWxStylePlugins(): PluginOption[] {
  * remain opaque.
  */
 function createWxStyleFinalizer(transformStyle: typeof transformWxStyle): Plugin {
+    /*
+     * DevEngine can omit an unchanged stylesheet from later complete output generations. Absence therefore has two meanings:
+     * the first clean output genuinely has no styles, or a later output is reusing the physical stylesheet already on disk.
+     * The Vite server creates a fresh plugin instance on a clean start, so this one lifecycle bit distinguishes those cases and
+     * resets naturally on restart. Deliberately retain no CSS bytes or graph projection here: memory remains O(1), changed CSS
+     * still arrives as a normal asset, and the dev host remains the only owner of incremental style preparation.
+     */
+    let hasFinalizedOutput = false
+
     return {
         name: 'vpt:wx-style-finalizer',
         generateBundle: {
@@ -61,7 +70,17 @@ function createWxStyleFinalizer(transformStyle: typeof transformWxStyle): Plugin
                 }
 
                 if (styles.length === 0) {
-                    this.emitFile({ type: 'asset', fileName: 'assets/global.wxss', source: '' })
+                    /*
+                     * A clean first output must materialize the stable import target imported by app.wxss. On later complete
+                     * outputs, DevEngine's physical writer preserves files omitted from the bundle; emitting the same empty
+                     * placeholder would instead overwrite valid unchanged WXSS. Emit nothing in that later case. A source or
+                     * configuration change that really removes all styles is already published as empty by ordinary style HMR,
+                     * while a clean server restart reaches this first-output branch and also clears any stale prior file.
+                     */
+                    if (!hasFinalizedOutput) {
+                        this.emitFile({ type: 'asset', fileName: 'assets/global.wxss', source: '' })
+                    }
+                    hasFinalizedOutput = true
                     return
                 }
 
@@ -73,6 +92,7 @@ function createWxStyleFinalizer(transformStyle: typeof transformWxStyle): Plugin
                 // intact. Only its finalized contents and stable WXSS identity change.
                 style.source = transformedResult.css
                 style.fileName = 'assets/global.wxss'
+                hasFinalizedOutput = true
             }
         }
     }

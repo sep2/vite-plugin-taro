@@ -94,6 +94,7 @@ async function testSyntaxRecovery(harness: DevToolsHarness): Promise<void> {
     const buildFailuresBefore = await countLog(harness.serverLogPath, 'wx dev build failed')
     const hmrFailuresBefore = await countLog(harness.serverLogPath, 'wx HMR update failed')
     const before = await readHmrInfo(infoPath)
+    await setPageState('syntax-retained', harness)
 
     await writeFile(harness.markerPath, 'export const hmrMarker = ;\n')
     try {
@@ -102,21 +103,21 @@ async function testSyntaxRecovery(harness: DevToolsHarness): Promise<void> {
             5_000,
             20
         )
-        // The invalid source must not start the complete build that empirically wedges DevEngine.
+        // Invalid editor contents carry no patch and must leave both the build identity and live Page heap untouched.
         assert.equal((await readHmrInfo(infoPath)).buildId, before.buildId)
+        await assertPageState('syntax-retained', harness)
     } finally {
         await writeFile(harness.markerPath, originalSource)
     }
 
-    await waitFor(async () => (await readHmrInfo(infoPath)).buildId !== before.buildId, 6_000, 20)
-    await assertWxss(harness.outDir)
-    await assertBaselineAfterBuild(harness)
-    assert.equal(await countLog(harness.serverLogPath, 'wx dev build failed'), buildFailuresBefore)
-
-    await setPageState('post-recovery', harness)
+    // The corrected save resumes ordinary HMR. Five real marker generations prove the stream remains live without rotating the
+    // complete-build identity or resetting Page state.
     await publishHmrEdits(harness.markerPath, postRecoveryProfile)
+    assert.equal((await readHmrInfo(infoPath)).buildId, before.buildId)
     assert.equal(await harness.element('#hmr-status', 'text', undefined), 'marker:baseline')
-    await assertPageState('post-recovery', harness)
+    await assertPageState('syntax-retained', harness)
+    await assertWxss(harness.outDir)
+    assert.equal(await countLog(harness.serverLogPath, 'wx dev build failed'), buildFailuresBefore)
     await assertCleanConsole(harness)
 }
 
@@ -167,11 +168,6 @@ async function assertPageState(value: string, harness: DevToolsHarness): Promise
 
 async function assertCleanConsole(harness: DevToolsHarness): Promise<void> {
     assert.equal(await harness.readConsoleErrors(), '')
-}
-
-async function assertBaselineAfterBuild(harness: DevToolsHarness): Promise<void> {
-    await delay(3_000)
-    assert.equal(await harness.element('#hmr-status', 'text', undefined), 'marker:baseline')
 }
 
 async function assertWxss(outDir: string): Promise<void> {
