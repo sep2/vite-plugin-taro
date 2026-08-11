@@ -33,6 +33,7 @@ export default defineConfig({
                     label: '开始使用',
                     items: [
                         { label: '快速开始', slug: 'guides/quick-start' },
+                        { label: '样式', slug: 'guides/styles' },
                         { label: '全自动分包', slug: 'guides/automatic-subpackages' },
                         { label: '开发者工具热更新', slug: 'guides/hot-module-replacement' },
                         { label: '微信原生组件', slug: 'guides/native-components' },
