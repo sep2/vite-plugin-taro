@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.5.16] - 2026-08-11
+
+### Changed
+
+- animate automatic subpackage diagram (d3b3201)
+- refine native component demo (2c695db)
+- showcase native components (066abb6)
+- adjust hmr burst (39d18ac)
+
 ## [0.5.15] - 2026-08-11
 
 ### Added
