@@ -44,7 +44,7 @@ type HostAction =
     | Readonly<{ kind: 'listening' }>
 
 /** One short trailing-edge window absorbs editor bursts before style preparation and physical Page notification. */
-const hmrSettleMilliseconds = 32
+const hmrSettleMilliseconds = 16
 
 /**
  * Creates the wx dev host: the adapter that owns the physical Rolldown DevEngine (created
