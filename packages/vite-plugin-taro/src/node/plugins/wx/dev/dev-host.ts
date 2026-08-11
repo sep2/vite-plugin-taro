@@ -244,8 +244,7 @@ export async function createWxDevHost({
 
         switch (report.kind) {
             case 'rebuild': {
-                server.config.logger.info(`[vpt] wx runtime requested a full rebuild: ${report.reason}`)
-                engine.triggerFullBuild()
+                requestFullBuild(report.reason)
                 return
             }
             case 'applied': {
@@ -283,6 +282,12 @@ export async function createWxDevHost({
         })
     }
 
+    /** Centralizes the one diagnostic and DevEngine command used by every rebuild authority. */
+    function requestFullBuild(reason: string | undefined): void {
+        server.config.logger.info(`[vpt] wx full rebuild required${reason ? `: ${reason}` : ''}`)
+        engine.triggerFullBuild()
+    }
+
     /** Selects active updates and publishes their resulting host transaction. */
     async function publishUpdates(result: HmrUpdates): Promise<void> {
         /*
@@ -300,8 +305,7 @@ export async function createWxDevHost({
                 continue
             }
 
-            server.config.logger.info(`[vpt] wx full rebuild required${update.reason ? `: ${update.reason}` : ''}`)
-            engine.triggerFullBuild()
+            requestFullBuild(update.reason)
             return
         }
 
