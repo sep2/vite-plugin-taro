@@ -1,0 +1,737 @@
+---
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import HomeSectionHeading from './home-section-heading.astro'
+---
+
+<section class="home-section native-components-showcase" aria-labelledby="native-components-title">
+    <HomeSectionHeading
+        id="native-components-title"
+        kicker="编译时连接 · 零运行时封装"
+        title="React 与原生组件，双向直连"
+        description="用 TypeScript 声明属性与事件。VPT 自动注册、复制并分配原生资源，让 React 数据与微信原生事件自然往返。"
+        align="center"
+    />
+
+    <vpt-native-component-demo class="native-stage">
+        <article class="native-bridge-panel" aria-label="React 与微信原生计数器的双向通信演示">
+            <header class="native-preview-header">
+                <span>微信小程序</span>
+                <strong><i aria-hidden="true"></i> Native live</strong>
+            </header>
+
+            <div class="native-bridge-canvas">
+                <section class="react-state-card" data-react-state>
+                    <span class="react-mark" aria-hidden="true">R</span>
+                    <span>
+                        <small>React state</small>
+                        <strong>count = <output data-native-count>12</output></strong>
+                    </span>
+                    <em>状态保留</em>
+                </section>
+
+                <div class="native-data-bridge" aria-hidden="true">
+                    <span class="bridge-lane bridge-props"><b>props</b><i></i></span>
+                    <span class="bridge-lane bridge-event"><i></i><b data-native-event>native event</b></span>
+                </div>
+
+                <section class="native-element-card" data-native-element>
+                    <header>
+                        <span>
+                            <small>微信原生组件</small>
+                            <strong>native-counter</strong>
+                        </span>
+                        <span class="native-resource-list" role="list" aria-label="原生组件文件">
+                            <i role="listitem">JS</i><i role="listitem">WXML</i><i role="listitem">WXSS</i>
+                        </span>
+                    </header>
+
+                    <div class="native-counter-shell">
+                        <small>SHARED COUNTER</small>
+                        <div class="native-counter-control">
+                            <button type="button" data-counter-delta="-1" aria-label="计数减一">−</button>
+                            <output data-native-count>12</output>
+                            <button type="button" data-counter-delta="1" aria-label="计数加一">+</button>
+                        </div>
+                    </div>
+                </section>
+
+                <p class="native-interaction-hint">点击原生按钮，观察事件回到 React</p>
+                <output class="sr-only" data-native-announcement aria-live="polite"></output>
+            </div>
+        </article>
+
+        <article class="native-code-window" aria-label="在 React 中声明微信原生组件">
+            <header class="native-code-toolbar">
+                <span class="window-controls" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="native-code-file">src/components/native-counter.tsx</span>
+                <span class="native-code-badge"><i aria-hidden="true">R</i> React</span>
+            </header>
+
+            <pre class="native-code" tabindex="0"><code><span><b class="code-keyword">import</b> {'{'} defineNativeComponent {'}'}</span>
+<span>  <b class="code-keyword">from</b> <em class="code-string">'virtual:taro/native'</em></span>
+<span></span>
+<span><b class="code-keyword">type</b> <b class="code-type">CounterProps</b> = {'{'}</span>
+<span>  count: <b class="code-type">number</b></span>
+<span>  onDecrement: () => <b class="code-type">void</b></span>
+<span>  onIncrement: () => <b class="code-type">void</b></span>
+<span>{'}'}</span>
+<span></span>
+<span><b class="code-keyword">export const</b> NativeCounter = <b class="code-function">defineNativeComponent</b>&lt;<b class="code-type">CounterProps</b>>(</span>
+<span>  () => <b class="code-keyword">import</b>(<em class="code-string">'./native-counter/counter.js'</em>)</span>
+<span>)</span>
+<span></span>
+<span class="native-code-divider" aria-hidden="true"></span>
+<span><b class="code-tag">&lt;NativeCounter</b></span>
+<span>  <b class="code-attribute">count</b>={'{'}count{'}'}</span>
+<span>  <b class="code-attribute">onDecrement</b>={'{'}() => setCount(count - 1){'}'}</span>
+<span>  <b class="code-attribute">onIncrement</b>={'{'}() => setCount(count + 1){'}'}</span>
+<span><b class="code-tag">/></b></span></code></pre>
+
+            <footer class="native-code-status">
+                <span><i></i> Typed props</span>
+                <span><i></i> Compiled away</span>
+            </footer>
+        </article>
+    </vpt-native-component-demo>
+
+    <a class="native-guide-link" href="/guides/native-components/">
+        查看原生组件指南 <span aria-hidden="true">→</span>
+    </a>
+</section>
+
+<script>
+    function requireDemoElement<T extends Element>(root: ParentNode, selector: string): T {
+        const element = root.querySelector<T>(selector)
+        if (element === null) throw new Error(`Native component showcase requires ${selector}`)
+        return element
+    }
+
+    class VptNativeComponentDemoElement extends HTMLElement {
+        // The count is the demo's only mutable domain state and models the React state shown in both panels.
+        private count = 12
+
+        connectedCallback(): void {
+            this.addEventListener('click', this.handleClick)
+        }
+
+        disconnectedCallback(): void {
+            this.removeEventListener('click', this.handleClick)
+        }
+
+        private readonly handleClick = (event: MouseEvent): void => {
+            if (!(event.target instanceof Element)) return
+            const button = event.target.closest<HTMLButtonElement>('[data-counter-delta]')
+            if (button === null) return
+
+            const delta = Number(button.dataset.counterDelta)
+            const eventName = delta > 0 ? 'increment' : 'decrement'
+            this.count += delta
+            this.renderUpdate(eventName)
+        }
+
+        private renderUpdate(eventName: 'decrement' | 'increment'): void {
+            this.querySelectorAll<HTMLOutputElement>('[data-native-count]').forEach((output) => {
+                output.value = String(this.count)
+            })
+
+            const eventLabel = requireDemoElement<HTMLElement>(this, '[data-native-event]')
+            const announcement = requireDemoElement<HTMLOutputElement>(this, '[data-native-announcement]')
+            eventLabel.textContent = `triggerEvent('${eventName}')`
+            announcement.value = `原生组件触发 ${eventName}，React count 更新为 ${this.count}`
+
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+            const reactState = requireDemoElement<HTMLElement>(this, '[data-react-state]')
+            const nativeElement = requireDemoElement<HTMLElement>(this, '[data-native-element]')
+            this.playUpdateAnimation(eventLabel, reactState, nativeElement)
+        }
+
+        private playUpdateAnimation(eventLabel: HTMLElement, reactState: HTMLElement, nativeElement: HTMLElement): void {
+            [eventLabel, reactState, nativeElement].forEach((element) => {
+                element.getAnimations().forEach((animation) => animation.cancel())
+            })
+            void eventLabel.animate(
+                [
+                    { background: 'rgba(233, 111, 85, 0.18)', transform: 'scale(0.96)' },
+                    { background: 'rgba(233, 111, 85, 0)', transform: 'scale(1)' }
+                ],
+                { duration: 620, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+            )
+            void nativeElement.animate(
+                [
+                    { transform: 'translateY(0)' },
+                    { transform: 'translateY(-0.24rem)' },
+                    { transform: 'translateY(0)' }
+                ],
+                { duration: 360, easing: 'ease-out' }
+            )
+            void reactState.animate(
+                [
+                    { boxShadow: '0 0 0 0 rgba(86, 177, 106, 0)' },
+                    { boxShadow: '0 0 0 0.38rem rgba(86, 177, 106, 0.13)' },
+                    { boxShadow: '0 0 0 0 rgba(86, 177, 106, 0)' }
+                ],
+                { duration: 620, easing: 'ease-out' }
+            )
+        }
+    }
+
+    if (customElements.get('vpt-native-component-demo') === undefined) {
+        customElements.define('vpt-native-component-demo', VptNativeComponentDemoElement)
+    }
+</script>
+
+<style>
+    .native-stage {
+        --native-preview-background: #f5f7ed;
+        --native-card-background: rgba(255, 255, 249, 0.9);
+        --native-card-border: rgba(30, 102, 61, 0.14);
+        --native-heading: #173e29;
+        --native-text: #315f44;
+        --native-muted: #718176;
+        --native-soft: #e8efe0;
+        --native-control: #217a48;
+        --native-on-control: #fffdf5;
+        display: grid;
+        grid-template-columns: minmax(22rem, 0.92fr) minmax(0, 1.08fr);
+        align-items: stretch;
+        gap: clamp(1.25rem, 3vw, 2rem);
+    }
+
+    :global(:root[data-theme='dark']) .native-stage {
+        --native-preview-background: #102219;
+        --native-card-background: rgba(24, 50, 35, 0.94);
+        --native-card-border: rgba(143, 207, 155, 0.18);
+        --native-heading: #e2efe3;
+        --native-text: #bed1c1;
+        --native-muted: #91a796;
+        --native-soft: #1d3727;
+        --native-control: #68c67e;
+        --native-on-control: #0d2b18;
+    }
+
+    .native-code-window,
+    .native-bridge-panel {
+        min-width: 0;
+        min-height: 34rem;
+        border: 1px solid var(--vpt-border);
+        border-radius: var(--home-panel-radius);
+        box-shadow: var(--home-panel-shadow);
+        overflow: hidden;
+    }
+
+    .native-code-window {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        background: #10251a;
+        color: #dce9de;
+    }
+
+    .native-code-toolbar {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        min-height: 3.25rem;
+        padding-inline: 1rem;
+        border-bottom: 1px solid rgba(190, 224, 197, 0.12);
+        background: #142c1f;
+    }
+
+    .window-controls {
+        display: flex;
+        gap: 0.4rem;
+    }
+
+    .window-controls i {
+        width: 0.62rem;
+        height: 0.62rem;
+        margin: 0;
+        border-radius: 50%;
+        background: #ed967c;
+    }
+
+    .window-controls i:nth-child(2) {
+        background: #e5c65c;
+    }
+
+    .window-controls i:nth-child(3) {
+        background: #57b870;
+    }
+
+    .native-code-file,
+    .native-code-badge,
+    .native-code-status {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .native-code-file {
+        color: #a9b9ad;
+        font-size: 0.72rem;
+        text-align: center;
+    }
+
+    .native-code-badge {
+        display: flex;
+        align-items: center;
+        justify-self: end;
+        gap: 0.35rem;
+        color: #9bc4ee;
+        font-size: 0.68rem;
+    }
+
+    .native-code-badge i {
+        display: grid;
+        width: 1rem;
+        height: 1rem;
+        margin: 0;
+        border: 1px solid currentColor;
+        border-radius: 50%;
+        font-size: 0.52rem;
+        font-style: normal;
+        place-items: center;
+    }
+
+    .native-code {
+        min-height: 0;
+        padding: 1.35rem 1.5rem;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        color: #d8e4da;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: clamp(0.7rem, 1vw, 0.8rem);
+        line-height: 1.75;
+        overflow: auto;
+        scrollbar-color: rgba(144, 198, 155, 0.35) transparent;
+    }
+
+    .native-code code {
+        display: grid;
+        min-width: max-content;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+    }
+
+    .native-code code > span {
+        display: block;
+        min-height: 1.4rem;
+        white-space: pre;
+    }
+
+    .native-code b,
+    .native-code em {
+        font-style: normal;
+        font-weight: 500;
+    }
+
+    .code-keyword {
+        color: #ef987f;
+    }
+
+    .code-type,
+    .code-function {
+        color: #e7cf75;
+    }
+
+    .code-string {
+        color: #d9e78a;
+    }
+
+    .code-tag {
+        color: #80d696;
+    }
+
+    .code-attribute {
+        color: #9bc4ee;
+    }
+
+    .native-code-divider {
+        height: 1px;
+        min-height: 1px !important;
+        margin-block: 0.45rem;
+        background: linear-gradient(90deg, rgba(128, 214, 150, 0.32), transparent);
+    }
+
+    .native-code-status {
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        min-height: 2.65rem;
+        padding: 0.75rem 1rem;
+        border-top: 1px solid rgba(190, 224, 197, 0.12);
+        background: #142c1f;
+        color: #91a697;
+        font-size: 0.65rem;
+    }
+
+    .native-code-status span {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .native-code-status i {
+        width: 0.45rem;
+        height: 0.45rem;
+        margin: 0;
+        border-radius: 50%;
+        background: #72d58b;
+        box-shadow: 0 0 0 0.2rem rgba(114, 213, 139, 0.12);
+    }
+
+    .native-bridge-panel {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        background:
+            radial-gradient(circle at 100% 0, rgba(232, 136, 112, 0.13), transparent 32%),
+            radial-gradient(circle at 0 100%, rgba(87, 184, 112, 0.14), transparent 38%),
+            var(--native-preview-background);
+    }
+
+    .native-preview-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 3.25rem;
+        padding-inline: 1rem;
+        border-bottom: 1px solid var(--native-card-border);
+        color: var(--native-muted);
+        font-size: var(--home-font-size-label);
+    }
+
+    .native-preview-header strong {
+        display: flex;
+        align-items: center;
+        gap: 0.42rem;
+        color: var(--vpt-accent);
+        font-size: 0.68rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .native-preview-header i {
+        width: 0.42rem;
+        height: 0.42rem;
+        margin: 0;
+        border-radius: 50%;
+        background: #67c47c;
+        box-shadow: 0 0 0 0.22rem rgba(103, 196, 124, 0.12);
+    }
+
+    .native-bridge-canvas {
+        display: flex;
+        align-items: center;
+        flex-direction: column;
+        justify-content: center;
+        min-height: 0;
+        padding: clamp(1.25rem, 3vw, 2rem);
+    }
+
+    .react-state-card,
+    .native-element-card {
+        width: min(100%, 24rem);
+        border: 1px solid var(--native-card-border);
+        background: var(--native-card-background);
+        box-shadow: 0 0.8rem 2rem var(--vpt-shadow);
+    }
+
+    .react-state-card {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 0.8rem;
+        padding: 1rem;
+        border-radius: 1.15rem;
+    }
+
+    .react-mark {
+        display: grid;
+        width: 2.45rem;
+        height: 2.45rem;
+        border: 1px solid color-mix(in srgb, #61a9e8 45%, transparent);
+        border-radius: 50%;
+        background: color-mix(in srgb, #61a9e8 12%, transparent);
+        color: #4295df;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-weight: 800;
+        place-items: center;
+    }
+
+    .react-state-card > span:nth-child(2) {
+        display: grid;
+        gap: 0.18rem;
+    }
+
+    .react-state-card small,
+    .native-element-card header small {
+        color: var(--native-muted);
+        font-size: 0.65rem;
+    }
+
+    .react-state-card strong {
+        color: var(--native-heading);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.92rem;
+    }
+
+    .react-state-card output {
+        color: var(--native-control);
+    }
+
+    .react-state-card em {
+        padding: 0.25rem 0.45rem;
+        border-radius: 999px;
+        background: var(--native-soft);
+        color: var(--native-muted);
+        font-size: 0.58rem;
+        font-style: normal;
+    }
+
+    .native-data-bridge {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: min(88%, 20rem);
+        height: 5.2rem;
+    }
+
+    .bridge-lane {
+        display: flex;
+        position: relative;
+        align-items: center;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.35rem;
+        color: var(--native-muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.62rem;
+    }
+
+    .bridge-lane i {
+        position: relative;
+        width: 1px;
+        height: 1.9rem;
+        margin: 0;
+        background: var(--vpt-border-strong);
+    }
+
+    .bridge-lane i::after {
+        position: absolute;
+        left: 50%;
+        width: 0.38rem;
+        height: 0.38rem;
+        border-right: 1px solid var(--vpt-accent);
+        border-bottom: 1px solid var(--vpt-accent);
+        content: '';
+    }
+
+    .bridge-props i::after {
+        bottom: 0;
+        transform: translateX(-50%) rotate(45deg);
+    }
+
+    .bridge-event {
+        flex-direction: column-reverse;
+    }
+
+    .bridge-event i::after {
+        top: 0;
+        transform: translateX(-50%) rotate(225deg);
+    }
+
+    .bridge-lane b {
+        padding: 0.2rem 0.4rem;
+        border-radius: 0.35rem;
+        color: var(--native-text);
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .native-element-card {
+        padding: 1rem;
+        border-radius: 1.4rem;
+    }
+
+    .native-element-card > header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+    }
+
+    .native-element-card > header > span:first-child {
+        display: grid;
+        gap: 0.15rem;
+    }
+
+    .native-element-card header strong {
+        color: var(--native-heading);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.82rem;
+    }
+
+    .native-resource-list {
+        display: flex;
+        gap: 0.25rem;
+    }
+
+    .native-resource-list i {
+        padding: 0.24rem 0.36rem;
+        border: 1px solid var(--native-card-border);
+        border-radius: 0.4rem;
+        background: var(--native-soft);
+        color: var(--native-muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.48rem;
+        font-style: normal;
+    }
+
+    .native-counter-shell {
+        margin-top: 1rem;
+        padding: 1rem;
+        border-radius: 1rem;
+        background: var(--native-soft);
+    }
+
+    .native-counter-shell > small {
+        display: block;
+        color: var(--native-text);
+        font-size: 0.58rem;
+        font-weight: 750;
+        letter-spacing: 0.12em;
+        text-align: center;
+    }
+
+    .native-counter-control {
+        display: grid;
+        grid-template-columns: 3.25rem minmax(0, 1fr) 3.25rem;
+        height: 3.25rem;
+        margin-top: 0.75rem;
+        border: 1px solid var(--native-card-border);
+        border-radius: 999px;
+        background: var(--native-card-background);
+        overflow: hidden;
+    }
+
+    .native-counter-control button {
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: var(--native-heading);
+        cursor: pointer;
+        font: inherit;
+        font-size: 1.25rem;
+        font-weight: 800;
+        touch-action: manipulation;
+        transition:
+            background 120ms ease,
+            opacity 120ms ease;
+    }
+
+    .native-counter-control button:last-child {
+        background: var(--native-control);
+        color: var(--native-on-control);
+    }
+
+    .native-counter-control button:hover {
+        background: color-mix(in srgb, var(--native-control) 14%, transparent);
+    }
+
+    .native-counter-control button:last-child:hover {
+        background: color-mix(in srgb, var(--native-control) 88%, black);
+    }
+
+    .native-counter-control button:active {
+        opacity: 0.82;
+    }
+
+    .native-counter-control button:focus-visible {
+        position: relative;
+        z-index: 1;
+        outline: 2px solid var(--vpt-accent);
+        outline-offset: -3px;
+    }
+
+    .native-counter-control output {
+        display: grid;
+        border-right: 1px solid var(--native-card-border);
+        border-left: 1px solid var(--native-card-border);
+        color: var(--native-control);
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 1.8rem;
+        font-weight: 600;
+        place-items: center;
+    }
+
+    .native-interaction-hint {
+        margin-top: 1rem;
+        color: var(--native-muted);
+        font-size: 0.68rem;
+        text-align: center;
+    }
+
+    .native-guide-link {
+        display: block;
+        width: fit-content;
+        margin: 1.75rem auto 0;
+        color: var(--vpt-accent-strong);
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .native-guide-link:hover {
+        text-decoration: underline;
+    }
+
+    @media (max-width: 60rem) {
+        .native-stage {
+            grid-template-columns: 1fr;
+            max-width: 44rem;
+            margin-inline: auto;
+        }
+    }
+
+    @media (max-width: 40rem) {
+        .native-code-toolbar {
+            grid-template-columns: 1fr auto;
+        }
+
+        .window-controls {
+            display: none;
+        }
+
+        .native-code-file {
+            justify-self: start;
+        }
+
+        .native-code-window,
+        .native-bridge-panel {
+            min-height: 31rem;
+        }
+
+        .native-code {
+            padding-inline: 1rem;
+            font-size: 0.68rem;
+        }
+
+        .native-bridge-canvas {
+            padding-inline: 1rem;
+        }
+
+        .react-state-card {
+            grid-template-columns: auto 1fr;
+        }
+
+        .react-state-card em {
+            display: none;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .native-counter-control button {
+            transition: none;
+        }
+    }
+</style>
