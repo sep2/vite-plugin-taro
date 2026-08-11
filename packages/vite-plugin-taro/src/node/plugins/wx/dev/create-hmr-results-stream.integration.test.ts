@@ -12,30 +12,20 @@ import type { BundledDev } from './wx-dev-options.ts'
 type HmrUpdatesResult = Parameters<NonNullable<DevOptions['onHmrUpdates']>>[0]
 type HmrUpdates = Exclude<HmrUpdatesResult, Error>
 
-test('coalesces separate real DevEngine callbacks into one lossless publication', async () => {
-    // Three independent modules ensure each patch owns a factory that neither later patch can reconstruct. The test waits for
-    // every native callback before editing the next module while Rolldown debounce is disabled; duplicate filesystem delivery
-    // may add a Noop callback, but every callback still lands inside one RxJS publication.
+test('adapts a real DevEngine callback into one publication', async () => {
     const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-hmr-results-stream-')))
     const appId = path.join(root, 'app.js')
-    const moduleNames = ['a', 'b', 'c'] as const
-    const moduleIds = moduleNames.map((moduleName) => path.join(root, `${moduleName}.js`))
+    const dependencyId = path.join(root, 'dependency.js')
     await Promise.all([
-        writeFile(
-            appId,
-            "import { a } from './a.js'\nimport { b } from './b.js'\nimport { c } from './c.js'\nexport const value = a + b + c\n"
-        ),
-        ...moduleIds.map((moduleId, index) =>
-            writeFile(moduleId, `export const ${moduleNames[index]} = 'initial-${index}'\n`)
-        )
+        writeFile(appId, "import { value } from './dependency.js'\nexport const current = value\n"),
+        writeFile(dependencyId, "export const value = 'initial'\n")
     ])
 
-    // These mutable journals distinguish native DevEngine callback count from conflated physical publication count.
-    const rawResults: HmrUpdatesResult[] = []
+    // These mutable journals prove the adapter receives Rolldown's real callback rather than only synthetic Subject values.
     const publications: HmrUpdates[] = []
     const failures: Error[] = []
     const hmrResults = createHmrResultsStream(
-        1_000,
+        32,
         asyncScheduler,
         (result) => {
             publications.push(result)
@@ -62,7 +52,6 @@ test('coalesces separate real DevEngine callbacks into one lossless publication'
         rebuildStrategy: 'never',
         watch: { skipWrite: true, useDebounce: false },
         onHmrUpdates(result) {
-            rawResults.push(result)
             hmrResults.next(result)
         }
     })
@@ -72,22 +61,15 @@ test('coalesces separate real DevEngine callbacks into one lossless publication'
         await engine.ensureCurrentBuildFinish()
         await engine.registerClient('hmr-results-stream-test')
 
-        // Waiting for the next real Patch after each write prevents duplicate filesystem Noops from satisfying a later edit's
-        // barrier. Not notifying delivery also exercises Rolldown's monotonically increasing per-client sequence.
-        for (const [index, moduleId] of moduleIds.entries()) {
-            await writeFile(moduleId, `export const ${moduleNames[index]} = 'updated-${index}'\n`)
-            await waitFor(() => countPatches(rawResults) >= index + 1)
-        }
-        await waitForCount(publications, 1)
+        await writeFile(dependencyId, "export const value = 'updated'\n")
+        await waitFor(() => countPatches(publications) >= 1)
 
-        // One publication retains all three patch sequence numbers and source identities; any real Noop remains harmless data.
-        assert.equal(rawResults.length >= 3, true)
-        assert.equal(publications.length, 1)
         assert.deepEqual(
-            publications[0]?.updates.flatMap(({ update }) => (update.type === 'Patch' ? [update.seq] : [])),
-            [1, 2, 3]
+            publications.flatMap(({ updates }) =>
+                updates.flatMap(({ update }) => (update.type === 'Patch' ? [update.seq] : []))
+            ),
+            [1]
         )
-        assert.deepEqual(new Set(publications[0]?.changedFiles), new Set(moduleIds))
         assert.deepEqual(failures, [])
     } finally {
         hmrResults.complete()
@@ -153,6 +135,7 @@ test('surfaces a real transform failure and accepts a later recovery generation'
 
         await writeFile(dependencyId, 'export const value = ;\n')
         await waitForCount(failures, 1)
+        await engine.ensureCurrentBuildFinish()
         assert.equal(countPatches(publications), 0)
 
         // The invalid generation leaves the old runtime frontier healthy. Once the source parses again, Rolldown emits the

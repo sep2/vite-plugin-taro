@@ -130,7 +130,13 @@ async function openProject(outDir: string): Promise<void> {
     }
     await runTool('open_project_window', outDir, {})
     await delay(10_000)
-    await runTool('automation_runtime_info', outDir, { action: 'currentPage' })
+    try {
+        await runTool('automation_runtime_info', outDir, { action: 'currentPage' })
+    } catch {
+        // On a clean dist, DevTools can finish compiling just after the automator's first internal response deadline. One second
+        // attachment attempt stays inside the setup-only 60-second budget; actual warm test cases still fail on their first call.
+        await runTool('automation_runtime_info', outDir, { action: 'currentPage' })
+    }
 }
 
 function createHarness(root: string, outDir: string): DevToolsHarness {

@@ -39,6 +39,7 @@ type HostAction =
     | Readonly<{ kind: 'publish'; result: HmrUpdates }>
     | Readonly<{ kind: 'error'; error: Error }>
     | Readonly<{ kind: 'reports'; reports: readonly RuntimeReport[] }>
+    | Readonly<{ kind: 'output'; result: DevOutputResult }>
 
 /** One short trailing-edge window absorbs editor bursts before style preparation and physical Page notification. */
 const hmrSettleMilliseconds = 32
@@ -92,12 +93,15 @@ export async function createWxDevHost({
     )
 
     // DevEngine does not reject run() after an initial plugin failure. The options layer owns a first-build buildEnd barrier
-    // and exposes only its result; later build errors continue independently through onOutput and onHmrUpdates.
+    // and exposes only its result; later build errors continue independently through the host streams below.
     const initialBuild = installWxDevOptions({ bundledDev, server, options, hostPlugins: [styleCapturePlugin] })
+    // This hot Subject is the only admission edge for non-awaited complete-output callbacks. It owns no build state; completion
+    // and errors become ordinary host actions whose effects remain serialized with patch and report transactions.
+    const buildOutputs = new Subject<DevOutputResult>()
     const engine: DevEngine = await createEngine()
 
     // Migrated sources reduce independently, then merge into this single semantic action edge. Its sole subscription sends
-    // actions through applyHostAction on hostTasks, preserving one state reducer and physical writer until outputs migrate too.
+    // actions through applyHostAction on hostTasks, preserving one state reducer and physical writer until lifecycle migrates.
     // Source subscriptions therefore never mutate PatchPublisher, style state, or DevEngine directly.
     const hostActions = new Subject<HostAction>()
     hostActions.subscribe((action) => {
@@ -128,6 +132,11 @@ export async function createWxDevHost({
         // build rotation. Reports arriving during publication therefore execute only after that physical transaction commits.
         hostActions.next({ kind: 'reports', reports: reports })
     })
+    buildOutputs.subscribe((result) => {
+        // Do not finalize from Rolldown's callback stack. One output action rotates the session only after every previously
+        // admitted patch/report effect, and a failed output follows the same ordering without mutating build identity.
+        hostActions.next({ kind: 'output', result: result })
+    })
 
     // The wx dev host owns the only DevEngine. Vite's default listen() would create a second
     // skip-write engine that renders into memory for browser HMR; instead the physical
@@ -155,11 +164,17 @@ export async function createWxDevHost({
 
     return {
         close: async () => {
-            // Source completion flushes each final partial quiet window synchronously; waiting afterward includes every action
-            // admitted by those flushes. Closing the engine first would discard its still-undelivered payload filenames.
+            /*
+             * First flush callback/report windows and execute their admitted actions while buildOutputs stays open: a final
+             * runtime report can request a complete build. Then wait for that DevEngine generation, whose non-awaited onOutput
+             * callback synchronously admits its output action. Only after that source is quiescent may the merged action edge
+             * complete. The second queue wait includes output finalization before engine.close releases Rolldown resources.
+             */
             hmrResults.complete()
             runtimeReports.complete()
-            // Both source completions synchronously flush their partial windows into hostActions; complete it only afterward.
+            await hostTasks.waitForIdle()
+            await engine.ensureCurrentBuildFinish()
+            buildOutputs.complete()
             hostActions.complete()
             await hostTasks.waitForIdle()
             await engine.close()
@@ -212,6 +227,12 @@ export async function createWxDevHost({
                 return
             case 'reports':
                 return processReports(action.reports)
+            case 'output':
+                if (action.result instanceof Error) {
+                    logWxError(server.config.logger, 'wx dev build failed', action.result)
+                    return
+                }
+                return finalizeDevOutput()
         }
     }
 
@@ -253,7 +274,10 @@ export async function createWxDevHost({
             onHmrUpdates: (result: HmrUpdatesResult) => {
                 hmrResults.next(result)
             },
-            onOutput: handleDevOutput,
+            // Complete outputs are source events, not permission to mutate host state on Rolldown's callback stack.
+            onOutput: (result: DevOutputResult) => {
+                buildOutputs.next(result)
+            },
             rebuildStrategy: 'never',
             watch: {
                 // Rolldown must observe every source generation and emit every incremental factory: later patches do not
@@ -346,15 +370,6 @@ export async function createWxDevHost({
         for (const patch of batch) {
             await engine.notifyPayloadDelivered(patch.filename)
         }
-    }
-
-    /** Rotates metadata after each successful complete output. */
-    function handleDevOutput(result: DevOutputResult): void {
-        if (result instanceof Error) {
-            logWxError(server.config.logger, 'wx dev build failed', result)
-            return
-        }
-        hostTasks.enqueue('wx dev build finalization failed', finalizeDevOutput)
     }
 
     /** Rebinds the byte frontier after a complete build replaces or preserves the physical stylesheet. */
