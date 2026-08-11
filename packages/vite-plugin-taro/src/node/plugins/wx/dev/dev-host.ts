@@ -283,22 +283,20 @@ export async function createWxDevHost({
         })
     }
 
-    /** Publishes only the active client's patches or requests the complete build required by Rolldown. */
+    /** Selects active updates and publishes their resulting host transaction. */
     async function publishUpdates(result: HmrUpdates): Promise<void> {
         /*
-         * This transaction-local mutable array collects active patches in one pass. A single traversal matters during large edit
-         * bursts and can stop immediately at the first rebuild instruction; filter/find/flatMap would traverse the input up to
-         * three times and allocate an intermediate array. The batch never escapes this serialized host action, preserves duplicate
-         * updates and callback order, and is discarded after publication, so local mutation cannot create shared state or races.
+         * This transaction-local array preserves every patch in one pass and permits immediate rebuild dominance. It never escapes
+         * the serialized action. A filter/find/flatMap pipeline would scan a large burst repeatedly and allocate an intermediate.
          */
-        const batch: PatchUpdate[] = []
+        const patches: PatchUpdate[] = []
         for (const { clientId, update } of result.updates) {
             if (!publisher.isCurrentBuild(clientId) || update.type === 'Noop') {
                 continue
             }
 
             if (update.type === 'Patch') {
-                batch.push(update)
+                patches.push(update)
                 continue
             }
 
@@ -307,22 +305,27 @@ export async function createWxDevHost({
             return
         }
 
-        if (batch.length === 0) {
+        await publishPatchBatch(patches)
+    }
+
+    /** Publishes one coherent WXSS, patch-file, and Rolldown-frontier transaction. */
+    async function publishPatchBatch(patches: readonly PatchUpdate[]): Promise<void> {
+        if (patches.length === 0) {
             return
         }
 
         // `onHmrUpdates` is the transaction boundary after every affected transform has updated graph and candidate state.
         // Every non-CSS edit may alter imports or Tailwind classes; rendering broadly and comparing finalized bytes avoids
         // source scanning while preventing unrelated JavaScript edits from notifying DevTools through an identical rename.
-        await styleCapture.publishChanged(batch.flatMap((patch) => patch.changedIds))
+        await styleCapture.publishChanged(patches.flatMap((patch) => patch.changedIds))
 
         // Publish global.wxss before the matching JavaScript patch so DevTools observes a coherent HMR transaction.
         // The physical file must exist before Rolldown advances: once committed, later patches may be generated relative to
         // this batch even if DevTools has not observed its file event yet. PatchPublisher keeps the unapplied range cumulative,
         // so any later file generation still carries every factory needed to bridge the runtime's older application frontier.
-        await publisher.produce(batch)
+        await publisher.produce(patches)
 
-        await commitPublishedBatch(batch)
+        await commitPublishedBatch(patches)
     }
 
     /**
