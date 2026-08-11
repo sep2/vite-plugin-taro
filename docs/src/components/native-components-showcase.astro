@@ -67,13 +67,12 @@ import HomeSectionHeading from './home-section-heading.astro'
                 <span class="native-code-badge"><i aria-hidden="true">R</i> React</span>
             </header>
 
-            <pre class="native-code" tabindex="0"><code><span><b class="code-keyword">import</b> {'{'} defineNativeComponent {'}'}</span>
-<span>  <b class="code-keyword">from</b> <em class="code-string">'virtual:taro/native'</em></span>
+            <pre class="native-code" tabindex="0"><code><span><b class="code-keyword">import</b> {'{'} defineNativeComponent {'}'} <b class="code-keyword">from</b> <em class="code-string">'virtual:taro/native'</em></span>
 <span></span>
 <span><b class="code-keyword">type</b> <b class="code-type">CounterProps</b> = {'{'}</span>
 <span>  count: <b class="code-type">number</b></span>
-<span>  onDecrement: () => <b class="code-type">void</b></span>
-<span>  onIncrement: () => <b class="code-type">void</b></span>
+<span data-native-handler="decrement">  onDecrement: () => <b class="code-type">void</b></span>
+<span data-native-handler="increment">  onIncrement: () => <b class="code-type">void</b></span>
 <span>{'}'}</span>
 <span></span>
 <span><b class="code-keyword">export const</b> NativeCounter = <b class="code-function">defineNativeComponent</b>&lt;<b class="code-type">CounterProps</b>>(</span>
@@ -83,8 +82,8 @@ import HomeSectionHeading from './home-section-heading.astro'
 <span class="native-code-divider" aria-hidden="true"></span>
 <span><b class="code-tag">&lt;NativeCounter</b></span>
 <span>  <b class="code-attribute">count</b>={'{'}count{'}'}</span>
-<span>  <b class="code-attribute">onDecrement</b>={'{'}() => setCount(count - 1){'}'}</span>
-<span>  <b class="code-attribute">onIncrement</b>={'{'}() => setCount(count + 1){'}'}</span>
+<span data-native-handler="decrement">  <b class="code-attribute">onDecrement</b>={'{'}() => setCount(count - 1){'}'}</span>
+<span data-native-handler="increment">  <b class="code-attribute">onIncrement</b>={'{'}() => setCount(count + 1){'}'}</span>
 <span><b class="code-tag">/></b></span></code></pre>
 
             <footer class="native-code-status">
@@ -142,11 +141,17 @@ import HomeSectionHeading from './home-section-heading.astro'
             if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
             const reactState = requireDemoElement<HTMLElement>(this, '[data-react-state]')
             const nativeElement = requireDemoElement<HTMLElement>(this, '[data-native-element]')
-            this.playUpdateAnimation(eventLabel, reactState, nativeElement)
+            const handlerLines = this.querySelectorAll<HTMLElement>(`[data-native-handler="${eventName}"]`)
+            this.playUpdateAnimation(eventLabel, reactState, nativeElement, handlerLines)
         }
 
-        private playUpdateAnimation(eventLabel: HTMLElement, reactState: HTMLElement, nativeElement: HTMLElement): void {
-            [eventLabel, reactState, nativeElement].forEach((element) => {
+        private playUpdateAnimation(
+            eventLabel: HTMLElement,
+            reactState: HTMLElement,
+            nativeElement: HTMLElement,
+            handlerLines: NodeListOf<HTMLElement>
+        ): void {
+            [eventLabel, reactState, nativeElement, ...handlerLines].forEach((element) => {
                 element.getAnimations().forEach((animation) => animation.cancel())
             })
             void eventLabel.animate(
@@ -154,7 +159,7 @@ import HomeSectionHeading from './home-section-heading.astro'
                     { background: 'rgba(233, 111, 85, 0.18)', transform: 'scale(0.96)' },
                     { background: 'rgba(233, 111, 85, 0)', transform: 'scale(1)' }
                 ],
-                { duration: 620, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+                { duration: 820, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
             )
             void nativeElement.animate(
                 [
@@ -162,7 +167,7 @@ import HomeSectionHeading from './home-section-heading.astro'
                     { transform: 'translateY(-0.24rem)' },
                     { transform: 'translateY(0)' }
                 ],
-                { duration: 360, easing: 'ease-out' }
+                { duration: 520, easing: 'ease-out' }
             )
             void reactState.animate(
                 [
@@ -170,8 +175,19 @@ import HomeSectionHeading from './home-section-heading.astro'
                     { boxShadow: '0 0 0 0.38rem rgba(86, 177, 106, 0.13)' },
                     { boxShadow: '0 0 0 0 rgba(86, 177, 106, 0)' }
                 ],
-                { duration: 620, easing: 'ease-out' }
+                { duration: 820, easing: 'ease-out' }
             )
+            handlerLines.forEach((handlerLine) => {
+                void handlerLine.animate(
+                    [
+                        { background: 'rgba(239, 152, 127, 0)', boxShadow: 'inset 2px 0 rgba(239, 152, 127, 0)' },
+                        { background: 'rgba(239, 152, 127, 0.18)', boxShadow: 'inset 2px 0 #ef987f' },
+                        { background: 'rgba(239, 152, 127, 0.18)', boxShadow: 'inset 2px 0 #ef987f' },
+                        { background: 'rgba(239, 152, 127, 0)', boxShadow: 'inset 2px 0 rgba(239, 152, 127, 0)' }
+                    ],
+                    { duration: 980, easing: 'ease-out' }
+                )
+            })
         }
     }
 
