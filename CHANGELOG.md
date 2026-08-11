@@ -4,7 +4,42 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
-## [0.5.13] - 2026-08-10
+## [0.5.14] - 2026-08-11
+
+### Changed
+
+- refactor (aae659a)
+- wx dev host (2390169)
+- wx dev host (2cf3a26)
+- wx dev host (e7be127)
+- bind WXSS frontier from build output (03393c8)
+- route initial WX output through host actions (bbd35d5)
+- simplify WX development pipeline (c9b5b47)
+- encapsulate WX style capture lifecycle (7b516cd)
+- serialize WX host lifecycle with RxJS (c17363f)
+- route WX style captures through host actions (98f433c)
+- migrate WX build outputs to host stream (6000608)
+- stabilize WX HMR reports and recovery (942cd85)
+- stress (0347db6)
+- stress (46643d9)
+- agents.md (ac56e9f)
+- coalesce WX HMR result bursts (021956c)
+- make lazy video work without JavaScript (3bf754f)
+- text (afb8936)
+- css (3e32633)
+- docs (8df9f53)
+- docs (fb67158)
+- refactor path normalization through Vite (4cfc429)
+
+### Removed
+
+- remove grid for skyline (c6761eb)
+
+### Fixed
+
+- fix Biome checks for Astro docs (d86ead1)
+
+## [0.5.13] - 2026-08-11
 
 ### Added
 
