@@ -3,6 +3,7 @@ import { Button, ScrollView, Text, View } from 'virtual:taro/components'
 import { useState } from 'react'
 import { Counter } from '../../components/counter/counter.tsx'
 import { NavigationBar } from '../../components/navigation-bar/navigation-bar.tsx'
+import styles from './home.module.css'
 
 const featureCards = [
     {
@@ -31,18 +32,18 @@ interface BotanicalSprigProps {
 
 function BotanicalSprig({ className }: BotanicalSprigProps) {
     return (
-        <View className={`botanical-sprig ${className}`} aria-hidden="true">
-            <View className="botanical-stem" />
-            <View className="botanical-leaf botanical-leaf-one" />
-            <View className="botanical-leaf botanical-leaf-two" />
-            <View className="botanical-leaf botanical-leaf-three" />
-            <View className="botanical-leaf botanical-leaf-four" />
-            <View className="botanical-flower">
-                <View className="botanical-petal botanical-petal-one" />
-                <View className="botanical-petal botanical-petal-two" />
-                <View className="botanical-petal botanical-petal-three" />
-                <View className="botanical-petal botanical-petal-four" />
-                <View className="botanical-flower-center" />
+        <View className={`${styles.botanicalSprig} ${className}`} aria-hidden="true">
+            <View className={styles.botanicalStem} />
+            <View className={`${styles.botanicalLeaf} ${styles.botanicalLeafOne}`} />
+            <View className={`${styles.botanicalLeaf} ${styles.botanicalLeafTwo}`} />
+            <View className={`${styles.botanicalLeaf} ${styles.botanicalLeafThree}`} />
+            <View className={`${styles.botanicalLeaf} ${styles.botanicalLeafFour}`} />
+            <View className={styles.botanicalFlower}>
+                <View className={`${styles.botanicalPetal} ${styles.botanicalPetalOne}`} />
+                <View className={`${styles.botanicalPetal} ${styles.botanicalPetalTwo}`} />
+                <View className={`${styles.botanicalPetal} ${styles.botanicalPetalThree}`} />
+                <View className={`${styles.botanicalPetal} ${styles.botanicalPetalFour}`} />
+                <View className={styles.botanicalFlowerCenter} />
             </View>
         </View>
     )
@@ -53,12 +54,12 @@ function HomePage() {
     const [count, setCount] = useState(0)
 
     return (
-        <View className="starter-canvas flex h-screen flex-col overflow-hidden text-[#315f44]">
+        <View className={`${styles.starterCanvas} flex h-screen flex-col overflow-hidden text-[#315f44]`}>
             <NavigationBar title="VPT" />
             <ScrollView scrollY className="flex min-h-0 flex-1 flex-col">
                 <View className="relative flex shrink-0 flex-col items-center overflow-hidden px-5 pb-8 pt-6">
-                    <BotanicalSprig className="botanical-sprig-top" />
-                    <BotanicalSprig className="botanical-sprig-side" />
+                    <BotanicalSprig className={styles.botanicalSprigTop} />
+                    <BotanicalSprig className={styles.botanicalSprigSide} />
 
                     <View className="relative z-10 flex w-full max-w-4xl flex-col items-center text-center">
                         <Text className="brand-serif mt-7 block text-[7rem] font-semibold leading-none tracking-[-0.08em] text-[#17673d] sm:text-[9rem]">
@@ -146,7 +147,7 @@ function HomePage() {
                         </View>
 
                         <View className="relative mt-8 flex flex-col overflow-hidden rounded-3xl bg-[#17673d] p-7 text-white sm:flex-row sm:items-center sm:justify-between sm:p-9">
-                            <BotanicalSprig className="botanical-sprig-cta" />
+                            <BotanicalSprig className={styles.botanicalSprigCta} />
                             <View className="relative z-10 flex max-w-lg flex-col">
                                 <Text className="text-xs font-bold tracking-widest text-[#a9e2b4]">TARO API READY</Text>
                                 <Text className="brand-serif mt-2 block text-3xl font-semibold text-white">

@@ -1,0 +1,126 @@
+.starterCanvas {
+    background:
+        radial-gradient(ellipse at 12% 5%, rgba(101, 190, 119, 0.11), rgba(101, 190, 119, 0.04) 28%, transparent 62%),
+        radial-gradient(ellipse at 90% 18%, rgba(234, 139, 115, 0.08), rgba(234, 139, 115, 0.03) 32%, transparent 68%),
+        #fbfaf1;
+}
+
+.botanicalSprig {
+    position: absolute;
+    z-index: 0;
+    width: 15rem;
+    height: 10rem;
+    opacity: 0.68;
+    pointer-events: none;
+}
+
+.botanicalSprigTop {
+    top: -2.25rem;
+    left: -4.25rem;
+    transform: rotate(-7deg);
+}
+
+.botanicalSprigSide {
+    right: -5rem;
+    bottom: -1.75rem;
+    opacity: 0.42;
+    transform: scaleX(-1) rotate(-11deg);
+}
+
+.botanicalSprigCta {
+    z-index: 0;
+    right: -3rem;
+    bottom: -2.5rem;
+    opacity: 0.18;
+    transform: scale(1.15) rotate(-8deg);
+}
+
+.botanicalStem {
+    position: absolute;
+    top: 7rem;
+    left: 0.5rem;
+    width: 14rem;
+    height: 0.3rem;
+    border-radius: 999px;
+    background: #237648;
+    transform: rotate(-24deg);
+    transform-origin: left center;
+}
+
+.botanicalLeaf {
+    position: absolute;
+    width: 3.2rem;
+    height: 1.55rem;
+    border-radius: 72% 28% 70% 30%;
+    background: linear-gradient(145deg, #9cd88b, #43a760);
+}
+
+.botanicalLeafOne {
+    top: 5.65rem;
+    left: 3rem;
+    transform: rotate(28deg);
+}
+
+.botanicalLeafTwo {
+    top: 3.95rem;
+    left: 6.1rem;
+    transform: rotate(-20deg);
+}
+
+.botanicalLeafThree {
+    top: 2.55rem;
+    left: 9.1rem;
+    transform: rotate(25deg);
+}
+
+.botanicalLeafFour {
+    top: 0.85rem;
+    left: 11.8rem;
+    transform: rotate(-17deg);
+}
+
+.botanicalFlower {
+    position: absolute;
+    top: 4.9rem;
+    left: 4.35rem;
+    width: 2.8rem;
+    height: 2.8rem;
+}
+
+.botanicalPetal,
+.botanicalFlowerCenter {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    border-radius: 999px;
+    transform: translate(-50%, -50%);
+}
+
+.botanicalPetal {
+    width: 1.05rem;
+    height: 1.55rem;
+    background: #ef977f;
+}
+
+.botanicalPetalOne {
+    transform: translate(-50%, -100%);
+}
+
+.botanicalPetalTwo {
+    transform: translate(0, -50%) rotate(90deg);
+}
+
+.botanicalPetalThree {
+    transform: translate(-50%, 0);
+}
+
+.botanicalPetalFour {
+    transform: translate(-100%, -50%) rotate(90deg);
+}
+
+.botanicalFlowerCenter {
+    z-index: 1;
+    width: 0.7rem;
+    height: 0.7rem;
+    background: #fff1bd;
+}
