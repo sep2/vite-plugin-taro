@@ -48,7 +48,7 @@ function BotanicalSprig({ className }: BotanicalSprigProps) {
     )
 }
 
-function IndexPage() {
+function HomePage() {
     // This local state intentionally demonstrates that VPT preserves React state during hot updates.
     const [count, setCount] = useState(0)
 
@@ -107,7 +107,7 @@ function IndexPage() {
                                 Edit. Save. Stay in flow.
                             </Text>
                             <Text className="mt-3 block text-sm leading-6 text-[#64786a]">
-                                Change this counter, then edit src/pages/index/index.tsx. Your state stays exactly where
+                                Change this counter, then edit src/pages/home/index.tsx. Your state stays exactly where
                                 you left it.
                             </Text>
                         </View>
@@ -176,4 +176,4 @@ function IndexPage() {
     )
 }
 
-export default IndexPage
+export default HomePage

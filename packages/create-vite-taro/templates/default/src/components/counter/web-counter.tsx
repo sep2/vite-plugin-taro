@@ -1,5 +1,5 @@
 import { Button, Text, View } from 'virtual:taro/components'
-import type { CounterProps } from './counter-props.ts'
+import type { CounterProps } from './counter.tsx'
 
 export function WebCounter({ count, onDecrement, onIncrement }: CounterProps) {
     return (

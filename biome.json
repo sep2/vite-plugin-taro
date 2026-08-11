@@ -10,7 +10,8 @@
         "includes": [
             "**",
             "!packages/loan-genius/src/index.html",
-            "!packages/towxml-stream-demo/src/native/towxml-adapter/towxml"
+            "!packages/towxml-stream-demo/src/native/towxml-adapter/towxml",
+            "!packages/create-vite-taro/templates/default"
         ]
     },
     "formatter": {

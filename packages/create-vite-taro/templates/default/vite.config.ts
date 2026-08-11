@@ -31,7 +31,7 @@ export default defineConfig(({ mode }) => {
                 app: 'src/app.tsx',
                 pages: [
                     {
-                        path: 'pages/index/index',
+                        path: 'pages/home/index',
                         config: {
                             navigationStyle: 'custom',
                             navigationBarTextStyle: 'black'
