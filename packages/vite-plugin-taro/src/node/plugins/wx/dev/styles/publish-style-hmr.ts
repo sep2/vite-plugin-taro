@@ -1,7 +1,7 @@
 import { transformWxStyle } from '../../styles/transform-wx-style.ts'
 import { composeGraphStyleCss, createTailwindSidecarId, extractViteCss } from '../../styles/utils.ts'
 import { writeHmrFile } from '../hmr-files.ts'
-import type { ProcessedStyle } from './create-style-capture-plugin.ts'
+import type { ProcessedStyle } from './create-style-capture.ts'
 
 export const globalWxssFileName = 'assets/global.wxss'
 

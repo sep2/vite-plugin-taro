@@ -5,11 +5,10 @@ import path from 'node:path'
 import test from 'node:test'
 import type { GetModuleInfo } from 'rolldown'
 import { dev } from 'rolldown/experimental'
-import { createServer, isCSSRequest, normalizePath } from 'vite'
-import { createGraphStylePlan, isGlobalStyleRequest } from '../../styles/utils.ts'
+import { Subject } from 'rxjs'
+import { createServer, normalizePath } from 'vite'
 import type { BundledDev } from '../wx-dev-options.ts'
-import { createStyleCapturePlugin, type ProcessedStyle } from './create-style-capture-plugin.ts'
-import { publishStyleHmr } from './publish-style-hmr.ts'
+import { createStyleCapture, type ProcessedStyle, type StyleCaptureAction } from './create-style-capture.ts'
 
 test('publishes processed CSS and live topology without identical rewrites', async () => {
     const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-host-css-capture-')))
@@ -25,14 +24,11 @@ test('publishes processed CSS and live topology without identical rewrites', asy
     ])
 
     // These mutable journals synchronize non-awaited DevEngine callbacks and preserve evidence from each lifecycle generation.
-    // `processedStyles` specifically mirrors the host-owned final-CSS projection used by physical publication.
     const captures: ProcessedStyle[] = []
-    const processedStyles = new Map<string, ProcessedStyle>()
     const graphReaders: GetModuleInfo[] = []
     const hmrResults: unknown[] = []
     const outputResults: unknown[] = []
-    // This mutable byte frontier mirrors the serialized host value returned only after a durable publication.
-    let publishedWxss: string | undefined
+    const styleCaptureActions = new Subject<StyleCaptureAction>()
     const server = await createServer({
         root: root,
         configFile: false,
@@ -58,20 +54,25 @@ test('publishes processed CSS and live topology without identical rewrites', asy
         },
         build: { rolldownOptions: { input: appId } }
     })
+    const styleCapture = createStyleCapture({
+        applicationEntryIds: [appId],
+        outDir: outDir,
+        emit: (action) => styleCaptureActions.next(action),
+        transformTailwindRoot: async (rootId, requestId) =>
+            server.environments.client.pluginContainer.transform(await readFile(rootId, 'utf8'), requestId)
+    })
+    styleCaptureActions.subscribe((action) => {
+        if (action.kind === 'capture-graph') {
+            graphReaders.push(action.getModuleInfo)
+            styleCapture.captureGraph(action.getModuleInfo)
+            return
+        }
+        captures.push(action.style)
+        styleCapture.captureStyle(action.id, action.style)
+    })
     const bundledDev = requireBundledDev(server.environments.client.bundledDev)
     const rolldownOptions = await bundledDev.getRolldownOptions()
-    rolldownOptions.plugins = [
-        rolldownOptions.plugins,
-        createStyleCapturePlugin({
-            captureGraph(reader) {
-                graphReaders.push(reader)
-            },
-            captureStyle(id, style) {
-                processedStyles.set(id, style)
-                captures.push(style)
-            }
-        })
-    ]
+    rolldownOptions.plugins = [rolldownOptions.plugins, styleCapture.plugin]
     const output = rolldownOptions.output
     if (!output || Array.isArray(output)) {
         throw new Error('Expected one bundled development output')
@@ -84,25 +85,10 @@ test('publishes processed CSS and live topology without identical rewrites', asy
             // observable result only afterward, so waiting for `hmrResults` proves global.wxss was durable first.
             void Promise.resolve()
                 .then(async () => {
-                    if (
-                        !(result instanceof Error) &&
-                        result.updates.some(
-                            ({ update }) =>
-                                update.type === 'Patch' &&
-                                update.changedIds.some((id) => isGlobalStyleRequest(id) || !isCSSRequest(id))
+                    if (!(result instanceof Error)) {
+                        await styleCapture.publishChanged(
+                            result.updates.flatMap(({ update }) => (update.type === 'Patch' ? update.changedIds : []))
                         )
-                    ) {
-                        const styleIds = createGraphStylePlan(
-                            [appId],
-                            requireLatestGraphReader(graphReaders),
-                            (styleId) => processedStyles.has(styleId)
-                        )
-                        publishedWxss = await publishStyleHmr({
-                            styleIds: styleIds,
-                            outDir: outDir,
-                            processedStyles: processedStyles,
-                            publishedWxss: publishedWxss
-                        })
                     }
                     hmrResults.push(result)
                 })

@@ -7,6 +7,7 @@ import {
     injectPageHmr,
     injectReactRefreshBootstrap,
     injectTaroConnection,
+    isWxClientEnvironment,
     removeDevelopmentAppWxss
 } from './plugins.ts'
 
@@ -18,6 +19,11 @@ const options: VitePluginTaroOptions = {
     projectConfigJson: {},
     sitemapJson: {}
 }
+
+test('assigns physical WX host ownership only to the client environment', () => {
+    assert.equal(isWxClientEnvironment({ name: 'client' }), true)
+    assert.equal(isWxClientEnvironment({ name: 'ssr' }), false)
+})
 
 test('preserves physical outputs across development host restarts', async () => {
     const config = await resolveConfig(

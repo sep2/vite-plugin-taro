@@ -10,6 +10,11 @@ import { createWxReactRefreshTransforms } from './react-refresh.ts'
 
 const taroRuntimeId = '@tarojs/runtime'
 
+/** Selects the sole Vite environment that owns the physical Mini Program development project. */
+export function isWxClientEnvironment(environment: Readonly<{ name: string }>): boolean {
+    return environment.name === 'client'
+}
+
 /**
  * Adds the serve-only bundled-development plugin set for the wx target: the dev adapter,
  * Page HMR activation, and React Refresh adaptation transforms.
@@ -32,6 +37,9 @@ export function createWxDevelopmentPlugin(
         {
             name: 'vpt:wx-dev',
             apply: 'serve',
+            // The physical WX DevEngine is a client build. Native environment scoping gives its shared host exactly one
+            // generate/close lifecycle instead of admitting hooks from Vite's unrelated SSR environment.
+            applyToEnvironment: isWxClientEnvironment,
 
             config() {
                 return {
@@ -80,14 +88,7 @@ export function createWxDevelopmentPlugin(
             },
 
             closeBundle() {
-                /*
-                 * One Vite plugin instance participates in both client and SSR environments, so an unscoped close hook drains
-                 * the shared host twice. The physical DevEngine belongs only to bundled client development; make that ownership
-                 * explicit here and give the host a single close lifecycle instead of hiding duplicate calls with idempotence.
-                 */
-                if (this.environment.name === 'client') {
-                    return host?.close()
-                }
+                return host?.close()
             }
         },
         {

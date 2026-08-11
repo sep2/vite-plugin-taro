@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import type { ProcessedStyle } from './create-style-capture-plugin.ts'
+import type { ProcessedStyle } from './create-style-capture.ts'
 import { publishStyleHmr, refreshTailwindStyles } from './publish-style-hmr.ts'
 
 test('publishes reachable styles once when finalized bytes are unchanged', async () => {
