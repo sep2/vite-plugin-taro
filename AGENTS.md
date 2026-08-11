@@ -35,7 +35,7 @@ If a conflict is in a file you did not modify, abort and ask the user.
 Ignore unrelated files' changes.
 
 ## Bash Timeout
-bash timeout should never be longer than 60 seconds.
+bash timeout should never be longer than 30 seconds.
 
 # Design Feature
 When designing a feature, I don't care about compatibility. I want the best architecture with the best readability and best simplicity.
