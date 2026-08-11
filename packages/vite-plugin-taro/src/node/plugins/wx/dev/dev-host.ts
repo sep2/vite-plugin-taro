@@ -35,7 +35,12 @@ export type WxDevHost = Readonly<{
 type HmrUpdatesResult = Parameters<NonNullable<DevOptions['onHmrUpdates']>>[0]
 type HmrUpdates = Exclude<HmrUpdatesResult, Error>
 type DevOutputResult = Parameters<NonNullable<DevOptions['onOutput']>>[0]
+type StyleCaptureAction =
+    | Readonly<{ kind: 'capture-graph'; getModuleInfo: GetModuleInfo }>
+    | Readonly<{ kind: 'capture-style'; id: string; style: ProcessedStyle }>
+
 type HostAction =
+    | StyleCaptureAction
     | Readonly<{ kind: 'publish'; result: HmrUpdates }>
     | Readonly<{ kind: 'error'; error: Error }>
     | Readonly<{ kind: 'reports'; reports: readonly RuntimeReport[] }>
@@ -63,6 +68,9 @@ export async function createWxDevHost({
     applicationEntryIds: readonly string[]
 }): Promise<WxDevHost> {
     const bundledDev = getBundledDev(server)
+    // Plugin hooks emit captures synchronously into this hot source instead of mutating host state from Rolldown's callback
+    // stack. Its subscription is installed before engine.run, so buildStart/transform emission order becomes host action order.
+    const styleCaptures = new Subject<StyleCaptureAction>()
     // This is the host's mutable style projection: CSS absent from Rolldown, the live graph capability rebound by each
     // complete build, and the last durable WXSS bytes used only to suppress identical filesystem publications. Style capture
     // remains O(1); derived order and reachability stay local to each HMR transaction.
@@ -77,10 +85,10 @@ export async function createWxDevHost({
     }
     const styleCapturePlugin = createStyleCapturePlugin({
         captureGraph(reader) {
-            styleState.getModuleInfo = reader
+            styleCaptures.next({ kind: 'capture-graph', getModuleInfo: reader })
         },
         captureStyle(id, style) {
-            styleState.processedStyles.set(id, style)
+            styleCaptures.next({ kind: 'capture-style', id: id, style: style })
         }
     })
 
@@ -106,6 +114,11 @@ export async function createWxDevHost({
     const hostActions = new Subject<HostAction>()
     hostActions.subscribe((action) => {
         hostTasks.enqueue(`wx HMR ${action.kind} failed`, () => applyHostAction(action))
+    })
+    styleCaptures.subscribe((action) => {
+        // Capture actions share the same queue as output and HMR actions. A transform capture therefore commits before the
+        // transaction callback it causally precedes, without plugin hooks directly touching the mutable style projection.
+        hostActions.next(action)
     })
 
     const hmrResults = createHmrResultsStream(
@@ -174,6 +187,8 @@ export async function createWxDevHost({
             runtimeReports.complete()
             await hostTasks.waitForIdle()
             await engine.ensureCurrentBuildFinish()
+            // A final complete generation emits graph/style captures before onOutput, so both sources stay open through ensure.
+            styleCaptures.complete()
             buildOutputs.complete()
             hostActions.complete()
             await hostTasks.waitForIdle()
@@ -220,6 +235,14 @@ export async function createWxDevHost({
     /** Reduces one merged source action through the existing authoritative host state. */
     function applyHostAction(action: HostAction): void | Promise<void> {
         switch (action.kind) {
+            case 'capture-graph':
+                // The buildStart reader is a live capability; replacing it only here makes the reducer own build rebinding.
+                styleState.getModuleInfo = action.getModuleInfo
+                return
+            case 'capture-style':
+                // A failed upstream transform emits no action, intentionally retaining the last valid processed CSS generation.
+                styleState.processedStyles.set(action.id, action.style)
+                return
             case 'publish':
                 return publishUpdates(action.result)
             case 'error':
