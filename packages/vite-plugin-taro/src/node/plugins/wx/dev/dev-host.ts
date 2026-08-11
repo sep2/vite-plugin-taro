@@ -4,10 +4,12 @@ import path from 'node:path'
 import colors from 'picocolors'
 import type { GetModuleInfo } from 'rolldown'
 import { type DevEngine, type DevOptions, dev } from 'rolldown/experimental'
+import { asyncScheduler } from 'rxjs'
 import { type Connect, isCSSRequest, type ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { SerializedTaskQueue } from '../../../utils/serialized-task-queue.ts'
 import { createGraphStylePlan, isGlobalStyleRequest } from '../styles/utils.ts'
+import { createHmrResultsStream } from './create-hmr-results-stream.ts'
 import {
     developmentAppWxssFileName,
     type HmrInfo,
@@ -46,6 +48,9 @@ type HmrReport = AppliedReport | RebuildReport
 type HmrUpdatesResult = Parameters<NonNullable<DevOptions['onHmrUpdates']>>[0]
 type HmrUpdates = Exclude<HmrUpdatesResult, Error>
 type DevOutputResult = Parameters<NonNullable<DevOptions['onOutput']>>[0]
+
+/** One short trailing-edge window absorbs editor bursts before style preparation and physical Page notification. */
+const hmrSettleMilliseconds = 16
 
 /**
  * Creates the wx dev host: the adapter that owns the physical Rolldown DevEngine (created
@@ -100,6 +105,25 @@ export async function createWxDevHost({
     const initialBuild = installWxDevOptions({ bundledDev, server, options, hostPlugins: [styleCapturePlugin] })
     const engine: DevEngine = await createEngine()
 
+    // This is intentionally only the first stream migration. RxJS owns callback admission and lossless burst conflation;
+    // hostTasks still owns every mutation of PatchPublisher, style publication, build rotation, and physical output. Keeping
+    // that boundary prevents two concurrency models from writing the same frontier before reports and outputs migrate too.
+    const hmrResults = createHmrResultsStream(
+        hmrSettleMilliseconds,
+        asyncScheduler,
+        (result) => {
+            // One reduced window becomes one existing host transaction: style preparation, one cumulative patch write, then
+            // ordered delivery notifications for every original Rolldown payload retained by the stream.
+            hostTasks.enqueue('wx HMR publication failed', () => publishUpdates(result))
+        },
+        (error) => {
+            logWxError(server.config.logger, 'wx HMR update failed', error)
+            // Recovery uses the same serialized writer as publication. Triggering directly from the subscription could overlap
+            // an in-flight Tailwind sidecar or physical rename and recreate the mixed full-build state seen during burst tests.
+            hostTasks.enqueue('wx HMR recovery failed', () => engine.triggerFullBuild())
+        }
+    )
+
     // The wx dev host owns the only DevEngine. Vite's default listen() would create a second
     // skip-write engine that renders into memory for browser HMR; instead the physical
     // engine's initial build must finish before the HTTP server becomes ready, because
@@ -126,6 +150,9 @@ export async function createWxDevHost({
 
     return {
         close: async () => {
+            // Subject completion flushes the final partial quiet window synchronously; waiting afterward includes the host task
+            // admitted by that flush. Closing the engine first would discard its still-undelivered payload filenames.
+            hmrResults.complete()
             await hostTasks.waitForIdle()
             await engine.close()
         }
@@ -193,20 +220,23 @@ export async function createWxDevHost({
         const output = requireSingleOutput(rolldownOptions)
 
         return dev(rolldownOptions, output, {
-            onHmrUpdates: handleHmrUpdates,
+            /**
+             * Admits Rolldown's non-awaited callback without starting asynchronous host work on the binding callback stack.
+             * The Subject retains Error values as control events and successful values as lossless patch data until its quiet edge.
+             */
+            onHmrUpdates: (result: HmrUpdatesResult) => {
+                hmrResults.next(result)
+            },
             onOutput: handleDevOutput,
             rebuildStrategy: 'never',
-            watch: { skipWrite: false }
+            watch: {
+                // Rolldown must observe every source generation and emit every incremental factory: later patches do not
+                // reconstruct modules changed only by an earlier callback. RxJS conflates publication after compilation,
+                // preserving the complete patch sequence while avoiding repeated physical DevTools notifications.
+                skipWrite: false,
+                useDebounce: false
+            }
         })
-    }
-
-    /** Converts Rolldown's non-awaited callback into one ordered host publication task. */
-    function handleHmrUpdates(result: HmrUpdatesResult): void {
-        if (result instanceof Error) {
-            logWxError(server.config.logger, 'wx HMR update failed', result)
-            return
-        }
-        hostTasks.enqueue('wx HMR publication failed', () => publishUpdates(result))
     }
 
     /** Publishes only the active client's patches or requests the complete build required by Rolldown. */

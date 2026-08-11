@@ -282,6 +282,9 @@ importers:
       rolldown:
         specifier: 1.2.3
         version: 1.2.3
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
@@ -4527,6 +4530,9 @@ packages:
 
   runes2@1.1.4:
     resolution: {integrity: sha512-LNPnEDPOOU4ehF71m5JoQyzT2yxwD6ZreFJ7MxZUAoMKNMY1XrAo60H1CUoX5ncSm0rIuKlqn9JZNRrRkNou2g==}
+
+  rxjs@7.8.2:
+    resolution: {integrity: sha512-dhKf903U/PQZY6boNNtAGdWbG85WAbjT/1xYoZIC7FAY0yWapOBQVsVrDl58W86//e1VpMNBtRV4MaXfdMySFA==}
 
   safe-buffer@5.2.1:
     resolution: {integrity: sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==}
@@ -9603,6 +9609,10 @@ snapshots:
       queue-microtask: 1.2.3
 
   runes2@1.1.4: {}
+
+  rxjs@7.8.2:
+    dependencies:
+      tslib: 2.8.1
 
   safe-buffer@5.2.1: {}
 
