@@ -26,7 +26,13 @@ export function createWxDevelopmentPlugin(
     options: VitePluginTaroOptions,
     applicationEntryIds: readonly string[]
 ): PluginOption[] {
-    // This mutable handle transfers ownership from configureServer to closeBundle; at most one host exists per plugin instance.
+    /*
+     * Vite creates this plugin descriptor before a server or DevEngine exists, then invokes configureServer and closeBundle on
+     * different lifecycle stacks. This mutable handle transfers the one client-owned host between those hooks: configureServer
+     * assigns it after asynchronous construction, and closeBundle reads it to drain the same engine. Environment scoping ensures
+     * only the client hook pair participates. Capturing a construction Promise would start too early, while recreating the host
+     * in closeBundle would lose every live action, patch, style, and client frontier owned by the running instance.
+     */
     let host: WxDevHost | null = null
     // Portable hook filters stay broad; these exact identities exclude similarly named user modules.
     const normalizedAppCapsulePath = normalizePath(appCapsulePath)
@@ -213,9 +219,12 @@ function getPageRoute(id: string): string {
     return route
 }
 
-// The assembled runtime chunk is byte-identical on every build (the base runtime and the
-// bundled implement are immutable for the server's lifetime), so the lowering runs once
-// and every build reuses it.
+/*
+ * memoize owns a mutable one-entry-by-input cache. The assembled runtime source is byte-identical across complete generations
+ * because both the Rolldown base and injected implementation are immutable for the server lifetime. Reusing its lowered result
+ * avoids repeating the only large Oxc transform on every rebuild; keying by source still invalidates correctly if a future Vite
+ * generation changes the runtime, unlike a module-global cached string detached from its actual input.
+ */
 const fixRolldownRuntime = memoize((code: string) => {
     return transformWithOxc(code, rolldownRuntimeId, {
         lang: 'js',

@@ -31,7 +31,13 @@ export function createRuntimeReportsStream(
     scheduler: SchedulerLike,
     publish: (reports: readonly RuntimeReport[]) => void
 ): Subject<RuntimeReport> {
-    // The Subject is the sole mutable HTTP admission edge; the debounced branch only closes the lossless report buffer.
+    /*
+     * This Subject is the sole mutable HTTP admission edge. Requests append reports synchronously and finish their responses;
+     * buffer then owns the short-lived window while debounceTime supplies only its quiet-edge signal. Reports are metadata rather
+     * than executable deltas, so the window may be reduced before entering hostActions. Directly mutating PatchPublisher from the
+     * request stack would race patch writes and build rotation; retaining every raw receipt beyond the window would grow with Page
+     * count and duplicate acknowledgements. Completion flushes the final window during phased shutdown.
+     */
     const reports = new Subject<RuntimeReport>()
 
     reports
@@ -44,7 +50,12 @@ export function createRuntimeReportsStream(
 }
 
 export function reduceRuntimeReportWindow(window: readonly RuntimeReport[]): readonly RuntimeReport[] {
-    // Map insertion order preserves first-seen build order while each value stores only that build's strongest frontier.
+    /*
+     * This transaction-local mutable Map is bounded by distinct build IDs in one quiet window. Insertion order preserves causal
+     * build order, while replacing a value conflates only that build's monotonic acknowledgement frontier; rebuild becomes its
+     * terminal value. A single global latest report would let delayed Pages erase another build, and retaining the raw window
+     * would make downstream work proportional to duplicate report volume. The Map is discarded immediately after reduction.
+     */
     const reportsByBuild = new Map<string, RuntimeReport>()
     for (const report of window) {
         const previous = reportsByBuild.get(report.buildId)

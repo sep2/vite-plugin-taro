@@ -19,9 +19,22 @@ type WritePatches = (content: string) => Promise<void>
  */
 export class PatchPublisher {
     private readonly writePatches: WritePatches
+
+    /*
+     * This mutable identity is the sole session authority for runtime reports and per-client Rolldown updates. startBuild rotates
+     * it only after a successful complete output reaches the serialized host reducer. Delayed reports retain their original ID
+     * and therefore fail isCurrentBuild instead of pruning or rebuilding the new session. An immutable constructor value cannot
+     * represent full-build rotation, while deriving identity from patches would leave empty builds without a client ID.
+     */
     private buildId: string | undefined
 
-    /** Executable updates retained until the runtime confirms successful application. */
+    /*
+     * This mutable ordered suffix bridges two independent frontiers: Rolldown payloads become published immediately after the
+     * cumulative file is durable, but entries remain here until the runtime acknowledges applying their sequence. Appending is
+     * lossless because later patches are deltas; prefix removal is the only valid mutation because acknowledgements are monotonic
+     * frontiers. A Set, latest-only value, or immutable reconstruction would either lose duplicate filenames/order or copy the
+     * complete unapplied history for every burst.
+     */
     private readonly pendingPatches: PatchUpdate[] = []
 
     // Explicit field assignment: node --test strips types and does not support parameter properties.
@@ -64,6 +77,10 @@ export class PatchPublisher {
      * retaining the gap between published and applied frontiers is what lets DevTools safely miss intermediate file events.
      */
     acknowledge(seq: number): void {
+        /*
+         * This local counter scans the monotonic prefix without allocating or invoking a callback for each patch. It exists only
+         * long enough to supply splice's prefix length; pendingPatches remains the sole durable frontier and is mutated once.
+         */
         let appliedCount = 0
 
         while (appliedCount < this.pendingPatches.length && this.pendingPatches[appliedCount].seq <= seq) {

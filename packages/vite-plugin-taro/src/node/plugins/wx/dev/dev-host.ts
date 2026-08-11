@@ -114,10 +114,13 @@ export async function createWxDevHost({
         // build rotation. Reports arriving during publication therefore execute only after that physical transaction commits.
         hostActions.next({ kind: 'reports', reports: reports })
     })
-    // The wx dev host owns the only DevEngine. Vite's default listen() would create a second
-    // skip-write engine that renders into memory for browser HMR; instead the physical
-    // engine's initial build must finish before the HTTP server becomes ready, because
-    // DevTools opens the output directory directly and the app requires its files on disk.
+    /*
+     * BundledDev is Vite's mutable environment adapter. Transfer its engine slot to the one physical writer created above so
+     * Vite middleware and close() address the same engine; leaving the slot untouched would make listen() create a second,
+     * skip-write browser engine with a divergent graph. Disable Vite's access-triggered regeneration because runtime reports and
+     * Rolldown HMR results now own every rebuild decision. Finally replace listen so readiness waits for physical initial output
+     * instead of Vite's in-memory bundle. These assignments are installation-time ownership transfer, never per-update state.
+     */
     bundledDev._devEngine = engine
     bundledDev.triggerBundleRegenerationIfStale = async () => false
     bundledDev.listen = async () => {
@@ -179,6 +182,10 @@ export async function createWxDevHost({
         await publishBuildMetadata(server, buildId, port)
     }
 
+    /**
+     * Mutates only the request-local HTTP response: unsupported methods become 404, malformed bounded bodies become 400, and a
+     * valid report is admitted before the default 200 response ends. No response object or parser state crosses requests.
+     */
     async function handleReport(req: Connect.IncomingMessage, res: ServerResponse): Promise<void> {
         if (req.method !== 'POST') {
             res.statusCode = 404
@@ -221,7 +228,6 @@ export async function createWxDevHost({
                     logWxError(server.config.logger, 'wx dev build failed', action.result)
                     return
                 }
-                // Bind finalized output bytes when present; omitted unchanged WXSS intentionally preserves the prior frontier.
                 styleCapture.bindOutput(action.result.output)
                 return rotateBuildSession()
             case 'listening':
@@ -279,6 +285,12 @@ export async function createWxDevHost({
 
     /** Publishes only the active client's patches or requests the complete build required by Rolldown. */
     async function publishUpdates(result: HmrUpdates): Promise<void> {
+        /*
+         * This transaction-local mutable array collects active patches in one pass. A single traversal matters during large edit
+         * bursts and can stop immediately at the first rebuild instruction; filter/find/flatMap would traverse the input up to
+         * three times and allocate an intermediate array. The batch never escapes this serialized host action, preserves duplicate
+         * updates and callback order, and is discarded after publication, so local mutation cannot create shared state or races.
+         */
         const batch: PatchUpdate[] = []
         for (const { clientId, update } of result.updates) {
             if (!publisher.isCurrentBuild(clientId) || update.type === 'Noop') {
@@ -362,6 +374,12 @@ async function publishBuildMetadata(server: ViteDevServer, buildId: string, port
 
 /** Replaces browser server URLs with the physical project directory consumed by WeChat DevTools. */
 function installDevToolsPrinter(server: ViteDevServer): void {
+    /*
+     * Vite exposes printing as a mutable server callback because URLs are unknown until startup. WX serves control reports over
+     * HTTP but users open the physical output directory, so retaining the browser printer advertises unusable navigation URLs.
+     * Replacing only this presentation callback leaves resolved URLs and server routing untouched and naturally dies with the
+     * server instance; logging elsewhere would duplicate Vite's one readiness notification.
+     */
     server.printUrls = () => {
         server.config.logger.info(
             `  ${colors.green('➜')}  ${colors.bold('WeChat DevTools')}: ${colors.cyan(relativeToViteConfig(server.config.build.outDir, server.config.configFile, server.config.root))}`
@@ -393,6 +411,12 @@ const maximumBodyBytes = 64 * 1024
 
 function readBody(req: Connect.IncomingMessage): Promise<string> {
     return new Promise((resolve, reject) => {
+        /*
+         * Node delivers one HTTP body through multiple callback invocations, so this request-local mutable string is the minimal
+         * state that joins chunks in wire order. The 64 KiB bound caps both retained memory and repeated-concatenation work; the
+         * value is parsed once on end and then discarded. Parsing per chunk is invalid because JSON tokens may cross boundaries,
+         * while retaining request bodies in host state would couple unrelated Page reports and leak across the server lifecycle.
+         */
         let body = ''
         req.on('data', (chunk: Buffer) => {
             body += chunk.toString('utf8')

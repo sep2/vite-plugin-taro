@@ -24,7 +24,13 @@ export function createHostActions<Action>(
     apply: (action: Action) => void | Promise<void>,
     reportError: (action: Action, error: unknown) => void
 ): HostActions<Action> {
-    // This Subject is the one mutable action-admission edge. Ordering state itself belongs to concatMap's subscription.
+    /*
+     * This Subject is the host's only mutable admission edge. Independent callback stacks synchronously append semantic actions
+     * or barriers; concatMap owns the queued ordering and admits exactly one asynchronous effect at a time. A Promise chain would
+     * require mutation at every producer and is permanently rejected after one failure, while mergeMap could overlap physical
+     * writes and build rotation. The Subject retains no business frontier itself and is completed only after all external sources
+     * are quiescent, allowing lastValueFrom to prove the final queued effect settled.
+     */
     const envelopes = new Subject<ActionEnvelope<Action>>()
 
     const completion = lastValueFrom(
@@ -70,6 +76,10 @@ export function createHostActions<Action>(
             )
         },
         waitForIdle() {
+            /*
+             * The resolver is one transaction-local mutable latch. Enqueuing it behind ordinary actions makes resolution mean
+             * every earlier effect settled, without completing the shared source needed by final DevEngine output callbacks.
+             */
             const barrier = Promise.withResolvers<void>()
             envelopes.next({ kind: 'barrier', resolve: barrier.resolve })
             return barrier.promise

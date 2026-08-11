@@ -38,6 +38,12 @@ export function installWxDevOptions({
     options: VitePluginTaroOptions
     hostPlugins: Plugin[]
 }): void {
+    /*
+     * Vite owns this mutable adapter method and calls it later when constructing DevEngine. Replacing that one seam preserves
+     * Vite's resolved graph while applying WX physical-output conventions to every options generation. Capturing and mutating one
+     * options object here would be stale on later complete builds; creating a second engine would duplicate watchers and graphs.
+     * The bound original remains immutable and is invoked exactly once per delegated options request.
+     */
     const original = bundledDev.getRolldownOptions.bind(bundledDev)
 
     bundledDev.getRolldownOptions = async () => {
@@ -51,9 +57,16 @@ export function installWxDevOptions({
         const configured = configuredOutput ?? {}
 
         // Every page entry must depend on hmr/patches.js: DevTools classifies a changed Page dependency as Page JavaScript
-        // hot reload and re-executes live Pages, which is the only physical patch trigger that preserves the App heap.
-        const pageFiles = new Set(options.pages.map((page) => `${page.path}.js`))
+        // hot reload and re-executes live Pages, which is the only physical patch trigger that preserves the App heap. Although
+        // Set provides O(1) membership, exposing it as ReadonlySet prevents mutation after this options generation is resolved.
+        const pageFiles: ReadonlySet<string> = new Set(options.pages.map((page) => `${page.path}.js`))
 
+        /*
+         * Rolldown passes this mutable output object onward by identity, and nested Vite plugins may already retain it. Mutating
+         * that single object preserves their references while atomically replacing browser-oriented naming and format fields with
+         * stable physical WX conventions. Cloning only our fields would leave retained references on stale hashed filenames;
+         * mutating configuredOutput itself would leak development normalization back into the user's resolved Vite config.
+         */
         Object.assign(output, configured, {
             assetFileNames: createStableFileNames(configured.assetFileNames, 'assets/[name][extname]'),
             banner: createEntryBanner(pageFiles),
@@ -64,6 +77,10 @@ export function installWxDevOptions({
             sourcemap: false
         })
 
+        /*
+         * experimental belongs to this transaction-local Rolldown options generation. Materialize it only when absent, then
+         * replace devMode with a new object so user fields survive without mutating a possibly shared configured sub-object.
+         */
         rolldownOptions.experimental ??= {}
         const existingDevMode = rolldownOptions.experimental.devMode
         rolldownOptions.experimental.devMode = {
@@ -73,8 +90,11 @@ export function installWxDevOptions({
             skipCommonRuntimeInjection: false
         }
 
-        // Preserve the physical paths watched by WeChat DevTools across host restarts; the complete build overwrites every
-        // active output without disrupting the hot-reload watcher.
+        /*
+         * The plugin list is mutable configuration consumed once by this engine generation. Replace the top-level reference with
+         * an ordered composite rather than pushing into Vite's potentially shared nested array: existing transforms run first,
+         * host capture observes their final values, and the reporter observes final output without mutating either input list.
+         */
         rolldownOptions.plugins = [rolldownOptions.plugins, hostPlugins, createViteReporter(server)]
         disableViteOxcSourcemap(rolldownOptions.plugins)
 
@@ -96,6 +116,7 @@ function ensureSingleOutput(rolldownOptions: BundledDevRolldownOptions): OutputO
     if (Array.isArray(rolldownOptions.output)) {
         throw new Error('wx development requires one configured Rolldown output.')
     }
+    // Rolldown needs the created object attached to input options by identity; returning a detached fallback would be ignored.
     rolldownOptions.output ??= {}
     return rolldownOptions.output
 }
@@ -147,6 +168,11 @@ function disableViteOxcSourcemap(pluginOption: unknown): void {
 
     const plugin = pluginOption as ViteTransformPlugin
     if (plugin.name === 'builtin:vite-transform' && plugin._options?.transformOptions) {
+        /*
+         * Vite's private builtin retains this mutable transform options object and does not expose a public replacement hook.
+         * Updating its one sourcemap flag prevents Oxc from allocating maps that final WX output always discards; cloning the
+         * descriptor would not update the builtin closure that reads the original object during transforms.
+         */
         plugin._options.transformOptions.sourcemap = false
     }
 }
@@ -165,7 +191,12 @@ function createViteReporter(server: ViteDevServer) {
     })
 }
 
-// The runtime source is immutable for the host's lifetime, so the nested bundle is shared by every complete build.
+/*
+ * once owns a mutable cached Promise, justified because getRolldownOptions may run for multiple complete generations while the
+ * runtime input and build options remain immutable for the process lifetime. Sharing the in-flight/result Promise prevents
+ * concurrent options requests from launching duplicate nested builds; caching source instead of a Rolldown output object avoids
+ * leaking mutable bundle metadata between engines.
+ */
 const bundleRuntimeSource = once(async function bundleRuntimeSource(): Promise<string> {
     // write: false keeps this nested helper build from creating a second dist directory in the application project.
     const result = await build({

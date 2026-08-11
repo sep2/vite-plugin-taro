@@ -214,7 +214,11 @@ export function removeRefreshPreambleGuard({ code, id }: { code: string; id: str
     })
 }
 
-// The refresh runtime module and the react-family modules are immutable for the server's
-// lifetime, so their Oxc parses run once per module and every build reuses the output.
+/*
+ * Each memoized transform owns a mutable cache keyed only by source bytes. The matching runtime/react-family modules are
+ * immutable between complete generations, so reparsing them would repeat O(source bytes) Oxc work without observing new state.
+ * Source keys still create a fresh result after a dependency upgrade or real module edit, unlike a once-only cache keyed by ID;
+ * keeping separate caches prevents identical text in different transform domains from sharing the wrong adaptation.
+ */
 const fixRefreshRuntime = memoize(transformRefreshRuntime, { getCacheKey: ({ code }) => code })
 const fixReactDevtoolsHook = memoize(transformReactDevtoolsHook, { getCacheKey: ({ code }) => code })

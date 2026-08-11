@@ -27,8 +27,13 @@ export function createHmrResultsStream(
     publish: (result: HmrUpdates) => void,
     reportError: (error: Error) => void
 ): Subject<HmrUpdatesResult> {
-    // This hot Subject is the sole mutable admission edge. Both buffer subscriptions observe the same callback identities:
-    // one stores them losslessly, while the debounced subscription emits only the signal that closes that stored window.
+    /*
+     * This hot Subject is the sole mutable boundary between Rolldown's non-awaited callback and RxJS. Each next preserves one
+     * compiler generation by reference and in arrival order. buffer owns the temporary lossless window; debounceTime observes the
+     * same Subject only to decide when that window closes. Replacing this with a debounced scalar would discard patch factories,
+     * while letting callback Promises mutate host state directly would overlap publications. Completion flushes the final window
+     * before shutdown, after which the Subject is never reused.
+     */
     const results = new Subject<HmrUpdatesResult>()
 
     results

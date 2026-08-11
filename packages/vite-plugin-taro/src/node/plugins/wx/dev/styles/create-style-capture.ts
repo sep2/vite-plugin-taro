@@ -47,11 +47,34 @@ export function createStyleCapture({
     plugin: Plugin
     publishChanged: (changedIds: readonly string[]) => Promise<void>
 }> {
-    // Complete builds replace this mutable live capability so later transactions always traverse Rolldown's current graph.
+    /*
+     * This mutable capability is rebound by buildStart for each complete generation. Rolldown keeps the captured function live
+     * across incremental graph edits, so HMR traverses authoritative current topology without maintaining a shadow graph. It is
+     * undefined only before the first buildStart; retaining an older reader across a later complete build would bind transactions
+     * to the wrong engine generation, while snapshotting module data would require O(V + E) mutation on every edit.
+     */
     let getModuleInfo: GetModuleInfo | undefined
-    // Transform captures mutate this CSS projection; stale unreachable entries are harmless because each graph plan filters it.
+    /*
+     * This mutable Map is the CSS projection Rolldown does not retain: successful final transform hooks replace one module's
+     * processed bytes, failed transforms intentionally leave its last valid generation, and a successful multi-root Tailwind
+     * refresh commits all replacements only after every sibling resolves. Entries are not deleted when topology changes because
+     * reachability comes from the live graph plan; eager deletion would need a duplicate reverse graph and could remove CSS still
+     * shared by another App/Page root. Its size is bounded by style module identities seen during this server lifecycle.
+     */
     const processedStyles = new Map<string, ProcessedStyle>()
-    // This mutable byte frontier advances only after complete output rebinding or a successful atomic HMR publication.
+    /*
+     * This mutable value mirrors the WXSS bytes currently durable on disk. It has one owner but two real transition sources:
+     *
+     * 1. DevEngine physically writes complete output before onOutput, so bindOutput only observes and adopts that external
+     *    commit. An omitted asset means DevEngine preserved the existing file and this value must remain unchanged.
+     * 2. Incremental HMR is physically written by this host, so publishChanged advances the value only after its atomic write
+     *    succeeds (or after byte equality proves no write was needed).
+     *
+     * Combining these operations behind one generic update event would still require branching between “observe an existing
+     * write” and “perform a new write”, while hiding their different durability boundaries. A genuine single path would require
+     * preventing DevEngine from writing complete WXSS and transferring that entire output responsibility to the host, adding
+     * asset interception and ordering machinery. The two explicit methods are therefore the smallest accurate state model.
+     */
     let publishedWxss: string | undefined
 
     const plugin: Plugin = {
@@ -79,11 +102,8 @@ export function createStyleCapture({
     return {
         bindOutput(output) {
             /*
-             * A complete build bypasses publishChanged and may replace physical WXSS, so its emitted bytes must rebind the
-             * comparison frontier. Leaving the old frontier could make the next HMR transaction rewrite identical disk bytes or
-             * skip a required rollback that happens to equal the stale value. DevEngine output carries the exact finalized asset
-             * source written to disk, which makes reading that file back redundant. When a later output omits global.wxss,
-             * DevEngine is preserving an unchanged physical asset, so retaining the existing frontier is the correct third case.
+             * Complete output is one of the two real physical writers. Its emitted asset is therefore the authoritative frontier
+             * when present; omission means DevEngine preserved the existing file and this state must remain unchanged.
              */
             const style = output.find(
                 (file): file is Extract<CompleteOutputFile, { type: 'asset' }> =>
@@ -122,6 +142,7 @@ export function createStyleCapture({
             if (wxss !== publishedWxss) {
                 await writeHmrFile(outDir, globalWxssFileName, wxss)
             }
+            // HMR is the second physical writer; advance the frontier only after its atomic write succeeds or was unnecessary.
             publishedWxss = wxss
         }
     }
