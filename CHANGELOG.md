@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.5.15] - 2026-08-11
+
+### Added
+
+- add native counter to default template (26f1d94)
+
+### Changed
+
+- split lazy home card and botanical component (b9f7f1a)
+- refine styles guide (786eef9)
+- css (06c1aac)
+- scope home page styles (12c3250)
+- styles docs (6f80509)
+- text (7f4f808)
+- refine default template structure (b70d7b9)
+- text (6aef0dc)
+- demonstrate Tailwind style HMR (1e63dc3)
+
+### Fixed
+
+- reconcile themed CSS modules in wx development (25290e7)
+- fix template (a1f6111)
+
 ## [0.5.14] - 2026-08-11
 
 ### Changed
