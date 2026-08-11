@@ -150,6 +150,10 @@ import HomeSectionHeading from './home-section-heading.astro'
             </div>
         </article>
     </div>
+
+    <a class="tailwind-guide-link" href="/guides/styles/">
+        查看样式指南 <span aria-hidden="true">→</span>
+    </a>
 </vpt-tailwind-showcase>
 
 <script>
@@ -1005,6 +1009,19 @@ import HomeSectionHeading from './home-section-heading.astro'
         background: var(--vpt-chip-background);
         color: var(--vpt-chip-text);
         font-size: 0.6rem;
+    }
+
+    .tailwind-guide-link {
+        display: block;
+        width: fit-content;
+        margin: 1.75rem auto 0;
+        color: var(--vpt-accent-strong);
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .tailwind-guide-link:hover {
+        text-decoration: underline;
     }
 
     vpt-tailwind-showcase.is-live .hmr-edit-line {

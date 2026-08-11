@@ -1,17 +1,15 @@
 ---
 title: 样式
-description: 在 vpt 项目中使用 Tailwind CSS v4、CSS Modules 和全局 CSS。
+description: 在 VPT 项目中使用 Tailwind CSS v4、CSS Modules 和全局 CSS。
 ---
 
 VPT 可同时使用 Tailwind CSS v4、CSS Modules 和普通 CSS。样式也支持热更新，修改后立刻在开发者工具中能看到效果，不会丢失页面状态。
 
-| 写法 | 适合场景 | 作用范围     |
-| --- | --- |--------------|
-| Tailwind CSS | 直接在 JSX 中组合样式 | 全局工具类   |
+| 写法 | 适合场景 | 作用范围 |
+| --- | --- | --- |
+| Tailwind CSS | 直接在 JSX 中组合样式 | 全局工具类 |
 | CSS Modules | 组件内部的复杂样式、动画和伪元素 | 类名自动隔离 |
-| 普通 CSS | 页面基础样式、重置样式和共享规则 | 全局         |
-
-这些写法可以同时使用，不需要选择其中一种。
+| 普通 CSS | 页面基础样式、重置样式和共享规则 | 全局 |
 
 ## Tailwind CSS v4
 
@@ -69,7 +67,7 @@ return <View className={`rounded-xl p-4 ${toneClass}`} />
 
 ### 自定义主题
 
-Tailwind v4 主题可以直接写在 CSS 中：
+推荐通过 `@theme` 设定项目的设计令牌（tokens）：
 
 ```css
 @theme {
@@ -79,11 +77,7 @@ Tailwind v4 主题可以直接写在 CSS 中：
 }
 ```
 
-之后可以使用 `bg-brand-500`、`text-brand-950` 和 `font-display`。
-
-### 推荐使用 Tailwind
-
-推荐使用 Tailwind，并通过 `@theme` 设定项目的设计令牌（tokens）。随着项目扩大，相同工具类会在不同组件中复用，样式体积主要随实际使用的规则增长，而不会为每个组件重复生成相同声明。统一的颜色、间距、字号和圆角令牌也能减少任意值与重复 CSS。
+之后可以使用 `bg-brand-500`、`text-brand-950` 和 `font-display`。随着项目扩大，相同工具类会在不同组件中复用，样式体积主要随实际使用的规则增长；统一的颜色、间距、字号和圆角令牌也能减少任意值与重复 CSS。
 
 ## CSS Modules
 
@@ -124,11 +118,9 @@ export function ProfileCard() {
 }
 ```
 
-CSS Modules 主要隔离局部类名。元素选择器和用 `:global(...)` 标记的选择器仍会影响其他组件，不要在组件 Module 中放置全局 reset。
-
 ### 与 Tailwind 一起使用
 
-CSS Modules 适合承载动画、伪元素和较长的组件规则，Tailwind 适合布局与间距。两者可以组合：
+Tailwind 工具类可以与 CSS Modules 生成的类名组合：
 
 ```tsx
 <View className={`${styles.card} flex items-center gap-3 p-4`}>
@@ -140,7 +132,7 @@ Sass、Less 和 Stylus 也支持 Modules 文件约定，例如 `profile-card.mod
 
 ## 普通 CSS
 
-普通 CSS 不会隔离选择器，适合放置全局重置、字体和根元素规则。建议将这些规则集中在 `app.css` 中；组件自己的复杂样式使用 CSS Modules。
+普通 CSS 不会隔离选择器，适合放置全局重置、字体和根元素规则。建议将这些规则集中在 `app.css` 中。
 
 ```css
 *,
@@ -158,8 +150,6 @@ body {
 ```
 
 `page` 是微信小程序的页面根元素，`body` 是 Web 的文档根元素。并列书写可以让基础规则同时覆盖两个目标。
-
-最终样式仍受微信小程序 WXSS 能力限制。
 
 目标专用规则可以使用条件指令：
 
@@ -181,7 +171,7 @@ body {
 
 ### Sass、Less 和 Stylus
 
-页面和组件可以按照 Vite 的文件约定导入 `.scss`、`.sass`、`.less` 或 `.styl`。使用前需要在项目中安装对应的预处理器，例如：
+VPT 仍支持 `.scss`、`.sass`、`.less` 和 `.styl`，但不推荐新项目使用。新项目请优先使用 Tailwind，复杂组件样式使用 CSS Modules。迁移现有预处理器样式时，需要安装对应的依赖，例如：
 
 ```sh
 npm install --save-dev sass
@@ -197,14 +187,13 @@ PostCSS 配置使用 Vite 的 `css.postcss` 或项目根目录中的 PostCSS 配
 
 ## 样式热更新
 
-运行 `npm run dev:wx` 时，以下修改会更新微信开发者工具中的样式，而不重新加载当前页面：
+运行 `npm run dev:wx` 时，以下修改会触发样式热更新：
 
-- 修改已导入的 CSS 或预处理器文件。
-- 修改 CSS Modules 规则。
+- 修改已导入的 CSS、CSS Modules 或预处理器文件。
 - 在 JSX 中新增、替换或删除 Tailwind 类名。
 - 添加或删除组件对样式文件的导入。
 
-vpt 会先写入新的 `dist/wx/assets/global.wxss`，再发布同一次代码更新，使样式与组件代码保持一致。页面路径、React 状态和输入内容会继续保留。Web 目标使用 Vite 自带的 CSS 热更新。
+VPT 会先写入新的 `dist/wx/assets/global.wxss`，再发布同一次代码更新，使样式与组件代码保持一致。Web 目标使用 Vite 自带的 CSS 热更新。
 
 ## 样式如何进入应用
 
@@ -221,22 +210,7 @@ function App({ children }: PropsWithChildren) {
 export default App
 ```
 
-页面或组件也可以导入自己的样式：
-
-```tsx
-import { Text, View } from 'virtual:taro/components'
-import './profile-card.css'
-
-export function ProfileCard() {
-    return (
-        <View className="profile-card">
-            <Text className="profile-card__title">个人资料</Text>
-        </View>
-    )
-}
-```
-
-未被任何应用、页面或组件导入的样式不会进入构建结果。
+页面或组件也可以导入自己的样式；未被任何应用、页面或组件导入的样式不会进入构建结果。
 
 ### 微信与 Web 的区别
 
@@ -247,8 +221,6 @@ dist/wx/assets/global.wxss
 ```
 
 这包含普通导入、CSS Modules、Tailwind 生成结果和动态导入分支中的样式。因此，微信目标不会等到动态组件加载时再加载它的 CSS。
-
-普通 CSS 在微信目标中仍是全局样式。请使用清晰的类名前缀，或使用 CSS Modules 避免不同组件之间的类名冲突。
 
 :::note
 原生组件自带的 `.wxss` 会继续跟随原生组件输出，不会合并到 React 应用的 `global.wxss` 中。
