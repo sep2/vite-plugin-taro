@@ -1,0 +1,82 @@
+:host {
+    display: block;
+}
+
+.native-counter {
+    display: flex;
+    flex-direction: column;
+    padding: 32rpx;
+    border-radius: 32rpx;
+    background: #edf5e8;
+}
+
+.native-counter__title {
+    color: #315f44;
+    font-size: 24rpx;
+    font-weight: 700;
+    letter-spacing: 2.4rpx;
+    line-height: 1;
+    text-align: center;
+}
+
+.native-counter__control {
+    display: flex;
+    height: 112rpx;
+    margin-top: 24rpx;
+    overflow: hidden;
+    border: 2rpx solid rgba(30, 102, 61, 0.15);
+    border-radius: 9999rpx;
+    background: #ffffff;
+    box-sizing: border-box;
+}
+
+.native-counter__button {
+    display: flex;
+    width: 112rpx;
+    height: 100%;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    background: #ffffff;
+    color: #315f44;
+    font-size: 36rpx;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.native-counter__button::after {
+    border: 0;
+}
+
+.native-counter__button--decrement {
+    border-radius: 9999rpx 0 0 9999rpx;
+}
+
+.native-counter__button--increment {
+    border-radius: 0 9999rpx 9999rpx 0;
+    background: #197342;
+    color: #ffffff;
+}
+
+.native-counter__button--pressed {
+    opacity: 0.82;
+}
+
+.native-counter__value {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    border-right: 2rpx solid rgba(30, 102, 61, 0.1);
+    border-left: 2rpx solid rgba(30, 102, 61, 0.1);
+    background: #f8fbf4;
+    box-sizing: border-box;
+    color: #197342;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 60rpx;
+    font-weight: 600;
+}

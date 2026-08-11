@@ -1,6 +1,7 @@
 import Taro from 'virtual:taro/api'
 import { Button, ScrollView, Text, View } from 'virtual:taro/components'
 import { useState } from 'react'
+import { Counter } from '../../components/counter/counter.tsx'
 import { NavigationBar } from '../../components/navigation-bar/navigation-bar.tsx'
 
 const featureCards = [
@@ -87,31 +88,16 @@ function IndexPage() {
                     </View>
                 </View>
 
-                <View className="flex shrink-0 flex-col rounded-2xl bg-[#edf5e8] p-4 sm:w-64 mx-6 mb-8">
-                    <Text className="text-center text-xs font-bold tracking-widest text-[#315f44]">
-                        SHARED COUNTER
-                    </Text>
-                    <View className="mt-3 flex h-14 w-full flex-row overflow-hidden rounded-full border border-[#1e663d]/15 bg-white">
-                        <View className="flex h-full w-14 shrink-0">
-                            <Button
-                                className="m-0 flex h-full w-full items-center justify-center rounded-l-full rounded-r-none bg-white p-0 text-lg font-bold leading-none text-[#315f44] after:border-0"
-                                onClick={() => setCount((currentCount) => currentCount - 1)}
-                            >
-                                <Text>−</Text>
-                            </Button>
-                        </View>
-                        <View className="flex min-w-0 flex-1 items-center justify-center border-x border-[#1e663d]/10 bg-[#f8fbf4]">
-                            <Text className="brand-serif text-3xl font-semibold text-[#197342]">{count}</Text>
-                        </View>
-                        <View className="flex h-full w-14 shrink-0">
-                            <Button
-                                className="m-0 flex h-full w-full items-center justify-center rounded-l-none rounded-r-full bg-[#197342] p-0 text-lg font-bold leading-none text-white after:border-0"
-                                onClick={() => setCount((currentCount) => currentCount + 1)}
-                            >
-                                <Text>+</Text>
-                            </Button>
-                        </View>
-                    </View>
+                <View className="mx-6 mb-8 shrink-0 sm:mx-auto sm:w-64">
+                    <Counter
+                        count={count}
+                        onDecrement={() => {
+                            setCount((currentCount) => currentCount - 1)
+                        }}
+                        onIncrement={() => {
+                            setCount((currentCount) => currentCount + 1)
+                        }}
+                    />
                 </View>
 
                 <View className="relative z-10 flex shrink-0 flex-col items-center px-5">
