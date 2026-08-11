@@ -96,7 +96,7 @@ import { Text, View } from 'virtual:taro/components'
 | `VITE_PLUGIN_TARO_TARGET` | 是 | 由根目录脚本设置为 `wx` 或 `h5`。 |
 | `VITE_PLUGIN_TARO_WECHAT_APP_ID` | 否 | 微信小程序 app id。默认值为 `touristappid`。 |
 
-如需在本地测试微信小程序，请将你的 app id 写入 `packages/loan-genius/.env.local`：
+如需在本地测试微信小程序，请将 app id 写入 `packages/loan-genius/.env.local`：
 
 ```env
 VITE_PLUGIN_TARO_WECHAT_APP_ID=your_app_id
