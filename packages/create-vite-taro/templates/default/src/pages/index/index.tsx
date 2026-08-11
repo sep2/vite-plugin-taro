@@ -55,18 +55,11 @@ function IndexPage() {
         <View className="starter-canvas flex h-screen flex-col overflow-hidden text-[#315f44]">
             <NavigationBar title="VPT" />
             <ScrollView scrollY className="flex min-h-0 flex-1 flex-col">
-                <View className="relative flex shrink-0 flex-col items-center overflow-hidden px-5 pb-12 pt-10">
+                <View className="relative flex shrink-0 flex-col items-center overflow-hidden px-5 pb-8 pt-6">
                     <BotanicalSprig className="botanical-sprig-top" />
                     <BotanicalSprig className="botanical-sprig-side" />
 
                     <View className="relative z-10 flex w-full max-w-4xl flex-col items-center text-center">
-                        <View className="flex flex-row items-center gap-2 rounded-full border border-[#1e663d]/15 bg-white/70 px-4 py-2">
-                            <View className="h-2 w-2 rounded-full bg-[#63bd74]" />
-                            <Text className="text-xs font-bold tracking-widest text-[#207344]">
-                                VITE × REACT × TARO
-                            </Text>
-                        </View>
-
                         <Text className="brand-serif mt-7 block text-[7rem] font-semibold leading-none tracking-[-0.08em] text-[#17673d] sm:text-[9rem]">
                             VPT
                         </Text>
@@ -94,12 +87,36 @@ function IndexPage() {
                     </View>
                 </View>
 
+                <View className="flex shrink-0 flex-col rounded-2xl bg-[#edf5e8] p-4 sm:w-64 mx-6 mb-8">
+                    <Text className="text-center text-xs font-bold tracking-widest text-[#315f44]">
+                        SHARED COUNTER
+                    </Text>
+                    <View className="mt-3 flex h-14 w-full flex-row overflow-hidden rounded-full border border-[#1e663d]/15 bg-white">
+                        <View className="flex h-full w-14 shrink-0">
+                            <Button
+                                className="m-0 flex h-full w-full items-center justify-center rounded-l-full rounded-r-none bg-white p-0 text-lg font-bold leading-none text-[#315f44] after:border-0"
+                                onClick={() => setCount((currentCount) => currentCount - 1)}
+                            >
+                                <Text>−</Text>
+                            </Button>
+                        </View>
+                        <View className="flex min-w-0 flex-1 items-center justify-center border-x border-[#1e663d]/10 bg-[#f8fbf4]">
+                            <Text className="brand-serif text-3xl font-semibold text-[#197342]">{count}</Text>
+                        </View>
+                        <View className="flex h-full w-14 shrink-0">
+                            <Button
+                                className="m-0 flex h-full w-full items-center justify-center rounded-l-none rounded-r-full bg-[#197342] p-0 text-lg font-bold leading-none text-white after:border-0"
+                                onClick={() => setCount((currentCount) => currentCount + 1)}
+                            >
+                                <Text>+</Text>
+                            </Button>
+                        </View>
+                    </View>
+                </View>
+
                 <View className="relative z-10 flex shrink-0 flex-col items-center px-5">
                     <View className="flex w-full max-w-4xl flex-col gap-5 overflow-hidden rounded-3xl border border-[#1e663d]/15 bg-white/85 p-6 shadow-xl sm:flex-row sm:items-center sm:p-8">
                         <View className="flex min-w-0 flex-1 flex-col">
-                            <Text className="text-xs font-bold tracking-widest text-[#e17f68]">
-                                STATE-PRESERVING HMR
-                            </Text>
                             <Text className="brand-serif mt-2 block text-3xl font-semibold text-[#174f32]">
                                 Edit. Save. Stay in flow.
                             </Text>
@@ -107,33 +124,6 @@ function IndexPage() {
                                 Change this counter, then edit src/pages/index/index.tsx. Your state stays exactly where
                                 you left it.
                             </Text>
-                        </View>
-
-                        <View className="flex shrink-0 flex-col rounded-2xl bg-[#edf5e8] p-4 sm:w-64">
-                            <Text className="text-center text-xs font-bold tracking-widest text-[#315f44]">
-                                SHARED COUNTER
-                            </Text>
-                            <View className="mt-3 flex h-14 w-full flex-row overflow-hidden rounded-xl border border-[#1e663d]/15 bg-white">
-                                <View className="flex h-full w-14 shrink-0">
-                                    <Button
-                                        className="m-0 flex h-full w-full items-center justify-center rounded-none bg-white p-0 text-lg font-bold leading-none text-[#315f44] after:border-0"
-                                        onClick={() => setCount((currentCount) => currentCount - 1)}
-                                    >
-                                        <Text>−</Text>
-                                    </Button>
-                                </View>
-                                <View className="flex min-w-0 flex-1 items-center justify-center border-x border-[#1e663d]/10 bg-[#f8fbf4]">
-                                    <Text className="brand-serif text-3xl font-semibold text-[#197342]">{count}</Text>
-                                </View>
-                                <View className="flex h-full w-14 shrink-0">
-                                    <Button
-                                        className="m-0 flex h-full w-full items-center justify-center rounded-none bg-[#197342] p-0 text-lg font-bold leading-none text-white after:border-0"
-                                        onClick={() => setCount((currentCount) => currentCount + 1)}
-                                    >
-                                        <Text>+</Text>
-                                    </Button>
-                                </View>
-                            </View>
                         </View>
                     </View>
                 </View>
