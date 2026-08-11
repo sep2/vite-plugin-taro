@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { VirtualTimeScheduler } from 'rxjs'
-import { SerializedTaskQueue } from '../../../utils/serialized-task-queue.ts'
+import { createHostActions } from './host-actions.ts'
 import { createRuntimeReportsStream, type RuntimeReport } from './runtime-reports.ts'
 
 const settleMilliseconds = 32
@@ -131,16 +131,19 @@ test('flushes an admitted report when the host completes the stream', () => {
 test('serializes a report arriving during physical publication behind that publication', async () => {
     const scheduler = new VirtualTimeScheduler()
     const gate = Promise.withResolvers<void>()
-    // This journal models PatchPublisher mutation and proves the report callback itself never bypasses the host queue.
+    // This journal models PatchPublisher mutation and proves the report callback never bypasses serialized host effects.
     const operations: string[] = []
-    const queue = new SerializedTaskQueue(() => {})
-    queue.enqueue('publication failed', async () => {
+    const actions = createHostActions<() => void | Promise<void>>(
+        (action) => action(),
+        () => {}
+    )
+    actions.next(async () => {
         operations.push('publication:start')
         await gate.promise
         operations.push('publication:end')
     })
     const stream = createRuntimeReportsStream(settleMilliseconds, scheduler, (reports) => {
-        queue.enqueue('report failed', () => {
+        actions.next(() => {
             operations.push(`report:${reports[0]?.kind}`)
         })
     })
@@ -151,7 +154,8 @@ test('serializes a report arriving during physical publication behind that publi
     assert.deepEqual(operations, ['publication:start'])
 
     gate.resolve()
-    await queue.waitForIdle()
+    await actions.waitForIdle()
     assert.deepEqual(operations, ['publication:start', 'publication:end', 'report:applied'])
     stream.complete()
+    await actions.complete()
 })

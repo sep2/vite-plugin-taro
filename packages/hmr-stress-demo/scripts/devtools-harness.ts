@@ -316,13 +316,16 @@ async function stopServer(server: ServerProcess): Promise<void> {
     if (server.exitCode !== null || server.signalCode !== null) {
         return
     }
+    // Register before signaling so an immediate clean exit cannot race past the observer. A forced kill is a test failure: it
+    // would hide a host action, output, or DevEngine generation dropped by shutdown instead of validating the lifecycle drain.
+    const exited = new Promise<void>((resolve) => server.once('exit', () => resolve()))
     server.kill('SIGTERM')
-    await Promise.race([
-        new Promise<void>((resolve) => server.once('exit', () => resolve())),
-        delay(500).then(() => {
-            server.kill('SIGKILL')
-        })
-    ])
+    const graceful = await Promise.race([exited.then(() => true), delay(2_000).then(() => false)])
+    if (!graceful) {
+        server.kill('SIGKILL')
+        await exited
+        throw new Error('Vite did not drain the WX host within two seconds')
+    }
 }
 
 export async function waitFor(

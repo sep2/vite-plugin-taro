@@ -7,7 +7,6 @@ import { type DevEngine, type DevOptions, dev } from 'rolldown/experimental'
 import { asyncScheduler, Subject } from 'rxjs'
 import { type Connect, isCSSRequest, type ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
-import { SerializedTaskQueue } from '../../../utils/serialized-task-queue.ts'
 import { createGraphStylePlan, isGlobalStyleRequest } from '../styles/utils.ts'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
 import {
@@ -22,6 +21,7 @@ import {
     renderInitialHmrPatches,
     writeHmrFile
 } from './hmr-files.ts'
+import { createHostActions } from './host-actions.ts'
 import { PatchPublisher } from './patch-publisher.ts'
 import { createRuntimeReportsStream, type RuntimeReport } from './runtime-reports.ts'
 import { createStyleCapturePlugin, type ProcessedStyle } from './styles/create-style-capture-plugin.ts'
@@ -45,6 +45,7 @@ type HostAction =
     | Readonly<{ kind: 'error'; error: Error }>
     | Readonly<{ kind: 'reports'; reports: readonly RuntimeReport[] }>
     | Readonly<{ kind: 'output'; result: DevOutputResult }>
+    | Readonly<{ kind: 'listening' }>
 
 /** One short trailing-edge window absorbs editor bursts before style preparation and physical Page notification. */
 const hmrSettleMilliseconds = 32
@@ -92,10 +93,6 @@ export async function createWxDevHost({
         }
     })
 
-    // Rolldown invokes output callbacks without awaiting their promises. This queue is the single owner of mutable HMR host
-    // state and physical metadata writes, preventing a later patch or build identity from being overwritten by older work.
-    const hostTasks = new SerializedTaskQueue((operation, error) => logWxError(server.config.logger, operation, error))
-
     const publisher = new PatchPublisher((content) =>
         writeHmrFile(server.config.build.outDir, hmrPatchesFileName, content)
     )
@@ -108,15 +105,13 @@ export async function createWxDevHost({
     const buildOutputs = new Subject<DevOutputResult>()
     const engine: DevEngine = await createEngine()
 
-    // Migrated sources reduce independently, then merge into this single semantic action edge. Its sole subscription sends
-    // actions through applyHostAction on hostTasks, preserving one state reducer and physical writer until lifecycle migrates.
-    // Source subscriptions therefore never mutate PatchPublisher, style state, or DevEngine directly.
-    const hostActions = new Subject<HostAction>()
-    hostActions.subscribe((action) => {
-        hostTasks.enqueue(`wx HMR ${action.kind} failed`, () => applyHostAction(action))
-    })
+    // Migrated sources reduce into this one action/effect pipeline. concatMap is the sole serializer, so source subscriptions
+    // never mutate PatchPublisher, style state, DevEngine, or physical files directly.
+    const hostActions = createHostActions<HostAction>(applyHostAction, (action, error) =>
+        logWxError(server.config.logger, `wx HMR ${action.kind} failed`, error)
+    )
     styleCaptures.subscribe((action) => {
-        // Capture actions share the same queue as output and HMR actions. A transform capture therefore commits before the
+        // Capture actions share the same serialized pipeline as output and HMR actions. A transform therefore commits before the
         // transaction callback it causally precedes, without plugin hooks directly touching the mutable style projection.
         hostActions.next(action)
     })
@@ -166,7 +161,8 @@ export async function createWxDevHost({
     // the actual port is not observable while onOutput runs for the first build. The App metadata
     // is written once the port is real; later full builds rewrite it from onOutput.
     server.httpServer?.once('listening', () => {
-        hostTasks.enqueue('wx HMR initialization failed', rotateBuildSession)
+        // Port availability is lifecycle data, so initial identity rotation follows prior output/capture actions in the reducer.
+        hostActions.next({ kind: 'listening' })
     })
 
     // The runtime's metadata-only reports land on the control path; the buildId in each report
@@ -176,23 +172,22 @@ export async function createWxDevHost({
     installDevToolsPrinter(server)
 
     return {
-        close: async () => {
+        close: async function drainHost(): Promise<void> {
             /*
-             * First flush callback/report windows and execute their admitted actions while buildOutputs stays open: a final
-             * runtime report can request a complete build. Then wait for that DevEngine generation, whose non-awaited onOutput
-             * callback synchronously admits its output action. Only after that source is quiescent may the merged action edge
-             * complete. The second queue wait includes output finalization before engine.close releases Rolldown resources.
+             * First flush callback/report windows and execute their admitted actions while buildOutputs stays open: a final runtime
+             * report can request a complete build. Then wait for that DevEngine generation, whose non-awaited onOutput callback
+             * synchronously admits its output action. Only after that source is quiescent may the merged action edge complete.
+             * This method itself is reached from DevEngine.close, so it drains host effects and returns without recursively closing
+             * the engine already waiting on this plugin hook.
              */
             hmrResults.complete()
             runtimeReports.complete()
-            await hostTasks.waitForIdle()
+            await hostActions.waitForIdle()
             await engine.ensureCurrentBuildFinish()
             // A final complete generation emits graph/style captures before onOutput, so both sources stay open through ensure.
             styleCaptures.complete()
             buildOutputs.complete()
-            hostActions.complete()
-            await hostTasks.waitForIdle()
-            await engine.close()
+            await hostActions.complete()
         }
     }
 
@@ -256,6 +251,8 @@ export async function createWxDevHost({
                     return
                 }
                 return finalizeDevOutput()
+            case 'listening':
+                return rotateBuildSession()
         }
     }
 

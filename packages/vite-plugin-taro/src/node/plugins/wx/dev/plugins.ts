@@ -80,7 +80,14 @@ export function createWxDevelopmentPlugin(
             },
 
             closeBundle() {
-                return host?.close()
+                /*
+                 * One Vite plugin instance participates in both client and SSR environments, so an unscoped close hook drains
+                 * the shared host twice. The physical DevEngine belongs only to bundled client development; make that ownership
+                 * explicit here and give the host a single close lifecycle instead of hiding duplicate calls with idempotence.
+                 */
+                if (this.environment.name === 'client') {
+                    return host?.close()
+                }
             }
         },
         {
