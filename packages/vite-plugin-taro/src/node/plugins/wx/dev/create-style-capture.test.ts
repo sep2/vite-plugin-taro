@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import type { ModuleInfo } from 'rolldown'
-import { globalWxssFileName } from '../hmr-files.ts'
 import { createStyleCapture, type StyleCaptureAction } from './create-style-capture.ts'
+import { globalWxssFileName } from './hmr-files.ts'
 
 test('captures final Vite CSS and the live graph through its merged plugin', async () => {
     // This mutable journal observes typed captures without letting plugin hooks mutate the style projection directly.

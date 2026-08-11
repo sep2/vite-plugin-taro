@@ -7,9 +7,9 @@ import type { GetModuleInfo } from 'rolldown'
 import { dev } from 'rolldown/experimental'
 import { Subject } from 'rxjs'
 import { createServer, normalizePath } from 'vite'
-import { createWxStylePlugins } from '../../styles/plugins.ts'
-import type { BundledDev } from '../wx-dev-options.ts'
+import { createWxStylePlugins } from '../styles/plugins.ts'
 import { createStyleCapture, type StyleCaptureAction } from './create-style-capture.ts'
+import type { BundledDev } from './wx-dev-options.ts'
 
 test('publishes processed CSS and live topology without identical rewrites', async () => {
     const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-host-css-capture-')))

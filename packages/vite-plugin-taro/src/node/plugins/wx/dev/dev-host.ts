@@ -7,6 +7,7 @@ import { asyncScheduler } from 'rxjs'
 import type { Connect, ViteDevServer } from 'vite'
 import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
+import { createStyleCapture, type StyleCaptureAction } from './create-style-capture.ts'
 import {
     developmentAppWxssFileName,
     type HmrInfo,
@@ -22,7 +23,6 @@ import {
 import { createHostActions } from './host-actions.ts'
 import { PatchPublisher } from './patch-publisher.ts'
 import { createRuntimeReportsStream, type RuntimeReport } from './runtime-reports.ts'
-import { createStyleCapture, type StyleCaptureAction } from './styles/create-style-capture.ts'
 import { type BundledDev, installWxDevOptions, requireSingleOutput } from './wx-dev-options.ts'
 
 export type WxDevHost = Readonly<{

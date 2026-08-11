@@ -1,15 +1,15 @@
 import type { GetModuleInfo, Plugin } from 'rolldown'
 import { isCSSRequest } from 'vite'
-import { normalizeModuleId } from '../../../../utils/modules.ts'
-import { transformWxStyle } from '../../styles/transform-wx-style.ts'
+import { normalizeModuleId } from '../../../utils/modules.ts'
+import { transformWxStyle } from '../styles/transform-wx-style.ts'
 import {
     composeGraphStyleCss,
     createGraphStylePlan,
     createTailwindSidecarId,
     extractViteCss,
     isGlobalStyleRequest
-} from '../../styles/utils.ts'
-import { globalWxssFileName, writeHmrFile } from '../hmr-files.ts'
+} from '../styles/utils.ts'
+import { globalWxssFileName, writeHmrFile } from './hmr-files.ts'
 
 type ProcessedStyle = Readonly<{
     css: string
