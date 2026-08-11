@@ -90,8 +90,6 @@ const { headingLevel } = Astro.props
         --diagram-footer-gap: clamp(2.25rem, 4vw, 3rem);
         --diagram-font-size-title: var(--home-font-size-title, clamp(1.25rem, 2vw, 1.55rem));
         --diagram-font-size-body: var(--home-font-size-body, 1rem);
-        --diagram-font-size-label: var(--home-font-size-label, 0.75rem);
-        --diagram-font-size-caption: var(--home-font-size-caption, 0.7rem);
         --diagram-panel-radius: var(--home-panel-radius, 1.5rem);
         --diagram-panel-shadow: var(--home-panel-shadow, 0 24px 60px var(--vpt-shadow));
         --planner-connector-gap: clamp(1rem, 2vw, 1.5rem);
@@ -145,7 +143,7 @@ const { headingLevel } = Astro.props
 
     .automatic-subpackages-diagram :global(.diagram-heading span) {
         color: var(--vpt-accent);
-        font-size: var(--diagram-font-size-label);
+        font-size: var(--home-font-size-small);
         font-weight: 750;
         letter-spacing: 0.14em;
         text-transform: uppercase;
@@ -274,7 +272,7 @@ const { headingLevel } = Astro.props
         top: calc(50% + 0.7rem);
         left: 50%;
         color: var(--vpt-accent);
-        font-size: var(--diagram-font-size-caption);
+        font-size: var(--home-font-size-small);
         font-weight: 700;
         line-height: 1;
         transform: translateX(-50%);
@@ -290,7 +288,7 @@ const { headingLevel } = Astro.props
         margin: 0;
         padding: 0;
         color: var(--vpt-muted);
-        font-size: var(--diagram-font-size-caption);
+        font-size: var(--home-font-size-small);
         list-style: none;
         pointer-events: none;
         transform: translate(-50%, -50%);
@@ -311,7 +309,7 @@ const { headingLevel } = Astro.props
         border: 0;
         background: transparent;
         color: color-mix(in srgb, var(--vpt-muted) 68%, var(--vpt-node-background));
-        font-size: 0.625rem;
+        font-size: 0.8333em;
         font-weight: 600;
         letter-spacing: 0.03em;
         line-height: 1;

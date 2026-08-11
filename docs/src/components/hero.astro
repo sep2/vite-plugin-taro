@@ -517,7 +517,7 @@ const proofPoints = [
         .eyebrow {
             margin-bottom: 2rem;
             color: var(--vpt-accent);
-            font-size: clamp(0.78rem, 1.3vw, 1rem);
+            font-size: var(--home-font-size-body);
             font-weight: 650;
             letter-spacing: 0.12em;
             text-box-edge: cap alphabetic;
@@ -536,7 +536,7 @@ const proofPoints = [
             border-radius: 999px;
             background: var(--vpt-surface);
             color: var(--vpt-muted);
-            font-size: 0.78rem;
+            font-size: var(--home-font-size-small);
             line-height: 1;
             text-decoration: none;
         }
@@ -553,8 +553,6 @@ const proofPoints = [
             font-weight: 600;
             letter-spacing: -0.08em;
             line-height: 1;
-            text-box-edge: cap alphabetic;
-            text-box-trim: trim-both;
             text-shadow: 0 5px 0 var(--vpt-shadow);
             user-select: none;
         }
@@ -607,7 +605,7 @@ const proofPoints = [
             width: min(100%, 31rem);
             margin-top: 1.4rem;
             color: var(--vpt-accent-strong);
-            font-size: clamp(0.8rem, 1.4vw, 0.95rem);
+            font-size: var(--home-font-size-small);
             font-weight: 650;
             letter-spacing: 0.06em;
             text-align: center;
@@ -959,13 +957,13 @@ const proofPoints = [
 
         .proof-point strong {
             color: var(--vpt-heading);
-            font-size: 0.9rem;
+            font-size: var(--home-font-size-body);
         }
 
         .proof-point small {
             margin-top: 0.15rem;
             color: var(--vpt-muted);
-            font-size: 0.72rem;
+            font-size: var(--home-font-size-small);
         }
 
         @media (prefers-reduced-motion: reduce) {

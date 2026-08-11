@@ -34,7 +34,7 @@
     box-shadow: 0 10px 24px var(--vpt-shadow);
     color: var(--vpt-accent-strong);
     cursor: pointer;
-    font-size: 0.75rem;
+    font-size: var(--home-font-size-small);
     font-weight: 750;
     letter-spacing: 0.04em;
     line-height: 1;
@@ -126,12 +126,12 @@
 
 .placeholder-copy strong {
     color: var(--vpt-heading-strong);
-    font-size: 0.95rem;
+    font-size: var(--home-font-size-body, 1rem);
 }
 
 .placeholder-copy small {
     color: var(--vpt-muted);
-    font-size: 0.75rem;
+    font-size: var(--home-font-size-small);
     line-height: 1.45;
 }
 
@@ -140,7 +140,7 @@
     align-items: center;
     gap: 0.4rem;
     color: var(--vpt-accent-strong);
-    font-size: 0.8rem;
+    font-size: var(--home-font-size-small);
     font-weight: 750;
     white-space: nowrap;
 }

@@ -281,7 +281,7 @@ import HomeSectionHeading from './home-section-heading.astro'
 
     .native-code-file {
         color: #a9b9ad;
-        font-size: 0.72rem;
+        font-size: var(--home-font-size-small);
         text-align: center;
     }
 
@@ -291,7 +291,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         justify-self: end;
         gap: 0.35rem;
         color: #9bc4ee;
-        font-size: 0.68rem;
+        font-size: var(--home-font-size-small);
     }
 
     .native-code-badge i {
@@ -315,7 +315,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         box-shadow: none;
         color: #d8e4da;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        font-size: clamp(0.7rem, 1vw, 0.8rem);
+        font-size: var(--home-font-size-small);
         line-height: 1.75;
         overflow: auto;
         scrollbar-color: rgba(144, 198, 155, 0.35) transparent;
@@ -380,7 +380,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         border-top: 1px solid rgba(190, 224, 197, 0.12);
         background: #142c1f;
         color: #91a697;
-        font-size: 0.65rem;
+        font-size: var(--home-font-size-small);
     }
 
     .native-code-status span {
@@ -415,7 +415,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         padding-inline: 1rem;
         border-bottom: 1px solid var(--native-card-border);
         color: var(--native-muted);
-        font-size: var(--home-font-size-label);
+        font-size: var(--home-font-size-small);
     }
 
     .native-preview-header strong {
@@ -423,7 +423,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         align-items: center;
         gap: 0.42rem;
         color: var(--vpt-accent);
-        font-size: 0.68rem;
+        font-size: var(--home-font-size-small);
         letter-spacing: 0.08em;
         text-transform: uppercase;
     }
@@ -484,13 +484,13 @@ import HomeSectionHeading from './home-section-heading.astro'
     .react-state-card small,
     .native-element-card header small {
         color: var(--native-muted);
-        font-size: 0.65rem;
+        font-size: var(--home-font-size-small);
     }
 
     .react-state-card strong {
         color: var(--native-heading);
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        font-size: 0.92rem;
+        font-size: var(--home-font-size-body);
     }
 
     .react-state-card output {
@@ -502,7 +502,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         border-radius: 999px;
         background: var(--native-soft);
         color: var(--native-muted);
-        font-size: 0.58rem;
+        font-size: var(--home-font-size-small);
         font-style: normal;
     }
 
@@ -522,7 +522,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         gap: 0.35rem;
         color: var(--native-muted);
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        font-size: 0.62rem;
+        font-size: var(--home-font-size-small);
     }
 
     .bridge-lane i {
@@ -585,7 +585,7 @@ import HomeSectionHeading from './home-section-heading.astro'
     .native-element-card header strong {
         color: var(--native-heading);
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        font-size: 0.82rem;
+        font-size: var(--home-font-size-small);
     }
 
     .native-resource-list {
@@ -600,7 +600,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         background: var(--native-soft);
         color: var(--native-muted);
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        font-size: 0.48rem;
+        font-size: var(--home-font-size-small);
         font-style: normal;
     }
 
@@ -614,7 +614,7 @@ import HomeSectionHeading from './home-section-heading.astro'
     .native-counter-shell > small {
         display: block;
         color: var(--native-text);
-        font-size: 0.58rem;
+        font-size: var(--home-font-size-small);
         font-weight: 750;
         letter-spacing: 0.12em;
         text-align: center;
@@ -684,14 +684,14 @@ import HomeSectionHeading from './home-section-heading.astro'
     .native-interaction-hint {
         margin-top: 1rem;
         color: var(--native-muted);
-        font-size: 0.68rem;
+        font-size: var(--home-font-size-small);
         text-align: center;
     }
 
     .native-guide-link {
         display: block;
         width: fit-content;
-        margin: 1.75rem auto 0;
+        margin: var(--home-section-heading-gap) auto 0;
         color: var(--vpt-accent-strong);
         font-weight: 700;
         text-decoration: none;
@@ -729,7 +729,6 @@ import HomeSectionHeading from './home-section-heading.astro'
 
         .native-code {
             padding-inline: 1rem;
-            font-size: 0.68rem;
         }
 
         .native-bridge-canvas {

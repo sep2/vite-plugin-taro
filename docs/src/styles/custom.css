@@ -5,6 +5,7 @@
     --sl-color-accent-low: rgb(11, 58, 33);
     --sl-color-accent: rgb(42, 174, 103);
     --sl-color-accent-high: rgb(183, 235, 207);
+    --home-font-size-small: 0.75rem;
 }
 
 :root[data-theme="light"] {
@@ -151,8 +152,6 @@ html[data-has-hero] {
     --home-font-size-display: clamp(1.8rem, 4.5vw, 3.25rem);
     --home-font-size-title: clamp(1.25rem, 2vw, 1.55rem);
     --home-font-size-body: 1rem;
-    --home-font-size-label: 0.75rem;
-    --home-font-size-caption: 0.7rem;
     --home-line-height-body: 1.8;
 }
 

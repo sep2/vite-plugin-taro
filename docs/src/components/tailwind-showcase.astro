@@ -67,8 +67,9 @@ import HomeSectionHeading from './home-section-heading.astro'
         </article>
 
         <article class="phone-preview" aria-label="Tailwind CSS 样式热更新在小程序中的效果">
-            <span class="preview-label"><i aria-hidden="true"></i> 微信小程序 · HMR</span>
-            <div class="phone-shell">
+            <div class="phone-stage">
+                <span class="preview-label"><i aria-hidden="true"></i> 微信小程序 · HMR</span>
+                <div class="phone-shell">
                 <div class="phone-speaker" aria-hidden="true"></div>
                 <div class="phone-screen">
                     <div class="phone-status">
@@ -145,8 +146,9 @@ import HomeSectionHeading from './home-section-heading.astro'
                     </div>
                 </div>
             </div>
-            <div class="preview-chips" role="list" aria-label="支持的 Tailwind CSS 能力">
-                <span role="listitem">任意值</span><span role="listitem">样式 HMR</span><span role="listitem">Flex</span><span role="listitem">Variants</span>
+                <div class="preview-chips" role="list" aria-label="支持的 Tailwind CSS 能力">
+                    <span role="listitem">任意值</span><span role="listitem">样式 HMR</span><span role="listitem">Flex</span><span role="listitem">Variants</span>
+                </div>
             </div>
         </article>
     </div>
@@ -208,7 +210,7 @@ import HomeSectionHeading from './home-section-heading.astro'
     }
 
     .tailwind-stage {
-        --tailwind-demo-height: 40rem;
+        --tailwind-demo-height: 41rem;
         display: grid;
         grid-template-columns: minmax(0, 1.2fr) minmax(22rem, 0.8fr);
         align-items: center;
@@ -271,7 +273,7 @@ import HomeSectionHeading from './home-section-heading.astro'
     .code-file {
         color: #a9b9ad;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        font-size: 0.72rem;
+        font-size: var(--home-font-size-small);
         text-align: center;
     }
 
@@ -282,7 +284,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         gap: 0.35rem;
         color: #8fcea0;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        font-size: 0.68rem;
+        font-size: var(--home-font-size-small);
     }
 
     .tailwind-badge i,
@@ -314,7 +316,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         box-shadow: none;
         color: #d8e4da;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        font-size: clamp(0.68rem, 1vw, 0.78rem);
+        font-size: var(--home-font-size-small);
         line-height: 1.8;
         overflow: auto;
         scrollbar-color: rgba(144, 198, 155, 0.35) transparent;
@@ -420,7 +422,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         background: #142c1f;
         color: #91a697;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        font-size: 0.65rem;
+        font-size: var(--home-font-size-small);
     }
 
     .code-status span {
@@ -480,7 +482,12 @@ import HomeSectionHeading from './home-section-heading.astro'
         align-items: center;
         flex-direction: column;
         justify-content: center;
-        padding-block: 0.5rem;
+    }
+
+    .phone-stage {
+        position: relative;
+        width: min(100%, 22rem);
+        height: var(--tailwind-demo-height);
     }
 
     :global(:root[data-theme='dark']) .phone-preview {
@@ -531,14 +538,19 @@ import HomeSectionHeading from './home-section-heading.astro'
 
     .preview-label {
         display: flex;
+        position: absolute;
+        z-index: 2;
+        top: -2.25rem;
+        left: 50%;
         align-items: center;
         gap: 0.42rem;
-        margin-bottom: 0.9rem;
         color: var(--vpt-accent);
-        font-size: 0.68rem;
+        font-size: var(--home-font-size-small);
         font-weight: 750;
         letter-spacing: 0.14em;
         text-transform: uppercase;
+        transform: translateX(-50%);
+        white-space: nowrap;
     }
 
     .preview-label i {
@@ -552,8 +564,8 @@ import HomeSectionHeading from './home-section-heading.astro'
 
     .phone-shell {
         position: relative;
-        width: min(100%, 22rem);
-        height: var(--tailwind-demo-height);
+        width: 100%;
+        height: 100%;
         padding: 0.55rem;
         border: 1px solid rgba(202, 231, 207, 0.28);
         border-radius: 2.65rem;
@@ -594,7 +606,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         justify-content: space-between;
         padding: 0.8rem 1.25rem 0.35rem;
         color: var(--phone-text);
-        font-size: 0.58rem;
+        font-size: var(--home-font-size-small);
     }
 
     .phone-indicators {
@@ -727,7 +739,7 @@ import HomeSectionHeading from './home-section-heading.astro'
     .welcome {
         margin: 0;
         color: var(--phone-muted);
-        font-size: 0.62rem;
+        font-size: var(--home-font-size-small);
     }
 
     .app-content > h3 {
@@ -812,7 +824,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         background: rgba(255, 253, 245, 0.94);
         box-shadow: 0 0.35rem 0.9rem rgba(125, 47, 36, 0.16);
         color: #a64637;
-        font-size: 0.44rem;
+        font-size: var(--home-font-size-small);
         line-height: 1;
         opacity: 0;
         transform: translateY(-0.3rem) scale(0.96);
@@ -827,7 +839,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         border-radius: 50%;
         background: #e96f55;
         color: #fffdf5;
-        font-size: 0.5rem;
+        font-size: var(--home-font-size-small);
         font-style: normal;
         place-items: center;
     }
@@ -838,13 +850,13 @@ import HomeSectionHeading from './home-section-heading.astro'
 
     .style-hmr-toast small {
         color: #bd6959;
-        font-size: 0.4rem;
+        font-size: var(--home-font-size-small);
     }
 
     .metric-label {
         display: block;
         color: #bce5b1;
-        font-size: 0.58rem;
+        font-size: var(--home-font-size-small);
         font-weight: 700;
         letter-spacing: 0.16em;
         text-transform: uppercase;
@@ -862,7 +874,7 @@ import HomeSectionHeading from './home-section-heading.astro'
 
     .steps-card > small {
         color: #a9b9ad;
-        font-size: 0.55rem;
+        font-size: var(--home-font-size-small);
     }
 
     .progress-track {
@@ -886,7 +898,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         justify-content: space-between;
         margin: 0.5rem 0 0;
         color: #a9b9ad;
-        font-size: 0.52rem;
+        font-size: var(--home-font-size-small);
     }
 
     .steps-card > p b {
@@ -915,7 +927,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         margin-bottom: 0.65rem;
         border-radius: 0.5rem;
         color: #fffef8;
-        font-size: 0.65rem;
+        font-size: var(--home-font-size-small);
         place-items: center;
     }
 
@@ -929,7 +941,7 @@ import HomeSectionHeading from './home-section-heading.astro'
 
     .metric-grid small {
         color: var(--phone-subtle);
-        font-size: 0.52rem;
+        font-size: var(--home-font-size-small);
     }
 
     .metric-grid strong {
@@ -942,7 +954,7 @@ import HomeSectionHeading from './home-section-heading.astro'
     .metric-grid strong i {
         color: var(--phone-unit);
         font-family: inherit;
-        font-size: 0.48rem;
+        font-size: var(--home-font-size-small);
         font-style: normal;
         font-weight: 500;
     }
@@ -958,12 +970,12 @@ import HomeSectionHeading from './home-section-heading.astro'
     .activity-card header {
         display: flex;
         justify-content: space-between;
-        font-size: 0.6rem;
+        font-size: var(--home-font-size-small);
     }
 
     .activity-card header span {
         color: var(--phone-link);
-        font-size: 0.5rem;
+        font-size: var(--home-font-size-small);
     }
 
     .activity-bars {
@@ -991,15 +1003,19 @@ import HomeSectionHeading from './home-section-heading.astro'
         justify-content: space-between;
         margin-top: 0.3rem;
         color: var(--phone-subtle);
-        font-size: 0.45rem;
+        font-size: var(--home-font-size-small);
     }
 
     .preview-chips {
         display: flex;
-        flex-wrap: wrap;
+        position: absolute;
+        z-index: 2;
+        bottom: -3.25rem;
+        left: 50%;
         justify-content: center;
         gap: 0.4rem;
-        margin-top: 1rem;
+        width: max-content;
+        transform: translateX(-50%);
     }
 
     .preview-chips span {
@@ -1008,13 +1024,13 @@ import HomeSectionHeading from './home-section-heading.astro'
         border-radius: 999px;
         background: var(--vpt-chip-background);
         color: var(--vpt-chip-text);
-        font-size: 0.6rem;
+        font-size: var(--home-font-size-small);
     }
 
     .tailwind-guide-link {
         display: block;
         width: fit-content;
-        margin: 1.75rem auto 0;
+        margin: var(--home-section-heading-gap) auto 0;
         color: var(--vpt-accent-strong);
         font-weight: 700;
         text-decoration: none;
@@ -1385,15 +1401,11 @@ import HomeSectionHeading from './home-section-heading.astro'
             display: none;
         }
 
-        .code-editor {
-            font-size: 0.68rem;
-        }
-
         .phone-preview {
             min-height: 42rem;
         }
 
-        .phone-shell {
+        .phone-stage {
             width: min(100%, 20rem);
         }
     }
