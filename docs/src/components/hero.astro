@@ -346,8 +346,9 @@ const proofPoints = [
 
                 const nozzleX = originBounds.left + originBounds.width / 2 - flightBounds.left
                 const nozzleY = originBounds.top + originBounds.height / 2 - flightBounds.top
-                canvas.style.left = `${nozzleX - canvasBounds.width * exhaustCanvasOrigin.x}px`
-                canvas.style.top = `${nozzleY - canvasBounds.height * exhaustCanvasOrigin.y}px`
+                const canvasX = nozzleX - canvasBounds.width * exhaustCanvasOrigin.x
+                const canvasY = nozzleY - canvasBounds.height * exhaustCanvasOrigin.y
+                canvas.style.transform = `translate3d(${canvasX}px, ${canvasY}px, 0)`
                 this.origin = exhaustCanvasOrigin
             } finally {
                 this.classList.toggle('is-live', isLive)

@@ -32,7 +32,7 @@ import HomeSectionHeading from './home-section-heading.astro'
 <span class="code-line"><i>10</i><span>        <b class="token-tag">&lt;/View></b></span></span>
 <span class="code-line"><i>11</i><span>        <b class="token-tag">&lt;Text</b> <b class="token-attribute">className</b>=<em class="token-string">"text-lg font-semibold text-emerald-950"</em><b class="token-tag">></b>VPT<b class="token-tag">&lt;/Text></b></span></span>
 <span class="code-line"><i>12</i><span>      <b class="token-tag">&lt;/View></b></span></span>
-<span class="code-line active hmr-edit-line"><i>13</i><span>      <b class="token-tag">&lt;View</b> <b class="token-attribute">className</b>=<span class="code-value"><em class="token-string code-value-before">"mt-5 rounded-3xl bg-emerald-900 p-6 text-white shadow-xl"</em><em class="token-string code-value-after" aria-hidden="true">"mt-5 rounded-[2rem] bg-[#e96f55] p-6 text-white shadow-2xl"</em><i class="code-caret" aria-hidden="true"></i></span><b class="token-tag">></b></span></span>
+<span class="code-line active hmr-edit-line"><i>13</i><span>      <b class="token-tag">&lt;View</b> <b class="token-attribute">className</b>=<span class="code-value"><span class="code-value-before"><em class="token-string">"mt-5 rounded-3xl bg-emerald-900 p-6 text-white shadow-xl"</em><i class="code-caret" aria-hidden="true"></i><b class="token-tag">></b></span><span class="code-value-after" aria-hidden="true"><em class="token-string">"mt-5 rounded-[2rem] bg-[#e96f55] p-6 text-white shadow-2xl"</em><i class="code-caret" aria-hidden="true"></i><b class="token-tag">></b></span></span></span></span>
 <span class="code-line"><i>14</i><span>        <b class="token-tag">&lt;Text</b> <b class="token-attribute">className</b>=<em class="token-string">"text-xs uppercase tracking-widest text-emerald-200"</em><b class="token-tag">></b>今日步数<b class="token-tag">&lt;/Text></b></span></span>
 <span class="code-line"><i>15</i><span>        <b class="token-tag">&lt;Text</b> <b class="token-attribute">className</b>=<em class="token-string">"mt-3 block text-4xl font-semibold"</em><b class="token-tag">></b>12,680<b class="token-tag">&lt;/Text></b></span></span>
 <span class="code-line"><i>16</i><span>        <b class="token-tag">&lt;Text</b> <b class="token-attribute">className</b>=<em class="token-string">"mt-2 block text-xs text-emerald-200/70"</em><b class="token-tag">></b>目标 16,000 步<b class="token-tag">&lt;/Text></b></span></span>
@@ -392,22 +392,25 @@ import HomeSectionHeading from './home-section-heading.astro'
     }
 
     .code-value > * {
+        display: inline-flex;
         grid-area: 1 / 1;
+        align-items: center;
     }
 
     .code-value-after {
-        color: #ffc1ad;
         opacity: 0;
         transform: translateY(0.18rem);
     }
 
+    .code-value-after .token-string {
+        color: #ffc1ad;
+    }
+
     .code-caret {
-        display: block;
-        align-self: center;
-        justify-self: end;
+        display: inline-block;
         width: 1px;
         height: 1.15em;
-        margin: 0 -0.12rem 0 0;
+        margin-inline: 0.08rem;
         background: #ffe6a3;
         opacity: 0;
     }
@@ -1383,7 +1386,24 @@ import HomeSectionHeading from './home-section-heading.astro'
         }
 
         .phone-preview {
-            min-height: 44rem;
+            min-height: 0;
+            padding-top: 2.75rem;
+        }
+
+        .phone-stage {
+            height: auto;
+        }
+
+        .phone-shell {
+            height: var(--tailwind-demo-height);
+        }
+
+        .preview-chips {
+            position: static;
+            flex-wrap: wrap;
+            width: 100%;
+            margin-top: 1rem;
+            transform: none;
         }
     }
 
@@ -1399,10 +1419,6 @@ import HomeSectionHeading from './home-section-heading.astro'
 
         .window-controls {
             display: none;
-        }
-
-        .phone-preview {
-            min-height: 42rem;
         }
 
         .phone-stage {

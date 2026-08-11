@@ -454,14 +454,10 @@ const { headingLevel } = Astro.props
         3%,
         13%,
         100% {
-            border-color: var(--vpt-border);
-            box-shadow: 0 10px 28px var(--vpt-shadow);
             transform: translateY(0) scale(1);
         }
 
         7% {
-            border-color: var(--vpt-border-strong);
-            box-shadow: 0 14px 32px var(--vpt-shadow-strong);
             transform: translateY(-0.16rem) scale(1.015);
         }
     }
@@ -471,15 +467,11 @@ const { headingLevel } = Astro.props
         10%,
         27%,
         100% {
-            border-color: rgba(232, 136, 112, 0.45);
-            box-shadow: 0 10px 28px var(--vpt-shadow);
             transform: translateY(0) scale(1);
         }
 
         15%,
         22% {
-            border-color: #e88870;
-            box-shadow: 0 14px 32px color-mix(in srgb, #e88870 18%, transparent);
             transform: translateY(-0.16rem) scale(1.018);
         }
     }
@@ -489,13 +481,13 @@ const { headingLevel } = Astro.props
         9%,
         27%,
         100% {
-            color: #d9725d;
+            opacity: 0.72;
             transform: translateX(-50%) scale(1);
         }
 
         14%,
         22% {
-            color: #ef8068;
+            opacity: 1;
             transform: translateX(-50%) scale(1.08);
         }
     }
@@ -505,14 +497,12 @@ const { headingLevel } = Astro.props
         10%,
         29%,
         100% {
-            border-color: rgba(232, 136, 112, 0.55);
-            filter: none;
+            opacity: 0.45;
         }
 
         16%,
         25% {
-            border-color: #e88870;
-            filter: drop-shadow(0 0 0.2rem rgba(232, 136, 112, 0.45));
+            opacity: 1;
         }
     }
 
@@ -521,15 +511,13 @@ const { headingLevel } = Astro.props
         15%,
         30%,
         100% {
-            border-color: rgba(232, 136, 112, 0.32);
-            box-shadow: none;
+            opacity: 0.72;
             transform: translateY(0);
         }
 
         20%,
         26% {
-            border-color: rgba(232, 136, 112, 0.72);
-            box-shadow: 0 0.55rem 1.2rem rgba(174, 73, 55, 0.12);
+            opacity: 1;
             transform: translateY(-0.14rem);
         }
     }
@@ -539,14 +527,12 @@ const { headingLevel } = Astro.props
         19%,
         34%,
         100% {
-            border-color: var(--vpt-border-strong);
-            filter: none;
+            opacity: 0.45;
         }
 
         23%,
         31% {
-            border-color: #e88870;
-            filter: drop-shadow(0 0 0.22rem rgba(232, 136, 112, 0.5));
+            opacity: 1;
         }
     }
 
@@ -555,14 +541,12 @@ const { headingLevel } = Astro.props
         48%,
         62%,
         100% {
-            border-color: var(--vpt-border-strong);
-            filter: none;
+            opacity: 0.45;
         }
 
         52%,
         59% {
-            border-color: var(--vpt-accent);
-            filter: drop-shadow(0 0 0.22rem color-mix(in srgb, var(--vpt-accent) 48%, transparent));
+            opacity: 1;
         }
     }
 
@@ -660,13 +644,13 @@ const { headingLevel } = Astro.props
         28%,
         51%,
         100% {
-            color: color-mix(in srgb, var(--vpt-muted) 68%, var(--vpt-node-background));
+            opacity: 0.72;
             transform: translate(-50%, -50%) scale(1);
         }
 
         34%,
         43% {
-            color: var(--vpt-accent);
+            opacity: 1;
             transform: translate(-50%, -50%) scale(1.08);
         }
     }
@@ -676,13 +660,13 @@ const { headingLevel } = Astro.props
         52%,
         66%,
         100% {
-            box-shadow: 0 10px 25px var(--vpt-shadow);
+            opacity: 0.86;
             transform: translateY(0);
         }
 
         57%,
         62% {
-            box-shadow: 0 14px 30px color-mix(in srgb, var(--vpt-accent) 14%, transparent);
+            opacity: 1;
             transform: translateY(-0.12rem);
         }
     }
@@ -692,15 +676,13 @@ const { headingLevel } = Astro.props
         58%,
         78%,
         100% {
-            border-color: rgba(232, 136, 112, 0.35);
-            box-shadow: 0 10px 25px var(--vpt-shadow);
+            opacity: 0.82;
             transform: translateY(0) scale(1);
         }
 
         64%,
         73% {
-            border-color: rgba(232, 136, 112, 0.72);
-            box-shadow: 0 15px 32px rgba(174, 73, 55, 0.14);
+            opacity: 1;
             transform: translateY(-0.18rem) scale(1.012);
         }
     }
@@ -710,13 +692,13 @@ const { headingLevel } = Astro.props
         62%,
         81%,
         100% {
-            background: var(--vpt-chip-background);
+            opacity: 0.78;
             transform: translateX(0);
         }
 
         68%,
         76% {
-            background: color-mix(in srgb, var(--vpt-chip-background) 78%, #ef957a);
+            opacity: 1;
             transform: translateX(0.12rem);
         }
     }
