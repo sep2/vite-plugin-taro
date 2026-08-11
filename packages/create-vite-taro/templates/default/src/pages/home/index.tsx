@@ -1,9 +1,8 @@
-import Taro from 'virtual:taro/api'
-import { Button, ScrollView, Text, View } from 'virtual:taro/components'
-import { useState } from 'react'
+import { ScrollView, Text, View } from 'virtual:taro/components'
+import { lazy, Suspense, useState } from 'react'
 import { Counter } from '../../components/counter/counter.tsx'
+import { BotanicalSprig } from '../../components/botanical-sprig/botanical-sprig.tsx'
 import { NavigationBar } from '../../components/navigation-bar/navigation-bar.tsx'
-import styles from './home.module.css'
 
 const featureCards = [
     {
@@ -26,28 +25,7 @@ const featureCards = [
     }
 ] as const
 
-interface BotanicalSprigProps {
-    className: string
-}
-
-function BotanicalSprig({ className }: BotanicalSprigProps) {
-    return (
-        <View className={`${styles.botanicalSprig} ${className}`} aria-hidden="true">
-            <View className={`${styles.botanicalStem} bg-primary-stem`} />
-            <View className={`${styles.botanicalLeaf} ${styles.botanicalLeafOne} bg-botanical-leaf`} />
-            <View className={`${styles.botanicalLeaf} ${styles.botanicalLeafTwo} bg-botanical-leaf`} />
-            <View className={`${styles.botanicalLeaf} ${styles.botanicalLeafThree} bg-botanical-leaf`} />
-            <View className={`${styles.botanicalLeaf} ${styles.botanicalLeafFour} bg-botanical-leaf`} />
-            <View className={styles.botanicalFlower}>
-                <View className={`${styles.botanicalPetal} ${styles.botanicalPetalOne} bg-petal`} />
-                <View className={`${styles.botanicalPetal} ${styles.botanicalPetalTwo} bg-petal`} />
-                <View className={`${styles.botanicalPetal} ${styles.botanicalPetalThree} bg-petal`} />
-                <View className={`${styles.botanicalPetal} ${styles.botanicalPetalFour} bg-petal`} />
-                <View className={`${styles.botanicalFlowerCenter} bg-sun`} />
-            </View>
-        </View>
-    )
-}
+const ApiCard = lazy(() => import('./lazy/api-card.tsx'))
 
 function HomePage() {
     // This local state intentionally demonstrates that VPT preserves React state during hot updates.
@@ -58,8 +36,8 @@ function HomePage() {
             <NavigationBar title="VPT" />
             <ScrollView scrollY className="flex min-h-0 flex-1 flex-col">
                 <View className="relative flex shrink-0 flex-col items-center overflow-hidden px-5 pb-8 pt-6">
-                    <BotanicalSprig className={styles.botanicalSprigTop} />
-                    <BotanicalSprig className={styles.botanicalSprigSide} />
+                    <BotanicalSprig placement="top" />
+                    <BotanicalSprig placement="side" />
 
                     <View className="relative z-10 flex w-full max-w-4xl flex-col items-center text-center">
                         <Text className="brand-serif mt-7 block text-[7rem] font-semibold leading-none tracking-[-0.08em] text-primary sm:text-[9rem]">
@@ -129,41 +107,32 @@ function HomePage() {
                             </Text>
                         </View>
 
-                        <View className="mt-8 flex flex-row flex-wrap gap-4">
+                        <View className="mt-8 flex flex-row flex-wrap items-start gap-4">
                             {featureCards.map((feature) => (
                                 <View
                                     key={feature.number}
-                                    className={`flex min-h-52 min-w-64 flex-1 flex-col rounded-3xl border border-outline bg-white/80 p-6 shadow-lg ${feature.tiltClass}`}
+                                    className={`flex min-w-64 flex-1 flex-col rounded-3xl border border-outline bg-white/80 p-6 shadow-lg ${feature.tiltClass}`}
                                 >
-                                    <View className="brand-serif flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-surface text-base font-bold text-primary-control">
-                                        {feature.number}
+                                    <View className="flex flex-row items-center gap-4">
+                                        <View className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary-surface">
+                                            <Text className="brand-serif block text-base font-bold leading-none text-primary-control">
+                                                {feature.number}
+                                            </Text>
+                                        </View>
+                                        <Text className="block min-w-0 flex-1 text-lg font-bold text-heading">
+                                            {feature.title}
+                                        </Text>
                                     </View>
-                                    <Text className="mt-5 block text-lg font-bold text-heading">{feature.title}</Text>
-                                    <Text className="mt-3 block text-sm leading-6 text-muted">
+                                    <Text className="mt-4 block text-sm leading-6 text-muted">
                                         {feature.description}
                                     </Text>
                                 </View>
                             ))}
                         </View>
 
-                        <View className="relative mt-8 flex flex-col overflow-hidden rounded-3xl bg-primary p-7 text-white sm:flex-row sm:items-center sm:justify-between sm:p-9">
-                            <BotanicalSprig className={styles.botanicalSprigCta} />
-                            <View className="relative z-10 flex max-w-lg flex-col">
-                                <Text className="text-xs font-bold tracking-widest text-on-primary-accent">TARO API READY</Text>
-                                <Text className="brand-serif mt-2 block text-3xl font-semibold text-white">
-                                    Make this starter yours.
-                                </Text>
-                                <Text className="mt-3 block text-sm leading-6 text-on-primary-muted">
-                                    Add pages, connect your data and ship the same experience to WeChat and H5.
-                                </Text>
-                            </View>
-                            <Button
-                                className="relative z-10 mt-6 flex items-center justify-center self-start rounded-full bg-action px-6 py-3 text-sm font-bold text-action-foreground after:border-0 sm:mt-0"
-                                onClick={() => Taro.showToast({ title: 'Hello from VPT!' })}
-                            >
-                                Try a Taro toast →
-                            </Button>
-                        </View>
+                        <Suspense fallback={<View className="mt-8 min-h-48 rounded-3xl bg-primary" />}>
+                            <ApiCard />
+                        </Suspense>
 
                         <View className="flex flex-col items-center px-2 pb-2 pt-9">
                             <Text className="text-center text-xs font-bold tracking-widest text-quiet">
