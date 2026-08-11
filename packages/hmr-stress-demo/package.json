@@ -7,8 +7,13 @@
     "scripts": {
         "build-wx": "cross-env NODE_ENV=production vite build",
         "dev-wx": "cross-env NODE_ENV=development vite",
-        "stress-hmr": "node scripts/run-hmr-stress.ts",
-        "stress-hmr:burst": "cross-env VPT_HMR_STRESS_UPDATES=60 VPT_HMR_STRESS_INTERVAL_MS=8 node scripts/run-hmr-stress.ts",
+        "stress-hmr": "node scripts/run-devtools-tests.ts burst",
+        "stress-hmr:burst": "node scripts/run-devtools-tests.ts burst",
+        "setup-devtools": "cross-env VPT_HMR_SETUP=1 node scripts/run-devtools-tests.ts setup",
+        "test-devtools": "node scripts/run-devtools-tests.ts all",
+        "test-devtools:burst": "node scripts/run-devtools-tests.ts burst",
+        "test-devtools:rebuild": "node scripts/run-devtools-tests.ts rebuild",
+        "test-devtools:recovery": "node scripts/run-devtools-tests.ts recovery",
         "typecheck": "tsc --project tsconfig.json"
     },
     "dependencies": {

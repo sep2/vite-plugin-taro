@@ -5,6 +5,7 @@ import ActivityGrid from './activity-grid.tsx'
 import DashboardControls from './dashboard-controls.tsx'
 import DeepChain from './deep-chain.tsx'
 import DeepMarker from './deep-marker.tsx'
+import { hmrMarker } from './hmr-marker.ts'
 import { createStressTree } from './tree-model.ts'
 import TreeNode from './tree-node.tsx'
 
@@ -31,6 +32,7 @@ export default function StressDashboard({ navigation, title }: StressDashboardPr
             <View className="stress-header">
                 <View>
                     <Text className="stress-title">{title}</Text>
+                    <Text id="hmr-status" className="stress-subtitle">{`marker:${hmrMarker}`}</Text>
                     <Text className="stress-subtitle">364 recursive nodes · 243 stateful leaves · 96 grid cells</Text>
                 </View>
                 {navigation}
