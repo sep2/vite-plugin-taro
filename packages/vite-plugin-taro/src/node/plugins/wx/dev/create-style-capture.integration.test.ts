@@ -98,10 +98,14 @@ test('publishes processed CSS and live topology without identical rewrites', asy
                 })
         },
         onOutput(result) {
-            if (!(result instanceof Error)) {
-                styleCapture.bindOutput(result.output)
+            if (result instanceof Error) {
+                outputResults.push(result)
+                return
             }
-            outputResults.push(result)
+            void styleCapture
+                .reconcileComplete(result.output)
+                .then(() => outputResults.push(result))
+                .catch((error: unknown) => outputResults.push(error))
         }
     })
 
@@ -225,10 +229,14 @@ test('publishes Tailwind candidate additions and removals before completing each
                 .catch((error: unknown) => hmrResults.push(error))
         },
         onOutput(result) {
-            if (!(result instanceof Error)) {
-                styleCapture.bindOutput(result.output)
+            if (result instanceof Error) {
+                outputResults.push(result)
+                return
             }
-            outputResults.push(result)
+            void styleCapture
+                .reconcileComplete(result.output)
+                .then(() => outputResults.push(result))
+                .catch((error: unknown) => outputResults.push(error))
         }
     })
 

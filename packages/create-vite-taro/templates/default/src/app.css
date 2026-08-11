@@ -4,6 +4,34 @@
 
 @source "./";
 
+@theme static {
+    --color-canvas: #fbfaf1;
+    --color-foreground: #315f44;
+    --color-heading: #174f32;
+    --color-primary: #17673d;
+    --color-primary-control: #197342;
+    --color-primary-label: #207344;
+    --color-primary-stem: #237648;
+    --color-action: #78dc91;
+    --color-action-foreground: #0d2b18;
+    --color-on-primary-accent: #a9e2b4;
+    --color-on-primary-muted: #d5ead9;
+    --color-primary-surface: #e3f4df;
+    --color-surface-muted: #edf5e8;
+    --color-surface-subtle: #f8fbf4;
+    --color-muted: #64786a;
+    --color-quiet: #819185;
+    --color-outline: rgba(30, 102, 61, 0.15);
+    --color-divider: rgba(30, 102, 61, 0.1);
+    --color-coral: #e98a72;
+    --color-petal: #ef977f;
+    --color-sun: #fff1bd;
+    --background-image-canvas-botanical:
+        radial-gradient(ellipse at 12% 5%, rgba(101, 190, 119, 0.11), rgba(101, 190, 119, 0.04) 28%, transparent 62%),
+        radial-gradient(ellipse at 90% 18%, rgba(234, 139, 115, 0.08), rgba(234, 139, 115, 0.03) 32%, transparent 68%);
+    --background-image-botanical-leaf: linear-gradient(145deg, #9cd88b, #43a760);
+}
+
 *,
 *::before,
 *::after {
@@ -18,8 +46,8 @@ button::after {
 page,
 body {
     margin: 0;
-    background: #fbfaf1;
-    color: #315f44;
+    background: var(--color-canvas);
+    color: var(--color-foreground);
 }
 
 button {

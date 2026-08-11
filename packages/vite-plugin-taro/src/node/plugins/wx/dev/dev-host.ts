@@ -228,11 +228,22 @@ export async function createWxDevHost({
                     logWxError(server.config.logger, 'wx dev build failed', action.result)
                     return
                 }
-                styleCapture.bindOutput(action.result.output)
-                return rotateBuildSession()
+                return reconcileCompleteOutput(action.result.output)
             case 'listening':
                 return rotateBuildSession()
         }
+    }
+
+    /**
+     * Reconciles graph-complete styles before rotating the App-visible build identity.
+     *
+     * DevEngine has already written its compiler asset when onOutput fires, but bundled development may have omitted CSS Modules
+     * from that asset. Awaiting reconciliation inside the serialized reducer guarantees the subsequent app.wxss rotation—the
+     * event that refreshes DevTools—can only expose a generation whose global WXSS already represents the complete App/Page graph.
+     */
+    async function reconcileCompleteOutput(output: Exclude<DevOutputResult, Error>['output']): Promise<void> {
+        await styleCapture.reconcileComplete(output)
+        await rotateBuildSession()
     }
 
     /** Applies one runtime receipt to the active physical patch history. */

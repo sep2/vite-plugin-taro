@@ -1,10 +1,3 @@
-.starterCanvas {
-    background:
-        radial-gradient(ellipse at 12% 5%, rgba(101, 190, 119, 0.11), rgba(101, 190, 119, 0.04) 28%, transparent 62%),
-        radial-gradient(ellipse at 90% 18%, rgba(234, 139, 115, 0.08), rgba(234, 139, 115, 0.03) 32%, transparent 68%),
-        #fbfaf1;
-}
-
 .botanicalSprig {
     position: absolute;
     z-index: 0;
@@ -42,7 +35,6 @@
     width: 14rem;
     height: 0.3rem;
     border-radius: 999px;
-    background: #237648;
     transform: rotate(-24deg);
     transform-origin: left center;
 }
@@ -52,7 +44,6 @@
     width: 3.2rem;
     height: 1.55rem;
     border-radius: 72% 28% 70% 30%;
-    background: linear-gradient(145deg, #9cd88b, #43a760);
 }
 
 .botanicalLeafOne {
@@ -99,7 +90,6 @@
 .botanicalPetal {
     width: 1.05rem;
     height: 1.55rem;
-    background: #ef977f;
 }
 
 .botanicalPetalOne {
@@ -122,5 +112,4 @@
     z-index: 1;
     width: 0.7rem;
     height: 0.7rem;
-    background: #fff1bd;
 }

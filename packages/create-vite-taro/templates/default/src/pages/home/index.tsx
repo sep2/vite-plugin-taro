@@ -33,17 +33,17 @@ interface BotanicalSprigProps {
 function BotanicalSprig({ className }: BotanicalSprigProps) {
     return (
         <View className={`${styles.botanicalSprig} ${className}`} aria-hidden="true">
-            <View className={styles.botanicalStem} />
-            <View className={`${styles.botanicalLeaf} ${styles.botanicalLeafOne}`} />
-            <View className={`${styles.botanicalLeaf} ${styles.botanicalLeafTwo}`} />
-            <View className={`${styles.botanicalLeaf} ${styles.botanicalLeafThree}`} />
-            <View className={`${styles.botanicalLeaf} ${styles.botanicalLeafFour}`} />
+            <View className={`${styles.botanicalStem} bg-primary-stem`} />
+            <View className={`${styles.botanicalLeaf} ${styles.botanicalLeafOne} bg-botanical-leaf`} />
+            <View className={`${styles.botanicalLeaf} ${styles.botanicalLeafTwo} bg-botanical-leaf`} />
+            <View className={`${styles.botanicalLeaf} ${styles.botanicalLeafThree} bg-botanical-leaf`} />
+            <View className={`${styles.botanicalLeaf} ${styles.botanicalLeafFour} bg-botanical-leaf`} />
             <View className={styles.botanicalFlower}>
-                <View className={`${styles.botanicalPetal} ${styles.botanicalPetalOne}`} />
-                <View className={`${styles.botanicalPetal} ${styles.botanicalPetalTwo}`} />
-                <View className={`${styles.botanicalPetal} ${styles.botanicalPetalThree}`} />
-                <View className={`${styles.botanicalPetal} ${styles.botanicalPetalFour}`} />
-                <View className={styles.botanicalFlowerCenter} />
+                <View className={`${styles.botanicalPetal} ${styles.botanicalPetalOne} bg-petal`} />
+                <View className={`${styles.botanicalPetal} ${styles.botanicalPetalTwo} bg-petal`} />
+                <View className={`${styles.botanicalPetal} ${styles.botanicalPetalThree} bg-petal`} />
+                <View className={`${styles.botanicalPetal} ${styles.botanicalPetalFour} bg-petal`} />
+                <View className={`${styles.botanicalFlowerCenter} bg-sun`} />
             </View>
         </View>
     )
@@ -54,7 +54,7 @@ function HomePage() {
     const [count, setCount] = useState(0)
 
     return (
-        <View className={`${styles.starterCanvas} flex h-screen flex-col overflow-hidden text-[#315f44]`}>
+        <View className="flex h-screen flex-col overflow-hidden bg-canvas bg-canvas-botanical text-foreground">
             <NavigationBar title="VPT" />
             <ScrollView scrollY className="flex min-h-0 flex-1 flex-col">
                 <View className="relative flex shrink-0 flex-col items-center overflow-hidden px-5 pb-8 pt-6">
@@ -62,28 +62,28 @@ function HomePage() {
                     <BotanicalSprig className={styles.botanicalSprigSide} />
 
                     <View className="relative z-10 flex w-full max-w-4xl flex-col items-center text-center">
-                        <Text className="brand-serif mt-7 block text-[7rem] font-semibold leading-none tracking-[-0.08em] text-[#17673d] sm:text-[9rem]">
+                        <Text className="brand-serif mt-7 block text-[7rem] font-semibold leading-none tracking-[-0.08em] text-primary sm:text-[9rem]">
                             VPT
                         </Text>
-                        <Text className="mt-5 block max-w-2xl text-2xl font-bold leading-tight text-[#174f32] sm:text-3xl">
+                        <Text className="mt-5 block max-w-2xl text-2xl font-bold leading-tight text-heading sm:text-3xl">
                             Build naturally. Ship everywhere.
                         </Text>
-                        <Text className="mt-4 block max-w-xl text-sm leading-7 text-[#64786a] sm:text-base">
+                        <Text className="mt-4 block max-w-xl text-sm leading-7 text-muted sm:text-base">
                             A botanical little starter for building polished WeChat Mini Programs and Web apps with one
                             modern React codebase.
                         </Text>
 
                         <View className="mt-7 flex flex-row flex-wrap items-center justify-center gap-3">
-                            <View className="rounded-full border border-[#1e663d]/15 bg-white/75 px-4 py-2">
-                                <Text className="text-sm font-bold text-[#17673d]">Vite 8</Text>
+                            <View className="rounded-full border border-outline bg-white/75 px-4 py-2">
+                                <Text className="text-sm font-bold text-primary">Vite 8</Text>
                             </View>
-                            <Text className="text-[#e98a72]">✿</Text>
-                            <View className="rounded-full border border-[#1e663d]/15 bg-white/75 px-4 py-2">
-                                <Text className="text-sm font-bold text-[#17673d]">React 19</Text>
+                            <Text className="text-coral">✿</Text>
+                            <View className="rounded-full border border-outline bg-white/75 px-4 py-2">
+                                <Text className="text-sm font-bold text-primary">React 19</Text>
                             </View>
-                            <Text className="text-[#e98a72]">✿</Text>
-                            <View className="rounded-full border border-[#1e663d]/15 bg-white/75 px-4 py-2">
-                                <Text className="text-sm font-bold text-[#17673d]">Tailwind 4</Text>
+                            <Text className="text-coral">✿</Text>
+                            <View className="rounded-full border border-outline bg-white/75 px-4 py-2">
+                                <Text className="text-sm font-bold text-primary">Tailwind 4</Text>
                             </View>
                         </View>
                     </View>
@@ -102,12 +102,12 @@ function HomePage() {
                 </View>
 
                 <View className="relative z-10 flex shrink-0 flex-col items-center px-5">
-                    <View className="flex w-full max-w-4xl flex-col gap-5 overflow-hidden rounded-3xl border border-[#1e663d]/15 bg-white/85 p-6 shadow-xl sm:flex-row sm:items-center sm:p-8">
+                    <View className="flex w-full max-w-4xl flex-col gap-5 overflow-hidden rounded-3xl border border-outline bg-white/85 p-6 shadow-xl sm:flex-row sm:items-center sm:p-8">
                         <View className="flex min-w-0 flex-1 flex-col">
-                            <Text className="brand-serif mt-2 block text-3xl font-semibold text-[#174f32]">
+                            <Text className="brand-serif mt-2 block text-3xl font-semibold text-heading">
                                 Edit. Save. Stay in flow.
                             </Text>
-                            <Text className="mt-3 block text-sm leading-6 text-[#64786a]">
+                            <Text className="mt-3 block text-sm leading-6 text-muted">
                                 Change this counter, then edit src/pages/home/index.tsx. Your state stays exactly where
                                 you left it.
                             </Text>
@@ -118,13 +118,13 @@ function HomePage() {
                 <View className="flex shrink-0 flex-col items-center px-5 pb-12 pt-14">
                     <View className="flex w-full max-w-4xl flex-col">
                         <View className="flex flex-col items-center text-center">
-                            <Text className="text-xs font-bold tracking-widest text-[#207344]">
+                            <Text className="text-xs font-bold tracking-widest text-primary-label">
                                 A SMALL START, A MODERN FOUNDATION
                             </Text>
-                            <Text className="brand-serif mt-3 block text-4xl font-semibold text-[#174f32]">
+                            <Text className="brand-serif mt-3 block text-4xl font-semibold text-heading">
                                 Everything is ready to grow.
                             </Text>
-                            <Text className="mt-3 block max-w-xl text-sm leading-7 text-[#64786a]">
+                            <Text className="mt-3 block max-w-xl text-sm leading-7 text-muted">
                                 Keep the pieces you need, replace the rest, and let VPT handle the cross-platform build.
                             </Text>
                         </View>
@@ -133,32 +133,32 @@ function HomePage() {
                             {featureCards.map((feature) => (
                                 <View
                                     key={feature.number}
-                                    className={`flex min-h-52 min-w-64 flex-1 flex-col rounded-3xl border border-[#1e663d]/15 bg-white/80 p-6 shadow-lg ${feature.tiltClass}`}
+                                    className={`flex min-h-52 min-w-64 flex-1 flex-col rounded-3xl border border-outline bg-white/80 p-6 shadow-lg ${feature.tiltClass}`}
                                 >
-                                    <View className="brand-serif flex h-11 w-11 items-center justify-center rounded-2xl bg-[#e3f4df] text-base font-bold text-[#197342]">
+                                    <View className="brand-serif flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-surface text-base font-bold text-primary-control">
                                         {feature.number}
                                     </View>
-                                    <Text className="mt-5 block text-lg font-bold text-[#174f32]">{feature.title}</Text>
-                                    <Text className="mt-3 block text-sm leading-6 text-[#64786a]">
+                                    <Text className="mt-5 block text-lg font-bold text-heading">{feature.title}</Text>
+                                    <Text className="mt-3 block text-sm leading-6 text-muted">
                                         {feature.description}
                                     </Text>
                                 </View>
                             ))}
                         </View>
 
-                        <View className="relative mt-8 flex flex-col overflow-hidden rounded-3xl bg-[#17673d] p-7 text-white sm:flex-row sm:items-center sm:justify-between sm:p-9">
+                        <View className="relative mt-8 flex flex-col overflow-hidden rounded-3xl bg-primary p-7 text-white sm:flex-row sm:items-center sm:justify-between sm:p-9">
                             <BotanicalSprig className={styles.botanicalSprigCta} />
                             <View className="relative z-10 flex max-w-lg flex-col">
-                                <Text className="text-xs font-bold tracking-widest text-[#a9e2b4]">TARO API READY</Text>
+                                <Text className="text-xs font-bold tracking-widest text-on-primary-accent">TARO API READY</Text>
                                 <Text className="brand-serif mt-2 block text-3xl font-semibold text-white">
                                     Make this starter yours.
                                 </Text>
-                                <Text className="mt-3 block text-sm leading-6 text-[#d5ead9]">
+                                <Text className="mt-3 block text-sm leading-6 text-on-primary-muted">
                                     Add pages, connect your data and ship the same experience to WeChat and H5.
                                 </Text>
                             </View>
                             <Button
-                                className="relative z-10 mt-6 flex items-center justify-center self-start rounded-full bg-[#78dc91] px-6 py-3 text-sm font-bold text-[#0d2b18] after:border-0 sm:mt-0"
+                                className="relative z-10 mt-6 flex items-center justify-center self-start rounded-full bg-action px-6 py-3 text-sm font-bold text-action-foreground after:border-0 sm:mt-0"
                                 onClick={() => Taro.showToast({ title: 'Hello from VPT!' })}
                             >
                                 Try a Taro toast →
@@ -166,7 +166,7 @@ function HomePage() {
                         </View>
 
                         <View className="flex flex-col items-center px-2 pb-2 pt-9">
-                            <Text className="text-center text-xs font-bold tracking-widest text-[#819185]">
+                            <Text className="text-center text-xs font-bold tracking-widest text-quiet">
                                 VPT · OPEN SOURCE · MIT
                             </Text>
                         </View>

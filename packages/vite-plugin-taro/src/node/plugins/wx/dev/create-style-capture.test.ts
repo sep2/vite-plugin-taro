@@ -43,7 +43,7 @@ test('captures final Vite CSS and the live graph through its merged plugin', asy
     })
 })
 
-test('binds complete output bytes and preserves the frontier when later output omits WXSS', async () => {
+test('reconciles complete output and preserves the frontier when later output omits WXSS', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'vpt-style-capture-'))
     const appId = '/project/app.js'
     const styleId = '/project/app.css'
@@ -80,14 +80,48 @@ test('binds complete output bytes and preserves the frontier when later output o
         const blueWxss = '.app { color: blue; }\n'
         assert.equal(await readFile(globalWxssPath, 'utf8'), blueWxss)
 
-        styleCapture.bindOutput([
+        await styleCapture.reconcileComplete([
             { type: 'asset', fileName: globalWxssFileName, source: new TextEncoder().encode(blueWxss) }
         ])
-        // A later complete output can omit unchanged WXSS; binding that output must retain the existing byte frontier.
-        styleCapture.bindOutput([{ type: 'chunk', fileName: 'app.js' }])
+        // A later complete output can omit unchanged WXSS; reconciliation must retain the existing byte frontier.
+        await styleCapture.reconcileComplete([{ type: 'chunk', fileName: 'app.js' }])
         const reboundInode = (await stat(globalWxssPath)).ino
         await styleCapture.publishChanged([styleId])
         assert.equal((await stat(globalWxssPath)).ino, reboundInode)
+    } finally {
+        await rm(root, { recursive: true })
+    }
+})
+
+test('reconciles CSS Modules omitted from complete bundled-development output', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'vpt-style-complete-'))
+    const appId = '/project/app.js'
+    const appStyleId = '/project/app.css'
+    const moduleStyleId = '/project/card.module.css'
+    const styleCapture = createStyleCapture({
+        applicationEntryIds: [appId],
+        outDir: root,
+        emit: () => assert.fail('Plugin hooks are not active in this state test'),
+        async transformTailwindRoot() {
+            return assert.fail('Ordinary CSS must not invoke a Tailwind sidecar transform')
+        }
+    })
+    styleCapture.captureGraph((moduleId) => {
+        if (moduleId === appId) return createModuleInfo(appId, [appStyleId, moduleStyleId])
+        if (moduleId === appStyleId || moduleId === moduleStyleId) return createModuleInfo(moduleId, [])
+        return null
+    })
+    styleCapture.captureStyle(appStyleId, { css: '.app { color: red; }\n', isTailwindRoot: false })
+    styleCapture.captureStyle(moduleStyleId, { css: '._card_hash { display: block; }\n', isTailwindRoot: false })
+
+    try {
+        await styleCapture.reconcileComplete([
+            { type: 'asset', fileName: globalWxssFileName, source: '.app { color: red; }\n' }
+        ])
+        const wxss = await readFile(path.join(root, globalWxssFileName), 'utf8')
+        assert.match(wxss, /\.app \{ color: red; \}/)
+        assert.match(wxss, /\._card_hash \{ display: block; \}/)
+        assert.ok(wxss.indexOf('.app') < wxss.indexOf('._card_hash'))
     } finally {
         await rm(root, { recursive: true })
     }
