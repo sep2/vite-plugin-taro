@@ -17,7 +17,7 @@ const { class: className, src, ariaLabel, width, height, captionSrc, captionLang
 <vpt-lazy-video>
     <video
         class={className}
-        data-src={src}
+        src={src}
         aria-label={ariaLabel}
         width={width}
         height={height}
@@ -29,7 +29,7 @@ const { class: className, src, ariaLabel, width, height, captionSrc, captionLang
     >
         <track
             kind="captions"
-            data-src={captionSrc}
+            src={captionSrc}
             srclang={captionLanguage}
             label={captionLabel}
             default
@@ -45,7 +45,7 @@ const { class: className, src, ariaLabel, width, height, captionSrc, captionLang
         connectedCallback(): void {
             if (this.observer !== null) return
 
-            const video = this.querySelector<HTMLVideoElement>('video[data-src]')
+            const video = this.querySelector<HTMLVideoElement>('video')
             if (video === null) return
 
             this.observer = new IntersectionObserver(
@@ -55,16 +55,6 @@ const { class: className, src, ariaLabel, width, height, captionSrc, captionLang
                         return
                     }
 
-                    if (!video.hasAttribute('src')) {
-                        const source = video.dataset.src
-                        if (source === undefined) return
-
-                        const track = video.querySelector<HTMLTrackElement>('track[data-src]')
-                        if (track?.dataset.src !== undefined) {
-                            track.src = track.dataset.src
-                        }
-                        video.src = source
-                    }
                     void video.play().catch(() => undefined)
                 },
                 { rootMargin: '64px 0px', threshold: 0.01 }
@@ -79,9 +69,6 @@ const { class: className, src, ariaLabel, width, height, captionSrc, captionLang
             const video = this.querySelector<HTMLVideoElement>('video')
             if (video === null) return
             video.pause()
-            video.removeAttribute('src')
-            video.querySelector('track')?.removeAttribute('src')
-            video.load()
         }
     }
 
