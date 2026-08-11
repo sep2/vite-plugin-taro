@@ -43,7 +43,7 @@ test('captures final Vite CSS and the live graph through its merged plugin', asy
     })
 })
 
-test('encapsulates graph, transformed CSS, and the durable WXSS frontier', async () => {
+test('binds complete output bytes and preserves the frontier when later output omits WXSS', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'vpt-style-capture-'))
     const appId = '/project/app.js'
     const styleId = '/project/app.css'
@@ -80,7 +80,11 @@ test('encapsulates graph, transformed CSS, and the durable WXSS frontier', async
         const blueWxss = '.app { color: blue; }\n'
         assert.equal(await readFile(globalWxssPath, 'utf8'), blueWxss)
 
-        styleCapture.bindPublishedWxss(blueWxss)
+        styleCapture.bindOutput([
+            { type: 'asset', fileName: globalWxssFileName, source: new TextEncoder().encode(blueWxss) }
+        ])
+        // A later complete output can omit unchanged WXSS; binding that output must retain the existing byte frontier.
+        styleCapture.bindOutput([{ type: 'chunk', fileName: 'app.js' }])
         const reboundInode = (await stat(globalWxssPath)).ino
         await styleCapture.publishChanged([styleId])
         assert.equal((await stat(globalWxssPath)).ino, reboundInode)

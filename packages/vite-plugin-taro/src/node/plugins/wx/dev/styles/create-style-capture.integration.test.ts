@@ -98,6 +98,9 @@ test('publishes processed CSS and live topology without identical rewrites', asy
                 })
         },
         onOutput(result) {
+            if (!(result instanceof Error)) {
+                styleCapture.bindOutput(result.output)
+            }
             outputResults.push(result)
         }
     })
@@ -222,16 +225,10 @@ test('publishes Tailwind candidate additions and removals before completing each
                 .catch((error: unknown) => hmrResults.push(error))
         },
         onOutput(result) {
-            if (result instanceof Error) {
-                outputResults.push(result)
-                return
+            if (!(result instanceof Error)) {
+                styleCapture.bindOutput(result.output)
             }
-            void readFile(path.join(outDir, 'assets/global.wxss'), 'utf8')
-                .then((wxss) => {
-                    styleCapture.bindPublishedWxss(wxss)
-                    outputResults.push(wxss)
-                })
-                .catch((error: unknown) => outputResults.push(error))
+            outputResults.push(result)
         }
     })
 
@@ -239,7 +236,7 @@ test('publishes Tailwind candidate additions and removals before completing each
         await engine.run()
         await engine.ensureCurrentBuildFinish()
         await waitForEventCount(outputResults, 1)
-        assert.match(String(outputResults[0]), /\.mt-2\b/)
+        assert.match(await readFile(path.join(outDir, 'assets/global.wxss'), 'utf8'), /\.mt-2\b/)
         await engine.registerClient('tailwind-style-hmr-test')
 
         await writeFile(appId, renderTailwindApplication('mt-2 p-4'))

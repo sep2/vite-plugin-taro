@@ -43,6 +43,8 @@ export async function createNativeComponentOutput({
                 })
 
                 for (const asset of source.assets) {
+                    // Native folders are intentionally opaque to Rolldown, so no bundle asset contains these bytes to reuse.
+                    // Read each planned source once here to transfer it into the compiler-owned output bundle.
                     files.push({
                         type: 'asset',
                         fileName: path.posix.join(outputFolder, asset.relativePath),

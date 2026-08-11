@@ -9,7 +9,6 @@ import type { VitePluginTaroOptions } from '../../../../options.ts'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
 import {
     developmentAppWxssFileName,
-    globalWxssFileName,
     type HmrInfo,
     hmrControlPath,
     hmrInfoFileName,
@@ -77,8 +76,11 @@ export async function createWxDevHost({
         outDir: server.config.build.outDir,
         // Capture hooks run only after engine.run, when the host action subscription and all reducer dependencies are ready.
         emit: (action) => hostActions.next(action),
-        transformTailwindRoot: async (rootId, requestId) =>
-            server.environments.client.pluginContainer.transform(await readFile(rootId, 'utf8'), requestId)
+        transformTailwindRoot: async (rootId, requestId) => {
+            // The capture contains generated CSS, while the sidecar must re-run from raw Tailwind directives. Vite exposes no
+            // raw source in its live module graph, so this read is the authoritative source generation rather than a read-back.
+            return server.environments.client.pluginContainer.transform(await readFile(rootId, 'utf8'), requestId)
+        }
     })
     const publisher = new PatchPublisher((content) =>
         writeHmrFile(server.config.build.outDir, hmrPatchesFileName, content)
@@ -219,7 +221,9 @@ export async function createWxDevHost({
                     logWxError(server.config.logger, 'wx dev build failed', action.result)
                     return
                 }
-                return finalizeDevOutput()
+                // Bind finalized output bytes when present; omitted unchanged WXSS intentionally preserves the prior frontier.
+                styleCapture.bindOutput(action.result.output)
+                return rotateBuildSession()
             case 'listening':
                 return rotateBuildSession()
         }
@@ -323,17 +327,6 @@ export async function createWxDevHost({
         for (const patch of batch) {
             await engine.notifyPayloadDelivered(patch.filename)
         }
-    }
-
-    /** Rebinds the byte frontier after a complete build replaces or preserves the physical stylesheet. */
-    async function finalizeDevOutput(): Promise<void> {
-        // The style finalizer emits changed CSS but intentionally omits unchanged CSS after its first output. In both cases the
-        // physical file is authoritative, so seeding its bytes is enough; no graph walk, Tailwind transform, or rewrite belongs
-        // on the complete-build path.
-        styleCapture.bindPublishedWxss(
-            await readFile(path.join(server.config.build.outDir, globalWxssFileName), 'utf8')
-        )
-        await rotateBuildSession()
     }
 }
 
