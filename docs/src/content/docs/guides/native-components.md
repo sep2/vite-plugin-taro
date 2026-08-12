@@ -240,7 +240,7 @@ export default function Counter(props: { count: number }) {
 }
 ```
 
-条件语法详见[配置选项中的条件编译](/references/configuration/#条件编译)。
+条件语法详见[配置选项中的条件编译](/guides/configuration/#条件编译)。
 
 ## 第三方组件
 

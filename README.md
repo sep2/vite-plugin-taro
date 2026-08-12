@@ -37,7 +37,7 @@ npm create vite-taro@latest my-app
 - [开发者工具热更新](https://vpt.js.org/guides/hot-module-replacement/)
 - [Skyline 模式](https://vpt.js.org/guides/skyline-mode/)
 - [从 Taro CLI 迁移](https://vpt.js.org/guides/migrate-from-taro/)
-- [配置参考](https://vpt.js.org/references/configuration/)
+- [配置参考](https://vpt.js.org/guides/configuration/)
 - [仓库维护](https://vpt.js.org/references/repository-management/)
 
 ## 许可证

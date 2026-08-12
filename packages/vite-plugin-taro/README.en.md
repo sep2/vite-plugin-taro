@@ -36,7 +36,7 @@ Continue with the [Quick Start guide](https://vpt.js.org/guides/quick-start/).
 - [Hot module replacement](https://vpt.js.org/guides/hot-module-replacement/)
 - [Skyline mode](https://vpt.js.org/guides/skyline-mode/)
 - [Migrate from Taro CLI](https://vpt.js.org/guides/migrate-from-taro/)
-- [Configuration reference](https://vpt.js.org/references/configuration/)
+- [Configuration reference](https://vpt.js.org/guides/configuration/)
 - [Repository management](https://vpt.js.org/references/repository-management/)
 
 ## License

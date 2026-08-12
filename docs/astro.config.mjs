@@ -34,6 +34,7 @@ export default defineConfig({
                     items: [
                         { label: '快速开始', slug: 'guides/quick-start' },
                         { label: '样式', slug: 'guides/styles' },
+                        { label: '配置选项', slug: 'guides/configuration' },
                         { label: '全自动分包', slug: 'guides/automatic-subpackages' },
                         { label: '微信原生组件', slug: 'guides/native-components' },
                         { label: '开发者工具热更新', slug: 'guides/hot-module-replacement' },
@@ -46,7 +47,6 @@ export default defineConfig({
                     items: [
                         { label: '模块系统', slug: 'references/module-system' },
                         { label: '热更新原理', slug: 'references/hmr-implementation' },
-                        { label: '配置选项', slug: 'references/configuration' },
                         { label: '仓库维护', slug: 'references/repository-management' }
                     ]
                 }
