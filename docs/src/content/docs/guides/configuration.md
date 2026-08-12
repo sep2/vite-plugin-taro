@@ -258,10 +258,6 @@ import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import vpt from 'vite-plugin-taro'
 
-function readJson(relativePath: string): Record<string, unknown> {
-    return JSON.parse(readFileSync(new URL(relativePath, import.meta.url), 'utf8'))
-}
-
 export default defineConfig({
     build: {
         outDir: 'dist/wx'
@@ -283,6 +279,10 @@ export default defineConfig({
         })
     ]
 })
+
+function readJson(relativePath: string): Record<string, unknown> {
+    return JSON.parse(readFileSync(new URL(relativePath, import.meta.url), 'utf8'))
+}
 ```
 
 这些文件只是配置的存储方式，生成规则不变。例如，`config/app.json` 中的 `pages` 和分包声明仍会由 vpt 的构建结果替换。

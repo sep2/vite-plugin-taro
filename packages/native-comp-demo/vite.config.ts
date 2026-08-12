@@ -3,12 +3,6 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import vpt from 'vite-plugin-taro'
 
-const projectRoot = fileURLToPath(new URL('.', import.meta.url))
-
-function fromRoot(...segments: string[]): string {
-    return path.resolve(projectRoot, ...segments)
-}
-
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), 'VITE_VPT_')
     const wechatAppId = env.VITE_VPT_WECHAT_APP_ID || 'touristappid'
@@ -72,3 +66,9 @@ export default defineConfig(({ mode }) => {
         ]
     }
 })
+
+const projectRoot = fileURLToPath(new URL('.', import.meta.url))
+
+function fromRoot(...segments: string[]): string {
+    return path.resolve(projectRoot, ...segments)
+}

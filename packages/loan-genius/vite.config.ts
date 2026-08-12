@@ -3,19 +3,6 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import vpt, { type VptTarget } from 'vite-plugin-taro'
 
-const targetEnvName = 'VITE_VPT_TARGET'
-const projectRoot = fileURLToPath(new URL('.', import.meta.url))
-
-function getTarget(env: Record<string, string>): VptTarget {
-    const target = env[targetEnvName]
-    if (target === 'wx' || target === 'h5') return target
-    throw new Error(`${targetEnvName} must be "wx" or "h5".`)
-}
-
-function fromRoot(...segments: string[]): string {
-    return path.resolve(projectRoot, ...segments)
-}
-
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), 'VITE_VPT_')
     const target = getTarget(env)
@@ -101,3 +88,16 @@ export default defineConfig(({ mode }) => {
         ]
     }
 })
+
+const targetEnvName = 'VITE_VPT_TARGET'
+const projectRoot = fileURLToPath(new URL('.', import.meta.url))
+
+function getTarget(env: Record<string, string>): VptTarget {
+    const target = env[targetEnvName]
+    if (target === 'wx' || target === 'h5') return target
+    throw new Error(`${targetEnvName} must be "wx" or "h5".`)
+}
+
+function fromRoot(...segments: string[]): string {
+    return path.resolve(projectRoot, ...segments)
+}
