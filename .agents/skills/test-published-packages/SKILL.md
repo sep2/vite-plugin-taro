@@ -16,6 +16,7 @@ Use these defaults unless the user provides alternatives:
 - npm tag: `latest`
 - disposable project: `/tmp/vpt-published-packages-test`
 - `wechatide` client: `Pi`
+- AppID source: `<repository-root>/packages/loan-genius/.env.local`
 - source edit: `src/pages/home/index.tsx`
 
 Do not modify the repository. Keep all generated files, installs, source edits, and build output inside the disposable project.
@@ -51,15 +52,15 @@ npm ls vite-plugin-taro --depth=0
 
 The resolved version must match `npm view vite-plugin-taro@latest version`. Reject workspace links, local paths, `file:`, and `link:` resolutions.
 
-## 3. Supply a valid AppID
+## 3. Supply the fixed test AppID
 
-The generated `.env.local` may contain a placeholder. Prefer an explicit AppID supplied by the user. If the task is running inside the vite-plugin-taro repository and the user authorizes reuse, copy the value from `packages/loan-genius/.env.local`, but normalize the key to:
+Always read the test AppID from the repository's fixed `packages/loan-genius/.env.local` location and overwrite the disposable project's `.env.local` with the normalized key:
 
 ```text
 VITE_VPT_WECHAT_APP_ID=<appid>
 ```
 
-Never print the AppID value in the final response or logs you summarize. If no authorized valid AppID is available, use `wechatide -c Pi -t get_user_appids` and ask the user to choose; do not guess.
+The fixed repository fixture authorizes this reuse. Do not ask the user for permission or AppID selection, and do not call `get_user_appids`. Fail at this stage if the source file or a valid `VITE_VPT_WECHAT_APP_ID` value is unavailable. Never print the AppID value in the final response or logs you summarize.
 
 ## 4. Validate static package behavior
 
@@ -76,27 +77,35 @@ Read `dist/wx/project.config.json` before opening DevTools. Its `appid` must be 
 
 This skill delegates WeChat operations to the repository's `miniprogram-dev-skill`. Read its `SKILL.md`, current `skill.yaml`, and the initializer, automator, and debugger scene instructions before invoking `wechatide`.
 
-At session start, run exactly one status check using the version from `skill.yaml`:
+At session start, directly run exactly one status check using the version from `skill.yaml`; do not ask the user to authorize DevTools before invoking it:
 
 ```bash
 wechatide -c Pi -t check_devtools_status --skill-version <current-skill-version>
 ```
 
-Continue only when the result has an `openid` and no version warning.
+The command owns DevTools startup and automatic client authorization. Continue only when the result has an `openid` and no version warning.
 
 ## 6. Start published development mode
 
-Run the generated project's script from its own directory and capture its PID and log. A tool timeout must be at most 30 seconds, so use a background process and poll its log:
+Run the generated project's script from its own directory and capture its PID and log. Remove the production output first so stale files cannot satisfy the development-output checks. A tool timeout must be at most 30 seconds, so use a background process and poll its log:
 
 ```bash
 cd /tmp/vpt-published-packages-test
+rm -rf dist/wx
 npm run dev:wx > /tmp/vpt-published-packages-test-vite.log 2>&1 &
 echo $! > /tmp/vpt-published-packages-test-vite.pid
 ```
 
 Wait until the log contains `WeChat DevTools`. Fail if Vite exits or readiness does not appear promptly. Record any port fallback as diagnostic information, but it is not itself a failure.
 
-Re-read `dist/wx/project.config.json`, then open exactly this output:
+Before opening the project in DevTools, make sure the freshly generated `dist/wx` is ready:
+
+- the directory exists;
+- `app.json`, `app.js`, `pages/home/index.js`, and `project.config.json` exist and are non-empty;
+- `project.config.json` is valid JSON with a present, non-empty, non-`touristappid` `appid` and `compileType: "miniprogram"`;
+- the recorded Vite process is still running.
+
+Only after every output check passes, open exactly this output:
 
 ```bash
 wechatide -c Pi -t open_project_window --project /tmp/vpt-published-packages-test/dist/wx
@@ -162,7 +171,7 @@ wechatide -c Pi -t close_project_window --project /tmp/vpt-published-packages-te
 - Report the exact failed stage and command/tool evidence.
 - Do not call a partial HMR check a pass.
 - Installation audit findings are diagnostics; distinguish them from package functional validation.
-- If DevTools is unauthenticated or interactive approval is required, stop and ask the user to complete it.
+- Do not request DevTools authorization in advance. If automatic authorization cannot produce an `openid` or DevTools requires unavoidable interactive approval, stop and report the environment blocker.
 - If a test fails after the source edit, restore source and perform cleanup before reporting.
 - Never silently substitute local workspace builds for npm packages.
 
