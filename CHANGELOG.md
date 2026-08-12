@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.6.1] - 2026-08-12
+
+### Added
+
+- plan wx subpackages from final chunks (2bc9d95)
+
+### Changed
+
+- refine configuration and module references (973b724)
+- simplify hot reload guide (1a67d20)
+- fix text (5bd8e52)
+- rewrite configuration guide (ca7896d)
+- relocate guide configuration (7bd9111)
+- rewrite HMR implementation reference (61d8264)
+- docs (f8dd735)
+- rewrite module system reference (e330bc2)
+- host HMR demo video locally (5c15a1c)
+- unify wx placement construction (20da09a)
+- add published package validation workflow (57fb457)
+
 ## [0.6.0] - 2026-08-12
 
 ### Added
