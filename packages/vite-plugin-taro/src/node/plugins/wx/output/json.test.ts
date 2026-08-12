@@ -115,11 +115,12 @@ test('adds generated code-only subpackages to app.json', () => {
     ])
 })
 
-test('omits project.private.config.json when it is not configured', () => {
+test('omits optional project JSON assets when they are not configured', () => {
     const assets = createJsonAssets({
         options: {
             ...options,
-            projectPrivateConfigJson: undefined
+            projectPrivateConfigJson: undefined,
+            sitemapJson: undefined
         },
         subpackages: [],
         nativeComponents: []
@@ -127,6 +128,10 @@ test('omits project.private.config.json when it is not configured', () => {
 
     assert.equal(
         assets.some((asset) => asset.fileName === 'project.private.config.json'),
+        false
+    )
+    assert.equal(
+        assets.some((asset) => asset.fileName === 'sitemap.json'),
         false
     )
 })

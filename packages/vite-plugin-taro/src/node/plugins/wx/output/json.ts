@@ -29,7 +29,7 @@ export function createJsonAssets({
             ? [createJsonAsset('project.private.config.json', options.projectPrivateConfigJson)]
             : []),
 
-        createJsonAsset('sitemap.json', options.sitemapJson)
+        ...(options.sitemapJson ? [createJsonAsset('sitemap.json', options.sitemapJson)] : [])
     ]
 }
 

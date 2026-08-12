@@ -66,7 +66,7 @@ interface VitePluginTaroOptions {
     appJson: Record<string, unknown>
     projectConfigJson: Record<string, unknown>
     projectPrivateConfigJson?: Record<string, unknown>
-    sitemapJson: Record<string, unknown>
+    sitemapJson?: Record<string, unknown>
 }
 ```
 
@@ -82,7 +82,7 @@ interface VitePluginTaroOptions {
 | `appJson` | 微信应用配置。vpt 会根据 `pages` 生成并覆盖 `pages`，并自行管理分包声明。                                  |
 | `projectConfigJson` | 微信构建时原样输出为 `project.config.json`。接口要求始终提供，Web 构建不会写出该文件。                     |
 | `projectPrivateConfigJson` | 可选的微信私有项目配置；提供时原样输出为 `project.private.config.json`。                                   |
-| `sitemapJson` | 微信构建时原样输出为 `sitemap.json`。接口要求始终提供，Web 构建不会写出该文件。                            |
+| `sitemapJson` | 可选的微信小程序索引规则；提供时原样输出为 `sitemap.json`，Web 构建不会写出该文件。                         |
 
 ## 入口与页面约定
 
