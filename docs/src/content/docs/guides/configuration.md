@@ -104,11 +104,7 @@ path: 'pages/profile/index'
 
 微信构建将它写入对应的页面 JSON，H5 构建将它用于对应路由。
 
-如果填写 `usingComponents`，vpt 会保留其中的自定义注册，并补充 Taro 和 `virtual:taro/native` 所需的组件注册。不要手写这些生成项。
-
-:::note
-`pages` 声明的都是微信主包页面。vpt 的自动分包处理动态导入的代码和相关资源，不处理微信原生页面分包。参见[全自动分包](/guides/automatic-subpackages/)。
-:::
+`usingComponents` 由 vpt 自动管理，无需填写。接入方式参见[微信原生组件](/guides/native-components/)。
 
 ## `appJson`
 
