@@ -1,17 +1,15 @@
 ---
 title: 开发者工具热更新
-description: 更新代码后，在微信开发者工具中保留应用、页面和组件状态。
+description: 在微信开发者工具中更新代码和样式，并保留应用状态。
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components'
 
-vpt 为微信小程序提供开发热更新。
+`create-vite-taro` 模板已经启用微信热更新，无需额外配置。
 
-无论是代码还是样式，修改后立即可见，并且不会丢失页面状态。
+## 使用
 
-## 默认无需配置
-
-`create-vite-taro` 模板已经启用热更新，可以直接启动微信开发模式：
+启动微信开发模式：
 
 <Tabs syncKey="package-manager">
     <TabItem label="npm">
@@ -37,9 +35,26 @@ bun run dev:wx
     </TabItem>
 </Tabs>
 
-等待初始构建完成，然后在微信开发者工具中打开终端提示的 `dist/wx`。开发期间需要保持 Vite 进程运行。
+等待构建完成，在微信开发者工具中打开 `dist/wx`。
 
-从其他项目迁移时，请确认微信项目配置包含：
+保存 JavaScript、TypeScript、React 组件或样式后，开发者工具会自动显示更新。
+
+## 保留的状态
+
+普通热更新会保留：
+
+- App 和 `globalData`；
+- 当前页面及其参数；
+- 兼容更新下的 React Hook 状态；
+- 页面中的输入内容。
+
+热更新产生的页面替换不会重复调用业务 `onUnload`、`onLoad` 和 `onShow`。正常跳转、返回和重新进入页面时，生命周期仍照常执行。
+
+改变 Hook 顺序、组件类型或导出结构时，React 可能重新挂载对应组件并重置它的局部状态。
+
+## 以下微信配置会影响热更新
+
+`create-vite-taro` 模板已经包含以下设置：
 
 ```ts
 projectConfigJson: {
@@ -56,79 +71,31 @@ projectPrivateConfigJson: {
 }
 ```
 
-- `compileHotReLoad` 启用开发者工具的页面 JavaScript 热重载。
-- `urlCheck: false` 允许小程序访问本机 Vite 服务的状态接口。
-- 开发者工具自身的 Skyline 调试暂不支持热更新，因此日常开发时保持 `skylineRenderEnable: false`。
+`compileHotReLoad: true` 开启开发者工具的热重载。补丁文件变化后，开发者工具只重新加载受影响的页面，不重启整个小程序；vpt 依靠这个行为保留 App 和 React 状态。
 
-## 更新时保留的状态
+`urlCheck: false` 关闭开发者工具的服务器域名校验，让小程序可以向本机 Vite 服务报告热更新结果。它只影响开发者工具中的调试请求，不会放宽正式版小程序的服务器域名限制。
 
-| 状态 | 行为 |
-| --- | --- |
-| App 与 `globalData` | App 不重启，现有数据继续保留。 |
-| React 函数组件 | React Refresh 边界兼容时保留 Hook 状态。 |
-| 当前页面 | 保留页面路径、参数和现有 React 树。 |
-| 原生输入 | 页面树保留时，输入内容继续存在。 |
-| 页面生命周期 | 更新产生的 `onUnload`、`onLoad` 和 `onShow` 不会重复调用业务处理函数。 |
-| 正常页面导航 | 返回、跳转、关闭和重新进入仍执行正常 Taro 生命周期。 |
+据[微信官方说明](https://developers.weixin.qq.com/miniprogram/dev/framework/runtime/skyline/migration/compatibility.html#常见的兼容问题)，开发者工具的 Skyline 调试模式暂不支持热更新。日常开发时保持 `skylineRenderEnable: false`；检查 Skyline 效果时再临时开启。参见[Skyline 模式](/guides/skyline-mode/)。
 
-修改 JSX 结构、文案或事件实现通常会保留组件状态。改变 Hook 顺序、组件类型或导出结构时，React Refresh 可能重新挂载对应组件。
+## 状态何时会重置
 
-## JavaScript 更新与完整构建
+以下情况会重新启动应用：
 
-一次成功的 JavaScript HMR 只会改写：
+- 点击开发者工具的“编译”；
+- 重启 `dev:wx` 或修改 Vite 配置；
+- 某次代码变化无法安全热更新，vpt 自动执行完整构建。
 
-```text
-dist/wx/hmr/patches.js
-```
+完整构建是热更新无法继续时的正常恢复方式，终端会显示相应提示。
 
-普通应用文件保持不变，所以微信开发者工具不会重启 App。可执行更新不会通过 HTTP 传输；本机 Vite 接口只接收构建标识、补丁序号和完整构建请求。
+## 保存后没有更新
 
-以下变化会执行完整构建并重置应用状态：
+依次检查：
 
-- Rolldown 无法生成安全的模块补丁。
-- 已执行模块找不到 HMR 接受边界。
-- 模块传播遇到循环路径。
-- 补丁缺失、执行失败或被 React Refresh 判定失效。
-- WXML、JSON、项目配置或其他原生输出需要重新生成。
+1. `dev:wx` 仍在运行且终端没有构建错误；
+2. 开发者工具打开的是当前项目的 `dist/wx`；
+3. `compileHotReLoad` 已开启，`urlCheck` 已关闭；
+4. `skylineRenderEnable` 未开启。
 
-## 重启行为
+仍然无效时，关闭开发者工具和开发命令，删除 `dist/wx`，重新运行 `dev:wx` 后再打开生成目录。
 
-| 操作 | 行为 |
-| --- | --- |
-| 修改项目代码 | 应用补丁并保留页面与 React 状态。 |
-| 点击开发者工具“编译” | 重新创建小程序运行环境，所有运行时状态重置。 |
-| 关闭并重新打开开发者工具 | 冷启动 `dist/wx`；Vite 服务可以继续运行。 |
-| 重启 `dev:wx` | 重新生成完整输出和构建标识；开发者工具无需重新导入项目。 |
-| 修改配置导致 Vite 重启 | 与重启 `dev:wx` 相同。 |
-
-## 排查问题
-
-### 保存后没有更新
-
-确认：
-
-1. 当前运行的是 `dev:wx`。
-2. 微信开发者工具打开的是当前项目的 `dist/wx`。
-3. `compileHotReLoad` 已开启，`urlCheck` 已关闭。
-4. Vite 进程没有构建错误。
-5. 开发者工具没有开启 Skyline 渲染调试。
-6. 如果以上都没有，请关闭微信开发者工具，关闭 dev 服务器，手动删除 `dist/wx`，再重新运行。
-
-### App 状态被重置
-
-终端出现完整构建提示时，App 状态会重置。常见原因包括配置变化、模块边界失效和补丁执行失败。
-
-### React 组件状态被重置
-
-检查 Hook 顺序、组件类型和导出结构是否变化。React Refresh 只有在边界兼容时才保留组件状态。
-
-### 本机状态请求失败
-
-确认 `urlCheck` 为 `false`，并检查代理或防火墙是否阻止微信开发者工具访问 Vite 打印的本机地址。
-
-## 样式热更新
-
-已支持。
-
-## 原理和实现
-需要了解物理文件边界、模块传播、React Refresh 适配和 Taro 页面重新绑定时，请阅读 [HMR 实现原理](/references/hmr-implementation/)。
+实现细节参见[热更新实现原理](/references/hmr-implementation/)。
