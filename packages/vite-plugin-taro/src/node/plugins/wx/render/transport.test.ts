@@ -32,12 +32,14 @@ async function materializeTestTransport({
     code,
     fileName,
     capsuleChunkIds,
-    nativeRuntimeChunkId
+    nativeRuntimeChunkId,
+    physicalChunkIds
 }: {
     code: string
     fileName: string
     capsuleChunkIds: readonly string[]
     nativeRuntimeChunkId?: string
+    physicalChunkIds?: Readonly<Record<string, string>>
 }): Promise<string> {
     const transportChunk = {
         fileName,
@@ -79,7 +81,8 @@ async function materializeTestTransport({
         code,
         transportChunk,
         chunks,
-        getLoadMode: (chunk) => (chunk.fileName.startsWith('sub/') ? 'async' : 'sync')
+        getLoadMode: (chunk) => (physicalChunkIds?.[chunk.fileName]?.startsWith('sub/') ? 'async' : 'sync'),
+        getPhysicalChunkId: (chunk) => physicalChunkIds?.[chunk.fileName] ?? chunk.fileName
     })
     return materialized.code
 }
@@ -137,9 +140,9 @@ test('materializes capsule switch cases with literal physical paths', async () =
     const evaluated = evaluateTransport(source, () => capsule)
     const transport = evaluated.runtime.transport
 
-    assert.strictEqual(transport('assets/chunks/lazy-b.js'), capsule)
+    assert.strictEqual(transport('chunks/lazy-b.js'), capsule)
     assert.deepEqual(evaluated.requiredPaths, ['./assets/chunks/lazy-b.js'])
-    assert.throws(() => transport('assets/missing.js'), /Unknown System module: assets\/missing\.js/)
+    assert.throws(() => transport('missing.js'), /Unknown System module: missing\.js/)
 
     const requireArguments = [...source.matchAll(/\brequire\(([^)]+)\)/g)].map((match) => JSON.parse(match[1]))
     assert.deepEqual(requireArguments, [
@@ -166,8 +169,8 @@ test('bridges amphibious bootstrap and Rolldown runtime namespaces lazily', asyn
     const transport = evaluated.runtime.transport
 
     // Neither creating nor selecting transport may recursively require bootstrap while bootstrap imports transport.
-    const bootstrapRegistration = transport('assets/bootstrap.js')
-    const runtimeRegistration = transport(runtimeChunkId)
+    const bootstrapRegistration = transport('bootstrap.js')
+    const runtimeRegistration = transport('rolldown-runtime-a.js')
     assert.deepEqual(evaluated.requiredPaths, [])
 
     const publishedBootstrap = executeAmphibiousRegistration(bootstrapRegistration)
@@ -183,13 +186,16 @@ test('waits for mocked require.async before resolving a subpackage capsule', asy
     const source = await materializeTestTransport({
         code: transportCode,
         fileName: 'transport.js',
-        capsuleChunkIds: ['sub/p_account/page.js']
+        capsuleChunkIds: ['assets/page.js'],
+        physicalChunkIds: {
+            'assets/page.js': 'sub/p_account/assets/page.js'
+        }
     })
     const capsule = {}
     const deferredLoad = Promise.withResolvers<unknown>()
     const evaluated = evaluateTransport(source, () => deferredLoad.promise)
 
-    const loading = Promise.resolve(evaluated.runtime.transport('sub/p_account/page.js'))
+    const loading = Promise.resolve(evaluated.runtime.transport('page.js'))
     // Mutable observation proves the transport promise cannot settle before mocked native download completion.
     let settled = false
     void loading.then(() => {
@@ -199,11 +205,11 @@ test('waits for mocked require.async before resolving a subpackage capsule', asy
 
     assert.equal(settled, false)
     assert.deepEqual(evaluated.synchronouslyRequiredPaths, [])
-    assert.deepEqual(evaluated.asynchronouslyRequiredPaths, ['./sub/p_account/page.js'])
+    assert.deepEqual(evaluated.asynchronouslyRequiredPaths, ['./sub/p_account/assets/page.js'])
     deferredLoad.resolve(capsule)
     assert.strictEqual(await loading, capsule)
     assert.equal(settled, true)
-    assert.match(source, /require\.async\(['"]\.\/sub\/p_account\/page\.js['"]\)/)
+    assert.match(source, /require\.async\(['"]\.\/sub\/p_account\/assets\/page\.js['"]\)/)
 })
 
 test('rejects an amphibious module outside the main package', async () => {
@@ -212,7 +218,10 @@ test('rejects an amphibious module outside the main package', async () => {
             code: transportCode,
             fileName: 'transport.js',
             capsuleChunkIds: [],
-            nativeRuntimeChunkId: 'sub/p_runtime/runtime.js'
+            nativeRuntimeChunkId: 'assets/runtime.js',
+            physicalChunkIds: {
+                'assets/runtime.js': 'sub/p_runtime/assets/runtime.js'
+            }
         }),
         /Amphibious wx module must be in the main package/
     )

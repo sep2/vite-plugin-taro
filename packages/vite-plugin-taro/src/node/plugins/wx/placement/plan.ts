@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { Rolldown } from 'vite'
 
-// Leave headroom below WeChat's 2M subpackage limit for capsule wrappers and bundler-generated code.
+// Leave headroom below WeChat's 2M subpackage limit for rendered wrappers and native assets.
 const subpackagePlanningBudget = 1_900_000
 const generatedSubpackageRootPrefix = 'sub/p_'
 
@@ -13,285 +13,281 @@ export type SubpackageLocation = {
     root: string
 }
 
-/** Physical package ownership for one transformed module. */
+/** Physical package ownership for one final Rolldown chunk. */
 export type PackageLocation = { kind: 'main' } | SubpackageLocation
 
-/** Immutable module-to-package ownership produced before Rolldown creates chunks. */
+/** Immutable preliminary-chunk-to-package ownership. */
 export type PlacementPlan = ReadonlyMap<string, PackageLocation>
 
-/** Minimal Rolldown graph interface consumed by the subpackage planner. */
-export type ModuleGraph = {
-    /** Every transformed module known after graph construction. */
-    moduleIds: Iterable<string>
-    /** Reads static edges, dynamic edges, transformed code, and entry ownership. */
-    getModuleInfo(moduleId: string): Rolldown.ModuleInfo | null
-    /** Adds non-JavaScript output owned by a transformed module to its package weight. */
-    getAdditionalModuleBytes?: (info: Rolldown.ModuleInfo) => number
-}
-
-/** One independently placeable lazy module together with size and co-location preferences. */
-type PlaceableModule = {
-    /** Stable module identity and final ownership key. */
-    moduleId: string
-    /** UTF-8 size of transformed source used as the bin-packing estimate. */
-    estimatedBytes: number
-    /** Dynamic roots whose static closures contain this module. */
-    consumers: ReadonlySet<string>
-    /** Lazy modules connected by a direct static import in either direction. */
-    neighbors: ReadonlySet<string>
-}
-
-/** Mutable subpackage candidate used only while best-fit packing is in progress. */
-type SubpackageBin = {
-    /** Modules currently assigned to this candidate. */
-    moduleIds: string[]
-    /** Accumulated transformed-source estimate. */
-    estimatedBytes: number
-    /** Dynamic roots represented by at least one assigned module. */
-    consumers: Set<string>
-}
-
-/** Final membership and stable physical location for one generated subpackage. */
-type PackedSubpackage = SubpackageLocation & {
-    /** Sorted membership used both for stable hashing and ownership assignment. */
-    moduleIds: readonly string[]
-}
-
-/** Shared main-package value used for every eager or output-generated module. */
+/** Shared main-package value used for every synchronously reachable chunk. */
 export const mainPackage = { kind: 'main' } as const
 
+type PlaceableChunk = {
+    chunkId: string
+    estimatedBytes: number
+    transitions: ReadonlySet<number>
+}
+
+type ChunkBin = {
+    chunkIds: string[]
+    estimatedBytes: number
+    transitions: Set<number>
+}
+
+type BinCandidate = {
+    bin: ChunkBin
+    overlap: number
+    remainingBytes: number
+}
+
+type PackedSubpackage = SubpackageLocation & {
+    chunkIds: readonly string[]
+}
+
 /**
- * Creates one deterministic subpackage placement plan:
+ * Applies Load-Transition Hypergraph Partitioning to Rolldown's final logical chunks:
  *
- * 1. Snapshot Rolldown's transformed module graph.
- * 2. Reserve every explicit shell and capsule entry together with its static closure in main.
- * 3. Treat dynamic imports as asynchronous roots, then annotate their modules with affinity.
- * 4. Pack those lazy modules independently under the planning budget.
- * 5. Return only module ownership; chunks and native manifests are reconciled later.
+ * 1. Sort logical chunk IDs to remove callback and object-enumeration order from every later decision.
+ * 2. Reserve every explicit entry and its complete static closure in main because native startup must load it synchronously.
+ * 3. Treat each dynamic-import edge as one load transition; the target's static closure is that transition's hyperedge.
+ *    Nested dynamic edges remain separate transitions rather than being folded into the parent closure.
+ * 4. Index every lazy chunk by all transitions requiring it. Shared chunks therefore carry global demand rather than being
+ *    assigned according to the first source module or dynamic root that happens to visit them.
+ * 5. Order chunks by transition demand, estimated emitted bytes, then logical ID. Place each chunk once into the fitting bin
+ *    with maximum transition overlap, using best-fit remaining capacity only as a tie-breaker.
+ * 6. Hash each bin's sorted logical chunk IDs into a deterministic physical package root and return unique ownership.
  *
- * Static cycles are deliberately not atomic only after a genuine nested dynamic boundary. System.import() may obtain their
- * registrations from several packages and await top-level execution while preserving the original static ESM graph.
+ * Analysis costs the sum of transition static-closure traversals. Packing scans fitting bins and intersects sparse
+ * transition sets; its worst case is O(CBT), while practical graphs have few bins and sparse transition membership.
  */
-export function createPlacementPlan({
-    moduleIds,
-    getModuleInfo,
-    getAdditionalModuleBytes,
+function createPlacementPlan({
+    chunks,
+    getAdditionalChunkBytes,
     planningBudgetBytes = subpackagePlanningBudget
-}: ModuleGraph & { planningBudgetBytes?: number }): PlacementPlan {
-    // Materialize the iterable once because every later phase needs stable random access by module ID.
-    const infos = new Map<string, Rolldown.ModuleInfo>()
-    for (const moduleId of moduleIds) {
-        const info = getModuleInfo(moduleId)
-        if (info) {
-            infos.set(moduleId, info)
-        }
-    }
-
-    // Eager ownership is a hard constraint; consumer and neighbor sets below are soft packing preferences only.
-    const eagerModules = findEagerModules(infos)
-    const consumersByModule = findLazyConsumers({ infos, eagerModules })
-    const neighborsByModule = findLazyNeighbors({ infos, eagerModules })
-    const placeableModules = [...infos.entries()]
-        .filter(([moduleId]) => !eagerModules.has(moduleId))
-        .map(([moduleId, info]) => ({
-            moduleId,
-            estimatedBytes: Buffer.byteLength(info.code ?? '', 'utf8') + (getAdditionalModuleBytes?.(info) ?? 0),
-            consumers: consumersByModule.get(moduleId) ?? new Set([moduleId]),
-            neighbors: neighborsByModule.get(moduleId) ?? new Set<string>()
+}: {
+    chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
+    getAdditionalChunkBytes(chunk: Rolldown.RenderedChunk): number
+    planningBudgetBytes?: number
+}): PlacementPlan {
+    const chunkById = new Map(Object.entries(chunks).sort(([left], [right]) => left.localeCompare(right)))
+    const mainChunkIds = findMainChunkIds(chunkById)
+    const transitionsByChunk = collectTransitionsByChunk({ chunks: chunkById, mainChunkIds: mainChunkIds })
+    const placeableChunks = [...chunkById]
+        .filter(([chunkId]) => !mainChunkIds.has(chunkId))
+        .map(([chunkId, chunk]) => ({
+            chunkId: chunkId,
+            estimatedBytes: estimateChunkBytes(chunk) + getAdditionalChunkBytes(chunk),
+            transitions: transitionsByChunk.get(chunkId) ?? new Set<number>()
         }))
+    const subpackages = packChunks({ chunks: placeableChunks, planningBudgetBytes: planningBudgetBytes }).map(
+        createPackedSubpackage
+    )
 
-    // Packing operates at module granularity, so a large lazy closure or cycle may span several subpackages.
-    const subpackages = packSubpackages({ modules: placeableModules, planningBudgetBytes }).map(createPackedSubpackage)
-    const locationByModule = new Map<string, PackageLocation>()
-    for (const moduleId of eagerModules) {
-        locationByModule.set(moduleId, mainPackage)
+    // This local map accumulates the immutable plan returned to output materialization.
+    const locationByChunk = new Map<string, PackageLocation>()
+    for (const chunkId of mainChunkIds) {
+        locationByChunk.set(chunkId, mainPackage)
     }
     for (const subpackage of subpackages) {
-        for (const moduleId of subpackage.moduleIds) {
-            locationByModule.set(moduleId, subpackage)
+        for (const chunkId of subpackage.chunkIds) {
+            locationByChunk.set(chunkId, subpackage)
         }
     }
-
-    return locationByModule
+    return locationByChunk
 }
 
-/**
- * Finds modules that must remain in main. Native shells and capsules are explicit entries, and static traversal keeps their
- * complete eager closures synchronous. Every dynamic import is therefore a genuine lazy boundary whose graph may use
- * subpackages and top-level await.
- */
-function findEagerModules(infos: ReadonlyMap<string, Rolldown.ModuleInfo>): Set<string> {
-    const eagerModules = new Set<string>()
-    const pending = [...infos.values()].filter((info) => info.isEntry).map((info) => info.id)
+export default createPlacementPlan
+
+/** Keeps every explicit output entry and its complete static chunk closure in main. */
+function findMainChunkIds(chunks: ReadonlyMap<string, Rolldown.RenderedChunk>): Set<string> {
+    const mainChunkIds = new Set<string>()
+    // The worklist avoids recursion and visits every eager static edge once.
+    const pending = [...chunks].filter(([, chunk]) => chunk.isEntry).map(([chunkId]) => chunkId)
     while (pending.length > 0) {
-        const moduleId = pending.pop()
-        if (!moduleId || eagerModules.has(moduleId)) {
+        const chunkId = pending.pop()
+        if (!chunkId || mainChunkIds.has(chunkId)) {
             continue
         }
-
-        const info = infos.get(moduleId)
-        if (!info) {
+        const chunk = chunks.get(chunkId)
+        if (!chunk) {
             continue
         }
-        eagerModules.add(moduleId)
-        pending.push(...info.importedIds)
+        mainChunkIds.add(chunkId)
+        pending.push(...chunk.imports)
     }
-    return eagerModules
+    return mainChunkIds
 }
 
-/**
- * Records demand after the eager importSync closure has been removed. Every remaining dynamic target starts one lazy root
- * traversal; that traversal follows static edges only and stops before another dynamic boundary. A shared module records
- * every root that can request it. These consumer sets improve co-location but never prevent subpackage splitting.
- */
-function findLazyConsumers({
-    infos,
-    eagerModules
+/** Creates every load-transition hyperedge and indexes its static closure by chunk. */
+function collectTransitionsByChunk({
+    chunks,
+    mainChunkIds
 }: {
-    infos: ReadonlyMap<string, Rolldown.ModuleInfo>
-    eagerModules: ReadonlySet<string>
-}): Map<string, Set<string>> {
-    const dynamicRoots = new Set<string>()
-    for (const info of infos.values()) {
-        for (const importedId of info.dynamicallyImportedIds) {
-            if (infos.has(importedId) && !eagerModules.has(importedId)) {
-                dynamicRoots.add(importedId)
-            }
-        }
-    }
-
-    const consumersByModule = new Map<string, Set<string>>()
-    for (const dynamicRoot of [...dynamicRoots].sort()) {
-        const visited = new Set<string>()
-        const pending = [dynamicRoot]
-        while (pending.length > 0) {
-            const moduleId = pending.pop()
-            if (!moduleId || visited.has(moduleId) || eagerModules.has(moduleId)) {
+    chunks: ReadonlyMap<string, Rolldown.RenderedChunk>
+    mainChunkIds: ReadonlySet<string>
+}): Map<string, ReadonlySet<number>> {
+    const transitionsByChunk = new Map<string, Set<number>>()
+    let transitionId = 0
+    for (const chunk of chunks.values()) {
+        for (const targetId of [...chunk.dynamicImports].sort()) {
+            if (!chunks.has(targetId) || mainChunkIds.has(targetId)) {
                 continue
             }
-
-            const info = infos.get(moduleId)
-            if (!info) {
-                continue
+            for (const chunkId of collectStaticClosure({
+                rootId: targetId,
+                chunks: chunks,
+                mainChunkIds: mainChunkIds
+            })) {
+                const transitions = transitionsByChunk.get(chunkId) ?? new Set<number>()
+                transitions.add(transitionId)
+                transitionsByChunk.set(chunkId, transitions)
             }
-            visited.add(moduleId)
-            const consumers = consumersByModule.get(moduleId) ?? new Set<string>()
-            consumers.add(dynamicRoot)
-            consumersByModule.set(moduleId, consumers)
-            pending.push(...info.importedIds)
+            transitionId++
         }
     }
-    return consumersByModule
+    return transitionsByChunk
 }
 
-/**
- * Converts each lazy static edge into an undirected affinity. Direction is irrelevant for co-location scoring, while the
- * original directed dependency remains in Rolldown and later in SystemJS. Cycles are therefore preferences, not atoms.
- */
-function findLazyNeighbors({
-    infos,
-    eagerModules
+/** Collects one transition's static closure; nested dynamic imports remain independent transitions. */
+function collectStaticClosure({
+    rootId,
+    chunks,
+    mainChunkIds
 }: {
-    infos: ReadonlyMap<string, Rolldown.ModuleInfo>
-    eagerModules: ReadonlySet<string>
-}): Map<string, Set<string>> {
-    const neighborsByModule = new Map<string, Set<string>>()
-    for (const [moduleId, info] of infos) {
-        if (eagerModules.has(moduleId)) {
+    rootId: string
+    chunks: ReadonlyMap<string, Rolldown.RenderedChunk>
+    mainChunkIds: ReadonlySet<string>
+}): string[] {
+    const closure = new Set<string>()
+    // The worklist follows static edges only; the visited set terminates cycles.
+    const pending = [rootId]
+    while (pending.length > 0) {
+        const chunkId = pending.pop()
+        if (!chunkId || closure.has(chunkId) || mainChunkIds.has(chunkId)) {
             continue
         }
-        for (const importedId of info.importedIds) {
-            if (!infos.has(importedId) || eagerModules.has(importedId)) {
-                continue
-            }
-            addNeighbor(neighborsByModule, moduleId, importedId)
-            addNeighbor(neighborsByModule, importedId, moduleId)
+        const chunk = chunks.get(chunkId)
+        if (!chunk) {
+            continue
         }
+        closure.add(chunkId)
+        pending.push(...chunk.imports)
     }
-    return neighborsByModule
+    return [...closure].sort()
 }
 
-/** Adds one side of an undirected lazy-module affinity edge. */
-function addNeighbor(neighborsByModule: Map<string, Set<string>>, moduleId: string, neighborId: string): void {
-    const neighbors = neighborsByModule.get(moduleId) ?? new Set<string>()
-    neighbors.add(neighborId)
-    neighborsByModule.set(moduleId, neighbors)
-}
-
-/**
- * Packs lazy modules with deterministic best-fit decreasing:
- *
- * 1. Visit larger transformed modules first, with module ID as the stable tie-breaker.
- * 2. Consider only existing bins that stay within the planning budget.
- * 3. Prefer the bin with the least remaining space, minimizing subpackage count in the usual best-fit heuristic.
- * 4. When remaining space ties, prefer shared dynamic consumers and then static neighbors.
- * 5. Create a new bin when no existing bin fits; an individually oversized module receives its own bin.
- */
-function packSubpackages({
-    modules,
+/** Partitions final chunks by transition overlap before best-fit capacity. */
+function packChunks({
+    chunks,
     planningBudgetBytes
 }: {
-    modules: readonly PlaceableModule[]
+    chunks: readonly PlaceableChunk[]
     planningBudgetBytes: number
-}): SubpackageBin[] {
-    const bins: SubpackageBin[] = []
-    const sortedModules = [...modules].sort((left, right) => {
-        return right.estimatedBytes - left.estimatedBytes || left.moduleId.localeCompare(right.moduleId)
-    })
-
-    for (const module of sortedModules) {
-        const candidate = bins
-            .filter((bin) => bin.estimatedBytes + module.estimatedBytes <= planningBudgetBytes)
-            .map((bin) => ({
-                bin,
-                remainingBytes: planningBudgetBytes - bin.estimatedBytes - module.estimatedBytes,
-                affinity: getAffinity(bin, module)
-            }))
-            .sort((left, right) => {
-                return left.remainingBytes - right.remainingBytes || right.affinity - left.affinity
-            })[0]?.bin
-
-        const bin = candidate ?? {
-            moduleIds: [],
-            estimatedBytes: 0,
-            consumers: new Set<string>()
-        }
-        if (!candidate) {
-            bins.push(bin)
-        }
-        bin.moduleIds.push(module.moduleId)
-        bin.estimatedBytes += module.estimatedBytes
-        for (const consumer of module.consumers) {
-            bin.consumers.add(consumer)
-        }
+}): ChunkBin[] {
+    const bins: ChunkBin[] = []
+    const orderedChunks = [...chunks].sort(compareChunks)
+    for (const chunk of orderedChunks) {
+        const bin =
+            chunk.estimatedBytes <= planningBudgetBytes
+                ? (findBestBin({ bins: bins, chunk: chunk, planningBudgetBytes: planningBudgetBytes }) ??
+                  createBin(bins))
+                : createBin(bins)
+        placeChunk(bin, chunk)
     }
     return bins
 }
 
-/** Scores dynamic-root overlap above direct static adjacency when equally full bins compete. */
-function getAffinity(bin: SubpackageBin, module: PlaceableModule): number {
-    let affinity = 0
-    for (const consumer of module.consumers) {
-        if (bin.consumers.has(consumer)) {
-            affinity += 2
-        }
-    }
-    for (const neighbor of module.neighbors) {
-        if (bin.moduleIds.includes(neighbor)) {
-            affinity += 1
-        }
-    }
-    return affinity
+/** Gives globally shared transition demand priority, then size and stable logical ID. */
+function compareChunks(left: PlaceableChunk, right: PlaceableChunk): number {
+    return (
+        right.transitions.size - left.transitions.size ||
+        right.estimatedBytes - left.estimatedBytes ||
+        left.chunkId.localeCompare(right.chunkId)
+    )
 }
 
-/** Freezes bin membership and derives a stable subpackage root from sorted module IDs. */
-function createPackedSubpackage(bin: SubpackageBin): PackedSubpackage {
-    const moduleIds = [...bin.moduleIds].sort()
-    const hash = createHash('sha256').update(moduleIds.join('\0')).digest('hex').slice(0, 8)
+/** Chooses maximum transition overlap, then the fullest fitting package and stable creation order. */
+function findBestBin({
+    bins,
+    chunk,
+    planningBudgetBytes
+}: {
+    bins: readonly ChunkBin[]
+    chunk: PlaceableChunk
+    planningBudgetBytes: number
+}): ChunkBin | undefined {
+    let best: BinCandidate | undefined
+    for (const bin of bins) {
+        if (bin.estimatedBytes + chunk.estimatedBytes > planningBudgetBytes) {
+            continue
+        }
+        const candidate = {
+            bin: bin,
+            overlap: countOverlap(bin.transitions, chunk.transitions),
+            remainingBytes: planningBudgetBytes - bin.estimatedBytes - chunk.estimatedBytes
+        }
+        if (
+            !best ||
+            candidate.overlap > best.overlap ||
+            (candidate.overlap === best.overlap && candidate.remainingBytes < best.remainingBytes)
+        ) {
+            best = candidate
+        }
+    }
+    return best?.bin
+}
+
+/** Counts transition-package incidences removed by one candidate placement. */
+function countOverlap(left: ReadonlySet<number>, right: ReadonlySet<number>): number {
+    const [smaller, larger] = left.size <= right.size ? [left, right] : [right, left]
+    let overlap = 0
+    for (const transition of smaller) {
+        if (larger.has(transition)) {
+            overlap++
+        }
+    }
+    return overlap
+}
+
+/** Creates one planner-local mutable package. */
+function createBin(bins: ChunkBin[]): ChunkBin {
+    const bin: ChunkBin = {
+        chunkIds: [],
+        estimatedBytes: 0,
+        transitions: new Set<number>()
+    }
+    bins.push(bin)
+    return bin
+}
+
+/** Applies one irreversible, non-duplicating final chunk assignment. */
+function placeChunk(bin: ChunkBin, chunk: PlaceableChunk): void {
+    bin.chunkIds.push(chunk.chunkId)
+    bin.estimatedBytes += chunk.estimatedBytes
+    for (const transition of chunk.transitions) {
+        bin.transitions.add(transition)
+    }
+}
+
+/** Estimates final output bytes from tree-shaken modules plus a bounded generated-chunk allowance. */
+function estimateChunkBytes(chunk: Rolldown.RenderedChunk): number {
+    const renderedModuleBytes = Object.values(chunk.modules).reduce(
+        (bytes, module) => bytes + (module.code ? Buffer.byteLength(module.code, 'utf8') : 0),
+        0
+    )
+    const moduleWrapperBytes = chunk.moduleIds.length * 64
+    const referenceBytes = (chunk.imports.length + chunk.dynamicImports.length) * 32
+    return renderedModuleBytes + moduleWrapperBytes + referenceBytes + 64
+}
+
+/** Freezes membership and derives a stable root from sorted logical chunk IDs. */
+function createPackedSubpackage(bin: ChunkBin): PackedSubpackage {
+    const chunkIds = [...bin.chunkIds].sort()
+    const hash = createHash('sha256').update(chunkIds.join('\0')).digest('hex').slice(0, 8)
     return {
         kind: 'subpackage',
         root: `${generatedSubpackageRootPrefix}${hash}`,
-        moduleIds
+        chunkIds: chunkIds
     }
 }
 

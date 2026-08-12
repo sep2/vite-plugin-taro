@@ -96,7 +96,7 @@ Page(config)`
 
     assert.strictEqual(registrations[0], config)
     assert.deepEqual(requiredPaths, ['./assets/bootstrap-a.js'])
-    assert.deepEqual(importedModuleIds, ['assets/module-b.js'])
+    assert.deepEqual(importedModuleIds, ['module-b.js'])
     assert.doesNotMatch(result.code, /import\(/)
     assert.ok(result.map)
     assert.deepEqual(result.map.sources, ['app.js'])

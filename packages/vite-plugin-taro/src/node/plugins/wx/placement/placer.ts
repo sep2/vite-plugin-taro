@@ -1,15 +1,7 @@
-import path from 'node:path'
-import type { Rolldown } from 'vite'
+import type { Plugin, Rolldown } from 'vite'
 import { getWxExecutionKind, isTransportModule } from '../module.ts'
-import {
-    createPlacementPlan,
-    getSubpackageName,
-    isGeneratedSubpackageFile,
-    type ModuleGraph,
-    mainPackage,
-    type PackageLocation,
-    type PlacementPlan
-} from './plan.ts'
+import { getNativeComponentAssetBytes } from '../native/native-component-assets.ts'
+import createPlacementPlan, { getSubpackageName, type PackageLocation } from './plan.ts'
 
 /** Native app.json declaration for one generated code-only subpackage. */
 export type GeneratedSubpackage = {
@@ -21,167 +13,230 @@ export type GeneratedSubpackage = {
     pages: readonly []
 }
 
-/**
- * Creates the stateful adapter between graph planning and Rolldown's output lifecycle:
- *
- * - renderStart analyzes transformed modules before chunking.
- * - codeSplitting prevents modules assigned to different packages from being merged.
- * - filename callbacks materialize planned subpackage roots.
- * - renderChunk derives native loading mode from those physical paths.
- * - generateBundle reconciles the plan with chunks that survived tree shaking.
- */
-export function createPlacer() {
-    // Filename and output callbacks run after analyze and read this immutable plan through their shared closure.
-    let plan: PlacementPlan = new Map()
+export type Placement = Readonly<{
+    getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation
+    getPhysicalChunkId(chunk: Rolldown.RenderedChunk): string
+    getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async'
+    finalize(bundle: Rolldown.OutputBundle): readonly GeneratedSubpackage[]
+}>
 
+type PlacementState =
+    | { phase: 'idle' }
+    | { phase: 'awaiting-chunks' }
+    | { phase: 'planned'; placement: Placement }
+    | { phase: 'finalized'; placement: Placement; subpackages: readonly GeneratedSubpackage[] }
+
+/** Placement services consumed by the later `vpt:wx` rendering and output hooks. */
+export type WxPlacementPlugin = Plugin &
+    Readonly<{
+        getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation
+        getPhysicalChunkId(chunk: Rolldown.RenderedChunk): string
+        getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async'
+        getSubpackages(): readonly GeneratedSubpackage[]
+    }>
+
+/**
+ * Rolldown options owned by WX placement. Every field enforces a distinct output invariant. The plugin returns this object
+ * from its config hook, while direct Rolldown integration tests reuse the same value to exercise the identical lifecycle.
+ */
+export const placementRolldownOptions = {
     /**
-     * Reduces module ownership to one package for filename generation. Unknown Rolldown-generated modules default to
-     * main, empty chunks default to main, and a chunk containing multiple known owners is rejected before paths diverge.
+     * Output-stage naming remains under Rolldown's ownership. These options establish physical candidates and hash
+     * participation only; LTHP mutates the resulting OutputChunk filenames later without replacing the chunks.
      */
-    function getChunkLocation(chunk: Rolldown.PreRenderedChunk): PackageLocation {
-        let location: PackageLocation | undefined
-        for (const moduleId of chunk.moduleIds) {
-            const moduleLocation = plan.get(moduleId) ?? mainPackage
-            if (!location) {
-                location = moduleLocation
-                continue
-            }
-            if (!hasSameLocation(location, moduleLocation)) {
-                throw new Error(`wx chunk mixes package owners: ${chunk.moduleIds.join(', ')}`)
-            }
+    output: {
+        /**
+         * Native App/Page/Component shells are files addressed directly by WeChat and must retain the exact names configured
+         * in `input`, such as `app.js` and `pages/home/index.js`. Transport is excluded even though it is CommonJS:
+         * application chunks import its content-hashed path, so it belongs with hashed runtime/capsule entries. `[hash]`
+         * remains a Rolldown placeholder here and is resolved only after renderChunk transforms finish.
+         */
+        entryFileNames(chunk: Rolldown.PreRenderedChunk): string {
+            return getWxExecutionKind(chunk) === 'native' && !isTransportModule(chunk)
+                ? '[name]'
+                : 'assets/[name]-[hash].js'
+        },
+        /**
+         * Leaves chunk identity and collision handling entirely to Rolldown. This package-neutral physical pattern deliberately
+         * contains no LTHP owner; generateBundle adds only the selected package root to the existing Rolldown filename.
+         */
+        chunkFileNames: 'assets/[name]-[hash].js',
+        /**
+         * Emits generic Rolldown assets under one collision-resistant hashed namespace. Native-component folders are not
+         * governed by this option: createNativeComponentOutput preserves their required relative filenames and relocates the
+         * complete folder beside its owning JavaScript chunk after LTHP finalization.
+         */
+        assetFileNames: 'assets/[name]-[hash][extname]'
+    },
+    /**
+     * Keeps every native entry's required exports while allowing Rolldown to add cross-chunk bindings created by natural code
+     * splitting. `strict` can reject those extensions; `exports-only` can merge away native boundaries; `allow-extension`
+     * preserves the shell/capsule contract without forcing source-module placement groups.
+     */
+    preserveEntrySignatures: 'allow-extension' as const
+}
+
+/**
+ * Creates the `vpt:wx-placer` lifecycle owner:
+ *
+ * 1. Its config hook installs package-neutral Rolldown names and entry-signature semantics.
+ * 2. `renderStart` atomically starts a generation in `awaiting-chunks`; no stale plan remains reachable.
+ * 3. Its pre-order `renderChunk` sees the complete tree-shaken graph, creates one immutable LTHP placement, and changes the
+ *    generation to `planned` before `vpt:wx` renders transport.
+ * 4. `vpt:wx` asks this plugin only for package ownership, physical relocation, and the resulting native loading mode.
+ * 5. Its pre-order `generateBundle` assigns each existing Rolldown OutputChunk its package-qualified filename and atomically
+ *    publishes the generated app.json declarations as `finalized` state.
+ * 6. The later `vpt:wx` generateBundle hook consumes those declarations and emits native assets against finalized paths.
+ *
+ * The discriminated state is the only generation-local mutation: `idle → awaiting-chunks → planned → finalized`. Each hook
+ * performs one whole-state transition, so stale byte maps, fake graph sentinels, empty fallback plans, duplicate planning,
+ * and partially reset generations are unrepresentable.
+ */
+export function createWxPlacementPlugin(): WxPlacementPlugin {
+    // This one mutable cell is the output-generation state machine described above; hooks replace it atomically by phase.
+    let state: PlacementState = { phase: 'idle' }
+
+    function requirePlacement(): Placement {
+        if (state.phase === 'idle' || state.phase === 'awaiting-chunks') {
+            throw new Error('wx placement is unavailable before Rolldown exposes the final chunk graph')
         }
-        return location ?? mainPackage
+        return state.placement
     }
 
     return {
-        /** Assigns every transformed module to main or one generated, size-bounded subpackage. */
-        analyze(graph: ModuleGraph): void {
-            plan = createPlacementPlan(graph)
-        },
+        name: 'vpt:wx-placer',
 
-        /**
-         * Complete Rolldown fragment required to preserve package placement and native entry semantics.
-         *
-         * ```text
-         * native App/Page/Component shell entry
-         *   └─ static import / runtime importSync() ─▶ explicit capsule entry + static closure [main, no TLA]
-         *                                                └─ System.import() ─▶ lazy-a [package A, TLA allowed]
-         *                                                                      └─ static import ─▶ lazy-b [package B]
-         *
-         * name()                              assigns lazy-a and lazy-b to their planned package groups
-         * includeDependenciesRecursively      false: does not pull lazy-b back into package A
-         * preserveEntrySignatures             allows cross-chunk bindings without weakening native entry exports
-         *
-         * package A capsule
-         *   └─ SystemJS dependency ─▶ package B capsule
-         *                                ▲
-         *                                └─ main transport obtains registration with require.async()
-         * ```
-         *
-         * Explicit entries preserve the shell/capsule rendering boundary while their static edge executes synchronously
-         * from main. Once a dynamic boundary is crossed, physical fetches may be asynchronous and modules may use
-         * top-level await. SystemJS still links that complete static lazy graph before execution, even across packages.
-         */
-        rolldownOptions: {
-            output: {
-                /**
-                 * Gives every generated subpackage a distinct Rolldown chunk group. Recursive dependency capture must
-                 * stay disabled: lazy static dependencies may belong to other subpackages and SystemJS links them
-                 * asynchronously.
-                 */
-                codeSplitting: {
-                    groups: [
-                        {
-                            name(moduleId: string): string | null {
-                                const location = plan.get(moduleId)
-                                return location?.kind === 'subpackage' ? getSubpackageName(location.root) : null
-                            },
-                            // Do not let Rolldown pull a lazy group's static closure into one chunk. Past the nested dynamic
-                            // boundary, transport may obtain registrations from several packages asynchronously before
-                            // SystemJS links and executes the original graph, including cycles and top-level await.
-                            includeDependenciesRecursively: false
-                        }
-                    ]
-                },
-                // strictExecutionOrder deliberately has no plugin default. When an application enables it through normal
-                // Rolldown output options, the generated helper runtime becomes amphibious: CommonJS evaluates it once and
-                // transport publishes that cached namespace to SystemJS.
-                /** Preserves exact native shell paths while hashing transport and explicit capsule entries. */
-                entryFileNames(chunk: Rolldown.PreRenderedChunk): string {
-                    return getWxExecutionKind(chunk) === 'native' && !isTransportModule(chunk)
-                        ? '[name]'
-                        : 'assets/[name]-[hash].js'
-                },
-                /** Converts the planned owner into its physical main or generated subpackage filename template. */
-                chunkFileNames(chunk: Rolldown.PreRenderedChunk): string {
-                    const location = getChunkLocation(chunk)
-                    if (location.kind === 'main') {
-                        return 'assets/[name]-[hash].js'
-                    }
-                    // The package group replaces Rolldown's [name], so recover the first bundled source file's name from
-                    // the final chunk module list instead of leaking the generated package hash into the filename.
-                    return `${location.root}/assets/${getFirstModuleName(chunk)}-[hash].js`
-                },
-                // Keep generic assets independent of native output identities assigned after bundling.
-                assetFileNames: 'assets/[name]-[hash][extname]'
-            },
-            // Rolldown rejects strict entry signatures when code-splitting groups disable recursive dependency capture.
-            // allow-extension retains required native-entry exports while permitting the extra cross-chunk bindings used
-            // to split lazy static closures across physical packages.
-            preserveEntrySignatures: 'allow-extension' as const
-        },
-
-        /**
-         * Selects loading mode from physical output rather than graph intent. Transport executes in main, so main files
-         * use require() and every generated subpackage file uses require.async().
-         */
-        getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async' {
-            return isGeneratedSubpackageFile(chunk.fileName) ? 'async' : 'sync'
-        },
-
-        /**
-         * Reconciles planned ownership with final chunks through module IDs. Tree-shaken subpackages disappear naturally,
-         * while roots are deduplicated and sorted before becoming deterministic app.json declarations.
-         */
-        getSubpackages(bundle: Rolldown.OutputBundle): GeneratedSubpackage[] {
-            const emittedSubpackageRoots = new Set<string>()
-            for (const output of Object.values(bundle)) {
-                if (output.type !== 'chunk') {
-                    continue
-                }
-                for (const moduleId of output.moduleIds) {
-                    const location = plan.get(moduleId)
-                    if (location?.kind === 'subpackage') {
-                        emittedSubpackageRoots.add(location.root)
-                    }
+        config() {
+            return {
+                build: {
+                    rolldownOptions: placementRolldownOptions
                 }
             }
+        },
 
-            return [...emittedSubpackageRoots].sort().map((root) => ({
+        renderStart() {
+            state = { phase: 'awaiting-chunks' }
+        },
+
+        renderChunk: {
+            order: 'pre',
+            handler(_code, _chunk, _outputOptions, meta) {
+                if (state.phase === 'planned') {
+                    return
+                }
+                if (state.phase !== 'awaiting-chunks') {
+                    throw new Error(`wx placement received final chunks during the ${state.phase} phase`)
+                }
+                state = {
+                    phase: 'planned',
+                    placement: createPlacement({
+                        chunks: meta.chunks,
+                        getAdditionalModuleBytes: (moduleId) =>
+                            getNativeComponentAssetBytes(this.getModuleInfo(moduleId)?.meta)
+                    })
+                }
+            }
+        },
+
+        generateBundle: {
+            order: 'pre',
+            handler(_outputOptions, bundle) {
+                const placement = requirePlacement()
+                state = {
+                    phase: 'finalized',
+                    placement: placement,
+                    subpackages: placement.finalize(bundle)
+                }
+            }
+        },
+
+        getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation {
+            return requirePlacement().getPackageLocation(chunk)
+        },
+
+        getPhysicalChunkId(chunk: Rolldown.RenderedChunk): string {
+            return requirePlacement().getPhysicalChunkId(chunk)
+        },
+
+        getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async' {
+            return requirePlacement().getLoadMode(chunk)
+        },
+
+        getSubpackages(): readonly GeneratedSubpackage[] {
+            if (state.phase !== 'finalized') {
+                throw new Error('wx subpackages are unavailable before output finalization')
+            }
+            return state.subpackages
+        }
+    }
+}
+
+/** Creates immutable ownership operations for one complete final-chunk graph. */
+export function createPlacement({
+    chunks,
+    getAdditionalModuleBytes
+}: {
+    chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
+    getAdditionalModuleBytes(moduleId: string): number
+}): Placement {
+    const plan = createPlacementPlan({
+        chunks: chunks,
+        getAdditionalChunkBytes: (chunk) =>
+            chunk.moduleIds.reduce((bytes, moduleId) => bytes + getAdditionalModuleBytes(moduleId), 0)
+    })
+
+    function getLocation(chunkId: string): PackageLocation {
+        const location = plan.get(chunkId)
+        if (!location) {
+            throw new Error(`wx placement is missing final chunk: ${chunkId}`)
+        }
+        return location
+    }
+
+    /** Resolves typed ownership from Rolldown's preliminary physical filename before or after finalization. */
+    function getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation {
+        return getLocation('preliminaryFileName' in chunk ? chunk.preliminaryFileName : chunk.fileName)
+    }
+
+    return {
+        getPackageLocation: getPackageLocation,
+
+        /** Adds the planned package root to a physical preliminary path without changing the chunk's SystemJS identity. */
+        getPhysicalChunkId(chunk: Rolldown.RenderedChunk): string {
+            const location = getPackageLocation(chunk)
+            return location.kind === 'main' ? chunk.fileName : `${location.root}/${chunk.fileName}`
+        },
+
+        /** Selects the native loading API directly from typed package ownership. */
+        getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async' {
+            return getPackageLocation(chunk).kind === 'subpackage' ? 'async' : 'sync'
+        },
+
+        /** Assigns each final chunk's Rolldown-owned physical filename and declares typed owners that survived output. */
+        finalize(bundle: Rolldown.OutputBundle): readonly GeneratedSubpackage[] {
+            const chunks = Object.values(bundle).filter(
+                (output): output is Rolldown.OutputChunk => output.type === 'chunk'
+            )
+            // This local mutable set deduplicates typed package owners that retain at least one final output chunk.
+            const roots = new Set<string>()
+            for (const chunk of chunks) {
+                // OutputChunk.fileName contains the resolved content hash. preliminaryFileName preserves the exact physical
+                // candidate with placeholders that identified this chunk when the immutable plan was created during renderChunk.
+                const location = getLocation(chunk.preliminaryFileName)
+                if (location.kind !== 'subpackage') {
+                    continue
+                }
+                // OutputChunk is mutable in generateBundle. Assigning fileName makes Rolldown retain all chunk metadata and
+                // write that same chunk at its physical package path; deleting bundle keys or re-emitting would lose identity.
+                chunk.fileName = `${location.root}/${chunk.fileName}`
+                roots.add(location.root)
+            }
+
+            return [...roots].sort().map((root) => ({
                 name: getSubpackageName(root),
-                root,
+                root: root,
                 pages: []
             }))
         }
     }
-}
-
-/** Uses the first bundled source filename as the readable identity of a generated subpackage chunk. */
-function getFirstModuleName(chunk: Rolldown.PreRenderedChunk): string {
-    const firstModuleId = chunk.moduleIds[0]
-    if (!firstModuleId) {
-        throw new Error('wx subpackage chunk has no source modules')
-    }
-
-    const normalizedId = firstModuleId.replaceAll('\\', '/')
-    const suffixIndex = normalizedId.search(/[?#]/)
-    const cleanId = suffixIndex === -1 ? normalizedId : normalizedId.slice(0, suffixIndex)
-    const fileName = path.posix.basename(cleanId)
-    const extension = path.posix.extname(fileName)
-    return extension ? fileName.slice(0, -extension.length) : fileName
-}
-
-/** Compares main by discriminant and generated subpackages by their unique physical root. */
-function hasSameLocation(left: PackageLocation, right: PackageLocation): boolean {
-    return left.kind === 'main' ? right.kind === 'main' : right.kind === 'subpackage' && left.root === right.root
 }

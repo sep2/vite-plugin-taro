@@ -1,8 +1,8 @@
 import { type PluginObj, type PluginTarget, types } from '@babel/core'
 import transformModulesCommonjs from '@babel/plugin-transform-modules-commonjs'
 import type { Rolldown } from 'vite'
-import { resolveChunkReference } from '../../../utils/modules.ts'
 import { type AstTransformResult, transformWithBabel } from '../../../utils/transform.ts'
+import { resolveLogicalChunkReference, resolvePhysicalChunkReference } from '../chunk-path.ts'
 import { getWxEntryRole } from '../module.ts'
 
 /** Renders a native module while activating its statically imported capsules through SystemJS. */
@@ -39,8 +39,8 @@ function connectNativeCapsulesPlugin(
                     return
                 }
 
-                const chunkId = resolveChunkReference(fileName, reference)
-                const importedChunk = chunks[chunkId]
+                const physicalChunkId = resolvePhysicalChunkReference(fileName, reference)
+                const importedChunk = chunks[physicalChunkId]
                 if (!importedChunk || getWxEntryRole(importedChunk) !== 'capsule') {
                     return
                 }
@@ -51,14 +51,14 @@ function connectNativeCapsulesPlugin(
                     !specifier ||
                     types.isImportNamespaceSpecifier(specifier)
                 ) {
-                    throw new Error(`Expected one capsule value import from ${chunkId} in ${fileName}`)
+                    throw new Error(`Expected one capsule value import from ${physicalChunkId} in ${fileName}`)
                 }
 
                 const imported = types.isImportDefaultSpecifier(specifier)
                     ? types.identifier('default')
                     : specifier.imported
                 const importedConfig = types.memberExpression(
-                    createSyncImport(chunkId),
+                    createSyncImport(resolveLogicalChunkReference(fileName, reference)),
                     types.cloneNode(imported),
                     types.isStringLiteral(imported)
                 )

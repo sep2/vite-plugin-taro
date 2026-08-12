@@ -1,5 +1,5 @@
 import { type PluginObj, types } from '@babel/core'
-import { resolveChunkReference } from '../../../utils/modules.ts'
+import { resolveLogicalChunkReference } from '../chunk-path.ts'
 
 /** Wraps System.register as an inert CommonJS capsule tuple with canonical final dependency IDs. */
 export function wrapCapsulePlugin(fileName: string): PluginObj {
@@ -75,12 +75,12 @@ function canonicalizeStaticReference(reference: types.Node | null | undefined, f
     if (!types.isStringLiteral(reference)) {
         throw new Error(`Expected a literal System.register dependency in ${fileName}`)
     }
-    reference.value = resolveChunkReference(fileName, reference.value)
+    reference.value = resolveLogicalChunkReference(fileName, reference.value)
 }
 
 /** Resolves application literals while preserving runtime-computed IDs injected by the development runtime. */
 function canonicalizeDynamicReference(reference: types.Node | null | undefined, fileName: string): void {
     if (types.isStringLiteral(reference) && (reference.value.startsWith('./') || reference.value.startsWith('../'))) {
-        reference.value = resolveChunkReference(fileName, reference.value)
+        reference.value = resolveLogicalChunkReference(fileName, reference.value)
     }
 }

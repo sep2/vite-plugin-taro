@@ -17,7 +17,8 @@ test('creates the stable app stylesheet wrapper', async () => {
         bundle: {},
         options,
         subpackages: [],
-        getModuleInfo: () => null
+        getModuleInfo: () => null,
+        getPackageLocation: () => ({ kind: 'main' })
     })
 
     assert.deepEqual(

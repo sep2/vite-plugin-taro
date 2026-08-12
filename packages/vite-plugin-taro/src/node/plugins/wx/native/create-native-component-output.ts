@@ -1,16 +1,18 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Rolldown } from 'vite'
-import { isGeneratedSubpackageFile } from '../placement/plan.ts'
+import type { PackageLocation } from '../placement/plan.ts'
 import { getNativeComponentSources } from './native-component-assets.ts'
 
 /** Creates opaque native files and their registrations from each surviving JSX interface module. */
 export async function createNativeComponentOutput({
     bundle,
-    getModuleInfo
+    getModuleInfo,
+    getPackageLocation
 }: {
     bundle: Rolldown.OutputBundle
     getModuleInfo: (moduleId: string) => { meta: Rolldown.CustomPluginOptions } | null
+    getPackageLocation(chunk: Rolldown.OutputChunk): PackageLocation
 }) {
     // Files and registrations accumulate in final chunk order for deterministic output.
     const files: Rolldown.EmittedAsset[] = []
@@ -25,9 +27,8 @@ export async function createNativeComponentOutput({
         if (output.type !== 'chunk') {
             continue
         }
-        const packageRoot = isGeneratedSubpackageFile(output.fileName)
-            ? path.posix.dirname(path.posix.dirname(output.fileName))
-            : undefined
+        const location = getPackageLocation(output)
+        const packageRoot = location.kind === 'subpackage' ? location.root : undefined
 
         for (const moduleId of output.moduleIds) {
             const sources = getNativeComponentSources(getModuleInfo(moduleId)?.meta)

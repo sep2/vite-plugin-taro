@@ -3,7 +3,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { build, type InputOption, type OutputBundle, type OutputChunk, type Plugin } from 'rolldown'
 import { appCapsulePath, appShellPath, bootstrapPath, transportPath } from '../module.ts'
-import { createPlacer, type GeneratedSubpackage } from './placer.ts'
+import { createPlacement, type GeneratedSubpackage, type Placement, placementRolldownOptions } from './placer.ts'
 
 const fixtureRoot = '/placer-fixture'
 const contentHashPattern = '[A-Za-z0-9_-]{8}'
@@ -17,13 +17,14 @@ type BuildFixture = {
 type FixtureOutput = {
     readonly bundle: OutputBundle
     readonly chunks: readonly OutputChunk[]
-    readonly placer: ReturnType<typeof createPlacer>
+    readonly placement: Placement
     readonly subpackages: readonly GeneratedSubpackage[]
 }
 
 /** Builds virtual modules through the real Rolldown output lifecycle used by the placer. */
 async function buildFixture({ modules, input, additionalBytes }: BuildFixture): Promise<FixtureOutput> {
-    const placer = createPlacer()
+    let placement: Placement | undefined
+    let subpackages: readonly GeneratedSubpackage[] = []
     const virtualModules: Plugin = {
         name: 'test:placer-fixture',
         resolveId(source, importer) {
@@ -40,19 +41,25 @@ async function buildFixture({ modules, input, additionalBytes }: BuildFixture): 
             return modules[moduleId] ?? null
         },
         renderStart() {
-            placer.analyze({
-                moduleIds: this.getModuleIds(),
-                getModuleInfo: (moduleId) => this.getModuleInfo(moduleId),
-                getAdditionalModuleBytes: (info) => additionalBytes?.[info.id] ?? 0
+            placement = undefined
+        },
+        renderChunk(_code, _chunk, _outputOptions, meta) {
+            placement ??= createPlacement({
+                chunks: meta.chunks,
+                getAdditionalModuleBytes: (moduleId) => additionalBytes?.[moduleId] ?? 0
             })
+        },
+        generateBundle(_outputOptions, bundle) {
+            assert.ok(placement)
+            subpackages = placement.finalize(bundle)
         }
     }
     const result = await build({
         input,
         plugins: [virtualModules],
-        preserveEntrySignatures: placer.rolldownOptions.preserveEntrySignatures,
+        preserveEntrySignatures: placementRolldownOptions.preserveEntrySignatures,
         output: {
-            ...placer.rolldownOptions.output,
+            ...placementRolldownOptions.output,
             format: 'es',
             sourcemap: false,
             strictExecutionOrder: true
@@ -61,12 +68,13 @@ async function buildFixture({ modules, input, additionalBytes }: BuildFixture): 
     })
     const bundle: OutputBundle = Object.fromEntries(result.output.map((output) => [output.fileName, output]))
     const chunks = result.output.filter((output): output is OutputChunk => output.type === 'chunk')
+    assert.ok(placement)
 
     return {
         bundle,
         chunks,
-        placer,
-        subpackages: placer.getSubpackages(bundle)
+        placement,
+        subpackages
     }
 }
 
@@ -106,10 +114,10 @@ test('emits an eager application closure entirely in the synchronous main packag
     assert.match(application.fileName, new RegExp(`^assets/application-${contentHashPattern}\\.js$`))
     assert.ok(application.moduleIds.includes(eagerId))
     assert.deepEqual(output.subpackages, [])
-    assert.ok(output.chunks.every((chunk) => output.placer.getLoadMode(chunk) === 'sync'))
+    assert.ok(output.chunks.every((chunk) => output.placement.getLoadMode(chunk) === 'sync'))
 })
 
-test('names a lazy static closure after the first file in its final module list', async () => {
+test('preserves Rolldown naming for one lazy static closure', async () => {
     const applicationId = moduleId('application.js')
     const featureId = moduleId('feature-panel.js')
     const dependencyId = moduleId('feature-data.js?variant=compact#summary')
@@ -131,9 +139,9 @@ test('names a lazy static closure after the first file in its final module list'
 
     assert.equal(feature.moduleIds[0], dependencyId)
     assert.ok(feature.moduleIds.includes(featureId))
-    assert.match(feature.fileName, new RegExp(`^${root}/assets/feature-data-${contentHashPattern}\\.js$`))
-    assert.equal(output.placer.getLoadMode(application), 'sync')
-    assert.equal(output.placer.getLoadMode(feature), 'async')
+    assert.match(feature.fileName, new RegExp(`^${root}/assets/feature-panel-${contentHashPattern}\\.js$`))
+    assert.equal(output.placement.getLoadMode(application), 'sync')
+    assert.equal(output.placement.getLoadMode(feature), 'async')
     assert.deepEqual(output.subpackages, [
         {
             name: root.slice('sub/'.length),
@@ -141,6 +149,36 @@ test('names a lazy static closure after the first file in its final module list'
             pages: []
         }
     ])
+})
+
+test('keeps same-named chunks from different source folders as distinct owners', async () => {
+    const applicationId = moduleId('application.js')
+    const accountId = moduleId('account/foo.js')
+    const reportId = moduleId('report/foo.js')
+    const output = await buildFixture({
+        input: { application: applicationId },
+        modules: {
+            [applicationId]: `
+                export const loadAccount = () => import('./account/foo.js')
+                export const loadReport = () => import('./report/foo.js')
+            `,
+            [accountId]: `export const account = 'account'`,
+            [reportId]: `export const report = 'report'`
+        },
+        additionalBytes: {
+            [accountId]: 1_000_000,
+            [reportId]: 1_000_000
+        }
+    })
+
+    const account = findChunk(output.chunks, accountId)
+    const report = findChunk(output.chunks, reportId)
+
+    assert.notEqual(account.preliminaryFileName, report.preliminaryFileName)
+    assert.notEqual(account.fileName, report.fileName)
+    assert.equal(output.placement.getLoadMode(account), 'async')
+    assert.equal(output.placement.getLoadMode(report), 'async')
+    assert.equal(output.subpackages.length, 2)
 })
 
 test('keeps an eagerly shared dependency in main when a subpackage also imports it', async () => {
@@ -168,8 +206,8 @@ test('keeps an eagerly shared dependency in main when a subpackage also imports 
 
     assert.doesNotMatch(shared.fileName, /^sub\//)
     assert.match(feature.fileName, new RegExp(`^sub/p_[a-f0-9]{8}/assets/lazy-feature-${contentHashPattern}\\.js$`))
-    assert.equal(output.placer.getLoadMode(shared), 'sync')
-    assert.equal(output.placer.getLoadMode(feature), 'async')
+    assert.equal(output.placement.getLoadMode(shared), 'sync')
+    assert.equal(output.placement.getLoadMode(feature), 'async')
     assert.equal(output.subpackages.length, 1)
 })
 
@@ -205,7 +243,7 @@ test('emits independently named chunks when the package budget splits lazy roots
         output.subpackages.map((subpackage) => subpackage.root),
         [accountRoot, reportRoot].sort()
     )
-    assert.ok([account, report].every((chunk) => output.placer.getLoadMode(chunk) === 'async'))
+    assert.ok([account, report].every((chunk) => output.placement.getLoadMode(chunk) === 'async'))
 })
 
 test('preserves native shell paths while hashing real capsule and runtime entries in main', async () => {
@@ -234,5 +272,5 @@ test('preserves native shell paths while hashing real capsule and runtime entrie
     assert.match(bootstrap.fileName, new RegExp(`^assets/bootstrap-${contentHashPattern}\\.js$`))
     assert.match(transport.fileName, new RegExp(`^assets/transport-${contentHashPattern}\\.js$`))
     assert.deepEqual(output.subpackages, [])
-    assert.ok(output.chunks.every((chunk) => output.placer.getLoadMode(chunk) === 'sync'))
+    assert.ok(output.chunks.every((chunk) => output.placement.getLoadMode(chunk) === 'sync'))
 })

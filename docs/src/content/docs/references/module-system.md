@@ -110,48 +110,67 @@ Rolldown 保留原生入口与这些代码之间的静态依赖，vpt 再把最�
 
 ### 2. 规划主包和分包
 
-位置规划发生在 Rolldown 的 `renderStart` 阶段：源码模块已经完成转换，最终 chunks 还没有生成。
+位置规划由独立的 Vite 插件 `vpt:wx-placer` 管理，而不是夹在渲染器中的共享缓存。它通过 `config` 安装微信输出命名和入口签名选项；在 Rolldown 已经完成 tree shaking、scope hoisting 和自然 chunk 切分后，从 `renderChunk` 提供的完整最终逻辑 chunk 图创建一次 LTHP 规划。后续每个 chunk 的渲染只读取这份不可变规划，不会重复遍历图，也不会重新推测源码模块最终会怎样合并。
+
+一次输出生成只经过以下状态：
+
+```text
+idle
+  → renderStart：awaiting-chunks
+  → 第一个 pre renderChunk：planned
+  → pre generateBundle：finalized
+```
+
+状态以一个整体值切换。新一代构建不会继承上一代的体积、chunk 或所有权缓存，`vpt:wx` 渲染插件也不能在规划前取得路径，或在最终化前取得 `app.json` 分包声明。
 
 以下内容必须留在主包：
 
-1. App、Page 和 Component 原生入口；
-2. `bootstrap` 和 `transport` chunks；
-3. 创建 `App()`、`Page()` 和 `Component()` 参数对象的代码；
-4. 以上入口递归静态导入的全部模块。
+1. 所有显式输出入口；
+2. 这些入口递归静态引用的完整 chunk 闭包；
+3. 因此也包括原生壳、`bootstrap`、`transport` 和生命周期 capsule 所需的同步代码。
 
-```text
-原生入口 [主包]
-   ├─ 静态 import → bootstrap chunk [主包]
-   └─ 静态 import → 微信入口参数所在 chunk [主包]
-                              ├─ 静态 import → 主包
-                              └─ 业务 import() → 按需加载边界
-```
+其余 chunk 使用 **Load-Transition Hypergraph Partitioning（LTHP）** 规划：
 
-其他源码模块可以进入生成分包。规划器按照以下确定性规则分组：
+1. 每条动态 chunk 边是一条加载迁移；
+2. 该动态目标的静态 chunk 闭包构成一条超边；
+3. 每个最终 chunk 只分配给一个物理包，绝不复制；
+4. 先放置参与更多迁移的共享 chunk，再处理较大 chunk；
+5. 每次优先选择与该 chunk 共享最多加载迁移的可容纳分包；
+6. 下载代价相同时，再选择剩余空间最小的分包。
 
-1. 以转换后源码的 UTF-8 字节数估算模块大小；
-2. 从大到小处理，大小相同时按源码模块 ID 排序；
-3. 优先放入容纳该模块后剩余空间最小的现有分包；
-4. 剩余空间相同时，优先放入使用相同动态入口或直接互相静态导入的模块所在分包；
-5. 没有现有分包可容纳时创建新分包。
+这样优化的是一次 `import()` 实际触及的包数量，而不是文件名顺序、直接邻接数或单纯装满程度。嵌套 `import()` 会形成独立迁移；共享 chunk 会综合所有使用它的迁移选择唯一所有者。
 
-每个分包的规划预算为 `1,900,000` 字节，为运行时包装和 Rolldown 生成代码预留空间。单个超预算源码模块会独占一个分包；规划器不会拆分源码模块，也不保证最终上传体积必然低于微信限制。
+每个分包的规划预算为 `1,900,000` 字节，为运行时包装和原生资源预留空间。最终 chunk 的估算包含 tree-shaken 模块代码、chunk 包装和引用开销以及原生组件资源。单个超预算 chunk 会独占分包；规划器不会复制或拆开 Rolldown 的最终 chunk。
 
-动态 `import()` 创建加载边界，但一个动态边界不等于一个分包。边界后的模块会根据是否也作为启动依赖使用、转换后体积、分包剩余空间、是否由同一个 `import()` 入口使用，以及直接静态依赖关系分别确定位置。静态导入关系只是同包偏好，不是强制约束。
-
-因此，位于分包 A 的引用方，其静态依赖可以位于主包、分包 A 或分包 B。每个模块仍然只归属一个物理包，不会为了满足跨包引用而复制。大型静态依赖图或循环依赖也可以拆到多个分包，由 SystemJS 保持原依赖关系和循环语义。
-
-分包目录名来自该分包内排序后的源码模块 IDs：对它们计算 SHA-256，并取前 8 位。
+分包目录名来自包内排序后的逻辑 chunk IDs：对它们计算 SHA-256，并取前 8 位。
 
 ```text
 sub/p_<8位哈希>
 ```
 
-Rolldown 的 chunk 分组配置会阻止不同物理包中的模块合并。如果最终 chunk 同时包含属于不同物理包的源码模块，构建会直接失败。
+SystemJS 继续使用包无关的逻辑 chunk ID；`transport` 单独把该 ID 映射到主包 `require()` 或分包 `require.async()` 的物理路径。因此最终化阶段只移动文件，不改变模块身份或复制 chunk。
+
+#### 规划复杂度与构建性能
+
+设最终 chunk 数为 `C`、动态加载迁移数为 `T`、生成分包数为 `B`。主包闭包遍历与最终文件落位均随 chunk 图线性增长；加载迁移分析的成本是各迁移静态闭包大小之和。装包时会扫描可容纳的分包并求稀疏迁移集合交集，理论最坏情况为 `O(CBT)`，但真实项目通常只有少量分包和稀疏迁移成员关系。
+
+规划在每次完整输出中只运行一次。随后路径与加载模式查询是 `O(1)` 的 Map 查询，`generateBundle` 最终化是 `O(C)`；规划器不复制 chunk，也不保留第二份完整 Rolldown chunk 图。
+
+Node.js 26 上的合成基准用于防止算法退化，不代表具体项目的总构建时间：
+
+| 最终 chunk 图 | 单次规划时间（约） |
+| --- | ---: |
+| 10,000 条相互独立的加载迁移 | 10 ms |
+| 1,000 个动态根共享 100 个 chunk | 16 ms |
+| 10,000 个 chunk、100 条近乎最大重叠的迁移 | 184 ms |
+
+最后一种是刻意制造的高重叠压力图；常见图更接近前两种稀疏情况。
 
 ### 3. 生成最终文件和分包声明
 
-主包普通 chunk 使用 `assets/<name>-<content-hash>.js`。分包 chunk 使用 `sub/p_<package-hash>/assets/<first-module-name>-<content-hash>.js`：`first-module-name` 来自 Rolldown 最终 chunk 模块列表中的第一个源码文件名，并移除查询参数、片段和扩展名。删除未使用代码后没有实际输出的分包不会进入 `app.json`。
+`chunkFileNames` 一次只能看到一个 `PreRenderedChunk`，看不到完整加载迁移图，因此它使用 Rolldown 原生的 `assets/[name]-[hash].js` 模式，绝不在这里决定分包或重建 chunk 名称。Rolldown 负责名称、碰撞处理、内容哈希和生成的相对导入；主包保留其路径，分包只在最终化时加上 `sub/p_<package-hash>/` 前缀。渲染层从 Rolldown 路径投影 SystemJS 逻辑 ID 时独立移除开头的 `assets/`，所以输出目录组织不会进入模块身份。
+
+在 pre `generateBundle` 中，`vpt:wx-placer` 用 preliminary logical ID 查找每个最终 `OutputChunk` 的强类型 `PackageLocation`，并直接设置 Rolldown 所属对象的 `fileName`。它不修改 bundle 键、不复制 chunk，也不通过 `emitFile` 重新发射 JavaScript。随后 `vpt:wx` 才按这些最终路径放置原生组件资源并生成 JSON。删除未使用代码后没有实际输出的分包不会进入 `app.json`。
 
 全局样式的实际内容固定输出为 `assets/global.wxss`。根目录下的 `app.wxss` 只包含对该文件的 `@import`，因此两个全局样式路径在生产和开发构建中都保持不变。
 
@@ -187,7 +206,7 @@ vpt 对最终存在的分包目录去重、排序，并生成分包声明：
 
 ```js
 module.exports = [
-    ['assets/dependency-<hash>.js'],
+    ['dependency-<hash>.js'],
     function (exportBinding, context) {
         return {
             setters: [/* 接收依赖导出更新的函数 */],
@@ -213,27 +232,27 @@ module.exports = [
 
 | 身份 | 用途 |
 | --- | --- |
-| Vite/Rolldown 源码模块 ID | 源码转换、删除未使用代码、位置规划和开发补丁 |
-| 最终 chunk 文件名 | 运行时模块 ID，以及 chunk 之间的静态和动态依赖 ID |
-| 相对于 `transport` chunk 的路径 | 仅供生成的 `require()` 与 `require.async()` 使用 |
+| Vite/Rolldown 源码模块 ID | 源码转换和开发补丁 |
+| 最终逻辑 chunk ID | 位置规划、SystemJS 模块 ID，以及 chunk 之间的静态和动态依赖 ID |
+| 最终物理文件路径 | 仅供生成的 `require()` 与 `require.async()` 使用 |
 
-SystemJS 使用相对于微信输出根目录的 chunk 文件名作为模块 ID。构建时，vpt 会把 chunk 之间的相对引用转换成统一 ID：
+SystemJS 使用不含物理分包归属的逻辑 chunk 路径作为模块 ID。构建时，vpt 会把 chunk 之间的相对引用转换成统一 ID：
 
 ```text
-../../assets/shared-<hash>.js  → assets/shared-<hash>.js
-./feature-data-<hash>.js       → sub/p_abcd1234/assets/feature-data-<hash>.js
+../shared-<hash>.js      → shared-<hash>.js
+./feature-data-<hash>.js → feature-data-<hash>.js
 ```
 
-转换后的依赖 ID 与模块最终位于主包还是分包无关；`import.meta.url` 也使用当前 chunk 的统一 ID。
+右侧是包无关的逻辑 ID，而不是物理文件路径。即使第二个 chunk 最终写入 `sub/p_abcd1234/assets/feature-data-<hash>.js`，SystemJS 仍以 `feature-data-<hash>.js` 标识它；`import.meta.url` 也使用当前 chunk 的逻辑 ID。
 
 `transport` 根据最终 chunk 列表生成：每个可加载 chunk 都有一个固定的 `case`，模块 ID 和 `require` 路径直接写入构建产物，未知 ID 会被拒绝。
 
 ```js
 function transport(moduleId) {
     switch (moduleId) {
-        case 'assets/page-a.js':
-            return require('./page-a.js')
-        case 'sub/p_abcd1234/assets/feature-data-<hash>.js':
+        case 'page-a.js':
+            return require('./assets/page-a.js')
+        case 'feature-data-<hash>.js':
             return require.async('../sub/p_abcd1234/assets/feature-data-<hash>.js')
         default:
             throw new Error(`Unknown module: ${moduleId}`)
@@ -241,7 +260,7 @@ function transport(moduleId) {
 }
 ```
 
-加载方式只由最终文件位置决定：`sub/p_` 下的 System.register 文件使用 `require.async()`，其他 System.register 文件使用 `require()`；同时供 CommonJS 和 SystemJS 使用的 chunk 必须位于主包。
+`case` 是 SystemJS 的逻辑 ID，`require` 参数才是相对于 transport 的物理路径。加载方式只由规划后的 `PackageLocation` 决定：分包中的 System.register 文件使用 `require.async()`，主包中的 System.register 文件使用 `require()`；同时供 CommonJS 和 SystemJS 使用的 chunk 必须位于主包。
 
 ### 启动过程
 
@@ -285,9 +304,11 @@ Page 和 Component 使用相同过程。业务动态导入仍使用异步加载�
 
 ## 开发模式
 
-第一次微信开发构建仍使用相同的物理输出和位置规划，但移除内容哈希以保持文件路径稳定。后续 JavaScript 更新由 Rolldown 开发运行时应用源码模块补丁，不会重新加载整套物理 chunks；无法安全接受的更新才触发完整构建。
+第一次微信开发构建仍使用相同的物理输出和位置规划，但移除内容哈希以保持文件路径稳定。普通 JavaScript HMR 由 Rolldown 开发运行时直接生成源码模块补丁，只改写 `hmr/patches.js`；它不会进入完整输出的 `renderStart`、`renderChunk` 或 `generateBundle`，因此不会运行 LTHP、扫描最终 chunk 图、重新分配分包或重写普通 chunk。
 
-完整过程参见[热更新原理](/references/hmr-implementation/)。
+只有初始构建和明确请求的完整构建会重新执行一次位置规划。完整构建本来就需要重新生成全部物理输出，LTHP 在其中增加的是一次规划成本：常见稀疏图通常是毫秒级，随后文件最终化随 chunk 数线性增长。普通补丁的 16 ms 合并窗口、补丁发布、React Refresh 和开发者工具页面替换路径均不受规划器影响。
+
+无法安全接受的更新才触发完整构建；此时应用状态会按既有恢复协议重置。完整过程参见[热更新原理](/references/hmr-implementation/)。
 
 ## Web 输出
 

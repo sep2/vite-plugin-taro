@@ -6,9 +6,8 @@ import { clientTaroNativeId } from '../client/constant.ts'
 import { createWxDevelopmentPlugin } from './dev/plugins.ts'
 import { getWxExecutionKind, isTransportModule } from './module.ts'
 import { compileNativeComponentInterface } from './native/compile-native-component-interface.ts'
-import { getNativeComponentAssetBytes } from './native/native-component-assets.ts'
 import { createOutputFiles } from './output/files.ts'
-import { createPlacer } from './placement/placer.ts'
+import { createWxPlacementPlugin, type WxPlacementPlugin } from './placement/placer.ts'
 import { renderCapsule } from './render/capsule.ts'
 import { renderNative } from './render/native.ts'
 import { materializeTransport } from './render/transport.ts'
@@ -23,17 +22,18 @@ export function createWxTargetPlugins(options: VptOptions): PluginOption[] {
 
     // Reuse the resolver instance's ordered application subset. Rolldown's complete input also contains bootstrap, transport,
     // shell, and component entries; entry membership alone cannot recover which roots define the App/Page CSS cascade.
+    const placement = createWxPlacementPlugin()
+
     return [
+        placement,
         createWxStylePlugins(),
-        createWxPlugin(options, resolver),
+        createWxPlugin(options, resolver, placement),
         createWxDevelopmentPlugin(options, resolver.applicationEntryIds)
     ]
 }
 
 /** Configures the complete wx target build pipeline. */
-function createWxPlugin(options: VptOptions, resolver: WxResolver): Plugin {
-    const placer = createPlacer()
-
+function createWxPlugin(options: VptOptions, resolver: WxResolver, placement: WxPlacementPlugin): Plugin {
     return {
         name: 'vpt:wx',
 
@@ -70,7 +70,8 @@ function createWxPlugin(options: VptOptions, resolver: WxResolver): Plugin {
                     target: esTarget,
 
                     rolldownOptions: {
-                        ...placer.rolldownOptions,
+                        // The dedicated vpt:wx-placer plugin owns output naming and entry-signature semantics. This plugin owns
+                        // only the closed named input set of native shells, lifecycle capsules, bootstrap, and transport entries.
                         input: resolver.input
                     }
                 }
@@ -99,17 +100,11 @@ function createWxPlugin(options: VptOptions, resolver: WxResolver): Plugin {
             }
         },
 
-        renderStart() {
-            placer.analyze({
-                moduleIds: this.getModuleIds(),
-                getModuleInfo: (moduleId) => this.getModuleInfo(moduleId),
-                getAdditionalModuleBytes: (info) => getNativeComponentAssetBytes(info.meta)
-            })
-        },
-
         renderChunk: {
             order: 'post',
             async handler(code, chunk, outputOptions, meta) {
+                // vpt:wx-placer runs first and has already created immutable placement from this complete chunk graph.
+
                 const executionKind = getWxExecutionKind(chunk)
                 const sourcemap = Boolean(outputOptions.sourcemap)
 
@@ -126,7 +121,8 @@ function createWxPlugin(options: VptOptions, resolver: WxResolver): Plugin {
                         code: native.code,
                         transportChunk: chunk,
                         chunks: meta.chunks,
-                        getLoadMode: placer.getLoadMode,
+                        getLoadMode: placement.getLoadMode,
+                        getPhysicalChunkId: placement.getPhysicalChunkId,
                         sourcemap
                     })
                 }
@@ -144,13 +140,17 @@ function createWxPlugin(options: VptOptions, resolver: WxResolver): Plugin {
              */
             order: 'post',
             async handler(_, bundle) {
-                const subpackages = placer.getSubpackages(bundle)
+                // LTHP joins OutputChunks to their preliminary logical IDs and assigns Rolldown-owned physical filenames.
+                // createOutputFiles then observes those paths to relocate native component folders, emit placeholders, and
+                // declare only surviving package roots in app.json. No JavaScript chunk is manually emitted or copied.
+                const subpackages = placement.getSubpackages()
 
                 const outputFiles = await createOutputFiles({
                     bundle,
                     options,
                     subpackages,
-                    getModuleInfo: (moduleId) => this.getModuleInfo(moduleId)
+                    getModuleInfo: (moduleId) => this.getModuleInfo(moduleId),
+                    getPackageLocation: placement.getPackageLocation
                 })
 
                 outputFiles.forEach((file) => {

@@ -68,12 +68,26 @@ export function installWxDevOptions({
          * mutating configuredOutput itself would leak development normalization back into the user's resolved Vite config.
          */
         Object.assign(output, configured, {
+            // Development output is overwritten in place after every complete build. Strip hash placeholders from the
+            // configured asset pattern so old files cannot accumulate and native JSON/WXML references remain stable.
             assetFileNames: createStableFileNames(configured.assetFileNames, 'assets/[name][extname]'),
+            // Banners create physical CommonJS edges after graph analysis: App initializes the dev runtime and each Page
+            // consumes the stable patch journal without allowing those host-only files into the application chunk graph.
             banner: createEntryBanner(pageFiles),
+            // Preserve the configured directory/name shape while removing content hashes. Stable chunk paths let DevTools
+            // overwrite executable files and let cumulative HMR patches address one persistent physical module identity.
             chunkFileNames: createStableFileNames(configured.chunkFileNames, 'assets/[name].js'),
+            // Native entry paths are public Mini Program routes (`app.js`, `pages/.../index.js`); development must never hash
+            // or relocate them because DevTools determines App/Page reload behavior from those exact filenames.
             entryFileNames: createStableFileNames(configured.entryFileNames, '[name]'),
+            // Keep ESM until the existing WX renderChunk pipeline classifies each final chunk and converts capsules to
+            // System.register data or native/amphibious entries to CommonJS. Choosing CommonJS here would erase that boundary.
             format: 'es',
+            // Bundled development emits complete physical output repeatedly. Minifying bounds disk transfer and DevTools
+            // compile work; source-level HMR diagnostics still come from Vite/Rolldown before this final output pass.
             minify: true,
+            // DevTools executes physical WX files and HMR applies module factories rather than browser source maps. Disabling
+            // maps avoids extra output files and prevents Vite's Oxc sourcemap transform from touching generated host code.
             sourcemap: false
         })
 
@@ -84,9 +98,16 @@ export function installWxDevOptions({
         rolldownOptions.experimental ??= {}
         const existingDevMode = rolldownOptions.experimental.devMode
         rolldownOptions.experimental.devMode = {
+            // Retain unknown user/forward-compatible devMode fields while the three explicit WX invariants below win.
             ...(typeof existingDevMode === 'object' ? existingDevMode : {}),
+            // Install the WX-adapted self-contained Rolldown runtime. It consumes physical patch journals and reports
+            // acknowledgements/rebuild requests through the host bridge instead of relying on browser globals or sockets.
             implement: await bundleRuntimeSource(),
+            // Produce a complete output graph on the initial build. Lazy per-request compilation cannot establish the closed
+            // App/Page graph, native companions, style sidecars, and build identity required before any patch is admitted.
             lazy: false,
+            // Keep Rolldown's common runtime injection because generated application factories call its module registry and
+            // HMR primitives. Skipping it would leave the custom implementation without the runtime surface it extends.
             skipCommonRuntimeInjection: false
         }
 

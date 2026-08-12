@@ -8,8 +8,8 @@ function transformRegistration(code: string): string {
     const result = transformSync(code, {
         babelrc: false,
         configFile: false,
-        filename: 'chunk.js',
-        plugins: [wrapCapsulePlugin('chunk.js') as PluginTarget],
+        filename: 'assets/chunk.js',
+        plugins: [wrapCapsulePlugin('assets/chunk.js') as PluginTarget],
         sourceType: 'script'
     })
 

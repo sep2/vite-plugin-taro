@@ -19,13 +19,15 @@ test('emits surviving native folders into their planned packages', async () => {
 
         const output = await createNativeComponentOutput({
             bundle: {
-                main: createChunk('assets/main.js', [main.moduleId]),
-                subpackage: createChunk('sub/p_test/assets/subpackage.js', [subpackage.moduleId])
+                main: createChunk('main.js', [main.moduleId]),
+                subpackage: createChunk('sub/p_test/subpackage.js', [subpackage.moduleId])
             },
             getModuleInfo: (moduleId) => {
                 const meta = metadata.get(moduleId)
                 return meta ? { meta } : null
-            }
+            },
+            getPackageLocation: (chunk) =>
+                chunk.fileName === 'main.js' ? { kind: 'main' } : { kind: 'subpackage', root: 'sub/p_test' }
         })
 
         assert.deepEqual(
