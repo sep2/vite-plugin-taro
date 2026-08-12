@@ -1,180 +1,212 @@
 ---
 title: 模块系统
-description: vpt 在 H5 与微信小程序目标中解析、切分、放置和执行 JavaScript 模块的完整机制。
+description: vpt 如何在 H5 和微信小程序中保留 ESM 语义，并为微信生成同步入口、运行时加载和自动分包。
 ---
 
-vpt 让应用始终使用 ESM：同步依赖写 `import`，按需加载写 `import()`。H5 继续使用 Vite 和浏览器的模块机制；微信小程序则把 Rolldown 的构建结果转换为微信可以同步启动、按需加载和全自动分包的应用。
+应用代码在两个目标中都使用标准 ESM：同步依赖写 `import`，按需加载写 `import()`。H5 直接使用 Vite 和浏览器的模块系统；微信小程序没有等价的原生 ESM 执行环境，因此 vpt 会在构建时改写模块格式，并在运行时补上模块连接与跨分包加载。
 
-本文涉及两种模块：
+最重要的规则只有一条：
 
-- **源码模块**：Vite/Rolldown 解析的源码文件；
-- **输出模块**：Rolldown 切分出的最终 chunk。
+> `import` 和 `import()` 决定依赖何时可用，不决定文件最终放在哪个微信分包。
 
-它们不一一对应。Rolldown 负责解析、转换、删除未使用代码（tree shaking）、合并模块作用域（scope hoisting）和切分 chunk；vpt 在最终输出阶段处理微信入口、运行时加载和物理分包。
+如果只想使用自动分包，阅读“应用代码的规则”即可。后面的章节解释构建产物和运行时，供排查问题或维护 vpt 时参考。使用示例参见[全自动分包](/guides/automatic-subpackages/)。
 
-## 这套设计解决了什么
+## 整体模型
 
-Vite/Rolldown 面向 ESM 和异步 chunk 加载，微信小程序却要求同步注册原生入口，并通过不同 API 加载主包与分包文件。如果把这些限制直接暴露给应用，业务代码就必须维护微信专用入口、包路径、共享依赖和加载顺序。
+```text
+同一份 ESM 源码
+   │
+   ├─ H5 ──→ Vite / Rolldown ──→ 浏览器 ESM
+   │
+   └─ 微信 ─→ Rolldown 最终代码块
+                  │
+                  ├─ 启动必须使用的代码 ──→ 主包
+                  └─ 可以按需加载的代码 ──→ 自动生成的分包
+                                      │
+                                      └─ vpt 模块运行时连接并执行
+```
 
-| 冲突 | vpt 的解决方式 |
+本文使用以下几个词：
+
+| 名称 | 含义 |
 | --- | --- |
-| `App()`、`Page()`、`Component()` 必须同步注册 | 生成固定路径的极小原生入口，并从主包同步取得配置对象 |
-| 主包和分包使用不同的物理加载 API | 根据最终文件位置生成加载代码，业务模块不接触微信加载 API |
-| 静态依赖可能跨越主包和多个分包 | 按原依赖图连接模块，共享依赖无需复制 |
-| 手工分包会把目录和体积管理泄漏进业务架构 | 根据静态与动态导入关系自动分配模块位置，并生成分包和 `app.json` |
+| 源码模块 | Vite 读取的一个源码文件 |
+| 代码块（chunk） | Rolldown 最终输出的一个 JavaScript 文件；它可能包含多个源码模块 |
+| 启动代码 | 从 App、Page 和 Component 原生入口沿静态导入可以到达的代码 |
+| 模块 ID | 模块运行时使用的稳定名称 |
+| 文件路径 | 微信实际传给 `require()` 或 `require.async()` 的输出路径 |
 
-核心原则是把**源码依赖关系**与**微信分包位置**分开。静态 `import` 不强制两个模块位于同一分包，动态 `import()` 也不指定某个分包。应用只表达同步依赖和异步加载边界。
+源码模块和最终代码块不是一一对应的。删除未使用代码、合并模块和代码切分都由 Rolldown 完成；vpt 只对最终代码块决定微信中的存放位置和加载方式。
 
-## 总览
+## 应用代码的规则
 
-```text
-应用源码
-   │
-   │ 静态 import：同步依赖
-   │ 动态 import()：按需加载边界
-   ▼
-Vite + Rolldown 模块图
-   │
-   ├─ 启动时同步可达的模块 ──────────────→ 主包
-   │
-   └─ 只在动态边界后可达的模块
-          │
-          └─ vpt 按体积和依赖关系分组 ──→ 一个或多个分包
-
-最终微信输出
-   ├─ 固定路径的 App / Page / Component 原生入口
-   ├─ 主包 JavaScript chunks
-   ├─ 分包 A：sub/p_a/assets/*
-   ├─ 分包 B：sub/p_b/assets/*
-   ├─ 根据模块 ID 加载这些文件的 transport chunk
-   └─ 与实际分包一致的 app.json
-```
-
-vpt 会按源码依赖图连接这些文件，因此分包 A 中的模块可以静态引用主包或分包 B 中的模块。
-
-运行时遵守三个规则：
-
-1. 原生入口必须同步完成注册；
-2. 静态依赖会在引用方执行前完成连接，即使两者位于不同分包；
-3. 动态 `import()` 才能触发按需文件加载。
-
-## 应用源码语义
-
-### 静态导入
-
-静态 `import` 表达预先连接的依赖关系：
+### 静态 `import`
 
 ```ts
-import { calculate } from './calculate'
+import { initializeStore } from './store'
+
+initializeStore()
 ```
 
-静态 `import` 要求依赖在引用方执行前完成连接，但不要求两者位于同一个物理包。从 App、页面或其他启动代码同步可达的模块属于**启动依赖**，因此都留在主包；进入动态导入边界后，每个模块的位置会独立规划。
+静态导入表示：执行当前模块之前，依赖必须已经连接并可用。
 
-所以，一个分包中的模块可以静态引用：
+从 App、Page 或 Component 入口沿静态导入可达的代码必须支持微信同步启动，因此会留在主包。若静态导入出现在一个按需功能内部，它的两端不必位于同一个分包；运行时会先取得全部静态依赖，再执行引用方。
 
-- 已经作为启动依赖使用、因而位于主包的共享模块；
-- 位于同一个分包的模块；
-- 位于另一个分包的模块。
+因此，按需功能中的代码可以静态引用：
 
-运行时会按原始依赖关系加载并连接这些模块，源码不需要知道最终分包位置。
+- 主包中的共享代码；
+- 同一分包中的代码；
+- 其他分包中的代码。
 
-### 动态导入
+源码不需要知道这三种情况的区别。
 
-应用中的 `import()` 创建异步加载边界，并且始终返回 Promise：
+### 动态 `import()`
 
 ```ts
-const { createReport } = await import('./features/report')
+async function openReport() {
+    const { createReport } = await import('./features/report')
+    return await createReport()
+}
 ```
 
-`import()` 只表示“这里可以按需加载”，不直接指定分包。如果目标模块同时被启动代码静态导入，它已经属于主包；只有仅在动态边界之后使用的模块才参与分包规划。业务代码在两种情况下都只需正常使用 `await import()`。
+动态导入表示：调用方允许在这里暂停，并通过 Promise 等待目标模块。它创建按需加载边界，但不保证目标一定进入分包。
 
-## 微信构建流水线
+目标的最终位置取决于完整依赖图：
 
-### 1. 建立微信原生入口
+| 依赖情况 | 结果 |
+| --- | --- |
+| 目标也被启动代码静态导入 | 目标已经是启动代码，留在主包 |
+| 目标只能通过 `import()` 到达 | 目标及其依赖参与分包规划 |
+| 按需功能内部还有下一层 `import()` | 下一层形成独立的按需加载边界 |
+| `import type` | 编译时删除，不影响输出位置 |
 
-vpt 为微信建立以下入口：
+如果启动代码本身过大，需要在合适的功能入口增加 `import()`。按源码目录移动文件，或手写微信分包配置，都不会把同步依赖变成按需依赖。
+
+### 应用不应依赖物理分包
+
+自动分包生成的目录名和文件位置属于构建结果，业务代码不应：
+
+- 根据源码目录推测分包；
+- 直接调用 `require.async()` 加载构建产物；
+- 在 `appJson` 中维护代码分包；
+- 保存或拼接生成后的代码块路径。
+
+vpt 会移除传入 `appJson` 的 `subPackages` 和 `subpackages`，再根据本次实际输出生成声明。
+
+## H5 如何执行模块
+
+H5 不需要额外模块运行时。vpt 会生成 H5 App 入口，把 App 配置和页面路由写入该入口，并为页面生成浏览器动态 `import()`。之后的模块解析、代码切分和加载都交给 Vite、Rolldown 与浏览器。
+
+因此 H5 产物继续使用浏览器 ESM；微信专用的启动文件、模块注册格式和文件加载表不会进入 H5 输出。
+
+## 为什么微信需要另一套执行方式
+
+微信构建需要同时满足三个约束：
+
+1. `app.js`、页面入口和递归组件入口由微信直接执行，且必须同步调用 `App()`、`Page()` 或 `Component()`；
+2. 主包文件可以用 `require()` 同步取得，分包文件需要用 `require.async()` 异步取得；
+3. 应用仍然需要 ESM 的共享模块、循环依赖、实时导出绑定、动态导入和顶层 `await` 语义。
+
+如果直接把物理路径写进模块关系，任何分包调整都会改变模块身份，也很难处理跨分包静态依赖。vpt 因此把微信运行时拆成三层：
+
+| 层 | 职责 |
+| --- | --- |
+| 原生入口 | 使用微信要求的固定文件名，同步调用注册函数 |
+| 模块运行时 | 按 ESM 规则连接、缓存和执行模块 |
+| 文件加载表 | 把模块 ID 映射到实际文件路径，并选择 `require()` 或 `require.async()` |
+
+模块运行时只认识模块 ID，只有文件加载表知道代码位于主包还是分包。分包规划因此可以改变文件位置，而不改变模块关系。
+
+## 微信构建过程
+
+### 1. 先生成最终代码块
+
+Rolldown 先完成源码转换、未使用代码删除、模块合并和代码切分。vpt 等最终代码块依赖图出现后再规划位置，而不是按源码文件或源码目录提前猜测。
+
+这样做有两个直接结果：
+
+- 规划使用的是最终会写入磁盘的 JavaScript 文件；
+- 体积估算基于已经删除未使用代码的结果。
+
+每次完整输出只规划一次。后续渲染和文件生成都读取同一份位置结果。
+
+### 2. 确定主包代码
+
+所有显式构建入口及其递归静态依赖都进入主包。这些代码包括：
+
+- 固定路径的 App、Page 和 Component 原生入口；
+- 安装模块运行时的启动代码；
+- 创建 `App()`、`Page()` 和 `Component()` 参数对象的模块；
+- 上述模块在启动时需要的全部静态依赖。
+
+这条规则来自“微信必须同步完成原生注册”的要求。主包代码不会为了凑体积被强行移入分包。
+
+### 3. 把其余代码分组
+
+分包规划有三个目标，按优先级排列：
+
+1. 每个最终代码块只保存一份；
+2. 单次动态导入尽量少触及分包；
+3. 每个生成分包保留足够的体积余量。
+
+规划器按以下步骤工作：
+
+1. 对每条最终动态导入，收集目标代码块及其递归静态依赖，得到一次加载所需的代码块集合；
+2. 记录每个代码块被哪些加载集合使用；
+3. 优先处理被更多加载集合共享的代码块，其次处理体积较大的代码块；
+4. 在容量允许时，把代码块放入与它共享最多加载集合的现有分包；
+5. 若多个分包同样合适，选择放入后剩余空间最少的分包；没有可用分包时创建一个新分包。
+
+嵌套 `import()` 会产生新的加载集合，不会并入外层。共享代码块综合所有使用方选择唯一位置，不会为不同功能复制多份。
+
+每个分包的规划预算是 `1,900,000` 字节，为最终包装和微信原生文件预留低于 2M 限制的空间。估算包含：
+
+- 删除未使用代码后的模块内容；
+- 代码块包装与依赖引用开销；
+- 由对应模块声明的微信原生组件文件。
+
+单个代码块如果已经超过预算，会独占一个分包。规划器不会拆开 Rolldown 已经生成的代码块，也不会复制它。图片、字体、全局样式和其他普通构建资源目前不参与这套位置规划；完整范围参见[全自动分包](/guides/automatic-subpackages/#原生组件与其他资源)。
+
+### 4. 生成微信可执行的文件
+
+不同文件使用不同输出形式：
+
+| 文件 | 输出形式 | 作用 |
+| --- | --- | --- |
+| `app.js`、`comp.js`、`pages/<route>.js` | CommonJS | 由微信直接执行并同步调用原生注册函数 |
+| 普通应用代码块 | 模块注册信息 | 交给模块运行时连接和执行 |
+| 启动运行时和文件加载表 | CommonJS | 安装模块运行时并访问微信文件加载 API |
+
+普通应用代码块不会在微信 `require()` 文件时立刻执行模块体。文件只导出类似下面的注册信息：
+
+```js
+module.exports = [
+    ['dependency.js'],
+    function declare(exportValue, context) {
+        return {
+            setters: [/* 接收依赖导出的函数 */],
+            execute() {
+                // 原代码块的执行体
+            }
+        }
+    }
+]
+```
+
+依赖列表用于建立模块关系，`setters` 用于更新 ESM 导入绑定，`execute` 在依赖连接完成后才运行。这使文件下载顺序和模块执行顺序可以分开处理。
+
+### 5. 写入目录并生成 `app.json`
+
+Rolldown 继续负责文件名、内容哈希和名称碰撞处理。主包代码块保留 `assets/...` 路径；分包代码块只增加一层自动生成的目录前缀：
 
 ```text
-app.js                         → App 原生入口
-comp.js                        → 递归 Component 原生入口
-pages/<route>.js               → 对应 route 的 Page 原生入口
+assets/report-<hash>.js
+sub/p_abcd1234/assets/report-<hash>.js
 ```
 
-这些原生入口只负责加载主包中的 `bootstrap` chunk、同步取得传给微信注册函数的对象，并调用 `App()`、`Page()` 或 `Component()`。`bootstrap` 安装 SystemJS Core，并把 `transport` 函数接入 `System.instantiate`。创建参数对象的代码会单独输出：
+每个分包目录名由该分包内排序后的代码块名称计算得出，所以同一份构建图会得到稳定结果。每个代码块只更改最终文件名，不会被复制或重新发射。
 
-- App 部分导入配置项 `app` 指向的组件（通常是 `src/app.tsx`），初始化 Taro React 运行时，并默认导出传给 `App()` 的对象；
-- Page 部分导入对应的页面组件，在 App 初始化后默认导出传给 `Page()` 的对象；
-- Component 部分在 App 初始化后默认导出传给 `Component()` 的递归组件对象。
-
-Rolldown 保留原生入口与这些代码之间的静态依赖，vpt 再把最终 chunk 的导入转换为同步运行时加载。应用中的 `import()` 只表示按需加载边界。
-
-### 2. 规划主包和分包
-
-位置规划由独立的 Vite 插件 `vpt:wx-placer` 管理，而不是夹在渲染器中的共享缓存。它通过 `config` 安装微信输出命名和入口签名选项；在 Rolldown 已经完成 tree shaking、scope hoisting 和自然 chunk 切分后，从 `renderChunk` 提供的完整最终 preliminary chunk 图创建一次 LTHP 位置。后续每个 chunk 的渲染只读取这份不可变位置，不会重复遍历图，也不会重新推测源码模块最终会怎样合并。
-
-一次输出生成只经过以下状态：
-
-```text
-idle
-  → renderStart：awaiting-chunks
-  → 第一个 pre renderChunk：planned
-  → pre generateBundle：finalized
-```
-
-状态以一个整体值切换。新一代构建不会继承上一代的体积、chunk 或所有权缓存，`vpt:wx` 渲染插件也不能在规划前取得路径，或在最终化前取得 `app.json` 分包声明。
-
-以下内容必须留在主包：
-
-1. 所有显式输出入口；
-2. 这些入口递归静态引用的完整 chunk 闭包；
-3. 因此也包括原生壳、`bootstrap`、`transport` 和生命周期 capsule 所需的同步代码。
-
-其余 chunk 使用 **Load-Transition Hypergraph Partitioning（LTHP）** 规划：
-
-1. 每条动态 chunk 边是一条加载迁移；
-2. 该动态目标的静态 chunk 闭包构成一条超边；
-3. 每个最终 chunk 只分配给一个物理包，绝不复制；
-4. 先放置参与更多迁移的共享 chunk，再处理较大 chunk；
-5. 每次优先选择与该 chunk 共享最多加载迁移的可容纳分包；
-6. 下载代价相同时，再选择剩余空间最小的分包。
-
-这样优化的是一次 `import()` 实际触及的包数量，而不是文件名顺序、直接邻接数或单纯装满程度。嵌套 `import()` 会形成独立迁移；共享 chunk 会综合所有使用它的迁移选择唯一所有者。
-
-每个分包的规划预算为 `1,900,000` 字节，为运行时包装和原生资源预留空间。最终 chunk 的估算包含 tree-shaken 模块代码、chunk 包装和引用开销以及原生组件资源。单个超预算 chunk 会独占分包；规划器不会复制或拆开 Rolldown 的最终 chunk。
-
-分包目录名来自包内排序后的 Rolldown preliminary filenames：对它们计算 SHA-256，并取前 8 位。
-
-```text
-sub/p_<8位哈希>
-```
-
-SystemJS 继续使用包无关的逻辑 chunk ID；`transport` 单独把该 ID 映射到主包 `require()` 或分包 `require.async()` 的物理路径。因此最终化阶段只移动文件，不改变模块身份或复制 chunk。
-
-#### 规划复杂度与构建性能
-
-设最终 chunk 数为 `C`、动态加载迁移数为 `T`、生成分包数为 `B`。主包闭包遍历与最终文件落位均随 chunk 图线性增长；加载迁移分析的成本是各迁移静态闭包大小之和。装包时会扫描可容纳的分包并求稀疏迁移集合交集，理论最坏情况为 `O(CBT)`，但真实项目通常只有少量分包和稀疏迁移成员关系。
-
-规划在每次完整输出中只运行一次。随后路径与加载模式查询是 `O(1)` 的 Map 查询，`generateBundle` 最终化是 `O(C)`；规划器不复制 chunk，也不保留第二份完整 Rolldown chunk 图。
-
-Node.js 26 上的合成基准用于防止算法退化，不代表具体项目的总构建时间：
-
-| 最终 chunk 图 | 单次规划时间（约） |
-| --- | ---: |
-| 10,000 条相互独立的加载迁移 | 10 ms |
-| 1,000 个动态根共享 100 个 chunk | 16 ms |
-| 10,000 个 chunk、100 条近乎最大重叠的迁移 | 184 ms |
-
-最后一种是刻意制造的高重叠压力图；常见图更接近前两种稀疏情况。
-
-### 3. 生成最终文件和分包声明
-
-`chunkFileNames` 一次只能看到一个 `PreRenderedChunk`，看不到完整加载迁移图，因此它使用 Rolldown 原生的 `assets/[name]-[hash].js` 模式，绝不在这里决定分包或重建 chunk 名称。Rolldown 负责名称、碰撞处理、内容哈希和生成的相对导入；主包保留其路径，分包只在最终化时加上 `sub/p_<package-hash>/` 前缀。渲染层从 Rolldown 路径投影 SystemJS 逻辑 ID 时独立移除开头的 `assets/`，所以输出目录组织不会进入模块身份。
-
-在 pre `generateBundle` 中，`vpt:wx-placer` 用 `preliminaryFileName` 查找每个最终 `OutputChunk` 的强类型 `PackageLocation`，并直接设置 Rolldown 所属对象的 `fileName`。它不修改 bundle 键、不复制 chunk，也不通过 `emitFile` 重新发射 JavaScript。随后 `vpt:wx` 才按这些最终路径放置原生组件资源并生成 JSON。删除未使用代码后没有实际输出的分包不会进入 `app.json`。
-
-全局样式的实际内容固定输出为 `assets/global.wxss`。根目录下的 `app.wxss` 只包含对该文件的 `@import`，因此两个全局样式路径在生产和开发构建中都保持不变。
-
-vpt 对最终存在的分包目录去重、排序，并生成分包声明：
+只有最终仍包含代码的分包会写入 `app.json`：
 
 ```json
 {
@@ -188,135 +220,116 @@ vpt 对最终存在的分包目录去重、排序，并生成分包声明：
 }
 ```
 
-这些分包只声明代码入口，所以 `pages` 为空。传入 `appJson` 的 `subPackages` 或 `subpackages` 会被移除，最终声明完全来自实际输出。
+这些分包只承载按需代码，不声明微信页面，所以 `pages` 为空。微信原生组件的配套文件会跟随声明它的代码块进入同一个包。
 
-## 微信运行时：SystemJS Core
+## 微信运行时如何加载模块
 
-微信小程序内置定制版 SystemJS Core。vpt 在上游 Core 基础上增加同步 `importSync()`，并接入主包与分包文件加载。它属于 vpt 的构建产物，不是应用 API。
+### 模块 ID 与文件路径分离
 
-### 输出文件的执行方式
-
-`app.js`、`comp.js`、页面入口和 `transport` chunk 转换为 CommonJS，由微信直接执行。普通应用 chunk 导出 `System.register` 注册数据，等待 SystemJS 连接和执行。
-
-`bootstrap` 和 Rolldown 辅助运行时还会被应用依赖图导入。它们先作为 CommonJS 执行，再由 `transport` 把同一组缓存导出发布给 SystemJS。包含 `App()`、`Page()` 或 `Component()` 参数对象的 chunk 始终由对应原生入口同步加载，不受最终执行方式影响。
-
-### System.register 文件
-
-普通 chunk 会被包装成一份不会立即执行的注册数据：
-
-```js
-module.exports = [
-    ['dependency-<hash>.js'],
-    function (exportBinding, context) {
-        return {
-            setters: [/* 接收依赖导出更新的函数 */],
-            execute() {
-                // 原 chunk 执行体
-            }
-        }
-    }
-]
-```
-
-微信 `require()` 这个文件时只会取得 `[依赖列表, 声明函数]`，不会执行应用模块体。SystemJS 负责连接依赖、处理循环和执行模块。
-
-### CommonJS 与 SystemJS 共享导出
-
-`bootstrap` chunk 必须先作为 CommonJS 安装 SystemJS，随后又会被应用依赖图导入。Rolldown 辅助运行时出现时也有相同需求。
-
-`transport` 会为这些 chunk 生成注册数据。SystemJS 执行它时，才通过 `require()` 取得 CommonJS 已缓存的导出，并发布到统一模块注册表。这样模块体只执行一次，也避免 `bootstrap` 与 `transport` 互相加载时产生初始化循环。
-
-### 模块 ID 和 transport
-
-模块在不同阶段使用不同身份：
-
-| 身份 | 用途 |
-| --- | --- |
-| Vite/Rolldown 源码模块 ID | 源码转换和开发补丁 |
-| 最终逻辑 chunk ID | 位置规划、SystemJS 模块 ID，以及 chunk 之间的静态和动态依赖 ID |
-| 最终物理文件路径 | 仅供生成的 `require()` 与 `require.async()` 使用 |
-
-SystemJS 使用不含物理分包归属的逻辑 chunk 路径作为模块 ID。构建时，vpt 会把 chunk 之间的相对引用转换成统一 ID：
+模块运行时使用不含分包目录和开头 `assets/` 的 ID。例如：
 
 ```text
-../shared-<hash>.js      → shared-<hash>.js
-./feature-data-<hash>.js → feature-data-<hash>.js
+模块 ID：   report-A1b2C3.js
+文件路径： sub/p_abcd1234/assets/report-A1b2C3.js
 ```
 
-右侧是包无关的逻辑 ID，而不是物理文件路径。即使第二个 chunk 最终写入 `sub/p_abcd1234/assets/feature-data-<hash>.js`，SystemJS 仍以 `feature-data-<hash>.js` 标识它；`import.meta.url` 也使用当前 chunk 的逻辑 ID。
-
-`transport` 根据最终 chunk 列表生成：每个可加载 chunk 都有一个固定的 `case`，模块 ID 和 `require` 路径直接写入构建产物，未知 ID 会被拒绝。
+代码块之间的静态导入和动态导入都引用左侧 ID。构建生成的文件加载表负责把它转换为右侧路径：
 
 ```js
-function transport(moduleId) {
+function loadModule(moduleId) {
     switch (moduleId) {
-        case 'page-a.js':
-            return require('./assets/page-a.js')
-        case 'feature-data-<hash>.js':
-            return require.async('../sub/p_abcd1234/assets/feature-data-<hash>.js')
+        case 'shared-D4e5F6.js':
+            return require('./shared-D4e5F6.js')
+        case 'report-A1b2C3.js':
+            return require.async('../sub/p_abcd1234/assets/report-A1b2C3.js')
         default:
             throw new Error(`Unknown module: ${moduleId}`)
     }
 }
 ```
 
-`case` 是 SystemJS 的逻辑 ID，`require` 参数才是相对于 transport 的物理路径。加载方式只由规划后的 `PackageLocation` 决定：分包中的 System.register 文件使用 `require.async()`，主包中的 System.register 文件使用 `require()`；同时供 CommonJS 和 SystemJS 使用的 chunk 必须位于主包。
+实际生成的函数名是 `transport`。它只接受本次构建已知的模块 ID，不允许运行时拼接任意文件路径。`import.meta.url` 同样使用当前模块的逻辑 ID，而不是物理分包路径。
 
-### 启动过程
+### 同步启动
 
-每个原生入口首先通过 CommonJS 加载 `assets/bootstrap-<hash>.js`。这个 chunk 会安装定制版 SystemJS Core，并设置 `System.instantiate = transport`。
-
-随后，原生入口会同步加载包含对应参数对象的 chunk，并把它的默认导出传给微信注册函数：
+每个原生入口执行相同的同步流程：
 
 ```text
-加载 bootstrap chunk
-  → 同步加载包含 App() 参数对象的 chunk
-  → 取得默认导出
-  → 调用 App(默认导出)
+微信执行原生入口
+   ↓
+require() 启动运行时
+   ↓
+System.importSync() 取得对应的注册参数对象
+   ↓
+调用 App()、Page() 或 Component()
 ```
 
-Page 和 Component 使用相同过程。业务动态导入仍使用异步加载。
+`System.importSync()` 会同步取得目标模块及其递归静态依赖，建立导出绑定，按依赖优先顺序执行，并返回模块命名空间。构建阶段已经保证这条同步依赖图全部位于主包。
 
-### 同步加载：`System.importSync()`
+这个 API 只供 vpt 生成的原生入口使用，不是业务 API。启动依赖中如果出现顶层 `await`，模块图将无法同步完成，运行时会直接报错；需要异步工作的代码应放到启动后的动态导入边界。
 
-`System.importSync()` 会：
+### 动态导入
 
-1. 通过 `transport` 取得目标模块的注册数据；
-2. 为目标模块和它递归静态依赖的模块创建注册表条目；
-3. 连接用于实时更新导出值的回调；
-4. 按依赖优先顺序执行；
-5. 返回包含模块全部导出的命名空间对象。
+应用的 `import()` 最终使用 `System.import()`：
 
-`System.importSync()` 和 `System.import()` 共用同一个注册表。同一 ID 只会初始化和执行一次，并返回同一个模块命名空间；静态循环、声明阶段导出和实时绑定（live bindings）也通过这张注册表处理。
+```text
+import(moduleId)
+   ↓
+文件加载表取得目标注册信息
+   ↓
+递归取得目标的静态依赖
+   ↓
+建立整张依赖图的导出绑定
+   ↓
+按依赖顺序执行
+   ↓
+Promise 返回模块命名空间
+```
 
-同步通道只服务于 vpt 生成的 App、Page 和 Component 原生入口，不是业务代码使用的 API。vpt 统一控制这些入口、参数对象所在 chunk 的位置和物理加载方式，保证默认导出从主包同步取得。
+主包依赖由 `require()` 取得，分包依赖由 `require.async()` 取得。一个按需功能即使静态引用另一个分包，运行时也会先等待相关文件，再执行引用方。依赖中的顶层 `await` 也会在这里被等待。
 
-### 异步加载：`System.import()`
+### 所有模块共享一份注册表
 
-应用动态导入最终使用 `System.import()`。它会：
+`System.importSync()` 和 `System.import()` 使用同一份模块注册表。同一个模块 ID：
 
-- 等待 `require.async()` 返回分包中的模块注册数据；
-- 在执行引用方之前连接完整静态依赖图；
-- 等待依赖中的顶层 `await`；
-- 保留实时绑定、共享模块命名空间、循环依赖和单次执行语义。
+- 只初始化和执行一次；
+- 始终返回同一个模块命名空间；
+- 在循环依赖中复用同一条模块记录；
+- 通过订阅导出更新保留 ESM 实时绑定。
 
-即使一个按需加载的循环依赖跨越多个物理分包，SystemJS 仍会按统一 ID 复用同一注册表条目，并把它们作为一张依赖图完成连接和执行。
+启动运行时本身既要被原生入口通过 CommonJS 加载，也可能出现在应用模块图中。vpt 会把 CommonJS 已缓存的导出发布到同一份模块注册表，而不是再次执行该文件。
 
 ## 开发模式
 
-第一次微信开发构建仍使用相同的物理输出和位置规划，但移除内容哈希以保持文件路径稳定。普通 JavaScript HMR 由 Rolldown 开发运行时直接生成源码模块补丁，只改写 `hmr/patches.js`；它不会进入完整输出的 `renderStart`、`renderChunk` 或 `generateBundle`，因此不会运行 LTHP、扫描最终 chunk 图、重新分配分包或重写普通 chunk。
+微信开发模式的第一次完整构建使用相同的代码块格式、位置规划和运行时，只移除内容哈希以保持文件路径稳定。
 
-只有初始构建和明确请求的完整构建会重新执行一次位置规划。完整构建本来就需要重新生成全部物理输出，LTHP 在其中增加的是一次规划成本：常见稀疏图通常是毫秒级，随后文件最终化随 chunk 数线性增长。普通补丁的 16 ms 合并窗口、补丁发布、React Refresh 和开发者工具页面替换路径均不受规划器影响。
+普通 JavaScript HMR 不重新生成完整代码块图。Rolldown 只生成源码模块补丁，vpt 只改写 `hmr/patches.js`，因此不会重新规划分包。只有初始构建或明确的完整构建才会再次执行位置规划。完整的补丁交付和状态保留流程参见[热更新实现原理](/references/hmr-implementation/)。
 
-无法安全接受的更新才触发完整构建；此时应用状态会按既有恢复协议重置。完整过程参见[热更新原理](/references/hmr-implementation/)。
+## 维护者附录
 
-## Web 输出
+### 必须保持的边界
 
-Web 不使用上述 SystemJS 运行时或生成分包。vpt 会：
+1. 源码导入关系不包含物理分包信息；
+2. 原生注册所需的完整静态依赖图始终位于主包；
+3. 每个最终代码块只属于一个物理包；
+4. 模块 ID 不随主包或分包位置改变；
+5. 只有文件加载表把模块 ID 转换成微信文件路径；
+6. 同步和异步导入共享模块注册表与命名空间。
 
-1. 在 `index.html` 注入 vpt 生成的 H5 App 入口；
-2. 将 App 配置和页面路由写入该入口；
-3. 为每条路由生成浏览器动态 `import()`，加载 `src/<page-path>.tsx`；
-4. 交给 Vite/Rolldown 和浏览器原生模块机制执行。
+### 源码中的内部名称
 
-共享源码仍然只使用静态 `import` 和动态 `import()`；微信专用运行时代码不会进入 H5 输出。
+正文使用职责名称，源码中还会看到以下简写：
+
+| 源码名称 | 本文中的名称 | 准确含义 |
+| --- | --- | --- |
+| `shell` | 原生入口 | 微信直接执行的固定路径 CommonJS 文件 |
+| `capsule` | 模块注册信息 | `require()` 后只返回依赖和执行函数、由模块运行时处理的文件；App/Page/Component capsule 专门创建注册参数对象 |
+| `bootstrap` | 启动运行时 | 安装 SystemJS 并接入文件加载表的主包代码 |
+| `transport` | 文件加载表 | 从模块 ID 选择物理路径和 `require` 方式的生成函数 |
+| `amphibious` | 双重入口运行时代码 | 同一份缓存导出需要同时提供给 CommonJS 和模块注册表的内部分类 |
+| `placement` | 位置规划 | 最终代码块到主包或某个分包的唯一映射 |
+| `LTHP` | 分包启发式 | 源码注释对“按动态加载集合重叠度装包”的简称，不是应用可见的模块概念 |
+
+### 规划成本
+
+设最终代码块数为 `C`，动态加载集合数为 `T`，生成分包数为 `B`。收集加载集合的成本等于各集合静态依赖闭包大小之和；装包阶段最坏为 `O(CBT)`，实际依赖集合通常较稀疏且分包数量较少。规划完成后，位置和加载方式查询是 `O(1)`，最终文件落位是 `O(C)`。
