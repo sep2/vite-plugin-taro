@@ -1,8 +1,7 @@
 import type { Rolldown } from 'vite'
 import type { VptJsonObject, VptOptions, VptPageOption } from '../../../../options.ts'
 import { createAppConfig } from '../../../utils/project-config.ts'
-import type { GeneratedSubpackage } from '../placement/placer.ts'
-import { isGeneratedSubpackageFile } from '../placement/plan.ts'
+import { type GeneratedSubpackage, isGeneratedSubpackageFile } from '../placer/placement.ts'
 import { toRootRelativePath } from './relative-root.ts'
 
 /** Creates every configured native JSON asset. */

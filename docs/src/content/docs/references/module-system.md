@@ -110,7 +110,7 @@ Rolldown 保留原生入口与这些代码之间的静态依赖，vpt 再把最�
 
 ### 2. 规划主包和分包
 
-位置规划由独立的 Vite 插件 `vpt:wx-placer` 管理，而不是夹在渲染器中的共享缓存。它通过 `config` 安装微信输出命名和入口签名选项；在 Rolldown 已经完成 tree shaking、scope hoisting 和自然 chunk 切分后，从 `renderChunk` 提供的完整最终逻辑 chunk 图创建一次 LTHP 规划。后续每个 chunk 的渲染只读取这份不可变规划，不会重复遍历图，也不会重新推测源码模块最终会怎样合并。
+位置规划由独立的 Vite 插件 `vpt:wx-placer` 管理，而不是夹在渲染器中的共享缓存。它通过 `config` 安装微信输出命名和入口签名选项；在 Rolldown 已经完成 tree shaking、scope hoisting 和自然 chunk 切分后，从 `renderChunk` 提供的完整最终 preliminary chunk 图创建一次 LTHP 位置。后续每个 chunk 的渲染只读取这份不可变位置，不会重复遍历图，也不会重新推测源码模块最终会怎样合并。
 
 一次输出生成只经过以下状态：
 
@@ -142,7 +142,7 @@ idle
 
 每个分包的规划预算为 `1,900,000` 字节，为运行时包装和原生资源预留空间。最终 chunk 的估算包含 tree-shaken 模块代码、chunk 包装和引用开销以及原生组件资源。单个超预算 chunk 会独占分包；规划器不会复制或拆开 Rolldown 的最终 chunk。
 
-分包目录名来自包内排序后的逻辑 chunk IDs：对它们计算 SHA-256，并取前 8 位。
+分包目录名来自包内排序后的 Rolldown preliminary filenames：对它们计算 SHA-256，并取前 8 位。
 
 ```text
 sub/p_<8位哈希>
@@ -170,7 +170,7 @@ Node.js 26 上的合成基准用于防止算法退化，不代表具体项目的
 
 `chunkFileNames` 一次只能看到一个 `PreRenderedChunk`，看不到完整加载迁移图，因此它使用 Rolldown 原生的 `assets/[name]-[hash].js` 模式，绝不在这里决定分包或重建 chunk 名称。Rolldown 负责名称、碰撞处理、内容哈希和生成的相对导入；主包保留其路径，分包只在最终化时加上 `sub/p_<package-hash>/` 前缀。渲染层从 Rolldown 路径投影 SystemJS 逻辑 ID 时独立移除开头的 `assets/`，所以输出目录组织不会进入模块身份。
 
-在 pre `generateBundle` 中，`vpt:wx-placer` 用 preliminary logical ID 查找每个最终 `OutputChunk` 的强类型 `PackageLocation`，并直接设置 Rolldown 所属对象的 `fileName`。它不修改 bundle 键、不复制 chunk，也不通过 `emitFile` 重新发射 JavaScript。随后 `vpt:wx` 才按这些最终路径放置原生组件资源并生成 JSON。删除未使用代码后没有实际输出的分包不会进入 `app.json`。
+在 pre `generateBundle` 中，`vpt:wx-placer` 用 `preliminaryFileName` 查找每个最终 `OutputChunk` 的强类型 `PackageLocation`，并直接设置 Rolldown 所属对象的 `fileName`。它不修改 bundle 键、不复制 chunk，也不通过 `emitFile` 重新发射 JavaScript。随后 `vpt:wx` 才按这些最终路径放置原生组件资源并生成 JSON。删除未使用代码后没有实际输出的分包不会进入 `app.json`。
 
 全局样式的实际内容固定输出为 `assets/global.wxss`。根目录下的 `app.wxss` 只包含对该文件的 `@import`，因此两个全局样式路径在生产和开发构建中都保持不变。
 

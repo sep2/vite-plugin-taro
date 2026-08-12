@@ -16,11 +16,26 @@ export type SubpackageLocation = {
 /** Physical package ownership for one final Rolldown chunk. */
 export type PackageLocation = { kind: 'main' } | SubpackageLocation
 
-/** Immutable preliminary-chunk-to-package ownership. */
-export type PlacementPlan = ReadonlyMap<string, PackageLocation>
+/** Native app.json declaration for one generated code-only subpackage. */
+export type GeneratedSubpackage = {
+    /** Stable native alias derived from the generated root hash. */
+    name: string
+    /** Physical directory containing this subpackage's emitted capsules. */
+    root: string
+    /** Marks this as a code-only subpackage with no native Page routes. */
+    pages: readonly []
+}
+
+/** Immutable ownership and materialization operations for one complete final-chunk graph. */
+export type Placement = Readonly<{
+    getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation
+    getPhysicalChunkId(chunk: Rolldown.RenderedChunk): string
+    getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async'
+    finalize(bundle: Rolldown.OutputBundle): readonly GeneratedSubpackage[]
+}>
 
 /** Shared main-package value used for every synchronously reachable chunk. */
-export const mainPackage = { kind: 'main' } as const
+const mainPackage = { kind: 'main' } as const
 
 type PlaceableChunk = {
     chunkId: string
@@ -45,30 +60,28 @@ type PackedSubpackage = SubpackageLocation & {
 }
 
 /**
- * Applies Load-Transition Hypergraph Partitioning to Rolldown's final logical chunks:
+ * Applies Load-Transition Hypergraph Partitioning to Rolldown's final preliminary chunk graph:
  *
- * 1. Sort logical chunk IDs to remove callback and object-enumeration order from every later decision.
+ * 1. Sort preliminary filenames to remove callback and object-enumeration order from every later decision.
  * 2. Reserve every explicit entry and its complete static closure in main because native startup must load it synchronously.
  * 3. Treat each dynamic-import edge as one load transition; the target's static closure is that transition's hyperedge.
  *    Nested dynamic edges remain separate transitions rather than being folded into the parent closure.
  * 4. Index every lazy chunk by all transitions requiring it. Shared chunks therefore carry global demand rather than being
  *    assigned according to the first source module or dynamic root that happens to visit them.
- * 5. Order chunks by transition demand, estimated emitted bytes, then logical ID. Place each chunk once into the fitting bin
- *    with maximum transition overlap, using best-fit remaining capacity only as a tie-breaker.
- * 6. Hash each bin's sorted logical chunk IDs into a deterministic physical package root and return unique ownership.
+ * 5. Order chunks by transition demand, estimated emitted bytes, then preliminary filename. Place each chunk once into the
+ *    fitting bin with maximum transition overlap, using best-fit remaining capacity only as a tie-breaker.
+ * 6. Hash each bin's sorted preliminary filenames into a deterministic physical package root and return unique ownership.
  *
  * Analysis costs the sum of transition static-closure traversals. Packing scans fitting bins and intersects sparse
  * transition sets; its worst case is O(CBT), while practical graphs have few bins and sparse transition membership.
  */
-function createPlacementPlan({
+export function createPlacement({
     chunks,
-    getAdditionalChunkBytes,
-    planningBudgetBytes = subpackagePlanningBudget
+    getAdditionalModuleBytes
 }: {
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
-    getAdditionalChunkBytes(chunk: Rolldown.RenderedChunk): number
-    planningBudgetBytes?: number
-}): PlacementPlan {
+    getAdditionalModuleBytes(moduleId: string): number
+}): Placement {
     const chunkById = new Map(Object.entries(chunks).sort(([left], [right]) => left.localeCompare(right)))
     const mainChunkIds = findMainChunkIds(chunkById)
     const transitionsByChunk = collectTransitionsByChunk({ chunks: chunkById, mainChunkIds: mainChunkIds })
@@ -76,12 +89,15 @@ function createPlacementPlan({
         .filter(([chunkId]) => !mainChunkIds.has(chunkId))
         .map(([chunkId, chunk]) => ({
             chunkId: chunkId,
-            estimatedBytes: estimateChunkBytes(chunk) + getAdditionalChunkBytes(chunk),
+            estimatedBytes:
+                estimateChunkBytes(chunk) +
+                chunk.moduleIds.reduce((bytes, moduleId) => bytes + getAdditionalModuleBytes(moduleId), 0),
             transitions: transitionsByChunk.get(chunkId) ?? new Set<number>()
         }))
-    const subpackages = packChunks({ chunks: placeableChunks, planningBudgetBytes: planningBudgetBytes }).map(
-        createPackedSubpackage
-    )
+    const subpackages = packChunks({
+        chunks: placeableChunks,
+        planningBudgetBytes: subpackagePlanningBudget
+    }).map(createPackedSubpackage)
 
     // This local map accumulates the immutable plan returned to output materialization.
     const locationByChunk = new Map<string, PackageLocation>()
@@ -93,10 +109,61 @@ function createPlacementPlan({
             locationByChunk.set(chunkId, subpackage)
         }
     }
-    return locationByChunk
-}
+    function getLocation(chunkId: string): PackageLocation {
+        const location = locationByChunk.get(chunkId)
+        if (!location) {
+            throw new Error(`wx placement is missing final chunk: ${chunkId}`)
+        }
+        return location
+    }
 
-export default createPlacementPlan
+    /** Resolves typed ownership from Rolldown's preliminary physical filename before or after finalization. */
+    function getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation {
+        return getLocation('preliminaryFileName' in chunk ? chunk.preliminaryFileName : chunk.fileName)
+    }
+
+    return {
+        getPackageLocation: getPackageLocation,
+
+        /** Adds the planned package root to a physical preliminary path without changing the chunk's SystemJS identity. */
+        getPhysicalChunkId(chunk: Rolldown.RenderedChunk): string {
+            const location = getPackageLocation(chunk)
+            return location.kind === 'main' ? chunk.fileName : `${location.root}/${chunk.fileName}`
+        },
+
+        /** Selects the native loading API directly from typed package ownership. */
+        getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async' {
+            return getPackageLocation(chunk).kind === 'subpackage' ? 'async' : 'sync'
+        },
+
+        /** Assigns each final chunk's Rolldown-owned physical filename and declares typed owners that survived output. */
+        finalize(bundle: Rolldown.OutputBundle): readonly GeneratedSubpackage[] {
+            const outputChunks = Object.values(bundle).filter(
+                (output): output is Rolldown.OutputChunk => output.type === 'chunk'
+            )
+            // This local mutable set deduplicates typed package owners that retain at least one final output chunk.
+            const roots = new Set<string>()
+            for (const chunk of outputChunks) {
+                // OutputChunk.fileName contains the resolved content hash. preliminaryFileName preserves the exact physical
+                // candidate with placeholders that identified this chunk when placement was created during renderChunk.
+                const location = getLocation(chunk.preliminaryFileName)
+                if (location.kind !== 'subpackage') {
+                    continue
+                }
+                // OutputChunk is mutable in generateBundle. Assigning fileName makes Rolldown retain all chunk metadata and
+                // write that same chunk at its physical package path; deleting bundle keys or re-emitting would lose identity.
+                chunk.fileName = `${location.root}/${chunk.fileName}`
+                roots.add(location.root)
+            }
+
+            return [...roots].sort().map((root) => ({
+                name: root.slice(root.lastIndexOf('/') + 1),
+                root: root,
+                pages: []
+            }))
+        }
+    }
+}
 
 /** Keeps every explicit output entry and its complete static chunk closure in main. */
 function findMainChunkIds(chunks: ReadonlyMap<string, Rolldown.RenderedChunk>): Set<string> {
@@ -197,7 +264,7 @@ function packChunks({
     return bins
 }
 
-/** Gives globally shared transition demand priority, then size and stable logical ID. */
+/** Gives globally shared transition demand priority, then size and stable preliminary filename. */
 function compareChunks(left: PlaceableChunk, right: PlaceableChunk): number {
     return (
         right.transitions.size - left.transitions.size ||
@@ -280,7 +347,7 @@ function estimateChunkBytes(chunk: Rolldown.RenderedChunk): number {
     return renderedModuleBytes + moduleWrapperBytes + referenceBytes + 64
 }
 
-/** Freezes membership and derives a stable root from sorted logical chunk IDs. */
+/** Freezes membership and derives a stable root from sorted preliminary filenames. */
 function createPackedSubpackage(bin: ChunkBin): PackedSubpackage {
     const chunkIds = [...bin.chunkIds].sort()
     const hash = createHash('sha256').update(chunkIds.join('\0')).digest('hex').slice(0, 8)
@@ -289,11 +356,6 @@ function createPackedSubpackage(bin: ChunkBin): PackedSubpackage {
         root: `${generatedSubpackageRootPrefix}${hash}`,
         chunkIds: chunkIds
     }
-}
-
-/** Uses the generated root directory itself as the native subpackage alias. */
-export function getSubpackageName(root: string): string {
-    return root.slice(root.lastIndexOf('/') + 1)
 }
 
 /** Tests the plugin-owned output prefix that physically identifies every generated subpackage. */

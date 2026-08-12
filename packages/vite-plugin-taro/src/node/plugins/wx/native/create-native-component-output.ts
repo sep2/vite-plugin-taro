@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Rolldown } from 'vite'
-import type { PackageLocation } from '../placement/plan.ts'
+import type { PackageLocation } from '../placer/placement.ts'
 import { getNativeComponentSources } from './native-component-assets.ts'
 
 /** Creates opaque native files and their registrations from each surviving JSX interface module. */

@@ -1,24 +1,9 @@
 import type { Plugin, Rolldown } from 'vite'
 import { getWxExecutionKind, isTransportModule } from '../module.ts'
 import { getNativeComponentAssetBytes } from '../native/native-component-assets.ts'
-import createPlacementPlan, { getSubpackageName, type PackageLocation } from './plan.ts'
+import { createPlacement, type GeneratedSubpackage, type PackageLocation, type Placement } from './placement.ts'
 
-/** Native app.json declaration for one generated code-only subpackage. */
-export type GeneratedSubpackage = {
-    /** Stable native alias derived from the generated root hash. */
-    name: string
-    /** Physical directory containing this subpackage's emitted capsules. */
-    root: string
-    /** Marks this as a code-only subpackage with no native Page routes. */
-    pages: readonly []
-}
-
-export type Placement = Readonly<{
-    getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation
-    getPhysicalChunkId(chunk: Rolldown.RenderedChunk): string
-    getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async'
-    finalize(bundle: Rolldown.OutputBundle): readonly GeneratedSubpackage[]
-}>
+export type { GeneratedSubpackage, Placement } from './placement.ts'
 
 type PlacementState =
     | { phase: 'idle' }
@@ -80,17 +65,14 @@ export const placementRolldownOptions = {
  * Creates the `vpt:wx-placer` lifecycle owner:
  *
  * 1. Its config hook installs package-neutral Rolldown names and entry-signature semantics.
- * 2. `renderStart` atomically starts a generation in `awaiting-chunks`; no stale plan remains reachable.
- * 3. Its pre-order `renderChunk` sees the complete tree-shaken graph, creates one immutable LTHP placement, and changes the
- *    generation to `planned` before `vpt:wx` renders transport.
- * 4. `vpt:wx` asks this plugin only for package ownership, physical relocation, and the resulting native loading mode.
- * 5. Its pre-order `generateBundle` assigns each existing Rolldown OutputChunk its package-qualified filename and atomically
- *    publishes the generated app.json declarations as `finalized` state.
- * 6. The later `vpt:wx` generateBundle hook consumes those declarations and emits native assets against finalized paths.
+ * 2. `renderStart` atomically starts a generation in `awaiting-chunks`; no stale placement remains reachable.
+ * 3. Its first pre-order `renderChunk` creates one immutable LTHP placement from the complete tree-shaken graph.
+ * 4. `vpt:wx` asks this plugin only for package ownership, physical relocation, and native loading mode.
+ * 5. Its pre-order `generateBundle` assigns each OutputChunk its package-qualified filename and publishes app.json declarations.
  *
  * The discriminated state is the only generation-local mutation: `idle → awaiting-chunks → planned → finalized`. Each hook
- * performs one whole-state transition, so stale byte maps, fake graph sentinels, empty fallback plans, duplicate planning,
- * and partially reset generations are unrepresentable.
+ * performs one whole-state transition, so stale graph state, duplicate planning, and partially reset generations are
+ * unrepresentable.
  */
 export function createWxPlacementPlugin(): WxPlacementPlugin {
     // This one mutable cell is the output-generation state machine described above; hooks replace it atomically by phase.
@@ -167,76 +149,6 @@ export function createWxPlacementPlugin(): WxPlacementPlugin {
                 throw new Error('wx subpackages are unavailable before output finalization')
             }
             return state.subpackages
-        }
-    }
-}
-
-/** Creates immutable ownership operations for one complete final-chunk graph. */
-export function createPlacement({
-    chunks,
-    getAdditionalModuleBytes
-}: {
-    chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
-    getAdditionalModuleBytes(moduleId: string): number
-}): Placement {
-    const plan = createPlacementPlan({
-        chunks: chunks,
-        getAdditionalChunkBytes: (chunk) =>
-            chunk.moduleIds.reduce((bytes, moduleId) => bytes + getAdditionalModuleBytes(moduleId), 0)
-    })
-
-    function getLocation(chunkId: string): PackageLocation {
-        const location = plan.get(chunkId)
-        if (!location) {
-            throw new Error(`wx placement is missing final chunk: ${chunkId}`)
-        }
-        return location
-    }
-
-    /** Resolves typed ownership from Rolldown's preliminary physical filename before or after finalization. */
-    function getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation {
-        return getLocation('preliminaryFileName' in chunk ? chunk.preliminaryFileName : chunk.fileName)
-    }
-
-    return {
-        getPackageLocation: getPackageLocation,
-
-        /** Adds the planned package root to a physical preliminary path without changing the chunk's SystemJS identity. */
-        getPhysicalChunkId(chunk: Rolldown.RenderedChunk): string {
-            const location = getPackageLocation(chunk)
-            return location.kind === 'main' ? chunk.fileName : `${location.root}/${chunk.fileName}`
-        },
-
-        /** Selects the native loading API directly from typed package ownership. */
-        getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async' {
-            return getPackageLocation(chunk).kind === 'subpackage' ? 'async' : 'sync'
-        },
-
-        /** Assigns each final chunk's Rolldown-owned physical filename and declares typed owners that survived output. */
-        finalize(bundle: Rolldown.OutputBundle): readonly GeneratedSubpackage[] {
-            const chunks = Object.values(bundle).filter(
-                (output): output is Rolldown.OutputChunk => output.type === 'chunk'
-            )
-            // This local mutable set deduplicates typed package owners that retain at least one final output chunk.
-            const roots = new Set<string>()
-            for (const chunk of chunks) {
-                // OutputChunk.fileName contains the resolved content hash. preliminaryFileName preserves the exact physical
-                // candidate with placeholders that identified this chunk when the immutable plan was created during renderChunk.
-                const location = getLocation(chunk.preliminaryFileName)
-                if (location.kind !== 'subpackage') {
-                    continue
-                }
-                // OutputChunk is mutable in generateBundle. Assigning fileName makes Rolldown retain all chunk metadata and
-                // write that same chunk at its physical package path; deleting bundle keys or re-emitting would lose identity.
-                chunk.fileName = `${location.root}/${chunk.fileName}`
-                roots.add(location.root)
-            }
-
-            return [...roots].sort().map((root) => ({
-                name: getSubpackageName(root),
-                root: root,
-                pages: []
-            }))
         }
     }
 }

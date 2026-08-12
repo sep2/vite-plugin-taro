@@ -1,8 +1,7 @@
 import type { Rolldown } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { createNativeComponentOutput } from '../native/create-native-component-output.ts'
-import type { GeneratedSubpackage } from '../placement/placer.ts'
-import type { PackageLocation } from '../placement/plan.ts'
+import type { GeneratedSubpackage, PackageLocation } from '../placer/placement.ts'
 import { createJsonAssets } from './json.ts'
 import { createTemplateAssets } from './templates.ts'
 
