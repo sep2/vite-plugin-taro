@@ -5,14 +5,14 @@ description: 配置、调试和发布使用 Skyline 渲染引擎的微信小程�
 
 Skyline 是微信小程序的新一代渲染引擎。它减少了传统 WebView 渲染中的跨线程通信，并提供面向复杂交互和高性能动画的渲染能力。
 
-`create-vite-taro` 的默认模板已经生成 Skyline 所需配置。无需安装额外依赖，也没有专用的 vpt 选项；相关设置直接写在 `vitePluginTaro()` 的 `appJson`、页面配置和 `projectConfigJson` 中。
+`create-vite-taro` 的默认模板已经生成 Skyline 所需配置。无需安装额外依赖，也没有专用的 vpt 选项；相关设置直接写在 `vpt()` 的 `appJson`、页面配置和 `projectConfigJson` 中。
 
 ## 默认配置
 
 模板在 `vite.config.ts` 中包含：
 
 ```ts
-vitePluginTaro({
+vpt({
     // ...
     appJson: {
         lazyCodeLoading: 'requiredComponents',

@@ -47,7 +47,7 @@ vpt 当前构建 **React 19 + 微信小程序 + Web**。Vue、Preact、Solid、R
 | `taro build --type weapp` | `vite`，目标为 `wx` |
 | `taro build --type h5` | `vite`，目标为 `h5` |
 | `config/index.ts`、`config/dev.ts`、`config/prod.ts` | `vite.config.ts` 与 Vite 配置 |
-| `src/app.config.ts` 或 `.js` | `vitePluginTaro({ appJson, pages })` |
+| `src/app.config.ts` 或 `.js` | `vpt({ appJson, pages })` |
 | 页面旁的 `*.config.ts` 或 `.js` | 对应 `pages[].config` |
 | `project.config.json`、`project.private.config.json`、`sitemap.json` | 对应的插件选项 |
 | `src/index.html` | 项目根目录的 `index.html` |
@@ -203,7 +203,7 @@ export default definePageConfig({
 })
 ```
 
-将页面顺序和页面配置合并到 `pages`，其余应用配置放入 `appJson`。在新模板现有的 `vitePluginTaro()` 调用中替换这两个字段，保留其他字段：
+将页面顺序和页面配置合并到 `pages`，其余应用配置放入 `appJson`。在新模板现有的 `vpt()` 调用中替换这两个字段，保留其他字段：
 
 ```ts
 pages: [

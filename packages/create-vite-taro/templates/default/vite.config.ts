@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
-import vitePluginTaro, { type VitePluginTaroTarget } from 'vite-plugin-taro'
+import vpt, { type VitePluginTaroTarget } from 'vite-plugin-taro'
 
 const targetEnvName = 'VITE_PLUGIN_TARO_TARGET'
 const projectRoot = fileURLToPath(new URL('.', import.meta.url))
@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => {
             outDir: fromRoot('dist', target)
         },
         plugins: [
-            vitePluginTaro({
+            vpt({
                 target,
                 app: 'src/app.tsx',
                 pages: [

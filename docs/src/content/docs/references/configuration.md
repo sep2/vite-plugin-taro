@@ -3,11 +3,11 @@ title: 配置选项
 description: VPT 的 Vite 配置与插件选项参考。
 ---
 
-在 `vite.config.ts` 中调用 `vitePluginTaro()`。每次 Vite 运行只构建一个目标，目标由环境变量或其他配置逻辑决定。
+在 `vite.config.ts` 中调用 `vpt()`。每次 Vite 运行只构建一个目标，目标由环境变量或其他配置逻辑决定。
 
 ```ts
 import { defineConfig, loadEnv } from 'vite'
-import vitePluginTaro, { type VitePluginTaroTarget } from 'vite-plugin-taro'
+import vpt, { type VitePluginTaroTarget } from 'vite-plugin-taro'
 
 function getTarget(value: string | undefined): VitePluginTaroTarget {
     if (value === 'wx' || value === 'h5') return value
@@ -23,7 +23,7 @@ export default defineConfig(({ mode }) => {
             outDir: `dist/${target}`
         },
         plugins: [
-            vitePluginTaro({
+            vpt({
                 target,
                 app: 'src/app.tsx',
                 pages: [

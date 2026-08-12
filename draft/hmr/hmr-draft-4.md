@@ -174,11 +174,11 @@ Application entries and all native App/Page JSON configuration live in `vite.con
 
 ```ts
 import { defineConfig } from 'vite';
-import { vitePluginTaro } from 'vite-plugin-taro';
+import vpt from 'vite-plugin-taro';
 
 export default defineConfig({
     plugins: [
-        vitePluginTaro({
+        vpt({
             project: {
                 appid: 'wx0000000000000000',
                 projectname: 'example'
@@ -738,7 +738,7 @@ browser WebSocket execution are never injected into generated Mini Program code.
 
 ### Plugin-owned Vite integration
 
-`vitePluginTaro()` installs the complete ordered plugin set required by the target, including:
+`vpt()` installs the complete ordered plugin set required by the target, including:
 
 - virtual Taro API and component modules;
 - React JSX transformation;
