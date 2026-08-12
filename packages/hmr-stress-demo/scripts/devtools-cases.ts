@@ -70,7 +70,7 @@ async function testRuntimeRebuild(harness: DevToolsHarness): Promise<void> {
     const rounds = readPositiveInteger('VPT_HMR_REBUILD_ROUNDS', 1)
     const reportsPerRound = readPositiveInteger('VPT_HMR_REPORTS_PER_ROUND', 100)
     const infoPath = path.join(harness.outDir, 'hmr/info.js')
-    const rebuildLogsBefore = await countLog(harness.serverLogPath, 'wx runtime requested a full rebuild')
+    const rebuildLogsBefore = await countLog(harness.serverLogPath, 'wx full rebuild required')
 
     for (let round = 1; round <= rounds; round++) {
         const before = await readHmrInfo(infoPath)
@@ -79,10 +79,7 @@ async function testRuntimeRebuild(harness: DevToolsHarness): Promise<void> {
         await assertWxss(harness.outDir)
     }
 
-    assert.equal(
-        (await countLog(harness.serverLogPath, 'wx runtime requested a full rebuild')) - rebuildLogsBefore,
-        rounds
-    )
+    assert.equal((await countLog(harness.serverLogPath, 'wx full rebuild required')) - rebuildLogsBefore, rounds)
     await delay(3_000)
     await harness.readRuntime('currentPage')
     await assertCleanConsole(harness)
