@@ -1,2 +1,2 @@
-export { default } from './node/vite-plugin.ts'
-export type { VitePluginTaroOptions, VitePluginTaroPageOption, VitePluginTaroTarget } from './options.ts'
+export { default } from './node/vpt.ts'
+export type { VptJsonObject, VptOptions, VptPageOption, VptTarget } from './options.ts'

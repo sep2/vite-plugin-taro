@@ -3,7 +3,7 @@ import type { InputOptions, OutputOptions, Plugin } from 'rolldown'
 import { build } from 'rolldown'
 import { type DevEngine, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
-import type { VitePluginTaroOptions } from '../../../../options.ts'
+import type { VptOptions } from '../../../../options.ts'
 import { once } from '../../../utils/once.ts'
 import { resolvePackageFile } from '../../../utils/packages.ts'
 import { appShellFileName } from '../module.ts'
@@ -35,7 +35,7 @@ export function installWxDevOptions({
 }: {
     bundledDev: BundledDev
     server: ViteDevServer
-    options: VitePluginTaroOptions
+    options: VptOptions
     hostPlugins: Plugin[]
 }): void {
     /*

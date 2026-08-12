@@ -1,11 +1,11 @@
 import { types } from '@babel/core'
-import type { VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../options.ts'
+import type { VptOptions, VptPageOption } from '../../../options.ts'
 import { createPageComponentImportPath } from '../../utils/modules.ts'
 import { createAppConfig } from '../../utils/project-config.ts'
 import { type AstTransformResult, replaceWithAst } from '../../utils/transform.ts'
 
-const appConfigPlaceholder = '__VITE_PLUGIN_TARO_H5_APP_CONFIG__'
-const routesPlaceholder = '__VITE_PLUGIN_TARO_H5_ROUTES__'
+const appConfigPlaceholder = '__VPT_H5_APP_CONFIG__'
+const routesPlaceholder = '__VPT_H5_ROUTES__'
 
 /** Specializes the physical H5 App for one configured project. */
 export async function transformH5App({
@@ -17,7 +17,7 @@ export async function transformH5App({
 }: {
     code: string
     id: string
-    options: VitePluginTaroOptions
+    options: VptOptions
     projectRoot: string
     sourcemap?: boolean
 }): Promise<AstTransformResult> {
@@ -56,7 +56,7 @@ function createRoute({
     page,
     projectRoot
 }: {
-    page: VitePluginTaroPageOption
+    page: VptPageOption
     projectRoot: string
 }): ReturnType<typeof types.objectExpression> {
     const pageComponentPath = createPageComponentImportPath({ pagePath: page.path, projectRoot })

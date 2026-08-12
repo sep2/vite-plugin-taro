@@ -1,7 +1,7 @@
-import type { JsonObject, VitePluginTaroOptions } from '../../options.ts'
+import type { VptJsonObject, VptOptions } from '../../options.ts'
 
 /** Creates shared App configuration with configured Page order as the authoritative value. */
-export function createAppConfig(options: VitePluginTaroOptions): JsonObject {
+export function createAppConfig(options: VptOptions): VptJsonObject {
     const { subPackages: _subPackages, subpackages: _subpackages, ...appJson } = options.appJson
     return {
         ...appJson,

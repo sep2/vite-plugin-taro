@@ -208,13 +208,13 @@ async function prepareFixture(root: string): Promise<void> {
 
 async function startServer(root: string): Promise<ServerProcess> {
     const viteExecutable = path.join(root, 'node_modules/.bin/vite')
-    const appId = process.env.VITE_PLUGIN_TARO_WECHAT_APP_ID ?? (await readFixtureAppId()) ?? 'touristappid'
+    const appId = process.env.VITE_VPT_WECHAT_APP_ID ?? (await readFixtureAppId()) ?? 'touristappid'
     const serverLogPath = path.join(root, 'vite.log')
     await writeFile(serverLogPath, '')
     const log = createWriteStream(serverLogPath)
     const server = spawn(viteExecutable, [], {
         cwd: root,
-        env: { ...process.env, NODE_ENV: 'development', VITE_PLUGIN_TARO_WECHAT_APP_ID: appId },
+        env: { ...process.env, NODE_ENV: 'development', VITE_VPT_WECHAT_APP_ID: appId },
         stdio: ['ignore', 'pipe', 'pipe']
     })
     server.stdout.pipe(log)
@@ -235,7 +235,7 @@ async function readFixtureAppId(): Promise<string | undefined> {
     }
     const line = (await readFile(envPath, 'utf8'))
         .split(/\r?\n/)
-        .find((candidate) => candidate.startsWith('VITE_PLUGIN_TARO_WECHAT_APP_ID='))
+        .find((candidate) => candidate.startsWith('VITE_VPT_WECHAT_APP_ID='))
     return line?.slice(line.indexOf('=') + 1).trim()
 }
 

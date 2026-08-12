@@ -22,7 +22,7 @@ The demo is WX-only because Towxml is a native WeChat component.
 pnpm --filter towxml-stream-demo dev-wx
 ```
 
-Open `packages/towxml-stream-demo/dist/wx` in WeChat DevTools. Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` in `.env.local` when
+Open `packages/towxml-stream-demo/dist/wx` in WeChat DevTools. Set `VITE_VPT_WECHAT_APP_ID` in `.env.local` when
 you want to use a real Mini Program AppID.
 
 ## Validate

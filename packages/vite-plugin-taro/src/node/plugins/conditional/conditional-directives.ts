@@ -1,9 +1,9 @@
 import type { Plugin } from 'vite'
-import type { VitePluginTaroTarget } from '../../../options.ts'
+import type { VptTarget } from '../../../options.ts'
 import { normalizeModuleId } from '../../utils/modules.ts'
 
 /** Creates source-level target conditional handling shared by H5 and WX. */
-export function createConditionalDirectivePlugin(target: VitePluginTaroTarget): Plugin {
+export function createConditionalDirectivePlugin(target: VptTarget): Plugin {
     return {
         name: 'vpt:conditional-directives',
         enforce: 'pre',
@@ -37,7 +37,7 @@ type DirectiveFrame = {
 }
 
 /** Keeps only the source branches active for one build target. */
-function transformConditionalDirectives(code: string, target: VitePluginTaroTarget): string {
+function transformConditionalDirectives(code: string, target: VptTarget): string {
     const lines = code.match(/[^\n]*(?:\n|$)/g) ?? []
     const frames: DirectiveFrame[] = []
     let transformed = ''

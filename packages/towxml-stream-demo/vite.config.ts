@@ -10,8 +10,8 @@ function fromRoot(...segments: string[]): string {
 }
 
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, process.cwd(), 'VITE_PLUGIN_TARO_')
-    const wechatAppId = env.VITE_PLUGIN_TARO_WECHAT_APP_ID || 'touristappid'
+    const env = loadEnv(mode, process.cwd(), 'VITE_VPT_')
+    const wechatAppId = env.VITE_VPT_WECHAT_APP_ID || 'touristappid'
 
     return {
         build: {

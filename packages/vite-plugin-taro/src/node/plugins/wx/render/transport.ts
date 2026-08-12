@@ -4,7 +4,7 @@ import type { Rolldown } from 'vite'
 import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
 import { getWxExecutionKind } from '../module.ts'
 
-const transportPlaceholder = '__VITE_PLUGIN_TARO_TRANSPORT__'
+const transportPlaceholder = '__VPT_TRANSPORT__'
 const moduleIdParameter = 'moduleId'
 const exportBindingParameter = 'exportBinding'
 

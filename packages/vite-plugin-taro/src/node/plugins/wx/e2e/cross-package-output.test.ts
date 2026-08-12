@@ -50,7 +50,7 @@ const largeLazyModuleIds: ReadonlySet<string> = new Set([subpackageAId, subpacka
 const modules: Readonly<Record<string, string>> = {
     // The package's built runtime is intentionally virtualized so this source-level test does not require a prebuilt dist.
     [transportPath]: `
-        export const transport = __VITE_PLUGIN_TARO_TRANSPORT__
+        export const transport = __VPT_TRANSPORT__
     `,
     [applicationId]: `
         import { mainName } from './main-dependency.js'

@@ -1,5 +1,5 @@
 import type { Plugin, PluginOption } from 'vite'
-import type { VitePluginTaroOptions } from '../../../options.ts'
+import type { VptOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { clientTaroNativeId } from '../client/constant.ts'
@@ -18,7 +18,7 @@ import { createWxStylePlugins } from './styles/plugins.ts'
 type WxResolver = ReturnType<typeof createResolver>
 
 /** Creates the complete plugin set for the wx target. */
-export function createWxTargetPlugins(options: VitePluginTaroOptions): PluginOption[] {
+export function createWxTargetPlugins(options: VptOptions): PluginOption[] {
     const resolver = createResolver(options)
 
     // Reuse the resolver instance's ordered application subset. Rolldown's complete input also contains bootstrap, transport,
@@ -31,7 +31,7 @@ export function createWxTargetPlugins(options: VitePluginTaroOptions): PluginOpt
 }
 
 /** Configures the complete wx target build pipeline. */
-function createWxPlugin(options: VitePluginTaroOptions, resolver: WxResolver): Plugin {
+function createWxPlugin(options: VptOptions, resolver: WxResolver): Plugin {
     const placer = createPlacer()
 
     return {

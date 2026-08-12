@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { resolveConfig } from 'vite'
-import type { VitePluginTaroOptions } from '../../../../options.ts'
+import type { VptOptions } from '../../../../options.ts'
 import {
     createWxDevelopmentPlugin,
     injectPageHmr,
@@ -11,7 +11,7 @@ import {
     removeDevelopmentAppWxss
 } from './plugins.ts'
 
-const options: VitePluginTaroOptions = {
+const options: VptOptions = {
     target: 'wx',
     app: 'src/app.tsx',
     pages: [],

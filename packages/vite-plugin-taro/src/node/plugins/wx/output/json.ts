@@ -1,5 +1,5 @@
 import type { Rolldown } from 'vite'
-import type { JsonObject, VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../../options.ts'
+import type { VptJsonObject, VptOptions, VptPageOption } from '../../../../options.ts'
 import { createAppConfig } from '../../../utils/project-config.ts'
 import type { GeneratedSubpackage } from '../placement/placer.ts'
 import { isGeneratedSubpackageFile } from '../placement/plan.ts'
@@ -11,7 +11,7 @@ export function createJsonAssets({
     subpackages,
     nativeComponents
 }: {
-    options: VitePluginTaroOptions
+    options: VptOptions
     subpackages: readonly GeneratedSubpackage[]
     nativeComponents: readonly { name: string; componentPath: string }[]
 }): Rolldown.EmittedAsset[] {
@@ -35,9 +35,9 @@ export function createJsonAssets({
 
 /** Creates Page JSON with generated Taro and native component registrations. */
 function createPageJson(
-    page: VitePluginTaroPageOption,
+    page: VptPageOption,
     nativeComponents: readonly { name: string; componentPath: string }[]
-): JsonObject {
+): VptJsonObject {
     const usingComponents = isJsonObject(page.config.usingComponents) ? page.config.usingComponents : {}
 
     // Cross-package components require a placeholder while WeChat downloads their generated subpackage. Paths are
@@ -60,17 +60,17 @@ function createPageJson(
 }
 
 /** Tests whether a configured JSON value can be merged as an object. */
-function isJsonObject(value: unknown): value is JsonObject {
+function isJsonObject(value: unknown): value is VptJsonObject {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** Serializes one native JSON object with stable formatting. */
-export function renderJson(value: JsonObject): string {
+export function renderJson(value: VptJsonObject): string {
     return `${JSON.stringify(value, null, 4)}\n`
 }
 
 /** Creates one native JSON asset. */
-function createJsonAsset(fileName: string, value: JsonObject): Rolldown.EmittedAsset {
+function createJsonAsset(fileName: string, value: VptJsonObject): Rolldown.EmittedAsset {
     return {
         type: 'asset',
         fileName,

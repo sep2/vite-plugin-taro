@@ -1,5 +1,5 @@
 import { normalizePath } from 'vite'
-import type { VitePluginTaroOptions, VitePluginTaroPageOption } from '../../../../options.ts'
+import type { VptOptions, VptPageOption } from '../../../../options.ts'
 import { normalizeModuleId, resolveAppComponentPath, resolvePageComponentPath } from '../../../utils/modules.ts'
 import { createAppConfig } from '../../../utils/project-config.ts'
 import { appComponentId } from '../../client/constant.ts'
@@ -25,7 +25,7 @@ import { specializePageCapsule } from './specialize-page-capsule.ts'
 type PrivateIdResolver = (importer: string | undefined, projectRoot: string) => string
 
 /** Creates the resolver and source specializer for the wx module graph. */
-export function createResolver(options: VitePluginTaroOptions) {
+export function createResolver(options: VptOptions) {
     const normalizedBootstrapPath = normalizePath(bootstrapPath)
     const normalizedPageCapsulePath = normalizePath(pageCapsulePath)
 
@@ -87,7 +87,7 @@ export function createResolver(options: VitePluginTaroOptions) {
 }
 
 /** Declares output entries and the ordered application subset that can own user styles. */
-function createEntryGraph(pages: readonly VitePluginTaroPageOption[]) {
+function createEntryGraph(pages: readonly VptPageOption[]) {
     const pageEntries = pages.map((page) => {
         return {
             capsuleId: createRouteModuleId({ moduleId: pageCapsulePath, pagePath: page.path }),
@@ -128,8 +128,8 @@ function requireConfiguredPage({
     pageByPath
 }: {
     moduleId: string | undefined
-    pageByPath: ReadonlyMap<string, VitePluginTaroPageOption>
-}): VitePluginTaroPageOption {
+    pageByPath: ReadonlyMap<string, VptPageOption>
+}): VptPageOption {
     const queryIndex = moduleId?.indexOf('?') ?? -1
     const pagePath = queryIndex === -1 ? undefined : new URLSearchParams(moduleId?.slice(queryIndex + 1)).get('route')
     const page = pagePath ? pageByPath.get(pagePath) : undefined

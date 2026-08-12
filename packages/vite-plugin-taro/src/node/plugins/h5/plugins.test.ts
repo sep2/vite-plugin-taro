@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { resolveConfig } from 'vite'
-import type { VitePluginTaroOptions } from '../../../options.ts'
+import type { VptOptions } from '../../../options.ts'
 import { createH5TargetPlugins, h5TaroApiTransformCodeFilter } from './plugins.ts'
 
-const options: VitePluginTaroOptions = {
+const options: VptOptions = {
     target: 'h5',
     app: 'src/app.tsx',
     pages: [],

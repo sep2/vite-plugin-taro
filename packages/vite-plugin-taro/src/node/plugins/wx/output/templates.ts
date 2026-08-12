@@ -1,7 +1,7 @@
 import { recursiveMerge } from '@tarojs/helper'
 import { Weapp as WxPlatform } from '@tarojs/plugin-platform-weapp'
 import type { Rolldown } from 'vite'
-import type { JsonObject, VitePluginTaroOptions } from '../../../../options.ts'
+import type { VptJsonObject, VptOptions } from '../../../../options.ts'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import { renderJson } from './json.ts'
@@ -19,7 +19,7 @@ const taroComponentsModulePath = packageRequire.resolve('@tarojs/plugin-platform
 /** Creates Taro's shared WeChat templates and native WXML/WXSS companions for every Page. */
 export function createTemplateAssets(
     bundle: Rolldown.OutputBundle,
-    options: VitePluginTaroOptions,
+    options: VptOptions,
     nativeComponents: readonly {
         name: string
         fields: readonly string[]
@@ -121,7 +121,7 @@ function toDashed(value: string): string {
 }
 
 /** Creates the recursive component configuration expected by Taro's templates. */
-function createComponentJson(): JsonObject {
+function createComponentJson(): VptJsonObject {
     return {
         component: true,
         styleIsolation: 'apply-shared',

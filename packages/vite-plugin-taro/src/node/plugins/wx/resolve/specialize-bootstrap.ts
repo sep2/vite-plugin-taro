@@ -1,8 +1,8 @@
 import { types } from '@babel/core'
-import type { JsonObject } from '../../../../options.ts'
+import type { VptJsonObject } from '../../../../options.ts'
 import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
 
-const appConfigPlaceholder = '__VITE_PLUGIN_TARO_APP_CONFIG__'
+const appConfigPlaceholder = '__VPT_APP_CONFIG__'
 
 /** Specializes the amphibious bootstrap with the shared App configuration. */
 export function specializeBootstrap({
@@ -13,7 +13,7 @@ export function specializeBootstrap({
 }: {
     code: string
     id: string
-    appConfig: JsonObject
+    appConfig: VptJsonObject
     sourcemap?: boolean
 }): Promise<AstTransformResult> {
     return replaceWithAst(

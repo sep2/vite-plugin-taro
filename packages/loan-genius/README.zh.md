@@ -75,7 +75,7 @@ packages/loan-genius/dist/h5
 ## 本示例演示的内容
 
 - 使用同一套 React 19 + Taro 源码同时支持 `wx` 和 `h5`。
-- 通过 `VITE_PLUGIN_TARO_TARGET` 进行 `vite-plugin-taro` 目标选择。
+- 通过 `VITE_VPT_TARGET` 进行 `vite-plugin-taro` 目标选择。
 - 在 `vite.config.ts` 中声明应用和页面元数据。
 - 微信小程序构建产物、H5 开发服务器和 H5 构建产物。
 - 从 `src/app.css` 引入 Tailwind CSS v4。
@@ -93,13 +93,13 @@ import { Text, View } from 'virtual:taro/components'
 
 | 变量 | 是否必需 | 说明 |
 | --- | --- | --- |
-| `VITE_PLUGIN_TARO_TARGET` | 是 | 由根目录脚本设置为 `wx` 或 `h5`。 |
-| `VITE_PLUGIN_TARO_WECHAT_APP_ID` | 否 | 微信小程序 app id。默认值为 `touristappid`。 |
+| `VITE_VPT_TARGET` | 是 | 由根目录脚本设置为 `wx` 或 `h5`。 |
+| `VITE_VPT_WECHAT_APP_ID` | 否 | 微信小程序 app id。默认值为 `touristappid`。 |
 
 如需在本地测试微信小程序，请将 app id 写入 `packages/loan-genius/.env.local`：
 
 ```env
-VITE_PLUGIN_TARO_WECHAT_APP_ID=your_app_id
+VITE_VPT_WECHAT_APP_ID=your_app_id
 ```
 
 ## 项目结构

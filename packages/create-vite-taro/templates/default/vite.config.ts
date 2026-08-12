@@ -1,12 +1,12 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
-import vpt, { type VitePluginTaroTarget } from 'vite-plugin-taro'
+import vpt, { type VptTarget } from 'vite-plugin-taro'
 
-const targetEnvName = 'VITE_PLUGIN_TARO_TARGET'
+const targetEnvName = 'VITE_VPT_TARGET'
 const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 
-function getTarget(env: Record<string, string>): VitePluginTaroTarget {
+function getTarget(env: Record<string, string>): VptTarget {
     const target = env[targetEnvName]
     if (target === 'wx' || target === 'h5') return target
     throw new Error(`${targetEnvName} must be "wx" or "h5".`)
@@ -17,9 +17,9 @@ function fromRoot(...segments: string[]): string {
 }
 
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, process.cwd(), 'VITE_PLUGIN_TARO_')
+    const env = loadEnv(mode, process.cwd(), 'VITE_VPT_')
     const target = getTarget(env)
-    const wechatAppId = env.VITE_PLUGIN_TARO_WECHAT_APP_ID || 'touristappid'
+    const wechatAppId = env.VITE_VPT_WECHAT_APP_ID || 'touristappid'
 
     return {
         build: {

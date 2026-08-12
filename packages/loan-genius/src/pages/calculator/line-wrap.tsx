@@ -70,7 +70,7 @@ export function LineWrap({
     }
 
     const list = data.filter((_item) => type.indexOf(_item && _item.renderType) > -1)
-    const isH5Target = import.meta.env.VITE_PLUGIN_TARO_TARGET === 'h5'
+    const isH5Target = import.meta.env.VITE_VPT_TARGET === 'h5'
 
     return (
         <View>

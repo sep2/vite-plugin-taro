@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
-import type { VitePluginTaroOptions } from '../../../../options.ts'
+import type { VptOptions } from '../../../../options.ts'
 import { appComponentId } from '../../client/constant.ts'
 import {
     appCapsulePath,
@@ -18,7 +18,7 @@ import {
 } from '../module.ts'
 import { createResolver } from './resolver.ts'
 
-const options: VitePluginTaroOptions = {
+const options: VptOptions = {
     target: 'wx',
     app: 'src/app.tsx',
     pages: [
@@ -67,7 +67,7 @@ test('resolves fixed and route-specific private IDs', () => {
 
 test('specializes bootstrap with the configured App JSON', async () => {
     const resolver = createResolver(options)
-    const result = await resolver.specialize('export const appConfig = __VITE_PLUGIN_TARO_APP_CONFIG__', bootstrapPath)
+    const result = await resolver.specialize('export const appConfig = __VPT_APP_CONFIG__', bootstrapPath)
 
     assert.ok(result)
     assert.match(result.code, /pages:\s*\[\s*["']pages\/home\/index["']/)

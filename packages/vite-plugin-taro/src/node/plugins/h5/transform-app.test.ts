@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
-import type { VitePluginTaroOptions } from '../../../options.ts'
+import type { VptOptions } from '../../../options.ts'
 import { transformH5App } from './transform-app.ts'
 
-const options: VitePluginTaroOptions = {
+const options: VptOptions = {
     target: 'h5',
     app: 'src/app.tsx',
     pages: [
@@ -27,8 +27,8 @@ const options: VitePluginTaroOptions = {
 
 const id = '/plugin/runtime/h5/app.js'
 const projectRoot = path.resolve('/project')
-const source = `const config = __VITE_PLUGIN_TARO_H5_APP_CONFIG__
-config.routes = __VITE_PLUGIN_TARO_H5_ROUTES__
+const source = `const config = __VPT_H5_APP_CONFIG__
+config.routes = __VPT_H5_ROUTES__
 `
 
 test('specializes the physical H5 App configuration and routes', async () => {
@@ -59,6 +59,6 @@ test('rejects an H5 App missing its specialization placeholders', async () => {
                 options,
                 projectRoot
             }),
-        /Expected one placeholder __VITE_PLUGIN_TARO_H5_APP_CONFIG__, found 0/
+        /Expected one placeholder __VPT_H5_APP_CONFIG__, found 0/
     )
 })

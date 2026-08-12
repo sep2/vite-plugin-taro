@@ -10,8 +10,6 @@ import LazyVideo from '../../../components/lazy-video.astro'
 
 ## 准备工作
 
-开始前请准备：
-
 - Node.js 24 或更高版本。
 - npm、pnpm 或 bun。
 - 开发微信小程序时需要安装[微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)。
@@ -54,7 +52,7 @@ bun install
 创建工具会在 `.env.local` 中生成一个占位 App ID。开发自己的小程序前，请替换为真实值：
 
 ```dotenv
-VITE_PLUGIN_TARO_WECHAT_APP_ID=wx1234567890abcdef
+VITE_VPT_WECHAT_APP_ID=wx1234567890abcdef
 ```
 
 `.env.local` 已被 Git 忽略，不会提交到仓库。

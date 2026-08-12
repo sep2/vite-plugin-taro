@@ -3,7 +3,7 @@ import test from 'node:test'
 import { specializeBootstrap } from './specialize-bootstrap.ts'
 
 const id = '/plugin/runtime/wx/amphibious/bootstrap.js'
-const source = 'export const appConfig = __VITE_PLUGIN_TARO_APP_CONFIG__'
+const source = 'export const appConfig = __VPT_APP_CONFIG__'
 
 test('specializes the amphibious bootstrap with the App configuration', async () => {
     const result = await specializeBootstrap({
@@ -19,7 +19,7 @@ test('specializes the amphibious bootstrap with the App configuration', async ()
 
     assert.match(result.code, /pages:\s*\[\s*["']pages\/home\/index["']/)
     assert.match(result.code, /navigationBarTitleText:\s*["']Example["']/)
-    assert.doesNotMatch(result.code, /__VITE_PLUGIN_TARO_APP_CONFIG__/)
+    assert.doesNotMatch(result.code, /__VPT_APP_CONFIG__/)
     assert.ok(result.map)
     assert.deepEqual(result.map.sources, [id])
 
@@ -35,6 +35,6 @@ test('rejects a bootstrap missing its App configuration placeholder', async () =
                 id,
                 appConfig: {}
             }),
-        /Expected one placeholder __VITE_PLUGIN_TARO_APP_CONFIG__, found 0/
+        /Expected one placeholder __VPT_APP_CONFIG__, found 0/
     )
 })

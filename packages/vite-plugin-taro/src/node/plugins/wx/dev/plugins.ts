@@ -1,5 +1,5 @@
 import { normalizePath, type PluginOption, transformWithOxc } from 'vite'
-import type { VitePluginTaroOptions } from '../../../../options.ts'
+import type { VptOptions } from '../../../../options.ts'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
 import { normalizeModuleId } from '../../../utils/modules.ts'
@@ -22,10 +22,7 @@ export function isWxClientEnvironment(environment: Readonly<{ name: string }>): 
  * The ordered application entries cross this configuration boundary unchanged so the host can compose global CSS without
  * reconstructing the resolver's App/Page ownership policy from unrelated Rolldown shell and transport entries.
  */
-export function createWxDevelopmentPlugin(
-    options: VitePluginTaroOptions,
-    applicationEntryIds: readonly string[]
-): PluginOption[] {
+export function createWxDevelopmentPlugin(options: VptOptions, applicationEntryIds: readonly string[]): PluginOption[] {
     /*
      * Vite creates this plugin descriptor before a server or DevEngine exists, then invokes configureServer and closeBundle on
      * different lifecycle stacks. This mutable handle transfers the one client-owned host between those hooks: configureServer

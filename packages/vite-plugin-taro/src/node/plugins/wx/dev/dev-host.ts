@@ -5,7 +5,7 @@ import colors from 'picocolors'
 import { type DevEngine, type DevOptions, dev } from 'rolldown/experimental'
 import { asyncScheduler } from 'rxjs'
 import type { Connect, ViteDevServer } from 'vite'
-import type { VitePluginTaroOptions } from '../../../../options.ts'
+import type { VptOptions } from '../../../../options.ts'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
 import { createStyleCapture, type StyleCaptureAction } from './create-style-capture.ts'
 import {
@@ -61,7 +61,7 @@ export async function createWxDevHost({
     applicationEntryIds
 }: {
     server: ViteDevServer
-    options: VitePluginTaroOptions
+    options: VptOptions
     applicationEntryIds: readonly string[]
 }): Promise<WxDevHost> {
     const bundledDev = getBundledDev(server)

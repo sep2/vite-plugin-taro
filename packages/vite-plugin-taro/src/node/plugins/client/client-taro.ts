@@ -1,5 +1,5 @@
 import { normalizePath, type Plugin } from 'vite'
-import type { VitePluginTaroTarget } from '../../../options.ts'
+import type { VptTarget } from '../../../options.ts'
 import { normalizeModuleId } from '../../utils/modules.ts'
 import { resolvePackageFile } from '../../utils/packages.ts'
 import { clientTaroNativeId } from './constant.ts'
@@ -32,7 +32,7 @@ const clientTaroModules = new Map([
 ])
 
 /** Creates the shared Taro facade backed by the selected target's API implementation. */
-export function createClientTaroPlugin(target: VitePluginTaroTarget): Plugin {
+export function createClientTaroPlugin(target: VptTarget): Plugin {
     const platformTaroId = resolvePlatformTaroId(target)
 
     return {
@@ -62,7 +62,7 @@ export function createClientTaroPlugin(target: VitePluginTaroTarget): Plugin {
     }
 }
 
-function resolvePlatformTaroId(target: VitePluginTaroTarget): string {
+function resolvePlatformTaroId(target: VptTarget): string {
     return target === 'h5' ? '@tarojs/plugin-platform-h5/dist/runtime/apis' : '@tarojs/taro'
 }
 

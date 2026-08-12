@@ -5,7 +5,7 @@ import { specializePageCapsule } from './specialize-page-capsule.ts'
 const source = `import './app.js'
 import { createPageConfig } from './taro-runtime.js'
 import PageComponent from '\0vpt:page-component'
-export default createPageConfig(PageComponent, __VITE_PLUGIN_TARO_PAGE_PATH__, undefined, __VITE_PLUGIN_TARO_PAGE_CONFIG__)`
+export default createPageConfig(PageComponent, __VPT_PAGE_PATH__, undefined, __VPT_PAGE_CONFIG__)`
 
 test('specializes the Page capsule for one route', async () => {
     const id = '/plugin/runtime/wx/capsule/page.js?route=pages%2Fhome%2Findex'
@@ -23,7 +23,7 @@ test('specializes the Page capsule for one route', async () => {
     assert.match(result.code, /vpt:page-component/)
     assert.match(result.code, /["']pages\/home\/index["']/)
     assert.match(result.code, /navigationBarTitleText:\s*["']Home["']/)
-    assert.doesNotMatch(result.code, /__VITE_PLUGIN_TARO_PAGE_/)
+    assert.doesNotMatch(result.code, /__VPT_PAGE_/)
     assert.ok(result.map)
     assert.deepEqual(result.map.sources, [id])
 })
@@ -39,6 +39,6 @@ test('rejects a Page capsule missing its specialization placeholders', async () 
                     config: {}
                 }
             }),
-        /Expected one placeholder __VITE_PLUGIN_TARO_PAGE_PATH__, found 0/
+        /Expected one placeholder __VPT_PAGE_PATH__, found 0/
     )
 })

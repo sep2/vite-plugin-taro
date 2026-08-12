@@ -5,14 +5,9 @@ import './app.ts'
 import PageComponent from '\0vpt:page-component'
 import { createPageConfig } from './taro-runtime.ts'
 
-declare const __VITE_PLUGIN_TARO_PAGE_PATH__: string
-declare const __VITE_PLUGIN_TARO_PAGE_CONFIG__: Record<string, unknown>
+declare const __VPT_PAGE_PATH__: string
+declare const __VPT_PAGE_CONFIG__: Record<string, unknown>
 
-const config = createPageConfig(
-    PageComponent,
-    __VITE_PLUGIN_TARO_PAGE_PATH__,
-    { root: { cn: [] } },
-    __VITE_PLUGIN_TARO_PAGE_CONFIG__
-)
+const config = createPageConfig(PageComponent, __VPT_PAGE_PATH__, { root: { cn: [] } }, __VPT_PAGE_CONFIG__)
 
 export default config

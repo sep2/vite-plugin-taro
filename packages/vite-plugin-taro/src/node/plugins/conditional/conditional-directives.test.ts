@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { VitePluginTaroTarget } from '../../../options.ts'
+import type { VptTarget } from '../../../options.ts'
 import { createConditionalDirectivePlugin } from './conditional-directives.ts'
 
 /** Applies the conditional transform for one target. */
-function transform(code: string, target: VitePluginTaroTarget): string {
+function transform(code: string, target: VptTarget): string {
     const hook = createConditionalDirectivePlugin(target).transform
     if (!hook) {
         throw new Error('Expected a transform hook')

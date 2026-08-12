@@ -1,9 +1,9 @@
 import { types } from '@babel/core'
-import type { VitePluginTaroPageOption } from '../../../../options.ts'
+import type { VptPageOption } from '../../../../options.ts'
 import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
 
-const pagePathPlaceholder = '__VITE_PLUGIN_TARO_PAGE_PATH__'
-const pageConfigPlaceholder = '__VITE_PLUGIN_TARO_PAGE_CONFIG__'
+const pagePathPlaceholder = '__VPT_PAGE_PATH__'
+const pageConfigPlaceholder = '__VPT_PAGE_CONFIG__'
 
 /** Specializes the Page capsule for one configured route. */
 export function specializePageCapsule({
@@ -14,7 +14,7 @@ export function specializePageCapsule({
 }: {
     code: string
     id: string
-    page: VitePluginTaroPageOption
+    page: VptPageOption
     sourcemap?: boolean
 }): Promise<AstTransformResult> {
     return replaceWithAst(

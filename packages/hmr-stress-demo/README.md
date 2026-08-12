@@ -50,7 +50,7 @@ The complete suite checks:
 Useful environment overrides:
 
 ```text
-VITE_PLUGIN_TARO_WECHAT_APP_ID   App ID; falls back to the demo .env.local, then touristappid
+VITE_VPT_WECHAT_APP_ID   App ID; falls back to the demo .env.local, then touristappid
 VPT_HMR_DEVTOOLS_CLIENT          wechatide client name; default Pi
 VPT_HMR_BUILD_PLUGIN             set to 1 to rebuild plugin dist before the suite
 VPT_HMR_STRESS_UPDATES           burst update count
@@ -66,7 +66,7 @@ For exploratory work rather than write-heavy pressure tests:
 
 ```bash
 pnpm build:plugin
-VITE_PLUGIN_TARO_WECHAT_APP_ID=<appid> pnpm dev:hmr-stress-demo:wx
+VITE_VPT_WECHAT_APP_ID=<appid> pnpm dev:hmr-stress-demo:wx
 ```
 
 Open `packages/hmr-stress-demo/dist/wx` manually. Do not run burst publishers against this repository-backed server; use the automated commands above so source generations remain confined to the disposable fixture.

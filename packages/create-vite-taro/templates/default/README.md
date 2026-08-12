@@ -24,7 +24,7 @@ npm run dev:h5
 
 You can keep `npm run dev:wx` and `npm run dev:h5` running at the same time in separate terminals.
 
-Set `VITE_PLUGIN_TARO_WECHAT_APP_ID` in `.env.local` to your WeChat App ID, then open `dist/wx` with WeChat DevTools
+Set `VITE_VPT_WECHAT_APP_ID` in `.env.local` to your WeChat App ID, then open `dist/wx` with WeChat DevTools
 for Mini Program development. State-preserving hot reload requires `compileHotReLoad: true`; the generated project sets
 it automatically and also disables Skyline rendering and URL checks by default.
 

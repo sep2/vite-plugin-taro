@@ -75,7 +75,7 @@ packages/loan-genius/dist/h5
 ## What this sample demonstrates
 
 - One React 19 + Taro source tree for both `wx` and `h5`.
-- `vite-plugin-taro` target selection with `VITE_PLUGIN_TARO_TARGET`.
+- `vite-plugin-taro` target selection with `VITE_VPT_TARGET`.
 - App and page metadata declared in `vite.config.ts`.
 - WeChat Mini Program build output, H5 dev server, and H5 build output.
 - Tailwind CSS v4 imported from `src/app.css`.
@@ -93,13 +93,13 @@ import { Text, View } from 'virtual:taro/components'
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `VITE_PLUGIN_TARO_TARGET` | Yes | Set by the root scripts to `wx` or `h5`. |
-| `VITE_PLUGIN_TARO_WECHAT_APP_ID` | No | WeChat Mini Program app id. Defaults to `touristappid`. |
+| `VITE_VPT_TARGET` | Yes | Set by the root scripts to `wx` or `h5`. |
+| `VITE_VPT_WECHAT_APP_ID` | No | WeChat Mini Program app id. Defaults to `touristappid`. |
 
 For local WeChat testing, put your app id in `packages/loan-genius/.env.local`:
 
 ```env
-VITE_PLUGIN_TARO_WECHAT_APP_ID=your_app_id
+VITE_VPT_WECHAT_APP_ID=your_app_id
 ```
 
 ## Project structure

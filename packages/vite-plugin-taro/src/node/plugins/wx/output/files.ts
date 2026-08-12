@@ -1,5 +1,5 @@
 import type { Rolldown } from 'vite'
-import type { VitePluginTaroOptions } from '../../../../options.ts'
+import type { VptOptions } from '../../../../options.ts'
 import { createNativeComponentOutput } from '../native/create-native-component-output.ts'
 import type { GeneratedSubpackage } from '../placement/placer.ts'
 import { createJsonAssets } from './json.ts'
@@ -13,7 +13,7 @@ export async function createOutputFiles({
     getModuleInfo
 }: {
     bundle: Rolldown.OutputBundle
-    options: VitePluginTaroOptions
+    options: VptOptions
     subpackages: readonly GeneratedSubpackage[]
     getModuleInfo: (moduleId: string) => { meta: Rolldown.CustomPluginOptions } | null
 }): Promise<Rolldown.EmittedFile[]> {

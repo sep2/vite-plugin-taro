@@ -1,7 +1,7 @@
 import Taro from 'virtual:taro/api'
 import { useState } from 'react'
 
-const isWechatTarget = import.meta.env.VITE_PLUGIN_TARO_TARGET === 'wx'
+const isWechatTarget = import.meta.env.VITE_VPT_TARGET === 'wx'
 
 interface NavigationBarNavInfo {
     height: number

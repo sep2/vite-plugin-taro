@@ -30,7 +30,7 @@ function px(value: number): string {
     return `${Math.round(value)}px`
 }
 
-const isWechatTarget = import.meta.env.VITE_PLUGIN_TARO_TARGET === 'wx'
+const isWechatTarget = import.meta.env.VITE_VPT_TARGET === 'wx'
 
 function getNavigationBarMetrics(): NavigationBarMetrics {
     const windowInfo = Taro.getWindowInfo()

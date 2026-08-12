@@ -7,16 +7,16 @@ description: VPT 的 Vite 配置与插件选项参考。
 
 ```ts
 import { defineConfig, loadEnv } from 'vite'
-import vpt, { type VitePluginTaroTarget } from 'vite-plugin-taro'
+import vpt, { type VptTarget } from 'vite-plugin-taro'
 
-function getTarget(value: string | undefined): VitePluginTaroTarget {
+function getTarget(value: string | undefined): VptTarget {
     if (value === 'wx' || value === 'h5') return value
-    throw new Error('VITE_PLUGIN_TARO_TARGET must be "wx" or "h5".')
+    throw new Error('VITE_VPT_TARGET must be "wx" or "h5".')
 }
 
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, process.cwd(), 'VITE_PLUGIN_TARO_')
-    const target = getTarget(env.VITE_PLUGIN_TARO_TARGET)
+    const env = loadEnv(mode, process.cwd(), 'VITE_VPT_')
+    const target = getTarget(env.VITE_VPT_TARGET)
 
     return {
         build: {
@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
                     window: { navigationBarTitleText: '示例应用' }
                 },
                 projectConfigJson: {
-                    appid: env.VITE_PLUGIN_TARO_WECHAT_APP_ID || 'touristappid',
+                    appid: env.VITE_VPT_WECHAT_APP_ID || 'touristappid',
                     projectname: 'vite-taro-app',
                     compileType: 'miniprogram'
                 },
@@ -52,21 +52,23 @@ export default defineConfig(({ mode }) => {
 ## 类型
 
 ```ts
-type VitePluginTaroTarget = 'wx' | 'h5'
+type VptJsonObject = Record<string, unknown>
 
-type VitePluginTaroPageOption = {
+type VptTarget = 'wx' | 'h5'
+
+type VptPageOption = {
     path: string
-    config: Record<string, unknown>
+    config: VptJsonObject
 }
 
-interface VitePluginTaroOptions {
-    target: VitePluginTaroTarget
+interface VptOptions {
+    target: VptTarget
     app: string
-    pages: VitePluginTaroPageOption[]
-    appJson: Record<string, unknown>
-    projectConfigJson: Record<string, unknown>
-    projectPrivateConfigJson?: Record<string, unknown>
-    sitemapJson?: Record<string, unknown>
+    pages: VptPageOption[]
+    appJson: VptJsonObject
+    projectConfigJson: VptJsonObject
+    projectPrivateConfigJson?: VptJsonObject
+    sitemapJson?: VptJsonObject
 }
 ```
 

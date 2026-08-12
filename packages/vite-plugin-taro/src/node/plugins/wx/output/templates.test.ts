@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
-import type { VitePluginTaroOptions } from '../../../../options.ts'
+import type { VptOptions } from '../../../../options.ts'
 import { createTemplateAssets } from './templates.ts'
 
-const options: VitePluginTaroOptions = {
+const options: VptOptions = {
     target: 'wx',
     app: 'src/app.tsx',
     pages: [

@@ -1,7 +1,7 @@
 import babel, { defineRolldownBabelPreset } from '@rolldown/plugin-babel'
 import type { HtmlTagDescriptor, Plugin, PluginOption } from 'vite'
 import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
-import type { VitePluginTaroOptions } from '../../../options.ts'
+import type { VptOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
 import { toViteFileImportPath } from '../../utils/modules.ts'
 import { packageRequire } from '../../utils/packages.ts'
@@ -12,7 +12,7 @@ import { createStencilClientAdapter } from './create-stencil-client-adapter.ts'
 import { createModuleResolver } from './resolver/module-resolver.ts'
 
 /** Creates the plugins that own the H5 target. */
-export function createH5TargetPlugins(options: VitePluginTaroOptions): PluginOption[] {
+export function createH5TargetPlugins(options: VptOptions): PluginOption[] {
     return [
         WeappTailwindcss({
             appType: 'weapp-vite',
@@ -36,7 +36,7 @@ export function createH5TargetPlugins(options: VitePluginTaroOptions): PluginOpt
 }
 
 /** Configures H5 resolution and supplies the specialized physical application entry. */
-function createH5TargetPlugin(options: VitePluginTaroOptions): Plugin {
+function createH5TargetPlugin(options: VptOptions): Plugin {
     const moduleResolver = createModuleResolver(options)
 
     return {
