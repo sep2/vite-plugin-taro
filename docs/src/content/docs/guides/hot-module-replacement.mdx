@@ -112,6 +112,7 @@ dist/wx/hmr/patches.js
 3. `compileHotReLoad` 已开启，`urlCheck` 已关闭。
 4. Vite 进程没有构建错误。
 5. 开发者工具没有开启 Skyline 渲染调试。
+6. 如果以上都没有，请关闭微信开发者工具，关闭 dev 服务器，手动删除 `dist/wx`，再重新运行。
 
 ### App 状态被重置
 
@@ -125,8 +126,9 @@ dist/wx/hmr/patches.js
 
 确认 `urlCheck` 为 `false`，并检查代理或防火墙是否阻止微信开发者工具访问 Vite 打印的本机地址。
 
-需要了解物理文件边界、模块传播、React Refresh 适配和 Taro 页面重新绑定时，请阅读 [HMR 实现原理](/references/hmr-implementation/)。
-
 ## 样式热更新
 
 已支持。
+
+## 原理和实现
+需要了解物理文件边界、模块传播、React Refresh 适配和 Taro 页面重新绑定时，请阅读 [HMR 实现原理](/references/hmr-implementation/)。
