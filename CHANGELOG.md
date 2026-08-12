@@ -4,6 +4,25 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.6.0] - 2026-08-12
+
+### Added
+
+- rename public API to vpt (6ee18a5)
+- make sitemap configuration optional (5c394c4)
+
+### Changed
+
+- match full rebuild diagnostic (d57afc1)
+- docs (2ba8d7d)
+- use vpt for plugin imports (f12a9b3)
+- eliminate Tailwind showcase paints (8ba6d7d)
+- docs (b3c7f14)
+
+### Fixed
+
+- fix docs homepage performance and mobile layout (b9d7830)
+
 ## [0.5.16] - 2026-08-11
 
 ### Changed
