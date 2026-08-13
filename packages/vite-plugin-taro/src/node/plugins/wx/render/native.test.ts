@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
-import { appCapsulePath, bootstrapPath, rolldownRuntimeId } from '../module.ts'
+import { appCapsulePath, bootstrapPath, rolldownRuntimeId } from '../module/module.ts'
 import { renderNative } from './native.ts'
 
 function chunk({

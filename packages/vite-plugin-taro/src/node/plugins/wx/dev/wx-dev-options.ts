@@ -6,7 +6,7 @@ import type { ViteDevServer } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { once } from '../../../utils/once.ts'
 import { resolvePackageFile } from '../../../utils/packages.ts'
-import { appShellFileName } from '../module.ts'
+import { appShellFileName } from '../module/module.ts'
 
 type BundledDevRolldownOptions = InputOptions & {
     experimental?: {

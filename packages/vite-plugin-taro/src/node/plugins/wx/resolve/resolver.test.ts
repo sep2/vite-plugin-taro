@@ -15,7 +15,7 @@ import {
     pageShellPath,
     transportPath,
     vitePreloadId
-} from '../module.ts'
+} from '../module/module.ts'
 import { createResolver } from './resolver.ts'
 
 const options: VptOptions = {

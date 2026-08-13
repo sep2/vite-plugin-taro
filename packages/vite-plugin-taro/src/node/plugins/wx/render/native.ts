@@ -2,8 +2,8 @@ import { type PluginObj, type PluginTarget, types } from '@babel/core'
 import transformModulesCommonjs from '@babel/plugin-transform-modules-commonjs'
 import type { Rolldown } from 'vite'
 import { type AstTransformResult, transformWithBabel } from '../../../utils/transform.ts'
-import { resolveLogicalChunkReference, resolvePhysicalChunkReference } from '../chunk-path.ts'
-import { getWxEntryRole } from '../module.ts'
+import { resolveLogicalChunkReference, resolvePhysicalChunkReference } from '../module/chunk-path.ts'
+import { getWxEntryRole } from '../module/module.ts'
 
 /** Renders a native module while activating its statically imported capsules through SystemJS. */
 export function renderNative({

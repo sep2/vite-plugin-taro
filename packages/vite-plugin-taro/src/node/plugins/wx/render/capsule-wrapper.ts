@@ -1,5 +1,5 @@
 import { type PluginObj, types } from '@babel/core'
-import { resolveLogicalChunkReference } from '../chunk-path.ts'
+import { resolveLogicalChunkReference } from '../module/chunk-path.ts'
 
 /** Wraps System.register as an inert CommonJS capsule tuple with canonical final dependency IDs. */
 export function wrapCapsulePlugin(fileName: string): PluginObj {

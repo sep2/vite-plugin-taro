@@ -17,7 +17,7 @@ import {
     pageShellPath,
     transportPath,
     vitePreloadId
-} from '../module.ts'
+} from '../module/module.ts'
 import { specializeBootstrap } from './specialize-bootstrap.ts'
 import { specializePageCapsule } from './specialize-page-capsule.ts'
 

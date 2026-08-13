@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
 import { build, type InputOption, type OutputBundle, type OutputChunk, type Plugin } from 'rolldown'
-import { appCapsulePath, appShellPath, bootstrapPath, transportPath } from '../module.ts'
+import { appCapsulePath, appShellPath, bootstrapPath, transportPath } from '../module/module.ts'
 import { createPlacement, type GeneratedSubpackage, type Placement } from './placement.ts'
 import { placementRolldownOptions } from './placer.ts'
 

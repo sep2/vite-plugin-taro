@@ -1,5 +1,5 @@
 import type { Plugin, Rolldown } from 'vite'
-import { getWxExecutionKind, isTransportModule } from '../module.ts'
+import { getWxExecutionKind, isTransportModule } from '../module/module.ts'
 import { getNativeComponentAssetBytes } from '../native/native-component-assets.ts'
 import { createPlacement, type GeneratedSubpackage, type PackageLocation, type Placement } from './placement.ts'
 

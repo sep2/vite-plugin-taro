@@ -4,7 +4,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { type Rolldown, transformWithOxc } from 'vite'
 import { esTarget } from '../../../utils/constant.ts'
-import { bootstrapPath, rolldownRuntimeId, transportPath } from '../module.ts'
+import { bootstrapPath, rolldownRuntimeId, transportPath } from '../module/module.ts'
 import { renderNative } from './native.ts'
 import { materializeTransport } from './transport.ts'
 
