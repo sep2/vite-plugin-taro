@@ -210,15 +210,6 @@ importers:
       '@babel/generator':
         specifier: ^7.29.8
         version: 7.29.8
-      '@babel/plugin-transform-dynamic-import':
-        specifier: ^7.29.7
-        version: 7.29.7(@babel/core@7.29.7)
-      '@babel/plugin-transform-modules-commonjs':
-        specifier: ^7.29.7
-        version: 7.29.7(@babel/core@7.29.7)
-      '@babel/plugin-transform-modules-systemjs':
-        specifier: ^7.29.8
-        version: 7.29.8(@babel/core@7.29.7)
       '@oxc-project/types':
         specifier: 0.143.0
         version: 0.143.0
@@ -295,6 +286,15 @@ importers:
         specifier: ^5.2.11
         version: 5.2.11(@oxc-project/types@0.143.0)(jiti@2.7.0)(rolldown@1.2.3)(tailwindcss@4.3.3)
     devDependencies:
+      '@babel/plugin-transform-dynamic-import':
+        specifier: ^7.29.7
+        version: 7.29.7(@babel/core@7.29.7)
+      '@babel/plugin-transform-modules-commonjs':
+        specifier: ^7.29.7
+        version: 7.29.7(@babel/core@7.29.7)
+      '@babel/plugin-transform-modules-systemjs':
+        specifier: ^7.29.8
+        version: 7.29.8(@babel/core@7.29.7)
       '@types/babel__core':
         specifier: ^7.20.5
         version: 7.20.5

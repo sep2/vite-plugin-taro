@@ -1,4 +1,3 @@
-import { type PluginItem, transformSync } from '@babel/core'
 import { generate } from '@babel/generator'
 import { type Rolldown, transformWithOxc } from 'vite'
 import { esTarget } from './constant.ts'
@@ -49,34 +48,5 @@ function requireOnePlaceholder(code: string, placeholder: string): void {
     const replacementCount = code.split(placeholder).length - 1
     if (replacementCount !== 1) {
         throw new Error(`Expected one placeholder ${placeholder}, found ${replacementCount}`)
-    }
-}
-
-/** Transforms one module with Babel's shared parser and source-map configuration. */
-export function transformWithBabel(
-    code: string,
-    filename: string,
-    plugins: PluginItem[],
-    sourcemap = true
-): AstTransformResult {
-    const transformed = transformSync(code, {
-        babelrc: false,
-        compact: true,
-        minified: true,
-        comments: false,
-        configFile: false,
-        filename,
-        plugins,
-        sourceFileName: filename,
-        sourceMaps: sourcemap,
-        sourceType: 'module'
-    })
-    if (!transformed?.code || (sourcemap && !transformed.map)) {
-        throw new Error(`Failed to transform ${filename} with Babel`)
-    }
-
-    return {
-        code: transformed.code,
-        map: sourcemap ? (transformed.map as Rolldown.ExistingRawSourceMap) : null
     }
 }

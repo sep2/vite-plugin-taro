@@ -58,9 +58,6 @@
     "dependencies": {
         "@babel/core": "^7.29.7",
         "@babel/generator": "^7.29.8",
-        "@babel/plugin-transform-dynamic-import": "^7.29.7",
-        "@babel/plugin-transform-modules-commonjs": "^7.29.7",
-        "@babel/plugin-transform-modules-systemjs": "^7.29.8",
         "@oxc-project/types": "0.143.0",
         "@rolldown/plugin-babel": "^0.2.3",
         "@tailwindcss-mangle/engine": "0.2.0",
@@ -91,6 +88,9 @@
         "vite": "8.2.1"
     },
     "devDependencies": {
+        "@babel/plugin-transform-dynamic-import": "^7.29.7",
+        "@babel/plugin-transform-modules-commonjs": "^7.29.7",
+        "@babel/plugin-transform-modules-systemjs": "^7.29.8",
         "@types/babel__core": "^7.20.5",
         "@types/babel__generator": "^7.27.0",
         "@types/node": "^26.1.1",
