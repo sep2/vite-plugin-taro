@@ -4,7 +4,7 @@ import test from 'node:test'
 import { build, type InputOption, type OutputBundle, type OutputChunk, type Plugin } from 'rolldown'
 import { appCapsulePath, appShellPath, bootstrapPath, transportPath } from '../module/module.ts'
 import { createPlacement, type GeneratedSubpackage, type Placement, subpackagePlanningBudget } from './placement.ts'
-import { placementRolldownOptions } from './placer.ts'
+import { isWxFrameworkVendorModule, placementRolldownOptions } from './placer.ts'
 
 const fixtureRoot = '/placer-fixture'
 const contentHashPattern = '[A-Za-z0-9_-]{8}'
@@ -96,6 +96,58 @@ function getSubpackageRoot(chunk: OutputChunk): string {
 function moduleId(fileName: string): string {
     return `${fixtureRoot}/${fileName}`
 }
+
+test('extracts the recursive React/Taro vendor closure without absorbing application modules', async () => {
+    const applicationId = moduleId('application.js')
+    const reactId = '/workspace/node_modules/.pnpm/react@19.2.7/node_modules/react/index.js'
+    const taroId = '/workspace/node_modules/.pnpm/@tarojs+runtime@4.2.0/node_modules/@tarojs/runtime/index.js'
+    const frameworkDependencyId = '/workspace/node_modules/.pnpm/tslib@2.8.1/node_modules/tslib/tslib.es6.mjs'
+    const applicationDependencyId = moduleId('application-dependency.js')
+    const output = await buildFixture({
+        input: { application: applicationId },
+        modules: {
+            [applicationId]: `
+                import { react } from '${reactId}'
+                import { application } from './application-dependency.js'
+                export const value = react + application
+            `,
+            [reactId]: `
+                import { taro } from '${taroId}'
+                import { helper } from '${frameworkDependencyId}'
+                export const react = taro + helper
+            `,
+            [taroId]: `export const taro = 'taro'`,
+            [frameworkDependencyId]: `export const helper = 'helper'`,
+            [applicationDependencyId]: `export const application = 'application'`
+        }
+    })
+
+    const vendor = findChunk(output.chunks, reactId)
+    const application = findChunk(output.chunks, applicationId)
+
+    assert.match(vendor.fileName, new RegExp(`^assets/vendor-${contentHashPattern}\\.js$`))
+    assert.ok(vendor.moduleIds.includes(taroId))
+    assert.ok(vendor.moduleIds.includes(frameworkDependencyId))
+    assert.ok(!vendor.moduleIds.includes(applicationId))
+    assert.ok(!vendor.moduleIds.includes(applicationDependencyId))
+    assert.ok(application.moduleIds.includes(applicationId))
+    assert.ok(application.moduleIds.includes(applicationDependencyId))
+    assert.equal(output.placement.getLoadMode(vendor), 'sync')
+    assert.deepEqual(output.subpackages, [])
+})
+
+test('matches only explicit React and Taro framework package roots', () => {
+    assert.equal(isWxFrameworkVendorModule('/repo/node_modules/.pnpm/react@19.2.7/node_modules/react/index.js'), true)
+    assert.equal(
+        isWxFrameworkVendorModule(
+            '/repo/node_modules/.pnpm/@tarojs+runtime@4.2.0/node_modules/@tarojs/runtime/index.js'
+        ),
+        true
+    )
+    assert.equal(isWxFrameworkVendorModule('/repo/packages/taro-react/dist/react.esm.js'), true)
+    assert.equal(isWxFrameworkVendorModule('/repo/src/react-feature.ts'), false)
+    assert.equal(isWxFrameworkVendorModule('/repo/src/taro-page.ts'), false)
+})
 
 test('emits an eager application closure entirely in the synchronous main package', async () => {
     const applicationId = moduleId('application.js')

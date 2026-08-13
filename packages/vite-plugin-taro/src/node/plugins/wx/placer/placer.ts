@@ -1,4 +1,4 @@
-import type { Plugin, Rolldown } from 'vite'
+import { normalizePath, type Plugin, type Rolldown } from 'vite'
 import { getWxExecutionKind, isTransportModule } from '../module/module.ts'
 import { getNativeComponentAssetBytes } from '../native/native-component-assets.ts'
 import {
@@ -10,6 +10,15 @@ import {
 } from './placement.ts'
 
 export type { GeneratedSubpackage, Placement } from './placement.ts'
+
+const pnpmFrameworkPackagePattern = /\/node_modules\/\.pnpm\/(?:@tarojs\+|react(?:-dom|-reconciler)?@|scheduler@)/
+const workspaceFrameworkPackagePattern = /\/packages\/(?:taro-react|taro-plugin-framework-react)\//
+
+/** Selects the explicit React/Taro roots whose complete dependency closure forms the framework vendor chunk. */
+export function isWxFrameworkVendorModule(moduleId: string): boolean {
+    const normalizedId = normalizePath(moduleId)
+    return pnpmFrameworkPackagePattern.test(normalizedId) || workspaceFrameworkPackagePattern.test(normalizedId)
+}
 
 type PlacementState =
     | { phase: 'idle' }
@@ -42,6 +51,19 @@ export const placementRolldownOptions = {
          */
         codeSplitting: {
             groups: [
+                {
+                    /**
+                     * React and Taro form one stable framework boundary shared by the App and every Page capsule. Keeping
+                     * their complete dependency closure together prevents application edits from invalidating framework
+                     * chunk identity and makes subsequent development generations eligible to reuse the unchanged vendor.
+                     * This does not defer framework loading: the placer still reserves this statically reachable chunk in
+                     * the synchronous main package.
+                     */
+                    name: 'vendor',
+                    test: isWxFrameworkVendorModule,
+                    priority: 100,
+                    includeDependenciesRecursively: true
+                },
                 {
                     name: 'wx',
                     entriesAware: true,
