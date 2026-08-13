@@ -6,8 +6,10 @@ import { renderCapsule } from './capsule.ts'
 test('converts a final ESM chunk into a System registration capsule', () => {
     const result = renderCapsule(
         `import { value } from './dependency.js'
-export const doubled = value * 2`,
-        { fileName: 'assets/root.js' } as Rolldown.RenderedChunk
+const doubled = value * 2
+export { doubled }`,
+        { fileName: 'assets/root.js' } as Rolldown.RenderedChunk,
+        true
     )
     const commonJsModule: { exports?: unknown } = {}
 
@@ -22,30 +24,33 @@ export const doubled = value * 2`,
 test('canonicalizes physical asset references as package-neutral logical IDs', () => {
     const result = renderCapsule(
         `import { value } from './shared.js'
-export const load = () => import('./lazy.js')
-export { value }`,
-        { fileName: 'assets/page.js' } as Rolldown.RenderedChunk
+const load = () => import('./lazy.js')
+export { load, value }`,
+        { fileName: 'assets/page.js' } as Rolldown.RenderedChunk,
+        true
     )
     const commonJsModule: { exports?: unknown } = {}
     Function('module', result.code)(commonJsModule)
 
     assert.ok(Array.isArray(commonJsModule.exports))
     assert.deepEqual(commonJsModule.exports[0], ['shared.js'])
-    assert.match(result.code, /_context\.import\(['"]lazy\.js['"]\)/)
+    assert.match(result.code, /\b\w+\.import\(['"]lazy\.js['"]\)/)
 })
 
 test('keeps Vite preload imports while converting dynamic imports', () => {
     const result = renderCapsule(
         `import { __vitePreload } from './bootstrap.js'
-export const load = () => __vitePreload(() => import('./lazy.js'), __VITE_PRELOAD__)`,
-        { fileName: 'assets/root.js' } as Rolldown.RenderedChunk
+const load = () => __vitePreload(() => import('./lazy.js'), __VITE_PRELOAD__)
+export { load }`,
+        { fileName: 'assets/root.js' } as Rolldown.RenderedChunk,
+        true
     )
     const commonJsModule: { exports?: unknown } = {}
     Function('module', result.code)(commonJsModule)
 
     assert.ok(Array.isArray(commonJsModule.exports))
     assert.deepEqual(commonJsModule.exports[0], ['bootstrap.js'])
-    assert.match(result.code, /_context\.import\(['"]lazy\.js['"]\)/)
+    assert.match(result.code, /\b\w+\.import\(['"]lazy\.js['"]\)/)
     assert.match(result.code, /VITE_PRELOAD/)
     assert.ok(result.map)
     assert.notEqual(typeof result.map, 'string')

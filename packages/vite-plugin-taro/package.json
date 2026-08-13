@@ -61,6 +61,7 @@
         "@babel/plugin-transform-dynamic-import": "^7.29.7",
         "@babel/plugin-transform-modules-commonjs": "^7.29.7",
         "@babel/plugin-transform-modules-systemjs": "^7.29.8",
+        "@oxc-project/types": "0.143.0",
         "@rolldown/plugin-babel": "^0.2.3",
         "@tailwindcss-mangle/engine": "0.2.0",
         "@tarojs/components": "4.2.0",
