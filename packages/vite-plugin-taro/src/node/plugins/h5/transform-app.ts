@@ -1,4 +1,4 @@
-import { types } from '@babel/core'
+import * as types from '@babel/types'
 import type { VptOptions, VptPageOption } from '../../../options.ts'
 import { createPageComponentImportPath } from '../../utils/modules.ts'
 import { createAppConfig } from '../../utils/project-config.ts'

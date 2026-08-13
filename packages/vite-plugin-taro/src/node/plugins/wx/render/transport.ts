@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { types } from '@babel/core'
+import * as types from '@babel/types'
 import type { Rolldown } from 'vite'
 import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
 import { toLogicalChunkId } from '../module/chunk-path.ts'

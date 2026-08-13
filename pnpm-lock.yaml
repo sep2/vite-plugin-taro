@@ -210,6 +210,9 @@ importers:
       '@babel/generator':
         specifier: ^7.29.8
         version: 7.29.8
+      '@babel/types':
+        specifier: ^7.29.8
+        version: 7.29.8
       '@oxc-project/types':
         specifier: 0.143.0
         version: 0.143.0

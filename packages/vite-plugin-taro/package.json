@@ -58,6 +58,7 @@
     "dependencies": {
         "@babel/core": "^7.29.7",
         "@babel/generator": "^7.29.8",
+        "@babel/types": "^7.29.8",
         "@oxc-project/types": "0.143.0",
         "@rolldown/plugin-babel": "^0.2.3",
         "@tailwindcss-mangle/engine": "0.2.0",

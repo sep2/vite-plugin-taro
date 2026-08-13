@@ -1,4 +1,4 @@
-import { types } from '@babel/core'
+import * as types from '@babel/types'
 import type { VptPageOption } from '../../../../options.ts'
 import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
 
