@@ -1,13 +1,7 @@
 import { normalizePath, type Plugin, type Rolldown } from 'vite'
 import { getWxExecutionKind, isTransportModule } from '../module/module.ts'
 import { getNativeComponentAssetBytes } from '../native/native-component-assets.ts'
-import {
-    createPlacement,
-    type GeneratedSubpackage,
-    type PackageLocation,
-    type Placement,
-    subpackagePlanningBudget
-} from './placement.ts'
+import { createPlacement, type GeneratedSubpackage, type PackageLocation, type Placement } from './placement.ts'
 
 export type { GeneratedSubpackage, Placement } from './placement.ts'
 
@@ -46,28 +40,18 @@ export const placementRolldownOptions = {
      */
     output: {
         /**
-         * Asks Rolldown to split every entry-specific module group before one indivisible final chunk can consume an entire
-         * generated subpackage. The placer remains the authority for assigning those final chunks to physical WX packages.
+         * React and Taro form one stable framework boundary shared by the App and every Page capsule. Keeping their complete
+         * dependency closure together prevents application edits from invalidating framework chunk identity and makes later
+         * development generations eligible to reuse the unchanged vendor. All remaining modules use Rolldown's automatic
+         * chunking; physical WX package placement operates on those final chunks without imposing another split strategy.
          */
         codeSplitting: {
             groups: [
                 {
-                    /**
-                     * React and Taro form one stable framework boundary shared by the App and every Page capsule. Keeping
-                     * their complete dependency closure together prevents application edits from invalidating framework
-                     * chunk identity and makes subsequent development generations eligible to reuse the unchanged vendor.
-                     * This does not defer framework loading: the placer still reserves this statically reachable chunk in
-                     * the synchronous main package.
-                     */
                     name: 'vendor',
                     test: isWxFrameworkVendorModule,
                     priority: 100,
                     includeDependenciesRecursively: true
-                },
-                {
-                    name: 'wx',
-                    entriesAware: true,
-                    maxSize: subpackagePlanningBudget
                 }
             ]
         },
