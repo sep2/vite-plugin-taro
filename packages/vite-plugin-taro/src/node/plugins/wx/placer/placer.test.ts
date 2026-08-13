@@ -3,7 +3,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { build, type InputOption, type OutputBundle, type OutputChunk, type Plugin } from 'rolldown'
 import { appCapsulePath, appShellPath, bootstrapPath, transportPath } from '../module/module.ts'
-import { createPlacement, type GeneratedSubpackage, type Placement } from './placement.ts'
+import { createPlacement, type GeneratedSubpackage, type Placement, subpackagePlanningBudget } from './placement.ts'
 import { placementRolldownOptions } from './placer.ts'
 
 const fixtureRoot = '/placer-fixture'
@@ -140,7 +140,7 @@ test('preserves Rolldown naming for one lazy static closure', async () => {
 
     assert.equal(feature.moduleIds[0], dependencyId)
     assert.ok(feature.moduleIds.includes(featureId))
-    assert.match(feature.fileName, new RegExp(`^${root}/assets/feature-panel-${contentHashPattern}\\.js$`))
+    assert.match(feature.fileName, new RegExp(`^${root}/assets/wx~feature-panel-${contentHashPattern}\\.js$`))
     assert.equal(output.placement.getLoadMode(application), 'sync')
     assert.equal(output.placement.getLoadMode(feature), 'async')
     assert.deepEqual(output.subpackages, [
@@ -206,7 +206,7 @@ test('keeps an eagerly shared dependency in main when a subpackage also imports 
     const feature = findChunk(output.chunks, featureId)
 
     assert.doesNotMatch(shared.fileName, /^sub\//)
-    assert.match(feature.fileName, new RegExp(`^sub/p_[a-f0-9]{8}/assets/lazy-feature-${contentHashPattern}\\.js$`))
+    assert.match(feature.fileName, new RegExp(`^sub/p_[a-f0-9]{8}/assets/wx~lazy-feature-${contentHashPattern}\\.js$`))
     assert.equal(output.placement.getLoadMode(shared), 'sync')
     assert.equal(output.placement.getLoadMode(feature), 'async')
     assert.equal(output.subpackages.length, 1)
@@ -238,13 +238,39 @@ test('emits independently named chunks when the package budget splits lazy roots
     const reportRoot = getSubpackageRoot(report)
 
     assert.notEqual(accountRoot, reportRoot)
-    assert.match(account.fileName, new RegExp(`^${accountRoot}/assets/account-panel-${contentHashPattern}\\.js$`))
-    assert.match(report.fileName, new RegExp(`^${reportRoot}/assets/report-panel-${contentHashPattern}\\.js$`))
+    assert.match(account.fileName, new RegExp(`^${accountRoot}/assets/wx~account-panel-${contentHashPattern}\\.js$`))
+    assert.match(report.fileName, new RegExp(`^${reportRoot}/assets/wx~report-panel-${contentHashPattern}\\.js$`))
     assert.deepEqual(
         output.subpackages.map((subpackage) => subpackage.root),
         [accountRoot, reportRoot].sort()
     )
     assert.ok([account, report].every((chunk) => output.placement.getLoadMode(chunk) === 'async'))
+})
+
+test('splits an oversized lazy closure before final-chunk placement', async () => {
+    const applicationId = moduleId('application.js')
+    const featureId = moduleId('large-feature.js')
+    const leftId = moduleId('large-left.js')
+    const rightId = moduleId('large-right.js')
+    const output = await buildFixture({
+        input: { application: applicationId },
+        modules: {
+            [applicationId]: `export const loadFeature = () => import('./large-feature.js')`,
+            [featureId]: `
+                import { left } from './large-left.js'
+                import { right } from './large-right.js'
+                export const size = left.length + right.length
+            `,
+            [leftId]: `export const left = '${'l'.repeat(1_000_000)}'`,
+            [rightId]: `export const right = '${'r'.repeat(1_000_000)}'`
+        }
+    })
+
+    const left = findChunk(output.chunks, leftId)
+    const right = findChunk(output.chunks, rightId)
+
+    assert.notEqual(left.fileName, right.fileName)
+    assert.ok(output.chunks.every((chunk) => Buffer.byteLength(chunk.code, 'utf8') < subpackagePlanningBudget))
 })
 
 test('preserves native shell paths while hashing real capsule and runtime entries in main', async () => {

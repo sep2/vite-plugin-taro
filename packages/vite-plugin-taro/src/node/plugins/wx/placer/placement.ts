@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import type { Rolldown } from 'vite'
 
 // Leave headroom below WeChat's 2M subpackage limit for rendered wrappers and native assets.
-const subpackagePlanningBudget = 1_900_000
+export const subpackagePlanningBudget = 1_900_000
 const generatedSubpackageRootPrefix = 'sub/p_'
 
 /** Identifies one generated code-only subpackage by its physical output root. */

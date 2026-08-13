@@ -1,7 +1,13 @@
 import type { Plugin, Rolldown } from 'vite'
 import { getWxExecutionKind, isTransportModule } from '../module/module.ts'
 import { getNativeComponentAssetBytes } from '../native/native-component-assets.ts'
-import { createPlacement, type GeneratedSubpackage, type PackageLocation, type Placement } from './placement.ts'
+import {
+    createPlacement,
+    type GeneratedSubpackage,
+    type PackageLocation,
+    type Placement,
+    subpackagePlanningBudget
+} from './placement.ts'
 
 export type { GeneratedSubpackage, Placement } from './placement.ts'
 
@@ -30,6 +36,19 @@ export const placementRolldownOptions = {
      * participation only; LTHP mutates the resulting OutputChunk filenames later without replacing the chunks.
      */
     output: {
+        /**
+         * Asks Rolldown to split every entry-specific module group before one indivisible final chunk can consume an entire
+         * generated subpackage. The placer remains the authority for assigning those final chunks to physical WX packages.
+         */
+        codeSplitting: {
+            groups: [
+                {
+                    name: 'wx',
+                    entriesAware: true,
+                    maxSize: subpackagePlanningBudget
+                }
+            ]
+        },
         /**
          * Native App/Page/Component shells are files addressed directly by WeChat and must retain the exact names configured
          * in `input`, such as `app.js` and `pages/home/index.js`. Transport is excluded even though it is CommonJS:
