@@ -9,7 +9,8 @@
         "preview-h5": "cross-env NODE_ENV=production VITE_VPT_TARGET=h5 vite preview --outDir dist/h5",
         "dev-wx": "cross-env NODE_ENV=development VITE_VPT_TARGET=wx vite",
         "dev-h5": "cross-env NODE_ENV=development VITE_VPT_TARGET=h5 vite",
-        "typecheck": "tsc --project tsconfig.json"
+        "test-hmr-wx": "node scripts/run-hmr-tests.ts",
+        "typecheck": "tsc --project tsconfig.json && tsc --project tsconfig.scripts.json"
     },
     "dependencies": {
         "clsx": "^2.1.1",
@@ -18,6 +19,7 @@
         "react-dom": "^19.2.7"
     },
     "devDependencies": {
+        "@types/node": "^26.0.0",
         "@types/react": "^19.2.17",
         "typescript": "^7.0.2",
         "cross-env": "^10.1.0",

@@ -15,7 +15,8 @@ The app is forked from [`wuba/Taro-Mortgage-Calculator`](https://github.com/wuba
 | --- | --- |
 | Node.js | `>=22` |
 | pnpm | `11.x` |
-| WeChat DevTools | Needed only for opening `dist/wx`. |
+| WeChat DevTools | Needed for opening `dist/wx` and running WX HMR tests. |
+| `wechatide` | Needed only for the automated WX HMR suite. |
 
 ## Run from a fresh clone
 
@@ -50,6 +51,20 @@ packages/loan-genius/dist/wx
 ```
 
 Open `packages/loan-genius/dist/wx` in WeChat DevTools. Do not open the source package directory.
+
+### WX HMR regression suite
+
+After building the current plugin, run the stateful 25-flow DevTools suite from the repository root:
+
+```sh
+pnpm build:plugin
+wechatide auth -c Pi
+pnpm test:loan-genius:hmr
+```
+
+The suite copies Loan Genius into `/tmp/vite-plugin-taro-loan-genius-hmr-v1`, instruments stable automation IDs, and exercises component edits, multi-file updates, bursts, open overlays, hidden pages, navigation, syntax-error recovery, and normal remounting. It also rejects WX-unsafe generated class names after applicable updates and restorations, so known style regressions remain visible as failures. It never edits the package source fixture and stops its Vite server and DevTools project window during cleanup.
+
+Set `VPT_LOAN_HMR_DEVTOOLS_CLIENT` when the authorized `wechatide` client is not named `Pi`.
 
 ## H5
 

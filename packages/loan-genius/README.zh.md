@@ -15,7 +15,8 @@ Loan Genius 是 `vite-plugin-taro` 的示例应用。它是一个基于 React 19
 | --- | --- |
 | Node.js | `>=22` |
 | pnpm | `11.x` |
-| 微信开发者工具 | 仅在打开 `dist/wx` 时需要。 |
+| 微信开发者工具 | 打开 `dist/wx` 和运行 WX HMR 测试时需要。 |
+| `wechatide` | 仅自动化 WX HMR 测试需要。 |
 
 ## 从全新克隆运行
 
@@ -50,6 +51,20 @@ packages/loan-genius/dist/wx
 ```
 
 请在微信开发者工具中打开 `packages/loan-genius/dist/wx`，不要打开源码包目录。
+
+### WX HMR 回归测试
+
+构建当前插件后，在仓库根目录运行包含 25 个有状态流程的开发者工具测试：
+
+```sh
+pnpm build:plugin
+wechatide auth -c Pi
+pnpm test:loan-genius:hmr
+```
+
+测试会将 Loan Genius 复制到 `/tmp/vite-plugin-taro-loan-genius-hmr-v1`，注入稳定的自动化 ID，并覆盖组件修改、多文件更新、突发更新、已打开浮层、隐藏页面、页面导航、语法错误恢复和正常重新挂载。测试还会在适用的更新和还原后拒绝 WX 不安全的生成类名，使已知样式回归继续以失败形式暴露。测试不会修改包内源码，并会在清理阶段停止 Vite 服务和关闭开发者工具项目窗口。
+
+如果已授权的 `wechatide` 客户端名称不是 `Pi`，请设置 `VPT_LOAN_HMR_DEVTOOLS_CLIENT`。
 
 ## H5
 
