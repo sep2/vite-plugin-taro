@@ -3,12 +3,10 @@ import type { VptOptions } from '../../../../options.ts'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
 import { normalizeModuleId } from '../../../utils/modules.ts'
-import { pageCapsulePath, rolldownRuntimeId, taroRuntimePath } from '../module/module.ts'
+import { pageShellPath, rolldownRuntimeId } from '../module/module.ts'
 import { createWxDevHost, type WxDevHost } from './dev-host.ts'
 import { developmentAppWxssFileName } from './hmr-files.ts'
 import { createWxReactRefreshTransforms } from './react-refresh.ts'
-
-const taroRuntimeId = '@tarojs/runtime'
 
 /** Selects the sole Vite environment that owns the physical Mini Program development project. */
 export function isWxClientEnvironment(environment: Readonly<{ name: string }>): boolean {
@@ -32,8 +30,7 @@ export function createWxDevelopmentPlugin(options: VptOptions, applicationEntryI
      */
     let host: WxDevHost | null = null
     // Portable hook filters stay broad; these exact identities exclude similarly named user modules.
-    const normalizedPageCapsulePath = normalizePath(pageCapsulePath)
-    const normalizedTaroRuntimePath = normalizePath(taroRuntimePath)
+    const normalizedPageShellPath = normalizePath(pageShellPath)
 
     return [
         {
@@ -115,26 +112,14 @@ export function createWxDevelopmentPlugin(options: VptOptions, applicationEntryI
             }
         },
         {
-            name: 'vpt:wx-page-hmr',
+            name: 'vpt:wx-page-shell-hmr',
             apply: 'serve',
             transform: {
                 order: 'post',
-                filter: { id: /\/runtime\/wx\/capsule\/page\.js(?:\?|$)/ },
+                filter: { id: /\/runtime\/wx\/native\/page\.js(?:\?|$)/ },
                 handler(code, id) {
-                    if (normalizeModuleId(id) !== normalizedPageCapsulePath) return
-                    return injectPageHmr(code, getPageRoute(id))
-                }
-            }
-        },
-        {
-            name: 'vpt:wx-taro-hmr',
-            apply: 'serve',
-            transform: {
-                order: 'post',
-                filter: { id: /\/runtime\/wx\/capsule\/taro-runtime\.js(?:\?|$)/ },
-                handler(code, id) {
-                    if (normalizeModuleId(id) !== normalizedTaroRuntimePath) return
-                    return injectTaroConnection(code)
+                    if (normalizeModuleId(id) !== normalizedPageShellPath) return
+                    return injectPageShellHmr(code)
                 }
             }
         },
@@ -161,38 +146,17 @@ export function removeDevelopmentAppWxss(bundle: Record<string, unknown>): void 
     delete bundle[developmentAppWxssFileName]
 }
 
-/** Connects the shared WX dev runtime to the application graph's Taro runtime instance. */
-export function injectTaroConnection(code: string): { code: string; map: null } {
-    if (!/\bCurrent\b/.test(code) || !/\bdocument\b/.test(code) || !/\binjectPageInstance\b/.test(code)) {
-        throw new Error('WX Taro runtime must expose Current, document, and injectPageInstance for HMR')
-    }
-
-    const taroImport = `import { Current as __vptCurrent, document as __vptDocument, injectPageInstance as __vptInjectPageInstance } from ${JSON.stringify(taroRuntimeId)};`
-
-    return {
-        code: `${code}\n${taroImport}\n__rolldown_runtime__.connectTaro(__vptCurrent, __vptDocument, __vptInjectPageInstance);`,
-        map: null
-    }
-}
-
-/** Activates development-only lifecycle handling for one plugin-owned Page capsule. */
-export function injectPageHmr(code: string, route: string): { code: string; map: null } {
-    if (!/\bconst\s+config\s*=/.test(code) || !/\bexport\s+default\s+config\b/.test(code)) {
-        throw new Error('WX Page capsule must declare and default-export config before HMR injection')
+/** Injects the retained snapshot at the exact native Page registration edge. */
+export function injectPageShellHmr(code: string): { code: string; map: null } {
+    const registration = 'Page(pageConfig)'
+    if (!code.includes(registration)) {
+        throw new Error('WX native Page shell must register pageConfig')
     }
 
     return {
-        code: `${code}\n__rolldown_runtime__.injectPageHmr(config, ${JSON.stringify(route)});`,
+        code: code.replace(registration, 'Page(__rolldown_runtime__.injectPageHmr(pageConfig))'),
         map: null
     }
-}
-
-/** Reads the stable route carried by every specialized Page capsule ID. */
-function getPageRoute(id: string): string {
-    const queryIndex = id.indexOf('?')
-    const route = queryIndex < 0 ? null : new URLSearchParams(id.slice(queryIndex + 1)).get('route')
-    if (!route) throw new Error(`WX Page capsule is missing its route: ${id}`)
-    return route
 }
 
 /*

@@ -8,8 +8,7 @@ type WeChatGlobal = object
 /** The App-global Rolldown dev runtime; present only in wx development builds. */
 declare const __rolldown_runtime__:
     | {
-          connectTaro(current: object, document: object, injectPageInstance: (...args: unknown[]) => unknown): void
-          injectPageHmr(config: object, route: string): void
+          injectPageHmr(config: object): object
       }
     | undefined
 

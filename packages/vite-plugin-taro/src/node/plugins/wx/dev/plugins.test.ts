@@ -4,8 +4,7 @@ import { resolveConfig } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import {
     createWxDevelopmentPlugin,
-    injectPageHmr,
-    injectTaroConnection,
+    injectPageShellHmr,
     isWxClientEnvironment,
     removeDevelopmentAppWxss
 } from './plugins.ts'
@@ -49,36 +48,13 @@ test('transfers the App style entry from complete output to the development host
     assert.deepEqual(bundle, { 'assets/global.wxss': globalStyle })
 })
 
-test('activates the shared HMR runtime in a development Page capsule', () => {
-    const source = 'const config = createPageConfig()\nexport default config'
-    const result = injectPageHmr(source, 'pages/home/index')
+test('injects Page HMR immediately before native registration', () => {
+    const result = injectPageShellHmr("import pageConfig from 'capsule'\nPage(pageConfig)")
 
-    assert.match(
-        result.code,
-        /export default config\n__rolldown_runtime__\.injectPageHmr\(config, "pages\/home\/index"\);$/
-    )
+    assert.match(result.code, /Page\(__rolldown_runtime__\.injectPageHmr\(pageConfig\)\)$/)
     assert.equal(result.map, null)
 })
 
-test('rejects a Page capsule without the stable config contract', () => {
-    assert.throws(
-        () => injectPageHmr('export default createPageConfig()', 'pages/home/index'),
-        /must declare and default-export config/
-    )
-})
-
-test('connects the application graph Taro runtime to the WX dev runtime', () => {
-    const source = "export { Current, document, injectPageInstance } from '@tarojs/runtime'"
-    const result = injectTaroConnection(source)
-
-    assert.match(result.code, /import \{ Current as __vptCurrent, document as __vptDocument/)
-    assert.match(
-        result.code,
-        /__rolldown_runtime__\.connectTaro\(__vptCurrent, __vptDocument, __vptInjectPageInstance\);$/
-    )
-    assert.equal(result.map, null)
-})
-
-test('rejects a Taro facade without the connection contract', () => {
-    assert.throws(() => injectTaroConnection("export { Current } from '@tarojs/runtime'"), /must expose/)
+test('rejects a native Page shell without the stable registration contract', () => {
+    assert.throws(() => injectPageShellHmr('Page(config)'), /must register pageConfig/)
 })
