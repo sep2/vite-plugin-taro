@@ -5,10 +5,11 @@ import { type DevEngine, type DevOptions, dev } from 'rolldown/experimental'
 import { asyncScheduler } from 'rxjs'
 import type { Connect, ViteDevServer } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
+import type { WxStylePlugin } from '../styles/plugins.ts'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
-import { createStyleCapture, type StyleCaptureAction } from './create-style-capture.ts'
 import {
     developmentAppWxssFileName,
+    globalWxssFileName,
     type HmrInfo,
     hmrControlPath,
     hmrInfoFileName,
@@ -35,7 +36,6 @@ type DevOutputResult = Parameters<NonNullable<DevOptions['onOutput']>>[0]
 type OutputAction = Readonly<{ kind: 'output'; result: DevOutputResult }>
 
 type HostAction =
-    | StyleCaptureAction
     | Readonly<{ kind: 'publish'; result: HmrUpdates }>
     | Readonly<{ kind: 'error'; error: Error }>
     | Readonly<{ kind: 'reports'; reports: readonly RuntimeReport[] }>
@@ -51,17 +51,17 @@ const hmrSettleMilliseconds = 16
  * engine writes directly to the Mini Program output directory instead of serving browser
  * HMR over HTTP.
  *
- * `applicationEntryIds` is the resolver's immutable cascade policy, not a second graph: it selects the App capsule followed
- * by configured Page capsules from Rolldown's larger entry set. Rolldown remains the authority for every live import edge.
+ * The shared style plugin carries the resolver's immutable App/Page cascade policy while Rolldown remains authoritative for
+ * every live import edge.
  */
 export async function createWxDevHost({
     server,
     options,
-    applicationEntryIds
+    styles
 }: {
     server: ViteDevServer
     options: VptOptions
-    applicationEntryIds: readonly string[]
+    styles: WxStylePlugin
 }): Promise<WxDevHost> {
     const bundledDev = getBundledDev(server)
 
@@ -70,18 +70,12 @@ export async function createWxDevHost({
         logWxError(server.config.logger, `wx HMR ${action.kind} failed`, error)
     )
 
-    const styleCapture = createStyleCapture({
-        applicationEntryIds: applicationEntryIds,
-        outDir: server.config.build.outDir,
-        // Capture hooks run only after engine.run, when the host action subscription and all reducer dependencies are ready.
-        emit: (action) => hostActions.next(action)
-    })
     const publisher = new PatchPublisher((content) =>
         writeHmrFile(server.config.build.outDir, hmrPatchesFileName, content)
     )
 
     // Option installation now configures only Rolldown. Build lifecycle results enter through the engine's output action below.
-    installWxDevOptions({ bundledDev, server, options, hostPlugins: [styleCapture.plugin] })
+    installWxDevOptions({ bundledDev, server, options })
     const engine: DevEngine = await createEngine()
 
     const hmrResults = createHmrResultsStream(
@@ -152,10 +146,15 @@ export async function createWxDevHost({
             hmrResults.complete()
             runtimeReports.complete()
             await hostActions.waitForIdle()
-            // Keep the action edge open until the final generation has admitted all capture and output callbacks.
+            // Keep the action edge open until the final generation has admitted every output callback.
             await engine.ensureCurrentBuildFinish()
             await hostActions.complete()
         }
+    }
+
+    /** Atomically materializes the style plugin's prepared global artifact. */
+    async function writeGlobalStyle(wxss: string): Promise<void> {
+        await writeHmrFile(server.config.build.outDir, globalWxssFileName, wxss)
     }
 
     /** Rotates the build identity and materializes the App metadata for it. */
@@ -201,14 +200,6 @@ export async function createWxDevHost({
     /** Reduces one merged source action through the existing authoritative host state. */
     function applyHostAction(action: HostAction): void | Promise<void> {
         switch (action.kind) {
-            case 'capture-graph':
-                // The buildStart reader is a live capability; replacing it only here makes the reducer own build rebinding.
-                styleCapture.captureGraph(action.getModuleInfo)
-                return
-            case 'capture-style':
-                // A failed CSS transform emits no action, intentionally retaining the last valid processed generation.
-                styleCapture.captureStyle(action.id, action.style)
-                return
             case 'publish':
                 return publishUpdates(action.result)
             case 'error':
@@ -222,10 +213,17 @@ export async function createWxDevHost({
                     logWxError(server.config.logger, 'wx dev build failed', action.result)
                     return
                 }
-                return rotateBuildSession()
+                return publishCompleteStyles()
             case 'listening':
                 return rotateBuildSession()
         }
+    }
+
+    /** Publishes graph-complete styles before rotating the App-visible build identity. */
+    async function publishCompleteStyles(): Promise<void> {
+        const generation = await styles.prepare()
+        await styles.publish(generation.wxss, writeGlobalStyle)
+        await rotateBuildSession()
     }
 
     /** Applies one runtime receipt to the active physical patch history. */
@@ -298,6 +296,9 @@ export async function createWxDevHost({
                 continue
             }
 
+            // Refresh current Tailwind root results before asking DevEngine for a complete generation, so final chunks use the
+            // same class set even when Rolldown reuses the compiler stylesheet.
+            await styles.prepare()
             requestFullBuild(update.reason)
             return
         }
@@ -311,17 +312,33 @@ export async function createWxDevHost({
             return
         }
 
-        // `onHmrUpdates` runs after every affected transform has updated captured CSS and the live import graph. Rendering the
-        // complete projection catches both style edits and JavaScript-only topology changes; byte equality suppresses no-op writes.
-        await styleCapture.publish()
+        // `onHmrUpdates` runs after every affected transform has updated captured CSS and the live import graph. One prepared
+        // generation supplies both the finalized WXSS and the exact raw class set used to transform every patch factory.
+        const generation = await styles.prepare()
+        const finalizedPatches = await finalizePatches(patches, generation.classSet)
+        await styles.publish(generation.wxss, writeGlobalStyle)
 
         // Publish global.wxss before the matching JavaScript patch so DevTools observes a coherent HMR transaction.
         // The physical file must exist before Rolldown advances: once committed, later patches may be generated relative to
         // this batch even if DevTools has not observed its file event yet. PatchPublisher keeps the unapplied range cumulative,
         // so any later file generation still carries every factory needed to bridge the runtime's older application frontier.
-        await publisher.produce(patches)
+        await publisher.produce(finalizedPatches)
 
-        await commitPublishedBatch(patches)
+        await commitPublishedBatch(finalizedPatches)
+    }
+
+    /** Finalizes every patch factory without transforming Rolldown module identities or patch metadata. */
+    async function finalizePatches(
+        patches: readonly PatchUpdate[],
+        classSet: Set<string>
+    ): Promise<readonly PatchUpdate[]> {
+        // This transaction-local result preserves patch sequence while each AST transform runs against the same class set.
+        const finalizedPatches: PatchUpdate[] = []
+        for (const patch of patches) {
+            const code = await styles.finalizeJavaScript(patch.code, classSet, patch.filename)
+            finalizedPatches.push({ ...patch, code: code })
+        }
+        return finalizedPatches
     }
 
     /**

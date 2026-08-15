@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { resolveConfig } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
+import { createWxStylePlugin } from '../styles/plugins.ts'
 import {
     createWxDevelopmentPlugin,
     injectPageShellHmr,
@@ -27,7 +28,7 @@ test('preserves physical outputs across development host restarts', async () => 
     const config = await resolveConfig(
         {
             configFile: false,
-            plugins: createWxDevelopmentPlugin(options, ['/app-capsule'])
+            plugins: createWxDevelopmentPlugin(options, createWxStylePlugin(['/app-capsule']))
         },
         'serve'
     )

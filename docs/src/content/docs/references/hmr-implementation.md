@@ -323,19 +323,21 @@ vpt 在原生 Page 注册边界协调一次短暂过程：
 
 ## 样式如何更新
 
-WXSS 内容不通过 JavaScript 模块的更新边界交付，vpt 为它维护独立的物理更新路径。CSS Modules 的 JavaScript 导出仍可包含在普通模块补丁中。全局 WXSS 按以下过程生成：
+WXSS 内容不通过 JavaScript 模块的更新边界交付。完整构建和增量补丁共用一个 WX 样式插件和同一种样式事务：
 
-1. 捕获 Vite 已完成 PostCSS、CSS Modules 等转换后的 CSS；
-2. 使用 Rolldown 当前模块图，按 App 和配置页面的顺序收集仍然可达的样式；
-3. 合并为一份确定的全局级联；
-4. 对完整内容执行一次微信 WXSS 转换；
-5. 内容确实变化时才替换 `assets/global.wxss`。
+1. 使用 Rolldown 当前模块图，按 App 和配置页面的顺序确定仍然可达的样式文件；
+2. 使用 Vite 为这一代模块提供的样式源码，包括内存中和虚拟模块的结果；
+3. 对 Tailwind 入口调用公开生成器，得到浏览器 CSS 和同一代原始类名集合；
+4. 通过 Vite 的 CSS 预处理接口执行 PostCSS、CSS Modules 和预处理器转换；
+5. 合并为一份确定的全局级联，再对完整内容执行一次微信 WXSS 转换；
+6. 用步骤 3 的类名集合转换同一事务中的最终 JavaScript；
+7. 内容确实变化时才替换 `assets/global.wxss`。
 
-JavaScript 改动也可能改变样式导入关系或 Tailwind 类名候选，因此发布 JavaScript 补丁前会检查样式结果。当前应用可达的 Tailwind 入口样式会从原始指令重新生成；全部生成成功后才一起采用，避免发布一半新、一半旧的样式。
+Tailwind 生成器只负责编译一次事务，不拥有 Vite HMR 生命周期。每次事务从 Vite 当前模块源码生成完整结果并立即释放生成器，因此新增和删除类名使用同一个权威集合，不依赖上一代候选缓存。vpt 不绕过 Vite 重新读取样式文件，不从 WXSS 反向解析类名，也不对最终补丁做第二次猜测性规范化。
 
-增量更新不会改写根目录的 `app.wxss`。它始终导入 `assets/global.wxss`，所以只替换后者即可让样式生效，同时保留 App 运行环境。若最终字节没有变化，vpt 不写文件，也不会制造多余的开发者工具事件。
+增量更新不会改写根目录的 `app.wxss`。它始终导入 `assets/global.wxss`，所以只替换后者即可让样式生效，同时保留 App 运行环境。vpt 先写入匹配类名集合的 WXSS，再发布已经用该集合转换过的 JavaScript 补丁。若最终字节没有变化，vpt 不写文件，也不会制造多余的开发者工具事件。
 
-完整构建会额外协调一次样式输出，确保 CSS Modules 等样式都进入全局 WXSS，然后才切换到新的构建身份。
+完整构建在最终输出阶段使用 Tailwind 入口转换时产生的同一类名集合处理 JavaScript，并把 Vite 的完整编译器样式转换为同一个 `global.wxss`。原生 Page 和组件 WXSS 随后单独输出，始终保持不透明。
 
 ## 什么时候执行完整构建
 
@@ -436,4 +438,4 @@ type RebuildReport = {
 | `seq` / `appliedSeq` | 补丁序号 / 已应用序号 | 验证增量连续性并释放已应用历史 |
 | HMR boundary | 更新边界 | 调用 `import.meta.hot.accept()`、可以接收新导出的模块 |
 | Page re-registration | Page 原生重新注册 | 用已挂载 Page 的当前数据再次注册静态配置，同时忽略临时 Page 上的重新注册生命周期 |
-| style capture | 样式汇总 | 从最终 CSS 和当前模块图生成全局 WXSS |
+| `WxStylePlugin` | WX 样式插件 | 从当前模块图和源文件生成同一事务的全局 WXSS 与 JavaScript 类名集合 |

@@ -1,5 +1,5 @@
 import path from 'node:path'
-import type { InputOptions, OutputOptions, Plugin } from 'rolldown'
+import type { InputOptions, OutputOptions } from 'rolldown'
 import { build } from 'rolldown'
 import { type DevEngine, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
@@ -30,13 +30,11 @@ export type BundledDev = {
 export function installWxDevOptions({
     bundledDev,
     server,
-    options,
-    hostPlugins
+    options
 }: {
     bundledDev: BundledDev
     server: ViteDevServer
     options: VptOptions
-    hostPlugins: Plugin[]
 }): void {
     /*
      * Vite owns this mutable adapter method and calls it later when constructing DevEngine. Replacing that one seam preserves
@@ -113,10 +111,10 @@ export function installWxDevOptions({
 
         /*
          * The plugin list is mutable configuration consumed once by this engine generation. Replace the top-level reference with
-         * an ordered composite rather than pushing into Vite's potentially shared nested array: existing transforms run first,
-         * host capture observes their final values, and the reporter observes final output without mutating either input list.
+         * an ordered composite rather than pushing into Vite's potentially shared nested array; the reporter observes final output
+         * without mutating Vite's retained input list.
          */
-        rolldownOptions.plugins = [rolldownOptions.plugins, hostPlugins, createViteReporter(server)]
+        rolldownOptions.plugins = [rolldownOptions.plugins, createViteReporter(server)]
         disableViteOxcSourcemap(rolldownOptions.plugins)
 
         return rolldownOptions

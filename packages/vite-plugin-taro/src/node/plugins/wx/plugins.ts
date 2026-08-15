@@ -12,7 +12,7 @@ import { renderCapsule } from './render/capsule.ts'
 import { renderNative } from './render/native.ts'
 import { materializeTransport } from './render/transport.ts'
 import { createResolver } from './resolve/resolver.ts'
-import { createWxStylePlugins } from './styles/plugins.ts'
+import { createWxStylePlugin } from './styles/plugins.ts'
 
 type WxResolver = ReturnType<typeof createResolver>
 
@@ -23,13 +23,9 @@ export function createWxTargetPlugins(options: VptOptions): PluginOption[] {
     // Reuse the resolver instance's ordered application subset. Rolldown's complete input also contains bootstrap, transport,
     // shell, and component entries; entry membership alone cannot recover which roots define the App/Page CSS cascade.
     const placement = createWxPlacementPlugin()
+    const styles = createWxStylePlugin(resolver.applicationEntryIds)
 
-    return [
-        placement,
-        createWxStylePlugins(),
-        createWxPlugin(options, resolver, placement),
-        createWxDevelopmentPlugin(options, resolver.applicationEntryIds)
-    ]
+    return [placement, styles, createWxPlugin(options, resolver, placement), createWxDevelopmentPlugin(options, styles)]
 }
 
 /** Configures the complete wx target build pipeline. */
@@ -133,7 +129,7 @@ function createWxPlugin(options: VptOptions, resolver: WxResolver, placement: Wx
 
         generateBundle: {
             /*
-             * Registration after createWxStylePlugins() makes the compiler stylesheet final before native Page and component
+             * Registration after the style pipeline makes the compiler stylesheet final before native Page and component
              * companions are emitted. The style finalizer therefore cannot mistake native WXSS for application CSS.
              */
             order: 'post',

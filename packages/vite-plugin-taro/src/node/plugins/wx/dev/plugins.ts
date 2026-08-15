@@ -4,6 +4,7 @@ import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { pageShellPath, rolldownRuntimeId } from '../module/module.ts'
+import type { WxStylePlugin } from '../styles/plugins.ts'
 import { createWxDevHost, type WxDevHost } from './dev-host.ts'
 import { developmentAppWxssFileName } from './hmr-files.ts'
 import { createWxReactRefreshTransforms } from './react-refresh.ts'
@@ -17,10 +18,10 @@ export function isWxClientEnvironment(environment: Readonly<{ name: string }>): 
  * Adds the serve-only bundled-development plugin set for the wx target: the dev adapter,
  * Page HMR activation, and React Refresh adaptation transforms.
  *
- * The ordered application entries cross this configuration boundary unchanged so the host can compose global CSS without
- * reconstructing the resolver's App/Page ownership policy from unrelated Rolldown shell and transport entries.
+ * The shared style pipeline already owns the resolver's ordered App/Page cascade policy, so the host does not reconstruct it
+ * from unrelated Rolldown shell and transport entries.
  */
-export function createWxDevelopmentPlugin(options: VptOptions, applicationEntryIds: readonly string[]): PluginOption[] {
+export function createWxDevelopmentPlugin(options: VptOptions, styles: WxStylePlugin): PluginOption[] {
     /*
      * Vite creates this plugin descriptor before a server or DevEngine exists, then invokes configureServer and closeBundle on
      * different lifecycle stacks. This mutable handle transfers the one client-owned host between those hooks: configureServer
@@ -71,7 +72,7 @@ export function createWxDevelopmentPlugin(options: VptOptions, applicationEntryI
                     host = await createWxDevHost({
                         server: server,
                         options: options,
-                        applicationEntryIds: applicationEntryIds
+                        styles: styles
                     })
                 }
             },
