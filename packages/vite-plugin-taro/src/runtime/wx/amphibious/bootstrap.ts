@@ -2,11 +2,6 @@
 import '../systemjs/system-core.js'
 import { transport } from './transport.ts'
 
-declare const __VPT_APP_CONFIG__: Record<string, unknown>
-
-/** Shares one App configuration object between the specialized bootstrap and App capsule. */
-export const appConfig = __VPT_APP_CONFIG__
-
 // WX has no modulepreload transport. Genuine application import() boundaries retain System.import() and may load
 // asynchronous subpackage or top-level-await graphs through this identity wrapper.
 export const __vitePreload = <Value>(load: () => Value): Value => load()

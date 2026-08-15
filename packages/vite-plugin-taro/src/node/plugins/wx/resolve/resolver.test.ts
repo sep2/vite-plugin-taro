@@ -65,9 +65,9 @@ test('resolves fixed and route-specific private IDs', () => {
     )
 })
 
-test('specializes bootstrap with the configured App JSON', async () => {
+test('specializes the App capsule with the configured App JSON', async () => {
     const resolver = createResolver(options)
-    const result = await resolver.specialize('export const appConfig = __VPT_APP_CONFIG__', bootstrapPath)
+    const result = await resolver.specialize('export default __VPT_APP_CONFIG__', appCapsulePath)
 
     assert.ok(result)
     assert.match(result.code, /pages:\s*\[\s*["']pages\/home\/index["']/)

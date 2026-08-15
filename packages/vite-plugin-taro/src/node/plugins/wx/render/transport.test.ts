@@ -161,7 +161,7 @@ test('bridges amphibious bootstrap and Rolldown runtime namespaces lazily', asyn
         capsuleChunkIds: [],
         nativeRuntimeChunkId: runtimeChunkId
     })
-    const bootstrapNamespace = { appConfig: {} }
+    const bootstrapNamespace = { __vitePreload: <Value>(value: Value) => value }
     const runtimeNamespace = { n: () => 'runtime' }
     const evaluated = evaluateTransport(source, (id) => {
         return id === './assets/bootstrap.js' ? bootstrapNamespace : runtimeNamespace
@@ -178,7 +178,7 @@ test('bridges amphibious bootstrap and Rolldown runtime namespaces lazily', asyn
 
     assert.doesNotMatch(source, /\blet namespace\b/)
     assert.deepEqual(evaluated.requiredPaths, ['./assets/bootstrap.js', './assets/rolldown-runtime-a.js'])
-    assert.strictEqual(publishedBootstrap.appConfig, bootstrapNamespace.appConfig)
+    assert.strictEqual(publishedBootstrap.__vitePreload, bootstrapNamespace.__vitePreload)
     assert.strictEqual(publishedRuntime.n, runtimeNamespace.n)
 })
 

@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { specializeBootstrap } from './specialize-bootstrap.ts'
+import { specializeAppCapsule } from './specialize-app-capsule.ts'
 
-const id = '/plugin/runtime/wx/amphibious/bootstrap.js'
-const source = 'export const appConfig = __VPT_APP_CONFIG__'
+const id = '/plugin/runtime/wx/capsule/app.js'
+const source = 'export default createReactApp(AppComponent, React, ReactDOM, __VPT_APP_CONFIG__)'
 
-test('specializes the amphibious bootstrap with the App configuration', async () => {
-    const result = await specializeBootstrap({
+test('specializes the App capsule with its native configuration', async () => {
+    const result = await specializeAppCapsule({
         code: source,
         id,
         appConfig: {
@@ -23,15 +23,15 @@ test('specializes the amphibious bootstrap with the App configuration', async ()
     assert.ok(result.map)
     assert.deepEqual(result.map.sources, [id])
 
-    const withoutSourceMap = await specializeBootstrap({ code: source, id, appConfig: {}, sourcemap: false })
+    const withoutSourceMap = await specializeAppCapsule({ code: source, id, appConfig: {}, sourcemap: false })
     assert.equal(withoutSourceMap.map, null)
 })
 
-test('rejects a bootstrap missing its App configuration placeholder', async () => {
+test('rejects an App capsule missing its configuration placeholder', async () => {
     await assert.rejects(
         () =>
-            specializeBootstrap({
-                code: 'export const appConfig = {}',
+            specializeAppCapsule({
+                code: 'export default {}',
                 id,
                 appConfig: {}
             }),

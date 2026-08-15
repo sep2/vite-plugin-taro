@@ -18,7 +18,7 @@ import {
     transportPath,
     vitePreloadId
 } from '../module/module.ts'
-import { specializeBootstrap } from './specialize-bootstrap.ts'
+import { specializeAppCapsule } from './specialize-app-capsule.ts'
 import { specializePageCapsule } from './specialize-page-capsule.ts'
 
 /** Resolves one exact plugin-private ID using its importer and configured project root. */
@@ -26,7 +26,7 @@ type PrivateIdResolver = (importer: string | undefined, projectRoot: string) => 
 
 /** Creates the resolver and source specializer for the wx module graph. */
 export function createResolver(options: VptOptions) {
-    const normalizedBootstrapPath = normalizePath(bootstrapPath)
+    const normalizedAppCapsulePath = normalizePath(appCapsulePath)
     const normalizedPageCapsulePath = normalizePath(pageCapsulePath)
 
     // Construct output input and application traversal roots together once so style order cannot drift from route order.
@@ -70,8 +70,8 @@ export function createResolver(options: VptOptions) {
         specialize(code: string, id: string, sourcemap = true) {
             const normalizedId = normalizeModuleId(id)
 
-            if (normalizedId === normalizedBootstrapPath) {
-                return specializeBootstrap({ code, id, appConfig: createAppConfig(options), sourcemap })
+            if (normalizedId === normalizedAppCapsulePath) {
+                return specializeAppCapsule({ code, id, appConfig: createAppConfig(options), sourcemap })
             }
 
             if (normalizedId === normalizedPageCapsulePath) {

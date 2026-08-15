@@ -4,8 +4,8 @@ import { type AstTransformResult, replaceWithAst } from '../../../utils/transfor
 
 const appConfigPlaceholder = '__VPT_APP_CONFIG__'
 
-/** Specializes the amphibious bootstrap with the shared App configuration. */
-export function specializeBootstrap({
+/** Specializes the App capsule with its normalized native configuration. */
+export function specializeAppCapsule({
     code,
     id,
     appConfig,
