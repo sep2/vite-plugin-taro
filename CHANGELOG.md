@@ -4,6 +4,20 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.6.3] - 2026-08-15
+
+### Changed
+
+- retain Page state through native re-registration (185d283)
+- activate Page HMR at native registration (4a8b17b)
+- add stateful WX HMR regression suite (f2b5785)
+- specialize App config in capsule (7868796)
+- complete README documentation links (37021ae)
+
+### Fixed
+
+- order React Refresh before renderer injection (24a36b7)
+
 ## [0.6.2] - 2026-08-15
 
 ### Changed
