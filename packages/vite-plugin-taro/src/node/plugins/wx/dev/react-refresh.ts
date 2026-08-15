@@ -2,7 +2,9 @@ import { isReferenceIdentifier, type WalkerEnter } from 'oxc-walker'
 import type { RolldownMagicString } from 'rolldown'
 import type { Plugin } from 'vite'
 import { memoize } from '../../../utils/memoize.ts'
+import { normalizeModuleId } from '../../../utils/modules.ts'
 import { transformWithOxcWalker } from '../../../utils/oxc-transform.ts'
+import { reactReconcilerRoot } from '../module/module.ts'
 
 /** The React DevTools hook protocol name; free references must target `global` in wx. */
 const reactDevtoolsHookProtocol = '__REACT_DEVTOOLS_GLOBAL_HOOK__'
@@ -14,7 +16,7 @@ const reactDevtoolsHookProtocol = '__REACT_DEVTOOLS_GLOBAL_HOOK__'
  * - `__getReactRefreshIgnoredExports` is an optional extension point read while validating a refresh boundary.
  *   Leaving that read on the nonexistent `window` crashes every update validation pass.
  *
- * Keeping this list explicit prevents the adapter from rewriting unrelated browser accesses if the vendored runtime
+ * Keeping this list explicit prevents the adapter from rewriting unrelated browser accesses if the refresh runtime
  * gains new code. Any future React Refresh protocol addition therefore requires a deliberate compatibility decision.
  */
 const refreshRuntimeWindowGlobals = ['__registerBeforePerformReactRefresh', '__getReactRefreshIgnoredExports'] as const
@@ -24,8 +26,9 @@ const refreshRuntimeWindowGlobals = ['__registerBeforePerformReactRefresh', '__g
  *
  * @vitejs/plugin-react's generated refresh code assumes the web HTML preamble and a browser
  * global scope; wx has neither. Each transform adapts one piece of that contract:
- * - the refresh runtime module (id-filtered): the vendored runtime reads and assigns
+ * - the refresh runtime module (id-filtered): the runtime reads and assigns
  *   `window` protocol globals (rewritten to `global`) and must inject itself at evaluation;
+ * - React Reconciler: its renderer injection statically depends on the refresh runtime, fixing cold-start order;
  * - react-family modules (filtered on free references): the DevTools hook is read as a free
  *   variable, which the WeChat runtime scope never resolves against `global` — every free
  *   reference becomes an explicit member access;
@@ -33,8 +36,8 @@ const refreshRuntimeWindowGlobals = ['__registerBeforePerformReactRefresh', '__g
  *   needed because the transform generates local wrappers over the imported refresh
  *   runtime, so the guard that checks for the global is removed.
  *
- * Each transform's filter is its routing: the three domains are disjoint, so a module is
- * transformed by at most one of them, and modules outside all three never reach a handler.
+ * Filters route every adaptation directly. The Reconciler intentionally receives the renderer dependency first and the
+ * global-hook rewrite second; modules outside these explicit domains never reach a handler.
  */
 export function createWxReactRefreshTransforms(): Plugin[] {
     return [
@@ -43,10 +46,23 @@ export function createWxReactRefreshTransforms(): Plugin[] {
             apply: 'serve',
             transform: {
                 order: 'post',
-                // The vendored refresh runtime module; id-filtered, so no code scan.
+                // The refresh runtime module is id-filtered, so no code scan is needed.
                 filter: { id: /^\/@react-refresh(?:\?|$)/ },
                 handler(code, id) {
                     return fixRefreshRuntime({ code, id })
+                }
+            }
+        },
+        {
+            name: 'vpt:wx-react-refresh-renderer-dependency',
+            apply: 'serve',
+            transform: {
+                order: 'post',
+                filter: { id: /\/react-reconciler\/cjs\/react-reconciler\.development\.js(?:\?|$)/ },
+                handler(code, id) {
+                    const rendererId = `${reactReconcilerRoot}/cjs/react-reconciler.development.js`
+                    if (normalizeModuleId(id) !== rendererId) return
+                    return injectReactRefreshRendererDependency(code)
                 }
             }
         },
@@ -92,7 +108,8 @@ export function createWxReactRefreshTransforms(): Plugin[] {
  * The protocol name is unique, but only reference identifiers are rewritten. Declaration
  * keys and explicit members such as `global.__REACT_DEVTOOLS_GLOBAL_HOOK__` must remain
  * untouched; rewriting those would either produce invalid syntax or double-prefix the hook.
- * The eagerly evaluated refresh runtime creates the hook on `global` before the renderer loads.
+ * The Reconciler's injected static dependency orders hook injection before renderer initialization independently of Rolldown's
+ * final chunking decision.
  */
 function createReactDevtoolsHookVisitor(editor: RolldownMagicString): WalkerEnter {
     return function enter(node, parent) {
@@ -146,7 +163,7 @@ function createRefreshRuntimeVisitor(editor: RolldownMagicString): WalkerEnter {
             refreshRuntimeWindowGlobals.some((globalName) => globalName === node.property.name)
         ) {
             // `global` is the shared wx App heap used by the dev runtime and hook injection. Only
-            // replacing the object range preserves the vendored runtime byte-for-byte otherwise
+            // replacing the object range preserves the upstream runtime byte-for-byte otherwise
             // and prevents unrelated `window` expressions from being silently adapted.
             editor.overwrite(node.object.start, node.object.end, 'global')
         }
@@ -184,6 +201,18 @@ function createRefreshPreambleGuardVisitor(editor: RolldownMagicString): WalkerE
         // parent and must not receive overlapping MagicString edits.
         editor.remove(node.start, node.end)
         this.skip()
+    }
+}
+
+/** Makes renderer hook injection statically depend on the refresh runtime. */
+export function injectReactRefreshRendererDependency(code: string): { code: string; map: null } {
+    if (!/\bhook\.inject\(internals\)/.test(code)) {
+        throw new Error('React Reconciler must inject its renderer into the DevTools hook')
+    }
+
+    return {
+        code: `import '/@react-refresh'\n${code}`,
+        map: null
     }
 }
 

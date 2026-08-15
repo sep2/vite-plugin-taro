@@ -5,7 +5,6 @@ import type { VptOptions } from '../../../../options.ts'
 import {
     createWxDevelopmentPlugin,
     injectPageHmr,
-    injectReactRefreshBootstrap,
     injectTaroConnection,
     isWxClientEnvironment,
     removeDevelopmentAppWxss
@@ -48,13 +47,6 @@ test('transfers the App style entry from complete output to the development host
     removeDevelopmentAppWxss(bundle)
 
     assert.deepEqual(bundle, { 'assets/global.wxss': globalStyle })
-})
-
-test('evaluates React Refresh before the App dependency graph', () => {
-    const result = injectReactRefreshBootstrap("import App from './app.tsx'")
-
-    assert.match(result.code, /^import "\/@react-refresh";/)
-    assert.equal(result.map, null)
 })
 
 test('activates the shared HMR runtime in a development Page capsule', () => {

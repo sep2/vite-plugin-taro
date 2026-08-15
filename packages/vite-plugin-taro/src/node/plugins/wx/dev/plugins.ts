@@ -3,7 +3,7 @@ import type { VptOptions } from '../../../../options.ts'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
 import { normalizeModuleId } from '../../../utils/modules.ts'
-import { appCapsulePath, pageCapsulePath, rolldownRuntimeId, taroRuntimePath } from '../module/module.ts'
+import { pageCapsulePath, rolldownRuntimeId, taroRuntimePath } from '../module/module.ts'
 import { createWxDevHost, type WxDevHost } from './dev-host.ts'
 import { developmentAppWxssFileName } from './hmr-files.ts'
 import { createWxReactRefreshTransforms } from './react-refresh.ts'
@@ -32,7 +32,6 @@ export function createWxDevelopmentPlugin(options: VptOptions, applicationEntryI
      */
     let host: WxDevHost | null = null
     // Portable hook filters stay broad; these exact identities exclude similarly named user modules.
-    const normalizedAppCapsulePath = normalizePath(appCapsulePath)
     const normalizedPageCapsulePath = normalizePath(pageCapsulePath)
     const normalizedTaroRuntimePath = normalizePath(taroRuntimePath)
 
@@ -116,18 +115,6 @@ export function createWxDevelopmentPlugin(options: VptOptions, applicationEntryI
             }
         },
         {
-            name: 'vpt:wx-react-refresh-bootstrap',
-            apply: 'serve',
-            transform: {
-                order: 'post',
-                filter: { id: /\/runtime\/wx\/capsule\/app\.js(?:\?|$)/ },
-                handler(code, id) {
-                    if (normalizeModuleId(id) !== normalizedAppCapsulePath) return
-                    return injectReactRefreshBootstrap(code)
-                }
-            }
-        },
-        {
             name: 'vpt:wx-page-hmr',
             apply: 'serve',
             transform: {
@@ -172,14 +159,6 @@ export function createWxDevelopmentPlugin(options: VptOptions, applicationEntryI
  */
 export function removeDevelopmentAppWxss(bundle: Record<string, unknown>): void {
     delete bundle[developmentAppWxssFileName]
-}
-
-/** Ensures the Refresh hook exists before React's renderer evaluates and injects itself. */
-export function injectReactRefreshBootstrap(code: string): { code: string; map: null } {
-    return {
-        code: `import ${JSON.stringify('/@react-refresh')};\n${code}`,
-        map: null
-    }
 }
 
 /** Connects the shared WX dev runtime to the application graph's Taro runtime instance. */

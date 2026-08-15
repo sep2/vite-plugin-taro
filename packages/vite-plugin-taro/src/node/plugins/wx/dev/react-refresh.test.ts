@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { removeRefreshPreambleGuard, transformReactDevtoolsHook, transformRefreshRuntime } from './react-refresh.ts'
+import {
+    injectReactRefreshRendererDependency,
+    removeRefreshPreambleGuard,
+    transformReactDevtoolsHook,
+    transformRefreshRuntime
+} from './react-refresh.ts'
 
 test('adapts the refresh runtime to the WeChat global object', () => {
     const transformed = transformRefreshRuntime({
@@ -20,6 +25,17 @@ test('adapts the refresh runtime to the WeChat global object', () => {
     assert.match(transformed.code, /performReactRefresh\(\)/)
     assert.doesNotMatch(transformed.code, /finishReactRefresh/)
     assert.match(transformed.code, /injectIntoGlobalHook\(global\);$/)
+})
+
+test('orders React Refresh before renderer injection', () => {
+    const transformed = injectReactRefreshRendererDependency('const rendererID = hook.inject(internals)')
+
+    assert.match(transformed.code, /^import '\/@react-refresh'/)
+    assert.equal(transformed.map, null)
+})
+
+test('rejects a Reconciler without the renderer injection contract', () => {
+    assert.throws(() => injectReactRefreshRendererDependency('export const renderer = {}'), /must inject its renderer/)
 })
 
 test('rewrites only reference uses of the React DevTools hook', () => {
