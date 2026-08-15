@@ -5,7 +5,7 @@
 // The `DevRuntime` base class is injected into the chunk by Rolldown's dev-mode
 // transform, so the WX host only extends it.
 //
-// Every Page explicitly passes the inert hmr/patches.js export here before importing its capsule. The runtime applies that
+// Every Page explicitly passes the inert hmr/patches.js export here before native Page registration. The runtime applies that
 // cumulative suffix synchronously, reports its successful application frontier, and ignores sequences replayed by other Pages.
 
 import type { DevRuntime as RolldownDevRuntime } from 'rolldown/experimental/runtime-types'
@@ -54,54 +54,30 @@ type HmrUpdate = Readonly<{
 
 type AcceptCallback = (moduleExports: unknown) => void
 
-type PageSnapshot = Readonly<{
-    $taroPath: string
-    $taroParams: Record<string, unknown>
-    data: Record<string, unknown>
-}>
-
 type NativePage = {
-    $taroPath: string
-    $taroParams: Record<string, unknown>
     data: Record<string, unknown>
-    setData(data: Record<string, unknown>): void
+}
+
+const pageHmrStateKey: unique symbol = Symbol('vpt.pageHmrState')
+
+type PageHmrState = {
+    /** True only across the unload/load/show sequence triggered by one native re-registration. */
+    isReregistering: boolean
+    /** The Page bound to `this` by ordinary onLoad, retained until ordinary onUnload. */
+    mountedPage: NativePage | undefined
 }
 
 type HmrPageConfig = {
+    data: Record<string, unknown>
     onUnload?: unknown
     onLoad?: unknown
     onShow?: unknown
+    [pageHmrStateKey]?: PageHmrState
 }
 
-type TaroRoot = {
-    ctx: unknown
-}
-
-/** Immutable bridge references plus replacement transactions owned by one Taro singleton. */
-type TaroState = {
-    /** Taro's existing current-page source of truth; replacement onLoad switches its receiver. */
-    readonly current: { page: NativePage | null }
-    /** Taro's virtual document, used to find the retained root by its preserved unique path. */
-    readonly document: { getElementById(path: string): unknown }
-    /** Replaces Taro's native lifecycle receiver without remounting the retained React subtree. */
-    readonly injectPageInstance: (instance: unknown, path: string) => void
-    /**
-     * Short-lived route transactions. Absence means ordinary lifecycle; null means armed
-     * before onUnload or snapshot-consumed before onShow; a snapshot exists only between
-     * replacement onUnload and onLoad. The large data reference is therefore released in
-     * onLoad, while the null marker remains just long enough to suppress synthetic onShow.
-     */
-    readonly pageReplacements: Map<string, PageSnapshot | null>
-}
-
-/** Forwards a native lifecycle with its original Page receiver. */
-function forward(handler: unknown, receiver: unknown, args: unknown[]): void {
-    if (typeof handler === 'function') handler.apply(receiver, args)
-}
-
-/** Narrows the untyped element returned across the Taro connection boundary. */
-function isTaroRoot(value: unknown): value is TaroRoot {
-    return typeof value === 'object' && value !== null && 'ctx' in value
+/** Calls a native lifecycle with the same Page bound to `this` and the same arguments. */
+function forward(handler: unknown, page: unknown, args: unknown[]): void {
+    if (typeof handler === 'function') handler.apply(page, args)
 }
 
 /** Shared no-op CSS contract because physical rebuilds replace styles wholesale. */
@@ -285,109 +261,90 @@ class WxDevRuntime extends DevRuntime {
         this.session = { ...info, appliedSeq: 0 }
     }
 
-    /**
-     * One-shot bridge to the application's Taro singleton. It cannot be imported into this
-     * separately bundled global runtime without creating a second Taro identity. Undefined
-     * only before the serve-only facade connection; route transactions share its lifetime.
-     */
-    private taro: TaroState | undefined
+    /** Tracks the mounted native Page and prepares its static config for HMR re-registration. */
+    injectPageHmr(config: HmrPageConfig): HmrPageConfig {
+        const existingState = config[pageHmrStateKey]
 
-    /** Connects HMR to the same Taro singleton used by the application module graph. */
-    connectTaro(
-        current: TaroState['current'],
-        document: TaroState['document'],
-        injectPageInstance: TaroState['injectPageInstance']
-    ): void {
-        if (this.taro) {
-            return
+        if (existingState) {
+            const mountedPage = existingState.mountedPage
+            /*
+             * The static config can outlive a native Page instance. Before its first ordinary onLoad, or after a real onUnload,
+             * there is no mounted Page or current view-model to carry into another registration. Leave the lifecycle gate
+             * unarmed and preserve the config's existing initial data so a future real onLoad still enters Taro normally.
+             */
+            if (!mountedPage) {
+                return config
+            }
+
+            /*
+             * Arm the lifecycle wrappers on this exact static config before it is passed back to `Page(config)`. DevTools then
+             * triggers an unload/load/show sequence for that native re-registration: unload and load observe `true` and return
+             * before entering Taro, preserving the mounted React tree and its original Page connection; show consumes the
+             * one-shot gate by restoring `false`. Ordinary navigation never enters this branch, and every Page config owns an
+             * independent state object, so no route map, global phase, or Page identity comparison participates in the decision.
+             */
+            existingState.isReregistering = true
+            /*
+             * `Page(config)` reads `config.data` as the initial native view-model for this registration. Supplying the mounted
+             * Page's latest data before that call prevents the temporary Page used for re-registration callbacks from starting
+             * empty. This is an O(1) reference assignment in vpt: it does not clone the recursive data tree, call `setData`, move
+             * React state, or rebind Taro. The ordinary Taro lifecycle remains suppressed until re-registration onShow, so its
+             * React tree and output connection stay attached to `mountedPage`; every later registration reads its latest data.
+             */
+            config.data = mountedPage.data
+
+            return config
         }
 
-        this.taro = {
-            current,
-            document,
-            injectPageInstance,
-            pageReplacements: new Map()
-        }
-    }
-
-    /** Injects snapshot-preserving behavior into one route-specific Taro Page configuration. */
-    injectPageHmr(config: HmrPageConfig, route: string): void {
         const originalOnUnload = config.onUnload
         const originalOnLoad = config.onLoad
         const originalOnShow = config.onShow
-        const runtime = this
+
+        const state: PageHmrState = {
+            isReregistering: false,
+            mountedPage: undefined
+        }
+
+        /*
+         * Attach the one mutable HMR state object to this exact static config. The lifecycle wrappers below close over the same
+         * object, while a later `injectPageHmr(config)` call finds it through the symbol and knows wrapping is already complete.
+         * A symbol cannot collide with WeChat or Taro's string-named Page options, and config-local ownership avoids route maps,
+         * a runtime-wide WeakMap, or state shared by two Page configs. The state becomes unreachable together with the config.
+         */
+        config[pageHmrStateKey] = state
 
         config.onUnload = function (this: NativePage, ...args: unknown[]) {
-            const taro = runtime.requireTaro()
-            if (taro.pageReplacements.has(route)) {
-                taro.pageReplacements.set(route, {
-                    $taroPath: this.$taroPath,
-                    $taroParams: this.$taroParams,
-                    // WeChat owns this serializable view-model. Keeping its reference is O(1),
-                    // unlike cloning the complete recursive projection before every edit.
-                    data: this.data
-                })
+            if (state.isReregistering) {
                 return
             }
+
             forward(originalOnUnload, this, args)
+            state.mountedPage = undefined
         }
 
         config.onLoad = function (this: NativePage, ...args: unknown[]) {
-            const taro = runtime.requireTaro()
-            const snapshot = taro.pageReplacements.get(route)
-            if (snapshot) {
-                // Replace the transaction before native work so exceptions cannot retain the
-                // large data snapshot while the route waits for its synthetic onShow.
-                taro.pageReplacements.set(route, null)
-
-                // Snapshot paint is the first bridge operation and removes the empty-page gap.
-                this.setData(snapshot.data)
-                this.$taroPath = snapshot.$taroPath
-                this.$taroParams = snapshot.$taroParams
-                runtime.bindPage(this, snapshot.$taroPath)
+            if (state.isReregistering) {
                 return
             }
+
             forward(originalOnLoad, this, args)
+            state.mountedPage = this
         }
 
         config.onShow = function (this: NativePage, ...args: unknown[]) {
-            if (runtime.requireTaro().pageReplacements.delete(route)) {
-                // Synthetic shows must not repeat requests or reset application state.
+            if (state.isReregistering) {
+                state.isReregistering = false
                 return
             }
 
             forward(originalOnShow, this, args)
         }
+
+        return config
     }
 
-    /** Returns the Taro connection or fails at the first incorrectly ordered use. */
-    private requireTaro(): TaroState {
-        if (!this.taro) throw new Error('[vpt] WX HMR used before the Taro runtime was connected')
-        return this.taro
-    }
-
-    /** Returns a retained Taro root after normal Page mount has created it. */
-    private findRoot(path: string): TaroRoot | undefined {
-        const root = this.requireTaro().document.getElementById(path)
-        return isTaroRoot(root) ? root : undefined
-    }
-
-    /** Rebinds a retained Taro tree to one replacement native Page without repainting. */
-    private bindPage(instance: NativePage, path: string): void {
-        const taro = this.requireTaro()
-        taro.injectPageInstance(instance, path)
-        taro.current.page = instance
-
-        const pageElement = this.findRoot(path)
-        if (!pageElement) {
-            throw new Error(`[vpt] retained Taro page not found: ${path}`)
-        }
-
-        pageElement.ctx = instance
-    }
-
-    /** Applies one Page-delivered payload and arms its route for native replacement. */
-    applyPatches(payload: PatchPayload | undefined, route?: string): void {
+    /** Applies one Page-delivered payload before its native shell registers the static route configuration. */
+    applyPatches(payload: PatchPayload | undefined): void {
         // The initial physical dependency exports undefined until the host has a patch range.
         if (!payload) return
 
@@ -395,12 +352,6 @@ class WxDevRuntime extends DevRuntime {
         if (!session || payload.buildId !== session.buildId) {
             console.warn('[vpt] patches for a stale build')
             return
-        }
-
-        // A replayed payload still causes DevTools to replace this physical Page. Arm the
-        // route independently of whether this App heap already applied its patch sequence.
-        if (route) {
-            this.requireTaro().pageReplacements.set(route, null)
         }
 
         // Apply synchronously: the page's imports below the require resolve against the
