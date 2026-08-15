@@ -14,35 +14,50 @@ import { wrapPluginTransform } from '../../../utils/vite.ts'
 import { tailwindcssBasedir } from '../../tailwind/tailwind-css.ts'
 import { globalWxssFileName } from '../dev/hmr-files.ts'
 
+/** Persistent Tailwind state owned by one physical CSS root across incremental Rolldown transforms. */
 type TailwindRoot = Readonly<{
+    /** Exact root source used to decide whether the existing compiler can accept another candidate-only update. */
     source: string
+    /** Authoritative raw candidates generated with the current source files; JavaScript and WXSS consume this same set. */
     classSet: Set<string>
+    /** CSS imports and compiler inputs whose changes invalidate the generator rather than only its candidate cache. */
     dependencies: ReadonlySet<string>
+    /** Stateful Tailwind compiler retaining its incremental candidate cache between source-file updates. */
     generator: WeappTailwindcssGenerator
+    /** Oxide source matcher reused to enumerate the current files covered by Tailwind source patterns. */
     scanner: Scanner
+    /** Marks a compiler dependency change that requires replacing the generator on the root's next transform. */
     invalidated: boolean
 }>
 
+/** Latest successful Vite CSS and optional Tailwind state joined by their normalized physical module ID. */
 type StyleModule = Readonly<{
+    /** Vite-final CSS captured after preprocessors, PostCSS, and CSS Modules; absent until `vite:css-post` succeeds. */
     css: string | undefined
+    /** Incremental Tailwind state; absent for ordinary CSS and removed when a root stops importing Tailwind. */
     tailwind: TailwindRoot | undefined
 }>
 
+/** JavaScript code plus the physical filename required by the Weapp JavaScript transformer. */
 type JavaScriptArtifact = Readonly<{
     code: string
     filename: string
 }>
 
+/** Vite plugin with the development-host operation that finalizes one coherent WX style/JavaScript transaction. */
 export type WxStylePlugin = Plugin &
     Readonly<{
+        /** Converts patch factories and publishes their matching global WXSS through the host's atomic writer. */
         finalizeUpdate: <Artifact extends JavaScriptArtifact>(
             artifacts: readonly Artifact[],
             writeWxss: (wxss: string) => Promise<void>
         ) => Promise<readonly Artifact[]>
     }>
 
+/** Vite CSS request modes that do not represent graph-owned application stylesheets. */
 const ignoredStyleQueries = ['direct', 'inline', 'inline-css', 'raw', 'style-attr', 'transform-only', 'url'] as const
 
+/** Whole-file conversion policy applied equally to complete builds and development updates. */
 const wxStyleOptions = {
     cssCalc: false,
     autoprefixer: false,
@@ -51,30 +66,136 @@ const wxStyleOptions = {
 } as const
 
 /**
- * Owns the WX boundary around Vite CSS and Rolldown incremental builds.
+ * Creates the single owner of global WX style compilation, graph projection, JavaScript class rewriting, and publication.
  *
- * Vite produces final module CSS, Tailwind roots compile only when Rolldown invalidates them, and graph projection selects
- * retained artifacts through the current application graph. Complete output and HMR patches therefore consume the same WXSS
- * and class identities without another source scan or CSS preprocessing pass.
+ * ## Architectural invariant
+ *
+ * A WX transaction must expose JavaScript and WXSS produced from one class-identity snapshot. Tailwind utility names can be
+ * rewritten for WeChat—for example, `py-5.5` becomes `py-5_d5`—so publishing either side independently can leave running code
+ * referring to selectors that do not yet exist. This plugin therefore treats reachable CSS, Tailwind candidates, converted
+ * WXSS, and converted JavaScript as one output. Complete builds and HMR updates both call `finalizeOutput()`; they differ only
+ * in how the returned bytes are materialized.
+ *
+ * ## Ownership boundaries
+ *
+ * The pipeline deliberately gives each subsystem one responsibility:
+ *
+ * 1. Rolldown owns module reachability and invalidation. VPT reads `getModuleInfo()` and registers watch files, but does not
+ *    maintain a second import graph or decide independently which root should rerun.
+ * 2. The persistent Tailwind generator owns candidate discovery and incremental candidate removal. VPT invokes it only from
+ *    the owning CSS root's Rolldown transform and never rescans the project during output publication.
+ * 3. Vite owns preprocessors, PostCSS, CSS Modules, and final module CSS semantics. VPT observes the input to the resolved
+ *    `vite:css-post` hook only after the original hook succeeds; it never rereads source files or repeats CSS preprocessing.
+ * 4. The Weapp transformation context owns WX selector conversion and JavaScript class-string conversion. One retained context
+ *    and one projected candidate set drive both operations.
+ * 5. VPT owns physical global WXSS and patch publication. Vite's browser CSS asset is only an intermediate carrier and is
+ *    removed before VPT emits `assets/global.wxss`.
+ *
+ * Native Page and component WXSS are outside this global pipeline. The WX output plugin is registered after this style plugin
+ * and emits those opaque companions later. The WX configuration also enforces `cssCodeSplit: false`, so Vite contributes at
+ * most one browser compiler stylesheet for this plugin to replace.
+ *
+ * ## Compilation phases
+ *
+ * ### 1. Tailwind pre-transform
+ *
+ * The pre-transform checks physical application CSS for Tailwind imports or directives. Ordinary styles pass through. A
+ * Tailwind root compiles to browser CSS before Vite's normal CSS pipeline runs. Successful generation records the generator,
+ * scanner, current class set, compiler dependencies, and exact root source under the normalized physical module ID.
+ *
+ * Candidate files and compiler dependencies intentionally have different invalidation behavior:
+ *
+ * - Candidate-file changes rerun the root with the existing generator and scanner. `incrementalCache: true` updates additions
+ *   and removals without discarding the generator's authoritative cache.
+ * - Compiler-dependency changes mark the root invalid. Its next Rolldown transform resolves a new Tailwind source and creates a
+ *   new generator and scanner. Replacement is delayed until that transform has current source and plugin context.
+ * - If a stylesheet stops being a Tailwind root, its generator is disposed and its Tailwind state is removed. The later Vite
+ *   CSS hook replaces the retained CSS after normal processing succeeds.
+ *
+ * ### 2. Vite-final CSS capture
+ *
+ * `configResolved` wraps the concrete `vite:css-post` transform while preserving its hook metadata, filter, ordering, and
+ * plugin context. The original Vite hook executes first, which preserves CSS Module exports and Vite's internal extraction
+ * state. Only a successful transform updates `styleByModuleId`; syntax errors therefore leave the last successful CSS available
+ * to the currently running application. Query modes such as `?raw`, `?url`, and `?inline` are excluded because they represent
+ * values rather than graph-owned stylesheets.
+ *
+ * ### 3. Live-graph projection
+ *
+ * Output finalization starts from canonical App/Page entry IDs and traverses Rolldown's current static and dynamic import edges
+ * in dependency-first post-order. Transaction-local visited sets terminate cycles and deduplicate shared modules and physical
+ * stylesheets. A retained stylesheet contributes only when its module is still reachable, so removing an import prunes its CSS
+ * and Tailwind candidates without a separate prune protocol or persistent topology cache. Candidate sets are unioned only from
+ * the Tailwind roots whose captured CSS survives that exact traversal, preserving the CSS/class identity invariant.
+ *
+ * ### 4. Shared WX finalization
+ *
+ * `finalizeOutput()` first converts the concatenated reachable CSS to WXSS, then transforms every supplied JavaScript artifact
+ * with the same projected class set. It returns data and performs no bundle mutation or filesystem publication. If either
+ * transformation fails, the promise rejects before callers expose partial output. JavaScript conversion is skipped when the
+ * projection contains no Tailwind candidates, preserving ordinary bundle bytes.
+ *
+ * ### 5a. Complete-build commit
+ *
+ * The post-order `generateBundle` hook gathers all JavaScript chunks, finalizes them as one operation, and only then mutates the
+ * bundle. It assigns converted code, clears invalid source maps, removes Vite's intermediate browser stylesheet, and always
+ * emits `assets/global.wxss`. Emitting an empty global file is required because `app.wxss` imports it even when the application
+ * currently has no styles. Native output hooks run afterward and emit Page/component companion files independently.
+ *
+ * ### 5b. Development commit
+ *
+ * The development host calls `finalizeUpdate()` after Rolldown produces patch factories or a complete-output notification.
+ * Finalization uses the `PluginContext` captured by `buildStart`, so it observes the same current graph as the compiler. After
+ * all conversion succeeds, the host's atomic writer publishes changed WXSS before `finalizeUpdate()` returns converted patch
+ * factories. The patch publisher therefore cannot expose newer JavaScript class identities before matching selectors exist.
+ * `publishedWxss` advances only after a successful write and suppresses byte-identical writes that would otherwise trigger
+ * unnecessary WeChat DevTools reload events.
+ *
+ * ## Retained state and lifecycle
+ *
+ * The factory retains three explicit mutable state owners plus one library-owned transformation context:
+ *
+ * - `graphContext`: the active Rolldown graph reader needed by host calls made outside plugin hooks;
+ * - `styleByModuleId`: the latest successful Vite CSS plus optional Tailwind state at one normalized module identity;
+ * - `publishedWxss`: the last durably published development stylesheet used for unchanged-write suppression;
+ * - `weappContext`: Weapp's internal conversion state, retained so selector and JavaScript rewriting share one context.
+ *
+ * Entry IDs and all four owner references are fixed for the plugin lifetime. Build-command bundles dispose Tailwind generators
+ * after bundle generation. A development watcher otherwise keeps them alive across updates and disposes them when it closes.
+ * Captured CSS survives compiler cleanup because output notifications can arrive after that cleanup, and is cleared only when
+ * the watcher terminates.
+ *
+ * ## Cost model
+ *
+ * Projection is `O(V + E + B + C)` for reachable modules, import edges, concatenated CSS bytes, and candidate insertions.
+ * JavaScript conversion is linear in the total supplied chunk or patch-factory bytes, subject to the Weapp parser's own cost.
+ * Retained memory is `O(B + C + D + F)` for latest CSS, candidate sets, compiler dependencies, and scanner file identities; no
+ * second application graph is retained. Tailwind's generator and Oxide scanner caches are intentionally persistent because
+ * recreating them on every candidate edit would repeat source normalization and scanning work.
  */
 export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxStylePlugin {
+    // Canonical entry identities are immutable graph roots shared by complete-build and HMR projections.
     const entryIds = applicationEntryIds.map(canonicalEntryId)
+    // One retained Weapp context guarantees that CSS selectors and JavaScript class strings use the same conversion rules.
     const weappContext = createContext({ appType: 'weapp-vite', logLevel: 'silent' })
 
-    // buildStart installs the mutable context required when the development host renders outside a plugin hook.
+    // buildStart installs this mutable context because the development host finalizes output outside a Rolldown plugin hook.
     let graphContext: PluginContext
-    // This mutable map retains Vite-final CSS and optional incremental Tailwind state at their shared module identity.
+    // This mutable map is the only retained style store: Vite and Tailwind update separate fields at one module identity.
     const styleByModuleId = new Map<string, StyleModule>()
-    // This mutable frontier advances only after the development host atomically publishes the rendered bytes.
+    // This mutable frontier advances only after the host durably writes WXSS, suppressing byte-identical filesystem events.
     let publishedWxss: string | undefined
 
+    /** Binds retained plugin state to the context of the complete build or development transaction being finalized. */
     const finalizeCurrentOutput = (context: PluginContext, javaScript: readonly JavaScriptArtifact[]) => {
         return finalizeOutput(entryIds, styleByModuleId, context.getModuleInfo.bind(context), weappContext, javaScript)
     }
 
+    /** Releases native compiler resources while retaining captured CSS needed by subsequent output callbacks. */
     const disposeTailwindRoots = (): void => {
         styleByModuleId.forEach((style, styleId) => {
             if (style.tailwind) {
+                // Dispose each generator exactly once, then remove the root reference while preserving Vite-final CSS.
                 style.tailwind.generator.dispose?.()
                 styleByModuleId.set(styleId, { css: style.css, tailwind: undefined })
             }
@@ -83,17 +204,22 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
 
     return {
         name: 'vpt:wx-styles',
+        /** Installs the single private Vite integration used to observe fully processed module CSS. */
         configResolved(config) {
+            // `vite:css-post` is the boundary after all public CSS processing and before browser-module serialization.
             const cssPostPlugin = config.plugins.find((plugin) => plugin.name === 'vite:css-post')!
 
-            // Observe Vite-final CSS immediately before its built-in post hook serializes the browser HMR module.
             wrapPluginTransform(cssPostPlugin, (transform) => {
                 return async function (css, id, options) {
+                    // Run Vite first so a failed CSS transform never replaces the last successful retained artifact.
                     const result = await transform.call(this, css, id, options)
+
+                    // Only physical application styles participate in WX graph projection; virtual request modes keep Vite semantics.
                     if (isApplicationStyle(id)) {
                         const styleId = normalizeModuleId(id)
                         styleByModuleId.set(styleId, {
                             css: css,
+                            // Tailwind compilation runs earlier, so CSS capture must preserve the root state at this identity.
                             tailwind: styleByModuleId.get(styleId)?.tailwind
                         })
                     }
@@ -101,32 +227,43 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
                 }
             })
         },
+        /** Captures the active graph reader for development finalization calls made outside plugin hooks. */
         buildStart() {
             graphContext = this
         },
         transform: {
+            // Tailwind must expand before Vite's normal CSS pipeline produces the final module CSS captured above.
             order: 'pre',
+            /** Compiles only Tailwind roots and registers every input needed for Rolldown-driven invalidation. */
             async handler(code, id) {
+                // Query variants such as `?raw` are values, not application stylesheets, and must remain untouched.
                 if (!isApplicationStyle(id)) {
                     return
                 }
 
+                // Join this early Tailwind phase to the later Vite CSS capture through one normalized module identity.
                 const rootId = normalizeModuleId(id)
                 const style = styleByModuleId.get(rootId)
                 const previous = style?.tailwind
+
+                // A file can stop being a Tailwind root during HMR; dispose its compiler without discarding last-good Vite CSS.
                 if (!isTailwindRoot(code)) {
                     previous?.generator.dispose?.()
                     styleByModuleId.set(rootId, { css: style?.css, tailwind: undefined })
                     return
                 }
 
+                // Candidate-only updates reuse incremental caches; compiler-input updates replace the entire generator.
                 const reusable = previous?.invalidated ? undefined : previous
                 const compiled = await compileTailwindRoot(this.environment.config.root, rootId, code, reusable)
                 if (compiled.root.generator !== previous?.generator) {
                     previous?.generator.dispose?.()
                 }
+
+                // Replace the retained root record only after generation has produced a complete result.
                 styleByModuleId.set(rootId, { css: style?.css, tailwind: compiled.root })
 
+                // Compiler dependencies trigger generator replacement, while candidate files trigger incremental regeneration.
                 compiled.root.dependencies.forEach((file) => {
                     this.addWatchFile(file)
                 })
@@ -134,69 +271,96 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
                     this.addWatchFile(file)
                 })
 
+                // Vite receives browser CSS and remains the sole owner of PostCSS, preprocessors, and CSS Modules.
                 return { code: compiled.css, map: null }
             }
         },
+        /** Marks roots whose compiler inputs changed; Rolldown still decides when those roots are transformed. */
         watchChange(id) {
             const dependencyId = normalizeModuleId(id)
+
+            // A dependency may feed multiple roots, so every retained root must be checked before the next transform wave.
             styleByModuleId.forEach((style, styleId) => {
                 if (style.tailwind?.dependencies.has(dependencyId)) {
                     styleByModuleId.set(styleId, {
                         css: style.css,
+                        // Delay generator replacement until the owning root transform has current root source and graph context.
                         tailwind: { ...style.tailwind, invalidated: true }
                     })
                 }
             })
         },
         generateBundle: {
+            // Vite must finish chunking and CSS extraction before VPT can finalize the complete WX output transaction.
             order: 'post',
+            /** Converts every JavaScript chunk and the reachable CSS projection with one authoritative class set. */
             async handler(_, bundle) {
                 const outputs = Object.values(bundle)
 
+                // Step 1: preserve bundle order so finalized code can be assigned back by index without a second lookup map.
                 const chunks = outputs.filter((output): output is Rolldown.OutputChunk => output.type === 'chunk')
 
+                // Step 2: finish all fallible CSS and JavaScript conversion before mutating any bundle output.
                 const finalized = await finalizeCurrentOutput(
                     this,
                     chunks.map((chunk) => ({ code: chunk.code, filename: chunk.fileName }))
                 )
+
+                // Step 3: commit the converted JavaScript as one completed result and discard now-invalid source maps.
                 chunks.forEach((chunk, index) => {
                     chunk.code = finalized.javaScript[index]!
                     chunk.map = null
                 })
 
-                // VPT replaces Vite's browser CSS carrier with the sole physical global WX stylesheet.
+                // Step 4: remove Vite's browser CSS carrier; VPT owns the sole physical global WX stylesheet.
                 Object.entries(bundle).forEach(([fileName, output]) => {
                     if (isStyleAsset(output)) {
                         delete bundle[fileName]
                     }
                 })
 
+                // Step 5: always emit the imported global file, including an empty file for applications without styles.
                 this.emitFile({ type: 'asset', fileName: globalWxssFileName, source: finalized.wxss })
             }
         },
+        /** Releases build-only compiler resources after the final bundle has consumed their candidate sets. */
         closeBundle() {
             if (this.environment.config.command === 'build') {
                 disposeTailwindRoots()
             }
         },
+        /** Releases long-lived development resources and clears captured CSS when the owning watcher terminates. */
         closeWatcher() {
             disposeTailwindRoots()
             styleByModuleId.clear()
         },
+        /** Finalizes one development result and publishes matching WXSS before exposing converted patch factories. */
         finalizeUpdate: async <Artifact extends JavaScriptArtifact>(
             artifacts: readonly Artifact[],
             writeWxss: (wxss: string) => Promise<void>
         ): Promise<readonly Artifact[]> => {
+            // Step 1: complete every fallible conversion against one snapshot of the current module graph.
             const output = await finalizeCurrentOutput(graphContext, artifacts)
+
+            // Step 2: publish changed WXSS first so DevTools cannot observe JavaScript containing newer class identities.
             if (output.wxss !== publishedWxss) {
                 await writeWxss(output.wxss)
+                // Advance the frontier only after the atomic writer succeeds; failed writes remain retryable.
                 publishedWxss = output.wxss
             }
+
+            // Step 3: preserve patch metadata and replace only code after the matching stylesheet is durable.
             return artifacts.map((artifact, index) => ({ ...artifact, code: output.javaScript[index]! }))
         }
     }
 }
 
+/**
+ * Produces WXSS and JavaScript from one live-graph projection.
+ *
+ * The function receives every stateful dependency explicitly so tests and both output modes execute the same algorithm. It
+ * completes WXSS conversion before JavaScript conversion and returns bytes without publishing or mutating caller artifacts.
+ */
 export async function finalizeOutput(
     entryIds: readonly string[],
     styleByModuleId: ReadonlyMap<
@@ -212,10 +376,16 @@ export async function finalizeOutput(
     weappContext: Pick<ReturnType<typeof createContext>, 'transformJs' | 'transformWxss'>,
     javaScript: readonly JavaScriptArtifact[]
 ) {
+    // Step 1: derive cascade order, reachable CSS, and raw Tailwind candidates from the same current graph snapshot.
     const projection = projectStyles(entryIds, styleByModuleId, getModuleInfo)
+
+    // Step 2: convert the complete stylesheet once; this fixes the selector identities JavaScript must subsequently use.
     const wxss = (await weappContext.transformWxss(projection.css, wxStyleOptions)).css
+
+    // Step 3: transform artifacts independently but with the exact candidate set used by the stylesheet conversion.
     const transformedJavaScript = await Promise.all(
         javaScript.map(async (artifact) => {
+            // Ordinary CSS needs no class-string rewrite, so preserve JavaScript bytes when Tailwind contributed no candidates.
             if (projection.classSet.size === 0) {
                 return artifact.code
             }
@@ -226,38 +396,51 @@ export async function finalizeOutput(
                 runtimeSet: projection.classSet
             })
             if (result.error) {
+                // Reject the whole transaction; callers have not mutated chunks or published WXSS at this point.
                 throw result.error
             }
             return result.code
         })
     )
+
+    // Returning data keeps physical bundle mutation and development filesystem publication at their respective owners.
     return { javaScript: transformedJavaScript, wxss: wxss }
 }
 
+/** Selects styles reachable from the configured entries in deterministic dependency-first cascade order. */
 function projectStyles(
     entryIds: Parameters<typeof finalizeOutput>[0],
     styleByModuleId: Parameters<typeof finalizeOutput>[1],
     getModuleInfo: Parameters<typeof finalizeOutput>[2]
 ) {
-    // All traversal state is transaction-local; no derived topology survives an import addition or removal.
+    // This mutable transaction-local set terminates cycles and prevents repeated traversal through shared JavaScript modules.
     const visitedModuleIds = new Set<string>()
+    // This mutable transaction-local set emits a physical stylesheet once even when multiple graph paths import it.
     const visitedStyleIds = new Set<string>()
+    // This mutable transaction-local list records dependency-first CSS order for the final concatenated stylesheet.
     const css: string[] = []
+    // This mutable transaction-local set unions candidates from exactly the Tailwind roots contributing reachable CSS.
     const classSet = new Set<string>()
 
+    /** Performs a post-order graph visit so dependencies precede the modules that import them in the CSS cascade. */
     const visit = (moduleId: string): void => {
+        // Step 1: claim the module before recursion to terminate cycles and shared dependency paths.
         if (visitedModuleIds.has(moduleId)) {
             return
         }
         visitedModuleIds.add(moduleId)
 
+        // Step 2: ignore IDs absent from the current graph; retained CSS alone never makes a removed module reachable.
         const moduleInfo = getModuleInfo(moduleId)
         if (!moduleInfo) {
             return
         }
+
+        // Step 3: visit static and dynamic dependencies before considering this module's own stylesheet contribution.
         moduleInfo.importedIds.forEach(visit)
         moduleInfo.dynamicallyImportedIds.forEach(visit)
 
+        // Step 4: join graph identity to captured style identity and append each reachable physical stylesheet once.
         const styleId = normalizeModuleId(moduleId)
         const style = styleByModuleId.get(styleId)
         if (style?.css === undefined || visitedStyleIds.has(styleId)) {
@@ -265,22 +448,30 @@ function projectStyles(
         }
         visitedStyleIds.add(styleId)
         css.push(style.css)
+
+        // Step 5: union candidates only from roots whose CSS survived this same reachability projection.
         style.tailwind?.classSet.forEach((className) => {
             classSet.add(className)
         })
     }
+
+    // Each App/Page entry is a root; shared visited sets deduplicate styles across the complete application projection.
     entryIds.forEach(visit)
 
     return { classSet: classSet, css: css.join('\n') }
 }
 
+/** Compiles one Tailwind root and returns replacement state without mutating the retained module store. */
 async function compileTailwindRoot(
     projectRoot: string,
     rootId: string,
     css: string,
     previous: TailwindRoot | undefined
 ): Promise<Readonly<{ css: string; root: TailwindRoot }>> {
+    // Step 1: exact root-source equality proves that candidate changes can reuse the existing compiler and scanner caches.
     const reuse = previous?.source === css
+
+    // Step 2: compiler-input changes resolve a fresh Tailwind source and create a new generator before retained state changes.
     const generator = reuse
         ? previous.generator
         : createWeappTailwindcssGenerator(
@@ -292,7 +483,10 @@ async function compileTailwindRoot(
           )
 
     try {
+        // Step 3: authoritative source scanning updates additions and removals in the persistent incremental candidate cache.
         const generated = await generator.generate({ target: 'web', scanSources: true, incrementalCache: true })
+
+        // Step 4: return a complete immutable replacement record; the caller commits it only after this function succeeds.
         return {
             css: generated.css,
             root: {
@@ -300,11 +494,13 @@ async function compileTailwindRoot(
                 classSet: generated.classSet,
                 dependencies: new Set(generated.dependencies.map(normalizeModuleId)),
                 generator: generator,
+                // Source patterns change with compiler inputs, while candidate-only updates can reuse their native matcher.
                 scanner: reuse ? previous.scanner : new Scanner({ sources: generated.sources }),
                 invalidated: false
             }
         }
     } catch (error) {
+        // A new generator has no retained owner on failure; reused generators remain owned by the previous root record.
         if (!reuse) {
             generator.dispose?.()
         }
@@ -312,35 +508,47 @@ async function compileTailwindRoot(
     }
 }
 
+/** Resolves symlinks in an entry's physical path while preserving its query as part of the graph identity. */
 function canonicalEntryId(id: string): string {
+    // Split before realpath resolution because filesystem APIs cannot resolve Vite query suffixes.
     const queryStart = id.indexOf('?')
     const file = queryStart < 0 ? id : id.slice(0, queryStart)
     const query = queryStart < 0 ? '' : id.slice(queryStart)
+
+    // Native realpath matches Rolldown's physical IDs; slash normalization makes the identity platform-independent.
     return `${normalizePath(realpathSync.native(file))}${query}`
 }
 
+/** Returns whether a Vite request represents a physical CSS module that contributes to application WXSS. */
 function isApplicationStyle(id: string): boolean {
+    // Step 1: use Vite's predicate so every supported preprocessor extension follows the same path.
     if (!isCSSRequest(id)) {
         return false
     }
 
+    // Step 2: a query-free CSS request is always a physical application stylesheet.
     const queryStart = id.indexOf('?')
     if (queryStart < 0) {
         return true
     }
+
+    // Step 3: reject Vite request modes whose values must not enter the global CSS projection.
     const fragmentStart = id.indexOf('#', queryStart)
     const query = id.slice(queryStart + 1, fragmentStart < 0 ? undefined : fragmentStart)
     const parameters = new URLSearchParams(query)
     return ignoredStyleQueries.every((parameter) => !parameters.has(parameter))
 }
 
+/** Detects source forms that require Tailwind compilation before Vite processes the resulting CSS. */
 function isTailwindRoot(code: string): boolean {
+    // Tailwind v4 uses package imports; legacy directives remain accepted because the generator supports both forms.
     return (
         /@import\s+(?:url\(\s*)?['"]tailwindcss(?:\/[^'"]*)?['"]/.test(code) ||
         /@tailwind\s+(?:base|components|utilities)\b/.test(code)
     )
 }
 
+/** Identifies Vite's browser stylesheet carrier, which VPT replaces after all final CSS has been captured. */
 function isStyleAsset(output: Rolldown.OutputBundle[string]): output is Rolldown.OutputAsset {
     return output.type === 'asset' && /\.(?:css|wxss)$/.test(output.fileName)
 }
