@@ -7,7 +7,6 @@ import type { GetModuleInfo } from 'rolldown'
 import { dev } from 'rolldown/experimental'
 import { Subject } from 'rxjs'
 import { createServer, normalizePath } from 'vite'
-import { createWxStylePlugins } from '../styles/plugins.ts'
 import { createStyleCapture, type StyleCaptureAction } from './create-style-capture.ts'
 import type { BundledDev } from './wx-dev-options.ts'
 
@@ -58,9 +57,7 @@ test('publishes processed CSS and live topology without identical rewrites', asy
     const styleCapture = createStyleCapture({
         applicationEntryIds: [appId],
         outDir: outDir,
-        emit: (action) => styleCaptureActions.next(action),
-        transformTailwindRoot: async (rootId, requestId) =>
-            server.environments.client.pluginContainer.transform(await readFile(rootId, 'utf8'), requestId)
+        emit: (action) => styleCaptureActions.next(action)
     })
     styleCaptureActions.subscribe((action) => {
         if (action.kind === 'capture-graph') {
@@ -87,9 +84,7 @@ test('publishes processed CSS and live topology without identical rewrites', asy
             void Promise.resolve()
                 .then(async () => {
                     if (!(result instanceof Error)) {
-                        await styleCapture.publishChanged(
-                            result.updates.flatMap(({ update }) => (update.type === 'Patch' ? update.changedIds : []))
-                        )
+                        await styleCapture.publish()
                     }
                     hmrResults.push(result)
                 })
@@ -98,14 +93,7 @@ test('publishes processed CSS and live topology without identical rewrites', asy
                 })
         },
         onOutput(result) {
-            if (result instanceof Error) {
-                outputResults.push(result)
-                return
-            }
-            void styleCapture
-                .reconcileComplete(result.output)
-                .then(() => outputResults.push(result))
-                .catch((error: unknown) => outputResults.push(error))
+            outputResults.push(result)
         }
     })
 
@@ -141,7 +129,7 @@ test('publishes processed CSS and live topology without identical rewrites', asy
         const globalWxssPath = path.join(outDir, 'assets/global.wxss')
         assert.doesNotMatch(await readFile(globalWxssPath, 'utf8'), /\.extra \{\}/)
 
-        // An unrelated JavaScript generation still renders for candidate and topology correctness, but byte equality must
+        // An unrelated JavaScript generation still renders for topology correctness, but byte equality must
         // preserve the destination inode and therefore produce no DevTools filesystem event.
         const unchangedInode = (await stat(globalWxssPath)).ino
         await writeFile(appId, "import './app.css'\nexport const value = 'unrelated'\n")
@@ -159,117 +147,6 @@ test('publishes processed CSS and live topology without identical rewrites', asy
         await rm(root, { recursive: true })
     }
 })
-
-test('publishes Tailwind candidate additions and removals before completing each HMR transaction', async () => {
-    const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-tailwind-style-hmr-')))
-    const appId = normalizePath(path.join(root, 'app.js'))
-    const cssId = normalizePath(path.join(root, 'app.css'))
-    const outDir = path.join(root, 'dist')
-    await Promise.all([
-        writeFile(appId, renderTailwindApplication('mt-2')),
-        writeFile(cssId, '@import "tailwindcss";\n@source "./";\n')
-    ])
-
-    // These mutable journals synchronize Rolldown's non-awaited callbacks and prove stable sidecar identity across generations.
-    const hmrResults: unknown[] = []
-    const outputResults: unknown[] = []
-    const sidecarIds: string[] = []
-    const styleCaptureActions = new Subject<StyleCaptureAction>()
-    const server = await createServer({
-        root: root,
-        configFile: false,
-        logLevel: 'silent',
-        appType: 'custom',
-        experimental: { bundledDev: true },
-        plugins: createWxStylePlugins(),
-        build: {
-            outDir: outDir,
-            cssCodeSplit: false,
-            cssMinify: false,
-            rolldownOptions: { input: appId }
-        }
-    })
-    const styleCapture = createStyleCapture({
-        applicationEntryIds: [appId],
-        outDir: outDir,
-        emit: (action) => styleCaptureActions.next(action),
-        transformTailwindRoot: async (rootId, requestId) => {
-            sidecarIds.push(requestId)
-            const source = await readFile(rootId, 'utf8')
-            return server.environments.client.pluginContainer.transform(source, requestId)
-        }
-    })
-    styleCaptureActions.subscribe((action) => {
-        if (action.kind === 'capture-graph') {
-            styleCapture.captureGraph(action.getModuleInfo)
-            return
-        }
-        styleCapture.captureStyle(action.id, action.style)
-    })
-    const bundledDev = requireBundledDev(server.environments.client.bundledDev)
-    const rolldownOptions = await bundledDev.getRolldownOptions()
-    rolldownOptions.plugins = [rolldownOptions.plugins, styleCapture.plugin]
-    const output = rolldownOptions.output
-    if (!output || Array.isArray(output)) {
-        throw new Error('Expected one bundled development output')
-    }
-    const engine = await dev(rolldownOptions, output, {
-        rebuildStrategy: 'never',
-        watch: { skipWrite: false },
-        onHmrUpdates(result) {
-            if (result instanceof Error) {
-                hmrResults.push(result)
-                return
-            }
-            void styleCapture
-                .publishChanged(
-                    result.updates.flatMap(({ update }) => (update.type === 'Patch' ? update.changedIds : []))
-                )
-                .then(() => hmrResults.push(result))
-                .catch((error: unknown) => hmrResults.push(error))
-        },
-        onOutput(result) {
-            if (result instanceof Error) {
-                outputResults.push(result)
-                return
-            }
-            void styleCapture
-                .reconcileComplete(result.output)
-                .then(() => outputResults.push(result))
-                .catch((error: unknown) => outputResults.push(error))
-        }
-    })
-
-    try {
-        await engine.run()
-        await engine.ensureCurrentBuildFinish()
-        await waitForEventCount(outputResults, 1)
-        assert.match(await readFile(path.join(outDir, 'assets/global.wxss'), 'utf8'), /\.mt-2\b/)
-        await engine.registerClient('tailwind-style-hmr-test')
-
-        await writeFile(appId, renderTailwindApplication('mt-2 p-4'))
-        await waitForEventCount(hmrResults, 1)
-        const addedWxss = await readFile(path.join(outDir, 'assets/global.wxss'), 'utf8')
-        assert.match(addedWxss, /\.mt-2\b/)
-        assert.match(addedWxss, /\.p-4\b/)
-
-        await writeFile(appId, renderTailwindApplication('p-4'))
-        await waitForEventCount(hmrResults, 2)
-        const removedWxss = await readFile(path.join(outDir, 'assets/global.wxss'), 'utf8')
-        assert.doesNotMatch(removedWxss, /\.mt-2\b/)
-        assert.match(removedWxss, /\.p-4\b/)
-        assert.deepEqual(sidecarIds, [`${cssId}?weapp-vite-sidecar=style`, `${cssId}?weapp-vite-sidecar=style`])
-        assert.equal(server.environments.client.moduleGraph.getModuleById(sidecarIds[0]), undefined)
-    } finally {
-        await engine.close()
-        await server.close()
-        await rm(root, { recursive: true })
-    }
-})
-
-function renderTailwindApplication(classes: string): string {
-    return `import './app.css'\nexport const classes = '${classes}'\n`
-}
 
 function requireLatestGraphReader(graphReaders: readonly GetModuleInfo[]): GetModuleInfo {
     const reader = graphReaders.at(-1)

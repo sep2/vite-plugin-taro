@@ -1,16 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-    composeGraphStyleCss,
-    createGraphStylePlan,
-    createTailwindSidecarId,
-    extractViteCss,
-    isGlobalStyleRequest
-} from './utils.ts'
-
-test('creates the stable upstream Tailwind sidecar request', () => {
-    assert.equal(createTailwindSidecarId('/project/src/app.css'), '/project/src/app.css?weapp-vite-sidecar=style')
-})
+import { composeGraphStyleCss, createGraphStylePlan, extractViteCss, isGlobalStyleRequest } from './utils.ts'
 
 test('selects only runtime global style requests', () => {
     assert.equal(isGlobalStyleRequest('/project/src/app.css'), true)
@@ -20,7 +10,6 @@ test('selects only runtime global style requests', () => {
     assert.equal(isGlobalStyleRequest('/project/src/app.css?url'), false)
     assert.equal(isGlobalStyleRequest('/project/src/app.css?inline'), false)
     assert.equal(isGlobalStyleRequest('/project/src/app.css?direct'), false)
-    assert.equal(isGlobalStyleRequest('/project/src/app.css?weapp-vite-sidecar=style'), false)
 })
 
 test('plans graph styles once in dependency order with shared modules deduplicated', () => {

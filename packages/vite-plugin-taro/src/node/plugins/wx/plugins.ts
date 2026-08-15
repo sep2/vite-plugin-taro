@@ -133,10 +133,8 @@ function createWxPlugin(options: VptOptions, resolver: WxResolver, placement: Wx
 
         generateBundle: {
             /*
-             * This hook is registered after createWxStylePlugins() and shares hook-level `order: 'post'` with the adapted
-             * upstream hooks and VPT style finalizer. Registration order therefore guarantees that the imported global
-             * stylesheet is complete before native Page/component companions are emitted. Without this order, the finalizer
-             * could consume incomplete Tailwind output or mistake native WXSS companions for additional compiler styles.
+             * Registration after createWxStylePlugins() makes the compiler stylesheet final before native Page and component
+             * companions are emitted. The style finalizer therefore cannot mistake native WXSS for application CSS.
              */
             order: 'post',
             async handler(_, bundle) {

@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises'
 import type { ServerResponse } from 'node:http'
 import path from 'node:path'
 import colors from 'picocolors'
@@ -75,12 +74,7 @@ export async function createWxDevHost({
         applicationEntryIds: applicationEntryIds,
         outDir: server.config.build.outDir,
         // Capture hooks run only after engine.run, when the host action subscription and all reducer dependencies are ready.
-        emit: (action) => hostActions.next(action),
-        transformTailwindRoot: async (rootId, requestId) => {
-            // The capture contains generated CSS, while the sidecar must re-run from raw Tailwind directives. Vite exposes no
-            // raw source in its live module graph, so this read is the authoritative source generation rather than a read-back.
-            return server.environments.client.pluginContainer.transform(await readFile(rootId, 'utf8'), requestId)
-        }
+        emit: (action) => hostActions.next(action)
     })
     const publisher = new PatchPublisher((content) =>
         writeHmrFile(server.config.build.outDir, hmrPatchesFileName, content)
@@ -212,7 +206,7 @@ export async function createWxDevHost({
                 styleCapture.captureGraph(action.getModuleInfo)
                 return
             case 'capture-style':
-                // A failed upstream transform emits no action, intentionally retaining the last valid processed CSS generation.
+                // A failed CSS transform emits no action, intentionally retaining the last valid processed generation.
                 styleCapture.captureStyle(action.id, action.style)
                 return
             case 'publish':
@@ -228,22 +222,10 @@ export async function createWxDevHost({
                     logWxError(server.config.logger, 'wx dev build failed', action.result)
                     return
                 }
-                return reconcileCompleteOutput(action.result.output)
+                return rotateBuildSession()
             case 'listening':
                 return rotateBuildSession()
         }
-    }
-
-    /**
-     * Reconciles graph-complete styles before rotating the App-visible build identity.
-     *
-     * DevEngine has already written its compiler asset when onOutput fires, but bundled development may have omitted CSS Modules
-     * from that asset. Awaiting reconciliation inside the serialized reducer guarantees the subsequent app.wxss rotation—the
-     * event that refreshes DevTools—can only expose a generation whose global WXSS already represents the complete App/Page graph.
-     */
-    async function reconcileCompleteOutput(output: Exclude<DevOutputResult, Error>['output']): Promise<void> {
-        await styleCapture.reconcileComplete(output)
-        await rotateBuildSession()
     }
 
     /** Applies one runtime receipt to the active physical patch history. */
@@ -329,10 +311,9 @@ export async function createWxDevHost({
             return
         }
 
-        // `onHmrUpdates` is the transaction boundary after every affected transform has updated graph and candidate state.
-        // Every non-CSS edit may alter imports or Tailwind classes; rendering broadly and comparing finalized bytes avoids
-        // source scanning while preventing unrelated JavaScript edits from notifying DevTools through an identical rename.
-        await styleCapture.publishChanged(patches.flatMap((patch) => patch.changedIds))
+        // `onHmrUpdates` runs after every affected transform has updated captured CSS and the live import graph. Rendering the
+        // complete projection catches both style edits and JavaScript-only topology changes; byte equality suppresses no-op writes.
+        await styleCapture.publish()
 
         // Publish global.wxss before the matching JavaScript patch so DevTools observes a coherent HMR transaction.
         // The physical file must exist before Rolldown advances: once committed, later patches may be generated relative to
