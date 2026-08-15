@@ -1,8 +1,7 @@
-import { realpathSync } from 'node:fs'
 import path from 'node:path'
 import { Scanner } from '@tailwindcss/oxide'
 import type { PluginContext } from 'rolldown'
-import { isCSSRequest, normalizePath, type Plugin, type Rolldown } from 'vite'
+import { isCSSRequest, type Plugin, type Rolldown } from 'vite'
 import { createContext } from 'weapp-tailwindcss/core'
 import {
     createWeappTailwindcssGenerator,
@@ -122,7 +121,7 @@ const wxStyleOptions = {
  *
  * ### 3. Live-graph projection
  *
- * Output finalization starts from canonical App/Page entry IDs and traverses Rolldown's current static and dynamic import edges
+ * Output finalization starts from resolved App/Page entry IDs and traverses Rolldown's current static and dynamic import edges
  * in dependency-first post-order. Transaction-local visited sets terminate cycles and deduplicate shared modules and physical
  * stylesheets. A retained stylesheet contributes only when its module is still reachable, so removing an import prunes its CSS
  * and Tailwind candidates without a separate prune protocol or persistent topology cache. Candidate sets are unioned only from
@@ -153,17 +152,18 @@ const wxStyleOptions = {
  *
  * ## Retained state and lifecycle
  *
- * The factory retains three explicit mutable state owners plus one library-owned transformation context:
+ * The factory retains four explicit mutable state owners plus one library-owned transformation context:
  *
+ * - `entryIds`: graph-exact App/Page entry identities resolved at the start of each build;
  * - `graphContext`: the active Rolldown graph reader needed by host calls made outside plugin hooks;
  * - `styleByModuleId`: the latest successful Vite CSS plus optional Tailwind state at one normalized module identity;
  * - `publishedWxss`: the last durably published development stylesheet used for unchanged-write suppression;
  * - `weappContext`: Weapp's internal conversion state, retained so selector and JavaScript rewriting share one context.
  *
- * Entry IDs and all four owner references are fixed for the plugin lifetime. Build-command bundles dispose Tailwind generators
- * after bundle generation. A development watcher otherwise keeps them alive across updates and disposes them when it closes.
- * Captured CSS survives compiler cleanup because output notifications can arrive after that cleanup, and is cleared only when
- * the watcher terminates.
+ * The state owners remain scoped to one plugin instance; `entryIds` is atomically replaced after each complete resolution.
+ * Build-command bundles dispose Tailwind generators after bundle generation. A development watcher otherwise keeps them alive
+ * across updates and disposes them when it closes. Captured CSS survives compiler cleanup because output notifications can
+ * arrive after that cleanup, and is cleared only when the watcher terminates.
  *
  * ## Cost model
  *
@@ -174,8 +174,8 @@ const wxStyleOptions = {
  * recreating them on every candidate edit would repeat source normalization and scanning work.
  */
 export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxStylePlugin {
-    // Canonical entry identities are immutable graph roots shared by complete-build and HMR projections.
-    const entryIds = applicationEntryIds.map(canonicalEntryId)
+    // This mutable root list is replaced in buildStart with Vite/Rolldown's exact cross-platform graph identities.
+    let entryIds = applicationEntryIds
     // One retained Weapp context guarantees that CSS selectors and JavaScript class strings use the same conversion rules.
     const weappContext = createContext({ appType: 'weapp-vite', logLevel: 'silent' })
 
@@ -227,8 +227,15 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
                 }
             })
         },
-        /** Captures the active graph reader for development finalization calls made outside plugin hooks. */
-        buildStart() {
+        /** Resolves exact graph roots and captures the graph reader used by host calls outside plugin hooks. */
+        async buildStart() {
+            // Resolve through Rolldown instead of reconstructing real paths, whose drive casing and separators vary on Windows.
+            const resolvedEntryIds = await Promise.all(
+                applicationEntryIds.map(async (entryId) => (await this.resolve(entryId))!.id)
+            )
+
+            // Commit the complete root set together so finalization never observes a partially resolved application graph.
+            entryIds = resolvedEntryIds
             graphContext = this
         },
         transform: {
@@ -506,17 +513,6 @@ async function compileTailwindRoot(
         }
         throw error
     }
-}
-
-/** Resolves symlinks in an entry's physical path while preserving its query as part of the graph identity. */
-function canonicalEntryId(id: string): string {
-    // Split before realpath resolution because filesystem APIs cannot resolve Vite query suffixes.
-    const queryStart = id.indexOf('?')
-    const file = queryStart < 0 ? id : id.slice(0, queryStart)
-    const query = queryStart < 0 ? '' : id.slice(queryStart)
-
-    // Native realpath matches Rolldown's physical IDs; slash normalization makes the identity platform-independent.
-    return `${normalizePath(realpathSync.native(file))}${query}`
 }
 
 /** Returns whether a Vite request represents a physical CSS module that contributes to application WXSS. */

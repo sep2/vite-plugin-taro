@@ -22,11 +22,23 @@ test('publishes processed CSS and live topology without identical rewrites', asy
         writeFile(extraCssId, '.extra {}\n')
     ])
 
-    // These mutable journals synchronize DevEngine's non-awaited lifecycle callbacks.
+    // These mutable journals retain DevEngine's non-awaited lifecycle results for test synchronization.
     const hmrResults: unknown[] = []
     const outputResults: unknown[] = []
+    // This mutable edge serializes physical publication exactly like the production host action reducer.
+    let publicationWork = Promise.resolve()
     const styles = createWxStylePlugin([appId])
     const writeStyle = (wxss: string) => writeHmrFile(outDir, globalWxssFileName, wxss)
+    const publish = (result: unknown, results: unknown[]): void => {
+        publicationWork = publicationWork.then(async () => {
+            try {
+                await styles.finalizeUpdate([], writeStyle)
+                results.push(result)
+            } catch (error) {
+                results.push(error)
+            }
+        })
+    }
     const server = await createServer({
         root: root,
         configFile: false,
@@ -79,20 +91,14 @@ test('publishes processed CSS and live topology without identical rewrites', asy
                 hmrResults.push(result)
                 return
             }
-            void styles
-                .finalizeUpdate([], writeStyle)
-                .then(() => hmrResults.push(result))
-                .catch((error: unknown) => hmrResults.push(error))
+            publish(result, hmrResults)
         },
         onOutput(result) {
             if (result instanceof Error) {
                 outputResults.push(result)
                 return
             }
-            void styles
-                .finalizeUpdate([], writeStyle)
-                .then(() => outputResults.push(result))
-                .catch((error: unknown) => outputResults.push(error))
+            publish(result, outputResults)
         }
     })
 
@@ -123,6 +129,7 @@ test('publishes processed CSS and live topology without identical rewrites', asy
         await waitForEventCount(outputResults, 2)
     } finally {
         await engine.close()
+        await publicationWork
         await server.close()
         await rm(root, { recursive: true })
     }
