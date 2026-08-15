@@ -4,7 +4,38 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { build, normalizePath, type Plugin } from 'vite'
-import { createWxStylePlugin } from './plugins.ts'
+import { createContext } from 'weapp-tailwindcss/core'
+import { createWxStylePlugin, finalizeOutput } from './plugins.ts'
+
+test('finalizes the current graph into WXSS and JavaScript with one projected class set', async () => {
+    const entryId = '/src/app.js'
+    const styleId = '/src/app.css'
+    const output = await finalizeOutput(
+        [entryId],
+        new Map([
+            [
+                styleId,
+                {
+                    css: '.py-5\\.5 { padding-top: 1px; }',
+                    tailwind: { classSet: new Set(['py-5.5']) }
+                }
+            ]
+        ]),
+        (moduleId) => {
+            if (moduleId === entryId) {
+                return { importedIds: [styleId], dynamicallyImportedIds: [] }
+            }
+            if (moduleId === styleId) {
+                return { importedIds: [], dynamicallyImportedIds: [] }
+            }
+        },
+        createContext({ appType: 'weapp-vite', logLevel: 'silent' }),
+        [{ code: "export const className = 'py-5.5'", filename: 'entry.js' }]
+    )
+
+    assert.match(output.wxss, /\.py-5_d5\s*\{/)
+    assert.deepEqual(output.javaScript, ["export const className = 'py-5_d5'"])
+})
 
 test('finalizes the complete compiler stylesheet before later WX output hooks', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'vpt-wxss-'))

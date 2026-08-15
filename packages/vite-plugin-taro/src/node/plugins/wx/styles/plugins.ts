@@ -20,16 +20,12 @@ type TailwindRoot = Readonly<{
     dependencies: ReadonlySet<string>
     generator: WeappTailwindcssGenerator
     scanner: Scanner
+    invalidated: boolean
 }>
 
-type StyleProjection = Readonly<{
-    classSet: Set<string>
-    css: string
-}>
-
-type FinalizedOutput = Readonly<{
-    javaScript: readonly string[]
-    wxss: string
+type StyleModule = Readonly<{
+    css: string | undefined
+    tailwind: TailwindRoot | undefined
 }>
 
 type JavaScriptArtifact = Readonly<{
@@ -64,87 +60,25 @@ const wxStyleOptions = {
 export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxStylePlugin {
     const entryIds = applicationEntryIds.map(canonicalEntryId)
     const weappContext = createContext({ appType: 'weapp-vite', logLevel: 'silent' })
+
     // buildStart installs the mutable context required when the development host renders outside a plugin hook.
     let graphContext: PluginContext
-    // This mutable map is Vite's latest successful final CSS for each physical style module.
-    const cssByModuleId = new Map<string, string>()
-    // This mutable map owns the incremental compiler and current candidate set for each Tailwind root.
-    const tailwindByRootId = new Map<string, TailwindRoot>()
-    // This mutable set delays dependency invalidation until Rolldown invokes the owning root transform.
-    const staleTailwindRootIds = new Set<string>()
+    // This mutable map retains Vite-final CSS and optional incremental Tailwind state at their shared module identity.
+    const styleByModuleId = new Map<string, StyleModule>()
     // This mutable frontier advances only after the development host atomically publishes the rendered bytes.
     let publishedWxss: string | undefined
 
-    const projectStyles = (context: PluginContext): StyleProjection => {
-        // All traversal state is transaction-local; no derived topology survives an import addition or removal.
-        const visitedModuleIds = new Set<string>()
-        const visitedStyleIds = new Set<string>()
-        const css: string[] = []
-        const classSet = new Set<string>()
-
-        const visit = (moduleId: string): void => {
-            if (visitedModuleIds.has(moduleId)) {
-                return
-            }
-            visitedModuleIds.add(moduleId)
-
-            const moduleInfo = context.getModuleInfo(moduleId)
-            if (!moduleInfo) {
-                return
-            }
-            moduleInfo.importedIds.forEach(visit)
-            moduleInfo.dynamicallyImportedIds.forEach(visit)
-
-            const styleId = normalizeModuleId(moduleId)
-            const styleCss = cssByModuleId.get(styleId)
-            if (styleCss === undefined || visitedStyleIds.has(styleId)) {
-                return
-            }
-            visitedStyleIds.add(styleId)
-            css.push(styleCss)
-            tailwindByRootId.get(styleId)?.classSet.forEach((className) => {
-                classSet.add(className)
-            })
-        }
-        entryIds.forEach(visit)
-
-        return { classSet: classSet, css: css.join('\n') }
-    }
-
-    const transformJavaScript = async (code: string, classSet: Set<string>, filename: string): Promise<string> => {
-        if (classSet.size === 0) {
-            return code
-        }
-
-        const result = await weappContext.transformJs(code, {
-            filename: filename,
-            generateMap: false,
-            runtimeSet: classSet
-        })
-        if (result.error) {
-            throw result.error
-        }
-        return result.code
-    }
-
-    const finalizeOutput = async (
-        context: PluginContext,
-        javaScript: readonly JavaScriptArtifact[]
-    ): Promise<FinalizedOutput> => {
-        const projection = projectStyles(context)
-        const wxss = (await weappContext.transformWxss(projection.css, wxStyleOptions)).css
-        const transformedJavaScript = await Promise.all(
-            javaScript.map((artifact) => transformJavaScript(artifact.code, projection.classSet, artifact.filename))
-        )
-        return { javaScript: transformedJavaScript, wxss: wxss }
+    const finalizeCurrentOutput = (context: PluginContext, javaScript: readonly JavaScriptArtifact[]) => {
+        return finalizeOutput(entryIds, styleByModuleId, context.getModuleInfo.bind(context), weappContext, javaScript)
     }
 
     const disposeTailwindRoots = (): void => {
-        tailwindByRootId.forEach((root) => {
-            root.generator.dispose?.()
+        styleByModuleId.forEach((style, styleId) => {
+            if (style.tailwind) {
+                style.tailwind.generator.dispose?.()
+                styleByModuleId.set(styleId, { css: style.css, tailwind: undefined })
+            }
         })
-        tailwindByRootId.clear()
-        staleTailwindRootIds.clear()
     }
 
     return {
@@ -157,7 +91,11 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
                 return async function (css, id, options) {
                     const result = await transform.call(this, css, id, options)
                     if (isApplicationStyle(id)) {
-                        cssByModuleId.set(normalizeModuleId(id), css)
+                        const styleId = normalizeModuleId(id)
+                        styleByModuleId.set(styleId, {
+                            css: css,
+                            tailwind: styleByModuleId.get(styleId)?.tailwind
+                        })
                     }
                     return result
                 }
@@ -174,30 +112,39 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
                 }
 
                 const rootId = normalizeModuleId(id)
+                const style = styleByModuleId.get(rootId)
+                const previous = style?.tailwind
                 if (!isTailwindRoot(code)) {
-                    tailwindByRootId.get(rootId)?.generator.dispose?.()
-                    tailwindByRootId.delete(rootId)
-                    staleTailwindRootIds.delete(rootId)
+                    previous?.generator.dispose?.()
+                    styleByModuleId.set(rootId, { css: style?.css, tailwind: undefined })
                     return
                 }
 
-                const previous = tailwindByRootId.get(rootId)
-                const reusable = staleTailwindRootIds.has(rootId) ? undefined : previous
+                const reusable = previous?.invalidated ? undefined : previous
                 const compiled = await compileTailwindRoot(this.environment.config.root, rootId, code, reusable)
                 if (compiled.root.generator !== previous?.generator) {
                     previous?.generator.dispose?.()
                 }
-                tailwindByRootId.set(rootId, compiled.root)
-                staleTailwindRootIds.delete(rootId)
-                watchTailwindRoot(this.addWatchFile.bind(this), compiled.root)
+                styleByModuleId.set(rootId, { css: style?.css, tailwind: compiled.root })
+
+                compiled.root.dependencies.forEach((file) => {
+                    this.addWatchFile(file)
+                })
+                compiled.root.scanner.files.forEach((file) => {
+                    this.addWatchFile(file)
+                })
+
                 return { code: compiled.css, map: null }
             }
         },
         watchChange(id) {
             const dependencyId = normalizeModuleId(id)
-            tailwindByRootId.forEach((root, rootId) => {
-                if (root.dependencies.has(dependencyId)) {
-                    staleTailwindRootIds.add(rootId)
+            styleByModuleId.forEach((style, styleId) => {
+                if (style.tailwind?.dependencies.has(dependencyId)) {
+                    styleByModuleId.set(styleId, {
+                        css: style.css,
+                        tailwind: { ...style.tailwind, invalidated: true }
+                    })
                 }
             })
         },
@@ -205,8 +152,10 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
             order: 'post',
             async handler(_, bundle) {
                 const outputs = Object.values(bundle)
+
                 const chunks = outputs.filter((output): output is Rolldown.OutputChunk => output.type === 'chunk')
-                const finalized = await finalizeOutput(
+
+                const finalized = await finalizeCurrentOutput(
                     this,
                     chunks.map((chunk) => ({ code: chunk.code, filename: chunk.fileName }))
                 )
@@ -215,12 +164,13 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
                     chunk.map = null
                 })
 
-                const style = outputs.find(isStyleAsset)
-                if (style) {
-                    style.source = finalized.wxss
-                    style.fileName = globalWxssFileName
-                    return
-                }
+                // VPT replaces Vite's browser CSS carrier with the sole physical global WX stylesheet.
+                Object.entries(bundle).forEach(([fileName, output]) => {
+                    if (isStyleAsset(output)) {
+                        delete bundle[fileName]
+                    }
+                })
+
                 this.emitFile({ type: 'asset', fileName: globalWxssFileName, source: finalized.wxss })
             }
         },
@@ -231,12 +181,13 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
         },
         closeWatcher() {
             disposeTailwindRoots()
+            styleByModuleId.clear()
         },
         finalizeUpdate: async <Artifact extends JavaScriptArtifact>(
             artifacts: readonly Artifact[],
             writeWxss: (wxss: string) => Promise<void>
         ): Promise<readonly Artifact[]> => {
-            const output = await finalizeOutput(graphContext, artifacts)
+            const output = await finalizeCurrentOutput(graphContext, artifacts)
             if (output.wxss !== publishedWxss) {
                 await writeWxss(output.wxss)
                 publishedWxss = output.wxss
@@ -244,6 +195,83 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
             return artifacts.map((artifact, index) => ({ ...artifact, code: output.javaScript[index]! }))
         }
     }
+}
+
+export async function finalizeOutput(
+    entryIds: readonly string[],
+    styleByModuleId: ReadonlyMap<
+        string,
+        Readonly<{
+            css: string | undefined
+            tailwind: Readonly<{ classSet: ReadonlySet<string> }> | undefined
+        }>
+    >,
+    getModuleInfo: (
+        moduleId: string
+    ) => Readonly<{ importedIds: readonly string[]; dynamicallyImportedIds: readonly string[] }> | null | undefined,
+    weappContext: Pick<ReturnType<typeof createContext>, 'transformJs' | 'transformWxss'>,
+    javaScript: readonly JavaScriptArtifact[]
+) {
+    const projection = projectStyles(entryIds, styleByModuleId, getModuleInfo)
+    const wxss = (await weappContext.transformWxss(projection.css, wxStyleOptions)).css
+    const transformedJavaScript = await Promise.all(
+        javaScript.map(async (artifact) => {
+            if (projection.classSet.size === 0) {
+                return artifact.code
+            }
+
+            const result = await weappContext.transformJs(artifact.code, {
+                filename: artifact.filename,
+                generateMap: false,
+                runtimeSet: projection.classSet
+            })
+            if (result.error) {
+                throw result.error
+            }
+            return result.code
+        })
+    )
+    return { javaScript: transformedJavaScript, wxss: wxss }
+}
+
+function projectStyles(
+    entryIds: Parameters<typeof finalizeOutput>[0],
+    styleByModuleId: Parameters<typeof finalizeOutput>[1],
+    getModuleInfo: Parameters<typeof finalizeOutput>[2]
+) {
+    // All traversal state is transaction-local; no derived topology survives an import addition or removal.
+    const visitedModuleIds = new Set<string>()
+    const visitedStyleIds = new Set<string>()
+    const css: string[] = []
+    const classSet = new Set<string>()
+
+    const visit = (moduleId: string): void => {
+        if (visitedModuleIds.has(moduleId)) {
+            return
+        }
+        visitedModuleIds.add(moduleId)
+
+        const moduleInfo = getModuleInfo(moduleId)
+        if (!moduleInfo) {
+            return
+        }
+        moduleInfo.importedIds.forEach(visit)
+        moduleInfo.dynamicallyImportedIds.forEach(visit)
+
+        const styleId = normalizeModuleId(moduleId)
+        const style = styleByModuleId.get(styleId)
+        if (style?.css === undefined || visitedStyleIds.has(styleId)) {
+            return
+        }
+        visitedStyleIds.add(styleId)
+        css.push(style.css)
+        style.tailwind?.classSet.forEach((className) => {
+            classSet.add(className)
+        })
+    }
+    entryIds.forEach(visit)
+
+    return { classSet: classSet, css: css.join('\n') }
 }
 
 async function compileTailwindRoot(
@@ -272,7 +300,8 @@ async function compileTailwindRoot(
                 classSet: generated.classSet,
                 dependencies: new Set(generated.dependencies.map(normalizeModuleId)),
                 generator: generator,
-                scanner: reuse ? previous.scanner : new Scanner({ sources: generated.sources })
+                scanner: reuse ? previous.scanner : new Scanner({ sources: generated.sources }),
+                invalidated: false
             }
         }
     } catch (error) {
@@ -281,14 +310,6 @@ async function compileTailwindRoot(
         }
         throw error
     }
-}
-
-function watchTailwindRoot(
-    addWatchFile: (id: string) => void,
-    root: Pick<TailwindRoot, 'dependencies' | 'scanner'>
-): void {
-    root.dependencies.forEach(addWatchFile)
-    root.scanner.files.forEach(addWatchFile)
 }
 
 function canonicalEntryId(id: string): string {
