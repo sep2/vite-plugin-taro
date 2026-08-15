@@ -4,7 +4,26 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
-## [0.6.1] - 2026-08-12
+## [0.6.2] - 2026-08-15
+
+### Changed
+
+- use automatic application chunking (9fc4901)
+- isolate React and Taro vendor chunk (6ce34c5)
+- narrow Babel AST dependency (b722305)
+- replace Babel native rendering (f8d99fb)
+- replace Babel capsule rendering (8b274dd)
+- relocate module (26279d4)
+- place config exports after imports (f991d31)
+- move conditional compilation to dedicated guide (1f6090d)
+- streamline published package test setup (4c2e045)
+- simplify hot reload guide (bd99ad8)
+
+### Fixed
+
+- bound wx chunk splitting (b802f43)
+
+## [0.6.1] - 2026-08-13
 
 ### Added
 
