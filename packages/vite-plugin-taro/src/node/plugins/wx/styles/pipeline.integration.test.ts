@@ -80,8 +80,7 @@ test('publishes processed CSS and live topology without identical rewrites', asy
                 return
             }
             void styles
-                .prepare()
-                .then((generation) => styles.publish(generation.wxss, writeStyle))
+                .finalizeUpdate([], writeStyle)
                 .then(() => hmrResults.push(result))
                 .catch((error: unknown) => hmrResults.push(error))
         },
@@ -91,8 +90,7 @@ test('publishes processed CSS and live topology without identical rewrites', asy
                 return
             }
             void styles
-                .prepare()
-                .then((generation) => styles.publish(generation.wxss, writeStyle))
+                .finalizeUpdate([], writeStyle)
                 .then(() => outputResults.push(result))
                 .catch((error: unknown) => outputResults.push(error))
         }
@@ -130,14 +128,16 @@ test('publishes processed CSS and live topology without identical rewrites', asy
     }
 })
 
-test('prepares Tailwind CSS and final patch factories from one class set', async () => {
+test('renders Tailwind CSS and final patch factories from one class set', async () => {
     const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-tailwind-style-hmr-')))
     const appId = normalizePath(path.join(root, 'app.js'))
     const cssId = normalizePath(path.join(root, 'app.css'))
+    const themeId = normalizePath(path.join(root, 'theme.css'))
     const outDir = path.join(root, 'dist')
     await Promise.all([
-        writeFile(appId, renderTailwindApplication('mt-2')),
-        writeFile(cssId, '@import "tailwindcss";\n@source "./";\n')
+        writeFile(appId, renderTailwindApplication('mt-2 bg-brand')),
+        writeFile(cssId, '@import "tailwindcss";\n@import "./theme.css";\n@source "./";\n'),
+        writeFile(themeId, '@theme { --color-brand: red; }\n')
     ])
 
     // These mutable journals synchronize callbacks and retain each complete prepared transaction.
@@ -177,15 +177,9 @@ test('prepares Tailwind CSS and final patch factories from one class set', async
             }
             hmrWork = hmrWork.then(async () => {
                 try {
-                    const generation = await styles.prepare()
-                    // This transaction-local array preserves patch order while applying one shared class set.
-                    const codes: string[] = []
-                    for (const { update } of result.updates) {
-                        if (update.type !== 'Patch') continue
-                        codes.push(await styles.finalizeJavaScript(update.code, generation.classSet, update.filename))
-                    }
-                    await styles.publish(generation.wxss, writeStyle)
-                    hmrResults.push({ codes: codes, generation: generation })
+                    const patches = result.updates.flatMap(({ update }) => (update.type === 'Patch' ? [update] : []))
+                    const finalized = await styles.finalizeUpdate(patches, writeStyle)
+                    hmrResults.push({ codes: finalized.map((patch) => patch.code) })
                 } catch (error) {
                     hmrResults.push(error)
                 }
@@ -197,8 +191,7 @@ test('prepares Tailwind CSS and final patch factories from one class set', async
                 return
             }
             void styles
-                .prepare()
-                .then((generation) => styles.publish(generation.wxss, writeStyle))
+                .finalizeUpdate([], writeStyle)
                 .then(() => outputResults.push(result))
                 .catch((error: unknown) => outputResults.push(error))
         }
@@ -209,36 +202,36 @@ test('prepares Tailwind CSS and final patch factories from one class set', async
         await engine.ensureCurrentBuildFinish()
         await waitForEventCount(outputResults, 1)
         const globalWxssPath = path.join(outDir, globalWxssFileName)
-        assert.match(await readFile(globalWxssPath, 'utf8'), /\.mt-2\b/)
+        const initialWxss = await readFile(globalWxssPath, 'utf8')
+        assert.match(initialWxss, /\.mt-2\b/)
+        assert.match(initialWxss, /--color-brand:\s*red/)
         await engine.registerClient('tailwind-style-hmr-test')
 
         const additionStart = hmrResults.length
         await writeFile(appId, renderTailwindApplication('mt-2 py-5.5'))
-        const added = await waitForPreparedHmr(
-            hmrResults,
-            additionStart,
-            (result) => result.generation.classSet.has('py-5.5') && /py-5_d5/.test(result.codes.join('\n'))
+        const added = await waitForFinalizedHmr(hmrResults, additionStart, (result) =>
+            /py-5_d5/.test(result.codes.join('\n'))
         )
-        assert.equal(added.generation.classSet.has('py-5.5'), true)
         assert.match(await readFile(globalWxssPath, 'utf8'), /\.py-5_d5\b/)
         assert.match(added.codes.join('\n'), /py-5_d5/)
         assert.doesNotMatch(added.codes.join('\n'), /py-5\.5/)
 
         const removalStart = hmrResults.length
         await writeFile(appId, renderTailwindApplication('mt-2 mr-4.5'))
-        const removed = await waitForPreparedHmr(
-            hmrResults,
-            removalStart,
-            (result) =>
-                result.generation.classSet.has('mr-4.5') &&
-                !result.generation.classSet.has('py-5.5') &&
-                /mr-4_d5/.test(result.codes.join('\n'))
+        const removed = await waitForFinalizedHmr(hmrResults, removalStart, (result) =>
+            /mr-4_d5/.test(result.codes.join('\n'))
         )
         const wxss = await readFile(globalWxssPath, 'utf8')
-        assert.equal(removed.generation.classSet.has('py-5.5'), false)
         assert.doesNotMatch(wxss, /\.py-5_d5\b/)
         assert.match(wxss, /\.mr-4_d5\b/)
         assert.match(removed.codes.join('\n'), /mr-4_d5/)
+
+        const dependencyStart = hmrResults.length
+        await writeFile(themeId, '@theme { --color-brand: blue; }\n')
+        await waitForFinalizedHmr(hmrResults, dependencyStart, (result) => /blue/.test(result.codes.join('\n')))
+        const themedWxss = await readFile(globalWxssPath, 'utf8')
+        assert.match(themedWxss, /--color-brand:\s*blue/)
+        assert.doesNotMatch(themedWxss, /--color-brand:\s*red/)
     } finally {
         await engine.close()
         await server.close()
@@ -250,26 +243,11 @@ function renderTailwindApplication(classes: string): string {
     return `import './app.css'\nexport const props = { className: '${classes}' }\n`
 }
 
-function requirePreparedHmr(value: unknown): Readonly<{
-    codes: readonly string[]
-    generation: Readonly<{ classSet: Set<string> }>
-}> {
-    if (!value || typeof value !== 'object' || !('codes' in value) || !('generation' in value)) {
-        throw new Error('Expected one prepared HMR transaction')
+function requireFinalizedHmr(value: unknown): Readonly<{ codes: readonly string[] }> {
+    if (!value || typeof value !== 'object' || !('codes' in value) || !Array.isArray(value.codes)) {
+        throw new Error('Expected finalized HMR code')
     }
-    const codes = value.codes
-    const generation = value.generation
-    if (!Array.isArray(codes) || !generation || typeof generation !== 'object' || !('classSet' in generation)) {
-        throw new Error('Expected prepared HMR codes and class set')
-    }
-    const classSet = generation.classSet
-    if (!(classSet instanceof Set)) {
-        throw new Error('Expected a prepared Tailwind class set')
-    }
-    return {
-        codes: codes.filter((code): code is string => typeof code === 'string'),
-        generation: { classSet: classSet }
-    }
+    return { codes: value.codes.filter((code): code is string => typeof code === 'string') }
 }
 
 function requireBundledDev(value: unknown): BundledDev {
@@ -292,21 +270,21 @@ function isBundledDev(value: unknown): value is BundledDev {
     )
 }
 
-async function waitForPreparedHmr(
+async function waitForFinalizedHmr(
     events: readonly unknown[],
     startIndex: number,
-    matches: (result: ReturnType<typeof requirePreparedHmr>) => boolean
-): Promise<ReturnType<typeof requirePreparedHmr>> {
+    matches: (result: ReturnType<typeof requireFinalizedHmr>) => boolean
+): Promise<ReturnType<typeof requireFinalizedHmr>> {
     const startedAt = Date.now()
     while (Date.now() - startedAt <= 10_000) {
         for (const event of events.slice(startIndex)) {
             if (event instanceof Error) throw event
-            const prepared = requirePreparedHmr(event)
-            if (matches(prepared)) return prepared
+            const finalized = requireFinalizedHmr(event)
+            if (matches(finalized)) return finalized
         }
         await new Promise((resolve) => setTimeout(resolve, 10))
     }
-    throw new Error('Timed out waiting for prepared HMR styles')
+    throw new Error('Timed out waiting for finalized HMR styles')
 }
 
 async function waitForStyle(

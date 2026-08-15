@@ -28,7 +28,7 @@ test('preserves physical outputs across development host restarts', async () => 
     const config = await resolveConfig(
         {
             configFile: false,
-            plugins: createWxDevelopmentPlugin(options, createWxStylePlugin(['/app-capsule']))
+            plugins: createWxDevelopmentPlugin(options, createWxStylePlugin([import.meta.filename]))
         },
         'serve'
     )

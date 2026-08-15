@@ -221,8 +221,7 @@ export async function createWxDevHost({
 
     /** Publishes graph-complete styles before rotating the App-visible build identity. */
     async function publishCompleteStyles(): Promise<void> {
-        const generation = await styles.prepare()
-        await styles.publish(generation.wxss, writeGlobalStyle)
+        await styles.finalizeUpdate([], writeGlobalStyle)
         await rotateBuildSession()
     }
 
@@ -296,9 +295,6 @@ export async function createWxDevHost({
                 continue
             }
 
-            // Refresh current Tailwind root results before asking DevEngine for a complete generation, so final chunks use the
-            // same class set even when Rolldown reuses the compiler stylesheet.
-            await styles.prepare()
             requestFullBuild(update.reason)
             return
         }
@@ -312,11 +308,9 @@ export async function createWxDevHost({
             return
         }
 
-        // `onHmrUpdates` runs after every affected transform has updated captured CSS and the live import graph. One prepared
-        // generation supplies both the finalized WXSS and the exact raw class set used to transform every patch factory.
-        const generation = await styles.prepare()
-        const finalizedPatches = await finalizePatches(patches, generation.classSet)
-        await styles.publish(generation.wxss, writeGlobalStyle)
+        // `onHmrUpdates` runs after every affected transform has updated captured CSS and the live import graph. The style
+        // boundary finalizes every factory before atomically publishing their matching WXSS.
+        const finalizedPatches = await styles.finalizeUpdate(patches, writeGlobalStyle)
 
         // Publish global.wxss before the matching JavaScript patch so DevTools observes a coherent HMR transaction.
         // The physical file must exist before Rolldown advances: once committed, later patches may be generated relative to
@@ -325,20 +319,6 @@ export async function createWxDevHost({
         await publisher.produce(finalizedPatches)
 
         await commitPublishedBatch(finalizedPatches)
-    }
-
-    /** Finalizes every patch factory without transforming Rolldown module identities or patch metadata. */
-    async function finalizePatches(
-        patches: readonly PatchUpdate[],
-        classSet: Set<string>
-    ): Promise<readonly PatchUpdate[]> {
-        // This transaction-local result preserves patch sequence while each AST transform runs against the same class set.
-        const finalizedPatches: PatchUpdate[] = []
-        for (const patch of patches) {
-            const code = await styles.finalizeJavaScript(patch.code, classSet, patch.filename)
-            finalizedPatches.push({ ...patch, code: code })
-        }
-        return finalizedPatches
     }
 
     /**
