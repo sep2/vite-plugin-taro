@@ -31,12 +31,17 @@ Continue with the [Quick Start guide](https://vpt.js.org/guides/quick-start/).
 
 ## Documentation
 
+- [Quick Start](https://vpt.js.org/guides/quick-start/)
+- [Styles](https://vpt.js.org/guides/styles/)
 - [Automatic subpackages](https://vpt.js.org/guides/automatic-subpackages/)
 - [Native WeChat components](https://vpt.js.org/guides/native-components/)
 - [Hot module replacement](https://vpt.js.org/guides/hot-module-replacement/)
+- [Configuration options](https://vpt.js.org/guides/configuration/)
+- [Conditional compilation](https://vpt.js.org/guides/conditional-directives/)
 - [Skyline mode](https://vpt.js.org/guides/skyline-mode/)
 - [Migrate from Taro CLI](https://vpt.js.org/guides/migrate-from-taro/)
-- [Configuration reference](https://vpt.js.org/guides/configuration/)
+- [Module system](https://vpt.js.org/references/module-system/)
+- [Hot module replacement internals](https://vpt.js.org/references/hmr-implementation/)
 - [Repository management](https://vpt.js.org/references/repository-management/)
 
 ## License

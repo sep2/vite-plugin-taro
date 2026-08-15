@@ -32,12 +32,17 @@ npm create vite-taro@latest my-app
 
 ## 文档
 
+- [快速开始](https://vpt.js.org/guides/quick-start/)
+- [样式](https://vpt.js.org/guides/styles/)
 - [全自动分包](https://vpt.js.org/guides/automatic-subpackages/)
 - [微信原生组件](https://vpt.js.org/guides/native-components/)
 - [开发者工具热更新](https://vpt.js.org/guides/hot-module-replacement/)
+- [配置选项](https://vpt.js.org/guides/configuration/)
+- [条件编译](https://vpt.js.org/guides/conditional-directives/)
 - [Skyline 模式](https://vpt.js.org/guides/skyline-mode/)
 - [从 Taro CLI 迁移](https://vpt.js.org/guides/migrate-from-taro/)
-- [配置参考](https://vpt.js.org/guides/configuration/)
+- [模块系统](https://vpt.js.org/references/module-system/)
+- [热更新原理](https://vpt.js.org/references/hmr-implementation/)
 - [仓库维护](https://vpt.js.org/references/repository-management/)
 
 ## 许可证
