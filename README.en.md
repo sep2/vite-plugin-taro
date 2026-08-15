@@ -1,4 +1,4 @@
-# vite-plugin-taro
+# VPT
 
 [![npm version](https://img.shields.io/npm/v/vite-plugin-taro.svg)](https://www.npmjs.com/package/vite-plugin-taro)
 ![Vite](https://img.shields.io/npm/dependency-version/vite-plugin-taro/peer/vite?label=Vite)
