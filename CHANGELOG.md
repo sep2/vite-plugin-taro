@@ -4,7 +4,21 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
-## [0.6.3] - 2026-08-15
+## [0.6.4] - 2026-08-15
+
+### Changed
+
+- explain style pipeline architecture (0e4dbf9)
+- simplify style finalization (edb4d08)
+- unify style output finalization (1bbd13b)
+- css (a9c5100)
+- remove legacy style orchestration (2984f50)
+- update readme (7786983)
+- script published package validation (1adddb8)
+- replace HMR demo video (cf4f17f)
+- update readme (705a174)
+
+## [0.6.3] - 2026-08-16
 
 ### Changed
 
