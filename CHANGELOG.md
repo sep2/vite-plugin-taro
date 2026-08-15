@@ -4,7 +4,13 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
-## [0.6.4] - 2026-08-15
+## [0.6.5] - 2026-08-15
+
+### Fixed
+
+- make style pipeline portable on Windows (1df307d)
+
+## [0.6.4] - 2026-08-16
 
 ### Changed
 
