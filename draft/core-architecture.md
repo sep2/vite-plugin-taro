@@ -7,7 +7,7 @@
 - an H5 application rendered in the browser;
 - a WeChat Mini Program rendered through native Mini Program files and the Taro runtime.
 
-The plugin does not run the Taro CLI or adapt Taro's webpack pipeline. Vite owns the build, development server, module graph, JavaScript transforms, CSS pipeline, and assets. Taro is used for the cross-platform runtime behavior that should not be reimplemented: APIs, components, routing, the Mini Program React renderer, and native template generation.
+The plugin does not use Taro's build tooling or adapt its webpack pipeline. Vite owns the build, development server, module graph, JavaScript transforms, CSS pipeline, and assets. Taro is used for the cross-platform runtime behavior that should not be reimplemented: APIs, components, routing, the Mini Program React renderer, and native template generation.
 
 The core model is:
 
@@ -49,7 +49,7 @@ The App component, page list, page configuration, and Mini Program configuration
 
 A single Vite run builds either `h5` or `wx`, never both. The targets require different module aliases, environment defines, renderers, entry graphs, CSS transforms, output formats, and development behavior. Keeping one target per graph prevents browser and Mini Program implementations from leaking into each other. Both targets can still run concurrently in separate Vite processes.
 
-The plugin does not read Taro CLI files such as `config/index.ts`, `app.config.ts`, or page `config.ts` files. Maintaining one configuration source avoids conflicting build models and lets Vite know the complete App and page graph before bundling begins.
+The plugin does not read Taro project files such as `config/index.ts`, `app.config.ts`, or page `config.ts` files. Maintaining one configuration source avoids conflicting build models and lets Vite know the complete App and page graph before bundling begins.
 
 ## Shared application boundary
 
@@ -237,7 +237,7 @@ The current boundaries are intentional:
 - only `h5` and `wx` targets are implemented;
 - each Vite run selects one target;
 - application code imports Taro through the plugin's virtual modules rather than directly from `@tarojs/*`;
-- App and page configuration comes from plugin options rather than Taro CLI config files;
+- App and page configuration comes from plugin options rather than Taro project config files;
 - platform-specific behavior may still require conditional source blocks;
 - the current WX pipeline uses a complete native rebuild for changes that require native files; the observed safe
   `page.wxss` boundary is not yet a generated update path.

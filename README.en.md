@@ -39,7 +39,7 @@ Continue with the [Quick Start guide](https://vpt.js.org/guides/quick-start/).
 - [Configuration options](https://vpt.js.org/guides/configuration/)
 - [Conditional compilation](https://vpt.js.org/guides/conditional-directives/)
 - [Skyline mode](https://vpt.js.org/guides/skyline-mode/)
-- [Migrate from Taro CLI](https://vpt.js.org/guides/migrate-from-taro/)
+- [Migrate from Taro](https://vpt.js.org/guides/migrate-from-taro/)
 - [Module system](https://vpt.js.org/references/module-system/)
 - [Hot module replacement internals](https://vpt.js.org/references/hmr-implementation/)
 - [Repository management](https://vpt.js.org/references/repository-management/)

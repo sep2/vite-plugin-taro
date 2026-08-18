@@ -41,7 +41,7 @@ export default defineConfig({
                         { label: '配置选项', slug: 'guides/configuration' },
                         { label: '条件编译', slug: 'guides/conditional-directives' },
                         { label: 'Skyline 模式', slug: 'guides/skyline-mode' },
-                        { label: '从 Taro CLI 迁移', slug: 'guides/migrate-from-taro' }
+                        { label: '从 Taro 迁移', slug: 'guides/migrate-from-taro' }
                     ]
                 },
                 {

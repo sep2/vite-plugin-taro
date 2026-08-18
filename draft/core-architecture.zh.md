@@ -7,7 +7,7 @@
 - 在浏览器中渲染的 H5 应用；
 - 通过原生小程序文件和 Taro runtime 渲染的微信小程序。
 
-插件不运行 Taro CLI，也不适配 Taro 的 webpack pipeline。Vite 负责构建、开发服务器、module graph、JavaScript transform、CSS pipeline 和资源处理。Taro 负责不应重复实现的跨平台 runtime 行为，包括 API、组件、路由、小程序 React renderer 和原生模板生成。
+插件不使用 Taro 的构建工具，也不适配其 webpack pipeline。Vite 负责构建、开发服务器、module graph、JavaScript transform、CSS pipeline 和资源处理。Taro 负责不应重复实现的跨平台 runtime 行为，包括 API、组件、路由、小程序 React renderer 和原生模板生成。
 
 核心模型是：
 
@@ -49,7 +49,7 @@ App 组件、页面列表、页面配置和小程序配置都声明在 Vite 配�
 
 一次 Vite 运行只构建 `h5` 或 `wx`，不会同时构建两者。两个 target 需要不同的 module alias、环境 define、renderer、入口图、CSS transform、输出格式和开发行为。每个 module graph 只包含一个 target，可以避免浏览器和小程序实现互相混入。两个 target 仍然可以通过两个独立的 Vite 进程同时运行。
 
-插件不读取 `config/index.ts`、`app.config.ts` 或页面 `config.ts` 等 Taro CLI 配置文件。只维护一个配置来源，可以避免两套构建模型冲突，也让 Vite 在 bundling 开始前就知道完整的 App 和页面结构。
+插件不读取 `config/index.ts`、`app.config.ts` 或页面 `config.ts` 等 Taro 项目配置文件。只维护一个配置来源，可以避免两套构建模型冲突，也让 Vite 在 bundling 开始前就知道完整的 App 和页面结构。
 
 ## 共享应用边界
 
@@ -234,7 +234,7 @@ H5 和 WX 共享组件源码，但 runtime contract 完全不同：
 - 只实现 `h5` 和 `wx` target；
 - 每次 Vite 运行只选择一个 target；
 - 应用代码通过插件虚拟模块导入 Taro，不直接导入 `@tarojs/*`；
-- App 和页面配置来自 plugin options，而不是 Taro CLI 配置文件；
+- App 和页面配置来自 plugin options，而不是 Taro 项目配置文件；
 - 平台专用行为仍可能需要条件源码块；
 - 当前 WX pipeline 对需要写入原生文件的修改执行完整原生构建；已观察到的安全 `page.wxss` 边界尚未成为
   生成更新路径。

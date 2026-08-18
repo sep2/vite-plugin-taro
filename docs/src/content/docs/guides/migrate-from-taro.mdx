@@ -1,5 +1,5 @@
 ---
-title: 从 Taro CLI 迁移
+title: 从 Taro 迁移
 description: 将现有 Taro React 项目迁移到 VPT。
 ---
 
@@ -34,15 +34,15 @@ vpt 当前构建 **React 19 + 微信小程序 + Web**。Vue、Preact、Solid、R
 5. 对照旧项目逐页检查路由、样式、资源、生命周期和 Taro API。
 ```
 
-让 AI 分阶段提交修改，并要求它解释删除的每一项 Taro CLI 配置。涉及原生页面分包、自定义原生组件、Taro 插件或 webpack 定制时，应先确认替代方案，不要让 AI 静默删除。
+让 AI 分阶段提交修改，并要求它解释删除的每一项 Taro 配置。涉及原生页面分包、自定义原生组件、Taro 插件或 webpack 定制时，应先确认替代方案，不要让 AI 静默删除。
 
 ## 迁移思路
 
-建议先创建一个新的 vpt 项目，再逐步复制业务源码，而不是直接修改原项目的构建配置。这样可以保留一份可运行的 Taro CLI 项目，用于逐页比较结果。
+建议先创建一个新的 vpt 项目，再逐步复制业务源码，而不是直接修改原项目的构建配置。这样可以保留一份可运行的 Taro 项目，用于逐页比较结果。
 
 主要变化如下：
 
-| Taro CLI 项目 | vpt 项目 |
+| Taro 项目 | vpt 项目 |
 | --- | --- |
 | `taro build --type weapp` | `vite`，目标为 `wx` |
 | `taro build --type h5` | `vite`，目标为 `h5` |
@@ -173,7 +173,7 @@ import { Button, Text, View } from 'virtual:taro/components'
 
 ## 4. 迁移应用与页面配置
 
-Taro CLI 会读取 `app.config.ts` 和每个页面旁边的 `*.config.ts`。vpt 不读取这些文件，配置必须写入 `vite.config.ts`。
+Taro 会读取 `app.config.ts` 和每个页面旁边的 `*.config.ts`。vpt 不读取这些文件，配置必须写入 `vite.config.ts`。
 
 假设原来的 `src/app.config.ts` 为：
 
@@ -283,7 +283,7 @@ vpt全自动分包处理的是通过动态 `import()` 加载的 **JavaScript 模
 | `mini.postcss`、`h5.postcss` | 使用 Vite 的 `css.postcss` 或 PostCSS 配置。 |
 | `mini.webpackChain`、`h5.webpackChain` | 删除并改写为 Vite 插件或 Vite 配置。 |
 | H5 history 与 `publicPath` | Web 固定使用 hash 路由；资源路径交给 Vite 的 `base`。 |
-| Taro CLI `plugins` | 不会运行；确认用途后改写为 Vite 插件或业务代码。 |
+| Taro `plugins` | 不会运行；确认用途后改写为 Vite 插件或业务代码。 |
 | `compiler`、`framework` | 删除；vpt 已确定使用 Vite 与 React。 |
 
 `designWidth`、`deviceRatio` 和 Taro `pxtransform` 配置没有可直接复制的选项。vpt 会为微信样式转换 `px` 和 `rem`，迁移后应逐页检查尺寸，不要假设旧的自定义换算比例仍然生效。
@@ -296,7 +296,7 @@ Vite 客户端代码只会公开以 `VITE_` 开头的环境变量。将旧环境
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
 ```
 
-`vite.config.ts` 中的变量通过 `loadEnv()` 读取。不要继续依赖 Taro CLI 在构建配置中注入的自定义环境变量。
+`vite.config.ts` 中的变量通过 `loadEnv()` 读取。不要继续依赖 Taro 在构建配置中注入的自定义环境变量。
 
 ### 条件编译
 
@@ -330,7 +330,7 @@ vpt 支持 `#ifdef`、`#ifndef`、`#else` 和 `#endif`，不支持 `#if` 与 `#e
 
 迁移项目应保留新模板中的 React 19、Vite、TypeScript 和 `vite-plugin-taro` 版本。将旧项目的业务依赖逐个安装，不要整段复制旧 `dependencies` 与 `devDependencies`。
 
-通常可以删除仅服务于 Taro CLI 构建链的直接依赖：
+通常可以删除仅服务于 Taro 构建链的直接依赖：
 
 - `@tarojs/cli`
 - `@tarojs/webpack5-runner`
@@ -344,7 +344,7 @@ vpt 支持 `#ifdef`、`#ifndef`、`#else` 和 `#endif`，不支持 `#if` 与 `#e
 也不要在应用中直接安装 `@tarojs/taro` 或 `@tarojs/components`。它们由 vpt 统一提供。
 
 :::caution[第三方 Taro 库]
-依赖 `@tarojs/*` peer dependency、Taro CLI 插件、webpack loader 或 React 18 内部行为的第三方库不一定兼容。先确认库支持 React 19，再在微信和 Web 两端分别验证。无法兼容的构建插件需要替换，而不是继续保留旧 Taro CLI。
+依赖 `@tarojs/*` peer dependency、Taro 插件、webpack loader 或 React 18 内部行为的第三方库不一定兼容。先确认库支持 React 19，再在微信和 Web 两端分别验证。无法兼容的构建插件需要替换，而不是继续保留旧 Taro 构建链。
 :::
 
 ## 9. 逐项验证

@@ -228,7 +228,7 @@ H5 需要项目根目录下的 `index.html`，其中包含挂载节点：
 
 不需要 `src/main.tsx`，也不需要在 HTML 中添加入口脚本。vpt 会生成并注入入口。微信构建不使用 `index.html`。
 
-## 不读取 Taro CLI 配置
+## 不读取 Taro 配置
 
 vpt 不读取：
 
@@ -238,7 +238,7 @@ vpt 不读取：
 - 手写的 `app.json` 或页面 JSON；
 - 手写的微信分包声明。
 
-已有 Taro 项目需要把这些配置移入 `vite.config.ts`。参见[从 Taro CLI 迁移](/guides/migrate-from-taro/)。
+已有 Taro 项目需要把这些配置移入 `vite.config.ts`。参见[从 Taro 迁移](/guides/migrate-from-taro/)。
 
 ## 使用独立 JSON 文件
 

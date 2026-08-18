@@ -40,7 +40,7 @@ npm create vite-taro@latest my-app
 - [配置选项](https://vpt.js.org/guides/configuration/)
 - [条件编译](https://vpt.js.org/guides/conditional-directives/)
 - [Skyline 模式](https://vpt.js.org/guides/skyline-mode/)
-- [从 Taro CLI 迁移](https://vpt.js.org/guides/migrate-from-taro/)
+- [从 Taro 迁移](https://vpt.js.org/guides/migrate-from-taro/)
 - [模块系统](https://vpt.js.org/references/module-system/)
 - [热更新原理](https://vpt.js.org/references/hmr-implementation/)
 - [仓库维护](https://vpt.js.org/references/repository-management/)
