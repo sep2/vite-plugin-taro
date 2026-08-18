@@ -157,7 +157,109 @@ export async function confirmSave() {
 }
 ```
 
-异步 API 支持 Promise，可以使用 `await`，也可以传入 Taro 文档所列的回调函数。
+[`Taro.showModal()`](/references/api/#taroshowmodaloption) 等异步 API 支持 Promise，可以使用 `await`，也可以传入回调函数。完整接口、参数和平台支持见 [API 参考](/references/api/)。
+
+### API 分类
+
+#### [Hooks](/references/api/#hooks)
+
+应用与页面生命周期、页面滚动与刷新、分享以及路由参数等 React hooks。
+
+#### [扩展](/references/api/#扩展)
+
+事件中心、运行环境、当前实例、渲染器信息和 API 拦截器等 Taro 运行时扩展。
+
+#### [框架](/references/api/#框架)
+
+获取 App 实例和当前页面栈。
+
+#### [基础](/references/api/#基础)
+
+运行环境、系统信息、版本更新、调试日志、性能监控和加密等基础能力。
+
+#### [路由](/references/api/#路由)
+
+在应用页面之间跳转、重定向、返回或切换 tab。
+
+#### [跳转](/references/api/#跳转)
+
+打开其他小程序、半屏小程序或业务功能页，并从外部小程序返回。
+
+#### [转发](/references/api/#转发)
+
+配置分享菜单、转发内容、私密消息和分享信息。
+
+#### [界面](/references/api/#界面)
+
+控制提示框、导航栏、Tab Bar、下拉刷新、滚动、动画、字体和窗口。
+
+#### [网络](/references/api/#网络)
+
+发起 HTTP 请求、上传下载文件，以及使用 WebSocket、TCP、UDP 和 mDNS。
+
+#### [支付](/references/api/#支付)
+
+发起微信支付、订单支付和支付身份验证。
+
+#### [数据缓存](/references/api/#数据缓存)
+
+同步或异步读写本地缓存，并使用缓存管理器和后台更新。
+
+#### [数据分析](/references/api/#数据分析)
+
+上报分析事件、性能指标和实验配置。
+
+#### [画布](/references/api/#画布)
+
+创建 Canvas 上下文、读写像素、导出图片和使用离屏画布。
+
+#### [媒体](/references/api/#媒体)
+
+处理图片、视频、音频、相机、录音、实时音视频、地图和媒体编辑。
+
+#### [位置](/references/api/#位置)
+
+获取和监听位置、选择地点并打开地图位置。
+
+#### [文件](/references/api/#文件)
+
+访问文件系统，保存、读取、删除和打开文件。
+
+#### [开放接口](/references/api/#开放接口)
+
+使用登录、用户信息、授权、账号设置、订阅消息、卡券和隐私接口。
+
+#### [设备](/references/api/#设备)
+
+访问蓝牙、Wi-Fi、NFC、传感器、剪贴板、键盘、电量、扫码和联系人等设备能力。
+
+#### [AI](/references/api/#ai)
+
+使用端侧推理、VisionKit、人体与人脸识别等微信 AI 能力。
+
+#### [Worker](/references/api/#worker)
+
+创建和管理小程序 Worker 后台线程。
+
+#### [WXML](/references/api/#wxml)
+
+查询节点，并观察元素相交、尺寸和媒体查询变化。
+
+#### [第三方平台](/references/api/#第三方平台)
+
+读取第三方平台代开发小程序的扩展配置。
+
+#### [广告](/references/api/#广告)
+
+创建和控制激励视频广告与插屏广告。
+
+#### [Skyline](/references/api/#skyline)
+
+操作 Skyline 的可拖拽面板上下文与节点截图能力。
+
+#### [云开发](/references/api/#云开发)
+
+访问微信云开发和云数据库实例。
 
 :::caution
 不要安装或直接导入 `@tarojs/components` 和 `@tarojs/taro`。
@@ -165,4 +267,4 @@ export async function confirmSave() {
 
 ## 平台支持
 
-组件支持见[组件参考](/references/components/)，API 支持见 [Taro API 文档](https://docs.taro.zone/docs/apis/about/desc)。微信小程序专用接口应使用[条件编译](/guides/conditional-directives/)与 Web 代码隔离。
+组件支持见[组件参考](/references/components/)，API 支持见 [API 参考](/references/api/)。微信小程序专用接口应使用[条件编译](/guides/conditional-directives/)与 Web 代码隔离。
