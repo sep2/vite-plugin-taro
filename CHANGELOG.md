@@ -4,7 +4,19 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
-## [0.6.5] - 2026-08-15
+## [0.6.6] - 2026-08-18
+
+### Changed
+
+- add API reference (a1be575)
+- improve generated app readme (30db2af)
+- simplify Taro terminology (c234328)
+- add component reference (b1cc6c3)
+- list supported components (4bf54fd)
+- update default home page path (77d6219)
+- add components and API guide (770c61e)
+
+## [0.6.5] - 2026-08-16
 
 ### Fixed
 
