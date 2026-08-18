@@ -34,7 +34,7 @@ export const NativeCounter = defineNativeComponent<NativeCounterProps>(
 此文件可以放在任意位置，在 React 中使用这个接口即可：
 
 ```tsx
-// src/pages/index/index.tsx
+// src/pages/home/index.tsx
 import { useState } from 'react'
 import { NativeCounter } from '../../components/native-counter.tsx'
 

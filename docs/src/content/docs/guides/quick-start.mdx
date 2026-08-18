@@ -141,14 +141,14 @@ bun run dev:h5
 
 ## 5. 编辑第一个页面
 
-模板的默认首页组件位于 `src/pages/index/index.tsx`。应用代码通过 vpt 提供的模块使用 Taro 组件和 API：
+模板的默认首页组件位于 `src/pages/home/index.tsx`。应用代码通过 vpt 提供的模块使用 Taro 组件和 API：
 
 ```tsx
 import Taro from 'virtual:taro/api'
 import { Button, Text, View } from 'virtual:taro/components'
 import { useState } from 'react'
 
-function IndexPage() {
+function HomePage() {
     const [count, setCount] = useState(0)
 
     return (
@@ -161,7 +161,7 @@ function IndexPage() {
     )
 }
 
-export default IndexPage
+export default HomePage
 ```
 
 | 导入 | 用途 |
@@ -231,14 +231,14 @@ my-app/
     ├── app.tsx
     ├── components/
     └── pages/
-        └── index/
+        └── home/
             └── index.tsx
 ```
 
 - `vite.config.ts` 配置构建目标、页面、应用和微信项目。
 - `src/app.tsx` 是两个目标共享的应用入口。
 - `src/app.css` 包含全局样式和 Tailwind CSS v4 配置。
-- `src/pages/index/index.tsx` 是模板的默认首页组件。
+- `src/pages/home/index.tsx` 是模板的默认首页组件。
 
 ## 常见问题
 
