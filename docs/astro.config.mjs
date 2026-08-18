@@ -49,6 +49,7 @@ export default defineConfig({
                     items: [
                         { label: '模块系统', slug: 'references/module-system' },
                         { label: '热更新原理', slug: 'references/hmr-implementation' },
+                        { label: '组件参考', slug: 'references/components' },
                         { label: '仓库维护', slug: 'references/repository-management' }
                     ]
                 }
