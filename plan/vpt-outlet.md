@@ -532,10 +532,55 @@ A current WX Page owns one compact Taro data tree:
 ```ts
 Page.data = {
     root: {
-        cn: pageHostNodes
+        cn: [/* compact records for the Page root's direct Taro children */]
     }
 }
 ```
+
+`pageHostNodes` in earlier shorthand meant these compact records; it is not a runtime variable or a collection of React
+Fibers. Taro keeps real JavaScript host objects in `TaroRootElement.childNodes`, then `hydrate()` converts each one into a
+plain serializable record for WeChat:
+
+```text
+In-memory Taro objects                         Native Page data
+
+TaroRootElement.childNodes
+└─ TaroElement('view')             hydrate()   Page.data.root.cn
+   └─ TaroElement('text')          ─────────►  └─ compact view record
+      └─ TaroText('Hello')                       └─ compact text record
+                                                    └─ compact text-value record
+```
+
+A simplified compact result looks like:
+
+```ts
+Page.data.root.cn = [
+    {
+        nn: '3',
+        sid: '_A',
+        cl: 'page',
+        cn: [
+            {
+                nn: '5',
+                sid: '_B',
+                cn: [{ nn: '9', sid: '_C', v: 'Hello' }]
+            }
+        ]
+    }
+]
+```
+
+The short keys are Taro's native-data format:
+
+```text
+cn   child records
+nn   generated node/template alias
+sid  stable Taro node identity used by events
+cl   class name
+v    text value
+```
+
+The numeric `nn` aliases depend on Taro's generated component table; WXML uses them to select the matching template.
 
 The generated Page WXML imports Taro's shared templates and invokes their entry template:
 
@@ -567,7 +612,7 @@ The shared entry template iterates the compact root children and dynamically cho
 A generated host template renders one native node and recursively renders its compact children:
 
 ```xml
-<template name="tmpl_0_view">
+<template name="tmpl_0_3">
   <view class="{{i.cl}}" style="{{i.st}}">
     <template
       is="{{xs.a(c, item.nn, l)}}"
@@ -593,23 +638,67 @@ Page React hosts
 This renders Page hosts correctly. App-side Taro nodes are absent because the Page has no App data key and its WXML starts
 directly from `Page.data.root`.
 
-#### Why two native data roots are required
+#### Why the minimum plan keeps two native data roots
 
-The feature must retain the existing Page root and add one independent App-wrap tree:
+A merged native tree is possible. Each Page could store one Page-specific composition:
+
+```text
+Page A data.root                     Page B data.root
+
+App wrap                             App wrap
+└─ outlet                            └─ outlet
+   └─ Page A records                    └─ Page B records
+```
+
+Normal Page WXML could then start from one `root`, with no second top-level `wrap` value and no `p` threaded through App
+templates. If this combined tree were the sole native representation, Page records would not need to be retained a second
+time. The earlier claim that merging necessarily copies them was too strong.
+
+Merging simplifies WXML but moves the composition problem into every runtime update path. A current Page mutation emits a
+path relative to its `TaroRootElement`:
+
+```text
+root.cn.0.cn.1.v
+```
+
+In a merged native tree, the same value lives below the current App outlet path:
+
+```text
+root.cn.<App path>.cn.<outlet position>.cn.0.cn.1.v
+```
+
+The outlet can move when App reconciliation inserts, removes, or reorders App hosts. A merged implementation must
+therefore:
+
+- discover and retain the current outlet path;
+- prefix or otherwise translate every Page-root payload;
+- keep Taro's array-reset and native custom-component routing logic valid after translation;
+- coordinate App structural updates and Page updates from the same React commit so neither writes to the other's old
+  shape;
+- construct the Page-specific combined tree before the first native flush.
+
+That is a runtime projection and scheduling system. Native storage remains approximately `O(App wrap + local Page)` either
+way; the merge changes shape rather than removing meaningful data.
+
+The minimum plan instead retains Taro's existing Page root unchanged and adds one independent App-wrap tree:
 
 ```ts
 Page.data = {
     wrap: {
-        cn: appWrapNodes
+        cn: [/* compact records hydrated from App-wrap Taro nodes */]
     },
     root: {
-        cn: pageHostNodes
+        cn: [/* compact records hydrated from this Page's Taro nodes */]
     }
 }
 ```
 
-They cannot be merged without copying Page hosts into the wrap and remapping Page update paths. Keeping them independent
-preserves every existing `root.*` Page update.
+Every existing `root.*` Page update remains valid without interception or path translation. WXML performs the one
+composition operation declaratively.
+
+This choice trades one extra WXML scope value for removing a general runtime path-remapping and cross-scheduler
+coordination layer. If profiling later proves the WXML scope cost dominant, a merged-root renderer is a separate
+architecture rather than a smaller form of this feature.
 
 WXML must render this visual composition:
 
