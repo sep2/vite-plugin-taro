@@ -137,7 +137,7 @@ bun run dev:h5
     </TabItem>
 </Tabs>
 
-浏览器访问终端显示的地址。Vite 默认从 [http://localhost:5173](http://localhost:5173) 开始选择端口；如果该端口已被微信开发服务占用，会自动使用下一个可用端口。`dev:wx` 和 `dev:h5` 可以同时运行，修改同一份源码后分别查看两个目标的结果。
+浏览器访问终端显示的地址。Vite 默认从 [http://localhost:5173](http://localhost:5173) 开始选择端口；如果该端口已被微信开发服务占用，会自动使用下一个可用端口。`dev:wx` 和 `dev:h5` 可以同时运行。
 
 ## 5. 编辑第一个页面
 
@@ -236,7 +236,7 @@ my-app/
 ```
 
 - `vite.config.ts` 配置构建目标、页面、应用和微信项目。
-- `src/app.tsx` 是两个目标共享的应用入口。
+- `src/app.tsx` 是应用入口。
 - `src/app.css` 包含全局样式和 Tailwind CSS v4 配置。
 - `src/pages/home/index.tsx` 是模板的默认首页组件。
 
