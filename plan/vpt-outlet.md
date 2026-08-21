@@ -88,8 +88,8 @@ App function Fiber                       no Taro node
          └─ Page host Fibers      ─────► Page Taro nodes           not App hosts
 ```
 
-`wrap` is the compact native data generated from those App-side Taro nodes plus the private outlet marker. It contains no
-Page-root descendants and is not another React component or React tree.
+“App wrap” names this UI structure. Its compact native mirror is stored at `Page.data.app`; the current Page's compact
+hosts are stored separately at `Page.data.page`. Neither data object is another React component or React tree.
 
 ## Current issue
 
@@ -236,18 +236,18 @@ The App could be given a native scheduler and serialized recursively. However, i
 Page roots. Normal `hydrate()` would therefore copy every Page subtree into the App data:
 
 ```text
-wrap = App hosts + Page A hosts + Page B hosts + ...
+Page.data.app = App hosts + Page A hosts + Page B hosts + ...
 ```
 
-That wrap would then be mirrored to every native Page even though every Page already stores its own `root` data.
+That `app` value would then be mirrored to every native Page even though every Page already stores its own `page` data.
 
 For `P` mounted Pages, this approaches:
 
 ```text
-O(P × (wrap + sum of all Page roots))
+O(P × (App wrap + sum of all Page roots))
 ```
 
-It also makes Page mount and unmount publish irrelevant wrap child-list updates.
+It also makes Page mount and unmount publish irrelevant `app.*` child-list updates.
 
 Filtering Page data after hydration is not sufficient: it still traverses and allocates every Page subtree before throwing
 the result away.
@@ -315,11 +315,11 @@ Only native serialization stops at the outlet:
 ```text
 Native Page A data                 Native Page B data
 
-wrap                               wrap
+app                                app
 └─ App hosts                       └─ App hosts
    └─ outlet                          └─ outlet
 
-root                               root
+page                               page
 └─ Page A hosts                    └─ Page B hosts
 ```
 
@@ -328,7 +328,7 @@ root                               root
 The existing Page roots could remain as compact markers while hydration omits only their descendants:
 
 ```text
-serialized wrap
+serialized App data
 
 view
 ├─ header                 index 0
@@ -337,8 +337,8 @@ view
 └─ footer                 index 3
 ```
 
-Each native Page could store its own root `sid`, and a generated root-marker template could render `p.cn` only when the
-marker `sid` matches. This is correct, but it makes every mounted Page root part of the wrap's serialized shape.
+Each native Page could store its own Page-root `sid` in `page` data, and a generated root-marker template could render `p.cn` only when the
+marker `sid` matches. This is correct, but it makes every mounted Page root part of `Page.data.app`'s serialized shape.
 
 Those markers cannot be allowed to become stale because Taro's granular update paths use child-array indices. For example,
 Page A initially receives:
@@ -360,11 +360,11 @@ future footer updates using index 3. A granular update could then target the wro
 problem.
 
 No explicit Page-stack tracker would be needed: `AppWrapper` and React already append/remove the Page roots, and Taro would
-naturally publish those child-list changes. However, every push and pop would have to update every wrap mirror to keep
+naturally publish those child-list changes. However, every push and pop would have to update every `app` mirror to keep
 indices aligned. Every native Page would also store `P` compact markers, carry a Page identity, and inspect up to `P`
 markers in WXML to render one local Page.
 
-Putting a marker inside the Page root does not help: wrap hydration stops before that root, so the inner marker is absent
+Putting a marker inside the Page root does not help: App-data hydration stops before that root, so the inner marker is absent
 from the App wrap and cannot preserve the `{children}` position among the App's header, footer, or other hosts.
 
 One outlet around `elements.slice()` represents the singular `{children}` expression directly:
@@ -378,9 +378,9 @@ view
 └─ footer
 ```
 
-The serialized wrap retains one stable insertion marker while Page-stack mutations remain hidden behind it. Each native
-Page evaluates that marker once and inserts only its own `root`. This avoids Page IDs, WXML conditions, navigation-driven
-wrap updates, and `O(P)` outlet scans.
+The serialized `app` data retains one stable insertion marker while Page-stack mutations remain hidden behind it. Each native
+Page evaluates that marker once and inserts only its own `page` data. This avoids Page IDs, WXML conditions,
+navigation-driven `app.*` updates, and `O(P)` outlet scans.
 
 This requires four focused changes.
 
@@ -398,9 +398,9 @@ return h(App, props, children)
 
 There is no React portal, detached container, second React root, Page registry, or active-Page tracker.
 
-### 2. Make the outlet opaque to App-wrap data only
+### 2. Specialize outlet opacity and the Page data path
 
-Specialize the pinned WX `@tarojs/runtime` in two places.
+Specialize the pinned WX `@tarojs/runtime` at four focused sites.
 
 #### Hydration
 
@@ -420,7 +420,7 @@ scheduler.
 #### Outlet-originated updates
 
 Appending or removing a Page root continues to update Taro's existing JavaScript `childNodes`, but must not enqueue an
-App-wrap `setData()` update:
+native `app.*` `setData()` update:
 
 ```ts
 TaroNode.prototype.enqueueUpdate = function (payload) {
@@ -432,19 +432,44 @@ TaroNode.prototype.enqueueUpdate = function (payload) {
 The specialization suppresses only native update forwarding from this private outlet. Parent relationships, ordering,
 event-source cleanup, and ordinary Taro node removal remain unchanged.
 
-Both changes must be applied as one asserted, source-mapped WX transform to the resolved Taro 4.2.0 ESM runtime. The
+#### Rename the Page root's native data path
+
+Keep the Taro host type and `TaroRootElement.nodeName` as `'root'`; they identify the host/update boundary. Change only the
+native data path returned by `TaroRootElement`:
+
+```ts
+get _path() {
+    return 'page'
+}
+```
+
+Taro 4.2.0 also names two initial array-reset paths explicitly. Rename those literals:
+
+```ts
+const resetPaths = new Set(
+    initRender
+        ? ['page.cn.[0]', 'page.cn[0]']
+        : []
+)
+```
+
+These two path edits make initial and steady Page payloads emit `page.*` directly. They add no adapter and no per-update
+translation. The scheduler-only App root's own `_path` is unused because App payload paths come from the App host
+container's explicit `_path = 'app'`.
+
+All four changes must be applied as one asserted, source-mapped WX transform to the resolved Taro 4.2.0 ESM runtime. The
 module identity must remain unchanged so Taro continues to have exactly one document and event source. H5 uses the stock
 runtime.
 
-### 3. Add one App-wrap scheduler
+### 3. Add one App-data scheduler
 
 The App nodes currently resolve `_root` to `null`, so their normal Taro mutations have nowhere to enqueue native updates.
-Reuse Taro's existing batching implementation by creating one new `TaroRootElement` solely as the wrap scheduler:
+Reuse Taro's existing batching implementation by creating one new `TaroRootElement` solely as the `app.*` scheduler:
 
 ```ts
-const wrapScheduler = document.createElement('root')
+const appScheduler = document.createElement('root')
 
-wrapScheduler.ctx = {
+appScheduler.ctx = {
     setData(data, callback) {
         const pages = getCurrentPages()
         const visiblePage = pages[pages.length - 1]
@@ -461,8 +486,8 @@ wrapScheduler.ctx = {
 }
 
 Object.defineProperties(appHostContainer, {
-    _path: { get: () => 'wrap' },
-    _root: { get: () => wrapScheduler }
+    _path: { get: () => 'app' },
+    _root: { get: () => appScheduler }
 })
 ```
 
@@ -472,28 +497,28 @@ root. It contributes only Taro's existing update queue, path batching, callback 
 ```text
 Scheduler relationships (not host parentage)
 
-App-side TaroElement._root ─────► wrapScheduler
-                                  └─ ctx.setData(wrap delta)
-                                     ├─ native Page A.setData(wrap delta)
-                                     └─ native Page B.setData(wrap delta)
+App-side TaroElement._root ─────► appScheduler
+                                  └─ ctx.setData(app delta)
+                                     ├─ native Page A.setData(app delta)
+                                     └─ native Page B.setData(app delta)
 
-Page A TaroRootElement._root ───► itself ──► native Page A.setData(root delta)
-Page B TaroRootElement._root ───► itself ──► native Page B.setData(root delta)
+Page A TaroRootElement._root ───► itself ──► native Page A.setData(page delta)
+Page B TaroRootElement._root ───► itself ──► native Page B.setData(page delta)
 ```
 
-An App host mutation computes a path beginning with `wrap`, enters `wrapScheduler.enqueueUpdate()`, and is reconciled only
+An App host mutation computes a path beginning with `app`, enters `appScheduler.enqueueUpdate()`, and is reconciled only
 once. The scheduler's synthetic `ctx.setData()` sink then mirrors the resulting granular batch to the bounded native Page
 stack. Only the visible Page's callback completes the logical React update; hidden mirrors need no extra reconciliation.
 
 #### Seed a new Page in its existing initial batch
 
-A new Page root already queues its initial `root.*` data before Taro connects it to the native Page. The React
+A new Page root already queues its initial `page.*` data before Taro connects it to the native Page. The React
 `forceUpdate()` callback is the one point where the root exists but that initial queue has not flushed. Add one payload
 there:
 
 ```ts
 pageRoot.enqueueUpdate({
-    path: 'wrap.cn',
+    path: 'app.cn',
     value: () => hydrate(appHostContainer).cn
 })
 ```
@@ -501,7 +526,7 @@ pageRoot.enqueueUpdate({
 Existing `createPageConfig()` then connects `pageRoot.ctx` and flushes the queue normally:
 
 ```text
-existing initial batch = root.* + wrap.cn
+existing initial batch = page.* + app.cn
                       └─ one native Page.setData()
 ```
 
@@ -509,21 +534,21 @@ The lazy value reads the committed App wrap at flush time. This adds no new queu
 `setData()` call. The payload is one-shot: `performUpdate(true)` removes it from the queue during the first flush.
 
 ```text
-New Page mount      → one full wrap snapshot + initial Page data
-Page-local update   → root.* bridge delta only; no JS wrap hydration or wrap setData
-App-wrap update     → wrap.* delta mirrored to mounted Pages
-Page pop            → no wrap update
+New Page mount      → one full App-wrap snapshot + initial Page data
+Page-local update   → page.* bridge delta only; no JS App hydration or app.* setData
+App-wrap update     → app.* delta mirrored to mounted Pages
+Page pop            → no app.* update
 ```
 
-Therefore the JavaScript `O(wrap size)` hydration and native wrap-transfer cost is paid once for each newly mounted Page,
+Therefore the JavaScript `O(wrap size)` hydration and native app-data transfer cost is paid once for each newly mounted Page,
 not on every Page render or Page state update.
 
-This does not claim zero native WXML work on a Page update. WXML receives the `root.*` delta through `p`, and `p` is
+This does not claim zero native WXML work on a Page update. WXML receives the `page.*` delta through `p`, and `p` is
 forwarded through App-wrap template scopes until the outlet. WeChat may reevaluate those dependent scopes while locating
 the changed Page nodes. `p` is deliberately omitted after the outlet, so this cost is bounded by the App wrap rather than
 the Page subtree. The runtime performance tests must measure this separately from `setData()` payload size.
 
-### 4. Join `wrap` and `root` in WXML
+### 4. Join native `app` and `page` data in WXML
 
 #### How current Page WXML works
 
@@ -643,28 +668,28 @@ directly from `Page.data.root`.
 A merged native tree is possible. Each Page could store one Page-specific composition:
 
 ```text
-Page A data.root                     Page B data.root
+Page A data.page                     Page B data.page
 
 App wrap                             App wrap
 └─ outlet                            └─ outlet
    └─ Page A records                    └─ Page B records
 ```
 
-Normal Page WXML could then start from one `root`, with no second top-level `wrap` value and no `p` threaded through App
-templates. If this combined tree were the sole native representation, Page records would not need to be retained a second
+Normal Page WXML could then bind its local `root` variable to one native `page` tree, with no second top-level `app` value
+and no `p` threaded through App templates. If this combined tree were the sole native representation, Page records would not need to be retained a second
 time. The earlier claim that merging necessarily copies them was too strong.
 
-Merging simplifies WXML but moves the composition problem into every runtime update path. A current Page mutation emits a
-path relative to its `TaroRootElement`:
+Merging simplifies WXML but moves the composition problem into every runtime update path. With the two-line native path
+rename, a Page mutation emits this path relative to its `TaroRootElement`:
 
 ```text
-root.cn.0.cn.1.v
+page.cn.0.cn.1.v
 ```
 
 In a merged native tree, the same value lives below the current App outlet path:
 
 ```text
-root.cn.<App path>.cn.<outlet position>.cn.0.cn.1.v
+page.cn.<App path>.cn.<outlet position>.cn.0.cn.1.v
 ```
 
 The outlet can move when App reconciliation inserts, removes, or reorders App hosts. A merged implementation must
@@ -680,21 +705,22 @@ therefore:
 That is a runtime projection and scheduling system. Native storage remains approximately `O(App wrap + local Page)` either
 way; the merge changes shape rather than removing meaningful data.
 
-The minimum plan instead retains Taro's existing Page root unchanged and adds one independent App-wrap tree:
+The minimum plan instead retains the existing Page-root scheduler behavior, renames its native prefix to `page`, and adds
+one independent App-wrap tree under `app`:
 
 ```ts
 Page.data = {
-    wrap: {
+    app: {
         cn: [/* compact records hydrated from App-wrap Taro nodes */]
     },
-    root: {
+    page: {
         cn: [/* compact records hydrated from this Page's Taro nodes */]
     }
 }
 ```
 
-Every existing `root.*` Page update remains valid without interception or path translation. WXML performs the one
-composition operation declaratively.
+The two focused Taro path edits make every Page update emit `page.*` directly without interception or translation. WXML
+performs the one composition operation declaratively.
 
 This choice trades one extra WXML scope value for removing a general runtime path-remapping and cross-scheduler
 coordination layer. If profiling later proves the WXML scope cost dominant, a merged-root renderer is a separate
@@ -703,25 +729,25 @@ architecture rather than a smaller form of this feature.
 WXML must render this visual composition:
 
 ```text
-wrap
+app
 └─ App native nodes
    ├─ Header
-   ├─ insertion position ──► root.cn
+   ├─ insertion position ──► page.cn
    └─ Footer
 ```
 
 The normal Taro entry template accepts only one variable named `root`, so the generated Page entry starts it with the App
-wrap and retains the Page root under one additional short scope name, `p`:
+data under `app` and retains the Page data under `page` with one additional short scope name, `p`:
 
 ```xml
-<template is="taro_tmpl" data="{{root:wrap,p:root}}" />
+<template is="taro_tmpl" data="{{root:app,p:page}}" />
 ```
 
 The scope after that call is:
 
 ```text
-taro_tmpl variable root  → native Page.data.wrap
-taro_tmpl variable p     → native Page.data.root
+taro_tmpl variable root  → native Page.data.app
+taro_tmpl variable p     → native Page.data.page
 ```
 
 `p` is only a WXML scope binding. It does not copy the Page tree and is not a React prop.
@@ -763,10 +789,10 @@ outlet. No layout node is added because `comp` is already Taro's existing virtua
 
 #### How the outlet inserts the local Page
 
-The compact wrap contains one private marker at the App's `{children}` position:
+The compact App data contains one private marker at the App's `{children}` position:
 
 ```text
-wrap.cn
+app.cn
 └─ App View
    ├─ Header node
    ├─ { nn: 'vpt_page_outlet', cn: [] }
@@ -816,21 +842,22 @@ is="{{xs.a(c, item.nn, l)}}"
 values avoids an active template name, preserves Taro's depth accounting, and lets the existing depth-15 `comp` boundary
 reset recursion when required. One normal template namespace is sufficient.
 
-#### Minimum generated changes
+#### Minimum native data and generated WXML changes
 
-The WXML change is limited to:
+The naming and projection change is limited to:
 
 ```text
-1. Page data:       add wrap beside the existing root
-2. Page entry:      root:root → root:wrap,p:root
-3. App recursion:   forward one additional scope value p
-4. comp boundary:   forward the same p through the existing depth reset
-5. base template:   append one node-less outlet template
+1. Page data:       add app and rename the native Page key from root to page
+2. Taro paths:      root.* → page.* at the two pinned Taro path sites
+3. Page entry:      root:root → root:app,p:page
+4. App recursion:   forward one additional scope value p
+5. comp boundary:   forward the same p through the existing depth reset
+6. base template:   append one node-less outlet template
 ```
 
 Everything else remains generated by Taro's existing template builder:
 
-- Page `root.*` paths;
+- Page payload generation, now rooted directly at `page.*`;
 - host template bodies;
 - native props and events;
 - WXS dispatch helpers;
@@ -850,7 +877,7 @@ Page component
 └─ existing PageWrapper
    └─ existing TaroRootElement
       └─ existing Page host reconciliation
-         └─ existing root.* updates to that native Page
+         └─ direct page.* updates to that native Page
 ```
 
 `connectReactPage()`, the Page component, its Fiber subtree, and its Page-root scheduler retain their existing behavior.
@@ -862,13 +889,13 @@ The native Page composition does change:
 ```text
 Current WX
 
-Page root data ──► normal Taro WXML ──► Page native nodes
+Page data.root ──► normal Taro WXML ──► Page native nodes
 
 Proposed WX
 
-App wrap data ──► normal Taro WXML
+Page data.app ──► normal Taro WXML
                          │
-                         └─ outlet ──► the same Page root data ──► the same Page native nodes
+                         └─ outlet ──► Page data.page ──► the same Page native nodes
 ```
 
 Therefore the feature changes generated Page data initialization and the WXML entry scope, but it does not instantiate,
@@ -880,25 +907,25 @@ clone, remount, or reinterpret the Page's React render output.
 
 1. Taro creates the singleton App React root.
 2. `AppWrapper` renders the Page root as a normal child of `vpt_page_outlet`.
-3. The outlet records that child but publishes no wrap child-list update.
-4. The Page root queues its normal `root.*` updates.
+3. The outlet records that child but publishes no `app.*` child-list update.
+4. The Page root queues its direct `page.*` updates.
 5. The framework hydrates the App wrap; hydration stops at the outlet.
-6. The framework queues `wrap.cn` on the Page root.
-7. The Page's initial `setData()` contains both wrap and Page data.
-8. WXML renders the wrap, reaches the outlet, and renders that Page's `root.cn` there.
+6. The framework queues `app.cn` on the Page root.
+7. The Page's initial `setData()` contains both `app` and `page` data.
+8. WXML renders `app`, reaches the outlet, and renders that Page's `page.cn` there.
 
 ### Navigation push
 
 1. Existing Page Fibers remain mounted.
 2. React appends the new Page root beneath the same outlet.
-3. The outlet suppresses the irrelevant wrap child-list update.
-4. The new native Page receives the current wrap snapshot plus its own root.
-5. Existing native Pages require no synchronization work beyond future real wrap updates.
+3. The outlet suppresses the irrelevant `app.*` child-list update.
+4. The new native Page receives the current App snapshot plus its own `page` data.
+5. Existing native Pages require no synchronization work beyond future real App-wrap updates.
 
 ### App update
 
 There is no explicit App-state subscription. The connection is established once when the framework assigns the App host
-container `_path = 'wrap'` and `_root = wrapScheduler` before React renders the App.
+container `_path = 'app'` and `_root = appScheduler` before React renders the App.
 
 If `setWrapCount()` changes the App's rendered `Text`, the existing React/Taro host pipeline performs:
 
@@ -907,29 +934,29 @@ setWrapCount(1)
 └─ React reconciles the singleton App
    └─ React updates the existing HostText Fiber
       └─ Taro renderer sets TaroText.nodeValue
-         └─ TaroText.enqueueUpdate({ path: 'wrap....v', value: '1' })
-            └─ parent _root lookup reaches wrapScheduler
-               └─ wrapScheduler batches the wrap delta
-                  └─ wrapScheduler.ctx.setData(delta)
+         └─ TaroText.enqueueUpdate({ path: 'app....v', value: '1' })
+            └─ parent _root lookup reaches appScheduler
+               └─ appScheduler batches the app delta
+                  └─ appScheduler.ctx.setData(delta)
                      ├─ native Page A.setData(delta)
                      └─ native Page B.setData(delta)
 ```
 
-Only App state that changes App-wrap host output produces `wrap.*` data. A state update with identical host output produces
-no native wrap update. Page-root data is never traversed or copied during this flow.
+Only App state that changes App-wrap host output produces `app.*` data. A state update with identical host output produces
+no native `app.*` update. Page data is never traversed or copied during this flow.
 
 ### Page update
 
 1. React reconciles that Page Fiber.
 2. Its nearest Taro root remains the existing Page `TaroRootElement`.
-3. Taro emits granular `root.*` paths only to that native Page.
-4. Wrap data and other Page roots are untouched.
+3. Taro emits granular `page.*` paths only to that native Page.
+4. `app` data and other Page roots are untouched.
 
 ### Navigation pop
 
 1. React unmounts only the unloaded Page wrapper.
 2. Taro removes its Page root from the outlet and performs normal cleanup.
-3. The outlet publishes no irrelevant wrap child-list update.
+3. The outlet publishes no irrelevant `app.*` child-list update.
 4. Remaining Page Fibers retain their state.
 
 ## Correctness
@@ -953,7 +980,7 @@ Serialization and `setData()` ownership cannot interrupt Context, error boundari
 ### Native ownership
 
 The outlet does not become a Page scheduler. Each nested `TaroRootElement` still returns itself from `_root`, so Page host
-mutations retain their existing `root.*` path and native sink.
+mutations use the patched direct `page.*` path and retain their existing native sink.
 
 ### Native visual nesting
 
@@ -962,7 +989,7 @@ layout, style inheritance, and visual order match the App JSX around `{children}
 
 ### Hidden Pages
 
-Every mounted native Page stores its own root and one mirror of the shared wrap. Real App updates keep hidden mirrors
+Every mounted native Page stores its own `page` data and one `app` mirror of the shared App wrap. Real App updates keep hidden mirrors
 current. Returning to a hidden Page requires no catch-up lifecycle patch.
 
 ## Performance
@@ -972,24 +999,24 @@ For App-wrap size `W`, Page sizes `R₁ ... Rₚ`, and `P` mounted native Pages:
 ```text
 React App instances:       1
 React Page instances:      P
-Native wrap storage:       O(P × W)
-Native Page storage:       O(sum Rᵢ)
+Native `app` storage:      O(P × W)
+Native `page` storage:     O(sum Rᵢ)
 App update bridge work:       O(P × delta W)
 Page update bridge work:      O(delta Rᵢ)
-New Page wrap seed:           O(W)
+New Page `app` seed:          O(W)
 Page-root insertion bridge:   O(0)
-Page-update wrap WXML scopes: O(W) worst-case reevaluation
+Page-update App WXML scopes:  O(W) worst-case reevaluation
 ```
 
 Important properties:
 
 - App reconciliation occurs once, regardless of Page count.
-- Hydrating the wrap is `O(W)` because it stops before Page roots.
-- Page mount/unmount does not publish wrap child-list data.
-- Page updates retain Taro's existing granular bridge paths; WXML wrap-scope reevaluation is profiled separately.
+- Hydrating `app` data is `O(W)` because it stops before Page roots.
+- Page mount/unmount does not publish `app.*` child-list data.
+- Page updates emit direct granular `page.*` bridge paths; App-scope WXML reevaluation is profiled separately.
 - The generated WXML namespace is not duplicated.
 - The plan adds no portal Fiber, detached Taro container, native outlet node, runtime collection, or lifecycle coordinator.
-- The only unavoidable fan-out is one wrap delta per independent native Page surface.
+- The only unavoidable fan-out is one app delta per independent native Page surface.
 
 ## Implementation locations
 
@@ -1004,9 +1031,9 @@ patches/@tarojs__plugin-framework-react@4.2.0-react19.patch
 Add only:
 
 - the private WX outlet host;
-- the App container's `wrap` scheduler;
-- wrap broadcasting;
-- atomic initial wrap snapshot enqueueing.
+- the App container's `app` scheduler;
+- `app.*` broadcasting;
+- atomic initial `app` snapshot enqueueing.
 
 Do not add a portal or detached Page container.
 
@@ -1018,8 +1045,9 @@ Add a focused transform under:
 packages/vite-plugin-taro/src/node/plugins/wx
 ```
 
-It must match exactly one `hydrate()` child serialization site and exactly one `TaroNode.enqueueUpdate()` forwarding site
-in pinned Taro 4.2.0, preserve source maps, and fail the build if either contract changes.
+It must match exactly one `hydrate()` child serialization site, one `TaroNode.enqueueUpdate()` forwarding site, the
+`TaroRootElement._path` getter, and the initial reset-path literals in pinned Taro 4.2.0. It must preserve source maps and
+fail the build if any contract changes.
 
 ### Generated WXML and Page data
 
@@ -1033,8 +1061,8 @@ packages/vite-plugin-taro/src/runtime/wx/capsule/component.ts
 
 Implement:
 
-- `{ wrap, root }` Page data;
-- `data="{{root:wrap,p:root}}"` Page entry;
+- `{ app, page }` Page data;
+- `data="{{root:app,p:page}}"` Page entry;
 - `p` forwarding through App-wrap scopes and recursive `comp`;
 - direct `p.cn` dispatch at the outlet;
 - no `p` propagation after the outlet;
@@ -1047,21 +1075,21 @@ Implement:
 3. WX gives retained Page roots exactly one private outlet parent.
 4. Every outlet child is a Taro Page root.
 5. Taro remains the sole owner of outlet child ordering through its existing `childNodes` implementation.
-6. Wrap hydration never traverses outlet children.
-7. Outlet-originated updates never enter the wrap scheduler.
-8. Every Page root remains its own scheduler boundary.
-9. Every native Page stores only the shared wrap mirror and its own Page root.
-10. WXML renders the local Page root exactly once at the outlet.
+6. App-data hydration never traverses outlet children.
+7. Outlet-originated updates never enter the `app` scheduler.
+8. Every Page root remains its own scheduler boundary and emits direct `page.*` paths.
+9. Every native Page stores only the shared `app` mirror and its own `page` data.
+10. WXML renders local `page` data exactly once at the outlet.
 11. H5 behavior and runtime remain unchanged.
 
 ## Validation
 
 ### Unit tests
 
-- Runtime specialization changes only outlet hydration and outlet-originated forwarding.
-- Hydrating a wrap stops before Page roots.
+- Runtime specialization changes only outlet opacity and the two direct Page-path sites.
+- Hydrating App data stops before Page roots.
 - Hydrating a Page root still includes all Page hosts.
-- Appending, reordering, and removing Page roots uses Taro's existing `childNodes` and `parentNode` without calling the wrap sink.
+- Appending, reordering, and removing Page roots uses Taro's existing `childNodes` and `parentNode` without calling the `app` sink.
 - Page-descendant updates still call only their Page root sink.
 - Generated assets contain one WXML namespace and no `page-base.wxml`.
 - Template scope rewriting changes only standalone `data` attributes, never attributes such as `extra-data`.
@@ -1078,16 +1106,16 @@ Use the App fixture above with at least two mounted Pages and verify:
 - the wrap and every visible or hidden Page Context probe observe the same `wrapCount` and `effectReady` values;
 - navigating forward and back retains the App count, effect state, Context value, and Page-local state;
 - App refs/effects and Page refs/effects are not remounted unexpectedly during ordinary navigation;
-- initial rendering contains wrap and Page content in one native update;
-- `page.data.wrap` contains no Page host subtree;
-- Page mount and unmount produce no wrap child-list update;
+- initial rendering contains `app` and `page` content in one native update;
+- `page.data.app` contains no Page host subtree;
+- Page mount and unmount produce no `app.*` child-list update;
 - no recursive-template, property-type, or runtime warning occurs.
 
 Use `setUpdatePerformanceListener({ withDataPaths: true })` to verify:
 
-- an App update emits granular `wrap.*` paths once per mounted native Page;
-- a Page update emits only granular `root.*` paths on that Page;
-- neither update replaces a complete root unnecessarily.
+- an App update emits granular `app.*` paths once per mounted native Page;
+- a Page update emits only granular `page.*` paths on that Page;
+- neither update replaces a complete `app` or `page` tree unnecessarily.
 
 ### Regression matrix
 
@@ -1112,10 +1140,10 @@ The feature is complete only when all are true:
 - Context crosses from App to visible and hidden Pages;
 - App launch runs once, App state remains singleton, and App effects do not remount during Page navigation;
 - Taro DOM parentage remains ordinary App → outlet → Page roots;
-- wrap data contains no serialized Page root;
-- Page mount/unmount emits no wrap child-list bridge update;
-- each native Page renders only its own `root` at the outlet;
-- wrap and Page updates remain granular;
+- `app` data contains no serialized Page root;
+- Page mount/unmount emits no `app.*` child-list bridge update;
+- each native Page renders only its own `page` data at the outlet;
+- `app` and `page` updates remain granular;
 - one static WXML namespace is emitted;
 - H5 is unchanged;
 - the complete regression matrix passes.
