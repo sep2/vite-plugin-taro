@@ -31,6 +31,14 @@ declare const wx: {
     request(options: WeChatRequestOptions): void
 }
 
+/** Native Page surface used by the singleton App-data scheduler. */
+type WeChatPage = {
+    setData(data: Readonly<Record<string, unknown>>, callback?: () => void): void
+}
+
+/** Returns every mounted native Page in stack order. */
+declare function getCurrentPages(): WeChatPage[]
+
 /** Registers the native WeChat Mini Program application. */
 declare function App(options: object): void
 

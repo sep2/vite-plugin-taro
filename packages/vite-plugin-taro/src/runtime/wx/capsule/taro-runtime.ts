@@ -10,5 +10,7 @@ export {
     createRecursiveComponentConfig,
     Current,
     document,
-    injectPageInstance
+    hydrate,
+    injectPageInstance,
+    TaroRootElement
 } from '@tarojs/runtime'
