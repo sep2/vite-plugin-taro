@@ -133,12 +133,6 @@ function HomePage() {
                         <Suspense fallback={<View className="mt-8 min-h-48 rounded-3xl bg-primary" />}>
                             <ApiCard />
                         </Suspense>
-
-                        <View className="flex flex-col items-center px-2 pb-2 pt-9">
-                            <Text className="text-center text-xs font-bold tracking-widest text-quiet">
-                                VPT · OPEN SOURCE · MIT
-                            </Text>
-                        </View>
                     </View>
                 </View>
             </ScrollView>
