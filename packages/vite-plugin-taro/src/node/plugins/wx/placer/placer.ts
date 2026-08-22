@@ -5,8 +5,9 @@ import { createPlacement, type GeneratedSubpackage, type PackageLocation, type P
 
 export type { GeneratedSubpackage, Placement } from './placement.ts'
 
-const pnpmFrameworkPackagePattern = /\/node_modules\/\.pnpm\/(?:@tarojs\+|react(?:-dom|-reconciler)?@|scheduler@)/
-const workspaceFrameworkPackagePattern = /\/packages\/(?:taro-react|taro-plugin-framework-react)\//
+const pnpmFrameworkPackagePattern =
+    /\/node_modules\/\.pnpm\/(?:@tarojs\+|vite-plugin-taro-runtime@|react(?:-dom|-reconciler)?@|scheduler@)/
+const workspaceFrameworkPackagePattern = /\/packages\/(?:taro-react|taro-plugin-framework-react|taro-runtime)\//
 
 /** Selects the explicit React/Taro roots whose complete dependency closure forms the framework vendor chunk. */
 export function isWxFrameworkVendorModule(moduleId: string): boolean {
