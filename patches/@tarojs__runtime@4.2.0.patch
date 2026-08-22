@@ -1,0 +1,50 @@
+diff --git a/dist/dom/node.js b/dist/dom/node.js
+index 415aa2e..6636f5a 100644
+--- a/dist/dom/node.js
++++ b/dist/dom/node.js
+@@ -277,6 +277,8 @@ class TaroNode extends TaroEventTarget {
+         return this.childNodes.length > 0;
+     }
+     enqueueUpdate(payload) {
++        if (this.nodeName === 'vpt_page_outlet')
++            return;
+         var _a;
+         (_a = this._root) === null || _a === void 0 ? void 0 : _a.enqueueUpdate(payload);
+     }
+diff --git a/dist/dom/root.js b/dist/dom/root.js
+index 727cf71..a5f7560 100644
+--- a/dist/dom/root.js
++++ b/dist/dom/root.js
+@@ -49,7 +49,7 @@ class TaroRootElement extends TaroElement {
+         this.tagName = ROOT_STR.toUpperCase();
+     }
+     get _path() {
+-        return ROOT_STR;
++        return 'page';
+     }
+     get _root() {
+         return this;
+@@ -72,7 +72,7 @@ class TaroRootElement extends TaroElement {
+             perf.start(setDataMark);
+             const data = Object.create(null);
+             const resetPaths = new Set(initRender
+-                ? ['root.cn.[0]', 'root.cn[0]']
++                ? ['page.cn.[0]', 'page.cn[0]']
+                 : []);
+             while (this.updatePayloads.length > 0) {
+                 const { path, value } = this.updatePayloads.shift();
+diff --git a/dist/hydrate.js b/dist/hydrate.js
+index e3bd1f1..128e5b0 100644
+--- a/dist/hydrate.js
++++ b/dist/hydrate.js
+@@ -65,7 +65,9 @@ function hydrate(node) {
+         }
+     }
+     // Children
+-    data["cn" /* Shortcuts.Childnodes */] = node.childNodes.filter(node => !isComment(node)).map(hydrate);
++    data["cn" /* Shortcuts.Childnodes */] = nodeName === 'vpt_page_outlet'
++        ? []
++        : node.childNodes.filter(node => !isComment(node)).map(hydrate);
+     if (node.className !== '') {
+         data["cl" /* Shortcuts.Class */] = node.className;
+     }
