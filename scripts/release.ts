@@ -27,6 +27,7 @@ const releaseFiles = [
     'packages/loan-genius/package.json',
     'packages/taro-plugin-framework-react/package.json',
     'packages/taro-react/package.json',
+    'packages/taro-runtime/package.json',
     'packages/vite-plugin-taro/package.json'
 ]
 

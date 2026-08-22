@@ -180,6 +180,15 @@ importers:
         specifier: 0.33.0
         version: 0.33.0(react@19.2.7)
 
+  packages/taro-runtime:
+    dependencies:
+      '@tarojs/shared':
+        specifier: 4.2.0
+        version: 4.2.0
+      tslib:
+        specifier: ^2.6.2
+        version: 2.8.1
+
   packages/towxml-stream-demo:
     dependencies:
       react:
@@ -250,8 +259,8 @@ importers:
         specifier: 4.2.0
         version: 4.2.0(@tarojs/runtime@4.2.0)(@tarojs/shared@4.2.0)(@tarojs/taro@4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.25))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.25))
       '@tarojs/runtime':
-        specifier: 4.2.0
-        version: 4.2.0
+        specifier: workspace:vite-plugin-taro-runtime@*
+        version: link:../taro-runtime
       '@tarojs/taro':
         specifier: 4.2.0
         version: 4.2.0(@tarojs/components@4.2.0(@tarojs/helper@4.2.0)(@types/react@19.2.17)(postcss@8.5.25))(@tarojs/helper@4.2.0)(@tarojs/shared@4.2.0)(@types/react@19.2.17)(postcss@8.5.25)
