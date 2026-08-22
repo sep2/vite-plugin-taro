@@ -1,0 +1,39 @@
+{
+    "name": "vite-plugin-taro-runtime",
+    "version": "0.6.6",
+    "description": "Taro 4.2 runtime patched for vite-plugin-taro WX App projection.",
+    "author": "sep2",
+    "license": "MIT",
+    "browser": "dist/index.js",
+    "main:h5": "dist/runtime.esm.js",
+    "main": "dist/runtime.esm.js",
+    "module": "dist/runtime.esm.js",
+    "types": "dist/index.d.ts",
+    "files": [
+        "dist",
+        "LICENSE",
+        "README.md"
+    ],
+    "sideEffects": [
+        "./dist/dom-external/index.js"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/sep2/vite-plugin-taro.git",
+        "directory": "packages/taro-runtime"
+    },
+    "bugs": {
+        "url": "https://github.com/sep2/vite-plugin-taro/issues"
+    },
+    "homepage": "https://vpt.js.org",
+    "engines": {
+        "node": ">=22"
+    },
+    "dependencies": {
+        "@tarojs/shared": "4.2.0",
+        "tslib": "^2.6.2"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}
