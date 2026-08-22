@@ -87,7 +87,7 @@ import HomeSectionHeading from './home-section-heading.astro'
                 </article>
 
                 <div class="page-deck" aria-label="页面卡片">
-                    <article class="page-card page-home" data-page-card="home" data-slot="-1">
+                    <article class="demo-page page-card page-home" data-page-card="home" data-slot="-1">
                         <header><span>首页</span><small>今天</small></header>
                         <p class="card-kicker">DAILY RHYTHM</p>
                         <h3>今天也向前一点</h3>
@@ -112,7 +112,7 @@ import HomeSectionHeading from './home-section-heading.astro'
                         <button class="card-select" type="button" data-card-select="home" aria-label="显示首页"></button>
                     </article>
 
-                    <article class="page-card page-discover" data-page-card="discover" data-slot="0">
+                    <article class="demo-page page-card page-discover" data-page-card="discover" data-slot="0">
                         <header><span>发现</span><small>附近</small></header>
                         <p class="card-kicker">WEEKEND PICKS</p>
                         <h3>去有风的地方</h3>
@@ -130,7 +130,7 @@ import HomeSectionHeading from './home-section-heading.astro'
                         <button class="card-select" type="button" data-card-select="discover" aria-label="显示发现页"></button>
                     </article>
 
-                    <article class="page-card page-profile" data-page-card="profile" data-slot="1">
+                    <article class="demo-page page-card page-profile" data-page-card="profile" data-slot="1">
                         <header><span>我的</span><small>个人空间</small></header>
                         <div class="profile-head">
                             <span class="profile-avatar" aria-hidden="true">林</span>
@@ -183,6 +183,15 @@ import HomeSectionHeading from './home-section-heading.astro'
         return value === 'home' || value === 'discover' || value === 'profile'
     }
 
+    function createPhonePage(pageCard: HTMLElement): HTMLElement {
+        const phonePage = document.createElement('article')
+        phonePage.className = pageCard.className
+        phonePage.classList.replace('page-card', 'phone-page')
+        phonePage.replaceChildren(...Array.from(pageCard.childNodes, (child) => child.cloneNode(true)))
+        requireDeckElement<HTMLButtonElement>(phonePage, '.card-select').remove()
+        return phonePage
+    }
+
     interface CardGesture {
         readonly card: HTMLElement
         readonly listeners: AbortController
@@ -203,6 +212,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
 
         connectedCallback(): void {
+            this.renderPhonePage(this.activePage)
             this.addEventListener('click', this.handleClick)
             this.addEventListener('pointerdown', this.handlePointerDown)
         }
@@ -316,6 +326,12 @@ import HomeSectionHeading from './home-section-heading.astro'
             this.selectPage(pageOrder[nextIndex], 'gesture')
         }
 
+        private renderPhonePage(page: PageId): void {
+            const pageCard = requireDeckElement<HTMLElement>(this, `[data-page-card="${page}"]`)
+            // The inert mirror keeps the phone populated while its source card moves around the deck.
+            requireDeckElement<HTMLElement>(this, '.page-aperture').replaceChildren(createPhonePage(pageCard))
+        }
+
         private animatePhone(pageOffset: -1 | 1): void {
             if (this.reducedMotion.matches) return
             const phone = requireDeckElement<HTMLElement>(this, '.phone-frame')
@@ -359,6 +375,7 @@ import HomeSectionHeading from './home-section-heading.astro'
             const pageOffset: -1 | 1 = forwardDistance === 1 ? 1 : -1
             if (motion === 'activation') this.animatePhone(pageOffset)
             this.activePage = nextPage
+            this.renderPhonePage(nextPage)
             const activeIndex = pageOrder.indexOf(nextPage)
 
             this.querySelectorAll<HTMLElement>('[data-page-card]').forEach((card) => {
@@ -659,7 +676,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         white-space: nowrap;
     }
 
-    .page-card header small,
+    .demo-page header small,
     .card-kicker,
     .focus-card small,
     .mini-stats small,
@@ -722,7 +739,9 @@ import HomeSectionHeading from './home-section-heading.astro'
     }
 
     .page-aperture {
+        min-height: 0;
         background: var(--deck-card);
+        overflow: hidden;
     }
 
     .app-tabs {
@@ -800,6 +819,27 @@ import HomeSectionHeading from './home-section-heading.astro'
         pointer-events: none;
     }
 
+    .demo-page {
+        padding: 1.15rem;
+        background: var(--deck-card);
+        color: var(--deck-ink);
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior-y: contain;
+        scrollbar-width: none;
+    }
+
+    .demo-page::-webkit-scrollbar {
+        display: none;
+    }
+
+    .phone-page {
+        height: 100%;
+        filter: saturate(0.35);
+        opacity: 0.42;
+        pointer-events: none;
+    }
+
     .page-card {
         --card-border-color: color-mix(in srgb, var(--deck-green) 18%, var(--vpt-border));
         --card-tilt: 0deg;
@@ -813,19 +853,12 @@ import HomeSectionHeading from './home-section-heading.astro'
             var(--phone-frame-top) + var(--phone-frame-height) - var(--phone-frame-padding) - var(--phone-tab-height) -
                 var(--page-deck-top) - var(--page-card-bottom-gap)
         );
-        padding: 1.15rem;
         border: 1px solid var(--card-border-color);
         border-radius: 1.15rem;
-        background: var(--deck-card);
         box-shadow: 0 18px 42px var(--vpt-shadow-strong);
-        color: var(--deck-ink);
         opacity: 0.93;
         scale: 1;
-        overflow-x: hidden;
-        overflow-y: auto;
-        overscroll-behavior-y: contain;
         pointer-events: auto;
-        scrollbar-width: none;
         touch-action: pan-y;
         transition:
             transform 680ms cubic-bezier(0.18, 1.28, 0.3, 1),
@@ -853,10 +886,6 @@ import HomeSectionHeading from './home-section-heading.astro'
     .page-profile {
         --card-tilt: -1.4deg;
         --card-y: 0.45rem;
-    }
-
-    .page-card::-webkit-scrollbar {
-        display: none;
     }
 
     .page-card[data-slot='0'] {
@@ -902,7 +931,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         transition: none;
     }
 
-    .page-card header {
+    .demo-page header {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -916,7 +945,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         font-weight: 800;
     }
 
-    .page-card h3 {
+    .demo-page h3 {
         margin: 0.38rem 0 0;
         color: var(--deck-ink);
         font-family: Georgia, 'Times New Roman', serif;
@@ -1253,7 +1282,6 @@ import HomeSectionHeading from './home-section-heading.astro'
     .profile-menu {
         display: grid;
         margin-top: 0;
-        border-top: 1px solid var(--vpt-border);
     }
 
     .profile-menu > span {
