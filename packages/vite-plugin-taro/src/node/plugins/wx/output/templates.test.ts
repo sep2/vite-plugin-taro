@@ -55,7 +55,7 @@ test('creates shared Taro templates and native companions for every Page', () =>
     )
     assert.match(
         baseTemplate,
-        /<template name="tmpl_0_vpt_fragment">\s*<template\s+is="{{xs\.a\(0, item\.nn, ''\)}}"[\s\S]*wx:for="{{i\.cn}}"/
+        /<template name="tmpl_0_vpt_fragment">\s*<template\s+is="{{xs\.a\(0, item\.nn, ''\)}}"[\s\S]*wx:for="{{i\.cn}}"[\s\S]*wx:key="sid"/
     )
     assert.match(baseTemplate, /<template name="tmpl_0_vpt_page_outlet">\s*<slot \/>\s*<\/template>/)
     assert.match(baseTemplate, /<comp i="{{i}}" l="{{l}}">\s*<slot \/>\s*<\/comp>/)

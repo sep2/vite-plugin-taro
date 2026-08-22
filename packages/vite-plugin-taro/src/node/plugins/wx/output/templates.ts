@@ -195,7 +195,10 @@ function createTemplateBuilder() {
              * those contracts without becoming a native or Taro host: its nn is only a template discriminator and its
              * template emits each real cn record directly. Keeping the collection behind one comp is important because that
              * component owns exactly one Page slot regardless of whether App rendered zero, one, or many top-level hosts.
-             * The synthetic record is not keyed or event-addressable, so it deliberately has no sid.
+             * The synthetic record itself is not keyed or event-addressable, so it deliberately has no sid. Its cn items are
+             * different: they are real hydrated Taro elements, text nodes, or the outlet, and every one has Taro's stable sid.
+             * wx:key="sid" matches Taro's stock root.cn loop so insertion/reordering preserves native-component instances,
+             * sibling identity, and event-source routing instead of reusing children only by array position.
              *
              * vpt_page_outlet is the matching terminal. The patched runtime retains Page roots below that marker in memory
              * for React/Taro ownership but serializes no children into app data; this slot inserts the parent Page's separate
