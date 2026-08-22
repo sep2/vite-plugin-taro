@@ -163,7 +163,8 @@ export async function confirmSave() {
 
 #### [Hooks](/references/api/#hooks)
 
-应用与页面生命周期、页面滚动与刷新、分享以及路由参数等 React hooks。
+应用与页面生命周期、页面滚动与刷新、分享以及路由参数等 React hooks。App 和 Page 的挂载、显示与卸载区别参见
+[App 与页面](/guides/app-and-pages/)。
 
 #### [扩展](/references/api/#扩展)
 
