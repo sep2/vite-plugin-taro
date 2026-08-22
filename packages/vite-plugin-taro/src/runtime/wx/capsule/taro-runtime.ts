@@ -5,12 +5,4 @@ import '@tarojs/plugin-platform-weapp/dist/runtime.js'
 
 export { createReactApp } from '@tarojs/plugin-framework-react/dist/runtime'
 export { default as ReactDOM } from '@tarojs/react'
-export {
-    createPageConfig,
-    createRecursiveComponentConfig,
-    Current,
-    document,
-    hydrate,
-    injectPageInstance,
-    TaroRootElement
-} from '@tarojs/runtime'
+export { createPageConfig, createRecursiveComponentConfig } from '@tarojs/runtime'
