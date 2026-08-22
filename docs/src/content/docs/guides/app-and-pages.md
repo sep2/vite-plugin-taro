@@ -34,7 +34,7 @@ export default App
 
 App 可以只返回 `children`，也可以在它外面添加背景、标题、页脚、共享状态或其他公共组件。
 
-无论什么情况，请始终渲染 `children`。
+此功能没有性能损失，请按照标准 React 组件的方式编写即可。具体实现原理参见 [App 视图原理](/references/app-view/)。
 
 ## 保持 App 轻量
 
@@ -245,6 +245,7 @@ function OrderDetailPage() {
 
 ## 相关文档
 
+- [App 视图实现原理](/references/app-view/)：了解 App JSX 在微信 Page 中的渲染和更新方式。
 - [配置选项](/guides/configuration/)：声明 App、页面路径和页面配置。
 - [组件与 API](/guides/components-and-api/)：使用组件、生命周期和路由 API。
 - [样式](/guides/styles/)：编写 App 和页面样式。
