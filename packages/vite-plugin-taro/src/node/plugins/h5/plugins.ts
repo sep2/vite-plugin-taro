@@ -31,12 +31,12 @@ export function createH5TargetPlugins(options: VptOptions): PluginOption[] {
             logLevel: 'warn'
         }),
         ...createH5SupportPlugins(),
-        createH5TargetPlugin(options)
+        createH5Plugin(options)
     ]
 }
 
 /** Configures H5 resolution and supplies the specialized physical application entry. */
-function createH5TargetPlugin(options: VptOptions): Plugin {
+function createH5Plugin(options: VptOptions): Plugin {
     const moduleResolver = createModuleResolver(options)
 
     return {
@@ -48,6 +48,10 @@ function createH5TargetPlugin(options: VptOptions): Plugin {
                 resolve: {
                     mainFields: ['main:h5', 'browser', 'module', 'jsnext:main', 'jsnext'],
                     alias: [
+                        {
+                            find: /^@tarojs\/runtime$/,
+                            replacement: packageRequire.resolve('@tarojs/runtime/dist/runtime.esm.js')
+                        },
                         {
                             find: /^@tarojs\/components$/,
                             replacement: packageRequire.resolve('@tarojs/components/lib/react')
