@@ -30,7 +30,7 @@ export function createTemplateAssets(
     return [
         createAsset(
             'base.wxml',
-            templateBuilder.buildTemplate(collectTemplateComponentConfig(bundle, nativeComponents))
+            templateBuilder.buildBaseTemplate(collectTemplateComponentConfig(bundle, nativeComponents))
         ),
         createAsset('utils.wxs', templateBuilder.buildXScript()),
         createAsset('comp.wxml', templateBuilder.buildBaseComponentTemplate('.wxml')),
@@ -49,23 +49,92 @@ export function createTemplateAssets(
 }
 
 /**
- * Adapts Taro's stock template builder to the native half of the App-wrap data flow without changing its recursive renderer.
+ * Adapts Taro's stock template builder to the WXML half of WX App wrapping without changing its recursive renderer.
  *
- * The React/framework patch keeps one tree shaped as App -> vpt_page_outlet -> Page roots. The runtime patch mirrors App
- * hosts under Page.data.app, keeps each Page root under Page.data.page, and makes the outlet opaque during App hydration.
- * These closures provide the matching WXML behavior:
+ * End-to-end contract
+ * -------------------
+ * React and Taro retain one in-memory ownership tree:
  *
- * 1. buildTemplate keeps Taro's host templates, teaches depth-reset comp calls to forward one default slot, and adds the two
- *    transparent private templates. vpt_fragment adapts the App root collection to comp's one-node input; vpt_page_outlet
- *    consumes the Page-owned slot at React's {children} position.
- * 2. buildPageTemplate makes the native Page the sole owner of both bindings: generic comp receives app, while its slot keeps
- *    the normal taro_tmpl bound directly to page. The complete Page object never enters App recursion.
- * 3. buildXScript remains upstream because Taro's alias and path helpers already operate on either compact subtree.
- * 4. buildBaseComponentTemplate remains upstream so comp still knows only generic compact recursion and event dispatch; all
- *    behavior belongs to the generated call site and Page boundary rather than App-specific component properties.
+ * App React root
+ *   -> App host records
+ *      -> vpt_page_outlet host at App {children}
+ *         -> independently scheduled Taro Page roots
  *
- * createTemplateAssets can therefore remain ordinary asset orchestration, one template namespace is retained, and neither
- * Page updates nor native-component declarations become dependencies of App recursion.
+ * The patched WX document makes the singleton App host a TaroRootElement. App host mutations therefore batch under app.*
+ * and fan out to every mounted native Page. Each Page root remains its own TaroRootElement and emits only page.*. Patched
+ * hydrate() serializes App hosts but stops at vpt_page_outlet, so Page roots remain attached for React Context, lifecycle,
+ * events, removal, refs, effects, and HMR without being copied into app data.
+ *
+ * Build-time output
+ * -----------------
+ * createTemplateAssets still asks one builder for the normal five products: shared base.wxml, utils.wxs, comp.wxml,
+ * comp.json, and each Page WXML. This adapter specializes only the two products that own the native join:
+ *
+ * - shared base.wxml receives branchless slot forwarding plus vpt_fragment and vpt_page_outlet template definitions;
+ * - each Page WXML replaces Taro's root:root entry with one generic comp bound to app and one caller-owned taro_tmpl bound
+ *   to page as that component's default slot.
+ *
+ * utils.wxs remains Taro's normal compact-node dispatcher. comp.wxml and comp.json remain Taro's generic depth-reset
+ * component and still know only i, l, virtual-host behavior, and eh event dispatch. There is one shared template namespace,
+ * no Page-specific base file, no App/Page mode property, and no Page object threaded through App template data.
+ *
+ * First native Page
+ * -----------------
+ * createPageConfig starts the native Page with:
+ *
+ *     app  = { nn: 'vpt_fragment', cn: [] }
+ *     page = { cn: [] }
+ *
+ * nn lets unchanged comp dispatch one input object even though App JSX may produce zero, one, or many root hosts. The record
+ * is WXML-only rather than a Taro host, so it needs no sid. After React commits the Page root below the outlet, the framework
+ * queues a lazy hydrate(AppRoot).cn value beside the Page root's already-pending page.* payloads. Taro drains both through the
+ * native Page's existing first setData, making App wrapping and Page content appear atomically.
+ *
+ * Native WXML execution
+ * ---------------------
+ * Data/slot ownership and named-template ownership intentionally travel through different scopes:
+ *
+ * Page WXML (owns app, page, Page eh, and Page-content light DOM)
+ *   -> <comp i="{{app}}"> (crosses into a virtual custom-component scope)
+ *      -> comp.wxml (owns App eh, imports utils.wxs and shared base.wxml)
+ *         -> tmpl_0_vpt_fragment (iterates the real App compact roots in app.cn)
+ *            -> stock Taro templates (render App hosts and recurse through their cn arrays)
+ *               -> depth-reset <comp i="{{i}}" l="{{l}}"><slot /></comp>
+ *                  -> forwarded default slot, repeated for every required depth reset
+ *               -> tmpl_0_vpt_page_outlet at React's exact {children} position
+ *                  -> <slot />
+ *                     -> caller-owned <template is="taro_tmpl" data="{{root:page}}" />
+ *                        -> stock Taro templates render this native Page's page.cn records
+ *
+ * The virtual comp and both private templates add no native layout node. App events execute through comp.eh; slotted Page
+ * events retain the native Page's eh. Both resolve the original Taro sid through the same event source.
+ *
+ * Named-template scope
+ * --------------------
+ * Slots transfer caller-owned light DOM only. They do not transfer the caller's named-template table or WXS modules. App
+ * dispatch runs inside comp.wxml, so vpt_fragment and vpt_page_outlet must live in base.wxml imported by that component.
+ * Putting those definitions in buildPageTemplate produces Page WXML that compiles, but component runtime dispatch fails with
+ * `Template tmpl_0_vpt_fragment not found`. Shared base.wxml makes the names visible in the root and every depth-reset comp
+ * scope and emits them once rather than once per Page.
+ *
+ * Steady-state updates and navigation
+ * -----------------------------------
+ * A page.* setData updates only the caller-owned Page template inside the slot. app is not passed through that template and
+ * comp.i does not change, so Page updates cannot invalidate App recursion. An app.* batch updates comp.i independently on
+ * every retained native Page; the Page slot data remains unchanged. Adding or removing a React Page root mutates the outlet
+ * only in memory; the runtime suppresses that marker's native child update. A newly pushed Page receives the latest complete
+ * App snapshot in its initial batch, while existing and hidden Pages require no navigation synchronization.
+ *
+ * Method responsibilities
+ * -----------------------
+ * 1. buildBaseTemplate wraps Taro's buildTemplate output, preserves every stock host template, forwards the slot at Taro's
+ *    existing depth-reset call site, and adds the two private definitions to the dispatcher-visible shared namespace.
+ * 2. buildPageTemplate owns only the Page boundary: app binding, page binding, and the single Page-content slot.
+ * 3. buildXScript delegates unchanged because Taro's aliases, lineage, and depth selection operate on both compact roots.
+ * 4. buildBaseComponentTemplate delegates unchanged so recursive comp remains generic and feature-independent.
+ *
+ * H5 never calls this WX output builder. Its App continues to receive ordinary Fragment children and none of these native
+ * data roots, templates, custom-component boundaries, or slot rules enter the browser build.
  */
 function createTemplateBuilder() {
     const platform = new WxPlatform(
@@ -96,7 +165,7 @@ function createTemplateBuilder() {
     }
 
     return {
-        buildTemplate: (componentConfig: TemplateComponentConfig) => {
+        buildBaseTemplate: (componentConfig: TemplateComponentConfig) => {
             const source = taroTemplateBuilder.buildTemplate(componentConfig)
             /*
              * Taro inserts recursive comp only when template depth resets. App {children} may be below any number of those
@@ -112,6 +181,16 @@ function createTemplateBuilder() {
             )
 
             /*
+             * These definitions belong in shared base.wxml rather than buildPageTemplate. Although native data is Page-owned,
+             * the dynamic calls that render App records execute after crossing into comp.wxml's component scope. WXML slots
+             * transfer caller-owned light DOM, not the caller's named-template table or WXS modules. comp.wxml can therefore
+             * resolve only its own definitions and those imported from base.wxml.
+             *
+             * Defining the two names in Page WXML is not merely redundant: WeChat accepts that Page file at compile time, then
+             * comp.wxml's runtime dispatch fails with `Template tmpl_0_vpt_fragment not found` because component template
+             * resolution never searches the caller Page. Shared base.wxml is already imported by comp.wxml, makes both names
+             * visible at every depth-reset component scope, and emits them once instead of once per generated Page.
+             *
              * Page WXML can give generic comp one i object, whereas App output is a root collection. vpt_fragment bridges
              * those contracts without becoming a native or Taro host: its nn is only a template discriminator and its
              * template emits each real cn record directly. Keeping the collection behind one comp is important because that
