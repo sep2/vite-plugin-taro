@@ -1,6 +1,6 @@
 # vite-plugin-taro-plugin-framework-react
 
-> React 19 compatibility build of `@tarojs/plugin-framework-react@4.2.0` for `vite-plugin-taro`.
+> React 19 and WX App-wrap build of `@tarojs/plugin-framework-react@4.2.0` for `vite-plugin-taro`.
 
 ## Status
 
@@ -15,7 +15,7 @@ import Taro from 'virtual:taro/api'
 
 ## Why this package exists
 
-`vite-plugin-taro` targets React 19 while keeping the official Taro runtime behavior. This package is produced from the upstream Taro npm tarball plus a small local compatibility patch, then published under the `vite-plugin-taro-plugin-framework-react` name for reproducible installs.
+`vite-plugin-taro` targets React 19 and renders one singleton App host tree around native WX Pages. This package is produced from the upstream Taro npm tarball plus a small local patch, then published under the `vite-plugin-taro-plugin-framework-react` name for reproducible installs.
 
 ## Generated source
 

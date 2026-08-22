@@ -1,6 +1,6 @@
 # vite-plugin-taro-runtime
 
-> WX App-projection build of `@tarojs/runtime@4.2.0` for `vite-plugin-taro`.
+> WX App-wrap build of `@tarojs/runtime@4.2.0` for `vite-plugin-taro`.
 
 ## Status
 
