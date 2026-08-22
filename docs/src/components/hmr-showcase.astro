@@ -6,6 +6,8 @@ import HomeSectionHeading from './home-section-heading.astro'
 ---
 
 <section class="home-section demo-section" aria-labelledby="demo-title">
+    <HmrVideoFrame variant="showcase" />
+
     <div class="demo-copy">
         <HomeSectionHeading
             id="demo-title"
@@ -21,15 +23,13 @@ import HomeSectionHeading from './home-section-heading.astro'
         </ul>
         <a href="/guides/hot-module-replacement/">了解热更新机制 <span aria-hidden="true">→</span></a>
     </div>
-
-    <HmrVideoFrame variant="showcase" />
 </section>
 
 
 <style>
     .demo-section {
         display: grid;
-        grid-template-columns: minmax(0, 0.8fr) minmax(25rem, 1.2fr);
+        grid-template-columns: minmax(25rem, 1.2fr) minmax(0, 0.8fr);
         align-items: center;
         gap: clamp(2rem, 6vw, 5rem);
     }

@@ -15,9 +15,18 @@ import HomeSectionHeading from './home-section-heading.astro'
             />
 
             <ul class="app-view-benefits">
-                <li><i aria-hidden="true">1</i><span><strong>共享视图只写一次</strong><small>导航、全局控件由 App 统一渲染</small></span></li>
-                <li><i aria-hidden="true">↳</i><span><strong>页面自然切换</strong><small>每个页面仍是 App 的 children</small></span></li>
-                <li><i aria-hidden="true">∞</i><span><strong>状态持续保留</strong><small>Context、Hooks 与生命周期不会重建</small></span></li>
+                <li>
+                    <i aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 8 4.5-8 4.5-8-4.5L12 3Z" /><path d="m4 12 8 4.5 8-4.5M4 16.5l8 4.5 8-4.5" /></svg></i>
+                    <span><strong>共享视图只写一次</strong><small>导航、全局控件由 App 统一渲染</small></span>
+                </li>
+                <li>
+                    <i aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 8h14m0 0-3-3m3 3-3 3M19 16H5m0 0 3-3m-3 3 3 3" /></svg></i>
+                    <span><strong>页面自然切换</strong><small>每个页面仍是 App 的 children</small></span>
+                </li>
+                <li>
+                    <i aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8.2 8.5c-2 0-3.7 1.5-3.7 3.5s1.7 3.5 3.7 3.5c3.8 0 3.8-7 7.6-7 2 0 3.7 1.5 3.7 3.5s-1.7 3.5-3.7 3.5c-3.8 0-3.8-7-7.6-7Z" /></svg></i>
+                    <span><strong>状态持续保留</strong><small>Context、Hooks 与生命周期不会重建</small></span>
+                </li>
             </ul>
 
             <nav class="app-view-links" aria-label="App 与页面文档">
@@ -168,6 +177,7 @@ import HomeSectionHeading from './home-section-heading.astro'
     const phoneTiltPerPixel = 0.16
     const swipeIntentDistance = 10
     type PageId = (typeof pageOrder)[number]
+    type PageSelectionMotion = 'activation' | 'gesture'
 
     function isPageId(value: string | undefined): value is PageId {
         return value === 'home' || value === 'discover' || value === 'profile'
@@ -188,6 +198,8 @@ import HomeSectionHeading from './home-section-heading.astro'
         private activePage: PageId = 'discover'
         // A gesture owns its captured card and every temporary listener as one disposable session.
         private gesture: CardGesture | null = null
+        // Click and Tab navigation share one replaceable phone animation so repeated selections cannot overlap.
+        private phoneAnimation: Animation | null = null
         private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
 
         connectedCallback(): void {
@@ -199,6 +211,7 @@ import HomeSectionHeading from './home-section-heading.astro'
             this.removeEventListener('click', this.handleClick)
             this.removeEventListener('pointerdown', this.handlePointerDown)
             if (this.gesture !== null) this.endGesture(this.gesture)
+            this.phoneAnimation?.cancel()
         }
 
         private readonly handleClick = (event: MouseEvent): void => {
@@ -207,7 +220,7 @@ import HomeSectionHeading from './home-section-heading.astro'
             if (tab !== null) {
                 const nextPage = tab.dataset.selectPage
                 if (!isPageId(nextPage)) throw new Error('Page deck Tab requires a valid Page id')
-                this.selectPage(nextPage)
+                this.selectPage(nextPage, 'activation')
                 return
             }
 
@@ -217,7 +230,7 @@ import HomeSectionHeading from './home-section-heading.astro'
             const control = event.target.closest<HTMLElement>('[data-card-select]')
             const nextPage = control?.dataset.cardSelect ?? card?.dataset.pageCard
             if (!isPageId(nextPage)) throw new Error('Page deck card requires a valid Page id')
-            this.selectPage(nextPage)
+            this.selectPage(nextPage, 'activation')
         }
 
         private readonly handlePointerDown = (event: PointerEvent): void => {
@@ -226,6 +239,7 @@ import HomeSectionHeading from './home-section-heading.astro'
             const card = event.target.closest<HTMLElement>('[data-page-card]')
             if (card === null || this.gesture !== null) return
 
+            this.phoneAnimation?.cancel()
             const listeners = new AbortController()
             const gesture: CardGesture = {
                 card: card,
@@ -260,7 +274,7 @@ import HomeSectionHeading from './home-section-heading.astro'
             if (!isPageId(nextPage)) throw new Error('Page deck card requires a valid Page id')
             const swipeOffset = gesture.swipeOffset
             this.endGesture(gesture)
-            if (swipeOffset === null) this.selectPage(nextPage)
+            if (swipeOffset === null) this.selectPage(nextPage, 'activation')
             else this.selectRelativePage(swipeOffset)
         }
 
@@ -299,11 +313,51 @@ import HomeSectionHeading from './home-section-heading.astro'
         private selectRelativePage(offset: -1 | 1): void {
             const currentIndex = pageOrder.indexOf(this.activePage)
             const nextIndex = (currentIndex + offset + pageOrder.length) % pageOrder.length
-            this.selectPage(pageOrder[nextIndex])
+            this.selectPage(pageOrder[nextIndex], 'gesture')
         }
 
-        private selectPage(nextPage: PageId): void {
+        private animatePhone(pageOffset: -1 | 1): void {
+            if (this.reducedMotion.matches) return
+            const phone = requireDeckElement<HTMLElement>(this, '.phone-frame')
+            const baseTransform = 'translateX(-50%) rotate(0.35deg)'
+            const peakTilt = pageOffset === 1 ? -phoneTiltLimit : phoneTiltLimit
+            this.phoneAnimation?.cancel()
+            const animation = phone.animate(
+                [
+                    {
+                        transform: `${baseTransform} rotateY(0deg)`,
+                        offset: 0,
+                        easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)'
+                    },
+                    {
+                        transform: `${baseTransform} rotateY(${peakTilt}deg)`,
+                        offset: 0.32,
+                        easing: 'cubic-bezier(0.16, 1, 0.3, 1)'
+                    },
+                    {
+                        transform: `${baseTransform} rotateY(${-peakTilt * 0.12}deg)`,
+                        offset: 0.74,
+                        easing: 'ease-out'
+                    },
+                    { transform: `${baseTransform} rotateY(0deg)`, offset: 1 }
+                ],
+                { duration: 720 }
+            )
+            this.phoneAnimation = animation
+            const clearAnimation = (): void => {
+                if (this.phoneAnimation === animation) this.phoneAnimation = null
+            }
+            animation.oncancel = clearAnimation
+            animation.onfinish = clearAnimation
+        }
+
+        private selectPage(nextPage: PageId, motion: PageSelectionMotion): void {
             if (nextPage === this.activePage) return
+            const currentIndex = pageOrder.indexOf(this.activePage)
+            const nextIndex = pageOrder.indexOf(nextPage)
+            const forwardDistance = (nextIndex - currentIndex + pageOrder.length) % pageOrder.length
+            const pageOffset: -1 | 1 = forwardDistance === 1 ? 1 : -1
+            if (motion === 'activation') this.animatePhone(pageOffset)
             this.activePage = nextPage
             const activeIndex = pageOrder.indexOf(nextPage)
 
@@ -383,11 +437,18 @@ import HomeSectionHeading from './home-section-heading.astro'
         border-radius: 0.8rem;
         background: var(--vpt-icon-background);
         color: var(--vpt-accent);
-        font-size: var(--home-font-size-small);
-        font-style: normal;
-        font-weight: 800;
         place-items: center;
         transform: rotate(-3deg);
+    }
+
+    .app-view-benefits svg {
+        width: 1.25rem;
+        height: 1.25rem;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.8;
     }
 
     .app-view-benefits li > span {
