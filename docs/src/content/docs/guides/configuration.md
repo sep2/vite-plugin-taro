@@ -41,6 +41,7 @@ app: 'src/app.tsx'
 ```tsx
 import type { PropsWithChildren } from 'react'
 import { useLaunch } from 'virtual:taro/api'
+import { View } from 'virtual:taro/components'
 import './app.css'
 
 function App({ children }: PropsWithChildren) {
@@ -48,13 +49,17 @@ function App({ children }: PropsWithChildren) {
         console.log('App launched')
     })
 
-    return children
+    return <View className="app-shell">{children}</View>
 }
 
 export default App
 ```
 
-当前页面通过 `children` 传入。全局样式、App 生命周期、React Provider 和应用级初始化通常放在这里。
+当前页面通过 `children` 传入。App 返回的 JSX 会在 H5 和微信小程序中包裹页面，因此全局布局、全局样式、App
+生命周期、React Provider 和应用级初始化都可以放在这里。
+
+微信构建仍然只有一个 React App 实例。页面切换不会为每个原生 Page 重新创建 App；App 的 Context、Hook
+状态、Effect 和 Ref 都沿普通的 App → Page React 父子关系保留。每个原生 Page 仍使用独立的数据更新边界。
 
 ## `pages`
 

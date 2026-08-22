@@ -58,9 +58,9 @@ shared apps for WeChat Mini Program (`wx`) and H5 targets.
 - `packages/create-vite-taro`: publishable project generator package (`create-vite-taro`) with templates under
   `templates/default`.
 - `packages/taro-react`: generated React 19-compatible fork of `@tarojs/react`, published as `vite-plugin-taro-react`.
-- `packages/taro-plugin-framework-react`: generated React 19-compatible fork of `@tarojs/plugin-framework-react`,
+- `packages/taro-plugin-framework-react`: generated React 19 and WX App-wrap fork of `@tarojs/plugin-framework-react`,
   published as `vite-plugin-taro-plugin-framework-react`.
-- `packages/taro-runtime`: generated WX App-projection fork of `@tarojs/runtime`, published as
+- `packages/taro-runtime`: generated WX App-wrap fork of `@tarojs/runtime`, published as
   `vite-plugin-taro-runtime`.
 - `packages/loan-genius`: sample app used to test the plugin against `h5` and `wx` targets.
 - `packages/native-comp-demo`: wx-only development project for native custom-component integration.

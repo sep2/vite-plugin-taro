@@ -2,9 +2,12 @@
 
 ## Status
 
-Design plan only. The repository remains on current Taro behavior until this plan is implemented and validated.
+Implemented in the WX compiler/runtime and exercised by the permanent native-component fixture. Static tests, production
+WX/H5 builds, depth-16 slot forwarding, granular `app.*`/`page.*` paths, retained-Page navigation, native components, and
+App HMR state retention are validated. Broader device profiling of object-property propagation remains a release benchmark,
+not an architectural blocker.
 
-The chosen design uses a native virtual-host component and slot. It does not forward Page data through App WXML, merge
+The implementation uses a native virtual-host component and slot. It does not forward Page data through App WXML, merge
 App and Page data paths, create a React portal, or instantiate App once per Page.
 
 ## Goal
@@ -385,7 +388,7 @@ App hosts                              App compact records
    └─ Page root B
 ```
 
-Specialize pinned WX Taro runtime in two places:
+Patch the generated WX Taro runtime at the two outlet behavior sites:
 
 ```ts
 // hydrate(): stop before Page roots
@@ -524,28 +527,19 @@ Context remains valid, but Taro `parentNode`, subtree traversal, MutationObserve
 longer match normal App-to-Page nesting. The plan keeps ordinary children and adds no `HostPortal` Fiber or detached Taro
 container.
 
-## Chosen design: virtual-host App surface with a Page slot
+## Chosen design: Page-owned transparent App fragment
 
-Render App compact data inside Taro's existing recursive `comp` custom component. `comp` already uses `virtualHost: true`,
-so it adds no native layout node. Render the Page's normal WXML as the component's default slot.
-
-The key separation is:
-
-```text
-Component-owned WXML scope    reads Page.data.app
-Parent Page WXML scope        reads Page.data.page and supplies slot content
-```
-
-A `page.*` update changes the parent-scoped slot without changing the component's App property. No Page object appears in
-App template scopes.
+Keep Taro's recursive `comp` implementation and configuration unchanged. The generated Page WXML binds both native data
+roots and passes `app` to `comp` as one ordinary compact node. Its child is the Page-owned template slot.
 
 ### Native data
 
-Use descriptive top-level keys:
+The App root is a private transparent compact record; only its `cn` array changes:
 
 ```ts
 Page.data = {
     app: {
+        nn: 'vpt_fragment',
         cn: [/* compact App-wrap records */]
     },
     page: {
@@ -554,28 +548,31 @@ Page.data = {
 }
 ```
 
-### Direct Page path names
+`nn` is required only because generic `comp` dispatches one input record through `i.nn`; `vpt_fragment` transparently adapts
+the arbitrary App root collection to that contract. The synthetic record is not a Taro host or keyed/event-addressable
+child, so it intentionally has no `sid`. Its `cn` entries are real Taro records and retain their stable `sid` as the
+fragment loop's `wx:key`, matching stock root rendering. Only `app.cn` participates in native updates.
 
-Keep the Taro host type and `TaroRootElement.nodeName` as `'root'`; they identify the host and event boundary. Patch only
-its native data path:
+### Direct App and Page paths
+
+Both the document App host and React Page hosts are `TaroRootElement` schedulers. Their structural parent selects the native
+data namespace while `nodeName` remains `root` for Taro host and event semantics:
 
 ```ts
 get _path() {
-    return 'page'
+    return this.parentNode?.nodeName === 'container' ? 'app' : 'page'
 }
 ```
 
-Taro 4.2.0 also names two initial reset paths explicitly:
+The App root is the only root directly below the document container; Page roots live below `vpt_page_outlet`. Descendants
+therefore derive direct `app.*` or `page.*` paths without instance overrides or path translation. Taro 4.2.0 also names two
+initial Page-array reset paths explicitly:
 
 ```ts
 initRender
     ? ['page.cn.[0]', 'page.cn[0]']
     : []
 ```
-
-These two edits make initial and steady Page updates emit `page.*` directly. There is no adapter or per-update path
-translation. The scheduler-only App root's own `_path` is irrelevant because App payload paths originate from the App host
-container's explicit path `app`.
 
 ### Parent Page WXML
 
@@ -585,66 +582,46 @@ Current Page entry:
 <template is="taro_tmpl" data="{{root:root}}" />
 ```
 
-Proposed Page entry:
+Generated Page entry:
 
 ```xml
 <import src="../../base.wxml" />
 
-<comp app-root="{{true}}" slot-mode="{{true}}" app-data="{{app}}">
+<comp i="{{app}}">
   <template is="taro_tmpl" data="{{root:page}}" />
 </comp>
 ```
 
-The Page template remains in the parent Page WXML scope, where `page` is directly available. Its generated host templates,
-events, props, recursive rendering, and `page.*` paths remain normal Taro behavior.
+The Page owns the `app` and `page` bindings. `comp` receives the same generic `i` property it has always rendered; it has no
+App data property, root mode, slot mode, or App/Page branch.
 
-Both the parent Page and `comp.wxml` import the same `base.wxml` namespace. This does not recreate the earlier recursive
-call problem: App `taro_tmpl` runs inside the custom component's WXML context, while Page `taro_tmpl` runs as caller-owned
-slot content in the parent Page context. The native component boundary separates their active template call stacks, so no
-second renamed namespace is needed.
+### Transparent App root and outlet
 
-### Root App mode in existing `comp`
-
-Extend existing `comp.wxml` rather than add another native component kind:
+The private fragment template renders `app.cn` without a native node:
 
 ```xml
-<block wx:if="{{appRoot}}">
-  <template is="taro_tmpl" data="{{root:appData,s:slotMode}}" />
-</block>
-
-<block wx:else>
+<template name="tmpl_0_vpt_fragment">
   <template
-    is="{{'tmpl_0_' + i.nn}}"
-    data="{{i:i,c:1,l:xs.f('',i.nn),s:slotMode}}"
+    is="{{xs.a(0, item.nn, '')}}"
+    data="{{i:item,c:1,l:xs.f('',item.nn)}}"
+    wx:for="{{i.cn}}"
+    wx:key="sid"
   />
-</block>
+</template>
 ```
 
-Root mode renders `Page.data.app` received through `appData`. Existing recursive mode renders the normal `i` subtree.
-
-The existing recursive component config gains:
+App hydration still stops at the private outlet marker:
 
 ```text
-appRoot   boolean selecting root App mode
-slotMode  boolean indicating that recursion carries the Page slot
-appData   object containing compact App data
+Page.data.app
+└─ vpt_fragment
+   └─ App View
+      ├─ Header
+      ├─ { nn: 'vpt_page_outlet', cn: [] }
+      └─ Footer
 ```
 
-The component already supplies virtual-host behavior and the `eh` method required by App host events.
-
-### App outlet template
-
-The compact App tree contains one private marker:
-
-```text
-Page.data.app.cn
-└─ App View
-   ├─ Header
-   ├─ { nn: 'vpt_page_outlet', cn: [] }
-   └─ Footer
-```
-
-Its generated template emits only the component slot:
+The outlet consumes the Page-owned default slot:
 
 ```xml
 <template name="tmpl_0_vpt_page_outlet">
@@ -652,29 +629,26 @@ Its generated template emits only the component slot:
 </template>
 ```
 
-The slot inserts parent-scoped Page WXML exactly at `{children}`. It emits no native wrapper.
-
 ### Depth-15 slot forwarding
 
-The root App component owns the Page slot. If App recursion crosses Taro's existing depth-15 `comp` boundary before the
-outlet, the slot must cross that native component boundary.
-
-Carry one stable generated scalar `s` through recursive scopes:
+Taro's depth-reset `comp` remains generic. Its generated invocation simply forwards whatever default slot its caller owns:
 
 ```xml
-data="{{i:item,c:c+1,l:xs.f(l,item.nn),s:s}}"
-```
-
-Forward the slot only in App slot mode:
-
-```xml
-<comp i="{{i}}" l="{{l}}" slot-mode="{{s}}">
-  <slot wx:if="{{s}}" />
+<comp i="{{i}}" l="{{l}}">
+  <slot />
 </comp>
 ```
 
-`Page.data.page` is never assigned to `s` or to a component property. Ordinary Page recursion does not provide `s`; App
-recursion provides one stable boolean. A Page update cannot change it.
+`l` is Taro's stock WXS lineage for bounded/nestable component aliases and remains part of the generic depth-reset contract.
+The new Page-root `comp` omits it because that call has no ancestor lineage and the property defaults to `''`. No Page object
+or mode scalar crosses recursive template calls. Page-side recursion forwards an empty slot; App-side recursion forwards the
+Page template until the outlet consumes it.
+
+### Native-component ownership
+
+`comp.json` remains unchanged and registers only recursive `comp`. `app.json` registers every generated native-component
+mapping and asynchronous placeholder once, making them available across WXML owners. Page JSON preserves explicit Page
+configuration and adds only the Page-local root `comp` registration.
 
 ### Native result
 
@@ -687,67 +661,62 @@ App native nodes                      App native nodes
 └─ Footer                             └─ Footer
 ```
 
-The root `comp` is a virtual host, and the outlet emits only `<slot>`, so neither adds a layout node.
+The fragment, virtual `comp`, and outlet add no native layout node.
 
 ## Verified WeChat platform behavior
 
-A disposable native fixture established the platform primitives before choosing this design:
+The permanent fixture validates:
 
 ```text
-1. <slot> inside a component WXML <template> renders caller content.
-2. Caller content generated by <template is="..."> retains the parent Page data scope.
-3. setData(page.*) updates slotted Page content without triggering the App-property observer.
-4. setData(app.*) triggers the App property and leaves Page data unchanged.
-5. A virtual child component can receive and forward the slot through another <slot>.
-6. No slot, property, or runtime warnings occur in these flows.
+1. comp.wxml and comp.json remain free of App/Page properties and branches.
+2. A depth-16 App wrap forwards the Page slot through recursive comp.
+3. Page-only updates report only page.* paths.
+4. App-only updates report only granular app.* paths.
+5. Context and App state survive two retained native Pages and back navigation.
+6. A native component rendered by app.tsx resolves through app.json while comp.json remains unchanged.
 ```
-
-These observations prove Page/App dependency isolation. They do not prove App-property update granularity; permanent tests
-must measure that separately.
 
 ## App scheduler
 
-App hosts currently resolve `_root` to null. Reuse Taro's existing batching logic with one scheduler-only
-`TaroRootElement`:
+Create the document's existing `#app` host as a `TaroRootElement` instead of a plain `TaroElement`. It remains React's one
+host container and also supplies Taro's normal batching queue; no detached scheduler node is needed.
+
+The structural parent selects the native namespace:
 
 ```ts
-const appScheduler = document.createElement('root')
+get _path() {
+    return this.parentNode?.nodeName === 'container' ? 'app' : 'page'
+}
+```
 
-appScheduler.ctx = {
+The App root is the only root directly below the document container. Page roots remain below `vpt_page_outlet`. Framework
+initialization assigns only the App root's native sink:
+
+```ts
+appRoot.ctx = {
     setData(data, callback) {
         const pages = getCurrentPages()
-        const visiblePage = pages[pages.length - 1]
+        const currentPage = pages[pages.length - 1]
 
-        if (!visiblePage) {
+        if (!currentPage) {
             callback()
             return
         }
 
         pages.forEach((page) => {
-            page.setData(data, page === visiblePage ? callback : undefined)
+            page.setData(data, page === currentPage ? callback : undefined)
         })
     }
 }
-
-Object.defineProperties(appHostContainer, {
-    _path: { get: () => 'app' },
-    _root: { get: () => appScheduler }
-})
 ```
 
-The scheduler is not appended to the Taro host tree and is not a React root. It contributes only Taro's existing update
-queue, path batching, callback batching, and scheduled flush.
-
 ```text
-Scheduler relationships, not host parentage
+App TaroRootElement._root ─────► itself ──► app.* fan-out
+                                           ├─ native Page A.setData(app delta)
+                                           └─ native Page B.setData(app delta)
 
-App-side TaroElement._root ─────► appScheduler
-                                  └─ app.* batch
-                                     ├─ native Page A.setData(app delta)
-                                     └─ native Page B.setData(app delta)
-
-Page A TaroRootElement._root ───► itself ──► native Page A.setData(page delta)
-Page B TaroRootElement._root ───► itself ──► native Page B.setData(page delta)
+Page A TaroRootElement._root ──► itself ──► native Page A.setData(page delta)
+Page B TaroRootElement._root ──► itself ──► native Page B.setData(page delta)
 ```
 
 Only App state that changes App host output produces `app.*`. Context-only or identical-output updates produce no native
@@ -762,7 +731,7 @@ payload:
 ```ts
 pageRoot.enqueueUpdate({
     path: 'app.cn',
-    value: () => hydrate(appHostContainer).cn
+    value: () => hydrate(container).cn
 })
 ```
 
@@ -776,7 +745,7 @@ The Page constructor starts with:
 
 ```ts
 {
-    app: { cn: [] },
+    app: { nn: 'vpt_fragment', cn: [] },
     page: { cn: [] }
 }
 ```
@@ -796,7 +765,7 @@ React commit
 ├─ Page root queues page.*
 └─ framework queues lazy app.cn
    └─ one initial native setData(app + page)
-      ├─ root virtual comp renders App data
+      ├─ Page-owned virtual comp renders App data
       └─ parent Page template fills the App slot from page data
 ```
 
@@ -807,7 +776,7 @@ Page setState()
 └─ React reconciles that Page Fiber
    └─ Page Taro root emits page.* to that native Page
       └─ parent Page WXML updates slotted Page nodes
-         └─ appData component property does not change
+         └─ root comp.i does not change
             └─ App templates do not depend on the Page update
 ```
 
@@ -817,8 +786,8 @@ Page setState()
 App setState()
 └─ React reconciles singleton App once
    └─ App Taro nodes emit app.*
-      └─ appScheduler mirrors one delta to each mounted Page
-         └─ root virtual comp updates App templates
+      └─ App Taro root mirrors one delta to each mounted Page
+         └─ Page-owned virtual comp updates App templates
             └─ slotted Page data remains unchanged
 ```
 
@@ -854,14 +823,14 @@ App
                └─ Page Fiber subtree
 ```
 
-Context, error boundaries, Suspense, state, effects, and refs follow this one tree. Native WXML only projects already
+Context, error boundaries, Suspense, state, effects, and refs follow this one tree. Native WXML only renders already
 reconciled host data.
 
 ### Native ownership
 
-The root App `comp` owns only App WXML. Slotted Page WXML remains owned by the parent native Page configuration. App host
-events use the component's existing `eh`; Page host events use the Page's `eh`. Taro `sid` values still resolve against one
-global event source.
+Page WXML owns the `app`/`page` binding. Generic `comp` dispatches the compact `i` record, while slotted Page WXML remains
+owned by the parent native Page configuration. App host events use the component's existing `eh`; Page host events use the
+Page's `eh`. Taro `sid` values still resolve against one global event source.
 
 ### Native visual nesting
 
@@ -875,8 +844,8 @@ to a hidden Page needs no `onShow` synchronization or active-Page tracker.
 
 ### H5
 
-H5 keeps ordinary Fragment children and browser DOM rendering. It receives no WX outlet, native `comp`, runtime
-specialization, App scheduler, or `{ app, page }` data contract.
+H5 keeps ordinary Fragment children and browser DOM rendering. It receives no WX outlet, native `comp`, App scheduler, or
+`{ app, page }` data contract. The generated runtime package leaves its H5 `runtime.esm.js` entry unchanged.
 
 ## Performance
 
@@ -885,9 +854,9 @@ Let `W` be App compact size, `Rᵢ` Page compact size, and `P` mounted Pages.
 ```text
 React App instances:             1
 React Page instances:            P
-Native virtual App components:   P
+Native virtual comp instances:   P plus ordinary depth-reset instances
 Parent Page app storage:         O(P × W)
-Component appData storage:       up to O(P × W), platform implementation dependent
+Component i storage:             up to O(P × W), platform implementation dependent
 Native Page storage:             O(sum Rᵢ)
 Page-local bridge work:          O(delta Rᵢ)
 Page-local App-template work:    O(0)
@@ -896,6 +865,68 @@ App component work:              O(P × delta W) ideal; O(P × W) conservative
 New Page App seed:               O(W)
 Page-root insertion bridge:      O(0)
 ```
+
+Let `delta A` and `delta Rᵢ` be the serialized App and Page payloads for one batch, `U` the number of Taro payload paths
+coalesced by that batch, and `B` the number of depth-reset `comp` boundaries crossed before the outlet.
+
+### Per-update cost model
+
+| Update | React/Taro work | Native calls | Bridge bytes | WXML consequence |
+| --- | --- | --- | --- | --- |
+| Page leaf update | Reconcile the affected Page Fiber subtree; one Page root batches its changed paths | 1 `Page.setData()` | `O(delta Rᵢ)` | Only `page.*` dependencies update; `comp.i === app` is unchanged |
+| Page structural update | Same root, but Taro may replace a sibling `cn` array according to its normal insertion heuristic | 1 | Between `O(delta Rᵢ)` and `O(Rᵢ)` | Same as baseline Taro Page array replacement through one outer slot |
+| App leaf update | Reconcile singleton App hosts once; App root coalesces `U` paths, then enumerates `P` native Pages | `P` | `O(P × delta A)` | Every Page's App templates update; component propagation is granular ideally and `O(W)` per Page conservatively |
+| App structural update | Taro may hydrate/replace an App `cn` array, so the payload can grow from one subtree to all siblings | `P` | Between `O(P × delta A)` and `O(P × W)` | Same App-property uncertainty, multiplied by every retained Page |
+| State update with identical host output | React reconciliation only; no Taro payload is enqueued | 0 | 0 | No native work |
+| Context update consumed only by Pages | Reconcile affected consumers; each affected Page root batches independently | Up to `P` | `O(sum delta Rᵢ)` | Page templates only |
+| Context update consumed by App and Pages | One App batch plus each affected Page batch | Up to `2P` | `O(P × delta A + sum delta Rᵢ)` | App and Page partitions update independently; the current Page can receive two `setData()` calls |
+| First mount of a native Page | Commit its React Page root, hydrate the current App hosts once, and add both payloads to the pending initial Page queue | 1 | `O(W + Rᵢ)` | App and Page appear atomically; one virtual root `comp` and `B` depth components instantiate |
+| Navigation push after React commit | Outlet child insertion changes only the in-memory ownership tree; initial Page seeding handles native data | 0 App calls, then the one initial Page call above | No App insertion payload | Existing Pages are untouched |
+| Navigation pop | Normal React/Taro removal and event-source cleanup for the unloaded Page; outlet propagation is suppressed | 0 App calls | 0 App bytes | Remaining surfaces are untouched and future fan-out uses `P - 1` Pages |
+| App update with no mounted Page | App root still coalesces its in-memory hosts; fan-out completes immediately | 0 | 0 | The next Page receives the latest full snapshot |
+
+Taro's existing root batching drains its payload array with repeated `shift()`, giving a theoretical `O(U²)` worst case,
+then checks up to `C` child-array reset paths against each retained path for `O(U × C)`. The feature changes neither step and
+adds no queue or path translation. App updates add the `O(P)` stack enumeration and native calls after that existing batch;
+Page updates do not.
+
+### Constant overhead introduced by the patches
+
+- The document's existing App container becomes a `TaroRootElement`. This adds one root queue and `ctx` reference but no
+  extra node, React root, or native layout element.
+- `TaroRootElement._path` performs one parent-name comparison whenever a root path is requested. This is `O(1)` and replaces
+  the former constant return; descendant path construction is otherwise unchanged.
+- `TaroNode.enqueueUpdate()` performs one outlet-name comparison for every host update. Only outlet child mutations return
+  early; that constant branch prevents a navigation change from becoming an `app.*` fan-out.
+- `hydrate()` performs one outlet-name comparison per visited App record. At the outlet it terminates traversal, avoiding
+  `O(sum Rᵢ)` Page serialization and the much larger `O(P × sum Rᵢ)` native duplication that traversal would cause.
+- `vpt_fragment` iterates the App's top-level compact records once and emits no node. Its cost is `O(N)` for `N` App roots,
+  which is the collection dispatch generic `comp` otherwise cannot express.
+- The outer virtual `comp` adds one native component context per Page. Slot forwarding adds no JavaScript bridge call or
+  data copy; a depth-`D` App wrap creates the same Taro reset components plus `B` forwarded slot boundaries, roughly one
+  per 15 host levels.
+- `broadcastAppUpdate()` calls `getCurrentPages()` once and dispatches `P` `setData()` calls. Only the current Page receives
+  the completion callback, avoiding `P` callback closures or a mutable fan-in counter; it does not wait for every hidden
+  surface's render callback before Taro completes the App batch.
+
+### Current DevTools observation
+
+A WeChat DevTools simulator run against the permanent native-component fixture used one mounted Page and an App outlet below
+16 host levels. `setUpdatePerformanceListener({ withDataPaths: true })` reported:
+
+| Interaction | Samples | Native batches per interaction | Paths per batch | Median queue | Median process | Median total | Maximum total |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| App-host-only state | 20 | 1 `app.*` | 2 | 4 ms | 2 ms | 6 ms | 9 ms |
+| Page-only state | 20 | 1 `page.*` | 3 | 2 ms | 1 ms | 2.5 ms | 4 ms |
+| Context rendered by App and Page | 10 | 1 `app.*` + 1 `page.*` | 1 each | 3 ms / 3 ms | 2 ms / 1 ms | 4.5 ms / 4 ms | 5 ms / 6 ms |
+
+“Queue” above is `pendingStartTimestamp -> updateStartTimestamp`; it does not include React reconciliation or Taro's
+scheduled delay before `Page.setData()` enters the native listener. These numbers are diagnostics, not a baseline benchmark:
+they are simulator timings from one machine, payload shapes differ, and Page-level data paths do not reveal whether WeChat
+copied or reevaluated the complete `comp.i` property internally. A release benchmark must compare the same fixture against
+upstream Taro on device for shallow, wide, depth-14, depth-15, and
+multi-boundary App shapes. Until that test exists, only bridge-call counts, payload paths, asymptotic costs, and Page/App
+isolation are established.
 
 ### Cost relative to current Taro
 
@@ -912,10 +943,10 @@ There is no Page-data forwarding through App scopes. The incremental Page-update
 Feature-only costs are:
 
 ```text
-Page mount:      one App snapshot and one virtual component instance
+Page mount:      one App snapshot and one ordinary virtual comp instance
 App update:      one delta per native Page plus component-property rendering
 Native storage:  one App mirror per Page and possibly one component property copy
-Static WXML:     outlet slot template plus stable scalar s plumbing
+Static WXML:     transparent-fragment and outlet templates plus one slot at the depth boundary
 ```
 
 ### App component property granularity
@@ -923,7 +954,7 @@ Static WXML:     outlet slot template plus stable scalar s plumbing
 The parent Page binds one object property:
 
 ```xml
-<comp app-data="{{app}}">
+<comp i="{{app}}">
 ```
 
 A granular parent update can remain:
@@ -943,7 +974,7 @@ app.cn.0.cn.1.v changes
 
 Coarse
 app object is considered changed
-└─ component receives/reevaluates complete appData       O(W)
+└─ component receives/reevaluates complete i             O(W)
 ```
 
 A Page-level performance listener showing a granular `app.*` path does not prove granular component work. The disposable
@@ -955,9 +986,9 @@ native tree. Do not add either mechanism without measurements.
 
 ### Native component boundary costs
 
-One virtual component per Page adds a native component context, property storage, WXML scope, and event method. It adds no
-layout node. Selector/ref semantics across the component boundary and native-component declarations reachable from App JSX
-must be treated as correctness requirements, not assumed free.
+One virtual `comp` per Page adds a native component context, property storage, WXML scope, and event method. It adds no
+layout node. Generated native components and asynchronous placeholders use one global `app.json` registration so their tags
+resolve across WXML owners. The root `comp` remains Page-local, and explicit user Page registrations remain untouched.
 
 ## Minimum implementation changes
 
@@ -969,35 +1000,34 @@ Update:
 patches/@tarojs__plugin-framework-react@4.2.0-react19.patch
 ```
 
-Add:
+Keep the ordinary four-argument `createReactApp()` API. Its existing Mini Program branch:
 
-- one private `vpt_page_outlet` host around WX Page elements;
-- one scheduler-only App root at native path `app`;
-- `app.*` fan-out to mounted native Pages;
-- one lazy `app.cn` seed in each Page's existing initial batch.
+- uses the existing App host as a `TaroRootElement` with direct `app.*` paths;
+- assigns its native sink to fan out App batches;
+- renders Page elements below the fixed private `vpt_page_outlet` host;
+- fans each batched `app.*` delta out to mounted native Pages;
+- lazily seeds `app.cn` before each Page's existing initial callback continues.
 
-Do not add a portal, detached Page container, Page registry, active-Page tracker, lifecycle synchronizer, or custom pending
-queue.
+The existing web branch retains its Fragment children and never executes the Mini Program scheduler code. Do not add a
+portal, detached Page container, Page registry, active-Page tracker, lifecycle synchronizer, or custom pending queue.
 
-### WX Taro-runtime specialization
+### Patched Taro runtime package
 
-Add one asserted source-mapped transform under the WX plugin. It must match exactly four pinned Taro 4.2.0 sites:
+Generate `vite-plugin-taro-runtime` from the upstream `@tarojs/runtime@4.2.0` tarball and
+`patches/@tarojs__runtime@4.2.0.patch` through `pnpm prepare:taro`, alongside the two existing patched Taro
+packages. The patch changes exactly five sites in the modular WX browser entry:
 
 ```text
-1. hydrate() outlet child serialization
-2. TaroNode.enqueueUpdate() forwarding
-3. TaroRootElement._path
-4. initial root.cn reset-path literals
+1. document App-host construction
+2. hydrate() outlet child serialization
+3. TaroNode.enqueueUpdate() forwarding
+4. TaroRootElement._path
+5. initial root.cn reset-path literals
 ```
 
-The transform:
-
-- makes the outlet opaque;
-- suppresses outlet-originated native updates;
-- emits Page paths at `page.*`;
-- changes initial reset paths to `page.cn`;
-- preserves one Taro runtime module identity;
-- applies only to WX.
+The patched modules make the outlet opaque, suppress outlet-originated native updates, and emit direct `page.*` paths. The
+plugin resolves every bare `@tarojs/runtime` import to this one package identity. `runtime.esm.js`, used by H5, remains the
+upstream file. No build-time Taro source specialization is performed.
 
 ### Page data capsule
 
@@ -1005,31 +1035,28 @@ Initialize:
 
 ```ts
 {
-    app: { cn: [] },
+    app: { nn: 'vpt_fragment', cn: [] },
     page: { cn: [] }
 }
 ```
 
 ### Generated Page WXML
 
-Emit the root virtual component and parent-scoped Page slot shown above. Keep one import of the existing shared base
-namespace.
+Emit the stock recursive `comp` with `i="{{app}}"` and the parent-scoped Page template as its default slot.
 
 ### Shared template generation
 
+- append transparent `tmpl_0_vpt_fragment`;
 - append `tmpl_0_vpt_page_outlet` containing `<slot />`;
-- add stable scalar `s` to recursive template scopes;
-- forward slot and `s` through depth-15 `comp` calls;
-- do not add Page data to App scopes;
+- place one unconditional `<slot />` inside Taro's existing depth-reset `comp` invocation;
+- do not change ordinary recursive template data scopes;
 - do not duplicate the template namespace;
 - do not emit `page-base.wxml`.
 
-Only standalone template `data` attributes may be augmented. Attributes such as `extra-data` must remain unchanged.
-
 ### Recursive component capsule
 
-Extend existing `comp` config with root App mode, slot mode, and App-data properties. Keep existing virtual-host and event
-behavior. Generate native-component declarations required by App templates at paths valid from root `comp.json`.
+Leave `component.ts`, `comp.wxml`, and `comp.json` at their generic Taro behavior. They contain no App/Page property, mode,
+or branch.
 
 ## Invariants
 
@@ -1043,9 +1070,9 @@ behavior. Generate native-component declarations required by App templates at pa
 8. Every Page root remains an independent scheduler emitting direct `page.*` paths.
 9. App hosts emit direct `app.*` paths through one singleton scheduler.
 10. Every native Page stores independent `{ app, page }` data.
-11. Root `comp` WXML depends only on `app` and stable slot mode.
-12. Parent Page WXML depends only on `page`.
-13. No Page object is forwarded through App scopes or component properties.
+11. `comp.wxml`, `component.ts`, and `comp.json` contain no App/Page distinction.
+12. Page WXML alone binds `app` to generic `i` and `page` to the default slot.
+13. No Page object is forwarded through App template scopes or component properties.
 14. The native slot is consumed exactly once at the outlet.
 15. Root and recursive `comp` instances are virtual hosts.
 16. H5 behavior is unchanged.
@@ -1054,44 +1081,46 @@ behavior. Generate native-component declarations required by App templates at pa
 
 ### Static and unit tests
 
-- runtime specialization matches exactly four intended Taro sites;
+- the runtime patch applies cleanly to exactly five intended Taro sites;
 - App hydration stops before outlet children without hydrating Page subtrees;
 - outlet insertion/removal preserves Taro host bookkeeping and emits no App sink call;
 - Page roots emit `page.*` directly;
 - App hosts emit `app.*` directly;
-- generated Page WXML uses root `comp` and a parent-scoped `page` template;
+- generated Page WXML binds generic `comp.i` to the transparent App record and supplies the Page template as its slot;
+- `component.ts`, `comp.wxml`, and `comp.json` contain no App-specific fields;
 - no App template scope contains Page data;
-- outlet template contains only `<slot />`;
-- stable slot mode and slot forwarding cross depth-15 recursion;
-- one template namespace is emitted;
-- `extra-data` and other non-scope attributes are unchanged.
+- fragment and outlet templates emit no native wrapper;
+- unconditional slot forwarding crosses depth-15 recursion;
+- one template namespace is emitted.
 
 ### React semantics fixture
 
-With at least two mounted Pages:
+The permanent native-component fixture currently verifies with two retained Pages:
 
-- App Context values appear in visible and hidden Pages;
-- `[vpt-wrap] launch` runs exactly once across push/hide/show/pop;
-- App effect mounts once and does not clean up during Page navigation;
+- App Context values appear in the visible Page and remain current after back navigation;
+- `Taro.useLaunch()` and the App effect mount once across push/hide/show/pop;
+- the App effect does not clean up during Page navigation;
 - App state increments once and survives navigation;
-- Page-local state survives hide/show and back;
-- App and Page refs do not remount unexpectedly;
-- accepted App HMR preserves nonzero App state and Context;
-- React Refresh may rerun effects but does not retrigger native App launch.
+- App-host-only state updates do not emit `page.*` paths;
+- Page-local state updates do not emit `app.*` paths;
+- a native component rendered by `app.tsx` receives App props.
+
+Accepted App HMR state retention has been exercised manually. Explicit App/Page ref-remount assertions and automated
+on-device lifecycle counters remain regression work rather than completed fixture coverage.
 
 ### WX rendering and isolation
 
 - App native nodes visually surround slotted Page nodes;
 - virtual hosts add no layout box;
 - Page `setState()` emits only `page.*`;
-- Page updates do not trigger root `comp` App-property observers or App-template updates;
+- Page updates do not change the root `comp.i` property or App-template data;
 - App `setState()` emits `app.*` once per mounted Page;
 - initial `app + page` rendering is atomic;
 - hidden App surfaces remain current;
 - slot forwarding works through one and multiple depth-15 boundaries;
 - Page and App controls dispatch to the correct React handlers;
-- native components, slots, styles, selectors, and refs retain semantics;
-- console contains no recursive-template, property, slot, or runtime warnings.
+- native-component props and slots retain semantics;
+- console contains no recursive-template, property, slot, or runtime errors.
 
 Use `setUpdatePerformanceListener({ withDataPaths: true })`, component observers, and native update timing. Bridge paths and
 component-internal work must be measured separately.
@@ -1133,15 +1162,16 @@ Run:
 - fresh generated-project WX and H5 builds;
 - App source HMR with nonzero App state.
 
-## Acceptance criteria
+## Architecture acceptance criteria
 
-The design is accepted only when all are true:
+The implemented architecture satisfies the structural criteria below; the on-device baseline and remaining automated
+regressions listed above are release-validation work:
 
 - App JSX visibly wraps every WX Page;
 - one App Fiber preserves Context, state, effects, refs, and reconciliation;
 - no React portal or second React root exists;
 - no Page data is threaded through App WXML scopes;
-- Page-local updates do not invalidate App templates or `appData`;
+- Page-local updates do not invalidate App templates or generic `comp.i`;
 - App updates remain acceptably granular across the component-property boundary;
 - every native Page renders only its own slotted `page` data;
 - App and Page events, styles, selectors, refs, and native components retain semantics;
@@ -1149,4 +1179,4 @@ The design is accepted only when all are true:
 - Page mount/unmount emits no native App child-list update;
 - one static WXML namespace is emitted;
 - H5 is unchanged;
-- the complete regression and performance matrix passes.
+- the complete regression and performance matrix is run before release.

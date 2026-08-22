@@ -17,7 +17,7 @@ pnpm prepare:taro
 pnpm build:plugin
 ```
 
-`pnpm prepare:taro` 会从上游 npm 包和 `patches` 中重新生成 React 19 兼容的 Taro 包。首次检出、更新 Taro 版本或修改 patch 后应重新执行。
+`pnpm prepare:taro` 会从上游 npm 包和 `patches` 中重新生成项目维护的 Taro 支持包。首次检出、更新 Taro 版本或修改 patch 后应重新执行。
 
 ## 工作区结构
 
@@ -26,7 +26,8 @@ pnpm build:plugin
 | `packages/vite-plugin-taro` | 发布到 npm 的 Vite 插件 |
 | `packages/create-vite-taro` | 项目生成器及默认模板 |
 | `packages/taro-react` | 生成的 React 19 兼容 Taro React 包 |
-| `packages/taro-plugin-framework-react` | 生成的 React 19 兼容框架插件 |
+| `packages/taro-plugin-framework-react` | 生成的 React 19 与 WX App 包裹框架插件 |
+| `packages/taro-runtime` | 生成的 WX App 包裹 Taro Runtime 包 |
 | `packages/loan-genius` | WX 与 H5 综合示例 |
 | `packages/native-comp-demo` | 微信原生组件示例 |
 | `packages/hmr-stress-demo` | 深层 React 树与页面栈 HMR 压力测试项目 |
@@ -88,7 +89,7 @@ pnpm dev:towxml-stream-demo:wx
 ## 生成文件
 
 - 不要手动编辑 `packages/vite-plugin-taro/dist`；运行 `pnpm build:plugin` 重新生成。
-- 不要直接修改 `packages/taro-react` 或 `packages/taro-plugin-framework-react` 的实现；修改 `patches/*@4.2.0-react19.patch` 后运行 `pnpm prepare:taro`。
+- 不要直接修改 `packages/taro-react`、`packages/taro-plugin-framework-react` 或 `packages/taro-runtime` 的实现；修改对应的 `patches/*@4.2.0*.patch` 后运行 `pnpm prepare:taro`。
 - 不要手动编辑 `CHANGELOG.md`；运行 `pnpm changelog`，或在发布时由 release 命令生成。
 - 根目录的 `README.md` 与 `README.en.md` 是插件 README 的来源；`pnpm build:plugin` 会同步到 `packages/vite-plugin-taro`。
 
