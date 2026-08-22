@@ -1,0 +1,882 @@
+---
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import HomeSectionHeading from './home-section-heading.astro'
+---
+
+<section class="home-section" aria-labelledby="app-view-title">
+    <div class="app-view-layout">
+        <div class="app-view-copy">
+            <HomeSectionHeading
+                id="app-view-title"
+                kicker="标准 React App"
+                title="App 可以渲染真实视图"
+                description="VPT 会渲染 App 返回的任意组件。布局、导航、全局控件与微信原生组件，都能真正出现在页面外层。"
+                align="start"
+            />
+
+            <ul class="app-view-benefits">
+                <li><i aria-hidden="true">V</i><span><strong>返回任意组件</strong><small>App 视图会被真正渲染</small></span></li>
+                <li><i aria-hidden="true">↳</i><span><strong>自然包裹页面</strong><small>页面仍是 App 的 children</small></span></li>
+                <li><i aria-hidden="true">1</i><span><strong>只创建一个 App</strong><small>Context、状态与生命周期保持唯一</small></span></li>
+            </ul>
+
+            <nav class="app-view-links" aria-label="App 与页面文档">
+                <a class="primary-link" href="/guides/app-and-pages/">了解 App 与页面 <span aria-hidden="true">→</span></a>
+            </nav>
+        </div>
+
+        <vpt-page-deck class="page-deck-demo" role="group" aria-label="App 中切换微信页面的交互演示">
+            <div class="deck-stage">
+                <article class="phone-frame" aria-label="VPT Life 微信小程序">
+                    <span class="phone-speaker" aria-hidden="true"></span>
+                    <div class="phone-screen">
+                        <header class="app-header">
+                            <span class="app-mark" aria-hidden="true">V</span>
+                            <span class="app-title"><small>ONE REACT APP</small><strong>VPT Life</strong></span>
+                            <span class="app-streak"><i aria-hidden="true">✦</i><span><small>连续</small><strong>12 天</strong></span></span>
+                        </header>
+                        <div class="page-aperture" aria-hidden="true"></div>
+                        <nav class="app-tabs" aria-label="页面导航">
+                            <button type="button" data-select-page="home" aria-current="page"><i aria-hidden="true">⌂</i><span>首页</span></button>
+                            <button type="button" data-select-page="discover"><i aria-hidden="true">◇</i><span>发现</span></button>
+                            <button type="button" data-select-page="profile"><i aria-hidden="true">○</i><span>我的</span></button>
+                        </nav>
+                    </div>
+                </article>
+
+                <div class="page-deck" aria-label="页面卡片">
+                    <article class="page-card page-home" data-page-card="home" data-slot="0">
+                        <header><span>首页</span><small>今天</small></header>
+                        <p class="card-kicker">DAILY RHYTHM</p>
+                        <h3>今天也向前一点</h3>
+                        <p class="card-copy">保留节奏，也留一点时间给自己。</p>
+                        <section class="focus-card">
+                            <span><small>专注时间</small><strong>2h 18m</strong></span>
+                            <i aria-hidden="true"><b></b></i>
+                            <em>目标完成 78%</em>
+                        </section>
+                        <div class="mini-stats">
+                            <span><small>步数</small><strong>8,420</strong></span>
+                            <span><small>能量</small><strong>486</strong></span>
+                        </div>
+                        <button class="card-select" type="button" data-card-select="home" aria-label="显示首页"></button>
+                    </article>
+
+                    <article class="page-card page-discover" data-page-card="discover" data-slot="1">
+                        <header><span>发现</span><small>附近</small></header>
+                        <p class="card-kicker">WEEKEND PICKS</p>
+                        <h3>去有风的地方</h3>
+                        <p class="card-copy">三条适合周末散步的绿色路线。</p>
+                        <section class="place-card">
+                            <span class="place-art" aria-hidden="true"><i></i><i></i><b></b></span>
+                            <span><small>距离 2.4 km</small><strong>溪谷植物园</strong><em>安静 · 适合散步</em></span>
+                        </section>
+                        <div class="place-tags"><span>自然</span><span>轻徒步</span><span>咖啡</span></div>
+                        <button class="card-select" type="button" data-card-select="discover" aria-label="显示发现页"></button>
+                    </article>
+
+                    <article class="page-card page-profile" data-page-card="profile" data-slot="-1">
+                        <header><span>我的</span><small>个人空间</small></header>
+                        <div class="profile-head">
+                            <span class="profile-avatar" aria-hidden="true">林</span>
+                            <span><small>GOOD MORNING</small><h3>林小满</h3><p>把日子过成喜欢的样子。</p></span>
+                        </div>
+                        <section class="profile-streak"><i aria-hidden="true">✦</i><span><small>连续记录</small><strong>12 天</strong></span></section>
+                        <div class="profile-grid">
+                            <span><strong>28</strong><small>完成计划</small></span>
+                            <span><strong>6</strong><small>收藏路线</small></span>
+                        </div>
+                        <button class="card-select" type="button" data-card-select="profile" aria-label="显示我的页面"></button>
+                    </article>
+                </div>
+
+                <p class="deck-hint"><span aria-hidden="true">↔</span> 滑动页面，或点击卡片和底部 Tab</p>
+                <output class="sr-only" data-page-announcement aria-live="polite"></output>
+            </div>
+        </vpt-page-deck>
+    </div>
+</section>
+
+<script>
+    function requireDeckElement<T extends Element>(root: ParentNode, selector: string): T {
+        const element = root.querySelector<T>(selector)
+        if (element === null) throw new Error(`Page deck requires ${selector}`)
+        return element
+    }
+
+    const pageOrder = ['home', 'discover', 'profile'] as const
+    type PageId = (typeof pageOrder)[number]
+
+    function isPageId(value: string | undefined): value is PageId {
+        return value === 'home' || value === 'discover' || value === 'profile'
+    }
+
+    class VptPageDeckElement extends HTMLElement {
+        // This is the selected React Page while the surrounding App header and tabs remain mounted.
+        private activePage: PageId = 'home'
+        // Pointer identity and origin are retained only for the active horizontal swipe gesture.
+        private dragPointerId: number | null = null
+        private dragStartX = 0
+        // This reference identifies whichever center or floating card currently follows the pointer.
+        private dragCard: HTMLElement | null = null
+        // This flag suppresses the synthetic click emitted after a completed swipe.
+        private suppressNextClick = false
+        private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+
+        connectedCallback(): void {
+            this.addEventListener('click', this.handleClick)
+            this.addEventListener('pointerdown', this.handlePointerDown)
+            this.addEventListener('pointermove', this.handlePointerMove)
+            this.addEventListener('pointerup', this.handlePointerUp)
+            this.addEventListener('pointercancel', this.handlePointerCancel)
+        }
+
+        disconnectedCallback(): void {
+            this.removeEventListener('click', this.handleClick)
+            this.removeEventListener('pointerdown', this.handlePointerDown)
+            this.removeEventListener('pointermove', this.handlePointerMove)
+            this.removeEventListener('pointerup', this.handlePointerUp)
+            this.removeEventListener('pointercancel', this.handlePointerCancel)
+        }
+
+        private readonly handleClick = (event: MouseEvent): void => {
+            if (this.suppressNextClick) {
+                this.suppressNextClick = false
+                return
+            }
+            if (!(event.target instanceof Element)) return
+            const control = event.target.closest<HTMLElement>('[data-select-page], [data-card-select]')
+            if (control === null) return
+            const nextPage = control.dataset.selectPage ?? control.dataset.cardSelect
+            if (!isPageId(nextPage)) throw new Error('Page deck requires a valid Page id')
+            this.selectPage(nextPage)
+        }
+
+        private readonly handlePointerDown = (event: PointerEvent): void => {
+            if (!(event.target instanceof Element)) return
+            const card = event.target.closest<HTMLElement>('[data-page-card]')
+            if (card === null) return
+            this.dragPointerId = event.pointerId
+            this.dragStartX = event.clientX
+            this.dragCard = card
+            card.setPointerCapture(event.pointerId)
+            card.dataset.dragging = ''
+        }
+
+        private readonly handlePointerMove = (event: PointerEvent): void => {
+            if (event.pointerId !== this.dragPointerId) return
+            const card = this.dragCard
+            if (card === null) throw new Error('Page deck drag requires a card')
+            const distance = Math.max(-110, Math.min(110, event.clientX - this.dragStartX))
+            card.style.setProperty('--drag-x', `${distance}px`)
+        }
+
+        private readonly handlePointerUp = (event: PointerEvent): void => {
+            if (event.pointerId !== this.dragPointerId) return
+            const distance = event.clientX - this.dragStartX
+            this.finishDrag()
+            if (Math.abs(distance) < 44) return
+            this.suppressNextClick = true
+            window.setTimeout(() => {
+                this.suppressNextClick = false
+            }, 0)
+            this.selectRelativePage(distance < 0 ? 1 : -1)
+        }
+
+        private readonly handlePointerCancel = (event: PointerEvent): void => {
+            if (event.pointerId !== this.dragPointerId) return
+            this.finishDrag()
+        }
+
+        private finishDrag(): void {
+            const card = this.dragCard
+            if (card === null) throw new Error('Page deck drag requires a card')
+            card.style.removeProperty('--drag-x')
+            delete card.dataset.dragging
+            this.dragPointerId = null
+            this.dragCard = null
+        }
+
+        private selectRelativePage(offset: -1 | 1): void {
+            const currentIndex = pageOrder.indexOf(this.activePage)
+            const nextIndex = (currentIndex + offset + pageOrder.length) % pageOrder.length
+            this.selectPage(pageOrder[nextIndex])
+        }
+
+        private selectPage(nextPage: PageId): void {
+            if (nextPage === this.activePage) return
+            this.activePage = nextPage
+            const activeIndex = pageOrder.indexOf(nextPage)
+
+            this.querySelectorAll<HTMLElement>('[data-page-card]').forEach((card) => {
+                const pageId = card.dataset.pageCard
+                if (!isPageId(pageId)) throw new Error('Page deck card requires a valid Page id')
+                const cardIndex = pageOrder.indexOf(pageId)
+                const difference = (cardIndex - activeIndex + pageOrder.length) % pageOrder.length
+                card.dataset.slot = difference === 0 ? '0' : difference === 1 ? '1' : '-1'
+                card.classList.toggle('is-active', difference === 0)
+            })
+
+            this.querySelectorAll<HTMLButtonElement>('[data-select-page]').forEach((tab) => {
+                const pageId = tab.dataset.selectPage
+                const isActive = pageId === nextPage
+                tab.classList.toggle('is-active', isActive)
+                if (isActive) tab.setAttribute('aria-current', 'page')
+                else tab.removeAttribute('aria-current')
+            })
+
+            const labels: Record<PageId, string> = { home: '首页', discover: '发现页', profile: '我的页面' }
+            requireDeckElement<HTMLOutputElement>(this, '[data-page-announcement]').value = `已切换到${labels[nextPage]}`
+
+            if (this.reducedMotion.matches) return
+            const activeCard = requireDeckElement<HTMLElement>(this, `[data-page-card="${nextPage}"]`)
+            void activeCard.animate(
+                [
+                    { filter: 'brightness(1)', offset: 0 },
+                    { filter: 'brightness(1.08)', offset: 0.62 },
+                    { filter: 'brightness(1)', offset: 1 }
+                ],
+                { duration: 680, easing: 'ease-out' }
+            )
+        }
+    }
+
+    if (customElements.get('vpt-page-deck') === undefined) {
+        customElements.define('vpt-page-deck', VptPageDeckElement)
+    }
+</script>
+
+<style>
+    .app-view-layout {
+        display: grid;
+        grid-template-columns: minmax(18rem, 0.78fr) minmax(32rem, 1.22fr);
+        align-items: center;
+        gap: clamp(2rem, 6vw, 5rem);
+    }
+
+    .app-view-copy :global(.home-section-heading) {
+        margin-bottom: 2rem;
+    }
+
+    .app-view-benefits {
+        display: grid;
+        gap: 0.9rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .app-view-benefits li {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 0.85rem;
+    }
+
+    .app-view-benefits i {
+        display: grid;
+        width: 2.5rem;
+        height: 2.5rem;
+        margin: 0;
+        border: 1px solid var(--vpt-border);
+        border-radius: 0.8rem;
+        background: var(--vpt-icon-background);
+        color: var(--vpt-accent);
+        font-size: 0.75rem;
+        font-style: normal;
+        font-weight: 800;
+        place-items: center;
+        transform: rotate(-3deg);
+    }
+
+    .app-view-benefits li > span {
+        display: grid;
+        gap: 0.1rem;
+    }
+
+    .app-view-benefits strong {
+        color: var(--vpt-heading);
+    }
+
+    .app-view-benefits small {
+        color: var(--vpt-muted);
+        font-size: var(--home-font-size-small);
+    }
+
+    .app-view-links {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.9rem 1.2rem;
+        margin-top: 2rem;
+    }
+
+    .app-view-links a {
+        color: var(--vpt-accent-strong);
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .app-view-links .primary-link {
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--vpt-border-strong);
+        border-radius: 999px;
+        background: var(--vpt-surface);
+        box-shadow: 0 10px 24px var(--vpt-shadow);
+    }
+
+    .app-view-links a:hover {
+        text-decoration: underline;
+    }
+
+    .page-deck-demo {
+        display: block;
+        min-width: 0;
+    }
+
+    .deck-stage {
+        --deck-green: #247b49;
+        --deck-green-soft: #edf5e8;
+        --deck-coral: #e2866d;
+        --deck-ink: #183f2a;
+        --deck-muted: #718277;
+        --deck-card: #fffef8;
+        position: relative;
+        height: 41rem;
+    }
+
+    :global(:root[data-theme='dark']) .deck-stage {
+        --deck-green: #72d18a;
+        --deck-green-soft: #173521;
+        --deck-coral: #ef9a82;
+        --deck-ink: #e0eee2;
+        --deck-muted: #91a697;
+        --deck-card: #102219;
+    }
+
+    .phone-frame {
+        position: absolute;
+        top: 2rem;
+        left: 50%;
+        width: 18.5rem;
+        height: 38.5rem;
+        padding: 0.55rem;
+        border: 1px solid color-mix(in srgb, var(--deck-green) 34%, #0b1d12);
+        border-radius: 2.35rem;
+        background: #102319;
+        box-shadow: 0 30px 65px rgba(20, 63, 38, 0.2);
+        transform: translateX(-50%) rotate(0.35deg);
+    }
+
+    .phone-speaker {
+        position: absolute;
+        z-index: 8;
+        top: 0.82rem;
+        left: 50%;
+        width: 4rem;
+        height: 1rem;
+        border-radius: 999px;
+        background: #0a1610;
+        transform: translateX(-50%);
+    }
+
+    .phone-screen {
+        display: grid;
+        position: relative;
+        height: 100%;
+        border-radius: 1.9rem;
+        background: var(--deck-card);
+        overflow: hidden;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+    }
+
+    .app-header {
+        display: grid;
+        position: relative;
+        z-index: 7;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        min-height: 5.35rem;
+        gap: 0.6rem;
+        padding: 1.45rem 0.9rem 0.7rem;
+        border-bottom: 1px solid color-mix(in srgb, var(--deck-green) 18%, transparent);
+        background: var(--deck-green-soft);
+    }
+
+    .app-mark {
+        display: grid;
+        width: 2.15rem;
+        height: 2.15rem;
+        border-radius: 0.68rem;
+        background: var(--deck-green);
+        color: #fff;
+        font-family: Georgia, 'Times New Roman', serif;
+        font-weight: 800;
+        place-items: center;
+        transform: rotate(-5deg);
+    }
+
+    .app-title,
+    .app-streak,
+    .app-streak > span {
+        display: grid;
+    }
+
+    .app-title small,
+    .app-streak small,
+    .page-card header small,
+    .card-kicker,
+    .focus-card small,
+    .mini-stats small,
+    .place-card small,
+    .profile-head small,
+    .profile-streak small,
+    .profile-grid small {
+        color: var(--deck-muted);
+        font-size: 0.55rem;
+        letter-spacing: 0.08em;
+    }
+
+    .app-title strong {
+        color: var(--deck-ink);
+        font-family: Georgia, 'Times New Roman', serif;
+    }
+
+    .app-streak {
+        grid-template-columns: auto auto;
+        align-items: center;
+        gap: 0.32rem;
+        padding: 0.4rem 0.5rem;
+        border-radius: 0.65rem;
+        background: color-mix(in srgb, var(--deck-card) 72%, transparent);
+        color: var(--deck-green);
+    }
+
+    .app-streak > i {
+        grid-row: 1 / 3;
+        font-style: normal;
+    }
+
+    .app-streak strong {
+        color: var(--deck-green);
+        font-size: 0.68rem;
+    }
+
+    .page-aperture {
+        background: var(--deck-card);
+    }
+
+    .app-tabs {
+        display: grid;
+        position: relative;
+        z-index: 7;
+        grid-template-columns: repeat(3, 1fr);
+        min-height: 4rem;
+        border-top: 1px solid color-mix(in srgb, var(--deck-green) 18%, transparent);
+        background: var(--deck-green-soft);
+    }
+
+    .app-tabs button {
+        display: grid;
+        position: relative;
+        align-content: center;
+        justify-items: center;
+        gap: 0.12rem;
+        border: 0;
+        background: transparent;
+        color: var(--deck-muted);
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.58rem;
+        transition:
+            color 240ms ease,
+            transform 480ms cubic-bezier(0.18, 1.3, 0.3, 1);
+    }
+
+    .app-tabs button::before {
+        position: absolute;
+        top: 0.28rem;
+        width: 2.4rem;
+        height: 0.18rem;
+        border-radius: 999px;
+        background: var(--deck-green);
+        content: '';
+        opacity: 0;
+        transform: scaleX(0.25);
+        transition:
+            opacity 220ms ease,
+            transform 480ms cubic-bezier(0.18, 1.3, 0.3, 1);
+    }
+
+    .app-tabs button i {
+        font-size: 1rem;
+        font-style: normal;
+    }
+
+    .app-tabs button.is-active,
+    .app-tabs button[aria-current='page'] {
+        color: var(--deck-green);
+        font-weight: 800;
+        transform: translateY(-0.08rem);
+    }
+
+    .app-tabs button.is-active::before,
+    .app-tabs button[aria-current='page']::before {
+        opacity: 1;
+        transform: scaleX(1);
+    }
+
+    .page-deck {
+        position: absolute;
+        z-index: 3;
+        top: 7.95rem;
+        right: 0;
+        left: 0;
+        height: 26rem;
+        pointer-events: none;
+    }
+
+    .page-card {
+        --drag-x: 0px;
+        position: absolute;
+        top: 0;
+        left: 50%;
+        width: 16.6rem;
+        height: 25.4rem;
+        padding: 1.15rem;
+        border: 1px solid color-mix(in srgb, var(--deck-green) 18%, var(--vpt-border));
+        border-radius: 1.15rem;
+        background: var(--deck-card);
+        box-shadow: 0 18px 42px var(--vpt-shadow-strong);
+        color: var(--deck-ink);
+        opacity: 0.93;
+        pointer-events: auto;
+        touch-action: pan-y;
+        transition:
+            transform 680ms cubic-bezier(0.18, 1.28, 0.3, 1),
+            opacity 380ms ease,
+            filter 380ms ease;
+        will-change: transform;
+    }
+
+    .page-card[data-slot='0'] {
+        z-index: 6;
+        opacity: 1;
+        transform: translateX(calc(-50% + var(--drag-x))) rotate(0deg) scale(1);
+    }
+
+    .page-card[data-slot='-1'] {
+        z-index: 1;
+        transform: translateX(calc(-50% - 13rem + var(--drag-x))) translateY(1.2rem) rotate(-11deg) scale(0.82);
+    }
+
+    .page-card[data-slot='1'] {
+        z-index: 1;
+        transform: translateX(calc(-50% + 13rem + var(--drag-x))) translateY(1rem) rotate(10deg) scale(0.82);
+    }
+
+    .page-card[data-dragging] {
+        cursor: grabbing;
+        transition: none;
+    }
+
+    .page-card header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: var(--deck-muted);
+        font-size: 0.65rem;
+    }
+
+    .card-kicker {
+        margin: 1.2rem 0 0;
+        color: var(--deck-coral);
+        font-weight: 800;
+    }
+
+    .page-card h3 {
+        margin: 0.38rem 0 0;
+        color: var(--deck-ink);
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 1.55rem;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+    }
+
+    .card-copy {
+        margin: 0.35rem 0 0;
+        color: var(--deck-muted);
+        font-size: 0.68rem;
+        line-height: 1.55;
+    }
+
+    .focus-card {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.65rem;
+        margin-top: 1.2rem;
+        padding: 1rem;
+        border-radius: 1rem;
+        background: var(--deck-green-soft);
+    }
+
+    .focus-card > span {
+        display: grid;
+    }
+
+    .focus-card strong {
+        font-size: 1.2rem;
+    }
+
+    .focus-card > i {
+        display: grid;
+        width: 3.1rem;
+        height: 3.1rem;
+        border: 0.42rem solid color-mix(in srgb, var(--deck-green) 18%, transparent);
+        border-top-color: var(--deck-green);
+        border-radius: 50%;
+        place-items: center;
+        transform: rotate(30deg);
+    }
+
+    .focus-card > i b {
+        width: 0.45rem;
+        height: 0.45rem;
+        border-radius: 50%;
+        background: var(--deck-coral);
+    }
+
+    .focus-card em {
+        grid-column: 1 / -1;
+        color: var(--deck-muted);
+        font-size: 0.6rem;
+        font-style: normal;
+    }
+
+    .mini-stats,
+    .profile-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.55rem;
+        margin-top: 0.7rem;
+    }
+
+    .mini-stats > span,
+    .profile-grid > span {
+        display: grid;
+        gap: 0.18rem;
+        padding: 0.75rem;
+        border: 1px solid var(--vpt-border);
+        border-radius: 0.75rem;
+    }
+
+    .place-card {
+        display: grid;
+        gap: 0.7rem;
+        margin-top: 1.1rem;
+        padding: 0.8rem;
+        border-radius: 1rem;
+        background: var(--deck-green-soft);
+    }
+
+    .place-art {
+        display: block;
+        position: relative;
+        height: 7rem;
+        border-radius: 0.75rem;
+        background: linear-gradient(160deg, #b8dfad, #eaf3dc);
+        overflow: hidden;
+    }
+
+    .place-art i {
+        position: absolute;
+        right: -1rem;
+        bottom: -1.5rem;
+        width: 7rem;
+        height: 7rem;
+        border-radius: 50%;
+        background: #6bb96e;
+    }
+
+    .place-art i:nth-child(2) {
+        right: 3.6rem;
+        bottom: -2.8rem;
+        background: #3f9358;
+    }
+
+    .place-art b {
+        position: absolute;
+        top: 1rem;
+        left: 1rem;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 50%;
+        background: #fff4c4;
+        box-shadow: 0 0 1.6rem rgba(255, 244, 196, 0.8);
+    }
+
+    .place-card > span:last-child,
+    .profile-head > span:last-child,
+    .profile-streak > span {
+        display: grid;
+        gap: 0.12rem;
+    }
+
+    .place-card em {
+        color: var(--deck-muted);
+        font-size: 0.6rem;
+        font-style: normal;
+    }
+
+    .place-tags {
+        display: flex;
+        gap: 0.4rem;
+        margin-top: 0.7rem;
+    }
+
+    .place-tags span {
+        padding: 0.3rem 0.5rem;
+        border-radius: 999px;
+        background: var(--deck-green-soft);
+        color: var(--deck-green);
+        font-size: 0.58rem;
+    }
+
+    .profile-head {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        align-items: center;
+        gap: 0.8rem;
+        margin-top: 1.4rem;
+    }
+
+    .profile-avatar {
+        display: grid;
+        width: 4rem;
+        height: 4rem;
+        border-radius: 1.25rem;
+        background: linear-gradient(145deg, var(--deck-green), #8dcf87);
+        color: white;
+        font-size: 1.15rem;
+        font-weight: 800;
+        place-items: center;
+        transform: rotate(-3deg);
+    }
+
+    .profile-head h3,
+    .profile-head p {
+        margin: 0;
+    }
+
+    .profile-head p {
+        color: var(--deck-muted);
+        font-size: 0.62rem;
+    }
+
+    .profile-streak {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        margin-top: 1.25rem;
+        padding: 1rem;
+        border-radius: 1rem;
+        background: var(--deck-green-soft);
+    }
+
+    .profile-streak > i {
+        display: grid;
+        width: 2.6rem;
+        height: 2.6rem;
+        border-radius: 0.8rem;
+        background: var(--deck-green);
+        color: white;
+        font-style: normal;
+        place-items: center;
+    }
+
+    .card-select {
+        position: absolute;
+        inset: 0;
+        border: 0;
+        border-radius: inherit;
+        background: transparent;
+        cursor: grab;
+        touch-action: pan-y;
+    }
+
+    .card-select:focus-visible,
+    .app-tabs button:focus-visible,
+    .app-view-links a:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--deck-green, var(--vpt-accent)) 44%, transparent);
+        outline-offset: 3px;
+    }
+
+    .deck-hint {
+        position: absolute;
+        bottom: -2.25rem;
+        left: 50%;
+        width: max-content;
+        max-width: calc(100% - 1rem);
+        color: var(--deck-muted);
+        font-size: var(--home-font-size-small);
+        text-align: center;
+        transform: translateX(-50%);
+        white-space: nowrap;
+    }
+
+    .deck-hint span {
+        margin-right: 0.35rem;
+        color: var(--deck-coral);
+    }
+
+    @media (max-width: 68rem) {
+        .app-view-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .app-view-copy {
+            width: min(100%, 42rem);
+        }
+
+        .page-deck-demo {
+            width: min(100%, 44rem);
+            margin-inline: auto;
+        }
+    }
+
+    @media (max-width: 38rem) {
+        .deck-stage {
+            height: 39rem;
+        }
+
+        .phone-frame {
+            top: 1.5rem;
+            width: 17.5rem;
+            height: 37rem;
+        }
+
+        .page-deck {
+            top: 7.45rem;
+        }
+
+        .page-card {
+            width: 15.6rem;
+        }
+
+        .page-card[data-slot='-1'] {
+            transform: translateX(calc(-50% - 8.5rem + var(--drag-x))) translateY(1rem) rotate(-10deg) scale(0.78);
+        }
+
+        .page-card[data-slot='1'] {
+            transform: translateX(calc(-50% + 8.5rem + var(--drag-x))) translateY(1rem) rotate(10deg) scale(0.78);
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .page-card,
+        .app-tabs button,
+        .app-tabs button::before {
+            transition: none;
+        }
+    }
+</style>
