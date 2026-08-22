@@ -26,7 +26,7 @@ test('creates shared Taro templates and native companions for every Page', () =>
     const templateAssets = createTemplateAssets({} as Rolldown.OutputBundle, options, [
         {
             name: 'native-counter',
-            fields: ['count', 'label', 'onIncrement']
+            fields: ['count', 'extraData', 'label', 'onIncrement']
         }
     ])
     const assets = new Map(templateAssets.map((asset) => [asset.fileName, String(asset.source)]))
@@ -44,13 +44,26 @@ test('creates shared Taro templates and native companions for every Page', () =>
             'pages/account/index.wxss'
         ]
     )
-    assert.match(assets.get('base.wxml') ?? '', /<template name="tmpl_0_native-counter">/)
+    const baseTemplate = assets.get('base.wxml') ?? ''
+    const componentTemplate = assets.get('comp.wxml') ?? ''
+    const homeTemplate = assets.get('pages/home/index.wxml') ?? ''
+
+    assert.match(baseTemplate, /<template name="tmpl_0_native-counter">/)
     assert.match(
-        assets.get('base.wxml') ?? '',
-        /<native-counter\s+count="{{i\.count}}" label="{{i\.label}}" bindincrement="eh"/
+        baseTemplate,
+        /<native-counter\s+count="{{i\.count}}" extraData="{{i\.extraData}}" label="{{i\.label}}" bindincrement="eh"/
     )
+    assert.match(
+        baseTemplate,
+        /<template name="tmpl_0_vpt_fragment">\s*<template\s+is="{{xs\.a\(0, item\.nn, ''\)}}"[\s\S]*wx:for="{{i\.cn}}"/
+    )
+    assert.match(baseTemplate, /<template name="tmpl_0_vpt_page_outlet">\s*<slot \/>\s*<\/template>/)
+    assert.match(baseTemplate, /<comp i="{{i}}" l="{{l}}">\s*<slot \/>\s*<\/comp>/)
+    assert.doesNotMatch(baseTemplate, /s:s|slot-mode/)
+
     assert.ok(assets.get('utils.wxs'))
-    assert.ok(assets.get('comp.wxml'))
+    assert.match(componentTemplate, /<template is="{{'tmpl_0_' \+ i\.nn}}" data="{{i:i,c:1,l:xs\.f\('',i\.nn\)}}" \/>/)
+    assert.doesNotMatch(componentTemplate, /appData|appRoot|slotMode/)
     assert.deepEqual(JSON.parse(assets.get('comp.json') ?? ''), {
         component: true,
         styleIsolation: 'apply-shared',
@@ -58,7 +71,9 @@ test('creates shared Taro templates and native companions for every Page', () =>
             comp: './comp'
         }
     })
-    assert.match(assets.get('pages/home/index.wxml') ?? '', /\.\.\/\.\.\/base\.wxml/)
+    assert.match(homeTemplate, /\.\.\/\.\.\/base\.wxml/)
+    assert.match(homeTemplate, /<comp i="{{app}}">\s*<template is="taro_tmpl" data="{{root:page}}" \/>\s*<\/comp>/)
+    assert.doesNotMatch(homeTemplate, /root:root/)
     assert.equal(assets.get('pages/home/index.wxss'), '')
     assert.match(assets.get('pages/account/index.wxml') ?? '', /\.\.\/\.\.\/base\.wxml/)
     assert.equal(assets.get('pages/account/index.wxss'), '')
