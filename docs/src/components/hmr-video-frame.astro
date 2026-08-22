@@ -1,0 +1,103 @@
+---
+import '../styles/vpt-theme.css'
+
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import LazyVideo from './lazy-video.astro'
+
+interface Props {
+    variant: 'showcase' | 'embedded'
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
+const { variant } = Astro.props
+---
+
+<div class="hmr-video-frame vpt-theme not-content" data-variant={variant}>
+    <div class="window-bar">
+        <span class="window-controls" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="window-title">微信开发者工具 · VPT</span>
+    </div>
+    <LazyVideo
+        class="hmr-video"
+        src="/vpt-hmr-demo.mp4"
+        ariaLabel="微信开发者工具中的 React 热更新演示"
+        width={1988}
+        height={1624}
+        captionSrc="/hmr-demo.zh-CN.vtt"
+        captionLanguage="zh-CN"
+        captionLabel="简体中文"
+    />
+</div>
+
+<style>
+    .hmr-video-frame {
+        display: block;
+        width: 100%;
+        border: 1px solid var(--vpt-border);
+        border-radius: var(--home-panel-radius, 1.5rem);
+        background: var(--vpt-surface);
+        box-shadow: none;
+        line-height: 0;
+        overflow: hidden;
+        transform: none;
+    }
+
+    .hmr-video-frame[data-variant='showcase'] {
+        box-shadow:
+            0 3px 10px var(--vpt-shadow-strong),
+            0 24px 60px var(--vpt-shadow);
+        transform: rotate(0.65deg);
+    }
+
+    .window-bar {
+        display: grid;
+        position: relative;
+        min-height: 2.5rem;
+        padding-inline: 0.85rem;
+        border-bottom: 1px solid var(--vpt-border);
+        color: var(--vpt-muted);
+        font-size: var(--home-font-size-small);
+        line-height: normal;
+        place-items: center;
+    }
+
+    .window-controls {
+        display: flex;
+        position: absolute;
+        left: 0.85rem;
+        gap: 0.32rem;
+    }
+
+    .window-bar i {
+        display: block;
+        width: 0.55rem;
+        height: 0.55rem;
+        margin: 0;
+        border-radius: 50%;
+        background: #ed967c;
+    }
+
+    .window-bar i:nth-child(2) {
+        background: #e5c65c;
+    }
+
+    .window-bar i:nth-child(3) {
+        background: #57b870;
+    }
+
+    .window-title {
+        padding-inline: 4rem;
+        text-align: center;
+    }
+
+    .hmr-video {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 1988 / 1624;
+        margin: 0;
+        border: 0;
+        border-radius: 0;
+        background: var(--vpt-video-background);
+    }
+</style>

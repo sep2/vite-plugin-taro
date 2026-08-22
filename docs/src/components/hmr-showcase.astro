@@ -1,8 +1,8 @@
 ---
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
-import HomeSectionHeading from './home-section-heading.astro'
+import HmrVideoFrame from './hmr-video-frame.astro'
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
-import LazyVideo from './lazy-video.astro'
+import HomeSectionHeading from './home-section-heading.astro'
 ---
 
 <section class="home-section demo-section" aria-labelledby="demo-title">
@@ -22,22 +22,7 @@ import LazyVideo from './lazy-video.astro'
         <a href="/guides/hot-module-replacement/">了解热更新机制 <span aria-hidden="true">→</span></a>
     </div>
 
-    <div class="demo-frame">
-        <div class="window-bar">
-            <span class="window-controls" aria-hidden="true"><i></i><i></i><i></i></span>
-            <span class="window-title">微信开发者工具 · VPT</span>
-        </div>
-        <LazyVideo
-            class="demo-video"
-            src="/vpt-hmr-demo.mp4"
-            ariaLabel="微信开发者工具中的 React 热更新演示"
-            width={1988}
-            height={1624}
-            captionSrc="/hmr-demo.zh-CN.vtt"
-            captionLanguage="zh-CN"
-            captionLabel="简体中文"
-        />
-    </div>
+    <HmrVideoFrame variant="showcase" />
 </section>
 
 
@@ -81,69 +66,6 @@ import LazyVideo from './lazy-video.astro'
 
     .demo-copy > a:hover {
         text-decoration: underline;
-    }
-
-    .demo-frame {
-        display: block;
-        border: 1px solid var(--vpt-border);
-        border-radius: var(--home-panel-radius);
-        background: var(--vpt-surface);
-        box-shadow: var(--home-panel-shadow);
-        line-height: 0;
-        overflow: hidden;
-        transform: rotate(0.65deg);
-    }
-
-    .window-bar {
-        display: grid;
-        position: relative;
-        min-height: 2.5rem;
-        padding-inline: 0.85rem;
-        border-bottom: 1px solid var(--vpt-border);
-        color: var(--vpt-muted);
-        font-size: var(--home-font-size-small);
-        line-height: normal;
-        place-items: center;
-    }
-
-    .window-controls {
-        display: flex;
-        position: absolute;
-        left: 0.85rem;
-        gap: 0.32rem;
-    }
-
-    .window-bar i {
-        display: block;
-        width: 0.55rem;
-        height: 0.55rem;
-        margin: 0;
-        border-radius: 50%;
-        background: #ed967c;
-    }
-
-    .window-bar i:nth-child(2) {
-        background: #e5c65c;
-    }
-
-    .window-bar i:nth-child(3) {
-        background: #57b870;
-    }
-
-    .window-title {
-        padding-inline: 4rem;
-        text-align: center;
-    }
-
-    .demo-video {
-        display: block;
-        width: 100%;
-        height: auto;
-        aspect-ratio: 1988 / 1624;
-        margin: 0;
-        border: 0;
-        border-radius: 0;
-        background: var(--vpt-video-background);
     }
 
     @media (max-width: 64rem) {
