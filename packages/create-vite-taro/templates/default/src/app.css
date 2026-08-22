@@ -54,6 +54,10 @@ button {
     line-height: inherit;
 }
 
+.app-shell > .taro_page {
+    height: calc(100% - 2.5rem);
+}
+
 .brand-serif {
     font-family: Georgia, "Times New Roman", serif;
 }

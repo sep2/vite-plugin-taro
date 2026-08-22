@@ -32,7 +32,7 @@ function HomePage() {
     const [count, setCount] = useState(0)
 
     return (
-        <View className="flex h-screen flex-col overflow-hidden bg-canvas bg-canvas-botanical text-foreground">
+        <View className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
             <NavigationBar title="VPT" />
             <ScrollView scrollY className="flex min-h-0 flex-1 flex-col">
                 <View className="relative flex shrink-0 flex-col items-center overflow-hidden px-5 pb-8 pt-6">
