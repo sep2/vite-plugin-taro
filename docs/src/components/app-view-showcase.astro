@@ -37,15 +37,24 @@ import HomeSectionHeading from './home-section-heading.astro'
                         </header>
                         <div class="page-aperture" aria-hidden="true"></div>
                         <nav class="app-tabs" aria-label="页面导航">
-                            <button type="button" data-select-page="home" aria-current="page"><i aria-hidden="true">⌂</i><span>首页</span></button>
-                            <button type="button" data-select-page="discover"><i aria-hidden="true">◇</i><span>发现</span></button>
-                            <button type="button" data-select-page="profile"><i aria-hidden="true">○</i><span>我的</span></button>
+                            <button type="button" data-select-page="home">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 10 8-7 8 7v10h-5v-6H9v6H4Z" /></svg>
+                                <span>首页</span>
+                            </button>
+                            <button type="button" data-select-page="discover" aria-current="page">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 9-8 9-8-9Z" /></svg>
+                                <span>发现</span>
+                            </button>
+                            <button type="button" data-select-page="profile">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4.5 21a7.5 7.5 0 0 1 15 0" /></svg>
+                                <span>我的</span>
+                            </button>
                         </nav>
                     </div>
                 </article>
 
                 <div class="page-deck" aria-label="页面卡片">
-                    <article class="page-card page-home" data-page-card="home" data-slot="0">
+                    <article class="page-card page-home" data-page-card="home" data-slot="-1">
                         <header><span>首页</span><small>今天</small></header>
                         <p class="card-kicker">DAILY RHYTHM</p>
                         <h3>今天也向前一点</h3>
@@ -62,7 +71,7 @@ import HomeSectionHeading from './home-section-heading.astro'
                         <button class="card-select" type="button" data-card-select="home" aria-label="显示首页"></button>
                     </article>
 
-                    <article class="page-card page-discover" data-page-card="discover" data-slot="1">
+                    <article class="page-card page-discover" data-page-card="discover" data-slot="0">
                         <header><span>发现</span><small>附近</small></header>
                         <p class="card-kicker">WEEKEND PICKS</p>
                         <h3>去有风的地方</h3>
@@ -75,7 +84,7 @@ import HomeSectionHeading from './home-section-heading.astro'
                         <button class="card-select" type="button" data-card-select="discover" aria-label="显示发现页"></button>
                     </article>
 
-                    <article class="page-card page-profile" data-page-card="profile" data-slot="-1">
+                    <article class="page-card page-profile" data-page-card="profile" data-slot="1">
                         <header><span>我的</span><small>个人空间</small></header>
                         <div class="profile-head">
                             <span class="profile-avatar" aria-hidden="true">林</span>
@@ -111,90 +120,102 @@ import HomeSectionHeading from './home-section-heading.astro'
         return value === 'home' || value === 'discover' || value === 'profile'
     }
 
+    interface CardGesture {
+        readonly card: HTMLElement
+        readonly listeners: AbortController
+        readonly pointerId: number
+        readonly startX: number
+    }
+
     class VptPageDeckElement extends HTMLElement {
         // This is the selected React Page while the surrounding App header and tabs remain mounted.
-        private activePage: PageId = 'home'
-        // Pointer identity and origin are retained only for the active horizontal swipe gesture.
-        private dragPointerId: number | null = null
-        private dragStartX = 0
-        // This reference identifies whichever center or floating card currently follows the pointer.
-        private dragCard: HTMLElement | null = null
-        // This flag suppresses the synthetic click emitted after a completed swipe.
-        private suppressNextClick = false
+        private activePage: PageId = 'discover'
+        // A gesture owns its captured card and every temporary listener as one disposable session.
+        private gesture: CardGesture | null = null
         private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
 
         connectedCallback(): void {
             this.addEventListener('click', this.handleClick)
             this.addEventListener('pointerdown', this.handlePointerDown)
-            this.addEventListener('pointermove', this.handlePointerMove)
-            this.addEventListener('pointerup', this.handlePointerUp)
-            this.addEventListener('pointercancel', this.handlePointerCancel)
         }
 
         disconnectedCallback(): void {
             this.removeEventListener('click', this.handleClick)
             this.removeEventListener('pointerdown', this.handlePointerDown)
-            this.removeEventListener('pointermove', this.handlePointerMove)
-            this.removeEventListener('pointerup', this.handlePointerUp)
-            this.removeEventListener('pointercancel', this.handlePointerCancel)
+            if (this.gesture !== null) this.endGesture(this.gesture)
         }
 
         private readonly handleClick = (event: MouseEvent): void => {
-            if (this.suppressNextClick) {
-                this.suppressNextClick = false
+            if (!(event.target instanceof Element)) return
+            const tab = event.target.closest<HTMLElement>('[data-select-page]')
+            if (tab !== null) {
+                const nextPage = tab.dataset.selectPage
+                if (!isPageId(nextPage)) throw new Error('Page deck Tab requires a valid Page id')
+                this.selectPage(nextPage)
                 return
             }
-            if (!(event.target instanceof Element)) return
-            const control = event.target.closest<HTMLElement>('[data-select-page], [data-card-select]')
-            if (control === null) return
-            const nextPage = control.dataset.selectPage ?? control.dataset.cardSelect
-            if (!isPageId(nextPage)) throw new Error('Page deck requires a valid Page id')
+
+            // Pointer taps are resolved by the gesture session; detail 0 preserves keyboard and assistive activation.
+            if (event.detail !== 0) return
+            const card = event.target.closest<HTMLElement>('[data-page-card]')
+            const control = event.target.closest<HTMLElement>('[data-card-select]')
+            const nextPage = control?.dataset.cardSelect ?? card?.dataset.pageCard
+            if (!isPageId(nextPage)) throw new Error('Page deck card requires a valid Page id')
             this.selectPage(nextPage)
         }
 
         private readonly handlePointerDown = (event: PointerEvent): void => {
+            if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return
             if (!(event.target instanceof Element)) return
             const card = event.target.closest<HTMLElement>('[data-page-card]')
-            if (card === null) return
-            this.dragPointerId = event.pointerId
-            this.dragStartX = event.clientX
-            this.dragCard = card
-            card.setPointerCapture(event.pointerId)
+            if (card === null || this.gesture !== null) return
+
+            const listeners = new AbortController()
+            const gesture: CardGesture = {
+                card: card,
+                listeners: listeners,
+                pointerId: event.pointerId,
+                startX: event.clientX
+            }
+            this.gesture = gesture
             card.dataset.dragging = ''
+            card.addEventListener('pointermove', this.handleGestureMove, { signal: listeners.signal })
+            card.addEventListener('pointerup', this.handleGestureEnd, { signal: listeners.signal })
+            card.addEventListener('pointercancel', this.handleGestureCancel, { signal: listeners.signal })
+            card.addEventListener('lostpointercapture', this.handleGestureCancel, { signal: listeners.signal })
+            card.setPointerCapture(event.pointerId)
         }
 
-        private readonly handlePointerMove = (event: PointerEvent): void => {
-            if (event.pointerId !== this.dragPointerId) return
-            const card = this.dragCard
-            if (card === null) throw new Error('Page deck drag requires a card')
-            const distance = Math.max(-110, Math.min(110, event.clientX - this.dragStartX))
-            card.style.setProperty('--drag-x', `${distance}px`)
+        private readonly handleGestureMove = (event: PointerEvent): void => {
+            const gesture = this.gesture
+            if (gesture === null || event.pointerId !== gesture.pointerId) return
+            const distance = Math.max(-110, Math.min(110, event.clientX - gesture.startX))
+            gesture.card.style.setProperty('--drag-x', `${distance}px`)
         }
 
-        private readonly handlePointerUp = (event: PointerEvent): void => {
-            if (event.pointerId !== this.dragPointerId) return
-            const distance = event.clientX - this.dragStartX
-            this.finishDrag()
-            if (Math.abs(distance) < 44) return
-            this.suppressNextClick = true
-            window.setTimeout(() => {
-                this.suppressNextClick = false
-            }, 0)
-            this.selectRelativePage(distance < 0 ? 1 : -1)
+        private readonly handleGestureEnd = (event: PointerEvent): void => {
+            const gesture = this.gesture
+            if (gesture === null || event.pointerId !== gesture.pointerId) return
+            const distance = event.clientX - gesture.startX
+            const nextPage = gesture.card.dataset.pageCard
+            if (!isPageId(nextPage)) throw new Error('Page deck card requires a valid Page id')
+            this.endGesture(gesture)
+            if (Math.abs(distance) >= 44) this.selectRelativePage(distance < 0 ? 1 : -1)
+            else this.selectPage(nextPage)
         }
 
-        private readonly handlePointerCancel = (event: PointerEvent): void => {
-            if (event.pointerId !== this.dragPointerId) return
-            this.finishDrag()
+        private readonly handleGestureCancel = (event: PointerEvent): void => {
+            const gesture = this.gesture
+            if (gesture === null || event.pointerId !== gesture.pointerId) return
+            this.endGesture(gesture)
         }
 
-        private finishDrag(): void {
-            const card = this.dragCard
-            if (card === null) throw new Error('Page deck drag requires a card')
-            card.style.removeProperty('--drag-x')
-            delete card.dataset.dragging
-            this.dragPointerId = null
-            this.dragCard = null
+        private endGesture(gesture: CardGesture): void {
+            gesture.listeners.abort()
+            gesture.card.style.removeProperty('--drag-x')
+            delete gesture.card.dataset.dragging
+            this.gesture = null
+            if (gesture.card.hasPointerCapture(gesture.pointerId)) gesture.card.releasePointerCapture(gesture.pointerId)
         }
 
         private selectRelativePage(offset: -1 | 1): void {
@@ -343,6 +364,8 @@ import HomeSectionHeading from './home-section-heading.astro'
         --deck-card: #fffef8;
         position: relative;
         height: 41rem;
+        -webkit-user-select: none;
+        user-select: none;
     }
 
     :global(:root[data-theme='dark']) .deck-stage {
@@ -508,9 +531,14 @@ import HomeSectionHeading from './home-section-heading.astro'
             transform 480ms cubic-bezier(0.18, 1.3, 0.3, 1);
     }
 
-    .app-tabs button i {
-        font-size: 1rem;
-        font-style: normal;
+    .app-tabs button svg {
+        width: 1.1rem;
+        height: 1.1rem;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.8;
     }
 
     .app-tabs button.is-active,
@@ -529,7 +557,7 @@ import HomeSectionHeading from './home-section-heading.astro'
     .page-deck {
         position: absolute;
         z-index: 3;
-        top: 7.95rem;
+        top: 7.35rem;
         right: 0;
         left: 0;
         height: 26rem;
@@ -537,12 +565,14 @@ import HomeSectionHeading from './home-section-heading.astro'
     }
 
     .page-card {
+        --card-tilt: 0deg;
+        --card-y: 0rem;
         --drag-x: 0px;
         position: absolute;
         top: 0;
         left: 50%;
-        width: 16.6rem;
-        height: 25.4rem;
+        width: 18rem;
+        height: 28.1rem;
         padding: 1.15rem;
         border: 1px solid color-mix(in srgb, var(--deck-green) 18%, var(--vpt-border));
         border-radius: 1.15rem;
@@ -559,20 +589,37 @@ import HomeSectionHeading from './home-section-heading.astro'
         will-change: transform;
     }
 
+    .page-home {
+        --card-tilt: -1.1deg;
+        --card-y: 0.25rem;
+    }
+
+    .page-discover {
+        --card-tilt: 0.8deg;
+        --card-y: -0.2rem;
+    }
+
+    .page-profile {
+        --card-tilt: -1.4deg;
+        --card-y: 0.45rem;
+    }
+
     .page-card[data-slot='0'] {
-        z-index: 6;
+        z-index: 8;
         opacity: 1;
-        transform: translateX(calc(-50% + var(--drag-x))) rotate(0deg) scale(1);
+        transform: translateX(calc(-50% + var(--drag-x))) translateY(var(--card-y)) rotate(var(--card-tilt)) scale(1);
     }
 
     .page-card[data-slot='-1'] {
         z-index: 1;
-        transform: translateX(calc(-50% - 13rem + var(--drag-x))) translateY(1.2rem) rotate(-11deg) scale(0.82);
+        transform: translateX(calc(-50% - 13rem + var(--drag-x))) translateY(calc(1.2rem + var(--card-y)))
+            rotate(calc(-10.5deg + var(--card-tilt))) scale(0.82);
     }
 
     .page-card[data-slot='1'] {
         z-index: 1;
-        transform: translateX(calc(-50% + 13rem + var(--drag-x))) translateY(1rem) rotate(10deg) scale(0.82);
+        transform: translateX(calc(-50% + 13rem + var(--drag-x))) translateY(calc(1rem + var(--card-y)))
+            rotate(calc(9.5deg + var(--card-tilt))) scale(0.82);
     }
 
     .page-card[data-dragging] {
@@ -856,19 +903,22 @@ import HomeSectionHeading from './home-section-heading.astro'
         }
 
         .page-deck {
-            top: 7.45rem;
+            top: 6.95rem;
         }
 
         .page-card {
-            width: 15.6rem;
+            width: 17rem;
+            height: 26.9rem;
         }
 
         .page-card[data-slot='-1'] {
-            transform: translateX(calc(-50% - 8.5rem + var(--drag-x))) translateY(1rem) rotate(-10deg) scale(0.78);
+            transform: translateX(calc(-50% - 8.5rem + var(--drag-x))) translateY(calc(1rem + var(--card-y)))
+                rotate(calc(-9deg + var(--card-tilt))) scale(0.78);
         }
 
         .page-card[data-slot='1'] {
-            transform: translateX(calc(-50% + 8.5rem + var(--drag-x))) translateY(1rem) rotate(10deg) scale(0.78);
+            transform: translateX(calc(-50% + 8.5rem + var(--drag-x))) translateY(calc(1rem + var(--card-y)))
+                rotate(calc(9deg + var(--card-tilt))) scale(0.78);
         }
     }
 
