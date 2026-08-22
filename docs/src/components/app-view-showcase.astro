@@ -820,6 +820,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         box-shadow: 0 18px 42px var(--vpt-shadow-strong);
         color: var(--deck-ink);
         opacity: 0.93;
+        scale: 1;
         overflow-x: hidden;
         overflow-y: auto;
         overscroll-behavior-y: contain;
@@ -829,9 +830,14 @@ import HomeSectionHeading from './home-section-heading.astro'
         transition:
             transform 680ms cubic-bezier(0.18, 1.28, 0.3, 1),
             border-color 380ms ease,
+            scale 280ms linear,
             opacity 380ms ease,
             filter 380ms ease;
         will-change: transform;
+    }
+
+    .page-card:hover {
+        scale: 1.02;
     }
 
     .page-home {
