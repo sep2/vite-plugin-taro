@@ -21,6 +21,12 @@ export default defineConfig(({ mode }) => {
                         config: {
                             navigationBarTitleText: 'Native component demo'
                         }
+                    },
+                    {
+                        path: 'pages/mirror/index',
+                        config: {
+                            navigationBarTitleText: 'Retained App mirror'
+                        }
                     }
                 ],
                 appJson: {
