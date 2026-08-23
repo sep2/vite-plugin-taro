@@ -378,13 +378,13 @@ import HomeSectionHeading from './home-section-heading.astro'
             this.renderPhonePage(nextPage)
             const activeIndex = pageOrder.indexOf(nextPage)
 
+            // Slot changes reuse the card's transform layer instead of creating a transient visual-effect surface.
             this.querySelectorAll<HTMLElement>('[data-page-card]').forEach((card) => {
                 const pageId = card.dataset.pageCard
                 if (!isPageId(pageId)) throw new Error('Page deck card requires a valid Page id')
                 const cardIndex = pageOrder.indexOf(pageId)
                 const difference = (cardIndex - activeIndex + pageOrder.length) % pageOrder.length
                 card.dataset.slot = difference === 0 ? '0' : difference === 1 ? '1' : '-1'
-                card.classList.toggle('is-active', difference === 0)
             })
 
             this.querySelectorAll<HTMLButtonElement>('[data-select-page]').forEach((tab) => {
@@ -397,17 +397,6 @@ import HomeSectionHeading from './home-section-heading.astro'
 
             const labels: Record<PageId, string> = { home: '首页', discover: '发现页', profile: '我的页面' }
             requireDeckElement<HTMLOutputElement>(this, '[data-page-announcement]').value = `已切换到${labels[nextPage]}`
-
-            if (this.reducedMotion.matches) return
-            const activeCard = requireDeckElement<HTMLElement>(this, `[data-page-card="${nextPage}"]`)
-            void activeCard.animate(
-                [
-                    { filter: 'brightness(1)', offset: 0 },
-                    { filter: 'brightness(1.08)', offset: 0.62 },
-                    { filter: 'brightness(1)', offset: 1 }
-                ],
-                { duration: 680, easing: 'ease-out' }
-            )
         }
     }
 
@@ -864,8 +853,7 @@ import HomeSectionHeading from './home-section-heading.astro'
             transform 680ms cubic-bezier(0.18, 1.28, 0.3, 1),
             border-color 380ms ease,
             scale 280ms linear,
-            opacity 380ms ease,
-            filter 380ms ease;
+            opacity 380ms ease;
         will-change: transform;
     }
 
