@@ -13,7 +13,7 @@ const options: VptOptions = {
     sitemapJson: {}
 }
 
-test('prebundles CommonJS dependencies loaded by the injected H5 runtime', async () => {
+test('promotes compiler-owned H5 dependencies to optimizer entries', async () => {
     const config = await resolveConfig(
         {
             configFile: false,
@@ -22,7 +22,11 @@ test('prebundles CommonJS dependencies loaded by the injected H5 runtime', async
         'serve'
     )
 
-    assert.deepEqual(config.optimizeDeps.include, ['@tarojs/plugin-platform-h5/dist/runtime/apis', 'react-dom/client'])
+    assert.deepEqual(config.optimizeDeps.include, [
+        '@tarojs/plugin-platform-h5/dist/runtime/apis',
+        '@tarojs/runtime',
+        'react-dom/client'
+    ])
     assert.deepEqual(config.optimizeDeps.exclude, [])
 
     const babelPlugin = config.plugins.find((plugin) => plugin.name === '@rolldown/plugin-babel')
