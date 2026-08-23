@@ -121,12 +121,12 @@ export function createTemplateAssets(
  *
  * Projection-spine ownership
  * --------------------------
- * React's host renderer runs after the final commit tree exists and keeps one Set of the Taro host ancestors from App root to
- * outlet. Nodes leaving that Set receive the ordinary host prop vo=false; nodes entering it receive vo=true. Taro's existing
- * lazy structural hydration runs later and therefore serializes those props without projection-specific scheduler or hydrate
- * behavior. If React replaces the outlet host while moving it, the renderer finds the unique new marker once and caches its
- * new ancestor Set. At a depth reset, i.vo makes forwarding an O(1) local decision; WXML never searches descendants, and Page
- * trees instantiate no unnamed slot.
+ * React's host renderer runs after the final commit tree exists and caches the outlet-to-root Taro host ancestor array. It
+ * skips the unchanged root-side suffix, gives old leaf-side nodes the ordinary host prop vo=false, and gives new ones vo=true.
+ * Taro's existing lazy structural hydration runs later and therefore serializes those props without projection-specific
+ * scheduler or hydrate behavior. If React replaces the outlet host while moving it, the renderer finds the unique new marker
+ * once and caches its new ancestor array. At a depth reset, i.vo makes forwarding an O(1) local decision; WXML never searches
+ * descendants, and Page trees instantiate no unnamed slot.
  *
  * Steady-state updates and navigation
  * -----------------------------------
