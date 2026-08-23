@@ -4,6 +4,61 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.6.7] - 2026-08-23
+
+### Added
+
+- add App footer to starter template (19f1bef)
+- Add app view card hover scale (d5b325d)
+- generate WX App wrap templates (e2b88fd)
+- centralize WX component registrations (a78e0c4)
+- initialize WX App and Page data roots (b51c11e)
+- add WX App wrap runtime patches (70604f6)
+- expose WX App projection runtime types (77b82e2)
+
+### Changed
+
+- move App outlet design to drafts (2b80841)
+- update template projection notes (fb219a0)
+- document App outlet projection (ae8c2b1)
+- stress deep App outlet projection (c6263c0)
+- clarify Page capsule projection routing (feba5fb)
+- Refine app view phone preview (4bdb808)
+- refine showcase motion and layout (fd8d703)
+- polish homepage showcases (d5496e0)
+- refine App view showcase interactions (17e5f86)
+- add interactive App view showcase (5cc7b8c)
+- unify HMR video frames (f68e7c3)
+- analyze WX module runtime performance (7429357)
+- explain WX App view architecture (00d2b2b)
+- refine App guide wording (14104a7)
+- clarify App component rendering (eb53536)
+- add App and Page guide (6ce2da7)
+- document WX App wrapping architecture (ed7aa5e)
+- cover WX App wrapping in native demo (7272737)
+- explain WX fragment keying (14a12e7)
+- clarify WX App template builder (760e188)
+- ignore generated Taro runtime license (23561f7)
+- document generated Taro runtime package (783b791)
+- add generated Taro runtime package (7c160b7)
+- resolve patched Taro runtime entries (0b33d6d)
+- classify patched runtime as WX vendor (d02328c)
+- use patched Taro runtime package (2009296)
+- add patched Taro runtime workflow (fa58785)
+- update Taro runtime for WX App view (f3da9cb)
+- redesign WX App wrap projection (50b7399)
+- refine WX App wrap plan (3bcfb7a)
+- plan WX App wrap projection (18b1c43)
+- plan WX App wrap projection (c039b7b)
+- text (41f037f)
+
+### Fixed
+
+- share the optimized Taro runtime (af93ac5)
+- reconcile App outlet projection after commits (8c63358)
+- guard recursive Page slot forwarding (77cd6bc)
+- lay out starter footer with flex (0d36fe2)
+
 ## [0.6.6] - 2026-08-18
 
 ### Changed
