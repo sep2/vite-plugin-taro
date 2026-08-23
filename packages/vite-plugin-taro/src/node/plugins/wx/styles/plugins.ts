@@ -191,6 +191,19 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
         return finalizeOutput(entryIds, styleByModuleId, context.getModuleInfo.bind(context), weappContext, javaScript)
     }
 
+    /** Invalidates every Tailwind root fed by one changed compiler dependency. */
+    const invalidateTailwindDependencies = (dependencyId: string): void => {
+        styleByModuleId.forEach((style, styleId) => {
+            if (style.tailwind?.dependencies.has(dependencyId)) {
+                styleByModuleId.set(styleId, {
+                    css: style.css,
+                    // The owning root transform replaces the generator using current source and plugin context.
+                    tailwind: { ...style.tailwind, invalidated: true }
+                })
+            }
+        })
+    }
+
     /** Releases native compiler resources while retaining captured CSS needed by subsequent output callbacks. */
     const disposeTailwindRoots = (): void => {
         styleByModuleId.forEach((style, styleId) => {
@@ -282,20 +295,14 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
                 return { code: compiled.css, map: null }
             }
         },
-        /** Marks roots whose compiler inputs changed; Rolldown still decides when those roots are transformed. */
+        /** Invalidates compiler state before Rolldown transforms roots selected through their watched dependencies. */
+        hotUpdate(update) {
+            invalidateTailwindDependencies(normalizeModuleId(update.file))
+            return update.modules
+        },
+        /** Marks roots whose compiler inputs changed for non-HMR Rolldown watch lifecycles. */
         watchChange(id) {
-            const dependencyId = normalizeModuleId(id)
-
-            // A dependency may feed multiple roots, so every retained root must be checked before the next transform wave.
-            styleByModuleId.forEach((style, styleId) => {
-                if (style.tailwind?.dependencies.has(dependencyId)) {
-                    styleByModuleId.set(styleId, {
-                        css: style.css,
-                        // Delay generator replacement until the owning root transform has current root source and graph context.
-                        tailwind: { ...style.tailwind, invalidated: true }
-                    })
-                }
-            })
+            invalidateTailwindDependencies(normalizeModuleId(id))
         },
         generateBundle: {
             // Vite must finish chunking and CSS extraction before VPT can finalize the complete WX output transaction.

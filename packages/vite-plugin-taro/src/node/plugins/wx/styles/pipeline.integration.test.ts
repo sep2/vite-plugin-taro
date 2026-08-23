@@ -3,7 +3,7 @@ import { mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { dev } from 'rolldown/experimental'
+import { type DevEngine, dev } from 'rolldown/experimental'
 import { createServer, normalizePath } from 'vite'
 import { globalWxssFileName, writeHmrFile } from '../dev/hmr-files.ts'
 import type { BundledDev } from '../dev/wx-dev-options.ts'
@@ -27,12 +27,17 @@ test('publishes processed CSS and live topology without identical rewrites', asy
     const outputResults: unknown[] = []
     // This mutable edge serializes physical publication exactly like the production host action reducer.
     let publicationWork = Promise.resolve()
+    // DevEngine callbacks run only after assignment and advance the same published frontier as the production host.
+    let engine: DevEngine
     const styles = createWxStylePlugin([appId])
     const writeStyle = (wxss: string) => writeHmrFile(outDir, globalWxssFileName, wxss)
-    const publish = (result: unknown, results: unknown[]): void => {
+    const publish = (result: unknown, results: unknown[], deliveredFileNames: readonly string[]): void => {
         publicationWork = publicationWork.then(async () => {
             try {
                 await styles.finalizeUpdate([], writeStyle)
+                for (const fileName of deliveredFileNames) {
+                    await engine.notifyPayloadDelivered(fileName)
+                }
                 results.push(result)
             } catch (error) {
                 results.push(error)
@@ -83,22 +88,31 @@ test('publishes processed CSS and live topology without identical rewrites', asy
     if (!output || Array.isArray(output)) {
         throw new Error('Expected one bundled development output')
     }
-    const engine = await dev(rolldownOptions, output, {
+    engine = await dev(rolldownOptions, output, {
         rebuildStrategy: 'never',
-        watch: { skipWrite: true, useDebounce: false },
+        watch: {
+            skipWrite: true,
+            useDebounce: false,
+            usePolling: true,
+            pollInterval: 20,
+            compareContentsForPolling: true
+        },
         onHmrUpdates(result) {
             if (result instanceof Error) {
                 hmrResults.push(result)
                 return
             }
-            publish(result, hmrResults)
+            const deliveredFileNames = result.updates.flatMap(({ update }) =>
+                update.type === 'Patch' ? [update.filename] : []
+            )
+            publish(result, hmrResults, deliveredFileNames)
         },
         onOutput(result) {
             if (result instanceof Error) {
                 outputResults.push(result)
                 return
             }
-            publish(result, outputResults)
+            publish(result, outputResults, [])
         }
     })
 
@@ -110,14 +124,20 @@ test('publishes processed CSS and live topology without identical rewrites', asy
         assert.equal(await readFile(globalWxssPath, 'utf8'), '.app { color: #ff0000; }\n')
         await engine.registerClient('style-plugin-test')
 
+        const colorResultCount = hmrResults.length
         await writeFile(cssId, '.app { color: blue; }\n')
         await waitForStyle(globalWxssPath, (wxss) => wxss === '.app { color: #0000ff; }\n', hmrResults)
+        await waitForEventCount(hmrResults, colorResultCount + 1)
 
+        const additionResultCount = hmrResults.length
         await writeFile(appId, "import './app.css'\nimport './extra.css'\nexport const value = 'added'\n")
         await waitForStyle(globalWxssPath, (wxss) => /\.extra \{\}/.test(wxss), hmrResults)
+        await waitForEventCount(hmrResults, additionResultCount + 1)
 
+        const removalResultCount = hmrResults.length
         await writeFile(appId, initialSource)
         await waitForStyle(globalWxssPath, (wxss) => !/\.extra \{\}/.test(wxss), hmrResults)
+        await waitForEventCount(hmrResults, removalResultCount + 1)
 
         const unchangedInode = (await stat(globalWxssPath)).ino
         const priorResultCount = hmrResults.length
@@ -152,6 +172,8 @@ test('renders Tailwind CSS and final patch factories from one class set', async 
     const outputResults: unknown[] = []
     // This mutable Promise serializes non-awaited callbacks exactly like the production host action reducer.
     let hmrWork = Promise.resolve()
+    // DevEngine callbacks run only after assignment and commit every finalized payload before the next source edit.
+    let engine: DevEngine
     const styles = createWxStylePlugin([appId])
     const writeStyle = (wxss: string) => writeHmrFile(outDir, globalWxssFileName, wxss)
     const server = await createServer({
@@ -174,9 +196,15 @@ test('renders Tailwind CSS and final patch factories from one class set', async 
     if (!output || Array.isArray(output)) {
         throw new Error('Expected one bundled development output')
     }
-    const engine = await dev(rolldownOptions, output, {
+    engine = await dev(rolldownOptions, output, {
         rebuildStrategy: 'never',
-        watch: { skipWrite: false, useDebounce: false },
+        watch: {
+            skipWrite: false,
+            useDebounce: false,
+            usePolling: true,
+            pollInterval: 20,
+            compareContentsForPolling: true
+        },
         onHmrUpdates(result) {
             if (result instanceof Error) {
                 hmrResults.push(result)
@@ -186,6 +214,9 @@ test('renders Tailwind CSS and final patch factories from one class set', async 
                 try {
                     const patches = result.updates.flatMap(({ update }) => (update.type === 'Patch' ? [update] : []))
                     const finalized = await styles.finalizeUpdate(patches, writeStyle)
+                    for (const patch of patches) {
+                        await engine.notifyPayloadDelivered(patch.filename)
+                    }
                     hmrResults.push({ codes: finalized.map((patch) => patch.code) })
                 } catch (error) {
                     hmrResults.push(error)
@@ -235,7 +266,8 @@ test('renders Tailwind CSS and final patch factories from one class set', async 
 
         const dependencyStart = hmrResults.length
         await writeFile(themeId, '@theme { --color-brand: blue; }\n')
-        await waitForFinalizedHmr(hmrResults, dependencyStart, (result) => /blue/.test(result.codes.join('\n')))
+        await waitForStyle(globalWxssPath, (wxss) => /--color-brand:\s*blue/.test(wxss), hmrResults)
+        await waitForEventCount(hmrResults, dependencyStart + 1)
         const themedWxss = await readFile(globalWxssPath, 'utf8')
         assert.match(themedWxss, /--color-brand:\s*blue/)
         assert.doesNotMatch(themedWxss, /--color-brand:\s*red/)

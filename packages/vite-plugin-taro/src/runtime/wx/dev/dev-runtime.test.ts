@@ -547,3 +547,118 @@ test('ignores patches for a stale build before running their factories', async (
     assert.deepEqual(runtime.loadExports('page'), { value: 'old' })
     assert.deepEqual(getNewReports(reports, reportCount), [])
 })
+
+test('bubbles a dependency update to the nearest accepting importer', async () => {
+    const { reports, runtime } = await createTestHarness()
+    runtime.registerGraph({
+        ids: ['page', 'dependency'],
+        localCount: 2,
+        edges: [[1], []],
+        dynamicEdges: [[], []]
+    })
+    runtime.registerModule('dependency', { exports: { value: 'old dependency' } })
+    runtime.registerModule('page', { exports: { value: 'page:old dependency' } })
+
+    // The previous Page generation records the fresh aggregate received at its HMR boundary.
+    let acceptedExports: unknown
+    const pageHotContext: TestHotContext = runtime.createModuleHotContext('page')
+    pageHotContext.accept((fresh) => {
+        acceptedExports = fresh
+    })
+    const reportCount = reports.length
+
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            {
+                seq: 1,
+                changedIds: ['dependency'],
+                factory() {
+                    runtime.registerGraph({
+                        ids: ['page', 'dependency'],
+                        localCount: 2,
+                        edges: [[1], []],
+                        dynamicEdges: [[], []]
+                    })
+                    runtime.registerFactory('dependency', 'esm', (id) => {
+                        runtime.registerModule(id, { exports: { value: 'new dependency' } })
+                    })
+                    runtime.registerFactory('page', 'esm', (id) => {
+                        const dependencyExports: unknown = runtime.initModule('dependency')
+                        assert.ok(
+                            dependencyExports &&
+                                typeof dependencyExports === 'object' &&
+                                'value' in dependencyExports &&
+                                typeof dependencyExports.value === 'string'
+                        )
+                        runtime.registerModule(id, { exports: { value: `page:${dependencyExports.value}` } })
+                        runtime.createModuleHotContext(id).accept()
+                    })
+                }
+            }
+        ]
+    })
+
+    assert.deepEqual(acceptedExports, { value: 'page:new dependency' })
+    assert.deepEqual(runtime.loadExports('page'), { value: 'page:new dependency' })
+    const newReports = getNewReports(reports, reportCount)
+    assertApplied(newReports, 1)
+    assertNoRebuild(newReports)
+})
+
+test('requests a rebuild when an executed graph has no accepting boundary', async (context) => {
+    context.mock.method(console, 'warn', () => {})
+    const { reports, runtime } = await createTestHarness()
+    runtime.registerGraph({ ids: ['page'], localCount: 1, edges: [[]], dynamicEdges: [[]] })
+    runtime.registerModule('page', { exports: { value: 'still live' } })
+    const reportCount = reports.length
+
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            createPatch({
+                runtime,
+                seq: 1,
+                moduleId: 'page',
+                moduleExports: { value: 'must not execute' },
+                deferAccept: false
+            })
+        ]
+    })
+
+    assert.deepEqual(runtime.loadExports('page'), { value: 'still live' })
+    const newReports = getNewReports(reports, reportCount)
+    assert.match(JSON.stringify(newReports), /no HMR boundary found for module page/)
+    assert.doesNotMatch(JSON.stringify(newReports), /"kind":"applied"/)
+})
+
+test('defers a patch for an unloaded lazy module until its first import', async () => {
+    const { reports, runtime } = await createTestHarness()
+    // Execution is observed separately from factory publication to prove the lazy boundary remains cold.
+    let moduleExecutions = 0
+    const reportCount = reports.length
+
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            createPatch({
+                runtime,
+                seq: 1,
+                moduleId: 'lazy-feature',
+                moduleExports: { value: 'latest lazy feature' },
+                deferAccept: false,
+                onExecute: () => {
+                    moduleExecutions++
+                }
+            })
+        ]
+    })
+
+    assert.equal(moduleExecutions, 0)
+    const newReports = getNewReports(reports, reportCount)
+    assertApplied(newReports, 1)
+    assertNoRebuild(newReports)
+
+    assert.deepEqual(runtime.initModule('lazy-feature'), { value: 'latest lazy feature' })
+    assert.equal(moduleExecutions, 1)
+})
