@@ -6,6 +6,7 @@
 *.tgz
 /packages/taro-react/LICENSE
 /packages/taro-plugin-framework-react/LICENSE
+/packages/taro-runtime/LICENSE
 /packages/taro-plugin-framework-react/index.js
 /.vscode/
 dist

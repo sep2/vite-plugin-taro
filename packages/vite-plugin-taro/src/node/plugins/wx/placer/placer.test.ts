@@ -144,7 +144,14 @@ test('matches only explicit React and Taro framework package roots', () => {
         ),
         true
     )
+    assert.equal(
+        isWxFrameworkVendorModule(
+            '/repo/node_modules/.pnpm/vite-plugin-taro-runtime@0.6.6/node_modules/vite-plugin-taro-runtime/dist/index.js'
+        ),
+        true
+    )
     assert.equal(isWxFrameworkVendorModule('/repo/packages/taro-react/dist/react.esm.js'), true)
+    assert.equal(isWxFrameworkVendorModule('/repo/packages/taro-runtime/dist/index.js'), true)
     assert.equal(isWxFrameworkVendorModule('/repo/src/react-feature.ts'), false)
     assert.equal(isWxFrameworkVendorModule('/repo/src/taro-page.ts'), false)
 })

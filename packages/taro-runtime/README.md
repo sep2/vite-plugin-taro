@@ -1,10 +1,10 @@
-# vite-plugin-taro-react
+# vite-plugin-taro-runtime
 
-> React 19 compatibility build of `@tarojs/react@4.2.0` for `vite-plugin-taro`.
+> WX App-wrap build of `@tarojs/runtime@4.2.0` for `vite-plugin-taro`.
 
 ## Status
 
-This is a generated support package. It is published so `vite-plugin-taro` can depend on a React 19-compatible Taro React runtime through the `@tarojs/react` package slot. Application code should not import this package directly.
+This is a generated support package. It is published so `vite-plugin-taro` can use one reproducibly patched Taro runtime. Application code should not import this package directly.
 
 Most apps should install `vite-plugin-taro` and import app-facing APIs through its virtual modules instead:
 
@@ -15,13 +15,13 @@ import Taro from 'virtual:taro/api'
 
 ## Why this package exists
 
-`vite-plugin-taro` targets React 19 while keeping the official Taro runtime behavior. For WX App views, the host renderer also maintains the compact outlet-projection marker after each React commit so Taro can serialize it as an ordinary host property. This package is produced from the upstream Taro npm tarball plus a small local patch, then published under the `vite-plugin-taro-react` name for reproducible installs.
+The WX renderer needs direct `page.*` paths and an opaque private Page outlet while H5 retains upstream Taro behavior. This package is produced from the upstream Taro npm tarball plus a small local patch, then published under the `vite-plugin-taro-runtime` name for reproducible installs.
 
 ## Generated source
 
 - Generator: [`scripts/build-patched-taro-packages.ts`](../../scripts/build-patched-taro-packages.ts)
-- Patch: [`patches/@tarojs__react@4.2.0-react19.patch`](../../patches/@tarojs__react@4.2.0-react19.patch)
-- Output package directory: [`packages/taro-react`](.)
+- Patch: [`patches/@tarojs__runtime@4.2.0.patch`](../../patches/@tarojs__runtime@4.2.0.patch)
+- Output package directory: [`packages/taro-runtime`](.)
 
 Regenerate from the repository root:
 

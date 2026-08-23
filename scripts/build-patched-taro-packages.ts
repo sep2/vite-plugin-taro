@@ -5,7 +5,11 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-type PackageSpec = readonly [upstreamName: string, targetDir: string]
+type PackageSpec = Readonly<{
+    upstreamName: string
+    targetDir: string
+    patchSuffix?: string
+}>
 type LocalPackageJson = {
     text: string
     value: {
@@ -21,19 +25,31 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const upstreamVersion = '4.2.0'
 
 const packages: PackageSpec[] = [
-    ['@tarojs/react', 'packages/taro-react'],
-    ['@tarojs/plugin-framework-react', 'packages/taro-plugin-framework-react']
+    {
+        upstreamName: '@tarojs/react',
+        targetDir: 'packages/taro-react',
+        patchSuffix: 'react19'
+    },
+    {
+        upstreamName: '@tarojs/plugin-framework-react',
+        targetDir: 'packages/taro-plugin-framework-react',
+        patchSuffix: 'react19'
+    },
+    {
+        upstreamName: '@tarojs/runtime',
+        targetDir: 'packages/taro-runtime'
+    }
 ]
 
-for (const [upstreamName, targetDir] of packages) {
-    await buildPackage(upstreamName, targetDir)
+for (const packageSpec of packages) {
+    await buildPackage(packageSpec)
 }
 
-async function buildPackage(upstreamName: string, targetDir: string): Promise<void> {
+async function buildPackage({ upstreamName, targetDir, patchSuffix }: PackageSpec): Promise<void> {
     const absoluteTargetDir = path.resolve(repoRoot, targetDir)
     const localPackageJson = readLocalPackageJson(absoluteTargetDir)
     const localReadme = readLocalReadme(absoluteTargetDir)
-    const patchFile = getPatchFile(upstreamName)
+    const patchFile = getPatchFile(upstreamName, patchSuffix)
     const workingDir = mkdtempSync(path.join(tmpdir(), 'vite-plugin-taro-'))
 
     try {
@@ -95,8 +111,9 @@ function readLocalTextFile(filePath: string): string {
     return text.endsWith('\n') ? text : `${text}\n`
 }
 
-function getPatchFile(upstreamName: string): string {
-    return path.resolve(repoRoot, `patches/${upstreamName.replace('/', '__')}@${upstreamVersion}-react19.patch`)
+function getPatchFile(upstreamName: string, patchSuffix: string | undefined): string {
+    const suffix = patchSuffix ? `-${patchSuffix}` : ''
+    return path.resolve(repoRoot, `patches/${upstreamName.replace('/', '__')}@${upstreamVersion}${suffix}.patch`)
 }
 
 function applyPatch(packageDir: string, patchFile: string): void {

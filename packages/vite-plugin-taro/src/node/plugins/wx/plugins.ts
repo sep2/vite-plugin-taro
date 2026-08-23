@@ -44,6 +44,10 @@ function createWxPlugin(options: VptOptions, resolver: WxResolver, placement: Wx
                 resolve: {
                     alias: [
                         {
+                            find: /^@tarojs\/runtime$/,
+                            replacement: packageRequire.resolve('@tarojs/runtime/dist/index.js')
+                        },
+                        {
                             find: /^@tarojs\/components$/,
                             replacement: packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
                         }
@@ -157,7 +161,7 @@ function createWxPlugin(options: VptOptions, resolver: WxResolver, placement: Wx
 
 /** Creates the build-time constants required by Taro's legacy feature gates. */
 function createTaroDefines(): Record<string, string> {
-    const taroVersion = String((packageRequire('@tarojs/runtime/package.json') as { version: string }).version)
+    const taroVersion = String((packageRequire('@tarojs/taro/package.json') as { version: string }).version)
 
     return {
         'process.env.FRAMEWORK': JSON.stringify('react'),

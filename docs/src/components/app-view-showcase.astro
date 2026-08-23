@@ -1,0 +1,1405 @@
+---
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import HomeSectionHeading from './home-section-heading.astro'
+---
+
+<section class="home-section" aria-labelledby="app-view-title">
+    <div class="app-view-layout">
+        <div class="app-view-copy">
+            <HomeSectionHeading
+                id="app-view-title"
+                kicker="一个 App · 多个页面"
+                title="App 渲染共享视图"
+                description="导航、状态展示与全局控件只需在 App 中编写一次，便会作为共享视图持续包裹每个页面。切换页面时，App 始终保持原位。"
+                align="start"
+            />
+
+            <ul class="app-view-benefits">
+                <li>
+                    <i aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 8 4.5-8 4.5-8-4.5L12 3Z" /><path d="m4 12 8 4.5 8-4.5M4 16.5l8 4.5 8-4.5" /></svg></i>
+                    <span><strong>共享视图只写一次</strong><small>导航、全局控件由 App 统一渲染</small></span>
+                </li>
+                <li>
+                    <i aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 8h14m0 0-3-3m3 3-3 3M19 16H5m0 0 3-3m-3 3 3 3" /></svg></i>
+                    <span><strong>页面自然切换</strong><small>每个页面仍是 App 的 children</small></span>
+                </li>
+                <li>
+                    <i aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8.2 8.5c-2 0-3.7 1.5-3.7 3.5s1.7 3.5 3.7 3.5c3.8 0 3.8-7 7.6-7 2 0 3.7 1.5 3.7 3.5s-1.7 3.5-3.7 3.5c-3.8 0-3.8-7-7.6-7Z" /></svg></i>
+                    <span><strong>状态持续保留</strong><small>Context、Hooks 与生命周期不会重建</small></span>
+                </li>
+            </ul>
+
+            <nav class="app-view-links" aria-label="App 与页面文档">
+                <a class="primary-link" href="/guides/app-and-pages/">了解 App 与页面 <span aria-hidden="true">→</span></a>
+            </nav>
+        </div>
+
+        <vpt-page-deck class="page-deck-demo" role="group" aria-label="App 中切换微信页面的交互演示">
+            <div class="deck-stage">
+                <article class="phone-frame" aria-label="VPT Life 微信小程序">
+                    <span class="phone-speaker" aria-hidden="true"></span>
+                    <div class="phone-screen">
+                        <div class="phone-status">
+                            <strong>8:25</strong>
+                            <span class="phone-indicators" aria-hidden="true">
+                                <svg class="signal-icon" viewBox="0 0 18 16">
+                                    <rect x="1" y="11" width="2.5" height="4" rx="0.7" />
+                                    <rect x="5.5" y="8" width="2.5" height="7" rx="0.7" />
+                                    <rect x="10" y="5" width="2.5" height="10" rx="0.7" />
+                                    <rect x="14.5" y="2" width="2.5" height="13" rx="0.7" />
+                                </svg>
+                                <svg class="wifi-icon" viewBox="0 0 20 16">
+                                    <path d="M2 5.5C6.7 1.7 13.3 1.7 18 5.5M5 9C7.9 6.8 12.1 6.8 15 9M8.2 12.3C9.3 11.5 10.7 11.5 11.8 12.3" />
+                                    <circle cx="10" cy="14.2" r="1" />
+                                </svg>
+                                <svg class="battery-icon" viewBox="0 0 25 14">
+                                    <rect x="1" y="1" width="20" height="12" rx="3" />
+                                    <path d="M23 5V9" />
+                                    <rect class="battery-level" x="3" y="3" width="15" height="8" rx="1.5" />
+                                </svg>
+                            </span>
+                        </div>
+                        <header class="app-header">
+                            <span class="app-mark" aria-hidden="true">V</span>
+                            <strong class="app-title">VPT Life</strong>
+                            <span class="wechat-capsule" aria-hidden="true">
+                                <span class="capsule-dots"><i></i><i></i><i></i></span>
+                                <i class="capsule-divider"></i>
+                                <span class="capsule-close"></span>
+                            </span>
+                        </header>
+                        <div class="page-aperture" aria-hidden="true"></div>
+                        <nav class="app-tabs" aria-label="页面导航">
+                            <button type="button" data-select-page="home">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 10 8-7 8 7v10h-5v-6H9v6H4Z" /></svg>
+                                <span>首页</span>
+                            </button>
+                            <button type="button" data-select-page="discover" aria-current="page">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 9-8 9-8-9Z" /></svg>
+                                <span>发现</span>
+                            </button>
+                            <button type="button" data-select-page="profile">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4.5 21a7.5 7.5 0 0 1 15 0" /></svg>
+                                <span>我的</span>
+                            </button>
+                        </nav>
+                    </div>
+                </article>
+
+                <div class="page-deck" aria-label="页面卡片">
+                    <article class="demo-page page-card page-home" data-page-card="home" data-slot="-1">
+                        <header><span>首页</span><small>今天</small></header>
+                        <p class="card-kicker">DAILY RHYTHM</p>
+                        <h3>今天也向前一点</h3>
+                        <p class="card-copy">保留节奏，也留一点时间给自己。</p>
+                        <section class="focus-card">
+                            <span><small>专注时间</small><strong>2h 18m</strong></span>
+                            <i aria-hidden="true"><b></b></i>
+                            <em>目标完成 78%</em>
+                        </section>
+                        <div class="mini-stats">
+                            <span><small>步数</small><strong>8,420</strong></span>
+                            <span><small>能量</small><strong>486</strong></span>
+                        </div>
+                        <section class="day-plan">
+                            <header><strong>接下来</strong><small>3 项</small></header>
+                            <div class="day-plan-list">
+                                <span><i></i><b>深度工作<small>产品迭代</small></b><em>09:30</em></span>
+                                <span><i></i><b>午间散步<small>河畔路线</small></b><em>12:20</em></span>
+                                <span><i></i><b>阅读时间<small>第三章</small></b><em>20:00</em></span>
+                            </div>
+                        </section>
+                        <button class="card-select" type="button" data-card-select="home" aria-label="显示首页"></button>
+                    </article>
+
+                    <article class="demo-page page-card page-discover" data-page-card="discover" data-slot="0">
+                        <header><span>发现</span><small>附近</small></header>
+                        <p class="card-kicker">WEEKEND PICKS</p>
+                        <h3>去有风的地方</h3>
+                        <p class="card-copy">三条适合周末散步的绿色路线。</p>
+                        <section class="place-card">
+                            <span class="place-art" aria-hidden="true"><i></i><i></i><b></b></span>
+                            <span><small>距离 2.4 km</small><strong>溪谷植物园</strong><em>安静 · 适合散步</em></span>
+                        </section>
+                        <div class="place-tags"><span>自然</span><span>轻徒步</span><span>咖啡</span></div>
+                        <section class="route-list">
+                            <header><strong>附近路线</strong><small>查看全部</small></header>
+                            <div class="route-row"><i class="route-river"></i><span><strong>河岸慢行</strong><small>绿荫 · 35 min</small></span><em>1.8 km</em></div>
+                            <div class="route-row"><i class="route-hill"></i><span><strong>松林小径</strong><small>安静 · 52 min</small></span><em>3.1 km</em></div>
+                        </section>
+                        <button class="card-select" type="button" data-card-select="discover" aria-label="显示发现页"></button>
+                    </article>
+
+                    <article class="demo-page page-card page-profile" data-page-card="profile" data-slot="1">
+                        <header><span>我的</span><small>个人空间</small></header>
+                        <div class="profile-head">
+                            <span class="profile-avatar" aria-hidden="true">林</span>
+                            <span><small>GOOD MORNING</small><h3>林小满</h3><p>把日子过成喜欢的样子。</p></span>
+                        </div>
+                        <section class="profile-streak"><i aria-hidden="true">✦</i><span><small>连续记录</small><strong>12 天</strong></span></section>
+                        <div class="profile-grid">
+                            <span><strong>28</strong><small>完成计划</small></span>
+                            <span><strong>6</strong><small>收藏路线</small></span>
+                        </div>
+                        <section class="profile-week">
+                            <header><strong>本周活跃</strong><small>6 / 7 天</small></header>
+                            <div class="week-bars" aria-hidden="true">
+                                <i style="--activity-height: 42%"></i><i style="--activity-height: 68%"></i><i style="--activity-height: 51%"></i><i style="--activity-height: 82%"></i><i style="--activity-height: 64%"></i><i class="today" style="--activity-height: 94%"></i><i style="--activity-height: 36%"></i>
+                            </div>
+                            <div class="week-days" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+                        </section>
+                        <div class="profile-menu">
+                            <span><i aria-hidden="true">♡</i><strong>收藏路线</strong><small>12</small></span>
+                            <span><i aria-hidden="true">◷</i><strong>生活片段</strong><small>28</small></span>
+                            <span><i aria-hidden="true">⌁</i><strong>我的足迹</strong><small>8.7 km</small></span>
+                        </div>
+                        <button class="card-select" type="button" data-card-select="profile" aria-label="显示我的页面"></button>
+                    </article>
+                </div>
+
+                <p class="deck-hint"><span aria-hidden="true">↔</span> 滑动页面，或点击卡片和底部 Tab</p>
+                <output class="sr-only" data-page-announcement aria-live="polite"></output>
+            </div>
+        </vpt-page-deck>
+    </div>
+</section>
+
+<script>
+    function requireDeckElement<T extends Element>(root: ParentNode, selector: string): T {
+        const element = root.querySelector<T>(selector)
+        if (element === null) throw new Error(`Page deck requires ${selector}`)
+        return element
+    }
+
+    const pageOrder = ['home', 'discover', 'profile'] as const
+    const cardDragLimit = 110
+    const phoneTiltLimit = 5.5
+    const phoneTiltPerPixel = 0.16
+    const swipeIntentDistance = 10
+    type PageId = (typeof pageOrder)[number]
+    type PageSelectionMotion = 'activation' | 'gesture'
+
+    function isPageId(value: string | undefined): value is PageId {
+        return value === 'home' || value === 'discover' || value === 'profile'
+    }
+
+    function createPhonePage(pageCard: HTMLElement): HTMLElement {
+        const phonePage = document.createElement('article')
+        phonePage.className = pageCard.className
+        phonePage.classList.replace('page-card', 'phone-page')
+        phonePage.replaceChildren(...Array.from(pageCard.childNodes, (child) => child.cloneNode(true)))
+        requireDeckElement<HTMLButtonElement>(phonePage, '.card-select').remove()
+        return phonePage
+    }
+
+    interface CardGesture {
+        readonly card: HTMLElement
+        readonly listeners: AbortController
+        readonly pointerId: number
+        readonly startX: number
+        readonly startY: number
+        // Horizontal intent stays committed; a deliberate reversal beyond the threshold updates its direction.
+        swipeOffset: -1 | 1 | null
+    }
+
+    class VptPageDeckElement extends HTMLElement {
+        // This is the selected React Page while the surrounding App header and tabs remain mounted.
+        private activePage: PageId = 'discover'
+        // A gesture owns its captured card and every temporary listener as one disposable session.
+        private gesture: CardGesture | null = null
+        // Click and Tab navigation share one replaceable phone animation so repeated selections cannot overlap.
+        private phoneAnimation: Animation | null = null
+        private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+
+        connectedCallback(): void {
+            this.renderPhonePage(this.activePage)
+            this.addEventListener('click', this.handleClick)
+            this.addEventListener('pointerdown', this.handlePointerDown)
+        }
+
+        disconnectedCallback(): void {
+            this.removeEventListener('click', this.handleClick)
+            this.removeEventListener('pointerdown', this.handlePointerDown)
+            if (this.gesture !== null) this.endGesture(this.gesture)
+            this.phoneAnimation?.cancel()
+        }
+
+        private readonly handleClick = (event: MouseEvent): void => {
+            if (!(event.target instanceof Element)) return
+            const tab = event.target.closest<HTMLElement>('[data-select-page]')
+            if (tab !== null) {
+                const nextPage = tab.dataset.selectPage
+                if (!isPageId(nextPage)) throw new Error('Page deck Tab requires a valid Page id')
+                this.selectPage(nextPage, 'activation')
+                return
+            }
+
+            // Pointer taps are resolved by the gesture session; detail 0 preserves keyboard and assistive activation.
+            if (event.detail !== 0) return
+            const card = event.target.closest<HTMLElement>('[data-page-card]')
+            const control = event.target.closest<HTMLElement>('[data-card-select]')
+            const nextPage = control?.dataset.cardSelect ?? card?.dataset.pageCard
+            if (!isPageId(nextPage)) throw new Error('Page deck card requires a valid Page id')
+            this.selectPage(nextPage, 'activation')
+        }
+
+        private readonly handlePointerDown = (event: PointerEvent): void => {
+            if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return
+            if (!(event.target instanceof Element)) return
+            const card = event.target.closest<HTMLElement>('[data-page-card]')
+            if (card === null || this.gesture !== null) return
+
+            this.phoneAnimation?.cancel()
+            const listeners = new AbortController()
+            const gesture: CardGesture = {
+                card: card,
+                listeners: listeners,
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startY: event.clientY,
+                swipeOffset: null
+            }
+            this.gesture = gesture
+            // Pointer movement owns both card translation and phone tilt until this session ends.
+            this.dataset.gesturing = ''
+            card.dataset.dragging = ''
+            card.addEventListener('pointermove', this.handleGestureMove, { signal: listeners.signal })
+            card.addEventListener('pointerup', this.handleGestureEnd, { signal: listeners.signal })
+            card.addEventListener('pointercancel', this.handleGestureCancel, { signal: listeners.signal })
+            card.addEventListener('lostpointercapture', this.handleGestureCancel, { signal: listeners.signal })
+            card.setPointerCapture(event.pointerId)
+        }
+
+        private readonly handleGestureMove = (event: PointerEvent): void => {
+            const gesture = this.gesture
+            if (gesture === null || event.pointerId !== gesture.pointerId) return
+            this.updateGesture(gesture, event)
+        }
+
+        private readonly handleGestureEnd = (event: PointerEvent): void => {
+            const gesture = this.gesture
+            if (gesture === null || event.pointerId !== gesture.pointerId) return
+            this.updateGesture(gesture, event)
+            const nextPage = gesture.card.dataset.pageCard
+            if (!isPageId(nextPage)) throw new Error('Page deck card requires a valid Page id')
+            const swipeOffset = gesture.swipeOffset
+            this.endGesture(gesture)
+            if (swipeOffset === null) this.selectPage(nextPage, 'activation')
+            else this.selectRelativePage(swipeOffset)
+        }
+
+        private readonly handleGestureCancel = (event: PointerEvent): void => {
+            const gesture = this.gesture
+            if (gesture === null || event.pointerId !== gesture.pointerId) return
+            const swipeOffset = gesture.swipeOffset
+            this.endGesture(gesture)
+            if (swipeOffset !== null) this.selectRelativePage(swipeOffset)
+        }
+
+        private updateGesture(gesture: CardGesture, event: PointerEvent): void {
+            const horizontalDistance = event.clientX - gesture.startX
+            const verticalDistance = event.clientY - gesture.startY
+            const visibleDistance = Math.max(-cardDragLimit, Math.min(cardDragLimit, horizontalDistance))
+            const phoneTilt = Math.max(-phoneTiltLimit, Math.min(phoneTiltLimit, horizontalDistance * phoneTiltPerPixel))
+            gesture.card.style.setProperty('--drag-x', `${visibleDistance}px`)
+            this.style.setProperty('--phone-rotate-y', `${phoneTilt}deg`)
+            const reachedIntentDistance = Math.abs(horizontalDistance) >= swipeIntentDistance
+            const hasHorizontalIntent = gesture.swipeOffset !== null
+            if (reachedIntentDistance && (hasHorizontalIntent || Math.abs(horizontalDistance) > Math.abs(verticalDistance))) {
+                gesture.swipeOffset = horizontalDistance < 0 ? 1 : -1
+            }
+        }
+
+        private endGesture(gesture: CardGesture): void {
+            gesture.listeners.abort()
+            gesture.card.style.removeProperty('--drag-x')
+            this.style.removeProperty('--phone-rotate-y')
+            delete gesture.card.dataset.dragging
+            delete this.dataset.gesturing
+            this.gesture = null
+            if (gesture.card.hasPointerCapture(gesture.pointerId)) gesture.card.releasePointerCapture(gesture.pointerId)
+        }
+
+        private selectRelativePage(offset: -1 | 1): void {
+            const currentIndex = pageOrder.indexOf(this.activePage)
+            const nextIndex = (currentIndex + offset + pageOrder.length) % pageOrder.length
+            this.selectPage(pageOrder[nextIndex], 'gesture')
+        }
+
+        private renderPhonePage(page: PageId): void {
+            const pageCard = requireDeckElement<HTMLElement>(this, `[data-page-card="${page}"]`)
+            // The inert mirror keeps the phone populated while its source card moves around the deck.
+            requireDeckElement<HTMLElement>(this, '.page-aperture').replaceChildren(createPhonePage(pageCard))
+        }
+
+        private animatePhone(pageOffset: -1 | 1): void {
+            if (this.reducedMotion.matches) return
+            const phone = requireDeckElement<HTMLElement>(this, '.phone-frame')
+            const baseTransform = 'translateX(-50%) rotate(0.35deg)'
+            const peakTilt = pageOffset === 1 ? -phoneTiltLimit : phoneTiltLimit
+            this.phoneAnimation?.cancel()
+            const animation = phone.animate(
+                [
+                    {
+                        transform: `${baseTransform} rotateY(0deg)`,
+                        offset: 0,
+                        easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)'
+                    },
+                    {
+                        transform: `${baseTransform} rotateY(${peakTilt}deg)`,
+                        offset: 0.32,
+                        easing: 'cubic-bezier(0.16, 1, 0.3, 1)'
+                    },
+                    {
+                        transform: `${baseTransform} rotateY(${-peakTilt * 0.12}deg)`,
+                        offset: 0.74,
+                        easing: 'ease-out'
+                    },
+                    { transform: `${baseTransform} rotateY(0deg)`, offset: 1 }
+                ],
+                { duration: 720 }
+            )
+            this.phoneAnimation = animation
+            const clearAnimation = (): void => {
+                if (this.phoneAnimation === animation) this.phoneAnimation = null
+            }
+            animation.oncancel = clearAnimation
+            animation.onfinish = clearAnimation
+        }
+
+        private selectPage(nextPage: PageId, motion: PageSelectionMotion): void {
+            if (nextPage === this.activePage) return
+            const currentIndex = pageOrder.indexOf(this.activePage)
+            const nextIndex = pageOrder.indexOf(nextPage)
+            const forwardDistance = (nextIndex - currentIndex + pageOrder.length) % pageOrder.length
+            const pageOffset: -1 | 1 = forwardDistance === 1 ? 1 : -1
+            if (motion === 'activation') this.animatePhone(pageOffset)
+            this.activePage = nextPage
+            this.renderPhonePage(nextPage)
+            const activeIndex = pageOrder.indexOf(nextPage)
+
+            this.querySelectorAll<HTMLElement>('[data-page-card]').forEach((card) => {
+                const pageId = card.dataset.pageCard
+                if (!isPageId(pageId)) throw new Error('Page deck card requires a valid Page id')
+                const cardIndex = pageOrder.indexOf(pageId)
+                const difference = (cardIndex - activeIndex + pageOrder.length) % pageOrder.length
+                card.dataset.slot = difference === 0 ? '0' : difference === 1 ? '1' : '-1'
+                card.classList.toggle('is-active', difference === 0)
+            })
+
+            this.querySelectorAll<HTMLButtonElement>('[data-select-page]').forEach((tab) => {
+                const pageId = tab.dataset.selectPage
+                const isActive = pageId === nextPage
+                tab.classList.toggle('is-active', isActive)
+                if (isActive) tab.setAttribute('aria-current', 'page')
+                else tab.removeAttribute('aria-current')
+            })
+
+            const labels: Record<PageId, string> = { home: '首页', discover: '发现页', profile: '我的页面' }
+            requireDeckElement<HTMLOutputElement>(this, '[data-page-announcement]').value = `已切换到${labels[nextPage]}`
+
+            if (this.reducedMotion.matches) return
+            const activeCard = requireDeckElement<HTMLElement>(this, `[data-page-card="${nextPage}"]`)
+            void activeCard.animate(
+                [
+                    { filter: 'brightness(1)', offset: 0 },
+                    { filter: 'brightness(1.08)', offset: 0.62 },
+                    { filter: 'brightness(1)', offset: 1 }
+                ],
+                { duration: 680, easing: 'ease-out' }
+            )
+        }
+    }
+
+    if (customElements.get('vpt-page-deck') === undefined) {
+        customElements.define('vpt-page-deck', VptPageDeckElement)
+    }
+</script>
+
+<style>
+    .app-view-layout {
+        --deck-hint-overhang: 2.25rem;
+        --layout-gap: clamp(2rem, 6vw, 5rem);
+        display: grid;
+        grid-template-columns: minmax(18rem, 0.78fr) minmax(32rem, 1.22fr);
+        align-items: center;
+        gap: var(--layout-gap);
+    }
+
+    .app-view-copy :global(.home-section-heading) {
+        margin-bottom: 2rem;
+    }
+
+    .app-view-benefits {
+        display: grid;
+        gap: 0.9rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .app-view-benefits li {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 0.85rem;
+    }
+
+    .app-view-benefits i {
+        display: grid;
+        width: 2.5rem;
+        height: 2.5rem;
+        margin: 0;
+        border: 1px solid var(--vpt-border);
+        border-radius: 0.8rem;
+        background: var(--vpt-icon-background);
+        color: var(--vpt-accent);
+        place-items: center;
+        transform: rotate(-3deg);
+    }
+
+    .app-view-benefits svg {
+        width: 1.25rem;
+        height: 1.25rem;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.8;
+    }
+
+    .app-view-benefits li > span {
+        display: grid;
+        gap: 0.1rem;
+    }
+
+    .app-view-benefits strong {
+        color: var(--vpt-heading);
+    }
+
+    .app-view-benefits small {
+        color: var(--vpt-muted);
+        font-size: var(--home-font-size-small);
+    }
+
+    .app-view-links {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.9rem 1.2rem;
+        margin-top: 2rem;
+    }
+
+    .app-view-links a {
+        color: var(--vpt-accent-strong);
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .app-view-links .primary-link {
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--vpt-border-strong);
+        border-radius: 999px;
+        background: var(--vpt-surface);
+        box-shadow: 0 10px 24px var(--vpt-shadow);
+    }
+
+    .app-view-links a:hover {
+        text-decoration: underline;
+    }
+
+    .page-deck-demo {
+        --phone-rotate-y: 0deg;
+        display: block;
+        min-width: 0;
+    }
+
+    .deck-stage {
+        --deck-green: #247b49;
+        --deck-green-soft: #edf5e8;
+        --deck-coral: #e2866d;
+        --deck-ink: #183f2a;
+        --deck-muted: #718277;
+        --deck-card: #fffef8;
+        --phone-frame-height: 38.5rem;
+        --phone-frame-padding: 0.55rem;
+        --phone-frame-top: 2rem;
+        --phone-tab-height: 4rem;
+        --page-card-bottom-gap: 0.5rem;
+        --page-deck-top: 7.35rem;
+        position: relative;
+        height: calc(var(--phone-frame-top) + var(--phone-frame-height) + 0.5rem);
+        perspective: 55rem;
+        perspective-origin: 50% 45%;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    :global(:root[data-theme='dark']) .deck-stage {
+        --deck-green: #72d18a;
+        --deck-green-soft: #173521;
+        --deck-coral: #ef9a82;
+        --deck-ink: #e0eee2;
+        --deck-muted: #91a697;
+        --deck-card: #102219;
+    }
+
+    .phone-frame {
+        position: absolute;
+        top: var(--phone-frame-top);
+        left: 50%;
+        width: 18.5rem;
+        height: var(--phone-frame-height);
+        padding: var(--phone-frame-padding);
+        border: 1px solid color-mix(in srgb, var(--deck-green) 34%, #0b1d12);
+        border-radius: 2.35rem;
+        background: #102319;
+        backface-visibility: hidden;
+        box-shadow: 0 30px 65px rgba(20, 63, 38, 0.2);
+        transform: translateX(-50%) rotate(0.35deg) rotateY(var(--phone-rotate-y));
+        transform-origin: center;
+        transform-style: preserve-3d;
+        transition: transform 720ms cubic-bezier(0.16, 1.35, 0.3, 1);
+        will-change: transform;
+    }
+
+    .page-deck-demo[data-gesturing] .phone-frame {
+        transition: none;
+    }
+
+    .phone-speaker {
+        position: absolute;
+        z-index: 8;
+        top: 0.82rem;
+        left: 50%;
+        width: 4rem;
+        height: 1rem;
+        border-radius: 999px;
+        background: #0a1610;
+        transform: translateX(-50%);
+    }
+
+    .phone-screen {
+        display: grid;
+        position: relative;
+        height: 100%;
+        border-radius: 1.9rem;
+        background: var(--deck-card);
+        overflow: hidden;
+        grid-template-rows: auto auto minmax(0, 1fr) auto;
+    }
+
+    .phone-status {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.68rem 1.05rem 0.3rem;
+        background: var(--deck-green-soft);
+        color: var(--deck-ink);
+        font-size: var(--home-font-size-small);
+        line-height: 1;
+    }
+
+    .phone-indicators {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        color: var(--deck-ink);
+    }
+
+    .phone-indicators svg {
+        display: block;
+        overflow: visible;
+    }
+
+    .signal-icon {
+        width: 0.72rem;
+        fill: currentColor;
+    }
+
+    .wifi-icon {
+        width: 0.8rem;
+        fill: currentColor;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-width: 1.5;
+    }
+
+    .wifi-icon path {
+        fill: none;
+    }
+
+    .battery-icon {
+        width: 1rem;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-width: 1.5;
+    }
+
+    .battery-icon .battery-level {
+        fill: currentColor;
+        stroke: none;
+    }
+
+    .app-header {
+        display: grid;
+        position: relative;
+        z-index: 7;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        min-height: 3.8rem;
+        gap: 0.55rem;
+        padding: 0.65rem 0.9rem;
+        border-bottom: 1px solid color-mix(in srgb, var(--deck-green) 18%, transparent);
+        background: var(--deck-green-soft);
+    }
+
+    .app-mark {
+        display: grid;
+        width: 2.15rem;
+        height: 2.15rem;
+        border-radius: 0.68rem;
+        background: var(--deck-green);
+        color: #fff;
+        font-family: Georgia, 'Times New Roman', serif;
+        font-weight: 800;
+        place-items: center;
+        transform: rotate(-5deg);
+    }
+
+    .app-title {
+        min-width: 0;
+        color: var(--deck-ink);
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: var(--home-font-size-body);
+        white-space: nowrap;
+    }
+
+    .demo-page header small,
+    .card-kicker,
+    .focus-card small,
+    .mini-stats small,
+    .place-card small,
+    .profile-head small,
+    .profile-streak small,
+    .profile-grid small {
+        color: var(--deck-muted);
+        font-size: var(--home-font-size-small);
+        letter-spacing: 0.08em;
+    }
+
+    .wechat-capsule {
+        display: grid;
+        width: 4rem;
+        height: 1.68rem;
+        border: 1px solid color-mix(in srgb, var(--deck-ink) 18%, transparent);
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--deck-card) 72%, transparent);
+        box-shadow: 0 0.12rem 0.32rem rgba(20, 63, 38, 0.08);
+        color: var(--deck-ink);
+        grid-template-columns: 1fr auto 1fr;
+        place-items: center;
+    }
+
+    .capsule-dots {
+        display: flex;
+        align-items: center;
+        gap: 0.18rem;
+    }
+
+    .capsule-dots i {
+        width: 0.18rem;
+        height: 0.18rem;
+        border-radius: 50%;
+        background: currentColor;
+    }
+
+    .capsule-divider {
+        width: 1px;
+        height: 0.88rem;
+        background: color-mix(in srgb, var(--deck-ink) 18%, transparent);
+    }
+
+    .capsule-close {
+        display: grid;
+        width: 0.84rem;
+        height: 0.84rem;
+        border: 0.11rem solid currentColor;
+        border-radius: 50%;
+        place-items: center;
+    }
+
+    .capsule-close::after {
+        width: 0.32rem;
+        height: 0.32rem;
+        border-radius: 50%;
+        background: currentColor;
+        content: '';
+    }
+
+    .page-aperture {
+        min-height: 0;
+        background: var(--deck-card);
+        overflow: hidden;
+    }
+
+    .app-tabs {
+        display: grid;
+        position: relative;
+        z-index: 7;
+        grid-template-columns: repeat(3, 1fr);
+        min-height: var(--phone-tab-height);
+        border-top: 1px solid color-mix(in srgb, var(--deck-green) 18%, transparent);
+        background: var(--deck-green-soft);
+    }
+
+    .app-tabs button {
+        display: grid;
+        position: relative;
+        align-content: center;
+        justify-items: center;
+        gap: 0.12rem;
+        border: 0;
+        background: transparent;
+        color: var(--deck-muted);
+        cursor: pointer;
+        font: inherit;
+        font-size: var(--home-font-size-small);
+        transition:
+            color 240ms ease,
+            transform 480ms cubic-bezier(0.18, 1.3, 0.3, 1);
+    }
+
+    .app-tabs button::before {
+        position: absolute;
+        top: 0.28rem;
+        width: 2.4rem;
+        height: 0.18rem;
+        border-radius: 999px;
+        background: var(--deck-green);
+        content: '';
+        opacity: 0;
+        transform: scaleX(0.25);
+        transition:
+            opacity 220ms ease,
+            transform 480ms cubic-bezier(0.18, 1.3, 0.3, 1);
+    }
+
+    .app-tabs button svg {
+        width: 1.1rem;
+        height: 1.1rem;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.8;
+    }
+
+    .app-tabs button.is-active,
+    .app-tabs button[aria-current='page'] {
+        color: var(--deck-green);
+        font-weight: 800;
+        transform: translateY(-0.08rem);
+    }
+
+    .app-tabs button.is-active::before,
+    .app-tabs button[aria-current='page']::before {
+        opacity: 1;
+        transform: scaleX(1);
+    }
+
+    .page-deck {
+        position: absolute;
+        z-index: 3;
+        top: var(--page-deck-top);
+        right: 0;
+        left: 0;
+        height: 26rem;
+        pointer-events: none;
+    }
+
+    .demo-page {
+        padding: 1.15rem;
+        background: var(--deck-card);
+        color: var(--deck-ink);
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior-y: contain;
+        scrollbar-width: none;
+    }
+
+    .demo-page::-webkit-scrollbar {
+        display: none;
+    }
+
+    .phone-page {
+        height: 100%;
+        filter: saturate(0.35);
+        opacity: 0.42;
+        pointer-events: none;
+    }
+
+    .page-card {
+        --card-border-color: color-mix(in srgb, var(--deck-green) 18%, var(--vpt-border));
+        --card-tilt: 0deg;
+        --card-y: 0rem;
+        --drag-x: 0px;
+        position: absolute;
+        top: 0;
+        left: 50%;
+        width: 18rem;
+        height: calc(
+            var(--phone-frame-top) + var(--phone-frame-height) - var(--phone-frame-padding) - var(--phone-tab-height) -
+                var(--page-deck-top) - var(--page-card-bottom-gap)
+        );
+        border: 1px solid var(--card-border-color);
+        border-radius: 1.15rem;
+        box-shadow: 0 18px 42px var(--vpt-shadow-strong);
+        opacity: 0.93;
+        scale: 1;
+        pointer-events: auto;
+        touch-action: pan-y;
+        transition:
+            transform 680ms cubic-bezier(0.18, 1.28, 0.3, 1),
+            border-color 380ms ease,
+            scale 280ms linear,
+            opacity 380ms ease,
+            filter 380ms ease;
+        will-change: transform;
+    }
+
+    .page-card:hover {
+        scale: 1.02;
+    }
+
+    .page-home {
+        --card-tilt: -1.1deg;
+        --card-y: 0.25rem;
+    }
+
+    .page-discover {
+        --card-tilt: 0.8deg;
+        --card-y: 0.3rem;
+    }
+
+    .page-profile {
+        --card-tilt: -1.4deg;
+        --card-y: 0.45rem;
+    }
+
+    .page-card[data-slot='0'] {
+        z-index: 8;
+        animation: page-card-border-enter 560ms ease-out;
+        opacity: 1;
+        transform: translateX(calc(-50% + var(--drag-x))) translateY(var(--card-y)) rotate(var(--card-tilt)) scale(1);
+    }
+
+    @keyframes page-card-border-enter {
+        0% {
+            border-color: transparent;
+        }
+
+        62% {
+            border-color: color-mix(in srgb, var(--deck-green) 42%, var(--vpt-border));
+        }
+
+        100% {
+            border-color: var(--card-border-color);
+        }
+    }
+
+    .page-card[data-slot='-1'],
+    .page-card[data-slot='1'] {
+        border-color: transparent;
+    }
+
+    .page-card[data-slot='-1'] {
+        z-index: 1;
+        transform: translateX(calc(-50% - 13rem + var(--drag-x))) translateY(calc(1.2rem + var(--card-y)))
+            rotate(calc(-10.5deg + var(--card-tilt))) scale(0.82);
+    }
+
+    .page-card[data-slot='1'] {
+        z-index: 1;
+        transform: translateX(calc(-50% + 13rem + var(--drag-x))) translateY(calc(1rem + var(--card-y)))
+            rotate(calc(9.5deg + var(--card-tilt))) scale(0.82);
+    }
+
+    .page-card[data-dragging] {
+        cursor: grabbing;
+        transition: none;
+    }
+
+    .demo-page header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: var(--deck-muted);
+        font-size: var(--home-font-size-small);
+    }
+
+    .card-kicker {
+        margin: 1.2rem 0 0;
+        color: var(--deck-coral);
+        font-weight: 800;
+    }
+
+    .demo-page h3 {
+        margin: 0.38rem 0 0;
+        color: var(--deck-ink);
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: var(--home-font-size-title);
+        font-weight: 600;
+        letter-spacing: -0.03em;
+    }
+
+    .card-copy {
+        margin: 0.35rem 0 0;
+        color: var(--deck-muted);
+        font-size: var(--home-font-size-small);
+        line-height: 1.55;
+    }
+
+    .focus-card {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.65rem;
+        margin-top: 1.2rem;
+        padding: 1rem;
+        border-radius: 1rem;
+        background: var(--deck-green-soft);
+    }
+
+    .focus-card > span {
+        display: grid;
+    }
+
+    .focus-card strong {
+        font-size: var(--home-font-size-title);
+    }
+
+    .focus-card > i {
+        display: grid;
+        width: 3.1rem;
+        height: 3.1rem;
+        border: 0.42rem solid color-mix(in srgb, var(--deck-green) 18%, transparent);
+        border-top-color: var(--deck-green);
+        border-radius: 50%;
+        place-items: center;
+        transform: rotate(30deg);
+    }
+
+    .focus-card > i b {
+        width: 0.45rem;
+        height: 0.45rem;
+        border-radius: 50%;
+        background: var(--deck-coral);
+    }
+
+    .focus-card em {
+        grid-column: 1 / -1;
+        color: var(--deck-muted);
+        font-size: var(--home-font-size-small);
+        font-style: normal;
+    }
+
+    .mini-stats,
+    .profile-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.55rem;
+        margin-top: 0.7rem;
+    }
+
+    .mini-stats > span,
+    .profile-grid > span {
+        display: grid;
+        gap: 0.18rem;
+        padding: 0.75rem;
+        border: 1px solid var(--vpt-border);
+        border-radius: 0.75rem;
+    }
+
+    .place-card {
+        display: grid;
+        gap: 0.7rem;
+        margin-top: 1.1rem;
+        padding: 0.8rem;
+        border-radius: 1rem;
+        background: var(--deck-green-soft);
+    }
+
+    .place-art {
+        display: block;
+        position: relative;
+        height: 7rem;
+        border-radius: 0.75rem;
+        background: linear-gradient(160deg, #b8dfad, #eaf3dc);
+        overflow: hidden;
+    }
+
+    .place-art i {
+        position: absolute;
+        right: -1rem;
+        bottom: -1.5rem;
+        width: 7rem;
+        height: 7rem;
+        border-radius: 50%;
+        background: #6bb96e;
+    }
+
+    .place-art i:nth-child(2) {
+        right: 3.6rem;
+        bottom: -2.8rem;
+        background: #3f9358;
+    }
+
+    .place-art b {
+        position: absolute;
+        top: 1rem;
+        left: 1rem;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 50%;
+        background: #fff4c4;
+        box-shadow: 0 0 1.6rem rgba(255, 244, 196, 0.8);
+    }
+
+    .place-card > span:last-child,
+    .profile-head > span:last-child,
+    .profile-streak > span {
+        display: grid;
+        gap: 0.12rem;
+    }
+
+    .place-card em {
+        color: var(--deck-muted);
+        font-size: var(--home-font-size-small);
+        font-style: normal;
+    }
+
+    .place-tags {
+        display: flex;
+        gap: 0.4rem;
+        margin-top: 0.7rem;
+    }
+
+    .place-tags span {
+        padding: 0.3rem 0.5rem;
+        border-radius: 999px;
+        background: var(--deck-green-soft);
+        color: var(--deck-green);
+        font-size: var(--home-font-size-small);
+    }
+
+    .profile-head {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        align-items: center;
+        gap: 0.8rem;
+        margin-top: 0.8rem;
+    }
+
+    .profile-avatar {
+        display: grid;
+        width: 4rem;
+        height: 4rem;
+        border-radius: 1.25rem;
+        background: linear-gradient(145deg, var(--deck-green), #8dcf87);
+        color: white;
+        font-size: var(--home-font-size-title);
+        font-weight: 800;
+        place-items: center;
+        transform: rotate(-3deg);
+    }
+
+    .profile-head h3,
+    .profile-head p {
+        margin: 0;
+    }
+
+    .profile-head p {
+        color: var(--deck-muted);
+        font-size: var(--home-font-size-small);
+    }
+
+    .profile-streak {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        margin-top: 0.75rem;
+        padding: 0.75rem 1rem;
+        border-radius: 1rem;
+        background: var(--deck-green-soft);
+    }
+
+    .profile-streak > i {
+        display: grid;
+        width: 2.6rem;
+        height: 2.6rem;
+        border-radius: 0.8rem;
+        background: var(--deck-green);
+        color: white;
+        font-style: normal;
+        place-items: center;
+    }
+
+    .day-plan,
+    .route-list,
+    .profile-week {
+        margin-top: 1rem;
+    }
+
+    .day-plan > header strong,
+    .route-list > header strong,
+    .profile-week > header strong {
+        color: var(--deck-ink);
+        font-size: var(--home-font-size-small);
+    }
+
+    .day-plan small,
+    .route-list small,
+    .profile-week small,
+    .profile-menu small {
+        color: var(--deck-muted);
+        font-size: var(--home-font-size-small);
+        font-weight: 400;
+    }
+
+    .day-plan-list {
+        display: grid;
+        margin-top: 0.45rem;
+        border-top: 1px solid var(--vpt-border);
+    }
+
+    .day-plan-list > span {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.52rem 0.1rem;
+        border-bottom: 1px solid var(--vpt-border);
+    }
+
+    .day-plan-list > span > i {
+        width: 0.48rem;
+        height: 0.48rem;
+        border-radius: 50%;
+        background: var(--deck-green);
+        box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--deck-green) 10%, transparent);
+    }
+
+    .day-plan-list > span:nth-child(2) > i {
+        background: var(--deck-coral);
+    }
+
+    .day-plan-list > span:nth-child(3) > i {
+        background: #d0aa54;
+    }
+
+    .day-plan-list b,
+    .route-row > span {
+        display: grid;
+        gap: 0.08rem;
+    }
+
+    .day-plan-list b {
+        font-size: var(--home-font-size-small);
+    }
+
+    .day-plan-list em,
+    .route-row em {
+        color: var(--deck-muted);
+        font-size: var(--home-font-size-small);
+        font-style: normal;
+    }
+
+    .route-list {
+        padding-top: 0.15rem;
+    }
+
+    .route-row {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.58rem 0;
+        border-bottom: 1px solid var(--vpt-border);
+    }
+
+    .route-row > i {
+        width: 2.15rem;
+        height: 2.15rem;
+        border-radius: 0.65rem;
+        background: linear-gradient(145deg, #bde0b1, #5fae70);
+    }
+
+    .route-row > i.route-hill {
+        background: linear-gradient(145deg, #f3d99b, #789d6d);
+    }
+
+    .route-row strong,
+    .profile-menu strong {
+        font-size: var(--home-font-size-small);
+    }
+
+    .profile-week {
+        margin-top: 0.5rem;
+        padding: 0.6rem 0.8rem;
+        border-radius: 0.9rem;
+        background: var(--deck-green-soft);
+    }
+
+    .week-bars {
+        display: flex;
+        align-items: end;
+        height: 1.9rem;
+        gap: 0.34rem;
+        margin-top: 0.4rem;
+    }
+
+    .week-bars i {
+        width: 100%;
+        height: var(--activity-height);
+        border-radius: 0.28rem 0.28rem 0.12rem 0.12rem;
+        background: color-mix(in srgb, var(--deck-green) 26%, transparent);
+    }
+
+    .week-bars i.today {
+        background: var(--deck-green);
+    }
+
+    .week-days {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        margin-top: 0.3rem;
+        color: var(--deck-muted);
+        font-size: var(--home-font-size-small);
+        text-align: center;
+    }
+
+    .profile-menu {
+        display: grid;
+        margin-top: 0;
+    }
+
+    .profile-menu > span {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.68rem 0.1rem;
+        border-bottom: 1px solid var(--vpt-border);
+    }
+
+    .profile-menu > span > i {
+        display: grid;
+        width: 1.65rem;
+        height: 1.65rem;
+        border-radius: 0.5rem;
+        background: var(--deck-green-soft);
+        color: var(--deck-green);
+        font-size: var(--home-font-size-small);
+        font-style: normal;
+        place-items: center;
+    }
+
+    .card-select {
+        position: absolute;
+        inset: 0;
+        border: 0;
+        border-radius: inherit;
+        background: transparent;
+        cursor: grab;
+        touch-action: pan-y;
+    }
+
+    .card-select:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--deck-green, var(--vpt-accent)) 44%, transparent);
+        outline-offset: -4px;
+    }
+
+    .app-tabs button:focus-visible,
+    .app-view-links a:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--deck-green, var(--vpt-accent)) 44%, transparent);
+        outline-offset: 3px;
+    }
+
+    .deck-hint {
+        position: absolute;
+        bottom: calc(-1 * var(--deck-hint-overhang));
+        left: 50%;
+        width: max-content;
+        max-width: calc(100% - 1rem);
+        color: var(--deck-muted);
+        font-size: var(--home-font-size-small);
+        text-align: center;
+        transform: translateX(-50%);
+        white-space: nowrap;
+    }
+
+    .deck-hint span {
+        margin-right: 0.35rem;
+        color: var(--deck-coral);
+    }
+
+    @media (max-width: 68rem) {
+        .app-view-layout {
+            display: flex;
+            align-items: stretch;
+            flex-direction: column-reverse;
+            gap: calc(var(--layout-gap) + var(--deck-hint-overhang));
+        }
+
+        .app-view-copy {
+            width: min(100%, 42rem);
+        }
+
+        .page-deck-demo {
+            width: min(100%, 44rem);
+            margin-inline: auto;
+        }
+    }
+
+    @media (max-width: 38rem) {
+        .deck-stage {
+            --phone-frame-height: 37rem;
+            --phone-frame-top: 1.5rem;
+            --page-deck-top: 6.95rem;
+        }
+
+        .phone-frame {
+            width: 17.5rem;
+        }
+
+        .page-card {
+            width: 17rem;
+        }
+
+        .page-card[data-slot='-1'] {
+            transform: translateX(calc(-50% - 8.5rem + var(--drag-x))) translateY(calc(1rem + var(--card-y)))
+                rotate(calc(-9deg + var(--card-tilt))) scale(0.78);
+        }
+
+        .page-card[data-slot='1'] {
+            transform: translateX(calc(-50% + 8.5rem + var(--drag-x))) translateY(calc(1rem + var(--card-y)))
+                rotate(calc(9deg + var(--card-tilt))) scale(0.78);
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .page-card,
+        .page-card[data-slot='0'],
+        .phone-frame,
+        .app-tabs button,
+        .app-tabs button::before {
+            animation: none;
+            transition: none;
+        }
+
+        .phone-frame {
+            transform: translateX(-50%) rotate(0.35deg);
+        }
+    }
+</style>

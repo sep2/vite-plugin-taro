@@ -4,7 +4,7 @@ description: 从创建项目到运行微信小程序与 Web 应用。
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components'
-import LazyVideo from '../../../components/lazy-video.astro'
+import HmrVideoFrame from '../../../components/hmr-video-frame.astro'
 
 本指南使用 `create-vite-taro` 创建一个同时支持微信小程序和 Web 的应用。默认模板已经配置好 Vite 8、React 19、Taro 4、TypeScript 和 Tailwind CSS v4。
 
@@ -98,16 +98,7 @@ dist/wx
 - React 组件状态
 - 原生输入状态
 
-<LazyVideo
-    class="demo-video"
-    src="/vpt-hmr-demo.mp4"
-    ariaLabel="微信开发者工具中的 React 热更新演示"
-    width={1988}
-    height={1624}
-    captionSrc="/hmr-demo.zh-CN.vtt"
-    captionLanguage="zh-CN"
-    captionLabel="简体中文"
-/>
+<HmrVideoFrame variant="embedded" />
 
 ## 4. 运行 Web 应用
 
@@ -266,6 +257,7 @@ my-app/
 
 ## 下一步
 
+- 理解 [App 与页面](/guides/app-and-pages/) 的布局、状态和生命周期关系。
 - 了解[样式](/guides/styles/)，使用Tailwind CSS v4 和 CSS Modules。
 - 了解[全自动分包](/guides/automatic-subpackages/)，使用动态导入减小微信小程序主包。
 - 在 React 中接入[微信原生组件](/guides/native-components/)。

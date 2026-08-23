@@ -70,7 +70,7 @@
         "@tarojs/plugin-platform-weapp": "4.2.0",
         "@tarojs/react": "workspace:vite-plugin-taro-react@*",
         "@tarojs/router": "4.2.0",
-        "@tarojs/runtime": "4.2.0",
+        "@tarojs/runtime": "workspace:vite-plugin-taro-runtime@*",
         "@tarojs/taro": "4.2.0",
         "@vitejs/plugin-react": "^6.0.5",
         "@weapp-tailwindcss/postcss": "3.2.8",

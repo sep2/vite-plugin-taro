@@ -1,5 +1,5 @@
 diff --git a/dist/react.esm.js b/dist/react.esm.js
-index ad8a51f..57cdf0c 100644
+index ad8a51f..ec334da 100644
 --- a/dist/react.esm.js
 +++ b/dist/react.esm.js
 @@ -1,7 +1,12 @@
@@ -29,7 +29,7 @@ index ad8a51f..57cdf0c 100644
  function getEventPriority(domEventName) {
      switch (domEventName) {
          case 'cancel':
-@@ -600,7 +599,50 @@ function styleObjectToCss(style) {
+@@ -600,7 +599,149 @@ function styleObjectToCss(style) {
  }
 
  /* eslint-disable @typescript-eslint/indent */
@@ -45,6 +45,105 @@ index ad8a51f..57cdf0c 100644
 +};
 +taroHostTransitionContext.Provider = taroHostTransitionContext;
 +taroHostTransitionContext.Consumer = taroHostTransitionContext;
++/**
++ * WX VPT Page outlet projection
++ * -----------------------------
++ * VPT retains one React ownership tree while WX exposes one independent setData surface per native Page. The singleton App
++ * host records live in each Page's `app` data, the current Page records live in `page`, and Page WXML supplies its own template
++ * as the default light-DOM slot of the virtual recursive App component. Taro restarts deep template recursion through nested
++ * `comp` components. At every such native component boundary the slot must be forwarded only through the App branch that
++ * contains the VPT Page outlet rendered for React's `{children}`: forwarding through all sibling branches creates duplicate
++ * unnamed slot consumers, while forwarding through none loses the Page.
++ *
++ * `vo` is the compact, branch-local answer to "does this App subtree contain the VPT Page outlet?". WXML reads only `i.vo`,
++ * so its decision is O(1) and it never scans descendants or receives Page data. This renderer owns `vo` rather than Taro's
++ * hydrate or root scheduler because React's commit boundary is the first point where every host mutation has completed and
++ * the final parent chain is authoritative. TaroElement already supports arbitrary properties: setAttribute updates
++ * node.props and queues the normal granular `app.*.vo` path. Structural Taro payloads are lazy functions flushed by setTimeout, so they run
++ * after resetAfterCommit and naturally serialize the same final `vo` props. There is consequently no projection-specific
++ * hydration mode, update-path translation, or full App snapshot.
++ *
++ * High-level commit flow:
++ * 1. React applies all Taro host insertions, removals, and reparenting synchronously.
++ * 2. resetAfterCommit obtains the unique VPT Page outlet and walks parentNode from that outlet to the App root.
++ * 3. The unchanged root-side suffix is skipped; old leaf-side nodes receive vo=false and new ones receive vo=true.
++ * 4. Ordinary Taro attribute updates join structural updates in the already scheduled App batch.
++ * 5. Lazy hydration observes node.props.vo, and the App batch fans out unchanged to every retained native Page.
++ *
++ * The App root stores the only persistent projection state as a VPT Page outlet-to-root node array. It contains O(D)
++ * references, where D is outlet depth, so index 0 is the outlet represented by the latest queued native batch. A normal commit
++ * performs an O(D) parent walk and raw array comparison and emits no native data when the spine is unchanged. A move touches
++ * only the leaf-side portions outside the common root-side suffix and never depends on total App size W or Page size. React
++ * can replace a host when moving it across parents; only then (and during initialization) a single O(W) search finds the new
++ * VPT Page outlet. WXML still performs one constant-time boolean check per recursive boundary.
++ */
++const VPT_PAGE_OUTLET = 'vpt_page_outlet';
++const VPT_PAGE_OUTLET_BRANCH = 'vo';
++const vptPageOutletSpineKey = Symbol('vptPageOutletSpine');
++/** Finds the VPT Page outlet only during initialization or after React replaced the cached VPT Page outlet host. */
++function findVptPageOutlet(node) {
++    if (node.nodeName === VPT_PAGE_OUTLET)
++        return node;
++    const children = node.childNodes;
++    for (let index = 0; index < children.length; index++) {
++        const vptPageOutlet = findVptPageOutlet(children[index]);
++        if (vptPageOutlet)
++            return vptPageOutlet;
++    }
++}
++/** Builds the final ancestor identity array from the VPT Page outlet to the App root. */
++function collectVptPageOutletSpine(container, vptPageOutlet) {
++    // This local array is filled once in parent-link order, then retained unchanged as the next VPT Page outlet spine.
++    const spine = [];
++    for (let node = vptPageOutlet; node !== container; node = node.parentNode) {
++        spine.push(node);
++    }
++    return spine;
++}
++/** Reconciles VPT Page outlet branch membership through ordinary Taro host props after one complete React commit. */
++function reconcileVptPageOutletSpine(container) {
++    // Other React roots, including standalone Page/component roots, do not own the singleton VPT App-view projection.
++    if (!container.parentNode || container.parentNode.nodeName !== 'container')
++        return;
++    const previousSpine = container[vptPageOutletSpineKey] || [];
++    const previousVptPageOutlet = previousSpine[0];
++    /*
++     * Reuse the cached VPT Page outlet while it remains under this App root. Cross-parent React reconciliation may replace
++     * the host rather than reparent its Taro node, so a detached cache entry requires one search of the committed tree.
++     */
++    const vptPageOutlet = previousVptPageOutlet && previousVptPageOutlet._root === container
++        ? previousVptPageOutlet
++        : findVptPageOutlet(container);
++    ensure(vptPageOutlet, 'App must render children exactly once.');
++    const currentSpine = collectVptPageOutletSpine(container, vptPageOutlet);
++    /*
++     * VPT Page outlet parent chains are stored outlet-to-root, so equal nodes form a root-side suffix. These mutable indexes
++     * walk that suffix once without iterator, callback, Set, or intermediate-array allocation; the remaining prefixes are the
++     * only candidates whose branch marker can differ.
++     */
++    let previousIndex = previousSpine.length - 1;
++    let currentIndex = currentSpine.length - 1;
++    while (previousIndex >= 0 && currentIndex >= 0 && previousSpine[previousIndex] === currentSpine[currentIndex]) {
++        previousIndex--;
++        currentIndex--;
++    }
++    /*
++     * Detached old nodes are already removed by their parent's structural payload. Surviving nodes in the changed old prefix
++     * still have native records, so clear their marker through Taro's ordinary attribute queue.
++     */
++    for (let index = 0; index <= previousIndex; index++) {
++        const node = previousSpine[index];
++        if (node._root === container) {
++            node.setAttribute(VPT_PAGE_OUTLET_BRANCH, false);
++        }
++    }
++    // Write the changed current prefix after clearing the old prefix so any surviving moved identity ends with vo=true.
++    for (let index = 0; index <= currentIndex; index++) {
++        currentSpine[index].setAttribute(VPT_PAGE_OUTLET_BRANCH, true);
++    }
++    // This is the sole persistent VPT projection state: the ancestor identities in the latest queued native App batch.
++    container[vptPageOutletSpineKey] = currentSpine;
++}
  const hostConfig = {
 +    // React 19 react-reconciler host config additions.
 +    setCurrentUpdatePriority(priority) {
@@ -80,7 +179,23 @@ index ad8a51f..57cdf0c 100644
      // below keys order by {React ReactFiberHostConfig.custom.js}, convenient for comparing each other.
      // -------------------
      // required by @types/react-reconciler
-@@ -668,7 +710,7 @@ const hostConfig = {
+@@ -617,7 +758,14 @@ const hostConfig = {
+     prepareForCommit(..._) {
+         return null;
+     },
+-    resetAfterCommit: noop,
++    /*
++     * React invokes this synchronously after host mutations and before returning from the commit. Taro defers evaluation of
++     * structural hydrate functions with setTimeout, so VPT Page outlet branch props written here are batched and visible to
++     * every compact record serialized for this commit.
++     */
++    resetAfterCommit(container) {
++        reconcileVptPageOutletSpine(container);
++    },
+     createInstance(type, props, _rootContainerInstance, _hostContext, internalInstanceHandle) {
+         const element = document.createElement(type);
+         precacheFiberNode(internalInstanceHandle, element);
+@@ -668,7 +816,7 @@ const hostConfig = {
      prepareScopeUpdate: noop,
      getInstanceFromScope: () => null,
      getCurrentEventPriority() {
@@ -89,7 +204,7 @@ index ad8a51f..57cdf0c 100644
      },
      detachDeletedInstance: noop,
      // -------------------
-@@ -699,7 +741,11 @@ const hostConfig = {
+@@ -699,7 +847,11 @@ const hostConfig = {
          textInst.nodeValue = newText;
      },
      commitMount: noop,
@@ -102,7 +217,7 @@ index ad8a51f..57cdf0c 100644
          if (!updatePayload)
              return;
          // payload 只包含 children 的时候，不应该再继续触发后续的属性比较和更新的逻辑了
-@@ -745,6 +791,17 @@ const hostConfig = {
+@@ -745,6 +897,17 @@ const hostConfig = {
      }
  };
  const TaroReconciler = Reconciler(hostConfig);
@@ -120,7 +235,7 @@ index ad8a51f..57cdf0c 100644
  if (process.env.NODE_ENV !== 'production') {
      const foundDevTools = TaroReconciler.injectIntoDevTools({
          bundleType: 1,
-@@ -847,22 +904,32 @@ class Root {
+@@ -847,22 +1010,32 @@ class Root {
              const concurrentUpdatesByDefaultOverride = false;
              let isStrictMode = false;
              let identifierPrefix = '';
@@ -158,7 +273,7 @@ index ad8a51f..57cdf0c 100644
          }
          else {
              const tag = 0; // LegacyRoot
-@@ -870,8 +937,10 @@ class Root {
+@@ -870,8 +1043,10 @@ class Root {
              false, // isStrictMode
              false, // concurrentUpdatesByDefaultOverride,
              '', // identifierPrefix

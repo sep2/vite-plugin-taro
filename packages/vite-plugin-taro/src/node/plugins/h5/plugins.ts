@@ -31,12 +31,12 @@ export function createH5TargetPlugins(options: VptOptions): PluginOption[] {
             logLevel: 'warn'
         }),
         ...createH5SupportPlugins(),
-        createH5TargetPlugin(options)
+        createH5Plugin(options)
     ]
 }
 
 /** Configures H5 resolution and supplies the specialized physical application entry. */
-function createH5TargetPlugin(options: VptOptions): Plugin {
+function createH5Plugin(options: VptOptions): Plugin {
     const moduleResolver = createModuleResolver(options)
 
     return {
@@ -49,6 +49,10 @@ function createH5TargetPlugin(options: VptOptions): Plugin {
                     mainFields: ['main:h5', 'browser', 'module', 'jsnext:main', 'jsnext'],
                     alias: [
                         {
+                            find: /^@tarojs\/runtime$/,
+                            replacement: packageRequire.resolve('@tarojs/runtime/dist/runtime.esm.js')
+                        },
+                        {
                             find: /^@tarojs\/components$/,
                             replacement: packageRequire.resolve('@tarojs/components/lib/react')
                         },
@@ -59,10 +63,13 @@ function createH5TargetPlugin(options: VptOptions): Plugin {
                     ]
                 },
                 optimizeDeps: {
-                    // The compiler-owned H5 app and Taro facade are injected after Vite's initial HTML scan. Prebundle
-                    // the facade's platform backend as one boundary so its CommonJS implementation details receive
-                    // interop without duplicating their package list. ReactDOM needs the same treatment for the H5 app.
-                    include: ['@tarojs/plugin-platform-h5/dist/runtime/apis', 'react-dom/client'],
+                    /*
+                     * The compiler-owned H5 app and Taro facade are injected after Vite's initial HTML scan, so declare their
+                     * optimization entries explicitly. The platform backend needs CommonJS interop, ReactDOM is imported by
+                     * the hidden app, and @tarojs/runtime must be a first-class entry so subsequently discovered Taro packages
+                     * share its Current singleton instead of embedding private copies in their optimized chunks.
+                     */
+                    include: ['@tarojs/plugin-platform-h5/dist/runtime/apis', '@tarojs/runtime', 'react-dom/client'],
                     // Dependency optimization is its own Rolldown build and does not run application transform plugins.
                     // Register the same adapter there so optimized Taro components cannot embed Stencil's original client.
                     rolldownOptions: {
