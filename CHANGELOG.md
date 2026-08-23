@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.6.8] - 2026-08-23
+
+### Changed
+
+- update published package App-view harness (f9f22f4)
+
+### Fixed
+
+- isolate routed Pages from App siblings (2f75789)
+
 ## [0.6.7] - 2026-08-23
 
 ### Added
