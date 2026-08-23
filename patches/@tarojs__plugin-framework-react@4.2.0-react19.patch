@@ -1,5 +1,5 @@
 diff --git a/dist/runtime.js b/dist/runtime.js
-index d428a64..8cd7b20 100644
+index d428a64..621b837 100644
 --- a/dist/runtime.js
 +++ b/dist/runtime.js
 @@ -1,6 +1,16 @@
@@ -20,7 +20,15 @@ index d428a64..8cd7b20 100644
  const reactMeta = {
      PageContext: EMPTY_OBJ,
      R: EMPTY_OBJ,
-@@ -257,6 +267,29 @@ function connectReactPage(R, id) {
+@@ -152,7 +162,6 @@ var taroHooks = /*#__PURE__*/Object.freeze({
+
+ let h$1;
+ let ReactDOM$1;
+-let Fragment;
+ const pageKeyId = incrementId();
+ function setReconciler(ReactDOM) {
+     hooks.tap('getLifecycle', function (instance, lifecycle) {
+@@ -257,6 +266,29 @@ function connectReactPage(R, id) {
          };
      };
  }
@@ -50,7 +58,15 @@ index d428a64..8cd7b20 100644
  /**
   * 桥接小程序 App 构造器和 React 渲染流程
   * @param App 用户编写的入口组件
-@@ -296,11 +329,27 @@ function createReactApp(App, react, dom, config) {
+@@ -272,7 +304,6 @@ function createReactApp(App, react, dom, config) {
+     reactMeta.R = react;
+     h$1 = react.createElement;
+     ReactDOM$1 = dom;
+-    Fragment = react.Fragment;
+     const appInstanceRef = react.createRef();
+     const isReactComponent = isClassComponent(react, App);
+     let appWrapper;
+@@ -296,11 +327,27 @@ function createReactApp(App, react, dom, config) {
          let container = document.getElementById(appId);
          if (container == null) {
              const appContainer = document.getElementById(CONTAINER);
@@ -80,7 +96,7 @@ index d428a64..8cd7b20 100644
              const root = ReactDOM$1.createRoot(container);
              (_a = root.render) === null || _a === void 0 ? void 0 : _a.call(root, h$1(AppWrapper));
          }
-@@ -308,6 +357,11 @@ function createReactApp(App, react, dom, config) {
+@@ -308,6 +355,11 @@ function createReactApp(App, react, dom, config) {
              // eslint-disable-next-line react/no-deprecated
              (_b = ReactDOM$1.render) === null || _b === void 0 ? void 0 : _b.call(ReactDOM$1, h$1(AppWrapper), container);
          }
@@ -92,7 +108,7 @@ index d428a64..8cd7b20 100644
      }
      class AppWrapper extends react.Component {
          constructor(props) {
-@@ -325,6 +379,19 @@ function createReactApp(App, react, dom, config) {
+@@ -325,6 +377,19 @@ function createReactApp(App, react, dom, config) {
              this.pages.push(page);
              this.forceUpdate((...args) => {
                  perf.stop(PAGE_INIT);
@@ -112,7 +128,7 @@ index d428a64..8cd7b20 100644
                  return cb(...args);
              });
          }
-@@ -344,12 +411,24 @@ function createReactApp(App, react, dom, config) {
+@@ -344,12 +409,25 @@ function createReactApp(App, react, dom, config) {
              if (isReactComponent) {
                  props = { ref: appInstanceRef };
              }
@@ -120,12 +136,13 @@ index d428a64..8cd7b20 100644
 +            const pageElements = elements.slice();
 +            /*
 +             * Keep Page elements as ordinary App children so Context, effects, refs, state, and HMR retain one React tree.
-+             * The private host marks the exact {children} position in Taro's in-memory tree. The runtime patch makes that
-+             * host opaque to app serialization, while generated Page WXML consumes its slot from the separate page data
-+             * root. This joins native App/Page output without a portal, cloned App, second root, or serialized Page object.
++             * Web gives the Page stack its own taro_router host: upstream routing CSS addresses direct Page children and uses
++             * their sibling order to hide retained Pages, so unrelated App siblings must not participate in that ordering.
++             * WX instead uses a private host at the exact {children} position. The runtime patch makes that host opaque to App
++             * serialization, while generated Page WXML consumes its slot from the separate Page data root.
 +             */
 +            const children = process.env.TARO_PLATFORM === 'web'
-+                ? h$1(Fragment !== null && Fragment !== void 0 ? Fragment : 'div', null, pageElements)
++                ? h$1('div', { className: 'taro_router' }, pageElements)
 +                : h$1('vpt_page_outlet', null, pageElements);
 +            return h$1(App, props, children);
          }

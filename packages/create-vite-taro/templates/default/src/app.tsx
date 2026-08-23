@@ -13,9 +13,8 @@ function App({ children }: PropsWithChildren) {
 
     return (
         <View className="app-shell flex h-screen flex-col overflow-hidden bg-canvas bg-canvas-botanical text-foreground">
-            {/* H5 requires the routed Page to remain the final child; flex order still places Footer below it. */}
+            {children}
             <Footer />
-            <>{children}</>
         </View>
     )
 }
