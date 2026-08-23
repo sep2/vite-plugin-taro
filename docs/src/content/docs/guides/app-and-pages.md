@@ -32,8 +32,7 @@ function App({ children }: PropsWithChildren) {
 export default App
 ```
 
-App 可以只返回 `children`，也可以在它外面添加背景、标题、页脚、共享状态或其他公共组件。无论采用哪种
-结构，都必须恰好渲染一次 `children`。
+App 可以只返回 `children`，也可以在它外面添加背景、标题、页脚、共享状态或其他公共组件。无论采用哪种结构，都必须恰好渲染一次 `children`。
 
 此功能没有性能损失，请按照标准 React 组件的方式编写即可。具体实现原理参见 [App 视图原理](/references/app-view/)。
 
@@ -79,8 +78,7 @@ export function AppShell({ children }: PropsWithChildren) {
 }
 ```
 
-工具组件及其依赖会等到首次打开时再加载。VPT 会自动规划这些动态模块的分包位置。这样可以减少启动时必须
-加载和执行的代码。完整规则参见[全自动分包](/guides/automatic-subpackages/)。
+工具组件及其依赖会等到首次打开时再加载。VPT 会自动规划这些动态模块的分包位置。这样可以减少启动时必须加载和执行的代码。完整规则参见[全自动分包](/guides/automatic-subpackages/)。
 
 App 中可以使用任意组件，包括[微信原生组件](/guides/native-components/)。
 
@@ -119,7 +117,11 @@ export function AppCountProvider({ children }: PropsWithChildren) {
         [count]
     )
 
-    return <AppCountContext.Provider value={contextValue}>{children}</AppCountContext.Provider>
+    return (
+        <AppCountContext.Provider value={contextValue}>
+            {children}
+        </AppCountContext.Provider>
+    )
 }
 ```
 

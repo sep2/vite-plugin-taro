@@ -1014,7 +1014,7 @@ portal, detached Page container, Page registry, active-Page tracker, lifecycle s
 ### Patched Taro runtime package
 
 Generate `vite-plugin-taro-runtime` from the upstream `@tarojs/runtime@4.2.0` tarball and
-`patches/@tarojs__runtime@4.2.0.patch` through `pnpm prepare:taro`, alongside the two existing patched Taro
+`../patches/@tarojs__runtime@4.2.0.patch` through `pnpm prepare:taro`, alongside the two existing patched Taro
 packages. The patch changes exactly five sites in the modular WX browser entry:
 
 ```text
