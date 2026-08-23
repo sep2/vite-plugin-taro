@@ -155,7 +155,8 @@ Page A                       Page B
 ### 页面标记
 
 Framework 在微信分支中把所有 Page 放进内部的 `vpt_page_outlet`。它就是用户 App 收到的 `children`，所以
-用户把 `{children}` 放在哪里，页面标记就出现在哪里。
+用户把 `{children}` 放在哪里，页面标记就出现在哪里。App 必须恰好渲染一次 `{children}`；缺失或重复的 outlet
+都不是有效的 App 结构。
 
 这个标记同时解决两个问题：
 
@@ -217,17 +218,25 @@ App 模板重新依赖 Page 数据。
 
 ### fragment 与 slot 转发
 
-App 可以返回零个、一个或多个顶层组件，而 Taro 的递归组件一次从一个节点开始。内部的 `vpt_fragment` 把
-App 顶层集合适配成一个统一入口，本身不产生微信布局节点。
+App 可以返回一个或多个顶层组件，而 Taro 的递归组件一次从一个节点开始。内部的 `vpt_fragment` 把 App
+顶层集合适配成一个统一入口，本身不产生微信布局节点。
 
 Taro 在模板递归达到深度限制时，会进入下一层递归组件。Page slot 必须继续穿过这些边界，直到遇到
-`vpt_page_outlet`。因此 VPT 在 Taro 原有的递归边界转发 slot，但不改变递归组件的数据和事件模型。
+`vpt_page_outlet`。React host renderer 在每次 commit 结束后读取最终 Taro host 树，并缓存 outlet 到 App root
+的祖先节点数组。renderer 跳过未变化的 root 侧后缀，让旧的 leaf 侧节点通过普通 host prop 得到 `vo: false`，
+新的节点得到 `vo: true`。递归边界只读取当前节点的 `i.vo`；只有 outlet 所在分支转发 slot，普通 Page 递归和
+App 的其他分支不创建无名 slot。
+
+这些属性更新发生在 React 同步 commit 结束、Taro 延迟求值结构序列化之前。因此 Taro 原有 `setAttribute()`、
+细粒度队列和 `hydrate()` 会像处理普通属性一样处理 `vo`，不需要投影专用 scheduler 或完整 App snapshot。
+React 在跨父级移动时可能替换 outlet host；旧引用脱离 App root 后，renderer 查找一次新的唯一 outlet 并缓存
+新路径。
 
 fragment 和 outlet 模板位于共享 `base.wxml`。原因是 App 递归发生在 `comp.wxml` 的作用域中，Page WXML
 定义的私有模板在该作用域不可见。放在共享模板中后，根组件和后续递归组件都能使用同一组定义。
 
-`comp` 本身保持通用，不增加 App/Page 模式。生成的微信原生组件注册在 `app.json`，所以 App 和 Page 的模板
-都能解析这些组件。
+`comp` 完全保留 Taro 原有的属性、节点递归和事件模型。`vo` 属于已存在的紧凑节点 `i`，不传递 Page 数据，
+也不引入 App/Page 模式。生成的微信原生组件注册在 `app.json`，所以 App 和 Page 的模板都能解析这些组件。
 
 ## 运行流程
 
@@ -262,9 +271,10 @@ App 数据和 App 模板都不参与这次更新，其他 Page 也不会收到�
 App state 变化时：
 
 1. React 只更新唯一的 App；
-2. App root 只生成变化的 `app.*`；
-3. 同一份变化发送到页面栈中的每个 Page；
-4. 每个 Page 更新自己的 App 视图，Page 内容保持不变。
+2. commit 结束后，renderer 把变化的 outlet 祖先作为普通 `vo` 属性并入 Taro 队列；
+3. App root 生成细粒度 `app.*`；
+4. 同一份更新发送到页面栈中的每个 Page；
+5. 每个 Page 更新自己的 App 视图，Page 内容保持不变。
 
 每个 Page 都显示 App，因此向每个 Page 发送 App 渲染更新是功能本身需要的工作，不是适配层产生的额外性能
 开销。
@@ -318,6 +328,12 @@ Page 或 App 的结构更新可能触发 Taro 原有的子数组替换，因此�
 新 Page 挂载时，VPT 读取一次当前 App 视图，复杂度为 `O(W)`。读取在页面标记处停止，不遍历其他 Page root，
 所以成本不随已有 Page 内容总量增长。App 与 Page 数据进入同一次初始 `setData()`。
 
+令 `D` 为 outlet 到 App root 的宿主节点深度。React commit 后的 parent walk 和祖先数组比较为 `O(D)`；
+持久状态也只有 `O(D)` 个 Taro 节点引用。普通属性更新不会改变路径，结构更新只给进入或离开路径的节点发送
+普通 `vo` 属性，因此投影新增传输量最多与变化路径长度成正比，不依赖 App 总大小 `W` 或 Page 大小。Taro 的
+结构序列化仍使用原有 lazy hydrate，Page hydrate 完全不参与投影。WXML 在每个递归边界只读取 `i.vo`，始终为
+`O(1)`。
+
 ### Context 更新
 
 Context 仍遵循 React 的消费关系：
@@ -331,8 +347,8 @@ Context 仍遵循 React 的消费关系：
 ### 固定结构
 
 每个 Page 保存自己正在显示的 App 视图，这是独立 Page 呈现相同 App 的必要结果。适配使用一个 App root、
-每个 Page 一个 virtual `comp`、fragment/outlet 模板，以及转换 App 数据时的一次 outlet 判断。它们不创建
-微信布局节点，也不增加额外的桥接调用；Taro 原有的节点队列、事件系统和 Page root 继续直接使用。
+每个 Page 一个 virtual `comp`、fragment/outlet 模板和紧凑数据中的投影路径。它们不创建微信布局节点，也不
+增加额外的桥接调用；Taro 原有的节点队列、事件系统和 Page root 继续直接使用。
 
 ### 微信内部处理
 

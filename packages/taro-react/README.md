@@ -15,7 +15,7 @@ import Taro from 'virtual:taro/api'
 
 ## Why this package exists
 
-`vite-plugin-taro` targets React 19 while keeping the official Taro runtime behavior. This package is produced from the upstream Taro npm tarball plus a small local compatibility patch, then published under the `vite-plugin-taro-react` name for reproducible installs.
+`vite-plugin-taro` targets React 19 while keeping the official Taro runtime behavior. For WX App views, the host renderer also maintains the compact outlet-projection marker after each React commit so Taro can serialize it as an ordinary host property. This package is produced from the upstream Taro npm tarball plus a small local patch, then published under the `vite-plugin-taro-react` name for reproducible installs.
 
 ## Generated source
 

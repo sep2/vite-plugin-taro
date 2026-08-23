@@ -32,7 +32,8 @@ function App({ children }: PropsWithChildren) {
 export default App
 ```
 
-App 可以只返回 `children`，也可以在它外面添加背景、标题、页脚、共享状态或其他公共组件。
+App 可以只返回 `children`，也可以在它外面添加背景、标题、页脚、共享状态或其他公共组件。无论采用哪种
+结构，都必须恰好渲染一次 `children`。
 
 此功能没有性能损失，请按照标准 React 组件的方式编写即可。具体实现原理参见 [App 视图原理](/references/app-view/)。
 
