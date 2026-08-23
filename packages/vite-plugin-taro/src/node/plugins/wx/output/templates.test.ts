@@ -55,15 +55,16 @@ test('creates shared Taro templates and native companions for every Page', () =>
     )
     assert.match(
         baseTemplate,
-        /<template name="tmpl_0_vpt_fragment">\s*<template\s+is="{{xs\.a\(0, item\.nn, ''\)}}"[\s\S]*wx:for="{{i\.cn}}"[\s\S]*wx:key="sid"/
+        /<template name="tmpl_0_vpt_fragment">\s*<template\s+is="{{xs\.a\(0, item\.nn, ''\)}}"\s+data="{{i:item,c:1,l:xs\.f\('',item\.nn\)}}"[\s\S]*wx:for="{{i\.cn}}"[\s\S]*wx:key="sid"/
     )
     assert.match(baseTemplate, /<template name="tmpl_0_vpt_page_outlet">\s*<slot \/>\s*<\/template>/)
-    assert.match(baseTemplate, /<comp i="{{i}}" l="{{l}}">\s*<slot \/>\s*<\/comp>/)
-    assert.doesNotMatch(baseTemplate, /s:s|slot-mode/)
+    assert.match(baseTemplate, /<comp i="{{i}}" l="{{l}}">\s*<slot wx:if="{{i\.vo}}" \/>\s*<\/comp>/)
+    assert.doesNotMatch(baseTemplate, /p:p|xs\.g\(|p="{{p}}"/)
 
-    assert.ok(assets.get('utils.wxs'))
+    const xScript = assets.get('utils.wxs') ?? ''
+    assert.doesNotMatch(xScript, /vpt_page_outlet|module\.exports\.g/)
     assert.match(componentTemplate, /<template is="{{'tmpl_0_' \+ i\.nn}}" data="{{i:i,c:1,l:xs\.f\('',i\.nn\)}}" \/>/)
-    assert.doesNotMatch(componentTemplate, /appData|appRoot|slotMode/)
+    assert.doesNotMatch(componentTemplate, /appData|appRoot|slotMode|p="/)
     assert.deepEqual(JSON.parse(assets.get('comp.json') ?? ''), {
         component: true,
         styleIsolation: 'apply-shared',
