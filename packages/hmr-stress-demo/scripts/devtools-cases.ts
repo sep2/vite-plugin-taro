@@ -14,13 +14,13 @@ type HmrInfo = Readonly<{
 }>
 
 const burstProfile: HmrEditProfile = {
-    applicationDelayMilliseconds: 2_000,
+    applicationDelayMilliseconds: 4_000,
     intervalMilliseconds: readPositiveInteger('VPT_HMR_STRESS_INTERVAL_MS', 8),
     restorationDelayMilliseconds: readPositiveInteger('VPT_HMR_STRESS_SETTLE_MS', 100),
     updateCount: readPositiveInteger('VPT_HMR_STRESS_UPDATES', 30)
 }
 const postRecoveryProfile: HmrEditProfile = {
-    applicationDelayMilliseconds: 2_000,
+    applicationDelayMilliseconds: 4_000,
     intervalMilliseconds: 40,
     restorationDelayMilliseconds: 100,
     updateCount: 5
@@ -54,8 +54,11 @@ async function testStateRetention(name: string, profile: HmrEditProfile, harness
 
     await publishHmrEdits(harness.markerPath, profile)
 
-    assert.equal(await harness.element('#hmr-status', 'text', undefined), 'marker:baseline')
-    assert.match(await readFile(harness.markerPath, 'utf8'), /hmrMarker = 'baseline'/)
+    await waitForBaselineMarker(harness)
+    await assertAppProjectionBaseline(harness)
+    const restoredMarkerSource = await readFile(harness.markerPath, 'utf8')
+    assert.match(restoredMarkerSource, /hmrMarker = 'baseline'/)
+    assert.match(restoredMarkerSource, /appOutletFirst = true/)
     await assertPageState(mirrorValue, harness)
     const stack = await harness.readRuntime('pageStack')
     assert.equal(isRecord(stack) && Array.isArray(stack.pageStack) ? stack.pageStack.length : 0, 2)
@@ -111,7 +114,8 @@ async function testSyntaxRecovery(harness: DevToolsHarness): Promise<void> {
     // complete-build identity or resetting Page state.
     await publishHmrEdits(harness.markerPath, postRecoveryProfile)
     assert.equal((await readHmrInfo(infoPath)).buildId, before.buildId)
-    assert.equal(await harness.element('#hmr-status', 'text', undefined), 'marker:baseline')
+    await waitForBaselineMarker(harness)
+    await assertAppProjectionBaseline(harness)
     await assertPageState('syntax-retained', harness)
     await assertWxss(harness.outDir)
     assert.equal(await countLog(harness.serverLogPath, 'wx dev build failed'), buildFailuresBefore)
@@ -161,6 +165,20 @@ async function setPageState(value: string, harness: DevToolsHarness): Promise<vo
 
 async function assertPageState(value: string, harness: DevToolsHarness): Promise<void> {
     assert.equal(await harness.element('#stress-input', 'value', undefined), value)
+}
+
+async function waitForBaselineMarker(harness: DevToolsHarness): Promise<void> {
+    await waitFor(
+        async () => (await harness.element('#hmr-status', 'text', undefined)) === 'marker:baseline',
+        6_000,
+        100
+    )
+}
+
+async function assertAppProjectionBaseline(harness: DevToolsHarness): Promise<void> {
+    const appText = await harness.element('comp', 'text', undefined)
+    assert.match(appText, /App marker: baseline/)
+    assert.match(appText, /App outlet: first/)
 }
 
 async function assertCleanConsole(harness: DevToolsHarness): Promise<void> {

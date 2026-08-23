@@ -10,7 +10,7 @@ Each page renders:
 - 96 additional stateful grid cells;
 - controlled input, counter, selection, density, and mount-token state.
 
-The mirror route mounts a second copy while the primary page remains in the back stack. This stresses cumulative patch delivery, repeated native Page replacement, large `data` snapshot restoration, React Refresh state retention, hidden-page recovery, runtime-requested rebuilds, and invalid-source recovery.
+The singleton App projects the Page outlet through a 16-level host chain beside a second 16-level decorative branch, and it consumes the same edited marker as both Pages. Every marker generation also reverses the two keyed App branches, forcing structural App HMR while retaining the Page subtree. The mirror route mounts a second Page copy while the primary Page remains in the back stack. Together they stress App-view slot routing, App and Page React Refresh, cumulative patch delivery, repeated native Page replacement, large `data` snapshot restoration, hidden-page recovery, runtime-requested rebuilds, and invalid-source recovery.
 
 ## Automated DevTools suite
 
@@ -38,8 +38,8 @@ Every invocation replaces the complete temporary `src` tree from the repository 
 
 The complete suite checks:
 
-1. burst patch publication with primary and hidden mirror state retention;
-2. marker restoration and valid two-Page navigation stacks;
+1. burst patch publication through both the deep App view and Pages, with primary and hidden mirror state retention;
+2. unique Page-slot routing while keyed deep App branches repeatedly reorder, marker restoration, and valid two-Page navigation stacks;
 3. duplicate and out-of-order ACK conflation under rebuild-report storms;
 4. build identity rotation and non-empty `assets/global.wxss` after every complete rebuild;
 5. invalid syntax does not start a complete build or alter the live Page heap;
