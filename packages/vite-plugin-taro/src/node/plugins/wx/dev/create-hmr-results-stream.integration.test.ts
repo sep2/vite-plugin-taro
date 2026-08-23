@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { mkdtemp, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -64,7 +65,7 @@ test('adapts a real DevEngine callback into one publication', async () => {
         await engine.ensureCurrentBuildFinish()
         await engine.registerClient('hmr-results-stream-test')
 
-        await writeFile(dependencyId, "export const value = 'updated'\n")
+        await publishSourceGeneration(dependencyId, "export const value = 'updated'\n")
         await waitFor(() => countPatches(publications) >= 1)
 
         assert.deepEqual(
@@ -194,14 +195,14 @@ test('surfaces a real transform failure and accepts a later recovery generation'
         await waitForCount(outputResults, 1)
         await engine.registerClient('hmr-recovery-test')
 
-        await writeFile(dependencyId, 'export const value = ;\n')
+        await publishSourceGeneration(dependencyId, 'export const value = ;\n')
         await waitForCount(failures, 1)
         await engine.ensureCurrentBuildFinish()
         assert.equal(countPatches(publications), 0)
 
         // The invalid generation leaves the old runtime frontier healthy. Once the source parses again, Rolldown emits the
         // ordinary next patch without a complete build or special recovery state.
-        await writeFile(dependencyId, "export const value = 'recovered'\n")
+        await publishSourceGeneration(dependencyId, "export const value = 'recovered'\n")
         await waitFor(() => countPatches(publications) >= 1)
         await engine.ensureCurrentBuildFinish()
 
@@ -220,6 +221,17 @@ test('surfaces a real transform failure and accepts a later recovery generation'
         await rm(root, { recursive: true })
     }
 })
+
+/** Publishes exactly one logical source generation without exposing writeFile's intermediate truncation state. */
+async function publishSourceGeneration(filePath: string, source: string): Promise<void> {
+    const temporaryPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.${randomUUID()}.txt`)
+    try {
+        await writeFile(temporaryPath, source)
+        await rename(temporaryPath, filePath)
+    } finally {
+        await rm(temporaryPath, { force: true })
+    }
+}
 
 function countPatches(results: readonly HmrUpdatesResult[]): number {
     return results.reduce(
