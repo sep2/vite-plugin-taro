@@ -24,6 +24,7 @@ interface ProjectPaths {
     root: string
     output: string
     source: string
+    counterSource: string
     backup: string
     viteLog: string
 }
@@ -35,6 +36,7 @@ const projectPaths: ProjectPaths = {
     root: temporaryRoot,
     output: resolve(temporaryRoot, 'dist/wx'),
     source: resolve(temporaryRoot, 'src/pages/home/index.tsx'),
+    counterSource: resolve(temporaryRoot, 'src/components/counter/counter.tsx'),
     backup: resolve(temporaryRoot, '.hmr-test-index.tsx.backup'),
     viteLog: '/tmp/vpt-published-packages-test-vite.log'
 }
@@ -43,6 +45,7 @@ const miniProgramSkill = resolve(repositoryRoot, '.agents/skills/miniprogram-dev
 const originalText = 'Build naturally. Ship everywhere.'
 const updatedText = 'Published HMR keeps React state.'
 const probeId = 'published-hmr-probe'
+const nativeCounterId = 'published-native-counter'
 const pollIntervalMs = 3_000
 const transitionDeadlineMs = 120_000
 const commandTimeoutMs = 29_000
@@ -245,8 +248,28 @@ function installProbeId(source: string): string {
 
 function configureDisposableProject(): void {
     writeFileSync(resolve(projectPaths.root, '.env.local'), `VITE_VPT_WECHAT_APP_ID=${readAppId()}\n`)
+
     const source = readFileSync(projectPaths.source, 'utf8')
-    writeFileSync(projectPaths.source, installProbeId(source))
+    const counterOpening = '                    <Counter\n'
+    if (source.split(counterOpening).length !== 2) {
+        throw new Error('Expected one Counter element in the generated Home Page')
+    }
+    writeFileSync(
+        projectPaths.source,
+        installProbeId(
+            source.replace(counterOpening, `${counterOpening}                        id="${nativeCounterId}"\n`)
+        )
+    )
+
+    const counterSource = readFileSync(projectPaths.counterSource, 'utf8')
+    const counterPropsOpening = 'export interface CounterProps {\n'
+    if (counterSource.split(counterPropsOpening).length !== 2) {
+        throw new Error('Expected one CounterProps interface in the generated counter')
+    }
+    writeFileSync(
+        projectPaths.counterSource,
+        counterSource.replace(counterPropsOpening, `${counterPropsOpening}    id: string\n`)
+    )
 }
 
 function validateProjectConfig(): void {
@@ -381,10 +404,10 @@ function readCounterCount(): number | undefined {
         ['--project', projectPaths.output, '--action', 'getData'],
         false
     )
-    if (!isRecord(result) || !isRecord(result.root)) {
+    if (!isRecord(result) || !isRecord(result.page)) {
         return undefined
     }
-    return findCounterCount(result.root)
+    return findCounterCount(result.page)
 }
 
 function readProbeText(): string | undefined {
@@ -399,7 +422,16 @@ function readProbeText(): string | undefined {
 function triggerIncrement(): void {
     callWechatide(
         'automation_element_action',
-        ['--project', projectPaths.output, '--selector', 'component', '--action', 'trigger', '--type', 'increment'],
+        [
+            '--project',
+            projectPaths.output,
+            '--selector',
+            `#${nativeCounterId}`,
+            '--action',
+            'trigger',
+            '--type',
+            'increment'
+        ],
         true
     )
 }
