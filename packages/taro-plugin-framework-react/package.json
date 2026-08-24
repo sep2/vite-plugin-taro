@@ -1,6 +1,6 @@
 {
     "name": "vite-plugin-taro-plugin-framework-react",
-    "version": "0.6.12",
+    "version": "0.6.13",
     "description": "React 19, WX App-view, and H5 Page-outlet fork of @tarojs/plugin-framework-react for vite-plugin-taro.",
     "author": "sep2",
     "license": "MIT",

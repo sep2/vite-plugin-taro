@@ -4,7 +4,17 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
-## [0.6.12] - 2026-08-24
+## [0.6.13] - 2026-08-24
+
+### Changed
+
+- keep npm badge link version-agnostic (c47bffe)
+
+### Fixed
+
+- scope native components locally (cee4c3a)
+
+## [0.6.12] - 2026-08-25
 
 ### Changed
 
