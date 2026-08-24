@@ -23,13 +23,13 @@ const options: VptOptions = {
 }
 
 test('creates shared Taro templates and native companions for every Page', () => {
-    const templateAssets = createTemplateAssets({} as Rolldown.OutputBundle, options, [
+    const output = createTemplateAssets({} as Rolldown.OutputBundle, options, [
         {
             name: 'native-counter',
             fields: ['count', 'extraData', 'label', 'onIncrement']
         }
     ])
-    const assets = new Map(templateAssets.map((asset) => [asset.fileName, String(asset.source)]))
+    const assets = new Map(output.map((asset) => [asset.fileName, String(asset.source)]))
 
     assert.deepEqual(
         [...assets.keys()],
@@ -38,6 +38,8 @@ test('creates shared Taro templates and native companions for every Page', () =>
             'utils.wxs',
             'comp.wxml',
             'comp.json',
+            'custom-wrapper.wxml',
+            'custom-wrapper.json',
             'pages/home/index.wxml',
             'pages/home/index.wxss',
             'pages/account/index.wxml',
@@ -49,6 +51,7 @@ test('creates shared Taro templates and native companions for every Page', () =>
     const homeTemplate = assets.get('pages/home/index.wxml') ?? ''
 
     assert.match(baseTemplate, /<template name="tmpl_0_native-counter">/)
+    assert.equal((baseTemplate.match(/<template name="tmpl_\d+_custom-wrapper">/g) ?? []).length, 15)
     assert.match(
         baseTemplate,
         /<native-counter\s+count="{{i\.count}}" extraData="{{i\.extraData}}" label="{{i\.label}}" bindincrement="eh"/
@@ -69,7 +72,17 @@ test('creates shared Taro templates and native companions for every Page', () =>
         component: true,
         styleIsolation: 'apply-shared',
         usingComponents: {
-            comp: './comp'
+            comp: './comp',
+            'custom-wrapper': './custom-wrapper'
+        }
+    })
+    assert.match(assets.get('custom-wrapper.wxml') ?? '', /<import src="\.\/base\.wxml" \/>/)
+    assert.deepEqual(JSON.parse(assets.get('custom-wrapper.json') ?? ''), {
+        component: true,
+        styleIsolation: 'apply-shared',
+        usingComponents: {
+            comp: './comp',
+            'custom-wrapper': './custom-wrapper'
         }
     })
     assert.match(homeTemplate, /\.\.\/\.\.\/base\.wxml/)

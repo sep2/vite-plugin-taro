@@ -76,7 +76,7 @@ function createAppJson({
     }
 }
 
-/** Preserves configured Page JSON and registers only Taro's local recursive component entry. */
+/** Preserves configured Page JSON and registers the standard generated recursive component entries. */
 function createPageJson(page: VptPageOption): VptJsonObject {
     const usingComponents = isJsonObject(page.config.usingComponents) ? page.config.usingComponents : {}
 
@@ -84,7 +84,8 @@ function createPageJson(page: VptPageOption): VptJsonObject {
         ...page.config,
         usingComponents: {
             ...usingComponents,
-            comp: toRootRelativePath(page.path, 'comp')
+            comp: toRootRelativePath(page.path, 'comp'),
+            'custom-wrapper': toRootRelativePath(page.path, 'custom-wrapper')
         }
     }
 }

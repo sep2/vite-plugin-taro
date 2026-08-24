@@ -11,6 +11,8 @@ import {
     componentCapsulePath,
     componentShellFileName,
     componentShellPath,
+    customWrapperShellFileName,
+    customWrapperShellPath,
     pageCapsuleId,
     pageCapsulePath,
     pageComponentId,
@@ -107,6 +109,7 @@ function createEntryGraph(pages: readonly VptPageOption[]) {
             ['app-capsule', appCapsulePath],
             [componentShellFileName, componentShellPath],
             ['component-capsule', componentCapsulePath],
+            [customWrapperShellFileName, customWrapperShellPath],
             ...pageEntries.flatMap((entry) => {
                 return [
                     [entry.shellName, entry.shellId],

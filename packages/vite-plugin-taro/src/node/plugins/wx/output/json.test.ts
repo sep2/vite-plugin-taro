@@ -85,7 +85,8 @@ test('creates configured native JSON assets at exact output paths', () => {
         navigationBarTitleText: 'Home',
         usingComponents: {
             custom: '../../custom',
-            comp: '../../comp'
+            comp: '../../comp',
+            'custom-wrapper': '../../custom-wrapper'
         },
         componentPlaceholder: {
             custom: 'text'
@@ -94,7 +95,8 @@ test('creates configured native JSON assets at exact output paths', () => {
     assert.deepEqual(assets.get('pages/account/index.json'), {
         navigationBarTitleText: 'Account',
         usingComponents: {
-            comp: '../../comp'
+            comp: '../../comp',
+            'custom-wrapper': '../../custom-wrapper'
         }
     })
     assert.deepEqual(assets.get('project.config.json'), options.projectConfigJson)
@@ -102,7 +104,7 @@ test('creates configured native JSON assets at exact output paths', () => {
     assert.deepEqual(assets.get('sitemap.json'), options.sitemapJson)
 })
 
-test('keeps comp Page-local when no native component registration exists', () => {
+test('keeps generated component registrations Page-local when no native component registration exists', () => {
     const assets = new Map(
         createJsonAssets({
             options,
@@ -113,7 +115,8 @@ test('keeps comp Page-local when no native component registration exists', () =>
 
     assert.equal(Object.hasOwn(assets.get('app.json'), 'usingComponents'), false)
     assert.deepEqual(assets.get('pages/account/index.json').usingComponents, {
-        comp: '../../comp'
+        comp: '../../comp',
+        'custom-wrapper': '../../custom-wrapper'
     })
 })
 

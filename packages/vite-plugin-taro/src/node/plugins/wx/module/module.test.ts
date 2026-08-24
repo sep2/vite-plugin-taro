@@ -5,6 +5,7 @@ import {
     appCapsulePath,
     appShellPath,
     bootstrapPath,
+    customWrapperShellPath,
     getWxEntryRole,
     getWxExecutionKind,
     pageCapsulePath,
@@ -19,6 +20,7 @@ function chunk(...moduleIds: string[]): Rolldown.PreRenderedChunk {
 test('identifies shell and capsule entry roles independently from output execution', () => {
     assert.equal(getWxEntryRole(chunk(appShellPath)), 'shell')
     assert.equal(getWxEntryRole(chunk(appCapsulePath)), 'capsule')
+    assert.equal(getWxEntryRole(chunk(customWrapperShellPath)), 'shell')
     assert.equal(getWxEntryRole(chunk(`${pageCapsulePath}?route=page`)), 'capsule')
     assert.equal(getWxEntryRole(chunk('/application')), undefined)
     assert.throws(() => getWxEntryRole(chunk(appShellPath, appCapsulePath)), /mixes shell and capsule entries/)

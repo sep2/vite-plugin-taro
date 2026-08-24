@@ -33,8 +33,14 @@ export const componentShellFileName = 'comp.js'
 /** Identifies the synchronous recursive Component shell source. */
 export const componentShellPath = resolvePackageFile('dist/runtime/wx/native/component.js')
 
-/** Identifies the recursive Component capsule kept behind the native shell boundary. */
+/** Identifies the recursive Component capsule shared by generated Taro component shells. */
 export const componentCapsulePath = resolvePackageFile('dist/runtime/wx/capsule/component.js')
+
+/** Forces Taro's CustomWrapper native shell to emit at its configured root path. */
+export const customWrapperShellFileName = 'custom-wrapper.js'
+
+/** Identifies the synchronous CustomWrapper shell source. */
+export const customWrapperShellPath = resolvePackageFile('dist/runtime/wx/native/custom-wrapper.js')
 
 /** Resolves the configured Page component from its route-qualified capsule importer. */
 export const pageComponentId = '\0vpt:page-component'
@@ -45,7 +51,7 @@ export const pageCapsuleId = '\0vpt:page-capsule'
 /** Provides the Page capsule source specialized through a stable route query. */
 export const pageCapsulePath = resolvePackageFile('dist/runtime/wx/capsule/page.js')
 
-/** Identifies the Taro facade shared by the App, Page, and recursive Component capsules. */
+/** Identifies the Taro facade shared by the App, Page, and generated component capsules. */
 export const taroRuntimePath = resolvePackageFile('dist/runtime/wx/capsule/taro-runtime.js')
 
 /** Identifies the reusable synchronous native Page shell source. */
@@ -61,7 +67,12 @@ export type WxExecutionKind = 'native' | 'capsule' | 'amphibious'
 
 // These fixed source identities describe entry roles independently from the final execution kind. A capsule entry may,
 // for example, become amphibious when Rolldown coalesces its generated runtime into the same output chunk.
-const shellModuleIds: ReadonlySet<string> = new Set([appShellPath, componentShellPath, pageShellPath])
+const shellModuleIds: ReadonlySet<string> = new Set([
+    appShellPath,
+    componentShellPath,
+    customWrapperShellPath,
+    pageShellPath
+])
 const capsuleModuleIds: ReadonlySet<string> = new Set([appCapsulePath, componentCapsulePath, pageCapsulePath])
 const amphibiousModuleIds: ReadonlySet<string> = new Set([bootstrapPath, rolldownRuntimeId])
 const transportModuleIds: ReadonlySet<string> = new Set([transportPath])

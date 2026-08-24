@@ -168,6 +168,9 @@ test('builds a complete native App and Page project for wx', async () => {
                 'comp.js',
                 'comp.json',
                 'comp.wxml',
+                'custom-wrapper.js',
+                'custom-wrapper.json',
+                'custom-wrapper.wxml',
                 'pages/home/index.js',
                 'pages/home/index.json',
                 'pages/home/index.wxml',
@@ -192,12 +195,77 @@ test('builds a complete native App and Page project for wx', async () => {
             assert.deepEqual(pageJson, {
                 navigationBarTitleText: 'Home',
                 usingComponents: {
-                    comp: '../../comp'
+                    comp: '../../comp',
+                    'custom-wrapper': '../../custom-wrapper'
                 }
             })
             assert.match(javascript, /WX page marker/)
             assert.doesNotMatch(requireChunk(output, 'app.js').code, /^\s*import\s/m)
             assert.doesNotMatch(requireChunk(output, 'pages/home/index.js').code, /^\s*import\s/m)
+        }
+    )
+})
+
+test('renders Page-local CustomWrapper through the standard recursive scopes', async () => {
+    await inspectFixtureBuild(
+        {
+            options: createOptions('wx'),
+            files: {
+                'src/app.tsx': appSource,
+                'src/pages/home/index.tsx': `
+                    import { CustomWrapper, Text } from '@tarojs/components'
+                    import { useState } from 'react'
+
+                    export default function Home() {
+                        const [count, setCount] = useState(0)
+                        return (
+                            <CustomWrapper id="page-wrapper">
+                                <Text onClick={() => setCount((value) => value + 1)}>{count}</Text>
+                            </CustomWrapper>
+                        )
+                    }
+                `
+            }
+        },
+        (output) => {
+            const fileNames = new Set(output.map((entry) => entry.fileName))
+            const baseTemplate = String(requireAsset(output, 'base.wxml').source)
+            const customWrapperTemplate = String(requireAsset(output, 'custom-wrapper.wxml').source)
+            const pageJson = parseJsonAsset(output, 'pages/home/index.json')
+            const componentJson = parseJsonAsset(output, 'comp.json')
+            const customWrapperJson = parseJsonAsset(output, 'custom-wrapper.json')
+            const customWrapperDefinitions = baseTemplate.match(/<template name="tmpl_\d+_custom-wrapper">/g) ?? []
+            const slotForwardingCalls =
+                baseTemplate.match(
+                    /<custom-wrapper i="{{i}}" l="{{l}}" id="{{i\.uid\|\|i\.sid}}" data-sid="{{i\.sid}}">\s*<slot wx:if="{{i\.vo}}" \/>/g
+                ) ?? []
+
+            assert.ok(fileNames.has('custom-wrapper.js'))
+            assert.equal(customWrapperDefinitions.length, 15)
+            assert.equal(slotForwardingCalls.length, 0)
+            assert.match(customWrapperTemplate, /<import src="\.\/base\.wxml" \/>/)
+            assert.match(customWrapperTemplate, /wx:for="{{i\.cn}}"/)
+            assert.deepEqual(pageJson.usingComponents, {
+                comp: '../../comp',
+                'custom-wrapper': '../../custom-wrapper'
+            })
+            assert.deepEqual(componentJson, {
+                component: true,
+                styleIsolation: 'apply-shared',
+                usingComponents: {
+                    comp: './comp',
+                    'custom-wrapper': './custom-wrapper'
+                }
+            })
+            assert.deepEqual(customWrapperJson, {
+                component: true,
+                styleIsolation: 'apply-shared',
+                usingComponents: {
+                    comp: './comp',
+                    'custom-wrapper': './custom-wrapper'
+                }
+            })
+            assert.doesNotMatch(requireChunk(output, 'custom-wrapper.js').code, /^\s*import\s/m)
         }
     )
 })

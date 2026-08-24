@@ -9,7 +9,9 @@ export default function NativeCounterDemo() {
         <View className="flex min-h-screen flex-col gap-5 bg-slate-50 p-6 text-slate-950">
             <View className="flex flex-col gap-2">
                 <Text className="text-2xl font-bold">Native component demo</Text>
-                <Text className="text-sm text-slate-600">React state: {count}</Text>
+                <Text id="native-demo-react-state" className="text-sm text-slate-600">
+                    React state: {count}
+                </Text>
             </View>
 
             <NativeCounter
@@ -27,6 +29,7 @@ export default function NativeCounterDemo() {
             </NativeCounter>
 
             <Button
+                id="native-demo-add-ten"
                 className="rounded-lg bg-emerald-600 px-4 py-2 text-white"
                 onClick={() => {
                     setCount((currentCount) => currentCount + 10)

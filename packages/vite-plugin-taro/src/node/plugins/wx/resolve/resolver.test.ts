@@ -9,6 +9,7 @@ import {
     bootstrapPath,
     componentCapsulePath,
     componentShellPath,
+    customWrapperShellPath,
     pageCapsuleId,
     pageCapsulePath,
     pageComponentId,
@@ -51,6 +52,7 @@ test('resolves fixed and route-specific private IDs', () => {
         transport: transportPath,
         'app-capsule': appCapsulePath,
         'component-capsule': componentCapsulePath,
+        'custom-wrapper.js': customWrapperShellPath,
         'pages/home/index.js': `${pageShellPath}?route=pages%2Fhome%2Findex`,
         'pages/home/index-capsule': `${pageCapsulePath}?route=pages%2Fhome%2Findex`
     })

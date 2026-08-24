@@ -14,6 +14,7 @@ type TemplateComponentConfig = {
     includeAll: boolean
 }
 
+const customWrapperName = 'custom-wrapper'
 const taroComponentsModulePath = packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
 
 /** Creates Taro's shared WeChat templates and native WXML/WXSS companions for every Page. */
@@ -26,15 +27,15 @@ export function createTemplateAssets(
     }[]
 ): Rolldown.EmittedAsset[] {
     const templateBuilder = createTemplateBuilder()
+    const componentConfig = collectTemplateComponentConfig(bundle, nativeComponents)
 
     return [
-        createAsset(
-            'base.wxml',
-            templateBuilder.buildBaseTemplate(collectTemplateComponentConfig(bundle, nativeComponents))
-        ),
+        createAsset('base.wxml', templateBuilder.buildBaseTemplate(componentConfig)),
         createAsset('utils.wxs', templateBuilder.buildXScript()),
         createAsset('comp.wxml', templateBuilder.buildBaseComponentTemplate('.wxml')),
         createAsset('comp.json', renderJson(createComponentJson())),
+        createAsset('custom-wrapper.wxml', templateBuilder.buildCustomComponentTemplate('.wxml')),
+        createAsset('custom-wrapper.json', renderJson(createCustomWrapperJson())),
         ...options.pages.flatMap((page) => [
             createAsset(
                 `${page.path}.wxml`,
@@ -68,16 +69,19 @@ export function createTemplateAssets(
  *
  * Build-time output
  * -----------------
- * createTemplateAssets still asks one builder for the normal five products: shared base.wxml, utils.wxs, comp.wxml,
- * comp.json, and each Page WXML. This adapter specializes only the two products that own the native join:
+ * createTemplateAssets asks one builder for shared base.wxml, utils.wxs, comp.wxml, custom-wrapper.wxml, and each Page WXML.
+ * This adapter specializes the products that own the native join:
  *
- * - shared base.wxml receives branch-local slot forwarding plus vpt_fragment and vpt_page_outlet template definitions;
+ * - shared base.wxml receives branch-local slot forwarding at comp boundaries plus vpt_fragment and vpt_page_outlet
+ *   template definitions;
  * - each Page WXML replaces Taro's root:root entry with one generic comp bound to app and one caller-owned taro_tmpl bound
  *   to page as that component's default slot.
  *
- * utils.wxs remains Taro's normal compact-node dispatcher. comp.wxml and comp.json remain Taro's generic depth-reset
- * component and still know only i, l, virtual-host behavior, and eh event dispatch. There is one shared template namespace,
- * no Page-specific base file, no App/Page mode property, and no Page object threaded through App template data.
+ * utils.wxs remains Taro's normal compact-node dispatcher. comp.wxml and custom-wrapper.wxml retain Taro's generic compact
+ * rendering contracts; their JSON companions register only recursive boundaries, while runtime configs retain standard
+ * event dispatch. CustomWrapper keeps Taro's Page-local ownership model and is not made slot-transparent for App wrapping.
+ * There is one shared template namespace, no Page-specific base file, no App/Page mode property, and no Page object threaded
+ * through App template data.
  *
  * First native Page
  * -----------------
@@ -100,7 +104,7 @@ export function createTemplateAssets(
  *      -> comp.wxml (owns App eh, imports unchanged utils.wxs and shared base.wxml)
  *         -> tmpl_0_vpt_fragment (iterates the real App compact roots in app.cn)
  *            -> stock Taro templates (render App hosts and recurse through their cn arrays)
- *               -> depth-reset <comp i="{{i}}" l="{{l}}">
+ *               -> native recursion boundary <comp ...>
  *                    -> forwards <slot /> only when this compact subtree root has i.vo
  *               -> tmpl_0_vpt_page_outlet at React's exact {children} position
  *                  -> <slot />
@@ -116,8 +120,8 @@ export function createTemplateAssets(
  * Slots transfer caller-owned light DOM only. They do not transfer the caller's named-template table or WXS modules. App
  * dispatch runs inside comp.wxml, so vpt_fragment and vpt_page_outlet must live in base.wxml imported by that component.
  * Putting those definitions in buildPageTemplate produces Page WXML that compiles, but component runtime dispatch fails with
- * `Template tmpl_0_vpt_fragment not found`. Shared base.wxml makes the names visible in the root and every depth-reset comp
- * scope and emits them once rather than once per Page.
+ * `Template tmpl_0_vpt_fragment not found`. Shared base.wxml makes the names visible in the root and every recursive
+ * component scope and emits them once rather than once per Page.
  *
  * Projection-spine ownership
  * --------------------------
@@ -125,8 +129,8 @@ export function createTemplateAssets(
  * skips the unchanged root-side suffix, gives old leaf-side nodes the ordinary host prop vo=false, and gives new ones vo=true.
  * Taro's existing lazy structural hydration runs later and therefore serializes those props without projection-specific
  * scheduler or hydrate behavior. If React replaces the outlet host while moving it, the renderer finds the unique new marker
- * once and caches its new ancestor array. At a depth reset, i.vo makes forwarding an O(1) local decision; WXML never searches
- * descendants, and Page trees instantiate no unnamed slot.
+ * once and caches its new ancestor array. At each depth-reset comp boundary, i.vo makes forwarding an O(1) local decision;
+ * WXML never searches descendants, and Page trees instantiate no unnamed slot.
  *
  * Steady-state updates and navigation
  * -----------------------------------
@@ -139,11 +143,12 @@ export function createTemplateAssets(
  *
  * Method responsibilities
  * -----------------------
- * 1. buildBaseTemplate wraps Taro's buildTemplate output, preserves every stock host template, guards the slot at Taro's
- *    existing depth-reset call site with i.vo, and adds the two private definitions to the shared namespace.
+ * 1. buildBaseTemplate preserves stock host templates, makes each depth-reset comp boundary slot-transparent through i.vo,
+ *    and adds the two private definitions to the shared namespace.
  * 2. buildPageTemplate owns only the Page boundary: app binding, page binding, and the single Page-content slot.
  * 3. buildXScript delegates unchanged because routing metadata already travels inside compact node i.
  * 4. buildBaseComponentTemplate delegates unchanged so recursive comp remains generic and feature-independent.
+ * 5. buildCustomComponentTemplate delegates unchanged so CustomWrapper renders compact children in its own native scope.
  *
  * H5 never calls this WX output builder. Its App continues to receive ordinary Fragment children and none of these native
  * data roots, templates, custom-component boundaries, or slot rules enter the browser build.
@@ -246,6 +251,10 @@ function createTemplateBuilder() {
              */
             return taroTemplateBuilder.buildBaseComponentTemplate(ext)
         },
+        buildCustomComponentTemplate: (ext: string) => {
+            // CustomWrapper renders its compact children in its own native scope; imported base templates perform dispatch.
+            return taroTemplateBuilder.buildCustomComponentTemplate(ext)
+        },
         buildPageTemplate: (baseTempPath: string, page: Record<string, unknown>) => {
             const source = taroTemplateBuilder.buildPageTemplate(baseTempPath, page)
 
@@ -267,7 +276,7 @@ function createTemplateBuilder() {
     }
 }
 
-/** Creates template metadata from reachable Taro hosts and native component JSX fields. */
+/** Creates template metadata from reachable Taro hosts, the standard CustomWrapper boundary, and native JSX fields. */
 function collectTemplateComponentConfig(
     bundle: Rolldown.OutputBundle,
     nativeComponents: readonly {
@@ -275,8 +284,10 @@ function collectTemplateComponentConfig(
         fields: readonly string[]
     }[]
 ): TemplateComponentConfig {
-    // This local config accumulates names in output order before the template builder consumes it.
-    const config: TemplateComponentConfig = {
+    const components = findBundleModule(bundle, taroComponentsModulePath)
+    const renderedComponentNames = (components?.renderedExports ?? []).map(toDashed)
+
+    return {
         includes: new Set([
             'view',
             'catch-view',
@@ -287,20 +298,16 @@ function collectTemplateComponentConfig(
             'image',
             'static-image',
             'text',
-            'static-text'
+            'static-text',
+            ...renderedComponentNames.filter((name) => name !== customWrapperName)
         ]),
         exclude: new Set(),
-        thirdPartyComponents: new Map(),
+        thirdPartyComponents: new Map<string, Set<string>>([
+            [customWrapperName, new Set<string>()],
+            ...nativeComponents.map((component) => [component.name, new Set(component.fields)] as const)
+        ]),
         includeAll: false
     }
-    const components = findBundleModule(bundle, taroComponentsModulePath)
-    for (const name of components?.renderedExports ?? []) {
-        config.includes.add(toDashed(name))
-    }
-    for (const component of nativeComponents) {
-        config.thirdPartyComponents.set(component.name, new Set(component.fields))
-    }
-    return config
 }
 
 /** Finds one module in the final chunk metadata. */
@@ -322,13 +329,26 @@ function toDashed(value: string): string {
     return value.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
 }
 
-/** Creates the recursive component configuration expected by Taro's templates. */
+/** Creates the recursive depth-reset component configuration expected by Taro's templates. */
 function createComponentJson(): VptJsonObject {
     return {
         component: true,
         styleIsolation: 'apply-shared',
         usingComponents: {
-            comp: './comp'
+            comp: './comp',
+            [customWrapperName]: `./${customWrapperName}`
+        }
+    }
+}
+
+/** Creates the recursive CustomWrapper configuration for nested wrappers and depth resets. */
+function createCustomWrapperJson(): VptJsonObject {
+    return {
+        component: true,
+        styleIsolation: 'apply-shared',
+        usingComponents: {
+            comp: './comp',
+            [customWrapperName]: `./${customWrapperName}`
         }
     }
 }
