@@ -4,7 +4,18 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
-## [0.6.9] - 2026-08-24
+## [0.6.10] - 2026-08-24
+
+### Changed
+
+- refine homepage actions and footer (5d3972d)
+- add llms link to homepage footer (3d52271)
+
+### Fixed
+
+- build plugin before publish tests (7618bff)
+
+## [0.6.9] - 2026-08-25
 
 ### Added
 
