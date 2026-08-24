@@ -1,37 +1,45 @@
 # VPT
 
-A cross-platform app built with Vite 8, React 19, Taro 4, TypeScript, and Tailwind CSS v4. The same React codebase runs as a WeChat Mini Program and a Web app.
+基于 Vite 8、React 19、Taro 4、TypeScript 和 Tailwind CSS v4，一套代码运行于微信小程序和 Web。
 
-> **AI-assisted development is recommended:** Follow the [VPT AI development guide](https://vpt.js.org/guides/ai/) and let a coding assistant create, develop, test, and validate your app.
-
-- [Documentation](https://vpt.js.org)
+- [文档](https://vpt.js.org)
 - [GitHub](https://github.com/sep2/vite-plugin-taro)
 
-## Get started
+## AI 开发
 
-Install the dependencies:
+把下面的提示词交给编程助手，让它先读取 VPT 文档，再开发并验证功能：
+
+```text
+请先阅读 https://vpt.js.org/llms.txt，再根据我的需求开发这个 VPT 项目。
+```
+
+测试微信小程序时，可安装微信官方的[开发者工具 Skills](https://developers.weixin.qq.com/miniprogram/dev/devtools/Skills.html)，让 AI 操作模拟器、读取日志、截图和预览。
+
+## 快速开始
+
+安装依赖：
 
 ```sh
 npm install
 ```
 
-### WeChat Mini Program
+### 微信小程序
 
-1. Replace the generated placeholder in `.env.local` with your WeChat App ID:
+1. 在 `.env.local` 中填写微信 App ID：
 
     ```dotenv
     VITE_VPT_WECHAT_APP_ID=wx1234567890abcdef
     ```
 
-2. Start the WeChat development build:
+2. 启动开发构建：
 
     ```sh
     npm run dev:wx
     ```
 
-3. In WeChat DevTools, import `dist/wx`—not the project root.
+3. 用微信开发者工具导入 `dist/wx`，不要导入项目根目录。
 
-Keep the Vite process running while you work. The template configures WeChat DevTools for hot reload, disables URL checks for local development, and keeps Skyline rendering disabled in DevTools because Skyline does not currently support hot reload there.
+开发期间保持命令运行。模板已开启热更新、关闭本地开发的 URL 校验，并默认关闭开发者工具中暂不支持热更新的 Skyline。
 
 ### Web
 
@@ -39,77 +47,45 @@ Keep the Vite process running while you work. The template configures WeChat Dev
 npm run dev:h5
 ```
 
-Open the URL printed by Vite, usually <http://localhost:5173>.
+打开 Vite 输出的地址，通常是 <http://localhost:5173>。
 
-You can run `dev:wx` and `dev:h5` in separate terminals to develop both targets at once.
+## 开发
 
-## Start building
-
-The default page is `src/pages/home/index.tsx`. Edit it while the counter is active to see React state survive a hot update.
-
-Use VPT's virtual modules for Taro components and APIs:
+默认页面是 `src/pages/home/index.tsx`。VPT 通过虚拟模块提供 Taro 组件和 API：
 
 ```tsx
 import Taro from 'virtual:taro/api'
 import { Button, Text, View } from 'virtual:taro/components'
 ```
 
-Do not install or import `@tarojs/*` packages directly. Add pages and change application or WeChat project settings in `vite.config.ts`.
+不要直接安装或导入 `@tarojs/*`。在 `vite.config.ts` 中添加页面并修改应用或微信项目配置。
 
-The starter also demonstrates:
+模板包含条件编译、微信原生组件、懒加载、自定义导航栏、Tailwind CSS、CSS Modules 和全局样式示例；不需要的示例可直接删除。
 
-- shared React components across WeChat and Web;
-- target-specific code with `// #ifdef wx` and `// #ifdef h5`;
-- a typed native WeChat component with a Web counterpart;
-- lazy-loaded React components;
-- a custom navigation bar; and
-- Tailwind CSS, CSS Modules, and global CSS.
+### 样式
 
-Delete or replace any example code you do not need.
+全局样式和 Tailwind 主题位于 `src/app.css`。保留 Tailwind 导入和 `@source "./";`，并在源码中写完整类名，不要拼接类名。组件独立样式使用 `*.module.css`。
 
-## Styling
+### 热更新
 
-Global styles and Tailwind theme tokens live in `src/app.css`. Keep the Tailwind imports and `@source "./";` directive so classes used under `src` are discovered for both targets.
+微信端热更新通常会保留 App 数据、当前页面、兼容的 React Hook 状态和原生输入值。修改 Vite 配置、组件或 Hook 结构不兼容，或更新无法安全应用时，会整页重载。详见[热更新指南](https://vpt.js.org/guides/hot-module-replacement/)。
 
-Use complete Tailwind class names in source code instead of constructing them from string fragments. For isolated component styles, create a `*.module.css` file and import it from the component.
+## 命令
 
-VPT hot-updates imported styles in both targets. For WeChat, it publishes generated WXSS together with the component update so the current page and React state remain intact.
-
-## Hot reload
-
-During normal WeChat updates, VPT preserves the running App, current page, compatible React Hook state, and native input values. A full reload is expected after changes to Vite configuration, incompatible component or Hook structure, or an update that cannot be applied safely.
-
-See the [hot reload guide](https://vpt.js.org/guides/hot-module-replacement/) for configuration and troubleshooting details.
-
-## Scripts
-
-| Command | Description | Output |
+| 命令 | 用途 | 输出 |
 | --- | --- | --- |
-| `npm run dev:wx` | Develop the WeChat Mini Program with hot reload | `dist/wx` |
-| `npm run dev:h5` | Start the Web development server | — |
-| `npm run build:wx` | Build the WeChat Mini Program | `dist/wx` |
-| `npm run build:h5` | Build the Web app | `dist/h5` |
-| `npm run preview:h5` | Preview the Web production build | — |
-| `npm run typecheck` | Typecheck the project with TypeScript | — |
+| `npm run dev:wx` | 开发微信小程序 | `dist/wx` |
+| `npm run dev:h5` | 开发 Web | — |
+| `npm run build:wx` | 构建微信小程序 | `dist/wx` |
+| `npm run build:h5` | 构建 Web | `dist/h5` |
+| `npm run preview:h5` | 预览 Web 生产构建 | — |
+| `npm run typecheck` | TypeScript 类型检查 | — |
 
-## Project structure
+## 常见问题
 
-```text
-.
-├── .env.local                 # Local WeChat App ID (ignored by Git)
-├── vite.config.ts             # VPT, pages, and target configuration
-└── src/
-    ├── app.tsx                # Shared application entry
-    ├── app.css                # Global styles and Tailwind theme
-    ├── components/            # Shared and target-specific components
-    └── pages/home/index.tsx   # Default page
-```
+- **开发者工具无法打开项目：** 确认导入的是 `dist/wx`，且 `.env.local` 中的 App ID 可用。
+- **热更新失败：** 依次关闭微信开发者工具、停止 `dev:wx`、删除 `dist/wx`、重新运行 `npm run dev:wx`，再打开开发者工具并导入 `dist/wx`。
+- **Tailwind 类未生效：** 保留 `src/app.css` 中的 `@source "./";`，并使用完整类名。
+- **pnpm 忽略依赖构建脚本：** 运行 `pnpm approve-builds`，批准所需脚本后重新安装。
 
-## Troubleshooting
-
-- **WeChat DevTools cannot open the app:** import `dist/wx` and verify that `.env.local` contains an App ID available to your WeChat account.
-- **Changes do not appear in WeChat:** confirm `dev:wx` is still running, DevTools has the current `dist/wx` open, and the terminal has no build errors.
-- **Tailwind classes are missing:** keep `@source "./";` in `src/app.css` and write each possible class name as a complete string.
-- **pnpm reports ignored dependency build scripts:** run `pnpm approve-builds`, approve the requested scripts, and install again.
-
-Continue with the [quick start guide](https://vpt.js.org/guides/quick-start/) or browse the [complete documentation](https://vpt.js.org).
+继续阅读[快速开始指南](https://vpt.js.org/guides/quick-start/)或[完整文档](https://vpt.js.org)。
