@@ -1,10 +1,11 @@
 import { recursiveMerge } from '@tarojs/helper'
 import { Weapp as WxPlatform } from '@tarojs/plugin-platform-weapp'
 import type { Rolldown } from 'vite'
-import type { VptJsonObject, VptOptions } from '../../../../options.ts'
+import type { VptJsonObject, VptOptions, VptPageOption } from '../../../../options.ts'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { packageRequire } from '../../../utils/packages.ts'
-import { renderJson } from './json.ts'
+import { createAppConfig } from '../../../utils/project-config.ts'
+import { type GeneratedSubpackage, isGeneratedSubpackageFile } from '../placer/placement.ts'
 import { toRootRelativePath } from './relative-root.ts'
 
 type TemplateComponentConfig = {
@@ -14,29 +15,45 @@ type TemplateComponentConfig = {
     includeAll: boolean
 }
 
+type NativeComponentRegistration = {
+    name: string
+    componentPath: string
+    fields: readonly string[]
+}
+
 const customWrapperName = 'custom-wrapper'
 const taroComponentsModulePath = packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
 
-/** Creates Taro's shared WeChat templates and native WXML/WXSS companions for every Page. */
-export function createTemplateAssets(
-    bundle: Rolldown.OutputBundle,
-    options: VptOptions,
-    nativeComponents: readonly {
-        name: string
-        fields: readonly string[]
-    }[]
-): Rolldown.EmittedAsset[] {
+/** Creates every JSON, WXML, WXS, and Page WXSS asset owned by Taro's native rendering boundary. */
+export function createTemplateAssets({
+    bundle,
+    options,
+    subpackages,
+    nativeComponents
+}: {
+    bundle: Rolldown.OutputBundle
+    options: VptOptions
+    subpackages: readonly GeneratedSubpackage[]
+    nativeComponents: readonly NativeComponentRegistration[]
+}): Rolldown.EmittedAsset[] {
     const templateBuilder = createTemplateBuilder()
     const componentConfig = collectTemplateComponentConfig(bundle, nativeComponents)
+    const recursiveComponentJson = createRecursiveComponentJson()
 
     return [
+        createJsonAsset('app.json', createAppJson({ options, subpackages, nativeComponents })),
+
         createAsset('base.wxml', templateBuilder.buildBaseTemplate(componentConfig)),
         createAsset('utils.wxs', templateBuilder.buildXScript()),
+
         createAsset('comp.wxml', templateBuilder.buildBaseComponentTemplate('.wxml')),
-        createAsset('comp.json', renderJson(createComponentJson())),
+        createJsonAsset('comp.json', recursiveComponentJson),
+
         createAsset('custom-wrapper.wxml', templateBuilder.buildCustomComponentTemplate('.wxml')),
-        createAsset('custom-wrapper.json', renderJson(createCustomWrapperJson())),
+        createJsonAsset('custom-wrapper.json', recursiveComponentJson),
+
         ...options.pages.flatMap((page) => [
+            createJsonAsset(`${page.path}.json`, createPageJson(page)),
             createAsset(
                 `${page.path}.wxml`,
                 templateBuilder.buildPageTemplate(toRootRelativePath(page.path, 'base.wxml'), {
@@ -45,7 +62,13 @@ export function createTemplateAssets(
                 })
             ),
             createAsset(`${page.path}.wxss`, '')
-        ])
+        ]),
+
+        createJsonAsset('project.config.json', options.projectConfigJson),
+        ...(options.projectPrivateConfigJson
+            ? [createJsonAsset('project.private.config.json', options.projectPrivateConfigJson)]
+            : []),
+        ...(options.sitemapJson ? [createJsonAsset('sitemap.json', options.sitemapJson)] : [])
     ]
 }
 
@@ -279,10 +302,7 @@ function createTemplateBuilder() {
 /** Creates template metadata from reachable Taro hosts, the standard CustomWrapper boundary, and native JSX fields. */
 function collectTemplateComponentConfig(
     bundle: Rolldown.OutputBundle,
-    nativeComponents: readonly {
-        name: string
-        fields: readonly string[]
-    }[]
+    nativeComponents: readonly NativeComponentRegistration[]
 ): TemplateComponentConfig {
     const components = findBundleModule(bundle, taroComponentsModulePath)
     const renderedComponentNames = (components?.renderedExports ?? []).map(toDashed)
@@ -329,8 +349,65 @@ function toDashed(value: string): string {
     return value.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
 }
 
-/** Creates the recursive depth-reset component configuration expected by Taro's templates. */
-function createComponentJson(): VptJsonObject {
+/** Creates App JSON with globally inherited native registrations and generated subpackages. */
+function createAppJson({
+    options,
+    subpackages,
+    nativeComponents
+}: {
+    options: VptOptions
+    subpackages: readonly GeneratedSubpackage[]
+    nativeComponents: readonly NativeComponentRegistration[]
+}): VptJsonObject {
+    const appConfig = createAppConfig(options)
+    const nativeUsingComponents = nativeComponents.map(({ name, componentPath }) => [name, componentPath])
+
+    // Cross-package components require a placeholder while WeChat downloads their generated subpackage. Paths are
+    // root-absolute, so remove the leading slash before testing the output-relative subpackage prefix.
+    // https://developers.weixin.qq.com/miniprogram/dev/framework/subpackages/async.html
+    // https://developers.weixin.qq.com/miniprogram/dev/framework/custom-component/placeholder.html
+    const componentPlaceholders = nativeComponents.flatMap(({ name, componentPath }) =>
+        isGeneratedSubpackageFile(componentPath.slice(1)) ? ([[name, 'view']] as const) : []
+    )
+
+    return {
+        ...appConfig,
+        ...(nativeUsingComponents.length > 0
+            ? {
+                  usingComponents: {
+                      ...(isJsonObject(appConfig.usingComponents) ? appConfig.usingComponents : {}),
+                      ...Object.fromEntries(nativeUsingComponents)
+                  }
+              }
+            : {}),
+        ...(componentPlaceholders.length > 0
+            ? {
+                  componentPlaceholder: {
+                      ...(isJsonObject(appConfig.componentPlaceholder) ? appConfig.componentPlaceholder : {}),
+                      ...Object.fromEntries(componentPlaceholders)
+                  }
+              }
+            : {}),
+        ...(subpackages.length > 0 ? { subPackages: subpackages } : {})
+    }
+}
+
+/** Preserves configured Page JSON and registers the generated recursive component entries. */
+function createPageJson(page: VptPageOption): VptJsonObject {
+    const usingComponents = isJsonObject(page.config.usingComponents) ? page.config.usingComponents : {}
+
+    return {
+        ...page.config,
+        usingComponents: {
+            ...usingComponents,
+            comp: toRootRelativePath(page.path, 'comp'),
+            [customWrapperName]: toRootRelativePath(page.path, customWrapperName)
+        }
+    }
+}
+
+/** Creates the shared recursive component configuration used by comp and CustomWrapper. */
+function createRecursiveComponentJson(): VptJsonObject {
     return {
         component: true,
         styleIsolation: 'apply-shared',
@@ -341,23 +418,21 @@ function createComponentJson(): VptJsonObject {
     }
 }
 
-/** Creates the recursive CustomWrapper configuration for nested wrappers and depth resets. */
-function createCustomWrapperJson(): VptJsonObject {
-    return {
-        component: true,
-        styleIsolation: 'apply-shared',
-        usingComponents: {
-            comp: './comp',
-            [customWrapperName]: `./${customWrapperName}`
-        }
-    }
+/** Tests whether a configured JSON value can be merged as an object. */
+function isJsonObject(value: unknown): value is VptJsonObject {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** Creates one emitted template or style asset. */
+/** Creates one emitted JSON asset. */
+function createJsonAsset(fileName: string, value: VptJsonObject): Rolldown.EmittedAsset {
+    return createAsset(fileName, `${JSON.stringify(value, null, 4)}\n`)
+}
+
+/** Creates one emitted text asset. */
 function createAsset(fileName: string, source: string): Rolldown.EmittedAsset {
     return {
         type: 'asset',
-        fileName,
-        source
+        fileName: fileName,
+        source: source
     }
 }
