@@ -4,23 +4,19 @@ interface Props {
     packageName: string
 }
 
+// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
 const { fallbackVersion, packageName } = Astro.props
 const encodedPackageName = encodeURIComponent(packageName)
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
 const manifestUrl = `https://registry.npmjs.org/${encodedPackageName}/latest`
-const packageUrl = `https://www.npmjs.com/package/${packageName}`
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
-const fallbackPackageUrl = `${packageUrl}/v/${encodeURIComponent(fallbackVersion)}`
+const packageUrl = `https://www.npmjs.com/package/${packageName}`
 ---
 
-<vpt-npm-package-version
-    data-fallback-version={fallbackVersion}
-    data-manifest-url={manifestUrl}
-    data-package-url={packageUrl}
->
+<vpt-npm-package-version data-fallback-version={fallbackVersion} data-manifest-url={manifestUrl}>
     <a
         class="latest-version"
-        href={fallbackPackageUrl}
+        href={packageUrl}
         target="_blank"
         rel="noopener noreferrer"
         aria-label={`在 npm 查看 ${packageName} 最新版本`}
@@ -58,15 +54,12 @@ const fallbackPackageUrl = `${packageUrl}/v/${encodeURIComponent(fallbackVersion
         }
 
         private readonly renderVersion = (version: string): void => {
-            const packageUrl = this.dataset.packageUrl
             const versionElement = this.querySelector<HTMLElement>('[data-version]')
-            const packageLink = this.querySelector<HTMLAnchorElement>('a')
-            if (packageUrl === undefined || versionElement === null || packageLink === null) {
-                throw new Error('npm package version component is missing required data')
+            if (versionElement === null) {
+                throw new Error('npm package version component is missing its version element')
             }
 
             versionElement.textContent = `v${version}`
-            packageLink.href = `${packageUrl}/v/${encodeURIComponent(version)}`
         }
 
         private async fetchLatestVersion(): Promise<string> {
