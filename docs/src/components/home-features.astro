@@ -96,11 +96,18 @@ const features = [
         }
     </div>
 
-    <a class="feature-docs-link" href="/guides/quick-start/">
-        <Icon name="open-book" />
-        <span>查看文档</span>
-        <Icon name="right-arrow" />
-    </a>
+    <div class="feature-actions">
+        <a class="feature-action" href="/guides/quick-start/">
+            <Icon name="open-book" />
+            <span>查看文档</span>
+            <Icon name="right-arrow" />
+        </a>
+        <a class="feature-action feature-action-ai" href="/guides/ai/">
+            <Icon name="rocket" />
+            <span>使用 AI</span>
+            <Icon name="right-arrow" />
+        </a>
+    </div>
 </section>
 
 <style>
@@ -111,7 +118,7 @@ const features = [
 
     .home-features :global(.home-section-heading),
     .feature-grid,
-    .feature-docs-link {
+    .feature-actions {
         position: relative;
         z-index: 1;
     }
@@ -229,12 +236,18 @@ const features = [
         font-size: var(--home-font-size-small);
     }
 
-    .feature-docs-link {
+    .feature-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1.5rem;
+        margin-top: var(--feature-cta-space);
+    }
+
+    .feature-action {
         display: flex;
         align-items: center;
         gap: 0.65rem;
-        width: fit-content;
-        margin: var(--feature-cta-space) auto 0;
         padding: 0.8rem 1.15rem;
         border: 1px solid var(--vpt-border-strong);
         border-radius: 999px;
@@ -249,18 +262,24 @@ const features = [
             transform 180ms ease;
     }
 
-    .feature-docs-link :global(svg) {
+    .feature-action-ai {
+        border-color: var(--vpt-button-background);
+        background: var(--vpt-button-background);
+        color: var(--vpt-button-text);
+    }
+
+    .feature-action :global(svg) {
         width: 1.05rem;
         height: 1.05rem;
     }
 
-    .feature-docs-link:hover {
+    .feature-action:hover {
         border-color: var(--vpt-border-strong);
         box-shadow: 0 16px 34px var(--vpt-shadow-strong);
         transform: translateY(-2px);
     }
 
-    .feature-docs-link:focus-visible {
+    .feature-action:focus-visible {
         outline: 3px solid color-mix(in srgb, var(--vpt-accent) 45%, transparent);
         outline-offset: 4px;
     }
@@ -306,7 +325,7 @@ const features = [
 
     @media (prefers-reduced-motion: reduce) {
         .feature-card,
-        .feature-docs-link {
+        .feature-action {
             transition: none;
         }
     }
