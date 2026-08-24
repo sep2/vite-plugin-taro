@@ -199,6 +199,8 @@ test('builds a complete native App and Page project for wx', async () => {
                     'custom-wrapper': '../../custom-wrapper'
                 }
             })
+            assert.equal(String(requireAsset(output, 'app.json').source), JSON.stringify(appJson))
+            assert.equal(String(requireAsset(output, 'pages/home/index.json').source), JSON.stringify(pageJson))
             assert.match(javascript, /WX page marker/)
             assert.doesNotMatch(requireChunk(output, 'app.js').code, /^\s*import\s/m)
             assert.doesNotMatch(requireChunk(output, 'pages/home/index.js').code, /^\s*import\s/m)

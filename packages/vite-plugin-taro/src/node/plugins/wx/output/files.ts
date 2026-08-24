@@ -9,12 +9,14 @@ export async function createOutputFiles({
     bundle,
     options,
     subpackages,
+    isProduction,
     getModuleInfo,
     getPackageLocation
 }: {
     bundle: Rolldown.OutputBundle
     options: VptOptions
     subpackages: readonly GeneratedSubpackage[]
+    isProduction: boolean
     getModuleInfo: (moduleId: string) => { meta: Rolldown.CustomPluginOptions } | null
     getPackageLocation(chunk: Rolldown.OutputChunk): PackageLocation
 }): Promise<Rolldown.EmittedFile[]> {
@@ -30,7 +32,8 @@ export async function createOutputFiles({
             bundle: bundle,
             options: options,
             subpackages: subpackages,
-            nativeComponents: nativeOutput.registrations
+            nativeComponents: nativeOutput.registrations,
+            isProduction: isProduction
         }),
         ...nativeOutput.files
     ]

@@ -147,6 +147,7 @@ function createWxPlugin(options: VptOptions, resolver: WxResolver, placement: Wx
                     bundle,
                     options,
                     subpackages,
+                    isProduction: this.environment.config.isProduction,
                     getModuleInfo: (moduleId) => this.getModuleInfo(moduleId),
                     getPackageLocation: placement.getPackageLocation
                 })

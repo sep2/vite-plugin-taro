@@ -51,6 +51,7 @@ test('creates native rendering and configuration assets', () => {
         bundle: {} as Rolldown.OutputBundle,
         options: options,
         subpackages: [{ name: 'p_example', root: 'sub/p_example', pages: [] }],
+        isProduction: false,
         nativeComponents: [
             {
                 name: 'native-counter',
@@ -70,9 +71,6 @@ test('creates native rendering and configuration assets', () => {
         [...assets.keys()],
         [
             'app.json',
-            'project.config.json',
-            'project.private.config.json',
-            'sitemap.json',
             'base.wxml',
             'utils.wxs',
             'comp.wxml',
@@ -84,9 +82,14 @@ test('creates native rendering and configuration assets', () => {
             'pages/home/index.wxss',
             'pages/account/index.json',
             'pages/account/index.wxml',
-            'pages/account/index.wxss'
+            'pages/account/index.wxss',
+            'project.config.json',
+            'project.private.config.json',
+            'sitemap.json'
         ]
     )
+    assert.match(assets.get('app.json') ?? '', /^\{\n {4}"/)
+    assert.match(assets.get('app.json') ?? '', /\n$/)
     assert.deepEqual(JSON.parse(assets.get('app.json') ?? ''), {
         pages: ['pages/home/index', 'pages/account/index'],
         usingComponents: {

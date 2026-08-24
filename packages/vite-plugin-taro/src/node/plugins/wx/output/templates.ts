@@ -29,31 +29,35 @@ export function createTemplateAssets({
     bundle,
     options,
     subpackages,
-    nativeComponents
+    nativeComponents,
+    isProduction
 }: {
     bundle: Rolldown.OutputBundle
     options: VptOptions
     subpackages: readonly GeneratedSubpackage[]
     nativeComponents: readonly NativeComponentRegistration[]
+    isProduction: boolean
 }): Rolldown.EmittedAsset[] {
     const templateBuilder = createTemplateBuilder()
     const componentConfig = collectTemplateComponentConfig(bundle, nativeComponents)
     const recursiveComponentJson = createRecursiveComponentJson()
 
+    const jsonAsset = (fileName: string, value: VptJsonObject) => createJsonAsset(fileName, value, isProduction)
+
     return [
-        createJsonAsset('app.json', createAppJson({ options, subpackages, nativeComponents })),
+        jsonAsset('app.json', createAppJson({ options, subpackages, nativeComponents })),
 
         createAsset('base.wxml', templateBuilder.buildBaseTemplate(componentConfig)),
         createAsset('utils.wxs', templateBuilder.buildXScript()),
 
         createAsset('comp.wxml', templateBuilder.buildBaseComponentTemplate('.wxml')),
-        createJsonAsset('comp.json', recursiveComponentJson),
+        jsonAsset('comp.json', recursiveComponentJson),
 
         createAsset('custom-wrapper.wxml', templateBuilder.buildCustomComponentTemplate('.wxml')),
-        createJsonAsset('custom-wrapper.json', recursiveComponentJson),
+        jsonAsset('custom-wrapper.json', recursiveComponentJson),
 
         ...options.pages.flatMap((page) => [
-            createJsonAsset(`${page.path}.json`, createPageJson(page)),
+            jsonAsset(`${page.path}.json`, createPageJson(page)),
             createAsset(
                 `${page.path}.wxml`,
                 templateBuilder.buildPageTemplate(toRootRelativePath(page.path, 'base.wxml'), {
@@ -64,11 +68,11 @@ export function createTemplateAssets({
             createAsset(`${page.path}.wxss`, '')
         ]),
 
-        createJsonAsset('project.config.json', options.projectConfigJson),
+        jsonAsset('project.config.json', options.projectConfigJson),
         ...(options.projectPrivateConfigJson
-            ? [createJsonAsset('project.private.config.json', options.projectPrivateConfigJson)]
+            ? [jsonAsset('project.private.config.json', options.projectPrivateConfigJson)]
             : []),
-        ...(options.sitemapJson ? [createJsonAsset('sitemap.json', options.sitemapJson)] : [])
+        ...(options.sitemapJson ? [jsonAsset('sitemap.json', options.sitemapJson)] : [])
     ]
 }
 
@@ -423,16 +427,12 @@ function isJsonObject(value: unknown): value is VptJsonObject {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** Creates one emitted JSON asset. */
-function createJsonAsset(fileName: string, value: VptJsonObject): Rolldown.EmittedAsset {
-    return createAsset(fileName, `${JSON.stringify(value, null, 4)}\n`)
+/** Creates compact production JSON and readable development JSON. */
+function createJsonAsset(fileName: string, value: VptJsonObject, isProduction: boolean): Rolldown.EmittedAsset {
+    return createAsset(fileName, isProduction ? JSON.stringify(value) : `${JSON.stringify(value, null, 4)}\n`)
 }
 
 /** Creates one emitted text asset. */
 function createAsset(fileName: string, source: string): Rolldown.EmittedAsset {
-    return {
-        type: 'asset',
-        fileName: fileName,
-        source: source
-    }
+    return { type: 'asset', fileName: fileName, source: source }
 }

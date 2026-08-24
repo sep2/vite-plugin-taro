@@ -17,6 +17,7 @@ test('creates the stable app stylesheet wrapper', async () => {
         bundle: {},
         options,
         subpackages: [],
+        isProduction: false,
         getModuleInfo: () => null,
         getPackageLocation: () => ({ kind: 'main' })
     })
