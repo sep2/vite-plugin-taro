@@ -66,6 +66,13 @@ test('creates native rendering and configuration assets', () => {
         ]
     })
     const assets = new Map(output.map((asset) => [asset.fileName, String(asset.source)]))
+    const nativeUsingComponents = {
+        'native-counter': '/components/native-counter/index',
+        'native-card': '/sub/p_card/components/native-card/index'
+    }
+    const nativeComponentPlaceholder = {
+        'native-card': 'view'
+    }
 
     assert.deepEqual(
         [...assets.keys()],
@@ -92,13 +99,6 @@ test('creates native rendering and configuration assets', () => {
     assert.match(assets.get('app.json') ?? '', /\n$/)
     assert.deepEqual(JSON.parse(assets.get('app.json') ?? ''), {
         pages: ['pages/home/index', 'pages/account/index'],
-        usingComponents: {
-            'native-counter': '/components/native-counter/index',
-            'native-card': '/sub/p_card/components/native-card/index'
-        },
-        componentPlaceholder: {
-            'native-card': 'view'
-        },
         window: {
             navigationBarTitleText: 'Example'
         },
@@ -108,19 +108,23 @@ test('creates native rendering and configuration assets', () => {
         navigationBarTitleText: 'Home',
         usingComponents: {
             custom: '../../custom',
+            ...nativeUsingComponents,
             comp: '../../comp',
             'custom-wrapper': '../../custom-wrapper'
         },
         componentPlaceholder: {
-            custom: 'text'
+            custom: 'text',
+            ...nativeComponentPlaceholder
         }
     })
     assert.deepEqual(JSON.parse(assets.get('pages/account/index.json') ?? ''), {
         navigationBarTitleText: 'Account',
         usingComponents: {
+            ...nativeUsingComponents,
             comp: '../../comp',
             'custom-wrapper': '../../custom-wrapper'
-        }
+        },
+        componentPlaceholder: nativeComponentPlaceholder
     })
     assert.deepEqual(JSON.parse(assets.get('project.config.json') ?? ''), options.projectConfigJson)
     assert.deepEqual(JSON.parse(assets.get('project.private.config.json') ?? ''), options.projectPrivateConfigJson)
@@ -148,23 +152,19 @@ test('creates native rendering and configuration assets', () => {
     assert.doesNotMatch(xScript, /vpt_page_outlet|module\.exports\.g/)
     assert.match(componentTemplate, /<template is="{{'tmpl_0_' \+ i\.nn}}" data="{{i:i,c:1,l:xs\.f\('',i\.nn\)}}" \/>/)
     assert.doesNotMatch(componentTemplate, /appData|appRoot|slotMode|p="/)
-    assert.deepEqual(JSON.parse(assets.get('comp.json') ?? ''), {
+    const recursiveComponentJson = {
         component: true,
         styleIsolation: 'apply-shared',
         usingComponents: {
+            ...nativeUsingComponents,
             comp: './comp',
             'custom-wrapper': './custom-wrapper'
-        }
-    })
+        },
+        componentPlaceholder: nativeComponentPlaceholder
+    }
+    assert.deepEqual(JSON.parse(assets.get('comp.json') ?? ''), recursiveComponentJson)
     assert.match(assets.get('custom-wrapper.wxml') ?? '', /<import src="\.\/base\.wxml" \/>/)
-    assert.deepEqual(JSON.parse(assets.get('custom-wrapper.json') ?? ''), {
-        component: true,
-        styleIsolation: 'apply-shared',
-        usingComponents: {
-            comp: './comp',
-            'custom-wrapper': './custom-wrapper'
-        }
-    })
+    assert.deepEqual(JSON.parse(assets.get('custom-wrapper.json') ?? ''), recursiveComponentJson)
     assert.match(homeTemplate, /\.\.\/\.\.\/base\.wxml/)
     assert.match(homeTemplate, /<comp i="{{app}}">\s*<template is="taro_tmpl" data="{{root:page}}" \/>\s*<\/comp>/)
     assert.doesNotMatch(homeTemplate, /root:root/)

@@ -21,6 +21,11 @@ type NativeComponentRegistration = {
     fields: readonly string[]
 }
 
+type NativeComponentConfig = {
+    usingComponents: Record<string, string>
+    componentPlaceholder: Record<string, string>
+}
+
 const customWrapperName = 'custom-wrapper'
 const taroComponentsModulePath = packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
 
@@ -40,12 +45,13 @@ export function createTemplateAssets({
 }): Rolldown.EmittedAsset[] {
     const templateBuilder = createTemplateBuilder()
     const componentConfig = collectTemplateComponentConfig(bundle, nativeComponents)
-    const recursiveComponentJson = createRecursiveComponentJson()
+    const nativeComponentConfig = createNativeComponentConfig(nativeComponents)
+    const recursiveComponentJson = createRecursiveComponentJson(nativeComponentConfig)
 
     const jsonAsset = (fileName: string, value: VptJsonObject) => createJsonAsset(fileName, value, isProduction)
 
     return [
-        jsonAsset('app.json', createAppJson({ options, subpackages, nativeComponents })),
+        jsonAsset('app.json', createAppJson({ options, subpackages })),
 
         createAsset('base.wxml', templateBuilder.buildBaseTemplate(componentConfig)),
         createAsset('utils.wxs', templateBuilder.buildXScript()),
@@ -57,7 +63,7 @@ export function createTemplateAssets({
         jsonAsset('custom-wrapper.json', recursiveComponentJson),
 
         ...options.pages.flatMap((page) => [
-            jsonAsset(`${page.path}.json`, createPageJson(page)),
+            jsonAsset(`${page.path}.json`, createPageJson(page, nativeComponentConfig)),
             createAsset(
                 `${page.path}.wxml`,
                 templateBuilder.buildPageTemplate(toRootRelativePath(page.path, 'base.wxml'), {
@@ -105,8 +111,9 @@ export function createTemplateAssets({
  *   to page as that component's default slot.
  *
  * utils.wxs remains Taro's normal compact-node dispatcher. comp.wxml and custom-wrapper.wxml retain Taro's generic compact
- * rendering contracts; their JSON companions register only recursive boundaries, while runtime configs retain standard
- * event dispatch. CustomWrapper keeps Taro's Page-local ownership model and is not made slot-transparent for App wrapping.
+ * rendering contracts; their JSON companions register recursive boundaries and native components, while runtime configs
+ * retain standard event dispatch. CustomWrapper keeps Taro's Page-local ownership model and is not made slot-transparent
+ * for App wrapping.
  * There is one shared template namespace, no Page-specific base file, no App/Page mode property, and no Page object threaded
  * through App template data.
  *
@@ -353,72 +360,75 @@ function toDashed(value: string): string {
     return value.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
 }
 
-/** Creates App JSON with globally inherited native registrations and generated subpackages. */
+/** Creates App JSON with generated subpackages. */
 function createAppJson({
     options,
-    subpackages,
-    nativeComponents
+    subpackages
 }: {
     options: VptOptions
     subpackages: readonly GeneratedSubpackage[]
-    nativeComponents: readonly NativeComponentRegistration[]
 }): VptJsonObject {
-    const appConfig = createAppConfig(options)
-    const nativeUsingComponents = nativeComponents.map(({ name, componentPath }) => [name, componentPath])
-
-    // Cross-package components require a placeholder while WeChat downloads their generated subpackage. Paths are
-    // root-absolute, so remove the leading slash before testing the output-relative subpackage prefix.
-    // https://developers.weixin.qq.com/miniprogram/dev/framework/subpackages/async.html
-    // https://developers.weixin.qq.com/miniprogram/dev/framework/custom-component/placeholder.html
-    const componentPlaceholders = nativeComponents.flatMap(({ name, componentPath }) =>
-        isGeneratedSubpackageFile(componentPath.slice(1)) ? ([[name, 'view']] as const) : []
-    )
-
     return {
-        ...appConfig,
-        ...(nativeUsingComponents.length > 0
-            ? {
-                  usingComponents: {
-                      ...(isJsonObject(appConfig.usingComponents) ? appConfig.usingComponents : {}),
-                      ...Object.fromEntries(nativeUsingComponents)
-                  }
-              }
-            : {}),
-        ...(componentPlaceholders.length > 0
-            ? {
-                  componentPlaceholder: {
-                      ...(isJsonObject(appConfig.componentPlaceholder) ? appConfig.componentPlaceholder : {}),
-                      ...Object.fromEntries(componentPlaceholders)
-                  }
-              }
-            : {}),
+        ...createAppConfig(options),
         ...(subpackages.length > 0 ? { subPackages: subpackages } : {})
     }
 }
 
-/** Preserves configured Page JSON and registers the generated recursive component entries. */
-function createPageJson(page: VptPageOption): VptJsonObject {
+/** Creates native registrations for every WXML rendering scope that can instantiate their templates. */
+function createNativeComponentConfig(nativeComponents: readonly NativeComponentRegistration[]): NativeComponentConfig {
+    // Cross-package components require a placeholder while WeChat downloads their generated subpackage. Paths are
+    // root-absolute, so remove the leading slash before testing the output-relative subpackage prefix.
+    // https://developers.weixin.qq.com/miniprogram/dev/framework/subpackages/async.html
+    // https://developers.weixin.qq.com/miniprogram/dev/framework/custom-component/placeholder.html
+
+    return {
+        usingComponents: Object.fromEntries(nativeComponents.map(({ name, componentPath }) => [name, componentPath])),
+        componentPlaceholder: Object.fromEntries(
+            nativeComponents.flatMap(({ name, componentPath }) =>
+                isGeneratedSubpackageFile(componentPath.slice(1)) ? ([[name, 'view']] as const) : []
+            )
+        )
+    }
+}
+
+/** Preserves configured Page JSON and registers its recursive and native component entries. */
+function createPageJson(page: VptPageOption, nativeComponentConfig: NativeComponentConfig): VptJsonObject {
     const usingComponents = isJsonObject(page.config.usingComponents) ? page.config.usingComponents : {}
+    const componentPlaceholder = isJsonObject(page.config.componentPlaceholder) ? page.config.componentPlaceholder : {}
+    const hasNativeComponentPlaceholder = Object.keys(nativeComponentConfig.componentPlaceholder).length > 0
 
     return {
         ...page.config,
         usingComponents: {
             ...usingComponents,
+            ...nativeComponentConfig.usingComponents,
             comp: toRootRelativePath(page.path, 'comp'),
             [customWrapperName]: toRootRelativePath(page.path, customWrapperName)
-        }
+        },
+        ...(hasNativeComponentPlaceholder
+            ? {
+                  componentPlaceholder: {
+                      ...componentPlaceholder,
+                      ...nativeComponentConfig.componentPlaceholder
+                  }
+              }
+            : {})
     }
 }
 
 /** Creates the shared recursive component configuration used by comp and CustomWrapper. */
-function createRecursiveComponentJson(): VptJsonObject {
+function createRecursiveComponentJson(nativeComponentConfig: NativeComponentConfig): VptJsonObject {
+    const hasNativeComponentPlaceholder = Object.keys(nativeComponentConfig.componentPlaceholder).length > 0
+
     return {
         component: true,
         styleIsolation: 'apply-shared',
         usingComponents: {
+            ...nativeComponentConfig.usingComponents,
             comp: './comp',
             [customWrapperName]: `./${customWrapperName}`
-        }
+        },
+        ...(hasNativeComponentPlaceholder ? { componentPlaceholder: nativeComponentConfig.componentPlaceholder } : {})
     }
 }
 

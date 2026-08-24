@@ -356,11 +356,21 @@ test('copies and registers an opaque native wx component end to end', async () =
         (output) => {
             const nativeRoot = 'components/native-counter'
             const appJson = parseJsonAsset(output, 'app.json')
+            const pageJson = parseJsonAsset(output, 'pages/home/index.json')
+            const componentJson = parseJsonAsset(output, 'comp.json')
             const nativeJson = parseJsonAsset(output, `${nativeRoot}/counter.json`)
             const binary = requireAsset(output, `${nativeRoot}/payload.bin`).source
 
-            assert.deepEqual(appJson.usingComponents, {
-                'native-counter': '/components/native-counter/counter'
+            assert.equal(appJson.usingComponents, undefined)
+            assert.deepEqual(pageJson.usingComponents, {
+                'native-counter': '/components/native-counter/counter',
+                comp: '../../comp',
+                'custom-wrapper': '../../custom-wrapper'
+            })
+            assert.deepEqual(componentJson.usingComponents, {
+                'native-counter': '/components/native-counter/counter',
+                comp: './comp',
+                'custom-wrapper': './custom-wrapper'
             })
             assert.deepEqual(nativeJson, {
                 component: true,
