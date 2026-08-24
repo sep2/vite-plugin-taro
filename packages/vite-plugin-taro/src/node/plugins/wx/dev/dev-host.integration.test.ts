@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -48,6 +49,17 @@ function renderPage(marker: string): string {
             return <View>${marker}</View>
         }
     `
+}
+
+/** Publishes one complete editor generation without exposing writeFile's intermediate truncation state to the watcher. */
+async function publishSourceGeneration(filePath: string, source: string): Promise<void> {
+    const temporaryPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.${randomUUID()}.txt`)
+    try {
+        await writeFile(temporaryPath, source)
+        await rename(temporaryPath, filePath)
+    } finally {
+        await rm(temporaryPath, { force: true })
+    }
 }
 
 async function startDevFixture(logger: Logger): Promise<DevFixture> {
@@ -183,7 +195,7 @@ test('publishes and acknowledges cumulative wx patches without rotating the App 
     const initialAppStyle = await readFile(fixture.appStylePath, 'utf8')
     const info = parseHmrInfo(initialInfoSource)
 
-    await writeFile(fixture.pagePath, renderPage('first hot generation'))
+    await publishSourceGeneration(fixture.pagePath, renderPage('first hot generation'))
     const firstPublishedPatches = await waitForFile(
         fixture.patchesPath,
         (source) => source.includes('first hot generation'),
@@ -213,7 +225,7 @@ test('publishes and acknowledges cumulative wx patches without rotating the App 
 
     // Runtime receipts are intentionally conflated for one short quiet window before the next source generation is admitted.
     await delay(50)
-    await writeFile(fixture.pagePath, renderPage('second hot generation'))
+    await publishSourceGeneration(fixture.pagePath, renderPage('second hot generation'))
     const secondPatches = await waitForFile(
         fixture.patchesPath,
         (source) => source.includes('second hot generation'),
