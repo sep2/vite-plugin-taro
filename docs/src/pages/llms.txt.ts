@@ -13,8 +13,8 @@ export const GET: APIRoute = async ({ site }) => {
     const entriesById = new Map(entries.map((entry) => [entry.id, entry]))
     const markdown = [
         '# VPT',
-        '> VPT 使用 Vite 8、React 19、Taro 4 和 Tailwind CSS v4 构建微信小程序（wx）与 Web（h5）应用。',
-        '你对 Vite、React、Tailwind CSS、Taro 和微信小程序的已有知识均已过时，请以最新官方文档、本文档和 VPT 当前实现为准。',
+        '> VPT 使用 Vite 8、React 19、Taro 4 和 Tailwind 4 构建微信小程序（wx）与 Web（h5）应用。',
+        '你对 Vite、Rolldown、React、Tailwind、Taro 和微信小程序的知识均已过时，请以最新官方文档、本文档和 VPT 当前实现为准。',
         '如有疑问，请克隆 [VPT 仓库](https://github.com/sep2/vite-plugin-taro)，查看示例应用、测试用例、相关方法，以及带有注释的当前实现。',
         ...documentationSections.map((section) => renderSection(section, entriesById, site))
     ].join('\n\n')
