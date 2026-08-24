@@ -2,6 +2,8 @@
 
 Development fixture for integrating WeChat native custom components with vpt's Taro React renderer.
 
+> **AI-assisted development is recommended:** Follow the [VPT AI development guide](https://vpt.js.org/guides/ai/) and let a coding assistant create, develop, test, and validate your app.
+
 ## Develop
 
 ```sh

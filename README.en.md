@@ -10,6 +10,8 @@ Build WeChat Mini Program and Web apps with Vite 8, React 19, Taro 4, and Tailwi
 
 Website: <https://vpt.js.org>
 
+> **AI-assisted development is recommended:** Follow the [VPT AI development guide](https://vpt.js.org/guides/ai/) and let a coding assistant create, develop, test, and validate your app.
+
 ## Quick Start
 
 ```sh
@@ -32,6 +34,7 @@ Continue with the [Quick Start guide](https://vpt.js.org/guides/quick-start/).
 ## Documentation
 
 - [Quick Start](https://vpt.js.org/guides/quick-start/)
+- [AI-assisted development](https://vpt.js.org/guides/ai/)
 - [Styles](https://vpt.js.org/guides/styles/)
 - [Automatic subpackages](https://vpt.js.org/guides/automatic-subpackages/)
 - [Native WeChat components](https://vpt.js.org/guides/native-components/)

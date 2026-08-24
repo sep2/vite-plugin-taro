@@ -2,6 +2,8 @@
 
 Create a Vite 8 + React 19 + Taro app for WeChat Mini Program and Web targets.
 
+> **AI-assisted development is recommended:** Follow the [VPT AI development guide](https://vpt.js.org/guides/ai/) and let a coding assistant create, develop, test, and validate your app.
+
 ```sh
 npm create vite-taro@latest my-app
 ```

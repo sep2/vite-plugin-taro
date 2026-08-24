@@ -1,6 +1,8 @@
-# Vite Taro App
+# VPT
 
-A cross-platform app built with [Vite 8](https://vite.dev), React 19, Taro 4, TypeScript, and Tailwind CSS v4. The same React codebase runs as a WeChat Mini Program and a Web app.
+A cross-platform app built with Vite 8, React 19, Taro 4, TypeScript, and Tailwind CSS v4. The same React codebase runs as a WeChat Mini Program and a Web app.
+
+> **AI-assisted development is recommended:** Follow the [VPT AI development guide](https://vpt.js.org/guides/ai/) and let a coding assistant create, develop, test, and validate your app.
 
 - [Documentation](https://vpt.js.org)
 - [GitHub](https://github.com/sep2/vite-plugin-taro)
@@ -12,14 +14,6 @@ Install the dependencies:
 ```sh
 npm install
 ```
-
-### Web
-
-```sh
-npm run dev:h5
-```
-
-Open the URL printed by Vite, usually <http://localhost:5173>.
 
 ### WeChat Mini Program
 
@@ -38,6 +32,14 @@ Open the URL printed by Vite, usually <http://localhost:5173>.
 3. In WeChat DevTools, import `dist/wx`—not the project root.
 
 Keep the Vite process running while you work. The template configures WeChat DevTools for hot reload, disables URL checks for local development, and keeps Skyline rendering disabled in DevTools because Skyline does not currently support hot reload there.
+
+### Web
+
+```sh
+npm run dev:h5
+```
+
+Open the URL printed by Vite, usually <http://localhost:5173>.
 
 You can run `dev:wx` and `dev:h5` in separate terminals to develop both targets at once.
 

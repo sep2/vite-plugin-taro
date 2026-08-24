@@ -3,6 +3,8 @@
 A WeChat Mini Program demo with a React/Tailwind chat shell and the native Towxml stream typewriter renderer from
 [`zhouzxx/towxml-stream-typewriter-weChat-example`](https://github.com/zhouzxx/towxml-stream-typewriter-weChat-example).
 
+> **AI-assisted development is recommended:** Follow the [VPT AI development guide](https://vpt.js.org/guides/ai/) and let a coding assistant create, develop, test, and validate your app.
+
 ## Architecture
 
 - `src/pages/index`: React chat page, message list, composer, request flow, and stream feeder; all UI styling uses Tailwind.

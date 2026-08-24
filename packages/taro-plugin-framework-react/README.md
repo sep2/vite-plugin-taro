@@ -2,6 +2,8 @@
 
 > React 19, WX App-view, and H5 Page-outlet build of `@tarojs/plugin-framework-react@4.2.0` for `vite-plugin-taro`.
 
+> **AI-assisted development is recommended:** Follow the [VPT AI development guide](https://vpt.js.org/guides/ai/) and let a coding assistant create, develop, test, and validate your app.
+
 ## Status
 
 This is a generated support package. It is published so `vite-plugin-taro` can depend on a React 19-compatible Taro React framework plugin through the `@tarojs/plugin-framework-react` package slot. Application code should not import this package directly.

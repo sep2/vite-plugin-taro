@@ -10,6 +10,8 @@
 
 官网：<https://vpt.js.org>
 
+> **推荐使用 AI 开发：** 阅读 [VPT AI 开发指南](https://vpt.js.org/guides/ai/)，让编程助手创建项目并完成开发、测试和验证。
+
 ## 快速开始
 
 ```sh
@@ -33,6 +35,7 @@ npm create vite-taro@latest my-app
 ## 文档
 
 - [快速开始](https://vpt.js.org/guides/quick-start/)
+- [AI 开发指南](https://vpt.js.org/guides/ai/)
 - [样式](https://vpt.js.org/guides/styles/)
 - [全自动分包](https://vpt.js.org/guides/automatic-subpackages/)
 - [微信原生组件](https://vpt.js.org/guides/native-components/)

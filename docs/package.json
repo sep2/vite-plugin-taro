@@ -14,9 +14,16 @@
         "@astrojs/starlight": "^0.41.7",
         "astro": "^7.1.6",
         "canvas-confetti": "^1.9.4",
-        "sharp": "^0.35.3"
+        "mdast-util-mdx-jsx": "^3.2.0",
+        "remark-mdx": "^3.1.1",
+        "remark-parse": "^11.0.0",
+        "remark-stringify": "^11.0.0",
+        "sharp": "^0.35.3",
+        "unified": "^11.0.5",
+        "unist-util-visit": "^5.1.0"
     },
     "devDependencies": {
-        "@types/canvas-confetti": "^1.9.0"
+        "@types/canvas-confetti": "^1.9.0",
+        "@types/mdast": "^4.0.4"
     }
 }

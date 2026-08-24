@@ -2,6 +2,8 @@
 
 > WX App-wrap build of `@tarojs/runtime@4.2.0` for `vite-plugin-taro`.
 
+> **AI-assisted development is recommended:** Follow the [VPT AI development guide](https://vpt.js.org/guides/ai/) and let a coding assistant create, develop, test, and validate your app.
+
 ## Status
 
 This is a generated support package. It is published so `vite-plugin-taro` can use one reproducibly patched Taro runtime. Application code should not import this package directly.

@@ -2,6 +2,8 @@
 
 A repository-only Mini Program fixture for exercising Page replacement with a large retained React/Taro tree.
 
+> **AI-assisted development is recommended:** Follow the [VPT AI development guide](https://vpt.js.org/guides/ai/) and let a coding assistant create, develop, test, and validate your app.
+
 Each page renders:
 
 - a 24-component linear chain around the edited marker;
