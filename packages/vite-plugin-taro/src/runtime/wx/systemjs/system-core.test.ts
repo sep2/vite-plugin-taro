@@ -505,6 +505,21 @@ test('throws immediately for asynchronous root and dependency execution', () => 
     assert.equal(rootExecutions, 0)
 })
 
+test('reports missing registrations with a local diagnostic', async () => {
+    // The public hook type excludes malformed transport results; this test deliberately exercises the runtime diagnostic.
+    // @ts-expect-error: undefined is the missing-registration condition under test.
+    system.instantiate = () => undefined
+
+    assert.throws(() => system.importSync('missing/sync.js'), {
+        name: 'Error',
+        message: 'Module did not instantiate: missing/sync.js'
+    })
+    await assert.rejects(system.import('missing/async.js'), {
+        name: 'Error',
+        message: 'Module did not instantiate: missing/async.js'
+    })
+})
+
 test('caches synchronous execution failures in the shared registry', () => {
     const failure = new Error('execution failed')
     let executions = 0

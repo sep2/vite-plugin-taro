@@ -18,8 +18,8 @@
 var envGlobal = global
 var hasSymbol = typeof Symbol !== 'undefined'
 
-function errMsg(errCode, msg) {
-    return (msg || '') + ' (SystemJS https://github.com/systemjs/systemjs/blob/main/docs/errors.md#' + errCode + ')'
+function createMissingRegistrationError(id) {
+    return Error('Module did not instantiate: ' + id)
 }
 
 export { REGISTRY, systemJSPrototype }
@@ -70,7 +70,7 @@ function linkLoadSync(loader, id) {
 
     var registration = loader.instantiate(id)
     if (isThenable(registration)) throw createAsyncGraphError(id)
-    if (!registration) throw Error(errMsg(2, id))
+    if (!registration) throw createMissingRegistrationError(id)
 
     // This row is intentionally mutable SystemJS-owned linking and execution state.
     var load = {
@@ -188,7 +188,7 @@ export function getOrCreateLoad(loader, id, firstParentUrl, meta) {
         })
         .then(
             function (registration) {
-                if (!registration) throw Error(errMsg(2, id))
+                if (!registration) throw createMissingRegistrationError(id)
                 var declared = registration[1](
                     createExport(load),
                     registration[1].length === 2 ? createDeclarationContext(loader, id) : undefined
