@@ -1,14 +1,14 @@
 ---
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
 import { LinkButton } from '@astrojs/starlight/components'
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
 import pluginPackage from '../../../packages/vite-plugin-taro/package.json'
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import NpmPackageVersion from './npm-package-version.astro'
 
 const { data } = Astro.locals.starlightRoute.entry
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
 const { title = data.title, tagline, actions = [] } = data.hero ?? {}
-const latestVersion = pluginPackage.version
-// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
-const latestPackageUrl = `https://www.npmjs.com/package/${pluginPackage.name}/v/${latestVersion}`
 
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
 const proofPoints = [
@@ -99,10 +99,7 @@ const proofPoints = [
     <div class="hero-grid">
         <div class="hero-copy">
             <div class="eyebrow">— 用现代化前端工具链开发微信小程序 —</div>
-            <a class="latest-version" href={latestPackageUrl} target="_blank" rel="noopener noreferrer">
-                <span>最新版本</span>
-                <strong>v{latestVersion}</strong>
-            </a>
+            <NpmPackageVersion packageName={pluginPackage.name} fallbackVersion={pluginPackage.version} />
             <h1 id="_top" data-page-title set:html={title} />
             <div class="technology-line">
                 <span>Vite 8</span><i>✿</i><span>React 19</span><i>✿</i><span>Tailwind 4</span>
@@ -523,27 +520,6 @@ const proofPoints = [
             letter-spacing: 0.12em;
             text-box-edge: cap alphabetic;
             text-box-trim: trim-both;
-        }
-
-        .latest-version {
-            display: inline-flex;
-            position: relative;
-            z-index: 1;
-            align-items: center;
-            gap: 0.45rem;
-            margin-bottom: 2rem;
-            padding: 0.32rem 0.7rem;
-            border: 1px solid var(--vpt-border);
-            border-radius: 999px;
-            background: var(--vpt-surface);
-            color: var(--vpt-muted);
-            font-size: var(--home-font-size-small);
-            line-height: 1;
-            text-decoration: none;
-        }
-
-        .latest-version strong {
-            color: var(--vpt-accent-strong);
         }
 
         h1 {
