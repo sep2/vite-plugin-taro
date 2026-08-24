@@ -4,6 +4,28 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.6.9] - 2026-08-24
+
+### Added
+
+- add page-local CustomWrapper support (6d1d213)
+
+### Changed
+
+- simplify readme (c77b1ba)
+- add AI development guide and llms index (c5d08c1)
+- Allow card scroll to chain to page (da88203)
+- recommend pnpm in quick start (b79d7be)
+- consolidate native template assets (ae5ab15)
+- add coverage reports and critical integration flows (6497363)
+- publish HMR source generations atomically (2c21730)
+
+### Fixed
+
+- replace upstream SystemJS error link (f8e55fb)
+- minify production JSON assets (61c71ef)
+- prevent app card flash after swipe (56c1177)
+
 ## [0.6.8] - 2026-08-23
 
 ### Changed
