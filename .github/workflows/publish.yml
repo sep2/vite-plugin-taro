@@ -42,6 +42,9 @@ jobs:
       - name: Prepare Taro packages
         run: pnpm prepare:taro
 
+      - name: Build plugin
+        run: pnpm build:plugin
+
       - name: Test
         run: pnpm test
 
