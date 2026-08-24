@@ -124,6 +124,11 @@ export async function createWxDevHost({
             throw result
         }
         await engine.ensureCurrentBuildFinish()
+        // onOutput admission happens on Rolldown's callback stack, but its style publication runs asynchronously through
+        // hostActions. Drain that transaction before returning control to Vite: otherwise the HTTP server can bind while the
+        // initial output action is still finalizing styles, causing both that action and the later listening action to observe
+        // the port and rotate the build identity twice.
+        await hostActions.waitForIdle()
     }
 
     // Vite binds the port only after initServer (and therefore the initial build) completes, so
