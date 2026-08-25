@@ -156,6 +156,50 @@ test('matches Babel for classes, destructured initialization, and collision-pron
     )
 })
 
+test('matches Babel for array holes and rest declarations', async () => {
+    const code = `
+        const [first, , ...rest] = [1, 2, 3, 4];
+        export { first, rest };
+    `
+
+    await compareOracle(code, async ({ namespace }) => [namespace.first, namespace.rest], undefined)
+})
+
+test('allocates a dependency prefix beyond every concrete source collision', () => {
+    const result = compile(`
+        import { value } from './dependency.js';
+        const __systemDependency0 = 'collision';
+        export { __systemDependency0, value };
+    `)
+
+    assert.match(result.code, /function\(__systemDependency10\)/)
+    assert.doesNotMatch(result.code, /function\(__systemDependency0\)/)
+})
+
+test('matches Babel for unexported object rest bindings consumed by a hoisted function', async () => {
+    const code = `
+        const { first, ...rest } = { first: 1, second: 2 };
+        function read() { return [first, rest]; }
+        export { read };
+    `
+
+    await compareOracle(
+        code,
+        async ({ namespace }) => Reflect.apply(requireFunction(namespace.read), undefined, []),
+        undefined
+    )
+})
+
+test('supports quoted import and export names through bracket member access', async () => {
+    const code = `
+        import { 'kebab-name' as kebab } from './dependency.js';
+        export { kebab as 'public-name' };
+    `
+    const dependencies = new Map<string, ModuleNamespace>([['./dependency.js', { 'kebab-name': 42 }]])
+
+    await compareOracle(code, async ({ namespace }) => namespace['public-name'], dependencies)
+})
+
 test('matches Babel for top-level this and lexical versus dynamic this', async () => {
     const code = `
         const moduleThis = this;
@@ -184,6 +228,14 @@ test('matches Babel for top-level await', async () => {
     `
 
     await compareOracle(code, async ({ namespace }) => [namespace.value], undefined)
+})
+
+test('renders empty and local-only chunks without export notifications', () => {
+    const empty = compile('')
+    const localOnly = compile('const local = 1; class Local {}; void [local, Local]')
+
+    assert.doesNotMatch(empty.code, /\bvar\s/)
+    assert.doesNotMatch(localOnly.code, /__systemExport\(["']/)
 })
 
 test('resolves static and literal dynamic references by kind', () => {
@@ -231,12 +283,29 @@ test('emits composable source maps while preserving hoisted function edits', asy
 
 test('rejects source-level module forms outside final Rolldown chunk grammar', () => {
     assert.throws(() => compile(`export const value = 1;`), /declaration exports/)
+    assert.throws(() => compile(`export default 1;`), /source-level ExportDefaultDeclaration/)
+    assert.throws(() => compile(`export * from './dependency.js';`), /source-level ExportAllDeclaration/)
     assert.throws(() => compile(`export { value } from './dependency.js';`), /re-exports/)
+    assert.throws(
+        () => compile(`import value from './dependency.json' with { type: 'json' }; export { value };`),
+        /import phases, attributes, or type-only imports/
+    )
+    assert.throws(() => compile(`export { missing };`), /export of non-module binding/)
     assert.throws(
         () => compile(`let value; ({ value } = source); export { value };`),
         /destructuring write to exported binding/
     )
+    assert.throws(
+        () => compile(`let value; for ({ value } of values) {} export { value };`),
+        /destructuring write to exported binding/
+    )
+    assert.throws(
+        () => compile(`const load = () => import('./lazy.js', { with: { type: 'json' } }); export { load };`),
+        /dynamic import options or phases/
+    )
+    assert.throws(() => compile(`using value = resource; export { value };`), /using or ambient variable declaration/)
     assert.throws(() => compile(`const value = eval('1'); export { value };`), /direct eval/)
+    assert.throws(() => compile(`export {`), /Failed to parse assets\/chunk\.js with Oxc/)
 })
 
 /** Executes Babel and Oxc registrations through the same runtime model and compares every observable phase. */

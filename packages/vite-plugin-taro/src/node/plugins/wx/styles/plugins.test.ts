@@ -5,7 +5,45 @@ import path from 'node:path'
 import test from 'node:test'
 import { build, normalizePath, type Plugin } from 'vite'
 import { createContext } from 'weapp-tailwindcss/core'
-import { createWxStylePlugin, finalizeOutput } from './plugins.ts'
+import { createWxStylePlugin, finalizeOutput, generateTailwindRoot } from './plugins.ts'
+
+test('disposes only newly-created Tailwind generators after generation failure', async () => {
+    const failure = new Error('Tailwind generation failed')
+    // This mutable count distinguishes unowned generator cleanup from retained incremental compiler ownership.
+    let disposals = 0
+    const generator = {
+        async generate(): Promise<never> {
+            throw failure
+        },
+        dispose(): void {
+            disposals++
+        }
+    }
+
+    await assert.rejects(generateTailwindRoot(generator, false), (error) => error === failure)
+    assert.equal(disposals, 1)
+    await assert.rejects(generateTailwindRoot(generator, true), (error) => error === failure)
+    assert.equal(disposals, 1)
+})
+
+test('handles physical and ignored query fragments before watcher cleanup', async () => {
+    const styles = createWxStylePlugin(['/src/app.js'])
+    const transformHook = styles.transform
+    assert.ok(transformHook)
+    const transform = typeof transformHook === 'function' ? transformHook : transformHook.handler
+
+    assert.equal(await Reflect.apply(transform, {}, ['.module {}', '/src/app.css?module#fragment']), undefined)
+    assert.equal(await Reflect.apply(transform, {}, ['.module {}', '/src/app.css?module']), undefined)
+    assert.equal(await Reflect.apply(transform, {}, ['.raw {}', '/src/app.css?raw#fragment']), undefined)
+    assert.equal(await Reflect.apply(transform, {}, ['export {}', '/src/app.ts']), undefined)
+
+    const closeWatcherHook = styles.closeWatcher
+    assert.ok(closeWatcherHook)
+    const closeWatcher = typeof closeWatcherHook === 'function' ? closeWatcherHook : closeWatcherHook.handler
+
+    await Reflect.apply(closeWatcher, {}, [])
+    await Reflect.apply(closeWatcher, {}, [])
+})
 
 test('finalizes the current graph into WXSS and JavaScript with one projected class set', async () => {
     const entryId = '/src/app.js'

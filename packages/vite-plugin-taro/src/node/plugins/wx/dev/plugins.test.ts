@@ -34,6 +34,15 @@ test('preserves physical outputs across development host restarts', async () => 
     )
 
     assert.equal(config.build.emptyOutDir, false)
+
+    const pagePlugin = config.plugins.find((plugin) => plugin.name === 'vpt:wx-page-shell-hmr')
+    assert.ok(pagePlugin?.transform)
+    const pageTransform =
+        typeof pagePlugin.transform === 'function' ? pagePlugin.transform : pagePlugin.transform.handler
+    assert.equal(
+        await Reflect.apply(pageTransform, {}, ['Page(pageConfig)', '/project/runtime/wx/native/page.js?other']),
+        undefined
+    )
 })
 
 test('transfers the App style entry from complete output to the development host', () => {

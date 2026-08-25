@@ -67,6 +67,24 @@ test('resolves fixed and route-specific private IDs', () => {
     )
 })
 
+test('rejects Page-private imports without one configured route origin', () => {
+    const resolver = createResolver(options)
+    const projectRoot = path.resolve('/project')
+
+    assert.throws(
+        () => resolver.resolveId(pageCapsuleId, undefined, projectRoot),
+        /Page capsule import must originate from a route module/
+    )
+    assert.throws(
+        () => resolver.resolveId(pageCapsuleId, '/runtime/page.js?route=pages%2Fmissing%2Findex', projectRoot),
+        /Unknown Page capsule: pages\/missing\/index/
+    )
+    assert.throws(
+        () => resolver.resolveId(pageComponentId, pageCapsulePath, projectRoot),
+        /Page capsule import must originate from a route module/
+    )
+})
+
 test('specializes the App capsule with the configured App JSON', async () => {
     const resolver = createResolver(options)
     const result = await resolver.specialize('export default __VPT_APP_CONFIG__', appCapsulePath)

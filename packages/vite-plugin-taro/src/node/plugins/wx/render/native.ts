@@ -529,7 +529,7 @@ function importedReferenceContext(
     while (semanticParent?.type === 'ParenthesizedExpression' && semanticParent.expression === expression) {
         expression = semanticParent
         ancestorIndex -= 1
-        semanticParent = ancestors[ancestorIndex] ?? null
+        semanticParent = ancestors[ancestorIndex] as Node
     }
     if (semanticParent?.type === 'CallExpression' && semanticParent.callee === expression) return 'unbound'
     if (semanticParent?.type === 'NewExpression' && semanticParent.callee === expression) return 'plain'
@@ -635,17 +635,13 @@ function moduleExportName(name: ModuleExportName): string {
     return name.type === 'Literal' ? String(name.value) : name.name
 }
 
-function declarationBindingNames(declaration: Node, filename: string): string[] {
-    switch (declaration.type) {
-        case 'VariableDeclaration':
-            return declaration.declarations.flatMap(({ id }) => bindingNames(id))
-        case 'FunctionDeclaration':
-        case 'ClassDeclaration':
-            if (declaration.id) return [declaration.id.name]
-            throw unsupported(filename, 'anonymous declaration export')
-        default:
-            throw unsupported(filename, `declaration export ${declaration.type}`)
+function declarationBindingNames(declaration: Node, _filename: string): string[] {
+    if (declaration.type === 'VariableDeclaration') {
+        return declaration.declarations.flatMap(({ id }) => bindingNames(id))
     }
+    // Final JavaScript named-declaration exports can otherwise contain only named functions or classes.
+    const namedDeclaration = declaration as Node & { id: { name: string } }
+    return [namedDeclaration.id.name]
 }
 
 function bindingNames(pattern: Node): string[] {
@@ -693,7 +689,6 @@ function createSourceMap(editor: RolldownMagicString, filename: string): Existin
         sources: generated.sources,
         sourcesContent: generated.sourcesContent,
         names: generated.names,
-        mappings: generated.mappings,
-        ...(generated.x_google_ignoreList ? { x_google_ignoreList: generated.x_google_ignoreList } : {})
+        mappings: generated.mappings
     }
 }

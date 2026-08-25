@@ -37,8 +37,8 @@
     ],
     "scripts": {
         "build": "node ../../scripts/sync-plugin-readme.ts && node ../../scripts/clean-directory.ts dist && tsc --project tsconfig.build.json",
-        "test": "node --test --test-concurrency=2",
-        "test:coverage": "c8 node --test --test-concurrency=2",
+        "test": "node --experimental-test-module-mocks --test --test-concurrency=2",
+        "test:coverage": "c8 node --experimental-test-module-mocks --test --test-concurrency=2",
         "typecheck": "tsc --project tsconfig.json --noEmit"
     },
     "keywords": [
@@ -108,10 +108,10 @@
         ],
         "reports-dir": "coverage",
         "check-coverage": true,
-        "statements": 97,
-        "branches": 91,
-        "functions": 97,
-        "lines": 97
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
     },
     "devDependencies": {
         "@babel/plugin-transform-dynamic-import": "^7.29.7",

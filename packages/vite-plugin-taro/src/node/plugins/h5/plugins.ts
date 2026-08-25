@@ -138,25 +138,27 @@ function createH5IndexHtmlTags(): HtmlTagDescriptor[] {
  */
 export const h5TaroApiTransformCodeFilter = /virtual:taro\/api|\baria[A-Z]/
 
-/** Creates a filterable Babel preset containing Taro's upstream, scope-aware API transform. */
-function createH5TaroApiPreset() {
+/** Babel preset body shared by Rolldown's filtered adapter and direct semantic tests. */
+export function h5TaroApiPreset() {
     const transformTaroApiPath = packageRequire.resolve('babel-plugin-transform-taroapi')
     const definition = packageRequire(packageRequire.resolve('@tarojs/plugin-platform-h5/dist/definition.json'))
+    return {
+        plugins: [
+            [
+                transformTaroApiPath,
+                {
+                    packageName: clientTaroApiId,
+                    definition
+                }
+            ]
+        ]
+    }
+}
 
+/** Creates a filterable Babel preset containing Taro's upstream, scope-aware API transform. */
+function createH5TaroApiPreset() {
     return defineRolldownBabelPreset({
-        preset: function h5TaroApiPreset() {
-            return {
-                plugins: [
-                    [
-                        transformTaroApiPath,
-                        {
-                            packageName: clientTaroApiId,
-                            definition
-                        }
-                    ]
-                ]
-            }
-        },
+        preset: h5TaroApiPreset,
         rolldown: {
             // @rolldown/plugin-babel can lift a preset filter into its native transform hook. The Taro plugin must be
             // nested in this preset rather than passed through Babel's top-level `plugins`: explicit plugins may apply

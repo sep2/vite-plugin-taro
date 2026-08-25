@@ -1,10 +1,35 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { collectNativeComponentAssets } from './native-component-assets.ts'
+import {
+    collectNativeComponentAssets,
+    getNativeComponentAssetBytes,
+    getNativeComponentSources,
+    nativeComponentMetaKey
+} from './native-component-assets.ts'
 import type { NativeComponentDefinition } from './native-component-interface.ts'
+
+test('reads empty and populated native component metadata', () => {
+    const source = {
+        folder: '/native/counter',
+        entry: 'index',
+        fields: ['count'],
+        assets: [{ relativePath: 'index.js', byteLength: 12 }]
+    }
+    const meta = {
+        [nativeComponentMetaKey]: {
+            sources: [source],
+            assetBytes: 12
+        }
+    }
+
+    assert.equal(getNativeComponentAssetBytes(undefined), 0)
+    assert.deepEqual(getNativeComponentSources(undefined), [])
+    assert.equal(getNativeComponentAssetBytes(meta), 12)
+    assert.deepEqual(getNativeComponentSources(meta), [source])
+})
 
 test('rejects a missing native component folder with its resolved path', async () => {
     const sourceDirectory = await mkdtemp(path.join(tmpdir(), 'vpt-missing-native-assets-'))
@@ -45,6 +70,39 @@ test('rejects a missing native component entry with its resolved path', async ()
         )
     } finally {
         await rm(sourceDirectory, { force: true, recursive: true })
+    }
+})
+
+test('propagates filesystem errors other than missing paths', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'vpt-invalid-native-path-'))
+    try {
+        await assert.rejects(
+            () =>
+                collectNativeComponentAssets(
+                    {
+                        folder: '\0',
+                        entry: 'index',
+                        fields: []
+                    },
+                    path.join(root, 'interface.tsx')
+                ),
+            /null bytes|path.*null/i
+        )
+
+        await assert.rejects(
+            () =>
+                collectNativeComponentAssets(
+                    {
+                        folder: root,
+                        entry: '\0',
+                        fields: []
+                    },
+                    path.join(root, 'interface.tsx')
+                ),
+            /null bytes|path.*null/i
+        )
+    } finally {
+        await rm(root, { force: true, recursive: true })
     }
 })
 
@@ -96,6 +154,7 @@ test('collects an opaque native folder recursively while excluding its co-locate
         const interfacePath = path.join(sourceDirectory, 'renderer.tsx')
         await writeFile(interfacePath, 'interface source')
         await writeFile(path.join(sourceDirectory, 'nested', 'data.bin'), Uint8Array.from([0, 1, 2]))
+        await symlink(path.join(sourceDirectory, 'nested'), path.join(sourceDirectory, 'linked'), 'junction')
         const definition: NativeComponentDefinition = {
             folder: sourceDirectory,
             entry: 'renderer',

@@ -10,6 +10,7 @@ type TestHotContext = Readonly<{
     accept: (callback?: (moduleExports: unknown) => void) => void
     invalidate: (reason?: string) => never
     prune: (callback?: () => void) => void
+    runAccept: (moduleExports: unknown) => void
 }>
 
 type TestPatch = Readonly<{
@@ -24,6 +25,7 @@ type TestRuntime = DevRuntime &
         moduleHotContexts: ReadonlyMap<string, TestHotContext>
         initialize: (info: { buildId: string; endpoint: string }) => void
         applyPatches: (payload: { buildId: string; patches: TestPatch[] } | undefined) => void
+        sendReport: (data: Record<string, unknown>) => Promise<void>
     }>
 
 type CapturedRequest = Readonly<{
@@ -63,13 +65,18 @@ async function createTestHarness(): Promise<TestHarness> {
         }
     })
 
+    const runtime = await importTestRuntime()
+    runtime.initialize({ buildId: 'build', endpoint: 'http://localhost/hmr' })
+    return { reports, requests, runtime }
+}
+
+async function importTestRuntime(): Promise<TestRuntime> {
     runtimeId++
     await import(`./dev-runtime.ts?test=${runtimeId}`)
 
     const runtime = (globalThis as typeof globalThis & { __rolldown_runtime__?: TestRuntime }).__rolldown_runtime__
     if (!runtime) throw new Error('WX dev runtime was not installed')
-    runtime.initialize({ buildId: 'build', endpoint: 'http://localhost/hmr' })
-    return { reports, requests, runtime }
+    return runtime
 }
 
 function readValue(moduleExports: unknown): string {
@@ -237,6 +244,39 @@ test('retains hot contexts only after they become accepting boundaries', async (
 
     runtime.createModuleHotContext('passive')
     assert.equal(runtime.moduleHotContexts.has('passive'), false)
+})
+
+test('fails invariant-only hot operations with local diagnostics', async () => {
+    const { runtime } = await createTestHarness()
+    const passiveContext: TestHotContext = runtime.createModuleHotContext('passive')
+
+    assert.throws(() => passiveContext.runAccept({}), /passive hot context reached as boundary: passive/)
+    assert.throws(() => passiveContext.invalidate(), /the accepting module invalidated the update/)
+})
+
+test('rejects reports before initialization and propagates wx request failures', async () => {
+    Object.assign(globalThis, {
+        DevRuntime,
+        wx: {
+            request(): void {
+                assert.fail('An uninitialized runtime must not issue a request')
+            }
+        }
+    })
+    const uninitializedRuntime = await importTestRuntime()
+    assert.throws(() => uninitializedRuntime.sendReport({ kind: 'applied', seq: 1 }), /runtime is not initialized/)
+
+    const { runtime } = await createTestHarness()
+    const requestFailure = new Error('wx request failed')
+    Object.assign(globalThis, {
+        wx: {
+            request(options: { fail: (error: unknown) => void }): void {
+                options.fail(requestFailure)
+            }
+        }
+    })
+
+    await assert.rejects(runtime.sendReport({ kind: 'applied', seq: 1 }), (error) => error === requestFailure)
 })
 
 test('keeps generated CSS hot operations inert because WXSS is replaced physically', async () => {
@@ -659,6 +699,28 @@ test('rejects a duplicate new sequence instead of treating it as a replay', asyn
     assert.deepEqual(runtime.loadExports('page'), { value: 'old' })
     assert.match(JSON.stringify(newReports), /"kind":"rebuild"/)
     assert.match(JSON.stringify(newReports), /missing patch sequence 2/)
+})
+
+test('stringifies non-Error patch failures in rebuild reports', async (context) => {
+    context.mock.method(console, 'warn', () => {})
+    const { reports, runtime } = await createTestHarness()
+    const failure = Object.freeze({ reason: 'non-error failure' })
+
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            {
+                seq: 1,
+                changedIds: [],
+                factory(): void {
+                    throw failure
+                }
+            }
+        ]
+    })
+
+    assert.match(JSON.stringify(reports), /"kind":"rebuild"/)
+    assert.match(JSON.stringify(reports), /\[object Object\]/)
 })
 
 test('turns boundary invalidation directly into a rebuild', async (context) => {

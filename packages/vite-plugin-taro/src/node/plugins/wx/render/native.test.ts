@@ -102,6 +102,44 @@ Page(config)`
     assert.deepEqual(result.map.sources, ['app.js'])
 })
 
+test('renders declaration exports, quoted imports, and unrelated destructuring', () => {
+    const result = renderNative({
+        code: `
+            import { 'kebab-name' as imported } from 'dependency'
+            const { local } = { local: 1 }
+            const state = { value: 1 }
+            state.value++
+            export function read() { return [imported, local] }
+            export class Counter { static value = imported }
+        `,
+        chunk: chunk({ fileName: 'app.js', moduleIds: ['/native-app'], isEntry: true }),
+        chunks: {},
+        sourcemap: false
+    })
+    const commonJsModule: { exports: Record<string, unknown> } = { exports: {} }
+    Function(
+        'require',
+        'module',
+        'exports',
+        result.code
+    )(
+        (id: string) => {
+            assert.equal(id, 'dependency')
+            return { 'kebab-name': 42 }
+        },
+        commonJsModule,
+        commonJsModule.exports
+    )
+
+    const read = commonJsModule.exports.read
+    const Counter = commonJsModule.exports.Counter
+    if (typeof read !== 'function' || typeof Counter !== 'function') {
+        assert.fail('Expected function and class declaration exports')
+    }
+    assert.deepEqual(Reflect.apply(read, undefined, []), [42, 1])
+    assert.equal(Reflect.get(Counter, 'value'), 42)
+})
+
 test('rejects malformed native chunks before any source rewrite', () => {
     assert.throws(
         () =>
@@ -126,6 +164,26 @@ test('rejects direct eval because native binding rewrites cannot preserve its sc
             }),
         /Unsupported final Rolldown native chunk app\.js: direct eval/
     )
+})
+
+test('rejects unsupported final native chunk grammar before rewriting', () => {
+    const nativeChunk = chunk({ fileName: 'app.js', moduleIds: ['/native-app'], isEntry: true })
+    const compile = (code: string) => renderNative({ code, chunk: nativeChunk, chunks: {}, sourcemap: false })
+
+    assert.throws(() => compile('export default 1'), /source-level ExportDefaultDeclaration/)
+    assert.throws(() => compile("export * from './dependency.js'"), /source-level ExportAllDeclaration/)
+    assert.throws(() => compile("export { value } from './dependency.js'"), /re-exports/)
+    assert.throws(
+        () => compile("import value from './dependency.json' with { type: 'json' }; export { value }"),
+        /import phases, attributes, or type-only imports/
+    )
+    assert.throws(
+        () => compile('let value; for ({ value } of values) {} export { value }'),
+        /destructuring write to exported binding/
+    )
+    assert.throws(() => compile('export const { value } = source'), /exported destructuring declaration/)
+    assert.throws(() => compile('export const [value = 1, , ...rest] = source'), /exported destructuring declaration/)
+    assert.throws(() => compile('export const { value, ...rest } = source'), /exported destructuring declaration/)
 })
 
 test('rejects a capsule namespace import from a native shell', () => {

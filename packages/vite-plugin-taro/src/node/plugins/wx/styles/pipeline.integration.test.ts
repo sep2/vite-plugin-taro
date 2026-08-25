@@ -292,6 +292,11 @@ test('renders Tailwind CSS and final patch factories from one class set', async 
         const themedWxss = await readFile(globalWxssPath, 'utf8')
         assert.match(themedWxss, /--color-brand:\s*blue/)
         assert.doesNotMatch(themedWxss, /--color-brand:\s*red/)
+
+        const plainCssStart = hmrResults.length
+        await writeFile(cssId, '.plain-root { color: green; }\n')
+        await waitForStyle(globalWxssPath, (wxss) => /\.plain-root/.test(wxss) && !/\.mt-2\b/.test(wxss), hmrResults)
+        await waitForEventCount(hmrResults, plainCssStart + 1)
     } finally {
         await engine.close()
         await server.close()

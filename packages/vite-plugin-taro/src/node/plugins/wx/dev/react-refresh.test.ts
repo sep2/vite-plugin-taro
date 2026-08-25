@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+    createWxReactRefreshTransforms,
     injectReactRefreshRendererDependency,
     removeRefreshPreambleGuard,
     transformReactDevtoolsHook,
@@ -51,6 +52,24 @@ test('rewrites only reference uses of the React DevTools hook', () => {
     assert.match(transformed.code, /typeof global\.__REACT_DEVTOOLS_GLOBAL_HOOK__/)
     assert.match(transformed.code, /global\.__REACT_DEVTOOLS_GLOBAL_HOOK__\n/)
     assert.match(transformed.code, /\{ __REACT_DEVTOOLS_GLOBAL_HOOK__: explicit \}/)
+})
+
+test('routes renderer and preamble plugin hooks through their exact IDs', async () => {
+    const transforms = createWxReactRefreshTransforms()
+    const rendererHook = transforms[1]?.transform
+    const preambleHook = transforms[3]?.transform
+    assert.ok(rendererHook)
+    assert.ok(preambleHook)
+    const renderer = typeof rendererHook === 'function' ? rendererHook : rendererHook.handler
+    const preamble = typeof preambleHook === 'function' ? preambleHook : preambleHook.handler
+
+    assert.equal(await Reflect.apply(renderer, {}, ['const renderer = {}', '/project/other-renderer.js']), undefined)
+    const transformed = await Reflect.apply(preamble, {}, [
+        "if (!window.$RefreshReg$) throw new Error('missing preamble')",
+        'boundary.js'
+    ])
+    assert.ok(transformed && typeof transformed === 'object' && 'code' in transformed)
+    assert.doesNotMatch(String(transformed.code), /missing preamble/)
 })
 
 test('removes only the web refresh preamble guard', () => {

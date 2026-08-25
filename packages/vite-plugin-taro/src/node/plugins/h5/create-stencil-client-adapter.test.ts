@@ -14,6 +14,39 @@ test('leaves identical insertion code outside the physical Stencil client untouc
     assert.equal(await adaptStencilClient(source, '/project/src/client.ts'), undefined)
 })
 
+test('leaves a near-miss Stencil insertion contract unchanged', async () => {
+    const source = await readFile(stencilClientPath, 'utf8')
+    const nearMiss = source.replace(
+        "styleContainerNode.insertBefore(styleElm, styleContainerNode.querySelector('link'))",
+        "styleContainerNode.insertBefore(styleElm, styleContainerNode.querySelector('style'))"
+    )
+    assert.notEqual(nearMiss, source)
+
+    const missingSelector = source.replace(
+        "styleContainerNode.insertBefore(styleElm, styleContainerNode.querySelector('link'))",
+        'styleContainerNode.insertBefore(styleElm, styleContainerNode.querySelector())'
+    )
+    const transformed = await adaptStencilClient(nearMiss, stencilClientPath)
+    const missingSelectorResult = await adaptStencilClient(missingSelector, stencilClientPath)
+
+    assert.ok(transformed)
+    assert.ok(missingSelectorResult)
+    assert.doesNotMatch(transformed.code, /scopeId\.startsWith\("sc-taro-"\)/)
+    assert.doesNotMatch(missingSelectorResult.code, /scopeId\.startsWith\("sc-taro-"\)/)
+})
+
+test('ignores insertion calls that use a different style value', async () => {
+    const source = "styleContainerNode.insertBefore(otherStyle, styleContainerNode.querySelector('link'))"
+    const transformed = await adaptStencilClient(source, stencilClientPath)
+
+    assert.ok(transformed)
+    assert.equal(transformed.code, source)
+})
+
+test('rejects malformed physical Stencil source before walking it', () => {
+    assert.throws(() => adaptStencilClient('const =', stencilClientPath), /Failed to parse .* with Oxc/)
+})
+
 test('adapts Stencil component style insertion', async () => {
     const source = await readFile(stencilClientPath, 'utf8')
     const transformed = await adaptStencilClient(source, stencilClientPath)

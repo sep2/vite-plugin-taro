@@ -4,7 +4,7 @@ import test from 'node:test'
 import { build, type InputOption, type OutputBundle, type OutputChunk, type Plugin } from 'rolldown'
 import { appCapsulePath, appShellPath, bootstrapPath, transportPath } from '../module/module.ts'
 import { createPlacement, type GeneratedSubpackage, type Placement } from './placement.ts'
-import { isWxFrameworkVendorModule, placementRolldownOptions } from './placer.ts'
+import { createWxPlacementPlugin, isWxFrameworkVendorModule, placementRolldownOptions } from './placer.ts'
 
 const fixtureRoot = '/placer-fixture'
 const contentHashPattern = '[A-Za-z0-9_-]{8}'
@@ -96,6 +96,35 @@ function getSubpackageRoot(chunk: OutputChunk): string {
 function moduleId(fileName: string): string {
     return `${fixtureRoot}/${fileName}`
 }
+
+test('rejects placement services and chunk delivery outside their lifecycle phases', async () => {
+    const output = await buildFixture({
+        input: { application: moduleId('lifecycle.js') },
+        modules: {
+            [moduleId('lifecycle.js')]: `export const value = 'lifecycle'`
+        }
+    })
+    const chunk = output.chunks[0]
+    assert.ok(chunk)
+    const plugin = createWxPlacementPlugin()
+
+    assert.throws(() => plugin.getPackageLocation(chunk), /placement is unavailable/)
+    assert.throws(() => plugin.getSubpackages(), /subpackages are unavailable/)
+
+    const renderChunkHook = plugin.renderChunk
+    assert.ok(renderChunkHook)
+    const renderChunk = typeof renderChunkHook === 'function' ? renderChunkHook : renderChunkHook.handler
+    assert.throws(
+        () => Reflect.apply(renderChunk, {}, ['', chunk, {}, { chunks: {} }]),
+        /received final chunks during the idle phase/
+    )
+
+    const renderStartHook = plugin.renderStart
+    assert.ok(renderStartHook)
+    const renderStart = typeof renderStartHook === 'function' ? renderStartHook : renderStartHook.handler
+    Reflect.apply(renderStart, {}, [])
+    assert.throws(() => plugin.getLoadMode(chunk), /placement is unavailable/)
+})
 
 test('extracts the recursive React/Taro vendor closure without absorbing application modules', async () => {
     const applicationId = moduleId('application.js')

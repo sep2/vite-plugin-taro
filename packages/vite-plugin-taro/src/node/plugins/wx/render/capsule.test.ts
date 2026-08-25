@@ -37,6 +37,17 @@ export { load, value }`,
     assert.match(result.code, /\b\w+\.import\(['"]lazy\.js['"]\)/)
 })
 
+test('preserves package-like dynamic import identities', () => {
+    const result = renderCapsule(
+        `const load = () => import('external-feature')
+export { load }`,
+        { fileName: 'assets/root.js' } as Rolldown.RenderedChunk,
+        false
+    )
+
+    assert.match(result.code, /\.import\(['"]external-feature['"]\)/)
+})
+
 test('keeps Vite preload imports while converting dynamic imports', () => {
     const result = renderCapsule(
         `import { __vitePreload } from './bootstrap.js'

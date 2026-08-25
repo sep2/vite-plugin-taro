@@ -48,8 +48,8 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Test
-        run: pnpm test
+      - name: Test with coverage
+        run: pnpm test:coverage
 
       - name: Build sample WeChat Mini Program
         run: pnpm build:loan-genius:wx

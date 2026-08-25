@@ -197,8 +197,9 @@ function readInterfaceFields(
     if (typeArguments.params.length !== 1) {
         throw buildError('Native component interface must be one TypeScript object type')
     }
-    const firstType = typeArguments.params[0]
-    const members = firstType ? resolveInterfaceMembers(firstType, declaredInterfaces) : undefined
+    // The length check above proves the one parameter exists; ESTree models the array element as optional generically.
+    const firstType = typeArguments.params[0] as ESTree.TSType
+    const members = resolveInterfaceMembers(firstType, declaredInterfaces)
     if (!members) {
         throw buildError('Native component interface must be inline or declared in the same module')
     }

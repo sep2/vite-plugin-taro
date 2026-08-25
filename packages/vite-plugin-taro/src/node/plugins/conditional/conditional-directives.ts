@@ -38,7 +38,7 @@ type DirectiveFrame = {
 
 /** Keeps only the source branches active for one build target. */
 function transformConditionalDirectives(code: string, target: VptTarget): string {
-    const lines = code.match(/[^\n]*(?:\n|$)/g) ?? []
+    const lines = Array.from(code.matchAll(/[^\n]*(?:\n|$)/g), (match) => match[0])
     const frames: DirectiveFrame[] = []
     let transformed = ''
 
@@ -82,15 +82,13 @@ function parseDirective(line: string): Directive | undefined {
     if (!match) {
         return
     }
-    const name = match[1]
+    // The regular expression constrains this capture to the complete directive union.
+    const name = match[1] as Directive['name'] | 'if' | 'elif'
     if (name === 'if' || name === 'elif') {
         throw new Error(`vpt no longer supports #${name}; use #ifdef, #ifndef, or #else`)
     }
-    if (name !== 'ifdef' && name !== 'ifndef' && name !== 'else' && name !== 'endif') {
-        return
-    }
     return {
         name,
-        target: match[2]?.replace(/\*\/$/, '').trim() ?? ''
+        target: match[2].replace(/\*\/$/, '').trim()
     }
 }

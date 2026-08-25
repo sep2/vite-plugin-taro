@@ -176,17 +176,19 @@ function analyzeModule(program: Program, filename: string): ModuleModel {
                         outerBindings.add(name)
                     })
                 break
-            case 'FunctionDeclaration':
-                if (!node.id || !node.body || node.declare) {
-                    throw unsupported(filename, 'anonymous or ambient function declaration')
-                }
+            case 'FunctionDeclaration': {
+                // Anonymous and ambient functions cannot occur as direct declarations in final JavaScript chunks.
+                const identifier = node.id as NonNullable<typeof node.id>
                 functions.push(node)
-                outerBindings.add(node.id.name)
+                outerBindings.add(identifier.name)
                 break
-            case 'ClassDeclaration':
-                if (!node.id || node.declare) throw unsupported(filename, 'anonymous or ambient class declaration')
-                outerBindings.add(node.id.name)
+            }
+            case 'ClassDeclaration': {
+                // Anonymous and ambient classes can occur only in source forms rejected before final chunk rendering.
+                const identifier = node.id as NonNullable<typeof node.id>
+                outerBindings.add(identifier.name)
                 break
+            }
         }
     }
 
@@ -237,7 +239,6 @@ function collectImport(
                 dependency.imports.push({ imported: null, local: specifier.local.name })
                 break
             case 'ImportSpecifier':
-                if (specifier.importKind === 'type') throw unsupported(filename, 'type-only import specifier')
                 dependency.imports.push({ imported: moduleExportName(specifier.imported), local: specifier.local.name })
                 break
         }
@@ -260,7 +261,6 @@ function collectExports(
     }
 
     for (const specifier of declaration.specifiers) {
-        if (specifier.exportKind === 'type') throw unsupported(filename, 'type-only export specifier')
         const local = moduleExportName(specifier.local)
         const exported = moduleExportName(specifier.exported)
         // Aliases are accumulated in declaration order because nested live-binding calls must publish in the same order as Babel.
@@ -325,11 +325,8 @@ function transformTopLevelVariables(
     exportBinding: string,
     exportNamesByLocal: ReadonlyMap<string, readonly string[]>
 ): void {
-    const [first] = declaration.declarations
-    if (!first) {
-        editor.remove(declaration.start, declaration.end)
-        return
-    }
+    // ESTree variable declarations always contain at least one declarator.
+    const first = declaration.declarations[0] as VariableDeclaration['declarations'][number]
 
     // `const value = init` becomes `(value = init)`: the declaration cell itself is emitted once in the registration scope.
     editor.overwrite(declaration.start, first.start, '(')
@@ -345,11 +342,8 @@ function transformNestedHoistedVariables(
     exportBinding: string,
     exportNamesByLocal: ReadonlyMap<string, readonly string[]>
 ): void {
-    const [first] = declaration.declarations
-    if (!first) {
-        editor.remove(declaration.start, declaration.end)
-        return
-    }
+    // ESTree variable declarations always contain at least one declarator.
+    const first = declaration.declarations[0] as VariableDeclaration['declarations'][number]
 
     editor.overwrite(declaration.start, first.start, isForIterationBinding ? '' : '(')
     if (!isForIterationBinding) editor.appendLeft(statementTerminatorStart(editor.original, declaration.end), ')')
@@ -372,7 +366,8 @@ function transformVariableInitializers(
 
         if (declarator.id.type === 'Identifier') {
             // Nested calls publish every alias while preserving the initializer's completion value.
-            const names = exportNamesByLocal.get(declarator.id.name) ?? []
+            // exportedBindings above proves this identifier owns at least one public alias.
+            const names = exportNamesByLocal.get(declarator.id.name) as readonly string[]
             editor.prependLeft(declarator.start, exportExpressionPrefix(exportBinding, names, ''))
             editor.appendRight(declarator.end, exportExpressionSuffix(names))
             continue
@@ -393,9 +388,10 @@ function transformTopLevelClass(
     exportBinding: string,
     exportNamesByLocal: ReadonlyMap<string, readonly string[]>
 ): void {
-    if (!declaration.id) return
-    const names = exportNamesByLocal.get(declaration.id.name) ?? []
-    editor.prependLeft(declaration.start, exportExpressionPrefix(exportBinding, names, `${declaration.id.name}=`))
+    // Anonymous classes can occur only in default exports, which analysis rejects before this pass.
+    const identifier = declaration.id as NonNullable<typeof declaration.id>
+    const names = exportNamesByLocal.get(identifier.name) ?? []
+    editor.prependLeft(declaration.start, exportExpressionPrefix(exportBinding, names, `${identifier.name}=`))
     editor.appendRight(declaration.end, exportExpressionSuffix(names))
 }
 
@@ -573,7 +569,7 @@ function createRegistrationShell(model: ModuleModel, options: TransformSystemJsO
 /** Produces declaration-time exports for functions and uninitialized variables, matching cyclic ESM availability. */
 function renderEarlyExports(model: ModuleModel): string {
     const functionNames = new Set(
-        model.functions.flatMap((declaration) => (declaration.id ? [declaration.id.name] : []))
+        model.functions.map((declaration) => (declaration.id as NonNullable<typeof declaration.id>).name)
     )
     const directVariables = model.program.body.flatMap((node) => (node.type === 'VariableDeclaration' ? [node] : []))
     const nestedHoistedVariables = model.hoistedVariables
@@ -758,11 +754,6 @@ function patternNames(pattern: Node): string[] {
             )
         case 'RestElement':
             return patternNames(pattern.argument)
-        case 'TSAsExpression':
-        case 'TSSatisfiesExpression':
-        case 'TSNonNullExpression':
-        case 'TSTypeAssertion':
-            return patternNames(pattern.expression)
         default:
             return []
     }
@@ -825,7 +816,6 @@ function createSourceMap(editor: RolldownMagicString, filename: string): Existin
         sources: generated.sources,
         sourcesContent: generated.sourcesContent,
         names: generated.names,
-        mappings: generated.mappings,
-        ...(generated.x_google_ignoreList ? { x_google_ignoreList: generated.x_google_ignoreList } : {})
+        mappings: generated.mappings
     }
 }

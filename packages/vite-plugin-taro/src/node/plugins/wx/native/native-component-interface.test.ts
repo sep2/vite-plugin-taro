@@ -100,6 +100,24 @@ test('generates a source map for native interface edits', () => {
     assert.notEqual(transformed.map?.mappings, '')
 })
 
+test('supports a default-exported macro call and quoted interface fields', () => {
+    const transformed = transformNativeComponentInterfaces(
+        `
+            import nativeApi, { defineNativeComponent, unrelated as other } from 'virtual:taro/native'
+            export default defineNativeComponent<{
+                'data-value': string
+            }>(() => import('./native-card/card.js'))
+            void nativeApi
+            void other
+        `,
+        moduleId,
+        false
+    )
+
+    assert.match(transformed.code, /export default ['"]native-card['"]/)
+    assert.deepEqual(transformed.definitions[0]?.fields, ['data-value'])
+})
+
 test('supports native components without fields', () => {
     const { definitions } = transformNativeComponentInterfaces(
         `
@@ -117,14 +135,17 @@ test('supports native components without fields', () => {
     })
 })
 
-test('ignores unrelated and shadowed functions with the same name', () => {
+test('ignores unrelated imports, default exports, and shadowed functions', () => {
     const { definitions } = transformNativeComponentInterfaces(
         `
-            import { defineNativeComponent } from 'virtual:taro/native'
+            import nativeApi, { unrelated } from 'virtual:taro/native'
+            export default function Component() {}
             function create(defineNativeComponent: () => void) {
                 defineNativeComponent()
             }
             create(() => {})
+            void nativeApi
+            void unrelated
         `,
         moduleId,
         false
@@ -208,6 +229,22 @@ const invalidInterfaces = [
             defineNativeComponent<{ [name]: number }>(() => import('./counter.js'))
         `,
         message: /interface contains a computed field/
+    },
+    {
+        name: 'numeric fields',
+        source: `
+            import { defineNativeComponent } from 'virtual:taro/native'
+            defineNativeComponent<{ 0: number }>(() => import('./counter.js'))
+        `,
+        message: /interface contains a computed field/
+    },
+    {
+        name: 'dynamic import options',
+        source: `
+            import { defineNativeComponent } from 'virtual:taro/native'
+            defineNativeComponent(() => import('./counter.js', { with: { type: 'json' } }))
+        `,
+        message: invalidEntryMessage
     },
     {
         name: 'duplicate fields',

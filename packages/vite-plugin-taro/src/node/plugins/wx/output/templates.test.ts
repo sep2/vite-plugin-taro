@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
-import { createTemplateAssets } from './templates.ts'
+import { createTemplateAssets, replaceExactlyOnce } from './templates.ts'
 
 const options: VptOptions = {
     target: 'wx',
@@ -45,6 +45,18 @@ const options: VptOptions = {
         rules: []
     }
 }
+
+test('enforces exact pinned Taro template fragments', () => {
+    assert.equal(
+        replaceExactlyOnce('before TOKEN after', 'TOKEN', 'replacement', 'fixture'),
+        'before replacement after'
+    )
+    assert.throws(() => replaceExactlyOnce('before after', 'TOKEN', 'replacement', 'fixture'), /found 0/)
+    assert.throws(
+        () => replaceExactlyOnce('TOKEN before TOKEN after', 'TOKEN', 'replacement', 'fixture'),
+        /found multiple/
+    )
+})
 
 test('creates native rendering and configuration assets', () => {
     const output = createTemplateAssets({

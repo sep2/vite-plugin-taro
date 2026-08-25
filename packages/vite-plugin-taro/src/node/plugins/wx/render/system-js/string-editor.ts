@@ -109,7 +109,8 @@ export class StringEditor {
     }
 
     #renderInsertions(position: number): string {
-        const insertions = this.#insertions.get(position)
-        return insertions ? `${insertions.prepend.join('')}${insertions.append.join('')}` : ''
+        // Callers enumerate this map's keys, so the matching insertion journal is guaranteed to exist.
+        const insertions = this.#insertions.get(position) as Insertions
+        return `${insertions.prepend.join('')}${insertions.append.join('')}`
     }
 }

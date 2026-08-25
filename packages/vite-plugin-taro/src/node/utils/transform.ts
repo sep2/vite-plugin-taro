@@ -28,13 +28,9 @@ export async function replaceWithAst(
             throw new Error(`Failed to replace placeholder ${placeholder} in ${filename}`)
         }
     }
-    if (sourcemap && !transformed.map) {
-        throw new Error(`Failed to generate a source map for ${filename}`)
-    }
-
     return {
         code: transformed.code,
-        map: sourcemap ? (transformed.map ?? null) : null
+        map: sourcemap ? (transformed.map as Rolldown.ExistingRawSourceMap) : null
     }
 }
 

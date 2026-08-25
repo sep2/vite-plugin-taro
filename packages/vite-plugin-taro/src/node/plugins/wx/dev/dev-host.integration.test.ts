@@ -4,10 +4,12 @@ import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promise
 import path from 'node:path'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
-import { createLogger, createServer, type Logger, type ViteDevServer } from 'vite'
+import { createLogger, createServer, type Logger, type Plugin, type ViteDevServer } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
+import { createWxStylePlugin } from '../styles/plugins.ts'
+import { createWxDevHost } from './dev-host.ts'
 import { type HmrInfo, hmrInfoFileName, hmrPatchesFileName } from './hmr-files.ts'
 import type { RuntimeReport } from './runtime-reports.ts'
 import type { BundledDev } from './wx-dev-options.ts'
@@ -65,7 +67,7 @@ async function publishSourceGeneration(filePath: string, source: string): Promis
     }
 }
 
-async function startDevFixture(logger: Logger): Promise<DevFixture> {
+async function startDevFixture(logger: Logger, host: string): Promise<DevFixture> {
     const root = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-dev-test-'))
     const outDir = path.join(root, 'dist')
     const pagePath = path.join(root, 'src/pages/home/index.tsx')
@@ -91,7 +93,7 @@ async function startDevFixture(logger: Logger): Promise<DevFixture> {
             outDir
         },
         server: {
-            host: '127.0.0.1',
+            host,
             port: 0,
             strictPort: true
         }
@@ -217,8 +219,63 @@ function postRuntimeReport(info: HmrInfo, report: RuntimeReport): Promise<Respon
     })
 }
 
+test('rejects a server without Vite bundled development ownership', async (context) => {
+    const server = await createServer({
+        configFile: false,
+        customLogger: createLogger('silent')
+    })
+    context.after(() => server.close())
+
+    await assert.rejects(
+        () =>
+            createWxDevHost({
+                server,
+                options: createOptions(),
+                styles: createWxStylePlugin([import.meta.filename])
+            }),
+        /Vite did not create the wx bundled-development environment/
+    )
+})
+
+test('rejects startup with the original complete-output failure', async () => {
+    const root = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-output-failure-test-'))
+    const pagePath = path.join(root, 'src/pages/home/index.tsx')
+    await mkdir(path.dirname(pagePath), { recursive: true })
+    await writeFile(path.join(root, 'src/app.tsx'), 'export default function App() { return null }\n')
+    await writeFile(pagePath, renderPage('initial output failure'))
+    const failure = new Error('expected complete-output failure')
+    const failOutput: Plugin = {
+        name: 'test:fail-complete-output',
+        generateBundle() {
+            throw failure
+        }
+    }
+    // This mutable journal proves the reducer logs the same output failure observed by startup.
+    const errors: string[] = []
+    const logger = createLogger('silent')
+    logger.error = (message) => {
+        errors.push(message)
+    }
+    const server = await createServer({
+        root,
+        configFile: false,
+        customLogger: logger,
+        plugins: [failOutput, vpt(createOptions())],
+        build: { outDir: path.join(root, 'dist') },
+        server: { host: '127.0.0.1', port: 0, strictPort: true }
+    })
+
+    try {
+        await assert.rejects(() => server.listen(), /expected complete-output failure/)
+        assert.match(errors.join('\n'), /wx dev build failed/)
+    } finally {
+        await server.close()
+        await rm(root, { force: true, recursive: true })
+    }
+})
+
 test('publishes and acknowledges cumulative wx patches without rotating the App heap', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'))
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1')
     context.after(fixture.close)
 
     const initialInfoSource = await waitForFile(
@@ -226,8 +283,12 @@ test('publishes and acknowledges cumulative wx patches without rotating the App 
         (source) => source.includes('buildId'),
         maximumWaitAttempts
     )
-    const initialAppStyle = await readFile(fixture.appStylePath, 'utf8')
     const info = parseHmrInfo(initialInfoSource)
+    const initialAppStyle = await waitForFile(
+        fixture.appStylePath,
+        (source) => source.includes(info.buildId),
+        maximumWaitAttempts
+    )
 
     await publishSourceGeneration(fixture.pagePath, renderPage('first hot generation'))
     const firstPublishedPatches = await waitForFile(
@@ -272,19 +333,39 @@ test('publishes and acknowledges cumulative wx patches without rotating the App 
 })
 
 test('rejects invalid control requests without compromising later patch publication', async (context) => {
-    // This mutable diagnostic journal proves malformed control traffic reaches the host error boundary exactly once.
+    // These mutable journals capture malformed-control diagnostics and the physical DevTools project banner.
     const errors: string[] = []
+    const infos: string[] = []
     const logger = createLogger('silent')
     logger.error = (message) => {
         errors.push(message)
     }
-    const fixture = await startDevFixture(logger)
+    logger.info = (message) => {
+        infos.push(message)
+    }
+    const fixture = await startDevFixture(logger, '0.0.0.0')
     context.after(fixture.close)
     const info = parseHmrInfo(
         await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
     )
 
+    assert.match(info.endpoint, /^http:\/\/127\.0\.0\.1:/)
     assert.equal(await fixture.bundledDev.triggerBundleRegenerationIfStale(), false)
+    fixture.server.printUrls()
+    assert.match(infos.join('\n'), /WeChat DevTools.*\.\/dist/)
+    // Temporarily vary only the presentation path to exercise root and parent-relative DevTools banners.
+    const originalOutDir = fixture.server.config.build.outDir
+    const originalConfigFile = fixture.server.config.configFile
+    Reflect.set(fixture.server.config, 'configFile', path.join(fixture.server.config.root, 'vite.config.ts'))
+    fixture.server.printUrls()
+    Reflect.set(fixture.server.config, 'configFile', originalConfigFile)
+    fixture.server.config.build.outDir = fixture.server.config.root
+    fixture.server.printUrls()
+    fixture.server.config.build.outDir = path.dirname(fixture.server.config.root)
+    fixture.server.printUrls()
+    fixture.server.config.build.outDir = originalOutDir
+    assert.match(infos.join('\n'), /WeChat DevTools.*: \./)
+    assert.match(infos.join('\n'), /WeChat DevTools.*: \.\./)
 
     const unsupportedMethod = await fetch(info.endpoint)
     assert.equal(unsupportedMethod.status, 404)
@@ -302,6 +383,20 @@ test('rejects invalid control requests without compromising later patch publicat
         maximumWaitAttempts
     )
 
+    const previousErrorCount = errors.length
+    const oversizedResult = await fetch(info.endpoint, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json'
+        },
+        body: 'x'.repeat(64 * 1024 + 1)
+    }).then(
+        (response) => response.status,
+        () => 'connection-reset' as const
+    )
+    assert.ok(oversizedResult === 400 || oversizedResult === 'connection-reset')
+    await waitForCondition(() => errors.length > previousErrorCount, maximumWaitAttempts)
+
     await publishSourceGeneration(fixture.pagePath, renderPage('healthy generation after invalid control traffic'))
     const patches = await waitForFile(
         fixture.patchesPath,
@@ -318,7 +413,7 @@ test('rotates build identity on a current rebuild report and rejects delayed old
     logger.info = (message) => {
         infos.push(message)
     }
-    const fixture = await startDevFixture(logger)
+    const fixture = await startDevFixture(logger, '127.0.0.1')
     context.after(fixture.close)
 
     const initialInfoSource = await waitForFile(
@@ -327,7 +422,11 @@ test('rotates build identity on a current rebuild report and rejects delayed old
         maximumWaitAttempts
     )
     const initialInfo = parseHmrInfo(initialInfoSource)
-    const initialAppStyle = await readFile(fixture.appStylePath, 'utf8')
+    const initialAppStyle = await waitForFile(
+        fixture.appStylePath,
+        (source) => source.includes(initialInfo.buildId),
+        maximumWaitAttempts
+    )
 
     const staleRebuildResponse = await postRuntimeReport(initialInfo, {
         buildId: 'stale-build',
@@ -393,6 +492,30 @@ test('rotates build identity on a current rebuild report and rejects delayed old
     assert.match(secondPatches, /second generation in the new build/)
 })
 
+test('reports a failed physical patch transaction through the serialized host boundary', async (context) => {
+    // This mutable journal captures the host-action failure after the initial build is already healthy.
+    const errors: string[] = []
+    const logger = createLogger('silent')
+    logger.error = (message) => {
+        errors.push(message)
+    }
+    const fixture = await startDevFixture(logger, '127.0.0.1')
+    context.after(fixture.close)
+    await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
+    const hmrDirectory = path.dirname(fixture.infoPath)
+
+    await rm(hmrDirectory, { force: true, recursive: true })
+    await writeFile(hmrDirectory, 'blocks atomic HMR publication')
+    await publishSourceGeneration(fixture.pagePath, renderPage('physical publication failure'))
+    await waitForCondition(
+        () => errors.some((message) => message.includes('[vpt] wx HMR publish failed')),
+        maximumWaitAttempts
+    )
+
+    await rm(hmrDirectory, { force: true })
+    await mkdir(hmrDirectory, { recursive: true })
+})
+
 test('resumes wx patch publication after a transient syntax error', async (context) => {
     // This request-local trace proves the invalid generation reached the host before recovery is attempted.
     const errors: string[] = []
@@ -400,7 +523,7 @@ test('resumes wx patch publication after a transient syntax error', async (conte
     logger.error = (message) => {
         errors.push(message)
     }
-    const fixture = await startDevFixture(logger)
+    const fixture = await startDevFixture(logger, '127.0.0.1')
     context.after(fixture.close)
 
     const initialInfoSource = await waitForFile(

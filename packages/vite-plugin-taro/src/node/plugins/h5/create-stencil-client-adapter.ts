@@ -79,7 +79,6 @@ function createStencilVisitor(editor: RolldownMagicString): WalkerEnter {
         // generated-AST type safety, so a broad match could silently alter unrelated runtime
         // behavior when Stencil changes its implementation.
         const [style, query] = node.arguments
-        const selector = query?.type === 'CallExpression' ? query.arguments[0] : undefined
         if (
             node.arguments.length !== 2 ||
             style?.type !== 'Identifier' ||
@@ -90,10 +89,12 @@ function createStencilVisitor(editor: RolldownMagicString): WalkerEnter {
             query.callee.object.type !== 'Identifier' ||
             query.callee.object.name !== 'styleContainerNode' ||
             query.callee.property.type !== 'Identifier' ||
-            query.callee.property.name !== 'querySelector' ||
-            selector?.type !== 'Literal' ||
-            selector.value !== 'link'
+            query.callee.property.name !== 'querySelector'
         ) {
+            return
+        }
+        const [selector] = query.arguments
+        if (selector?.type !== 'Literal' || selector.value !== 'link') {
             return
         }
 

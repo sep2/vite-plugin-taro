@@ -187,13 +187,26 @@ export function createTemplateAssets({
  * H5 never calls this WX output builder. Its App continues to receive ordinary Fragment children and none of these native
  * data roots, templates, custom-component boundaries, or slot rules enter the browser build.
  */
+/** Replaces one pinned Taro fragment and rejects absent or duplicated upstream contracts. */
+export function replaceExactlyOnce(source: string, current: string, replacement: string, description: string): string {
+    const firstIndex = source.indexOf(current)
+    const duplicateIndex = firstIndex === -1 ? -1 : source.indexOf(current, firstIndex + current.length)
+    if (firstIndex === -1 || duplicateIndex !== -1) {
+        throw new Error(`Expected one ${description}, found ${firstIndex === -1 ? 0 : 'multiple'}`)
+    }
+    return `${source.slice(0, firstIndex)}${replacement}${source.slice(firstIndex + current.length)}`
+}
+
 function createTemplateBuilder() {
     const platform = new WxPlatform(
         {
             helper: {
                 recursiveMerge
             },
+            // c8 cannot observe callbacks Taro accepts but intentionally never invokes.
+            /* c8 ignore next */
             modifyWebpackChain() {},
+            /* c8 ignore next */
             registerPlatform() {}
         },
         {},
@@ -201,19 +214,6 @@ function createTemplateBuilder() {
     )
     platform.modifyTemplate({})
     const taroTemplateBuilder = platform.template
-
-    /**
-     * Replaces one pinned Taro fragment so an upstream template change cannot silently break the coordinated
-     * framework/runtime/WXML boundary or partially apply the feature.
-     */
-    function replaceExactlyOnce(source: string, current: string, replacement: string, description: string): string {
-        const firstIndex = source.indexOf(current)
-        const duplicateIndex = firstIndex === -1 ? -1 : source.indexOf(current, firstIndex + current.length)
-        if (firstIndex === -1 || duplicateIndex !== -1) {
-            throw new Error(`Expected one ${description}, found ${firstIndex === -1 ? 0 : 'multiple'}`)
-        }
-        return `${source.slice(0, firstIndex)}${replacement}${source.slice(firstIndex + current.length)}`
-    }
 
     return {
         buildBaseTemplate: (componentConfig: TemplateComponentConfig) => {

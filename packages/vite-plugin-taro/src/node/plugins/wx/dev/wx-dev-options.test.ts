@@ -138,6 +138,58 @@ test('adapts configured output into a stable physical wx development project', a
     assert.equal(await banner(createRenderedChunk('assets/vendor.js', 'assets/vendor.js')), '')
 })
 
+test('supplies stable output defaults when Vite has no configured output', async (context) => {
+    // These process-global presentation flags are restored after this isolated test-file process invokes the reporter factory.
+    const ttyDescriptor = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY')
+    const previousCi = process.env.CI
+    Object.defineProperty(process.stdout, 'isTTY', { configurable: true, value: true })
+    delete process.env.CI
+    context.after(() => {
+        if (ttyDescriptor) {
+            Object.defineProperty(process.stdout, 'isTTY', ttyDescriptor)
+        } else {
+            Reflect.deleteProperty(process.stdout, 'isTTY')
+        }
+        if (previousCi === undefined) {
+            delete process.env.CI
+        } else {
+            process.env.CI = previousCi
+        }
+    })
+    const server = await createServer({
+        root: packageRoot,
+        configFile: false,
+        customLogger: createLogger('silent')
+    })
+    context.after(() => server.close())
+    const bundledDev: BundledDev = {
+        async getRolldownOptions() {
+            return {
+                plugins: [false],
+                experimental: { devMode: true }
+            }
+        },
+        async listen() {},
+        async triggerBundleRegenerationIfStale() {
+            return true
+        }
+    }
+
+    installWxDevOptions({ bundledDev, server, options })
+    const adapted = await bundledDev.getRolldownOptions()
+    const output = requireSingleOutput(adapted)
+
+    assert.equal(output.assetFileNames, 'assets/[name][extname]')
+    assert.equal(output.chunkFileNames, 'assets/[name].js')
+    assert.equal(output.entryFileNames, '[name]')
+    assert.deepEqual(adapted.experimental?.devMode, {
+        implement:
+            typeof adapted.experimental?.devMode === 'object' ? adapted.experimental.devMode.implement : undefined,
+        lazy: false,
+        skipCommonRuntimeInjection: false
+    })
+})
+
 test('rejects missing and multiple generated outputs before creating a development engine', () => {
     assert.throws(() => requireSingleOutput({}), /requires exactly one Rolldown output/)
     assert.throws(() => requireSingleOutput({ output: [{}, {}] }), /requires exactly one Rolldown output/)

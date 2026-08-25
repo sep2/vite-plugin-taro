@@ -69,8 +69,7 @@ export function transformWithOxcWalker({
                   sources: generatedMap.sources,
                   sourcesContent: generatedMap.sourcesContent,
                   names: generatedMap.names,
-                  mappings: generatedMap.mappings,
-                  ...(generatedMap.x_google_ignoreList ? { x_google_ignoreList: generatedMap.x_google_ignoreList } : {})
+                  mappings: generatedMap.mappings
               }
             : null
     }

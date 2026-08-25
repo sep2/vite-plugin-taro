@@ -82,7 +82,13 @@ async function materializeTestTransport({
         transportChunk,
         chunks,
         getLoadMode: (chunk) => (physicalChunkIds?.[chunk.fileName]?.startsWith('sub/') ? 'async' : 'sync'),
-        getPhysicalChunkId: (chunk) => physicalChunkIds?.[chunk.fileName] ?? chunk.fileName
+        ...(physicalChunkIds
+            ? {
+                  getPhysicalChunkId: (chunk: Rolldown.RenderedChunk) => {
+                      return physicalChunkIds[chunk.fileName] ?? chunk.fileName
+                  }
+              }
+            : {})
     })
     return materialized.code
 }

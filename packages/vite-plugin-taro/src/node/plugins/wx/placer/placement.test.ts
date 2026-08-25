@@ -135,6 +135,19 @@ test('assigns one shared final chunk once while minimizing both transitions', ()
     assert.equal(Object.keys(output.chunks).filter((chunkId) => chunkId === '/shared.js').length, 1)
 })
 
+test('uses fullest-bin capacity as the stable tie-breaker when transition overlap is equal', () => {
+    const output = createTestPlacement({
+        '/entry.js': { isEntry: true, dynamicImports: ['/large.js', '/medium.js', '/candidate.js'] },
+        '/large.js': { bytes: 1_000_000 },
+        '/medium.js': { bytes: 950_000 },
+        '/candidate.js': { bytes: 800_000 },
+        '/orphan.js': { bytes: 100 }
+    })
+
+    assert.equal(packageCount(output, ['/large.js', '/candidate.js']), 1)
+    assert.equal(getLocation(output, '/orphan.js').kind, 'subpackage')
+})
+
 test('prefers transition overlap over a tighter unrelated package', () => {
     const output = createTestPlacement({
         '/entry.js': { isEntry: true, dynamicImports: ['/feature-a.js', '/filler.js', '/feature-b.js'] },
@@ -185,6 +198,23 @@ test('plans many final-chunk transitions without source-module traversal', () =>
 
     assert.equal(Object.keys(output.chunks).length, 1_001)
     assert.ok(packageMembers(output).length > 0)
+})
+
+test('ignores dangling graph edges and rejects chunks absent from the final plan', () => {
+    const output = createTestPlacement({
+        '/entry.js': {
+            isEntry: true,
+            imports: ['/missing-eager.js'],
+            dynamicImports: ['/missing-lazy.js', '/entry.js', '/feature.js']
+        },
+        '/feature.js': { imports: ['/missing-feature-dependency.js'] }
+    })
+
+    assert.equal(getLocation(output, '/entry.js').kind, 'main')
+    assert.equal(getLocation(output, '/feature.js').kind, 'subpackage')
+
+    const unknown = renderedChunk('/unknown.js', {})
+    assert.throws(() => output.placement.getPackageLocation(unknown), /placement is missing final chunk: \/unknown\.js/)
 })
 
 test('produces stable roots independent of chunk object order', () => {

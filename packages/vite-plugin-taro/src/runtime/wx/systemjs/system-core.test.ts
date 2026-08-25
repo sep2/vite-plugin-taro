@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
+import { createContext, Script } from 'node:vm'
 import './system-core.js'
 
 const system = (global as unknown as { System: System.Loader }).System
@@ -19,6 +22,50 @@ function requireRegistration(registrations: ReadonlyMap<string, System.Registrat
 function installRegistrations(registrations: ReadonlyMap<string, System.Registration>): void {
     system.instantiate = (id) => requireRegistration(registrations, id)
 }
+
+test('uses the string registry and plain namespaces when Symbol is unavailable', async () => {
+    const filename = fileURLToPath(new URL('./system-core.js', import.meta.url))
+    const source = await readFile(filename, 'utf8')
+    const exportList = 'export { REGISTRY, systemJSPrototype }'
+    const exportedFunction = 'export function getOrCreateLoad'
+    const executable = source
+        .replace(exportList, ' '.repeat(exportList.length))
+        .replace(exportedFunction, `       ${exportedFunction.slice('export '.length)}`)
+    // The isolated global receives the loader created by the fallback runtime.
+    const runtimeGlobal: { System?: System.Loader } = {}
+    const context = createContext({ global: runtimeGlobal, Symbol: undefined })
+
+    new Script(executable, { filename }).runInContext(context)
+
+    const fallbackSystem = runtimeGlobal.System
+    assert.ok(fallbackSystem)
+    assert.equal(Object.hasOwn(fallbackSystem, '@'), true)
+    assert.deepEqual(Object.getOwnPropertySymbols(fallbackSystem), [])
+
+    fallbackSystem.instantiate = () =>
+        createRegistration([], (exportBinding) => ({
+            execute() {
+                exportBinding('value', 42)
+            }
+        }))
+    const namespace = fallbackSystem.importSync('fallback/entry.js')
+
+    assert.equal(namespace.value, 42)
+    assert.equal(Object.prototype.toString.call(namespace), '[object Object]')
+})
+
+test('captures and consumes anonymous System.register declarations', () => {
+    const registrationApi = system as System.Loader & {
+        register(dependencies: readonly string[], declare: System.Declare): void
+        getRegister(): System.Registration | undefined
+    }
+    const declare: System.Declare = () => ({ execute() {} })
+
+    registrationApi.register(['capture/dependency.js'], declare)
+
+    assert.deepEqual(registrationApi.getRegister(), [['capture/dependency.js'], declare, undefined])
+    assert.equal(registrationApi.getRegister(), undefined)
+})
 
 test('executes a shared synchronous graph once in dependency-first order', () => {
     const order: string[] = []
@@ -336,6 +383,36 @@ test('keeps dynamic imports asynchronous and exposes canonical import.meta IDs',
     assert.equal(lazy.value, 42)
 })
 
+test('executes the asynchronous fallback for declarations without execute', async () => {
+    installRegistrations(new Map([['declaration/async-empty.js', createRegistration([], () => ({ setters: [] }))]]))
+
+    assert.deepEqual(Object.keys(await system.import('declaration/async-empty.js')), [])
+})
+
+test('forwards object-form import metadata to transport', async () => {
+    const loaderWithMetadata = system as System.Loader & {
+        import(id: string, meta: Readonly<Record<string, unknown>>): Promise<System.Module>
+        instantiate(id: string, parentId?: string, meta?: unknown): System.Registration
+    }
+    const metadata = { source: 'test' }
+    // This mutable observation captures the metadata argument crossing the public import boundary.
+    let receivedMeta: unknown
+    loaderWithMetadata.instantiate = (_id: string, _parentId?: string, meta?: unknown) => {
+        receivedMeta = meta
+        return createRegistration([], (exportBinding) => ({
+            execute() {
+                exportBinding({ value: 1 })
+                exportBinding({ value: 1 })
+            }
+        }))
+    }
+
+    const module = await loaderWithMetadata.import('metadata/entry.js', metadata)
+
+    assert.strictEqual(receivedMeta, metadata)
+    assert.equal(module.value, 1)
+})
+
 test('supports empty declarations and non-enumerable __esModule exports', () => {
     const registrations = new Map<string, System.Registration>([
         ['declaration/empty.js', createRegistration([], () => ({}))],
@@ -394,6 +471,20 @@ test('links circular dependencies delivered through asynchronous transport', asy
 
     assert.equal(a.dependency, 'b')
     assert.equal(b.dependency, 'a')
+})
+
+test('caches asynchronous transport rejection on the failed load', async () => {
+    const failure = new Error('asynchronous transport rejected')
+    // This mutable count proves the rejected transport is retained by the shared registry.
+    let instantiations = 0
+    system.instantiate = () => {
+        instantiations++
+        return Promise.reject(failure)
+    }
+
+    await assert.rejects(system.import('async-transport-error/entry.js'), (error) => error === failure)
+    await assert.rejects(system.import('async-transport-error/entry.js'), (error) => error === failure)
+    assert.equal(instantiations, 1)
 })
 
 test('caches asynchronous execution failures without executing importers', async () => {
@@ -463,6 +554,30 @@ test('throws immediately for asynchronous root and dependency transport', () => 
     assert.equal(rootExecutions, 0)
 })
 
+test('rejects synchronous access while the shared module is executing asynchronously', async () => {
+    const execution = Promise.withResolvers<void>()
+    const started = Promise.withResolvers<void>()
+    installRegistrations(
+        new Map([
+            [
+                'async-execution/in-flight.js',
+                createRegistration([], () => ({
+                    execute() {
+                        started.resolve()
+                        return execution.promise
+                    }
+                }))
+            ]
+        ])
+    )
+
+    const loading = system.import('async-execution/in-flight.js')
+    await started.promise
+    assert.throws(() => system.importSync('async-execution/in-flight.js'), /module graph is asynchronous/)
+    execution.resolve()
+    await loading
+})
+
 test('throws immediately for asynchronous root and dependency execution', () => {
     installRegistrations(
         new Map([
@@ -518,6 +633,39 @@ test('reports missing registrations with a local diagnostic', async () => {
         name: 'Error',
         message: 'Module did not instantiate: missing/async.js'
     })
+})
+
+test('prevents a synchronous importer from executing after its dependency throws', () => {
+    const failure = new Error('dependency execution failed')
+    // This mutable count proves execution stops before entering the importer.
+    let rootExecutions = 0
+    installRegistrations(
+        new Map([
+            [
+                'sync-dependency-error/dependency.js',
+                createRegistration([], () => ({
+                    execute() {
+                        throw failure
+                    }
+                }))
+            ],
+            [
+                'sync-dependency-error/root.js',
+                createRegistration(['sync-dependency-error/dependency.js'], () => ({
+                    setters: [() => undefined],
+                    execute() {
+                        rootExecutions++
+                    }
+                }))
+            ]
+        ])
+    )
+
+    assert.throws(
+        () => system.importSync('sync-dependency-error/root.js'),
+        (error) => error === failure
+    )
+    assert.equal(rootExecutions, 0)
 })
 
 test('caches synchronous execution failures in the shared registry', () => {

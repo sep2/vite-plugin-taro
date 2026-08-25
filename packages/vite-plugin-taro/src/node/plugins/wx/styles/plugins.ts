@@ -496,26 +496,33 @@ async function compileTailwindRoot(
               })
           )
 
-    try {
-        // Step 3: authoritative source scanning updates additions and removals in the persistent incremental candidate cache.
-        const generated = await generator.generate({ target: 'web', scanSources: true, incrementalCache: true })
+    // Step 3: authoritative source scanning updates additions and removals in the persistent incremental candidate cache.
+    const generated = await generateTailwindRoot(generator, reuse)
 
-        // Step 4: return a complete immutable replacement record; the caller commits it only after this function succeeds.
-        return {
-            css: generated.css,
-            root: {
-                source: css,
-                classSet: generated.classSet,
-                dependencies: new Set(generated.dependencies.map(normalizeModuleId)),
-                generator: generator,
-                // Source patterns change with compiler inputs, while candidate-only updates can reuse their native matcher.
-                scanner: reuse ? previous.scanner : new Scanner({ sources: generated.sources }),
-                invalidated: false
-            }
+    // Step 4: return a complete immutable replacement record; the caller commits it only after this function succeeds.
+    return {
+        css: generated.css,
+        root: {
+            source: css,
+            classSet: generated.classSet,
+            dependencies: new Set(generated.dependencies.map(normalizeModuleId)),
+            generator: generator,
+            // Source patterns change with compiler inputs, while candidate-only updates can reuse their native matcher.
+            scanner: reuse ? previous.scanner : new Scanner({ sources: generated.sources }),
+            invalidated: false
         }
+    }
+}
+
+/** Generates one Tailwind root and disposes only a new compiler that fails before acquiring a retained owner. */
+export async function generateTailwindRoot(
+    generator: Pick<WeappTailwindcssGenerator, 'dispose' | 'generate'>,
+    reused: boolean
+) {
+    try {
+        return await generator.generate({ target: 'web', scanSources: true, incrementalCache: true })
     } catch (error) {
-        // A new generator has no retained owner on failure; reused generators remain owned by the previous root record.
-        if (!reuse) {
+        if (!reused) {
             generator.dispose?.()
         }
         throw error
