@@ -25,6 +25,8 @@ test('publishes processed CSS and live topology without identical rewrites', asy
     // These mutable journals retain DevEngine's non-awaited lifecycle results for test synchronization.
     const hmrResults: unknown[] = []
     const outputResults: unknown[] = []
+    // This mutable journal records only complete physical style generations after their atomic writes finish.
+    const publishedStyles: string[] = []
     // This mutable edge serializes physical publication exactly like the production host action reducer.
     let publicationWork = Promise.resolve()
     // DevEngine callbacks run only after assignment and advance the same published frontier as the production host.
@@ -39,6 +41,7 @@ test('publishes processed CSS and live topology without identical rewrites', asy
             throw error
         }
         await writeHmrFile(outDir, globalWxssFileName, wxss)
+        publishedStyles.push(wxss)
     }
     const publish = (result: unknown, results: unknown[], deliveredFileNames: readonly string[]): void => {
         publicationWork = publicationWork.then(async () => {
@@ -134,17 +137,38 @@ test('publishes processed CSS and live topology without identical rewrites', asy
         await engine.registerClient('style-plugin-test')
 
         const colorResultCount = hmrResults.length
+        const colorStyleCount = publishedStyles.length
         await writeFile(cssId, '.app { color: blue; }\n')
+        await waitForPublishedStyle(
+            publishedStyles,
+            colorStyleCount,
+            (wxss) => wxss === '.app { color: #0000ff; }\n',
+            hmrResults
+        )
         await waitForEventCount(hmrResults, colorResultCount + 1)
         assert.equal(await readFile(globalWxssPath, 'utf8'), '.app { color: #0000ff; }\n')
 
         const additionResultCount = hmrResults.length
+        const additionStyleCount = publishedStyles.length
         await writeFile(appId, "import './app.css'\nimport './extra.css'\nexport const value = 'added'\n")
+        await waitForPublishedStyle(
+            publishedStyles,
+            additionStyleCount,
+            (wxss) => /\.extra \{\}/.test(wxss),
+            hmrResults
+        )
         await waitForEventCount(hmrResults, additionResultCount + 1)
         assert.match(await readFile(globalWxssPath, 'utf8'), /\.extra \{\}/)
 
         const removalResultCount = hmrResults.length
+        const removalStyleCount = publishedStyles.length
         await writeFile(appId, initialSource)
+        await waitForPublishedStyle(
+            publishedStyles,
+            removalStyleCount,
+            (wxss) => !/\.extra \{\}/.test(wxss),
+            hmrResults
+        )
         await waitForEventCount(hmrResults, removalResultCount + 1)
         assert.doesNotMatch(await readFile(globalWxssPath, 'utf8'), /\.extra \{\}/)
 
@@ -191,12 +215,17 @@ test('renders Tailwind CSS and final patch factories from one class set', async 
     // These mutable journals synchronize callbacks and retain each complete prepared transaction.
     const hmrResults: unknown[] = []
     const outputResults: unknown[] = []
+    // This mutable journal records only complete physical style generations after their atomic writes finish.
+    const publishedStyles: string[] = []
     // This mutable Promise serializes non-awaited callbacks exactly like the production host action reducer.
     let hmrWork = Promise.resolve()
     // DevEngine callbacks run only after assignment and commit every finalized payload before the next source edit.
     let engine: DevEngine
     const styles = createWxStylePlugin([appId])
-    const writeStyle = (wxss: string) => writeHmrFile(outDir, globalWxssFileName, wxss)
+    const writeStyle = async (wxss: string): Promise<void> => {
+        await writeHmrFile(outDir, globalWxssFileName, wxss)
+        publishedStyles.push(wxss)
+    }
     const server = await createServer({
         root: root,
         configFile: false,
@@ -286,20 +315,35 @@ test('renders Tailwind CSS and final patch factories from one class set', async 
         assert.match(removed.codes.join('\n'), /mr-4_d5/)
 
         const dependencyStart = hmrResults.length
+        const dependencyStyleCount = publishedStyles.length
         await writeFile(themeId, '@theme { --color-brand: blue; }\n')
+        await waitForPublishedStyle(
+            publishedStyles,
+            dependencyStyleCount,
+            (wxss) => /--color-brand:\s*blue/.test(wxss),
+            hmrResults
+        )
         await waitForEventCount(hmrResults, dependencyStart + 1)
         const themedWxss = await readFile(globalWxssPath, 'utf8')
         assert.match(themedWxss, /--color-brand:\s*blue/)
         assert.doesNotMatch(themedWxss, /--color-brand:\s*red/)
 
         const plainCssStart = hmrResults.length
+        const plainStyleCount = publishedStyles.length
         await writeFile(cssId, '.plain-root { color: green; }\n')
+        await waitForPublishedStyle(
+            publishedStyles,
+            plainStyleCount,
+            (wxss) => /\.plain-root/.test(wxss) && !/\.mt-2\b/.test(wxss),
+            hmrResults
+        )
         await waitForEventCount(hmrResults, plainCssStart + 1)
         const plainWxss = await readFile(globalWxssPath, 'utf8')
         assert.match(plainWxss, /\.plain-root/)
         assert.doesNotMatch(plainWxss, /\.mt-2\b/)
     } finally {
         await engine.close()
+        await hmrWork
         await server.close()
         await rm(root, { recursive: true })
     }
@@ -351,6 +395,22 @@ async function waitForFinalizedHmr(
         await new Promise((resolve) => setTimeout(resolve, 10))
     }
     throw new Error('Timed out waiting for finalized HMR styles')
+}
+
+async function waitForPublishedStyle(
+    styles: readonly string[],
+    startIndex: number,
+    matches: (wxss: string) => boolean,
+    events: readonly unknown[]
+): Promise<void> {
+    const startedAt = Date.now()
+    while (Date.now() - startedAt <= 10_000) {
+        const error = events.find((event) => event instanceof Error)
+        if (error instanceof Error) throw error
+        if (styles.slice(startIndex).some(matches)) return
+        await new Promise((resolve) => setTimeout(resolve, 10))
+    }
+    throw new Error('Timed out waiting for a published WXSS generation')
 }
 
 async function waitForRawEventCount(events: readonly unknown[], expectedCount: number): Promise<void> {
