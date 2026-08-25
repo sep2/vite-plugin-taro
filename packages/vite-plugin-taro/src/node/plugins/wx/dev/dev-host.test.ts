@@ -95,7 +95,9 @@ async function waitForFileChange(fileName: string, previousSource: string): Prom
     throw new Error(`Timed out waiting for changed ${fileName}`)
 }
 
-test('reduces synthetic engine update variants and unknown host failures without changing host internals', async () => {
+test('reduces synthetic engine update variants and unknown host failures without changing host internals', {
+    skip: process.platform === 'win32' ? 'Node module interception terminates the Windows test worker' : false
+}, async () => {
     // These mutable cells expose the callbacks and current synthetic engine state owned by the redirected DevEngine substitute.
     let hooks: DevHooks | undefined
     let triggerFullBuild: (() => void) | undefined
