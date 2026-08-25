@@ -51,8 +51,36 @@ jobs:
       - name: Test with coverage
         run: pnpm test:coverage
 
+      - name: Upload coverage summary
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-summary
+          path: packages/vite-plugin-taro/coverage/coverage-summary.json
+
       - name: Build sample WeChat Mini Program
         run: pnpm build:loan-genius:wx
 
       - name: Build sample H5
         run: pnpm build:loan-genius:h5
+
+  coverage-badge:
+    name: Update coverage badge
+    needs: test
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download coverage summary
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage-summary
+          path: coverage
+
+      - name: Update coverage badge
+        uses: we-cli/coverage-badge-action@8a0b6ee05f6dd0f294089cbe7a848452a2b43eef
