@@ -66,8 +66,10 @@ jobs:
       actions: read
       contents: write
     steps:
-      - name: Checkout
+      - name: Checkout without persisted credentials
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Download coverage summary
         uses: actions/download-artifact@v8
