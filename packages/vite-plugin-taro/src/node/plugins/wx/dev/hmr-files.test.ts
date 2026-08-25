@@ -28,6 +28,10 @@ test('renders initial and cumulative patches as inert CommonJS data', () => {
     assert.doesNotMatch(source, /^__rolldown_runtime__/)
 })
 
+test('rejects an empty cumulative patch range', () => {
+    assert.throws(() => renderHmrPatches('build', []), /Cannot render an empty WX patch range/)
+})
+
 test('revises the development App style entry for each complete build', () => {
     assert.equal(renderDevelopmentAppWxss('build-one'), '@import "./assets/global.wxss";\n/* vpt-build:build-one */\n')
     assert.notEqual(renderDevelopmentAppWxss('build-one'), renderDevelopmentAppWxss('build-two'))

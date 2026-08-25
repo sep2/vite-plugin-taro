@@ -11,3 +11,10 @@ test('keeps physical reference resolution separate from logical identity project
     assert.equal(resolvePhysicalChunkReference('assets/pages/home.js', '../shared.js'), 'assets/shared.js')
     assert.equal(resolveLogicalChunkReference('assets/pages/home.js', '../shared.js'), 'shared.js')
 })
+
+test('rejects chunk references that are not relative to their importer', () => {
+    assert.throws(
+        () => resolvePhysicalChunkReference('assets/pages/home.js', 'shared.js'),
+        /Expected a relative chunk reference in assets\/pages\/home\.js: shared\.js/
+    )
+})
