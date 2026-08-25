@@ -9,6 +9,8 @@ import type { VptOptions } from '../../../../options.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
 import { type HmrInfo, hmrInfoFileName, hmrPatchesFileName } from './hmr-files.ts'
+import type { RuntimeReport } from './runtime-reports.ts'
+import type { BundledDev } from './wx-dev-options.ts'
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 const maximumWaitAttempts = 400
@@ -19,6 +21,7 @@ type DevFixture = Readonly<{
     close: () => Promise<void>
     infoPath: string
     appStylePath: string
+    bundledDev: BundledDev
     pagePath: string
     patchesPath: string
     server: ViteDevServer
@@ -104,6 +107,7 @@ async function startDevFixture(logger: Logger): Promise<DevFixture> {
 
     return {
         server,
+        bundledDev: requireBundledDev(server.environments.client.bundledDev),
         pagePath,
         appStylePath: path.join(outDir, 'app.wxss'),
         infoPath: path.join(outDir, hmrInfoFileName),
@@ -176,11 +180,41 @@ async function waitForCondition(predicate: () => boolean, attemptsRemaining: num
     return waitForCondition(predicate, attemptsRemaining - 1)
 }
 
+function isBundledDev(value: unknown): value is BundledDev {
+    return (
+        typeof value === 'object' &&
+        value !== null &&
+        'getRolldownOptions' in value &&
+        typeof value.getRolldownOptions === 'function' &&
+        'listen' in value &&
+        typeof value.listen === 'function' &&
+        'triggerBundleRegenerationIfStale' in value &&
+        typeof value.triggerBundleRegenerationIfStale === 'function'
+    )
+}
+
+function requireBundledDev(value: unknown): BundledDev {
+    if (!isBundledDev(value)) {
+        throw new Error('Expected the WX bundled development adapter')
+    }
+    return value
+}
+
 function parseHmrInfo(source: string): HmrInfo {
     const prefix = 'module.exports = Object.freeze('
     const suffix = ');\n'
     assert.ok(source.startsWith(prefix) && source.endsWith(suffix))
     return JSON.parse(source.slice(prefix.length, -suffix.length)) as HmrInfo
+}
+
+function postRuntimeReport(info: HmrInfo, report: RuntimeReport): Promise<Response> {
+    return fetch(info.endpoint, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json'
+        },
+        body: JSON.stringify(report)
+    })
 }
 
 test('publishes and acknowledges cumulative wx patches without rotating the App heap', async (context) => {
@@ -235,6 +269,128 @@ test('publishes and acknowledges cumulative wx patches without rotating the App 
     assert.doesNotMatch(secondPatches, /first hot generation/)
     assert.equal(await readFile(fixture.infoPath, 'utf8'), initialInfoSource)
     assert.equal(await readFile(fixture.appStylePath, 'utf8'), initialAppStyle)
+})
+
+test('rejects invalid control requests without compromising later patch publication', async (context) => {
+    // This mutable diagnostic journal proves malformed control traffic reaches the host error boundary exactly once.
+    const errors: string[] = []
+    const logger = createLogger('silent')
+    logger.error = (message) => {
+        errors.push(message)
+    }
+    const fixture = await startDevFixture(logger)
+    context.after(fixture.close)
+    const info = parseHmrInfo(
+        await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
+    )
+
+    assert.equal(await fixture.bundledDev.triggerBundleRegenerationIfStale(), false)
+
+    const unsupportedMethod = await fetch(info.endpoint)
+    assert.equal(unsupportedMethod.status, 404)
+
+    const malformedReport = await fetch(info.endpoint, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json'
+        },
+        body: '{'
+    })
+    assert.equal(malformedReport.status, 400)
+    await waitForCondition(
+        () => errors.some((message) => message.includes('[vpt] wx HMR report failed')),
+        maximumWaitAttempts
+    )
+
+    await publishSourceGeneration(fixture.pagePath, renderPage('healthy generation after invalid control traffic'))
+    const patches = await waitForFile(
+        fixture.patchesPath,
+        (source) => source.includes('healthy generation after invalid control traffic'),
+        maximumWaitAttempts
+    )
+    assert.match(patches, /healthy generation after invalid control traffic/)
+})
+
+test('rotates build identity on a current rebuild report and rejects delayed old-session reports', async (context) => {
+    // This mutable journal records the one full-build command admitted for the active runtime session.
+    const infos: string[] = []
+    const logger = createLogger('silent')
+    logger.info = (message) => {
+        infos.push(message)
+    }
+    const fixture = await startDevFixture(logger)
+    context.after(fixture.close)
+
+    const initialInfoSource = await waitForFile(
+        fixture.infoPath,
+        (source) => source.includes('buildId'),
+        maximumWaitAttempts
+    )
+    const initialInfo = parseHmrInfo(initialInfoSource)
+    const initialAppStyle = await readFile(fixture.appStylePath, 'utf8')
+
+    const staleRebuildResponse = await postRuntimeReport(initialInfo, {
+        buildId: 'stale-build',
+        kind: 'rebuild',
+        reason: 'must be ignored'
+    })
+    assert.equal(staleRebuildResponse.status, 200)
+    await delay(50)
+    assert.equal(await readFile(fixture.infoPath, 'utf8'), initialInfoSource)
+    assert.doesNotMatch(infos.join('\n'), /must be ignored/)
+
+    const rebuildResponse = await postRuntimeReport(initialInfo, {
+        buildId: initialInfo.buildId,
+        kind: 'rebuild',
+        reason: 'runtime graph lost its boundary'
+    })
+    assert.equal(rebuildResponse.status, 200)
+
+    const nextInfoSource = await waitForFile(
+        fixture.infoPath,
+        (source) => source !== initialInfoSource,
+        maximumWaitAttempts
+    )
+    const nextInfo = parseHmrInfo(nextInfoSource)
+    const nextAppStyle = await waitForFile(
+        fixture.appStylePath,
+        (source) => source.includes(nextInfo.buildId),
+        maximumWaitAttempts
+    )
+
+    assert.notEqual(nextInfo.buildId, initialInfo.buildId)
+    assert.notEqual(nextAppStyle, initialAppStyle)
+    assert.match(infos.join('\n'), /wx full rebuild required: runtime graph lost its boundary/)
+    assert.equal(await readFile(fixture.patchesPath, 'utf8'), 'module.exports = undefined;\n')
+    const engine = fixture.bundledDev._devEngine
+    assert.ok(engine)
+    await engine.ensureCurrentBuildFinish()
+
+    await publishSourceGeneration(fixture.pagePath, renderPage('first generation in the new build'))
+    const firstPatches = await waitForFile(
+        fixture.patchesPath,
+        (source) => source.includes('first generation in the new build'),
+        maximumWaitAttempts
+    )
+    assert.match(firstPatches, new RegExp(`buildId: ${JSON.stringify(nextInfo.buildId)}`))
+
+    const delayedAcknowledgement = await postRuntimeReport(nextInfo, {
+        buildId: initialInfo.buildId,
+        kind: 'applied',
+        seq: Number.MAX_SAFE_INTEGER
+    })
+    assert.equal(delayedAcknowledgement.status, 200)
+    await delay(50)
+
+    await publishSourceGeneration(fixture.pagePath, renderPage('second generation in the new build'))
+    const secondPatches = await waitForFile(
+        fixture.patchesPath,
+        (source) => source.includes('second generation in the new build'),
+        maximumWaitAttempts
+    )
+
+    assert.match(secondPatches, /first generation in the new build/)
+    assert.match(secondPatches, /second generation in the new build/)
 })
 
 test('resumes wx patch publication after a transient syntax error', async (context) => {

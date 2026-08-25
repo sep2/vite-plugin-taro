@@ -8,6 +8,12 @@ const stencilClientPath = packageRequire.resolve('@stencil/core/internal/client'
     paths: [packageRequire.resolve('@tarojs/components/package.json')]
 })
 
+test('leaves identical insertion code outside the physical Stencil client untouched', async () => {
+    const source = await readFile(stencilClientPath, 'utf8')
+
+    assert.equal(await adaptStencilClient(source, '/project/src/client.ts'), undefined)
+})
+
 test('adapts Stencil component style insertion', async () => {
     const source = await readFile(stencilClientPath, 'utf8')
     const transformed = await adaptStencilClient(source, stencilClientPath)

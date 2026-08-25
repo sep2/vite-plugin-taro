@@ -48,6 +48,44 @@ test('rejects a missing native component entry with its resolved path', async ()
     }
 })
 
+test('rejects a file as the component source and a directory as its JavaScript entry', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'vpt-invalid-native-assets-'))
+    try {
+        const sourceFile = path.join(root, 'source-file')
+        await writeFile(sourceFile, 'not a directory')
+        await assert.rejects(
+            () =>
+                collectNativeComponentAssets(
+                    {
+                        folder: sourceFile,
+                        entry: 'index',
+                        fields: []
+                    },
+                    path.join(root, 'interface.tsx')
+                ),
+            new Error(`Native component source is not a directory: ${sourceFile}`)
+        )
+
+        const sourceDirectory = path.join(root, 'component')
+        const entryDirectory = path.join(sourceDirectory, 'counter.js')
+        await mkdir(entryDirectory, { recursive: true })
+        await assert.rejects(
+            () =>
+                collectNativeComponentAssets(
+                    {
+                        folder: sourceDirectory,
+                        entry: 'counter',
+                        fields: []
+                    },
+                    path.join(root, 'interface.tsx')
+                ),
+            new Error(`Native component entry is not a file: ${entryDirectory}`)
+        )
+    } finally {
+        await rm(root, { force: true, recursive: true })
+    }
+})
+
 test('collects an opaque native folder recursively while excluding its co-located interface', async () => {
     const sourceDirectory = await mkdtemp(path.join(tmpdir(), 'vpt-native-assets-'))
     try {

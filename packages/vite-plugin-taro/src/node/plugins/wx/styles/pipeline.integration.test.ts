@@ -30,7 +30,16 @@ test('publishes processed CSS and live topology without identical rewrites', asy
     // DevEngine callbacks run only after assignment and advance the same published frontier as the production host.
     let engine: DevEngine
     const styles = createWxStylePlugin([appId])
-    const writeStyle = (wxss: string) => writeHmrFile(outDir, globalWxssFileName, wxss)
+    // This one-shot mutable fault proves a failed atomic writer does not advance the plugin's published stylesheet frontier.
+    let writeFailure: Error | undefined
+    const writeStyle = async (wxss: string): Promise<void> => {
+        if (writeFailure) {
+            const error = writeFailure
+            writeFailure = undefined
+            throw error
+        }
+        await writeHmrFile(outDir, globalWxssFileName, wxss)
+    }
     const publish = (result: unknown, results: unknown[], deliveredFileNames: readonly string[]): void => {
         publicationWork = publicationWork.then(async () => {
             try {
@@ -147,6 +156,18 @@ test('publishes processed CSS and live topology without identical rewrites', asy
 
         engine.triggerFullBuild()
         await waitForEventCount(outputResults, 2)
+
+        const durableWxss = await readFile(globalWxssPath, 'utf8')
+        const failedResultCount = hmrResults.length
+        writeFailure = new Error('simulated atomic WXSS write failure')
+        await writeFile(cssId, '.app { color: black; }\n')
+        await waitForRawEventCount(hmrResults, failedResultCount + 1)
+
+        assert.match(String(hmrResults[failedResultCount]), /simulated atomic WXSS write failure/)
+        assert.equal(await readFile(globalWxssPath, 'utf8'), durableWxss)
+
+        await styles.finalizeUpdate([], writeStyle)
+        assert.equal(await readFile(globalWxssPath, 'utf8'), '.app { color: black; }\n')
     } finally {
         await engine.close()
         await publicationWork
@@ -339,6 +360,16 @@ async function waitForStyle(
         await new Promise((resolve) => setTimeout(resolve, 10))
     }
     throw new Error(`Timed out waiting for WXSS: ${fileName}`)
+}
+
+async function waitForRawEventCount(events: readonly unknown[], expectedCount: number): Promise<void> {
+    const startedAt = Date.now()
+    while (events.length < expectedCount) {
+        if (Date.now() - startedAt > 10_000) {
+            throw new Error(`Timed out waiting for raw DevEngine event ${expectedCount}`)
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10))
+    }
 }
 
 async function waitForEventCount(events: readonly unknown[], expectedCount: number): Promise<void> {

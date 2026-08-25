@@ -3,8 +3,13 @@ import test from 'node:test'
 import { DevRuntime } from 'rolldown/experimental/runtime'
 
 type TestHotContext = Readonly<{
+    _internal: Readonly<{
+        removeStyle: () => void
+        updateStyle: () => void
+    }>
     accept: (callback?: (moduleExports: unknown) => void) => void
     invalidate: (reason?: string) => never
+    prune: (callback?: () => void) => void
 }>
 
 type TestPatch = Readonly<{
@@ -21,8 +26,16 @@ type TestRuntime = DevRuntime &
         applyPatches: (payload: { buildId: string; patches: TestPatch[] } | undefined) => void
     }>
 
+type CapturedRequest = Readonly<{
+    url: string
+    method: string
+    data: unknown
+    header: Readonly<Record<string, string>>
+}>
+
 type TestHarness = Readonly<{
     reports: unknown[]
+    requests: CapturedRequest[]
     runtime: TestRuntime
 }>
 
@@ -31,11 +44,19 @@ let runtimeId = 0
 
 /** Creates one isolated runtime and captures only its metadata reports. */
 async function createTestHarness(): Promise<TestHarness> {
+    // These mutable request journals retain protocol metadata and report bodies emitted by one isolated runtime.
     const reports: unknown[] = []
+    const requests: CapturedRequest[] = []
     Object.assign(globalThis, {
         DevRuntime,
         wx: {
-            request(options: { data: unknown; success: () => void }): void {
+            request(options: CapturedRequest & { success: () => void }): void {
+                requests.push({
+                    url: options.url,
+                    method: options.method,
+                    data: options.data,
+                    header: options.header
+                })
                 reports.push(options.data)
                 options.success()
             }
@@ -48,7 +69,17 @@ async function createTestHarness(): Promise<TestHarness> {
     const runtime = (globalThis as typeof globalThis & { __rolldown_runtime__?: TestRuntime }).__rolldown_runtime__
     if (!runtime) throw new Error('WX dev runtime was not installed')
     runtime.initialize({ buildId: 'build', endpoint: 'http://localhost/hmr' })
-    return { reports, runtime }
+    return { reports, requests, runtime }
+}
+
+function readValue(moduleExports: unknown): string {
+    assert.ok(
+        moduleExports &&
+            typeof moduleExports === 'object' &&
+            'value' in moduleExports &&
+            typeof moduleExports.value === 'string'
+    )
+    return moduleExports.value
 }
 
 function registerInitialModule({
@@ -131,6 +162,70 @@ test('ignores the initial empty physical patch module', async () => {
     assert.deepEqual(getNewReports(reports, reportCount), [])
 })
 
+test('reports the committed application frontier through the exact host protocol', async () => {
+    const { requests, runtime } = await createTestHarness()
+    registerInitialModule({ runtime, moduleId: 'page', moduleExports: { value: 'old' } })
+
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            createPatch({
+                runtime,
+                seq: 1,
+                moduleId: 'page',
+                moduleExports: { value: 'new' },
+                deferAccept: false
+            })
+        ]
+    })
+
+    assert.deepEqual(requests, [
+        {
+            url: 'http://localhost/hmr',
+            method: 'POST',
+            data: { buildId: 'build', kind: 'applied', seq: 1 },
+            header: { 'content-type': 'application/json' }
+        }
+    ])
+})
+
+test('keeps the first App-heap identity when initialize is replayed', async (context) => {
+    context.mock.method(console, 'warn', () => {})
+    const { requests, runtime } = await createTestHarness()
+    runtime.initialize({ buildId: 'replacement', endpoint: 'http://replacement/hmr' })
+    registerInitialModule({ runtime, moduleId: 'page', moduleExports: { value: 'old' } })
+
+    runtime.applyPatches({
+        buildId: 'replacement',
+        patches: [
+            {
+                seq: 1,
+                changedIds: ['page'],
+                factory(): void {
+                    assert.fail('A replacement session must not execute in the existing App heap')
+                }
+            }
+        ]
+    })
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            createPatch({
+                runtime,
+                seq: 1,
+                moduleId: 'page',
+                moduleExports: { value: 'current' },
+                deferAccept: false
+            })
+        ]
+    })
+
+    assert.deepEqual(runtime.loadExports('page'), { value: 'current' })
+    assert.equal(requests.length, 1)
+    assert.equal(requests[0]?.url, 'http://localhost/hmr')
+    assert.deepEqual(requests[0]?.data, { buildId: 'build', kind: 'applied', seq: 1 })
+})
+
 test('retains hot contexts only after they become accepting boundaries', async () => {
     const { runtime } = await createTestHarness()
     const passiveContext = runtime.createModuleHotContext('passive')
@@ -142,6 +237,47 @@ test('retains hot contexts only after they become accepting boundaries', async (
 
     runtime.createModuleHotContext('passive')
     assert.equal(runtime.moduleHotContexts.has('passive'), false)
+})
+
+test('keeps generated CSS hot operations inert because WXSS is replaced physically', async () => {
+    const { runtime } = await createTestHarness()
+    const hotContext = runtime.createModuleHotContext('style.css')
+
+    hotContext._internal.updateStyle()
+    hotContext._internal.removeStyle()
+    hotContext.prune(() => assert.fail('Physical WXSS replacement must not run browser teardown callbacks'))
+
+    assert.equal(runtime.moduleHotContexts.has('style.css'), false)
+})
+
+test('runs every callback from the previous accepting generation in registration order', async () => {
+    const { runtime } = await createTestHarness()
+    // This mutable trace captures callback order while the new generation replaces the module cache.
+    const accepted: unknown[] = []
+    runtime.registerGraph({ ids: ['page'], localCount: 1, edges: [[]], dynamicEdges: [[]] })
+    const hotContext: TestHotContext = runtime.createModuleHotContext('page')
+    hotContext.accept()
+    hotContext.accept((fresh) => accepted.push(['first', fresh]))
+    hotContext.accept((fresh) => accepted.push(['second', fresh]))
+    runtime.registerModule('page', { exports: { value: 'old' } })
+
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            createPatch({
+                runtime,
+                seq: 1,
+                moduleId: 'page',
+                moduleExports: { value: 'new' },
+                deferAccept: false
+            })
+        ]
+    })
+
+    assert.deepEqual(accepted, [
+        ['first', { value: 'new' }],
+        ['second', { value: 'new' }]
+    ])
 })
 
 test('evicts an accepted module before running its new factory', async () => {
@@ -364,6 +500,40 @@ test('ignores a cumulative payload prefix already applied by another Page shell'
     assert.equal(latestFactoryRuns, 1)
     assert.deepEqual(runtime.loadExports('page'), { value: 'latest' })
     assertNoRebuild(getNewReports(reports, reportCount))
+})
+
+test('re-reports the committed frontier when another Page shell replays the complete patch file', async () => {
+    const { reports, runtime } = await createTestHarness()
+    registerInitialModule({ runtime, moduleId: 'page', moduleExports: { value: 'old' } })
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            createPatch({
+                runtime,
+                seq: 1,
+                moduleId: 'page',
+                moduleExports: { value: 'current' },
+                deferAccept: false
+            })
+        ]
+    })
+    const reportCount = reports.length
+
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            {
+                seq: 1,
+                changedIds: ['page'],
+                factory(): void {
+                    assert.fail('A fully replayed physical patch file must not execute factories')
+                }
+            }
+        ]
+    })
+
+    assert.deepEqual(runtime.loadExports('page'), { value: 'current' })
+    assert.deepEqual(getNewReports(reports, reportCount), [{ buildId: 'build', kind: 'applied', seq: 1 }])
 })
 
 test('detects a sequence gap after skipping a replayed physical prefix', async (context) => {
@@ -604,6 +774,157 @@ test('bubbles a dependency update to the nearest accepting importer', async () =
     const newReports = getNewReports(reports, reportCount)
     assertApplied(newReports, 1)
     assertNoRebuild(newReports)
+})
+
+test('applies a converging dependency graph once at its shared accepting boundary', async () => {
+    const { reports, runtime } = await createTestHarness()
+    const graph = {
+        ids: ['boundary', 'left', 'right', 'dependency'],
+        localCount: 4,
+        edges: [[1, 2], [3], [3], []],
+        dynamicEdges: [[], [], [], []]
+    }
+    runtime.registerGraph(graph)
+    runtime.registerModule('dependency', { exports: { value: 'old' } })
+    runtime.registerModule('left', { exports: { value: 'left:old' } })
+    runtime.registerModule('right', { exports: { value: 'right:old' } })
+    runtime.registerModule('boundary', { exports: { value: 'boundary:old' } })
+    // These mutable counters prove converging importer paths do not execute shared modules or boundaries twice.
+    const executions = new Map<string, number>()
+    const countExecution = (moduleId: string): void => {
+        executions.set(moduleId, (executions.get(moduleId) ?? 0) + 1)
+    }
+    // This mutable observation retains the one fresh namespace delivered to the previous accepting generation.
+    let acceptedExports: unknown
+    const boundaryHotContext: TestHotContext = runtime.createModuleHotContext('boundary')
+    boundaryHotContext.accept((fresh) => {
+        acceptedExports = fresh
+    })
+    const reportCount = reports.length
+
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            {
+                seq: 1,
+                changedIds: ['dependency'],
+                factory(): void {
+                    runtime.registerGraph(graph)
+                    runtime.registerFactory('dependency', 'esm', (id) => {
+                        countExecution(id)
+                        runtime.registerModule(id, { exports: { value: 'new' } })
+                    })
+                    runtime.registerFactory('left', 'esm', (id) => {
+                        countExecution(id)
+                        const dependency = runtime.initModule('dependency')
+                        runtime.registerModule(id, { exports: { value: `left:${readValue(dependency)}` } })
+                    })
+                    runtime.registerFactory('right', 'esm', (id) => {
+                        countExecution(id)
+                        const dependency = runtime.initModule('dependency')
+                        runtime.registerModule(id, { exports: { value: `right:${readValue(dependency)}` } })
+                    })
+                    runtime.registerFactory('boundary', 'esm', (id) => {
+                        countExecution(id)
+                        const left = runtime.initModule('left')
+                        const right = runtime.initModule('right')
+                        runtime.registerModule(id, {
+                            exports: { value: `${readValue(left)}|${readValue(right)}` }
+                        })
+                        runtime.createModuleHotContext(id).accept()
+                    })
+                }
+            }
+        ]
+    })
+
+    assert.deepEqual(acceptedExports, { value: 'left:new|right:new' })
+    assert.deepEqual(Object.fromEntries(executions), {
+        boundary: 1,
+        left: 1,
+        dependency: 1,
+        right: 1
+    })
+    assertApplied(getNewReports(reports, reportCount), 1)
+    assertNoRebuild(getNewReports(reports, reportCount))
+})
+
+test('requests a rebuild before eviction when any propagated module lacks a fresh factory', async (context) => {
+    context.mock.method(console, 'warn', () => {})
+    const { reports, runtime } = await createTestHarness()
+    const graph = {
+        ids: ['page', 'dependency'],
+        localCount: 2,
+        edges: [[1], []],
+        dynamicEdges: [[], []]
+    }
+    runtime.registerGraph(graph)
+    runtime.registerModule('dependency', { exports: { value: 'old dependency' } })
+    runtime.registerModule('page', { exports: { value: 'old page' } })
+    runtime.createModuleHotContext('page').accept()
+    const reportCount = reports.length
+
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            {
+                seq: 1,
+                changedIds: ['dependency'],
+                factory(): void {
+                    runtime.registerGraph(graph)
+                    runtime.registerFactory('dependency', 'esm', (id) => {
+                        runtime.registerModule(id, { exports: { value: 'new dependency' } })
+                    })
+                }
+            }
+        ]
+    })
+
+    assert.deepEqual(runtime.loadExports('dependency'), { value: 'old dependency' })
+    assert.deepEqual(runtime.loadExports('page'), { value: 'old page' })
+    const newReports = getNewReports(reports, reportCount)
+    assert.match(JSON.stringify(newReports), /no HMR factory for module page/)
+    assert.doesNotMatch(JSON.stringify(newReports), /"kind":"applied"/)
+})
+
+test('requests a rebuild for circular propagation without an accepting boundary', async (context) => {
+    context.mock.method(console, 'warn', () => {})
+    const { reports, runtime } = await createTestHarness()
+    const graph = {
+        ids: ['a', 'b'],
+        localCount: 2,
+        edges: [[1], [0]],
+        dynamicEdges: [[], []]
+    }
+    runtime.registerGraph(graph)
+    runtime.registerModule('a', { exports: { value: 'old a' } })
+    runtime.registerModule('b', { exports: { value: 'old b' } })
+    const reportCount = reports.length
+
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            {
+                seq: 1,
+                changedIds: ['a'],
+                factory(): void {
+                    runtime.registerGraph(graph)
+                    runtime.registerFactory('a', 'esm', (id) => {
+                        runtime.registerModule(id, { exports: { value: 'new a' } })
+                    })
+                    runtime.registerFactory('b', 'esm', (id) => {
+                        runtime.registerModule(id, { exports: { value: 'new b' } })
+                    })
+                }
+            }
+        ]
+    })
+
+    assert.deepEqual(runtime.loadExports('a'), { value: 'old a' })
+    assert.deepEqual(runtime.loadExports('b'), { value: 'old b' })
+    const newReports = getNewReports(reports, reportCount)
+    assert.match(JSON.stringify(newReports), /circular HMR propagation between/)
+    assert.doesNotMatch(JSON.stringify(newReports), /"kind":"applied"/)
 })
 
 test('requests a rebuild when an executed graph has no accepting boundary', async (context) => {

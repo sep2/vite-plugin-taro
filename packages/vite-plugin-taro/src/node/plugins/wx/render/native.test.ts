@@ -102,6 +102,32 @@ Page(config)`
     assert.deepEqual(result.map.sources, ['app.js'])
 })
 
+test('rejects malformed native chunks before any source rewrite', () => {
+    assert.throws(
+        () =>
+            renderNative({
+                code: 'export const =',
+                chunk: chunk({ fileName: 'app.js', moduleIds: ['/native-app'], isEntry: true }),
+                chunks: {},
+                sourcemap: false
+            }),
+        /Failed to parse app\.js with Oxc/
+    )
+})
+
+test('rejects direct eval because native binding rewrites cannot preserve its scope semantics', () => {
+    assert.throws(
+        () =>
+            renderNative({
+                code: "const value = eval('1'); export { value }",
+                chunk: chunk({ fileName: 'app.js', moduleIds: ['/native-app'], isEntry: true }),
+                chunks: {},
+                sourcemap: false
+            }),
+        /Unsupported final Rolldown native chunk app\.js: direct eval/
+    )
+})
+
 test('rejects a capsule namespace import from a native shell', () => {
     const nativeChunk = chunk({ fileName: 'app.js', moduleIds: ['/native-app'], isEntry: true })
     const chunks = {

@@ -43,6 +43,38 @@ const enabled = true
     assert.doesNotMatch(transform(source, 'h5'), /const enabled = true/)
 })
 
+test('keeps a nested else inactive when its parent target branch is inactive', () => {
+    const source = `/* #ifdef h5 */
+/* #ifdef wx */
+const impossible = 'nested match'
+/* #else */
+const alsoImpossible = 'nested else'
+/* #endif */
+/* #endif */
+const retained = true
+`
+    const result = transform(source, 'wx')
+
+    assert.doesNotMatch(result, /nested match|nested else/)
+    assert.match(result, /const retained = true/)
+})
+
+test('supports block-comment directives, case-insensitive targets, and CRLF line endings', () => {
+    const source = [
+        '/* #ifdef WX */',
+        "const platform = 'wx'",
+        '/* #else */',
+        "const platform = 'h5'",
+        '/* #endif */',
+        ''
+    ].join('\r\n')
+    const result = transform(source, 'wx')
+
+    assert.match(result, /const platform = 'wx'/)
+    assert.doesNotMatch(result, /const platform = 'h5'/)
+    assert.equal((result.match(/\r\n/g) ?? []).length, 5)
+})
+
 test('rejects expression directives', () => {
     assert.throws(
         () => transform('// #if wx && !h5\nconst enabled = true\n// #endif\n', 'wx'),

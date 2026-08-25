@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
-import type { OutputOptions, RenderedChunk } from 'rolldown'
+import type { OutputOptions, PreRenderedChunk, RenderedChunk } from 'rolldown'
 import { createLogger, createServer } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { packageRequire } from '../../../utils/packages.ts'
@@ -22,6 +22,17 @@ const options: VptOptions = {
     projectConfigJson: {}
 }
 
+function createPreRenderedChunk(name: string): PreRenderedChunk {
+    return {
+        name,
+        isEntry: false,
+        isDynamicEntry: true,
+        facadeModuleId: undefined,
+        moduleIds: [],
+        exports: []
+    }
+}
+
 function createRenderedChunk(name: string, fileName: string): RenderedChunk {
     return {
         type: 'chunk',
@@ -39,9 +50,10 @@ function createRenderedChunk(name: string, fileName: string): RenderedChunk {
 }
 
 test('adapts configured output into a stable physical wx development project', async (context) => {
+    const configuredChunkFileNames = (chunk: PreRenderedChunk): string => `chunks/${chunk.name}.[hash].js`
     const configuredOutput: OutputOptions = {
         assetFileNames: 'static/[name]-[hash:8][extname]',
-        chunkFileNames: 'chunks/[name].[hash].js',
+        chunkFileNames: configuredChunkFileNames,
         entryFileNames: '[name]-[hash]'
     }
     const server = await createServer({
@@ -57,11 +69,16 @@ test('adapts configured output into a stable physical wx development project', a
     context.after(() => server.close())
 
     const generatedOutput: OutputOptions = {}
+    const viteTransformOptions = { sourcemap: true }
+    const viteTransformPlugin = {
+        name: 'builtin:vite-transform',
+        _options: { transformOptions: viteTransformOptions }
+    }
     const bundledDev: BundledDev = {
         async getRolldownOptions() {
             return {
                 output: generatedOutput,
-                plugins: [{ name: 'fixture:existing-plugin' }],
+                plugins: [[{ name: 'fixture:existing-plugin' }], viteTransformPlugin],
                 experimental: {
                     devMode: {
                         retainedFixtureOption: 'retained'
@@ -82,16 +99,21 @@ test('adapts configured output into a stable physical wx development project', a
 
     assert.equal(output, generatedOutput)
     assert.equal(output.assetFileNames, 'static/[name][extname]')
-    assert.equal(output.chunkFileNames, 'chunks/[name].js')
+    assert.equal(typeof output.chunkFileNames, 'function')
+    if (typeof output.chunkFileNames !== 'function') {
+        assert.fail('Expected configured chunk naming to remain a function')
+    }
+    assert.equal(output.chunkFileNames(createPreRenderedChunk('feature')), 'chunks/feature.js')
     assert.equal(output.entryFileNames, '[name]')
     assert.equal(output.format, 'es')
     assert.equal(output.minify, true)
     assert.equal(output.sourcemap, false)
     assert.deepEqual(configuredOutput, {
         assetFileNames: 'static/[name]-[hash:8][extname]',
-        chunkFileNames: 'chunks/[name].[hash].js',
+        chunkFileNames: configuredChunkFileNames,
         entryFileNames: '[name]-[hash]'
     })
+    assert.equal(viteTransformOptions.sourcemap, false)
 
     assert.ok(devMode && typeof devMode === 'object')
     assert.equal(devMode.retainedFixtureOption, 'retained')
@@ -114,4 +136,53 @@ test('adapts configured output into a stable physical wx development project', a
         "__rolldown_runtime__.applyPatches(require('../../hmr/patches.js'));\n"
     )
     assert.equal(await banner(createRenderedChunk('assets/vendor.js', 'assets/vendor.js')), '')
+})
+
+test('rejects missing and multiple generated outputs before creating a development engine', () => {
+    assert.throws(() => requireSingleOutput({}), /requires exactly one Rolldown output/)
+    assert.throws(() => requireSingleOutput({ output: [{}, {}] }), /requires exactly one Rolldown output/)
+})
+
+test('rejects output arrays from both Vite configuration and generated Rolldown options', async (context) => {
+    const server = await createServer({
+        root: packageRoot,
+        configFile: false,
+        customLogger: createLogger('silent'),
+        build: {
+            rolldownOptions: {
+                output: [{}, {}]
+            }
+        }
+    })
+    context.after(() => server.close())
+
+    const configuredArrayBundledDev: BundledDev = {
+        async getRolldownOptions() {
+            return { output: {} }
+        },
+        async listen() {},
+        async triggerBundleRegenerationIfStale() {
+            return true
+        }
+    }
+    installWxDevOptions({ bundledDev: configuredArrayBundledDev, server, options })
+    await assert.rejects(
+        () => configuredArrayBundledDev.getRolldownOptions(),
+        /wx development supports one configured Rolldown output/
+    )
+
+    const generatedArrayBundledDev: BundledDev = {
+        async getRolldownOptions() {
+            return { output: [{}, {}] }
+        },
+        async listen() {},
+        async triggerBundleRegenerationIfStale() {
+            return true
+        }
+    }
+    installWxDevOptions({ bundledDev: generatedArrayBundledDev, server, options })
+    await assert.rejects(
+        () => generatedArrayBundledDev.getRolldownOptions(),
+        /wx development requires one configured Rolldown output/
+    )
 })

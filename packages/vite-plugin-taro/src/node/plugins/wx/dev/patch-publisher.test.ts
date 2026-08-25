@@ -44,6 +44,32 @@ test('publishes only the unacknowledged Rolldown sequence', async () => {
     assert.doesNotMatch(writes[1], /p2/)
 })
 
+test('retains a patch after a failed physical write and republishes it with the next generation', async () => {
+    // This mutable journal records every attempted physical generation, including the failed one.
+    const attempts: string[] = []
+    // This one-shot mutable fault models an atomic filesystem write failing before publication becomes durable.
+    let writeError: Error | undefined = new Error('disk unavailable')
+    const publisher = new PatchPublisher(async (content) => {
+        attempts.push(content)
+        if (writeError) {
+            const error = writeError
+            writeError = undefined
+            throw error
+        }
+    })
+    publisher.startBuild()
+
+    await assert.rejects(() => publisher.produce([patch(1, 'p1')]), /disk unavailable/)
+    await publisher.produce([patch(2, 'p2')])
+
+    assert.equal(attempts.length, 2)
+    assert.match(attempts[1], /seq: 1/)
+    assert.match(attempts[1], /p1/)
+    assert.match(attempts[1], /seq: 2/)
+    assert.match(attempts[1], /p2/)
+    assert.equal((attempts[1].match(/seq: 1/g) ?? []).length, 1)
+})
+
 test('retains an unacknowledged suffix across later edits', async () => {
     const { publisher, writes } = createPublisher()
     publisher.startBuild()

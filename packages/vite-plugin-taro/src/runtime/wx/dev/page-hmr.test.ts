@@ -6,18 +6,25 @@ type TestPage = {
     data: Record<string, unknown>
 }
 
-type TestPageConfig = {
+type PageConfigInput = {
     data: Record<string, unknown>
+    onUnload?: (this: TestPage, ...args: unknown[]) => void
+    onLoad?: (this: TestPage, ...args: unknown[]) => void
+    onShow?: (this: TestPage, ...args: unknown[]) => void
+}
+
+type TestPageConfig = PageConfigInput & {
     onUnload(this: TestPage, ...args: unknown[]): void
     onLoad(this: TestPage, ...args: unknown[]): void
     onShow(this: TestPage, ...args: unknown[]): void
 }
 
 type TestRuntime = DevRuntime & {
-    injectPageHmr(config: TestPageConfig): TestPageConfig
+    injectPageHmr(config: PageConfigInput): TestPageConfig
 }
 
 type TestHarness = Readonly<{
+    createBareConfig(): TestPageConfig
     createConfig(originals?: Partial<TestPageConfig>): TestPageConfig
     createPage(): TestPage
     reregisterPage(config: TestPageConfig): void
@@ -46,6 +53,9 @@ async function createTestHarness(): Promise<TestHarness> {
         createPage() {
             return { data: {} }
         },
+        createBareConfig() {
+            return runtime.injectPageHmr({ data: { root: { cn: [] } } })
+        },
         createConfig(originals) {
             const config = {
                 data: { root: { cn: [] } },
@@ -60,6 +70,22 @@ async function createTestHarness(): Promise<TestHarness> {
         }
     }
 }
+
+test('wraps Page configurations that omit every business lifecycle', async () => {
+    const harness = await createTestHarness()
+    const config = harness.createBareConfig()
+    const page = harness.createPage()
+
+    config.onLoad.call(page, { route: 'initial' })
+    config.onShow.call(page)
+    harness.reregisterPage(config)
+    config.onUnload.call(page)
+    config.onLoad.call(page)
+    config.onShow.call(page)
+
+    harness.reregisterPage(config)
+    assert.strictEqual(config.data, page.data)
+})
 
 test('scopes re-registration lifecycles to their static Page configuration', async () => {
     const harness = await createTestHarness()
@@ -84,6 +110,48 @@ test('scopes re-registration lifecycles to their static Page configuration', asy
     mirrorConfig.onUnload.call(mirror)
 
     assert.deepEqual(unloads, ['primary'])
+})
+
+test('does not arm re-registration before mount or after an ordinary unload', async () => {
+    const harness = await createTestHarness()
+    // This mutable trace verifies that ordinary lifecycle forwarding preserves both receiver identity and arguments.
+    const lifecycleCalls: Array<Readonly<{ kind: string; page: TestPage; args: unknown[] }>> = []
+    const config = harness.createConfig({
+        onUnload(...args) {
+            lifecycleCalls.push({ kind: 'unload', page: this, args })
+        },
+        onLoad(...args) {
+            lifecycleCalls.push({ kind: 'load', page: this, args })
+        },
+        onShow(...args) {
+            lifecycleCalls.push({ kind: 'show', page: this, args })
+        }
+    })
+    const initialData = config.data
+
+    harness.reregisterPage(config)
+    assert.strictEqual(config.data, initialData)
+
+    const firstPage = harness.createPage()
+    config.onLoad.call(firstPage, 'first-load')
+    config.onShow.call(firstPage, 'first-show')
+    config.onUnload.call(firstPage, 'first-unload')
+
+    firstPage.data = { stale: true }
+    harness.reregisterPage(config)
+    assert.strictEqual(config.data, initialData)
+
+    const nextPage = harness.createPage()
+    config.onLoad.call(nextPage, 'next-load')
+    config.onShow.call(nextPage, 'next-show')
+
+    assert.deepEqual(lifecycleCalls, [
+        { kind: 'load', page: firstPage, args: ['first-load'] },
+        { kind: 'show', page: firstPage, args: ['first-show'] },
+        { kind: 'unload', page: firstPage, args: ['first-unload'] },
+        { kind: 'load', page: nextPage, args: ['next-load'] },
+        { kind: 'show', page: nextPage, args: ['next-show'] }
+    ])
 })
 
 test('retains native data and suppresses re-registration business lifecycles', async () => {
