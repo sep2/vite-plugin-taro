@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promise
 import path from 'node:path'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
+import { stripVTControlCharacters } from 'node:util'
 import { createLogger, createServer, type Logger, type Plugin, type ViteDevServer } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { packageRequire } from '../../../utils/packages.ts'
@@ -352,7 +353,7 @@ test('rejects invalid control requests without compromising later patch publicat
     assert.match(info.endpoint, /^http:\/\/127\.0\.0\.1:/)
     assert.equal(await fixture.bundledDev.triggerBundleRegenerationIfStale(), false)
     fixture.server.printUrls()
-    assert.match(infos.join('\n'), /WeChat DevTools.*\.\/dist/)
+    assert.match(stripVTControlCharacters(infos.join('\n')), /WeChat DevTools.*\.\/dist/)
     // Temporarily vary only the presentation path to exercise root and parent-relative DevTools banners.
     const originalOutDir = fixture.server.config.build.outDir
     const originalConfigFile = fixture.server.config.configFile
@@ -364,8 +365,9 @@ test('rejects invalid control requests without compromising later patch publicat
     fixture.server.config.build.outDir = path.dirname(fixture.server.config.root)
     fixture.server.printUrls()
     fixture.server.config.build.outDir = originalOutDir
-    assert.match(infos.join('\n'), /WeChat DevTools.*: \./)
-    assert.match(infos.join('\n'), /WeChat DevTools.*: \.\./)
+    const devToolsOutput = stripVTControlCharacters(infos.join('\n'))
+    assert.match(devToolsOutput, /WeChat DevTools.*: \./)
+    assert.match(devToolsOutput, /WeChat DevTools.*: \.\./)
 
     const unsupportedMethod = await fetch(info.endpoint)
     assert.equal(unsupportedMethod.status, 404)

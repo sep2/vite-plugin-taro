@@ -135,18 +135,18 @@ test('publishes processed CSS and live topology without identical rewrites', asy
 
         const colorResultCount = hmrResults.length
         await writeFile(cssId, '.app { color: blue; }\n')
-        await waitForStyle(globalWxssPath, (wxss) => wxss === '.app { color: #0000ff; }\n', hmrResults)
         await waitForEventCount(hmrResults, colorResultCount + 1)
+        assert.equal(await readFile(globalWxssPath, 'utf8'), '.app { color: #0000ff; }\n')
 
         const additionResultCount = hmrResults.length
         await writeFile(appId, "import './app.css'\nimport './extra.css'\nexport const value = 'added'\n")
-        await waitForStyle(globalWxssPath, (wxss) => /\.extra \{\}/.test(wxss), hmrResults)
         await waitForEventCount(hmrResults, additionResultCount + 1)
+        assert.match(await readFile(globalWxssPath, 'utf8'), /\.extra \{\}/)
 
         const removalResultCount = hmrResults.length
         await writeFile(appId, initialSource)
-        await waitForStyle(globalWxssPath, (wxss) => !/\.extra \{\}/.test(wxss), hmrResults)
         await waitForEventCount(hmrResults, removalResultCount + 1)
+        assert.doesNotMatch(await readFile(globalWxssPath, 'utf8'), /\.extra \{\}/)
 
         const unchangedInode = (await stat(globalWxssPath)).ino
         const priorResultCount = hmrResults.length
@@ -287,7 +287,6 @@ test('renders Tailwind CSS and final patch factories from one class set', async 
 
         const dependencyStart = hmrResults.length
         await writeFile(themeId, '@theme { --color-brand: blue; }\n')
-        await waitForStyle(globalWxssPath, (wxss) => /--color-brand:\s*blue/.test(wxss), hmrResults)
         await waitForEventCount(hmrResults, dependencyStart + 1)
         const themedWxss = await readFile(globalWxssPath, 'utf8')
         assert.match(themedWxss, /--color-brand:\s*blue/)
@@ -295,8 +294,10 @@ test('renders Tailwind CSS and final patch factories from one class set', async 
 
         const plainCssStart = hmrResults.length
         await writeFile(cssId, '.plain-root { color: green; }\n')
-        await waitForStyle(globalWxssPath, (wxss) => /\.plain-root/.test(wxss) && !/\.mt-2\b/.test(wxss), hmrResults)
         await waitForEventCount(hmrResults, plainCssStart + 1)
+        const plainWxss = await readFile(globalWxssPath, 'utf8')
+        assert.match(plainWxss, /\.plain-root/)
+        assert.doesNotMatch(plainWxss, /\.mt-2\b/)
     } finally {
         await engine.close()
         await server.close()
@@ -350,21 +351,6 @@ async function waitForFinalizedHmr(
         await new Promise((resolve) => setTimeout(resolve, 10))
     }
     throw new Error('Timed out waiting for finalized HMR styles')
-}
-
-async function waitForStyle(
-    fileName: string,
-    matches: (wxss: string) => boolean,
-    events: readonly unknown[]
-): Promise<void> {
-    const startedAt = Date.now()
-    while (Date.now() - startedAt <= 10_000) {
-        const error = events.find((event) => event instanceof Error)
-        if (error instanceof Error) throw error
-        if (matches(await readFile(fileName, 'utf8'))) return
-        await new Promise((resolve) => setTimeout(resolve, 10))
-    }
-    throw new Error(`Timed out waiting for WXSS: ${fileName}`)
 }
 
 async function waitForRawEventCount(events: readonly unknown[], expectedCount: number): Promise<void> {

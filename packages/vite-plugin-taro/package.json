@@ -37,8 +37,8 @@
     ],
     "scripts": {
         "build": "node ../../scripts/sync-plugin-readme.ts && node ../../scripts/clean-directory.ts dist && tsc --project tsconfig.build.json",
-        "test": "node --experimental-test-module-mocks --test --test-concurrency=2",
-        "test:coverage": "c8 node --experimental-test-module-mocks --test --test-concurrency=2",
+        "test": "node --test --test-concurrency=2",
+        "test:coverage": "c8 node --test --test-concurrency=2",
         "typecheck": "tsc --project tsconfig.json --noEmit"
     },
     "keywords": [

@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { registerHooks } from 'node:module'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { DevOptions } from 'rolldown/experimental'
-import * as rolldownExperimental from 'rolldown/experimental'
 import { createLogger, createServer } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import type { WxStylePlugin } from '../styles/plugins.ts'
@@ -17,12 +17,41 @@ type DevHooks = Readonly<{
     onOutput: (result: unknown) => void
 }>
 
+type CreateWxDevHost = typeof import('./dev-host.ts')['createWxDevHost']
+
+type SyntheticDev = (_input: unknown, _output: unknown, devOptions: DevOptions) => unknown
+
+const devHostHarnessKey = '__vptDevHostTestHarness__'
+
 const options: VptOptions = {
     target: 'wx',
     app: 'src/app.tsx',
     pages: [],
     appJson: {},
     projectConfigJson: {}
+}
+
+async function importDevHost(dev: SyntheticDev): Promise<CreateWxDevHost> {
+    const devHostUrl = `${new URL('./dev-host.ts', import.meta.url).href}?synthetic-dev-host-test=${Date.now()}`
+    const mockSource = `const harness = globalThis[${JSON.stringify(devHostHarnessKey)}]; export const dev = harness.dev`
+    const mockUrl = `data:text/javascript,${encodeURIComponent(mockSource)}`
+    // This process-global slot exists only while the redirected module captures its immutable synthetic engine.
+    Reflect.set(globalThis, devHostHarnessKey, { dev })
+    const hooks = registerHooks({
+        resolve(specifier, context, nextResolve) {
+            if (specifier === 'rolldown/experimental' && context.parentURL === devHostUrl) {
+                return { shortCircuit: true, url: mockUrl }
+            }
+            return nextResolve(specifier, context)
+        }
+    })
+    try {
+        const devHost = await import(devHostUrl)
+        return devHost.createWxDevHost
+    } finally {
+        hooks.deregister()
+        Reflect.deleteProperty(globalThis, devHostHarnessKey)
+    }
 }
 
 function isBundledDev(value: unknown): value is BundledDev {
@@ -66,49 +95,43 @@ async function waitForFileChange(fileName: string, previousSource: string): Prom
     throw new Error(`Timed out waiting for changed ${fileName}`)
 }
 
-test('reduces synthetic engine update variants and unknown host failures without changing host internals', async (context) => {
-    // These mutable cells expose the callbacks and current synthetic engine state owned by the mocked DevEngine factory.
+test('reduces synthetic engine update variants and unknown host failures without changing host internals', async () => {
+    // These mutable cells expose the callbacks and current synthetic engine state owned by the redirected DevEngine substitute.
     let hooks: DevHooks | undefined
     let triggerFullBuild: (() => void) | undefined
     const deliveredFiles: string[] = []
-    context.mock.module('rolldown/experimental', {
-        cache: true,
-        exports: {
-            ...rolldownExperimental,
-            dev(_input: unknown, _output: unknown, devOptions: DevOptions) {
-                const onHmrUpdates = devOptions.onHmrUpdates
-                const onOutput = devOptions.onOutput
-                if (!onHmrUpdates || !onOutput) {
-                    throw new Error('Expected WX development callbacks')
-                }
-                hooks = {
-                    onHmrUpdates(result) {
-                        Reflect.apply(onHmrUpdates, undefined, [result])
-                    },
-                    onOutput(result) {
-                        Reflect.apply(onOutput, undefined, [result])
-                    }
-                }
-                triggerFullBuild = () => Reflect.apply(onOutput, undefined, [{}])
-                return {
-                    async run() {
-                        Reflect.apply(onOutput, undefined, [{}])
-                    },
-                    async ensureCurrentBuildFinish() {},
-                    async registerClient() {},
-                    async removeClient() {},
-                    async notifyPayloadDelivered(fileName: string) {
-                        deliveredFiles.push(fileName)
-                    },
-                    triggerFullBuild() {
-                        triggerFullBuild?.()
-                    },
-                    async close() {}
-                }
+    const dev = (_input: unknown, _output: unknown, devOptions: DevOptions) => {
+        const onHmrUpdates = devOptions.onHmrUpdates
+        const onOutput = devOptions.onOutput
+        if (!onHmrUpdates || !onOutput) {
+            throw new Error('Expected WX development callbacks')
+        }
+        hooks = {
+            onHmrUpdates(result) {
+                Reflect.apply(onHmrUpdates, undefined, [result])
+            },
+            onOutput(result) {
+                Reflect.apply(onOutput, undefined, [result])
             }
         }
-    })
-    const { createWxDevHost } = await import(`./dev-host.ts?synthetic=${Date.now()}`)
+        triggerFullBuild = () => Reflect.apply(onOutput, undefined, [{}])
+        return {
+            async run() {
+                Reflect.apply(onOutput, undefined, [{}])
+            },
+            async ensureCurrentBuildFinish() {},
+            async registerClient() {},
+            async removeClient() {},
+            async notifyPayloadDelivered(fileName: string) {
+                deliveredFiles.push(fileName)
+            },
+            triggerFullBuild() {
+                triggerFullBuild?.()
+            },
+            async close() {}
+        }
+    }
+    const createWxDevHost = await importDevHost(dev)
     const root = await mkdtemp(path.join(tmpdir(), 'vpt-dev-host-unit-'))
     const outDir = path.join(root, 'dist')
     const appPath = path.join(root, 'src/app.tsx')
