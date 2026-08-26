@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module'
 import babel, { defineRolldownBabelPreset } from '@rolldown/plugin-babel'
 import type { HtmlTagDescriptor, Plugin, PluginOption } from 'vite'
 import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
@@ -140,7 +141,9 @@ export const h5TaroApiTransformCodeFilter = /virtual:taro\/api|\baria[A-Z]/
 
 /** Babel preset body shared by Rolldown's filtered adapter and direct semantic tests. */
 export function h5TaroApiPreset() {
-    const transformTaroApiPath = packageRequire.resolve('babel-plugin-transform-taroapi')
+    // Resolve Taro's private transform from the H5 package that owns it instead of promoting it into VPT's Babel graph.
+    const h5PlatformRequire = createRequire(packageRequire.resolve('@tarojs/plugin-platform-h5/package.json'))
+    const transformTaroApiPath = h5PlatformRequire.resolve('babel-plugin-transform-taroapi')
     const definition = packageRequire(packageRequire.resolve('@tarojs/plugin-platform-h5/dist/definition.json'))
     return {
         plugins: [
