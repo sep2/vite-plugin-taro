@@ -10,7 +10,8 @@ VPT 推荐使用 AI 助手进行开发。
 把下面这段话交给编程助手：
 
 ```text
-请阅读 https://vpt.js.org/llms.txt，然后创建一个 VPT 项目。
+请阅读 https://vpt.js.org/llms.txt
+然后创建一个 VPT 项目。
 ```
 
 通过 AI 完成开发、测试、验证。
@@ -28,7 +29,9 @@ VPT 推荐使用 AI 助手进行开发。
 把下面这段话交给编程助手：
 
 ```text
-请阅读 https://vpt.js.org/llms.txt，对比最新的 create-vite-taro 模板，将项目升级到最新稳定版 VPT，并完成所有验证测试。
+请阅读 https://vpt.js.org/llms.txt
+对比最新的 create-vite-taro 模板，
+将项目升级到最新稳定版 VPT，并完成所有验证测试。
 ```
 
 ## 手动创建
