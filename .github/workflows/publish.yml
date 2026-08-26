@@ -50,3 +50,12 @@ jobs:
 
       - name: Publish packages
         run: pnpm publish:all -- --no-git-check
+
+  website:
+    if: ${{ !contains(github.ref_name, '-') }}
+    needs: publish
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/website.yml

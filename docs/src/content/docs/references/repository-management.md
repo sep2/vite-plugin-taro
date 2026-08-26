@@ -130,4 +130,4 @@ pnpm release patch --dry-run
 pnpm release patch --no-push
 ```
 
-推送 `v*.*.*` tag 后，`.github/workflows/publish.yml` 会通过 npm Trusted Publishing 按依赖顺序发布公开包。不要为该工作流配置 `NPM_TOKEN`。
+推送 `v*.*.*` tag 后，`.github/workflows/publish.yml` 会通过 npm Trusted Publishing 按依赖顺序发布公开包，并在稳定版本发布成功后部署文档；beta 发布不会重复部署。文档首页在静态构建阶段读取 npm 的 `latest` dist-tag，因此始终显示稳定版本，且不依赖浏览器 JavaScript。不要为该工作流配置 `NPM_TOKEN`。

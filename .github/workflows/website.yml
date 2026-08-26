@@ -1,17 +1,16 @@
 name: Deploy documentation to GitHub Pages
 
 on:
+  workflow_call:
+  workflow_dispatch:
   push:
     branches:
       - main
-    tags:
-      - 'v*.*.*'
     paths:
       - 'docs/**'
   pull_request:
     paths:
       - 'docs/**'
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -38,6 +37,7 @@ jobs:
           out-dir: docs/dist
 
   deploy:
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     environment:

@@ -1,107 +1,37 @@
 ---
+import { fetchLatestStableVersion } from '../lib/fetch-latest-stable-version.ts'
+
 interface Props {
-    fallbackVersion: string
     packageName: string
 }
 
+const { packageName } = Astro.props
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
-const { fallbackVersion, packageName } = Astro.props
-const encodedPackageName = encodeURIComponent(packageName)
-// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
-const manifestUrl = `https://registry.npmjs.org/${encodedPackageName}/latest`
+const latestVersion = await fetchLatestStableVersion(packageName)
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
 const packageUrl = `https://www.npmjs.com/package/${packageName}`
 ---
 
-<vpt-npm-package-version data-fallback-version={fallbackVersion} data-manifest-url={manifestUrl}>
-    <a
-        class="latest-version"
-        href={packageUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={`在 npm 查看 ${packageName} 最新版本`}
-    >
-        <span>最新版本</span>
-        <strong data-version aria-live="polite">v{fallbackVersion}</strong>
-    </a>
-</vpt-npm-package-version>
-
-<script>
-    const npmRequestTimeout = 10_000
-
-    interface NpmPackageManifest {
-        version: string
-    }
-
-    function isNpmPackageManifest(value: unknown): value is NpmPackageManifest {
-        return (
-            typeof value === 'object' &&
-            value !== null &&
-            'version' in value &&
-            typeof value.version === 'string' &&
-            value.version.length > 0
-        )
-    }
-
-    class VptNpmPackageVersionElement extends HTMLElement {
-        connectedCallback(): void {
-            const fallbackVersion = this.dataset.fallbackVersion
-            if (fallbackVersion === undefined) {
-                throw new Error('npm package version component is missing its fallback version')
-            }
-
-            void this.fetchLatestVersion().then(this.renderVersion).catch(() => this.renderVersion(fallbackVersion))
-        }
-
-        private readonly renderVersion = (version: string): void => {
-            const versionElement = this.querySelector<HTMLElement>('[data-version]')
-            if (versionElement === null) {
-                throw new Error('npm package version component is missing its version element')
-            }
-
-            versionElement.textContent = `v${version}`
-        }
-
-        private async fetchLatestVersion(): Promise<string> {
-            const manifestUrl = this.dataset.manifestUrl
-            if (manifestUrl === undefined) {
-                throw new Error('npm package version component is missing its manifest URL')
-            }
-
-            const response = await fetch(manifestUrl, {
-                signal: AbortSignal.timeout(npmRequestTimeout)
-            })
-            if (!response.ok) {
-                throw new Error(`npm registry returned ${response.status} ${response.statusText}`)
-            }
-
-            const manifest: unknown = await response.json()
-            if (!isNpmPackageManifest(manifest)) {
-                throw new Error('npm registry returned an invalid package manifest')
-            }
-
-            return manifest.version
-        }
-    }
-
-    if (customElements.get('vpt-npm-package-version') === undefined) {
-        customElements.define('vpt-npm-package-version', VptNpmPackageVersionElement)
-    }
-</script>
+<a
+    class="latest-version"
+    href={packageUrl}
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label={`在 npm 查看 ${packageName} 最新版本`}
+>
+    <span>最新版本</span>
+    <strong>v{latestVersion}</strong>
+</a>
 
 <style>
     @layer starlight.core {
-        vpt-npm-package-version {
-            display: block;
-            margin-bottom: 2rem;
-        }
-
         .latest-version {
             display: inline-flex;
             position: relative;
             z-index: 1;
             align-items: center;
             gap: 0.45rem;
+            margin-bottom: 2rem;
             padding: 0.32rem 0.7rem;
             border: 1px solid var(--vpt-border);
             border-radius: 999px;
@@ -115,6 +45,5 @@ const packageUrl = `https://www.npmjs.com/package/${packageName}`
         .latest-version strong {
             color: var(--vpt-accent-strong);
         }
-
     }
 </style>
