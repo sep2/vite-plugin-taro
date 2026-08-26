@@ -4,7 +4,27 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
-## [0.6.14] - 2026-08-24
+## [0.6.15-beta.0] - 2026-08-26
+
+### Changed
+
+- expose Windows test worker exits (dd377f7)
+- docs (e7f520b)
+- upgrade Babel to v8 (e1bd372)
+- add beta release channel (280ea31)
+- upgrade dependencies (efca80a)
+- clean up (6df61e1)
+- synchronize style publications (4629905)
+- avoid duplicate badge credentials (1c56ead)
+- run coverage on Ubuntu (184cece)
+- fix Windows coverage failures (88d6c49)
+- publish coverage badge (1476927)
+- reach full plugin coverage (4a15870)
+- execute generated runtime entries (f55e6fe)
+- cover critical runtime paths (b7b7579)
+- improve edge-case coverage (b58686b)
+
+## [0.6.14] - 2026-08-25
 
 ### Added
 
