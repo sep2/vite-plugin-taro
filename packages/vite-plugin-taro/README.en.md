@@ -2,7 +2,7 @@
 
 [![npm version](https://img.shields.io/npm/v/vite-plugin-taro.svg)](https://www.npmjs.com/package/vite-plugin-taro)
 ![Vite](https://img.shields.io/npm/dependency-version/vite-plugin-taro/peer/vite?label=Vite)
-[![coverage](https://raw.githubusercontent.com/sep2/vite-plugin-taro/gh-pages/badges/coverage.svg)](https://github.com/sep2/vite-plugin-taro/actions/workflows/coverage.yml)
+[![coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](https://github.com/sep2/vite-plugin-taro/actions/workflows/coverage.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 [简体中文](README.md) | English

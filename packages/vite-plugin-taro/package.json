@@ -89,29 +89,6 @@
         "react-dom": "^19.0.0",
         "vite": "8.2.2"
     },
-    "c8": {
-        "all": true,
-        "include": [
-            "src/**/*.{ts,js}"
-        ],
-        "exclude": [
-            "src/**/*.test.ts",
-            "src/**/*.d.ts",
-            "src/options.ts"
-        ],
-        "reporter": [
-            "text",
-            "html",
-            "lcov",
-            "json-summary"
-        ],
-        "reports-dir": "coverage",
-        "check-coverage": true,
-        "statements": 100,
-        "branches": 100,
-        "functions": 100,
-        "lines": 100
-    },
     "devDependencies": {
         "@babel/plugin-transform-dynamic-import": "^8.0.1",
         "@babel/plugin-transform-modules-commonjs": "^8.0.1",
