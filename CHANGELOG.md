@@ -4,6 +4,20 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.6.17] - 2026-08-26
+
+### Changed
+
+- refresh CI badge status (a7bea50)
+- unify validation and release pipeline (1c471c7)
+- switch downloads badge provider (a4b3cd8)
+
+### Fixed
+
+- inherit documentation permissions from caller (fbfe36b)
+- make release version deterministic (c288aab)
+- finalize prerelease on patch bump (f255164)
+
 ## [0.6.16] - 2026-08-26
 
 ### Changed
