@@ -49,7 +49,8 @@ jobs:
         run: pnpm typecheck
 
       - name: Test
-        run: pnpm test
+        # TAP preserves a failed test worker's exit code and signal; the spec reporter only prints "test failed".
+        run: pnpm --filter vite-plugin-taro test --test-reporter=tap
 
       - name: Build sample WeChat Mini Program
         run: pnpm build:loan-genius:wx
