@@ -171,10 +171,11 @@ function resolveVersion(value: string, currentVersion: string, prereleaseIdentif
         case 'minor':
             return formatSemver({ major: current.major, minor: current.minor + 1, patch: 0, prerelease: [] })
         case 'patch':
+            // A patch bump finalizes an existing prerelease before advancing a stable version.
             return formatSemver({
                 major: current.major,
                 minor: current.minor,
-                patch: current.patch + 1,
+                patch: current.prerelease.length > 0 ? current.patch : current.patch + 1,
                 prerelease: []
             })
         case 'premajor':
