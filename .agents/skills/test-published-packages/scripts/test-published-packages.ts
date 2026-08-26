@@ -6,6 +6,7 @@ import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync,
 import { resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { inferNpmTag } from '../../../../scripts/infer-npm-tag.ts'
 
 interface CommandResult {
     status: number | null
@@ -15,6 +16,7 @@ interface CommandResult {
 }
 
 interface PackageIdentity {
+    releaseTag: string
     creatorVersion: string
     pluginVersion: string
     pluginTarball: string
@@ -163,16 +165,23 @@ async function pollUntil<T>(
     return attempt()
 }
 
-function readLatestPackageIdentity(): PackageIdentity {
+function readRepositoryVersion(): string {
+    const packageJson = readJsonFile(resolve(repositoryRoot, 'package.json'))
+    return requireString(packageJson.version, 'repository package version')
+}
+
+function readPublishedPackageIdentity(): PackageIdentity {
+    const repositoryVersion = readRepositoryVersion()
+    const releaseTag = inferNpmTag(repositoryVersion)
     const creatorVersion = requireCommand(
         'npm',
-        ['view', 'create-vite-taro@latest', 'version'],
+        ['view', `create-vite-taro@${releaseTag}`, 'version'],
         repositoryRoot,
         undefined
     ).trim()
     const pluginVersion = requireCommand(
         'npm',
-        ['view', 'vite-plugin-taro@latest', 'version'],
+        ['view', `vite-plugin-taro@${releaseTag}`, 'version'],
         repositoryRoot,
         undefined
     ).trim()
@@ -183,15 +192,25 @@ function readLatestPackageIdentity(): PackageIdentity {
         undefined
     ).trim()
 
+    if (creatorVersion !== repositoryVersion || pluginVersion !== repositoryVersion) {
+        throw new Error(
+            `Expected npm ${releaseTag} packages at ${repositoryVersion}; received create-vite-taro@${creatorVersion} and vite-plugin-taro@${pluginVersion}`
+        )
+    }
     if (!pluginTarball.startsWith('https://')) {
         throw new Error(`Published plugin tarball is not an HTTPS registry artifact: ${pluginTarball}`)
     }
-    return { creatorVersion, pluginVersion, pluginTarball }
+    return { releaseTag, creatorVersion, pluginVersion, pluginTarball }
 }
 
-function createFreshProject(): void {
+function createFreshProject(identity: PackageIdentity): void {
     rmSync(projectPaths.root, { recursive: true, force: true })
-    requireCommand('npm', ['create', 'vite-taro@latest', 'vpt-published-packages-test'], '/tmp', undefined)
+    requireCommand(
+        'npm',
+        ['create', `vite-taro@${identity.releaseTag}`, 'vpt-published-packages-test'],
+        '/tmp',
+        undefined
+    )
     const installOutput = requireCommand('npm', ['install'], projectPaths.root, undefined)
     process.stdout.write(installOutput)
 }
@@ -624,13 +643,14 @@ async function runDevToolsValidation(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-    stage('Resolving npm latest versions')
-    const identity = readLatestPackageIdentity()
+    stage('Resolving the repository release channel on npm')
+    const identity = readPublishedPackageIdentity()
+    console.log(`npm dist-tag: ${identity.releaseTag}`)
     console.log(`create-vite-taro@${identity.creatorVersion}`)
     console.log(`vite-plugin-taro@${identity.pluginVersion}`)
 
     stage('Creating and installing a fresh disposable project')
-    createFreshProject()
+    createFreshProject(identity)
     validateInstalledPlugin(identity)
     configureDisposableProject()
 
@@ -645,7 +665,7 @@ async function main(): Promise<void> {
 
     stage('PASS')
     console.log(
-        `Published create-vite-taro@${identity.creatorVersion} and vite-plugin-taro@${identity.pluginVersion} passed.`
+        `Published ${identity.releaseTag} packages create-vite-taro@${identity.creatorVersion} and vite-plugin-taro@${identity.pluginVersion} passed.`
     )
     console.log(`Disposable project retained at ${projectPaths.root}`)
 }

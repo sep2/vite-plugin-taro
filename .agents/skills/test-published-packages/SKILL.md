@@ -1,6 +1,6 @@
 ---
 name: test-published-packages
-description: Validates npm latest create-vite-taro and vite-plugin-taro in a fresh disposable project, including registry provenance, typecheck, WX build, and WeChat DevTools HMR state retention. Use after publishing or when testing npm artifacts independently from the workspace.
+description: Validates the published create-vite-taro and vite-plugin-taro release channel matching the repository version, including beta releases, registry provenance, typecheck, WX build, and WeChat DevTools HMR state retention. Use after publishing or when testing npm artifacts independently from the workspace.
 compatibility: Requires Node.js 26+, npm, WeChat DevTools, wechatide, and the repository's fixed test AppID.
 ---
 
@@ -14,8 +14,9 @@ node scripts/test-published-packages.ts
 
 The script owns the complete workflow:
 
-- resolves both `latest` npm versions;
-- creates `/tmp/vpt-published-packages-test` from the published creator;
+- maps the repository version to its npm dist-tag (`beta` for a beta release, `latest` for a stable release);
+- requires both published package versions to exactly match the repository version;
+- creates `/tmp/vpt-published-packages-test` from that published creator channel;
 - rejects local, linked, or non-registry plugin installations;
 - runs typecheck and a production WX build;
 - opens the fresh WX development output in WeChat DevTools;

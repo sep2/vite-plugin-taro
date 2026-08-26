@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { inferNpmTag } from './infer-npm-tag.ts'
 
 type PackageInfo = {
     name: string
@@ -105,16 +106,6 @@ function resolvePublishTag(publishPackages: PackageInfo[], requestedTag: string 
     }
 
     return inferredTag
-}
-
-function inferNpmTag(version: string): string {
-    const buildMetadataStart = version.indexOf('+')
-    const versionWithoutBuildMetadata = buildMetadataStart === -1 ? version : version.slice(0, buildMetadataStart)
-    const prereleaseStart = versionWithoutBuildMetadata.indexOf('-')
-    if (prereleaseStart === -1) return 'latest'
-
-    const [prereleaseIdentifier] = versionWithoutBuildMetadata.slice(prereleaseStart + 1).split('.')
-    return /^\d+$/.test(prereleaseIdentifier) ? 'next' : prereleaseIdentifier
 }
 
 function packageInfo(packageJsonPath: string): PackageInfo {
