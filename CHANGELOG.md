@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.6.16] - 2026-08-26
+
+### Changed
+
+- link manual setup guide (6ad504d)
+- select newest published release (da7245c)
+- add AI upgrade prompt (3c26d53)
+- replace beta badge with downloads (bd0b3b4)
+- add beta and CI badges (293f057)
+- simplify coverage badge workflow (cdd07ab)
+- render npm latest during static builds (8633978)
+- validate published release channels (9ac8376)
+
 ## [0.6.15-beta.0] - 2026-08-26
 
 ### Changed
