@@ -6,7 +6,6 @@ import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync,
 import { resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
-import { inferNpmTag } from '../../../../scripts/infer-npm-tag.ts'
 
 interface CommandResult {
     status: number | null
@@ -15,10 +14,16 @@ interface CommandResult {
     error: Error | undefined
 }
 
-interface PackageIdentity {
-    releaseTag: string
+type ReleaseTag = 'beta' | 'latest'
+
+interface PublishedRelease {
+    releaseTag: ReleaseTag
     creatorVersion: string
     pluginVersion: string
+    publishedAt: number
+}
+
+interface PackageIdentity extends PublishedRelease {
     pluginTarball: string
 }
 
@@ -165,42 +170,61 @@ async function pollUntil<T>(
     return attempt()
 }
 
-function readRepositoryVersion(): string {
-    const packageJson = readJsonFile(resolve(repositoryRoot, 'package.json'))
-    return requireString(packageJson.version, 'repository package version')
+function readPublishedVersion(packageName: string, releaseTag: ReleaseTag): string {
+    return requireCommand('npm', ['view', `${packageName}@${releaseTag}`, 'version'], repositoryRoot, undefined).trim()
+}
+
+function readPublishedAt(packageName: string, version: string): number {
+    const timestamp = requireCommand('npm', ['view', packageName, `time[${version}]`], repositoryRoot, undefined).trim()
+    const publishedAt = Date.parse(timestamp)
+    if (Number.isNaN(publishedAt)) {
+        throw new Error(`npm returned an invalid publication time for ${packageName}@${version}: ${timestamp}`)
+    }
+    return publishedAt
+}
+
+function readPublishedRelease(releaseTag: ReleaseTag): PublishedRelease {
+    const creatorVersion = readPublishedVersion('create-vite-taro', releaseTag)
+    const pluginVersion = readPublishedVersion('vite-plugin-taro', releaseTag)
+    if (creatorVersion !== pluginVersion) {
+        throw new Error(
+            `npm ${releaseTag} tags are inconsistent: create-vite-taro@${creatorVersion} and vite-plugin-taro@${pluginVersion}`
+        )
+    }
+
+    const publishedAt = Math.max(
+        readPublishedAt('create-vite-taro', creatorVersion),
+        readPublishedAt('vite-plugin-taro', pluginVersion)
+    )
+    return {
+        releaseTag: releaseTag,
+        creatorVersion: creatorVersion,
+        pluginVersion: pluginVersion,
+        publishedAt: publishedAt
+    }
 }
 
 function readPublishedPackageIdentity(): PackageIdentity {
-    const repositoryVersion = readRepositoryVersion()
-    const releaseTag = inferNpmTag(repositoryVersion)
-    const creatorVersion = requireCommand(
-        'npm',
-        ['view', `create-vite-taro@${releaseTag}`, 'version'],
-        repositoryRoot,
-        undefined
-    ).trim()
-    const pluginVersion = requireCommand(
-        'npm',
-        ['view', `vite-plugin-taro@${releaseTag}`, 'version'],
-        repositoryRoot,
-        undefined
-    ).trim()
+    const stableRelease = readPublishedRelease('latest')
+    const betaRelease = readPublishedRelease('beta')
+    const selectedRelease = betaRelease.publishedAt > stableRelease.publishedAt ? betaRelease : stableRelease
     const pluginTarball = requireCommand(
         'npm',
-        ['view', `vite-plugin-taro@${pluginVersion}`, 'dist.tarball'],
+        ['view', `vite-plugin-taro@${selectedRelease.pluginVersion}`, 'dist.tarball'],
         repositoryRoot,
         undefined
     ).trim()
 
-    if (creatorVersion !== repositoryVersion || pluginVersion !== repositoryVersion) {
-        throw new Error(
-            `Expected npm ${releaseTag} packages at ${repositoryVersion}; received create-vite-taro@${creatorVersion} and vite-plugin-taro@${pluginVersion}`
-        )
-    }
     if (!pluginTarball.startsWith('https://')) {
         throw new Error(`Published plugin tarball is not an HTTPS registry artifact: ${pluginTarball}`)
     }
-    return { releaseTag, creatorVersion, pluginVersion, pluginTarball }
+    return {
+        releaseTag: selectedRelease.releaseTag,
+        creatorVersion: selectedRelease.creatorVersion,
+        pluginVersion: selectedRelease.pluginVersion,
+        publishedAt: selectedRelease.publishedAt,
+        pluginTarball: pluginTarball
+    }
 }
 
 function createFreshProject(identity: PackageIdentity): void {
@@ -643,11 +667,12 @@ async function runDevToolsValidation(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-    stage('Resolving the repository release channel on npm')
+    stage('Resolving the newest npm release from the latest and beta channels')
     const identity = readPublishedPackageIdentity()
     console.log(`npm dist-tag: ${identity.releaseTag}`)
     console.log(`create-vite-taro@${identity.creatorVersion}`)
     console.log(`vite-plugin-taro@${identity.pluginVersion}`)
+    console.log(`release completed at ${new Date(identity.publishedAt).toISOString()}`)
 
     stage('Creating and installing a fresh disposable project')
     createFreshProject(identity)
