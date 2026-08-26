@@ -22,7 +22,7 @@ type RunOptions = {
 }
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const upstreamVersion = '4.2.0'
+const upstreamVersion = '4.2.1'
 
 const packages: PackageSpec[] = [
     {

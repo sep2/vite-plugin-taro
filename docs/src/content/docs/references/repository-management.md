@@ -89,7 +89,7 @@ pnpm dev:towxml-stream-demo:wx
 ## 生成文件
 
 - 不要手动编辑 `packages/vite-plugin-taro/dist`；运行 `pnpm build:plugin` 重新生成。
-- 不要直接修改 `packages/taro-react`、`packages/taro-plugin-framework-react` 或 `packages/taro-runtime` 的实现；修改对应的 `patches/*@4.2.0*.patch` 后运行 `pnpm prepare:taro`。
+- 不要直接修改 `packages/taro-react`、`packages/taro-plugin-framework-react` 或 `packages/taro-runtime` 的实现；修改对应的 `patches/*@4.2.1*.patch` 后运行 `pnpm prepare:taro`。
 - 不要手动编辑 `CHANGELOG.md`；运行 `pnpm changelog`，或在发布时由 release 命令生成。
 - 根目录的 `README.md` 与 `README.en.md` 是插件 README 的来源；`pnpm build:plugin` 会同步到 `packages/vite-plugin-taro`。
 

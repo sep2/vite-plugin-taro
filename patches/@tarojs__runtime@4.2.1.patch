@@ -29,7 +29,7 @@ index abb2d3e..423a5c6 100644
 +     * same React container and keeps the same id, but can now batch app.* updates through its own ctx just as each Page root
 +     * batches page.* updates. Reusing the host itself removes the need for a detached scheduler node.
 +     *
-+     * Taro and the framework locate this container by id; the pinned 4.2.0 runtime has no behavior branching on an APP
++     * Taro and the framework locate this container by id; the pinned 4.2.1 runtime has no behavior branching on an APP
 +     * nodeName or APP tagName. App snapshots hydrate the container's children rather than the container record itself, so
 +     * ROOT is never emitted as a native layout node. The observable change is limited to unsupported code directly
 +     * inspecting #app.nodeName/tagName or using this support fork with upstream templates. H5 loads the untouched

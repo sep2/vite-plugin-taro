@@ -65,7 +65,7 @@ shared apps for WeChat Mini Program (`wx`) and H5 targets.
 - `packages/loan-genius`: sample app used to test the plugin against `h5` and `wx` targets.
 - `packages/native-comp-demo`: wx-only development project for native custom-component integration.
 - `packages/hmr-stress-demo`: wx-only deep React tree fixture for paced and burst HMR stress tests.
-- `patches`: local patches applied to upstream Taro 4.2.0 packages when regenerating the generated packages.
+- `patches`: local patches applied to upstream Taro 4.2.1 packages when regenerating the generated packages.
 
 Node.js v26+ is available and can execute TypeScript natively.
 
@@ -98,6 +98,6 @@ Node.js v26+ is available and can execute TypeScript natively.
 - Do not manually edit `packages/vite-plugin-taro/dist`; rebuild it with `pnpm build:plugin`.
 - Do not manually edit generated Taro package implementation files under `packages/taro-react`,
   `packages/taro-plugin-framework-react`, or `packages/taro-runtime`. Change the relevant file in
-  `patches/*@4.2.0*.patch`, then run `pnpm prepare:taro`.
+  `patches/*@4.2.1*.patch`, then run `pnpm prepare:taro`.
 - The generated Taro package `package.json` and `README.md` files are local metadata and are preserved by
   `pnpm prepare:taro`.

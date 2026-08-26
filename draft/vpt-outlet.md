@@ -565,7 +565,7 @@ get _path() {
 ```
 
 The App root is the only root directly below the document container; Page roots live below `vpt_page_outlet`. Descendants
-therefore derive direct `app.*` or `page.*` paths without instance overrides or path translation. Taro 4.2.0 also names two
+therefore derive direct `app.*` or `page.*` paths without instance overrides or path translation. Taro 4.2.1 also names two
 initial Page-array reset paths explicitly:
 
 ```ts
@@ -997,7 +997,7 @@ resolve across WXML owners. The root `comp` remains Page-local, and explicit use
 Update:
 
 ```text
-patches/@tarojs__plugin-framework-react@4.2.0-react19.patch
+patches/@tarojs__plugin-framework-react@4.2.1-react19.patch
 ```
 
 Keep the ordinary four-argument `createReactApp()` API. Its existing Mini Program branch:
@@ -1013,8 +1013,8 @@ portal, detached Page container, Page registry, active-Page tracker, lifecycle s
 
 ### Patched Taro runtime package
 
-Generate `vite-plugin-taro-runtime` from the upstream `@tarojs/runtime@4.2.0` tarball and
-`../patches/@tarojs__runtime@4.2.0.patch` through `pnpm prepare:taro`, alongside the two existing patched Taro
+Generate `vite-plugin-taro-runtime` from the upstream `@tarojs/runtime@4.2.1` tarball and
+`../patches/@tarojs__runtime@4.2.1.patch` through `pnpm prepare:taro`, alongside the two existing patched Taro
 packages. The patch changes exactly five sites in the modular WX browser entry:
 
 ```text

@@ -150,7 +150,7 @@ export function h5TaroApiPreset() {
                     packageName: clientTaroApiId,
                     definition
                 }
-            ]
+            ] satisfies [string, object]
         ]
     }
 }

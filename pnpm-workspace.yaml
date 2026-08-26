@@ -3,10 +3,10 @@ packages:
   - docs
 
 overrides:
-  react: '^19.2.7'
-  react-dom: '^19.2.7'
-  vite: 8.2.1
-  '@tarojs/runner-utils>rollup': 4.60.3
+  react: '^19.2.8'
+  react-dom: '^19.2.8'
+  vite: 8.2.2
+  '@tarojs/runner-utils>rollup': 4.63.0
 
 allowBuilds:
   '@biomejs/biome': false
@@ -15,10 +15,37 @@ allowBuilds:
   esbuild: true
 
 minimumReleaseAgeExclude:
-  - '@weapp-tailwindcss/postcss@3.1.10 || 3.2.8'
-  - weapp-tailwindcss@5.1.14 || 5.2.11
-  - '@astrojs/starlight@0.41.7'
-  - vite@8.2.1
+  - '@weapp-tailwindcss/postcss@3.2.11'
+  - weapp-tailwindcss@5.3.5
+  - '@astrojs/starlight@0.41.9'
+  - astro@7.2.7
+  - rollup@4.63.0
+  - vite@8.2.2
+  - '@rollup/rollup-android-arm-eabi@4.63.0'
+  - '@rollup/rollup-android-arm64@4.63.0'
+  - '@rollup/rollup-darwin-arm64@4.63.0'
+  - '@rollup/rollup-darwin-x64@4.63.0'
+  - '@rollup/rollup-freebsd-arm64@4.63.0'
+  - '@rollup/rollup-freebsd-x64@4.63.0'
+  - '@rollup/rollup-linux-arm-gnueabihf@4.63.0'
+  - '@rollup/rollup-linux-arm-musleabihf@4.63.0'
+  - '@rollup/rollup-linux-arm64-gnu@4.63.0'
+  - '@rollup/rollup-linux-arm64-musl@4.63.0'
+  - '@rollup/rollup-linux-loong64-gnu@4.63.0'
+  - '@rollup/rollup-linux-loong64-musl@4.63.0'
+  - '@rollup/rollup-linux-ppc64-gnu@4.63.0'
+  - '@rollup/rollup-linux-ppc64-musl@4.63.0'
+  - '@rollup/rollup-linux-riscv64-gnu@4.63.0'
+  - '@rollup/rollup-linux-riscv64-musl@4.63.0'
+  - '@rollup/rollup-linux-s390x-gnu@4.63.0'
+  - '@rollup/rollup-linux-x64-gnu@4.63.0'
+  - '@rollup/rollup-linux-x64-musl@4.63.0'
+  - '@rollup/rollup-openbsd-x64@4.63.0'
+  - '@rollup/rollup-openharmony-arm64@4.63.0'
+  - '@rollup/rollup-win32-arm64-msvc@4.63.0'
+  - '@rollup/rollup-win32-ia32-msvc@4.63.0'
+  - '@rollup/rollup-win32-x64-gnu@4.63.0'
+  - '@rollup/rollup-win32-x64-msvc@4.63.0'
 
 patchedDependencies:
   canvas-confetti@1.9.4: patches/canvas-confetti@1.9.4.patch

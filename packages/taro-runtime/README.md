@@ -1,6 +1,6 @@
 # vite-plugin-taro-runtime
 
-> WX App-wrap build of `@tarojs/runtime@4.2.0` for `vite-plugin-taro`.
+> WX App-wrap build of `@tarojs/runtime@4.2.1` for `vite-plugin-taro`.
 
 > **AI-assisted development is recommended:** Follow the [VPT AI development guide](https://vpt.js.org/guides/ai/) and let a coding assistant create, develop, test, and validate your app.
 
@@ -22,7 +22,7 @@ The WX renderer needs direct `page.*` paths and an opaque private Page outlet wh
 ## Generated source
 
 - Generator: [`scripts/build-patched-taro-packages.ts`](../../scripts/build-patched-taro-packages.ts)
-- Patch: [`patches/@tarojs__runtime@4.2.0.patch`](../../patches/@tarojs__runtime@4.2.0.patch)
+- Patch: [`patches/@tarojs__runtime@4.2.1.patch`](../../patches/@tarojs__runtime@4.2.1.patch)
 - Output package directory: [`packages/taro-runtime`](.)
 
 Regenerate from the repository root:

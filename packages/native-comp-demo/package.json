@@ -10,14 +10,14 @@
         "typecheck": "tsc --project tsconfig.json"
     },
     "dependencies": {
-        "vite-plugin-taro": "workspace:*",
-        "react": "^19.2.7",
-        "react-dom": "^19.2.7"
+        "react": "^19.2.8",
+        "react-dom": "^19.2.8",
+        "vite-plugin-taro": "workspace:*"
     },
     "devDependencies": {
-        "@types/react": "^19.2.17",
+        "@types/react": "^19.2.18",
         "cross-env": "^10.1.0",
         "typescript": "^7.0.2",
-        "vite": "^8.2.0"
+        "vite": "^8.2.2"
     }
 }

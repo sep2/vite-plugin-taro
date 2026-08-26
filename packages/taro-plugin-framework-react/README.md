@@ -1,6 +1,6 @@
 # vite-plugin-taro-plugin-framework-react
 
-> React 19, WX App-view, and H5 Page-outlet build of `@tarojs/plugin-framework-react@4.2.0` for `vite-plugin-taro`.
+> React 19, WX App-view, and H5 Page-outlet build of `@tarojs/plugin-framework-react@4.2.1` for `vite-plugin-taro`.
 
 > **AI-assisted development is recommended:** Follow the [VPT AI development guide](https://vpt.js.org/guides/ai/) and let a coding assistant create, develop, test, and validate your app.
 
@@ -22,7 +22,7 @@ import Taro from 'virtual:taro/api'
 ## Generated source
 
 - Generator: [`scripts/build-patched-taro-packages.ts`](../../scripts/build-patched-taro-packages.ts)
-- Patch: [`patches/@tarojs__plugin-framework-react@4.2.0-react19.patch`](../../patches/@tarojs__plugin-framework-react@4.2.0-react19.patch)
+- Patch: [`patches/@tarojs__plugin-framework-react@4.2.1-react19.patch`](../../patches/@tarojs__plugin-framework-react@4.2.1-react19.patch)
 - Output package directory: [`packages/taro-plugin-framework-react`](.)
 
 Regenerate from the repository root:

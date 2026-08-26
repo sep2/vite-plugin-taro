@@ -128,8 +128,8 @@ test('rejects placement services and chunk delivery outside their lifecycle phas
 
 test('extracts the recursive React/Taro vendor closure without absorbing application modules', async () => {
     const applicationId = moduleId('application.js')
-    const reactId = '/workspace/node_modules/.pnpm/react@19.2.7/node_modules/react/index.js'
-    const taroId = '/workspace/node_modules/.pnpm/@tarojs+runtime@4.2.0/node_modules/@tarojs/runtime/index.js'
+    const reactId = '/workspace/node_modules/.pnpm/react@19.2.8/node_modules/react/index.js'
+    const taroId = '/workspace/node_modules/.pnpm/@tarojs+runtime@4.2.1/node_modules/@tarojs/runtime/index.js'
     const frameworkDependencyId = '/workspace/node_modules/.pnpm/tslib@2.8.1/node_modules/tslib/tslib.es6.mjs'
     const applicationDependencyId = moduleId('application-dependency.js')
     const output = await buildFixture({
@@ -166,10 +166,10 @@ test('extracts the recursive React/Taro vendor closure without absorbing applica
 })
 
 test('matches only explicit React and Taro framework package roots', () => {
-    assert.equal(isWxFrameworkVendorModule('/repo/node_modules/.pnpm/react@19.2.7/node_modules/react/index.js'), true)
+    assert.equal(isWxFrameworkVendorModule('/repo/node_modules/.pnpm/react@19.2.8/node_modules/react/index.js'), true)
     assert.equal(
         isWxFrameworkVendorModule(
-            '/repo/node_modules/.pnpm/@tarojs+runtime@4.2.0/node_modules/@tarojs/runtime/index.js'
+            '/repo/node_modules/.pnpm/@tarojs+runtime@4.2.1/node_modules/@tarojs/runtime/index.js'
         ),
         true
     )
