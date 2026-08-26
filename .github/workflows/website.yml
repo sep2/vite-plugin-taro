@@ -12,11 +12,6 @@ on:
         required: false
         type: string
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 concurrency:
   group: documentation-${{ inputs.deploy && 'pages' || github.ref }}
   cancel-in-progress: true
