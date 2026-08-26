@@ -1,7 +1,7 @@
 # VPT
 
 [![npm version](https://img.shields.io/npm/v/vite-plugin-taro.svg)](https://www.npmjs.com/package/vite-plugin-taro)
-[![npm downloads](https://img.shields.io/npm/dm/vite-plugin-taro.svg)](https://www.npmjs.com/package/vite-plugin-taro)
+[![npm downloads](https://badgen.net/npm/dm/vite-plugin-taro)](https://www.npmjs.com/package/vite-plugin-taro)
 ![Vite](https://img.shields.io/npm/dependency-version/vite-plugin-taro/peer/vite?label=Vite)
 [![CI](https://github.com/sep2/vite-plugin-taro/actions/workflows/windows.yml/badge.svg?branch=main)](https://github.com/sep2/vite-plugin-taro/actions/workflows/windows.yml)
 [![coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](https://github.com/sep2/vite-plugin-taro/actions/workflows/coverage.yml)
