@@ -45,7 +45,6 @@ Options:
   --dry-run          Preview the version bump and git steps without writing files.
   --skip-validation  Skip the local pnpm publish:dry validation before committing.
   --no-push          Create the release commit and tag locally without pushing.
-  --branch <name>    Release branch to push. Defaults to main.
   --remote <name>    Git remote to push. Defaults to origin.
   --help             Show this help.
 `
@@ -56,8 +55,8 @@ const skipValidation = takeFlag('--skip-validation')
 const noPush = takeFlag('--no-push')
 const help = takeFlag('--help') || takeFlag('-h')
 const preid = takeOption('--preid')
-const branch = takeOption('--branch') ?? 'main'
 const remote = takeOption('--remote') ?? 'origin'
+const releaseBranch = 'main'
 const bump = args.shift()
 
 if (help) {
@@ -91,13 +90,13 @@ if (dryRun) {
     console.log(
         noPush
             ? '- Would not push because --no-push was passed.'
-            : `- Would push: git push ${remote} ${branch} ${tagName}`
+            : `- Would push: git push --atomic ${remote} ${releaseBranch} ${tagName}`
     )
     process.exit(0)
 }
 
 assertCleanGitTree()
-assertCurrentBranch(branch)
+assertCurrentBranch(releaseBranch)
 
 const nextVersion = resolveNextVersion(false)
 const tagName = `v${nextVersion}`
@@ -122,10 +121,10 @@ run(git, ['tag', tagName])
 
 if (noPush) {
     console.log(`\nCreated release commit and tag ${tagName} locally. Push with:`)
-    console.log(`git push ${remote} ${branch} ${tagName}`)
+    console.log(`git push --atomic ${remote} ${releaseBranch} ${tagName}`)
 } else {
-    run(git, ['push', remote, branch, tagName])
-    console.log(`\nRelease ${tagName} pushed. GitHub Actions will publish packages and deploy Pages.`)
+    run(git, ['push', '--atomic', remote, releaseBranch, tagName])
+    console.log(`\nRelease ${tagName} pushed. GitHub Actions will validate and publish it.`)
 }
 
 function resolveNextVersion(printOutput: boolean): string {

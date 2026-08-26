@@ -1,25 +1,42 @@
-name: Windows CI
+name: Quality
 
 on:
-  push:
-    # Branch pushes run this CI directly; the release tag workflow also calls it as a publish prerequisite.
-    branches:
-      - '**'
-    paths:
-      - '.github/workflows/windows.yml'
-      - 'packages/vite-plugin-taro/**'
-  pull_request:
-    paths:
-      - '.github/workflows/windows.yml'
-      - 'packages/vite-plugin-taro/**'
-  workflow_dispatch:
   workflow_call:
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare Taro packages
+        run: pnpm prepare:taro
+
+      - name: Build plugin
+        run: pnpm build:plugin
+
+      - name: Enforce 100% coverage
+        run: pnpm test:coverage
+
+  windows:
     runs-on: windows-latest
     steps:
       - name: Checkout

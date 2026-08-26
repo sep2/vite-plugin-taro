@@ -1,24 +1,94 @@
-name: Publish packages
+name: CI and release
 
 on:
   push:
-    tags:
-      - 'v*.*.*'
+    branches:
+      - main
+  pull_request:
 
 permissions:
   contents: read
-  id-token: write
+  pull-requests: read
 
 concurrency:
-  group: publish-${{ github.ref }}
-  cancel-in-progress: false
+  group: pipeline-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  windows:
-    uses: ./.github/workflows/windows.yml
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      documentation: ${{ steps.changes.outputs.documentation }}
+      quality: ${{ steps.changes.outputs.quality }}
+      release_tag: ${{ steps.release.outputs.tag }}
+      stable_release_tag: ${{ !contains(steps.release.outputs.tag, '-') && steps.release.outputs.tag || '' }}
+    steps:
+      - name: Checkout push
+        if: github.event_name == 'push'
+        uses: actions/checkout@v6
+        with:
+          fetch-tags: true
+
+      - name: Classify changes
+        id: changes
+        uses: dorny/paths-filter@v4
+        with:
+          base: ${{ github.ref }}
+          filters: |
+            documentation:
+              - '.github/workflows/website.yml'
+              - 'docs/**'
+              - 'pnpm-*.yaml'
+            quality:
+              - '.github/workflows/publish.yml'
+              - '.github/workflows/quality.yml'
+              - 'package.json'
+              - 'packages/**'
+              - 'patches/**'
+              - 'pnpm-*.yaml'
+              - 'scripts/**'
+
+      - name: Find release tag
+        if: github.event_name == 'push'
+        id: release
+        run: echo "tag=$(git tag --points-at "$GITHUB_SHA" --list 'v*.*.*')" >> "$GITHUB_OUTPUT"
+
+  quality:
+    if: needs.plan.outputs.release_tag != '' || needs.plan.outputs.quality == 'true'
+    needs: plan
+    uses: ./.github/workflows/quality.yml
+
+  documentation-check:
+    if: github.event_name == 'pull_request' && needs.plan.outputs.documentation == 'true'
+    needs: plan
+    permissions:
+      contents: read
+    uses: ./.github/workflows/website.yml
+    with:
+      deploy: false
+
+  documentation:
+    if: >-
+      github.event_name == 'push' &&
+      needs.plan.outputs.release_tag == '' &&
+      needs.plan.outputs.documentation == 'true'
+    needs: plan
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/website.yml
+    with:
+      deploy: true
 
   publish:
-    needs: windows
+    if: needs.plan.outputs.release_tag != ''
+    needs:
+      - plan
+      - quality
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -39,25 +109,23 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Prepare Taro packages
-        run: pnpm prepare:taro
-
-      - name: Build plugin
-        run: pnpm build:plugin
-
-      - name: Test
-        run: pnpm test
-
+      # publish:all owns preparation, build, typecheck, package validation, and publication.
       - name: Publish packages
         run: pnpm publish:all -- --no-git-check
 
-  website:
-    if: ${{ !contains(github.ref_name, '-') }}
-    needs: publish
+  release-documentation:
+    if: >-
+      needs.plan.outputs.stable_release_tag != '' ||
+      (needs.plan.outputs.release_tag != '' &&
+      needs.plan.outputs.documentation == 'true')
+    needs:
+      - plan
+      - publish
     permissions:
       contents: read
       pages: write
       id-token: write
     uses: ./.github/workflows/website.yml
     with:
-      release_tag: ${{ github.ref_name }}
+      deploy: true
+      release_tag: ${{ needs.plan.outputs.stable_release_tag }}

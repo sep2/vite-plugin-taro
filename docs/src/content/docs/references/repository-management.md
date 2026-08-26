@@ -130,4 +130,4 @@ pnpm release patch --dry-run
 pnpm release patch --no-push
 ```
 
-推送 `v*.*.*` tag 后，`.github/workflows/publish.yml` 会通过 npm Trusted Publishing 按依赖顺序发布公开包，并在稳定版本发布成功后部署文档；beta 发布不会重复部署。文档首页在静态构建阶段显示稳定版本：普通文档构建读取 npm 的 `latest` dist-tag，稳定发布完成后的部署直接使用已发布的 Git tag，避免 npm CDN 缓存造成版本回退，且不依赖浏览器 JavaScript。不要为该工作流配置 `NPM_TOKEN`。
+release 命令会通过一次原子 push 同时更新 `main` 与 `v*.*.*` tag。`.github/workflows/publish.yml` 以指向该次 push HEAD 的 tag 作为发布信号，统一编排覆盖率、Windows 验证、npm Trusted Publishing 和文档部署；各子工作流不再独立响应同一次 push。稳定版本发布成功后始终重新部署文档，beta 版本只在本次 push 包含文档改动时部署。文档首页在静态构建阶段显示稳定版本：普通文档构建读取 npm 的 `latest` dist-tag，稳定发布完成后的部署直接使用已发布的 Git tag，避免 npm CDN 缓存造成版本回退，且不依赖浏览器 JavaScript。不要为该工作流配置 `NPM_TOKEN`。

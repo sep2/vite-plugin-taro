@@ -3,19 +3,14 @@ name: Deploy documentation to GitHub Pages
 on:
   workflow_call:
     inputs:
+      deploy:
+        description: Deploy the completed build to GitHub Pages
+        required: true
+        type: boolean
       release_tag:
         description: Stable release tag already published by the caller
         required: false
         type: string
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'docs/**'
-  pull_request:
-    paths:
-      - 'docs/**'
 
 permissions:
   contents: read
@@ -23,7 +18,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: documentation-${{ inputs.deploy && 'pages' || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -44,7 +39,7 @@ jobs:
           out-dir: docs/dist
 
   deploy:
-    if: github.event_name != 'pull_request'
+    if: inputs.deploy
     needs: build
     runs-on: ubuntu-latest
     environment:
