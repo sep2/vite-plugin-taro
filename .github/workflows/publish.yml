@@ -59,3 +59,5 @@ jobs:
       pages: write
       id-token: write
     uses: ./.github/workflows/website.yml
+    with:
+      release_tag: ${{ github.ref_name }}

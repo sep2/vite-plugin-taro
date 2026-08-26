@@ -1,5 +1,5 @@
 ---
-import { fetchLatestStableVersion } from '../lib/fetch-latest-stable-version.ts'
+import { resolveLatestStableVersion } from '../lib/resolve-latest-stable-version.ts'
 
 interface Props {
     packageName: string
@@ -7,7 +7,7 @@ interface Props {
 
 const { packageName } = Astro.props
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
-const latestVersion = await fetchLatestStableVersion(packageName)
+const latestVersion = await resolveLatestStableVersion(packageName, process.env.VPT_RELEASE_TAG)
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
 const packageUrl = `https://www.npmjs.com/package/${packageName}`
 ---

@@ -2,6 +2,11 @@ name: Deploy documentation to GitHub Pages
 
 on:
   workflow_call:
+    inputs:
+      release_tag:
+        description: Stable release tag already published by the caller
+        required: false
+        type: string
   workflow_dispatch:
   push:
     branches:
@@ -24,6 +29,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      VPT_RELEASE_TAG: ${{ inputs.release_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
