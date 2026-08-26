@@ -32,12 +32,12 @@ const releaseFiles = [
 ]
 
 const usage = `Usage:
-  pnpm release <version|major|minor|patch|premajor|preminor|prepatch|prerelease> [--preid beta]
+  pnpm release <version|beta|major|minor|patch|premajor|preminor|prepatch|prerelease> [--preid beta]
 
 Examples:
   pnpm release patch
   pnpm release 0.2.0
-  pnpm release prerelease --preid beta
+  pnpm release beta
   pnpm release patch --dry-run
 
 Options:
@@ -77,8 +77,7 @@ if (preid && !bump.startsWith('pre')) {
     fail(`--preid can only be used with pre* bump types.\n\n${usage}`)
 }
 
-const versionBumpArgs = [bump]
-if (preid) versionBumpArgs.push('--preid', preid)
+const versionBumpArgs = bump === 'beta' ? ['prerelease', '--preid', 'beta'] : preid ? [bump, '--preid', preid] : [bump]
 
 if (dryRun) {
     const nextVersion = resolveNextVersion(true)

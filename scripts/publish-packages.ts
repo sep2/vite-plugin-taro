@@ -22,7 +22,7 @@ const usage = `Usage:
 Options:
   --dry-run       Run npm publish --dry-run for every packed package.
   --otp <code>    npm 2FA one-time password. You can also use NPM_CONFIG_OTP.
-  --tag <tag>     npm dist-tag to publish with, for example next.
+  --tag <tag>     Override the inferred npm dist-tag (latest for stable, prerelease ID for prereleases).
   --skip-checks   Skip typecheck and package validation before publish.
   --no-git-check  Do not require a clean git working tree.
   --help          Show this help.
@@ -35,7 +35,7 @@ const skipChecks = takeFlag('--skip-checks')
 const noGitCheck = takeFlag('--no-git-check')
 const help = takeFlag('--help') || takeFlag('-h')
 const otp = takeOption('--otp') ?? process.env.NPM_CONFIG_OTP
-const tag = takeOption('--tag')
+const explicitTag = takeOption('--tag')
 
 if (help) {
     console.log(usage)
@@ -53,11 +53,13 @@ const packages = [
     packageInfo('packages/vite-plugin-taro/package.json'),
     packageInfo('packages/create-vite-taro/package.json')
 ]
+const tag = resolvePublishTag(packages, explicitTag)
+
 console.log(dryRun ? 'Publishing dry run for:' : 'Publishing packages:')
 for (const pkg of packages) {
     console.log(`- ${pkg.name}@${pkg.version}`)
 }
-console.log('')
+console.log(`npm dist-tag: ${tag}\n`)
 
 const publishTargets = dryRun ? packages : packages.filter((pkg) => !isPackageVersionPublished(pkg))
 
@@ -93,6 +95,28 @@ try {
 
 console.log(dryRun ? '\nPublish dry run completed.' : '\nPublish completed.')
 
+function resolvePublishTag(publishPackages: PackageInfo[], requestedTag: string | undefined): string {
+    if (requestedTag) return requestedTag
+
+    const inferredTags = publishPackages.map((pkg) => inferNpmTag(pkg.version))
+    const [inferredTag] = inferredTags
+    if (inferredTags.some((candidateTag) => candidateTag !== inferredTag)) {
+        fail(`Cannot infer one npm dist-tag because package prerelease channels differ: ${inferredTags.join(', ')}`)
+    }
+
+    return inferredTag
+}
+
+function inferNpmTag(version: string): string {
+    const buildMetadataStart = version.indexOf('+')
+    const versionWithoutBuildMetadata = buildMetadataStart === -1 ? version : version.slice(0, buildMetadataStart)
+    const prereleaseStart = versionWithoutBuildMetadata.indexOf('-')
+    if (prereleaseStart === -1) return 'latest'
+
+    const [prereleaseIdentifier] = versionWithoutBuildMetadata.slice(prereleaseStart + 1).split('.')
+    return /^\d+$/.test(prereleaseIdentifier) ? 'next' : prereleaseIdentifier
+}
+
 function packageInfo(packageJsonPath: string): PackageInfo {
     const absolutePath = path.join(repoRoot, packageJsonPath)
     const packageJson: unknown = JSON.parse(readFileSync(absolutePath, 'utf8'))
@@ -123,7 +147,7 @@ function packPackage(pkg: PackageInfo, packRoot: string): string {
 function publishPackage(tarballPath: string): void {
     const publishArgs = ['publish', tarballPath, '--access', 'public']
     if (dryRun) publishArgs.push('--dry-run', '--force')
-    if (tag) publishArgs.push('--tag', tag)
+    publishArgs.push('--tag', tag)
     if (otp) publishArgs.push('--otp', otp)
 
     run(npm, publishArgs)

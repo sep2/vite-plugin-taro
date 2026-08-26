@@ -115,10 +115,17 @@ pnpm release patch
 pnpm release 1.0.0
 ```
 
+发布 beta 版本：
+
+```sh
+pnpm release beta
+```
+
+该命令从稳定版本创建下一个 patch 的 `beta.0`，再次运行则递增为 `beta.1`。发布工作流会将预发布标识符用作 npm dist-tag，因此 beta 版本发布到 `beta`，不会移动 `latest`。测试完成后，使用不含预发布标识符的明确版本号发布稳定版本。
+
 常用选项：
 
 ```sh
-pnpm release prerelease --preid beta
 pnpm release patch --dry-run
 pnpm release patch --no-push
 ```
