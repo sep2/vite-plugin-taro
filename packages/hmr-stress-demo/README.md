@@ -24,7 +24,7 @@ pnpm setup:hmr-stress-demo:devtools   # one cold window setup
 pnpm test:hmr-stress-demo:devtools
 ```
 
-Setup alone may use up to 60 seconds for the first DevTools compile. Every actual case has a hard 30-second deadline and reuses that fixed runtime. The complete suite runs only the strict burst, rebuild storm, and syntax recovery cases. Runtime assertions replace long fixed settle sleeps, and plugin rebuilding is opt-in.
+Setup and the aggregate suite may each use up to 60 seconds. Every standalone case has a hard 30-second deadline and reuses the fixed runtime. The complete suite runs only the strict burst, rebuild storm, and syntax recovery cases. Runtime assertions replace long fixed settle sleeps, and plugin rebuilding is opt-in.
 
 Individual cases can be run independently:
 

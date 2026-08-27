@@ -60,8 +60,8 @@ async function testStateRetention(name: string, profile: HmrEditProfile, harness
     assert.match(restoredMarkerSource, /hmrMarker = 'baseline'/)
     assert.match(restoredMarkerSource, /appOutletFirst = true/)
     await assertPageState(mirrorValue, harness)
-    const stack = await harness.readRuntime('pageStack')
-    assert.equal(isRecord(stack) && Array.isArray(stack.pageStack) ? stack.pageStack.length : 0, 2)
+    const stack = await harness.readPageStack()
+    assert.equal(stack.length, 2)
     await assertCleanConsole(harness)
 
     await harness.navigate('navigateBack', undefined)
@@ -84,7 +84,7 @@ async function testRuntimeRebuild(harness: DevToolsHarness): Promise<void> {
 
     assert.equal((await countLog(harness.serverLogPath, 'wx full rebuild required')) - rebuildLogsBefore, rounds)
     await delay(3_000)
-    await harness.readRuntime('currentPage')
+    await harness.readCurrentPage()
     await assertCleanConsole(harness)
 }
 
@@ -155,28 +155,24 @@ async function readHmrInfo(infoPath: string): Promise<HmrInfo> {
 }
 
 async function assertCurrentRoute(expectedPath: string, harness: DevToolsHarness): Promise<void> {
-    const currentPage = await harness.readRuntime('currentPage')
-    assert.equal(isRecord(currentPage) ? currentPage.path : undefined, expectedPath)
+    const currentPage = await harness.readCurrentPage()
+    assert.equal(currentPage.path, expectedPath)
 }
 
 async function setPageState(value: string, harness: DevToolsHarness): Promise<void> {
-    await harness.element('#stress-input', 'input', value)
+    await harness.inputElement('#stress-input', value)
 }
 
 async function assertPageState(value: string, harness: DevToolsHarness): Promise<void> {
-    assert.equal(await harness.element('#stress-input', 'value', undefined), value)
+    assert.equal(await harness.readElement('#stress-input', 'value'), value)
 }
 
 async function waitForBaselineMarker(harness: DevToolsHarness): Promise<void> {
-    await waitFor(
-        async () => (await harness.element('#hmr-status', 'text', undefined)) === 'marker:baseline',
-        6_000,
-        100
-    )
+    await waitFor(async () => (await harness.readElement('#hmr-status', 'text')) === 'marker:baseline', 6_000, 100)
 }
 
 async function assertAppProjectionBaseline(harness: DevToolsHarness): Promise<void> {
-    const appText = await harness.element('comp', 'text', undefined)
+    const appText = await harness.readElement('comp', 'text')
     assert.match(appText, /App marker: baseline/)
     assert.match(appText, /App outlet: first/)
 }

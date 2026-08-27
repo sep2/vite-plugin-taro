@@ -7,16 +7,19 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 
 export type DevToolsHarness = Readonly<{
-    element: (selector: string, action: string, value: string | undefined) => Promise<string>
+    inputElement: (selector: string, value: string) => Promise<void>
     markerPath: string
     navigate: (action: string, url: string | undefined) => Promise<void>
     outDir: string
     readConsoleErrors: () => Promise<string>
-    readRuntime: (action: string) => Promise<unknown>
+    readCurrentPage: () => Promise<Readonly<{ path: string }>>
+    readElement: (selector: string, action: ElementReadAction) => Promise<string>
+    readPageStack: () => Promise<readonly unknown[]>
     root: string
     serverLogPath: string
 }>
 
+type ElementReadAction = 'text' | 'value'
 type ToolParameters = Readonly<Record<string, string>>
 type TestCase = (harness: DevToolsHarness) => Promise<void>
 type ServerProcess = ChildProcessByStdio<null, Readable, Readable>
@@ -25,7 +28,8 @@ const scriptsRoot = path.dirname(fileURLToPath(import.meta.url))
 const fixtureRoot = path.dirname(scriptsRoot)
 const repositoryRoot = path.resolve(fixtureRoot, '../..')
 const commandTimeoutMilliseconds = 12_000
-const testDeadline = Date.now() + (process.env.VPT_HMR_SETUP === '1' ? 60_000 : 30_000)
+const requestedCase = process.argv[2] ?? 'all'
+const testDeadline = Date.now() + (process.env.VPT_HMR_SETUP === '1' || requestedCase === 'all' ? 60_000 : 30_000)
 // Keep both this client name and the RAM-disk project path fixed. WeChat DevTools persists trust by identity/path; random temp
 // directories or per-run clients would force a new authorization prompt and make standalone cases slower and interactive.
 const devToolsClient = process.env.VPT_HMR_DEVTOOLS_CLIENT ?? 'Pi'
@@ -141,16 +145,15 @@ async function openProject(outDir: string): Promise<void> {
 
 function createHarness(root: string, outDir: string): DevToolsHarness {
     return {
-        element: async (selector, action, value) => {
-            const parameters: Record<string, string> = { selector: selector, action: action }
-            if (value !== undefined) {
-                parameters.value = value
+        inputElement: async (selector, value) => {
+            const result = await runTool('automation_element_action', outDir, {
+                selector: selector,
+                action: 'input',
+                value: value
+            })
+            if (!isRecord(result) || result.success !== true) {
+                throw new Error(`Expected successful input result for ${selector}`)
             }
-            const result = await runTool('automation_element_action', outDir, parameters)
-            if (typeof result !== 'string') {
-                throw new Error(`Expected element result for ${selector}`)
-            }
-            return result
         },
         markerPath: path.join(root, 'src/components/hmr-marker.ts'),
         navigate: async (action, url) => {
@@ -170,7 +173,30 @@ function createHarness(root: string, outDir: string): DevToolsHarness {
             }
             return result
         },
-        readRuntime: (action) => runTool('automation_runtime_info', outDir, { action: action }),
+        readCurrentPage: async () => {
+            const result = await runTool('automation_runtime_info', outDir, { action: 'currentPage' })
+            if (!isRecord(result) || !isRecord(result.currentPage) || typeof result.currentPage.path !== 'string') {
+                throw new Error('Expected current DevTools page')
+            }
+            return { path: result.currentPage.path }
+        },
+        readElement: async (selector, action) => {
+            const result = await runTool('automation_element_action', outDir, {
+                selector: selector,
+                action: action
+            })
+            if (typeof result !== 'string') {
+                throw new Error(`Expected element result for ${selector}:${action}`)
+            }
+            return result
+        },
+        readPageStack: async () => {
+            const result = await runTool('automation_runtime_info', outDir, { action: 'pageStack' })
+            if (!isRecord(result) || !Array.isArray(result.pageStack)) {
+                throw new Error('Expected DevTools page stack')
+            }
+            return result.pageStack
+        },
         root: root,
         serverLogPath: path.join(root, 'vite.log')
     }
