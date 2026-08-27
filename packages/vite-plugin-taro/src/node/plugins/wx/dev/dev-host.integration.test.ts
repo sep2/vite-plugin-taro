@@ -275,6 +275,29 @@ test('rejects startup with the original complete-output failure', async () => {
     }
 })
 
+test('coalesces one full-file save into one wx patch', async (context) => {
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1')
+    context.after(fixture.close)
+
+    await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
+
+    await writeFile(fixture.pagePath, renderPage('one source generation'))
+    const publishedPatches = await waitForFile(
+        fixture.patchesPath,
+        (source) => source.includes('one source generation'),
+        maximumWaitAttempts
+    )
+    const stablePatches = await waitForStableFile(
+        fixture.patchesPath,
+        publishedPatches,
+        stableReadCount,
+        maximumWaitAttempts
+    )
+    const sequences = [...stablePatches.matchAll(/\{seq: (\d+)/g)].map((match) => Number(match[1]))
+
+    assert.deepEqual(sequences, [1])
+})
+
 test('publishes and acknowledges cumulative wx patches without rotating the App heap', async (context) => {
     const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1')
     context.after(fixture.close)

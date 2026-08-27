@@ -268,11 +268,11 @@ export async function createWxDevHost({
             },
             rebuildStrategy: 'never',
             watch: {
-                // Rolldown must observe every source generation and emit every incremental factory: later patches do not
-                // reconstruct modules changed only by an earlier callback. RxJS conflates publication after compilation,
-                // preserving the complete patch sequence while avoiding repeated physical DevTools notifications.
+                // Normalize platform filesystem notifications before compilation. In particular, a single Windows full-file
+                // save can emit separate truncate and write events. Rolldown's debounce folds those physical events into one
+                // logical source generation; the RxJS result stream still preserves every callback emitted after compilation.
                 skipWrite: false,
-                useDebounce: false
+                useDebounce: true
             }
         })
     }

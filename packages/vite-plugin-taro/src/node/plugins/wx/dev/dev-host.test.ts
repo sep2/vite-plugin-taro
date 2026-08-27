@@ -103,6 +103,8 @@ test('reduces synthetic engine update variants and unknown host failures without
     let triggerFullBuild: (() => void) | undefined
     const deliveredFiles: string[] = []
     const dev = (_input: unknown, _output: unknown, devOptions: DevOptions) => {
+        // Filesystem debounce normalizes duplicate native notifications before they become compiler generations.
+        assert.equal(devOptions.watch?.useDebounce, true)
         const onHmrUpdates = devOptions.onHmrUpdates
         const onOutput = devOptions.onOutput
         if (!onHmrUpdates || !onOutput) {
