@@ -39,6 +39,34 @@ bun run dev:wx
 
 保存 JavaScript、TypeScript、React 组件或样式后，开发者工具会自动显示更新。
 
+若希望每次构建都全量输出，不用热更新缓存，可这样调用：
+<Tabs syncKey="package-manager">
+    <TabItem label="npm">
+
+        ```sh
+        npm run build:wx -- --watch
+        ```
+
+    </TabItem>
+    <TabItem label="pnpm">
+
+        ```sh
+        pnpm build:wx -- --watch
+        ```
+
+    </TabItem>
+    <TabItem label="bun">
+
+        ```sh
+        bun run build:wx -- --watch
+        ```
+
+    </TabItem>
+</Tabs>
+
+这样每次修改都会刷新开发者工具。一般在 AI 开发，或者 dev 模式出问题时临时使用。
+
+
 ## 保留的状态
 
 普通热更新会保留：
@@ -97,5 +125,6 @@ projectPrivateConfigJson: {
 4. `skylineRenderEnable` 未开启。
 
 仍然无效时，关闭开发者工具和开发命令，删除 `dist/wx`，重新运行 `dev:wx` 后再打开生成目录。
+
 
 实现细节参见[热更新实现原理](/references/hmr-implementation/)。
