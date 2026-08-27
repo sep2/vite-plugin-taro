@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { setTimeout as delay } from 'node:timers/promises'
-import { isRecord, type LoanHmrDevTools, waitFor } from './hmr-devtools.ts'
+import { type LoanHmrDevTools, waitFor } from './hmr-devtools.ts'
 import { type LoanHmrFixture, replaceOnce } from './hmr-fixture.ts'
 
 type HmrContext = Readonly<{
@@ -37,13 +37,13 @@ export async function runLoanHmrCases(context: HmrContext): Promise<void> {
     await context.devTools.navigate('reLaunch', `/${calculatorRoute}`)
     await waitForMarker(context, calculatorMarker, 'baseline')
     await waitForElement(context, primaryInput)
-    await context.devTools.element(primaryInput, 'input', initialLoanValue)
+    await context.devTools.inputElement(primaryInput, initialLoanValue)
     await waitFor(
-        async () => (await context.devTools.element(primaryInput, 'value', undefined)) === initialLoanValue,
+        async () => (await context.devTools.readElement(primaryInput, 'value')) === initialLoanValue,
         5_000,
         75
     )
-    await context.devTools.element('#loan-submit', 'tap', undefined)
+    await context.devTools.tapElement('#loan-submit')
     await waitForElement(context, '#loan-result-header')
 
     await runCalculatorFlows(context)
@@ -196,7 +196,7 @@ async function runBurstFlow(context: HmrContext): Promise<void> {
 }
 
 async function runOverlayFlows(context: HmrContext): Promise<void> {
-    await context.devTools.element('#loan-picker-root', 'tap', undefined)
+    await context.devTools.tapElement('#loan-picker-root')
     await waitForElement(context, 'picker-view')
     await runFlow(
         context,
@@ -221,10 +221,10 @@ async function runOverlayFlows(context: HmrContext): Promise<void> {
             await waitForElement(context, 'picker-view')
         }
     )
-    await context.devTools.element('#loan-picker-confirm', 'tap', undefined)
+    await context.devTools.tapElement('#loan-picker-confirm')
     await delay(250)
 
-    await context.devTools.element('#loan-explain-loanLrp', 'tap', undefined)
+    await context.devTools.tapElement('#loan-explain-loanLrp')
     await waitForElement(context, '#loan-explain-dialog')
     await runFlow(
         context,
@@ -240,7 +240,7 @@ async function runOverlayFlows(context: HmrContext): Promise<void> {
             await waitForElement(context, '#loan-explain-dialog')
         }
     )
-    await context.devTools.element('#loan-explain-dialog button', 'tap', undefined)
+    await context.devTools.tapElement('#loan-explain-dialog button')
     await delay(100)
 
     await runFlow(
@@ -257,12 +257,12 @@ async function runOverlayFlows(context: HmrContext): Promise<void> {
 }
 
 async function runNavigationFlows(context: HmrContext): Promise<void> {
-    await context.devTools.element('#loan-open-monthly', 'tap', undefined)
+    await context.devTools.tapElement('#loan-open-monthly')
     await waitForRoute(context, monthlyRoute)
     await waitForMarker(context, monthlyMarker, 'baseline')
-    await context.devTools.element('#loan-payment-equalPrincipal', 'tap', undefined)
+    await context.devTools.tapElement('#loan-payment-equalPrincipal')
     assert.match(
-        await context.devTools.element('#loan-payment-equalPrincipal', 'outerWxml', undefined),
+        await context.devTools.readElement('#loan-payment-equalPrincipal', 'outerWxml'),
         /comm_form_icon_gouxuan\.png/
     )
 
@@ -278,7 +278,7 @@ async function runNavigationFlows(context: HmrContext): Promise<void> {
         async () => {
             await assertRoute(context, monthlyRoute)
             assert.match(
-                await context.devTools.element('#loan-payment-equalPrincipal', 'outerWxml', undefined),
+                await context.devTools.readElement('#loan-payment-equalPrincipal', 'outerWxml'),
                 /comm_form_icon_gouxuan\.png/
             )
         }
@@ -295,7 +295,7 @@ async function runNavigationFlows(context: HmrContext): Promise<void> {
         async () => {
             await assertRoute(context, monthlyRoute)
             assert.match(
-                await context.devTools.element('#loan-payment-equalPrincipal', 'outerWxml', undefined),
+                await context.devTools.readElement('#loan-payment-equalPrincipal', 'outerWxml'),
                 /comm_form_icon_gouxuan\.png/
             )
         }
@@ -315,7 +315,7 @@ async function runNavigationFlows(context: HmrContext): Promise<void> {
     await waitForRoute(context, calculatorRoute)
     await assertCalculatorState(context)
 
-    await context.devTools.element('#loan-open-history', 'tap', undefined)
+    await context.devTools.tapElement('#loan-open-history')
     await waitForRoute(context, historyRoute)
     await waitForMarker(context, historyMarker, 'baseline')
     await runFlow(
@@ -356,7 +356,7 @@ async function runRecoveryFlow(context: HmrContext): Promise<void> {
     try {
         await context.fixture.write(file, 'export default function Broken(\n')
         await delay(500)
-        assert.equal(await context.devTools.element('#loan-hmr-marker', 'text', undefined), 'baseline')
+        assert.equal(await context.devTools.readElement('#loan-hmr-marker', 'text'), 'baseline')
         await assertCalculatorState(context)
     } finally {
         await context.fixture.write(file, original)
@@ -375,7 +375,7 @@ async function runNormalRemountFlow(context: HmrContext): Promise<void> {
     await context.devTools.navigate('redirectTo', `/${calculatorRoute}`)
     await waitForRoute(context, calculatorRoute)
     await waitForElement(context, primaryInput)
-    assert.equal(await context.devTools.element(primaryInput, 'value', undefined), '0')
+    assert.equal(await context.devTools.readElement(primaryInput, 'value'), '0')
     console.log('[loan-hmr] normal-unmount-remount passed')
 }
 
@@ -409,18 +409,18 @@ async function runFlow(
 }
 
 async function assertWxSafeClasses(context: HmrContext, generation: string): Promise<void> {
-    const current = await context.devTools.readRuntime('currentPage')
-    if (!isRecord(current) || current.path !== calculatorRoute) {
+    const current = await context.devTools.readCurrentPage()
+    if (current.path !== calculatorRoute) {
         return
     }
 
-    const wxml = await context.devTools.element('#loan-field-commerceLoanYear', 'outerWxml', undefined)
+    const wxml = await context.devTools.readElement('#loan-field-commerceLoanYear', 'outerWxml')
     assert.match(wxml, /py-5_d5/, `WX-unsafe class after ${generation}`)
 }
 
 async function assertCalculatorState(context: HmrContext): Promise<void> {
     await assertRoute(context, calculatorRoute)
-    assert.equal(await context.devTools.element(primaryInput, 'value', undefined), initialLoanValue)
+    assert.equal(await context.devTools.readElement(primaryInput, 'value'), initialLoanValue)
     await waitForElement(context, '#loan-result-header')
 }
 
@@ -428,7 +428,7 @@ async function waitForMarker(context: HmrContext, markerFile: string, value: str
     await waitFor(
         async () => {
             try {
-                return (await context.devTools.element('#loan-hmr-marker', 'text', undefined)) === value
+                return (await context.devTools.readElement('#loan-hmr-marker', 'text')) === value
             } catch {
                 return false
             }
@@ -442,8 +442,8 @@ async function waitForMarker(context: HmrContext, markerFile: string, value: str
 async function waitForRoute(context: HmrContext, route: string): Promise<void> {
     await waitFor(
         async () => {
-            const current = await context.devTools.readRuntime('currentPage')
-            return isRecord(current) && current.path === route
+            const current = await context.devTools.readCurrentPage()
+            return current.path === route
         },
         8_000,
         75
@@ -451,15 +451,15 @@ async function waitForRoute(context: HmrContext, route: string): Promise<void> {
 }
 
 async function assertRoute(context: HmrContext, route: string): Promise<void> {
-    const current = await context.devTools.readRuntime('currentPage')
-    assert.equal(isRecord(current) ? current.path : undefined, route)
+    const current = await context.devTools.readCurrentPage()
+    assert.equal(current.path, route)
 }
 
 async function waitForElement(context: HmrContext, selector: string): Promise<void> {
     await waitFor(
         async () => {
             try {
-                await context.devTools.element(selector, 'wxml', undefined)
+                await context.devTools.readElement(selector, 'wxml')
                 return true
             } catch {
                 return false

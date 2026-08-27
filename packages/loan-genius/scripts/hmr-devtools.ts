@@ -5,13 +5,17 @@ import type { LoanHmrFixture } from './hmr-fixture.ts'
 
 export type LoanHmrDevTools = Readonly<{
     closeProject: () => Promise<void>
-    element: (selector: string, action: string, value: string | undefined) => Promise<string>
+    inputElement: (selector: string, value: string) => Promise<void>
     navigate: (action: string, url: string | undefined) => Promise<void>
     openProject: () => Promise<void>
     readConsoleErrors: () => Promise<string>
-    readRuntime: (action: string) => Promise<unknown>
+    readCurrentPage: () => Promise<Readonly<{ path: string }>>
+    readElement: (selector: string, action: ElementReadAction) => Promise<string>
+    tapElement: (selector: string) => Promise<void>
 }>
 
+type ElementInteractionAction = 'input' | 'tap'
+type ElementReadAction = 'outerWxml' | 'text' | 'value' | 'wxml'
 type ToolParameters = Readonly<Record<string, string>>
 
 const execFileAsync = promisify(execFile)
@@ -20,21 +24,26 @@ const devToolsClient = process.env.VPT_LOAN_HMR_DEVTOOLS_CLIENT ?? 'Pi'
 
 export function createLoanHmrDevTools(fixture: LoanHmrFixture): LoanHmrDevTools {
     const runTool = (tool: string, parameters: ToolParameters) => executeTool(fixture, tool, parameters)
+    const interactWithElement = async (
+        selector: string,
+        action: ElementInteractionAction,
+        value: string | undefined
+    ): Promise<void> => {
+        const parameters: ToolParameters =
+            value === undefined
+                ? { selector: selector, action: action }
+                : { selector: selector, action: action, value: value }
+        const result = await runTool('automation_element_action', parameters)
+        if (!isRecord(result) || result.success !== true) {
+            throw new Error(`Expected successful interaction result for ${selector}:${action}`)
+        }
+    }
+
     return {
         closeProject: async () => {
             await runTool('close_project_window', {})
         },
-        element: async (selector, action, value) => {
-            const parameters: ToolParameters =
-                value === undefined
-                    ? { selector: selector, action: action }
-                    : { selector: selector, action: action, value: value }
-            const result = await runTool('automation_element_action', parameters)
-            if (typeof result !== 'string') {
-                throw new Error(`Expected string result for ${selector}:${action}`)
-            }
-            return result
-        },
+        inputElement: (selector, value) => interactWithElement(selector, 'input', value),
         navigate: async (action, url) => {
             const parameters: ToolParameters = url === undefined ? { action: action } : { action: action, url: url }
             await runTool('automation_navigate', parameters)
@@ -61,7 +70,21 @@ export function createLoanHmrDevTools(fixture: LoanHmrFixture): LoanHmrDevTools 
                 .filter((line) => line.length > 0 && isErrorConsoleEntry(line))
                 .join('\n')
         },
-        readRuntime: (action) => runTool('automation_runtime_info', { action: action })
+        readCurrentPage: async () => {
+            const result = await runTool('automation_runtime_info', { action: 'currentPage' })
+            if (!isRecord(result) || !isRecord(result.currentPage) || typeof result.currentPage.path !== 'string') {
+                throw new Error('Expected current DevTools page')
+            }
+            return { path: result.currentPage.path }
+        },
+        readElement: async (selector, action) => {
+            const result = await runTool('automation_element_action', { selector: selector, action: action })
+            if (typeof result !== 'string') {
+                throw new Error(`Expected string result for ${selector}:${action}`)
+            }
+            return result
+        },
+        tapElement: (selector) => interactWithElement(selector, 'tap', undefined)
     }
 }
 
@@ -124,6 +147,6 @@ export async function waitFor(
     }
 }
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null
 }
