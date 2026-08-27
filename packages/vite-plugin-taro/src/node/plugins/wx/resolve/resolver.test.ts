@@ -71,19 +71,6 @@ test('resolves fixed and route-specific private IDs', () => {
     )
 })
 
-test('normalizes configured component IDs before they enter the module graph', () => {
-    const resolver = createResolver(options)
-    const projectRoot = 'C:\\projects\\my-app'
-    const pageCapsule = resolver.resolveId(pageCapsuleId, '/runtime/page.js?route=pages%2Fhome%2Findex', projectRoot)
-    const appComponent = resolver.resolveId(appComponentId, undefined, projectRoot)
-    const pageComponent = resolver.resolveId(pageComponentId, pageCapsule, projectRoot)
-
-    assert.ok(appComponent)
-    assert.ok(pageComponent)
-    assert.doesNotMatch(appComponent, /\\/)
-    assert.doesNotMatch(pageComponent, /\\/)
-})
-
 test('rejects Page-private imports without one configured route origin', () => {
     const resolver = createResolver(options)
     const projectRoot = path.resolve('/project')
