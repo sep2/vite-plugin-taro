@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.6.18] - 2026-08-27
+
+### Changed
+
+- document full rebuild watch mode (8dcdca0)
+- draft rules (c64815d)
+- update HMR stress DevTools harness (46375af)
+- update Loan Genius DevTools harness (f17489f)
+- docs (6403fed)
+
+### Fixed
+
+- neutralize CSS payloads in HMR patches (a6aa09c)
+- read current DevTools page data (0328656)
+
 ## [0.6.18-beta.0] - 2026-08-27
 
 ### Changed

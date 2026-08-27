@@ -1,6 +1,6 @@
 {
     "name": "vite-plugin-taro-runtime",
-    "version": "0.6.18-beta.0",
+    "version": "0.6.18",
     "description": "Taro 4.2 runtime patched for vite-plugin-taro WX App wrapping.",
     "author": "sep2",
     "license": "MIT",
