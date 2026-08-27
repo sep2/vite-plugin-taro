@@ -9,13 +9,16 @@ export type LoanHmrDevTools = Readonly<{
     navigate: (action: string, url: string | undefined) => Promise<void>
     openProject: () => Promise<void>
     readConsoleErrors: () => Promise<string>
-    readRuntime: (action: string) => Promise<unknown>
+    readCurrentPage: () => Promise<Record<string, unknown>>
 }>
 
 type ToolParameters = Readonly<Record<string, string>>
 
 const execFileAsync = promisify(execFile)
+const elementReadActions: readonly string[] = ['outerWxml', 'text', 'value', 'wxml']
 const commandTimeoutMilliseconds = 12_000
+const devToolsExecutable = process.platform === 'win32' ? 'cmd.exe' : 'wechatide'
+const devToolsArguments = process.platform === 'win32' ? ['/d', '/s', '/c', 'wechatide'] : []
 const devToolsClient = process.env.VPT_LOAN_HMR_DEVTOOLS_CLIENT ?? 'Pi'
 
 export function createLoanHmrDevTools(fixture: LoanHmrFixture): LoanHmrDevTools {
@@ -30,10 +33,13 @@ export function createLoanHmrDevTools(fixture: LoanHmrFixture): LoanHmrDevTools 
                     ? { selector: selector, action: action }
                     : { selector: selector, action: action, value: value }
             const result = await runTool('automation_element_action', parameters)
-            if (typeof result !== 'string') {
-                throw new Error(`Expected string result for ${selector}:${action}`)
+            if (elementReadActions.includes(action)) {
+                if (typeof result !== 'string') {
+                    throw new Error(`Expected string result for ${selector}:${action}`)
+                }
+                return result
             }
-            return result
+            return ''
         },
         navigate: async (action, url) => {
             const parameters: ToolParameters = url === undefined ? { action: action } : { action: action, url: url }
@@ -61,7 +67,13 @@ export function createLoanHmrDevTools(fixture: LoanHmrFixture): LoanHmrDevTools 
                 .filter((line) => line.length > 0 && isErrorConsoleEntry(line))
                 .join('\n')
         },
-        readRuntime: (action) => runTool('automation_runtime_info', { action: action })
+        readCurrentPage: async () => {
+            const result = await runTool('automation_runtime_info', { action: 'currentPage' })
+            if (!isRecord(result) || !isRecord(result.currentPage)) {
+                throw new Error('Expected current page result')
+            }
+            return result.currentPage
+        }
     }
 }
 
@@ -77,8 +89,8 @@ async function runToolWithTimeout(
 ): Promise<unknown> {
     const parameterArguments = Object.entries(parameters).flatMap(([name, value]) => [`--${name}`, value])
     const { stdout } = await execFileAsync(
-        'wechatide',
-        ['-c', devToolsClient, '-t', tool, '--project', fixture.outDir, ...parameterArguments],
+        devToolsExecutable,
+        [...devToolsArguments, '-c', devToolsClient, '-t', tool, '--project', fixture.outDir, ...parameterArguments],
         {
             cwd: fixture.repositoryRoot,
             env: process.env,
@@ -124,6 +136,6 @@ export async function waitFor(
     }
 }
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null
 }

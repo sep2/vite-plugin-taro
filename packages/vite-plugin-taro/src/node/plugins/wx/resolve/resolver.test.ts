@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
+import { normalizePath } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { appComponentId } from '../../client/constant.ts'
 import {
@@ -57,13 +58,16 @@ test('resolves fixed and route-specific private IDs', () => {
         'pages/home/index-capsule': `${pageCapsulePath}?route=pages%2Fhome%2Findex`
     })
     assert.equal(resolver.resolveId(vitePreloadId, undefined, projectRoot), bootstrapPath)
-    assert.equal(resolver.resolveId(appComponentId, undefined, projectRoot), path.resolve(projectRoot, 'src/app.tsx'))
+    assert.equal(
+        resolver.resolveId(appComponentId, undefined, projectRoot),
+        normalizePath(path.resolve(projectRoot, 'src/app.tsx'))
+    )
 
     const pageCapsule = resolver.resolveId(pageCapsuleId, '/runtime/page.js?route=pages%2Fhome%2Findex', projectRoot)
     assert.equal(pageCapsule, `${pageCapsulePath}?route=pages%2Fhome%2Findex`)
     assert.equal(
         resolver.resolveId(pageComponentId, pageCapsule, projectRoot),
-        path.resolve(projectRoot, 'src/pages/home/index.tsx')
+        normalizePath(path.resolve(projectRoot, 'src/pages/home/index.tsx'))
     )
 })
 
