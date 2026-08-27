@@ -1,251 +1,125 @@
 ---
 name: automator
-description: 负责页面操作：点击、输入、滚动、截图、验证。
+description: >-
+  小程序/小游戏页面自动化：点击、输入、滚动、导航、断言、生成 automator 脚本。
+  小程序走 selector / 页面栈；小游戏走画布坐标触摸（automation_game_action）。
+  用户要点按钮、填表、页面验证、自动化测试时使用。不负责 console/network 深度排查。
 ---
 
 # automator
 
 ## 用途
 
-在当前小程序项目内做确定性的 UI 操作和验证。
+在当前项目内做确定性 UI 操作与验证。先按 `compileType` 分流：`miniprogram` → 小程序；`game` / `gamePlugin` → 小游戏。二者工具集不同，不要混用。
 
-典型情况：
-
-- 点按钮、输入文字、滚动页面
-- 在页面间导航
-- 截图留证
-- 验证页面状态是否符合预期
-
-## 工作流
-
-1. 解析目标流程。
-2. 通过工具执行导航和交互。
-3. 采集验证证据。
-4. 输出简洁的 pass/fail 摘要。
-
-## 工具列表
-
-### automation_navigate — 页面导航
-
-执行小程序页面导航。
-
-```bash
-wechatide -c <clientName> -t automation_navigate --project <project> --action navigateTo --url pages/index/index
-```
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `project` | string | 是 | 项目本地绝对路径 |
-| `action` | string | 是 | `navigateTo`、`redirectTo`、`navigateBack`、`reLaunch`、`switchTab` |
-| `url` | string | 否 | 目标页面路径（navigateBack 时不需要） |
-| `delta` | number | 否 | 回退层数（仅 navigateBack） |
+参数与动作枚举：`wechatide -c <clientName> <tool> --help`。调用前须已由根入口完成登录检查；项目窗口未开时先经 initializer。截图统一用 `simulator_screenshot`（参数见 `--help`）。
 
 ---
 
-### automation_element_action — 元素级操作
+## 小程序
 
-执行元素点击、输入、文本读取、样式读取和触摸操作。**点击和输入都用这个工具。**
+### 工作流
+
+1. 解析目标流程 → 导航/交互 → 采集证据 → pass/fail 摘要
+2. 「等 → 再点/再跳」用工具自带 `waitForSelector` / `wait`，不要拆成单独等待 tool
+3. 不确定选择器时，先 `automation_page_action`（`querySelectorAll`）
+
+### 意图 → 工具
+
+| 意图 | 工具 |
+|------|------|
+| 页面导航 | `automation_navigate` |
+| 点击/输入/长按/读文本/样式/触摸 | `automation_element_action`（必须带 `selector`） |
+| 读/写 page data、querySelector、callMethod | `automation_page_action` |
+| 页面滚动；真机调试 / 关工具 | `automation_viewport_action`（`pageScrollTo` / `remote` / `close`） |
+| 截图 | `simulator_screenshot` |
+| 运行时页栈/当前页 | `automation_runtime_info`（主归属 initializer，此处只读） |
+| 执行受控表达式 | `automation_evaluate` |
+| 调用/mock wx API | `automation_wx_api`（主归属 debugger；此处限流程内 mock/调用） |
+| 测试号 / ticket | `automation_testaccount` |
+| 生成脚本草稿 | `automation_generate_script`（生成后需人工检查） |
+
+### 示例
 
 ```bash
-wechatide -c <clientName> -t automation_element_action --project <project> --selector button --action tap
+wechatide -c <clientName> automation_element_action --project <project> --selector button --action tap --wait-for-selector button
+wechatide -c <clientName> automation_page_action --project <project> --action querySelectorAll --selector button
+wechatide -c <clientName> simulator_screenshot --project <project> --path <localOutputPath>
 ```
 
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `project` | string | 是 | 项目本地绝对路径 |
-| `action` | string | 是 | 见下方动作列表 |
-| `selector` | string | 是 | CSS 选择器，定位目标元素 |
-| `type` | string | 否 | trigger 的事件类型 |
-| `detail` | object | 否 | trigger 的事件 detail；CLI 使用 `--detail-file` |
-| `value` | string | 否 | input 的输入值 |
-| `name` | string | 否 | attribute 的属性名 |
-| `x` | number | 否 | 触摸坐标 x |
-| `y` | number | 否 | 触摸坐标 y |
-| `touches` | array | 否 | 触摸点列表；CLI 使用 `--touches-file` |
-| `changedTouches` | array | 否 | 变化的触摸点列表；CLI 使用 `--changed-touches-file` |
+### 边界
 
-**支持动作**：`tap`、`longpress`、`trigger`、`input`、`size`、`offset`、`text`、`attribute`、`value`、`property`、`wxml`、`outerWxml`、`style`、`scrollWidth`、`scrollHeight`、`scrollTo`、`touchstart`、`touchmove`、`touchend`
+- 元素交互只用 `automation_element_action`，不是 `automation_viewport_action`
+- `automation_viewport_action` **不支持** tap/input
+- 不要对小程序项目调用 `automation_game_action`
+- 生成脚本先在项目目录 `npm i miniprogram-automator`，再用 `node <script> [projectPath]` 运行；不传路径时用录制时的项目路径
+
+### 失败快表
+
+| 情况 | 处理 |
+|------|------|
+| 窗口未开 / `PROJECT_*` | initializer 开窗；配置错误见 [project-tool-error-guide.md](../../wechatide-tools/references/project-tool-error-guide.md) |
+| timeout / 找不到元素 | 记录步骤与当前页；`querySelectorAll` 核对选择器；**不要**盲目加长 wait 死循环 |
+| 需要 console/network 归因 | 移交 debugger，带上复现步骤与选择器 |
+| User denied（测试号等） | 停等；勿自动重试破坏性动作 |
 
 ---
 
-### automation_page_action — 页面级操作
+## 小游戏
 
-执行页面数据读取、查询、等待和页面方法调用。
+### 工作流
+
+1. `simulator_screenshot` 看清目标 → 用图上像素坐标触摸 → 再截图取证 → pass/fail 摘要
+2. 交互只用画布坐标或截图坐标，不用 WXML `selector` / 页面导航 / page data
+3. 等待只用可选 `wait`（秒）；无 `waitForSelector`
+4. 从图上取点：先 `simulator_screenshot`，再 tap/swipe 带 `--coordinate-space image` 与返回的宽高（见下方边界）
+
+### 意图 → 工具
+
+| 意图 | 工具 |
+|------|------|
+| 画布 tap / swipe / touch\* | `automation_game_action`（默认画布坐标；或 `coordinateSpace=image`） |
+| 运行时执行表达式 | `automation_evaluate`（`wx.*` 等；勿依赖页面栈 / WXML） |
+| 截图 | `simulator_screenshot` |
+| 调用/mock wx API | `automation_wx_api`（主归属 debugger；此处限流程内 mock/调用） |
+| 测试号 / ticket | `automation_testaccount` |
+
+**不要用**（小游戏无页面栈 / WXML）：`automation_navigate`、`automation_element_action`、`automation_page_action`、`automation_runtime_info`、`automation_generate_script`。
+
+### 示例
 
 ```bash
-wechatide -c <clientName> -t automation_page_action --project <project> --action querySelectorAll --selector button
+wechatide -c <clientName> simulator_screenshot --project <project>
+wechatide -c <clientName> automation_game_action --project <project> --action tap --x 120 --y 340
+wechatide -c <clientName> automation_game_action --project <project> --action tap --x 240 --y 680 --coordinate-space image --image-width 750 --image-height 1334
+wechatide -c <clientName> automation_game_action --project <project> --action swipe --start-x 20 --start-y 400 --end-x 300 --end-y 400 --duration 300
+wechatide -c <clientName> automation_evaluate --project <project> --fn-source 'function(){ return wx.getSystemInfoSync() }'
 ```
 
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `project` | string | 是 | 项目本地绝对路径 |
-| `action` | string | 是 | `getData`、`setData`、`waitFor`、`querySelector`、`querySelectorAll`、`size`、`callMethod`、`scrollTop` |
-| `path` | string | 否 | getData 的数据路径 |
-| `patch` | string | 否 | setData 的补丁（JSON 字符串） |
-| `condition` | string | 否 | waitFor 的条件表达式 |
-| `selector` | string | 否 | querySelector/querySelectorAll 的选择器 |
-| `method` | string | 否 | callMethod 的方法名 |
-| `args` | array | 否 | callMethod 的参数；CLI 使用 `--args-file` |
+### 边界
+
+- 触摸只用 `automation_game_action`；误用 selector / navigate → 停止并改回本工具
+- `automation_evaluate` 可执行 `wx.*` 等表达式；小游戏勿写依赖 `getCurrentPages` / Page 的代码
+- `coordinateSpace=image` 时：`x`/`y`/`startX`/`startY`/`endX`/`endY` 均为截图像素，且必须带与参照图一致的 `imageWidth`/`imageHeight`；工具按当前画布尺寸换算，agent 不要自己算 scale
+- 默认 `coordinateSpace=canvas`（或不传）时上述坐标为画布逻辑坐标
+- 需重新编译时走 compiler 的 `simulator_refresh`，不是 `simulator_open_page` / `compile_wxml`
+
+### 失败快表
+
+| 情况 | 处理 |
+|------|------|
+| 窗口未开 / `PROJECT_*` | initializer 开窗；配置错误见 [project-tool-error-guide.md](../../wechatide-tools/references/project-tool-error-guide.md) |
+| 误用 selector / navigate / page_action | 停止；改用 `automation_game_action` |
+| 触摸无反馈 | 核对坐标空间（canvas vs image）与 image 尺寸；补截图；移交 debugger 看 console |
+| 需要 console/network 归因 | 移交 debugger，带上复现步骤与坐标 |
+| User denied（测试号等） | 停等；勿自动重试破坏性动作 |
 
 ---
 
-### automation_viewport_action — 小程序级操作
+## 移交
 
-执行全局操作：截图、页面滚动等。**不支持 tap/input。**
-
-```bash
-wechatide -c <clientName> -t automation_viewport_action --project <project> --action screenshot --wait-for-selector .submit-btn --path <localOutputPath>
-```
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `project` | string | 是 | 项目本地绝对路径 |
-| `action` | string | 是 | `pageScrollTo`、`screenshot`、`testAccounts`、`stopAudits`、`getTicket`、`setTicket`、`refreshTicket`、`remote`、`close` |
-| `scrollTop` | number | 否 | 页面滚动目标位置 |
-| `path` | string | 否 | 截图本地输出路径 |
-| `waitForSelector` | string | 截图时二选一 | 截图前等待该选择器出现，推荐优先使用 |
-| `waitSeconds` | number | 截图时二选一 | 截图前固定等待秒数，范围 0-10 |
-| `ticket` | string | 否 | ticket 值 |
-
-截图要求：
-
-- `action: "screenshot"` 必须传入 `waitForSelector` 或 `waitSeconds` 之一。
-- 优先使用 `waitForSelector`，让截图等待页面关键元素出现后再执行。
-- 只有在没有稳定选择器时才使用 `waitSeconds`。
-
----
-
-### automation_evaluate — 运行时执行
-
-在小程序上下文中执行受控 evaluate。
-
-```bash
-wechatide -c <clientName> -t automation_evaluate --project <project> --fn-source 'function() { return 1 }'
-```
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `project` | string | 是 | 项目本地绝对路径 |
-| `action` | string | 固定 | 固定为 `evaluate`（CLI 自动注入，无需传参） |
-| `fnSource` | string | 是 | 要执行的函数源码 |
-| `args` | array | 否 | 函数参数；CLI 使用 `--args-file` |
-
----
-
-### automation_runtime_info — 运行时信息
-
-获取 pageStack、currentPage 或 systemInfo。
-
-```bash
-wechatide -c <clientName> -t automation_runtime_info --project <project> --action currentPage
-```
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `project` | string | 是 | 项目本地绝对路径 |
-| `action` | string | 是 | `pageStack`、`currentPage`、`systemInfo` |
-
----
-
-### automation_wx_api — 小程序 API 调试
-
-调用、mock 或恢复 wx API。
-
-```bash
-wechatide -c <clientName> -t automation_wx_api --project <project> --action call --method getSystemInfo
-```
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `project` | string | 是 | 项目本地绝对路径 |
-| `action` | string | 是 | `call`、`mock`、`restore` |
-| `method` | string | 是 | wx API 方法名 |
-| `args` | array | 否 | 调用参数；CLI 使用 `--args-file` |
-| `result` | object | 否 | mock 返回值；CLI 使用 `--result-file` |
-| `functionDeclaration` | string | 否 | mock 函数声明 |
-
----
-
-### automation_generate_script — 生成 automator 脚本
-
-把已记录调用生成可运行的 automator 脚本。生成结果作为草稿，使用前应人工检查。
-
-```bash
-wechatide -c <clientName> -t automation_generate_script [--include-failed] [--clear-history]
-```
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `includeFailed` | boolean | 否 | 是否包含失败的调用 |
-| `clearHistory` | boolean | 否 | 是否清除历史 |
-
----
-
-## 常见目标到工具
-
-| 用户意图 | 选择 |
-|---------|------|
-| 想进入某个页面 | `automation_navigate`（action: `navigateTo`） |
-| 想点击某个元素 | `automation_element_action`（action: `tap`） |
-| 想输入文字 | `automation_element_action`（action: `input`） |
-| 想读取元素文本 | `automation_element_action`（action: `text`） |
-| 想查看页面有哪些元素 | `automation_page_action`（action: `querySelectorAll`） |
-| 想截图 | `automation_viewport_action`（action: `screenshot`） |
-| 想滚动页面 | `automation_viewport_action`（action: `pageScrollTo`） |
-| 想读取页面数据 | `automation_page_action`（action: `getData`） |
-| 想执行自定义表达式 | `automation_evaluate` |
-
-## 快速调用示例
-
-点击页面中第一个 button：
-
-```bash
-wechatide -c CodeBuddy -t automation_element_action --project <project> --selector button --action tap
-```
-
-向 input 输入文字：
-
-```bash
-wechatide -c CodeBuddy -t automation_element_action --project <project> --selector input --action input --value hello
-```
-
-读取某元素的文本内容：
-
-```bash
-wechatide -c CodeBuddy -t automation_element_action --project <project> --selector .title --action text
-```
-
-查找页面中所有 button 元素：
-
-```bash
-wechatide -c CodeBuddy -t automation_page_action --project <project> --action querySelectorAll --selector button
-```
-
-截图（推荐等待关键元素出现）：
-
-```bash
-wechatide -c CodeBuddy -t automation_viewport_action --project <project> --action screenshot --wait-for-selector .submit-btn --path <localOutputPath>
-```
-
-## 重要提醒
-
-- **点击、输入、长按等元素交互** 全部通过 `automation_element_action` 完成，不是 `automation_viewport_action`
-- `automation_viewport_action` 仅用于全局操作（截图、页面滚动等），不支持 tap/input
-- 截图必须提供 `waitForSelector` 或 `waitSeconds`；优先选择能代表页面已渲染完成的 selector
-- `automation_element_action` 必须提供 `selector` 参数（CSS 选择器），用于定位目标元素
-- 如果不确定选择器，先用 `automation_page_action`（action: `querySelectorAll`）列出元素
-
-## timeout 处理
-
-如果自动化相关调用出现 timeout，不要只停留在报错本身。
-
-推荐处理方式：
-
-1. 先记录当前是哪一步动作 timeout。
-2. 检查当前页面和运行时状态是否仍可读取。
-3. 如果页面状态仍可读取，优先补充当前页面、关键元素和最后一次成功动作作为证据。
-4. 如果页面状态不可读，输出 timeout 步骤、最后一次可读状态和错误原文，不要在本 scene 内继续扩展恢复动作。
-
-使用提醒：
-
-- timeout 后应优先补充状态证据，再决定是否直接重试
+| 目标 | 还需 |
+|------|------|
+| debugger | 失败步骤；小程序带 currentPage/selector，小游戏带坐标；已采集截图路径 |
+| compiler | 小程序：需重新编译的页面；小游戏：`simulator_refresh` |
+| 结束 | pass/fail 摘要与关键证据 |
