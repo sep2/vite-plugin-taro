@@ -300,9 +300,13 @@ test('renders Tailwind CSS and final patch factories from one class set', async 
         const added = await waitForFinalizedHmr(hmrResults, additionStart, (result) =>
             /py-5_d5/.test(result.codes.join('\n'))
         )
+        const addedCode = added.codes.join('\n')
         assert.match(await readFile(globalWxssPath, 'utf8'), /\.py-5_d5\b/)
-        assert.match(added.codes.join('\n'), /py-5_d5/)
-        assert.doesNotMatch(added.codes.join('\n'), /py-5\.5/)
+        assert.match(addedCode, /py-5_d5/)
+        assert.match(addedCode, /registerFactory\([^\n]*app\.css/)
+        assert.match(addedCode, /\b(?:const|let|var)\s+__vite__css[\w$]*\s*=\s*"";/)
+        assert.match(addedCode, /__vite__updateStyle\(/)
+        assert.doesNotMatch(addedCode, /py-5\.5/)
 
         const removalStart = hmrResults.length
         await writeFile(appId, renderTailwindApplication('mt-2 mr-4.5'))

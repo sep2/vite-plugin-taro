@@ -46,7 +46,7 @@ type JavaScriptArtifact = Readonly<{
 /** Vite plugin with the development-host operation that finalizes one coherent WX style/JavaScript transaction. */
 export type WxStylePlugin = Plugin &
     Readonly<{
-        /** Converts patch factories and publishes their matching global WXSS through the host's atomic writer. */
+        /** Neutralizes browser CSS payloads and publishes their matching global WXSS through the host's atomic writer. */
         finalizeUpdate: <Artifact extends JavaScriptArtifact>(
             artifacts: readonly Artifact[],
             writeWxss: (wxss: string) => Promise<void>
@@ -146,7 +146,8 @@ const wxStyleOptions = {
  * The development host calls `finalizeUpdate()` after Rolldown produces patch factories or a complete-output notification.
  * Finalization uses the `PluginContext` captured by `buildStart`, so it observes the same current graph as the compiler. After
  * all conversion succeeds, the host's atomic writer publishes changed WXSS before `finalizeUpdate()` returns converted patch
- * factories. The patch publisher therefore cannot expose newer JavaScript class identities before matching selectors exist.
+ * factories. Their captured Vite CSS literals are emptied first; factories, exports, changed IDs, and sequences remain intact.
+ * The patch publisher therefore cannot expose newer JavaScript class identities before matching selectors exist.
  * `publishedWxss` advances only after a successful write and suppresses byte-identical writes that would otherwise trigger
  * unnecessary WeChat DevTools reload events.
  *
@@ -353,8 +354,14 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
             artifacts: readonly Artifact[],
             writeWxss: (wxss: string) => Promise<void>
         ): Promise<readonly Artifact[]> => {
+            // CSS is already captured for physical publication, so its browser payload need not enter JavaScript conversion.
+            const javaScript = artifacts.map((artifact) => ({
+                code: neutralizeViteCssPayload(artifact.code),
+                filename: artifact.filename
+            }))
+
             // Step 1: complete every fallible conversion against one snapshot of the current module graph.
-            const output = await finalizeCurrentOutput(graphContext, artifacts)
+            const output = await finalizeCurrentOutput(graphContext, javaScript)
 
             // Step 2: publish changed WXSS first so DevTools cannot observe JavaScript containing newer class identities.
             if (output.wxss !== publishedWxss) {
@@ -547,6 +554,30 @@ function isApplicationStyle(id: string): boolean {
     const query = id.slice(queryStart + 1, fragmentStart < 0 ? undefined : fragmentStart)
     const parameters = new URLSearchParams(query)
     return ignoredStyleQueries.every((parameter) => !parameters.has(parameter))
+}
+
+/**
+ * Empties only the CSS bytes in Vite's generated browser transport:
+ *
+ * ```js
+ * const __vite__css = ".app { color: red }";
+ * __vite__updateStyle(__vite__id, __vite__css);
+ * ```
+ *
+ * becomes:
+ *
+ * ```js
+ * const __vite__css = "";
+ * __vite__updateStyle(__vite__id, __vite__css);
+ * ```
+ *
+ * The surrounding factory, CSS Module exports, changed IDs, and patch sequence remain unchanged.
+ */
+function neutralizeViteCssPayload(code: string): string {
+    return code.replace(
+        /(\b(?:const|let|var)\s+__vite__css[\w$]*\s*=\s*)"(?:\\[\s\S]|[^"\\])*"(?=;\s*\b__vite__updateStyle[\w$]*\s*\()/g,
+        '$1""'
+    )
 }
 
 /** Detects source forms that require Tailwind compilation before Vite processes the resulting CSS. */
