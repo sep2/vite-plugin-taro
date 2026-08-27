@@ -3,6 +3,7 @@
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
@@ -12,6 +13,11 @@ interface CommandResult {
     stdout: string
     stderr: string
     error: Error | undefined
+}
+
+interface CommandInvocation {
+    executable: string
+    args: readonly string[]
 }
 
 type ReleaseTag = 'beta' | 'latest'
@@ -38,14 +44,15 @@ interface ProjectPaths {
 
 const skillDirectory = resolve(fileURLToPath(new URL('.', import.meta.url)), '..')
 const repositoryRoot = resolve(skillDirectory, '../../..')
-const temporaryRoot = '/tmp/vpt-published-packages-test'
+const temporaryDirectory = tmpdir()
+const temporaryRoot = resolve(temporaryDirectory, 'vpt-published-packages-test')
 const projectPaths: ProjectPaths = {
     root: temporaryRoot,
     output: resolve(temporaryRoot, 'dist/wx'),
     source: resolve(temporaryRoot, 'src/pages/home/index.tsx'),
     counterSource: resolve(temporaryRoot, 'src/components/counter/counter.tsx'),
     backup: resolve(temporaryRoot, '.hmr-test-index.tsx.backup'),
-    viteLog: '/tmp/vpt-published-packages-test-vite.log'
+    viteLog: resolve(temporaryDirectory, 'vpt-published-packages-test-vite.log')
 }
 const appIdSource = resolve(repositoryRoot, 'packages/loan-genius/.env.local')
 const miniProgramSkill = resolve(repositoryRoot, '.agents/skills/miniprogram-dev-skill')
@@ -61,8 +68,15 @@ function stage(message: string): void {
     console.log(`\n[published-packages] ${message}`)
 }
 
+function createCommandInvocation(command: string, args: readonly string[]): CommandInvocation {
+    return process.platform === 'win32'
+        ? { executable: 'cmd.exe', args: ['/d', '/s', '/c', command, ...args] }
+        : { executable: command, args: args }
+}
+
 function execute(command: string, args: readonly string[], cwd: string, timeoutMs: number | undefined): CommandResult {
-    const result = spawnSync(command, args, {
+    const invocation = createCommandInvocation(command, args)
+    const result = spawnSync(invocation.executable, invocation.args, {
         cwd,
         encoding: 'utf8',
         maxBuffer: 20 * 1024 * 1024,
@@ -232,7 +246,7 @@ function createFreshProject(identity: PackageIdentity): void {
     requireCommand(
         'npm',
         ['create', `vite-taro@${identity.releaseTag}`, 'vpt-published-packages-test'],
-        '/tmp',
+        temporaryDirectory,
         undefined
     )
     const installOutput = requireCommand('npm', ['install'], projectPaths.root, undefined)
@@ -330,8 +344,8 @@ function validateStaticBuild(): void {
 }
 
 function readSkillVersion(): string {
-    const yaml = readFileSync(resolve(miniProgramSkill, 'skill.yaml'), 'utf8')
-    const match = /^version:\s*(\S+)$/m.exec(yaml)
+    const skill = readFileSync(resolve(miniProgramSkill, 'SKILL.md'), 'utf8')
+    const match = /^version:\s*(\S+)$/m.exec(skill)
     if (match === null) {
         throw new Error('Unable to read miniprogram-dev-skill version')
     }
@@ -340,10 +354,14 @@ function readSkillVersion(): string {
 
 function validateDevToolsStatus(): void {
     const result = requireRecord(
-        callWechatide('check_devtools_status', ['--skill-version', readSkillVersion()], true),
+        callWechatide('check_wechatide_status', ['--skill-version', readSkillVersion()], true),
         'DevTools status'
     )
-    requireString(result.openid, 'DevTools status openid')
+    const loginUser = requireRecord(result.loginUser, 'DevTools status login user')
+    requireString(loginUser.openid, 'DevTools status openid')
+    if (result.loginExpired !== false) {
+        throw new Error('WeChat DevTools login is expired')
+    }
 }
 
 function startDevServer(): ChildProcess {
@@ -351,9 +369,10 @@ function startDevServer(): ChildProcess {
     rmSync(projectPaths.viteLog, { force: true })
     mkdirSync(resolve(projectPaths.output, '..'), { recursive: true })
     const logDescriptor = openSync(projectPaths.viteLog, 'w')
-    const child = spawn('npm', ['run', 'dev:wx'], {
+    const invocation = createCommandInvocation('npm', ['run', 'dev:wx'])
+    const child = spawn(invocation.executable, invocation.args, {
         cwd: projectPaths.root,
-        detached: true,
+        detached: process.platform !== 'win32',
         stdio: ['ignore', logDescriptor, logDescriptor]
     })
     closeSync(logDescriptor)
@@ -394,7 +413,11 @@ function processGroupExists(pid: number): boolean {
 }
 
 async function stopDevServer(child: ChildProcess): Promise<void> {
-    if (child.pid === undefined) {
+    if (child.pid === undefined || child.exitCode !== null) {
+        return
+    }
+    if (process.platform === 'win32') {
+        requireCommand('taskkill', ['/pid', String(child.pid), '/t', '/f'], repositoryRoot, commandTimeoutMs)
         return
     }
     signalProcessGroup(child.pid, 'SIGTERM')
@@ -422,10 +445,10 @@ function currentRoute(): string | undefined {
         ['--project', projectPaths.output, '--action', 'currentPage'],
         false
     )
-    if (!isRecord(result)) {
+    if (!isRecord(result) || !isRecord(result.currentPage)) {
         return undefined
     }
-    return typeof result.route === 'string' ? result.route : undefined
+    return typeof result.currentPage.route === 'string' ? result.currentPage.route : undefined
 }
 
 function findCounterCount(value: unknown): number | undefined {
@@ -447,10 +470,10 @@ function readCounterCount(): number | undefined {
         ['--project', projectPaths.output, '--action', 'getData'],
         false
     )
-    if (!isRecord(result) || !isRecord(result.page)) {
+    if (!isRecord(result) || !isRecord(result.data) || !isRecord(result.data.page)) {
         return undefined
     }
-    return findCounterCount(result.page)
+    return findCounterCount(result.data.page)
 }
 
 function readProbeText(): string | undefined {

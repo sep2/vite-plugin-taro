@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
+import { normalizePath } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { appComponentId } from '../../client/constant.ts'
 import { h5AppPath } from '../constant.ts'
@@ -19,7 +20,10 @@ test('resolves the configured App component', () => {
     const resolver = createModuleResolver(options)
     const projectRoot = path.resolve('/project')
 
-    assert.equal(resolver.resolveId({ id: appComponentId, projectRoot }), path.resolve(projectRoot, 'src/app.tsx'))
+    assert.equal(
+        resolver.resolveId({ id: appComponentId, projectRoot }),
+        normalizePath(path.resolve(projectRoot, 'src/app.tsx'))
+    )
     assert.equal(resolver.resolveId({ id: 'react', projectRoot }), undefined)
 })
 

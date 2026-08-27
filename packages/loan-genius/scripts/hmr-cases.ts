@@ -46,12 +46,28 @@ export async function runLoanHmrCases(context: HmrContext): Promise<void> {
     await context.devTools.tapElement('#loan-submit')
     await waitForElement(context, '#loan-result-header')
 
+    await runIsolatedPageFlow(context)
     await runCalculatorFlows(context)
     await runOverlayFlows(context)
     await runNavigationFlows(context)
     await runRecoveryFlow(context)
     await runNormalRemountFlow(context)
     assert.equal(await context.devTools.readConsoleErrors(), '')
+}
+
+async function runIsolatedPageFlow(context: HmrContext): Promise<void> {
+    const file = 'src/pages/calculator/index.tsx'
+    const original = await context.fixture.read(file)
+    try {
+        await context.fixture.write(file, replaceOnce(original, 'direct-page-baseline', 'direct-page-updated'))
+        await waitForElementText(context, '#loan-direct-page-probe', 'direct-page-updated')
+        await assertCalculatorState(context)
+    } finally {
+        await context.fixture.write(file, original)
+    }
+    await waitForElementText(context, '#loan-direct-page-probe', 'direct-page-baseline')
+    await assertCalculatorState(context)
+    console.log('[loan-hmr] 00-isolated-page-self-update passed')
 }
 
 async function runCalculatorFlows(context: HmrContext): Promise<void> {
@@ -409,8 +425,8 @@ async function runFlow(
 }
 
 async function assertWxSafeClasses(context: HmrContext, generation: string): Promise<void> {
-    const current = await context.devTools.readCurrentPage()
-    if (current.path !== calculatorRoute) {
+    const currentPage = await context.devTools.readCurrentPage()
+    if (currentPage.path !== calculatorRoute) {
         return
     }
 
@@ -425,10 +441,15 @@ async function assertCalculatorState(context: HmrContext): Promise<void> {
 }
 
 async function waitForMarker(context: HmrContext, markerFile: string, value: string): Promise<void> {
+    await waitForElementText(context, '#loan-hmr-marker', value)
+    assert.equal(await context.fixture.read(markerFile), `export const hmrMarker = '${value}'\n`)
+}
+
+async function waitForElementText(context: HmrContext, selector: string, value: string): Promise<void> {
     await waitFor(
         async () => {
             try {
-                return (await context.devTools.readElement('#loan-hmr-marker', 'text')) === value
+                return (await context.devTools.readElement(selector, 'text')) === value
             } catch {
                 return false
             }
@@ -436,23 +457,14 @@ async function waitForMarker(context: HmrContext, markerFile: string, value: str
         8_000,
         75
     )
-    assert.equal(await context.fixture.read(markerFile), `export const hmrMarker = '${value}'\n`)
 }
 
 async function waitForRoute(context: HmrContext, route: string): Promise<void> {
-    await waitFor(
-        async () => {
-            const current = await context.devTools.readCurrentPage()
-            return current.path === route
-        },
-        8_000,
-        75
-    )
+    await waitFor(async () => (await context.devTools.readCurrentPage()).path === route, 8_000, 75)
 }
 
 async function assertRoute(context: HmrContext, route: string): Promise<void> {
-    const current = await context.devTools.readCurrentPage()
-    assert.equal(current.path, route)
+    assert.equal((await context.devTools.readCurrentPage()).path, route)
 }
 
 async function waitForElement(context: HmrContext, selector: string): Promise<void> {

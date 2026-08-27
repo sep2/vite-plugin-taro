@@ -13,9 +13,9 @@ await withLoanHmrFixture(async (fixture) => {
         try {
             // The first App service reload follows project compilation; interactions begin only after that runtime is stable.
             await delay(5_000)
-            console.log(`[loan-hmr] running 25 flows in ${fixture.root}`)
+            console.log(`[loan-hmr] running 26 flows in ${fixture.root}`)
             await runLoanHmrCases({ devTools: devTools, fixture: fixture })
-            console.log('[loan-hmr] all 25 complex flows passed')
+            console.log('[loan-hmr] all 26 complex flows passed')
         } catch (error) {
             console.error(
                 `[loan-hmr] Vite log before cleanup:\n${await readFile(path.join(fixture.root, 'vite.log'), 'utf8')}`

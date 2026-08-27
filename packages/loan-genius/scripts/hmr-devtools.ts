@@ -20,6 +20,8 @@ type ToolParameters = Readonly<Record<string, string>>
 
 const execFileAsync = promisify(execFile)
 const commandTimeoutMilliseconds = 12_000
+const devToolsExecutable = process.platform === 'win32' ? 'cmd.exe' : 'wechatide'
+const devToolsArguments = process.platform === 'win32' ? ['/d', '/s', '/c', 'wechatide'] : []
 const devToolsClient = process.env.VPT_LOAN_HMR_DEVTOOLS_CLIENT ?? 'Pi'
 
 export function createLoanHmrDevTools(fixture: LoanHmrFixture): LoanHmrDevTools {
@@ -100,8 +102,8 @@ async function runToolWithTimeout(
 ): Promise<unknown> {
     const parameterArguments = Object.entries(parameters).flatMap(([name, value]) => [`--${name}`, value])
     const { stdout } = await execFileAsync(
-        'wechatide',
-        ['-c', devToolsClient, '-t', tool, '--project', fixture.outDir, ...parameterArguments],
+        devToolsExecutable,
+        [...devToolsArguments, '-c', devToolsClient, '-t', tool, '--project', fixture.outDir, ...parameterArguments],
         {
             cwd: fixture.repositoryRoot,
             env: process.env,
