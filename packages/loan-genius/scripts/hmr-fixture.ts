@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { cp, type FileHandle, mkdir, open, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
@@ -26,8 +27,8 @@ type FixtureTest = (fixture: LoanHmrFixture) => Promise<void>
 const scriptsRoot = path.dirname(fileURLToPath(import.meta.url))
 const packageRoot = path.dirname(scriptsRoot)
 const repositoryRoot = path.resolve(packageRoot, '../..')
-const fixtureRoot = '/tmp/vite-plugin-taro-loan-genius-hmr-v1'
-const fixtureLockPath = '/tmp/vite-plugin-taro-loan-genius-hmr.lock'
+const fixtureRoot = path.join(tmpdir(), 'vite-plugin-taro-loan-genius-hmr-v1')
+const fixtureLockPath = path.join(tmpdir(), 'vite-plugin-taro-loan-genius-hmr.lock')
 
 /** Runs one suite against the fixed trusted DevTools project without allowing concurrent source mutation. */
 export async function withLoanHmrFixture(test: FixtureTest): Promise<void> {
@@ -94,7 +95,11 @@ async function prepareFixture(): Promise<LoanHmrFixture> {
     if (existsSync(path.join(packageRoot, '.env.local'))) {
         await cp(path.join(packageRoot, '.env.local'), path.join(fixtureRoot, '.env.local'))
     }
-    await symlink(path.join(packageRoot, 'node_modules'), path.join(fixtureRoot, 'node_modules'), 'dir')
+    await symlink(
+        path.join(packageRoot, 'node_modules'),
+        path.join(fixtureRoot, 'node_modules'),
+        process.platform === 'win32' ? 'junction' : 'dir'
+    )
 
     const fixture = createFixture()
     await configureAutomatableRenderer(fixture)
@@ -106,7 +111,8 @@ function createFixture(): LoanHmrFixture {
     const write = (relativePath: string, source: string) => writeFile(path.join(fixtureRoot, relativePath), source)
     return {
         outDir: path.join(fixtureRoot, 'dist/wx'),
-        read: (relativePath) => readFile(path.join(fixtureRoot, relativePath), 'utf8'),
+        read: async (relativePath) =>
+            (await readFile(path.join(fixtureRoot, relativePath), 'utf8')).replaceAll('\r\n', '\n'),
         repositoryRoot: repositoryRoot,
         root: fixtureRoot,
         publishMarker: async (markerFile, value) => {
@@ -147,7 +153,7 @@ async function instrumentSources(fixture: LoanHmrFixture): Promise<void> {
             ],
             [
                 '            <NavigationBar backgroundColor={backgroundColor} color={navigationBarColor}>',
-                '            <Text id="loan-hmr-marker">{hmrMarker}</Text>\n            <NavigationBar backgroundColor={backgroundColor} color={navigationBarColor}>'
+                '            <Text id="loan-direct-page-probe">direct-page-baseline</Text>\n            <Text id="loan-hmr-marker">{hmrMarker}</Text>\n            <NavigationBar backgroundColor={backgroundColor} color={navigationBarColor}>'
             ],
             [
                 '                <Button\n                    className="flex p-2',
@@ -260,7 +266,7 @@ export function replaceOnce(source: string, oldText: string, newText: string): s
 export async function startLoanHmrServer(fixture: LoanHmrFixture): Promise<LoanHmrServer> {
     const logPath = path.join(fixture.root, 'vite.log')
     const logFile = await open(logPath, 'w')
-    const server = spawn(path.join(fixture.root, 'node_modules/.bin/vite'), [], {
+    const server = spawn(process.execPath, [path.join(fixture.root, 'node_modules/vite/bin/vite.js')], {
         cwd: fixture.root,
         env: { ...process.env, NODE_ENV: 'development', VITE_VPT_TARGET: 'wx' },
         stdio: ['ignore', logFile.fd, logFile.fd]

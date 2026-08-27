@@ -13,12 +13,12 @@ type PageComponentPathOptions = {
 
 /** Resolves the source file for the configured App component. */
 export function resolveAppComponentPath({ appPath, projectRoot }: AppComponentPathOptions): string {
-    return path.resolve(projectRoot, appPath)
+    return normalizePath(path.resolve(projectRoot, appPath))
 }
 
 /** Resolves the source file for one configured Page component. */
 export function resolvePageComponentPath({ pagePath, projectRoot }: PageComponentPathOptions): string {
-    return path.resolve(projectRoot, 'src', `${pagePath}.tsx`)
+    return normalizePath(path.resolve(projectRoot, 'src', `${pagePath}.tsx`))
 }
 
 /** Creates a portable import for one configured Page component. */
