@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.6.18-beta.0] - 2026-08-27
+
+### Changed
+
+- use platform-native resolver paths (9fa9ad4)
+- upgrade WeChat DevTools skill (52ed6ac)
+- docs (3732acc)
+
+### Fixed
+
+- normalize Windows page HMR identities (f950597)
+
 ## [0.6.17] - 2026-08-26
 
 ### Changed
