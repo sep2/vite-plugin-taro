@@ -470,10 +470,10 @@ function readCounterCount(): number | undefined {
         ['--project', projectPaths.output, '--action', 'getData'],
         false
     )
-    if (!isRecord(result) || !isRecord(result.page)) {
+    if (!isRecord(result) || !isRecord(result.data) || !isRecord(result.data.page)) {
         return undefined
     }
-    return findCounterCount(result.page)
+    return findCounterCount(result.data.page)
 }
 
 function readProbeText(): string | undefined {
