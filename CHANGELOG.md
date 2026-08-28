@@ -4,10 +4,19 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
-## [0.6.18] - 2026-08-27
+## [0.6.19-beta.0] - 2026-08-28
 
 ### Changed
 
+- rename native component runtime (41b8741)
+- use plugin source in workspace (bfa3405)
+- bundle weapp-tailwindcss (613f04c)
+- split plugin build outputs (74f7eb0)
+- bundle plugin compiler (890704c)
+- restructure tests (121a8db)
+- combine SystemJS analysis traversals (65a632e)
+- strengthen wx React Refresh coverage (4f09f6e)
+- clarify wx React Refresh invariants (404ecd4)
 - document full rebuild watch mode (8dcdca0)
 - draft rules (c64815d)
 - update HMR stress DevTools harness (46375af)
@@ -16,19 +25,32 @@ This file is generated from git release history by `pnpm changelog`.
 
 ### Fixed
 
+- prevent hero title flash (c119970)
+- fix Windows wx HMR duplicate events (7e85f28)
 - neutralize CSS payloads in HMR patches (a6aa09c)
 - read current DevTools page data (0328656)
 
 ## [0.6.18-beta.0] - 2026-08-27
 
+Initial release.
+
+## [0.6.18] - 2026-08-27
+
 ### Changed
 
+- document full rebuild watch mode (8dcdca0)
+- draft rules (c64815d)
 - use platform-native resolver paths (9fa9ad4)
+- update HMR stress DevTools harness (46375af)
+- update Loan Genius DevTools harness (f17489f)
+- docs (6403fed)
 - upgrade WeChat DevTools skill (52ed6ac)
 - docs (3732acc)
 
 ### Fixed
 
+- neutralize CSS payloads in HMR patches (a6aa09c)
+- read current DevTools page data (0328656)
 - normalize Windows page HMR identities (f950597)
 
 ## [0.6.17] - 2026-08-26
