@@ -53,3 +53,4 @@ minimumReleaseAgeExclude:
 
 patchedDependencies:
   canvas-confetti@1.9.4: patches/canvas-confetti@1.9.4.patch
+  weapp-tailwindcss@5.3.5: patches/weapp-tailwindcss@5.3.5.patch

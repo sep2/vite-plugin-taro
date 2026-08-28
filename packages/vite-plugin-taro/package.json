@@ -56,6 +56,7 @@
         "node": "^22.18.0 || >=24.11.0"
     },
     "dependencies": {
+        "@tailwindcss/node": "4.3.3",
         "@tailwindcss/oxide": "4.3.3",
         "@tarojs/components": "4.2.1",
         "@tarojs/helper": "4.2.1",
@@ -69,8 +70,7 @@
         "@vitejs/plugin-react": "^6.1.0",
         "react-reconciler": "0.33.0",
         "rolldown": "1.2.5",
-        "tailwindcss": "^4.3.3",
-        "weapp-tailwindcss": "^5.3.5"
+        "tailwindcss": "^4.3.3"
     },
     "peerDependencies": {
         "react": "^19.0.0",
@@ -95,6 +95,7 @@
         "picocolors": "^1.1.1",
         "rxjs": "^7.8.2",
         "typescript": "^7.0.2",
-        "vite": "8.2.2"
+        "vite": "8.2.2",
+        "weapp-tailwindcss": "5.3.5"
     }
 }

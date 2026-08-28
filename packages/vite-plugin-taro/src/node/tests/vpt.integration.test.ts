@@ -4,9 +4,8 @@ import path from 'node:path'
 import test from 'node:test'
 import type { OutputAsset, OutputChunk } from 'rolldown'
 import { createLogger, build as viteBuild } from 'vite'
-import type { VptOptions, VptTarget } from '../../options.ts'
+import vpt, { type VptOptions, type VptTarget } from '../../index.ts'
 import { packageRequire } from '../utils/packages.ts'
-import vpt from '../vpt.ts'
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 const appSource = `

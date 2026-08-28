@@ -1,0 +1,24 @@
+diff --git a/dist/vite-mWyHvLB0.js b/dist/vite-mWyHvLB0.js
+--- a/dist/vite-mWyHvLB0.js
++++ b/dist/vite-mWyHvLB0.js
+@@ -10213,9 +10213,9 @@
+ //#endregion
+ //#region src/bundlers/vite/shared/create-framework-plugins-runtime.ts
+ const debug = createDebug();
+-const weappTailwindcssPackageDir = resolvePackageDir("weapp-tailwindcss");
++const weappTailwindcssPackageDir = path.dirname(fileURLToPath(import.meta.url));
+ const weappTailwindcssDirPosix = slash(weappTailwindcssPackageDir);
+-const generatorPlaceholderCssFile = path.join(weappTailwindcssPackageDir, "generator-placeholder.css");
++const generatorPlaceholderCssFile = "data:text/css,%2F*!%20weapp-tailwindcss%20generator-placeholder%20*%2F";
+ const ENV_PLATFORM_KEYS = [
+ 	"UNI_PLATFORM",
+ 	"UNI_UTS_PLATFORM",
+@@ -10748,7 +10748,7 @@
+ 	const rewritePlugins = createRewriteCssImportsPlugins({
+ 		getAppType: () => opts.appType,
+ 		generateTailwindCss: generateTailwindCssForVitePipeline,
+-		rootImport: shouldOwnTailwindGeneration ? `${weappTailwindcssDirPosix}/generator-placeholder.css` : void 0,
++		rootImport: shouldOwnTailwindGeneration ? generatorPlaceholderCssFile : void 0,
+ 		onTailwindRootCss: registerTailwindRootCss,
+ 		onCssSourceTransform: (id, code) => cssMemory.refreshRememberedCssSourceBySourceFile(id, code),
+ 		shouldGenerateCss: (_id, code) => hasVitePipelineTailwindGenerationDirective(code),
