@@ -128,12 +128,15 @@ function analyzeModule(program: Program, filename: string): ModuleModel {
     const hoistedVariables: HoistedVariable[] = []
     const importBindings = new Set<string>()
     const outerBindings = new Set<string>()
+    // ScopeTracker mutates only during this shared analysis walk, then freezes into the immutable model used by edit passes.
+    const scopes = new ScopeTracker({ preserveExitedScopes: true })
     // Boundary depth excludes declarations and await expressions owned by nested functions or classes from module analysis.
     let moduleBoundaryDepth = 0
     let hasDirectEval = false
     let hasTopLevelAwait = false
 
     walk(program, {
+        scopeTracker: scopes,
         enter(node, parent) {
             if (node.type === 'Identifier') identifierNames.add(node.name)
             if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'eval') {
@@ -192,10 +195,10 @@ function analyzeModule(program: Program, filename: string): ModuleModel {
         }
     }
 
+    scopes.freeze()
     requireNoDirectEval(hasDirectEval, filename)
     const generatedNames = createGeneratedNames(identifierNames, dependencyBySource.size)
     validateExportBindings(exportNamesByLocal, outerBindings, filename)
-    const scopes = createFrozenScopes(program)
 
     return {
         dependencies: [...dependencyBySource.values()],
@@ -706,15 +709,6 @@ function createGeneratedNames(identifierNames: ReadonlySet<string>, dependencyCo
         exportBinding: take('__systemExport'),
         dependencyPrefix: takeDependencyPrefix('__systemDependency')
     }
-}
-
-/** Builds and freezes complete lexical declarations for scope-correct write detection. */
-function createFrozenScopes(program: Program): ScopeTracker {
-    // ScopeTracker is intentionally mutable during its declaration pass, then frozen before every query traversal.
-    const scopes = new ScopeTracker({ preserveExitedScopes: true })
-    walk(program, { scopeTracker: scopes })
-    scopes.freeze()
-    return scopes
 }
 
 /** Normalizes identifier and quoted module names to the runtime property string. */
