@@ -410,8 +410,13 @@ export async function finalizeOutput(
     // Step 1: derive cascade order, reachable CSS, and raw Tailwind candidates from the same current graph snapshot.
     const projection = projectStyles(entryIds, styleByModuleId, getModuleInfo)
 
-    // Step 2: convert the complete stylesheet once; this fixes the selector identities JavaScript must subsequently use.
-    const wxss = (await weappContext.transformWxss(projection.css, wxStyleOptions)).css
+    // Step 2: convert the complete stylesheet and install its exact candidates without a second runtime source scan.
+    const wxss = (
+        await weappContext.transformWxss(projection.css, {
+            ...wxStyleOptions,
+            runtimeSet: projection.classSet
+        })
+    ).css
 
     // Step 3: transform artifacts independently but with the exact candidate set used by the stylesheet conversion.
     const transformedJavaScript = await Promise.all(

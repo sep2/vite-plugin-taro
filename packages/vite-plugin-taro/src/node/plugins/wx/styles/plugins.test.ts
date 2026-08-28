@@ -45,6 +45,26 @@ test('handles physical and ignored query fragments before watcher cleanup', asyn
     await Reflect.apply(closeWatcher, {}, [])
 })
 
+test('retains a supplied WXSS runtime set without source discovery', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'vpt-wxss-runtime-'))
+
+    try {
+        const context = createContext({
+            appType: 'weapp-vite',
+            logLevel: 'silent',
+            tailwindcssBasedir: root
+        })
+        const runtimeSet = new Set(['py-5.5'])
+        const style = await context.transformWxss('.py-5\\.5 { padding: 1px; }', { runtimeSet })
+        const javaScript = await context.transformJs("export const className = 'py-5.5'", { generateMap: false })
+
+        assert.match(style.css, /\.py-5_d5\s*\{/)
+        assert.equal(javaScript.code, "export const className = 'py-5_d5'")
+    } finally {
+        await rm(root, { recursive: true, force: true })
+    }
+})
+
 test('finalizes the current graph into WXSS and JavaScript with one projected class set', async () => {
     const entryId = '/src/app.js'
     const styleId = '/src/app.css'
