@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
-import { packageRequire, resolvePackageFile } from '../../../utils/packages.ts'
+import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
 
 /** Identifies Rolldown's generated helper module independently of its unstable output filename. */
 export const rolldownRuntimeId = '\0rolldown/runtime.js'
@@ -10,10 +10,10 @@ export const rolldownRuntimeId = '\0rolldown/runtime.js'
 export const reactReconcilerRoot = normalizePath(path.dirname(packageRequire.resolve('react-reconciler/package.json')))
 
 /** Identifies the amphibious bootstrap that initializes SystemJS and serves every native shell. */
-export const bootstrapPath = resolvePackageFile('dist/runtime/wx/amphibious/bootstrap.js')
+export const bootstrapPath = resolveRuntimeFile('wx/amphibious/bootstrap')
 
 /** Identifies the native transport source materialized before Rolldown finalizes content hashes. */
-export const transportPath = resolvePackageFile('dist/runtime/wx/amphibious/transport.js')
+export const transportPath = resolveRuntimeFile('wx/amphibious/transport')
 
 /** Redirects Vite's injected browser preload helper to the bootstrap identity loader. */
 export const vitePreloadId = '\0vite/preload-helper.js'
@@ -22,25 +22,25 @@ export const vitePreloadId = '\0vite/preload-helper.js'
 export const appShellFileName = 'app.js'
 
 /** Identifies the synchronous native App shell source. */
-export const appShellPath = resolvePackageFile('dist/runtime/wx/native/app.js')
+export const appShellPath = resolveRuntimeFile('wx/native/app')
 
 /** Identifies the App capsule kept behind the native shell boundary. */
-export const appCapsulePath = resolvePackageFile('dist/runtime/wx/capsule/app.js')
+export const appCapsulePath = resolveRuntimeFile('wx/capsule/app')
 
 /** Forces Taro's recursive native Component entry to emit at its configured root path. */
 export const componentShellFileName = 'comp.js'
 
 /** Identifies the synchronous recursive Component shell source. */
-export const componentShellPath = resolvePackageFile('dist/runtime/wx/native/component.js')
+export const componentShellPath = resolveRuntimeFile('wx/native/component')
 
 /** Identifies the recursive Component capsule shared by generated Taro component shells. */
-export const componentCapsulePath = resolvePackageFile('dist/runtime/wx/capsule/component.js')
+export const componentCapsulePath = resolveRuntimeFile('wx/capsule/component')
 
 /** Forces Taro's CustomWrapper native shell to emit at its configured root path. */
 export const customWrapperShellFileName = 'custom-wrapper.js'
 
 /** Identifies the synchronous CustomWrapper shell source. */
-export const customWrapperShellPath = resolvePackageFile('dist/runtime/wx/native/custom-wrapper.js')
+export const customWrapperShellPath = resolveRuntimeFile('wx/native/custom-wrapper')
 
 /** Resolves the configured Page component from its route-qualified capsule importer. */
 export const pageComponentId = '\0vpt:page-component'
@@ -49,13 +49,13 @@ export const pageComponentId = '\0vpt:page-component'
 export const pageCapsuleId = '\0vpt:page-capsule'
 
 /** Provides the Page capsule source specialized through a stable route query. */
-export const pageCapsulePath = resolvePackageFile('dist/runtime/wx/capsule/page.js')
+export const pageCapsulePath = resolveRuntimeFile('wx/capsule/page')
 
 /** Identifies the Taro facade shared by the App, Page, and generated component capsules. */
-export const taroRuntimePath = resolvePackageFile('dist/runtime/wx/capsule/taro-runtime.js')
+export const taroRuntimePath = resolveRuntimeFile('wx/capsule/taro-runtime')
 
 /** Identifies the reusable synchronous native Page shell source. */
-export const pageShellPath = resolvePackageFile('dist/runtime/wx/native/page.js')
+export const pageShellPath = resolveRuntimeFile('wx/native/page')
 
 export type WxChunk = Rolldown.PreRenderedChunk | Rolldown.RenderedChunk
 

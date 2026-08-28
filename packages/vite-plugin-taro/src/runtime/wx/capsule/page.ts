@@ -5,9 +5,6 @@ import './app.ts'
 import PageComponent from '\0vpt:page-component'
 import { createPageConfig } from './taro-runtime.ts'
 
-declare const __VPT_PAGE_PATH__: string
-declare const __VPT_PAGE_CONFIG__: Record<string, unknown>
-
 /*
  * Generated Page WXML invokes Taro's unchanged recursive comp, whose input contract is one compact node selected by i.nn.
  * App JSX does not have that cardinality: it may return one or many top-level hosts, and the private Page outlet may

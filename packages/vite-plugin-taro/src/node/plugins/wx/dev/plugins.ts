@@ -117,7 +117,7 @@ export function createWxDevelopmentPlugin(options: VptOptions, styles: WxStylePl
             apply: 'serve',
             transform: {
                 order: 'post',
-                filter: { id: /\/runtime\/wx\/native\/page\.js(?:\?|$)/ },
+                filter: { id: /\/runtime\/wx\/native\/page\.(?:js|ts)(?:\?|$)/ },
                 handler(code, id) {
                     if (normalizeModuleId(id) !== normalizedPageShellPath) return
                     return injectPageShellHmr(code)

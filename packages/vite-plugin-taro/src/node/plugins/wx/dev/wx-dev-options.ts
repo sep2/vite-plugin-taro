@@ -5,7 +5,7 @@ import { type DevEngine, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { once } from '../../../utils/once.ts'
-import { resolvePackageFile } from '../../../utils/packages.ts'
+import { resolveRuntimeFile } from '../../../utils/packages.ts'
 import { appShellFileName } from '../module/module.ts'
 
 type BundledDevRolldownOptions = InputOptions & {
@@ -218,7 +218,7 @@ function createViteReporter(server: ViteDevServer) {
 const bundleRuntimeSource = once(async function bundleRuntimeSource(): Promise<string> {
     // write: false keeps this nested helper build from creating a second dist directory in the application project.
     const result = await build({
-        input: resolvePackageFile('dist/runtime/wx/dev/dev-runtime.js'),
+        input: resolveRuntimeFile('wx/dev/dev-runtime'),
         output: { format: 'iife', minify: true, sourcemap: false },
         write: false
     })

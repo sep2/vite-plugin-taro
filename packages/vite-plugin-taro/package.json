@@ -13,17 +13,20 @@
         "url": "https://github.com/sep2/vite-plugin-taro/issues"
     },
     "homepage": "https://vpt.js.org",
-    "main": "./dist/index.js",
-    "module": "./dist/index.js",
-    "types": "./dist/index.d.ts",
+    "main": "./src/index.ts",
+    "module": "./src/index.ts",
+    "types": "./src/index.ts",
     "exports": {
         ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js",
-            "default": "./dist/index.js"
+            "types": "./src/index.ts",
+            "import": "./src/index.ts",
+            "default": "./src/index.ts"
         },
         "./client": {
             "types": "./client.d.ts"
+        },
+        "./types/native": {
+            "types": "./src/runtime/client/taro/define-native-component.ts"
         },
         "./package.json": "./package.json"
     },
@@ -50,7 +53,24 @@
     ],
     "license": "MIT",
     "publishConfig": {
-        "access": "public"
+        "access": "public",
+        "main": "./dist/index.js",
+        "module": "./dist/index.js",
+        "types": "./dist/index.d.ts",
+        "exports": {
+            ".": {
+                "types": "./dist/index.d.ts",
+                "import": "./dist/index.js",
+                "default": "./dist/index.js"
+            },
+            "./client": {
+                "types": "./client.d.ts"
+            },
+            "./types/native": {
+                "types": "./dist/runtime/client/taro/define-native-component.d.ts"
+            },
+            "./package.json": "./package.json"
+        }
     },
     "engines": {
         "node": "^22.18.0 || >=24.11.0"

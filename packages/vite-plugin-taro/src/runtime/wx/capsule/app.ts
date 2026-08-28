@@ -5,8 +5,6 @@ import React from 'react'
 // @ts-expect-error: The wx build resolves this private App component.
 import AppComponent from '\0vpt:app-component'
 
-declare const __VPT_APP_CONFIG__: Record<string, unknown>
-
 const config = createReactApp(AppComponent, React, ReactDOM, __VPT_APP_CONFIG__)
 
 export default config

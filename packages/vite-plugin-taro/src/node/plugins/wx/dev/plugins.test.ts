@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { resolveConfig } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
+import { pageShellPath } from '../module/module.ts'
 import { createWxStylePlugin } from '../styles/plugins.ts'
 import {
     createWxDevelopmentPlugin,
@@ -43,6 +44,8 @@ test('preserves physical outputs across development host restarts', async () => 
         await Reflect.apply(pageTransform, {}, ['Page(pageConfig)', '/project/runtime/wx/native/page.js?other']),
         undefined
     )
+    const transformed = await Reflect.apply(pageTransform, {}, ['Page(pageConfig)', pageShellPath])
+    assert.match(transformed.code, /injectPageHmr/)
 })
 
 test('transfers the App style entry from complete output to the development host', () => {

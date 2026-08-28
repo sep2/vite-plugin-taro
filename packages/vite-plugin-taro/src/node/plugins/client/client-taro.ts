@@ -1,7 +1,7 @@
 import { normalizePath, type Plugin } from 'vite'
 import type { VptTarget } from '../../../options.ts'
 import { normalizeModuleId } from '../../utils/modules.ts'
-import { resolvePackageFile } from '../../utils/packages.ts'
+import { resolveRuntimeFile } from '../../utils/packages.ts'
 import { clientTaroNativeId } from './constant.ts'
 import { injectTaroFrameworkApis } from './inject-taro-framework-apis.ts'
 
@@ -20,15 +20,15 @@ import { injectTaroFrameworkApis } from './inject-taro-framework-apis.ts'
 /** Public facade used by transformed application API imports. */
 export const clientTaroApiId = 'virtual:taro/api'
 
-const clientTaroApiPath = resolvePackageFile('dist/runtime/client/taro/api.js')
+const clientTaroApiPath = resolveRuntimeFile('client/taro/api')
 const normalizedClientTaroApiPath = normalizePath(clientTaroApiPath)
 
 const clientTaroComponentId = 'virtual:taro/components'
 
 const clientTaroModules = new Map([
     [clientTaroApiId, clientTaroApiPath],
-    [clientTaroComponentId, resolvePackageFile('dist/runtime/client/taro/component.js')],
-    [clientTaroNativeId, resolvePackageFile('dist/runtime/client/taro/define-native-component.js')]
+    [clientTaroComponentId, resolveRuntimeFile('client/taro/component')],
+    [clientTaroNativeId, resolveRuntimeFile('client/taro/define-native-component')]
 ])
 
 /** Creates the shared Taro facade backed by the selected target's API implementation. */
