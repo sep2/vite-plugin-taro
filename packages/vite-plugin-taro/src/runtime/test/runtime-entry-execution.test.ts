@@ -19,7 +19,7 @@ type ExecutionContext = Readonly<{
     Component: Registration
 }>
 
-const runtimeRoot = path.dirname(fileURLToPath(import.meta.url))
+const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 function recordCall(calls: Call[], name: string, result: unknown): (...args: unknown[]) => unknown {
     return (...args) => {

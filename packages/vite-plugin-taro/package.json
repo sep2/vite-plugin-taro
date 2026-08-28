@@ -13,14 +13,14 @@
         "url": "https://github.com/sep2/vite-plugin-taro/issues"
     },
     "homepage": "https://vpt.js.org",
-    "main": "./dist/vite.js",
-    "module": "./dist/vite.js",
-    "types": "./dist/vite.d.ts",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
     "exports": {
         ".": {
-            "types": "./dist/vite.d.ts",
-            "import": "./dist/vite.js",
-            "default": "./dist/vite.js"
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js",
+            "default": "./dist/index.js"
         },
         "./client": {
             "types": "./client.d.ts"
@@ -29,14 +29,13 @@
     },
     "files": [
         "dist",
-        "src",
         "client.d.ts",
         "LICENSE",
         "README.md",
         "README.en.md"
     ],
     "scripts": {
-        "build": "node ../../scripts/sync-plugin-readme.ts && node ../../scripts/clean-directory.ts dist && tsc --project tsconfig.build.json",
+        "build": "node ../../scripts/sync-plugin-readme.ts && node ./scripts/build.ts",
         "test": "node --test --test-concurrency=2",
         "test:coverage": "c8 node --test --test-concurrency=2",
         "typecheck": "tsc --project tsconfig.json --noEmit"
@@ -57,12 +56,6 @@
         "node": "^22.18.0 || >=24.11.0"
     },
     "dependencies": {
-        "@babel/core": "^8.0.1",
-        "@babel/generator": "^8.0.0",
-        "@babel/types": "^8.0.4",
-        "@oxc-project/types": "0.147.0",
-        "@rolldown/plugin-babel": "^0.2.3",
-        "@tailwindcss-mangle/engine": "0.2.0",
         "@tailwindcss/oxide": "4.3.3",
         "@tarojs/components": "4.2.1",
         "@tarojs/helper": "4.2.1",
@@ -74,13 +67,8 @@
         "@tarojs/runtime": "workspace:vite-plugin-taro-runtime@*",
         "@tarojs/taro": "4.2.1",
         "@vitejs/plugin-react": "^6.1.0",
-        "@weapp-tailwindcss/postcss": "3.2.11",
-        "oxc-walker": "1.1.1",
-        "picocolors": "^1.1.1",
         "react-reconciler": "0.33.0",
-        "react-refresh": "^0.18.0",
         "rolldown": "1.2.5",
-        "rxjs": "^7.8.2",
         "tailwindcss": "^4.3.3",
         "weapp-tailwindcss": "^5.3.5"
     },
@@ -90,14 +78,22 @@
         "vite": "8.2.2"
     },
     "devDependencies": {
+        "@babel/core": "^8.0.1",
+        "@babel/generator": "^8.0.0",
         "@babel/plugin-transform-dynamic-import": "^8.0.1",
         "@babel/plugin-transform-modules-commonjs": "^8.0.1",
         "@babel/plugin-transform-modules-systemjs": "^8.0.1",
+        "@babel/types": "^8.0.4",
+        "@oxc-project/types": "0.147.0",
+        "@rolldown/plugin-babel": "^0.2.3",
         "@types/node": "^26.3.0",
         "@types/react": "^19.2.18",
         "@types/react-dom": "^19.2.5",
         "@types/react-refresh": "^0.14.7",
         "c8": "^12.0.0",
+        "oxc-walker": "1.1.1",
+        "picocolors": "^1.1.1",
+        "rxjs": "^7.8.2",
         "typescript": "^7.0.2",
         "vite": "8.2.2"
     }

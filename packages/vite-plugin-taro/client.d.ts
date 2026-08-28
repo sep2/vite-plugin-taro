@@ -9,10 +9,10 @@ declare module 'virtual:taro/components' {
 }
 
 declare module 'virtual:taro/native' {
-    type NativeModule = typeof import('./src/runtime/client/taro/define-native-component.ts')
+    type NativeModule = typeof import('./dist/runtime/client/taro/define-native-component.js')
 
     export type NativeComponentEvent<Detail> =
-        import('./src/runtime/client/taro/define-native-component.ts').NativeComponentEvent<Detail>
+        import('./dist/runtime/client/taro/define-native-component.js').NativeComponentEvent<Detail>
 
     export const defineNativeComponent: NativeModule['defineNativeComponent']
 }
