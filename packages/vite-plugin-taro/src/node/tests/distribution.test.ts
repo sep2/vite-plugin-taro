@@ -4,7 +4,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const distRoot = path.join(packageRoot, 'dist')
 
 test('bundles only the compiler and leaves client modules for the final app linker', async () => {
