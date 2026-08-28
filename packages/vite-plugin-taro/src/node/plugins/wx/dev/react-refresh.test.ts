@@ -39,7 +39,7 @@ test('rejects a Reconciler without the renderer injection contract', () => {
     assert.throws(() => injectReactRefreshRendererDependency('export const renderer = {}'), /must inject its renderer/)
 })
 
-test('rewrites only reference uses of the React DevTools hook', () => {
+test('rewrites only reference uses of the React DevTools hook in an admitted module', () => {
     const transformed = transformReactDevtoolsHook({
         code: `
             const available = typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ !== 'undefined'
@@ -50,12 +50,13 @@ test('rewrites only reference uses of the React DevTools hook', () => {
     })
 
     assert.match(transformed.code, /typeof global\.__REACT_DEVTOOLS_GLOBAL_HOOK__/)
-    assert.match(transformed.code, /global\.__REACT_DEVTOOLS_GLOBAL_HOOK__\n/)
-    assert.match(transformed.code, /\{ __REACT_DEVTOOLS_GLOBAL_HOOK__: explicit \}/)
+    assert.doesNotMatch(transformed.code, /typeof __REACT_DEVTOOLS_GLOBAL_HOOK__/)
+    assert.match(transformed.code, /__REACT_DEVTOOLS_GLOBAL_HOOK__: explicit/)
 })
 
 test('routes renderer and preamble plugin hooks through their exact IDs', async () => {
     const transforms = createWxReactRefreshTransforms()
+    assert.equal(transforms.length, 4)
     const rendererHook = transforms[1]?.transform
     const preambleHook = transforms[3]?.transform
     assert.ok(rendererHook)
@@ -72,7 +73,7 @@ test('routes renderer and preamble plugin hooks through their exact IDs', async 
     assert.doesNotMatch(String(transformed.code), /missing preamble/)
 })
 
-test('removes only the web refresh preamble guard', () => {
+test('structurally removes only the web refresh preamble guard', () => {
     const transformed = removeRefreshPreambleGuard({
         code: `
             if (!window.$RefreshReg$) throw new Error('missing preamble')

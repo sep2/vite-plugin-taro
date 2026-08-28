@@ -296,6 +296,7 @@ test('coalesces one full-file save into one wx patch', async (context) => {
     const sequences = [...stablePatches.matchAll(/\{seq: (\d+)/g)].map((match) => Number(match[1]))
 
     assert.deepEqual(sequences, [1])
+    assert.doesNotMatch(stablePatches, /window\.\$RefreshReg\$/)
 })
 
 test('publishes and acknowledges cumulative wx patches without rotating the App heap', async (context) => {
