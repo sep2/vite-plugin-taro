@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.6.19] - 2026-08-28
+
+Initial release.
+
 ## [0.6.19-beta.0] - 2026-08-28
 
 ### Changed
