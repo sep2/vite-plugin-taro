@@ -6,7 +6,7 @@ import { normalizeModuleId } from '../../../utils/modules.ts'
 import { transformWithOxcWalker } from '../../../utils/oxc-transform.ts'
 import { reactReconcilerRoot } from '../module/module.ts'
 
-/** The React DevTools hook protocol name; free references must target `global` in wx. */
+/** The React DevTools hook protocol name; free references must target `global` in wx development. */
 const reactDevtoolsHookProtocol = '__REACT_DEVTOOLS_GLOBAL_HOOK__'
 
 /**
@@ -24,20 +24,21 @@ const refreshRuntimeWindowGlobals = ['__registerBeforePerformReactRefresh', '__g
 /**
  * Creates the serve-only React Refresh adaptation transforms for the wx target.
  *
- * @vitejs/plugin-react's generated refresh code assumes the web HTML preamble and a browser
- * global scope; wx has neither. Each transform adapts one piece of that contract:
- * - the refresh runtime module (id-filtered): the runtime reads and assigns
- *   `window` protocol globals (rewritten to `global`) and must inject itself at evaluation;
- * - React Reconciler: its renderer injection statically depends on the refresh runtime, fixing cold-start order;
- * - react-family modules (filtered on free references): the DevTools hook is read as a free
- *   variable, which the WeChat runtime scope never resolves against `global` — every free
- *   reference becomes an explicit member access;
- * - boundary modules (filtered on the guard): the preamble's `$RefreshReg$` global is not
- *   needed because the transform generates local wrappers over the imported refresh
- *   runtime, so the guard that checks for the global is removed.
+ * @vitejs/plugin-react's generated refresh code assumes an HTML preamble and a browser global scope; wx has neither. Each
+ * transform owns one distinct compatibility boundary:
  *
- * Filters route every adaptation directly. The Reconciler intentionally receives the renderer dependency first and the
- * global-hook rewrite second; modules outside these explicit domains never reach a handler.
+ * - The refresh runtime is selected by exact ID. It rewrites only the two browser protocol globals that React Refresh evaluates
+ *   and injects its renderer hook at module evaluation, replacing the missing HTML preamble.
+ * - React Reconciler is selected by exact physical ID. Its renderer injection receives a static dependency on the refresh
+ *   runtime, so hook installation cannot race renderer initialization during cold startup.
+ * - React-family modules are selected by the reserved free DevTools-hook identifier. Their expression references must resolve
+ *   through WeChat's `global` object; an AST visitor edits only those identifier ranges after the filter admits the module.
+ * - Refresh boundaries are selected by Vite's generated `$RefreshReg$` guard. The AST transform removes only that web-preamble
+ *   assertion because each boundary already owns local wrappers over the imported refresh runtime.
+ *
+ * These adaptations deliberately remain serve-only plugin transforms rather than target-wide `define` entries. That scope
+ * prevents development protocol behavior from leaking into production or unrelated WX modules. Plugin order also
+ * matters: Reconciler receives its static refresh dependency before the later DevTools-hook transform lowers its free references.
  */
 export function createWxReactRefreshTransforms(): Plugin[] {
     return [
@@ -71,9 +72,8 @@ export function createWxReactRefreshTransforms(): Plugin[] {
             apply: 'serve',
             transform: {
                 order: 'post',
-                // Matches only free references (react-family modules). The member accesses in
-                // the refresh runtime and the dev runtime chunk never match, so they need no
-                // id exclusion.
+                // This reserved free identifier occurs in React-family modules. The AST visitor changes only reference
+                // identifiers, leaving explicit members, property keys, and string contents byte-for-byte intact.
                 filter: { code: /(^|[^.\w$])__REACT_DEVTOOLS_GLOBAL_HOOK__/ },
                 handler(code, id) {
                     return fixReactDevtoolsHook({ code, id })
@@ -85,8 +85,7 @@ export function createWxReactRefreshTransforms(): Plugin[] {
             apply: 'serve',
             transform: {
                 order: 'post',
-                // Vite's documented refresh protocol global; the generated guard is its only
-                // occurrence, in boundary modules.
+                // Vite's documented refresh protocol global; generated boundary modules own its only expression use.
                 filter: { code: /window\.\$RefreshReg\$/ },
                 handler(code, id) {
                     return removeRefreshPreambleGuard({ code, id })
@@ -99,17 +98,16 @@ export function createWxReactRefreshTransforms(): Plugin[] {
 /**
  * React-family modules: free `__REACT_DEVTOOLS_GLOBAL_HOOK__` reads must target `global`.
  *
- * The renderer checks the hook with `typeof __REACT_DEVTOOLS_GLOBAL_HOOK__` and injects via
- * `hook.inject(...)` — but in the WeChat runtime, free-variable reads never resolve against
- * `global`'s properties (verified: the free lookup is undefined while
- * `global.__REACT_DEVTOOLS_GLOBAL_HOOK__` exists). The renderer would therefore silently
- * skip injection, leaving React Refresh with no renderer on which to schedule re-renders.
+ * React checks the hook through free expressions such as `typeof __REACT_DEVTOOLS_GLOBAL_HOOK__` before calling
+ * `hook.inject(...)`. WeChat does not expose properties of its `global` object as free lexical bindings, so those checks would
+ * see `undefined` even after the refresh runtime installed `global.__REACT_DEVTOOLS_GLOBAL_HOOK__`. Renderer registration would
+ * then be skipped silently, leaving React Refresh without a renderer on which to schedule updates.
  *
- * The protocol name is unique, but only reference identifiers are rewritten. Declaration
- * keys and explicit members such as `global.__REACT_DEVTOOLS_GLOBAL_HOOK__` must remain
- * untouched; rewriting those would either produce invalid syntax or double-prefix the hook.
- * The Reconciler's injected static dependency orders hook injection before renderer initialization independently of Rolldown's
- * final chunking decision.
+ * The protocol name can also occur as an explicit member, an object key, or string content. A textual replacement cannot
+ * distinguish those forms. The AST predicate admits only reference identifiers, and MagicString changes only their source
+ * ranges, preserving every unrelated byte in these large dependency modules. Keeping this operation inside the serve-only,
+ * code-filtered hook is intentional: a target-wide Vite `define` would affect production and every user module merely to
+ * optimize a handful of immutable React sources.
  */
 function createReactDevtoolsHookVisitor(editor: RolldownMagicString): WalkerEnter {
     return function enter(node, parent) {
@@ -121,9 +119,8 @@ function createReactDevtoolsHookVisitor(editor: RolldownMagicString): WalkerEnte
             return
         }
 
-        // An explicit member access is required because WeChat does not expose properties of
-        // its global object as free lexical bindings. Removing this edit disables renderer
-        // registration even though the hook object itself still exists.
+        // WeChat does not expose properties of `global` as free lexical bindings. Prefixing only this identifier range retains
+        // declarations, keys, strings, comments, formatting, and every explicit `global.__REACT_DEVTOOLS_GLOBAL_HOOK__` member.
         editor.overwrite(node.start, node.end, `global.${reactDevtoolsHookProtocol}`)
     }
 }
@@ -173,12 +170,14 @@ function createRefreshRuntimeVisitor(editor: RolldownMagicString): WalkerEnter {
 /**
  * Removes the web-only `if (!window.$RefreshReg$) throw Error(...)` assertion from boundary modules.
  *
- * The assertion verifies that Vite's HTML preamble installed global registration helpers.
- * wx has no preamble and evaluating `window` itself fails. The assertion is unnecessary here:
- * @vitejs/plugin-react generates local `$RefreshReg$` and `$RefreshSig$` wrappers that delegate
- * directly to the imported refresh runtime. Removing the whole statement therefore removes
- * only an invalid platform check; component registration continues through those local wrappers.
- * If this edit is removed, every transformed refresh boundary crashes before its module body runs.
+ * The assertion verifies that Vite's HTML preamble installed global registration helpers. wx has no HTML preamble, and
+ * evaluating `window` itself fails. The assertion is unnecessary here because @vitejs/plugin-react generates local
+ * `$RefreshReg$` and `$RefreshSig$` wrappers that delegate directly to the imported refresh runtime. Removing the complete
+ * statement therefore removes only an invalid platform check; component registration continues through those local wrappers.
+ *
+ * This remains a structural AST edit rather than defining `window.$RefreshReg$` as truthy. A truthy substitution would hide the
+ * invariant, retain an unreachable throw in every HMR patch, and make an unrelated `window.$RefreshReg$` expression silently
+ * change meaning. Without either adaptation, every transformed refresh boundary crashes before its module body runs.
  */
 function createRefreshPreambleGuardVisitor(editor: RolldownMagicString): WalkerEnter {
     return function enter(node) {
@@ -196,9 +195,8 @@ function createRefreshPreambleGuardVisitor(editor: RolldownMagicString): WalkerE
             return
         }
 
-        // Matching the complete AST shape prevents an unrelated `$RefreshReg$` use from being
-        // removed. Skipping descendants is required because their ranges disappear with the
-        // parent and must not receive overlapping MagicString edits.
+        // Matching the complete AST shape prevents an unrelated `$RefreshReg$` use from being removed. Skipping descendants is
+        // required because their ranges disappear with the parent and must not receive overlapping MagicString edits.
         editor.remove(node.start, node.end)
         this.skip()
     }
@@ -244,10 +242,11 @@ export function removeRefreshPreambleGuard({ code, id }: { code: string; id: str
 }
 
 /*
- * Each memoized transform owns a mutable cache keyed only by source bytes. The matching runtime/react-family modules are
- * immutable between complete generations, so reparsing them would repeat O(source bytes) Oxc work without observing new state.
- * Source keys still create a fresh result after a dependency upgrade or real module edit, unlike a once-only cache keyed by ID;
- * keeping separate caches prevents identical text in different transform domains from sharing the wrong adaptation.
+ * Each memoized transform owns a mutable one-entry cache keyed only by source bytes. The matching runtime and React-family
+ * modules are immutable between complete generations, so reparsing them would repeat O(source bytes) Oxc work without observing
+ * new state. Source keys still produce a fresh result after a dependency upgrade or real module edit, unlike an ID-keyed or
+ * once-only cache detached from its input. Separate caches prevent identical text in different transform domains from sharing
+ * the wrong adaptation.
  */
 const fixRefreshRuntime = memoize(transformRefreshRuntime, { getCacheKey: ({ code }) => code })
 const fixReactDevtoolsHook = memoize(transformReactDevtoolsHook, { getCacheKey: ({ code }) => code })
