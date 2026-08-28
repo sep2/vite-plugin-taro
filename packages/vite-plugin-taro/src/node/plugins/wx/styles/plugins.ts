@@ -43,6 +43,8 @@ type JavaScriptArtifact = Readonly<{
     filename: string
 }>
 
+type WeappContext = Pick<ReturnType<typeof createContext>, 'transformJs' | 'transformWxss'>
+
 /** Vite plugin with the development-host operation that finalizes one coherent WX style/JavaScript transaction. */
 export type WxStylePlugin = Plugin &
     Readonly<{
@@ -177,8 +179,8 @@ const wxStyleOptions = {
 export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxStylePlugin {
     // This mutable root list is replaced in buildStart with Vite/Rolldown's exact cross-platform graph identities.
     let entryIds = applicationEntryIds
-    // One retained Weapp context guarantees that CSS selectors and JavaScript class strings use the same conversion rules.
-    const weappContext = createContext({ appType: 'weapp-vite', logLevel: 'silent' })
+    // configResolved installs this mutable context with Vite's authoritative project root before any build can finalize output.
+    let weappContext: WeappContext
 
     // buildStart installs this mutable context because the development host finalizes output outside a Rolldown plugin hook.
     let graphContext: PluginContext
@@ -220,6 +222,14 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
         name: 'vpt:wx-styles',
         /** Installs the single private Vite integration used to observe fully processed module CSS. */
         configResolved(config) {
+            // Binding discovery to Vite's root prevents the bundled compiler path from becoming Tailwind's scan root.
+            weappContext = createContext({
+                appType: 'weapp-vite',
+                logLevel: 'silent',
+                tailwindcssBasedir: config.root,
+                experimentalJsFastPath: 'oxc'
+            })
+
             // `vite:css-post` is the boundary after all public CSS processing and before browser-module serialization.
             const cssPostPlugin = config.plugins.find((plugin) => plugin.name === 'vite:css-post')!
 
@@ -394,7 +404,7 @@ export async function finalizeOutput(
     getModuleInfo: (
         moduleId: string
     ) => Readonly<{ importedIds: readonly string[]; dynamicallyImportedIds: readonly string[] }> | null | undefined,
-    weappContext: Pick<ReturnType<typeof createContext>, 'transformJs' | 'transformWxss'>,
+    weappContext: WeappContext,
     javaScript: readonly JavaScriptArtifact[]
 ) {
     // Step 1: derive cascade order, reachable CSS, and raw Tailwind candidates from the same current graph snapshot.
