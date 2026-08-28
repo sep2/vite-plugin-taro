@@ -536,6 +536,8 @@ const proofPoints = [
 
         @supports (background-clip: text) or (-webkit-background-clip: text) {
             h1 {
+                /* Keep the mask in render-blocking CSS so the heading is visible in the first paint. */
+                --vpt-stamp-texture: url('../assets/stamp-texture.svg?inline');
                 background: linear-gradient(
                     155deg,
                     var(--vpt-heading-strong) 0 38%,
@@ -544,13 +546,13 @@ const proofPoints = [
                 );
                 background-clip: text;
                 color: transparent;
-                mask-image: url('/stamp-texture.svg');
+                mask-image: var(--vpt-stamp-texture);
                 mask-position: center;
                 mask-repeat: repeat;
                 mask-size: 15rem 10rem;
                 text-shadow: none;
                 -webkit-background-clip: text;
-                -webkit-mask-image: url('/stamp-texture.svg');
+                -webkit-mask-image: var(--vpt-stamp-texture);
                 -webkit-mask-position: center;
                 -webkit-mask-repeat: repeat;
                 -webkit-mask-size: 15rem 10rem;
