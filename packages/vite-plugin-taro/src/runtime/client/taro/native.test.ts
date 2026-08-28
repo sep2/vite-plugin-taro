@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { defineNativeComponent } from './define-native-component.ts'
+import { defineNativeComponent } from './native.ts'
 
 test('fails clearly when the native component interface was not compiled', () => {
     assert.throws(

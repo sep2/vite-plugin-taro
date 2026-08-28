@@ -28,7 +28,7 @@ const clientTaroComponentId = 'virtual:taro/components'
 const clientTaroModules = new Map([
     [clientTaroApiId, clientTaroApiPath],
     [clientTaroComponentId, resolveRuntimeFile('client/taro/component')],
-    [clientTaroNativeId, resolveRuntimeFile('client/taro/define-native-component')]
+    [clientTaroNativeId, resolveRuntimeFile('client/taro/native')]
 ])
 
 /** Creates the shared Taro facade backed by the selected target's API implementation. */

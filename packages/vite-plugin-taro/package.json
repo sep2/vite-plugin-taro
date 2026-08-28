@@ -26,7 +26,7 @@
             "types": "./client.d.ts"
         },
         "./types/native": {
-            "types": "./src/runtime/client/taro/define-native-component.ts"
+            "types": "./src/runtime/client/taro/native.ts"
         },
         "./package.json": "./package.json"
     },
@@ -67,7 +67,7 @@
                 "types": "./client.d.ts"
             },
             "./types/native": {
-                "types": "./dist/runtime/client/taro/define-native-component.d.ts"
+                "types": "./dist/runtime/client/taro/native.d.ts"
             },
             "./package.json": "./package.json"
         }
