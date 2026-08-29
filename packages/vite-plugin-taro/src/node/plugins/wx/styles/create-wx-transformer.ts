@@ -20,6 +20,7 @@ const wxStyleHandlerOptions = {
     cssCalc: false,
     cssChildCombinatorReplaceValue: ['view', 'text'],
     cssPreflight,
+    cssPresetEnv: { autoprefixer: false },
     cssRemoveActivePseudoClass: true,
     cssRemoveHoverPseudoClass: true,
     majorVersion: 4,

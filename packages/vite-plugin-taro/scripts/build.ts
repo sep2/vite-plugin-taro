@@ -4,22 +4,48 @@ import { readFileSync, rmSync } from 'node:fs'
 import { builtinModules, createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { build } from 'rolldown'
+import { build, type Plugin } from 'rolldown'
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
 const distRoot = path.join(packageRoot, 'dist')
+
 const packageRequire = createRequire(path.join(packageRoot, 'package.json'))
+
 const tscPath = path.join(path.dirname(packageRequire.resolve('typescript/package.json')), 'bin/tsc')
+
 const packageJson = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8')) as {
     dependencies: Record<string, string>
     peerDependencies: Record<string, string>
 }
+
 /** Production and peer packages remain physical; implementation-only dev dependencies are bundled automatically. */
 const externalPackages: ReadonlySet<string> = new Set([
     ...Object.keys(packageJson.dependencies),
     ...Object.keys(packageJson.peerDependencies)
 ])
 const nodeBuiltins: ReadonlySet<string> = new Set([...builtinModules, ...builtinModules.map((name) => `node:${name}`)])
+
+/** Removes generic branches that VPT's fixed WX style policy makes unreachable without externalizing their dependencies. */
+function pruneWxStyleDependencies(): Plugin {
+    const stubPrefix = '\0vpt:wx-style-stub:'
+
+    const dependencyStubs: Readonly<Record<string, string>> = {
+        autoprefixer: `export default function unavailable() { throw new Error('VPT disables WX autoprefixer') }`,
+        'postcss-load-config': `export default function unavailable() { throw new Error('VPT owns WX PostCSS configuration') }`,
+        'tailwindcss-config': `export function loadConfig() { throw new Error('VPT compiles Tailwind before WX PostCSS') }`
+    }
+
+    return {
+        name: 'vpt:prune-wx-style-dependencies',
+        resolveId(id) {
+            return Object.hasOwn(dependencyStubs, id) ? `${stubPrefix}${id}` : undefined
+        },
+        load(id) {
+            return id.startsWith(stubPrefix) ? dependencyStubs[id.slice(stubPrefix.length)] : undefined
+        }
+    }
+}
 
 await main()
 
@@ -32,6 +58,7 @@ async function main(): Promise<void> {
         input: path.join(packageRoot, 'src/index.ts'),
         platform: 'node',
         external: isExternal,
+        plugins: [pruneWxStyleDependencies()],
         output: {
             file: path.join(distRoot, 'index.js'),
             format: 'esm',

@@ -7,7 +7,7 @@ import { h5AppPath } from '../plugins/h5/constant.ts'
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const distRoot = path.join(packageRoot, 'dist')
-const compilerSizeLimit = 2_700_000
+const compilerSizeLimit = 2_200_000
 
 test('uses source in the workspace and publishes a size-bounded compiler plus client modules', async () => {
     const packageJson = JSON.parse(await readFile(path.join(packageRoot, 'package.json'), 'utf8')) as {
