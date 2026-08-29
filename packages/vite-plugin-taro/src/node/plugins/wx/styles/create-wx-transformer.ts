@@ -38,20 +38,23 @@ type WxTransformer = Readonly<{
     transformStylesheet: (css: string) => Promise<string>
 }>
 
+type CandidateTransform = Readonly<{
+    pattern: RegExp
+    replacements: ReadonlyMap<string, string>
+}>
+
 /** Creates VPT's fixed Tailwind-v4/WX transformer without loading Weapp's generic framework context. */
 export function createWxTransformer(): WxTransformer {
     const styleHandler = createStyleHandler(wxStyleHandlerOptions)
-    // This factory-local cache memoizes the deterministic Mini Program spelling of each admitted Tailwind class.
-    const escapedClassNames = new Map<string, string>()
-    // Each projected class set gets one exact source precheck so class-free vendor and helper chunks avoid an Oxc parse.
-    const candidatePatternByClassSet = new WeakMap<ReadonlySet<string>, RegExp | null>()
+    // Weak keys release each transaction's exact precheck and replacement table with its projected class set.
+    const candidateTransformByClassSet = new WeakMap<ReadonlySet<string>, CandidateTransform | null>()
 
     const transformJavaScript = ({ classSet, code, filename }: JavaScriptTransformInput): string => {
-        const candidatePattern = getCandidatePattern(classSet, escapedClassNames, candidatePatternByClassSet)
-        if (!candidatePattern?.test(code)) {
+        const candidateTransform = getCandidateTransform(classSet, candidateTransformByClassSet)
+        if (!candidateTransform?.pattern.test(code)) {
             return code
         }
-        return transformJavaScriptSource(code, filename, classSet, escapedClassNames)
+        return transformJavaScriptSource(code, filename, candidateTransform.replacements)
     }
 
     return {
@@ -62,12 +65,7 @@ export function createWxTransformer(): WxTransformer {
     }
 }
 
-function transformJavaScriptSource(
-    code: string,
-    filename: string,
-    classSet: ReadonlySet<string>,
-    escapedClassNames: Map<string, string>
-): string {
+function transformJavaScriptSource(code: string, filename: string, replacements: ReadonlyMap<string, string>): string {
     const parsed = parseSync(filename, code)
     if (parsed.errors.length > 0) {
         const diagnostics = parsed.errors.map((error) => error.message).join('; ')
@@ -77,24 +75,23 @@ function transformJavaScriptSource(
     // This transaction-local editor batches non-overlapping literal replacements without regenerating untouched code.
     const editor = new RolldownMagicString(code, { filename })
     walk(parsed.program, {
-        enter: createClassNameVisitor(code, classSet, escapedClassNames, editor)
+        enter: createClassNameVisitor(code, replacements, editor)
     })
     return editor.toString()
 }
 
 function createClassNameVisitor(
     code: string,
-    classSet: ReadonlySet<string>,
-    escapedClassNames: Map<string, string>,
+    replacements: ReadonlyMap<string, string>,
     editor: RolldownMagicString
 ): WalkerEnter {
     return (node) => {
         if (isStringLiteral(node)) {
-            replaceStringLiteral(code, node, classSet, escapedClassNames, editor)
+            replaceStringLiteral(code, node, replacements, editor)
             return
         }
         if (node.type === 'TemplateElement') {
-            replaceTemplateElement(code, node, classSet, escapedClassNames, editor)
+            replaceTemplateElement(code, node, replacements, editor)
         }
     }
 }
@@ -102,11 +99,10 @@ function createClassNameVisitor(
 function replaceStringLiteral(
     code: string,
     node: StringLiteral,
-    classSet: ReadonlySet<string>,
-    escapedClassNames: Map<string, string>,
+    replacements: ReadonlyMap<string, string>,
     editor: RolldownMagicString
 ): void {
-    const transformed = transformLiteralText(node.value, classSet, escapedClassNames)
+    const transformed = transformLiteralText(node.value, replacements)
     if (transformed !== undefined) {
         replaceRange(code, node.start + 1, node.end - 1, jsStringEscape(transformed), editor)
     }
@@ -115,11 +111,10 @@ function replaceStringLiteral(
 function replaceTemplateElement(
     code: string,
     node: TemplateElement,
-    classSet: ReadonlySet<string>,
-    escapedClassNames: Map<string, string>,
+    replacements: ReadonlyMap<string, string>,
     editor: RolldownMagicString
 ): void {
-    const transformed = transformLiteralText(node.value.raw, classSet, escapedClassNames)
+    const transformed = transformLiteralText(node.value.raw, replacements)
     if (transformed !== undefined) {
         replaceTemplateRange(code, node, transformed, editor)
     }
@@ -150,63 +145,48 @@ function replaceRange(
     }
 }
 
-function transformLiteralText(
-    source: string,
-    classSet: ReadonlySet<string>,
-    escapedClassNames: Map<string, string>
-): string | undefined {
+function transformLiteralText(source: string, replacements: ReadonlyMap<string, string>): string | undefined {
     const candidates = splitCandidateTokens(source)
     // This local accumulator applies each admitted token once while preserving all non-class source bytes.
     let transformed = source
 
     candidates.forEach((candidate) => {
-        if (candidate === '*' || isPlainSlashPathCandidate(candidate)) {
-            return
+        const replacement = replacements.get(candidate)
+        if (replacement !== undefined) {
+            transformed = transformed.replace(candidate, replacement)
         }
-        const escaped = getEscapedClassName(candidate, escapedClassNames)
-        if (!classSet.has(candidate) && !classSet.has(escaped)) {
-            return
-        }
-        transformed = transformed.replace(candidate, escaped)
     })
 
     return transformed === source ? undefined : transformed
 }
 
-/** Builds the exact raw-source alternatives that can produce a Mini Program class-name mutation. */
-function getCandidatePattern(
+/** Builds the exact source precheck and replacements owned by one projected class set. */
+function getCandidateTransform(
     classSet: ReadonlySet<string>,
-    escapedClassNames: Map<string, string>,
-    patternByClassSet: WeakMap<ReadonlySet<string>, RegExp | null>
-): RegExp | undefined {
-    const cached = patternByClassSet.get(classSet)
+    transformByClassSet: WeakMap<ReadonlySet<string>, CandidateTransform | null>
+): CandidateTransform | undefined {
+    const cached = transformByClassSet.get(classSet)
     if (cached !== undefined) {
         return cached ?? undefined
     }
 
-    // These transaction-local alternatives include decoded and JavaScript-escaped spellings without broad class heuristics.
+    // These local collections become weakly reachable with the class set and never accumulate across HMR generations.
     const alternatives = new Set<string>()
+    const replacements = new Map<string, string>()
     classSet.forEach((candidate) => {
-        if (getEscapedClassName(candidate, escapedClassNames) === candidate) {
+        const replacement = escapeClassName(candidate, { map: MappingChars2String })
+        if (replacement === candidate || isPlainSlashPathCandidate(candidate)) {
             return
         }
+        replacements.set(candidate, replacement)
         alternatives.add(RegExp.escape(candidate))
         alternatives.add(RegExp.escape(jsStringEscape(candidate)))
     })
 
-    const pattern = alternatives.size > 0 ? new RegExp([...alternatives].join('|')) : null
-    patternByClassSet.set(classSet, pattern)
-    return pattern ?? undefined
-}
-
-function getEscapedClassName(candidate: string, escapedClassNames: Map<string, string>): string {
-    const cached = escapedClassNames.get(candidate)
-    if (cached !== undefined) {
-        return cached
-    }
-    const escaped = escapeClassName(candidate, { map: MappingChars2String })
-    escapedClassNames.set(candidate, escaped)
-    return escaped
+    const transform =
+        alternatives.size > 0 ? { pattern: new RegExp([...alternatives].join('|')), replacements: replacements } : null
+    transformByClassSet.set(classSet, transform)
+    return transform ?? undefined
 }
 
 function isPlainSlashPathCandidate(candidate: string): boolean {
