@@ -5,18 +5,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { build, normalizePath, type Plugin } from 'vite'
 import { createWxTransformer } from './create-wx-transformer.ts'
-import { createWxStylePlugin, finalizeOutput, generateTailwindRoot } from './plugins.ts'
-
-test('propagates Tailwind generation failures from the authoritative source scan', async () => {
-    const failure = new Error('Tailwind generation failed')
-    const generator = {
-        async generate(): Promise<never> {
-            throw failure
-        }
-    }
-
-    await assert.rejects(generateTailwindRoot(generator), (error) => error === failure)
-})
+import { createWxStylePlugin, finalizeOutput } from './plugins.ts'
 
 test('handles physical and ignored query fragments before watcher cleanup', async () => {
     const styles = createWxStylePlugin(['/src/app.js'])

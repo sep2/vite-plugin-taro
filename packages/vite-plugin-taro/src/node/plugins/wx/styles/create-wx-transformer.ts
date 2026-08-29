@@ -21,16 +21,8 @@ const wxStyleHandlerOptions = {
     cssChildCombinatorReplaceValue: ['view', 'text'],
     cssPreflight,
     cssRemoveActivePseudoClass: true,
-    cssRemoveFocusPseudoClass: true,
     cssRemoveHoverPseudoClass: true,
-    cssRemoveProperty: true,
-    cssSelectorReplacement: {
-        root: ['page', '.tw-root', 'wx-root-portal-content'],
-        universal: ['view', 'text']
-    },
-    isMainChunk: true,
     majorVersion: 4,
-    postcssOptions: {},
     px2rpx: true,
     rem2rpx: true
 } satisfies Partial<IStyleHandlerOptions>

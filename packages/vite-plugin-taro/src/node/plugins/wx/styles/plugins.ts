@@ -19,8 +19,8 @@ type TailwindRoot = Readonly<{
     dependencies: ReadonlySet<string>
     /** Stateful Tailwind compiler reused for candidate-only source updates. */
     generator: TailwindV4Engine
-    /** Oxide source matcher reused to enumerate the current files covered by Tailwind source patterns. */
-    scanner: Scanner
+    /** Physical files covered by Tailwind source patterns and registered with Rolldown's watcher. */
+    files: readonly string[]
     /** Marks a compiler dependency change that requires replacing the generator on the root's next transform. */
     invalidated: boolean
 }>
@@ -53,7 +53,7 @@ export type WxStylePlugin = Plugin &
 
 /** Vite CSS request modes that do not represent graph-owned application stylesheets. */
 const ignoredStyleQueries = ['direct', 'inline', 'inline-css', 'raw', 'style-attr', 'transform-only', 'url'] as const
-const tailwindRootImportPattern = /(@(?:import|reference)\s+(?:url\(\s*)?)(['"]?)tailwindcss\2(?=\s*\)?(?:\s|;|$))/g
+const tailwindRootImportPattern = /(@(?:import|reference)\s+(?:url\(\s*)?)(['"])tailwindcss\2(?=\s*\)?(?:\s|;|$))/g
 const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.css'))
 
 /**
@@ -90,16 +90,16 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  *
  * ### 1. Tailwind pre-transform
  *
- * The pre-transform checks physical application CSS for Tailwind imports or directives. Ordinary styles pass through. A
+ * The pre-transform checks physical application CSS for Tailwind imports. Ordinary styles pass through. A
  * Tailwind root compiles to browser CSS before Vite's normal CSS pipeline runs. Successful generation records the generator,
- * scanner, current class set, compiler dependencies, and exact root source under the normalized physical module ID.
+ * watched source files, current class set, compiler dependencies, and exact root source under the normalized module ID.
  *
  * Candidate files and compiler dependencies intentionally have different invalidation behavior:
  *
- * - Candidate-file changes rerun the root with the existing Tailwind engine and scanner. The engine rescans the authoritative
+ * - Candidate-file changes rerun the root with the existing Tailwind engine. The engine rescans the authoritative
  *   source set and returns one complete stylesheet containing both additions and removals.
- * - Compiler-dependency changes mark the root invalid. Its next Rolldown transform resolves a new Tailwind source and creates a
- *   new generator and scanner. Replacement is delayed until that transform has current source and plugin context.
+ * - Compiler-dependency changes mark the root invalid. Its next Rolldown transform resolves a new Tailwind source, generator,
+ *   and watched file set. Replacement is delayed until that transform has current source and plugin context.
  * - If a stylesheet stops being a Tailwind root, its Tailwind state is removed. The later Vite CSS hook replaces the retained
  *   CSS after normal processing succeeds.
  *
@@ -154,8 +154,7 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * - `wxTransformer`: fixed stylesheet options and escaped-class cache shared by CSS and JavaScript conversion.
  *
  * The state owners remain scoped to one plugin instance; `entryIds` is atomically replaced after each complete resolution.
- * Build-command bundles release retained Tailwind roots after generation. A development watcher keeps them across updates and
- * clears them when it closes. Captured CSS survives build cleanup because output notifications can arrive afterward.
+ * A development watcher retains them across updates; build and watcher shutdown clear the complete style store.
  *
  * ## Cost model
  *
@@ -163,9 +162,8 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * Building one exact candidate precheck costs `O(C)` candidate bytes and testing a chunk costs `O(J)` source bytes. Matching
  * chunks then parse and walk in `O(J)`; replacing `Kᵢ` candidate tokens in literal `i` costs `O(LᵢKᵢ)` while preserving
  * untouched bytes through Rolldown's native editor. Retained memory is `O(B + C + D + F)` for latest CSS, candidate sets,
- * compiler dependencies, and scanner file identities; no second application graph is retained. Tailwind's generator and
- * Oxide scanner caches are intentionally persistent because
- * recreating them on every candidate edit would repeat source normalization and scanning work.
+ * compiler dependencies, and watched file identities; no second application graph is retained. The Tailwind generator stays
+ * alive across candidate edits to avoid repeating source normalization and compiler initialization.
  */
 export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxStylePlugin {
     // This mutable root list is replaced in buildStart with Vite/Rolldown's exact cross-platform graph identities.
@@ -194,15 +192,6 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
                     // The owning root transform replaces the generator using current source and plugin context.
                     tailwind: { ...style.tailwind, invalidated: true }
                 })
-            }
-        })
-    }
-
-    /** Releases retained Tailwind roots while preserving captured CSS needed by subsequent output callbacks. */
-    const clearTailwindRoots = (): void => {
-        styleByModuleId.forEach((style, styleId) => {
-            if (style.tailwind) {
-                styleByModuleId.set(styleId, { css: style.css, tailwind: undefined })
             }
         })
     }
@@ -275,7 +264,7 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
                 compiled.root.dependencies.forEach((file) => {
                     this.addWatchFile(file)
                 })
-                compiled.root.scanner.files.forEach((file) => {
+                compiled.root.files.forEach((file) => {
                     this.addWatchFile(file)
                 })
 
@@ -286,7 +275,6 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
         /** Invalidates compiler state before Rolldown transforms roots selected through their watched dependencies. */
         hotUpdate(update) {
             invalidateTailwindDependencies(normalizeModuleId(update.file))
-            return update.modules
         },
         /** Marks roots whose compiler inputs changed for non-HMR Rolldown watch lifecycles. */
         watchChange(id) {
@@ -325,15 +313,14 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
                 this.emitFile({ type: 'asset', fileName: globalWxssFileName, source: finalized.wxss })
             }
         },
-        /** Releases build-only compiler state after the final bundle has consumed its candidate sets. */
+        /** Releases build-only state after the final bundle has consumed it. */
         closeBundle() {
             if (this.environment.config.command === 'build') {
-                clearTailwindRoots()
+                styleByModuleId.clear()
             }
         },
-        /** Releases long-lived development state when the owning watcher terminates. */
+        /** Releases all long-lived development state when the owning watcher terminates. */
         closeWatcher() {
-            clearTailwindRoots()
             styleByModuleId.clear()
         },
         /** Finalizes one development result and publishes matching WXSS before exposing converted patch factories. */
@@ -464,7 +451,7 @@ async function compileTailwindRoot(
     css: string,
     previous: TailwindRoot | undefined
 ): Promise<Readonly<{ css: string; root: TailwindRoot }>> {
-    // Step 1: exact root-source equality proves that candidate changes can reuse the existing compiler and scanner caches.
+    // Step 1: exact root-source equality proves that candidate changes can reuse the existing compiler.
     const reuse = previous?.source === css
 
     // Step 2: compiler-input changes resolve a fresh Tailwind source and create a new engine before retained state changes.
@@ -485,7 +472,7 @@ async function compileTailwindRoot(
           )
 
     // Step 3: authoritative source scanning returns one complete stylesheet containing additions and removals.
-    const generated = await generateTailwindRoot(generator)
+    const generated = await generator.generate({ scanSources: true })
 
     // Step 4: return a complete immutable replacement record; the caller commits it only after this function succeeds.
     return {
@@ -495,16 +482,10 @@ async function compileTailwindRoot(
             classSet: generated.classSet,
             dependencies: new Set(generated.dependencies.map(normalizeModuleId)),
             generator: generator,
-            // Source patterns change with compiler inputs, while candidate-only updates can reuse their native matcher.
-            scanner: reuse ? previous.scanner : new Scanner({ sources: generated.sources }),
+            files: reuse ? previous.files : new Scanner({ sources: generated.sources }).files,
             invalidated: false
         }
     }
-}
-
-/** Generates one complete Tailwind stylesheet from the engine's current authoritative source scan. */
-export function generateTailwindRoot(generator: Pick<TailwindV4Engine, 'generate'>) {
-    return generator.generate({ scanSources: true })
 }
 
 /** Resolves the one bare Tailwind root import through VPT's compiler-owned Tailwind installation. */
@@ -558,13 +539,9 @@ function neutralizeViteCssPayload(code: string): string {
     )
 }
 
-/** Detects source forms that require Tailwind compilation before Vite processes the resulting CSS. */
+/** Detects Tailwind v4 package imports before Vite processes the resulting CSS. */
 function isTailwindRoot(code: string): boolean {
-    // Tailwind v4 uses package imports; legacy directives remain accepted because the generator supports both forms.
-    return (
-        /@import\s+(?:url\(\s*)?['"]tailwindcss(?:\/[^'"]*)?['"]/.test(code) ||
-        /@tailwind\s+(?:base|components|utilities)\b/.test(code)
-    )
+    return /@(?:import|reference)\s+(?:url\(\s*)?['"]tailwindcss(?:\/[^'"]*)?['"]/.test(code)
 }
 
 /** Identifies Vite's browser stylesheet carrier, which VPT replaces after all final CSS has been captured. */
