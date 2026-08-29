@@ -190,12 +190,12 @@ function getCandidateTransform(
 }
 
 function isPlainSlashPathCandidate(candidate: string): boolean {
+    if (candidate.startsWith('//') || candidate.startsWith('http://') || candidate.startsWith('https://')) {
+        return true
+    }
     const slashIndex = candidate.indexOf('/')
     if (slashIndex <= 0) {
         return false
-    }
-    if (candidate.startsWith('//') || candidate.startsWith('http://') || candidate.startsWith('https://')) {
-        return true
     }
     if (candidate.includes('[') || candidate.includes(']') || candidate.includes(':')) {
         return false
@@ -210,10 +210,6 @@ function isStringLiteral(node: Node): node is StringLiteral {
 function jsStringEscape(value: string): string {
     return value.replaceAll(/[\n\r"'\\\u2028\u2029]/g, (character) => {
         switch (character) {
-            case '"':
-            case "'":
-            case '\\':
-                return `\\${character}`
             case '\n':
                 return '\\n'
             case '\r':
@@ -222,8 +218,7 @@ function jsStringEscape(value: string): string {
                 return '\\u2028'
             case '\u2029':
                 return '\\u2029'
-            default:
-                return character
         }
+        return `\\${character}`
     })
 }
