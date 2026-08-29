@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.6.20-beta.1] - 2026-08-29
+
+### Changed
+
+- simplify wx style pipeline (fcecfb6)
+- specialize wx tailwind pipeline (b6fee48)
+
+### Fixed
+
+- release wx class transform caches (e817950)
+
 ## [0.6.20-beta.0] - 2026-08-29
 
 ### Changed
