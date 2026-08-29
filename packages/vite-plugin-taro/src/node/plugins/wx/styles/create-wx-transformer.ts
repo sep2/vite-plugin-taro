@@ -16,11 +16,21 @@ const cssPreflight = {
 /** Static replacement for the generic Weapp context, keeping VPT policy explicit and framework detection out of the bundle. */
 const wxStyleHandlerOptions = {
     appType: 'weapp-vite',
+    /*
+     * Tailwind runs before this WX handler and emits vendor-prefixed and standard utility declarations together,
+     * such as `-webkit-user-select` and `user-select`. Running the standalone Autoprefixer afterward would
+     * retarget completed Tailwind output through a second Browserslist policy and duplicate compatibility ownership.
+     *
+     * @weapp-tailwindcss/postcss also controls an independent Autoprefixer inside postcss-preset-env. Its default
+     * `{ add: false }` pass cannot add compatibility; it can only remove prefixes emitted by Tailwind or supplied
+     * by application CSS. Disabling both entry points preserves those declarations and lets the compiler build
+     * eliminate Autoprefixer and its browser-data graph.
+     */
     autoprefixer: false,
+    cssPresetEnv: { autoprefixer: false },
     cssCalc: false,
     cssChildCombinatorReplaceValue: ['view', 'text'],
     cssPreflight,
-    cssPresetEnv: { autoprefixer: false },
     cssRemoveActivePseudoClass: true,
     cssRemoveHoverPseudoClass: true,
     majorVersion: 4,
