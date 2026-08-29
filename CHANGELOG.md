@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.6.20-beta.2] - 2026-08-29
+
+### Changed
+
+- explain wx autoprefixer policy (b7347ba)
+- prune unused wx style dependencies (43e6675)
+- restore wx transformer coverage (60be0d3)
+
 ## [0.6.20-beta.1] - 2026-08-29
 
 ### Changed
