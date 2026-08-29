@@ -4,11 +4,20 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
-## [0.6.19] - 2026-08-28
+## [0.6.20-beta.0] - 2026-08-29
+
+### Changed
+
+- reduce plugin bundle size (26bd290)
+- design wx hmr mode abstraction (e04627a)
+- reuse projected Tailwind class set (8d9cfeb)
+- bind style compiler to Vite root (d467827)
+
+## [0.6.19-beta.0] - 2026-08-28
 
 Initial release.
 
-## [0.6.19-beta.0] - 2026-08-28
+## [0.6.19] - 2026-08-28
 
 ### Changed
 
