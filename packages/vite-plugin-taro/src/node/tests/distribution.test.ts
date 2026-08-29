@@ -7,11 +7,12 @@ import { h5AppPath } from '../plugins/h5/constant.ts'
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const distRoot = path.join(packageRoot, 'dist')
-const compilerSizeLimit = 3_000_000
+const compilerSizeLimit = 2_700_000
 
 test('uses source in the workspace and publishes a size-bounded compiler plus client modules', async () => {
     const packageJson = JSON.parse(await readFile(path.join(packageRoot, 'package.json'), 'utf8')) as {
         dependencies: Record<string, string>
+        devDependencies: Record<string, string>
         files: string[]
         main: string
         publishConfig: { main: string }
@@ -25,6 +26,10 @@ test('uses source in the workspace and publishes a size-bounded compiler plus cl
     assert.ok(!packageJson.files.includes('src'))
     assert.match(h5AppPath, /\/src\/runtime\/h5\/app\.ts$/)
     assert.equal(packageJson.dependencies['@tailwindcss/vite'], '4.3.3')
+    assert.equal(packageJson.devDependencies['@tailwindcss-mangle/engine'], '0.2.0')
+    assert.equal(packageJson.devDependencies['@weapp-core/escape'], '8.0.0')
+    assert.equal(packageJson.devDependencies['@weapp-tailwindcss/postcss'], '3.2.11')
+    assert.equal(packageJson.devDependencies['weapp-tailwindcss'], undefined)
     assert.equal(packageJson.dependencies['weapp-tailwindcss'], undefined)
     assert.doesNotMatch(compiler, /from\s*['"]weapp-tailwindcss/)
     assert.match(compiler, /@tailwindcss\/vite/)

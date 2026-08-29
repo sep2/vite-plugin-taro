@@ -20,7 +20,6 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - '@weapp-tailwindcss/postcss@3.2.11'
-  - weapp-tailwindcss@5.3.5
   - '@astrojs/starlight@0.41.9'
   - astro@7.2.7
   - rollup@4.63.0
@@ -53,4 +52,3 @@ minimumReleaseAgeExclude:
 
 patchedDependencies:
   canvas-confetti@1.9.4: patches/canvas-confetti@1.9.4.patch
-  weapp-tailwindcss@5.3.5: patches/weapp-tailwindcss@5.3.5.patch

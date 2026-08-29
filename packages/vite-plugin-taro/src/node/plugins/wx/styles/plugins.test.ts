@@ -4,26 +4,18 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { build, normalizePath, type Plugin } from 'vite'
-import { createContext } from 'weapp-tailwindcss/core'
+import { createWxTransformer } from './create-wx-transformer.ts'
 import { createWxStylePlugin, finalizeOutput, generateTailwindRoot } from './plugins.ts'
 
-test('disposes only newly-created Tailwind generators after generation failure', async () => {
+test('propagates Tailwind generation failures from the authoritative source scan', async () => {
     const failure = new Error('Tailwind generation failed')
-    // This mutable count distinguishes unowned generator cleanup from retained incremental compiler ownership.
-    let disposals = 0
     const generator = {
         async generate(): Promise<never> {
             throw failure
-        },
-        dispose(): void {
-            disposals++
         }
     }
 
-    await assert.rejects(generateTailwindRoot(generator, false), (error) => error === failure)
-    assert.equal(disposals, 1)
-    await assert.rejects(generateTailwindRoot(generator, true), (error) => error === failure)
-    assert.equal(disposals, 1)
+    await assert.rejects(generateTailwindRoot(generator), (error) => error === failure)
 })
 
 test('handles physical and ignored query fragments before watcher cleanup', async () => {
@@ -45,24 +37,18 @@ test('handles physical and ignored query fragments before watcher cleanup', asyn
     await Reflect.apply(closeWatcher, {}, [])
 })
 
-test('retains a supplied WXSS runtime set without source discovery', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'vpt-wxss-runtime-'))
+test('transforms WXSS and JavaScript from one supplied class set without source discovery', async () => {
+    const transformer = createWxTransformer()
+    const classSet = new Set(['py-5.5'])
+    const style = await transformer.transformStylesheet('.py-5\\.5 { padding: 1px; }')
+    const javaScript = transformer.transformJavaScript({
+        classSet,
+        code: "export const className = 'py-5.5'",
+        filename: 'entry.js'
+    })
 
-    try {
-        const context = createContext({
-            appType: 'weapp-vite',
-            logLevel: 'silent',
-            tailwindcssBasedir: root
-        })
-        const runtimeSet = new Set(['py-5.5'])
-        const style = await context.transformWxss('.py-5\\.5 { padding: 1px; }', { runtimeSet })
-        const javaScript = await context.transformJs("export const className = 'py-5.5'", { generateMap: false })
-
-        assert.match(style.css, /\.py-5_d5\s*\{/)
-        assert.equal(javaScript.code, "export const className = 'py-5_d5'")
-    } finally {
-        await rm(root, { recursive: true, force: true })
-    }
+    assert.match(style, /\.py-5_d5\s*\{/)
+    assert.equal(javaScript, "export const className = 'py-5_d5'")
 })
 
 test('finalizes the current graph into WXSS and JavaScript with one projected class set', async () => {
@@ -87,7 +73,7 @@ test('finalizes the current graph into WXSS and JavaScript with one projected cl
                 return { importedIds: [], dynamicallyImportedIds: [] }
             }
         },
-        createContext({ appType: 'weapp-vite', logLevel: 'silent' }),
+        createWxTransformer(),
         [{ code: "export const className = 'py-5.5'", filename: 'entry.js' }]
     )
 
@@ -129,7 +115,7 @@ test('projects cyclic multi-entry graphs in dependency-first order without dupli
             ]
         ]),
         (moduleId) => moduleGraph.get(moduleId),
-        createContext({ appType: 'weapp-vite', logLevel: 'silent' }),
+        createWxTransformer(),
         [{ code: "export const classes = 'py-5.5 mr-4.5'", filename: 'entry.js' }]
     )
 
@@ -162,7 +148,7 @@ test('rejects the complete style transaction when JavaScript conversion fails', 
                     ]
                 ]),
                 (moduleId) => (moduleId === '/entry.js' ? { importedIds: [], dynamicallyImportedIds: [] } : undefined),
-                createContext({ appType: 'weapp-vite', logLevel: 'silent' }),
+                createWxTransformer(),
                 [{ code: source, filename: 'entry.js' }]
             ),
         Error
