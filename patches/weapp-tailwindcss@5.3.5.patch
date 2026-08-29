@@ -39,28 +39,3 @@ index d7e0baea7a3fe88587fd9f7f0cdf7e8fe0e504f8..bca0ee8671a84840353c4b2f922abe6a
 +		const { runtimeSet: runtimeOverride, ...styleOptions } = options ?? {};
 +		const result = await styleHandler(rawCss, resolveTransformWxssOptions(styleOptions));
 +		runtimeSet = runtimeOverride ?? await ensureRuntimeClassSet(runtimeState);
-diff --git a/dist/vite-mWyHvLB0.js b/dist/vite-mWyHvLB0.js
-index 2fec684fdb08ed2c6e38af169c0d690a233dd3e0..1424a67e710e2617e5e7cc127b96b164818f6416 100644
---- a/dist/vite-mWyHvLB0.js
-+++ b/dist/vite-mWyHvLB0.js
-@@ -10213,9 +10213,9 @@ function createFrameworkTailwindRootCss(options) {
- //#endregion
- //#region src/bundlers/vite/shared/create-framework-plugins-runtime.ts
- const debug = createDebug();
--const weappTailwindcssPackageDir = resolvePackageDir("weapp-tailwindcss");
-+const weappTailwindcssPackageDir = path.dirname(fileURLToPath(import.meta.url));
- const weappTailwindcssDirPosix = slash(weappTailwindcssPackageDir);
--const generatorPlaceholderCssFile = path.join(weappTailwindcssPackageDir, "generator-placeholder.css");
-+const generatorPlaceholderCssFile = "data:text/css,%2F*!%20weapp-tailwindcss%20generator-placeholder%20*%2F";
- const ENV_PLATFORM_KEYS = [
- 	"UNI_PLATFORM",
- 	"UNI_UTS_PLATFORM",
-@@ -10748,7 +10748,7 @@ ${tracedCss}`;
- 	const rewritePlugins = createRewriteCssImportsPlugins({
- 		getAppType: () => opts.appType,
- 		generateTailwindCss: generateTailwindCssForVitePipeline,
--		rootImport: shouldOwnTailwindGeneration ? `${weappTailwindcssDirPosix}/generator-placeholder.css` : void 0,
-+		rootImport: shouldOwnTailwindGeneration ? generatorPlaceholderCssFile : void 0,
- 		onTailwindRootCss: registerTailwindRootCss,
- 		onCssSourceTransform: (id, code) => cssMemory.refreshRememberedCssSourceBySourceFile(id, code),
- 		shouldGenerateCss: (_id, code) => hasVitePipelineTailwindGenerationDirective(code),

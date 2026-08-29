@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module'
 import babel, { defineRolldownBabelPreset } from '@rolldown/plugin-babel'
+import tailwindcss from '@tailwindcss/vite'
 import type { HtmlTagDescriptor, Plugin, PluginOption } from 'vite'
-import { WeappTailwindcss } from 'weapp-tailwindcss/vite'
 import type { VptOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
 import { toViteFileImportPath } from '../../utils/modules.ts'
@@ -15,22 +15,8 @@ import { createModuleResolver } from './resolver/module-resolver.ts'
 /** Creates the plugins that own the H5 target. */
 export function createH5TargetPlugins(options: VptOptions): PluginOption[] {
     return [
-        WeappTailwindcss({
-            appType: 'weapp-vite',
-            rewriteCssImports: false,
-            platform: 'web',
-            tailwindcssBasedir,
-            generator: {
-                target: 'web'
-            },
-            cssOptions: {
-                cssCalc: false,
-                autoprefixer: true,
-                rem2rpx: true,
-                px2rpx: true
-            },
-            logLevel: 'warn'
-        }),
+        // Vite owns final H5 CSS optimization; disabling Tailwind's extra pass avoids duplicate transformations.
+        ...tailwindcss({ optimize: false }),
         ...createH5SupportPlugins(),
         createH5Plugin(options)
     ]
@@ -49,6 +35,11 @@ function createH5Plugin(options: VptOptions): Plugin {
                 resolve: {
                     mainFields: ['main:h5', 'browser', 'module', 'jsnext:main', 'jsnext'],
                     alias: [
+                        {
+                            // Tailwind is compiler-owned, so application CSS does not depend on a project installation.
+                            find: /^tailwindcss(?=\/|$)/,
+                            replacement: tailwindcssBasedir
+                        },
                         {
                             find: /^@tarojs\/runtime$/,
                             replacement: packageRequire.resolve('@tarojs/runtime/dist/runtime.esm.js')

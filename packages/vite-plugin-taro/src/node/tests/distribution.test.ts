@@ -7,8 +7,9 @@ import { h5AppPath } from '../plugins/h5/constant.ts'
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const distRoot = path.join(packageRoot, 'dist')
+const compilerSizeLimit = 3_000_000
 
-test('uses source in the workspace and publishes only the compiler bundle and client modules', async () => {
+test('uses source in the workspace and publishes a size-bounded compiler plus client modules', async () => {
     const packageJson = JSON.parse(await readFile(path.join(packageRoot, 'package.json'), 'utf8')) as {
         dependencies: Record<string, string>
         files: string[]
@@ -18,16 +19,16 @@ test('uses source in the workspace and publishes only the compiler bundle and cl
     const compiler = await readFile(path.join(distRoot, 'index.js'), 'utf8')
     const componentFacade = await readFile(path.join(distRoot, 'runtime/client/taro/component.js'), 'utf8')
     const compilerModules = await readdir(path.join(distRoot, 'node'), { recursive: true })
-    const distributionFiles = await readdir(distRoot)
 
     assert.equal(packageJson.main, './src/index.ts')
     assert.equal(packageJson.publishConfig.main, './dist/index.js')
     assert.ok(!packageJson.files.includes('src'))
     assert.match(h5AppPath, /\/src\/runtime\/h5\/app\.ts$/)
+    assert.equal(packageJson.dependencies['@tailwindcss/vite'], '4.3.3')
     assert.equal(packageJson.dependencies['weapp-tailwindcss'], undefined)
-    assert.doesNotMatch(compiler, /from ['"]weapp-tailwindcss/)
-    assert.match(compiler, /data:text\/css,%2F\*!%20weapp-tailwindcss%20generator-placeholder/)
-    assert.ok(!distributionFiles.includes('generator-placeholder.css'))
+    assert.doesNotMatch(compiler, /from\s*['"]weapp-tailwindcss/)
+    assert.match(compiler, /@tailwindcss\/vite/)
+    assert.ok(Buffer.byteLength(compiler) < compilerSizeLimit)
     assert.match(componentFacade, /from '@tarojs\/components'/)
     assert.equal(
         compilerModules.some((file) => file.endsWith('.js')),

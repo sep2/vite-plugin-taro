@@ -35,7 +35,8 @@ async function main(): Promise<void> {
         output: {
             file: path.join(distRoot, 'index.js'),
             format: 'esm',
-            codeSplitting: false
+            codeSplitting: false,
+            minify: true
         }
     })
 }

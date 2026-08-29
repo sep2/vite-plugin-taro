@@ -12,7 +12,7 @@ overrides:
 
 patchedDependencies:
   canvas-confetti@1.9.4: a11dfdc640afc8af441edc53ff394b7d212b3493646c3525f21d41d58cccddd0
-  weapp-tailwindcss@5.3.5: 8b2c06c86713adf8d4aacce5895b5a9f9ee100c950827106edd90906931f15f4
+  weapp-tailwindcss@5.3.5: 40f11907c4706a2aa72ba5daf3db9ea8416cee46615c2358112397996a900f6d
 
 importers:
 
@@ -244,6 +244,9 @@ importers:
       '@tailwindcss/oxide':
         specifier: 4.3.3
         version: 4.3.3
+      '@tailwindcss/vite':
+        specifier: 4.3.3
+        version: 4.3.3(vite@8.2.2(@types/node@26.3.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0))
       '@tarojs/components':
         specifier: 4.2.1
         version: 4.2.1(@tarojs/helper@4.2.1(supports-color@7.2.0))(@types/react@19.2.18)(postcss@8.5.26)
@@ -346,7 +349,7 @@ importers:
         version: 8.2.2(@types/node@26.3.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0)
       weapp-tailwindcss:
         specifier: 5.3.5
-        version: 5.3.5(patch_hash=8b2c06c86713adf8d4aacce5895b5a9f9ee100c950827106edd90906931f15f4)(@oxc-project/types@0.147.0)(jiti@2.7.0)(rolldown@1.2.5)(supports-color@7.2.0)(tailwindcss@4.3.3)
+        version: 5.3.5(patch_hash=40f11907c4706a2aa72ba5daf3db9ea8416cee46615c2358112397996a900f6d)(@oxc-project/types@0.147.0)(jiti@2.7.0)(rolldown@1.2.5)(supports-color@7.2.0)(tailwindcss@4.3.3)
 
 packages:
 
@@ -2395,6 +2398,11 @@ packages:
   '@tailwindcss/oxide@4.3.3':
     resolution: {integrity: sha512-krXjAikiaFSPaK/FkAQT5UTx3VormQaiZ5hBFlJZ9UFQGB/rwg1MZIhHAG9smMQRTdyJxP6Qt5MwMtdyU5FWrA==}
     engines: {node: '>= 20'}
+
+  '@tailwindcss/vite@4.3.3':
+    resolution: {integrity: sha512-yYU8cogLeSh/ms2jh8Fj7jaba/EWa7Ja6GoUqYZaraEuCI5YS6ms6ObZgjjedm+jm6XZjdNRWBpPP6Z86oOxcw==}
+    peerDependencies:
+      vite: 8.2.2
 
   '@tarojs/api@4.2.1':
     resolution: {integrity: sha512-GlgqH/mx0EC+tYrcUnqa7vsGSOaAzIJNxvDcUESO6FiKb1xLESGmgGbaiEkqw29Nx/3j3lEXjHrCHJUdGy3X2Q==}
@@ -6967,6 +6975,13 @@ snapshots:
       '@tailwindcss/oxide-win32-arm64-msvc': 4.3.3
       '@tailwindcss/oxide-win32-x64-msvc': 4.3.3
 
+  '@tailwindcss/vite@4.3.3(vite@8.2.2(@types/node@26.3.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0))':
+    dependencies:
+      '@tailwindcss/node': 4.3.3
+      '@tailwindcss/oxide': 4.3.3
+      tailwindcss: 4.3.3
+      vite: 8.2.2(@types/node@26.3.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0)
+
   '@tarojs/api@4.2.1(@tarojs/runtime@4.2.1)(@tarojs/shared@4.2.1)':
     dependencies:
       '@tarojs/runtime': 4.2.1
@@ -10499,7 +10514,7 @@ snapshots:
       '@weapp-tailwindcss/shared': 2.0.2
       micromatch: 4.0.8
 
-  weapp-tailwindcss@5.3.5(patch_hash=8b2c06c86713adf8d4aacce5895b5a9f9ee100c950827106edd90906931f15f4)(@oxc-project/types@0.147.0)(jiti@2.7.0)(rolldown@1.2.5)(supports-color@7.2.0)(tailwindcss@4.3.3):
+  weapp-tailwindcss@5.3.5(patch_hash=40f11907c4706a2aa72ba5daf3db9ea8416cee46615c2358112397996a900f6d)(@oxc-project/types@0.147.0)(jiti@2.7.0)(rolldown@1.2.5)(supports-color@7.2.0)(tailwindcss@4.3.3):
     dependencies:
       '@babel/parser': 8.0.4
       '@babel/traverse': 8.0.4

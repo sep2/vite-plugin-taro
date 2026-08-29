@@ -78,6 +78,7 @@
     "dependencies": {
         "@tailwindcss/node": "4.3.3",
         "@tailwindcss/oxide": "4.3.3",
+        "@tailwindcss/vite": "4.3.3",
         "@tarojs/components": "4.2.1",
         "@tarojs/helper": "4.2.1",
         "@tarojs/plugin-framework-react": "workspace:vite-plugin-taro-plugin-framework-react@*",
