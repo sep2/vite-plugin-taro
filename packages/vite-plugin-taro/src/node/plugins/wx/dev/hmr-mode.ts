@@ -1,24 +1,36 @@
-import type { Plugin, ViteDevServer } from 'vite'
+import type { Plugin } from 'vite'
 import type { VptHmrOptions } from '../../../../options.ts'
 import type { PatchPublication } from './hmr-protocol.ts'
 import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
 import { createInterpreterHmrMode } from './modes/interpreter/interpreter-hmr-mode.ts'
-import type { PatchJournal } from './patch-journal.ts'
 
-export type WriteDevelopmentFile = (fileName: string, source: string) => Promise<void>
+/** One mode-selected effect executed by the development host. */
+export type WxHmrAction =
+    | Readonly<{
+          kind: 'event'
+          event: string
+          data: unknown
+      }>
+    | Readonly<{
+          kind: 'write'
+          fileName: string
+          source: string
+      }>
 
 /**
  * The behavior that genuinely differs between WX HMR implementations.
  *
- * The descriptor is selected once during plugin composition. Interpreter mode publishes the journal through Vite's existing
- * WebSocket; DevTools reset and publish effects materialize that same journal as its watched native patch file.
+ * The descriptor is selected once during plugin composition and returns declarative effects. The shared host alone performs
+ * physical writes and event transport, so neither mode receives a Vite server or owns asynchronous infrastructure.
  */
 export type WxHmrMode = Readonly<{
     runtimeFile: string
     plugins: readonly Plugin[]
-    reset: (server: ViteDevServer, buildId: string, writeFile: WriteDevelopmentFile) => Promise<void>
-    publish: (server: ViteDevServer, publication: PatchPublication, writeFile: WriteDevelopmentFile) => Promise<void>
-    configureServer: (server: ViteDevServer, journal: PatchJournal) => void
+
+    reset: () => WxHmrAction | undefined
+    publish: (publication: PatchPublication) => WxHmrAction
+    replay: (publication: PatchPublication | undefined, buildId: string) => WxHmrAction | undefined
+
     createEntryBanner: (
         pageFiles: ReadonlySet<string>
     ) => (chunk: Readonly<{ name: string; fileName: string }>) => string

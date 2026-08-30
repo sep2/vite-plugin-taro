@@ -26,12 +26,19 @@ export function createDevtoolsHmrMode(): WxHmrMode {
         createEntryBanner: createDevtoolsEntryBanner,
         // Every Page requires this path from its first complete build. Exporting undefined keeps that dependency valid while
         // making initial Page evaluation a no-op in the runtime adapter until a real cumulative patch suffix exists.
-        reset: (_, __, writeFile) => writeFile(devtoolsPatchesFileName, renderInitialDevtoolsPatches()),
+        reset: () => ({
+            kind: 'write',
+            fileName: devtoolsPatchesFileName,
+            source: renderInitialDevtoolsPatches()
+        }),
         // Later publications always replace the same watched path. The journal supplies the entire unacknowledged suffix so a
         // coalesced or missed DevTools file event cannot strand the App runtime between two Rolldown generations.
-        publish: (_, publication, writeFile) =>
-            writeFile(devtoolsPatchesFileName, renderDevtoolsPatches(publication.buildId, publication.patches)),
-        configureServer: () => {}
+        publish: (publication) => ({
+            kind: 'write',
+            fileName: devtoolsPatchesFileName,
+            source: renderDevtoolsPatches(publication.buildId, publication.patches)
+        }),
+        replay: () => undefined
     }
 }
 

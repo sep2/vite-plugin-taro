@@ -13,7 +13,8 @@ import {
     type RuntimeControlMessage,
     type RuntimeReport,
     runtimeControlEvent,
-    runtimeReportEvent
+    runtimeReportEvent,
+    runtimeSubscribeEvent
 } from './wx-hmr-protocol.ts'
 
 /** Lexical base class injected into the runtime chunk by Rolldown; typed via the contract. */
@@ -236,7 +237,7 @@ export class WxHmrRuntime extends DevRuntime {
         const socket = wx.connectSocket({ url: info.endpoint, protocols: ['vite-hmr'] })
         this.socket = socket
 
-        socket.onOpen(() => this.onSocketOpen(info))
+        socket.onOpen(() => this.sendSocketEvent(runtimeSubscribeEvent, { buildId: info.buildId }))
 
         socket.onMessage(({ data }) => {
             if (typeof data !== 'string') return
@@ -254,9 +255,6 @@ export class WxHmrRuntime extends DevRuntime {
             this.onSocketEvent(info, message.event, message.data)
         })
     }
-
-    /** Called after the shared socket opens; interpreter mode uses it to subscribe its build. */
-    protected onSocketOpen(_info: HmrInfo): void {}
 
     /** Receives mode-specific Vite custom events after shared control messages have been handled. */
     protected onSocketEvent(_info: HmrInfo, _event: string, _data: unknown): void {}

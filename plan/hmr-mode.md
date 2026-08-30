@@ -45,8 +45,9 @@ The shared development host owns:
 - the one Rolldown `DevEngine`;
 - Rolldown client registration and build rotation;
 - HMR callback buffering and invalid-source recovery;
-- style finalization and physical WXSS publication;
+- style finalization and every physical development-file write;
 - the cumulative patch journal;
+- dispatch of mode-selected broadcast and client-response events;
 - runtime report event admission and serialized acknowledgement commits;
 - ACK handling and rebuild requests;
 - payload-delivery notification to Rolldown;
@@ -61,7 +62,7 @@ The `devtools` mode owns:
 - the `hmr/patches.js` filename;
 - initial patch-module rendering;
 - cumulative CommonJS patch-module rendering;
-- writing the patch module through the injected physical-file writer;
+- describing patch-module writes as declarative host actions;
 - the App and Page entry banners;
 - the Page shell transform that calls `injectPageHmr()`;
 - the DevTools runtime entry selected for nested Rolldown bundling.
@@ -70,7 +71,7 @@ The `devtools` mode owns:
 
 The `interpreter` mode owns:
 
-- Vite custom events for initial build subscription and source publication;
+- declarative custom events for initial build subscription and source publication;
 - initial subscription replay from the current journal suffix;
 - cumulative messages containing the original `{ seq, changedIds, code }` patch fields;
 - an App-only entry banner and interpreter runtime entry.
@@ -90,6 +91,7 @@ The shared WX HMR runtime owns:
 - build identity and the applied sequence frontier;
 - contiguous batch validation;
 - the App heap's sole Vite-protocol SocketTask;
+- the shared build-subscription event sent when that socket opens;
 - application and rebuild report events;
 - build-replacement and host-shutdown control events.
 
@@ -109,7 +111,6 @@ The DevTools runtime owns:
 
 The interpreter runtime owns:
 
-- build subscription after the shared socket opens;
 - source-event handling through the shared socket;
 - the App-level Sval sandbox and imported Rolldown runtime registry;
 - interpreting each registration program synchronously;
@@ -125,19 +126,24 @@ export type PatchPublication = Readonly<{
     patches: readonly PatchUpdate[]
 }>
 
+export type WxHmrEvent = Readonly<{ kind: 'event'; event: string; data: unknown }>
+export type WxHmrModeAction =
+    | Readonly<{ kind: 'write'; fileName: string; source: string }>
+    | WxHmrEvent
+
 export type WxHmrMode = Readonly<{
     runtimeFile: string
     plugins: readonly Plugin[]
-    reset: (server: ViteDevServer, buildId: string, writeFile: WriteDevelopmentFile) => Promise<void>
-    publish: (server: ViteDevServer, publication: PatchPublication, writeFile: WriteDevelopmentFile) => Promise<void>
-    configureServer: (server: ViteDevServer, journal: PatchJournal) => void
+    reset: () => WxHmrModeAction | undefined
+    publish: (publication: PatchPublication) => WxHmrModeAction
+    replay: (publication: PatchPublication | undefined, buildId: string) => WxHmrEvent | undefined
     createEntryBanner: (
         pageFiles: ReadonlySet<string>
     ) => (chunk: Readonly<{ name: string; fileName: string }>) => string
 }>
 ```
 
-The descriptor is created once during Vite plugin composition. DevTools reset and publish materialize the journal as a watched file. Interpreter mode sends the same value through `server.ws`; the initial build subscription reads `journal.current`. A publish Promise resolves only after the selected representation is observable; the common host notifies Rolldown afterward.
+The descriptor is created once during Vite plugin composition. It is pure with respect to host infrastructure: neither mode receives `ViteDevServer`, a WebSocket, or a physical writer. DevTools returns file-write actions; interpreter mode returns broadcast events and implements `replay()` for the host's shared subscription event. The host executes the selected action and only then notifies Rolldown that the publication is observable.
 
 ### Patch journal
 
@@ -147,7 +153,7 @@ Replace the file-aware `PatchPublisher` with a transport-independent `PatchJourn
 export class PatchJournal {
     constructor(publish: (publication: PatchPublication) => Promise<void>)
 
-    readonly current: PatchPublication | undefined
+    current(): PatchPublication | undefined
     isCurrentBuild(buildId: string): boolean
     startBuild(): Readonly<{ buildId: string; previousBuildId: string | undefined }>
     produce(patches: readonly PatchUpdate[]): Promise<void>
@@ -155,9 +161,9 @@ export class PatchJournal {
 }
 ```
 
-The journal keeps the original mutable build ID and pending-patch array. `current` adds only a synchronous view used when an interpreter socket first subscribes.
+The journal keeps the original mutable build ID and pending-patch array. `current()` adds only a synchronous view used when an interpreter socket first subscribes.
 
-`produce()` appends patches and passes the same structured publication to the selected mode effect bound by the host constructor. It does not render JavaScript, know a destination filename, or own transport listeners.
+`produce()` appends patches and passes the same structured publication to the selected mode action factory bound by the host constructor. It does not render JavaScript, know a destination filename, or own transport listeners.
 
 A failed delivery leaves every appended patch in the journal. A later publication therefore republishes the complete required suffix.
 
@@ -199,7 +205,7 @@ DevTools invokes `patch.factory()`. Interpreter mode invokes `sval.run(patch.cod
 ### Startup
 
 1. Resolve the configured mode descriptor.
-2. Construct the authoritative `PatchJournal` in the host with the mode's publication effect.
+2. Construct the authoritative `PatchJournal` in the host with mode-action dispatch.
 3. Install common Rolldown development options using the mode's runtime file and entry-banner factory.
 4. Create and run the one physical `DevEngine`.
 5. Wait for the initial complete output and style finalization.
@@ -213,7 +219,7 @@ The common host performs this ordered transaction:
 2. rotate the journal build ID;
 3. remove the previous Rolldown client when present;
 4. register the new Rolldown client;
-5. call `mode.reset(server, buildId, writeFile)`;
+5. execute the action returned by `mode.reset()`;
 6. write `hmr/info.js` with the new build ID and authenticated WebSocket endpoint;
 7. write the build-versioned `app.wxss` wrapper.
 
@@ -228,10 +234,10 @@ The common host performs this ordered transaction:
 3. finalize styles for the retained patches;
 4. write `assets/global.wxss`;
 5. call `journal.produce(finalizedPatches)`;
-6. await mode delivery durability;
+6. execute and await the mode-selected host action;
 7. notify Rolldown of every delivered payload in sequence order.
 
-DevTools renders the publication into `hmr/patches.js`. Interpreter mode broadcasts the publication through Vite WebSocket; the initial subscription replays `journal.current` without a second snapshot.
+DevTools returns a write action containing the rendered `hmr/patches.js`. Interpreter mode returns a source event; the host broadcasts it through Vite WebSocket. Its initial-subscription hook reads `journal.current()` without a second snapshot, and the host sends the returned response event to that client.
 
 ### Runtime report
 
@@ -383,7 +389,7 @@ packages/vite-plugin-taro/src/runtime/wx/dev/
 - development App style rendering;
 - atomic physical file replacement.
 
-`devtools-hmr-mode.ts` owns the `hmr/patches.js` name, patch rendering, delivery, entry banners, and Page shell plugin together. These behaviors form one concrete implementation and do not need pass-through factories or one-function files.
+`devtools-hmr-mode.ts` owns the `hmr/patches.js` name, patch rendering, write-action description, entry banners, and Page shell plugin together. The shared host executes the returned write without exposing its writer to the mode.
 
 ## Test organization
 

@@ -43,7 +43,7 @@ export class PatchJournal {
     }
 
     /** Request-local view serialized synchronously when an interpreter socket first subscribes; never retain it across actions. */
-    get current(): PatchPublication | undefined {
+    current(): PatchPublication | undefined {
         if (this.buildId === undefined) {
             return undefined
         }

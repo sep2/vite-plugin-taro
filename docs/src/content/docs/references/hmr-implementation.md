@@ -436,6 +436,6 @@ type RebuildReport = {
 | `buildId` | 构建身份 | 区分两次完整构建的运行时和报告 |
 | `seq` / `appliedSeq` | 补丁序号 / 已应用序号 | 验证增量连续性并释放已应用历史 |
 | HMR boundary | 更新边界 | 调用 `import.meta.hot.accept()`、可以接收新导出的模块 |
-| `WxHmrMode` | HMR 模式 | 提供运行时、DevTools 文件物化或解释器 WebSocket 发布效果 |
+| `WxHmrMode` | HMR 模式 | 提供运行时、入口改写和声明式文件写入或事件动作，由开发主机执行副作用 |
 | Page re-registration | Page 原生重新注册 | `devtools` 用已挂载 Page 的数据再次注册配置，同时忽略临时 Page 生命周期 |
 | `WxStylePlugin` | WX 样式插件 | 从当前模块图和源文件生成同一事务的全局 WXSS 与 JavaScript 类名集合 |

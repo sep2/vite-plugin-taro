@@ -6,12 +6,7 @@
 import Sval from 'sval'
 import type { HmrInfo } from '../../wx-hmr-protocol.ts'
 import { WxHmrRuntime } from '../../wx-hmr-runtime.ts'
-import {
-    type InterpreterPatch,
-    type InterpreterServerMessage,
-    interpreterClientEvent,
-    interpreterServerEvent
-} from './interpreter-protocol.ts'
+import { type InterpreterPatch, type InterpreterServerMessage, interpreterServerEvent } from './interpreter-protocol.ts'
 
 /** Interprets cumulative patch source received by the shared App-level HMR socket. */
 class InterpreterHmrRuntime extends WxHmrRuntime {
@@ -23,10 +18,6 @@ class InterpreterHmrRuntime extends WxHmrRuntime {
         const interpreter = new Sval()
         interpreter.import('__rolldown_runtime__', this)
         this.installPatch = (patch) => interpreter.run(patch.code)
-    }
-
-    protected override onSocketOpen(info: HmrInfo): void {
-        this.sendSocketEvent(interpreterClientEvent, { buildId: info.buildId })
     }
 
     protected override onSocketEvent(info: HmrInfo, event: string, data: unknown): void {

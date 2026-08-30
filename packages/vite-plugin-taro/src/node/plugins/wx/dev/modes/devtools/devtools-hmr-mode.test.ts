@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createLogger, createServer } from 'vite'
 import { pageShellPath } from '../../../module/module.ts'
 import type { PatchUpdate } from '../../hmr-protocol.ts'
 import {
@@ -80,24 +79,22 @@ test('rejects an empty cumulative patch range', () => {
     assert.throws(() => renderDevtoolsPatches('build', []), /Cannot render an empty WX patch range/)
 })
 
-test('resets and publishes through the exact DevTools patch path', async (context) => {
-    const server = await createServer({ configFile: false, customLogger: createLogger('silent') })
-    context.after(() => server.close())
-    // This mutable list captures the complete physical generations requested by one stateless mode.
-    const writes: Array<Readonly<{ fileName: string; source: string }>> = []
-    const writeFile = async (fileName: string, source: string) => {
-        writes.push({ fileName: fileName, source: source })
-    }
+test('describes reset and publication writes through the exact DevTools patch path', () => {
     const mode = createDevtoolsHmrMode()
-
-    await mode.reset(server, 'build', writeFile)
-    await mode.publish(server, { buildId: 'build', patches: [patch] }, writeFile)
+    const reset = mode.reset()
+    const publication = mode.publish({ buildId: 'build', patches: [patch] })
 
     assert.equal(devtoolsPatchesFileName, 'hmr/patches.js')
-    assert.deepEqual(
-        writes.map(({ fileName }) => fileName),
-        ['hmr/patches.js', 'hmr/patches.js']
-    )
-    assert.equal(writes[0]?.source, 'module.exports = undefined;\n')
-    assert.match(writes[1]?.source ?? '', /registerLatestFactory\(\)/)
+    assert.deepEqual(reset, {
+        kind: 'write',
+        fileName: 'hmr/patches.js',
+        source: 'module.exports = undefined;\n'
+    })
+    assert.equal(publication.kind, 'write')
+    if (publication.kind !== 'write') {
+        assert.fail('DevTools publication must request a physical write')
+    }
+    assert.equal(publication.fileName, 'hmr/patches.js')
+    assert.match(publication.source, /registerLatestFactory\(\)/)
+    assert.equal(mode.replay(undefined, 'build'), undefined)
 })

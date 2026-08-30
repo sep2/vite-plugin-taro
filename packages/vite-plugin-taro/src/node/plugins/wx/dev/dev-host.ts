@@ -7,8 +7,10 @@ import type { VptOptions } from '../../../../options.ts'
 import {
     type RuntimeControlMessage,
     type RuntimeReport,
+    type RuntimeSubscription,
     runtimeControlEvent,
-    runtimeReportEvent
+    runtimeReportEvent,
+    runtimeSubscribeEvent
 } from '../../../../runtime/wx/dev/wx-hmr-protocol.ts'
 import type { WxStylePlugin } from '../styles/plugins.ts'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
@@ -20,7 +22,7 @@ import {
     renderHmrInfo,
     writeDevelopmentFile
 } from './hmr-files.ts'
-import type { WriteDevelopmentFile, WxHmrMode } from './hmr-mode.ts'
+import type { WxHmrAction, WxHmrMode } from './hmr-mode.ts'
 import { type HmrInfo, hmrEndpointPath, type PatchUpdate } from './hmr-protocol.ts'
 import { createHostActions } from './host-actions.ts'
 import { PatchJournal } from './patch-journal.ts'
@@ -30,6 +32,7 @@ declare module 'vite' {
     interface CustomEventMap {
         'vpt:wx-hmr:control': RuntimeControlMessage
         'vpt:wx-hmr:report': RuntimeReport
+        'vpt:wx-hmr:subscribe': RuntimeSubscription
     }
 }
 
@@ -83,11 +86,18 @@ export async function createWxDevHost({
         logWxError(server.config.logger, `wx HMR ${action.kind} failed`, error)
     )
 
-    // Mode effects receive the one physical writer without owning journal state or constructing another publication boundary.
+    // Modes return declarative effects; this host alone owns physical writes, event dispatch, and journal publication ordering.
     const writeFile = (fileName: string, source: string) =>
         writeDevelopmentFile(server.config.build.outDir, fileName, source)
-    const journal = new PatchJournal((publication) => hmrMode.publish(server, publication, writeFile))
-    hmrMode.configureServer(server, journal)
+
+    const journal = new PatchJournal((publication) => dispatchModeAction(hmrMode.publish(publication)))
+
+    server.ws.on(runtimeSubscribeEvent, ({ buildId }, client) => {
+        const response = hmrMode.replay(journal.current(), buildId)
+        if (response?.kind === 'event') {
+            client.send(response.event, response.data)
+        }
+    })
 
     server.ws.on(runtimeReportEvent, (report) => {
         hostActions.next({ kind: 'report', report: report })
@@ -189,7 +199,38 @@ export async function createWxDevHost({
         }
         await engine.registerClient(buildId)
 
-        await publishBuildMetadata(server, buildId, port, hmrMode, writeFile)
+        await publishBuildMetadata(buildId, port)
+    }
+
+    /** Executes one mode-selected physical write or broadcast through host-owned infrastructure. */
+    async function dispatchModeAction(action: WxHmrAction | undefined): Promise<void> {
+        if (!action) return
+
+        switch (action.kind) {
+            case 'write':
+                await writeFile(action.fileName, action.source)
+                return
+            case 'event':
+                server.ws.send(action.event, action.data)
+                return
+        }
+    }
+
+    /** Exposes one complete build only after its mode reset and matching socket metadata are durable. */
+    async function publishBuildMetadata(buildId: string, port: number): Promise<void> {
+        const info: HmrInfo = {
+            buildId: buildId,
+            endpoint: createSocketEndpoint(server, port)
+        }
+
+        await dispatchModeAction(hmrMode.reset())
+        await writeFile(hmrInfoFileName, renderHmrInfo(info))
+        // `removeDevelopmentAppWxss` kept the previous physical wrapper in place while the complete output was written. Replace it
+        // only now, after the selected mode is reset and matching identity is durable. DevTools treats `app.wxss` as an App root,
+        // so this write intentionally causes the one full refresh allowed at a complete-build boundary; the refreshed App reads
+        // the new info above. Incremental updates must never write this file because an App refresh could destroy the heap while
+        // its JavaScript patch is being acknowledged. They publish only the imported `assets/global.wxss` stylesheet instead.
+        await writeFile(developmentAppWxssFileName, renderDevelopmentAppWxss(buildId))
     }
 
     /** Reduces one merged source action through the existing authoritative host state. */
@@ -371,35 +412,6 @@ function createSocketEndpoint(server: ViteDevServer, port: number): string {
     const endpointUrl = new URL(`${protocol}://${resolveEndpointHost(server)}:${port}${hmrEndpointPath}`)
     endpointUrl.searchParams.set('token', server.config.webSocketToken)
     return endpointUrl.href
-}
-
-/**
- * Exposes a complete build to a fresh App heap in dependency order.
- *
- * Delivery resets first so no Page can pair the new identity with factories from the previous build. `hmr/info.js` follows so
- * the refreshed App can initialize the matching client, and `app.wxss` is written last because DevTools treats that root write as
- * the refresh trigger. Reordering these writes creates a window where the App observes a mixed build generation.
- */
-async function publishBuildMetadata(
-    server: ViteDevServer,
-    buildId: string,
-    port: number,
-    hmrMode: WxHmrMode,
-    writeFile: WriteDevelopmentFile
-): Promise<void> {
-    const info: HmrInfo = {
-        buildId: buildId,
-        endpoint: createSocketEndpoint(server, port)
-    }
-
-    await hmrMode.reset(server, buildId, writeFile)
-    await writeFile(hmrInfoFileName, renderHmrInfo(info))
-    // `removeDevelopmentAppWxss` kept the previous physical wrapper in place while the complete output was written. Replace it
-    // only now, after the selected mode is reset and matching identity is durable. DevTools treats `app.wxss` as an App root,
-    // so this write intentionally causes the one full refresh allowed at a complete-build boundary; the refreshed App reads the
-    // new info above. Incremental updates must never write this file because an App refresh could destroy the heap while its
-    // JavaScript patch is being acknowledged. They publish only the imported `assets/global.wxss` stylesheet instead.
-    await writeFile(developmentAppWxssFileName, renderDevelopmentAppWxss(buildId))
 }
 
 /** Replaces browser server URLs with the physical project directory consumed by WeChat DevTools. */

@@ -9,10 +9,9 @@ import { createLogger, createServer, type Logger, type Plugin, type ViteDevServe
 import type { VptOptions } from '../../../../options.ts'
 import {
     type InterpreterServerMessage,
-    interpreterClientEvent,
     interpreterServerEvent
 } from '../../../../runtime/wx/dev/modes/interpreter/interpreter-protocol.ts'
-import { runtimeReportEvent } from '../../../../runtime/wx/dev/wx-hmr-protocol.ts'
+import { runtimeReportEvent, runtimeSubscribeEvent } from '../../../../runtime/wx/dev/wx-hmr-protocol.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
 import { createWxStylePlugin } from '../styles/plugins.ts'
@@ -252,7 +251,7 @@ function subscribeInterpreterSocket(socket: WebSocket, buildId: string): void {
     socket.send(
         JSON.stringify({
             type: 'custom',
-            event: interpreterClientEvent,
+            event: runtimeSubscribeEvent,
             data: { buildId: buildId }
         })
     )
