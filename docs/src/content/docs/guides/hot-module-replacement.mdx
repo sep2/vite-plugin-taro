@@ -5,7 +5,7 @@ description: 在微信开发者工具中更新代码和样式，并保留应用�
 
 import { Tabs, TabItem } from '@astrojs/starlight/components'
 
-`create-vite-taro` 模板已经启用微信热更新，无需额外配置。当前的 `devtools` 实现通过微信开发者工具编译项目内的物理补丁并执行原生 JavaScript。
+`create-vite-taro` 模板已经启用微信热更新，无需额外配置。默认的 `devtools` 模式让微信开发者工具编译物理补丁；可选的 `interpreter` 模式在存活的 App 中解释执行补丁源码。
 
 ## 使用
 
@@ -38,6 +38,28 @@ bun run dev:wx
 等待构建完成，在微信开发者工具中打开 `dist/wx`。
 
 保存 JavaScript、TypeScript、React 组件或样式后，开发者工具会自动显示更新。
+
+## 选择热更新模式
+
+默认模式无需配置：
+
+```ts
+hmr: {
+    mode: 'devtools'
+}
+```
+
+若希望 JavaScript 更新不触发原生 Page 重新注册，可选择解释器：
+
+```ts
+hmr: {
+    mode: 'interpreter'
+}
+```
+
+解释器模式复用 Vite 已有的 WebSocket 连接。源码变化时，主机直接推送累计补丁；连接重建后，App 重新订阅当前构建，主机从日志补发尚未确认的源码。空闲期间没有轮询请求或定时器。Sval 只解释 Rolldown 生成的模块注册程序和更新后的模块；初始完整构建仍由开发者工具原生执行。
+
+`devtools` 模式的运行时代码更小，执行补丁更快，仍是默认值。`interpreter` 模式避免 Page 热重载及其生命周期交接，但开发运行时更大，更新后的模块执行也更慢。两者都只影响本地开发。
 
 若希望每次构建都全量输出，不用热更新缓存，可这样调用：
 <Tabs syncKey="package-manager">

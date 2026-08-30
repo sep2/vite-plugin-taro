@@ -2,9 +2,9 @@
  * Shared WX HMR runtime, bundled into the mode-selected entry and injected into Rolldown's generated runtime chunk.
  * Rolldown provides the lexical `DevRuntime` base class; this file extends that registry instead of duplicating module loading.
  *
- * Concrete modes decide how executable factories arrive and provide only a synchronous installer. This class owns the invariant
- * that installation, graph propagation, cache eviction, boundary execution, and ACK form one application transaction. HTTP is
- * used only for metadata reports, never executable source.
+ * Concrete modes decide how executable registrations arrive—native project JavaScript or interpreted source—and provide only a
+ * synchronous installer. This class owns the invariant that installation, graph propagation, cache eviction, boundary execution,
+ * and ACK form one application transaction; it has no file, HTTP delivery, or interpreter policy of its own.
  */
 
 import type { DevRuntime as RolldownDevRuntime } from 'rolldown/experimental/runtime-types'
@@ -13,19 +13,20 @@ import type { DevRuntime as RolldownDevRuntime } from 'rolldown/experimental/run
 declare const DevRuntime: new (clientId: string) => RolldownDevRuntime
 
 /**
- * Identity and report endpoint fixed for one App heap. A later complete build creates a new heap rather than mutating this session,
+ * Identity and control endpoint fixed for one App heap. A later complete build creates a new heap rather than mutating this session,
  * so delayed deliveries and reports can be rejected by build ID without coordinating another mutable runtime-global value.
  */
 export type HmrInfo = Readonly<{
     buildId: string
     endpoint: string
+    socketEndpoint?: string
 }>
 
 /** App-heap HMR identity; only the committed application frontier mutates. */
 type HmrSession = {
     /** Rejects delayed patch delivery and identifies reports after a newer full build exists. */
     readonly buildId: string
-    /** Fixed control URL discovered from the Vite server that produced this full build. */
+    /** Fixed report URL discovered from the Vite server that produced this complete build. */
     readonly endpoint: string
     /**
      * Highest contiguous application sequence whose installation, graph propagation, and accept callbacks all succeeded.
@@ -39,7 +40,7 @@ type HmrSession = {
 export type RuntimePatch = Readonly<{
     seq: number
     /** Stable ids of the changed modules; synchronous application walks the graph from these roots. */
-    changedIds: string[]
+    changedIds: readonly string[]
 }>
 
 type HmrUpdate = Readonly<{
@@ -236,25 +237,26 @@ export class WxHmrRuntime extends DevRuntime {
     /**
      * Applies one mode-delivered cumulative payload through its mode-specific patch installer.
      *
-     * Application is deliberately synchronous: once a mode exposes a payload, the generated entry code that follows must resolve
-     * imports against the newly installed factories. The installer is the only mode seam; sequence validation and ACK timing stay
-     * here so no delivery can accidentally report visibility as successful application.
+     * Application is deliberately synchronous so every later message observes the committed module generation. The installer is
+     * the only mode seam; sequence validation and ACK reporting stay here so no mode can mistake delivery for application.
      */
     protected applyPatchPayload<Patch extends RuntimePatch>(
         payload: Readonly<{ buildId: string; patches: readonly Patch[] }>,
         installPatch: (patch: Patch) => void
-    ): void {
+    ): boolean {
         const session = this.session
         if (!session || payload.buildId !== session.buildId) {
             console.warn('[vpt] patches for a stale build')
-            return
+            return false
         }
 
-        if (this.applyPatchBatch(session, payload.patches, installPatch)) {
+        const applied = this.applyPatchBatch(session, payload.patches, installPatch)
+        if (applied) {
             // The host may publish later generations while synchronous application runs. Reporting only afterward makes this the
             // application frontier: journal history is never pruned merely because a delivery became observable.
             void this.sendReport({ kind: 'applied', seq: session.appliedSeq })
         }
+        return applied
     }
 
     /**
@@ -335,10 +337,7 @@ export class WxHmrRuntime extends DevRuntime {
         }
     }
 
-    /**
-     * Sends one metadata-only application frontier or rebuild request to the shared host endpoint. Executable factories never
-     * travel over HTTP, and the host prunes its cumulative journal only after this request reports successful application.
-     */
+    /** Sends one metadata-only application frontier or rebuild request to the shared host report endpoint. */
     private sendReport(data: Record<string, unknown>): Promise<void> {
         const session = this.session
         if (!session) {

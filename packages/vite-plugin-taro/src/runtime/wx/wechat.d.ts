@@ -15,20 +15,42 @@ declare const __rolldown_runtime__:
 // This object is available everywhere, but no globalThis, window on WeChat Mini Program
 declare const global: WeChatGlobal
 
-/** Minimal wx.request surface used by the DevRuntime; application API types remain owned by Taro/WeChat packages. */
-type WeChatRequestOptions = Readonly<{
+/** Minimal wx.request result used by the development runtime; application API types remain owned by Taro/WeChat packages. */
+type WeChatRequestResult<Result> = Readonly<{
+    statusCode: number
+    data: Result
+}>
+
+/** Minimal POST surface used by HMR reports. */
+type WeChatRequestOptions<Result> = Readonly<{
     url: string
     method: 'POST'
-    data: unknown
-    header: Readonly<Record<string, string>>
-    timeout?: number
-    success(result: unknown): void
+    data?: unknown
+    header?: Readonly<Record<string, string>>
+    success(result: WeChatRequestResult<Result>): void
     fail(error: unknown): void
 }>
 
-/** Native HTTP request API available in the Mini Program JavaScript environment. */
+/** Minimal SocketTask surface used by interpreter HMR. */
+type WeChatSocketTask = Readonly<{
+    send(options: Readonly<{ data: string | ArrayBuffer; fail?: (error: unknown) => void }>): void
+    close(options: Readonly<{ code: number; reason: string }>): void
+    onOpen(listener: () => void): void
+    onMessage(listener: (result: Readonly<{ data: string | ArrayBuffer }>) => void): void
+    onClose(listener: (result: Readonly<{ code: number; reason: string }>) => void): void
+    onError(listener: (error: unknown) => void): void
+}>
+
+type WeChatConnectSocketOptions = Readonly<{
+    url: string
+    protocols: readonly string[]
+    fail?: (error: unknown) => void
+}>
+
+/** Native network APIs available in the Mini Program JavaScript environment. */
 declare const wx: {
-    request(options: WeChatRequestOptions): void
+    request<Result>(options: WeChatRequestOptions<Result>): void
+    connectSocket(options: WeChatConnectSocketOptions): WeChatSocketTask
 }
 
 /** Native Page surface used by the singleton App-data scheduler. */

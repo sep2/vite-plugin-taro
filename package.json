@@ -22,6 +22,7 @@
         "stress:hmr-stress-demo:burst": "pnpm --filter hmr-stress-demo stress-hmr:burst",
         "setup:hmr-stress-demo:devtools": "pnpm --filter hmr-stress-demo setup-devtools",
         "test:hmr-stress-demo:devtools": "pnpm --filter hmr-stress-demo test-devtools",
+        "test:hmr-stress-demo:interpreter": "pnpm --filter hmr-stress-demo test-interpreter",
         "test:hmr-stress-demo:rebuild": "pnpm --filter hmr-stress-demo test-devtools:rebuild",
         "test:hmr-stress-demo:recovery": "pnpm --filter hmr-stress-demo test-devtools:recovery",
         "build:towxml-stream-demo:wx": "pnpm --filter towxml-stream-demo build-wx",

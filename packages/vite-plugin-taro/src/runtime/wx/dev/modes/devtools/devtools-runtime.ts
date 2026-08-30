@@ -11,10 +11,9 @@ import { injectPageHmr as injectDevtoolsPageHmr } from './page-hmr.ts'
  * One physical DevTools patch. DevTools compiles `factory` as native project JavaScript; invoking it registers updated Rolldown
  * factories but does not execute application modules, allowing the shared runtime to install a complete batch before one render.
  */
-type DevtoolsPatch = RuntimePatch &
-    Readonly<{
-        factory: () => void
-    }>
+type DevtoolsPatch = RuntimePatch & {
+    readonly factory: () => void
+}
 
 type HmrPageConfig = Parameters<typeof injectDevtoolsPageHmr>[0]
 

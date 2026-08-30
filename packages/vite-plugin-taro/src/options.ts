@@ -4,6 +4,12 @@ export type VptJsonObject = Record<string, unknown>
 /** Build target handled by this plugin. */
 export type VptTarget = 'wx' | 'h5'
 
+/** Selects one implemented WX development HMR delivery and execution mechanism. */
+export type VptHmrOptions = Readonly<{
+    /** `devtools` executes native patch files; `interpreter` fetches source and evaluates it without native Page reload. */
+    mode: 'devtools' | 'interpreter'
+}>
+
 /** Configures one Taro page. */
 export type VptPageOption = {
     /**
@@ -79,4 +85,11 @@ export interface VptOptions {
      * The file is emitted only when this value is provided for a `wx` build. It is ignored for `h5`.
      */
     sitemapJson?: VptJsonObject
+
+    /**
+     * Selects the WX development HMR mode. Omission uses `devtools`.
+     *
+     * This option affects only `vite serve` for the `wx` target and never changes H5 or production output.
+     */
+    hmr?: VptHmrOptions
 }

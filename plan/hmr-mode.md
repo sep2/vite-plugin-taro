@@ -2,7 +2,7 @@
 
 ## Status
 
-Phase 1 implemented: the existing WeChat DevTools HMR behavior is isolated behind the `devtools` mode and the shared host/runtime abstractions are in place. No interpreter, source-over-HTTP delivery, fallback behavior, or second executable mode is included.
+Phase 2 implemented: `devtools` and `interpreter` are selectable implementations over the same journal, host ordering, module runtime, styles, React Refresh, reports, and rebuild recovery. Interpreter delivery reuses Vite's existing WebSocket and has no polling timer or HTTP request broker.
 
 ## Objective
 
@@ -14,9 +14,9 @@ The refactor must:
 - select one HMR mode once during WX plugin composition;
 - keep Rolldown lifecycle, styles, sequencing, reports, and recovery shared;
 - isolate physical patch files, Page reload activation, and Page lifecycle handoff inside `devtools`;
-- create a narrow runtime patch-installation seam for a future mode;
+- install native DevTools factories or Sval-interpreted registration programs through one runtime seam;
 - avoid mode branches in the per-update hot path;
-- avoid adding unused interpreter types, dependencies, endpoints, or runtime code.
+- keep interpreter source delivery event-driven and bounded to one socket per App heap.
 
 ## Decisions
 
@@ -26,17 +26,15 @@ A WX development server and its App heap use exactly one HMR mode. Modes are alt
 
 The mode is resolved before Vite creates the development host. The same immutable mode descriptor is then passed to plugin creation, Rolldown option installation, and host creation.
 
-### Defer public mode selection
+### Expose implemented mode selection
 
-Only `devtools` exists, so `createWxDevelopmentPlugin()` constructs it directly. There is no public no-op option, one-entry registry, or selector abstraction.
-
-Add public mode configuration and composition selection only when a second implementation exists. That change will select one descriptor before host construction without introducing mode checks into the update path.
+`VptOptions.hmr.mode` accepts `'devtools' | 'interpreter'`; omission remains `devtools`. One exhaustive switch resolves the descriptor during plugin composition. No mode check occurs during publication or application.
 
 ### Select by composition, not runtime conditionals
 
 The selected mode supplies its runtime entry, entry banners, Vite transforms, and delivery implementation. Common code calls those capabilities directly. It must not repeatedly inspect `mode` during patch publication or application.
 
-This also guarantees that a future mode's dependencies cannot enter the `devtools` runtime bundle.
+This also guarantees that Sval enters only the interpreter runtime bundle and cannot increase the default DevTools runtime.
 
 ## Ownership
 
@@ -49,7 +47,7 @@ The shared development host owns:
 - HMR callback buffering and invalid-source recovery;
 - style finalization and physical WXSS publication;
 - the cumulative patch journal;
-- runtime report parsing, conflation, and serialization;
+- runtime report parsing and serialized acknowledgement commits;
 - ACK handling and rebuild requests;
 - payload-delivery notification to Rolldown;
 - initial server readiness and shutdown ordering.
@@ -67,6 +65,18 @@ The `devtools` mode owns:
 - the App and Page entry banners;
 - the Page shell transform that calls `injectPageHmr()`;
 - the DevTools runtime entry selected for nested Rolldown bundling.
+
+### Interpreter Node mode
+
+The `interpreter` mode owns:
+
+- Vite custom events for subscription and source publication;
+- reconnect replay from the current journal suffix;
+- cumulative messages containing the original `{ seq, changedIds, code }` patch fields;
+- stale-subscription and shutdown terminal messages;
+- an App-only entry banner and interpreter runtime entry.
+
+It owns no timer, physical JavaScript patch file, HTTP source handler, Page transform, or Page lifecycle state.
 
 ### Shared runtime
 
@@ -94,26 +104,19 @@ The DevTools runtime owns:
 - Page re-registration data retention and lifecycle suppression;
 - installation of the DevTools runtime singleton on `globalThis`.
 
+### Interpreter runtime
+
+The interpreter runtime owns:
+
+- one Vite-protocol SocketTask and event-driven reconnection;
+- build subscription after every connection;
+- the App-level Sval sandbox and imported Rolldown runtime registry;
+- interpreting each registration program synchronously;
+- stopping source consumption after stale-build or failed application results.
+
 ## Internal contracts
 
 ### Mode descriptor
-
-```ts
-export type WxHmrMode = Readonly<{
-    runtimeFile: string
-    plugins: readonly Plugin[]
-    createDelivery: (
-        writeFile: (fileName: string, source: string) => Promise<void>
-    ) => WxHmrDelivery
-    createEntryBanner: (
-        pageFiles: ReadonlySet<string>
-    ) => (chunk: Readonly<{ name: string; fileName: string }>) => string
-}>
-```
-
-The descriptor contains only behavior that differs by implementation. A fresh descriptor is created for each Vite plugin composition.
-
-### Delivery contract
 
 ```ts
 export type PatchPublication = Readonly<{
@@ -121,18 +124,21 @@ export type PatchPublication = Readonly<{
     patches: readonly PatchUpdate[]
 }>
 
-export type WxHmrDelivery = Readonly<{
-    reset: () => Promise<void>
-    publish: (publication: PatchPublication) => Promise<void>
+export type WxHmrMode = Readonly<{
+    runtimeFile: string
+    plugins: readonly Plugin[]
+    reset: (server: ViteDevServer, buildId: string, writeFile: WriteDevelopmentFile) => Promise<void>
+    publish: (server: ViteDevServer, publication: PatchPublication, writeFile: WriteDevelopmentFile) => Promise<void>
+    close: (server: ViteDevServer) => Promise<void>
+    configureServer: (server: ViteDevServer, journal: PatchJournal) => void
+    usesWebSocket: boolean
+    createEntryBanner: (
+        pageFiles: ReadonlySet<string>
+    ) => (chunk: Readonly<{ name: string; fileName: string }>) => string
 }>
 ```
 
-For `devtools`:
-
-- `reset()` writes the existing `module.exports = undefined` patch module;
-- `publish()` renders and writes the complete unacknowledged patch suffix.
-
-The delivery Promise resolves only after that publication is durable. The common host may notify Rolldown only after it resolves.
+The descriptor is created once during Vite plugin composition. DevTools reset and publish materialize the journal as a watched file. Interpreter mode sends the same value through `server.ws`; reconnect subscriptions read `journal.current`. A publish Promise resolves only after the selected representation is observable; the common host notifies Rolldown afterward.
 
 ### Patch journal
 
@@ -142,6 +148,7 @@ Replace the file-aware `PatchPublisher` with a transport-independent `PatchJourn
 export class PatchJournal {
     constructor(publish: (publication: PatchPublication) => Promise<void>)
 
+    readonly current: PatchPublication | undefined
     isCurrentBuild(buildId: string): boolean
     startBuild(): Readonly<{ buildId: string; previousBuildId: string | undefined }>
     produce(patches: readonly PatchUpdate[]): Promise<void>
@@ -149,18 +156,11 @@ export class PatchJournal {
 }
 ```
 
-The journal owns only:
+The journal keeps the original mutable build ID and pending-patch array. `current` adds only a synchronous view used when a reconnected interpreter socket subscribes.
 
-- the current build ID;
-- the ordered unacknowledged patch suffix;
-- build rotation;
-- monotonic prefix pruning.
-
-`produce()` appends patches and passes a structured publication to the selected delivery. It does not render JavaScript or know a destination filename.
+`produce()` appends patches and passes the same structured publication to the selected mode effect bound by the host constructor. It does not render JavaScript, know a destination filename, or own transport listeners.
 
 A failed delivery leaves every appended patch in the journal. A later publication therefore republishes the complete required suffix.
-
-All journal operations remain serialized by the existing host action edge. The delivery may read the journal's readonly patch view until its Promise settles; no ACK, build rotation, or later publication can overlap it.
 
 ### Runtime patch installer seam
 
@@ -169,7 +169,7 @@ The shared runtime accepts a patch descriptor containing only sequence and graph
 ```ts
 export type RuntimePatch = Readonly<{
     seq: number
-    changedIds: string[]
+    changedIds: readonly string[]
 }>
 ```
 
@@ -179,7 +179,7 @@ The shared class exposes one protected method without another payload alias:
 protected applyPatchPayload<Patch extends RuntimePatch>(
     payload: Readonly<{ buildId: string; patches: readonly Patch[] }>,
     installPatch: (patch: Patch) => void
-): void
+): boolean
 ```
 
 The method:
@@ -193,25 +193,18 @@ The method:
 7. commits the applied frontier only after success;
 8. reports either the committed sequence or a rebuild request.
 
-The DevTools adapter supplies:
-
-```ts
-this.applyPatchPayload(payload, (patch) => patch.factory())
-```
-
-No evaluator or source-code type is introduced during this phase.
+DevTools invokes `patch.factory()`. Interpreter mode invokes `sval.run(patch.code)`. Successful application reports the committed sequence in shared code and returns `true`; failure requests a full build and returns `false` so interpreter mode closes its socket.
 
 ## Host lifecycle
 
 ### Startup
 
-1. Resolve the configured HMR mode.
-2. Create the mode's delivery using the common atomic development-file writer.
-3. Construct `PatchJournal` with the delivery's `publish()` capability.
-4. Install common Rolldown development options using the mode's runtime file and entry-banner factory.
-5. Create and run the one physical `DevEngine`.
-6. Wait for the initial complete output and style finalization.
-7. When the Vite port is bound, rotate to the first real build session.
+1. Resolve the configured mode descriptor.
+2. Construct the authoritative `PatchJournal` in the host with the mode's publication effect.
+3. Install common Rolldown development options using the mode's runtime file and entry-banner factory.
+4. Create and run the one physical `DevEngine`.
+5. Wait for the initial complete output and style finalization.
+6. When the Vite port is bound, rotate to the first real build session.
 
 ### Complete build rotation
 
@@ -220,7 +213,7 @@ The common host performs this ordered transaction:
 1. rotate the journal build ID;
 2. remove the previous Rolldown client when present;
 3. register the new Rolldown client;
-4. call `delivery.reset()`;
+4. call `mode.reset(server, buildId, writeFile)`;
 5. write `hmr/info.js` with the new build ID and report endpoint;
 6. write the build-versioned `app.wxss` wrapper.
 
@@ -238,35 +231,32 @@ The common host performs this ordered transaction:
 6. await mode delivery durability;
 7. notify Rolldown of every delivered payload in sequence order.
 
-The DevTools delivery renders the journal publication into `hmr/patches.js`. No other common component references that path.
+DevTools renders the publication into `hmr/patches.js`. Interpreter mode broadcasts the publication through Vite WebSocket; reconnect subscriptions replay `journal.current` without a second snapshot.
 
 ### Runtime report
 
 The common report path remains unchanged:
 
 1. parse a bounded POST body;
-2. conflate reports by build ID;
-3. admit reports through the serialized host action edge;
-4. ignore stale build IDs;
-5. prune the journal for an applied report;
-6. trigger a complete build for a rebuild report.
+2. admit the report through the serialized host action edge;
+3. ignore stale build IDs;
+4. prune the journal for an applied report or trigger a complete build for a rebuild report;
+5. return the metadata response while the serialized host action owns journal mutation.
 
 ### Shutdown
 
 Shutdown ordering remains unchanged:
 
 1. complete HMR result buffering;
-2. complete runtime report buffering;
-3. drain host actions;
-4. wait for the current Rolldown generation;
-5. complete the action edge;
+2. drain host actions;
+3. wait for the current Rolldown generation;
+4. complete the action edge;
+5. call `mode.close(server)` so interpreter runtimes stop before Vite closes its socket server;
 6. let the existing server and engine shutdown finish.
-
-The initial DevTools delivery has no independent background resource and therefore needs no `close()` method.
 
 ## Plugin composition
 
-`createWxDevelopmentPlugin()` constructs the concrete DevTools descriptor once and closes over it for plugin, host, and Rolldown configuration.
+`createWxDevelopmentPlugin()` resolves the configured descriptor once and closes over it for plugin, host, and Rolldown configuration.
 
 The development plugin list becomes:
 
@@ -285,7 +275,7 @@ The common plugin retains:
 - transfer of `app.wxss` ownership to the development host;
 - lowering of the assembled Rolldown runtime.
 
-The DevTools mode plugin contains only the exact Page shell transform and its structural contract check.
+The DevTools mode plugin contains the exact Page shell transform and structural contract check. Interpreter mode contributes no Page plugin.
 
 ## Rolldown option installation
 
@@ -351,7 +341,11 @@ Move the shared module and update machinery into `wx-hmr-runtime.ts`:
 
 `page-hmr.ts` owns the Page-config symbol, mounted Page reference, re-registration gate, lifecycle forwarding, and native data reference transfer. It has no module-graph or transport responsibility.
 
-## Proposed file layout
+### Interpreter adapter
+
+`interpreter-runtime.ts` owns Sval and one SocketTask. It imports the shared runtime object into one sandbox, subscribes the current build after connection, interprets registration programs synchronously, and applies them through `applyPatchPayload()`. Native failure or close reconnects and resubscribes without a timer; explicit reset, shutdown, or application failure stops the socket.
+
+## Implemented file layout
 
 ```text
 packages/vite-plugin-taro/src/node/plugins/wx/dev/
@@ -363,18 +357,22 @@ packages/vite-plugin-taro/src/node/plugins/wx/dev/
 ├── patch-journal.ts
 ├── plugins.ts
 ├── react-refresh.ts
-├── runtime-reports.ts
 ├── wx-dev-options.ts
 └── modes/
-    └── devtools/
-        └── devtools-hmr-mode.ts
+    ├── devtools/
+    │   └── devtools-hmr-mode.ts
+    └── interpreter/
+        └── interpreter-hmr-mode.ts
 
 packages/vite-plugin-taro/src/runtime/wx/dev/
 ├── wx-hmr-runtime.ts
 └── modes/
-    └── devtools/
-        ├── devtools-runtime.ts
-        └── page-hmr.ts
+    ├── devtools/
+    │   ├── devtools-runtime.ts
+    │   └── page-hmr.ts
+    └── interpreter/
+        ├── interpreter-protocol.ts
+        └── interpreter-runtime.ts
 ```
 
 `hmr-files.ts` retains only shared physical development files and helpers:
@@ -452,6 +450,10 @@ Keep or create tests for:
 
 `page-hmr.test.ts` retains the current Page lifecycle and data-reference tests under the DevTools mode directory.
 
+### Interpreter mode tests
+
+Interpreter tests cover App-only banners, WebSocket publication, reconnect replay subscription, stale-build and shutdown messages, Sval registration, interpreter failures, and connection re-establishment without timers.
+
 ### Integration acceptance
 
 The existing real DevEngine and WeChat DevTools suites remain authoritative. The refactor must preserve:
@@ -475,7 +477,7 @@ Update:
 - `docs/src/content/docs/guides/hot-module-replacement.mdx` to identify the documented implementation as DevTools mode;
 - `docs/src/content/docs/references/hmr-implementation.md` to distinguish shared HMR concepts from DevTools-specific patch delivery.
 
-Do not document or advertise an interpreter mode during this phase.
+Document both selectable modes, their shared guarantees, and interpreter runtime/performance tradeoffs. `devtools` remains the default.
 
 ## Complexity
 
@@ -483,7 +485,8 @@ The mode abstraction adds O(1) startup composition and no per-update mode lookup
 
 Patch behavior remains:
 
-- O(number of retained patches plus rendered code size) per cumulative publication;
+- O(number of retained patches plus source size) per cumulative publication;
+- O(connected Vite WebSocket clients) to broadcast an interpreter publication, normally O(1);
 - O(acknowledged prefix length) per ACK;
 - O(executed module graph edges) for runtime propagation;
 - O(number of accepting boundaries) retained hot-context space.
@@ -491,24 +494,24 @@ Patch behavior remains:
 Mutable state remains localized and justified:
 
 - host action queue: serializes asynchronous effects;
-- patch journal build ID and suffix: bridges published and applied frontiers;
+- patch journal publication reference: bridges the published and applied frontiers;
 - runtime session frontier: records successfully applied sequences;
 - hot-context map: retains accepting boundaries across cache eviction;
-- Page handoff state: spans one native re-registration lifecycle.
+- Page handoff state: spans one DevTools native re-registration lifecycle;
+- interpreter socket reference: identifies the sole live connection and rejects callbacks from replaced tasks.
 
 The mode descriptor and all publication values are immutable.
 
 ## Implementation sequence
 
-1. Introduce the small internal mode and delivery contracts.
-2. Construct DevTools mode directly during development plugin composition.
-3. Convert `PatchPublisher` into the structured, transport-independent `PatchJournal`.
-4. Move physical patch rendering, delivery, banners, and Page shell transformation into the DevTools mode.
-5. Pass the descriptor into `installWxDevOptions()` and `createWxDevHost()`.
-6. Split `WxHmrRuntime` from `DevtoolsHmrRuntime` and extract Page handoff state.
-7. Reorganize tests by shared and mode-specific ownership.
-8. Update implementation documentation.
-9. Run unit, integration, distribution, WX build, and DevTools stress verification.
+1. Keep the Phase 1 shared journal, runtime, and DevTools mode unchanged by default.
+2. Add public `'devtools' | 'interpreter'` selection resolved once during composition.
+3. Extend delivery with build-aware reset and access to the authoritative journal.
+4. Add timer-free interpreter delivery through Vite's existing WebSocket custom events.
+5. Add the Sval runtime adapter and reconnect subscription replay.
+6. Test source delivery, interpretation, failures, rotation, shutdown, and default DevTools bytes.
+7. Run both modes through the real WeChat DevTools burst, rebuild, and recovery suite.
+8. Document behavior and performance tradeoffs.
 
 ## Verification commands
 
@@ -519,6 +522,7 @@ pnpm lint
 pnpm build:plugin
 pnpm build:hmr-stress-demo:wx
 pnpm test:hmr-stress-demo:devtools
+pnpm test:hmr-stress-demo:interpreter
 pnpm test:hmr-stress-demo:rebuild
 pnpm test:hmr-stress-demo:recovery
 ```
@@ -527,26 +531,24 @@ pnpm test:hmr-stress-demo:recovery
 
 This phase does not:
 
-- add Sval or any JavaScript interpreter;
-- add executable source to HTTP responses;
-- add polling or WebSocket patch transport;
+- add timer-based polling, heartbeats, SSE, or a second socket server;
 - add native-first fallback behavior;
 - execute one sequence through multiple modes;
 - change WXSS delivery;
 - change complete-build recovery;
 - change React Refresh semantics;
 - change Page re-registration semantics;
-- expose mode configuration before another implementation exists;
+- include interpreter or Sval in production WX output;
 - alter production WX output.
 
 ## Completion criteria
 
 The refactor is complete when:
 
-1. all existing DevTools behavior is implemented through the selected `WxHmrMode`;
-2. common host and runtime files contain no `hmr/patches.js` or Page re-registration assumptions;
-3. DevTools-specific files contain all physical patch and Page handoff behavior;
-4. no interpreter package or source-delivery code exists;
-5. no public selector or registry exists for the sole implementation;
-6. generated development artifacts remain byte-compatible with the current implementation;
-7. all automated unit, integration, build, and DevTools stress checks pass.
+1. omitted mode and explicit `devtools` preserve existing artifacts and behavior;
+2. `interpreter` delivers no physical JavaScript patch and installs no Page transform;
+3. interpreter idle delivery reuses one Vite WebSocket and owns no timer, heartbeat, or periodic request;
+4. common journal, styles, reports, graph application, React Refresh, and recovery serve both modes;
+5. interpreter failures stop source consumption and request a complete build;
+6. Sval is bundled only into the selected development runtime;
+7. both modes pass unit, integration, build, burst, rebuild, and recovery checks in WeChat DevTools.

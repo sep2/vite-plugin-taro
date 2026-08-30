@@ -15,11 +15,10 @@ import {
     renderHmrInfo,
     writeDevelopmentFile
 } from './hmr-files.ts'
-import type { WxHmrDelivery, WxHmrMode } from './hmr-mode.ts'
-import { type HmrInfo, hmrControlPath, type PatchUpdate } from './hmr-protocol.ts'
+import type { WriteDevelopmentFile, WxHmrMode } from './hmr-mode.ts'
+import { type HmrInfo, hmrControlPath, type PatchUpdate, type RuntimeReport } from './hmr-protocol.ts'
 import { createHostActions } from './host-actions.ts'
 import { PatchJournal } from './patch-journal.ts'
-import { createRuntimeReportsStream, type RuntimeReport } from './runtime-reports.ts'
 import { type BundledDev, installWxDevOptions, requireSingleOutput } from './wx-dev-options.ts'
 
 export type WxDevHost = Readonly<{
@@ -35,7 +34,7 @@ type OutputAction = Readonly<{ kind: 'output'; result: DevOutputResult }>
 type HostAction =
     | Readonly<{ kind: 'publish'; result: HmrUpdates }>
     | Readonly<{ kind: 'error'; error: Error }>
-    | Readonly<{ kind: 'reports'; reports: readonly RuntimeReport[] }>
+    | Readonly<{ kind: 'report'; report: RuntimeReport }>
     | OutputAction
     | Readonly<{ kind: 'listening' }>
 
@@ -46,9 +45,9 @@ type HostAction =
 const hmrSettleMilliseconds = 16
 
 /**
- * Creates the WX dev host: the adapter that owns the physical Rolldown DevEngine, shared patch journal, and selected delivery.
- * It replaces Vite's browser-oriented `bundledDev.listen()` because a Mini Program cannot fetch executable updates from Vite's
- * module URLs; its engine must write a complete native project and let the selected mode make patches executable there.
+ * Creates the WX dev host: the adapter that owns the physical Rolldown DevEngine, shared patch journal, and selected mode effects.
+ * It replaces Vite's browser-oriented `bundledDev.listen()` because a Mini Program cannot execute Vite's browser module graph;
+ * its engine must write a complete native project while the selected mode supplies an environment-valid patch mechanism.
  *
  * The shared style plugin carries the resolver's immutable App/Page cascade policy while Rolldown remains authoritative for
  * every live import edge. Keeping those responsibilities in the same serialized host transaction prevents JavaScript factories,
@@ -72,13 +71,11 @@ export async function createWxDevHost({
         logWxError(server.config.logger, `wx HMR ${action.kind} failed`, error)
     )
 
-    // Bind the generic mode to this server's one physical output root. The journal deliberately sees only structured patches,
-    // while the delivery deliberately sees only an atomic writer; this prevents sequencing/ACK logic from learning DevTools
-    // filenames and prevents mode code from mutating host state or advancing Rolldown before a write is durable.
+    // Mode effects receive the one physical writer without owning journal state or constructing another publication boundary.
     const writeFile = (fileName: string, source: string) =>
         writeDevelopmentFile(server.config.build.outDir, fileName, source)
-    const delivery = hmrMode.createDelivery(writeFile)
-    const journal = new PatchJournal((publication) => delivery.publish(publication))
+    const journal = new PatchJournal((publication) => hmrMode.publish(server, publication, writeFile))
+    hmrMode.configureServer(server, journal)
 
     // Option installation configures only Rolldown. Build lifecycle results enter through the engine's output action below.
     installWxDevOptions({ bundledDev: bundledDev, server: server, options: options, hmrMode: hmrMode })
@@ -104,11 +101,6 @@ export async function createWxDevHost({
         }
     )
 
-    const runtimeReports = createRuntimeReportsStream(hmrSettleMilliseconds, asyncScheduler, (reports) => {
-        // ACK conflation happens before admission, but journal validation and mutation remain ordered with selected-mode
-        // delivery and build rotation. Reports arriving during publication execute only after that transaction commits.
-        hostActions.next({ kind: 'reports', reports: reports })
-    })
     /*
      * BundledDev is Vite's mutable environment adapter. Transfer its engine slot to the one physical writer created above so
      * Vite middleware and close() address the same engine; leaving the slot untouched would make listen() create a second,
@@ -146,21 +138,21 @@ export async function createWxDevHost({
         hostActions.next({ kind: 'listening' })
     })
 
-    // The runtime sends only application-frontier and rebuild metadata over this control path; executable code never travels over
-    // HTTP. Its buildId is also the Rolldown client ID, letting the same identity reject delayed reports and stale compiler updates.
+    // HTTP carries only application-frontier and rebuild reports. Interpreter source uses Vite's existing WebSocket instead.
+    // The buildId is also Rolldown's client ID, so delayed reports cannot mutate a newer complete build.
     server.middlewares.use(hmrControlPath, (req, res) => void handleReport(req, res))
 
     installDevToolsPrinter(server)
 
     return {
         close: async () => {
-            // Quiet-window completion first admits final HMR publications and rebuild reports into the serialized action edge.
+            // Quiet-window completion first admits final HMR publications into the serialized action edge.
             hmrResults.complete()
-            runtimeReports.complete()
             await hostActions.waitForIdle()
             // Keep the action edge open until the final generation has admitted every output callback.
             await engine.ensureCurrentBuildFinish()
             await hostActions.complete()
+            await hmrMode.close(server)
         }
     }
 
@@ -184,7 +176,7 @@ export async function createWxDevHost({
         }
         await engine.registerClient(buildId)
 
-        await publishBuildMetadata(server, buildId, port, delivery, writeFile)
+        await publishBuildMetadata(server, buildId, port, hmrMode, writeFile)
     }
 
     /**
@@ -200,7 +192,7 @@ export async function createWxDevHost({
 
         try {
             const report = JSON.parse(await readBody(req)) as RuntimeReport
-            runtimeReports.next(report)
+            hostActions.next({ kind: 'report', report: report })
             res.end()
         } catch (e) {
             logWxError(server.config.logger, 'wx HMR report failed', e)
@@ -217,8 +209,8 @@ export async function createWxDevHost({
             case 'error':
                 logWxError(server.config.logger, 'wx HMR update failed', action.error)
                 return
-            case 'reports':
-                action.reports.forEach(processReport)
+            case 'report':
+                processReport(action.report)
                 return
             case 'output':
                 if (action.result instanceof Error) {
@@ -341,7 +333,7 @@ export async function createWxDevHost({
     /**
      * Advances Rolldown's published frontier in the same sequence order materialized by cumulative mode delivery.
      *
-     * Given a batch [5, 6], journal.produce has already made factories [5, 6] durable through the selected delivery. This
+     * Given a batch [5, 6], journal.produce has already made factories [5, 6] durable through the selected mode. This
      * method then commits payload 5 followed by payload 6. If the runtime observes neither publication before sequence 7, the
      * next cumulative delivery contains [5, 6, 7], while Rolldown may generate 7 relative to its published sequence 6.
      */
@@ -368,6 +360,28 @@ function boundPort(server: ViteDevServer): number | undefined {
     return address.port
 }
 
+/** Adds Vite's existing socket endpoint only for the mode that consumes it. */
+function withViteSocketEndpoint(server: ViteDevServer, info: HmrInfo): HmrInfo {
+    if (server.config.server.ws === false) {
+        throw new Error('WX interpreter HMR requires Vite server.ws.')
+    }
+
+    const socketOptions = typeof server.config.server.ws === 'object' ? server.config.server.ws : undefined
+    const socketUrl = new URL(info.endpoint)
+    socketUrl.protocol = socketOptions?.protocol
+        ? `${socketOptions.protocol}:`
+        : socketUrl.protocol === 'https:'
+          ? 'wss:'
+          : 'ws:'
+    socketUrl.hostname = socketOptions?.host ?? socketUrl.hostname
+    socketUrl.port = String(socketOptions?.clientPort ?? socketOptions?.port ?? socketUrl.port)
+    socketUrl.pathname = path.posix.join(server.config.base, socketOptions?.path ?? '')
+    socketUrl.search = ''
+    socketUrl.searchParams.set('token', server.config.webSocketToken)
+
+    return { ...info, socketEndpoint: socketUrl.href }
+}
+
 /**
  * Exposes a complete build to a fresh App heap in dependency order.
  *
@@ -379,18 +393,19 @@ async function publishBuildMetadata(
     server: ViteDevServer,
     buildId: string,
     port: number,
-    delivery: WxHmrDelivery,
-    writeFile: (fileName: string, source: string) => Promise<void>
+    hmrMode: WxHmrMode,
+    writeFile: WriteDevelopmentFile
 ): Promise<void> {
-    const info: HmrInfo = {
+    const baseInfo: HmrInfo = {
         buildId: buildId,
         endpoint: `${server.config.server.https ? 'https' : 'http'}://${resolveEndpointHost(server)}:${port}${hmrControlPath}`
     }
+    const info = hmrMode.usesWebSocket ? withViteSocketEndpoint(server, baseInfo) : baseInfo
 
-    await delivery.reset()
+    await hmrMode.reset(server, buildId, writeFile)
     await writeFile(hmrInfoFileName, renderHmrInfo(info))
     // `removeDevelopmentAppWxss` kept the previous physical wrapper in place while the complete output was written. Replace it
-    // only now, after the selected delivery is empty and matching identity is durable. DevTools treats `app.wxss` as an App root,
+    // only now, after the selected mode is reset and matching identity is durable. DevTools treats `app.wxss` as an App root,
     // so this write intentionally causes the one full refresh allowed at a complete-build boundary; the refreshed App reads the
     // new info above. Incremental updates must never write this file because an App refresh could destroy the heap while its
     // JavaScript patch is being acknowledged. They publish only the imported `assets/global.wxss` stylesheet instead.

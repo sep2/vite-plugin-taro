@@ -200,7 +200,26 @@ sitemapJson: {
 }
 ```
 
-H5 构建忽略该选项。
+
+## `hmr`
+
+可选。为 `vite serve` 的微信目标选择 JavaScript 热更新方式：
+
+```ts
+hmr: {
+    mode: 'interpreter'
+}
+```
+
+| `mode` | 行为 |
+| --- | --- |
+| `devtools` | 默认值。把原生补丁写入项目，由微信开发者工具重新执行 Page。 |
+| `interpreter` | 通过 Vite 现有 WebSocket 推送源码，在存活的 App 中使用 Sval 解释执行，不重新注册 Page。 |
+
+`interpreter` 不使用轮询定时器，不把补丁交给 `eval()` 或 `Function()`，也不生成 `hmr/patches.js`。它复用 Vite WebSocket，不创建补丁 HTTP 轮询端点；连接恢复后会从累计日志补发尚未确认的源码。该模式可以避开开发者工具的 Page 热重载，但会增大开发运行时，并且更新后的模块以解释方式执行。两种模式共享补丁序号、样式更新、React Refresh、确认和完整构建恢复。
+
+该选项不改变 H5 或生产构建输出。
+
 
 ## 生成的微信配置文件
 

@@ -24,15 +24,16 @@ export function createDevtoolsHmrMode(): WxHmrMode {
         runtimeFile: devtoolsRuntimeFile,
         plugins: [createDevtoolsPagePlugin()],
         createEntryBanner: createDevtoolsEntryBanner,
-        createDelivery: (writeFile) => ({
-            // Every Page requires this path from its first complete build. Exporting undefined keeps that dependency valid while
-            // making initial Page evaluation a no-op in the runtime adapter until a real cumulative patch suffix exists.
-            reset: () => writeFile(devtoolsPatchesFileName, renderInitialDevtoolsPatches()),
-            // Later publications always replace the same watched path. The journal supplies the entire unacknowledged suffix so
-            // a coalesced or missed DevTools file event cannot strand the App runtime between two Rolldown generations.
-            publish: (publication) =>
-                writeFile(devtoolsPatchesFileName, renderDevtoolsPatches(publication.buildId, publication.patches))
-        })
+        // Every Page requires this path from its first complete build. Exporting undefined keeps that dependency valid while
+        // making initial Page evaluation a no-op in the runtime adapter until a real cumulative patch suffix exists.
+        reset: (_, __, writeFile) => writeFile(devtoolsPatchesFileName, renderInitialDevtoolsPatches()),
+        // Later publications always replace the same watched path. The journal supplies the entire unacknowledged suffix so a
+        // coalesced or missed DevTools file event cannot strand the App runtime between two Rolldown generations.
+        publish: (_, publication, writeFile) =>
+            writeFile(devtoolsPatchesFileName, renderDevtoolsPatches(publication.buildId, publication.patches)),
+        close: async () => {},
+        configureServer: () => {},
+        usesWebSocket: false
     }
 }
 

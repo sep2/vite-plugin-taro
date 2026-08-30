@@ -1,30 +1,38 @@
-import type { Plugin } from 'vite'
+import type { Plugin, ViteDevServer } from 'vite'
+import type { VptHmrOptions } from '../../../../options.ts'
 import type { PatchPublication } from './hmr-protocol.ts'
+import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
+import { createInterpreterHmrMode } from './modes/interpreter/interpreter-hmr-mode.ts'
+import type { PatchJournal } from './patch-journal.ts'
 
-/**
- * Durability boundary between the shared patch journal and one concrete delivery mechanism.
- *
- * `reset()` establishes an empty frontier before a new build identity becomes App-visible. `publish()` must resolve only after
- * the cumulative suffix is observable by that mode; the host advances Rolldown's published frontier only after this Promise, so
- * resolving earlier could let Rolldown generate a delta relative to code the runtime cannot yet load.
- */
-export type WxHmrDelivery = Readonly<{
-    reset: () => Promise<void>
-    publish: (publication: PatchPublication) => Promise<void>
-}>
+export type WriteDevelopmentFile = (fileName: string, source: string) => Promise<void>
 
 /**
  * The behavior that genuinely differs between WX HMR implementations.
  *
- * A descriptor is created once while development plugins are composed and then closed over by the host and Rolldown options.
- * This keeps mode choice out of the per-update path. The host supplies the physical writer because it alone knows Vite's outDir;
- * the mode supplies runtime, entry edges, plugins, and delivery because those choices must remain internally consistent.
+ * The descriptor is selected once during plugin composition. Interpreter mode publishes the journal through Vite's existing
+ * WebSocket; DevTools reset and publish effects materialize that same journal as its watched native patch file.
  */
 export type WxHmrMode = Readonly<{
     runtimeFile: string
     plugins: readonly Plugin[]
-    createDelivery: (writeFile: (fileName: string, source: string) => Promise<void>) => WxHmrDelivery
+    reset: (server: ViteDevServer, buildId: string, writeFile: WriteDevelopmentFile) => Promise<void>
+    publish: (server: ViteDevServer, publication: PatchPublication, writeFile: WriteDevelopmentFile) => Promise<void>
+    close: (server: ViteDevServer) => Promise<void>
+    configureServer: (server: ViteDevServer, journal: PatchJournal) => void
+    usesWebSocket: boolean
     createEntryBanner: (
         pageFiles: ReadonlySet<string>
     ) => (chunk: Readonly<{ name: string; fileName: string }>) => string
 }>
+
+/** Resolves exactly one implementation before the WX development host is created. */
+export function createWxHmrMode(options: VptHmrOptions | undefined): WxHmrMode {
+    const mode = options?.mode ?? 'devtools'
+    switch (mode) {
+        case 'devtools':
+            return createDevtoolsHmrMode()
+        case 'interpreter':
+            return createInterpreterHmrMode()
+    }
+}

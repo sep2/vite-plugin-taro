@@ -6,7 +6,7 @@ import { rolldownRuntimeId } from '../module/module.ts'
 import type { WxStylePlugin } from '../styles/plugins.ts'
 import { createWxDevHost, type WxDevHost } from './dev-host.ts'
 import { developmentAppWxssFileName } from './hmr-files.ts'
-import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
+import { createWxHmrMode } from './hmr-mode.ts'
 import { createWxReactRefreshTransforms } from './react-refresh.ts'
 
 /** Selects the sole Vite environment that owns the physical Mini Program development project. */
@@ -22,9 +22,8 @@ export function isWxClientEnvironment(environment: Readonly<{ name: string }>): 
  * from unrelated Rolldown shell and transport entries.
  */
 export function createWxDevelopmentPlugin(options: VptOptions, styles: WxStylePlugin): PluginOption[] {
-    // DevTools is the sole implementation today, so compose it once here rather than introducing a one-entry selector. The same
-    // descriptor then configures plugins, host delivery, and runtime bundling without a mode branch on each update.
-    const hmrMode = createDevtoolsHmrMode()
+    // Resolve once so plugins, journal effects, entry banners, and runtime bundling cannot disagree about the active mechanism.
+    const hmrMode = createWxHmrMode(options.hmr)
 
     /*
      * Vite creates this plugin descriptor before a server or DevEngine exists, then invokes configureServer and closeBundle on
@@ -47,10 +46,9 @@ export function createWxDevelopmentPlugin(options: VptOptions, styles: WxStylePl
                     build: {
                         // The development output is the live Mini Program project opened by WeChat DevTools, not a disposable
                         // build artifact. Deleting and recreating its directory tree during a dev-server restart detaches the
-                        // DevTools watcher; recreating identical paths does not reliably reattach it. The host would keep writing
-                        // `hmr/patches.js`, but no Page shell would re-execute to consume or acknowledge those patches. Preserve
-                        // watched paths and let the initial complete build overwrite their contents. This plugin is serve-only,
-                        // so production builds retain Vite's normal output cleanup.
+                        // DevTools watcher; recreating identical paths does not reliably reattach it. Both HMR modes still depend
+                        // on that watcher for complete builds and WXSS, while DevTools mode also uses it for JavaScript patches.
+                        // Preserve watched paths and overwrite their contents. Production builds retain normal output cleanup.
                         emptyOutDir: false,
                         // Disable maps in resolved environment config as well as final output so Oxc and Babel skip producing
                         // intermediate maps that Rolldown would discard.
@@ -130,9 +128,9 @@ export function createWxDevelopmentPlugin(options: VptOptions, styles: WxStylePl
  *
  * Deleting only the in-memory bundle entry avoids both premature writes. Development sets `emptyOutDir: false`, so the prior
  * physical `app.wxss` remains available while the complete output is written. The host replaces it exactly once after the
- * selected delivery has reset `hmr/patches.js` and the matching `hmr/info.js` identity is durable. Incremental HMR never enters
- * this complete-output hook and changes only `assets/global.wxss`; rewriting the App root would reload the heap while a JavaScript
- * patch is awaiting acknowledgement. The serve-only plugin leaves production output unchanged.
+ * selected mode has reset and the matching `hmr/info.js` identity is durable. Incremental HMR never enters this complete-
+ * output hook and changes only `assets/global.wxss`; rewriting the App root would reload the heap while a JavaScript patch is
+ * awaiting acknowledgement. The serve-only plugin leaves production output unchanged.
  */
 export function removeDevelopmentAppWxss(bundle: Record<string, unknown>): void {
     delete bundle[developmentAppWxssFileName]

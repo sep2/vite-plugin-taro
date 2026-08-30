@@ -7,14 +7,18 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { stripVTControlCharacters } from 'node:util'
 import { createLogger, createServer, type Logger, type Plugin, type ViteDevServer } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
+import {
+    type InterpreterServerMessage,
+    interpreterClientEvent,
+    interpreterServerEvent
+} from '../../../../runtime/wx/dev/modes/interpreter/interpreter-protocol.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
 import { createWxStylePlugin } from '../styles/plugins.ts'
 import { createWxDevHost } from './dev-host.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
-import type { HmrInfo } from './hmr-protocol.ts'
+import type { HmrInfo, RuntimeReport } from './hmr-protocol.ts'
 import { createDevtoolsHmrMode, devtoolsPatchesFileName } from './modes/devtools/devtools-hmr-mode.ts'
-import type { RuntimeReport } from './runtime-reports.ts'
 import type { BundledDev } from './wx-dev-options.ts'
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
@@ -49,6 +53,13 @@ function createOptions(): VptOptions {
     }
 }
 
+function createInterpreterOptions(): VptOptions {
+    return {
+        ...createOptions(),
+        hmr: { mode: 'interpreter' }
+    }
+}
+
 function renderPage(marker: string): string {
     return `
         import { View } from '@tarojs/components'
@@ -70,7 +81,7 @@ async function publishSourceGeneration(filePath: string, source: string): Promis
     }
 }
 
-async function startDevFixture(logger: Logger, host: string): Promise<DevFixture> {
+async function startDevFixture(logger: Logger, host: string, options: VptOptions): Promise<DevFixture> {
     const root = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-dev-test-'))
     const outDir = path.join(root, 'dist')
     const pagePath = path.join(root, 'src/pages/home/index.tsx')
@@ -91,7 +102,7 @@ async function startDevFixture(logger: Logger, host: string): Promise<DevFixture
         root,
         configFile: false,
         customLogger: logger,
-        plugins: vpt(createOptions()),
+        plugins: vpt(options),
         build: {
             outDir
         },
@@ -222,6 +233,50 @@ function postRuntimeReport(info: HmrInfo, report: RuntimeReport): Promise<Respon
     })
 }
 
+type ViteSocketEnvelope = Readonly<{
+    type: string
+    event?: string
+    data?: InterpreterServerMessage
+}>
+
+async function openInterpreterSocket(info: HmrInfo): Promise<WebSocket> {
+    assert.ok(info.socketEndpoint)
+    const socket = new WebSocket(info.socketEndpoint, ['vite-hmr'])
+    const opened = Promise.withResolvers<void>()
+    socket.addEventListener('open', () => opened.resolve(), { once: true })
+    socket.addEventListener('error', () => opened.reject(new Error('Interpreter WebSocket failed to open.')), {
+        once: true
+    })
+    await opened.promise
+    return socket
+}
+
+function subscribeInterpreterSocket(socket: WebSocket, buildId: string): void {
+    socket.send(
+        JSON.stringify({
+            type: 'custom',
+            event: interpreterClientEvent,
+            data: { buildId: buildId }
+        })
+    )
+}
+
+function waitForInterpreterMessage(socket: WebSocket): Promise<InterpreterServerMessage> {
+    const result = Promise.withResolvers<InterpreterServerMessage>()
+    const receive = (event: MessageEvent<unknown>) => {
+        if (typeof event.data !== 'string') {
+            return
+        }
+        const envelope = JSON.parse(event.data) as ViteSocketEnvelope
+        if (envelope.type === 'custom' && envelope.event === interpreterServerEvent && envelope.data) {
+            socket.removeEventListener('message', receive)
+            result.resolve(envelope.data)
+        }
+    }
+    socket.addEventListener('message', receive)
+    return result.promise
+}
+
 test('rejects a server without Vite bundled development ownership', async (context) => {
     const server = await createServer({
         configFile: false,
@@ -279,7 +334,7 @@ test('rejects startup with the original complete-output failure', async () => {
 })
 
 test('coalesces one full-file save into one wx patch', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1')
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions())
     context.after(fixture.close)
 
     await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
@@ -303,7 +358,7 @@ test('coalesces one full-file save into one wx patch', async (context) => {
 })
 
 test('publishes and acknowledges cumulative wx patches without rotating the App heap', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1')
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions())
     context.after(fixture.close)
 
     const initialInfoSource = await waitForFile(
@@ -360,6 +415,63 @@ test('publishes and acknowledges cumulative wx patches without rotating the App 
     assert.equal(await readFile(fixture.appStylePath, 'utf8'), initialAppStyle)
 })
 
+test('publishes interpreter source through Vite WebSocket', async (context) => {
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createInterpreterOptions())
+    context.after(fixture.close)
+
+    const info = parseHmrInfo(
+        await waitForFile(fixture.infoPath, (source) => source.includes('socketEndpoint'), maximumWaitAttempts)
+    )
+    assert.equal(await readExistingFile(fixture.patchesPath), undefined)
+
+    const socket = await openInterpreterSocket(info)
+    context.after(() => socket.close())
+    subscribeInterpreterSocket(socket, info.buildId)
+
+    const firstMessagePromise = waitForInterpreterMessage(socket)
+    await publishSourceGeneration(fixture.pagePath, renderPage('first interpreted generation'))
+    const firstMessage = await firstMessagePromise
+    assert.equal(firstMessage.kind, 'patches')
+    if (firstMessage.kind !== 'patches') {
+        assert.fail('Expected interpreter patch source')
+    }
+    assert.match(firstMessage.patches.map(({ code }) => code).join('\n'), /first interpreted generation/)
+
+    const firstSeq = firstMessage.patches.at(-1)?.seq
+    assert.ok(firstSeq)
+
+    socket.close()
+    const replaySocket = await openInterpreterSocket(info)
+    context.after(() => replaySocket.close())
+    const replayPromise = waitForInterpreterMessage(replaySocket)
+    subscribeInterpreterSocket(replaySocket, info.buildId)
+    const replay = await replayPromise
+    assert.equal(replay.kind, 'patches')
+    if (replay.kind !== 'patches') {
+        assert.fail('Expected replayed interpreter patch source')
+    }
+    assert.equal(replay.patches.at(-1)?.seq, firstSeq)
+
+    const acknowledgement = await postRuntimeReport(info, {
+        buildId: info.buildId,
+        kind: 'applied',
+        seq: firstSeq
+    })
+    assert.equal(acknowledgement.status, 200)
+
+    const secondMessagePromise = waitForInterpreterMessage(replaySocket)
+    await publishSourceGeneration(fixture.pagePath, renderPage('second interpreted generation'))
+    const secondMessage = await secondMessagePromise
+    assert.equal(secondMessage.kind, 'patches')
+    if (secondMessage.kind !== 'patches') {
+        assert.fail('Expected interpreter patch source')
+    }
+    const secondSource = secondMessage.patches.map(({ code }) => code).join('\n')
+    assert.match(secondSource, /second interpreted generation/)
+    assert.doesNotMatch(secondSource, /first interpreted generation/)
+    assert.equal(await readExistingFile(fixture.patchesPath), undefined)
+})
+
 test('rejects invalid control requests without compromising later patch publication', async (context) => {
     // These mutable journals capture malformed-control diagnostics and the physical DevTools project banner.
     const errors: string[] = []
@@ -371,7 +483,7 @@ test('rejects invalid control requests without compromising later patch publicat
     logger.info = (message) => {
         infos.push(message)
     }
-    const fixture = await startDevFixture(logger, '0.0.0.0')
+    const fixture = await startDevFixture(logger, '0.0.0.0', createOptions())
     context.after(fixture.close)
     const info = parseHmrInfo(
         await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
@@ -442,7 +554,7 @@ test('rotates build identity on a current rebuild report and rejects delayed old
     logger.info = (message) => {
         infos.push(message)
     }
-    const fixture = await startDevFixture(logger, '127.0.0.1')
+    const fixture = await startDevFixture(logger, '127.0.0.1', createOptions())
     context.after(fixture.close)
 
     const initialInfoSource = await waitForFile(
@@ -528,7 +640,7 @@ test('reports a failed physical patch transaction through the serialized host bo
     logger.error = (message) => {
         errors.push(message)
     }
-    const fixture = await startDevFixture(logger, '127.0.0.1')
+    const fixture = await startDevFixture(logger, '127.0.0.1', createOptions())
     context.after(fixture.close)
     await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
     const hmrDirectory = path.dirname(fixture.infoPath)
@@ -552,7 +664,7 @@ test('resumes wx patch publication after a transient syntax error', async (conte
     logger.error = (message) => {
         errors.push(message)
     }
-    const fixture = await startDevFixture(logger, '127.0.0.1')
+    const fixture = await startDevFixture(logger, '127.0.0.1', createOptions())
     context.after(fixture.close)
 
     const initialInfoSource = await waitForFile(

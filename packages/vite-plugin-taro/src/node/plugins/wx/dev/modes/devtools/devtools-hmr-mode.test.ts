@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createLogger, createServer } from 'vite'
 import { pageShellPath } from '../../../module/module.ts'
 import type { PatchUpdate } from '../../hmr-protocol.ts'
 import {
@@ -79,15 +80,18 @@ test('rejects an empty cumulative patch range', () => {
     assert.throws(() => renderDevtoolsPatches('build', []), /Cannot render an empty WX patch range/)
 })
 
-test('resets and publishes through the exact DevTools patch path', async () => {
-    // This mutable journal captures the complete physical generations requested by one stateless delivery.
+test('resets and publishes through the exact DevTools patch path', async (context) => {
+    const server = await createServer({ configFile: false, customLogger: createLogger('silent') })
+    context.after(() => server.close())
+    // This mutable list captures the complete physical generations requested by one stateless mode.
     const writes: Array<Readonly<{ fileName: string; source: string }>> = []
-    const delivery = createDevtoolsHmrMode().createDelivery(async (fileName, source) => {
+    const writeFile = async (fileName: string, source: string) => {
         writes.push({ fileName: fileName, source: source })
-    })
+    }
+    const mode = createDevtoolsHmrMode()
 
-    await delivery.reset()
-    await delivery.publish({ buildId: 'build', patches: [patch] })
+    await mode.reset(server, 'build', writeFile)
+    await mode.publish(server, { buildId: 'build', patches: [patch] }, writeFile)
 
     assert.equal(devtoolsPatchesFileName, 'hmr/patches.js')
     assert.deepEqual(

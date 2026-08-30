@@ -6,6 +6,7 @@ import vpt from 'vite-plugin-taro'
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), 'VITE_VPT_')
     const wechatAppId = env.VITE_VPT_WECHAT_APP_ID || 'touristappid'
+    const hmrMode = process.env.VPT_HMR_MODE === 'interpreter' ? 'interpreter' : 'devtools'
 
     return {
         build: {
@@ -14,6 +15,7 @@ export default defineConfig(({ mode }) => {
         plugins: [
             vpt({
                 target: 'wx',
+                hmr: { mode: hmrMode },
                 app: 'src/app.tsx',
                 pages: [
                     {

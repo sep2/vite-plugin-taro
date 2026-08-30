@@ -42,6 +42,14 @@ export class PatchJournal {
         this.publishPatches = publishPatches
     }
 
+    /** Request-local view serialized synchronously when an interpreter socket reconnects; never retain it across host actions. */
+    get current(): PatchPublication | undefined {
+        if (this.buildId === undefined) {
+            return undefined
+        }
+        return { buildId: this.buildId, patches: this.pendingPatches }
+    }
+
     /** True when the buildId belongs to the current complete build. */
     isCurrentBuild(buildId: string): boolean {
         return buildId === this.buildId

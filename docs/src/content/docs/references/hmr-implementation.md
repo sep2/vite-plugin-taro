@@ -1,13 +1,14 @@
 ---
 title: 热更新实现原理
-description: vpt 如何通过磁盘补丁、页面重载、React Refresh 和 Taro 页面交接，在微信开发者工具中保留运行状态。
+description: vpt 如何通过原生补丁或解释器、共享模块运行时和 React Refresh，在微信开发期间保留运行状态。
 ---
 
-本页描述 vpt 当前的 `devtools` 热更新模式。vpt 的微信热更新不是浏览器热模块替换（Hot Module Replacement，HMR）的移植。浏览器可以从开发服务器加载新的 JavaScript 地址，微信小程序则只能执行开发者工具编译过的项目文件。`devtools` 模式因此把更新写入 `dist/wx`，再借助开发者工具已有的页面热重载能力执行它。
+vpt 的微信热更新不是浏览器 HMR 的直接移植。两种模式共享 Rolldown 增量、补丁序号、模块图更新、React Refresh、样式事务、确认和完整构建恢复，只改变补丁如何到达并安装到存活的 App 运行时：
 
-整套设计可以概括为一句话：
+- `devtools` 把原生 JavaScript 补丁写入 `dist/wx`，借助开发者工具的 Page 热重载执行，再保护原 Taro/React 页面连接；
+- `interpreter` 通过 Vite 已有 WebSocket 推送源码，由 App 中的 Sval 安装模块实现，不重新注册 Page。
 
-> JavaScript 更新不覆盖 App 或业务代码文件，只替换 Page 从启动时就依赖的补丁文件。开发者工具因此替换 Page 而不重启 App；仍然存活的 App 运行时负责替换模块，vpt 把原有 Taro 页面连接到新的微信 Page 对象，React Refresh 再更新组件。
+一次开发服务器只选择其中一种模式，更新路径中没有逐补丁模式判断。
 
 使用方法和常见问题参见[开发者工具热更新](/guides/hot-module-replacement/)。本页解释内部设计。
 
@@ -18,27 +19,22 @@ description: vpt 如何通过磁盘补丁、页面重载、React Refresh 和 Tar
 | 变化 | 被替换的内容 | 状态结果 |
 | --- | --- | --- |
 | 模块热更新 | App 内存中的部分 JavaScript 模块 | App 和兼容的 React 组件状态保留 |
-| 开发者工具替换 Page | 当前微信 Page 对象 | vpt 把原 React/Taro 页面交接给新对象 |
+| 开发者工具替换 Page（仅 `devtools`） | 当前微信 Page 对象 | vpt 保留原 React/Taro 页面连接并抑制替换生命周期 |
 | 完整构建 | 整个 `dist/wx` 代码基线和 App 运行环境 | 所有运行时状态重置 |
 
-一次成功更新通常同时包含前两项：模块在存活的 App 中被替换，开发者工具也重新创建了当前 Page。页面交接使第二项看起来像没有发生。
+`devtools` 的成功更新通常同时包含前两项，页面交接使第二项看起来像没有发生。`interpreter` 只执行第一项。
 
 完整构建是恢复手段。只要局部替换无法证明安全，vpt 就生成新基线并允许开发者工具重启 App。
 
 ## 微信环境决定了什么
 
-### 新代码必须先成为项目文件
+### 新代码需要环境允许的执行机制
 
-小程序不能把 `wx.request()` 收到的源码交给 `eval()`、`Function()` 或等价机制执行。新的 JavaScript 必须先写入 `dist/wx`，再由微信开发者工具发现、编译和加载。
+小程序不能把 `wx.request()` 收到的源码交给 `eval()` 或 `Function()`。`devtools` 因此先把补丁写入 `dist/wx`，由微信开发者工具编译为原生 JavaScript。`interpreter` 则把源码当作数据交给 Sval 的解析器和解释执行器，不调用动态代码生成 API。
 
-因此：
+解释器只存在于开发运行时。生产构建仍然全部是开发者工具可编译的静态项目文件。
 
-- HTTP 不传输可执行补丁；
-- WebSocket 不承担代码交付；
-- 内存中的 Vite 输出不能直接成为小程序更新；
-- 补丁本身必须是一个真实 JavaScript 文件。
-
-### 改了哪个文件，决定重载多大范围
+### `devtools`：改了哪个文件，决定重载多大范围
 
 开发者工具根据发生变化的文件及其已有依赖关系决定如何重载：
 
@@ -63,13 +59,13 @@ React Refresh 不会把状态序列化后重建。它只能更新仍然存活的
 | 部分 | 职责 |
 | --- | --- |
 | Rolldown 开发引擎 | 监视源码，生成模块补丁或要求完整构建 |
-| vpt 开发主机 | 串行处理构建结果、样式、补丁文件和运行时报告 |
-| `hmr/patches.js` | 保存开发者工具下一次需要交付的模块补丁 |
+| vpt 开发主机 | 串行处理构建结果、样式、累计补丁、交付和运行时报告 |
+| DevTools 交付 | 把累计补丁渲染为 `hmr/patches.js` |
+| Interpreter 交付 | 通过 Vite WebSocket 推送累计日志，并在重连订阅时补发 |
 | App 模块运行时 | 保存模块图、缓存、热更新边界和已应用序号 |
+| Sval（仅 `interpreter`） | 解析并解释 Rolldown 模块注册程序与更新后的模块实现 |
 | React Refresh | 判断组件边界是否兼容，并更新现有 React 树 |
-| Taro 页面交接 | 把保留的页面树重新绑定到开发者工具创建的新 Page 对象 |
-
-其中只有 `hmr/patches.js` 携带可执行更新。HTTP 接口只接收“已经应用到哪个序号”或“需要完整构建”这两类报告。
+| Taro 页面交接（仅 `devtools`） | 在开发者工具重新注册 Page 时保留原页面连接 |
 
 ## 初始构建建立的基础
 
@@ -91,13 +87,15 @@ React Refresh 不会把状态序列化后重建。它只能更新仍然存活的
 // hmr/info.js
 module.exports = {
     buildId: '本次完整构建的唯一标识',
-    endpoint: 'http://127.0.0.1:<port>/__vpt_hmr__'
+    endpoint: 'http://127.0.0.1:<port>/__vpt_hmr__',
+    // 仅 interpreter 模式存在
+    socketEndpoint: 'ws://127.0.0.1:<port>/?token=<vite-token>'
 }
 ```
 
 App 入口在业务模块执行前读取该文件并初始化共享模块运行时。旧构建延迟到达的补丁或报告会因为 `buildId` 不匹配而被忽略。
 
-### 页面的固定补丁依赖
+### `devtools` 的固定 Page 补丁依赖
 
 初始 `hmr/patches.js` 不包含更新：
 
@@ -116,35 +114,31 @@ __rolldown_runtime__.applyPatches(
 
 第一次执行什么也不会发生，但开发者工具已经记录了 Page 到补丁文件的直接依赖。以后只需替换这个文件，就能触发所需的 Page 重载。
 
+### `interpreter` 的 App 源码通道
+
+解释器模式不给 Page 添加补丁依赖，也不生成 `hmr/patches.js`。App 使用 `hmr/info.js` 中的地址连接 Vite 已有 WebSocket，并用 `buildId` 订阅当前日志。源码发布时，主机直接广播累计补丁；连接中断后，App 从原生关闭事件重新连接并再次订阅，主机补发仍未确认的日志后缀。
+
+空闲连接不产生轮询请求、心跳或插件定时器。构建身份切换和主机关闭也通过同一通道通知旧 App 停止监听。
+
 ### App 级运行时
 
-模块缓存、模块引用关系、热更新边界和补丁序号都保存在 App 共享的运行时中。Page 重新执行时取得的仍是同一个实例，因此它能把新实现应用到旧模块图，而不是从空状态开始。
+模块缓存、模块引用关系、热更新边界和补丁序号都保存在 App 共享的运行时中。`devtools` 的 Page 重新执行时取得同一个实例；`interpreter` 的 WebSocket 也由该实例持有。两者都把新实现应用到现有模块图，而不是从空状态开始。
 
-开发构建还会把这个运行时连接到应用实际使用的 Taro 实例，并在 React 渲染器运行前安装 React Refresh 所需的全局 Hook。这里不能另行导入一份 Taro，否则页面交接面对的会是另一个模块实例。
+开发构建还会使用应用实际的 Taro 模块实例，并在 React 渲染器运行前安装 React Refresh 所需的全局 Hook。这里不能另行导入一份 Taro，否则 DevTools 页面交接和解释器更新都会面对与应用不同的模块实例。
 
 ## 一次 JavaScript 更新
 
 ```text
-保存源码
-   ↓
-Rolldown 生成模块补丁
-   ↓
-vpt 先更新可能受影响的全局 WXSS
-   ↓
-vpt 写入累计的 hmr/patches.js
-   ↓
-开发者工具重新执行依赖它的 Page
-   ↓
-App 运行时验证并替换模块
-   ↓
-接受回调安排 React Refresh，并报告已应用序号
-   ↓
-vpt 把原 Taro 页面交接给新的微信 Page
-   ↓
-React Refresh 更新仍然存活的 React 树
+保存源码 → Rolldown 补丁 → global.wxss → 累计补丁日志
+                                         ├─ devtools: patches.js → Page 重载 → 原生工厂
+                                         └─ interpreter: Vite WebSocket → Sval 安装源码
+                                                            ↓
+                                      共享运行时验证并一次应用整个批次
+                                                            ↓
+                                      React Refresh → POST 已应用序号
 ```
 
-下面按顺序展开。
+`devtools` 随后还会完成 Page 生命周期交接；`interpreter` 的 Page 从未被重新注册。下面按共享顺序和模式差异展开。
 
 ### 1. Rolldown 判断更新类型
 
@@ -160,19 +154,19 @@ React Refresh 更新仍然存活的 React 树
 
 连续保存时，vpt 会短暂等待这一轮编译结果结束，再合并成一次磁盘通知。这段等待只减少文件写入次数，不会丢弃中间补丁：后一个补丁是基于前一个补丁产生的增量，必须按原顺序全部保留。
 
-### 2. 主机按顺序发布文件
+### 2. 主机按顺序发布样式和补丁
 
 一次补丁发布遵守固定顺序：
 
 1. 根据最新模块图重新生成需要变化的全局 WXSS；
-2. 写入 `hmr/patches.js`；
-3. 按补丁顺序通知 Rolldown，这些补丁已经成为可交付文件。
+2. 让所选模式发布累计补丁：`devtools` 原子替换文件，`interpreter` 通过 Vite WebSocket 广播源码；
+3. 按补丁顺序通知 Rolldown，这些补丁已经可交付。
 
-所有构建结果、补丁写入、样式写入、运行时报告和完整构建切换都经过同一条串行队列。任何两个文件事务都不会并发修改共享状态。
+所有构建结果、样式、补丁、运行时报告和完整构建切换都经过同一条串行队列。交付成功只推进 Rolldown 的“已发布”前沿；App POST 成功应用序号后，日志才推进“已应用”前沿。
 
-文件使用“同目录临时 `.txt` 文件 + rename”的方式替换。开发者工具忽略临时文件，只会看到完整的最终内容；同目录 rename 也保证替换发生在同一文件系统中。
+`devtools` 文件使用“同目录临时 `.txt` 文件 + rename”替换。开发者工具忽略临时文件，只会看到完整的最终内容。`interpreter` 不写 JavaScript 文件，也不复制第二份发布状态；广播和重连补发都直接序列化补丁日志的当前值。
 
-### 3. 补丁文件保留尚未确认的完整序列
+### 3. `devtools` 补丁文件保留尚未确认的完整序列
 
 `hmr/patches.js` 不是“最新补丁”，而是“当前 App 尚未确认应用的全部补丁”。例如，App 已应用到序号 `3`：
 
@@ -212,11 +206,17 @@ module.exports = {
 
 补丁文件本身只导出数据，不会擅自修改运行时。Page 入口明确把它交给 App 模块运行时。
 
-### 4. Page 在业务代码之前应用补丁
+### 4. `devtools` Page 在业务代码之前应用补丁
 
 开发者工具发现 `hmr/patches.js` 变化后，会重新执行依赖它的存活 Page。Page 入口先调用 `applyPatches()`，之后才继续加载页面业务模块。因此本次重新执行看到的是新模块状态。
 
 多个 Page 可能依次读取同一份补丁。App 运行时使用序号跳过已经应用的部分，但仍会为每个被开发者工具替换的路由建立独立的页面交接。
+
+### 4b. `interpreter` 接收 WebSocket 源码并安装
+
+主机把当前尚未确认的补丁 `{ buildId, patches: [{ seq, changedIds, code, ... }] }` 作为 Vite 自定义事件发送。Sval 在一个 App 级沙箱作用域中解释每个 `code`；代码只登记模块图和模块工厂，应用模块仍由共享运行时稍后统一执行。
+
+成功应用后，App 仍通过 HTTP POST 报告序号。WebSocket 只在新发布或重新订阅时发送，不会因为幂等重放形成请求循环。每份源码携带构建身份，旧构建重连订阅和主机关闭都会收到终止消息；连接恢复由原生 SocketTask 事件驱动，不存在轮询定时器。
 
 ### 5. 运行时验证补丁
 
@@ -267,7 +267,7 @@ React 项目的更新边界通常由 `@vitejs/plugin-react` 生成，vpt 不另�
 }
 ```
 
-主机收到后只删除该序号覆盖的补丁前缀。把“文件已经写入”和“App 已经应用”分开，才能在开发者工具尚未处理文件事件时继续安全发布后续补丁。
+主机收到后只删除该序号覆盖的补丁前缀。把“模式已经发布”和“App 已经应用”分开，才能在 Page 尚未处理文件事件或解释器尚未收到 WebSocket 消息时继续安全发布后续补丁。
 
 ## React Refresh 如何保留组件状态
 
@@ -282,7 +282,7 @@ React 项目的更新边界通常由 `@vitejs/plugin-react` 生成，vpt 不另�
 
 vpt 不读取或序列化 React 内部的渲染树，不复制 Hook 状态，也不创建第二棵 React 树。
 
-## Page 原生重新注册如何保留页面
+## `devtools` 如何在 Page 原生重新注册时保留页面
 
 模块补丁应用后，开发者工具会重新执行原生 Page 注册。这个动作不是普通页面导航，却会额外触发一组卸载、加载和显示生命周期。如果这些回调直接进入 Taro，仍然有效的 React 页面会被卸载，随后又以新的页面身份挂载，组件状态和业务上下文都会丢失。
 
@@ -355,7 +355,7 @@ Tailwind 生成器只负责编译入口，不拥有补丁发布。它在入口�
 
 1. 协调本次完整输出的全局 WXSS；
 2. 生成新的 `buildId`，停止使用旧 Rolldown 客户端身份；
-3. 清空待确认补丁，并把 `hmr/patches.js` 重置为初始状态；
+3. 旋转补丁日志身份并清空待确认补丁；`devtools` 同时清空补丁文件，`interpreter` 广播新构建身份让旧连接停止；
 4. 写入带有新身份和报告地址的 `hmr/info.js`；
 5. 最后写入带有新 `buildId` 标记的 `app.wxss`。
 
@@ -363,9 +363,9 @@ Tailwind 生成器只负责编译入口，不拥有补丁发布。它在入口�
 
 vpt 不尝试在完整构建后恢复 React 内部状态。新的磁盘基线和新的 App 运行环境就是恢复边界。
 
-## HTTP 接口做什么
+## 控制接口做什么
 
-控制接口只接受 `POST`，运行时发送两种消息：
+两种模式都用 `POST` 发送运行时报告：
 
 ```ts
 type AppliedReport = {
@@ -381,9 +381,9 @@ type RebuildReport = {
 }
 ```
 
-`applied` 允许主机删除已经成功应用的补丁历史；`rebuild` 请求完整构建。报告会先按构建身份合并重复信息，再与补丁写入和构建切换按顺序处理。
+`applied` 允许主机删除已经成功应用的补丁历史；`rebuild` 请求完整构建。每份报告都与补丁交付和构建切换按顺序处理。HTTP 不承载解释器源码。
 
-接口不返回 JavaScript，不提供补丁下载，不轮询模块状态，也不保存第二份应用模块图。
+`interpreter` 复用 Vite WebSocket 的自定义事件。App 连接或重连后发送 `{ buildId }` 订阅；主机若仍保留该构建的未确认补丁，就立即回放当前累计值。后续发布、构建切换和关闭均由主机主动推送。
 
 ## 顺序保证
 
@@ -394,8 +394,8 @@ type RebuildReport = {
 ```text
 收齐且保留全部 Rolldown 增量
    → 发布新的 global.wxss（如果变化）
-   → 发布累计 patches.js
-   → 按序确认文件已交付给 Rolldown
+   → 通过所选模式发布累计补丁
+   → 按序确认补丁已交付给 Rolldown
    → 等待 App 报告实际应用序号
 ```
 
@@ -405,7 +405,7 @@ type RebuildReport = {
 写入完整输出
    → 协调最终 global.wxss
    → 创建新 buildId
-   → 清空 patches.js
+   → 重置所选交付
    → 写入 info.js
    → 最后更新 app.wxss，让 DevTools 重启 App
 ```
@@ -414,16 +414,16 @@ type RebuildReport = {
 
 ## 维护者不变量
 
-1. 每个 Page 从初始构建起直接、字面量地依赖同一个 `hmr/patches.js`；
+1. 一次服务器只运行一种 HMR 模式，模式选择不进入增量热路径；
 2. 普通模块更新不能改写 App 入口或其他会重启 App 的根文件；
-3. 可执行补丁只能通过开发者工具观察的项目文件交付；
-4. HTTP 只传递确认和恢复请求；
+3. `devtools` 的每个 Page 从初始构建起依赖同一个 `hmr/patches.js`；
+4. `interpreter` 每个 App 堆只保留一条 Vite WebSocket，且不得使用轮询定时器；
 5. App 模块运行时必须比 Page 活得更久；
-6. 补丁文件必须保留所有尚未确认应用的连续序号；
+6. 补丁日志必须保留所有尚未确认应用的连续序号；
 7. 整个受影响模块集合必须在任一新边界执行前统一清除缓存；
-8. Page 原生重新注册必须保留已挂载页面，且不能绑定到重新注册回调中的临时 Page；
+8. `devtools` 的 Page 重新注册必须保留已挂载页面，且不能绑定到临时 Page；
 9. React Refresh 必须复用存活的 App React 根；
-10. 新构建身份暴露给 App 前，补丁文件必须已经重置；
+10. 新构建身份暴露给 App 前，所选交付必须已经重置；
 11. 样式必须先于对应 JavaScript 补丁发布；
 12. 任何无法证明连续且安全的模块状态都必须回到完整构建。
 
@@ -433,9 +433,10 @@ type RebuildReport = {
 | --- | --- | --- |
 | `DevEngine` | Rolldown 开发引擎 | 生成完整输出和增量模块补丁 |
 | `WxDevHost` | vpt 开发主机 | 排队并执行所有磁盘输出、报告和构建切换 |
-| `PatchPublisher` | 补丁历史发布器 | 保存并写出尚未确认应用的连续补丁 |
+| `PatchJournal` | 补丁日志 | 保存构建身份和尚未确认应用的累计补丁 |
 | `buildId` | 构建身份 | 区分两次完整构建的运行时和报告 |
 | `seq` / `appliedSeq` | 补丁序号 / 已应用序号 | 验证增量连续性并释放已应用历史 |
 | HMR boundary | 更新边界 | 调用 `import.meta.hot.accept()`、可以接收新导出的模块 |
-| Page re-registration | Page 原生重新注册 | 用已挂载 Page 的当前数据再次注册静态配置，同时忽略临时 Page 上的重新注册生命周期 |
+| `WxHmrMode` | HMR 模式 | 提供运行时、DevTools 文件物化或解释器 WebSocket 发布效果 |
+| Page re-registration | Page 原生重新注册 | `devtools` 用已挂载 Page 的数据再次注册配置，同时忽略临时 Page 生命周期 |
 | `WxStylePlugin` | WX 样式插件 | 从当前模块图和源文件生成同一事务的全局 WXSS 与 JavaScript 类名集合 |

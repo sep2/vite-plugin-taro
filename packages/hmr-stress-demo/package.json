@@ -11,6 +11,7 @@
         "stress-hmr:burst": "node scripts/run-devtools-tests.ts burst",
         "setup-devtools": "cross-env VPT_HMR_SETUP=1 node scripts/run-devtools-tests.ts setup",
         "test-devtools": "node scripts/run-devtools-tests.ts all",
+        "test-interpreter": "cross-env VPT_HMR_MODE=interpreter node scripts/run-devtools-tests.ts all",
         "test-devtools:burst": "node scripts/run-devtools-tests.ts burst",
         "test-devtools:rebuild": "node scripts/run-devtools-tests.ts rebuild",
         "test-devtools:recovery": "node scripts/run-devtools-tests.ts recovery",

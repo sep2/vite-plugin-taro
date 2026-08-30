@@ -55,10 +55,9 @@ export function installWxDevOptions({
         }
         const configured = configuredOutput ?? {}
 
-        // Entry banners run after Rolldown has assigned chunk names, so the mode needs route membership rather than source IDs.
-        // DevTools uses it to give every Page a physical `hmr/patches.js` dependency: changing that dependency is the only native
-        // JavaScript reload trigger that re-executes a live Page while preserving the App heap. ReadonlySet keeps lookup O(1) and
-        // prevents the resolved entry set from changing while Rolldown invokes the banner for later chunks.
+        // Entry banners run after Rolldown has assigned chunk names, so the mode receives route membership rather than source
+        // IDs. DevTools mode uses O(1) membership to add Page patch dependencies; interpreter mode emits only its App initializer.
+        // ReadonlySet prevents the resolved entry set from changing while Rolldown invokes the banner for later chunks.
         const pageFiles: ReadonlySet<string> = new Set(options.pages.map((page) => `${page.path}.js`))
 
         /*
@@ -71,9 +70,9 @@ export function installWxDevOptions({
             // Development output is overwritten in place after every complete build. Strip hash placeholders from the
             // configured asset pattern so old files cannot accumulate and native JSON/WXML references remain stable.
             assetFileNames: createStableFileNames(configured.assetFileNames, 'assets/[name][extname]'),
-            // These banners create physical CommonJS edges only after graph analysis. App initializes the selected runtime and
-            // Page entries consume its delivery before loading their capsules, while host-only metadata and patches stay outside
-            // the application chunk graph and therefore cannot affect placement or generate transport chunks of their own.
+            // These banners create physical CommonJS edges only after graph analysis. Every mode initializes its App runtime;
+            // modes that need Page delivery can additionally prepend Page edges. Host-only metadata stays outside the application
+            // chunk graph and therefore cannot affect placement or generate transport chunks of its own.
             banner: hmrMode.createEntryBanner(pageFiles),
             // Preserve the configured directory/name shape while removing content hashes. Stable chunk paths let DevTools
             // overwrite executable files and keep one persistent physical module identity across complete builds.
@@ -103,8 +102,8 @@ export function installWxDevOptions({
             ...(typeof existingDevMode === 'object' ? existingDevMode : {}),
             // Install the self-contained runtime selected once by the HMR mode. Nested bundling resolves all adapter imports into
             // one implementation string because Rolldown injects it into a generated runtime chunk where ordinary module imports
-            // are unavailable. It reports metadata-only ACK/rebuild messages through the host bridge instead of browser sockets;
-            // executable patch factories remain in the mode's native delivery.
+            // are unavailable. Shared ACK/rebuild reports use the host bridge; each adapter separately owns how executable module
+            // registrations reach that runtime.
             implement: await bundleRuntimeSource(hmrMode.runtimeFile),
             // Produce a complete output graph on the initial build. Lazy per-request compilation cannot establish the closed
             // App/Page graph, native companions, style sidecars, and build identity required before any patch is admitted.
