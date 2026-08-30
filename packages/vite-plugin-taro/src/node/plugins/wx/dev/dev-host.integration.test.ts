@@ -11,7 +11,9 @@ import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
 import { createWxStylePlugin } from '../styles/plugins.ts'
 import { createWxDevHost } from './dev-host.ts'
-import { type HmrInfo, hmrInfoFileName, hmrPatchesFileName } from './hmr-files.ts'
+import { hmrInfoFileName } from './hmr-files.ts'
+import type { HmrInfo } from './hmr-protocol.ts'
+import { createDevtoolsHmrMode, devtoolsPatchesFileName } from './modes/devtools/devtools-hmr-mode.ts'
 import type { RuntimeReport } from './runtime-reports.ts'
 import type { BundledDev } from './wx-dev-options.ts'
 
@@ -114,7 +116,7 @@ async function startDevFixture(logger: Logger, host: string): Promise<DevFixture
         pagePath,
         appStylePath: path.join(outDir, 'app.wxss'),
         infoPath: path.join(outDir, hmrInfoFileName),
-        patchesPath: path.join(outDir, hmrPatchesFileName),
+        patchesPath: path.join(outDir, devtoolsPatchesFileName),
         close: async () => {
             try {
                 await server.close()
@@ -230,9 +232,10 @@ test('rejects a server without Vite bundled development ownership', async (conte
     await assert.rejects(
         () =>
             createWxDevHost({
-                server,
+                server: server,
                 options: createOptions(),
-                styles: createWxStylePlugin([import.meta.filename])
+                styles: createWxStylePlugin([import.meta.filename]),
+                hmrMode: createDevtoolsHmrMode()
             }),
         /Vite did not create the wx bundled-development environment/
     )

@@ -1,50 +1,45 @@
-// WX dev runtime — bundled and injected verbatim at the end of the shared Rolldown
-// runtime chunk (`assets/rolldown-runtime.js`, required first by every chunk). Defines the
-// App-global `__rolldown_runtime__` that generated modules call.
-//
-// The `DevRuntime` base class is injected into the chunk by Rolldown's dev-mode
-// transform, so the WX host only extends it.
-//
-// Every Page explicitly passes the inert hmr/patches.js export here before native Page registration. The runtime applies that
-// cumulative suffix synchronously, reports its successful application frontier, and ignores sequences replayed by other Pages.
+/*
+ * Shared WX HMR runtime, bundled into the mode-selected entry and injected into Rolldown's generated runtime chunk.
+ * Rolldown provides the lexical `DevRuntime` base class; this file extends that registry instead of duplicating module loading.
+ *
+ * Concrete modes decide how executable factories arrive and provide only a synchronous installer. This class owns the invariant
+ * that installation, graph propagation, cache eviction, boundary execution, and ACK form one application transaction. HTTP is
+ * used only for metadata reports, never executable source.
+ */
 
 import type { DevRuntime as RolldownDevRuntime } from 'rolldown/experimental/runtime-types'
 
 /** Lexical base class injected into the runtime chunk by Rolldown; typed via the contract. */
 declare const DevRuntime: new (clientId: string) => RolldownDevRuntime
 
-/** Identity and report endpoint, materialized by the host into hmr/info.js for every full build. */
-type HmrInfo = Readonly<{
+/**
+ * Identity and report endpoint fixed for one App heap. A later complete build creates a new heap rather than mutating this session,
+ * so delayed deliveries and reports can be rejected by build ID without coordinating another mutable runtime-global value.
+ */
+export type HmrInfo = Readonly<{
     buildId: string
     endpoint: string
 }>
 
 /** App-heap HMR identity; only the committed application frontier mutates. */
 type HmrSession = {
-    /** Rejects delayed patch files and identifies reports after a newer full build exists. */
+    /** Rejects delayed patch delivery and identifies reports after a newer full build exists. */
     readonly buildId: string
     /** Fixed control URL discovered from the Vite server that produced this full build. */
     readonly endpoint: string
     /**
-     * Highest contiguous application sequence whose factories, graph propagation, and accept callbacks all succeeded.
-     * Host-filtered native asset updates consume no sequence. Replayed Page shells read this watermark; it advances only
+     * Highest contiguous application sequence whose installation, graph propagation, and accept callbacks all succeeded.
+     * Host-filtered native asset updates consume no sequence. Replayed mode deliveries read this watermark; it advances only
      * after an atomic batch succeeds and resets only with a new App heap.
      */
     appliedSeq: number
 }
 
-/** One physical hmr/patches.js payload: the build identity plus one patch program per update. */
-type PatchPayload = Readonly<{
-    buildId: string
-    patches: readonly PatchProgram[]
-}>
-
-/** One patch: its physical application sequence, changed module ids, and Rolldown factory program. */
-type PatchProgram = Readonly<{
+/** Mode-independent patch metadata consumed by the shared sequence and graph reducer. */
+export type RuntimePatch = Readonly<{
     seq: number
-    /** Stable ids of the changed modules; the sync apply walks the graph from these. */
+    /** Stable ids of the changed modules; synchronous application walks the graph from these roots. */
     changedIds: string[]
-    factory: () => void
 }>
 
 type HmrUpdate = Readonly<{
@@ -53,32 +48,6 @@ type HmrUpdate = Readonly<{
 }>
 
 type AcceptCallback = (moduleExports: unknown) => void
-
-type NativePage = {
-    data: Record<string, unknown>
-}
-
-const pageHmrStateKey: unique symbol = Symbol('vpt.pageHmrState')
-
-type PageHmrState = {
-    /** True only across the unload/load/show sequence triggered by one native re-registration. */
-    isReregistering: boolean
-    /** The Page bound to `this` by ordinary onLoad, retained until ordinary onUnload. */
-    mountedPage: NativePage | undefined
-}
-
-type HmrPageConfig = {
-    data: Record<string, unknown>
-    onUnload?: unknown
-    onLoad?: unknown
-    onShow?: unknown
-    [pageHmrStateKey]?: PageHmrState
-}
-
-/** Calls a native lifecycle with the same Page bound to `this` and the same arguments. */
-function forward(handler: unknown, page: unknown, args: unknown[]): void {
-    if (typeof handler === 'function') handler.apply(page, args)
-}
 
 /** Shared no-op CSS contract because physical rebuilds replace styles wholesale. */
 const hotContextInternals = Object.freeze({
@@ -139,11 +108,11 @@ class WxHotContext {
     prune(_callback?: () => void): void {}
 }
 
-/** The WX host: extends the Rolldown contract instead of reimplementing it. */
-class WxDevRuntime extends DevRuntime {
+/** Shared WX host mechanics extending the Rolldown contract instead of reimplementing it. */
+export class WxHmrRuntime extends DevRuntime {
     /**
-     * One session for this App heap. Undefined only before app.js consumes hmr/info.js; its
-     * identity and endpoint then stay fixed while appliedSeq records the committed frontier.
+     * One session for this App heap. Undefined only before the mode-selected entry initializes the runtime; its identity and
+     * endpoint then stay fixed while appliedSeq records the committed frontier.
      */
     private session: HmrSession | undefined
 
@@ -255,128 +224,57 @@ class WxDevRuntime extends DevRuntime {
         }
     }
 
-    /** Consumed once per App heap from hmr/info.js; the host buildId identifies its cumulative patch history. */
+    /**
+     * Initializes exactly once per App heap. Repeated entry evaluation must not replace the identity or reset `appliedSeq`, because
+     * either change could acknowledge factories against another host client or replay already committed application generations.
+     */
     initialize(info: HmrInfo): void {
         if (this.session) return
         this.session = { ...info, appliedSeq: 0 }
     }
 
-    /** Tracks the mounted native Page and prepares its static config for HMR re-registration. */
-    injectPageHmr(config: HmrPageConfig): HmrPageConfig {
-        const existingState = config[pageHmrStateKey]
-
-        if (existingState) {
-            const mountedPage = existingState.mountedPage
-            /*
-             * The static config can outlive a native Page instance. Before its first ordinary onLoad, or after a real onUnload,
-             * there is no mounted Page or current view-model to carry into another registration. Leave the lifecycle gate
-             * unarmed and preserve the config's existing initial data so a future real onLoad still enters Taro normally.
-             */
-            if (!mountedPage) {
-                return config
-            }
-
-            /*
-             * Arm the lifecycle wrappers on this exact static config before it is passed back to `Page(config)`. DevTools then
-             * triggers an unload/load/show sequence for that native re-registration: unload and load observe `true` and return
-             * before entering Taro, preserving the mounted React tree and its original Page connection; show consumes the
-             * one-shot gate by restoring `false`. Ordinary navigation never enters this branch, and every Page config owns an
-             * independent state object, so no route map, global phase, or Page identity comparison participates in the decision.
-             */
-            existingState.isReregistering = true
-            /*
-             * `Page(config)` reads `config.data` as the initial native view-model for this registration. Supplying the mounted
-             * Page's latest data before that call prevents the temporary Page used for re-registration callbacks from starting
-             * empty. This is an O(1) reference assignment in vpt: it does not clone the recursive data tree, call `setData`, move
-             * React state, or rebind Taro. The ordinary Taro lifecycle remains suppressed until re-registration onShow, so its
-             * React tree and output connection stay attached to `mountedPage`; every later registration reads its latest data.
-             */
-            config.data = mountedPage.data
-
-            return config
-        }
-
-        const originalOnUnload = config.onUnload
-        const originalOnLoad = config.onLoad
-        const originalOnShow = config.onShow
-
-        const state: PageHmrState = {
-            isReregistering: false,
-            mountedPage: undefined
-        }
-
-        /*
-         * Attach the one mutable HMR state object to this exact static config. The lifecycle wrappers below close over the same
-         * object, while a later `injectPageHmr(config)` call finds it through the symbol and knows wrapping is already complete.
-         * A symbol cannot collide with WeChat or Taro's string-named Page options, and config-local ownership avoids route maps,
-         * a runtime-wide WeakMap, or state shared by two Page configs. The state becomes unreachable together with the config.
-         */
-        config[pageHmrStateKey] = state
-
-        config.onUnload = function (this: NativePage, ...args: unknown[]) {
-            if (state.isReregistering) {
-                return
-            }
-
-            forward(originalOnUnload, this, args)
-            state.mountedPage = undefined
-        }
-
-        config.onLoad = function (this: NativePage, ...args: unknown[]) {
-            if (state.isReregistering) {
-                return
-            }
-
-            forward(originalOnLoad, this, args)
-            state.mountedPage = this
-        }
-
-        config.onShow = function (this: NativePage, ...args: unknown[]) {
-            if (state.isReregistering) {
-                state.isReregistering = false
-                return
-            }
-
-            forward(originalOnShow, this, args)
-        }
-
-        return config
-    }
-
-    /** Applies one Page-delivered payload before its native shell registers the static route configuration. */
-    applyPatches(payload: PatchPayload | undefined): void {
-        // The initial physical dependency exports undefined until the host has a patch range.
-        if (!payload) return
-
+    /**
+     * Applies one mode-delivered cumulative payload through its mode-specific patch installer.
+     *
+     * Application is deliberately synchronous: once a mode exposes a payload, the generated entry code that follows must resolve
+     * imports against the newly installed factories. The installer is the only mode seam; sequence validation and ACK timing stay
+     * here so no delivery can accidentally report visibility as successful application.
+     */
+    protected applyPatchPayload<Patch extends RuntimePatch>(
+        payload: Readonly<{ buildId: string; patches: readonly Patch[] }>,
+        installPatch: (patch: Patch) => void
+    ): void {
         const session = this.session
         if (!session || payload.buildId !== session.buildId) {
             console.warn('[vpt] patches for a stale build')
             return
         }
 
-        // Apply synchronously: the page's imports below the require resolve against the
-        // freshly registered modules, so the re-executed Page evaluates with the new code.
-        if (this.applyPatchBatch(session, payload.patches)) {
-            // The host may publish later generations while this synchronous apply runs. Reporting only afterward makes this
-            // the application frontier: publisher history is never pruned merely because its JavaScript file was observed.
+        if (this.applyPatchBatch(session, payload.patches, installPatch)) {
+            // The host may publish later generations while synchronous application runs. Reporting only afterward makes this the
+            // application frontier: journal history is never pruned merely because a delivery became observable.
             void this.sendReport({ kind: 'applied', seq: session.appliedSeq })
         }
     }
 
     /**
-     * Folds one cumulative physical patch file into a single logical HMR update.
+     * Folds one cumulative mode delivery into a single logical HMR update.
      *
-     * `hmr/patches.js` can contain several unacknowledged application patches and can be required by several Page shells. The
-     * runtime must therefore ignore replayed sequences, reject a missing sequence, and move directly from the currently live
-     * module generation to the latest published generation without rendering intermediate generations.
+     * A delivery may contain several unacknowledged application patches and may be replayed by its mode—for DevTools, every
+     * affected live Page evaluates the same physical file. The runtime therefore ignores old sequences, rejects a missing one,
+     * and moves directly from the live module generation to the latest published one without intermediate renders.
      *
      * For an appliedSeq of 4:
      *
-     * - [5, 6, 7] registers every factory, performs one update using their unioned changedIds, commits appliedSeq 7, and reports 7;
-     * - a second Page evaluating [5, 6, 7] skips the complete replay and leaves the latest factories untouched;
-     * - [5, 7] fails at the expected sequence 6, keeps appliedSeq 4, and requests a full rebuild because factory 6 is unrecoverable.
+     * - [5, 6, 7] installs every patch, applies their unioned changedIds, commits appliedSeq 7, and reports 7;
+     * - a replay of [5, 6, 7] leaves the latest factories untouched;
+     * - [5, 7] fails at expected sequence 6, keeps appliedSeq 4, and requests a complete rebuild.
      */
-    private applyPatchBatch(session: HmrSession, patches: readonly PatchProgram[]): boolean {
+    private applyPatchBatch<Patch extends RuntimePatch>(
+        session: HmrSession,
+        patches: readonly Patch[],
+        installPatch: (patch: Patch) => void
+    ): boolean {
         // Keep the initial watermark immutable throughout the fold. Comparing replays against a moving watermark would allow
         // a duplicate new sequence in the same payload to masquerade as an already-applied patch.
         const previousSeq = session.appliedSeq
@@ -388,21 +286,21 @@ class WxDevRuntime extends DevRuntime {
 
         try {
             for (const patch of patches) {
-                // The same physical file is evaluated once per affected Page. Those later evaluations replay its prefix and
-                // must not let an old factory overwrite the newer factory already stored in the Rolldown runtime.
+                // Replayed delivery prefixes must not let an old installation overwrite newer factories already stored in the
+                // Rolldown runtime.
                 if (patch.seq <= previousSeq) {
                     continue
                 }
 
-                // Every patch is incremental: if one physical write was missed, later factories cannot reconstruct modules
-                // changed only by that missing patch. Rebuilding is safer than silently running a mixed module generation.
+                // Every patch is incremental: if one delivery was missed, later patches cannot reconstruct modules changed only
+                // by that missing sequence. Rebuilding is safer than silently running a mixed module generation.
                 if (patch.seq !== nextSeq) {
                     throw new Error(`missing patch sequence ${nextSeq}`)
                 }
 
-                // A patch factory only registers module graphs and module factories; it does not execute application modules.
-                // Running all of them first leaves the registry at the latest generation while avoiding intermediate renders.
-                patch.factory()
+                // Mode installation registers module graphs and factories without executing application modules. Running every
+                // installer first leaves the registry at the latest generation while avoiding intermediate renders.
+                installPatch(patch)
 
                 for (const changedId of patch.changedIds) {
                     changedIds.add(changedId)
@@ -418,7 +316,7 @@ class WxDevRuntime extends DevRuntime {
 
             // Apply once after every factory is registered. React Refresh arms a newly executed module's hot.accept callback
             // in a microtask; applying consecutive patches separately would inspect that intermediate context too early and
-            // incorrectly bubble through the capsule to the native Page shell as though no HMR boundary existed.
+            // incorrectly bubble through the accepting capsule as though no HMR boundary existed.
             this.applyHmrUpdate(changedIds)
 
             // Commit application only after graph propagation and boundary callbacks succeed. A failure leaves the old watermark
@@ -426,6 +324,8 @@ class WxDevRuntime extends DevRuntime {
             session.appliedSeq = nextSeq - 1
             return true
         } catch (error) {
+            // An installer may already have replaced some factories and the module registry has no inverse operation. Keep the
+            // old application watermark unacknowledged and request a complete build, the only coherent rollback boundary.
             console.warn('[vpt] patch batch failed; apply stopped', error)
             void this.sendReport({
                 kind: 'rebuild',
@@ -435,7 +335,10 @@ class WxDevRuntime extends DevRuntime {
         }
     }
 
-    /** Sends one metadata-only report to the host; executable code never travels over HTTP. */
+    /**
+     * Sends one metadata-only application frontier or rebuild request to the shared host endpoint. Executable factories never
+     * travel over HTTP, and the host prunes its cumulative journal only after this request reports successful application.
+     */
     private sendReport(data: Record<string, unknown>): Promise<void> {
         const session = this.session
         if (!session) {
@@ -459,6 +362,3 @@ class WxDevRuntime extends DevRuntime {
         })
     }
 }
-
-const runtime = new WxDevRuntime()
-;(globalThis as { __rolldown_runtime__?: WxDevRuntime }).__rolldown_runtime__ = runtime

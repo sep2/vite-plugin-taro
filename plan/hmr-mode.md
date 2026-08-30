@@ -2,7 +2,7 @@
 
 ## Status
 
-Design only. The first implementation phase refactors the existing WeChat DevTools HMR behavior into the `devtools` mode. It does not add an interpreter, source-over-HTTP delivery, fallback behavior, or a second executable mode.
+Phase 1 implemented: the existing WeChat DevTools HMR behavior is isolated behind the `devtools` mode and the shared host/runtime abstractions are in place. No interpreter, source-over-HTTP delivery, fallback behavior, or second executable mode is included.
 
 ## Objective
 
@@ -26,24 +26,11 @@ A WX development server and its App heap use exactly one HMR mode. Modes are alt
 
 The mode is resolved before Vite creates the development host. The same immutable mode descriptor is then passed to plugin creation, Rolldown option installation, and host creation.
 
-### Expose only implemented configuration
+### Defer public mode selection
 
-The initial public option accepts only `devtools`:
+Only `devtools` exists, so `createWxDevelopmentPlugin()` constructs it directly. There is no public no-op option, one-entry registry, or selector abstraction.
 
-```ts
-export type VptHmrOptions = Readonly<{
-    mode: 'devtools'
-}>
-
-export interface VptOptions {
-    // Existing options remain unchanged.
-    hmr?: VptHmrOptions
-}
-```
-
-Omitting `hmr` resolves to `{ mode: 'devtools' }`. This preserves the current user experience while allowing callers and tests to select the mode explicitly.
-
-Do not add `'interpreter'` to the exported type until that implementation exists. When another implementation is ready, `VptHmrOptions` can become a discriminated union.
+Add public mode configuration and composition selection only when a second implementation exists. That change will select one descriptor before host construction without introducing mode checks into the update path.
 
 ### Select by composition, not runtime conditionals
 
@@ -112,25 +99,19 @@ The DevTools runtime owns:
 ### Mode descriptor
 
 ```ts
-export type WxHmrEntryBanner = (
-    chunk: Readonly<{
-        name: string
-        fileName: string
-    }>
-) => string
-
-export type WriteDevelopmentFile = (fileName: string, source: string) => Promise<void>
-
 export type WxHmrMode = Readonly<{
-    mode: 'devtools'
     runtimeFile: string
-    createDelivery: (writeFile: WriteDevelopmentFile) => WxHmrDelivery
-    createEntryBanner: (pageFiles: ReadonlySet<string>) => WxHmrEntryBanner
-    createPlugins: () => PluginOption[]
+    plugins: readonly Plugin[]
+    createDelivery: (
+        writeFile: (fileName: string, source: string) => Promise<void>
+    ) => WxHmrDelivery
+    createEntryBanner: (
+        pageFiles: ReadonlySet<string>
+    ) => (chunk: Readonly<{ name: string; fileName: string }>) => string
 }>
 ```
 
-`createPlugins()` returns fresh Vite plugin descriptors for each Vite configuration. The immutable mode descriptor itself may be shared.
+The descriptor contains only behavior that differs by implementation. A fresh descriptor is created for each Vite plugin composition.
 
 ### Delivery contract
 
@@ -190,18 +171,13 @@ export type RuntimePatch = Readonly<{
     seq: number
     changedIds: string[]
 }>
-
-export type RuntimePatchPayload<Patch extends RuntimePatch> = Readonly<{
-    buildId: string
-    patches: readonly Patch[]
-}>
 ```
 
-The shared class exposes one protected method:
+The shared class exposes one protected method without another payload alias:
 
 ```ts
 protected applyPatchPayload<Patch extends RuntimePatch>(
-    payload: RuntimePatchPayload<Patch>,
+    payload: Readonly<{ buildId: string; patches: readonly Patch[] }>,
     installPatch: (patch: Patch) => void
 ): void
 ```
@@ -290,14 +266,14 @@ The initial DevTools delivery has no independent background resource and therefo
 
 ## Plugin composition
 
-`createWxTargetPlugins()` resolves one `WxHmrMode` and passes the same descriptor to `createWxDevelopmentPlugin()`.
+`createWxDevelopmentPlugin()` constructs the concrete DevTools descriptor once and closes over it for plugin, host, and Rolldown configuration.
 
 The development plugin list becomes:
 
 ```text
 common vpt:wx-dev plugin
 common Rolldown runtime lowering plugin
-mode.createPlugins()
+mode.plugins
 common React Refresh transforms
 ```
 
@@ -391,8 +367,7 @@ packages/vite-plugin-taro/src/node/plugins/wx/dev/
 ├── wx-dev-options.ts
 └── modes/
     └── devtools/
-        ├── devtools-hmr-mode.ts
-        └── devtools-patch-file.ts
+        └── devtools-hmr-mode.ts
 
 packages/vite-plugin-taro/src/runtime/wx/dev/
 ├── wx-hmr-runtime.ts
@@ -410,12 +385,7 @@ packages/vite-plugin-taro/src/runtime/wx/dev/
 - development App style rendering;
 - atomic physical file replacement.
 
-The following move to `devtools-patch-file.ts`:
-
-- `hmr/patches.js` name;
-- initial patch-module rendering;
-- cumulative physical patch rendering;
-- creation of the DevTools delivery.
+`devtools-hmr-mode.ts` owns the `hmr/patches.js` name, patch rendering, delivery, entry banners, and Page shell plugin together. These behaviors form one concrete implementation and do not need pass-through factories or one-function files.
 
 ## Test organization
 
@@ -454,16 +424,11 @@ Keep or create tests for:
 - exact Page shell selection;
 - `injectPageHmr()` insertion;
 - rejection of a Page shell without the stable registration contract;
-- fresh plugin descriptor creation.
-
-`devtools-patch-file.test.ts` covers:
-
-- initial CommonJS bytes;
-- cumulative CommonJS bytes;
+- fresh plugin descriptor creation;
+- initial and cumulative CommonJS bytes;
 - inert top-level patch representation;
 - empty publication rejection;
-- exact physical filename;
-- durable atomic replacement through the shared writer.
+- exact physical filename and delivery.
 
 ### Runtime tests
 
@@ -507,7 +472,6 @@ The existing real DevEngine and WeChat DevTools suites remain authoritative. The
 
 Update:
 
-- `docs/src/content/docs/guides/configuration.md` with the optional `hmr.mode` option and its `devtools` default;
 - `docs/src/content/docs/guides/hot-module-replacement.mdx` to identify the documented implementation as DevTools mode;
 - `docs/src/content/docs/references/hmr-implementation.md` to distinguish shared HMR concepts from DevTools-specific patch delivery.
 
@@ -536,16 +500,15 @@ The mode descriptor and all publication values are immutable.
 
 ## Implementation sequence
 
-1. Add `VptHmrOptions` with only `mode: 'devtools'` and resolve the omitted option to DevTools mode.
-2. Introduce the internal mode and delivery contracts.
+1. Introduce the small internal mode and delivery contracts.
+2. Construct DevTools mode directly during development plugin composition.
 3. Convert `PatchPublisher` into the structured, transport-independent `PatchJournal`.
-4. Move physical patch rendering and delivery into the DevTools mode.
-5. Pass the selected mode into plugin composition, `installWxDevOptions()`, and `createWxDevHost()`.
-6. Move Page shell transformation into the DevTools mode plugin.
-7. Split `WxHmrRuntime` from `DevtoolsHmrRuntime` and extract Page handoff state.
-8. Reorganize tests by shared and mode-specific ownership.
-9. Update user and implementation documentation.
-10. Run unit, integration, distribution, WX build, and DevTools stress verification.
+4. Move physical patch rendering, delivery, banners, and Page shell transformation into the DevTools mode.
+5. Pass the descriptor into `installWxDevOptions()` and `createWxDevHost()`.
+6. Split `WxHmrRuntime` from `DevtoolsHmrRuntime` and extract Page handoff state.
+7. Reorganize tests by shared and mode-specific ownership.
+8. Update implementation documentation.
+9. Run unit, integration, distribution, WX build, and DevTools stress verification.
 
 ## Verification commands
 
@@ -573,7 +536,7 @@ This phase does not:
 - change complete-build recovery;
 - change React Refresh semantics;
 - change Page re-registration semantics;
-- expose an unimplemented mode in public types;
+- expose mode configuration before another implementation exists;
 - alter production WX output.
 
 ## Completion criteria
@@ -584,6 +547,6 @@ The refactor is complete when:
 2. common host and runtime files contain no `hmr/patches.js` or Page re-registration assumptions;
 3. DevTools-specific files contain all physical patch and Page handoff behavior;
 4. no interpreter package or source-delivery code exists;
-5. omitted and explicit `hmr: { mode: 'devtools' }` configurations are behaviorally identical;
+5. no public selector or registry exists for the sole implementation;
 6. generated development artifacts remain byte-compatible with the current implementation;
 7. all automated unit, integration, build, and DevTools stress checks pass.

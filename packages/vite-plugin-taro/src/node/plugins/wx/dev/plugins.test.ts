@@ -2,14 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { resolveConfig } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
-import { pageShellPath } from '../module/module.ts'
 import { createWxStylePlugin } from '../styles/plugins.ts'
-import {
-    createWxDevelopmentPlugin,
-    injectPageShellHmr,
-    isWxClientEnvironment,
-    removeDevelopmentAppWxss
-} from './plugins.ts'
+import { createWxDevelopmentPlugin, isWxClientEnvironment, removeDevelopmentAppWxss } from './plugins.ts'
 
 const options: VptOptions = {
     target: 'wx',
@@ -25,7 +19,7 @@ test('assigns physical WX host ownership only to the client environment', () => 
     assert.equal(isWxClientEnvironment({ name: 'ssr' }), false)
 })
 
-test('preserves physical outputs across development host restarts', async () => {
+test('preserves physical outputs and composes the selected mode across development restarts', async () => {
     const config = await resolveConfig(
         {
             configFile: false,
@@ -35,17 +29,7 @@ test('preserves physical outputs across development host restarts', async () => 
     )
 
     assert.equal(config.build.emptyOutDir, false)
-
-    const pagePlugin = config.plugins.find((plugin) => plugin.name === 'vpt:wx-page-shell-hmr')
-    assert.ok(pagePlugin?.transform)
-    const pageTransform =
-        typeof pagePlugin.transform === 'function' ? pagePlugin.transform : pagePlugin.transform.handler
-    assert.equal(
-        await Reflect.apply(pageTransform, {}, ['Page(pageConfig)', '/project/runtime/wx/native/page.js?other']),
-        undefined
-    )
-    const transformed = await Reflect.apply(pageTransform, {}, ['Page(pageConfig)', pageShellPath])
-    assert.match(transformed.code, /injectPageHmr/)
+    assert.ok(config.plugins.some((plugin) => plugin.name === 'vpt:wx-page-shell-hmr'))
 })
 
 test('transfers the App style entry from complete output to the development host', () => {
@@ -59,15 +43,4 @@ test('transfers the App style entry from complete output to the development host
     removeDevelopmentAppWxss(bundle)
 
     assert.deepEqual(bundle, { 'assets/global.wxss': globalStyle })
-})
-
-test('injects Page HMR immediately before native registration', () => {
-    const result = injectPageShellHmr("import pageConfig from 'capsule'\nPage(pageConfig)")
-
-    assert.match(result.code, /Page\(__rolldown_runtime__\.injectPageHmr\(pageConfig\)\)$/)
-    assert.equal(result.map, null)
-})
-
-test('rejects a native Page shell without the stable registration contract', () => {
-    assert.throws(() => injectPageShellHmr('Page(config)'), /must register pageConfig/)
 })

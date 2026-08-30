@@ -77,7 +77,7 @@ test('keeps one rebuild dominant across a large acknowledgement storm', () => {
 
 test('bounds a large multi-page acknowledgement burst by build count', () => {
     // Ten thousand receipts model many retained Pages replaying file events. Only the maximum monotonic frontier per build may
-    // survive, so reducer memory and downstream PatchPublisher work remain independent of raw acknowledgement count.
+    // survive, so reducer memory and downstream PatchJournal work remain independent of raw acknowledgement count.
     const { publications, scheduler, stream } = createProbe()
     const reportCount = 10_000
     const buildCount = 23
@@ -131,7 +131,7 @@ test('flushes an admitted report when the host completes the stream', () => {
 test('serializes a report arriving during physical publication behind that publication', async () => {
     const scheduler = new VirtualTimeScheduler()
     const gate = Promise.withResolvers<void>()
-    // This journal models PatchPublisher mutation and proves the report callback never bypasses serialized host effects.
+    // This journal models PatchJournal mutation and proves the report callback never bypasses serialized host effects.
     const operations: string[] = []
     const actions = createHostActions<() => void | Promise<void>>(
         (action) => action(),

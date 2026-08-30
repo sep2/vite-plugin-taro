@@ -3,7 +3,7 @@ title: 热更新实现原理
 description: vpt 如何通过磁盘补丁、页面重载、React Refresh 和 Taro 页面交接，在微信开发者工具中保留运行状态。
 ---
 
-vpt 的微信热更新不是浏览器热模块替换（Hot Module Replacement，HMR）的移植。浏览器可以从开发服务器加载新的 JavaScript 地址，微信小程序则只能执行开发者工具编译过的项目文件。vpt 因此把更新写入 `dist/wx`，再借助开发者工具已有的页面热重载能力执行它。
+本页描述 vpt 当前的 `devtools` 热更新模式。vpt 的微信热更新不是浏览器热模块替换（Hot Module Replacement，HMR）的移植。浏览器可以从开发服务器加载新的 JavaScript 地址，微信小程序则只能执行开发者工具编译过的项目文件。`devtools` 模式因此把更新写入 `dist/wx`，再借助开发者工具已有的页面热重载能力执行它。
 
 整套设计可以概括为一句话：
 

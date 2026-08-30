@@ -10,6 +10,7 @@ import { createLogger, createServer } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import type { WxStylePlugin } from '../styles/plugins.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
+import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
 import type { BundledDev } from './wx-dev-options.ts'
 
 type DevHooks = Readonly<{
@@ -179,7 +180,12 @@ test('reduces synthetic engine update variants and unknown host failures without
     const originalAddress = httpServer.address
 
     try {
-        const host = await createWxDevHost({ server, options, styles })
+        const host = await createWxDevHost({
+            server: server,
+            options: options,
+            styles: styles,
+            hmrMode: createDevtoolsHmrMode()
+        })
         const bundledDev = requireBundledDev(server.environments.client.bundledDev)
 
         // Initial output has an HTTP object without a bound address, so no build identity is exposed yet.

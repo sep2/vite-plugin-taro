@@ -4,9 +4,8 @@ import { build } from 'rolldown'
 import { type DevEngine, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
-import { once } from '../../../utils/once.ts'
-import { resolveRuntimeFile } from '../../../utils/packages.ts'
-import { appShellFileName } from '../module/module.ts'
+import { memoize } from '../../../utils/memoize.ts'
+import type { WxHmrMode } from './hmr-mode.ts'
 
 type BundledDevRolldownOptions = InputOptions & {
     experimental?: {
@@ -30,11 +29,13 @@ export type BundledDev = {
 export function installWxDevOptions({
     bundledDev,
     server,
-    options
+    options,
+    hmrMode
 }: {
     bundledDev: BundledDev
     server: ViteDevServer
     options: VptOptions
+    hmrMode: WxHmrMode
 }): void {
     /*
      * Vite owns this mutable adapter method and calls it later when constructing DevEngine. Replacing that one seam preserves
@@ -54,9 +55,10 @@ export function installWxDevOptions({
         }
         const configured = configuredOutput ?? {}
 
-        // Every page entry must depend on hmr/patches.js: DevTools classifies a changed Page dependency as Page JavaScript
-        // hot reload and re-executes live Pages, which is the only physical patch trigger that preserves the App heap. Although
-        // Set provides O(1) membership, exposing it as ReadonlySet prevents mutation after this options generation is resolved.
+        // Entry banners run after Rolldown has assigned chunk names, so the mode needs route membership rather than source IDs.
+        // DevTools uses it to give every Page a physical `hmr/patches.js` dependency: changing that dependency is the only native
+        // JavaScript reload trigger that re-executes a live Page while preserving the App heap. ReadonlySet keeps lookup O(1) and
+        // prevents the resolved entry set from changing while Rolldown invokes the banner for later chunks.
         const pageFiles: ReadonlySet<string> = new Set(options.pages.map((page) => `${page.path}.js`))
 
         /*
@@ -69,11 +71,12 @@ export function installWxDevOptions({
             // Development output is overwritten in place after every complete build. Strip hash placeholders from the
             // configured asset pattern so old files cannot accumulate and native JSON/WXML references remain stable.
             assetFileNames: createStableFileNames(configured.assetFileNames, 'assets/[name][extname]'),
-            // Banners create physical CommonJS edges after graph analysis: App initializes the dev runtime and each Page
-            // consumes the stable patch journal without allowing those host-only files into the application chunk graph.
-            banner: createEntryBanner(pageFiles),
+            // These banners create physical CommonJS edges only after graph analysis. App initializes the selected runtime and
+            // Page entries consume its delivery before loading their capsules, while host-only metadata and patches stay outside
+            // the application chunk graph and therefore cannot affect placement or generate transport chunks of their own.
+            banner: hmrMode.createEntryBanner(pageFiles),
             // Preserve the configured directory/name shape while removing content hashes. Stable chunk paths let DevTools
-            // overwrite executable files and let cumulative HMR patches address one persistent physical module identity.
+            // overwrite executable files and keep one persistent physical module identity across complete builds.
             chunkFileNames: createStableFileNames(configured.chunkFileNames, 'assets/[name].js'),
             // Native entry paths are public Mini Program routes (`app.js`, `pages/.../index.js`); development must never hash
             // or relocate them because DevTools determines App/Page reload behavior from those exact filenames.
@@ -98,9 +101,11 @@ export function installWxDevOptions({
         rolldownOptions.experimental.devMode = {
             // Retain unknown user/forward-compatible devMode fields while the three explicit WX invariants below win.
             ...(typeof existingDevMode === 'object' ? existingDevMode : {}),
-            // Install the WX-adapted self-contained Rolldown runtime. It consumes physical patch journals and reports
-            // acknowledgements/rebuild requests through the host bridge instead of relying on browser globals or sockets.
-            implement: await bundleRuntimeSource(),
+            // Install the self-contained runtime selected once by the HMR mode. Nested bundling resolves all adapter imports into
+            // one implementation string because Rolldown injects it into a generated runtime chunk where ordinary module imports
+            // are unavailable. It reports metadata-only ACK/rebuild messages through the host bridge instead of browser sockets;
+            // executable patch factories remain in the mode's native delivery.
+            implement: await bundleRuntimeSource(hmrMode.runtimeFile),
             // Produce a complete output graph on the initial build. Lazy per-request compilation cannot establish the closed
             // App/Page graph, native companions, style sidecars, and build identity required before any patch is admitted.
             lazy: false,
@@ -138,24 +143,6 @@ function ensureSingleOutput(rolldownOptions: BundledDevRolldownOptions): OutputO
     // Rolldown needs the created object attached to input options by identity; returning a detached fallback would be ignored.
     rolldownOptions.output ??= {}
     return rolldownOptions.output
-}
-
-/**
- * Prepends entry banners after Rolldown's analysis so their native requires remain physical dependencies rather than chunk
- * graph edges. The App initializes the runtime identity, while every Page explicitly applies the watched patch data before its
- * native Page registration.
- */
-function createEntryBanner(pageFiles: ReadonlySet<string>): (chunk: { name: string; fileName: string }) => string {
-    return (chunk) => {
-        if (chunk.name === appShellFileName) {
-            return "__rolldown_runtime__.initialize(require('./hmr/info.js'));\n"
-        }
-        if (pageFiles.has(chunk.name)) {
-            const patchesPath = path.posix.relative(path.posix.dirname(chunk.fileName), 'hmr/patches.js')
-            return `__rolldown_runtime__.applyPatches(require('${patchesPath}'));\n`
-        }
-        return ''
-    }
 }
 
 function createStableFileNames<Value>(addon: unknown, fallback: string): string | ((value: Value) => string) {
@@ -210,15 +197,14 @@ function createViteReporter(server: ViteDevServer) {
 }
 
 /*
- * once owns a mutable cached Promise, justified because getRolldownOptions may run for multiple complete generations while the
- * runtime input and build options remain immutable for the process lifetime. Sharing the in-flight/result Promise prevents
- * concurrent options requests from launching duplicate nested builds; caching source instead of a Rolldown output object avoids
- * leaking mutable bundle metadata between engines.
+ * memoize owns one mutable Promise per runtime path. getRolldownOptions may run for multiple complete generations, and separate
+ * Vite servers may select different mode entries in one process. Sharing each in-flight/result Promise prevents duplicate nested
+ * builds without leaking mutable Rolldown output objects between engines.
  */
-const bundleRuntimeSource = once(async function bundleRuntimeSource(): Promise<string> {
+const bundleRuntimeSource = memoize(async function bundleRuntimeSource(runtimeFile: string): Promise<string> {
     // write: false keeps this nested helper build from creating a second dist directory in the application project.
     const result = await build({
-        input: resolveRuntimeFile('wx/dev/dev-runtime'),
+        input: runtimeFile,
         output: { format: 'iife', minify: true, sourcemap: false },
         write: false
     })

@@ -3,33 +3,13 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import {
-    type PatchUpdate,
-    renderDevelopmentAppWxss,
-    renderHmrPatches,
-    renderInitialHmrPatches,
-    writeHmrFile
-} from './hmr-files.ts'
+import { renderDevelopmentAppWxss, renderHmrInfo, writeDevelopmentFile } from './hmr-files.ts'
 
-const patch: PatchUpdate = {
-    type: 'Patch',
-    code: 'registerLatestFactory()',
-    filename: 'pages/index.js',
-    changedIds: ['src/page.tsx'],
-    seq: 1
-}
-
-test('renders initial and cumulative patches as inert CommonJS data', () => {
-    assert.equal(renderInitialHmrPatches(), 'module.exports = undefined;\n')
-
-    const source = renderHmrPatches('build', [patch])
-    assert.match(source, /^module\.exports = \{buildId: "build", patches:/)
-    assert.match(source, /registerLatestFactory\(\)/)
-    assert.doesNotMatch(source, /^__rolldown_runtime__/)
-})
-
-test('rejects an empty cumulative patch range', () => {
-    assert.throws(() => renderHmrPatches('build', []), /Cannot render an empty WX patch range/)
+test('renders frozen CommonJS build metadata', () => {
+    assert.equal(
+        renderHmrInfo({ buildId: 'build', endpoint: 'http://localhost/hmr' }),
+        'module.exports = Object.freeze({"buildId":"build","endpoint":"http://localhost/hmr"});\n'
+    )
 })
 
 test('revises the development App style entry for each complete build', () => {
@@ -37,20 +17,20 @@ test('revises the development App style entry for each complete build', () => {
     assert.notEqual(renderDevelopmentAppWxss('build-one'), renderDevelopmentAppWxss('build-two'))
 })
 
-test('atomically replaces a complete HMR module without leaving temporary files', async () => {
+test('atomically replaces a complete development file without leaving temporary files', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-hmr-file-'))
-    const fileName = 'hmr/patches.js'
+    const fileName = 'hmr/info.js'
     const filePath = path.join(root, fileName)
 
     try {
-        await writeHmrFile(root, fileName, 'old generation')
+        await writeDevelopmentFile(root, fileName, 'old generation')
         const previousInode = (await fs.stat(filePath)).ino
 
-        await writeHmrFile(root, fileName, 'new generation')
+        await writeDevelopmentFile(root, fileName, 'new generation')
 
         assert.equal(await fs.readFile(filePath, 'utf8'), 'new generation')
         assert.notEqual((await fs.stat(filePath)).ino, previousInode)
-        assert.deepEqual(await fs.readdir(path.dirname(filePath)), ['patches.js'])
+        assert.deepEqual(await fs.readdir(path.dirname(filePath)), ['info.js'])
     } finally {
         await fs.rm(root, { force: true, recursive: true })
     }

@@ -21,7 +21,7 @@ export type RuntimeReport = AppliedReport | RebuildReport
  * Reports are metadata frontiers rather than executable deltas: for one build, the highest applied sequence subsumes lower and
  * duplicate acknowledgements. A rebuild does not subsume reports from a different build, because delayed Pages may still POST
  * after session rotation, but it dominates every acknowledgement for its own build. The host validates each retained build ID
- * against the physical publisher only when its serialized task executes, preserving rotation order.
+ * against the active patch journal only when its serialized task executes, preserving rotation and publication order.
  *
  * Completing the Subject flushes the active window synchronously so shutdown can include its host task before closing Rolldown.
  * Reduction is O(reports) time and O(distinct builds) retained space per quiet window.
@@ -34,7 +34,7 @@ export function createRuntimeReportsStream(
     /*
      * This Subject is the sole mutable HTTP admission edge. Requests append reports synchronously and finish their responses;
      * buffer then owns the short-lived window while debounceTime supplies only its quiet-edge signal. Reports are metadata rather
-     * than executable deltas, so the window may be reduced before entering hostActions. Directly mutating PatchPublisher from the
+     * than executable deltas, so the window may be reduced before entering hostActions. Directly mutating PatchJournal from the
      * request stack would race patch writes and build rotation; retaining every raw receipt beyond the window would grow with Page
      * count and duplicate acknowledgements. Completion flushes the final window during phased shutdown.
      */

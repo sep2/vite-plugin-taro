@@ -5,7 +5,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { type DevEngine, dev } from 'rolldown/experimental'
 import { createServer, normalizePath } from 'vite'
-import { globalWxssFileName, writeHmrFile } from '../dev/hmr-files.ts'
+import { globalWxssFileName, writeDevelopmentFile } from '../dev/hmr-files.ts'
 import type { BundledDev } from '../dev/wx-dev-options.ts'
 import { createWxStylePlugin } from './plugins.ts'
 
@@ -40,7 +40,7 @@ test('publishes processed CSS and live topology without identical rewrites', asy
             writeFailure = undefined
             throw error
         }
-        await writeHmrFile(outDir, globalWxssFileName, wxss)
+        await writeDevelopmentFile(outDir, globalWxssFileName, wxss)
         publishedStyles.push(wxss)
     }
     const publish = (result: unknown, results: unknown[], deliveredFileNames: readonly string[]): void => {
@@ -223,7 +223,7 @@ test('renders Tailwind CSS and final patch factories from one class set', async 
     let engine: DevEngine
     const styles = createWxStylePlugin([appId])
     const writeStyle = async (wxss: string): Promise<void> => {
-        await writeHmrFile(outDir, globalWxssFileName, wxss)
+        await writeDevelopmentFile(outDir, globalWxssFileName, wxss)
         publishedStyles.push(wxss)
     }
     const server = await createServer({

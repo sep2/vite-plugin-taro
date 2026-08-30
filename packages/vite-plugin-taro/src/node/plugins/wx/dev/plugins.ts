@@ -1,12 +1,12 @@
-import { normalizePath, type PluginOption, transformWithOxc } from 'vite'
+import { type PluginOption, transformWithOxc } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
-import { normalizeModuleId } from '../../../utils/modules.ts'
-import { pageShellPath, rolldownRuntimeId } from '../module/module.ts'
+import { rolldownRuntimeId } from '../module/module.ts'
 import type { WxStylePlugin } from '../styles/plugins.ts'
 import { createWxDevHost, type WxDevHost } from './dev-host.ts'
 import { developmentAppWxssFileName } from './hmr-files.ts'
+import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
 import { createWxReactRefreshTransforms } from './react-refresh.ts'
 
 /** Selects the sole Vite environment that owns the physical Mini Program development project. */
@@ -15,13 +15,17 @@ export function isWxClientEnvironment(environment: Readonly<{ name: string }>): 
 }
 
 /**
- * Adds the serve-only bundled-development plugin set for the wx target: the dev adapter,
- * Page HMR activation, and React Refresh adaptation transforms.
+ * Adds the serve-only bundled-development plugin set for the wx target: the shared dev adapter, selected HMR mode, and React
+ * Refresh adaptation transforms.
  *
  * The shared style pipeline already owns the resolver's ordered App/Page cascade policy, so the host does not reconstruct it
  * from unrelated Rolldown shell and transport entries.
  */
 export function createWxDevelopmentPlugin(options: VptOptions, styles: WxStylePlugin): PluginOption[] {
+    // DevTools is the sole implementation today, so compose it once here rather than introducing a one-entry selector. The same
+    // descriptor then configures plugins, host delivery, and runtime bundling without a mode branch on each update.
+    const hmrMode = createDevtoolsHmrMode()
+
     /*
      * Vite creates this plugin descriptor before a server or DevEngine exists, then invokes configureServer and closeBundle on
      * different lifecycle stacks. This mutable handle transfers the one client-owned host between those hooks: configureServer
@@ -30,9 +34,6 @@ export function createWxDevelopmentPlugin(options: VptOptions, styles: WxStylePl
      * in closeBundle would lose every live action, patch, style, and client frontier owned by the running instance.
      */
     let host: WxDevHost | null = null
-    // Portable hook filters stay broad; these exact identities exclude similarly named user modules.
-    const normalizedPageShellPath = normalizePath(pageShellPath)
-
     return [
         {
             name: 'vpt:wx-dev',
@@ -45,12 +46,11 @@ export function createWxDevelopmentPlugin(options: VptOptions, styles: WxStylePl
                 return {
                     build: {
                         // The development output is the live Mini Program project opened by WeChat DevTools, not a disposable
-                        // build artifact. Deleting and recreating its directory tree during a dev-server restart disrupts
-                        // DevTools' hot-reload watcher; recreating the same paths does not reliably attach that watcher again.
-                        // The host then continues writing hmr/patches.js, but DevTools no longer observes it and therefore never
-                        // re-executes the Page shell that consumes and acknowledges the patches. Keep the watched paths present
-                        // across host restarts and let the initial complete build overwrite active outputs. This plugin applies
-                        // only to `serve`; production builds retain Vite's normal output cleanup.
+                        // build artifact. Deleting and recreating its directory tree during a dev-server restart detaches the
+                        // DevTools watcher; recreating identical paths does not reliably reattach it. The host would keep writing
+                        // `hmr/patches.js`, but no Page shell would re-execute to consume or acknowledge those patches. Preserve
+                        // watched paths and let the initial complete build overwrite their contents. This plugin is serve-only,
+                        // so production builds retain Vite's normal output cleanup.
                         emptyOutDir: false,
                         // Disable maps in resolved environment config as well as final output so Oxc and Babel skip producing
                         // intermediate maps that Rolldown would discard.
@@ -72,7 +72,8 @@ export function createWxDevelopmentPlugin(options: VptOptions, styles: WxStylePl
                     host = await createWxDevHost({
                         server: server,
                         options: options,
-                        styles: styles
+                        styles: styles,
+                        hmrMode: hmrMode
                     })
                 }
             },
@@ -112,18 +113,7 @@ export function createWxDevelopmentPlugin(options: VptOptions, styles: WxStylePl
                 }
             }
         },
-        {
-            name: 'vpt:wx-page-shell-hmr',
-            apply: 'serve',
-            transform: {
-                order: 'post',
-                filter: { id: /\/runtime\/wx\/native\/page\.(?:js|ts)(?:\?|$)/ },
-                handler(code, id) {
-                    if (normalizeModuleId(id) !== normalizedPageShellPath) return
-                    return injectPageShellHmr(code)
-                }
-            }
-        },
+        ...hmrMode.plugins,
         ...createWxReactRefreshTransforms()
     ]
 }
@@ -139,25 +129,13 @@ export function createWxDevelopmentPlugin(options: VptOptions, styles: WxStylePl
  * 3. let the host replace the wrapper again with the new build ID, causing a second App reload.
  *
  * Deleting only the in-memory bundle entry avoids both premature writes. Development sets `emptyOutDir: false`, so the prior
- * physical `app.wxss` remains available while the complete output is written. The host replaces it exactly once after
- * `hmr/patches.js` and `hmr/info.js` are durable. Incremental HMR never enters this complete-output hook and continues changing
- * only `assets/global.wxss`, which preserves the App heap. The serve-only plugin leaves production output unchanged.
+ * physical `app.wxss` remains available while the complete output is written. The host replaces it exactly once after the
+ * selected delivery has reset `hmr/patches.js` and the matching `hmr/info.js` identity is durable. Incremental HMR never enters
+ * this complete-output hook and changes only `assets/global.wxss`; rewriting the App root would reload the heap while a JavaScript
+ * patch is awaiting acknowledgement. The serve-only plugin leaves production output unchanged.
  */
 export function removeDevelopmentAppWxss(bundle: Record<string, unknown>): void {
     delete bundle[developmentAppWxssFileName]
-}
-
-/** Injects the retained snapshot at the exact native Page registration edge. */
-export function injectPageShellHmr(code: string): { code: string; map: null } {
-    const registration = 'Page(pageConfig)'
-    if (!code.includes(registration)) {
-        throw new Error('WX native Page shell must register pageConfig')
-    }
-
-    return {
-        code: code.replace(registration, 'Page(__rolldown_runtime__.injectPageHmr(pageConfig))'),
-        map: null
-    }
 }
 
 /*

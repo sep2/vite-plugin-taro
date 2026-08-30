@@ -132,8 +132,8 @@ function createReactDevtoolsHookVisitor(editor: RolldownMagicString): WalkerEnte
  * modules load. wx has no HTML document or preamble, so nothing performs that bootstrap.
  * The call must live in the refresh runtime module itself:
  * - this module's closure owns `helpersByRendererID`, mounted roots, and the update helpers;
- * - the wx dev-runtime chunk cannot call into it because the refresh module is in a later,
- *   lazily loaded chunk and does not exist when the dev-runtime chunk evaluates.
+ * - the selected WX HMR runtime chunk cannot call into it because the refresh module is in a later, lazily loaded chunk and
+ *   does not exist when the HMR runtime chunk evaluates.
  *
  * Unlike the preamble's `$RefreshReg$` globals, which boundary modules replace with local
  * wrappers, the renderer-hook machinery has no local equivalent. Without this injected call,

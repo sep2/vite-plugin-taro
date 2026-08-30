@@ -3,7 +3,7 @@ import test from 'node:test'
 import type { DevOptions } from 'rolldown/experimental'
 import { VirtualTimeScheduler } from 'rxjs'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
-import type { PatchUpdate } from './hmr-files.ts'
+import type { PatchUpdate } from './hmr-protocol.ts'
 
 type HmrUpdatesResult = Parameters<NonNullable<DevOptions['onHmrUpdates']>>[0]
 type HmrUpdates = Exclude<HmrUpdatesResult, Error>

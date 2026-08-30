@@ -10,18 +10,15 @@ import { createHmrResultsStream } from './create-hmr-results-stream.ts'
 import {
     developmentAppWxssFileName,
     globalWxssFileName,
-    type HmrInfo,
-    hmrControlPath,
     hmrInfoFileName,
-    hmrPatchesFileName,
-    type PatchUpdate,
     renderDevelopmentAppWxss,
     renderHmrInfo,
-    renderInitialHmrPatches,
-    writeHmrFile
+    writeDevelopmentFile
 } from './hmr-files.ts'
+import type { WxHmrDelivery, WxHmrMode } from './hmr-mode.ts'
+import { type HmrInfo, hmrControlPath, type PatchUpdate } from './hmr-protocol.ts'
 import { createHostActions } from './host-actions.ts'
-import { PatchPublisher } from './patch-publisher.ts'
+import { PatchJournal } from './patch-journal.ts'
 import { createRuntimeReportsStream, type RuntimeReport } from './runtime-reports.ts'
 import { type BundledDev, installWxDevOptions, requireSingleOutput } from './wx-dev-options.ts'
 
@@ -42,26 +39,31 @@ type HostAction =
     | OutputAction
     | Readonly<{ kind: 'listening' }>
 
-/** One short trailing-edge window absorbs editor bursts before style preparation and physical Page notification. */
+/**
+ * One frame-sized trailing edge folds an editor burst into one style/delivery transaction. The upstream result stream retains
+ * every Rolldown payload in order, so settling reduces redundant physical writes without dropping factories or sequence numbers.
+ */
 const hmrSettleMilliseconds = 16
 
 /**
- * Creates the wx dev host: the adapter that owns the physical Rolldown DevEngine (created
- * with dev(...)) and the patch publisher, and replaces Vite's bundledDev.listen so the
- * engine writes directly to the Mini Program output directory instead of serving browser
- * HMR over HTTP.
+ * Creates the WX dev host: the adapter that owns the physical Rolldown DevEngine, shared patch journal, and selected delivery.
+ * It replaces Vite's browser-oriented `bundledDev.listen()` because a Mini Program cannot fetch executable updates from Vite's
+ * module URLs; its engine must write a complete native project and let the selected mode make patches executable there.
  *
  * The shared style plugin carries the resolver's immutable App/Page cascade policy while Rolldown remains authoritative for
- * every live import edge.
+ * every live import edge. Keeping those responsibilities in the same serialized host transaction prevents JavaScript factories,
+ * physical WXSS, and Rolldown's published frontier from describing different source generations.
  */
 export async function createWxDevHost({
     server,
     options,
-    styles
+    styles,
+    hmrMode
 }: {
     server: ViteDevServer
     options: VptOptions
     styles: WxStylePlugin
+    hmrMode: WxHmrMode
 }): Promise<WxDevHost> {
     const bundledDev = getBundledDev(server)
 
@@ -70,20 +72,25 @@ export async function createWxDevHost({
         logWxError(server.config.logger, `wx HMR ${action.kind} failed`, error)
     )
 
-    const publisher = new PatchPublisher((content) =>
-        writeHmrFile(server.config.build.outDir, hmrPatchesFileName, content)
-    )
+    // Bind the generic mode to this server's one physical output root. The journal deliberately sees only structured patches,
+    // while the delivery deliberately sees only an atomic writer; this prevents sequencing/ACK logic from learning DevTools
+    // filenames and prevents mode code from mutating host state or advancing Rolldown before a write is durable.
+    const writeFile = (fileName: string, source: string) =>
+        writeDevelopmentFile(server.config.build.outDir, fileName, source)
+    const delivery = hmrMode.createDelivery(writeFile)
+    const journal = new PatchJournal((publication) => delivery.publish(publication))
 
-    // Option installation now configures only Rolldown. Build lifecycle results enter through the engine's output action below.
-    installWxDevOptions({ bundledDev, server, options })
+    // Option installation configures only Rolldown. Build lifecycle results enter through the engine's output action below.
+    installWxDevOptions({ bundledDev: bundledDev, server: server, options: options, hmrMode: hmrMode })
     const engine: DevEngine = await createEngine()
 
     const hmrResults = createHmrResultsStream(
         hmrSettleMilliseconds,
         asyncScheduler,
         (result) => {
-            // One reduced window becomes one existing host transaction: style preparation, one cumulative patch write, then
-            // ordered delivery notifications for every original Rolldown payload retained by the stream.
+            // One reduced window becomes one host transaction: style preparation, one cumulative mode publication, then ordered
+            // delivery notifications for every original Rolldown payload retained by the stream. The reduction changes physical
+            // write count only; notification count and order still match Rolldown's sequence frontier exactly.
             hostActions.next({ kind: 'publish', result: result })
         },
         (error) => {
@@ -98,8 +105,8 @@ export async function createWxDevHost({
     )
 
     const runtimeReports = createRuntimeReportsStream(hmrSettleMilliseconds, asyncScheduler, (reports) => {
-        // ACK conflation happens before admission, but publisher validation and mutation remain ordered with patch writes and
-        // build rotation. Reports arriving during publication therefore execute only after that physical transaction commits.
+        // ACK conflation happens before admission, but journal validation and mutation remain ordered with selected-mode
+        // delivery and build rotation. Reports arriving during publication execute only after that transaction commits.
         hostActions.next({ kind: 'reports', reports: reports })
     })
     /*
@@ -139,8 +146,8 @@ export async function createWxDevHost({
         hostActions.next({ kind: 'listening' })
     })
 
-    // The runtime's metadata-only reports land on the control path; the buildId in each report
-    // IS the Rolldown client ID.
+    // The runtime sends only application-frontier and rebuild metadata over this control path; executable code never travels over
+    // HTTP. Its buildId is also the Rolldown client ID, letting the same identity reject delayed reports and stale compiler updates.
     server.middlewares.use(hmrControlPath, (req, res) => void handleReport(req, res))
 
     installDevToolsPrinter(server)
@@ -159,7 +166,7 @@ export async function createWxDevHost({
 
     /** Atomically materializes the style plugin's prepared global artifact. */
     async function writeGlobalStyle(wxss: string): Promise<void> {
-        await writeHmrFile(server.config.build.outDir, globalWxssFileName, wxss)
+        await writeFile(globalWxssFileName, wxss)
     }
 
     /** Rotates the build identity and materializes the App metadata for it. */
@@ -171,13 +178,13 @@ export async function createWxDevHost({
             return
         }
 
-        const { buildId, previousBuildId } = publisher.startBuild()
+        const { buildId, previousBuildId } = journal.startBuild()
         if (previousBuildId) {
             await engine.removeClient(previousBuildId)
         }
         await engine.registerClient(buildId)
 
-        await publishBuildMetadata(server, buildId, port)
+        await publishBuildMetadata(server, buildId, port, delivery, writeFile)
     }
 
     /**
@@ -230,10 +237,15 @@ export async function createWxDevHost({
         await rotateBuildSession()
     }
 
-    /** Applies one runtime receipt to the active physical patch history. */
+    /**
+     * Applies one runtime receipt to the active shared patch journal.
+     *
+     * Publication alone never prunes history: only the runtime can prove installation, graph propagation, and accept callbacks
+     * completed. A rebuild report likewise enters this serialized edge so it cannot rotate the build during an in-flight write.
+     */
     function processReport(report: RuntimeReport): void {
         // Delayed reports from older builds must never prune the live build's cumulative patch history.
-        if (!publisher.isCurrentBuild(report.buildId)) {
+        if (!journal.isCurrentBuild(report.buildId)) {
             return
         }
 
@@ -243,7 +255,7 @@ export async function createWxDevHost({
                 return
             }
             case 'applied': {
-                publisher.acknowledge(report.seq)
+                journal.acknowledge(report.seq)
                 return
             }
         }
@@ -291,7 +303,7 @@ export async function createWxDevHost({
          */
         const patches: PatchUpdate[] = []
         for (const { clientId, update } of result.updates) {
-            if (!publisher.isCurrentBuild(clientId) || update.type === 'Noop') {
+            if (!journal.isCurrentBuild(clientId) || update.type === 'Noop') {
                 continue
             }
 
@@ -307,7 +319,7 @@ export async function createWxDevHost({
         await publishPatchBatch(patches)
     }
 
-    /** Publishes one coherent WXSS, patch-file, and Rolldown-frontier transaction. */
+    /** Publishes one coherent WXSS, selected-mode delivery, and Rolldown-frontier transaction. */
     async function publishPatchBatch(patches: readonly PatchUpdate[]): Promise<void> {
         if (patches.length === 0) {
             return
@@ -317,21 +329,21 @@ export async function createWxDevHost({
         // boundary finalizes every factory before atomically publishing their matching WXSS.
         const finalizedPatches = await styles.finalizeUpdate(patches, writeGlobalStyle)
 
-        // Publish global.wxss before the matching JavaScript patch so DevTools observes a coherent HMR transaction.
-        // The physical file must exist before Rolldown advances: once committed, later patches may be generated relative to
-        // this batch even if DevTools has not observed its file event yet. PatchPublisher keeps the unapplied range cumulative,
-        // so any later file generation still carries every factory needed to bridge the runtime's older application frontier.
-        await publisher.produce(finalizedPatches)
+        // Publish global.wxss before matching JavaScript delivery so the selected mode observes a coherent HMR transaction.
+        // Delivery must become durable before Rolldown advances: later patches may be generated relative to this batch even if
+        // the runtime has not applied it. PatchJournal retains the unapplied range, so every later publication still bridges the
+        // runtime's older application frontier.
+        await journal.produce(finalizedPatches)
 
         await commitPublishedBatch(finalizedPatches)
     }
 
     /**
-     * Advances Rolldown's published frontier in the same sequence order materialized in the cumulative physical file.
+     * Advances Rolldown's published frontier in the same sequence order materialized by cumulative mode delivery.
      *
-     * Given a batch [5, 6], publisher.produce has already made factories [5, 6] visible in hmr/patches.js. This method then
-     * commits payload 5 followed by payload 6. If DevTools observes neither event before sequence 7 is published, the next
-     * physical file contains [5, 6, 7], while Rolldown is free to generate 7 relative to its already-published sequence 6.
+     * Given a batch [5, 6], journal.produce has already made factories [5, 6] durable through the selected delivery. This
+     * method then commits payload 5 followed by payload 6. If the runtime observes neither publication before sequence 7, the
+     * next cumulative delivery contains [5, 6, 7], while Rolldown may generate 7 relative to its published sequence 6.
      */
     async function commitPublishedBatch(batch: readonly PatchUpdate[]): Promise<void> {
         // Do not use Promise.all or deduplicate filenames. Multiple sequential payloads may target the same output filename,
@@ -356,21 +368,33 @@ function boundPort(server: ViteDevServer): number | undefined {
     return address.port
 }
 
-/** Resets physical patches and then exposes one coherent build identity to a freshly compiled App heap. */
-async function publishBuildMetadata(server: ViteDevServer, buildId: string, port: number): Promise<void> {
+/**
+ * Exposes a complete build to a fresh App heap in dependency order.
+ *
+ * Delivery resets first so no Page can pair the new identity with factories from the previous build. `hmr/info.js` follows so
+ * the refreshed App can initialize the matching client, and `app.wxss` is written last because DevTools treats that root write as
+ * the refresh trigger. Reordering these writes creates a window where the App observes a mixed build generation.
+ */
+async function publishBuildMetadata(
+    server: ViteDevServer,
+    buildId: string,
+    port: number,
+    delivery: WxHmrDelivery,
+    writeFile: (fileName: string, source: string) => Promise<void>
+): Promise<void> {
     const info: HmrInfo = {
-        buildId,
+        buildId: buildId,
         endpoint: `${server.config.server.https ? 'https' : 'http'}://${resolveEndpointHost(server)}:${port}${hmrControlPath}`
     }
 
-    await writeHmrFile(server.config.build.outDir, hmrPatchesFileName, renderInitialHmrPatches())
-    await writeHmrFile(server.config.build.outDir, hmrInfoFileName, renderHmrInfo(info))
-    // `removeDevelopmentAppWxss` kept the previous physical wrapper in place while the complete output was written. Replace
-    // it only now, after the empty patch frontier and matching identity are durable. DevTools treats `app.wxss` as an App root,
-    // so this write intentionally causes the one full refresh allowed at a complete-build boundary; the refreshed App reads
-    // the new info above. Incremental updates must never write this file because an App refresh could destroy the heap while
-    // its JavaScript patch is being acknowledged. They publish only the imported `assets/global.wxss` stylesheet instead.
-    await writeHmrFile(server.config.build.outDir, developmentAppWxssFileName, renderDevelopmentAppWxss(buildId))
+    await delivery.reset()
+    await writeFile(hmrInfoFileName, renderHmrInfo(info))
+    // `removeDevelopmentAppWxss` kept the previous physical wrapper in place while the complete output was written. Replace it
+    // only now, after the selected delivery is empty and matching identity is durable. DevTools treats `app.wxss` as an App root,
+    // so this write intentionally causes the one full refresh allowed at a complete-build boundary; the refreshed App reads the
+    // new info above. Incremental updates must never write this file because an App refresh could destroy the heap while its
+    // JavaScript patch is being acknowledged. They publish only the imported `assets/global.wxss` stylesheet instead.
+    await writeFile(developmentAppWxssFileName, renderDevelopmentAppWxss(buildId))
 }
 
 /** Replaces browser server URLs with the physical project directory consumed by WeChat DevTools. */
