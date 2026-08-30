@@ -474,8 +474,8 @@ The existing real DevEngine and WeChat DevTools suites remain authoritative. The
 
 Update:
 
-- `docs/src/content/docs/guides/hot-module-replacement.mdx` to identify the documented implementation as DevTools mode;
-- `docs/src/content/docs/references/hmr-implementation.md` to distinguish shared HMR concepts from DevTools-specific patch delivery.
+- `../docs/src/content/docs/guides/hot-module-replacement.mdx` to identify the documented implementation as DevTools mode;
+- `../docs/src/content/docs/references/hmr-implementation.md` to distinguish shared HMR concepts from DevTools-specific patch delivery.
 
 Document both selectable modes, their shared guarantees, and interpreter runtime/performance tradeoffs. `devtools` remains the default.
 
