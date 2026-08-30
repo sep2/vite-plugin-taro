@@ -13,6 +13,8 @@ type HmrInfo = Readonly<{
     endpoint: string
 }>
 
+const runtimeReportEvent = 'vpt:wx-hmr:report'
+
 const burstProfile: HmrEditProfile = {
     applicationDelayMilliseconds: 4_000,
     intervalMilliseconds: readPositiveInteger('VPT_HMR_STRESS_INTERVAL_MS', 8),
@@ -129,19 +131,21 @@ async function sendReportStorm(info: HmrInfo, round: number, reportCount: number
             ? { kind: 'rebuild', buildId: info.buildId, reason: `automated-storm-${round}` }
             : { kind: 'applied', buildId: info.buildId, seq: reportCount - index }
     )
-    const responses = await Promise.all(
-        reports.map((report) =>
-            fetch(info.endpoint, {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify(report)
-            })
-        )
-    )
-    assert.equal(
-        responses.every((response) => response.status === 200),
-        true
-    )
+    const socket = await openReportSocket(info.endpoint)
+    for (const report of reports) {
+        socket.send(JSON.stringify({ type: 'custom', event: runtimeReportEvent, data: report }))
+    }
+    await waitFor(() => socket.bufferedAmount === 0, 1_000, 5)
+    socket.close()
+}
+
+async function openReportSocket(endpoint: string): Promise<WebSocket> {
+    const socket = new WebSocket(endpoint, ['vite-hmr'])
+    await new Promise<void>((resolve, reject) => {
+        socket.addEventListener('open', () => resolve(), { once: true })
+        socket.addEventListener('error', () => reject(new Error('HMR report socket failed to open')), { once: true })
+    })
+    return socket
 }
 
 async function readHmrInfo(infoPath: string): Promise<HmrInfo> {
