@@ -10,6 +10,7 @@ import { createLogger, createServer } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import type { WxStylePlugin } from '../styles/plugins.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
+import { hmrEndpointPath } from './hmr-protocol.ts'
 import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
 import type { BundledDev } from './wx-dev-options.ts'
 
@@ -173,6 +174,9 @@ test('reduces synthetic engine update variants and unknown host failures without
         build: {
             outDir,
             rolldownOptions: { input: appPath }
+        },
+        server: {
+            ws: { path: hmrEndpointPath }
         }
     })
     const httpServer = server.httpServer
@@ -211,7 +215,7 @@ test('reduces synthetic engine update variants and unknown host failures without
         const firstInfo = await waitForFile(path.join(outDir, hmrInfoFileName))
         const firstBuildId = /"buildId":"([^"]+)"/.exec(firstInfo)?.[1]
         assert.ok(firstBuildId)
-        assert.match(firstInfo, /http:\/\/127\.0\.0\.1:43123/)
+        assert.match(firstInfo, /ws:\/\/127\.0\.0\.1:43123/)
 
         addressCalls = 0
         httpServer.address = () => {
@@ -264,7 +268,7 @@ test('reduces synthetic engine update variants and unknown host failures without
         const nextBuildId = /"buildId":"([^"]+)"/.exec(nextInfo)?.[1]
         assert.ok(nextBuildId)
         assert.notEqual(nextBuildId, activeBuildId)
-        assert.match(nextInfo, /https:\/\/\[::1\]:43124/)
+        assert.match(nextInfo, /wss:\/\/\[::1\]:43124/)
         Reflect.set(server.config.server, 'https', originalHttps)
         styleFailure = Object.freeze({ kind: 'unknown-style-failure' })
         hooks.onHmrUpdates({

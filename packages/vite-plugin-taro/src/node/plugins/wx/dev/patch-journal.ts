@@ -42,7 +42,7 @@ export class PatchJournal {
         this.publishPatches = publishPatches
     }
 
-    /** Request-local view serialized synchronously when an interpreter socket reconnects; never retain it across host actions. */
+    /** Request-local view serialized synchronously when an interpreter socket first subscribes; never retain it across actions. */
     get current(): PatchPublication | undefined {
         if (this.buildId === undefined) {
             return undefined

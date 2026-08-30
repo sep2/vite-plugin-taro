@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { DevRuntime } from 'rolldown/experimental/runtime'
+import { runtimeReportEvent } from '../../wx-hmr-protocol.ts'
 
 type TestHotContext = Readonly<{
     _internal: Readonly<{
@@ -25,19 +26,18 @@ type TestRuntime = DevRuntime &
         moduleHotContexts: ReadonlyMap<string, TestHotContext>
         initialize: (info: { buildId: string; endpoint: string }) => void
         applyPatches: (payload: { buildId: string; patches: TestPatch[] } | undefined) => void
-        sendReport: (data: Record<string, unknown>) => Promise<void>
+        sendReport: (data: Record<string, unknown>) => void
     }>
 
-type CapturedRequest = Readonly<{
-    url: string
-    method: string
+type CapturedSocketMessage = Readonly<{
+    type: 'custom'
+    event: string
     data: unknown
-    header: Readonly<Record<string, string>>
 }>
 
 type TestHarness = Readonly<{
+    messages: CapturedSocketMessage[]
     reports: unknown[]
-    requests: CapturedRequest[]
     runtime: TestRuntime
 }>
 
@@ -46,28 +46,41 @@ let runtimeId = 0
 
 /** Creates one isolated runtime and captures only its metadata reports. */
 async function createTestHarness(): Promise<TestHarness> {
-    // These mutable request journals retain protocol metadata and report bodies emitted by one isolated runtime.
+    // These mutable values capture socket output and the one native open callback.
     const reports: unknown[] = []
-    const requests: CapturedRequest[] = []
+    const messages: CapturedSocketMessage[] = []
+    let openSocket = () => {}
+    const socket: WeChatSocketTask = {
+        send(options) {
+            const envelope = JSON.parse(String(options.data)) as CapturedSocketMessage
+            messages.push(envelope)
+            if (envelope.event === runtimeReportEvent) {
+                reports.push(envelope.data)
+            }
+        },
+        close() {},
+        onOpen(listener) {
+            openSocket = listener
+        },
+        onMessage() {}
+    }
     Object.assign(globalThis, {
         DevRuntime,
         wx: {
-            request(options: CapturedRequest & { success: () => void }): void {
-                requests.push({
-                    url: options.url,
-                    method: options.method,
-                    data: options.data,
-                    header: options.header
-                })
-                reports.push(options.data)
-                options.success()
+            connectSocket(): WeChatSocketTask {
+                return socket
             }
         }
     })
 
     const runtime = await importTestRuntime()
-    runtime.initialize({ buildId: 'build', endpoint: 'http://localhost/hmr' })
-    return { reports, requests, runtime }
+    runtime.initialize({ buildId: 'build', endpoint: 'ws://localhost/hmr' })
+    openSocket()
+    return {
+        messages: messages,
+        reports: reports,
+        runtime: runtime
+    }
 }
 
 async function importTestRuntime(): Promise<TestRuntime> {
@@ -170,7 +183,7 @@ test('ignores the initial empty physical patch module', async () => {
 })
 
 test('reports the committed application frontier through the exact host protocol', async () => {
-    const { requests, runtime } = await createTestHarness()
+    const { messages, runtime } = await createTestHarness()
     registerInitialModule({ runtime, moduleId: 'page', moduleExports: { value: 'old' } })
 
     runtime.applyPatches({
@@ -186,20 +199,19 @@ test('reports the committed application frontier through the exact host protocol
         ]
     })
 
-    assert.deepEqual(requests, [
+    assert.deepEqual(messages, [
         {
-            url: 'http://localhost/hmr',
-            method: 'POST',
-            data: { buildId: 'build', kind: 'applied', seq: 1 },
-            header: { 'content-type': 'application/json' }
+            type: 'custom',
+            event: runtimeReportEvent,
+            data: { buildId: 'build', kind: 'applied', seq: 1 }
         }
     ])
 })
 
 test('keeps the first App-heap identity when initialize is replayed', async (context) => {
     context.mock.method(console, 'warn', () => {})
-    const { requests, runtime } = await createTestHarness()
-    runtime.initialize({ buildId: 'replacement', endpoint: 'http://replacement/hmr' })
+    const { messages, runtime } = await createTestHarness()
+    runtime.initialize({ buildId: 'replacement', endpoint: 'ws://replacement/hmr' })
     registerInitialModule({ runtime, moduleId: 'page', moduleExports: { value: 'old' } })
 
     runtime.applyPatches({
@@ -228,9 +240,8 @@ test('keeps the first App-heap identity when initialize is replayed', async (con
     })
 
     assert.deepEqual(runtime.loadExports('page'), { value: 'current' })
-    assert.equal(requests.length, 1)
-    assert.equal(requests[0]?.url, 'http://localhost/hmr')
-    assert.deepEqual(requests[0]?.data, { buildId: 'build', kind: 'applied', seq: 1 })
+    assert.equal(messages.length, 1)
+    assert.deepEqual(messages[0]?.data, { buildId: 'build', kind: 'applied', seq: 1 })
 })
 
 test('retains hot contexts only after they become accepting boundaries', async () => {
@@ -254,29 +265,17 @@ test('fails invariant-only hot operations with local diagnostics', async () => {
     assert.throws(() => passiveContext.invalidate(), /the accepting module invalidated the update/)
 })
 
-test('rejects reports before initialization and propagates wx request failures', async () => {
+test('rejects reports before initialization', async () => {
     Object.assign(globalThis, {
         DevRuntime,
         wx: {
-            request(): void {
-                assert.fail('An uninitialized runtime must not issue a request')
+            connectSocket(): never {
+                assert.fail('An uninitialized runtime must not open a socket')
             }
         }
     })
     const uninitializedRuntime = await importTestRuntime()
     assert.throws(() => uninitializedRuntime.sendReport({ kind: 'applied', seq: 1 }), /runtime is not initialized/)
-
-    const { runtime } = await createTestHarness()
-    const requestFailure = new Error('wx request failed')
-    Object.assign(globalThis, {
-        wx: {
-            request(options: { fail: (error: unknown) => void }): void {
-                options.fail(requestFailure)
-            }
-        }
-    })
-
-    await assert.rejects(runtime.sendReport({ kind: 'applied', seq: 1 }), (error) => error === requestFailure)
 })
 
 test('keeps generated CSS hot operations inert because WXSS is replaced physically', async () => {

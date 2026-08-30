@@ -8,19 +8,14 @@ export type InterpreterPatch = RuntimePatch & {
     readonly code: string
 }
 
-/** Identifies the App heap when a new or reconnected socket asks for the journal's current suffix. */
+/** Identifies the App heap when its socket first asks for the journal's current suffix. */
 export type InterpreterSubscription = Readonly<{
     buildId: string
 }>
 
 /** Messages published by the host over Vite's existing WebSocket. */
-export type InterpreterServerMessage =
-    | Readonly<{
-          kind: 'patches'
-          buildId: string
-          patches: readonly InterpreterPatch[]
-      }>
-    | Readonly<{
-          kind: 'close'
-          reason: 'build replaced' | 'host closed'
-      }>
+export type InterpreterServerMessage = Readonly<{
+    kind: 'patches'
+    buildId: string
+    patches: readonly InterpreterPatch[]
+}>

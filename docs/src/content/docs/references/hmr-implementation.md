@@ -30,7 +30,7 @@ vpt 的微信热更新不是浏览器 HMR 的直接移植。两种模式共享 R
 
 ### 新代码需要环境允许的执行机制
 
-小程序不能把 `wx.request()` 收到的源码交给 `eval()` 或 `Function()`。`devtools` 因此先把补丁写入 `dist/wx`，由微信开发者工具编译为原生 JavaScript。`interpreter` 则把源码当作数据交给 Sval 的解析器和解释执行器，不调用动态代码生成 API。
+小程序不能把网络收到的源码交给 `eval()` 或 `Function()`。`devtools` 因此先把补丁写入 `dist/wx`，由微信开发者工具编译为原生 JavaScript。`interpreter` 则把源码当作数据交给 Sval 的解析器和解释执行器，不调用动态代码生成 API。
 
 解释器只存在于开发运行时。生产构建仍然全部是开发者工具可编译的静态项目文件。
 
@@ -61,7 +61,7 @@ React Refresh 不会把状态序列化后重建。它只能更新仍然存活的
 | Rolldown 开发引擎 | 监视源码，生成模块补丁或要求完整构建 |
 | vpt 开发主机 | 串行处理构建结果、样式、累计补丁、交付和运行时报告 |
 | DevTools 交付 | 把累计补丁渲染为 `hmr/patches.js` |
-| Interpreter 交付 | 通过 Vite WebSocket 推送累计日志，并在重连订阅时补发 |
+| Interpreter 交付 | 通过 Vite WebSocket 推送累计日志，并在首次订阅时补发当前值 |
 | App 模块运行时 | 保存模块图、缓存、热更新边界和已应用序号 |
 | Sval（仅 `interpreter`） | 解析并解释 Rolldown 模块注册程序与更新后的模块实现 |
 | React Refresh | 判断组件边界是否兼容，并更新现有 React 树 |
@@ -81,15 +81,13 @@ React Refresh 不会把状态序列化后重建。它只能更新仍然存活的
 
 ### 构建身份
 
-每次成功并交付给开发者工具的完整构建都有一个新的 `buildId`。主机把它和报告地址写入：
+每次成功并交付给开发者工具的完整构建都有一个新的 `buildId`。主机把它和已认证的 Vite WebSocket 地址写入：
 
 ```js
 // hmr/info.js
 module.exports = {
     buildId: '本次完整构建的唯一标识',
-    endpoint: 'http://127.0.0.1:<port>/__vpt_hmr__',
-    // 仅 interpreter 模式存在
-    socketEndpoint: 'ws://127.0.0.1:<port>/?token=<vite-token>'
+    endpoint: 'ws://127.0.0.1:<port>/__vpt_hmr__?token=<vite-token>'
 }
 ```
 
@@ -116,9 +114,9 @@ __rolldown_runtime__.applyPatches(
 
 ### `interpreter` 的 App 源码通道
 
-解释器模式不给 Page 添加补丁依赖，也不生成 `hmr/patches.js`。App 使用 `hmr/info.js` 中的地址连接 Vite 已有 WebSocket，并用 `buildId` 订阅当前日志。源码发布时，主机直接广播累计补丁；连接中断后，App 从原生关闭事件重新连接并再次订阅，主机补发仍未确认的日志后缀。
+解释器模式不给 Page 添加补丁依赖，也不生成 `hmr/patches.js`。App 连接 `hmr/info.js` 中的 WebSocket，并用 `buildId` 订阅当前日志。源码发布时，主机直接广播累计补丁；首次订阅时，主机补发仍未确认的日志后缀。
 
-空闲连接不产生轮询请求、心跳或插件定时器。构建身份切换和主机关闭也通过同一通道通知旧 App 停止监听。
+每个 App 运行环境只创建并保留一个原生 `SocketTask`，不会重建连接，也没有轮询、心跳或插件定时器。构建身份切换和主机关闭通过同一通道通知旧 App 关闭该连接。
 
 ### App 级运行时
 
@@ -135,7 +133,7 @@ __rolldown_runtime__.applyPatches(
                                                             ↓
                                       共享运行时验证并一次应用整个批次
                                                             ↓
-                                      React Refresh → POST 已应用序号
+                                      React Refresh → WebSocket 报告已应用序号
 ```
 
 `devtools` 随后还会完成 Page 生命周期交接；`interpreter` 的 Page 从未被重新注册。下面按共享顺序和模式差异展开。
@@ -162,9 +160,9 @@ __rolldown_runtime__.applyPatches(
 2. 让所选模式发布累计补丁：`devtools` 原子替换文件，`interpreter` 通过 Vite WebSocket 广播源码；
 3. 按补丁顺序通知 Rolldown，这些补丁已经可交付。
 
-所有构建结果、样式、补丁、运行时报告和完整构建切换都经过同一条串行队列。交付成功只推进 Rolldown 的“已发布”前沿；App POST 成功应用序号后，日志才推进“已应用”前沿。
+所有构建结果、样式、补丁、运行时报告和完整构建切换都经过同一条串行队列。交付成功只推进 Rolldown 的“已发布”前沿；App 通过 WebSocket 成功应用序号后，日志才推进“已应用”前沿。
 
-`devtools` 文件使用“同目录临时 `.txt` 文件 + rename”替换。开发者工具忽略临时文件，只会看到完整的最终内容。`interpreter` 不写 JavaScript 文件，也不复制第二份发布状态；广播和重连补发都直接序列化补丁日志的当前值。
+`devtools` 文件使用“同目录临时 `.txt` 文件 + rename”替换。开发者工具忽略临时文件，只会看到完整的最终内容。`interpreter` 不写 JavaScript 文件，也不复制第二份发布状态；广播和首次订阅补发都直接序列化补丁日志的当前值。
 
 ### 3. `devtools` 补丁文件保留尚未确认的完整序列
 
@@ -216,7 +214,7 @@ module.exports = {
 
 主机把当前尚未确认的补丁 `{ buildId, patches: [{ seq, changedIds, code, ... }] }` 作为 Vite 自定义事件发送。Sval 在一个 App 级沙箱作用域中解释每个 `code`；代码只登记模块图和模块工厂，应用模块仍由共享运行时稍后统一执行。
 
-成功应用后，App 仍通过 HTTP POST 报告序号。WebSocket 只在新发布或重新订阅时发送，不会因为幂等重放形成请求循环。每份源码携带构建身份，旧构建重连订阅和主机关闭都会收到终止消息；连接恢复由原生 SocketTask 事件驱动，不存在轮询定时器。
+成功应用后，App 通过同一个 WebSocket 报告序号。解释器源码只在新发布或首次订阅时发送，不会因为幂等重放形成请求循环。每份源码携带构建身份；构建替换和主机关闭都会向旧 App 发送终止消息。
 
 ### 5. 运行时验证补丁
 
@@ -355,8 +353,8 @@ Tailwind 生成器只负责编译入口，不拥有补丁发布。它在入口�
 
 1. 协调本次完整输出的全局 WXSS；
 2. 生成新的 `buildId`，停止使用旧 Rolldown 客户端身份；
-3. 旋转补丁日志身份并清空待确认补丁；`devtools` 同时清空补丁文件，`interpreter` 广播新构建身份让旧连接停止；
-4. 写入带有新身份和报告地址的 `hmr/info.js`；
+3. 通知旧 App 关闭 WebSocket，再旋转补丁日志身份并清空待确认补丁；`devtools` 同时清空补丁文件；
+4. 写入带有新身份和认证 WebSocket 地址的 `hmr/info.js`；
 5. 最后写入带有新 `buildId` 标记的 `app.wxss`。
 
 最后一步是有意的 App 级文件变化。开发者工具随后重启 App，新运行时从序号 `0` 开始读取已经写好的匹配身份。旧 App 延迟发送的报告会被忽略。
@@ -365,7 +363,7 @@ vpt 不尝试在完整构建后恢复 React 内部状态。新的磁盘基线和
 
 ## 控制接口做什么
 
-两种模式都用 `POST` 发送运行时报告：
+两种模式都通过同一个 Vite WebSocket 自定义事件发送运行时报告：
 
 ```ts
 type AppliedReport = {
@@ -381,9 +379,9 @@ type RebuildReport = {
 }
 ```
 
-`applied` 允许主机删除已经成功应用的补丁历史；`rebuild` 请求完整构建。每份报告都与补丁交付和构建切换按顺序处理。HTTP 不承载解释器源码。
+`applied` 允许主机删除已经成功应用的补丁历史；`rebuild` 请求完整构建。每份报告都与补丁交付和构建切换按顺序处理，不存在单独的 HTTP 报告协议。
 
-`interpreter` 复用 Vite WebSocket 的自定义事件。App 连接或重连后发送 `{ buildId }` 订阅；主机若仍保留该构建的未确认补丁，就立即回放当前累计值。后续发布、构建切换和关闭均由主机主动推送。
+`interpreter` 在该 WebSocket 上额外发送 `{ buildId }` 订阅事件；主机若仍保留该构建的未确认补丁，就立即回放当前累计值。后续源码发布、构建切换和关闭均由主机主动推送。
 
 ## 顺序保证
 
@@ -404,6 +402,7 @@ type RebuildReport = {
 ```text
 写入完整输出
    → 协调最终 global.wxss
+   → 通知旧 App 关闭 WebSocket
    → 创建新 buildId
    → 重置所选交付
    → 写入 info.js
@@ -417,7 +416,7 @@ type RebuildReport = {
 1. 一次服务器只运行一种 HMR 模式，模式选择不进入增量热路径；
 2. 普通模块更新不能改写 App 入口或其他会重启 App 的根文件；
 3. `devtools` 的每个 Page 从初始构建起依赖同一个 `hmr/patches.js`；
-4. `interpreter` 每个 App 堆只保留一条 Vite WebSocket，且不得使用轮询定时器；
+4. 每个 App 堆只创建并保留一条 Vite WebSocket，不重建连接，也不使用轮询定时器；
 5. App 模块运行时必须比 Page 活得更久；
 6. 补丁日志必须保留所有尚未确认应用的连续序号；
 7. 整个受影响模块集合必须在任一新边界执行前统一清除缓存；

@@ -57,7 +57,7 @@ hmr: {
 }
 ```
 
-解释器模式复用 Vite 已有的 WebSocket 连接。源码变化时，主机直接推送累计补丁；连接重建后，App 重新订阅当前构建，主机从日志补发尚未确认的源码。空闲期间没有轮询请求或定时器。Sval 只解释 Rolldown 生成的模块注册程序和更新后的模块；初始完整构建仍由开发者工具原生执行。
+解释器模式复用 Vite 已有的 WebSocket。每个 App 运行环境只创建一个连接；首次订阅当前构建时，主机从日志补发尚未确认的源码，之后直接推送累计补丁。空闲期间没有轮询请求或定时器。Sval 只解释 Rolldown 生成的模块注册程序和更新后的模块；初始完整构建仍由开发者工具原生执行。
 
 `devtools` 模式的运行时代码更小，执行补丁更快，仍是默认值。`interpreter` 模式避免 Page 热重载及其生命周期交接，但开发运行时更大，更新后的模块执行也更慢。两者都只影响本地开发。
 
@@ -123,7 +123,7 @@ projectPrivateConfigJson: {
 
 `compileHotReLoad: true` 开启开发者工具的热重载。补丁文件变化后，开发者工具只重新加载受影响的页面，不重启整个小程序；vpt 依靠这个行为保留 App 和 React 状态。
 
-`urlCheck: false` 关闭开发者工具的服务器域名校验，让小程序可以向本机 Vite 服务报告热更新结果。它只影响开发者工具中的调试请求，不会放宽正式版小程序的服务器域名限制。
+`urlCheck: false` 关闭开发者工具的服务器域名校验，让小程序可以连接本机 Vite WebSocket 并报告热更新结果。它只影响开发者工具中的调试连接，不会放宽正式版小程序的服务器域名限制。
 
 据[微信官方说明](https://developers.weixin.qq.com/miniprogram/dev/framework/runtime/skyline/migration/compatibility.html#常见的兼容问题)，开发者工具的 Skyline 调试模式暂不支持热更新。日常开发时保持 `skylineRenderEnable: false`；检查 Skyline 效果时再临时开启。参见[Skyline 模式](/guides/skyline-mode/)。
 

@@ -12,6 +12,7 @@ import {
     interpreterClientEvent,
     interpreterServerEvent
 } from '../../../../runtime/wx/dev/modes/interpreter/interpreter-protocol.ts'
+import { runtimeReportEvent } from '../../../../runtime/wx/dev/wx-hmr-protocol.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
 import { createWxStylePlugin } from '../styles/plugins.ts'
@@ -223,14 +224,11 @@ function parseHmrInfo(source: string): HmrInfo {
     return JSON.parse(source.slice(prefix.length, -suffix.length)) as HmrInfo
 }
 
-function postRuntimeReport(info: HmrInfo, report: RuntimeReport): Promise<Response> {
-    return fetch(info.endpoint, {
-        method: 'POST',
-        headers: {
-            'content-type': 'application/json'
-        },
-        body: JSON.stringify(report)
-    })
+async function sendRuntimeReport(info: HmrInfo, report: RuntimeReport): Promise<void> {
+    const socket = await openHmrSocket(info)
+    socket.send(JSON.stringify({ type: 'custom', event: runtimeReportEvent, data: report }))
+    await delay(0)
+    socket.close()
 }
 
 type ViteSocketEnvelope = Readonly<{
@@ -239,9 +237,8 @@ type ViteSocketEnvelope = Readonly<{
     data?: InterpreterServerMessage
 }>
 
-async function openInterpreterSocket(info: HmrInfo): Promise<WebSocket> {
-    assert.ok(info.socketEndpoint)
-    const socket = new WebSocket(info.socketEndpoint, ['vite-hmr'])
+async function openHmrSocket(info: HmrInfo): Promise<WebSocket> {
+    const socket = new WebSocket(info.endpoint, ['vite-hmr'])
     const opened = Promise.withResolvers<void>()
     socket.addEventListener('open', () => opened.resolve(), { once: true })
     socket.addEventListener('error', () => opened.reject(new Error('Interpreter WebSocket failed to open.')), {
@@ -388,18 +385,11 @@ test('publishes and acknowledges cumulative wx patches without rotating the App 
     const sequences = [...firstPatches.matchAll(/\{seq: (\d+)/g)].map((match) => Number(match[1]))
     assert.ok(sequences.length > 0)
 
-    const response = await fetch(info.endpoint, {
-        method: 'POST',
-        headers: {
-            'content-type': 'application/json'
-        },
-        body: JSON.stringify({
-            buildId: info.buildId,
-            kind: 'applied',
-            seq: Math.max(...sequences)
-        })
+    await sendRuntimeReport(info, {
+        buildId: info.buildId,
+        kind: 'applied',
+        seq: Math.max(...sequences)
     })
-    assert.equal(response.status, 200)
 
     // Runtime receipts are intentionally conflated for one short quiet window before the next source generation is admitted.
     await delay(50)
@@ -420,16 +410,16 @@ test('publishes interpreter source through Vite WebSocket', async (context) => {
     context.after(fixture.close)
 
     const info = parseHmrInfo(
-        await waitForFile(fixture.infoPath, (source) => source.includes('socketEndpoint'), maximumWaitAttempts)
+        await waitForFile(fixture.infoPath, (source) => source.includes('token='), maximumWaitAttempts)
     )
     assert.equal(await readExistingFile(fixture.patchesPath), undefined)
 
-    const socket = await openInterpreterSocket(info)
-    context.after(() => socket.close())
-    subscribeInterpreterSocket(socket, info.buildId)
-
-    const firstMessagePromise = waitForInterpreterMessage(socket)
     await publishSourceGeneration(fixture.pagePath, renderPage('first interpreted generation'))
+
+    const socket = await openHmrSocket(info)
+    context.after(() => socket.close())
+    const firstMessagePromise = waitForInterpreterMessage(socket)
+    subscribeInterpreterSocket(socket, info.buildId)
     const firstMessage = await firstMessagePromise
     assert.equal(firstMessage.kind, 'patches')
     if (firstMessage.kind !== 'patches') {
@@ -440,26 +430,16 @@ test('publishes interpreter source through Vite WebSocket', async (context) => {
     const firstSeq = firstMessage.patches.at(-1)?.seq
     assert.ok(firstSeq)
 
-    socket.close()
-    const replaySocket = await openInterpreterSocket(info)
-    context.after(() => replaySocket.close())
-    const replayPromise = waitForInterpreterMessage(replaySocket)
-    subscribeInterpreterSocket(replaySocket, info.buildId)
-    const replay = await replayPromise
-    assert.equal(replay.kind, 'patches')
-    if (replay.kind !== 'patches') {
-        assert.fail('Expected replayed interpreter patch source')
-    }
-    assert.equal(replay.patches.at(-1)?.seq, firstSeq)
+    socket.send(
+        JSON.stringify({
+            type: 'custom',
+            event: runtimeReportEvent,
+            data: { buildId: info.buildId, kind: 'applied', seq: firstSeq }
+        })
+    )
+    await delay(0)
 
-    const acknowledgement = await postRuntimeReport(info, {
-        buildId: info.buildId,
-        kind: 'applied',
-        seq: firstSeq
-    })
-    assert.equal(acknowledgement.status, 200)
-
-    const secondMessagePromise = waitForInterpreterMessage(replaySocket)
+    const secondMessagePromise = waitForInterpreterMessage(socket)
     await publishSourceGeneration(fixture.pagePath, renderPage('second interpreted generation'))
     const secondMessage = await secondMessagePromise
     assert.equal(secondMessage.kind, 'patches')
@@ -472,14 +452,10 @@ test('publishes interpreter source through Vite WebSocket', async (context) => {
     assert.equal(await readExistingFile(fixture.patchesPath), undefined)
 })
 
-test('rejects invalid control requests without compromising later patch publication', async (context) => {
-    // These mutable journals capture malformed-control diagnostics and the physical DevTools project banner.
-    const errors: string[] = []
+test('prints physical project paths without compromising later patch publication', async (context) => {
+    // This mutable list captures the physical DevTools project banner.
     const infos: string[] = []
     const logger = createLogger('silent')
-    logger.error = (message) => {
-        errors.push(message)
-    }
     logger.info = (message) => {
         infos.push(message)
     }
@@ -489,7 +465,7 @@ test('rejects invalid control requests without compromising later patch publicat
         await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
     )
 
-    assert.match(info.endpoint, /^http:\/\/127\.0\.0\.1:/)
+    assert.match(info.endpoint, /^ws:\/\/127\.0\.0\.1:/)
     assert.equal(await fixture.bundledDev.triggerBundleRegenerationIfStale(), false)
     fixture.server.printUrls()
     assert.match(stripVTControlCharacters(infos.join('\n')), /WeChat DevTools.*\.\/dist/)
@@ -507,36 +483,6 @@ test('rejects invalid control requests without compromising later patch publicat
     const devToolsOutput = stripVTControlCharacters(infos.join('\n'))
     assert.match(devToolsOutput, /WeChat DevTools.*: \./)
     assert.match(devToolsOutput, /WeChat DevTools.*: \.\./)
-
-    const unsupportedMethod = await fetch(info.endpoint)
-    assert.equal(unsupportedMethod.status, 404)
-
-    const malformedReport = await fetch(info.endpoint, {
-        method: 'POST',
-        headers: {
-            'content-type': 'application/json'
-        },
-        body: '{'
-    })
-    assert.equal(malformedReport.status, 400)
-    await waitForCondition(
-        () => errors.some((message) => message.includes('[vpt] wx HMR report failed')),
-        maximumWaitAttempts
-    )
-
-    const previousErrorCount = errors.length
-    const oversizedResult = await fetch(info.endpoint, {
-        method: 'POST',
-        headers: {
-            'content-type': 'application/json'
-        },
-        body: 'x'.repeat(64 * 1024 + 1)
-    }).then(
-        (response) => response.status,
-        () => 'connection-reset' as const
-    )
-    assert.ok(oversizedResult === 400 || oversizedResult === 'connection-reset')
-    await waitForCondition(() => errors.length > previousErrorCount, maximumWaitAttempts)
 
     await publishSourceGeneration(fixture.pagePath, renderPage('healthy generation after invalid control traffic'))
     const patches = await waitForFile(
@@ -569,22 +515,20 @@ test('rotates build identity on a current rebuild report and rejects delayed old
         maximumWaitAttempts
     )
 
-    const staleRebuildResponse = await postRuntimeReport(initialInfo, {
+    await sendRuntimeReport(initialInfo, {
         buildId: 'stale-build',
         kind: 'rebuild',
         reason: 'must be ignored'
     })
-    assert.equal(staleRebuildResponse.status, 200)
     await delay(50)
     assert.equal(await readFile(fixture.infoPath, 'utf8'), initialInfoSource)
     assert.doesNotMatch(infos.join('\n'), /must be ignored/)
 
-    const rebuildResponse = await postRuntimeReport(initialInfo, {
+    await sendRuntimeReport(initialInfo, {
         buildId: initialInfo.buildId,
         kind: 'rebuild',
         reason: 'runtime graph lost its boundary'
     })
-    assert.equal(rebuildResponse.status, 200)
 
     const nextInfoSource = await waitForFile(
         fixture.infoPath,
@@ -614,12 +558,11 @@ test('rotates build identity on a current rebuild report and rejects delayed old
     )
     assert.match(firstPatches, new RegExp(`buildId: ${JSON.stringify(nextInfo.buildId)}`))
 
-    const delayedAcknowledgement = await postRuntimeReport(nextInfo, {
+    await sendRuntimeReport(nextInfo, {
         buildId: initialInfo.buildId,
         kind: 'applied',
         seq: Number.MAX_SAFE_INTEGER
     })
-    assert.equal(delayedAcknowledgement.status, 200)
     await delay(50)
 
     await publishSourceGeneration(fixture.pagePath, renderPage('second generation in the new build'))

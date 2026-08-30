@@ -18,9 +18,7 @@ export type WxHmrMode = Readonly<{
     plugins: readonly Plugin[]
     reset: (server: ViteDevServer, buildId: string, writeFile: WriteDevelopmentFile) => Promise<void>
     publish: (server: ViteDevServer, publication: PatchPublication, writeFile: WriteDevelopmentFile) => Promise<void>
-    close: (server: ViteDevServer) => Promise<void>
     configureServer: (server: ViteDevServer, journal: PatchJournal) => void
-    usesWebSocket: boolean
     createEntryBanner: (
         pageFiles: ReadonlySet<string>
     ) => (chunk: Readonly<{ name: string; fileName: string }>) => string

@@ -31,9 +31,7 @@ export function createDevtoolsHmrMode(): WxHmrMode {
         // coalesced or missed DevTools file event cannot strand the App runtime between two Rolldown generations.
         publish: (_, publication, writeFile) =>
             writeFile(devtoolsPatchesFileName, renderDevtoolsPatches(publication.buildId, publication.patches)),
-        close: async () => {},
-        configureServer: () => {},
-        usesWebSocket: false
+        configureServer: () => {}
     }
 }
 

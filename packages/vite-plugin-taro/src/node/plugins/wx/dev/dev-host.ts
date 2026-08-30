@@ -1,10 +1,15 @@
-import type { ServerResponse } from 'node:http'
 import path from 'node:path'
 import colors from 'picocolors'
 import { type DevEngine, type DevOptions, dev } from 'rolldown/experimental'
 import { asyncScheduler } from 'rxjs'
-import type { Connect, ViteDevServer } from 'vite'
+import type { ViteDevServer } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
+import {
+    type RuntimeControlMessage,
+    type RuntimeReport,
+    runtimeControlEvent,
+    runtimeReportEvent
+} from '../../../../runtime/wx/dev/wx-hmr-protocol.ts'
 import type { WxStylePlugin } from '../styles/plugins.ts'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
 import {
@@ -16,10 +21,17 @@ import {
     writeDevelopmentFile
 } from './hmr-files.ts'
 import type { WriteDevelopmentFile, WxHmrMode } from './hmr-mode.ts'
-import { type HmrInfo, hmrControlPath, type PatchUpdate, type RuntimeReport } from './hmr-protocol.ts'
+import { type HmrInfo, hmrEndpointPath, type PatchUpdate } from './hmr-protocol.ts'
 import { createHostActions } from './host-actions.ts'
 import { PatchJournal } from './patch-journal.ts'
 import { type BundledDev, installWxDevOptions, requireSingleOutput } from './wx-dev-options.ts'
+
+declare module 'vite' {
+    interface CustomEventMap {
+        'vpt:wx-hmr:control': RuntimeControlMessage
+        'vpt:wx-hmr:report': RuntimeReport
+    }
+}
 
 export type WxDevHost = Readonly<{
     close: () => Promise<void>
@@ -76,6 +88,10 @@ export async function createWxDevHost({
         writeDevelopmentFile(server.config.build.outDir, fileName, source)
     const journal = new PatchJournal((publication) => hmrMode.publish(server, publication, writeFile))
     hmrMode.configureServer(server, journal)
+
+    server.ws.on(runtimeReportEvent, (report) => {
+        hostActions.next({ kind: 'report', report: report })
+    })
 
     // Option installation configures only Rolldown. Build lifecycle results enter through the engine's output action below.
     installWxDevOptions({ bundledDev: bundledDev, server: server, options: options, hmrMode: hmrMode })
@@ -138,10 +154,6 @@ export async function createWxDevHost({
         hostActions.next({ kind: 'listening' })
     })
 
-    // HTTP carries only application-frontier and rebuild reports. Interpreter source uses Vite's existing WebSocket instead.
-    // The buildId is also Rolldown's client ID, so delayed reports cannot mutate a newer complete build.
-    server.middlewares.use(hmrControlPath, (req, res) => void handleReport(req, res))
-
     installDevToolsPrinter(server)
 
     return {
@@ -152,7 +164,7 @@ export async function createWxDevHost({
             // Keep the action edge open until the final generation has admitted every output callback.
             await engine.ensureCurrentBuildFinish()
             await hostActions.complete()
-            await hmrMode.close(server)
+            server.ws.send(runtimeControlEvent, { kind: 'close', reason: 'host closed' })
         }
     }
 
@@ -170,6 +182,7 @@ export async function createWxDevHost({
             return
         }
 
+        server.ws.send(runtimeControlEvent, { kind: 'close', reason: 'build replaced' })
         const { buildId, previousBuildId } = journal.startBuild()
         if (previousBuildId) {
             await engine.removeClient(previousBuildId)
@@ -177,28 +190,6 @@ export async function createWxDevHost({
         await engine.registerClient(buildId)
 
         await publishBuildMetadata(server, buildId, port, hmrMode, writeFile)
-    }
-
-    /**
-     * Mutates only the request-local HTTP response: unsupported methods become 404, malformed bounded bodies become 400, and a
-     * valid report is admitted before the default 200 response ends. No response object or parser state crosses requests.
-     */
-    async function handleReport(req: Connect.IncomingMessage, res: ServerResponse): Promise<void> {
-        if (req.method !== 'POST') {
-            res.statusCode = 404
-            res.end()
-            return
-        }
-
-        try {
-            const report = JSON.parse(await readBody(req)) as RuntimeReport
-            hostActions.next({ kind: 'report', report: report })
-            res.end()
-        } catch (e) {
-            logWxError(server.config.logger, 'wx HMR report failed', e)
-            res.statusCode = 400
-            res.end()
-        }
     }
 
     /** Reduces one merged source action through the existing authoritative host state. */
@@ -360,26 +351,26 @@ function boundPort(server: ViteDevServer): number | undefined {
     return address.port
 }
 
-/** Adds Vite's existing socket endpoint only for the mode that consumes it. */
-function withViteSocketEndpoint(server: ViteDevServer, info: HmrInfo): HmrInfo {
-    if (server.config.server.ws === false) {
-        throw new Error('WX interpreter HMR requires Vite server.ws.')
+/** Materializes the authenticated Vite WebSocket endpoint used by every WX HMR runtime. */
+function createSocketEndpoint(server: ViteDevServer, port: number): string {
+    const socketOptions = typeof server.config.server.ws === 'object' ? server.config.server.ws : undefined
+    if (
+        server.config.server.ws === false ||
+        server.config.base !== '/' ||
+        socketOptions?.path !== hmrEndpointPath ||
+        socketOptions?.protocol !== undefined ||
+        socketOptions?.host !== undefined ||
+        socketOptions?.port !== undefined ||
+        socketOptions?.clientPort !== undefined ||
+        socketOptions?.server !== undefined
+    ) {
+        throw new Error('WX HMR requires Vite WebSocket on the development HTTP server.')
     }
 
-    const socketOptions = typeof server.config.server.ws === 'object' ? server.config.server.ws : undefined
-    const socketUrl = new URL(info.endpoint)
-    socketUrl.protocol = socketOptions?.protocol
-        ? `${socketOptions.protocol}:`
-        : socketUrl.protocol === 'https:'
-          ? 'wss:'
-          : 'ws:'
-    socketUrl.hostname = socketOptions?.host ?? socketUrl.hostname
-    socketUrl.port = String(socketOptions?.clientPort ?? socketOptions?.port ?? socketUrl.port)
-    socketUrl.pathname = path.posix.join(server.config.base, socketOptions?.path ?? '')
-    socketUrl.search = ''
-    socketUrl.searchParams.set('token', server.config.webSocketToken)
-
-    return { ...info, socketEndpoint: socketUrl.href }
+    const protocol = server.config.server.https ? 'wss' : 'ws'
+    const endpointUrl = new URL(`${protocol}://${resolveEndpointHost(server)}:${port}${hmrEndpointPath}`)
+    endpointUrl.searchParams.set('token', server.config.webSocketToken)
+    return endpointUrl.href
 }
 
 /**
@@ -396,11 +387,10 @@ async function publishBuildMetadata(
     hmrMode: WxHmrMode,
     writeFile: WriteDevelopmentFile
 ): Promise<void> {
-    const baseInfo: HmrInfo = {
+    const info: HmrInfo = {
         buildId: buildId,
-        endpoint: `${server.config.server.https ? 'https' : 'http'}://${resolveEndpointHost(server)}:${port}${hmrControlPath}`
+        endpoint: createSocketEndpoint(server, port)
     }
-    const info = hmrMode.usesWebSocket ? withViteSocketEndpoint(server, baseInfo) : baseInfo
 
     await hmrMode.reset(server, buildId, writeFile)
     await writeFile(hmrInfoFileName, renderHmrInfo(info))
@@ -415,8 +405,8 @@ async function publishBuildMetadata(
 /** Replaces browser server URLs with the physical project directory consumed by WeChat DevTools. */
 function installDevToolsPrinter(server: ViteDevServer): void {
     /*
-     * Vite exposes printing as a mutable server callback because URLs are unknown until startup. WX serves control reports over
-     * HTTP but users open the physical output directory, so retaining the browser printer advertises unusable navigation URLs.
+     * Vite exposes printing as a mutable server callback because URLs are unknown until startup. WX uses its socket only for HMR
+     * control while users open the physical output directory, so the browser printer advertises unusable navigation URLs.
      * Replacing only this presentation callback leaves resolved URLs and server routing untouched and naturally dies with the
      * server instance; logging elsewhere would duplicate Vite's one readiness notification.
      */
@@ -445,29 +435,6 @@ function logWxError(logger: ViteDevServer['config']['logger'], prefix: string, e
     } else {
         logger.error(`[vpt] ${prefix} with unknown error: ${error}`)
     }
-}
-
-const maximumBodyBytes = 64 * 1024
-
-function readBody(req: Connect.IncomingMessage): Promise<string> {
-    return new Promise((resolve, reject) => {
-        /*
-         * Node delivers one HTTP body through multiple callback invocations, so this request-local mutable string is the minimal
-         * state that joins chunks in wire order. The 64 KiB bound caps both retained memory and repeated-concatenation work; the
-         * value is parsed once on end and then discarded. Parsing per chunk is invalid because JSON tokens may cross boundaries,
-         * while retaining request bodies in host state would couple unrelated Page reports and leak across the server lifecycle.
-         */
-        let body = ''
-        req.on('data', (chunk: Buffer) => {
-            body += chunk.toString('utf8')
-            if (body.length > maximumBodyBytes) {
-                reject(new Error('report body too large'))
-                req.destroy()
-            }
-        })
-        req.on('end', () => resolve(body))
-        req.on('error', reject)
-    })
 }
 
 /** The bound address host, or loopback for wildcard binds; IPv6 literals are bracketed. */

@@ -7,8 +7,8 @@ import { renderDevelopmentAppWxss, renderHmrInfo, writeDevelopmentFile } from '.
 
 test('renders frozen CommonJS build metadata', () => {
     assert.equal(
-        renderHmrInfo({ buildId: 'build', endpoint: 'http://localhost/hmr' }),
-        'module.exports = Object.freeze({"buildId":"build","endpoint":"http://localhost/hmr"});\n'
+        renderHmrInfo({ buildId: 'build', endpoint: 'ws://localhost/hmr?token=test' }),
+        'module.exports = Object.freeze({"buildId":"build","endpoint":"ws://localhost/hmr?token=test"});\n'
     )
 })
 

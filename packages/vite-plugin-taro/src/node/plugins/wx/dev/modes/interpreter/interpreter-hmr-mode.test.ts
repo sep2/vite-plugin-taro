@@ -27,7 +27,6 @@ test('initializes only the App entry and installs no Page transform', () => {
     )
     assert.equal(banner({ name: 'pages/home/index.js', fileName: 'pages/home/index.js' }), '')
     assert.deepEqual(mode.plugins, [])
-    assert.equal(mode.usesWebSocket, true)
     assert.match(mode.runtimeFile, /wx\/dev\/modes\/interpreter\/interpreter-runtime\.(?:ts|js)$/)
 })
 
@@ -48,13 +47,11 @@ test('publishes cumulative source through Vite WebSocket without writing a patch
 
     await mode.reset(server, buildId, writeFile)
     await journal.produce([patch])
-    await mode.close(server)
 
     assert.deepEqual(sent, [
         {
             event: interpreterServerEvent,
             message: { kind: 'patches', buildId: buildId, patches: [patch] }
-        },
-        { event: interpreterServerEvent, message: { kind: 'close', reason: 'host closed' } }
+        }
     ])
 })

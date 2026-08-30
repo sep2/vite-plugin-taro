@@ -7,6 +7,7 @@ import type { WxStylePlugin } from '../styles/plugins.ts'
 import { createWxDevHost, type WxDevHost } from './dev-host.ts'
 import { developmentAppWxssFileName } from './hmr-files.ts'
 import { createWxHmrMode } from './hmr-mode.ts'
+import { hmrEndpointPath } from './hmr-protocol.ts'
 import { createWxReactRefreshTransforms } from './react-refresh.ts'
 
 /** Selects the sole Vite environment that owns the physical Mini Program development project. */
@@ -58,6 +59,10 @@ export function createWxDevelopmentPlugin(options: VptOptions, styles: WxStylePl
                         // Ask Vite to resolve its bundled-development graph and expose the private adapter instance. The wx
                         // configureServer hook replaces only its startup method with the directly writing DevEngine.
                         bundledDev: true
+                    },
+                    server: {
+                        // Source and reports share Vite's existing socket at the one generated runtime endpoint.
+                        ws: { path: hmrEndpointPath }
                     }
                 }
             },

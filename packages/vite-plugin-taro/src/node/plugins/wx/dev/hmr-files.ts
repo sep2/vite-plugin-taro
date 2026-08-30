@@ -9,7 +9,7 @@ export const hmrInfoFileName = 'hmr/info.js'
 
 /**
  * Renders immutable CommonJS metadata because App startup must initialize the runtime synchronously before any entry capsule.
- * Freezing also prevents application code from accidentally changing the build identity or report endpoint for the App heap.
+ * Freezing also prevents application code from accidentally changing the build identity or socket endpoint for the App heap.
  */
 export function renderHmrInfo(info: HmrInfo): string {
     return `module.exports = Object.freeze(${JSON.stringify(info)});\n`

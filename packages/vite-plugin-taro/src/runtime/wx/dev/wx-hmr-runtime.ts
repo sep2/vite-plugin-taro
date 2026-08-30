@@ -4,30 +4,25 @@
  *
  * Concrete modes decide how executable registrations arrive—native project JavaScript or interpreted source—and provide only a
  * synchronous installer. This class owns the invariant that installation, graph propagation, cache eviction, boundary execution,
- * and ACK form one application transaction; it has no file, HTTP delivery, or interpreter policy of its own.
+ * and ACK form one application transaction; it has no file-delivery or interpreter policy of its own.
  */
 
 import type { DevRuntime as RolldownDevRuntime } from 'rolldown/experimental/runtime-types'
+import {
+    type HmrInfo,
+    type RuntimeControlMessage,
+    type RuntimeReport,
+    runtimeControlEvent,
+    runtimeReportEvent
+} from './wx-hmr-protocol.ts'
 
 /** Lexical base class injected into the runtime chunk by Rolldown; typed via the contract. */
 declare const DevRuntime: new (clientId: string) => RolldownDevRuntime
-
-/**
- * Identity and control endpoint fixed for one App heap. A later complete build creates a new heap rather than mutating this session,
- * so delayed deliveries and reports can be rejected by build ID without coordinating another mutable runtime-global value.
- */
-export type HmrInfo = Readonly<{
-    buildId: string
-    endpoint: string
-    socketEndpoint?: string
-}>
 
 /** App-heap HMR identity; only the committed application frontier mutates. */
 type HmrSession = {
     /** Rejects delayed patch delivery and identifies reports after a newer full build exists. */
     readonly buildId: string
-    /** Fixed report URL discovered from the Vite server that produced this complete build. */
-    readonly endpoint: string
     /**
      * Highest contiguous application sequence whose installation, graph propagation, and accept callbacks all succeeded.
      * Host-filtered native asset updates consume no sequence. Replayed mode deliveries read this watermark; it advances only
@@ -42,6 +37,8 @@ export type RuntimePatch = Readonly<{
     /** Stable ids of the changed modules; synchronous application walks the graph from these roots. */
     changedIds: readonly string[]
 }>
+
+type RuntimeReportData = Readonly<{ kind: 'applied'; seq: number }> | Readonly<{ kind: 'rebuild'; reason: string }>
 
 type HmrUpdate = Readonly<{
     boundaries: readonly string[]
@@ -112,10 +109,13 @@ class WxHotContext {
 /** Shared WX host mechanics extending the Rolldown contract instead of reimplementing it. */
 export class WxHmrRuntime extends DevRuntime {
     /**
-     * One session for this App heap. Undefined only before the mode-selected entry initializes the runtime; its identity and
-     * endpoint then stay fixed while appliedSeq records the committed frontier.
+     * One session for this App heap. Undefined only before the mode-selected entry initializes the runtime; its identity then
+     * stays fixed while appliedSeq records the committed frontier.
      */
     private session: HmrSession | undefined
+
+    /** The App heap's sole SocketTask, assigned once by initialize and retained for its lifetime. */
+    private socket: WeChatSocketTask | undefined
 
     /**
      * Sparse current-generation accepting boundaries keyed by module id. Entries alone must
@@ -231,7 +231,53 @@ export class WxHmrRuntime extends DevRuntime {
      */
     initialize(info: HmrInfo): void {
         if (this.session) return
-        this.session = { ...info, appliedSeq: 0 }
+        this.session = { buildId: info.buildId, appliedSeq: 0 }
+
+        const socket = wx.connectSocket({ url: info.endpoint, protocols: ['vite-hmr'] })
+        this.socket = socket
+
+        socket.onOpen(() => this.onSocketOpen(info))
+
+        socket.onMessage(({ data }) => {
+            if (typeof data !== 'string') return
+            const message = JSON.parse(data) as Readonly<{
+                type: string
+                event?: string
+                data?: unknown
+            }>
+            if (message.type !== 'custom' || !message.event) return
+            if (message.event === runtimeControlEvent) {
+                const control = message.data as RuntimeControlMessage
+                this.stopSocket(control.reason)
+                return
+            }
+            this.onSocketEvent(info, message.event, message.data)
+        })
+    }
+
+    /** Called after the shared socket opens; interpreter mode uses it to subscribe its build. */
+    protected onSocketOpen(_info: HmrInfo): void {}
+
+    /** Receives mode-specific Vite custom events after shared control messages have been handled. */
+    protected onSocketEvent(_info: HmrInfo, _event: string, _data: unknown): void {}
+
+    /** Sends one typed Vite custom event through the current App-level socket. */
+    protected sendSocketEvent(event: string, data: unknown): void {
+        const socket = this.socket
+        if (!socket) {
+            throw new Error('WX HMR socket is not initialized')
+        }
+        socket.send({ data: JSON.stringify({ type: 'custom', event: event, data: data }) })
+    }
+
+    /** Closes the sole socket after terminal host control or interpreter failure. */
+    protected stopSocket(reason: string): void {
+        const socket = this.socket
+        if (!socket) {
+            throw new Error('WX HMR socket is not initialized')
+        }
+
+        socket.close({ code: 1000, reason: reason })
     }
 
     /**
@@ -337,27 +383,15 @@ export class WxHmrRuntime extends DevRuntime {
         }
     }
 
-    /** Sends one metadata-only application frontier or rebuild request to the shared host report endpoint. */
-    private sendReport(data: Record<string, unknown>): Promise<void> {
+    /** Sends one application-frontier or rebuild report through the shared Vite WebSocket. */
+    private sendReport(data: RuntimeReportData): void {
         const session = this.session
         if (!session) {
             // A report without initialize is a programming error; fail loudly instead of
             // silently dropping the sync traffic.
             throw new Error('WX dev runtime is not initialized')
         }
-        return new Promise((resolve, reject) => {
-            wx.request({
-                url: session.endpoint,
-                method: 'POST',
-                data: { buildId: session.buildId, ...data },
-                header: { 'content-type': 'application/json' },
-                success(): void {
-                    resolve()
-                },
-                fail(error: unknown): void {
-                    reject(error)
-                }
-            })
-        })
+        const report: RuntimeReport = { buildId: session.buildId, ...data }
+        this.sendSocketEvent(runtimeReportEvent, report)
     }
 }

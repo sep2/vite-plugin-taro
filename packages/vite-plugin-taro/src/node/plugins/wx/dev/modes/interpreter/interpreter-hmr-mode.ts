@@ -5,6 +5,7 @@ import {
     interpreterClientEvent,
     interpreterServerEvent
 } from '../../../../../../runtime/wx/dev/modes/interpreter/interpreter-protocol.ts'
+import { type RuntimeControlMessage, runtimeControlEvent } from '../../../../../../runtime/wx/dev/wx-hmr-protocol.ts'
 import { resolveRuntimeFile } from '../../../../../utils/packages.ts'
 import { appShellFileName } from '../../../module/module.ts'
 import { hmrInfoFileName } from '../../hmr-files.ts'
@@ -16,6 +17,7 @@ declare module 'vite' {
     interface CustomEventMap {
         'vpt:wx-interpreter:subscribe': InterpreterSubscription
         'vpt:wx-interpreter:source': InterpreterServerMessage
+        'vpt:wx-hmr:control': RuntimeControlMessage
     }
 }
 
@@ -28,19 +30,15 @@ export function createInterpreterHmrMode(): WxHmrMode {
         plugins: [],
         createEntryBanner: createInterpreterEntryBanner,
         configureServer: installSubscriptionHandler,
-        usesWebSocket: true,
-        // Build identity already travels with every publication and reconnect subscription.
+        // Build identity already travels with every publication and initial subscription.
         reset: async () => {},
         publish: async (server, publication) => {
             server.ws.send(interpreterServerEvent, toSourceMessage(publication))
-        },
-        close: async (server) => {
-            server.ws.send(interpreterServerEvent, { kind: 'close', reason: 'host closed' })
         }
     }
 }
 
-/** Replays the journal suffix when an App heap first connects or reconnects after missing a broadcast. */
+/** Replays the journal suffix when an App heap first subscribes after potentially missing an early broadcast. */
 function installSubscriptionHandler(server: ViteDevServer, journal: PatchJournal): void {
     server.ws.on(interpreterClientEvent, (subscription, client) => {
         publishCurrentJournal(client, journal.current, subscription)
@@ -56,7 +54,7 @@ function publishCurrentJournal(
         return
     }
     if (publication.buildId !== subscription.buildId) {
-        client.send(interpreterServerEvent, { kind: 'close', reason: 'build replaced' })
+        client.send(runtimeControlEvent, { kind: 'close', reason: 'build replaced' })
         return
     }
     if (publication.patches.length > 0) {
