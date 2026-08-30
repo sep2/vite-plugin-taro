@@ -13,7 +13,4 @@ export type RuntimeReport =
     | Readonly<{ kind: 'applied'; buildId: string; seq: number }>
     | Readonly<{ kind: 'rebuild'; buildId: string; reason: string }>
 
-export type RuntimeControlMessage = Readonly<{
-    kind: 'close'
-    reason: 'build replaced' | 'host closed'
-}>
+export type RuntimeControlMessage = Readonly<{ kind: 'close'; reason: string }>
