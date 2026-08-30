@@ -22,6 +22,9 @@ export default defineConfig(({ mode }) => {
         plugins: [
             vpt({
                 target,
+                hmr: {
+                    mode: 'interpreter'
+                },
                 app: 'src/app.tsx',
                 pages: [
                     {
