@@ -13,8 +13,7 @@ import {
     type RuntimeControlMessage,
     type RuntimeReport,
     runtimeControlEvent,
-    runtimeReportEvent,
-    runtimeSubscribeEvent
+    runtimeReportEvent
 } from './wx-hmr-protocol.ts'
 
 /** Lexical base class injected into the runtime chunk by Rolldown; typed via the contract. */
@@ -236,8 +235,6 @@ export class WxHmrRuntime extends DevRuntime {
 
         const socket = wx.connectSocket({ url: info.endpoint, protocols: ['vite-hmr'] })
         this.socket = socket
-
-        socket.onOpen(() => this.sendSocketEvent(runtimeSubscribeEvent, { buildId: info.buildId }))
 
         socket.onMessage(({ data }) => {
             if (typeof data !== 'string') return

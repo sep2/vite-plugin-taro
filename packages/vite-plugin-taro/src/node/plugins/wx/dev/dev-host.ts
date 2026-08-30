@@ -7,10 +7,8 @@ import type { VptOptions } from '../../../../options.ts'
 import {
     type RuntimeControlMessage,
     type RuntimeReport,
-    type RuntimeSubscription,
     runtimeControlEvent,
-    runtimeReportEvent,
-    runtimeSubscribeEvent
+    runtimeReportEvent
 } from '../../../../runtime/wx/dev/wx-hmr-protocol.ts'
 import type { WxStylePlugin } from '../styles/plugins.ts'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
@@ -32,7 +30,6 @@ declare module 'vite' {
     interface CustomEventMap {
         'vpt:wx-hmr:control': RuntimeControlMessage
         'vpt:wx-hmr:report': RuntimeReport
-        'vpt:wx-hmr:subscribe': RuntimeSubscription
     }
 }
 
@@ -91,13 +88,6 @@ export async function createWxDevHost({
         writeDevelopmentFile(server.config.build.outDir, fileName, source)
 
     const journal = new PatchJournal((publication) => dispatchModeAction(hmrMode.publish(publication)))
-
-    server.ws.on(runtimeSubscribeEvent, ({ buildId }, client) => {
-        const response = hmrMode.replay(journal.current(), buildId)
-        if (response?.kind === 'event') {
-            client.send(response.event, response.data)
-        }
-    })
 
     server.ws.on(runtimeReportEvent, (report) => {
         hostActions.next({ kind: 'report', report: report })

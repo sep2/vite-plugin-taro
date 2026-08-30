@@ -1,12 +1,8 @@
-import {
-    type InterpreterServerMessage,
-    interpreterServerEvent
-} from '../../../../../../runtime/wx/dev/modes/interpreter/interpreter-protocol.ts'
-import { runtimeControlEvent } from '../../../../../../runtime/wx/dev/wx-hmr-protocol.ts'
+import { interpreterServerEvent } from '../../../../../../runtime/wx/dev/modes/interpreter/interpreter-protocol.ts'
 import { resolveRuntimeFile } from '../../../../../utils/packages.ts'
 import { appShellFileName } from '../../../module/module.ts'
 import { hmrInfoFileName } from '../../hmr-files.ts'
-import type { WxHmrAction, WxHmrMode } from '../../hmr-mode.ts'
+import type { WxHmrMode } from '../../hmr-mode.ts'
 import type { PatchPublication } from '../../hmr-protocol.ts'
 
 const interpreterRuntimeFile = resolveRuntimeFile('wx/dev/modes/interpreter/interpreter-runtime')
@@ -18,36 +14,16 @@ export function createInterpreterHmrMode(): WxHmrMode {
         plugins: [],
         createEntryBanner: createInterpreterEntryBanner,
         reset: () => undefined,
-        publish: toSourceEvent,
-        replay: replayJournal
-    }
-}
-
-/** Returns the current journal suffix for an initial subscription without retaining another snapshot. */
-function replayJournal(publication: PatchPublication | undefined, buildId: string): WxHmrAction | undefined {
-    if (!publication) {
-        return undefined
-    }
-    if (publication.buildId !== buildId) {
-        return {
+        publish: (publication: PatchPublication) => ({
             kind: 'event',
-            event: runtimeControlEvent,
-            data: { kind: 'close', reason: 'build replaced' }
-        }
+            event: interpreterServerEvent,
+            data: {
+                kind: 'patches',
+                buildId: publication.buildId,
+                patches: publication.patches
+            }
+        })
     }
-    if (publication.patches.length === 0) {
-        return undefined
-    }
-    return toSourceEvent(publication)
-}
-
-function toSourceEvent(publication: PatchPublication): WxHmrAction {
-    const message: InterpreterServerMessage = {
-        kind: 'patches',
-        buildId: publication.buildId,
-        patches: publication.patches
-    }
-    return { kind: 'event', event: interpreterServerEvent, data: message }
 }
 
 /** Interpreter runtime starts from App only; Pages have no patch edge or lifecycle handoff. */

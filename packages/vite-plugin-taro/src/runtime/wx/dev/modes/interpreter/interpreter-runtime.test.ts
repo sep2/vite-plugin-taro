@@ -1,12 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { DevRuntime } from 'rolldown/experimental/runtime'
-import {
-    type RuntimeControlMessage,
-    runtimeControlEvent,
-    runtimeReportEvent,
-    runtimeSubscribeEvent
-} from '../../wx-hmr-protocol.ts'
+import { type RuntimeControlMessage, runtimeControlEvent, runtimeReportEvent } from '../../wx-hmr-protocol.ts'
 import { type InterpreterServerMessage, interpreterServerEvent } from './interpreter-protocol.ts'
 
 type TestHotContext = Readonly<{
@@ -24,16 +19,10 @@ type ConnectOptions = Readonly<{
     protocols: readonly string[]
 }>
 
-type SentSocketMessage = Readonly<{
-    data: string | ArrayBuffer
-}>
-
 type CapturedSocket = WeChatSocketTask &
     Readonly<{
         connectOptions: ConnectOptions
         closed: Array<Readonly<{ code: number; reason: string }>>
-        sent: SentSocketMessage[]
-        emitOpen: () => void
         emitMessage: (message: InterpreterServerMessage) => void
         emitControl: (message: RuntimeControlMessage) => void
         emitEvent: (event: string, data: unknown) => void
@@ -49,18 +38,14 @@ type TestHarness = Readonly<{
 let runtimeId = 0
 
 function createSocket(connectOptions: ConnectOptions, reports: unknown[]): CapturedSocket {
-    // These mutable listener cells model the one callback registered for each native SocketTask event.
-    let openListener = () => {}
+    // This mutable listener cell models the callback registered for native SocketTask messages.
     let messageListener = (_result: Readonly<{ data: string | ArrayBuffer }>) => {}
-    const sent: SentSocketMessage[] = []
     const closed: Array<Readonly<{ code: number; reason: string }>> = []
 
     return {
         connectOptions: connectOptions,
-        sent: sent,
         closed: closed,
         send(options) {
-            sent.push(options)
             const envelope = JSON.parse(String(options.data)) as Readonly<{ event: string; data: unknown }>
             if (envelope.event === runtimeReportEvent) {
                 reports.push(envelope.data)
@@ -69,14 +54,8 @@ function createSocket(connectOptions: ConnectOptions, reports: unknown[]): Captu
         close(options) {
             closed.push(options)
         },
-        onOpen(listener) {
-            openListener = listener
-        },
         onMessage(listener) {
             messageListener = listener
-        },
-        emitOpen() {
-            openListener()
         },
         emitMessage(message) {
             messageListener({
@@ -135,7 +114,7 @@ __rolldown_runtime__.registerFactory('page', 'esm', function (moduleId) {
 });
 `
 
-test('subscribes, interprets cumulative source, and reports its application frontier', async () => {
+test('interprets cumulative source and reports its application frontier', async () => {
     const { reports, runtime, sockets } = await createTestHarness()
     // This mutable cell captures the fresh boundary exports passed by the shared graph application transaction.
     let acceptedExports: unknown
@@ -147,13 +126,6 @@ test('subscribes, interprets cumulative source, and reports its application fron
     assert.ok(socket)
     assert.equal(socket.connectOptions.url, 'ws://localhost/__vpt_hmr__?token=test')
     assert.deepEqual(socket.connectOptions.protocols, ['vite-hmr'])
-
-    socket.emitOpen()
-    assert.deepEqual(JSON.parse(String(socket.sent[0]?.data)), {
-        type: 'custom',
-        event: runtimeSubscribeEvent,
-        data: { buildId: 'build' }
-    })
 
     socket.emitMessage({
         kind: 'patches',
@@ -192,7 +164,6 @@ test('stops the socket after interpreter failure and requests a complete build',
 
     const socket = sockets[0]
     assert.ok(socket)
-    socket.emitOpen()
     socket.emitMessage({
         kind: 'patches',
         buildId: 'build',
@@ -208,13 +179,6 @@ test('retains one socket and closes it when the host rotates builds', async () =
     const { sockets } = await createTestHarness()
     const socket = sockets[0]
     assert.ok(socket)
-
-    socket.emitOpen()
-    assert.deepEqual(JSON.parse(String(socket.sent[0]?.data)), {
-        type: 'custom',
-        event: runtimeSubscribeEvent,
-        data: { buildId: 'build' }
-    })
 
     socket.emitControl({ kind: 'close', reason: 'build replaced' })
     assert.deepEqual(socket.closed, [{ code: 1000, reason: 'build replaced' }])

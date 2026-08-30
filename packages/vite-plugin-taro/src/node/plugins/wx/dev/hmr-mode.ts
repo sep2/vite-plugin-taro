@@ -29,7 +29,6 @@ export type WxHmrMode = Readonly<{
 
     reset: () => WxHmrAction | undefined
     publish: (publication: PatchPublication) => WxHmrAction
-    replay: (publication: PatchPublication | undefined, buildId: string) => WxHmrAction | undefined
 
     createEntryBanner: (
         pageFiles: ReadonlySet<string>

@@ -30,7 +30,6 @@ function createJournal(): { journal: PatchJournal; publications: PatchPublicatio
 test('before any build no session is current and nothing is published', async () => {
     const { journal, publications } = createJournal()
 
-    assert.equal(journal.current(), undefined)
     assert.equal(journal.isCurrentBuild('anything'), false)
     journal.acknowledge(0)
     await journal.produce([patch(1, 'p1')])

@@ -8,7 +8,6 @@ import { setTimeout as delay } from 'node:timers/promises'
 import type { DevOptions } from 'rolldown/experimental'
 import { createLogger, createServer } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
-import { runtimeSubscribeEvent } from '../../../../runtime/wx/dev/wx-hmr-protocol.ts'
 import type { WxStylePlugin } from '../styles/plugins.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
 import { hmrEndpointPath } from './hmr-protocol.ts'
@@ -100,7 +99,7 @@ async function waitForFileChange(fileName: string, previousSource: string): Prom
 
 test('reduces synthetic engine update variants and unknown host failures without changing host internals', {
     skip: process.platform === 'win32' ? 'Node module interception terminates the Windows test worker' : false
-}, async (context) => {
+}, async () => {
     // These mutable cells expose the callbacks and current synthetic engine state owned by the redirected DevEngine substitute.
     let hooks: DevHooks | undefined
     let triggerFullBuild: (() => void) | undefined
@@ -180,22 +179,6 @@ test('reduces synthetic engine update variants and unknown host failures without
             ws: { path: hmrEndpointPath }
         }
     })
-    type TestSocketClient = Readonly<{ send: (event: string, data: unknown) => void }>
-    type TestSocketListener = (data: unknown, client: TestSocketClient) => void
-
-    // This mutable map captures the host's transport listeners without replacing the Vite server itself.
-    const socketListeners = new Map<string, TestSocketListener>()
-    context.mock.method(server.ws, 'on', (event: string, listener: (...args: unknown[]) => unknown) => {
-        if (typeof event === 'string') {
-            socketListeners.set(event, (data, client) => {
-                Reflect.apply(listener, undefined, [data, client])
-            })
-        }
-    })
-    const hmrMode = {
-        ...createDevtoolsHmrMode(),
-        replay: () => ({ kind: 'event' as const, event: 'test:response', data: 'response' })
-    }
     const httpServer = server.httpServer
     assert.ok(httpServer)
     const originalAddress = httpServer.address
@@ -205,21 +188,8 @@ test('reduces synthetic engine update variants and unknown host failures without
             server: server,
             options: options,
             styles: styles,
-            hmrMode: hmrMode
+            hmrMode: createDevtoolsHmrMode()
         })
-        const listener = socketListeners.get(runtimeSubscribeEvent)
-        assert.ok(listener)
-        // This mutable list captures the response dispatched to one synthetic socket client.
-        const socketResponses: Array<Readonly<{ event: string; data: unknown }>> = []
-        listener(
-            { buildId: 'build' },
-            {
-                send(event, data) {
-                    socketResponses.push({ event: event, data: data })
-                }
-            }
-        )
-        assert.deepEqual(socketResponses, [{ event: 'test:response', data: 'response' }])
         const bundledDev = requireBundledDev(server.environments.client.bundledDev)
 
         // Initial output has an HTTP object without a bound address, so no build identity is exposed yet.

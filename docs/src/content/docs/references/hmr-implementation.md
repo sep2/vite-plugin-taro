@@ -61,7 +61,7 @@ React Refresh 不会把状态序列化后重建。它只能更新仍然存活的
 | Rolldown 开发引擎 | 监视源码，生成模块补丁或要求完整构建 |
 | vpt 开发主机 | 串行处理构建结果、样式、累计补丁、交付和运行时报告 |
 | DevTools 交付 | 把累计补丁渲染为 `hmr/patches.js` |
-| Interpreter 交付 | 通过 Vite WebSocket 推送累计日志，并在首次订阅时补发当前值 |
+| Interpreter 交付 | 通过 Vite WebSocket 推送新发布的累计日志 |
 | App 模块运行时 | 保存模块图、缓存、热更新边界和已应用序号 |
 | Sval（仅 `interpreter`） | 解析并解释 Rolldown 模块注册程序与更新后的模块实现 |
 | React Refresh | 判断组件边界是否兼容，并更新现有 React 树 |
@@ -114,7 +114,7 @@ __rolldown_runtime__.applyPatches(
 
 ### `interpreter` 的 App 源码通道
 
-解释器模式不给 Page 添加补丁依赖，也不生成 `hmr/patches.js`。App 连接 `hmr/info.js` 中的 WebSocket，并用 `buildId` 订阅当前日志。源码发布时，主机直接广播累计补丁；首次订阅时，主机补发仍未确认的日志后缀。
+解释器模式不给 Page 添加补丁依赖，也不生成 `hmr/patches.js`。App 连接 `hmr/info.js` 中的 WebSocket，源码发布时主机直接广播累计补丁。
 
 每个 App 运行环境只创建并保留一个原生 `SocketTask`，不会重建连接，也没有轮询、心跳或插件定时器。构建身份切换和主机关闭通过同一通道通知旧 App 关闭该连接。
 
@@ -162,7 +162,7 @@ __rolldown_runtime__.applyPatches(
 
 所有构建结果、样式、补丁、运行时报告和完整构建切换都经过同一条串行队列。交付成功只推进 Rolldown 的“已发布”前沿；App 通过 WebSocket 成功应用序号后，日志才推进“已应用”前沿。
 
-`devtools` 文件使用“同目录临时 `.txt` 文件 + rename”替换。开发者工具忽略临时文件，只会看到完整的最终内容。`interpreter` 不写 JavaScript 文件，也不复制第二份发布状态；广播和首次订阅补发都直接序列化补丁日志的当前值。
+`devtools` 文件使用“同目录临时 `.txt` 文件 + rename”替换。开发者工具忽略临时文件，只会看到完整的最终内容。`interpreter` 不写 JavaScript 文件，也不复制第二份发布状态；每次广播直接序列化本次累计补丁发布。
 
 ### 3. `devtools` 补丁文件保留尚未确认的完整序列
 
@@ -214,7 +214,7 @@ module.exports = {
 
 主机把当前尚未确认的补丁 `{ buildId, patches: [{ seq, changedIds, code, ... }] }` 作为 Vite 自定义事件发送。Sval 在一个 App 级沙箱作用域中解释每个 `code`；代码只登记模块图和模块工厂，应用模块仍由共享运行时稍后统一执行。
 
-成功应用后，App 通过同一个 WebSocket 报告序号。解释器源码只在新发布或首次订阅时发送，不会因为幂等重放形成请求循环。每份源码携带构建身份；构建替换和主机关闭都会向旧 App 发送终止消息。
+成功应用后，App 通过同一个 WebSocket 报告序号。解释器源码只在新发布时发送。每份源码携带构建身份；构建替换和主机关闭都会向旧 App 发送终止消息。
 
 ### 5. 运行时验证补丁
 
@@ -381,7 +381,7 @@ type RebuildReport = {
 
 `applied` 允许主机删除已经成功应用的补丁历史；`rebuild` 请求完整构建。每份报告都与补丁交付和构建切换按顺序处理，不存在单独的 HTTP 报告协议。
 
-`interpreter` 在该 WebSocket 上额外发送 `{ buildId }` 订阅事件；主机若仍保留该构建的未确认补丁，就立即回放当前累计值。后续源码发布、构建切换和关闭均由主机主动推送。
+`interpreter` 的源码发布、构建切换和关闭由主机通过 WebSocket 主动推送。
 
 ## 顺序保证
 

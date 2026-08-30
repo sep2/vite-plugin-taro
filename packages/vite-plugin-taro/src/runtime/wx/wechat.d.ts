@@ -19,7 +19,6 @@ declare const global: WeChatGlobal
 type WeChatSocketTask = Readonly<{
     send(options: Readonly<{ data: string | ArrayBuffer }>): void
     close(options: Readonly<{ code: number; reason: string }>): void
-    onOpen(listener: () => void): void
     onMessage(listener: (result: Readonly<{ data: string | ArrayBuffer }>) => void): void
 }>
 

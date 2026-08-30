@@ -37,26 +37,7 @@ export function createDevtoolsHmrMode(): WxHmrMode {
             kind: 'write',
             fileName: devtoolsPatchesFileName,
             source: renderDevtoolsPatches(publication.buildId, publication.patches)
-        }),
-        replay: () => undefined
-    }
-}
-
-/**
- * Injects Page handoff at the exact native registration edge rather than wrapping arbitrary user `Page` calls.
- *
- * The native shell has one stable `Page(pageConfig)` contract. Failing when that contract changes is intentional: silently
- * skipping this transform would let DevTools unload the live Taro Page and destroy React state while appearing to support HMR.
- */
-export function injectPageShellHmr(code: string): { code: string; map: null } {
-    const registration = 'Page(pageConfig)'
-    if (!code.includes(registration)) {
-        throw new Error('WX native Page shell must register pageConfig')
-    }
-
-    return {
-        code: code.replace(registration, 'Page(__rolldown_runtime__.injectPageHmr(pageConfig))'),
-        map: null
+        })
     }
 }
 
@@ -118,5 +99,23 @@ function createDevtoolsPagePlugin(): Plugin {
                 return injectPageShellHmr(code)
             }
         }
+    }
+}
+
+/**
+ * Injects Page handoff at the exact native registration edge rather than wrapping arbitrary user `Page` calls.
+ *
+ * The native shell has one stable `Page(pageConfig)` contract. Failing when that contract changes is intentional: silently
+ * skipping this transform would let DevTools unload the live Taro Page and destroy React state while appearing to support HMR.
+ */
+export function injectPageShellHmr(code: string): { code: string; map: null } {
+    const registration = 'Page(pageConfig)'
+    if (!code.includes(registration)) {
+        throw new Error('WX native Page shell must register pageConfig')
+    }
+
+    return {
+        code: code.replace(registration, 'Page(__rolldown_runtime__.injectPageHmr(pageConfig))'),
+        map: null
     }
 }

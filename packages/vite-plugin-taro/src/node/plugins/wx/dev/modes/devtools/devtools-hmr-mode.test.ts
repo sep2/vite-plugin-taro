@@ -96,5 +96,4 @@ test('describes reset and publication writes through the exact DevTools patch pa
     }
     assert.equal(publication.fileName, 'hmr/patches.js')
     assert.match(publication.source, /registerLatestFactory\(\)/)
-    assert.equal(mode.replay(undefined, 'build'), undefined)
 })

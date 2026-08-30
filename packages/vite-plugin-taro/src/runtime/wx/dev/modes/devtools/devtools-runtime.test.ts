@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { DevRuntime } from 'rolldown/experimental/runtime'
-import { runtimeReportEvent, runtimeSubscribeEvent } from '../../wx-hmr-protocol.ts'
+import { runtimeReportEvent } from '../../wx-hmr-protocol.ts'
 
 type TestHotContext = Readonly<{
     _internal: Readonly<{
@@ -49,10 +49,9 @@ let runtimeId = 0
 
 /** Creates one isolated runtime and captures only its metadata reports. */
 async function createTestHarness(): Promise<TestHarness> {
-    // These mutable values capture socket output and the native callbacks registered by one runtime.
+    // These mutable values capture socket output and the native message callback registered by one runtime.
     const reports: unknown[] = []
     const messages: CapturedSocketMessage[] = []
-    let openSocket = () => {}
     let receiveSocketMessage = (_result: Readonly<{ data: string | ArrayBuffer }>) => {}
     const socket: WeChatSocketTask = {
         send(options) {
@@ -63,9 +62,6 @@ async function createTestHarness(): Promise<TestHarness> {
             }
         },
         close() {},
-        onOpen(listener) {
-            openSocket = listener
-        },
         onMessage(listener) {
             receiveSocketMessage = listener
         }
@@ -81,7 +77,6 @@ async function createTestHarness(): Promise<TestHarness> {
 
     const runtime = await importTestRuntime()
     runtime.initialize({ buildId: 'build', endpoint: 'ws://localhost/hmr' })
-    openSocket()
     return {
         emitSocketMessage(data) {
             receiveSocketMessage({ data: data })
@@ -222,11 +217,6 @@ test('reports the committed application frontier through the exact host protocol
     assert.deepEqual(messages, [
         {
             type: 'custom',
-            event: runtimeSubscribeEvent,
-            data: { buildId: 'build' }
-        },
-        {
-            type: 'custom',
             event: runtimeReportEvent,
             data: { buildId: 'build', kind: 'applied', seq: 1 }
         }
@@ -265,8 +255,8 @@ test('keeps the first App-heap identity when initialize is replayed', async (con
     })
 
     assert.deepEqual(runtime.loadExports('page'), { value: 'current' })
-    assert.equal(messages.length, 2)
-    assert.deepEqual(messages[1]?.data, { buildId: 'build', kind: 'applied', seq: 1 })
+    assert.equal(messages.length, 1)
+    assert.deepEqual(messages[0]?.data, { buildId: 'build', kind: 'applied', seq: 1 })
 })
 
 test('retains hot contexts only after they become accepting boundaries', async () => {

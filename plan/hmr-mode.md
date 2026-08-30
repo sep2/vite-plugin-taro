@@ -71,8 +71,7 @@ The `devtools` mode owns:
 
 The `interpreter` mode owns:
 
-- declarative custom events for initial build subscription and source publication;
-- initial subscription replay from the current journal suffix;
+- declarative events for source publication;
 - cumulative messages containing the original `{ seq, changedIds, code }` patch fields;
 - an App-only entry banner and interpreter runtime entry.
 
@@ -91,7 +90,6 @@ The shared WX HMR runtime owns:
 - build identity and the applied sequence frontier;
 - contiguous batch validation;
 - the App heap's sole Vite-protocol SocketTask;
-- the shared build-subscription event sent when that socket opens;
 - application and rebuild report events;
 - build-replacement and host-shutdown control events.
 
@@ -126,24 +124,22 @@ export type PatchPublication = Readonly<{
     patches: readonly PatchUpdate[]
 }>
 
-export type WxHmrEvent = Readonly<{ kind: 'event'; event: string; data: unknown }>
-export type WxHmrModeAction =
+export type WxHmrAction =
     | Readonly<{ kind: 'write'; fileName: string; source: string }>
-    | WxHmrEvent
+    | Readonly<{ kind: 'event'; event: string; data: unknown }>
 
 export type WxHmrMode = Readonly<{
     runtimeFile: string
     plugins: readonly Plugin[]
-    reset: () => WxHmrModeAction | undefined
-    publish: (publication: PatchPublication) => WxHmrModeAction
-    replay: (publication: PatchPublication | undefined, buildId: string) => WxHmrEvent | undefined
+    reset: () => WxHmrAction | undefined
+    publish: (publication: PatchPublication) => WxHmrAction
     createEntryBanner: (
         pageFiles: ReadonlySet<string>
     ) => (chunk: Readonly<{ name: string; fileName: string }>) => string
 }>
 ```
 
-The descriptor is created once during Vite plugin composition. It is pure with respect to host infrastructure: neither mode receives `ViteDevServer`, a WebSocket, or a physical writer. DevTools returns file-write actions; interpreter mode returns broadcast events and implements `replay()` for the host's shared subscription event. The host executes the selected action and only then notifies Rolldown that the publication is observable.
+The descriptor is created once during Vite plugin composition. It is pure with respect to host infrastructure: neither mode receives `ViteDevServer`, a WebSocket, or a physical writer. DevTools returns file-write actions and interpreter mode returns broadcast events. The host executes the selected action and only then notifies Rolldown that the publication is observable.
 
 ### Patch journal
 
@@ -152,8 +148,6 @@ Replace the file-aware `PatchPublisher` with a transport-independent `PatchJourn
 ```ts
 export class PatchJournal {
     constructor(publish: (publication: PatchPublication) => Promise<void>)
-
-    current(): PatchPublication | undefined
     isCurrentBuild(buildId: string): boolean
     startBuild(): Readonly<{ buildId: string; previousBuildId: string | undefined }>
     produce(patches: readonly PatchUpdate[]): Promise<void>
@@ -161,7 +155,7 @@ export class PatchJournal {
 }
 ```
 
-The journal keeps the original mutable build ID and pending-patch array. `current()` adds only a synchronous view used when an interpreter socket first subscribes.
+The journal keeps the original mutable build ID and pending-patch array.
 
 `produce()` appends patches and passes the same structured publication to the selected mode action factory bound by the host constructor. It does not render JavaScript, know a destination filename, or own transport listeners.
 
@@ -237,7 +231,7 @@ The common host performs this ordered transaction:
 6. execute and await the mode-selected host action;
 7. notify Rolldown of every delivered payload in sequence order.
 
-DevTools returns a write action containing the rendered `hmr/patches.js`. Interpreter mode returns a source event; the host broadcasts it through Vite WebSocket. Its initial-subscription hook reads `journal.current()` without a second snapshot, and the host sends the returned response event to that client.
+DevTools returns a write action containing the rendered `hmr/patches.js`. Interpreter mode returns a source event, which the host broadcasts through Vite WebSocket.
 
 ### Runtime report
 
@@ -349,7 +343,7 @@ Move the shared module and update machinery into `wx-hmr-runtime.ts`:
 
 ### Interpreter adapter
 
-`interpreter-runtime.ts` owns Sval and interpreter-specific socket hooks. It imports the shared runtime object into one sandbox, subscribes the current build after the shared socket opens, interprets registration programs synchronously, and applies them through `applyPatchPayload()`. Application failure closes the retained shared socket and requests a complete build.
+`interpreter-runtime.ts` owns Sval and interpreter-specific source handling. It imports the shared runtime object into one sandbox, interprets registration programs synchronously, and applies them through `applyPatchPayload()`. Application failure closes the retained shared socket and requests a complete build.
 
 ## Implemented file layout
 
@@ -458,7 +452,7 @@ Keep or create tests for:
 
 ### Interpreter mode tests
 
-Interpreter tests cover App-only banners, WebSocket publication, initial subscription replay, build-replacement and shutdown controls, Sval registration, interpreter failures, and retention of exactly one SocketTask.
+Interpreter tests cover App-only banners, WebSocket publication, build-replacement and shutdown controls, Sval registration, interpreter failures, and retention of exactly one SocketTask.
 
 ### Integration acceptance
 
@@ -514,7 +508,7 @@ The mode descriptor and all publication values are immutable.
 2. Add public `'devtools' | 'interpreter'` selection resolved once during composition.
 3. Extend delivery with build-aware reset and access to the authoritative journal.
 4. Add timer-free interpreter delivery through Vite's existing WebSocket custom events.
-5. Add the Sval runtime adapter and initial subscription replay.
+5. Add the Sval runtime adapter and source-event handling.
 6. Test source delivery, interpretation, failures, rotation, shutdown, and default DevTools bytes.
 7. Run both modes through the real WeChat DevTools burst, rebuild, and recovery suite.
 8. Document behavior and performance tradeoffs.

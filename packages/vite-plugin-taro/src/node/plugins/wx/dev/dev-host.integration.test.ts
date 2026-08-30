@@ -11,7 +11,7 @@ import {
     type InterpreterServerMessage,
     interpreterServerEvent
 } from '../../../../runtime/wx/dev/modes/interpreter/interpreter-protocol.ts'
-import { runtimeReportEvent, runtimeSubscribeEvent } from '../../../../runtime/wx/dev/wx-hmr-protocol.ts'
+import { runtimeReportEvent } from '../../../../runtime/wx/dev/wx-hmr-protocol.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
 import { createWxStylePlugin } from '../styles/plugins.ts'
@@ -247,16 +247,6 @@ async function openHmrSocket(info: HmrInfo): Promise<WebSocket> {
     return socket
 }
 
-function subscribeInterpreterSocket(socket: WebSocket, buildId: string): void {
-    socket.send(
-        JSON.stringify({
-            type: 'custom',
-            event: runtimeSubscribeEvent,
-            data: { buildId: buildId }
-        })
-    )
-}
-
 function waitForInterpreterMessage(socket: WebSocket): Promise<InterpreterServerMessage> {
     const result = Promise.withResolvers<InterpreterServerMessage>()
     const receive = (event: MessageEvent<unknown>) => {
@@ -413,12 +403,10 @@ test('publishes interpreter source through Vite WebSocket', async (context) => {
     )
     assert.equal(await readExistingFile(fixture.patchesPath), undefined)
 
-    await publishSourceGeneration(fixture.pagePath, renderPage('first interpreted generation'))
-
     const socket = await openHmrSocket(info)
     context.after(() => socket.close())
     const firstMessagePromise = waitForInterpreterMessage(socket)
-    subscribeInterpreterSocket(socket, info.buildId)
+    await publishSourceGeneration(fixture.pagePath, renderPage('first interpreted generation'))
     const firstMessage = await firstMessagePromise
     assert.equal(firstMessage.kind, 'patches')
     if (firstMessage.kind !== 'patches') {
