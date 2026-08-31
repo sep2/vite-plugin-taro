@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { transformSync } from '@babel/core'
 import { resolveConfig } from 'vite'
 import type { VptOptions } from '../../../options.ts'
+import { packageRequire } from '../../utils/packages.ts'
 import { createH5TargetPlugins, h5TaroApiPreset, h5TaroApiTransformCodeFilter } from './plugins.ts'
 
 const options: VptOptions = {
@@ -25,10 +26,23 @@ test('promotes compiler-owned H5 dependencies to optimizer entries', async () =>
 
     assert.deepEqual(config.optimizeDeps.include, [
         '@tarojs/plugin-platform-h5/dist/runtime/apis',
+        '@tarojs/router',
         '@tarojs/runtime',
         'react-dom/client'
     ])
     assert.deepEqual(config.optimizeDeps.exclude, [])
+
+    const platformApiAlias = config.resolve.alias.find((alias) => {
+        return alias.find instanceof RegExp && alias.find.test('@tarojs/plugin-platform-h5/dist/runtime/apis')
+    })
+    assert.ok(platformApiAlias)
+    assert.equal(platformApiAlias.replacement, packageRequire.resolve('@tarojs/plugin-platform-h5/dist/runtime/apis'))
+
+    const routerAlias = config.resolve.alias.find((alias) => {
+        return alias.find instanceof RegExp && alias.find.test('@tarojs/router')
+    })
+    assert.ok(routerAlias)
+    assert.equal(routerAlias.replacement, packageRequire.resolve('@tarojs/router/dist/index.esm.js'))
 
     const babelPlugin = config.plugins.find((plugin) => plugin.name === '@rolldown/plugin-babel')
     assert.ok(babelPlugin)

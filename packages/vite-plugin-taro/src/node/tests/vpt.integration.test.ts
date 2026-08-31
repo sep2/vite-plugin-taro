@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import type { OutputAsset, OutputChunk } from 'rolldown'
-import { createLogger, build as viteBuild } from 'vite'
+import { createLogger, normalizePath, build as viteBuild } from 'vite'
 import vpt, { type VptOptions, type VptTarget } from '../../index.ts'
 import { packageRequire } from '../utils/packages.ts'
 
@@ -115,23 +115,29 @@ test('builds a routed H5 application through the public plugin entry', async () 
                     import { View } from '@tarojs/components'
 
                     export default function Home() {
+                        const pageCount = Taro.getCurrentPages().length
                         const notify = () => {
                             void Taro.showToast({ title: 'default-api-marker' })
                             void showToast({ title: 'named-api-marker' })
                         }
-                        return <View id="h5-home" onClick={notify}>H5 route marker</View>
+                        return <View id="h5-home" data-page-count={pageCount} onClick={notify}>H5 route marker</View>
                     }
                 `
             }
         },
         (output) => {
             const html = String(requireAsset(output, 'index.html').source)
-            const javascript = output
-                .filter((candidate): candidate is OutputChunk => candidate.type === 'chunk')
-                .map((chunk) => chunk.code)
-                .join('\n')
+            const chunks = output.filter((candidate): candidate is OutputChunk => candidate.type === 'chunk')
+            const javascript = chunks.map((chunk) => chunk.code).join('\n')
+            const routerModuleIds = new Set(
+                chunks
+                    .flatMap((chunk) => Object.keys(chunk.modules))
+                    .map(normalizePath)
+                    .filter((id) => id.endsWith('/@tarojs/router/dist/index.esm.js'))
+            )
 
             assert.match(html, /<script type="module" crossorigin src="\/assets\//)
+            assert.equal(routerModuleIds.size, 1)
             assert.match(javascript, /H5 route marker/)
             assert.match(javascript, /pages\/home\/index/)
             assert.match(javascript, /Fixture App/)
