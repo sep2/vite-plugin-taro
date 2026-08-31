@@ -23,7 +23,7 @@
         "cross-env": "^10.1.0",
         "rolldown": "1.2.5",
         "vite": "8.2.2",
-        "vite-plugin-taro": "^0.6.20-beta.3"
+        "vite-plugin-taro": "^0.6.20"
     },
     "overrides": {
         "@types/react": "$@types/react"
