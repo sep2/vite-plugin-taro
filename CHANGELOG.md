@@ -4,6 +4,33 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.6.20-beta.3] - 2026-08-31
+
+### Added
+
+- add WebSocket interpreter HMR mode (5b111fc)
+
+### Changed
+
+- lazily materialize wrapper snapshots (eae206e)
+- stop wrapper snapshot traversal early (4b473ac)
+- add Alipay support plan (c390755)
+- docs (919202f)
+- send HMR reports over WebSocket (7b48551)
+- remove HMR subscription replay (673634a)
+- centralize HMR effects in dev host (945c572)
+- types (c522f36)
+- hmr interpreter mode (bc13ab0)
+- use WebSocket for HMR reports (7470232)
+- isolate DevTools HMR mode (ed9b6a6)
+- show latest version in llms index (08b1942)
+
+### Fixed
+
+- fix h5 build (aa254aa)
+- fix demo (93335de)
+- preserve CustomWrapper snapshots during HMR (1ff3939)
+
 ## [0.6.20-beta.2] - 2026-08-29
 
 ### Changed
