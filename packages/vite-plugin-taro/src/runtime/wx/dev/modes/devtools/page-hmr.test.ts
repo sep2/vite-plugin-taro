@@ -168,7 +168,7 @@ test('requires the App-global CustomWrapper cache before mounted re-registration
     assert.throws(() => harness.reregisterPage(config), /cache is not installed/)
 })
 
-test('materializes a loaded lazy tree instead of its stale Suspense fallback before Page registration', async () => {
+test('materializes nested lazy snapshots and stops after every cached wrapper is processed', async () => {
     const harness = await createTestHarness()
     const config = harness.createConfig()
     const page = harness.createPage()
@@ -191,16 +191,21 @@ test('materializes a loaded lazy tree instead of its stale Suspense fallback bef
     }
     const unmountedWrapper = { nn: 'custom-wrapper', sid: 'unmounted', cn: [null] }
     const invalidWrapper = { nn: 'custom-wrapper', sid: 7, cn: [] }
-    const pageChildren = [staleOuter, unmountedWrapper, invalidWrapper, 'ordinary text']
+    const unreachableTail = {
+        get value(): never {
+            return assert.fail('Traversal continued after every cached wrapper was processed')
+        }
+    }
+    const pageChildren = [unmountedWrapper, invalidWrapper, 'ordinary text', staleOuter, unreachableTail]
     page.data = { root: { cn: pageChildren } }
 
     config.onLoad.call(page)
     harness.reregisterPage(config)
 
-    assert.strictEqual(pageChildren[0], currentOuter)
+    assert.strictEqual(pageChildren[0], unmountedWrapper)
+    assert.strictEqual(pageChildren[1], invalidWrapper)
+    assert.strictEqual(pageChildren[3], currentOuter)
     assert.strictEqual(currentOuter.cn[0], currentInner)
-    assert.strictEqual(pageChildren[1], unmountedWrapper)
-    assert.strictEqual(pageChildren[2], invalidWrapper)
     assert.strictEqual(config.data, page.data)
 })
 

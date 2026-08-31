@@ -117,8 +117,9 @@ type CustomWrapperCache = ReadonlyMap<string, Readonly<{ data: Readonly<{ i: Sna
 const customWrapperCacheKey = Symbol.for('customWrapperCache')
 
 /**
- * Replaces stale Page.data placeholders with each mounted CustomWrapper's current native snapshot in one O(n) traversal.
- * This mutates only the registration data before WeChat reads it; it performs no setData call and does not inspect React.
+ * Replaces stale Page.data placeholders with each mounted CustomWrapper's current native snapshot in at most one O(n)
+ * traversal. This mutates only the registration data before WeChat reads it; it performs no setData call and does not
+ * inspect React.
  */
 function applyCustomWrapperSnapshots(data: SnapshotRecord): void {
     const customWrapperCache: unknown = Reflect.get(global, customWrapperCacheKey)
@@ -127,15 +128,25 @@ function applyCustomWrapperSnapshots(data: SnapshotRecord): void {
         throw new Error('WX CustomWrapper cache is not installed in the App global.')
     }
 
-    if (customWrapperCache.size > 0) {
-        materialize(data, customWrapperCache)
+    if (customWrapperCache.size === 0) {
+        return
     }
+
+    // This local mutable set lets the synchronous traversal stop after every mounted wrapper snapshot has been consumed.
+    // Cache entries owned by another mounted Page remain, naturally falling back to a complete traversal of this Page.
+    const remainingSids: Set<string> = new Set(customWrapperCache.keys())
+
+    materialize(data, customWrapperCache, remainingSids)
 }
 
-function materialize(value: unknown, customWrapperCache: CustomWrapperCache): unknown {
+function materialize(value: unknown, customWrapperCache: CustomWrapperCache, remainingSids: Set<string>): unknown {
     if (Array.isArray(value)) {
         for (let i = 0; i < value.length; i++) {
-            value[i] = materialize(value[i], customWrapperCache)
+            if (remainingSids.size === 0) {
+                return value
+            }
+
+            value[i] = materialize(value[i], customWrapperCache, remainingSids)
         }
 
         return value
@@ -145,18 +156,32 @@ function materialize(value: unknown, customWrapperCache: CustomWrapperCache): un
         return value
     }
 
-    const snapshot =
-        value.nn === 'custom-wrapper' && typeof value.sid === 'string'
-            ? customWrapperCache.get(value.sid)?.data.i
-            : undefined
+    if (value.nn === 'custom-wrapper' && typeof value.sid === 'string') {
+        const snapshot = customWrapperCache.get(value.sid)?.data.i
 
-    const current = snapshot ?? value
-
-    for (const key in current) {
-        current[key] = materialize(current[key], customWrapperCache)
+        if (snapshot) {
+            remainingSids.delete(value.sid)
+            return materializeRecord(snapshot, customWrapperCache, remainingSids)
+        }
     }
 
-    return current
+    return materializeRecord(value, customWrapperCache, remainingSids)
+}
+
+function materializeRecord(
+    record: SnapshotRecord,
+    customWrapperCache: CustomWrapperCache,
+    remainingSids: Set<string>
+): SnapshotRecord {
+    for (const key in record) {
+        if (remainingSids.size === 0) {
+            return record
+        }
+
+        record[key] = materialize(record[key], customWrapperCache, remainingSids)
+    }
+
+    return record
 }
 
 function isRecord(value: unknown): value is SnapshotRecord {
