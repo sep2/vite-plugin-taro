@@ -252,4 +252,4 @@ function OrderDetailPage() {
 - [配置选项](/guides/configuration/)：声明 App、页面路径和页面配置。
 - [组件与 API](/guides/components-and-api/)：使用组件、生命周期和路由 API。
 - [样式](/guides/styles/)：编写 App 和页面样式。
-- [开发者工具热更新](/guides/hot-module-replacement/)：了解更新时保留的 App 和页面状态。
+- [开发热更新](/guides/hot-module-replacement/)：了解更新时保留的 App 和页面状态。

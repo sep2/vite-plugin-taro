@@ -42,7 +42,7 @@ npm create vite-taro@latest my-app
 - [样式](https://vpt.js.org/guides/styles/)
 - [全自动分包](https://vpt.js.org/guides/automatic-subpackages/)
 - [微信原生组件](https://vpt.js.org/guides/native-components/)
-- [开发者工具热更新](https://vpt.js.org/guides/hot-module-replacement/)
+- [开发热更新](https://vpt.js.org/guides/hot-module-replacement/)
 - [配置选项](https://vpt.js.org/guides/configuration/)
 - [条件编译](https://vpt.js.org/guides/conditional-directives/)
 - [Skyline 模式](https://vpt.js.org/guides/skyline-mode/)

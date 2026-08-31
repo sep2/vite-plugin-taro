@@ -174,7 +174,7 @@ projectConfigJson: {
 VITE_VPT_WECHAT_APP_ID=wx1234567890abcdef
 ```
 
-热更新所需设置参见[开发者工具热更新](/guides/hot-module-replacement/)。
+热更新所需设置参见[开发热更新](/guides/hot-module-replacement/)。
 
 ## `projectPrivateConfigJson`
 

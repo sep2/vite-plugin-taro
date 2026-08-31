@@ -22,7 +22,7 @@ export const documentationSections: ReadonlyArray<DocumentationSection> = [
             { label: '微信原生组件', slug: 'guides/native-components' },
             { label: '组件与 API', slug: 'guides/components-and-api' },
             { label: '配置选项', slug: 'guides/configuration' },
-            { label: '开发者工具热更新', slug: 'guides/hot-module-replacement' },
+            { label: '开发热更新', slug: 'guides/hot-module-replacement' },
             { label: '条件编译', slug: 'guides/conditional-directives' },
             { label: 'Skyline 模式', slug: 'guides/skyline-mode' },
             { label: '从 Taro 迁移', slug: 'guides/migrate-from-taro' }
