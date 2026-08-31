@@ -50,13 +50,14 @@ export function injectPageHmr(config: HmrPageConfig): HmrPageConfig {
          */
         existingState.isReregistering = true
         /*
-         * `Page(config)` reads `config.data` as the initial native view-model for this registration. Supplying the mounted Page's
-         * latest data prevents the temporary Page used for re-registration callbacks from starting empty. This is an O(1)
-         * reference assignment: it does not clone the recursive data tree, call `setData`, move React state, or rebind Taro. The
-         * ordinary Taro lifecycle stays suppressed through re-registration onShow, so the existing React tree remains attached
-         * to `mountedPage` and every later registration reads that Page's latest native data.
+         * `Page(config)` reads `config.data` as the initial native view-model for this registration. The Page owns current app
+         * and ordinary Page fields, while each mounted CustomWrapper owns the current snapshot below its native boundary. Join
+         * those already-serialized snapshots before registration so WeChat never publishes the stale initial placeholder tree.
+         * This lifecycle handoff performs no setData call and runs before React Refresh can publish another logical tree.
          */
         config.data = mountedPage.data
+
+        applyCustomWrapperSnapshots(config.data)
 
         return config
     }
@@ -108,4 +109,56 @@ export function injectPageHmr(config: HmrPageConfig): HmrPageConfig {
     }
 
     return config
+}
+
+type SnapshotRecord = Record<string, unknown>
+type CustomWrapperCache = ReadonlyMap<string, Readonly<{ data: Readonly<{ i: SnapshotRecord }> }>>
+
+const customWrapperCacheKey = Symbol.for('customWrapperCache')
+
+/**
+ * Replaces stale Page.data placeholders with each mounted CustomWrapper's current native snapshot in one O(n) traversal.
+ * This mutates only the registration data before WeChat reads it; it performs no setData call and does not inspect React.
+ */
+function applyCustomWrapperSnapshots(data: SnapshotRecord): void {
+    const customWrapperCache: unknown = Reflect.get(global, customWrapperCacheKey)
+
+    if (!(customWrapperCache instanceof Map)) {
+        throw new Error('WX CustomWrapper cache is not installed in the App global.')
+    }
+
+    if (customWrapperCache.size > 0) {
+        materialize(data, customWrapperCache)
+    }
+}
+
+function materialize(value: unknown, customWrapperCache: CustomWrapperCache): unknown {
+    if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i++) {
+            value[i] = materialize(value[i], customWrapperCache)
+        }
+
+        return value
+    }
+
+    if (!isRecord(value)) {
+        return value
+    }
+
+    const snapshot =
+        value.nn === 'custom-wrapper' && typeof value.sid === 'string'
+            ? customWrapperCache.get(value.sid)?.data.i
+            : undefined
+
+    const current = snapshot ?? value
+
+    for (const key in current) {
+        current[key] = materialize(current[key], customWrapperCache)
+    }
+
+    return current
+}
+
+function isRecord(value: unknown): value is SnapshotRecord {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

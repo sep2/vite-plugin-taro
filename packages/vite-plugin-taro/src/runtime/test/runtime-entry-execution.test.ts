@@ -350,7 +350,15 @@ test('preserves WX capsule runtime initialization order and export identities', 
     const ReactDOM = {}
     const createPageConfig = () => undefined
     const createRecursiveComponentConfig = () => undefined
-    const harness = { events, createReactApp, ReactDOM, createPageConfig, createRecursiveComponentConfig }
+    const customWrapperCache = new Map()
+    const harness = {
+        events,
+        createReactApp,
+        ReactDOM,
+        createPageConfig,
+        createRecursiveComponentConfig,
+        customWrapperCache
+    }
     const code = await bundleRuntimeEntry({
         entry: 'wx/capsule/taro-runtime.ts',
         mocks: {
@@ -367,14 +375,16 @@ test('preserves WX capsule runtime initialization order and export identities', 
                 globalThis.harness.events.push('taro-runtime')
                 export const createPageConfig = globalThis.harness.createPageConfig
                 export const createRecursiveComponentConfig = globalThis.harness.createRecursiveComponentConfig
+                export const customWrapperCache = globalThis.harness.customWrapperCache
             `
         },
-        defines: {}
+        defines: { 'process.env.NODE_ENV': JSON.stringify('development') }
     })
-
-    const exports = executeRuntimeEntry(code, createExecutionContext(harness))
+    const context = createExecutionContext(harness)
+    const exports = executeRuntimeEntry(code, context)
 
     assert.deepEqual(events, ['platform-runtime', 'framework', 'react-dom', 'taro-runtime'])
+    assert.strictEqual(Reflect.get(context.global, Symbol.for('customWrapperCache')), customWrapperCache)
     assert.strictEqual(exports.createReactApp, createReactApp)
     assert.strictEqual(exports.ReactDOM, ReactDOM)
     assert.strictEqual(exports.createPageConfig, createPageConfig)

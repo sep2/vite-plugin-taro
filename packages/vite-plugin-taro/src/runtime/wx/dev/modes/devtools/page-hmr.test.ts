@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { customWrapperCache } from '@tarojs/runtime/dist/utils/index.js'
 import { DevRuntime } from 'rolldown/experimental/runtime'
 
 type TestPage = {
@@ -30,10 +31,14 @@ type TestHarness = Readonly<{
     reregisterPage(config: TestPageConfig): void
 }>
 
+const customWrapperCacheKey = Symbol.for('customWrapperCache')
+
 // Mutable only to give each dynamic import a fresh App-global runtime singleton.
 let runtimeId = 0
 
 async function createTestHarness(): Promise<TestHarness> {
+    customWrapperCache.clear()
+    Reflect.set(global, customWrapperCacheKey, customWrapperCache)
     Object.assign(globalThis, {
         DevRuntime,
         wx: {
@@ -152,6 +157,51 @@ test('does not arm re-registration before mount or after an ordinary unload', as
         { kind: 'load', page: nextPage, args: ['next-load'] },
         { kind: 'show', page: nextPage, args: ['next-show'] }
     ])
+})
+
+test('requires the App-global CustomWrapper cache before mounted re-registration', async () => {
+    const harness = await createTestHarness()
+    const config = harness.createConfig()
+    config.onLoad.call(harness.createPage())
+    Reflect.deleteProperty(global, customWrapperCacheKey)
+
+    assert.throws(() => harness.reregisterPage(config), /cache is not installed/)
+})
+
+test('materializes a loaded lazy tree instead of its stale Suspense fallback before Page registration', async () => {
+    const harness = await createTestHarness()
+    const config = harness.createConfig()
+    const page = harness.createPage()
+    const currentInner = {
+        nn: 'custom-wrapper',
+        sid: 'inner',
+        cn: [{ nn: '5', sid: 'label', cn: [{ nn: '9', sid: 'text', v: 'current lazy tree' }] }]
+    }
+    const currentOuter = {
+        nn: 'custom-wrapper',
+        sid: 'outer',
+        cn: [{ nn: 'custom-wrapper', sid: 'inner', cn: [{ v: 'stale inner placeholder' }] }]
+    }
+    customWrapperCache.set('outer', { data: { i: currentOuter } })
+    customWrapperCache.set('inner', { data: { i: currentInner } })
+    const staleOuter = {
+        nn: 'custom-wrapper',
+        sid: 'outer',
+        cn: [{ v: 'Loading native component...' }]
+    }
+    const unmountedWrapper = { nn: 'custom-wrapper', sid: 'unmounted', cn: [null] }
+    const invalidWrapper = { nn: 'custom-wrapper', sid: 7, cn: [] }
+    const pageChildren = [staleOuter, unmountedWrapper, invalidWrapper, 'ordinary text']
+    page.data = { root: { cn: pageChildren } }
+
+    config.onLoad.call(page)
+    harness.reregisterPage(config)
+
+    assert.strictEqual(pageChildren[0], currentOuter)
+    assert.strictEqual(currentOuter.cn[0], currentInner)
+    assert.strictEqual(pageChildren[1], unmountedWrapper)
+    assert.strictEqual(pageChildren[2], invalidWrapper)
+    assert.strictEqual(config.data, page.data)
 })
 
 test('retains native data and suppresses re-registration business lifecycles', async () => {
