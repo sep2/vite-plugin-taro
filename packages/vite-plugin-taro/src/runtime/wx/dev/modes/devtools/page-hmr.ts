@@ -132,56 +132,54 @@ function applyCustomWrapperSnapshots(data: SnapshotRecord): void {
         return
     }
 
-    // This local mutable set lets the synchronous traversal stop after every mounted wrapper snapshot has been consumed.
-    // Cache entries owned by another mounted Page remain, naturally falling back to a complete traversal of this Page.
+    // This local mutable set lets the lazy traversal stop after every mounted wrapper snapshot has been consumed. Cache
+    // entries owned by another mounted Page remain, naturally falling back to a complete traversal of this Page.
     const remainingSids: Set<string> = new Set(customWrapperCache.keys())
 
-    materialize(data, customWrapperCache, remainingSids)
-}
+    for (const sid of materializeSnapshots(data, customWrapperCache)) {
+        remainingSids.delete(sid)
 
-function materialize(value: unknown, customWrapperCache: CustomWrapperCache, remainingSids: Set<string>): unknown {
-    if (Array.isArray(value)) {
-        for (let i = 0; i < value.length; i++) {
-            if (remainingSids.size === 0) {
-                return value
-            }
-
-            value[i] = materialize(value[i], customWrapperCache, remainingSids)
-        }
-
-        return value
-    }
-
-    if (!isRecord(value)) {
-        return value
-    }
-
-    if (value.nn === 'custom-wrapper' && typeof value.sid === 'string') {
-        const snapshot = customWrapperCache.get(value.sid)?.data.i
-
-        if (snapshot) {
-            remainingSids.delete(value.sid)
-            return materializeRecord(snapshot, customWrapperCache, remainingSids)
-        }
-    }
-
-    return materializeRecord(value, customWrapperCache, remainingSids)
-}
-
-function materializeRecord(
-    record: SnapshotRecord,
-    customWrapperCache: CustomWrapperCache,
-    remainingSids: Set<string>
-): SnapshotRecord {
-    for (const key in record) {
         if (remainingSids.size === 0) {
-            return record
+            return
         }
+    }
+}
 
-        record[key] = materialize(record[key], customWrapperCache, remainingSids)
+/** Lazily traverses the Page snapshot and yields each mounted CustomWrapper sid after replacing its stale node. */
+function* materializeSnapshots(value: unknown, customWrapperCache: CustomWrapperCache): Generator<string, void> {
+    if (Array.isArray(value)) {
+        for (let index = 0; index < value.length; index++) {
+            yield* replaceCustomWrapperSnapshot(value, index, customWrapperCache)
+            yield* materializeSnapshots(value[index], customWrapperCache)
+        }
+    } else if (isRecord(value)) {
+        for (const key in value) {
+            yield* replaceCustomWrapperSnapshot(value, key, customWrapperCache)
+            yield* materializeSnapshots(value[key], customWrapperCache)
+        }
+    }
+}
+
+/** Assigns a snapshot before yielding its sid, so closing the generator cannot discard the final replacement. */
+function* replaceCustomWrapperSnapshot<Key extends string | number>(
+    container: Record<Key, unknown>,
+    key: Key,
+    customWrapperCache: CustomWrapperCache
+): Generator<string, void> {
+    const value = container[key]
+
+    if (!isRecord(value) || value.nn !== 'custom-wrapper' || typeof value.sid !== 'string') {
+        return
     }
 
-    return record
+    const snapshot = customWrapperCache.get(value.sid)?.data.i
+    if (!snapshot) {
+        return
+    }
+
+    container[key] = snapshot
+
+    yield value.sid
 }
 
 function isRecord(value: unknown): value is SnapshotRecord {

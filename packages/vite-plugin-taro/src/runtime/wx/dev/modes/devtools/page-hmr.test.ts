@@ -209,6 +209,19 @@ test('materializes nested lazy snapshots and stops after every cached wrapper is
     assert.strictEqual(config.data, page.data)
 })
 
+test('completes the Page traversal when cached wrappers belong to another mounted Page', async () => {
+    const harness = await createTestHarness()
+    const config = harness.createConfig()
+    const page = harness.createPage()
+    page.data = { root: { cn: ['current Page'] } }
+    customWrapperCache.set('hidden', { data: { i: { nn: 'custom-wrapper', sid: 'hidden', cn: [] } } })
+
+    config.onLoad.call(page)
+    harness.reregisterPage(config)
+
+    assert.strictEqual(config.data, page.data)
+})
+
 test('retains native data and suppresses re-registration business lifecycles', async () => {
     const harness = await createTestHarness()
     const page = harness.createPage()
