@@ -10,7 +10,7 @@ import {
     runtimeReportEvent
 } from '../../../../runtime/wx/dev/wx-hmr-protocol.ts'
 import type { MiniContract } from '../mini-contract.d.ts'
-import type { WxStylePlugin } from '../styles/plugins.ts'
+import type { MiniStylePlugin } from '../styles/plugins.ts'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
 import {
     developmentAppWxssFileName,
@@ -20,11 +20,11 @@ import {
     renderHmrInfo,
     writeDevelopmentFile
 } from './hmr-files.ts'
-import type { WxHmrAction, WxHmrMode } from './hmr-mode.ts'
+import type { MiniHmrAction, MiniHmrMode } from './hmr-mode.ts'
 import { type HmrInfo, hmrEndpointPath, type PatchUpdate } from './hmr-protocol.ts'
 import { createHostActions } from './host-actions.ts'
+import { type BundledDev, installMiniDevOptions, requireSingleOutput } from './mini-dev-options.ts'
 import { PatchJournal } from './patch-journal.ts'
-import { type BundledDev, installWxDevOptions, requireSingleOutput } from './wx-dev-options.ts'
 
 declare module 'vite' {
     interface CustomEventMap {
@@ -33,7 +33,7 @@ declare module 'vite' {
     }
 }
 
-export type WxDevHost = Readonly<{
+export type MiniDevHost = Readonly<{
     close: () => Promise<void>
 }>
 
@@ -57,7 +57,7 @@ type HostAction =
 const hmrSettleMilliseconds = 16
 
 /**
- * Creates the WX dev host: the adapter that owns the physical Rolldown DevEngine, shared patch journal, and selected mode effects.
+ * Creates the Mini Program dev host: the adapter that owns the physical Rolldown DevEngine, shared patch journal, and selected mode effects.
  * It replaces Vite's browser-oriented `bundledDev.listen()` because a Mini Program cannot execute Vite's browser module graph;
  * its engine must write a complete native project while the selected mode supplies an environment-valid patch mechanism.
  *
@@ -65,7 +65,7 @@ const hmrSettleMilliseconds = 16
  * every live import edge. Keeping those responsibilities in the same serialized host transaction prevents JavaScript factories,
  * physical WXSS, and Rolldown's published frontier from describing different source generations.
  */
-export async function createWxDevHost({
+export async function createMiniDevHost({
     server,
     contract,
     styles,
@@ -73,14 +73,14 @@ export async function createWxDevHost({
 }: {
     server: ViteDevServer
     contract: MiniContract
-    styles: WxStylePlugin
-    hmrMode: WxHmrMode
-}): Promise<WxDevHost> {
+    styles: MiniStylePlugin
+    hmrMode: MiniHmrMode
+}): Promise<MiniDevHost> {
     const bundledDev = getBundledDev(server)
 
     // All callbacks admit typed actions through this edge; concatMap is the sole owner of effect ordering and mutable host state.
     const hostActions = createHostActions<HostAction>(applyHostAction, (action, error) =>
-        logWxError(server.config.logger, `wx HMR ${action.kind} failed`, error)
+        logMiniError(server.config.logger, `wx HMR ${action.kind} failed`, error)
     )
 
     // Modes return declarative effects; this host alone owns physical writes, event dispatch, and journal publication ordering.
@@ -94,7 +94,7 @@ export async function createWxDevHost({
     })
 
     // Option installation configures only Rolldown. Build lifecycle results enter through the engine's output action below.
-    installWxDevOptions({ bundledDev: bundledDev, server: server, contract: contract, hmrMode: hmrMode })
+    installMiniDevOptions({ bundledDev: bundledDev, server: server, contract: contract, hmrMode: hmrMode })
     const engine: DevEngine = await createEngine()
 
     const hmrResults = createHmrResultsStream(
@@ -193,7 +193,7 @@ export async function createWxDevHost({
     }
 
     /** Executes one mode-selected physical write or broadcast through host-owned infrastructure. */
-    async function dispatchModeAction(action: WxHmrAction | undefined): Promise<void> {
+    async function dispatchModeAction(action: MiniHmrAction | undefined): Promise<void> {
         if (!action) return
 
         switch (action.kind) {
@@ -229,14 +229,14 @@ export async function createWxDevHost({
             case 'publish':
                 return publishUpdates(action.result)
             case 'error':
-                logWxError(server.config.logger, 'wx HMR update failed', action.error)
+                logMiniError(server.config.logger, 'wx HMR update failed', action.error)
                 return
             case 'report':
                 processReport(action.report)
                 return
             case 'output':
                 if (action.result instanceof Error) {
-                    logWxError(server.config.logger, 'wx dev build failed', action.result)
+                    logMiniError(server.config.logger, 'wx dev build failed', action.result)
                     return
                 }
                 return publishCompleteStyles()
@@ -431,7 +431,7 @@ function relativeToViteConfig(outDir: string, configFile: string | undefined, ro
 }
 
 /** Logs an error with the plugin prefix, distinguishing Error values from unknowns. */
-function logWxError(logger: ViteDevServer['config']['logger'], prefix: string, error: unknown): void {
+function logMiniError(logger: ViteDevServer['config']['logger'], prefix: string, error: unknown): void {
     if (Error.isError(error)) {
         logger.error(`[vpt] ${prefix}`, { error })
     } else {

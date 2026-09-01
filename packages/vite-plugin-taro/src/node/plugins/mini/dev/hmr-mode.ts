@@ -5,7 +5,7 @@ import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
 import { createInterpreterHmrMode } from './modes/interpreter/interpreter-hmr-mode.ts'
 
 /** One mode-selected effect executed by the development host. */
-export type WxHmrAction =
+export type MiniHmrAction =
     | Readonly<{
           kind: 'event'
           event: string
@@ -18,25 +18,25 @@ export type WxHmrAction =
       }>
 
 /**
- * The behavior that genuinely differs between WX HMR implementations.
+ * The behavior that genuinely differs between Mini Program HMR implementations.
  *
  * The descriptor is selected once during plugin composition and returns declarative effects. The shared host alone performs
  * physical writes and event transport, so neither mode receives a Vite server or owns asynchronous infrastructure.
  */
-export type WxHmrMode = Readonly<{
+export type MiniHmrMode = Readonly<{
     runtimeFile: string
     plugins: readonly Plugin[]
 
-    reset: () => WxHmrAction | undefined
-    publish: (publication: PatchPublication) => WxHmrAction
+    reset: () => MiniHmrAction | undefined
+    publish: (publication: PatchPublication) => MiniHmrAction
 
     createEntryBanner: (
         pageFiles: ReadonlySet<string>
     ) => (chunk: Readonly<{ name: string; fileName: string }>) => string
 }>
 
-/** Resolves exactly one implementation before the WX development host is created. */
-export function createWxHmrMode(options: MiniHmrOptions): WxHmrMode {
+/** Resolves exactly one implementation before the Mini Program development host is created. */
+export function createMiniHmrMode(options: MiniHmrOptions): MiniHmrMode {
     const mode = options?.mode ?? 'devtools'
     switch (mode) {
         case 'devtools':

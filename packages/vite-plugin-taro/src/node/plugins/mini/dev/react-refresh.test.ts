@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
-    createWxReactRefreshTransforms,
+    createMiniReactRefreshTransforms,
     injectReactRefreshRendererDependency,
     removeRefreshPreambleGuard,
     transformReactDevtoolsHook,
@@ -55,7 +55,7 @@ test('rewrites only reference uses of the React DevTools hook in an admitted mod
 })
 
 test('routes renderer and preamble plugin hooks through their exact IDs', async () => {
-    const transforms = createWxReactRefreshTransforms()
+    const transforms = createMiniReactRefreshTransforms()
     assert.equal(transforms.length, 4)
     const rendererHook = transforms[1]?.transform
     const preambleHook = transforms[3]?.transform

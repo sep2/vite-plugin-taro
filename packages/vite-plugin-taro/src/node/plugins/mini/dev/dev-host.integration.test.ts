@@ -14,12 +14,12 @@ import { runtimeReportEvent } from '../../../../runtime/wx/dev/wx-hmr-protocol.t
 import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
 import type { MiniContract } from '../mini-contract.d.ts'
-import { createWxStylePlugin } from '../styles/plugins.ts'
-import { createWxDevHost } from './dev-host.ts'
+import { createMiniStylePlugin } from '../styles/plugins.ts'
+import { createMiniDevHost } from './dev-host.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
 import type { HmrInfo, RuntimeReport } from './hmr-protocol.ts'
+import type { BundledDev } from './mini-dev-options.ts'
 import { createDevtoolsHmrMode, devtoolsPatchesFileName } from './modes/devtools/devtools-hmr-mode.ts'
-import type { BundledDev } from './wx-dev-options.ts'
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 const maximumWaitAttempts = 400
@@ -272,10 +272,10 @@ test('rejects a server without Vite bundled development ownership', async (conte
 
     await assert.rejects(
         () =>
-            createWxDevHost({
+            createMiniDevHost({
                 server: server,
                 contract: createOptions(),
-                styles: createWxStylePlugin([import.meta.filename]),
+                styles: createMiniStylePlugin([import.meta.filename]),
                 hmrMode: createDevtoolsHmrMode()
             }),
         /Vite did not create the wx bundled-development environment/

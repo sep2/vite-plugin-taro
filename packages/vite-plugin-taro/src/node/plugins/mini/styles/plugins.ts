@@ -7,7 +7,7 @@ import { normalizeModuleId } from '../../../utils/modules.ts'
 import { wrapPluginTransform } from '../../../utils/vite.ts'
 import { tailwindcssBasedir } from '../../tailwind/tailwind-css.ts'
 import { globalWxssFileName } from '../dev/hmr-files.ts'
-import { createWxTransformer } from './create-wx-transformer.ts'
+import { createMiniTransformer } from './create-mini-transformer.ts'
 
 /** Persistent Tailwind state owned by one physical CSS root across incremental Rolldown transforms. */
 type TailwindRoot = Readonly<{
@@ -39,10 +39,10 @@ type JavaScriptArtifact = Readonly<{
     filename: string
 }>
 
-type WxTransformer = ReturnType<typeof createWxTransformer>
+type MiniTransformer = ReturnType<typeof createMiniTransformer>
 
 /** Vite plugin with the development-host operation that finalizes one coherent WX style/JavaScript transaction. */
-export type WxStylePlugin = Plugin &
+export type MiniStylePlugin = Plugin &
     Readonly<{
         /** Neutralizes browser CSS payloads and publishes their matching global WXSS through the host's atomic writer. */
         finalizeUpdate: <Artifact extends JavaScriptArtifact>(
@@ -151,7 +151,7 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * - `graphContext`: the active Rolldown graph reader needed by host calls made outside plugin hooks;
  * - `styleByModuleId`: the latest successful Vite CSS plus optional Tailwind state at one normalized module identity;
  * - `publishedWxss`: the last durably published development stylesheet used for unchanged-write suppression;
- * - `wxTransformer`: fixed stylesheet options and escaped-class cache shared by CSS and JavaScript conversion.
+ * - `miniTransformer`: fixed stylesheet options and escaped-class cache shared by CSS and JavaScript conversion.
  *
  * The state owners remain scoped to one plugin instance; `entryIds` is atomically replaced after each complete resolution.
  * A development watcher retains them across updates; build and watcher shutdown clear the complete style store.
@@ -165,11 +165,11 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * compiler dependencies, and watched file identities; no second application graph is retained. The Tailwind generator stays
  * alive across candidate edits to avoid repeating source normalization and compiler initialization.
  */
-export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxStylePlugin {
+export function createMiniStylePlugin(applicationEntryIds: readonly string[]): MiniStylePlugin {
     // This mutable root list is replaced in buildStart with Vite/Rolldown's exact cross-platform graph identities.
     let entryIds = applicationEntryIds
     // The fixed transformer retains only deterministic class-escape and PostCSS pipeline caches for this plugin instance.
-    const wxTransformer = createWxTransformer()
+    const miniTransformer = createMiniTransformer()
 
     // buildStart installs this mutable context because the development host finalizes output outside a Rolldown plugin hook.
     let graphContext: PluginContext
@@ -180,7 +180,13 @@ export function createWxStylePlugin(applicationEntryIds: readonly string[]): WxS
 
     /** Binds retained plugin state to the context of the complete build or development transaction being finalized. */
     const finalizeCurrentOutput = (context: PluginContext, javaScript: readonly JavaScriptArtifact[]) => {
-        return finalizeOutput(entryIds, styleByModuleId, context.getModuleInfo.bind(context), wxTransformer, javaScript)
+        return finalizeOutput(
+            entryIds,
+            styleByModuleId,
+            context.getModuleInfo.bind(context),
+            miniTransformer,
+            javaScript
+        )
     }
 
     /** Invalidates every Tailwind root fed by one changed compiler dependency. */
@@ -368,18 +374,18 @@ export async function finalizeOutput(
     getModuleInfo: (
         moduleId: string
     ) => Readonly<{ importedIds: readonly string[]; dynamicallyImportedIds: readonly string[] }> | null | undefined,
-    wxTransformer: WxTransformer,
+    miniTransformer: MiniTransformer,
     javaScript: readonly JavaScriptArtifact[]
 ) {
     // Step 1: derive cascade order, reachable CSS, and raw Tailwind candidates from the same current graph snapshot.
     const projection = projectStyles(entryIds, styleByModuleId, getModuleInfo)
 
     // Step 2: convert the complete stylesheet with VPT's fixed Tailwind-v4/WX policy.
-    const wxss = await wxTransformer.transformStylesheet(projection.css)
+    const wxss = await miniTransformer.transformStylesheet(projection.css)
 
     // Step 3: transform artifacts independently with the exact candidate set projected from that stylesheet.
     const transformedJavaScript = javaScript.map((artifact) =>
-        wxTransformer.transformJavaScript({
+        miniTransformer.transformJavaScript({
             classSet: projection.classSet,
             code: artifact.code,
             filename: artifact.filename

@@ -3,7 +3,7 @@ import * as types from '@babel/types'
 import type { Rolldown } from 'vite'
 import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
 import { toLogicalChunkId } from '../module/chunk-path.ts'
-import { getWxExecutionKind } from '../module/module.ts'
+import { getMiniExecutionKind } from '../module/module.ts'
 
 const transportPlaceholder = '__VPT_TRANSPORT__'
 const moduleIdParameter = 'moduleId'
@@ -97,7 +97,7 @@ function getTransportedChunks(chunks: Readonly<Record<string, Rolldown.RenderedC
     const transportedChunks: TransportedChunk[] = []
 
     for (const chunk of Object.values(chunks)) {
-        const kind = getWxExecutionKind(chunk)
+        const kind = getMiniExecutionKind(chunk)
         if (kind !== 'native') {
             transportedChunks.push({ chunk, kind })
         }

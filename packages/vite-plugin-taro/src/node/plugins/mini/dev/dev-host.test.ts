@@ -8,18 +8,18 @@ import { setTimeout as delay } from 'node:timers/promises'
 import type { DevOptions } from 'rolldown/experimental'
 import { createLogger, createServer } from 'vite'
 import type { MiniContract } from '../mini-contract.d.ts'
-import type { WxStylePlugin } from '../styles/plugins.ts'
+import type { MiniStylePlugin } from '../styles/plugins.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
 import { hmrEndpointPath } from './hmr-protocol.ts'
+import type { BundledDev } from './mini-dev-options.ts'
 import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
-import type { BundledDev } from './wx-dev-options.ts'
 
 type DevHooks = Readonly<{
     onHmrUpdates: (result: unknown) => void
     onOutput: (result: unknown) => void
 }>
 
-type CreateWxDevHost = typeof import('./dev-host.ts')['createWxDevHost']
+type CreateMiniDevHost = typeof import('./dev-host.ts')['createMiniDevHost']
 
 type SyntheticDev = (_input: unknown, _output: unknown, devOptions: DevOptions) => unknown
 
@@ -33,7 +33,7 @@ const contract: MiniContract = {
     projectConfigJson: {}
 }
 
-async function importDevHost(dev: SyntheticDev): Promise<CreateWxDevHost> {
+async function importDevHost(dev: SyntheticDev): Promise<CreateMiniDevHost> {
     const devHostUrl = `${new URL('./dev-host.ts', import.meta.url).href}?synthetic-dev-host-test=${Date.now()}`
     const mockSource = `const harness = globalThis[${JSON.stringify(devHostHarnessKey)}]; export const dev = harness.dev`
     const mockUrl = `data:text/javascript,${encodeURIComponent(mockSource)}`
@@ -49,7 +49,7 @@ async function importDevHost(dev: SyntheticDev): Promise<CreateWxDevHost> {
     })
     try {
         const devHost = await import(devHostUrl)
-        return devHost.createWxDevHost
+        return devHost.createMiniDevHost
     } finally {
         hooks.deregister()
         Reflect.deleteProperty(globalThis, devHostHarnessKey)
@@ -137,7 +137,7 @@ test('reduces synthetic engine update variants and unknown host failures without
             async close() {}
         }
     }
-    const createWxDevHost = await importDevHost(dev)
+    const createMiniDevHost = await importDevHost(dev)
     const root = await mkdtemp(path.join(tmpdir(), 'vpt-dev-host-unit-'))
     const outDir = path.join(root, 'dist')
     const appPath = path.join(root, 'src/app.tsx')
@@ -154,7 +154,7 @@ test('reduces synthetic engine update variants and unknown host failures without
     logger.info = (message) => {
         infos.push(message)
     }
-    const styles: WxStylePlugin = {
+    const styles: MiniStylePlugin = {
         name: 'test:synthetic-wx-styles',
         async finalizeUpdate(artifacts, writeWxss) {
             if (styleFailure !== undefined) {
@@ -184,7 +184,7 @@ test('reduces synthetic engine update variants and unknown host failures without
     const originalAddress = httpServer.address
 
     try {
-        const host = await createWxDevHost({
+        const host = await createMiniDevHost({
             server: server,
             contract: contract,
             styles: styles,

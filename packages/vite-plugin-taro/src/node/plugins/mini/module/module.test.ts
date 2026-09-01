@@ -6,8 +6,8 @@ import {
     appShellPath,
     bootstrapPath,
     customWrapperShellPath,
-    getWxEntryRole,
-    getWxExecutionKind,
+    getMiniEntryRole,
+    getMiniExecutionKind,
     pageCapsulePath,
     rolldownRuntimeId,
     transportPath
@@ -18,20 +18,20 @@ function chunk(...moduleIds: string[]): Rolldown.PreRenderedChunk {
 }
 
 test('identifies shell and capsule entry roles independently from output execution', () => {
-    assert.equal(getWxEntryRole(chunk(appShellPath)), 'shell')
-    assert.equal(getWxEntryRole(chunk(appCapsulePath)), 'capsule')
-    assert.equal(getWxEntryRole(chunk(customWrapperShellPath)), 'shell')
-    assert.equal(getWxEntryRole(chunk(`${pageCapsulePath}?route=page`)), 'capsule')
-    assert.equal(getWxEntryRole(chunk('/application')), undefined)
-    assert.throws(() => getWxEntryRole(chunk(appShellPath, appCapsulePath)), /mixes shell and capsule entries/)
+    assert.equal(getMiniEntryRole(chunk(appShellPath)), 'shell')
+    assert.equal(getMiniEntryRole(chunk(appCapsulePath)), 'capsule')
+    assert.equal(getMiniEntryRole(chunk(customWrapperShellPath)), 'shell')
+    assert.equal(getMiniEntryRole(chunk(`${pageCapsulePath}?route=page`)), 'capsule')
+    assert.equal(getMiniEntryRole(chunk('/application')), undefined)
+    assert.throws(() => getMiniEntryRole(chunk(appShellPath, appCapsulePath)), /mixes shell and capsule entries/)
 })
 
 test('classifies native, capsule, and amphibious execution domains', () => {
-    assert.equal(getWxExecutionKind(chunk('/application')), 'capsule')
-    assert.equal(getWxExecutionKind(chunk(appShellPath)), 'native')
-    assert.equal(getWxExecutionKind(chunk(transportPath)), 'native')
-    assert.equal(getWxExecutionKind(chunk(appCapsulePath)), 'capsule')
-    assert.equal(getWxExecutionKind(chunk(bootstrapPath)), 'amphibious')
-    assert.equal(getWxExecutionKind(chunk(rolldownRuntimeId)), 'amphibious')
-    assert.equal(getWxExecutionKind(chunk(appCapsulePath, rolldownRuntimeId)), 'amphibious')
+    assert.equal(getMiniExecutionKind(chunk('/application')), 'capsule')
+    assert.equal(getMiniExecutionKind(chunk(appShellPath)), 'native')
+    assert.equal(getMiniExecutionKind(chunk(transportPath)), 'native')
+    assert.equal(getMiniExecutionKind(chunk(appCapsulePath)), 'capsule')
+    assert.equal(getMiniExecutionKind(chunk(bootstrapPath)), 'amphibious')
+    assert.equal(getMiniExecutionKind(chunk(rolldownRuntimeId)), 'amphibious')
+    assert.equal(getMiniExecutionKind(chunk(appCapsulePath, rolldownRuntimeId)), 'amphibious')
 })

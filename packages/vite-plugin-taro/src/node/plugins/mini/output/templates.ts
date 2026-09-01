@@ -1,5 +1,5 @@
 import { recursiveMerge } from '@tarojs/helper'
-import { Weapp as WxPlatform } from '@tarojs/plugin-platform-weapp'
+import { Weapp as WeappPlatform } from '@tarojs/plugin-platform-weapp'
 import type { Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { packageRequire } from '../../../utils/packages.ts'
@@ -198,7 +198,7 @@ export function replaceExactlyOnce(source: string, current: string, replacement:
 }
 
 function createTemplateBuilder() {
-    const platform = new WxPlatform(
+    const platform = new WeappPlatform(
         {
             helper: {
                 recursiveMerge

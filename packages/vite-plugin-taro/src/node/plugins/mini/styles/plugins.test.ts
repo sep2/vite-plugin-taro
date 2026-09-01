@@ -4,11 +4,11 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { build, normalizePath, type Plugin } from 'vite'
-import { createWxTransformer } from './create-wx-transformer.ts'
-import { createWxStylePlugin, finalizeOutput } from './plugins.ts'
+import { createMiniTransformer } from './create-mini-transformer.ts'
+import { createMiniStylePlugin, finalizeOutput } from './plugins.ts'
 
 test('handles physical and ignored query fragments before watcher cleanup', async () => {
-    const styles = createWxStylePlugin(['/src/app.js'])
+    const styles = createMiniStylePlugin(['/src/app.js'])
     const transformHook = styles.transform
     assert.ok(transformHook)
     const transform = typeof transformHook === 'function' ? transformHook : transformHook.handler
@@ -27,7 +27,7 @@ test('handles physical and ignored query fragments before watcher cleanup', asyn
 })
 
 test('transforms WXSS and JavaScript from one supplied class set without source discovery', async () => {
-    const transformer = createWxTransformer()
+    const transformer = createMiniTransformer()
     const classSet = new Set(['py-5.5'])
     const style = await transformer.transformStylesheet('.py-5\\.5 { padding: 1px; }')
     const javaScript = transformer.transformJavaScript({
@@ -62,7 +62,7 @@ test('finalizes the current graph into WXSS and JavaScript with one projected cl
                 return { importedIds: [], dynamicallyImportedIds: [] }
             }
         },
-        createWxTransformer(),
+        createMiniTransformer(),
         [{ code: "export const className = 'py-5.5'", filename: 'entry.js' }]
     )
 
@@ -104,7 +104,7 @@ test('projects cyclic multi-entry graphs in dependency-first order without dupli
             ]
         ]),
         (moduleId) => moduleGraph.get(moduleId),
-        createWxTransformer(),
+        createMiniTransformer(),
         [{ code: "export const classes = 'py-5.5 mr-4.5'", filename: 'entry.js' }]
     )
 
@@ -137,7 +137,7 @@ test('rejects the complete style transaction when JavaScript conversion fails', 
                     ]
                 ]),
                 (moduleId) => (moduleId === '/entry.js' ? { importedIds: [], dynamicallyImportedIds: [] } : undefined),
-                createWxTransformer(),
+                createMiniTransformer(),
                 [{ code: source, filename: 'entry.js' }]
             ),
         Error
@@ -171,7 +171,7 @@ test('finalizes the complete compiler stylesheet before later WX output hooks', 
         await writeFile(path.join(pageRoot, 'index.css'), '.page-marker { color: red; }\n')
 
         const applicationEntry = path.join(sourceRoot, 'app.ts')
-        const styles = createWxStylePlugin([applicationEntry])
+        const styles = createMiniStylePlugin([applicationEntry])
         const verifyAssetOwnership: Plugin = {
             name: 'test:verify-wx-style-ownership',
             generateBundle: {
@@ -233,7 +233,7 @@ test('emits an empty global stylesheet when the application has no styles', asyn
         const appPath = path.join(root, 'app.ts')
         await writeFile(appPath, 'export {}\n')
 
-        const styles = createWxStylePlugin([appPath])
+        const styles = createMiniStylePlugin([appPath])
         await build({
             root,
             logLevel: 'silent',

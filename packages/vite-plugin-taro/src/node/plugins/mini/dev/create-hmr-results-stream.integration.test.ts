@@ -9,7 +9,7 @@ import { asyncScheduler } from 'rxjs'
 import { createServer } from 'vite'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
 import { createHostActions } from './host-actions.ts'
-import type { BundledDev } from './wx-dev-options.ts'
+import type { BundledDev } from './mini-dev-options.ts'
 
 type HmrUpdatesResult = Parameters<NonNullable<DevOptions['onHmrUpdates']>>[0]
 type HmrUpdates = Exclude<HmrUpdatesResult, Error>

@@ -36,7 +36,7 @@ import { parseSync } from 'rolldown/utils'
 import type { Rolldown } from 'vite'
 import type { AstTransformResult } from '../../../utils/transform.ts'
 import { resolveLogicalChunkReference, resolvePhysicalChunkReference } from '../module/chunk-path.ts'
-import { getWxEntryRole } from '../module/module.ts'
+import { getMiniEntryRole } from '../module/module.ts'
 
 type ImportBinding = Readonly<{
     imported: string | null
@@ -552,7 +552,7 @@ function getImportedCapsule(
 ): Rolldown.RenderedChunk | undefined {
     if (!reference.startsWith('./') && !reference.startsWith('../')) return undefined
     const imported = chunks[resolvePhysicalChunkReference(fileName, reference)]
-    return imported && getWxEntryRole(imported) === 'capsule' ? imported : undefined
+    return imported && getMiniEntryRole(imported) === 'capsule' ? imported : undefined
 }
 
 /**

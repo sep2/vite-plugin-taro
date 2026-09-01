@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createWxTransformer } from './create-wx-transformer.ts'
+import { createMiniTransformer } from './create-mini-transformer.ts'
 
 const classSet = new Set(['px-1.25', 'py-5.5', 'w-1/2'])
 
 test('rewrites only generated Tailwind classes in strings and template elements', () => {
-    const transformer = createWxTransformer()
+    const transformer = createMiniTransformer()
     const code = [
         "const classes = 'py-5.5 w-1/2 pages/home/index mr-4.5'",
         'const template = `px-1.25 $' + '{value} py-5.5`'
@@ -21,7 +21,7 @@ test('rewrites only generated Tailwind classes in strings and template elements'
 })
 
 test('rewrites TypeScript template spans without consuming their delimiters', () => {
-    const transformer = createWxTransformer()
+    const transformer = createMiniTransformer()
     const code = 'const template = `px-1.25 $' + '{first} py-5.5 $' + '{second} w-1/2`'
 
     assert.equal(
@@ -31,7 +31,7 @@ test('rewrites TypeScript template spans without consuming their delimiters', ()
 })
 
 test('leaves slash paths and URLs intact while rewriting slash-based classes', () => {
-    const transformer = createWxTransformer()
+    const transformer = createMiniTransformer()
     const slashClassSet = new Set([
         '//cdn.example.com/app.js',
         'http://example.com/app.js',
@@ -50,7 +50,7 @@ test('leaves slash paths and URLs intact while rewriting slash-based classes', (
 })
 
 test('detects every escaped JavaScript spelling in arbitrary-value classes', () => {
-    const transformer = createWxTransformer()
+    const transformer = createMiniTransformer()
     const escapedClassSet = new Set([
         'before:content-["x"]',
         "before:content-['x\\y']",
@@ -82,7 +82,7 @@ test('detects every escaped JavaScript spelling in arbitrary-value classes', () 
 })
 
 test('rejects malformed final JavaScript before exposing partial class rewrites', () => {
-    const transformer = createWxTransformer()
+    const transformer = createMiniTransformer()
 
     assert.throws(
         () => transformer.transformJavaScript({ classSet, code: "export const = 'py-5.5'", filename: 'entry.js' }),

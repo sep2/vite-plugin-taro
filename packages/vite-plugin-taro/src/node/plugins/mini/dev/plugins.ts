@@ -3,28 +3,28 @@ import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
 import type { MiniContract } from '../mini-contract.d.ts'
 import { rolldownRuntimeId } from '../module/module.ts'
-import type { WxStylePlugin } from '../styles/plugins.ts'
-import { createWxDevHost, type WxDevHost } from './dev-host.ts'
+import type { MiniStylePlugin } from '../styles/plugins.ts'
+import { createMiniDevHost, type MiniDevHost } from './dev-host.ts'
 import { developmentAppWxssFileName } from './hmr-files.ts'
-import { createWxHmrMode } from './hmr-mode.ts'
+import { createMiniHmrMode } from './hmr-mode.ts'
 import { hmrEndpointPath } from './hmr-protocol.ts'
-import { createWxReactRefreshTransforms } from './react-refresh.ts'
+import { createMiniReactRefreshTransforms } from './react-refresh.ts'
 
 /** Selects the sole Vite environment that owns the physical Mini Program development project. */
-export function isWxClientEnvironment(environment: Readonly<{ name: string }>): boolean {
+export function isMiniClientEnvironment(environment: Readonly<{ name: string }>): boolean {
     return environment.name === 'client'
 }
 
 /**
- * Adds the serve-only bundled-development plugin set for the wx target: the shared dev adapter, selected HMR mode, and React
+ * Adds the serve-only bundled-development plugin set for a Mini Program target: the shared dev adapter, selected HMR mode, and React
  * Refresh adaptation transforms.
  *
  * The shared style pipeline already owns the resolver's ordered App/Page cascade policy, so the host does not reconstruct it
  * from unrelated Rolldown shell and transport entries.
  */
-export function createWxDevelopmentPlugin(contract: MiniContract, styles: WxStylePlugin): PluginOption[] {
+export function createMiniDevelopmentPlugin(contract: MiniContract, styles: MiniStylePlugin): PluginOption[] {
     // Resolve once so plugins, journal effects, entry banners, and runtime bundling cannot disagree about the active mechanism.
-    const hmrMode = createWxHmrMode(contract.hmr)
+    const hmrMode = createMiniHmrMode(contract.hmr)
 
     /*
      * Vite creates this plugin descriptor before a server or DevEngine exists, then invokes configureServer and closeBundle on
@@ -33,14 +33,14 @@ export function createWxDevelopmentPlugin(contract: MiniContract, styles: WxStyl
      * only the client hook pair participates. Capturing a construction Promise would start too early, while recreating the host
      * in closeBundle would lose every live action, patch, style, and client frontier owned by the running instance.
      */
-    let host: WxDevHost | null = null
+    let host: MiniDevHost | null = null
     return [
         {
             name: 'vpt:wx-dev',
             apply: 'serve',
             // The physical WX DevEngine is a client build. Native environment scoping gives its shared host exactly one
             // generate/close lifecycle instead of admitting hooks from Vite's unrelated SSR environment.
-            applyToEnvironment: isWxClientEnvironment,
+            applyToEnvironment: isMiniClientEnvironment,
 
             config() {
                 return {
@@ -72,7 +72,7 @@ export function createWxDevelopmentPlugin(contract: MiniContract, styles: WxStyl
                 // asks bundledDev to create its hard-coded skip-write DevEngine.
                 order: 'post',
                 async handler(server) {
-                    host = await createWxDevHost({
+                    host = await createMiniDevHost({
                         server: server,
                         contract: contract,
                         styles: styles,
@@ -117,7 +117,7 @@ export function createWxDevelopmentPlugin(contract: MiniContract, styles: WxStyl
             }
         },
         ...hmrMode.plugins,
-        ...createWxReactRefreshTransforms()
+        ...createMiniReactRefreshTransforms()
     ]
 }
 

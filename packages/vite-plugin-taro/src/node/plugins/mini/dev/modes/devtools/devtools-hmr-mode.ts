@@ -4,7 +4,7 @@ import { normalizeModuleId } from '../../../../../utils/modules.ts'
 import { resolveRuntimeFile } from '../../../../../utils/packages.ts'
 import { appShellFileName, pageShellPath } from '../../../module/module.ts'
 import { hmrInfoFileName } from '../../hmr-files.ts'
-import type { WxHmrMode } from '../../hmr-mode.ts'
+import type { MiniHmrMode } from '../../hmr-mode.ts'
 import type { PatchUpdate } from '../../hmr-protocol.ts'
 
 export const devtoolsPatchesFileName = 'hmr/patches.js'
@@ -19,7 +19,7 @@ const devtoolsRuntimeFile = resolveRuntimeFile('wx/dev/modes/devtools/devtools-r
  * DevTools observes a changed Page dependency, re-executes the Page shell, and that shell synchronously gives the cumulative
  * native factory payload to the persistent App runtime. Mixing any one of these pieces with another mode would break that chain.
  */
-export function createDevtoolsHmrMode(): WxHmrMode {
+export function createDevtoolsHmrMode(): MiniHmrMode {
     return {
         runtimeFile: devtoolsRuntimeFile,
         plugins: [createDevtoolsPagePlugin()],

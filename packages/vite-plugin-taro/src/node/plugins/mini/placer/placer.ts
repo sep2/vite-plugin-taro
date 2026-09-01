@@ -1,5 +1,5 @@
 import { normalizePath, type Plugin, type Rolldown } from 'vite'
-import { getWxExecutionKind, isTransportModule } from '../module/module.ts'
+import { getMiniExecutionKind, isTransportModule } from '../module/module.ts'
 import { getNativeComponentAssetBytes } from '../native/native-component-assets.ts'
 import { createPlacement, type GeneratedSubpackage, type PackageLocation, type Placement } from './placement.ts'
 
@@ -10,7 +10,7 @@ const pnpmFrameworkPackagePattern =
 const workspaceFrameworkPackagePattern = /\/packages\/(?:taro-react|taro-plugin-framework-react|taro-runtime)\//
 
 /** Selects the explicit React/Taro roots whose complete dependency closure forms the framework vendor chunk. */
-export function isWxFrameworkVendorModule(moduleId: string): boolean {
+export function isMiniFrameworkVendorModule(moduleId: string): boolean {
     const normalizedId = normalizePath(moduleId)
     return pnpmFrameworkPackagePattern.test(normalizedId) || workspaceFrameworkPackagePattern.test(normalizedId)
 }
@@ -21,8 +21,8 @@ type PlacementState =
     | { phase: 'planned'; placement: Placement }
     | { phase: 'finalized'; placement: Placement; subpackages: readonly GeneratedSubpackage[] }
 
-/** Placement services consumed by the later `vpt:wx` rendering and output hooks. */
-export type WxPlacementPlugin = Plugin &
+/** Placement services consumed by the later Mini Program rendering and output hooks. */
+export type MiniPlacementPlugin = Plugin &
     Readonly<{
         getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation
         getPhysicalChunkId(chunk: Rolldown.RenderedChunk): string
@@ -31,7 +31,7 @@ export type WxPlacementPlugin = Plugin &
     }>
 
 /**
- * Rolldown options owned by WX placement. Every field enforces a distinct output invariant. The plugin returns this object
+ * Rolldown options owned by Mini Program placement. Every field enforces a distinct output invariant. The plugin returns this object
  * from its config hook, while direct Rolldown integration tests reuse the same value to exercise the identical lifecycle.
  */
 export const placementRolldownOptions = {
@@ -50,7 +50,7 @@ export const placementRolldownOptions = {
             groups: [
                 {
                     name: 'vendor',
-                    test: isWxFrameworkVendorModule,
+                    test: isMiniFrameworkVendorModule,
                     priority: 100,
                     includeDependenciesRecursively: true
                 }
@@ -63,7 +63,7 @@ export const placementRolldownOptions = {
          * remains a Rolldown placeholder here and is resolved only after renderChunk transforms finish.
          */
         entryFileNames(chunk: Rolldown.PreRenderedChunk): string {
-            return getWxExecutionKind(chunk) === 'native' && !isTransportModule(chunk)
+            return getMiniExecutionKind(chunk) === 'native' && !isTransportModule(chunk)
                 ? '[name]'
                 : 'assets/[name]-[hash].js'
         },
@@ -100,13 +100,13 @@ export const placementRolldownOptions = {
  * performs one whole-state transition, so stale graph state, duplicate planning, and partially reset generations are
  * unrepresentable.
  */
-export function createWxPlacementPlugin(): WxPlacementPlugin {
+export function createMiniPlacementPlugin(): MiniPlacementPlugin {
     // This one mutable cell is the output-generation state machine described above; hooks replace it atomically by phase.
     let state: PlacementState = { phase: 'idle' }
 
     function requirePlacement(): Placement {
         if (state.phase === 'idle' || state.phase === 'awaiting-chunks') {
-            throw new Error('wx placement is unavailable before Rolldown exposes the final chunk graph')
+            throw new Error('Mini Program placement is unavailable before Rolldown exposes the final chunk graph')
         }
         return state.placement
     }
@@ -133,7 +133,7 @@ export function createWxPlacementPlugin(): WxPlacementPlugin {
                     return
                 }
                 if (state.phase !== 'awaiting-chunks') {
-                    throw new Error(`wx placement received final chunks during the ${state.phase} phase`)
+                    throw new Error(`Mini Program placement received final chunks during the ${state.phase} phase`)
                 }
                 state = {
                     phase: 'planned',
@@ -172,7 +172,7 @@ export function createWxPlacementPlugin(): WxPlacementPlugin {
 
         getSubpackages(): readonly GeneratedSubpackage[] {
             if (state.phase !== 'finalized') {
-                throw new Error('wx subpackages are unavailable before output finalization')
+                throw new Error('Mini Program subpackages are unavailable before output finalization')
             }
             return state.subpackages
         }

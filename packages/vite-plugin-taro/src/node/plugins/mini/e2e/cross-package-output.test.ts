@@ -4,7 +4,7 @@ import test from 'node:test'
 import { build, type OutputChunk, type Plugin } from 'rolldown'
 import { normalizePath } from 'vite'
 import '../../../../runtime/wx/systemjs/system-core.js'
-import { getWxExecutionKind, isTransportModule, transportPath } from '../module/module.ts'
+import { getMiniExecutionKind, isTransportModule, transportPath } from '../module/module.ts'
 import { createPlacement, type Placement } from '../placer/placement.ts'
 import { placementRolldownOptions } from '../placer/placer.ts'
 import { renderCapsule } from '../render/capsule.ts'
@@ -148,7 +148,7 @@ function createVirtualModulesPlugin(): Plugin {
 }
 
 /** Runs the same placement and final rendering stages used by the production wx plugin. */
-function createWxOutputPlugin(): Plugin {
+function createMiniOutputPlugin(): Plugin {
     let placement: Placement | undefined
 
     return {
@@ -162,7 +162,7 @@ function createWxOutputPlugin(): Plugin {
                 getAdditionalModuleBytes: (moduleId) => (largeLazyModuleIds.has(moduleId) ? 1_000_000 : 0)
             })
             const sourcemap = Boolean(outputOptions.sourcemap)
-            if (getWxExecutionKind(chunk) === 'capsule') {
+            if (getMiniExecutionKind(chunk) === 'capsule') {
                 return renderCapsule(code, chunk, sourcemap)
             }
 
@@ -193,7 +193,7 @@ async function buildCrossPackageOutput(): Promise<CrossPackageOutput> {
             application: applicationId,
             transport: transportPath
         },
-        plugins: [createVirtualModulesPlugin(), createWxOutputPlugin()],
+        plugins: [createVirtualModulesPlugin(), createMiniOutputPlugin()],
         preserveEntrySignatures: placementRolldownOptions.preserveEntrySignatures,
         output: {
             ...placementRolldownOptions.output,

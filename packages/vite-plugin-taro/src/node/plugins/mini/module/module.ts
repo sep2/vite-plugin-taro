@@ -57,13 +57,13 @@ export const taroRuntimePath = resolveRuntimeFile('wx/capsule/taro-runtime')
 /** Identifies the reusable synchronous native Page shell source. */
 export const pageShellPath = resolveRuntimeFile('wx/native/page')
 
-export type WxChunk = Rolldown.PreRenderedChunk | Rolldown.RenderedChunk
+export type MiniChunk = Rolldown.PreRenderedChunk | Rolldown.RenderedChunk
 
 /** Build-graph role of an explicit native lifecycle entry. */
-export type WxEntryRole = 'shell' | 'capsule'
+export type MiniEntryRole = 'shell' | 'capsule'
 
-/** Runtime domain in which one final wx JavaScript chunk executes. */
-export type WxExecutionKind = 'native' | 'capsule' | 'amphibious'
+/** Runtime domain in which one final Mini Program JavaScript chunk executes. */
+export type MiniExecutionKind = 'native' | 'capsule' | 'amphibious'
 
 // These fixed source identities describe entry roles independently from the final execution kind. A capsule entry may,
 // for example, become amphibious when Rolldown coalesces its generated runtime into the same output chunk.
@@ -78,17 +78,17 @@ const amphibiousModuleIds: ReadonlySet<string> = new Set([bootstrapPath, rolldow
 const transportModuleIds: ReadonlySet<string> = new Set([transportPath])
 
 /** Returns the one explicit lifecycle role owned by a chunk. */
-export function getWxEntryRole(chunk: WxChunk): WxEntryRole | undefined {
+export function getMiniEntryRole(chunk: MiniChunk): MiniEntryRole | undefined {
     const ownsShell = containsModule(chunk, shellModuleIds)
     const ownsCapsule = containsModule(chunk, capsuleModuleIds)
     if (ownsShell && ownsCapsule) {
-        throw new Error(`wx chunk mixes shell and capsule entries: ${chunk.moduleIds.join(', ')}`)
+        throw new Error(`Mini Program chunk mixes shell and capsule entries: ${chunk.moduleIds.join(', ')}`)
     }
     return ownsShell ? 'shell' : ownsCapsule ? 'capsule' : undefined
 }
 
 /** Tests whether a chunk contains the physical transport implementation. */
-export function isTransportModule(chunk: WxChunk): boolean {
+export function isTransportModule(chunk: MiniChunk): boolean {
     return containsModule(chunk, transportModuleIds)
 }
 
@@ -96,8 +96,8 @@ export function isTransportModule(chunk: WxChunk): boolean {
  * Classifies one final output chunk by execution domain. Entry role is deliberately independent: explicit capsule entries
  * normally fall through to capsule rendering, but a capsule containing an amphibious runtime executes in both domains.
  */
-export function getWxExecutionKind(chunk: WxChunk): WxExecutionKind {
-    const entryRole = getWxEntryRole(chunk)
+export function getMiniExecutionKind(chunk: MiniChunk): MiniExecutionKind {
+    const entryRole = getMiniEntryRole(chunk)
     if (containsModule(chunk, amphibiousModuleIds)) {
         return 'amphibious'
     }
@@ -105,6 +105,6 @@ export function getWxExecutionKind(chunk: WxChunk): WxExecutionKind {
 }
 
 /** Tests normalized chunk module IDs against one fixed identity set. */
-function containsModule(chunk: WxChunk, moduleIds: ReadonlySet<string>): boolean {
+function containsModule(chunk: MiniChunk, moduleIds: ReadonlySet<string>): boolean {
     return chunk.moduleIds.some((moduleId) => moduleIds.has(normalizeModuleId(moduleId)))
 }

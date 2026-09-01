@@ -4,7 +4,7 @@ import test from 'node:test'
 import { build, type InputOption, type OutputBundle, type OutputChunk, type Plugin } from 'rolldown'
 import { appCapsulePath, appShellPath, bootstrapPath, transportPath } from '../module/module.ts'
 import { createPlacement, type GeneratedSubpackage, type Placement } from './placement.ts'
-import { createWxPlacementPlugin, isWxFrameworkVendorModule, placementRolldownOptions } from './placer.ts'
+import { createMiniPlacementPlugin, isMiniFrameworkVendorModule, placementRolldownOptions } from './placer.ts'
 
 const fixtureRoot = '/placer-fixture'
 const contentHashPattern = '[A-Za-z0-9_-]{8}'
@@ -106,7 +106,7 @@ test('rejects placement services and chunk delivery outside their lifecycle phas
     })
     const chunk = output.chunks[0]
     assert.ok(chunk)
-    const plugin = createWxPlacementPlugin()
+    const plugin = createMiniPlacementPlugin()
 
     assert.throws(() => plugin.getPackageLocation(chunk), /placement is unavailable/)
     assert.throws(() => plugin.getSubpackages(), /subpackages are unavailable/)
@@ -166,23 +166,23 @@ test('extracts the recursive React/Taro vendor closure without absorbing applica
 })
 
 test('matches only explicit React and Taro framework package roots', () => {
-    assert.equal(isWxFrameworkVendorModule('/repo/node_modules/.pnpm/react@19.2.8/node_modules/react/index.js'), true)
+    assert.equal(isMiniFrameworkVendorModule('/repo/node_modules/.pnpm/react@19.2.8/node_modules/react/index.js'), true)
     assert.equal(
-        isWxFrameworkVendorModule(
+        isMiniFrameworkVendorModule(
             '/repo/node_modules/.pnpm/@tarojs+runtime@4.2.1/node_modules/@tarojs/runtime/index.js'
         ),
         true
     )
     assert.equal(
-        isWxFrameworkVendorModule(
+        isMiniFrameworkVendorModule(
             '/repo/node_modules/.pnpm/vite-plugin-taro-runtime@0.6.6/node_modules/vite-plugin-taro-runtime/dist/index.js'
         ),
         true
     )
-    assert.equal(isWxFrameworkVendorModule('/repo/packages/taro-react/dist/react.esm.js'), true)
-    assert.equal(isWxFrameworkVendorModule('/repo/packages/taro-runtime/dist/index.js'), true)
-    assert.equal(isWxFrameworkVendorModule('/repo/src/react-feature.ts'), false)
-    assert.equal(isWxFrameworkVendorModule('/repo/src/taro-page.ts'), false)
+    assert.equal(isMiniFrameworkVendorModule('/repo/packages/taro-react/dist/react.esm.js'), true)
+    assert.equal(isMiniFrameworkVendorModule('/repo/packages/taro-runtime/dist/index.js'), true)
+    assert.equal(isMiniFrameworkVendorModule('/repo/src/react-feature.ts'), false)
+    assert.equal(isMiniFrameworkVendorModule('/repo/src/taro-page.ts'), false)
 })
 
 test('emits an eager application closure entirely in the synchronous main package', async () => {

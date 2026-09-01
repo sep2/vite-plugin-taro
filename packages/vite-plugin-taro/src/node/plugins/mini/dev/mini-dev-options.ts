@@ -5,7 +5,7 @@ import { type DevEngine, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
 import { memoize } from '../../../utils/memoize.ts'
 import type { MiniContract } from '../mini-contract.d.ts'
-import type { WxHmrMode } from './hmr-mode.ts'
+import type { MiniHmrMode } from './hmr-mode.ts'
 
 type BundledDevRolldownOptions = InputOptions & {
     experimental?: {
@@ -26,7 +26,7 @@ export type BundledDev = {
  * Installs physical WX output and runtime conventions over Vite's browser-oriented bundled-development options.
  * Build completion deliberately remains outside this options adapter: DevEngine onOutput is the single lifecycle authority.
  */
-export function installWxDevOptions({
+export function installMiniDevOptions({
     bundledDev,
     server,
     contract,
@@ -35,7 +35,7 @@ export function installWxDevOptions({
     bundledDev: BundledDev
     server: ViteDevServer
     contract: MiniContract
-    hmrMode: WxHmrMode
+    hmrMode: MiniHmrMode
 }): void {
     /*
      * Vite owns this mutable adapter method and calls it later when constructing DevEngine. Replacing that one seam preserves

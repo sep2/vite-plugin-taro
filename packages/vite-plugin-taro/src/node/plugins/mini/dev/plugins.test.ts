@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { resolveConfig } from 'vite'
 import type { MiniContract } from '../mini-contract.d.ts'
-import { createWxStylePlugin } from '../styles/plugins.ts'
-import { createWxDevelopmentPlugin, isWxClientEnvironment, removeDevelopmentAppWxss } from './plugins.ts'
+import { createMiniStylePlugin } from '../styles/plugins.ts'
+import { createMiniDevelopmentPlugin, isMiniClientEnvironment, removeDevelopmentAppWxss } from './plugins.ts'
 
 const contract: MiniContract = {
     target: 'wx',
@@ -14,16 +14,16 @@ const contract: MiniContract = {
     sitemapJson: {}
 }
 
-test('assigns physical WX host ownership only to the client environment', () => {
-    assert.equal(isWxClientEnvironment({ name: 'client' }), true)
-    assert.equal(isWxClientEnvironment({ name: 'ssr' }), false)
+test('assigns physical Mini Program host ownership only to the client environment', () => {
+    assert.equal(isMiniClientEnvironment({ name: 'client' }), true)
+    assert.equal(isMiniClientEnvironment({ name: 'ssr' }), false)
 })
 
 test('preserves physical outputs and composes the selected mode across development restarts', async () => {
     const config = await resolveConfig(
         {
             configFile: false,
-            plugins: createWxDevelopmentPlugin(contract, createWxStylePlugin([import.meta.filename]))
+            plugins: createMiniDevelopmentPlugin(contract, createMiniStylePlugin([import.meta.filename]))
         },
         'serve'
     )

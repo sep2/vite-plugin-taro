@@ -5,8 +5,8 @@ import type { OutputOptions, PreRenderedChunk, RenderedChunk } from 'rolldown'
 import { createLogger, createServer } from 'vite'
 import { packageRequire } from '../../../utils/packages.ts'
 import type { MiniContract } from '../mini-contract.d.ts'
+import { type BundledDev, installMiniDevOptions, requireSingleOutput } from './mini-dev-options.ts'
 import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
-import { type BundledDev, installWxDevOptions, requireSingleOutput } from './wx-dev-options.ts'
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 
@@ -94,7 +94,7 @@ test('adapts configured output into a stable physical wx development project', a
         }
     }
 
-    installWxDevOptions({ bundledDev: bundledDev, server: server, contract: options, hmrMode: hmrMode })
+    installMiniDevOptions({ bundledDev: bundledDev, server: server, contract: options, hmrMode: hmrMode })
     const adaptedOptions = await bundledDev.getRolldownOptions()
     const output = requireSingleOutput(adaptedOptions)
     const devMode = adaptedOptions.experimental?.devMode
@@ -177,7 +177,7 @@ test('supplies stable output defaults when Vite has no configured output', async
         }
     }
 
-    installWxDevOptions({ bundledDev: bundledDev, server: server, contract: options, hmrMode: hmrMode })
+    installMiniDevOptions({ bundledDev: bundledDev, server: server, contract: options, hmrMode: hmrMode })
     const adapted = await bundledDev.getRolldownOptions()
     const output = requireSingleOutput(adapted)
 
@@ -219,7 +219,7 @@ test('rejects output arrays from both Vite configuration and generated Rolldown 
             return true
         }
     }
-    installWxDevOptions({
+    installMiniDevOptions({
         bundledDev: configuredArrayBundledDev,
         server: server,
         contract: options,
@@ -239,7 +239,7 @@ test('rejects output arrays from both Vite configuration and generated Rolldown 
             return true
         }
     }
-    installWxDevOptions({
+    installMiniDevOptions({
         bundledDev: generatedArrayBundledDev,
         server: server,
         contract: options,

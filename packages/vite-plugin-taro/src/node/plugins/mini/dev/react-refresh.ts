@@ -40,7 +40,7 @@ const refreshRuntimeWindowGlobals = ['__registerBeforePerformReactRefresh', '__g
  * prevents development protocol behavior from leaking into production or unrelated WX modules. Plugin order also
  * matters: Reconciler receives its static refresh dependency before the later DevTools-hook transform lowers its free references.
  */
-export function createWxReactRefreshTransforms(): Plugin[] {
+export function createMiniReactRefreshTransforms(): Plugin[] {
     return [
         {
             name: 'vpt:wx-react-refresh-runtime',

@@ -2,17 +2,17 @@ import type { Plugin, PluginOption } from 'vite'
 import { esTarget } from '../../utils/constant.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { clientTaroNativeId } from '../client/constant.ts'
-import { createWxDevelopmentPlugin } from './dev/plugins.ts'
+import { createMiniDevelopmentPlugin } from './dev/plugins.ts'
 import type { MiniContract } from './mini-contract.d.ts'
-import { getWxExecutionKind, isTransportModule } from './module/module.ts'
+import { getMiniExecutionKind, isTransportModule } from './module/module.ts'
 import { compileNativeComponentInterface } from './native/compile-native-component-interface.ts'
 import { createOutputFiles } from './output/files.ts'
-import { createWxPlacementPlugin, type WxPlacementPlugin } from './placer/placer.ts'
+import { createMiniPlacementPlugin, type MiniPlacementPlugin } from './placer/placer.ts'
 import { renderCapsule } from './render/capsule.ts'
 import { renderNative } from './render/native.ts'
 import { materializeTransport } from './render/transport.ts'
 import { createResolver } from './resolve/resolver.ts'
-import { createWxStylePlugin } from './styles/plugins.ts'
+import { createMiniStylePlugin } from './styles/plugins.ts'
 
 type MiniResolver = ReturnType<typeof createResolver>
 
@@ -22,19 +22,19 @@ export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] 
 
     // Reuse the resolver instance's ordered application subset. Rolldown's complete input also contains bootstrap, transport,
     // shell, and component entries; entry membership alone cannot recover which roots define the App/Page CSS cascade.
-    const placement = createWxPlacementPlugin()
-    const styles = createWxStylePlugin(resolver.applicationEntryIds)
+    const placement = createMiniPlacementPlugin()
+    const styles = createMiniStylePlugin(resolver.applicationEntryIds)
 
     return [
         placement,
         styles,
         createMiniPlugin(contract, resolver, placement),
-        createWxDevelopmentPlugin(contract, styles)
+        createMiniDevelopmentPlugin(contract, styles)
     ]
 }
 
 /** Configures the complete Mini Program target build pipeline. */
-function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placement: WxPlacementPlugin): Plugin {
+function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placement: MiniPlacementPlugin): Plugin {
     return {
         name: 'vpt:wx',
 
@@ -110,7 +110,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
             async handler(code, chunk, outputOptions, meta) {
                 // vpt:wx-placer runs first and has already created immutable placement from this complete chunk graph.
 
-                const executionKind = getWxExecutionKind(chunk)
+                const executionKind = getMiniExecutionKind(chunk)
                 const sourcemap = Boolean(outputOptions.sourcemap)
 
                 if (executionKind === 'capsule') {

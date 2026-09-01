@@ -14,7 +14,7 @@ const cssPreflight = {
 } as const
 
 /** Static replacement for the generic Weapp context, keeping VPT policy explicit and framework detection out of the bundle. */
-const wxStyleHandlerOptions = {
+const miniStyleHandlerOptions = {
     appType: 'weapp-vite',
     /*
      * Tailwind runs before this WX handler and emits vendor-prefixed and standard utility declarations together,
@@ -44,7 +44,7 @@ type JavaScriptTransformInput = Readonly<{
     filename: string
 }>
 
-type WxTransformer = Readonly<{
+type MiniTransformer = Readonly<{
     transformJavaScript: (input: JavaScriptTransformInput) => string
     transformStylesheet: (css: string) => Promise<string>
 }>
@@ -55,8 +55,8 @@ type CandidateTransform = Readonly<{
 }>
 
 /** Creates VPT's fixed Tailwind-v4/WX transformer without loading Weapp's generic framework context. */
-export function createWxTransformer(): WxTransformer {
-    const styleHandler = createStyleHandler(wxStyleHandlerOptions)
+export function createMiniTransformer(): MiniTransformer {
+    const styleHandler = createStyleHandler(miniStyleHandlerOptions)
     // Weak keys release each transaction's exact precheck and replacement table with its projected class set.
     const candidateTransformByClassSet = new WeakMap<ReadonlySet<string>, CandidateTransform | null>()
 
