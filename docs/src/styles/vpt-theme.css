@@ -1,30 +1,31 @@
-.vpt-theme {
-    --vpt-page-bg: #0c1610;
-    --vpt-heading: #d9ebdc;
-    --vpt-heading-strong: #78d58d;
-    --vpt-text: #bed1c1;
-    --vpt-muted: #91a796;
-    --vpt-accent: #6fd087;
-    --vpt-accent-strong: #74dc8f;
-    --vpt-button-background: #74dc8f;
-    --vpt-button-text: #0d2b18;
-    --vpt-button-glow: rgba(101, 207, 128, 0.42);
-    --vpt-border: rgba(140, 207, 151, 0.16);
-    --vpt-border-strong: rgba(112, 211, 134, 0.42);
-    --vpt-surface: rgba(21, 38, 27, 0.84);
-    --vpt-surface-soft: rgba(18, 33, 23, 0.7);
-    --vpt-node-background: #142319;
+:root[data-theme="dark"] {
+    --vpt-page-bg: #1b1d21;
+    --vpt-heading: #f4f3ef;
+    --vpt-heading-strong: #91dfa5;
+    --vpt-text: #ccced3;
+    --vpt-muted: #a3a6ae;
+    --vpt-accent: #78d993;
+    --vpt-accent-strong: #90e1a5;
+    --vpt-button-background: #7ddd98;
+    --vpt-button-text: #152b1d;
+    --vpt-button-glow: rgba(103, 214, 134, 0.3);
+    --vpt-border: rgba(231, 233, 237, 0.11);
+    --vpt-border-strong: rgba(123, 217, 147, 0.34);
+    --vpt-surface: rgba(38, 41, 47, 0.95);
+    --vpt-surface-soft: rgba(34, 37, 42, 0.88);
+    --vpt-node-background: #292c32;
     --vpt-card-background:
-        radial-gradient(circle at 100% 0, rgba(86, 178, 104, 0.13), transparent 34%), rgba(19, 35, 24, 0.88);
-    --vpt-chip-background: #1b3021;
-    --vpt-chip-text: #a4d4ae;
-    --vpt-icon-background: linear-gradient(145deg, #1c3b26, #303c25);
-    --vpt-video-background: #111f16;
-    --vpt-shadow: rgba(0, 0, 0, 0.2);
-    --vpt-shadow-strong: rgba(0, 0, 0, 0.38);
+        radial-gradient(circle at 100% 0, rgba(124, 216, 147, 0.07), transparent 36%),
+        radial-gradient(circle at 0 100%, rgba(235, 142, 116, 0.045), transparent 38%), #25282e;
+    --vpt-chip-background: #2e3238;
+    --vpt-chip-text: #c7cbd0;
+    --vpt-icon-background: linear-gradient(145deg, #29332e, #343137);
+    --vpt-video-background: #212329;
+    --vpt-shadow: rgba(2, 3, 5, 0.18);
+    --vpt-shadow-strong: rgba(2, 3, 5, 0.34);
 }
 
-:root[data-theme="light"] .vpt-theme {
+:root[data-theme="light"] {
     --vpt-page-bg: #fbfaf1;
     --vpt-heading: #174f32;
     --vpt-heading-strong: #17673d;

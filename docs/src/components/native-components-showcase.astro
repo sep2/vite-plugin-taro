@@ -214,15 +214,36 @@ import HomeSectionHeading from './home-section-heading.astro'
     }
 
     :global(:root[data-theme='dark']) .native-stage {
-        --native-preview-background: #102219;
-        --native-card-background: rgba(24, 50, 35, 0.94);
-        --native-card-border: rgba(143, 207, 155, 0.18);
-        --native-heading: #e2efe3;
-        --native-text: #bed1c1;
-        --native-muted: #91a796;
-        --native-soft: #1d3727;
-        --native-control: #68c67e;
-        --native-on-control: #0d2b18;
+        --native-preview-background: #24272c;
+        --native-card-background: rgba(45, 48, 54, 0.96);
+        --native-card-border: rgba(228, 230, 234, 0.14);
+        --native-heading: #f2f2ef;
+        --native-text: #d0d1d5;
+        --native-muted: #a1a5ad;
+        --native-soft: #34383e;
+        --native-control: #80dc98;
+        --native-on-control: #152b1d;
+    }
+
+    :global(:root[data-theme='dark']) .native-code-window {
+        background: #202329;
+        color: #e0e1e4;
+    }
+
+    :global(:root[data-theme='dark']) .native-code-toolbar,
+    :global(:root[data-theme='dark']) .native-code-status {
+        border-color: rgba(225, 227, 231, 0.1);
+        background: #272a30;
+    }
+
+    :global(:root[data-theme='dark']) .native-code-file,
+    :global(:root[data-theme='dark']) .native-code-status {
+        color: #a5a9b1;
+    }
+
+    :global(:root[data-theme='dark']) .native-code {
+        color: #dcdee2;
+        scrollbar-color: rgba(197, 200, 207, 0.28) transparent;
     }
 
     .native-code-window,

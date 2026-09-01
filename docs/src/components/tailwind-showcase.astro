@@ -535,24 +535,55 @@ import HomeSectionHeading from './home-section-heading.astro'
     }
 
     :global(:root[data-theme='dark']) .phone-preview {
-        --phone-shell-background: #07170e;
-        --phone-shell-ring: #214b31;
-        --phone-screen-background: #11271a;
-        --phone-surface-background: #183223;
-        --phone-surface-border: #2d5139;
-        --phone-text: #dcebdd;
-        --phone-heading: #f2f8ec;
-        --phone-muted: #91aa98;
-        --phone-subtle: #a5b9a9;
-        --phone-indicator: #c8dccb;
-        --phone-mark-background: #244b31;
-        --phone-capsule-background: rgba(9, 26, 16, 0.78);
-        --phone-capsule-border: rgba(202, 231, 207, 0.18);
-        --phone-capsule-divider: rgba(202, 231, 207, 0.15);
-        --phone-capsule-shadow: rgba(0, 0, 0, 0.2);
-        --phone-chart-bar: #31543b;
-        --phone-unit: #9db0a1;
-        --phone-link: #8fcda0;
+        --phone-shell-background: #17191d;
+        --phone-shell-ring: #39413b;
+        --phone-screen-background: #24272c;
+        --phone-surface-background: #2b2f34;
+        --phone-surface-border: #43484f;
+        --phone-text: #dfe0e3;
+        --phone-heading: #f5f5f2;
+        --phone-muted: #a5a9b1;
+        --phone-subtle: #b9bcc2;
+        --phone-indicator: #d8dadd;
+        --phone-mark-background: #303b34;
+        --phone-capsule-background: rgba(22, 24, 28, 0.86);
+        --phone-capsule-border: rgba(226, 228, 232, 0.17);
+        --phone-capsule-divider: rgba(226, 228, 232, 0.14);
+        --phone-capsule-shadow: rgba(2, 3, 5, 0.24);
+        --phone-chart-bar: #3b4147;
+        --phone-unit: #a9acb4;
+        --phone-link: #91d6a2;
+    }
+
+    :global(:root[data-theme='dark']) .code-window {
+        background: #202329;
+        color: #e0e1e4;
+    }
+
+    :global(:root[data-theme='dark']) .code-toolbar,
+    :global(:root[data-theme='dark']) .code-status {
+        border-color: rgba(225, 227, 231, 0.1);
+        background: #272a30;
+    }
+
+    :global(:root[data-theme='dark']) .code-file,
+    :global(:root[data-theme='dark']) .code-status {
+        color: #a5a9b1;
+    }
+
+    :global(:root[data-theme='dark']) .code-editor {
+        color: #dcdee2;
+        scrollbar-color: rgba(197, 200, 207, 0.28) transparent;
+    }
+
+    :global(:root[data-theme='dark']) .code-line > i {
+        color: #9297a0;
+    }
+
+    :global(:root[data-theme='dark']) .hmr-edit-line::before {
+        background:
+            linear-gradient(90deg, rgba(239, 152, 127, 0.15), transparent 88%),
+            #202329;
     }
 
     .phone-preview::before,
