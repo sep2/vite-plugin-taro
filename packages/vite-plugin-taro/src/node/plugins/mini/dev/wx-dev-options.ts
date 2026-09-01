@@ -3,8 +3,8 @@ import type { InputOptions, OutputOptions } from 'rolldown'
 import { build } from 'rolldown'
 import { type DevEngine, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
-import type { VptOptions } from '../../../../options.ts'
 import { memoize } from '../../../utils/memoize.ts'
+import type { MiniContract } from '../mini-contract.d.ts'
 import type { WxHmrMode } from './hmr-mode.ts'
 
 type BundledDevRolldownOptions = InputOptions & {
@@ -29,12 +29,12 @@ export type BundledDev = {
 export function installWxDevOptions({
     bundledDev,
     server,
-    options,
+    contract,
     hmrMode
 }: {
     bundledDev: BundledDev
     server: ViteDevServer
-    options: VptOptions
+    contract: MiniContract
     hmrMode: WxHmrMode
 }): void {
     /*
@@ -58,7 +58,7 @@ export function installWxDevOptions({
         // Entry banners run after Rolldown has assigned chunk names, so the mode receives route membership rather than source
         // IDs. DevTools mode uses O(1) membership to add Page patch dependencies; interpreter mode emits only its App initializer.
         // ReadonlySet prevents the resolved entry set from changing while Rolldown invokes the banner for later chunks.
-        const pageFiles: ReadonlySet<string> = new Set(options.pages.map((page) => `${page.path}.js`))
+        const pageFiles: ReadonlySet<string> = new Set(contract.pages.map((page) => `${page.path}.js`))
 
         /*
          * Rolldown passes this mutable output object onward by identity, and nested Vite plugins may already retain it. Mutating

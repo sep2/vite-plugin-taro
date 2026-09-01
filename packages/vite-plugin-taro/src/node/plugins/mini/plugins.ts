@@ -1,9 +1,9 @@
 import type { Plugin, PluginOption } from 'vite'
-import type { VptOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { clientTaroNativeId } from '../client/constant.ts'
 import { createWxDevelopmentPlugin } from './dev/plugins.ts'
+import type { MiniContract } from './mini-contract.d.ts'
 import { getWxExecutionKind, isTransportModule } from './module/module.ts'
 import { compileNativeComponentInterface } from './native/compile-native-component-interface.ts'
 import { createOutputFiles } from './output/files.ts'
@@ -17,8 +17,8 @@ import { createWxStylePlugin } from './styles/plugins.ts'
 type MiniResolver = ReturnType<typeof createResolver>
 
 /** Creates the complete Mini Program plugin set. */
-export function createMiniTargetPlugins(options: VptOptions): PluginOption[] {
-    const resolver = createResolver(options)
+export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] {
+    const resolver = createResolver(contract)
 
     // Reuse the resolver instance's ordered application subset. Rolldown's complete input also contains bootstrap, transport,
     // shell, and component entries; entry membership alone cannot recover which roots define the App/Page CSS cascade.
@@ -28,13 +28,13 @@ export function createMiniTargetPlugins(options: VptOptions): PluginOption[] {
     return [
         placement,
         styles,
-        createMiniPlugin(options, resolver, placement),
-        createWxDevelopmentPlugin(options, styles)
+        createMiniPlugin(contract, resolver, placement),
+        createWxDevelopmentPlugin(contract, styles)
     ]
 }
 
 /** Configures the complete Mini Program target build pipeline. */
-function createMiniPlugin(options: VptOptions, resolver: MiniResolver, placement: WxPlacementPlugin): Plugin {
+function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placement: WxPlacementPlugin): Plugin {
     return {
         name: 'vpt:wx',
 
@@ -150,7 +150,7 @@ function createMiniPlugin(options: VptOptions, resolver: MiniResolver, placement
 
                 const outputFiles = await createOutputFiles({
                     bundle,
-                    options,
+                    contract,
                     subpackages,
                     isProduction: this.environment.config.isProduction,
                     getModuleInfo: (moduleId) => this.getModuleInfo(moduleId),

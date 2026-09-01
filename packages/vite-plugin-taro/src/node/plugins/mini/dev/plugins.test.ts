@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { resolveConfig } from 'vite'
-import type { VptOptions } from '../../../../options.ts'
+import type { MiniContract } from '../mini-contract.d.ts'
 import { createWxStylePlugin } from '../styles/plugins.ts'
 import { createWxDevelopmentPlugin, isWxClientEnvironment, removeDevelopmentAppWxss } from './plugins.ts'
 
-const options: VptOptions = {
+const contract: MiniContract = {
     target: 'wx',
     app: 'src/app.tsx',
     pages: [],
@@ -23,7 +23,7 @@ test('preserves physical outputs and composes the selected mode across developme
     const config = await resolveConfig(
         {
             configFile: false,
-            plugins: createWxDevelopmentPlugin(options, createWxStylePlugin([import.meta.filename]))
+            plugins: createWxDevelopmentPlugin(contract, createWxStylePlugin([import.meta.filename]))
         },
         'serve'
     )

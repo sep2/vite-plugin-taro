@@ -6,7 +6,6 @@ import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 import { stripVTControlCharacters } from 'node:util'
 import { createLogger, createServer, type Logger, type Plugin, type ViteDevServer } from 'vite'
-import type { VptOptions } from '../../../../options.ts'
 import {
     type InterpreterServerMessage,
     interpreterServerEvent
@@ -14,6 +13,7 @@ import {
 import { runtimeReportEvent } from '../../../../runtime/wx/dev/wx-hmr-protocol.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
+import type { MiniContract } from '../mini-contract.d.ts'
 import { createWxStylePlugin } from '../styles/plugins.ts'
 import { createWxDevHost } from './dev-host.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
@@ -36,7 +36,7 @@ type DevFixture = Readonly<{
     server: ViteDevServer
 }>
 
-function createOptions(): VptOptions {
+function createOptions(): MiniContract {
     return {
         target: 'wx',
         app: 'src/app.tsx',
@@ -53,7 +53,7 @@ function createOptions(): VptOptions {
     }
 }
 
-function createInterpreterOptions(): VptOptions {
+function createInterpreterOptions(): MiniContract {
     return {
         ...createOptions(),
         hmr: { mode: 'interpreter' }
@@ -81,7 +81,7 @@ async function publishSourceGeneration(filePath: string, source: string): Promis
     }
 }
 
-async function startDevFixture(logger: Logger, host: string, options: VptOptions): Promise<DevFixture> {
+async function startDevFixture(logger: Logger, host: string, options: MiniContract): Promise<DevFixture> {
     const root = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-dev-test-'))
     const outDir = path.join(root, 'dist')
     const pagePath = path.join(root, 'src/pages/home/index.tsx')
@@ -274,7 +274,7 @@ test('rejects a server without Vite bundled development ownership', async (conte
         () =>
             createWxDevHost({
                 server: server,
-                options: createOptions(),
+                contract: createOptions(),
                 styles: createWxStylePlugin([import.meta.filename]),
                 hmrMode: createDevtoolsHmrMode()
             }),

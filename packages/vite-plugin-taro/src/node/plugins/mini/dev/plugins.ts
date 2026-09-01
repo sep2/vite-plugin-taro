@@ -1,7 +1,7 @@
 import { type PluginOption, transformWithOxc } from 'vite'
-import type { VptOptions } from '../../../../options.ts'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
+import type { MiniContract } from '../mini-contract.d.ts'
 import { rolldownRuntimeId } from '../module/module.ts'
 import type { WxStylePlugin } from '../styles/plugins.ts'
 import { createWxDevHost, type WxDevHost } from './dev-host.ts'
@@ -22,9 +22,9 @@ export function isWxClientEnvironment(environment: Readonly<{ name: string }>): 
  * The shared style pipeline already owns the resolver's ordered App/Page cascade policy, so the host does not reconstruct it
  * from unrelated Rolldown shell and transport entries.
  */
-export function createWxDevelopmentPlugin(options: VptOptions, styles: WxStylePlugin): PluginOption[] {
+export function createWxDevelopmentPlugin(contract: MiniContract, styles: WxStylePlugin): PluginOption[] {
     // Resolve once so plugins, journal effects, entry banners, and runtime bundling cannot disagree about the active mechanism.
-    const hmrMode = createWxHmrMode(options.hmr)
+    const hmrMode = createWxHmrMode(contract.hmr)
 
     /*
      * Vite creates this plugin descriptor before a server or DevEngine exists, then invokes configureServer and closeBundle on
@@ -74,7 +74,7 @@ export function createWxDevelopmentPlugin(options: VptOptions, styles: WxStylePl
                 async handler(server) {
                     host = await createWxDevHost({
                         server: server,
-                        options: options,
+                        contract: contract,
                         styles: styles,
                         hmrMode: hmrMode
                     })

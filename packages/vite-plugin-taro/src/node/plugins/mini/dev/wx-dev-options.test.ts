@@ -3,14 +3,14 @@ import path from 'node:path'
 import test from 'node:test'
 import type { OutputOptions, PreRenderedChunk, RenderedChunk } from 'rolldown'
 import { createLogger, createServer } from 'vite'
-import type { VptOptions } from '../../../../options.ts'
 import { packageRequire } from '../../../utils/packages.ts'
+import type { MiniContract } from '../mini-contract.d.ts'
 import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
 import { type BundledDev, installWxDevOptions, requireSingleOutput } from './wx-dev-options.ts'
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 
-const options: VptOptions = {
+const options: MiniContract = {
     target: 'wx',
     app: 'src/app.tsx',
     pages: [
@@ -94,7 +94,7 @@ test('adapts configured output into a stable physical wx development project', a
         }
     }
 
-    installWxDevOptions({ bundledDev: bundledDev, server: server, options: options, hmrMode: hmrMode })
+    installWxDevOptions({ bundledDev: bundledDev, server: server, contract: options, hmrMode: hmrMode })
     const adaptedOptions = await bundledDev.getRolldownOptions()
     const output = requireSingleOutput(adaptedOptions)
     const devMode = adaptedOptions.experimental?.devMode
@@ -177,7 +177,7 @@ test('supplies stable output defaults when Vite has no configured output', async
         }
     }
 
-    installWxDevOptions({ bundledDev: bundledDev, server: server, options: options, hmrMode: hmrMode })
+    installWxDevOptions({ bundledDev: bundledDev, server: server, contract: options, hmrMode: hmrMode })
     const adapted = await bundledDev.getRolldownOptions()
     const output = requireSingleOutput(adapted)
 
@@ -222,7 +222,7 @@ test('rejects output arrays from both Vite configuration and generated Rolldown 
     installWxDevOptions({
         bundledDev: configuredArrayBundledDev,
         server: server,
-        options: options,
+        contract: options,
         hmrMode: hmrMode
     })
     await assert.rejects(
@@ -242,7 +242,7 @@ test('rejects output arrays from both Vite configuration and generated Rolldown 
     installWxDevOptions({
         bundledDev: generatedArrayBundledDev,
         server: server,
-        options: options,
+        contract: options,
         hmrMode: hmrMode
     })
     await assert.rejects(

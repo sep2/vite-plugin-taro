@@ -1,10 +1,10 @@
 import { recursiveMerge } from '@tarojs/helper'
 import { Weapp as WxPlatform } from '@tarojs/plugin-platform-weapp'
 import type { Rolldown } from 'vite'
-import type { VptJsonObject, VptOptions, VptPageOption } from '../../../../options.ts'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import { createAppConfig } from '../../../utils/project-config.ts'
+import type { MiniContract, MiniJsonObject, MiniPage } from '../mini-contract.d.ts'
 import { type GeneratedSubpackage, isGeneratedSubpackageFile } from '../placer/placement.ts'
 import { toRootRelativePath } from './relative-root.ts'
 
@@ -32,13 +32,13 @@ const taroComponentsModulePath = packageRequire.resolve('@tarojs/plugin-platform
 /** Creates every JSON, WXML, WXS, and Page WXSS asset owned by Taro's native rendering boundary. */
 export function createTemplateAssets({
     bundle,
-    options,
+    contract,
     subpackages,
     nativeComponents,
     isProduction
 }: {
     bundle: Rolldown.OutputBundle
-    options: VptOptions
+    contract: MiniContract
     subpackages: readonly GeneratedSubpackage[]
     nativeComponents: readonly NativeComponentRegistration[]
     isProduction: boolean
@@ -48,10 +48,10 @@ export function createTemplateAssets({
     const nativeComponentConfig = createNativeComponentConfig(nativeComponents)
     const recursiveComponentJson = createRecursiveComponentJson(nativeComponentConfig)
 
-    const jsonAsset = (fileName: string, value: VptJsonObject) => createJsonAsset(fileName, value, isProduction)
+    const jsonAsset = (fileName: string, value: MiniJsonObject) => createJsonAsset(fileName, value, isProduction)
 
     return [
-        jsonAsset('app.json', createAppJson({ options, subpackages })),
+        jsonAsset('app.json', createAppJson({ contract: contract, subpackages: subpackages })),
 
         createAsset('base.wxml', templateBuilder.buildBaseTemplate(componentConfig)),
         createAsset('utils.wxs', templateBuilder.buildXScript()),
@@ -62,7 +62,7 @@ export function createTemplateAssets({
         createAsset('custom-wrapper.wxml', templateBuilder.buildCustomComponentTemplate('.wxml')),
         jsonAsset('custom-wrapper.json', recursiveComponentJson),
 
-        ...options.pages.flatMap((page) => [
+        ...contract.pages.flatMap((page) => [
             jsonAsset(`${page.path}.json`, createPageJson(page, nativeComponentConfig)),
             createAsset(
                 `${page.path}.wxml`,
@@ -74,11 +74,11 @@ export function createTemplateAssets({
             createAsset(`${page.path}.wxss`, '')
         ]),
 
-        jsonAsset('project.config.json', options.projectConfigJson),
-        ...(options.projectPrivateConfigJson
-            ? [jsonAsset('project.private.config.json', options.projectPrivateConfigJson)]
+        jsonAsset('project.config.json', contract.projectConfigJson),
+        ...(contract.projectPrivateConfigJson
+            ? [jsonAsset('project.private.config.json', contract.projectPrivateConfigJson)]
             : []),
-        ...(options.sitemapJson ? [jsonAsset('sitemap.json', options.sitemapJson)] : [])
+        ...(contract.sitemapJson ? [jsonAsset('sitemap.json', contract.sitemapJson)] : [])
     ]
 }
 
@@ -362,14 +362,14 @@ function toDashed(value: string): string {
 
 /** Creates App JSON with generated subpackages. */
 function createAppJson({
-    options,
+    contract,
     subpackages
 }: {
-    options: VptOptions
+    contract: MiniContract
     subpackages: readonly GeneratedSubpackage[]
-}): VptJsonObject {
+}): MiniJsonObject {
     return {
-        ...createAppConfig(options),
+        ...createAppConfig(contract),
         ...(subpackages.length > 0 ? { subPackages: subpackages } : {})
     }
 }
@@ -392,7 +392,7 @@ function createNativeComponentConfig(nativeComponents: readonly NativeComponentR
 }
 
 /** Preserves configured Page JSON and registers its recursive and native component entries. */
-function createPageJson(page: VptPageOption, nativeComponentConfig: NativeComponentConfig): VptJsonObject {
+function createPageJson(page: MiniPage, nativeComponentConfig: NativeComponentConfig): MiniJsonObject {
     const usingComponents = isJsonObject(page.config.usingComponents) ? page.config.usingComponents : {}
     const componentPlaceholder = isJsonObject(page.config.componentPlaceholder) ? page.config.componentPlaceholder : {}
     const hasNativeComponentPlaceholder = Object.keys(nativeComponentConfig.componentPlaceholder).length > 0
@@ -417,7 +417,7 @@ function createPageJson(page: VptPageOption, nativeComponentConfig: NativeCompon
 }
 
 /** Creates the shared recursive component configuration used by comp and CustomWrapper. */
-function createRecursiveComponentJson(nativeComponentConfig: NativeComponentConfig): VptJsonObject {
+function createRecursiveComponentJson(nativeComponentConfig: NativeComponentConfig): MiniJsonObject {
     const hasNativeComponentPlaceholder = Object.keys(nativeComponentConfig.componentPlaceholder).length > 0
 
     return {
@@ -433,12 +433,12 @@ function createRecursiveComponentJson(nativeComponentConfig: NativeComponentConf
 }
 
 /** Tests whether a configured JSON value can be merged as an object. */
-function isJsonObject(value: unknown): value is VptJsonObject {
+function isJsonObject(value: unknown): value is MiniJsonObject {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** Creates compact production JSON and readable development JSON. */
-function createJsonAsset(fileName: string, value: VptJsonObject, isProduction: boolean): Rolldown.EmittedAsset {
+function createJsonAsset(fileName: string, value: MiniJsonObject, isProduction: boolean): Rolldown.EmittedAsset {
     return createAsset(fileName, isProduction ? JSON.stringify(value) : `${JSON.stringify(value, null, 4)}\n`)
 }
 

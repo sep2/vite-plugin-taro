@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
-import type { VptOptions } from '../../../../options.ts'
+import type { MiniContract } from '../mini-contract.d.ts'
 import { createTemplateAssets, replaceExactlyOnce } from './templates.ts'
 
-const options: VptOptions = {
+const contract: MiniContract = {
     target: 'wx',
     app: 'src/app.tsx',
     pages: [
@@ -61,7 +61,7 @@ test('enforces exact pinned Taro template fragments', () => {
 test('creates native rendering and configuration assets', () => {
     const output = createTemplateAssets({
         bundle: {} as Rolldown.OutputBundle,
-        options: options,
+        contract: contract,
         subpackages: [{ name: 'p_example', root: 'sub/p_example', pages: [] }],
         isProduction: false,
         nativeComponents: [
@@ -138,9 +138,9 @@ test('creates native rendering and configuration assets', () => {
         },
         componentPlaceholder: nativeComponentPlaceholder
     })
-    assert.deepEqual(JSON.parse(assets.get('project.config.json') ?? ''), options.projectConfigJson)
-    assert.deepEqual(JSON.parse(assets.get('project.private.config.json') ?? ''), options.projectPrivateConfigJson)
-    assert.deepEqual(JSON.parse(assets.get('sitemap.json') ?? ''), options.sitemapJson)
+    assert.deepEqual(JSON.parse(assets.get('project.config.json') ?? ''), contract.projectConfigJson)
+    assert.deepEqual(JSON.parse(assets.get('project.private.config.json') ?? ''), contract.projectPrivateConfigJson)
+    assert.deepEqual(JSON.parse(assets.get('sitemap.json') ?? ''), contract.sitemapJson)
 
     const baseTemplate = assets.get('base.wxml') ?? ''
     const componentTemplate = assets.get('comp.wxml') ?? ''

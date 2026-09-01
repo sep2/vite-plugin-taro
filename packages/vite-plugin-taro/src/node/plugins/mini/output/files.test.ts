@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { VptOptions } from '../../../../options.ts'
+import type { MiniContract } from '../mini-contract.d.ts'
 import { createOutputFiles } from './files.ts'
 
-const options: VptOptions = {
+const contract: MiniContract = {
     target: 'wx',
     app: 'src/app.tsx',
     pages: [],
@@ -15,7 +15,7 @@ const options: VptOptions = {
 test('creates the stable app stylesheet wrapper', async () => {
     const outputFiles = await createOutputFiles({
         bundle: {},
-        options,
+        contract: contract,
         subpackages: [],
         isProduction: false,
         getModuleInfo: () => null,

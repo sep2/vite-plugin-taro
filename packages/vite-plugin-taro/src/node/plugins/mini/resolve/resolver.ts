@@ -1,8 +1,8 @@
 import { normalizePath } from 'vite'
-import type { VptOptions, VptPageOption } from '../../../../options.ts'
 import { normalizeModuleId, resolveAppComponentPath, resolvePageComponentPath } from '../../../utils/modules.ts'
 import { createAppConfig } from '../../../utils/project-config.ts'
 import { appComponentId } from '../../client/constant.ts'
+import type { MiniContract, MiniPage } from '../mini-contract.d.ts'
 import {
     appCapsulePath,
     appShellFileName,
@@ -27,21 +27,21 @@ import { specializePageCapsule } from './specialize-page-capsule.ts'
 type PrivateIdResolver = (importer: string | undefined, projectRoot: string) => string
 
 /** Creates the resolver and source specializer for the wx module graph. */
-export function createResolver(options: VptOptions) {
+export function createResolver(contract: MiniContract) {
     const normalizedAppCapsulePath = normalizePath(appCapsulePath)
     const normalizedPageCapsulePath = normalizePath(pageCapsulePath)
 
     // Construct output input and application traversal roots together once so style order cannot drift from route order.
-    const entryGraph = createEntryGraph(options.pages)
+    const entryGraph = createEntryGraph(contract.pages)
 
     // Provide constant-time route validation and access to each configured Page JSON object.
-    const pageByPath = new Map(options.pages.map((page) => [page.path, page]))
+    const pageByPath = new Map(contract.pages.map((page) => [page.path, page]))
 
     const privateIdResolvers = new Map<string, PrivateIdResolver>([
         // Share bootstrap's preload identity through native require and its amphibious SystemJS registration.
         [vitePreloadId, () => bootstrapPath],
         // Keep the configured App component behind one stable private import in the App capsule.
-        [appComponentId, (_importer, projectRoot) => resolveAppComponentPath({ appPath: options.app, projectRoot })],
+        [appComponentId, (_importer, projectRoot) => resolveAppComponentPath({ appPath: contract.app, projectRoot })],
         [
             pageComponentId,
             (importer, projectRoot) => {
@@ -73,7 +73,7 @@ export function createResolver(options: VptOptions) {
             const normalizedId = normalizeModuleId(id)
 
             if (normalizedId === normalizedAppCapsulePath) {
-                return specializeAppCapsule({ code, id, appConfig: createAppConfig(options), sourcemap })
+                return specializeAppCapsule({ code, id, appConfig: createAppConfig(contract), sourcemap })
             }
 
             if (normalizedId === normalizedPageCapsulePath) {
@@ -89,7 +89,7 @@ export function createResolver(options: VptOptions) {
 }
 
 /** Declares output entries and the ordered application subset that can own user styles. */
-function createEntryGraph(pages: readonly VptPageOption[]) {
+function createEntryGraph(pages: readonly MiniPage[]) {
     const pageEntries = pages.map((page) => {
         return {
             capsuleId: createRouteModuleId({ moduleId: pageCapsulePath, pagePath: page.path }),
@@ -131,8 +131,8 @@ function requireConfiguredPage({
     pageByPath
 }: {
     moduleId: string | undefined
-    pageByPath: ReadonlyMap<string, VptPageOption>
-}): VptPageOption {
+    pageByPath: ReadonlyMap<string, MiniPage>
+}): MiniPage {
     const queryIndex = moduleId?.indexOf('?') ?? -1
     const pagePath = queryIndex === -1 ? undefined : new URLSearchParams(moduleId?.slice(queryIndex + 1)).get('route')
     const page = pagePath ? pageByPath.get(pagePath) : undefined

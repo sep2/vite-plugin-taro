@@ -1,6 +1,6 @@
 import * as types from '@babel/types'
-import type { VptPageOption } from '../../../../options.ts'
 import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
+import type { MiniPage } from '../mini-contract.d.ts'
 
 const pagePathPlaceholder = '__VPT_PAGE_PATH__'
 const pageConfigPlaceholder = '__VPT_PAGE_CONFIG__'
@@ -14,7 +14,7 @@ export function specializePageCapsule({
 }: {
     code: string
     id: string
-    page: VptPageOption
+    page: MiniPage
     sourcemap?: boolean
 }): Promise<AstTransformResult> {
     return replaceWithAst(

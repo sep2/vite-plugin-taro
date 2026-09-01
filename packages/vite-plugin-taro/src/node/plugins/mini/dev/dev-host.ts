@@ -3,13 +3,13 @@ import colors from 'picocolors'
 import { type DevEngine, type DevOptions, dev } from 'rolldown/experimental'
 import { asyncScheduler } from 'rxjs'
 import type { ViteDevServer } from 'vite'
-import type { VptOptions } from '../../../../options.ts'
 import {
     type RuntimeControlMessage,
     type RuntimeReport,
     runtimeControlEvent,
     runtimeReportEvent
 } from '../../../../runtime/wx/dev/wx-hmr-protocol.ts'
+import type { MiniContract } from '../mini-contract.d.ts'
 import type { WxStylePlugin } from '../styles/plugins.ts'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
 import {
@@ -67,12 +67,12 @@ const hmrSettleMilliseconds = 16
  */
 export async function createWxDevHost({
     server,
-    options,
+    contract,
     styles,
     hmrMode
 }: {
     server: ViteDevServer
-    options: VptOptions
+    contract: MiniContract
     styles: WxStylePlugin
     hmrMode: WxHmrMode
 }): Promise<WxDevHost> {
@@ -94,7 +94,7 @@ export async function createWxDevHost({
     })
 
     // Option installation configures only Rolldown. Build lifecycle results enter through the engine's output action below.
-    installWxDevOptions({ bundledDev: bundledDev, server: server, options: options, hmrMode: hmrMode })
+    installWxDevOptions({ bundledDev: bundledDev, server: server, contract: contract, hmrMode: hmrMode })
     const engine: DevEngine = await createEngine()
 
     const hmrResults = createHmrResultsStream(

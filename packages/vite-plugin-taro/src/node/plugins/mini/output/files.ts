@@ -1,5 +1,5 @@
 import type { Rolldown } from 'vite'
-import type { VptOptions } from '../../../../options.ts'
+import type { MiniContract } from '../mini-contract.d.ts'
 import { createNativeComponentOutput } from '../native/create-native-component-output.ts'
 import type { GeneratedSubpackage, PackageLocation } from '../placer/placement.ts'
 import { createTemplateAssets } from './templates.ts'
@@ -7,14 +7,14 @@ import { createTemplateAssets } from './templates.ts'
 /** Creates every compiler-owned WX file derived from the final Rolldown bundle. */
 export async function createOutputFiles({
     bundle,
-    options,
+    contract,
     subpackages,
     isProduction,
     getModuleInfo,
     getPackageLocation
 }: {
     bundle: Rolldown.OutputBundle
-    options: VptOptions
+    contract: MiniContract
     subpackages: readonly GeneratedSubpackage[]
     isProduction: boolean
     getModuleInfo: (moduleId: string) => { meta: Rolldown.CustomPluginOptions } | null
@@ -30,7 +30,7 @@ export async function createOutputFiles({
         },
         ...createTemplateAssets({
             bundle: bundle,
-            options: options,
+            contract: contract,
             subpackages: subpackages,
             nativeComponents: nativeOutput.registrations,
             isProduction: isProduction

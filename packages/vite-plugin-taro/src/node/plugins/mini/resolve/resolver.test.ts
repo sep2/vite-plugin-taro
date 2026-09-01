@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
 import { normalizePath } from 'vite'
-import type { VptOptions } from '../../../../options.ts'
 import { appComponentId } from '../../client/constant.ts'
+import type { MiniContract } from '../mini-contract.d.ts'
 import {
     appCapsulePath,
     appShellPath,
@@ -20,7 +20,7 @@ import {
 } from '../module/module.ts'
 import { createResolver } from './resolver.ts'
 
-const options: VptOptions = {
+const options: MiniContract = {
     target: 'wx',
     app: 'src/app.tsx',
     pages: [

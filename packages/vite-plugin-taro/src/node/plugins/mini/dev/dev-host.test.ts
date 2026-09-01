@@ -7,7 +7,7 @@ import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { DevOptions } from 'rolldown/experimental'
 import { createLogger, createServer } from 'vite'
-import type { VptOptions } from '../../../../options.ts'
+import type { MiniContract } from '../mini-contract.d.ts'
 import type { WxStylePlugin } from '../styles/plugins.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
 import { hmrEndpointPath } from './hmr-protocol.ts'
@@ -25,7 +25,7 @@ type SyntheticDev = (_input: unknown, _output: unknown, devOptions: DevOptions) 
 
 const devHostHarnessKey = '__vptDevHostTestHarness__'
 
-const options: VptOptions = {
+const contract: MiniContract = {
     target: 'wx',
     app: 'src/app.tsx',
     pages: [],
@@ -186,7 +186,7 @@ test('reduces synthetic engine update variants and unknown host failures without
     try {
         const host = await createWxDevHost({
             server: server,
-            options: options,
+            contract: contract,
             styles: styles,
             hmrMode: createDevtoolsHmrMode()
         })

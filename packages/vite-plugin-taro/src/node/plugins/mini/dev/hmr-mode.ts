@@ -1,5 +1,5 @@
 import type { Plugin } from 'vite'
-import type { VptHmrOptions } from '../../../../options.ts'
+import type { MiniHmrOptions } from '../mini-contract.d.ts'
 import type { PatchPublication } from './hmr-protocol.ts'
 import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
 import { createInterpreterHmrMode } from './modes/interpreter/interpreter-hmr-mode.ts'
@@ -36,7 +36,7 @@ export type WxHmrMode = Readonly<{
 }>
 
 /** Resolves exactly one implementation before the WX development host is created. */
-export function createWxHmrMode(options: VptHmrOptions | undefined): WxHmrMode {
+export function createWxHmrMode(options: MiniHmrOptions): WxHmrMode {
     const mode = options?.mode ?? 'devtools'
     switch (mode) {
         case 'devtools':

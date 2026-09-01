@@ -1,6 +1,6 @@
 import * as types from '@babel/types'
-import type { VptJsonObject } from '../../../../options.ts'
 import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
+import type { MiniJsonObject } from '../mini-contract.d.ts'
 
 const appConfigPlaceholder = '__VPT_APP_CONFIG__'
 
@@ -13,7 +13,7 @@ export function specializeAppCapsule({
 }: {
     code: string
     id: string
-    appConfig: VptJsonObject
+    appConfig: MiniJsonObject
     sourcemap?: boolean
 }): Promise<AstTransformResult> {
     return replaceWithAst(
