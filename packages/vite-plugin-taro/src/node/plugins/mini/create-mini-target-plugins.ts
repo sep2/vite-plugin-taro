@@ -14,10 +14,10 @@ import { materializeTransport } from './render/transport.ts'
 import { createResolver } from './resolve/resolver.ts'
 import { createWxStylePlugin } from './styles/plugins.ts'
 
-type WxResolver = ReturnType<typeof createResolver>
+type MiniResolver = ReturnType<typeof createResolver>
 
-/** Creates the complete plugin set for the wx target. */
-export function createWxTargetPlugins(options: VptOptions): PluginOption[] {
+/** Creates the complete Mini Program plugin set. */
+export function createMiniTargetPlugins(options: VptOptions): PluginOption[] {
     const resolver = createResolver(options)
 
     // Reuse the resolver instance's ordered application subset. Rolldown's complete input also contains bootstrap, transport,
@@ -25,11 +25,16 @@ export function createWxTargetPlugins(options: VptOptions): PluginOption[] {
     const placement = createWxPlacementPlugin()
     const styles = createWxStylePlugin(resolver.applicationEntryIds)
 
-    return [placement, styles, createWxPlugin(options, resolver, placement), createWxDevelopmentPlugin(options, styles)]
+    return [
+        placement,
+        styles,
+        createMiniPlugin(options, resolver, placement),
+        createWxDevelopmentPlugin(options, styles)
+    ]
 }
 
-/** Configures the complete wx target build pipeline. */
-function createWxPlugin(options: VptOptions, resolver: WxResolver, placement: WxPlacementPlugin): Plugin {
+/** Configures the complete Mini Program target build pipeline. */
+function createMiniPlugin(options: VptOptions, resolver: MiniResolver, placement: WxPlacementPlugin): Plugin {
     return {
         name: 'vpt:wx',
 
