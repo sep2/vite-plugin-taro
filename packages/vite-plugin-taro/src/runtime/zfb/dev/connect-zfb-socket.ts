@@ -5,4 +5,4 @@ declare const my: {
 }
 
 /** Opens an independent task-scoped Vite socket through the Alipay native API. */
-export const connectMiniSocket: ConnectMiniSocket = (endpoint) => my.connectSocket({ url: endpoint, multiple: true })
+export const connectZfbSocket: ConnectMiniSocket = (endpoint) => my.connectSocket({ url: endpoint, multiple: true })

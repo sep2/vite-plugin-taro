@@ -1,6 +1,6 @@
 import type { RuntimePatch } from '../../mini-hmr-runtime.ts'
 
-export const interpreterServerEvent = 'vpt:wx-interpreter:source'
+export const interpreterServerEvent = 'vpt:hmr-interpreter:source'
 
 /** One Rolldown patch whose existing code field is interpreted instead of wrapped in a native factory. */
 export type InterpreterPatch = RuntimePatch & {

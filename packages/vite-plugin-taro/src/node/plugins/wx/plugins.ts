@@ -30,8 +30,8 @@ export function createMiniContract(vptOptions: VptOptions): MiniContract {
                 customWrapperShell: resolveRuntimeFile('mini/native/custom-wrapper'),
                 pageShell: resolveRuntimeFile('mini/native/page'),
                 pageCapsule: resolveRuntimeFile('mini/capsule/page'),
-                devtoolsHmrRuntime: resolveRuntimeFile('wx/dev/modes/devtools/devtools-runtime'),
-                interpreterHmrRuntime: resolveRuntimeFile('wx/dev/modes/interpreter/interpreter-runtime')
+                devtoolsHmrRuntime: resolveRuntimeFile('wx/dev/devtools-runtime'),
+                interpreterHmrRuntime: resolveRuntimeFile('wx/dev/interpreter-runtime')
             }
         },
         styles: {

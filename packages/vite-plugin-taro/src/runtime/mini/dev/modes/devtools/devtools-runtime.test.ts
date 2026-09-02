@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { DevRuntime } from 'rolldown/experimental/runtime'
 import { runtimeReportEvent } from '../../hmr-protocol.ts'
+import type { MiniSocketTask } from '../../mini-hmr-runtime.ts'
 
 type TestHotContext = Readonly<{
     _internal: Readonly<{
@@ -53,7 +54,7 @@ async function createTestHarness(): Promise<TestHarness> {
     const reports: unknown[] = []
     const messages: CapturedSocketMessage[] = []
     let receiveSocketMessage = (_result: Readonly<{ data: string | ArrayBuffer }>) => {}
-    const socket: WeChatSocketTask = {
+    const socket: MiniSocketTask = {
         send(options) {
             const envelope = JSON.parse(String(options.data)) as CapturedSocketMessage
             messages.push(envelope)
@@ -70,7 +71,7 @@ async function createTestHarness(): Promise<TestHarness> {
         DevRuntime,
         __VPT_RUNTIME_GLOBAL__: globalThis,
         wx: {
-            connectSocket(): WeChatSocketTask {
+            connectSocket(): MiniSocketTask {
                 return socket
             }
         }
@@ -90,7 +91,7 @@ async function createTestHarness(): Promise<TestHarness> {
 
 async function importTestRuntime(): Promise<TestRuntime> {
     runtimeId++
-    await import(`../../../../wx/dev/modes/devtools/devtools-runtime.ts?test=${runtimeId}`)
+    await import(`../../../../wx/dev/devtools-runtime.ts?test=${runtimeId}`)
 
     const runtime = (globalThis as typeof globalThis & { __rolldown_runtime__?: TestRuntime }).__rolldown_runtime__
     if (!runtime) throw new Error('Mini Program dev runtime was not installed')

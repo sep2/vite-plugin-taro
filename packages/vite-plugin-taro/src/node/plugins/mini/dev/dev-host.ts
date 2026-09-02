@@ -21,8 +21,8 @@ import { PatchJournal } from './patch-journal.ts'
 
 declare module 'vite' {
     interface CustomEventMap {
-        'vpt:wx-hmr:control': RuntimeControlMessage
-        'vpt:wx-hmr:report': RuntimeReport
+        'vpt:mini-hmr:control': RuntimeControlMessage
+        'vpt:mini-hmr:report': RuntimeReport
     }
 }
 

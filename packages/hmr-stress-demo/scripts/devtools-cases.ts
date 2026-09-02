@@ -13,7 +13,7 @@ type HmrInfo = Readonly<{
     endpoint: string
 }>
 
-const runtimeReportEvent = 'vpt:wx-hmr:report'
+const runtimeReportEvent = 'vpt:mini-hmr:report'
 
 const burstProfile: HmrEditProfile = {
     applicationDelayMilliseconds: 4_000,

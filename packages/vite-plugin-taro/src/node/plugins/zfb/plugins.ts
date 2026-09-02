@@ -30,8 +30,8 @@ export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
                 customWrapperShell: resolveRuntimeFile('mini/native/custom-wrapper'),
                 pageShell: resolveRuntimeFile('mini/native/page'),
                 pageCapsule: resolveRuntimeFile('mini/capsule/page'),
-                devtoolsHmrRuntime: resolveRuntimeFile('zfb/dev/modes/devtools/devtools-runtime'),
-                interpreterHmrRuntime: resolveRuntimeFile('zfb/dev/modes/interpreter/interpreter-runtime')
+                devtoolsHmrRuntime: resolveRuntimeFile('zfb/dev/devtools-runtime'),
+                interpreterHmrRuntime: resolveRuntimeFile('zfb/dev/interpreter-runtime')
             }
         },
         styles: {

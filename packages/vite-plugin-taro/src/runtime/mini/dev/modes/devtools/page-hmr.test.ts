@@ -50,7 +50,7 @@ async function createTestHarness(): Promise<TestHarness> {
     })
 
     runtimeId++
-    await import(`../../../../wx/dev/modes/devtools/devtools-runtime.ts?page-hmr-test=${runtimeId}`)
+    await import(`../../../../wx/dev/devtools-runtime.ts?page-hmr-test=${runtimeId}`)
 
     const runtime = (globalThis as typeof globalThis & { __rolldown_runtime__?: TestRuntime }).__rolldown_runtime__
     if (!runtime) throw new Error('Mini Program dev runtime was not installed')

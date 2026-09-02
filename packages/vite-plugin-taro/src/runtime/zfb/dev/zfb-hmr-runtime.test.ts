@@ -10,7 +10,7 @@ const socket: MiniSocketTask = {
 }
 
 function importRuntimeEntry(mode: 'devtools' | 'interpreter'): Promise<unknown> {
-    return import(`./modes/${mode}/${mode}-runtime.ts?zfb-entry`)
+    return import(`./${mode}-runtime.ts?zfb-entry`)
 }
 
 function initializeRuntime(runtime: unknown, buildId: string): void {
@@ -33,8 +33,8 @@ test('uses an independent Alipay SocketTask and installs both shared HMR modes o
         }
     })
 
-    const { connectMiniSocket } = await import('./connect-mini-socket.ts')
-    assert.strictEqual(connectMiniSocket('ws://localhost/hmr'), socket)
+    const { connectZfbSocket } = await import('./connect-zfb-socket.ts')
+    assert.strictEqual(connectZfbSocket('ws://localhost/hmr'), socket)
     assert.deepEqual(connectOptions, [{ url: 'ws://localhost/hmr', multiple: true }])
 
     await importRuntimeEntry('devtools')
