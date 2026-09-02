@@ -40,7 +40,7 @@ const contract: MiniContract = {
         appFileName: 'app.wxss',
         globalFileName: 'assets/global.wxss'
     },
-    react: {},
+
     output: {
         subpackagePlanningBudget: 1_900_000
     }

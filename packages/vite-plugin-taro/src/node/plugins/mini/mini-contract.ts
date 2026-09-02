@@ -33,9 +33,6 @@ export type StyleContract = {
     globalFileName: string
 }
 
-/** React integration reserved for target-specific behavior introduced by later platform adapters. */
-export type ReactContract = Readonly<Record<string, never>>
-
 /** Output planning constraints selected by one Mini Program target. */
 export type OutputContract = {
     subpackagePlanningBudget: number
@@ -47,7 +44,6 @@ export type MiniContract = {
     taro: TaroContract
     runtime: RuntimeContract
     styles: StyleContract
-    react: ReactContract
     output: OutputContract
 }
 

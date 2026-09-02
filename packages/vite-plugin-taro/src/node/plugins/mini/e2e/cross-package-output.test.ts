@@ -69,7 +69,7 @@ const contract: MiniContract = {
         appFileName: 'app.style',
         globalFileName: 'assets/global.style'
     },
-    react: {},
+
     output: {
         subpackagePlanningBudget: 1_900_000
     }
