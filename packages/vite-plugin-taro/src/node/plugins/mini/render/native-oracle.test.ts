@@ -3,8 +3,28 @@ import test from 'node:test'
 import { type PluginTarget, transformSync } from '@babel/core'
 import transformModulesCommonjs from '@babel/plugin-transform-modules-commonjs'
 import type { Rolldown } from 'vite'
-import { bootstrapPath } from '../module/module.ts'
+import type { RuntimeContract } from '../mini-contract.ts'
+import { createMiniModuleClassifier } from '../module/module.ts'
 import { renderNative } from './native.ts'
+
+const runtime: RuntimeContract = {
+    globalObject: 'global',
+    modules: {
+        bootstrap: '/runtime/bootstrap',
+        transport: '/runtime/transport',
+        appShell: '/runtime/app-shell',
+        appCapsule: '/runtime/app-capsule',
+        componentShell: '/runtime/component-shell',
+        componentCapsule: '/runtime/component-capsule',
+        customWrapperShell: '/runtime/custom-wrapper-shell',
+        pageShell: '/runtime/page-shell',
+        pageCapsule: '/runtime/page-capsule',
+        devtoolsHmrRuntime: '/runtime/devtools-hmr',
+        interpreterHmrRuntime: '/runtime/interpreter-hmr'
+    }
+}
+
+const classifyModule = createMiniModuleClassifier(runtime.modules)
 
 type ModuleNamespace = Record<string, unknown>
 type CommonJsInstance = Readonly<{
@@ -152,8 +172,15 @@ test('matches Babel for side-effect import order and local declaration exports',
 })
 
 function compile(code: string) {
-    const chunk = { fileName: 'assets/native.js', moduleIds: [bootstrapPath] } as Rolldown.RenderedChunk
-    return renderNative({ code, chunk, chunks: {}, sourcemap: false })
+    const chunk = { fileName: 'assets/native.js', moduleIds: [runtime.modules.bootstrap] } as Rolldown.RenderedChunk
+    return renderNative({
+        code,
+        chunk,
+        chunks: {},
+        runtime: runtime,
+        classifyModule: classifyModule,
+        sourcemap: false
+    })
 }
 
 /** Executes both compilers against identical dependencies and compares their observable module namespaces. */

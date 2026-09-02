@@ -1,17 +1,17 @@
 /**
- * Final Rolldown ESM to native WX CommonJS renderer.
+ * Final Rolldown ESM to native Mini Program CommonJS renderer.
  *
- * The WX build intentionally has two cooperating JavaScript execution domains:
+ * The Mini Program build has two cooperating JavaScript execution domains:
  *
- * - Native and amphibious chunks are entered by WeChat through synchronous CommonJS `require`. They install infrastructure
+ * - Native and amphibious chunks are entered by the host through synchronous CommonJS `require`. They install infrastructure
  *   and call the native App, Page, and Component lifecycle APIs.
  * - Capsule chunks retain ESM linking behavior behind the bundled SystemJS runtime. They contain the application graph and
  *   may use cycles, live bindings, dynamic imports, and top-level await.
  *
- * Rolldown still emits one ESM chunk graph before that runtime split is materialized. WeChat cannot execute those final ESM
+ * Rolldown still emits one ESM chunk graph before that runtime split is materialized. Mini Program hosts cannot execute final ESM
  * imports directly, so this renderer translates chunks classified as native or amphibious into CommonJS while preserving the
  * ESM behavior observable at their boundary. Ordinary native dependencies become `require` namespace cells; capsule imports
- * become synchronous `global.System.importSync` lookups; and exports are published through the CommonJS `exports` object.
+ * become synchronous platform-global `System.importSync` lookups; and exports are published through the CommonJS `exports` object.
  *
  * This is deliberately a final-chunk compiler, not a general source-module compiler. Rolldown has already lowered TypeScript,
  * bundled source modules, selected chunk boundaries, and normalized the remaining imports and exports. Restricting the input
@@ -35,8 +35,9 @@ import { type ExistingRawSourceMap, RolldownMagicString } from 'rolldown'
 import { parseSync } from 'rolldown/utils'
 import type { Rolldown } from 'vite'
 import type { AstTransformResult } from '../../../utils/transform.ts'
+import type { RuntimeContract } from '../mini-contract.ts'
 import { resolveLogicalChunkReference, resolvePhysicalChunkReference } from '../module/chunk-path.ts'
-import { getMiniEntryRole } from '../module/module.ts'
+import type { MiniModuleClassifier } from '../module/module.ts'
 
 type ImportBinding = Readonly<{
     imported: string | null
@@ -69,14 +70,14 @@ type NativeModuleModel = Readonly<{
 }>
 
 /**
- * Materializes one final native/amphibious Rolldown chunk as executable WX CommonJS.
+ * Materializes one final native/amphibious Rolldown chunk as executable Mini Program CommonJS.
  *
  * The transform performs four semantic operations:
  *
  * 1. Static ESM imports are hoisted into source-order `require` calls. Named imports remain property reads from the required
  *    namespace so they observe current values. Default and namespace imports receive Babel-compatible CommonJS interop.
  * 2. An import whose target owns a capsule entry is not passed to native `require`. It becomes
- *    `global.System.importSync(logicalChunkId)`, synchronously linking the capsule before the native lifecycle call.
+ *    the platform-global `System.importSync(logicalChunkId)`, synchronously linking the capsule before the native lifecycle call.
  * 3. Local exports are published at declaration and mutation points. Imported re-exports use getters, while assignments and
  *    updates notify every alias without changing expression completion values or accidentally matching shadowed bindings.
  * 4. ESM top-level `this` becomes `undefined`. Direct imported calls and tags are explicitly unbound so converting an import
@@ -84,18 +85,22 @@ type NativeModuleModel = Readonly<{
  *
  * Static dependency loading is emitted before the untouched module body because ESM evaluates dependencies before body
  * statements regardless of where import declarations appear textually. Generated helper names are allocated against every
- * source identifier. Source maps use the same range edits when requested; WX development disables them and keeps this path
+ * source identifier. Source maps use the same range edits when requested; Mini Program development disables them and keeps this path
  * focused on startup latency.
  */
 export function renderNative({
     code,
     chunk,
     chunks,
+    runtime,
+    classifyModule,
     sourcemap
 }: {
     code: string
     chunk: Rolldown.RenderedChunk
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
+    runtime: RuntimeContract
+    classifyModule: MiniModuleClassifier
     sourcemap: boolean
 }): AstTransformResult {
     const parsed = parseSync(chunk.fileName, code)
@@ -106,7 +111,7 @@ export function renderNative({
 
     // Analysis owns grammar validation, scope resolution, helper allocation, and physical-to-logical capsule classification.
     // It completes before an editor exists, so failure cannot leak a partially rewritten chunk into Rolldown's output graph.
-    const model = analyzeNativeModule(parsed.program, chunk, chunks)
+    const model = analyzeNativeModule(parsed.program, chunk, chunks, classifyModule)
     const editor = new RolldownMagicString(code, { filename: chunk.fileName })
 
     // Expression edits split untouched source ranges first. Declaration replacement runs afterwards because MagicString must
@@ -118,7 +123,7 @@ export function renderNative({
     const hasExports = model.exportNamesByLocal.size > 0
     const helpers = renderInteropHelpers(model)
     const postfixTemp = model.usesPostfixTemp ? `var ${model.postfixTemp};` : ''
-    const imports = renderImports(model)
+    const imports = renderImports(model, runtime.globalObject)
     if (hasExports) {
         editor.prepend(
             `"use strict";Object.defineProperty(exports,"__esModule",{value:true});${helpers}${postfixTemp}${imports}`
@@ -143,7 +148,8 @@ export function renderNative({
 function analyzeNativeModule(
     program: Program,
     chunk: Rolldown.RenderedChunk,
-    chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
+    chunks: Readonly<Record<string, Rolldown.RenderedChunk>>,
+    classifyModule: MiniModuleClassifier
 ): NativeModuleModel {
     const identifierNames = collectIdentifierNames(program)
     const exportNamesByLocal = new Map<string, string[]>()
@@ -164,7 +170,7 @@ function analyzeNativeModule(
         switch (node.type) {
             case 'ImportDeclaration': {
                 requirePlainImport(node, chunk.fileName)
-                const capsule = getImportedCapsule(chunk.fileName, node.source.value, chunks)
+                const capsule = getImportedCapsule(chunk.fileName, node.source.value, chunks, classifyModule)
                 if (capsule) {
                     const [specifier] = node.specifiers
                     if (node.specifiers.length !== 1 || !specifier || specifier.type === 'ImportNamespaceSpecifier') {
@@ -244,7 +250,7 @@ function analyzeNativeModule(
 }
 
 /**
- * Removes syntax that WX cannot parse and adds declaration-time CommonJS publication without regenerating other source.
+ * Removes syntax that Mini Program hosts cannot parse and adds declaration-time CommonJS publication without regenerating other source.
  * Import execution itself is emitted in the generated header; removing declarations here retains comments and all unrelated
  * Rolldown output byte-for-byte. Final export lists publish only imported getters because local cells were already instrumented
  * at their declarations and writes.
@@ -548,11 +554,12 @@ function memberExpression(object: string, property: string): string {
 function getImportedCapsule(
     fileName: string,
     reference: string,
-    chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
+    chunks: Readonly<Record<string, Rolldown.RenderedChunk>>,
+    classifyModule: MiniModuleClassifier
 ): Rolldown.RenderedChunk | undefined {
     if (!reference.startsWith('./') && !reference.startsWith('../')) return undefined
     const imported = chunks[resolvePhysicalChunkReference(fileName, reference)]
-    return imported && getMiniEntryRole(imported) === 'capsule' ? imported : undefined
+    return imported && classifyModule(imported).entryRole === 'capsule' ? imported : undefined
 }
 
 /**
@@ -562,12 +569,12 @@ function getImportedCapsule(
  * import declaration, while cross-domain capsule imports synchronously ask SystemJS for the namespace under its package-neutral
  * logical ID. Physical package placement remains the transport's responsibility.
  */
-function renderImports(model: NativeModuleModel): string {
+function renderImports(model: NativeModuleModel, globalObject: string): string {
     return model.imports
         .map((importModel) => {
             if (importModel.capsuleBinding) {
                 const { imported, local, logicalId } = importModel.capsuleBinding
-                const namespace = `global.System.importSync(${JSON.stringify(logicalId)})`
+                const namespace = `${globalObject}.System.importSync(${JSON.stringify(logicalId)})`
                 return `var ${local}=${memberExpression(namespace, imported)};`
             }
 

@@ -28,6 +28,7 @@ function createTestPlacement(chunks: Readonly<Record<string, TestChunk>>): TestP
         chunks: renderedChunks,
         placement: createPlacement({
             chunks: renderedChunks,
+            planningBudgetBytes: packageBudgetBytes,
             getAdditionalModuleBytes: (moduleId) => bytesByModuleId.get(moduleId) ?? 0
         })
     }

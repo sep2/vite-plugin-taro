@@ -6,7 +6,7 @@ import { isCSSRequest, normalizePath, type Plugin, type Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { wrapPluginTransform } from '../../../utils/vite.ts'
 import { tailwindcssBasedir } from '../../tailwind/tailwind-css.ts'
-import { globalWxssFileName } from '../dev/hmr-files.ts'
+import type { MiniContract } from '../mini-contract.ts'
 import { createMiniTransformer } from './create-mini-transformer.ts'
 
 /** Persistent Tailwind state owned by one physical CSS root across incremental Rolldown transforms. */
@@ -165,7 +165,7 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * compiler dependencies, and watched file identities; no second application graph is retained. The Tailwind generator stays
  * alive across candidate edits to avoid repeating source normalization and compiler initialization.
  */
-export function createMiniStylePlugin(applicationEntryIds: readonly string[]): MiniStylePlugin {
+export function createMiniStylePlugin(contract: MiniContract, applicationEntryIds: readonly string[]): MiniStylePlugin {
     // This mutable root list is replaced in buildStart with Vite/Rolldown's exact cross-platform graph identities.
     let entryIds = applicationEntryIds
     // The fixed transformer retains only deterministic class-escape and PostCSS pipeline caches for this plugin instance.
@@ -203,7 +203,7 @@ export function createMiniStylePlugin(applicationEntryIds: readonly string[]): M
     }
 
     return {
-        name: 'vpt:wx-styles',
+        name: 'vpt:mini-styles',
         /** Installs the single private Vite integration used to observe fully processed module CSS. */
         configResolved(config) {
             // `vite:css-post` is the boundary after all public CSS processing and before browser-module serialization.
@@ -316,7 +316,7 @@ export function createMiniStylePlugin(applicationEntryIds: readonly string[]): M
                 })
 
                 // Step 5: always emit the imported global file, including an empty file for applications without styles.
-                this.emitFile({ type: 'asset', fileName: globalWxssFileName, source: finalized.wxss })
+                this.emitFile({ type: 'asset', fileName: contract.styles.globalFileName, source: finalized.wxss })
             }
         },
         /** Releases build-only state after the final bundle has consumed it. */

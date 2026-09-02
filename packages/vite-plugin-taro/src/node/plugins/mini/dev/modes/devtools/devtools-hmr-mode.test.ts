@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { pageShellPath } from '../../../module/module.ts'
+import type { RuntimeModulesContract } from '../../../mini-contract.ts'
 import type { PatchUpdate } from '../../hmr-protocol.ts'
 import {
     createDevtoolsHmrMode,
@@ -9,6 +9,20 @@ import {
     renderDevtoolsPatches,
     renderInitialDevtoolsPatches
 } from './devtools-hmr-mode.ts'
+
+const modules: RuntimeModulesContract = {
+    bootstrap: '/runtime/bootstrap',
+    transport: '/runtime/transport',
+    appShell: '/runtime/app-shell',
+    appCapsule: '/runtime/app-capsule',
+    componentShell: '/runtime/component-shell',
+    componentCapsule: '/runtime/component-capsule',
+    customWrapperShell: '/runtime/custom-wrapper-shell',
+    pageShell: '/runtime/native/page.ts',
+    pageCapsule: '/runtime/page-capsule',
+    devtoolsHmrRuntime: '/runtime/devtools-runtime.ts',
+    interpreterHmrRuntime: '/runtime/interpreter-runtime.ts'
+}
 
 const patch: PatchUpdate = {
     type: 'Patch',
@@ -19,7 +33,7 @@ const patch: PatchUpdate = {
 }
 
 test('creates exact App and Page entry banners', () => {
-    const mode = createDevtoolsHmrMode()
+    const mode = createDevtoolsHmrMode(modules)
     const banner = mode.createEntryBanner(new Set(['pages/home/index.js']))
 
     assert.equal(
@@ -31,26 +45,28 @@ test('creates exact App and Page entry banners', () => {
         "__rolldown_runtime__.applyPatches(require('../../hmr/patches.js'));\n"
     )
     assert.equal(banner({ name: 'assets/vendor.js', fileName: 'assets/vendor.js' }), '')
-    assert.match(mode.runtimeFile, /wx\/dev\/modes\/devtools\/devtools-runtime\.(?:ts|js)$/)
+    assert.equal(mode.runtimeFile, modules.devtoolsHmrRuntime)
 })
 
 test('creates fresh Page plugins with exact shell identity filtering', async () => {
-    const first = createDevtoolsHmrMode().plugins[0]
-    const second = createDevtoolsHmrMode().plugins[0]
+    const first = createDevtoolsHmrMode(modules).plugins[0]
+    const second = createDevtoolsHmrMode(modules).plugins[0]
     assert.ok(first)
     assert.ok(second)
     assert.notStrictEqual(first, second)
-    assert.equal(first.name, 'vpt:wx-page-shell-hmr')
+    assert.equal(first.name, 'vpt:mini-page-shell-hmr')
 
     const transformHook = first.transform
-    assert.ok(transformHook)
-    const transform = typeof transformHook === 'function' ? transformHook : transformHook.handler
-    assert.equal(
-        await Reflect.apply(transform, {}, ['Page(pageConfig)', '/project/runtime/wx/native/page.js?other']),
-        undefined
-    )
+    assert.ok(transformHook && typeof transformHook === 'object')
+    const idFilter = transformHook.filter?.id
+    assert.ok(idFilter instanceof RegExp)
+    assert.equal(idFilter.test(modules.pageShell), true)
+    assert.equal(idFilter.test(`${modules.pageShell}?other`), true)
+    assert.equal(idFilter.test(`${modules.pageShell}.copy`), false)
+    assert.equal(idFilter.test(modules.pageShell.replace('.ts', 'Xts')), false)
+    assert.equal(idFilter.test('/project/runtime/native/page.ts'), false)
 
-    const transformed = await Reflect.apply(transform, {}, ['Page(pageConfig)', pageShellPath])
+    const transformed = await Reflect.apply(transformHook.handler, {}, ['Page(pageConfig)', modules.pageShell])
     assert.ok(transformed && typeof transformed === 'object' && 'code' in transformed)
     assert.match(String(transformed.code), /injectPageHmr/)
 })
@@ -80,7 +96,7 @@ test('rejects an empty cumulative patch range', () => {
 })
 
 test('describes reset and publication writes through the exact DevTools patch path', () => {
-    const mode = createDevtoolsHmrMode()
+    const mode = createDevtoolsHmrMode(modules)
     const reset = mode.reset()
     const publication = mode.publish({ buildId: 'build', patches: [patch] })
 

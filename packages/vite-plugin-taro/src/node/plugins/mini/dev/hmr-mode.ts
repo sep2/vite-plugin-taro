@@ -1,5 +1,5 @@
 import type { Plugin } from 'vite'
-import type { MiniHmrOptions } from '../mini-contract.d.ts'
+import type { MiniHmrOptions, RuntimeModulesContract } from '../mini-contract.ts'
 import type { PatchPublication } from './hmr-protocol.ts'
 import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
 import { createInterpreterHmrMode } from './modes/interpreter/interpreter-hmr-mode.ts'
@@ -36,12 +36,12 @@ export type MiniHmrMode = Readonly<{
 }>
 
 /** Resolves exactly one implementation before the Mini Program development host is created. */
-export function createMiniHmrMode(options: MiniHmrOptions): MiniHmrMode {
+export function createMiniHmrMode(options: MiniHmrOptions, modules: RuntimeModulesContract): MiniHmrMode {
     const mode = options?.mode ?? 'devtools'
     switch (mode) {
         case 'devtools':
-            return createDevtoolsHmrMode()
+            return createDevtoolsHmrMode(modules)
         case 'interpreter':
-            return createInterpreterHmrMode()
+            return createInterpreterHmrMode(modules)
     }
 }

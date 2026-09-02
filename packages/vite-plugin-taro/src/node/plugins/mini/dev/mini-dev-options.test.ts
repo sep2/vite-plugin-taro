@@ -4,13 +4,13 @@ import test from 'node:test'
 import type { OutputOptions, PreRenderedChunk, RenderedChunk } from 'rolldown'
 import { createLogger, createServer } from 'vite'
 import { packageRequire } from '../../../utils/packages.ts'
-import type { MiniContract } from '../mini-contract.d.ts'
+import { createMiniContract } from '../../wx/plugins.ts'
 import { type BundledDev, installMiniDevOptions, requireSingleOutput } from './mini-dev-options.ts'
 import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 
-const options: MiniContract = {
+const options = createMiniContract({
     target: 'wx',
     app: 'src/app.tsx',
     pages: [
@@ -21,8 +21,8 @@ const options: MiniContract = {
     ],
     appJson: {},
     projectConfigJson: {}
-}
-const hmrMode = createDevtoolsHmrMode()
+})
+const hmrMode = createDevtoolsHmrMode(options.runtime.modules)
 
 function createPreRenderedChunk(name: string): PreRenderedChunk {
     return {

@@ -1,6 +1,6 @@
 import * as types from '@babel/types'
 import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
-import type { MiniJsonObject } from '../mini-contract.d.ts'
+import type { MiniJsonObject } from '../mini-contract.ts'
 
 const appConfigPlaceholder = '__VPT_APP_CONFIG__'
 

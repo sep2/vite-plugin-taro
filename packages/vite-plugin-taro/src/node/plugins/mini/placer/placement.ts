@@ -1,8 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Rolldown } from 'vite'
 
-// Leave headroom below WeChat's 2M subpackage limit for rendered wrappers and native assets.
-export const subpackagePlanningBudget = 1_900_000
 const generatedSubpackageRootPrefix = 'sub/p_'
 
 /** Identifies one generated code-only subpackage by its physical output root. */
@@ -77,9 +75,11 @@ type PackedSubpackage = SubpackageLocation & {
  */
 export function createPlacement({
     chunks,
+    planningBudgetBytes,
     getAdditionalModuleBytes
 }: {
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
+    planningBudgetBytes: number
     getAdditionalModuleBytes(moduleId: string): number
 }): Placement {
     const chunkById = new Map(Object.entries(chunks).sort(([left], [right]) => left.localeCompare(right)))
@@ -96,7 +96,7 @@ export function createPlacement({
         }))
     const subpackages = packChunks({
         chunks: placeableChunks,
-        planningBudgetBytes: subpackagePlanningBudget
+        planningBudgetBytes: planningBudgetBytes
     }).map(createPackedSubpackage)
 
     // This local map accumulates the immutable plan returned to output materialization.
@@ -112,7 +112,7 @@ export function createPlacement({
     function getLocation(chunkId: string): PackageLocation {
         const location = locationByChunk.get(chunkId)
         if (!location) {
-            throw new Error(`wx placement is missing final chunk: ${chunkId}`)
+            throw new Error(`Mini Program placement is missing final chunk: ${chunkId}`)
         }
         return location
     }

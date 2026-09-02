@@ -3,8 +3,6 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { HmrInfo } from './hmr-protocol.ts'
 
-export const developmentAppWxssFileName = 'app.wxss'
-export const globalWxssFileName = 'assets/global.wxss'
 export const hmrInfoFileName = 'hmr/info.js'
 
 /**
@@ -22,8 +20,8 @@ export function renderHmrInfo(info: HmrInfo): string {
  * cache after it restarts. Tying this inert comment to the build identity invalidates that cache once per complete build,
  * while incremental style updates continue changing only the imported file and therefore preserve the App heap.
  */
-export function renderDevelopmentAppWxss(buildId: string): string {
-    return `@import "./assets/global.wxss";\n/* vpt-build:${buildId} */\n`
+export function renderDevelopmentAppStyle(globalStyleFileName: string, buildId: string): string {
+    return `@import "./${globalStyleFileName}";\n/* vpt-build:${buildId} */\n`
 }
 
 /**

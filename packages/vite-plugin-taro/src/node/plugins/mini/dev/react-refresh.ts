@@ -1,16 +1,25 @@
+import path from 'node:path'
 import { isReferenceIdentifier, type WalkerEnter } from 'oxc-walker'
 import type { RolldownMagicString } from 'rolldown'
-import type { Plugin } from 'vite'
+import { normalizePath, type Plugin } from 'vite'
 import { memoize } from '../../../utils/memoize.ts'
-import { normalizeModuleId } from '../../../utils/modules.ts'
+import { createExactModuleIdFilter } from '../../../utils/modules.ts'
 import { transformWithOxcWalker } from '../../../utils/oxc-transform.ts'
-import { reactReconcilerRoot } from '../module/module.ts'
+import { packageRequire } from '../../../utils/packages.ts'
 
-/** The React DevTools hook protocol name; free references must target `global` in wx development. */
+const reactRefreshRuntimeId = '/@react-refresh'
+const reactReconcilerDevelopmentId = normalizePath(
+    path.join(
+        path.dirname(packageRequire.resolve('react-reconciler/package.json')),
+        'cjs/react-reconciler.development.js'
+    )
+)
+
+/** The React DevTools hook protocol name; free references must target the configured runtime global in Mini Program development. */
 const reactDevtoolsHookProtocol = '__REACT_DEVTOOLS_GLOBAL_HOOK__'
 
 /**
- * Refresh protocol globals that must live on the WeChat `global` object:
+ * Refresh protocol globals that must live on the configured runtime global:
  * - `__registerBeforePerformReactRefresh` is assigned at module evaluation so the HMR client can register work that
  *   must finish before a refresh. Leaving it on `window` throws before the refresh runtime can initialize.
  * - `__getReactRefreshIgnoredExports` is an optional extension point read while validating a refresh boundary.
@@ -22,9 +31,9 @@ const reactDevtoolsHookProtocol = '__REACT_DEVTOOLS_GLOBAL_HOOK__'
 const refreshRuntimeWindowGlobals = ['__registerBeforePerformReactRefresh', '__getReactRefreshIgnoredExports'] as const
 
 /**
- * Creates the serve-only React Refresh adaptation transforms for the wx target.
+ * Creates the serve-only React Refresh adaptation transforms for a Mini Program target.
  *
- * @vitejs/plugin-react's generated refresh code assumes an HTML preamble and a browser global scope; wx has neither. Each
+ * @vitejs/plugin-react assumes an HTML preamble and browser global scope; Mini Program hosts provide neither. Each
  * transform owns one distinct compatibility boundary:
  *
  * - The refresh runtime is selected by exact ID. It rewrites only the two browser protocol globals that React Refresh evaluates
@@ -32,43 +41,41 @@ const refreshRuntimeWindowGlobals = ['__registerBeforePerformReactRefresh', '__g
  * - React Reconciler is selected by exact physical ID. Its renderer injection receives a static dependency on the refresh
  *   runtime, so hook installation cannot race renderer initialization during cold startup.
  * - React-family modules are selected by the reserved free DevTools-hook identifier. Their expression references must resolve
- *   through WeChat's `global` object; an AST visitor edits only those identifier ranges after the filter admits the module.
+ *   through the configured runtime global; an AST visitor edits only those identifier ranges after the filter admits the module.
  * - Refresh boundaries are selected by Vite's generated `$RefreshReg$` guard. The AST transform removes only that web-preamble
  *   assertion because each boundary already owns local wrappers over the imported refresh runtime.
  *
  * These adaptations deliberately remain serve-only plugin transforms rather than target-wide `define` entries. That scope
- * prevents development protocol behavior from leaking into production or unrelated WX modules. Plugin order also
+ * prevents development protocol behavior from leaking into production or unrelated Mini Program modules. Plugin order also
  * matters: Reconciler receives its static refresh dependency before the later DevTools-hook transform lowers its free references.
  */
-export function createMiniReactRefreshTransforms(): Plugin[] {
+export function createMiniReactRefreshTransforms(globalObject: string): Plugin[] {
     return [
         {
-            name: 'vpt:wx-react-refresh-runtime',
+            name: 'vpt:mini-react-refresh-runtime',
             apply: 'serve',
             transform: {
                 order: 'post',
                 // The refresh runtime module is id-filtered, so no code scan is needed.
-                filter: { id: /^\/@react-refresh(?:\?|$)/ },
+                filter: { id: createExactModuleIdFilter(reactRefreshRuntimeId) },
                 handler(code, id) {
-                    return fixRefreshRuntime({ code, id })
+                    return fixRefreshRuntime({ code, id, globalObject })
                 }
             }
         },
         {
-            name: 'vpt:wx-react-refresh-renderer-dependency',
+            name: 'vpt:mini-react-refresh-renderer-dependency',
             apply: 'serve',
             transform: {
                 order: 'post',
-                filter: { id: /\/react-reconciler\/cjs\/react-reconciler\.development\.js(?:\?|$)/ },
-                handler(code, id) {
-                    const rendererId = `${reactReconcilerRoot}/cjs/react-reconciler.development.js`
-                    if (normalizeModuleId(id) !== rendererId) return
+                filter: { id: createExactModuleIdFilter(reactReconcilerDevelopmentId) },
+                handler(code) {
                     return injectReactRefreshRendererDependency(code)
                 }
             }
         },
         {
-            name: 'vpt:wx-react-devtools-hook',
+            name: 'vpt:mini-react-devtools-hook',
             apply: 'serve',
             transform: {
                 order: 'post',
@@ -76,12 +83,12 @@ export function createMiniReactRefreshTransforms(): Plugin[] {
                 // identifiers, leaving explicit members, property keys, and string contents byte-for-byte intact.
                 filter: { code: /(^|[^.\w$])__REACT_DEVTOOLS_GLOBAL_HOOK__/ },
                 handler(code, id) {
-                    return fixReactDevtoolsHook({ code, id })
+                    return fixReactDevtoolsHook({ code, id, globalObject })
                 }
             }
         },
         {
-            name: 'vpt:wx-refresh-preamble-guard',
+            name: 'vpt:mini-refresh-preamble-guard',
             apply: 'serve',
             transform: {
                 order: 'post',
@@ -96,11 +103,11 @@ export function createMiniReactRefreshTransforms(): Plugin[] {
 }
 
 /**
- * React-family modules: free `__REACT_DEVTOOLS_GLOBAL_HOOK__` reads must target `global`.
+ * React-family modules: free `__REACT_DEVTOOLS_GLOBAL_HOOK__` reads must target the runtime global.
  *
  * React checks the hook through free expressions such as `typeof __REACT_DEVTOOLS_GLOBAL_HOOK__` before calling
- * `hook.inject(...)`. WeChat does not expose properties of its `global` object as free lexical bindings, so those checks would
- * see `undefined` even after the refresh runtime installed `global.__REACT_DEVTOOLS_GLOBAL_HOOK__`. Renderer registration would
+ * `hook.inject(...)`. Mini Program hosts do not expose runtime-global properties as free lexical bindings, so those checks would
+ * see `undefined` even after the refresh runtime installs the configured hook member. Renderer registration would
  * then be skipped silently, leaving React Refresh without a renderer on which to schedule updates.
  *
  * The protocol name can also occur as an explicit member, an object key, or string content. A textual replacement cannot
@@ -109,7 +116,7 @@ export function createMiniReactRefreshTransforms(): Plugin[] {
  * code-filtered hook is intentional: a target-wide Vite `define` would affect production and every user module merely to
  * optimize a handful of immutable React sources.
  */
-function createReactDevtoolsHookVisitor(editor: RolldownMagicString): WalkerEnter {
+function createReactDevtoolsHookVisitor(editor: RolldownMagicString, globalObject: string): WalkerEnter {
     return function enter(node, parent) {
         if (
             node.type !== 'Identifier' ||
@@ -119,9 +126,9 @@ function createReactDevtoolsHookVisitor(editor: RolldownMagicString): WalkerEnte
             return
         }
 
-        // WeChat does not expose properties of `global` as free lexical bindings. Prefixing only this identifier range retains
-        // declarations, keys, strings, comments, formatting, and every explicit `global.__REACT_DEVTOOLS_GLOBAL_HOOK__` member.
-        editor.overwrite(node.start, node.end, `global.${reactDevtoolsHookProtocol}`)
+        // Mini Program hosts do not expose runtime-global properties as free lexical bindings. Prefixing only this identifier
+        // range retains declarations, keys, strings, comments, formatting, and every explicit runtime-global DevTools hook member.
+        editor.overwrite(node.start, node.end, `${globalObject}.${reactDevtoolsHookProtocol}`)
     }
 }
 
@@ -129,11 +136,11 @@ function createReactDevtoolsHookVisitor(editor: RolldownMagicString): WalkerEnte
  * Refresh runtime module: self-inject at evaluation and rewrite its browser protocol globals.
  *
  * In web Vite, an HTML preamble calls `injectIntoGlobalHook(window)` before application
- * modules load. wx has no HTML document or preamble, so nothing performs that bootstrap.
+ * modules load. Mini Program hosts have no HTML document or preamble, so nothing performs that bootstrap.
  * The call must live in the refresh runtime module itself:
  * - this module's closure owns `helpersByRendererID`, mounted roots, and the update helpers;
- * - the selected WX HMR runtime chunk cannot call into it because the refresh module is in a later, lazily loaded chunk and
- *   does not exist when the HMR runtime chunk evaluates.
+ * - the selected Mini Program HMR runtime chunk cannot call into it because the refresh module is in a later, lazily loaded
+ *   chunk and does not exist when the HMR runtime chunk evaluates.
  *
  * Unlike the preamble's `$RefreshReg$` globals, which boundary modules replace with local
  * wrappers, the renderer-hook machinery has no local equivalent. Without this injected call,
@@ -142,13 +149,13 @@ function createReactDevtoolsHookVisitor(editor: RolldownMagicString): WalkerEnte
  * Appending the call is safe even when React has already registered its renderer: the refresh
  * runtime replays `hook.renderers` during injection, then its patched commit hooks observe all
  * later mounts and remounts. The same module also contains two browser-only `window` protocol
- * accesses; those must point at `global` or evaluation/update validation throws in WeChat.
+ * accesses; those must point at the runtime global or evaluation/update validation throws in the host.
  */
-function createRefreshRuntimeVisitor(editor: RolldownMagicString): WalkerEnter {
+function createRefreshRuntimeVisitor(editor: RolldownMagicString, globalObject: string): WalkerEnter {
     // The declarations must execute before self-injection, so the call is appended instead of
     // prepended. Removing it would leave the web preamble's only essential responsibility
-    // unimplemented in wx.
-    editor.append('\ninjectIntoGlobalHook(global);')
+    // unimplemented in a Mini Program.
+    editor.append(`\ninjectIntoGlobalHook(${globalObject});`)
 
     return function enter(node) {
         if (
@@ -159,10 +166,10 @@ function createRefreshRuntimeVisitor(editor: RolldownMagicString): WalkerEnter {
             node.property.type === 'Identifier' &&
             refreshRuntimeWindowGlobals.some((globalName) => globalName === node.property.name)
         ) {
-            // `global` is the shared wx App heap used by the dev runtime and hook injection. Only
+            // The runtime global is the shared App heap used by the dev runtime and hook injection. Only
             // replacing the object range preserves the upstream runtime byte-for-byte otherwise
             // and prevents unrelated `window` expressions from being silently adapted.
-            editor.overwrite(node.object.start, node.object.end, 'global')
+            editor.overwrite(node.object.start, node.object.end, globalObject)
         }
     }
 }
@@ -170,8 +177,8 @@ function createRefreshRuntimeVisitor(editor: RolldownMagicString): WalkerEnter {
 /**
  * Removes the web-only `if (!window.$RefreshReg$) throw Error(...)` assertion from boundary modules.
  *
- * The assertion verifies that Vite's HTML preamble installed global registration helpers. wx has no HTML preamble, and
- * evaluating `window` itself fails. The assertion is unnecessary here because @vitejs/plugin-react generates local
+ * The assertion verifies that Vite's HTML preamble installed global registration helpers. A Mini Program has no HTML preamble,
+ * and evaluating `window` itself fails. The assertion is unnecessary here because @vitejs/plugin-react generates local
  * `$RefreshReg$` and `$RefreshSig$` wrappers that delegate directly to the imported refresh runtime. Removing the complete
  * statement therefore removes only an invalid platform check; component registration continues through those local wrappers.
  *
@@ -209,26 +216,42 @@ export function injectReactRefreshRendererDependency(code: string): { code: stri
     }
 
     return {
-        code: `import '/@react-refresh'\n${code}`,
+        code: `import '${reactRefreshRuntimeId}'\n${code}`,
         map: null
     }
 }
 
-export function transformRefreshRuntime({ code, id }: { code: string; id: string }) {
+export function transformRefreshRuntime({
+    code,
+    id,
+    globalObject
+}: {
+    code: string
+    id: string
+    globalObject: string
+}) {
     return transformWithOxcWalker({
         code,
         filename: id,
         sourcemap: false,
-        createVisitor: createRefreshRuntimeVisitor
+        createVisitor: (editor) => createRefreshRuntimeVisitor(editor, globalObject)
     })
 }
 
-export function transformReactDevtoolsHook({ code, id }: { code: string; id: string }) {
+export function transformReactDevtoolsHook({
+    code,
+    id,
+    globalObject
+}: {
+    code: string
+    id: string
+    globalObject: string
+}) {
     return transformWithOxcWalker({
         code,
         filename: id,
         sourcemap: false,
-        createVisitor: createReactDevtoolsHookVisitor
+        createVisitor: (editor) => createReactDevtoolsHookVisitor(editor, globalObject)
     })
 }
 
@@ -248,5 +271,9 @@ export function removeRefreshPreambleGuard({ code, id }: { code: string; id: str
  * once-only cache detached from its input. Separate caches prevent identical text in different transform domains from sharing
  * the wrong adaptation.
  */
-const fixRefreshRuntime = memoize(transformRefreshRuntime, { getCacheKey: ({ code }) => code })
-const fixReactDevtoolsHook = memoize(transformReactDevtoolsHook, { getCacheKey: ({ code }) => code })
+const fixRefreshRuntime = memoize(transformRefreshRuntime, {
+    getCacheKey: ({ code, globalObject }) => `${globalObject}\0${code}`
+})
+const fixReactDevtoolsHook = memoize(transformReactDevtoolsHook, {
+    getCacheKey: ({ code, globalObject }) => `${globalObject}\0${code}`
+})

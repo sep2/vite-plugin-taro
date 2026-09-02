@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
+import path from 'node:path'
 import { test } from 'node:test'
+import { normalizePath } from 'vite'
+import { packageRequire } from '../../../utils/packages.ts'
 import {
     createMiniReactRefreshTransforms,
     injectReactRefreshRendererDependency,
@@ -17,7 +20,8 @@ test('adapts the refresh runtime to the WeChat global object', () => {
             const ignored = window.__getReactRefreshIgnoredExports
             performReactRefresh()
         `,
-        id: '/@react-refresh'
+        id: '/@react-refresh',
+        globalObject: 'global'
     })
 
     assert.doesNotMatch(transformed.code, /window\.__/)
@@ -46,7 +50,8 @@ test('rewrites only reference uses of the React DevTools hook in an admitted mod
             const explicit = global.__REACT_DEVTOOLS_GLOBAL_HOOK__
             const record = { __REACT_DEVTOOLS_GLOBAL_HOOK__: explicit }
         `,
-        id: 'react-renderer.js'
+        id: 'react-renderer.js',
+        globalObject: 'global'
     })
 
     assert.match(transformed.code, /typeof global\.__REACT_DEVTOOLS_GLOBAL_HOOK__/)
@@ -55,16 +60,31 @@ test('rewrites only reference uses of the React DevTools hook in an admitted mod
 })
 
 test('routes renderer and preamble plugin hooks through their exact IDs', async () => {
-    const transforms = createMiniReactRefreshTransforms()
+    const transforms = createMiniReactRefreshTransforms('global')
     assert.equal(transforms.length, 4)
     const rendererHook = transforms[1]?.transform
     const preambleHook = transforms[3]?.transform
-    assert.ok(rendererHook)
+    assert.ok(rendererHook && typeof rendererHook === 'object')
     assert.ok(preambleHook)
-    const renderer = typeof rendererHook === 'function' ? rendererHook : rendererHook.handler
-    const preamble = typeof preambleHook === 'function' ? preambleHook : preambleHook.handler
+    const rendererIdFilter = rendererHook.filter?.id
+    assert.ok(rendererIdFilter instanceof RegExp)
+    const rendererId = normalizePath(
+        path.join(
+            path.dirname(packageRequire.resolve('react-reconciler/package.json')),
+            'cjs/react-reconciler.development.js'
+        )
+    )
+    assert.equal(rendererIdFilter.test(rendererId), true)
+    assert.equal(rendererIdFilter.test(`${rendererId}?v=1`), true)
+    assert.equal(rendererIdFilter.test('/project/other-renderer.js'), false)
+    const rendererResult = await Reflect.apply(rendererHook.handler, {}, [
+        'const rendererID = hook.inject(internals)',
+        rendererId
+    ])
+    assert.ok(rendererResult && typeof rendererResult === 'object' && 'code' in rendererResult)
+    assert.match(String(rendererResult.code), /^import '\/@react-refresh'/)
 
-    assert.equal(await Reflect.apply(renderer, {}, ['const renderer = {}', '/project/other-renderer.js']), undefined)
+    const preamble = typeof preambleHook === 'function' ? preambleHook : preambleHook.handler
     const transformed = await Reflect.apply(preamble, {}, [
         "if (!window.$RefreshReg$) throw new Error('missing preamble')",
         'boundary.js'

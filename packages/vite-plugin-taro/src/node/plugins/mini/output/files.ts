@@ -1,10 +1,10 @@
 import type { Rolldown } from 'vite'
-import type { MiniContract } from '../mini-contract.d.ts'
+import type { MiniContract } from '../mini-contract.ts'
 import { createNativeComponentOutput } from '../native/create-native-component-output.ts'
 import type { GeneratedSubpackage, PackageLocation } from '../placer/placement.ts'
 import { createTemplateAssets } from './templates.ts'
 
-/** Creates every compiler-owned WX file derived from the final Rolldown bundle. */
+/** Creates every compiler-owned Mini Program file derived from the final Rolldown bundle. */
 export async function createOutputFiles({
     bundle,
     contract,
@@ -25,8 +25,8 @@ export async function createOutputFiles({
     return [
         {
             type: 'asset',
-            fileName: 'app.wxss',
-            source: '@import "./assets/global.wxss";\n'
+            fileName: contract.styles.appFileName,
+            source: `@import "./${contract.styles.globalFileName}";\n`
         },
         ...createTemplateAssets({
             bundle: bundle,

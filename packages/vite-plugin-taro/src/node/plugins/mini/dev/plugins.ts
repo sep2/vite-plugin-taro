@@ -1,11 +1,11 @@
 import { type PluginOption, transformWithOxc } from 'vite'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
-import type { MiniContract } from '../mini-contract.d.ts'
+import { createExactModuleIdFilter } from '../../../utils/modules.ts'
+import type { MiniContract } from '../mini-contract.ts'
 import { rolldownRuntimeId } from '../module/module.ts'
 import type { MiniStylePlugin } from '../styles/plugins.ts'
 import { createMiniDevHost, type MiniDevHost } from './dev-host.ts'
-import { developmentAppWxssFileName } from './hmr-files.ts'
 import { createMiniHmrMode } from './hmr-mode.ts'
 import { hmrEndpointPath } from './hmr-protocol.ts'
 import { createMiniReactRefreshTransforms } from './react-refresh.ts'
@@ -24,7 +24,7 @@ export function isMiniClientEnvironment(environment: Readonly<{ name: string }>)
  */
 export function createMiniDevelopmentPlugin(contract: MiniContract, styles: MiniStylePlugin): PluginOption[] {
     // Resolve once so plugins, journal effects, entry banners, and runtime bundling cannot disagree about the active mechanism.
-    const hmrMode = createMiniHmrMode(contract.hmr)
+    const hmrMode = createMiniHmrMode(contract.options.hmr, contract.runtime.modules)
 
     /*
      * Vite creates this plugin descriptor before a server or DevEngine exists, then invokes configureServer and closeBundle on
@@ -36,7 +36,7 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
     let host: MiniDevHost | null = null
     return [
         {
-            name: 'vpt:wx-dev',
+            name: 'vpt:mini-dev',
             apply: 'serve',
             // The physical WX DevEngine is a client build. Native environment scoping gives its shared host exactly one
             // generate/close lifecycle instead of admitting hooks from Vite's unrelated SSR environment.
@@ -87,7 +87,7 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
                     // `vpt:wx` emits the production App wrapper during every complete build: initial startup and each
                     // recovery build, not just once when this plugin instance is created. Development transfers that file
                     // to the host so its only physical write happens after the matching build identity is durable.
-                    removeDevelopmentAppWxss(bundle)
+                    removeDevelopmentAppStyle(bundle, contract.styles.appFileName)
                 }
             },
 
@@ -96,7 +96,7 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
             }
         },
         {
-            name: 'vpt:wx-runtime-lowering',
+            name: 'vpt:mini-runtime-lowering',
             apply: 'serve',
             transform: {
                 order: 'post',
@@ -105,9 +105,8 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
                 // bypasses the build's es2018 lowering. Real-device engines and WeChat's
                 // upload parser predate class fields and nullish operators, so the assembled
                 // runtime is lowered here — the only module that needs it. The exact id
-                // filter needs no code scan; the id must stay in sync with rolldownRuntimeId
-                // in module.ts (kept as a regex for the Rolldown-side filter).
-                filter: { id: /^\0rolldown\/runtime\.js(?:\?|$)/ },
+                // filter needs no code scan and is constructed from the same authoritative Rolldown runtime ID.
+                filter: { id: createExactModuleIdFilter(rolldownRuntimeId) },
                 handler(code) {
                     // The `setPublicClassFields` assumption emits plain `this.x = ...`
                     // assignments instead of external helpers, whose references the later
@@ -117,7 +116,7 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
             }
         },
         ...hmrMode.plugins,
-        ...createMiniReactRefreshTransforms()
+        ...createMiniReactRefreshTransforms(contract.runtime.globalObject)
     ]
 }
 
@@ -137,8 +136,8 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
  * output hook and changes only `assets/global.wxss`; rewriting the App root would reload the heap while a JavaScript patch is
  * awaiting acknowledgement. The serve-only plugin leaves production output unchanged.
  */
-export function removeDevelopmentAppWxss(bundle: Record<string, unknown>): void {
-    delete bundle[developmentAppWxssFileName]
+export function removeDevelopmentAppStyle(bundle: Record<string, unknown>, appStyleFileName: string): void {
+    delete bundle[appStyleFileName]
 }
 
 /*

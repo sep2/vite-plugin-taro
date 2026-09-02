@@ -3,8 +3,7 @@ import { esTarget } from '../../utils/constant.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { clientTaroNativeId } from '../client/constant.ts'
 import { createMiniDevelopmentPlugin } from './dev/plugins.ts'
-import type { MiniContract } from './mini-contract.d.ts'
-import { getMiniExecutionKind, isTransportModule } from './module/module.ts'
+import type { MiniContract } from './mini-contract.ts'
 import { compileNativeComponentInterface } from './native/compile-native-component-interface.ts'
 import { createOutputFiles } from './output/files.ts'
 import { createMiniPlacementPlugin, type MiniPlacementPlugin } from './placer/placer.ts'
@@ -22,8 +21,8 @@ export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] 
 
     // Reuse the resolver instance's ordered application subset. Rolldown's complete input also contains bootstrap, transport,
     // shell, and component entries; entry membership alone cannot recover which roots define the App/Page CSS cascade.
-    const placement = createMiniPlacementPlugin()
-    const styles = createMiniStylePlugin(resolver.applicationEntryIds)
+    const placement = createMiniPlacementPlugin(contract)
+    const styles = createMiniStylePlugin(contract, resolver.applicationEntryIds)
 
     return [
         placement,
@@ -36,11 +35,11 @@ export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] 
 /** Configures the complete Mini Program target build pipeline. */
 function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placement: MiniPlacementPlugin): Plugin {
     return {
-        name: 'vpt:wx',
+        name: 'vpt:mini',
 
         config(_config, _env) {
             return {
-                define: createTaroDefines(),
+                define: createTaroDefines(contract.taro.env),
 
                 appType: 'custom',
 
@@ -54,7 +53,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                         },
                         {
                             find: /^@tarojs\/components$/,
-                            replacement: packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
+                            replacement: contract.taro.componentsReactPath
                         }
                     ]
                 },
@@ -64,8 +63,8 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                     // Mini Program styles are intentionally global. This guarantees one compiler stylesheet for the CSS
                     // finalizer; enabling splitting would require Page ownership and must not be silently flattened.
                     cssCodeSplit: false,
-                    // Preserve readable source for the final WX compatibility pass; browser minification can emit syntax
-                    // unsupported by WeChat and would make the subsequent whole-file conversion harder to reason about.
+                    // Preserve readable source for the final platform compatibility pass; browser minification can emit syntax
+                    // unsupported by Mini Program engines and complicate the subsequent whole-file conversion.
                     cssMinify: false,
 
                     // No base64 assets: Taro warns on image srcs above ~2KB, and inlined
@@ -75,7 +74,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                     target: esTarget,
 
                     rolldownOptions: {
-                        // The dedicated vpt:wx-placer plugin owns output naming and entry-signature semantics. This plugin owns
+                        // The dedicated Mini placement plugin owns output naming and entry-signature semantics. This plugin owns
                         // only the closed named input set of native shells, lifecycle capsules, bootstrap, and transport entries.
                         input: resolver.input
                     }
@@ -108,24 +107,32 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
         renderChunk: {
             order: 'post',
             async handler(code, chunk, outputOptions, meta) {
-                // vpt:wx-placer runs first and has already created immutable placement from this complete chunk graph.
+                // The placement plugin runs first and has already created immutable placement from this complete chunk graph.
 
-                const executionKind = getMiniExecutionKind(chunk)
+                const classification = placement.classifyChunk(chunk)
                 const sourcemap = Boolean(outputOptions.sourcemap)
 
-                if (executionKind === 'capsule') {
+                if (classification.executionKind === 'capsule') {
                     return renderCapsule(code, chunk, sourcemap)
                 }
 
                 // Native and amphibious modules share the CommonJS renderer. Amphibious transport exposure is a
                 // separate concern materialized from final output paths after the physical transport itself is rendered.
-                const native = renderNative({ code, chunk, chunks: meta.chunks, sourcemap })
+                const native = renderNative({
+                    code,
+                    chunk,
+                    chunks: meta.chunks,
+                    runtime: contract.runtime,
+                    classifyModule: placement.classifyChunk,
+                    sourcemap
+                })
 
-                if (isTransportModule(chunk)) {
+                if (classification.isTransport) {
                     return materializeTransport({
                         code: native.code,
                         transportChunk: chunk,
                         chunks: meta.chunks,
+                        classifyModule: placement.classifyChunk,
                         getLoadMode: placement.getLoadMode,
                         getPhysicalChunkId: placement.getPhysicalChunkId,
                         sourcemap
@@ -139,7 +146,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
         generateBundle: {
             /*
              * Registration after the style pipeline makes the compiler stylesheet final before native Page and component
-             * companions are emitted. The style finalizer therefore cannot mistake native WXSS for application CSS.
+             * companions are emitted. The style finalizer therefore cannot mistake native platform styles for application CSS.
              */
             order: 'post',
             async handler(_, bundle) {
@@ -166,13 +173,13 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
 }
 
 /** Creates the build-time constants required by Taro's legacy feature gates. */
-function createTaroDefines(): Record<string, string> {
+function createTaroDefines(taroEnv: string): Record<string, string> {
     const taroVersion = String((packageRequire('@tarojs/taro/package.json') as { version: string }).version)
 
     return {
         'process.env.FRAMEWORK': JSON.stringify('react'),
         'process.env.SUPPORT_TARO_POLYFILL': JSON.stringify('disabled'),
-        'process.env.TARO_ENV': JSON.stringify('weapp'),
+        'process.env.TARO_ENV': JSON.stringify(taroEnv),
         'process.env.TARO_PLATFORM': JSON.stringify('mini'),
         'process.env.TARO_VERSION': JSON.stringify(taroVersion),
         // React's development-only Suspense diagnostics call this browser API without guards.

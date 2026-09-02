@@ -5,9 +5,49 @@ import path from 'node:path'
 import test from 'node:test'
 import { type DevEngine, dev } from 'rolldown/experimental'
 import { createServer, normalizePath } from 'vite'
-import { globalWxssFileName, writeDevelopmentFile } from '../dev/hmr-files.ts'
+import { writeDevelopmentFile } from '../dev/hmr-files.ts'
 import type { BundledDev } from '../dev/mini-dev-options.ts'
+import type { MiniContract } from '../mini-contract.ts'
 import { createMiniStylePlugin } from './plugins.ts'
+
+const contract: MiniContract = {
+    options: {
+        target: 'wx',
+        app: '/src/app.tsx',
+        pages: [],
+        appJson: {},
+        projectConfigJson: {}
+    },
+    taro: {
+        env: 'test',
+        componentsReactPath: '/taro/components-react'
+    },
+    runtime: {
+        globalObject: 'host',
+        modules: {
+            bootstrap: '/runtime/bootstrap',
+            transport: '/runtime/transport',
+            appShell: '/runtime/app-shell',
+            appCapsule: '/runtime/app-capsule',
+            componentShell: '/runtime/component-shell',
+            componentCapsule: '/runtime/component-capsule',
+            customWrapperShell: '/runtime/custom-wrapper-shell',
+            pageShell: '/runtime/page-shell',
+            pageCapsule: '/runtime/page-capsule',
+            devtoolsHmrRuntime: '/runtime/devtools-hmr',
+            interpreterHmrRuntime: '/runtime/interpreter-hmr'
+        }
+    },
+    styles: {
+        appFileName: 'app.wxss',
+        globalFileName: 'assets/global.wxss'
+    },
+    react: {},
+    output: {
+        subpackagePlanningBudget: 1_900_000
+    }
+}
+const globalWxssFileName = contract.styles.globalFileName
 
 test('publishes processed CSS and live topology without identical rewrites', async () => {
     const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-style-plugin-')))
@@ -31,7 +71,7 @@ test('publishes processed CSS and live topology without identical rewrites', asy
     let publicationWork = Promise.resolve()
     // DevEngine callbacks run only after assignment and advance the same published frontier as the production host.
     let engine: DevEngine
-    const styles = createMiniStylePlugin([appId])
+    const styles = createMiniStylePlugin(contract, [appId])
     // This one-shot mutable fault proves a failed atomic writer does not advance the plugin's published stylesheet frontier.
     let writeFailure: Error | undefined
     const writeStyle = async (wxss: string): Promise<void> => {
@@ -221,7 +261,7 @@ test('renders Tailwind CSS and final patch factories from one class set', async 
     let hmrWork = Promise.resolve()
     // DevEngine callbacks run only after assignment and commit every finalized payload before the next source edit.
     let engine: DevEngine
-    const styles = createMiniStylePlugin([appId])
+    const styles = createMiniStylePlugin(contract, [appId])
     const writeStyle = async (wxss: string): Promise<void> => {
         await writeDevelopmentFile(outDir, globalWxssFileName, wxss)
         publishedStyles.push(wxss)

@@ -7,7 +7,7 @@ import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { DevOptions } from 'rolldown/experimental'
 import { createLogger, createServer } from 'vite'
-import type { MiniContract } from '../mini-contract.d.ts'
+import { createMiniContract } from '../../wx/plugins.ts'
 import type { MiniStylePlugin } from '../styles/plugins.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
 import { hmrEndpointPath } from './hmr-protocol.ts'
@@ -25,13 +25,13 @@ type SyntheticDev = (_input: unknown, _output: unknown, devOptions: DevOptions) 
 
 const devHostHarnessKey = '__vptDevHostTestHarness__'
 
-const contract: MiniContract = {
+const contract = createMiniContract({
     target: 'wx',
     app: 'src/app.tsx',
     pages: [],
     appJson: {},
     projectConfigJson: {}
-}
+})
 
 async function importDevHost(dev: SyntheticDev): Promise<CreateMiniDevHost> {
     const devHostUrl = `${new URL('./dev-host.ts', import.meta.url).href}?synthetic-dev-host-test=${Date.now()}`
@@ -188,7 +188,7 @@ test('reduces synthetic engine update variants and unknown host failures without
             server: server,
             contract: contract,
             styles: styles,
-            hmrMode: createDevtoolsHmrMode()
+            hmrMode: createDevtoolsHmrMode(contract.runtime.modules)
         })
         const bundledDev = requireBundledDev(server.environments.client.bundledDev)
 

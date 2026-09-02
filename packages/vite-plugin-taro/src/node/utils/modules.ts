@@ -26,6 +26,12 @@ export function createPageComponentImportPath(options: PageComponentPathOptions)
     return toViteFileImportPath(resolvePageComponentPath(options))
 }
 
+/** Creates an exact normalized module-ID filter while admitting Vite query parameters. */
+export function createExactModuleIdFilter(moduleId: string): RegExp {
+    const escapedModuleId = normalizePath(moduleId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return new RegExp(`^${escapedModuleId}(?:\\?.*)?$`)
+}
+
 /** Converts a file-backed Vite request ID to its normalized physical path for stable comparisons. */
 export function normalizeModuleId(id: string): string {
     return normalizePath(id.replace(/\?.*$/, ''))

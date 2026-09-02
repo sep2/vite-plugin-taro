@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { renderDevelopmentAppWxss, renderHmrInfo, writeDevelopmentFile } from './hmr-files.ts'
+import { renderDevelopmentAppStyle, renderHmrInfo, writeDevelopmentFile } from './hmr-files.ts'
 
 test('renders frozen CommonJS build metadata', () => {
     assert.equal(
@@ -13,8 +13,14 @@ test('renders frozen CommonJS build metadata', () => {
 })
 
 test('revises the development App style entry for each complete build', () => {
-    assert.equal(renderDevelopmentAppWxss('build-one'), '@import "./assets/global.wxss";\n/* vpt-build:build-one */\n')
-    assert.notEqual(renderDevelopmentAppWxss('build-one'), renderDevelopmentAppWxss('build-two'))
+    assert.equal(
+        renderDevelopmentAppStyle('assets/global.wxss', 'build-one'),
+        '@import "./assets/global.wxss";\n/* vpt-build:build-one */\n'
+    )
+    assert.notEqual(
+        renderDevelopmentAppStyle('assets/global.wxss', 'build-one'),
+        renderDevelopmentAppStyle('assets/global.wxss', 'build-two')
+    )
 })
 
 test('atomically replaces a complete development file without leaving temporary files', async () => {

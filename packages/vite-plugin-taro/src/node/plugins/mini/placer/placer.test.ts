@@ -2,10 +2,55 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
 import { build, type InputOption, type OutputBundle, type OutputChunk, type Plugin } from 'rolldown'
-import { appCapsulePath, appShellPath, bootstrapPath, transportPath } from '../module/module.ts'
+import type { MiniContract } from '../mini-contract.ts'
+import { createMiniModuleClassifier } from '../module/module.ts'
 import { createPlacement, type GeneratedSubpackage, type Placement } from './placement.ts'
-import { createMiniPlacementPlugin, isMiniFrameworkVendorModule, placementRolldownOptions } from './placer.ts'
+import { createMiniPlacementPlugin, createPlacementRolldownOptions, isMiniFrameworkVendorModule } from './placer.ts'
 
+const contract: MiniContract = {
+    options: {
+        target: 'wx',
+        app: '/src/app.tsx',
+        pages: [],
+        appJson: {},
+        projectConfigJson: {}
+    },
+    taro: {
+        env: 'test',
+        componentsReactPath: '/taro/components-react'
+    },
+    runtime: {
+        globalObject: 'host',
+        modules: {
+            bootstrap: '/runtime/bootstrap',
+            transport: '/runtime/transport',
+            appShell: '/runtime/app-shell',
+            appCapsule: '/runtime/app-capsule',
+            componentShell: '/runtime/component-shell',
+            componentCapsule: '/runtime/component-capsule',
+            customWrapperShell: '/runtime/custom-wrapper-shell',
+            pageShell: '/runtime/page-shell',
+            pageCapsule: '/runtime/page-capsule',
+            devtoolsHmrRuntime: '/runtime/devtools-hmr',
+            interpreterHmrRuntime: '/runtime/interpreter-hmr'
+        }
+    },
+    styles: {
+        appFileName: 'app.style',
+        globalFileName: 'assets/global.style'
+    },
+    react: {},
+    output: {
+        subpackagePlanningBudget: 1_900_000
+    }
+}
+const {
+    appCapsule: appCapsulePath,
+    appShell: appShellPath,
+    bootstrap: bootstrapPath,
+    transport: transportPath
+} = contract.runtime.modules
+const placementRolldownOptions = createPlacementRolldownOptions(createMiniModuleClassifier(contract.runtime.modules))
 const fixtureRoot = '/placer-fixture'
 const contentHashPattern = '[A-Za-z0-9_-]{8}'
 
@@ -47,6 +92,7 @@ async function buildFixture({ modules, input, additionalBytes }: BuildFixture): 
         renderChunk(_code, _chunk, _outputOptions, meta) {
             placement ??= createPlacement({
                 chunks: meta.chunks,
+                planningBudgetBytes: contract.output.subpackagePlanningBudget,
                 getAdditionalModuleBytes: (moduleId) => additionalBytes?.[moduleId] ?? 0
             })
         },
@@ -106,7 +152,7 @@ test('rejects placement services and chunk delivery outside their lifecycle phas
     })
     const chunk = output.chunks[0]
     assert.ok(chunk)
-    const plugin = createMiniPlacementPlugin()
+    const plugin = createMiniPlacementPlugin(contract)
 
     assert.throws(() => plugin.getPackageLocation(chunk), /placement is unavailable/)
     assert.throws(() => plugin.getSubpackages(), /subpackages are unavailable/)

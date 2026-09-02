@@ -9,17 +9,10 @@ import {
     runtimeControlEvent,
     runtimeReportEvent
 } from '../../../../runtime/wx/dev/wx-hmr-protocol.ts'
-import type { MiniContract } from '../mini-contract.d.ts'
+import type { MiniContract } from '../mini-contract.ts'
 import type { MiniStylePlugin } from '../styles/plugins.ts'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
-import {
-    developmentAppWxssFileName,
-    globalWxssFileName,
-    hmrInfoFileName,
-    renderDevelopmentAppWxss,
-    renderHmrInfo,
-    writeDevelopmentFile
-} from './hmr-files.ts'
+import { hmrInfoFileName, renderDevelopmentAppStyle, renderHmrInfo, writeDevelopmentFile } from './hmr-files.ts'
 import type { MiniHmrAction, MiniHmrMode } from './hmr-mode.ts'
 import { type HmrInfo, hmrEndpointPath, type PatchUpdate } from './hmr-protocol.ts'
 import { createHostActions } from './host-actions.ts'
@@ -170,7 +163,7 @@ export async function createMiniDevHost({
 
     /** Atomically materializes the style plugin's prepared global artifact. */
     async function writeGlobalStyle(wxss: string): Promise<void> {
-        await writeFile(globalWxssFileName, wxss)
+        await writeFile(contract.styles.globalFileName, wxss)
     }
 
     /** Rotates the build identity and materializes the App metadata for it. */
@@ -220,7 +213,7 @@ export async function createMiniDevHost({
         // so this write intentionally causes the one full refresh allowed at a complete-build boundary; the refreshed App reads
         // the new info above. Incremental updates must never write this file because an App refresh could destroy the heap while
         // its JavaScript patch is being acknowledged. They publish only the imported `assets/global.wxss` stylesheet instead.
-        await writeFile(developmentAppWxssFileName, renderDevelopmentAppWxss(buildId))
+        await writeFile(contract.styles.appFileName, renderDevelopmentAppStyle(contract.styles.globalFileName, buildId))
     }
 
     /** Reduces one merged source action through the existing authoritative host state. */

@@ -3,7 +3,7 @@ import * as types from '@babel/types'
 import type { Rolldown } from 'vite'
 import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
 import { toLogicalChunkId } from '../module/chunk-path.ts'
-import { getMiniExecutionKind } from '../module/module.ts'
+import type { MiniModuleClassifier } from '../module/module.ts'
 
 const transportPlaceholder = '__VPT_TRANSPORT__'
 const moduleIdParameter = 'moduleId'
@@ -29,6 +29,7 @@ export async function materializeTransport({
     code,
     transportChunk,
     chunks,
+    classifyModule,
     getLoadMode,
     getPhysicalChunkId = (chunk) => chunk.fileName,
     sourcemap = true
@@ -36,6 +37,7 @@ export async function materializeTransport({
     code: string
     transportChunk: Rolldown.RenderedChunk
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
+    classifyModule: MiniModuleClassifier
     getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async'
     getPhysicalChunkId?: (chunk: Rolldown.RenderedChunk) => string
     sourcemap?: boolean
@@ -52,7 +54,7 @@ export async function materializeTransport({
     //         default: throw new Error(`Unknown System module: ${moduleId}`)
     //     }
     // }
-    const cases = getTransportedChunks(chunks)
+    const cases = getTransportedChunks(chunks, classifyModule)
         .sort((left, right) => left.chunk.fileName.localeCompare(right.chunk.fileName))
         .map(({ chunk, kind }) => {
             const loadMode = getLoadMode(chunk)
@@ -62,7 +64,7 @@ export async function materializeTransport({
             const physicalChunkId = getPhysicalChunkId(chunk)
 
             if (kind === 'amphibious' && loadMode !== 'sync') {
-                throw new Error(`Amphibious wx module must be in the main package: ${chunk.fileName}`)
+                throw new Error(`Amphibious Mini Program module must be in the main package: ${chunk.fileName}`)
             }
 
             return createTransportCase({
@@ -93,11 +95,14 @@ export async function materializeTransport({
 }
 
 /** Keeps only capsule and amphibious chunks and carries their narrowed kind into source generation. */
-function getTransportedChunks(chunks: Readonly<Record<string, Rolldown.RenderedChunk>>): TransportedChunk[] {
+function getTransportedChunks(
+    chunks: Readonly<Record<string, Rolldown.RenderedChunk>>,
+    classifyModule: MiniModuleClassifier
+): TransportedChunk[] {
     const transportedChunks: TransportedChunk[] = []
 
     for (const chunk of Object.values(chunks)) {
-        const kind = getMiniExecutionKind(chunk)
+        const kind = classifyModule(chunk).executionKind
         if (kind !== 'native') {
             transportedChunks.push({ chunk, kind })
         }

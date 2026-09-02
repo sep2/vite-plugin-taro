@@ -4,7 +4,8 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { type Rolldown, transformWithOxc } from 'vite'
 import { esTarget } from '../../../utils/constant.ts'
-import { bootstrapPath, rolldownRuntimeId, transportPath } from '../module/module.ts'
+import type { RuntimeContract } from '../mini-contract.ts'
+import { createMiniModuleClassifier, rolldownRuntimeId } from '../module/module.ts'
 import { renderNative } from './native.ts'
 import { materializeTransport } from './transport.ts'
 
@@ -12,6 +13,25 @@ import { materializeTransport } from './transport.ts'
 interface TransportExports {
     transport(moduleId: string): unknown
 }
+
+const runtime: RuntimeContract = {
+    globalObject: 'global',
+    modules: {
+        bootstrap: '/runtime/bootstrap',
+        transport: '/runtime/transport',
+        appShell: '/runtime/app-shell',
+        appCapsule: '/runtime/app-capsule',
+        componentShell: '/runtime/component-shell',
+        componentCapsule: '/runtime/component-capsule',
+        customWrapperShell: '/runtime/custom-wrapper-shell',
+        pageShell: '/runtime/page-shell',
+        pageCapsule: '/runtime/page-capsule',
+        devtoolsHmrRuntime: '/runtime/devtools-hmr',
+        interpreterHmrRuntime: '/runtime/interpreter-hmr'
+    }
+}
+const { bootstrap: bootstrapPath, transport: transportPath } = runtime.modules
+const classifyModule = createMiniModuleClassifier(runtime.modules)
 
 const transportTypeScript = readFileSync(
     fileURLToPath(new URL('../../../../runtime/wx/amphibious/transport.ts', import.meta.url)),
@@ -24,6 +44,8 @@ const transportCode = renderNative({
     code: transportJavaScript,
     chunk: { fileName: 'transport.js' } as Rolldown.RenderedChunk,
     chunks: {},
+    runtime: runtime,
+    classifyModule: classifyModule,
     sourcemap: false
 }).code
 
@@ -81,6 +103,7 @@ async function materializeTestTransport({
         code,
         transportChunk,
         chunks,
+        classifyModule: classifyModule,
         getLoadMode: (chunk) => (physicalChunkIds?.[chunk.fileName]?.startsWith('sub/') ? 'async' : 'sync'),
         ...(physicalChunkIds
             ? {
@@ -229,6 +252,6 @@ test('rejects an amphibious module outside the main package', async () => {
                 'assets/runtime.js': 'sub/p_runtime/assets/runtime.js'
             }
         }),
-        /Amphibious wx module must be in the main package/
+        /Amphibious Mini Program module must be in the main package/
     )
 })

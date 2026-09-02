@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
-import type { MiniContract } from '../mini-contract.d.ts'
+import { createMiniContract } from '../../wx/plugins.ts'
 import { createTemplateAssets, replaceExactlyOnce } from './templates.ts'
 
-const contract: MiniContract = {
+const contract = createMiniContract({
     target: 'wx',
     app: 'src/app.tsx',
     pages: [
@@ -44,7 +44,7 @@ const contract: MiniContract = {
     sitemapJson: {
         rules: []
     }
-}
+})
 
 test('enforces exact pinned Taro template fragments', () => {
     assert.equal(
@@ -138,9 +138,12 @@ test('creates native rendering and configuration assets', () => {
         },
         componentPlaceholder: nativeComponentPlaceholder
     })
-    assert.deepEqual(JSON.parse(assets.get('project.config.json') ?? ''), contract.projectConfigJson)
-    assert.deepEqual(JSON.parse(assets.get('project.private.config.json') ?? ''), contract.projectPrivateConfigJson)
-    assert.deepEqual(JSON.parse(assets.get('sitemap.json') ?? ''), contract.sitemapJson)
+    assert.deepEqual(JSON.parse(assets.get('project.config.json') ?? ''), contract.options.projectConfigJson)
+    assert.deepEqual(
+        JSON.parse(assets.get('project.private.config.json') ?? ''),
+        contract.options.projectPrivateConfigJson
+    )
+    assert.deepEqual(JSON.parse(assets.get('sitemap.json') ?? ''), contract.options.sitemapJson)
 
     const baseTemplate = assets.get('base.wxml') ?? ''
     const componentTemplate = assets.get('comp.wxml') ?? ''

@@ -4,11 +4,50 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { build, normalizePath, type Plugin } from 'vite'
+import type { MiniContract } from '../mini-contract.ts'
 import { createMiniTransformer } from './create-mini-transformer.ts'
 import { createMiniStylePlugin, finalizeOutput } from './plugins.ts'
 
+const contract: MiniContract = {
+    options: {
+        target: 'wx',
+        app: '/src/app.tsx',
+        pages: [],
+        appJson: {},
+        projectConfigJson: {}
+    },
+    taro: {
+        env: 'test',
+        componentsReactPath: '/taro/components-react'
+    },
+    runtime: {
+        globalObject: 'host',
+        modules: {
+            bootstrap: '/runtime/bootstrap',
+            transport: '/runtime/transport',
+            appShell: '/runtime/app-shell',
+            appCapsule: '/runtime/app-capsule',
+            componentShell: '/runtime/component-shell',
+            componentCapsule: '/runtime/component-capsule',
+            customWrapperShell: '/runtime/custom-wrapper-shell',
+            pageShell: '/runtime/page-shell',
+            pageCapsule: '/runtime/page-capsule',
+            devtoolsHmrRuntime: '/runtime/devtools-hmr',
+            interpreterHmrRuntime: '/runtime/interpreter-hmr'
+        }
+    },
+    styles: {
+        appFileName: 'app.wxss',
+        globalFileName: 'assets/global.wxss'
+    },
+    react: {},
+    output: {
+        subpackagePlanningBudget: 1_900_000
+    }
+}
+
 test('handles physical and ignored query fragments before watcher cleanup', async () => {
-    const styles = createMiniStylePlugin(['/src/app.js'])
+    const styles = createMiniStylePlugin(contract, ['/src/app.js'])
     const transformHook = styles.transform
     assert.ok(transformHook)
     const transform = typeof transformHook === 'function' ? transformHook : transformHook.handler
@@ -171,7 +210,7 @@ test('finalizes the complete compiler stylesheet before later WX output hooks', 
         await writeFile(path.join(pageRoot, 'index.css'), '.page-marker { color: red; }\n')
 
         const applicationEntry = path.join(sourceRoot, 'app.ts')
-        const styles = createMiniStylePlugin([applicationEntry])
+        const styles = createMiniStylePlugin(contract, [applicationEntry])
         const verifyAssetOwnership: Plugin = {
             name: 'test:verify-wx-style-ownership',
             generateBundle: {
@@ -233,7 +272,7 @@ test('emits an empty global stylesheet when the application has no styles', asyn
         const appPath = path.join(root, 'app.ts')
         await writeFile(appPath, 'export {}\n')
 
-        const styles = createMiniStylePlugin([appPath])
+        const styles = createMiniStylePlugin(contract, [appPath])
         await build({
             root,
             logLevel: 'silent',

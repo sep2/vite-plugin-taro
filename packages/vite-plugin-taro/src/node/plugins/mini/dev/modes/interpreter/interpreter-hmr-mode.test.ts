@@ -1,8 +1,23 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { interpreterServerEvent } from '../../../../../../runtime/wx/dev/modes/interpreter/interpreter-protocol.ts'
+import type { RuntimeModulesContract } from '../../../mini-contract.ts'
 import type { PatchPublication, PatchUpdate } from '../../hmr-protocol.ts'
 import { createInterpreterHmrMode } from './interpreter-hmr-mode.ts'
+
+const modules: RuntimeModulesContract = {
+    bootstrap: '/runtime/bootstrap',
+    transport: '/runtime/transport',
+    appShell: '/runtime/app-shell',
+    appCapsule: '/runtime/app-capsule',
+    componentShell: '/runtime/component-shell',
+    componentCapsule: '/runtime/component-capsule',
+    customWrapperShell: '/runtime/custom-wrapper-shell',
+    pageShell: '/runtime/native/page.ts',
+    pageCapsule: '/runtime/page-capsule',
+    devtoolsHmrRuntime: '/runtime/devtools-runtime.ts',
+    interpreterHmrRuntime: '/runtime/interpreter-runtime.ts'
+}
 
 const patch: PatchUpdate = {
     type: 'Patch',
@@ -13,7 +28,7 @@ const patch: PatchUpdate = {
 }
 
 test('initializes only the App entry and installs no Page transform', () => {
-    const mode = createInterpreterHmrMode()
+    const mode = createInterpreterHmrMode(modules)
     const banner = mode.createEntryBanner(new Set(['pages/home/index.js']))
 
     assert.equal(
@@ -22,11 +37,11 @@ test('initializes only the App entry and installs no Page transform', () => {
     )
     assert.equal(banner({ name: 'pages/home/index.js', fileName: 'pages/home/index.js' }), '')
     assert.deepEqual(mode.plugins, [])
-    assert.match(mode.runtimeFile, /wx\/dev\/modes\/interpreter\/interpreter-runtime\.(?:ts|js)$/)
+    assert.equal(mode.runtimeFile, modules.interpreterHmrRuntime)
 })
 
 test('describes publication events without owning their transport', () => {
-    const mode = createInterpreterHmrMode()
+    const mode = createInterpreterHmrMode(modules)
     const publication: PatchPublication = { buildId: 'build', patches: [patch] }
 
     assert.equal(mode.reset(), undefined)

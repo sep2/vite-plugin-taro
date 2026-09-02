@@ -6,6 +6,7 @@ import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 import { stripVTControlCharacters } from 'node:util'
 import { createLogger, createServer, type Logger, type Plugin, type ViteDevServer } from 'vite'
+import type { VptOptions } from '../../../../options.ts'
 import {
     type InterpreterServerMessage,
     interpreterServerEvent
@@ -13,7 +14,7 @@ import {
 import { runtimeReportEvent } from '../../../../runtime/wx/dev/wx-hmr-protocol.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
-import type { MiniContract } from '../mini-contract.d.ts'
+import { createMiniContract } from '../../wx/plugins.ts'
 import { createMiniStylePlugin } from '../styles/plugins.ts'
 import { createMiniDevHost } from './dev-host.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
@@ -36,7 +37,7 @@ type DevFixture = Readonly<{
     server: ViteDevServer
 }>
 
-function createOptions(): MiniContract {
+function createOptions(): VptOptions {
     return {
         target: 'wx',
         app: 'src/app.tsx',
@@ -53,7 +54,7 @@ function createOptions(): MiniContract {
     }
 }
 
-function createInterpreterOptions(): MiniContract {
+function createInterpreterOptions(): VptOptions {
     return {
         ...createOptions(),
         hmr: { mode: 'interpreter' }
@@ -81,7 +82,7 @@ async function publishSourceGeneration(filePath: string, source: string): Promis
     }
 }
 
-async function startDevFixture(logger: Logger, host: string, options: MiniContract): Promise<DevFixture> {
+async function startDevFixture(logger: Logger, host: string, options: VptOptions): Promise<DevFixture> {
     const root = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-dev-test-'))
     const outDir = path.join(root, 'dist')
     const pagePath = path.join(root, 'src/pages/home/index.tsx')
@@ -264,6 +265,7 @@ function waitForInterpreterMessage(socket: WebSocket): Promise<InterpreterServer
 }
 
 test('rejects a server without Vite bundled development ownership', async (context) => {
+    const contract = createMiniContract(createOptions())
     const server = await createServer({
         configFile: false,
         customLogger: createLogger('silent')
@@ -274,9 +276,9 @@ test('rejects a server without Vite bundled development ownership', async (conte
         () =>
             createMiniDevHost({
                 server: server,
-                contract: createOptions(),
-                styles: createMiniStylePlugin([import.meta.filename]),
-                hmrMode: createDevtoolsHmrMode()
+                contract: contract,
+                styles: createMiniStylePlugin(contract, [import.meta.filename]),
+                hmrMode: createDevtoolsHmrMode(contract.runtime.modules)
             }),
         /Vite did not create the wx bundled-development environment/
     )

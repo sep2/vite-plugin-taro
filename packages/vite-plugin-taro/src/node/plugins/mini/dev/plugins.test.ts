@@ -1,18 +1,18 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { resolveConfig } from 'vite'
-import type { MiniContract } from '../mini-contract.d.ts'
+import { createMiniContract } from '../../wx/plugins.ts'
 import { createMiniStylePlugin } from '../styles/plugins.ts'
-import { createMiniDevelopmentPlugin, isMiniClientEnvironment, removeDevelopmentAppWxss } from './plugins.ts'
+import { createMiniDevelopmentPlugin, isMiniClientEnvironment, removeDevelopmentAppStyle } from './plugins.ts'
 
-const contract: MiniContract = {
+const contract = createMiniContract({
     target: 'wx',
     app: 'src/app.tsx',
     pages: [],
     appJson: {},
     projectConfigJson: {},
     sitemapJson: {}
-}
+})
 
 test('assigns physical Mini Program host ownership only to the client environment', () => {
     assert.equal(isMiniClientEnvironment({ name: 'client' }), true)
@@ -23,13 +23,13 @@ test('preserves physical outputs and composes the selected mode across developme
     const config = await resolveConfig(
         {
             configFile: false,
-            plugins: createMiniDevelopmentPlugin(contract, createMiniStylePlugin([import.meta.filename]))
+            plugins: createMiniDevelopmentPlugin(contract, createMiniStylePlugin(contract, [import.meta.filename]))
         },
         'serve'
     )
 
     assert.equal(config.build.emptyOutDir, false)
-    assert.ok(config.plugins.some((plugin) => plugin.name === 'vpt:wx-page-shell-hmr'))
+    assert.ok(config.plugins.some((plugin) => plugin.name === 'vpt:mini-page-shell-hmr'))
 })
 
 test('transfers the App style entry from complete output to the development host', () => {
@@ -40,7 +40,7 @@ test('transfers the App style entry from complete output to the development host
         'assets/global.wxss': globalStyle
     }
 
-    removeDevelopmentAppWxss(bundle)
+    removeDevelopmentAppStyle(bundle, contract.styles.appFileName)
 
     assert.deepEqual(bundle, { 'assets/global.wxss': globalStyle })
 })

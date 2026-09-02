@@ -4,9 +4,10 @@ import test from 'node:test'
 import { build, type OutputChunk, type Plugin } from 'rolldown'
 import { normalizePath } from 'vite'
 import '../../../../runtime/wx/systemjs/system-core.js'
-import { getMiniExecutionKind, isTransportModule, transportPath } from '../module/module.ts'
+import type { MiniContract } from '../mini-contract.ts'
+import { createMiniModuleClassifier } from '../module/module.ts'
 import { createPlacement, type Placement } from '../placer/placement.ts'
-import { placementRolldownOptions } from '../placer/placer.ts'
+import { createPlacementRolldownOptions } from '../placer/placer.ts'
 import { renderCapsule } from '../render/capsule.ts'
 import { renderNative } from '../render/native.ts'
 import { materializeTransport } from '../render/transport.ts'
@@ -36,6 +37,48 @@ import { materializeTransport } from '../render/transport.ts'
  * planning budget. Their smaller static dependencies remain independently placeable, so the test does not rely on a
  * static closure being collapsed into one package.
  */
+const contract: MiniContract = {
+    options: {
+        target: 'wx',
+        app: '/src/app.tsx',
+        pages: [],
+        appJson: {},
+        projectConfigJson: {}
+    },
+    taro: {
+        env: 'test',
+        componentsReactPath: '/taro/components-react'
+    },
+    runtime: {
+        globalObject: 'global',
+        modules: {
+            bootstrap: '/runtime/bootstrap',
+            transport: '/runtime/transport',
+            appShell: '/runtime/app-shell',
+            appCapsule: '/runtime/app-capsule',
+            componentShell: '/runtime/component-shell',
+            componentCapsule: '/runtime/component-capsule',
+            customWrapperShell: '/runtime/custom-wrapper-shell',
+            pageShell: '/runtime/page-shell',
+            pageCapsule: '/runtime/page-capsule',
+            devtoolsHmrRuntime: '/runtime/devtools-hmr',
+            interpreterHmrRuntime: '/runtime/interpreter-hmr'
+        }
+    },
+    styles: {
+        appFileName: 'app.style',
+        globalFileName: 'assets/global.style'
+    },
+    react: {},
+    output: {
+        subpackagePlanningBudget: 1_900_000
+    }
+}
+const runtimeModules = contract.runtime.modules
+const classifyModule = createMiniModuleClassifier(runtimeModules)
+const transportPath = runtimeModules.transport
+const placementRolldownOptions = createPlacementRolldownOptions(classifyModule)
+
 const applicationId = '/cross-package/application.js'
 const mainDependencyId = '/cross-package/main-dependency.js'
 const subpackageAId = '/cross-package/subpackage-a.js'
@@ -159,21 +202,31 @@ function createMiniOutputPlugin(): Plugin {
         async renderChunk(code, chunk, outputOptions, meta) {
             placement ??= createPlacement({
                 chunks: meta.chunks,
+                planningBudgetBytes: contract.output.subpackagePlanningBudget,
                 getAdditionalModuleBytes: (moduleId) => (largeLazyModuleIds.has(moduleId) ? 1_000_000 : 0)
             })
             const sourcemap = Boolean(outputOptions.sourcemap)
-            if (getMiniExecutionKind(chunk) === 'capsule') {
+            const classification = classifyModule(chunk)
+            if (classification.executionKind === 'capsule') {
                 return renderCapsule(code, chunk, sourcemap)
             }
 
-            const native = renderNative({ code, chunk, chunks: meta.chunks, sourcemap })
-            if (!isTransportModule(chunk)) {
+            const native = renderNative({
+                code,
+                chunk,
+                chunks: meta.chunks,
+                runtime: contract.runtime,
+                classifyModule: classifyModule,
+                sourcemap
+            })
+            if (!classification.isTransport) {
                 return native
             }
             return materializeTransport({
                 code: native.code,
                 transportChunk: chunk,
                 chunks: meta.chunks,
+                classifyModule: classifyModule,
                 getLoadMode: placement.getLoadMode,
                 getPhysicalChunkId: placement.getPhysicalChunkId,
                 sourcemap

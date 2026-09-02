@@ -1,6 +1,6 @@
 import * as types from '@babel/types'
 import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
-import type { MiniPage } from '../mini-contract.d.ts'
+import type { MiniPage } from '../mini-contract.ts'
 
 const pagePathPlaceholder = '__VPT_PAGE_PATH__'
 const pageConfigPlaceholder = '__VPT_PAGE_CONFIG__'

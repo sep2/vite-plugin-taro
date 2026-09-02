@@ -1,16 +1,13 @@
 import path from 'node:path'
-import { normalizePath, type Plugin } from 'vite'
-import { normalizeModuleId } from '../../../../../utils/modules.ts'
-import { resolveRuntimeFile } from '../../../../../utils/packages.ts'
-import { appShellFileName, pageShellPath } from '../../../module/module.ts'
+import type { Plugin } from 'vite'
+import { createExactModuleIdFilter } from '../../../../../utils/modules.ts'
+import type { RuntimeModulesContract } from '../../../mini-contract.ts'
+import { appShellFileName } from '../../../module/module.ts'
 import { hmrInfoFileName } from '../../hmr-files.ts'
 import type { MiniHmrMode } from '../../hmr-mode.ts'
 import type { PatchUpdate } from '../../hmr-protocol.ts'
 
 export const devtoolsPatchesFileName = 'hmr/patches.js'
-
-const normalizedPageShellPath = normalizePath(pageShellPath)
-const devtoolsRuntimeFile = resolveRuntimeFile('wx/dev/modes/devtools/devtools-runtime')
 
 /**
  * Collects the behavior that depends on WeChat DevTools project-file compilation.
@@ -19,10 +16,10 @@ const devtoolsRuntimeFile = resolveRuntimeFile('wx/dev/modes/devtools/devtools-r
  * DevTools observes a changed Page dependency, re-executes the Page shell, and that shell synchronously gives the cumulative
  * native factory payload to the persistent App runtime. Mixing any one of these pieces with another mode would break that chain.
  */
-export function createDevtoolsHmrMode(): MiniHmrMode {
+export function createDevtoolsHmrMode(modules: RuntimeModulesContract): MiniHmrMode {
     return {
-        runtimeFile: devtoolsRuntimeFile,
-        plugins: [createDevtoolsPagePlugin()],
+        runtimeFile: modules.devtoolsHmrRuntime,
+        plugins: [createDevtoolsPagePlugin(modules.pageShell)],
         createEntryBanner: createDevtoolsEntryBanner,
         // Every Page requires this path from its first complete build. Exporting undefined keeps that dependency valid while
         // making initial Page evaluation a no-op in the runtime adapter until a real cumulative patch suffix exists.
@@ -86,16 +83,17 @@ function createDevtoolsEntryBanner(pageFiles: ReadonlySet<string>) {
     }
 }
 
-/** Keeps the broad portable hook filter cheap while transforming only VPT's exact native Page shell identity. */
-function createDevtoolsPagePlugin(): Plugin {
+/** Transforms only the contracted native Page shell identity. */
+function createDevtoolsPagePlugin(pageShell: string): Plugin {
+    const pageShellFilter = createExactModuleIdFilter(pageShell)
+
     return {
-        name: 'vpt:wx-page-shell-hmr',
+        name: 'vpt:mini-page-shell-hmr',
         apply: 'serve',
         transform: {
             order: 'post',
-            filter: { id: /\/runtime\/wx\/native\/page\.(?:js|ts)(?:\?|$)/ },
-            handler(code, id) {
-                if (normalizeModuleId(id) !== normalizedPageShellPath) return
+            filter: { id: pageShellFilter },
+            handler(code) {
                 return injectPageShellHmr(code)
             }
         }

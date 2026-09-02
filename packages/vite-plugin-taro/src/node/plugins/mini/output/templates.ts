@@ -4,7 +4,7 @@ import type { Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import { createAppConfig } from '../../../utils/project-config.ts'
-import type { MiniContract, MiniJsonObject, MiniPage } from '../mini-contract.d.ts'
+import type { MiniContract, MiniJsonObject, MiniPage } from '../mini-contract.ts'
 import { type GeneratedSubpackage, isGeneratedSubpackageFile } from '../placer/placement.ts'
 import { toRootRelativePath } from './relative-root.ts'
 
@@ -62,7 +62,7 @@ export function createTemplateAssets({
         createAsset('custom-wrapper.wxml', templateBuilder.buildCustomComponentTemplate('.wxml')),
         jsonAsset('custom-wrapper.json', recursiveComponentJson),
 
-        ...contract.pages.flatMap((page) => [
+        ...contract.options.pages.flatMap((page) => [
             jsonAsset(`${page.path}.json`, createPageJson(page, nativeComponentConfig)),
             createAsset(
                 `${page.path}.wxml`,
@@ -74,11 +74,11 @@ export function createTemplateAssets({
             createAsset(`${page.path}.wxss`, '')
         ]),
 
-        jsonAsset('project.config.json', contract.projectConfigJson),
-        ...(contract.projectPrivateConfigJson
-            ? [jsonAsset('project.private.config.json', contract.projectPrivateConfigJson)]
+        jsonAsset('project.config.json', contract.options.projectConfigJson),
+        ...(contract.options.projectPrivateConfigJson
+            ? [jsonAsset('project.private.config.json', contract.options.projectPrivateConfigJson)]
             : []),
-        ...(contract.sitemapJson ? [jsonAsset('sitemap.json', contract.sitemapJson)] : [])
+        ...(contract.options.sitemapJson ? [jsonAsset('sitemap.json', contract.options.sitemapJson)] : [])
     ]
 }
 
@@ -369,7 +369,7 @@ function createAppJson({
     subpackages: readonly GeneratedSubpackage[]
 }): MiniJsonObject {
     return {
-        ...createAppConfig(contract),
+        ...createAppConfig(contract.options),
         ...(subpackages.length > 0 ? { subPackages: subpackages } : {})
     }
 }
