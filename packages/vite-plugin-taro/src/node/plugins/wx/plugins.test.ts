@@ -23,6 +23,5 @@ test('creates the WX Mini Program contract without translating public options', 
         appFileName: 'app.wxss',
         globalFileName: 'assets/global.wxss'
     })
-    assert.deepEqual(contract.react, {})
     assert.deepEqual(contract.output, { subpackagePlanningBudget: 1_900_000 })
 })

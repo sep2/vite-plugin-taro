@@ -82,6 +82,7 @@
         "@tarojs/components": "4.2.1",
         "@tarojs/helper": "4.2.1",
         "@tarojs/plugin-framework-react": "workspace:vite-plugin-taro-plugin-framework-react@*",
+        "@tarojs/plugin-platform-alipay": "4.2.1",
         "@tarojs/plugin-platform-h5": "4.2.1",
         "@tarojs/plugin-platform-weapp": "4.2.1",
         "@tarojs/react": "workspace:vite-plugin-taro-react@*",

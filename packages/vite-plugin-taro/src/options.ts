@@ -2,7 +2,7 @@
 export type VptJsonObject = Record<string, unknown>
 
 /** Build target handled by this plugin. */
-export type VptTarget = 'wx' | 'h5'
+export type VptTarget = 'wx' | 'zfb' | 'h5'
 
 /** Selects one implemented WX development HMR delivery and execution mechanism. */
 export type VptHmrOptions = Readonly<{
