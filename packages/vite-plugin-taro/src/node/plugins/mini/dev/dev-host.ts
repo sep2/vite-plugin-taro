@@ -8,7 +8,7 @@ import {
     type RuntimeReport,
     runtimeControlEvent,
     runtimeReportEvent
-} from '../../../../runtime/wx/dev/wx-hmr-protocol.ts'
+} from '../../../../runtime/mini/dev/hmr-protocol.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import type { MiniStylePlugin } from '../styles/plugins.ts'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'

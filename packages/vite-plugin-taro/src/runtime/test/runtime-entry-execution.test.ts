@@ -259,8 +259,8 @@ test('creates WX App and recursive component capsules only after App initializat
     const defines = {
         __VPT_APP_CONFIG__: 'globalThis.harness.appConfigInput'
     }
-    const appCode = await bundleRuntimeEntry({ entry: 'wx/capsule/app.ts', mocks, defines })
-    const componentCode = await bundleRuntimeEntry({ entry: 'wx/capsule/component.ts', mocks, defines })
+    const appCode = await bundleRuntimeEntry({ entry: 'mini/capsule/app.ts', mocks, defines })
+    const componentCode = await bundleRuntimeEntry({ entry: 'mini/capsule/component.ts', mocks, defines })
 
     const appExports = executeRuntimeEntry(appCode, createExecutionContext(harness))
     assert.deepEqual(
@@ -285,7 +285,7 @@ test('creates WX App and recursive component capsules only after App initializat
     assert.strictEqual(exports.customWrapperConfig, customWrapperConfig)
 })
 
-test('creates the WX Page capsule with the transparent App collection seed', async () => {
+test('creates the Mini Program Page capsule with the transparent App collection seed', async () => {
     // This mutable journal captures App-before-Page initialization and the exact recursive projection seed.
     const calls: Call[] = []
     const appConfigInput = { pages: ['pages/home/index'] }
@@ -309,13 +309,16 @@ test('creates the WX Page capsule with the transparent App collection seed', asy
         createPageConfig: recordCall(calls, 'createPageConfig', pageConfig)
     }
     const code = await bundleRuntimeEntry({
-        entry: 'wx/capsule/page.ts',
+        entry: 'mini/capsule/page.ts',
         mocks: {
             './taro-runtime.ts': `
                 const harness = globalThis.harness
                 export const ReactDOM = harness.ReactDOM
                 export const createReactApp = harness.createReactApp
                 export const createPageConfig = harness.createPageConfig
+            `,
+            '../../mini/capsule/taro-runtime.ts': `
+                export const createPageConfig = globalThis.harness.createPageConfig
             `,
             react: 'export default globalThis.harness.React',
             '\0vpt:app-component': 'export default globalThis.harness.AppComponent',
@@ -360,9 +363,9 @@ test('preserves WX capsule runtime initialization order and export identities', 
         customWrapperCache
     }
     const code = await bundleRuntimeEntry({
-        entry: 'wx/capsule/taro-runtime.ts',
+        entry: 'mini/capsule/taro-runtime.ts',
         mocks: {
-            '@tarojs/plugin-platform-weapp/dist/runtime.js': "globalThis.harness.events.push('platform-runtime')",
+            '\0vpt:taro-platform-runtime': "globalThis.harness.events.push('platform-runtime')",
             '@tarojs/plugin-framework-react/dist/runtime': `
                 globalThis.harness.events.push('framework')
                 export const createReactApp = globalThis.harness.createReactApp
@@ -378,7 +381,10 @@ test('preserves WX capsule runtime initialization order and export identities', 
                 export const customWrapperCache = globalThis.harness.customWrapperCache
             `
         },
-        defines: { 'process.env.NODE_ENV': JSON.stringify('development') }
+        defines: {
+            'process.env.NODE_ENV': JSON.stringify('development'),
+            __VPT_RUNTIME_GLOBAL__: 'global'
+        }
     })
     const context = createExecutionContext(harness)
     const exports = executeRuntimeEntry(code, context)
@@ -398,7 +404,7 @@ test('registers every native WX shell after its amphibious bootstrap', async () 
     const pageConfig = { kind: 'page-config' }
     const entries = [
         {
-            entry: 'wx/native/app.ts',
+            entry: 'mini/native/app.ts',
             mocks: {
                 '../amphibious/bootstrap.ts':
                     "globalThis.harness.events.push({ name: 'bootstrap', config: undefined })",
@@ -408,7 +414,7 @@ test('registers every native WX shell after its amphibious bootstrap', async () 
             config: appConfig
         },
         {
-            entry: 'wx/native/component.ts',
+            entry: 'mini/native/component.ts',
             mocks: {
                 '../amphibious/bootstrap.ts':
                     "globalThis.harness.events.push({ name: 'bootstrap', config: undefined })",
@@ -418,7 +424,7 @@ test('registers every native WX shell after its amphibious bootstrap', async () 
             config: componentConfig
         },
         {
-            entry: 'wx/native/custom-wrapper.ts',
+            entry: 'mini/native/custom-wrapper.ts',
             mocks: {
                 '../amphibious/bootstrap.ts':
                     "globalThis.harness.events.push({ name: 'bootstrap', config: undefined })",
@@ -428,7 +434,7 @@ test('registers every native WX shell after its amphibious bootstrap', async () 
             config: customWrapperConfig
         },
         {
-            entry: 'wx/native/page.ts',
+            entry: 'mini/native/page.ts',
             mocks: {
                 '../amphibious/bootstrap.ts':
                     "globalThis.harness.events.push({ name: 'bootstrap', config: undefined })",
@@ -478,15 +484,16 @@ test('installs amphibious transport on SystemJS and preserves preload semantics'
         }
     }
     const defines = {
+        __VPT_RUNTIME_GLOBAL__: 'global',
         __VPT_TRANSPORT__: 'globalThis.harness.transport'
     }
     const transportCode = await bundleRuntimeEntry({
-        entry: 'wx/amphibious/transport.ts',
+        entry: 'mini/amphibious/transport.ts',
         mocks: {},
         defines
     })
     const code = await bundleRuntimeEntry({
-        entry: 'wx/amphibious/bootstrap.ts',
+        entry: 'mini/amphibious/bootstrap.ts',
         mocks: {
             '../systemjs/system-core.js': 'globalThis.harness.installSystem()'
         },

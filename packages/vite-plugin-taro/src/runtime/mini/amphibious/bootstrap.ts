@@ -2,12 +2,12 @@
 import '../systemjs/system-core.js'
 import { transport } from './transport.ts'
 
-// WX has no modulepreload transport. Genuine application import() boundaries retain System.import() and may load
+// Mini Program hosts have no modulepreload transport. Application import() boundaries retain System.import() and may load
 // asynchronous subpackage or top-level-await graphs through this identity wrapper.
 export const __vitePreload = <Value>(load: () => Value): Value => load()
 
-// SystemJS installs on WeChat's `global` object; its properties are not lexical bindings.
-const installedSystem = (global as unknown as WeChatGlobal & { System: System.Loader }).System
+// SystemJS installs on the contracted runtime global; its properties are not lexical bindings.
+const installedSystem = (__VPT_RUNTIME_GLOBAL__ as { System: System.Loader }).System
 if (!installedSystem) {
     throw new Error('SystemJS failed to initialize in the WeChat runtime')
 }

@@ -1,5 +1,5 @@
 /*
- * Shared WX HMR runtime, bundled into the mode-selected entry and injected into Rolldown's generated runtime chunk.
+ * Shared Mini Program HMR runtime, bundled into the mode-selected entry and injected into Rolldown's generated runtime chunk.
  * Rolldown provides the lexical `DevRuntime` base class; this file extends that registry instead of duplicating module loading.
  *
  * Concrete modes decide how executable registrations arrive—native project JavaScript or interpreted source—and provide only a
@@ -14,7 +14,7 @@ import {
     type RuntimeReport,
     runtimeControlEvent,
     runtimeReportEvent
-} from './wx-hmr-protocol.ts'
+} from './hmr-protocol.ts'
 
 /** Lexical base class injected into the runtime chunk by Rolldown; typed via the contract. */
 declare const DevRuntime: new (clientId: string) => RolldownDevRuntime
@@ -57,7 +57,7 @@ const hotContextInternals = Object.freeze({
  * Per-module hot state, mirroring Rolldown's web runtime: accept is a passive registration;
  * the propagation invokes the previous execution's callbacks with the fresh exports.
  */
-class WxHotContext {
+class MiniHotContext {
     readonly _internal = hotContextInternals
 
     /**
@@ -69,9 +69,9 @@ class WxHotContext {
 
     /** Stable module identity and shared sparse index used only when this context accepts. */
     private readonly moduleId: string
-    private readonly acceptingContexts: Map<string, WxHotContext>
+    private readonly acceptingContexts: Map<string, MiniHotContext>
 
-    constructor(moduleId: string, acceptingContexts: Map<string, WxHotContext>) {
+    constructor(moduleId: string, acceptingContexts: Map<string, MiniHotContext>) {
         this.moduleId = moduleId
         this.acceptingContexts = acceptingContexts
     }
@@ -106,8 +106,18 @@ class WxHotContext {
     prune(_callback?: () => void): void {}
 }
 
-/** Shared WX host mechanics extending the Rolldown contract instead of reimplementing it. */
-export class WxHmrRuntime extends DevRuntime {
+/** Task-scoped socket surface shared by the WX and Alipay Mini Program APIs. */
+export type MiniSocketTask = Readonly<{
+    send(options: Readonly<{ data: string }>): void
+    close(options: Readonly<{ code: number; reason: string }>): void
+    onMessage(listener: (result: Readonly<{ data: unknown }>) => void): void
+}>
+
+/** Connects one App-level HMR socket using the active platform API. */
+export type ConnectMiniSocket = (endpoint: string) => MiniSocketTask
+
+/** Shared Mini Program host mechanics extending the Rolldown contract instead of reimplementing it. */
+export class MiniHmrRuntime extends DevRuntime {
     /**
      * One session for this App heap. Undefined only before the mode-selected entry initializes the runtime; its identity then
      * stays fixed while appliedSeq records the committed frontier.
@@ -115,7 +125,7 @@ export class WxHmrRuntime extends DevRuntime {
     private session: HmrSession | undefined
 
     /** The App heap's sole SocketTask, assigned once by initialize and retained for its lifetime. */
-    private socket: WeChatSocketTask | undefined
+    private socket: MiniSocketTask | undefined
 
     /**
      * Sparse current-generation accepting boundaries keyed by module id. Entries alone must
@@ -123,12 +133,16 @@ export class WxHmrRuntime extends DevRuntime {
      * createModuleHotContext removes the prior generation immediately; first accept inserts
      * the new one. Passive contexts are never retained, so space is O(number of boundaries).
      */
-    private readonly moduleHotContexts = new Map<string, WxHotContext>()
+    private readonly moduleHotContexts = new Map<string, MiniHotContext>()
 
-    constructor() {
+    /** Immutable platform socket constructor retained for the App heap's first initialization. */
+    private readonly connectSocket: ConnectMiniSocket
+
+    constructor(connectSocket: ConnectMiniSocket) {
         // The base has no messenger: the engine tracks per-client shipped payloads instead
-        // of executed module ids, so the wx host registers the client session itself.
+        // of executed module ids, so the Mini Program host registers the client session itself.
         super('')
+        this.connectSocket = connectSocket
     }
 
     /**
@@ -136,10 +150,10 @@ export class WxHmrRuntime extends DevRuntime {
      * return value. Each execution immediately retires its previous accepting boundary;
      * calling accept registers the new context after the apply plan captured old callbacks.
      */
-    override createModuleHotContext(moduleId: string): WxHotContext {
+    override createModuleHotContext(moduleId: string): MiniHotContext {
         // A new execution supersedes the old boundary before it decides whether to accept.
         this.moduleHotContexts.delete(moduleId)
-        return new WxHotContext(moduleId, this.moduleHotContexts)
+        return new MiniHotContext(moduleId, this.moduleHotContexts)
     }
 
     /** Computes accepting boundaries and every executed module that must be re-armed. */
@@ -233,7 +247,7 @@ export class WxHmrRuntime extends DevRuntime {
         if (this.session) return
         this.session = { buildId: info.buildId, appliedSeq: 0 }
 
-        const socket = wx.connectSocket({ url: info.endpoint, protocols: ['vite-hmr'] })
+        const socket = this.connectSocket(info.endpoint)
         this.socket = socket
 
         socket.onMessage(({ data }) => {
@@ -260,7 +274,7 @@ export class WxHmrRuntime extends DevRuntime {
     protected sendSocketEvent(event: string, data: unknown): void {
         const socket = this.socket
         if (!socket) {
-            throw new Error('WX HMR socket is not initialized')
+            throw new Error('Mini Program HMR socket is not initialized')
         }
         socket.send({ data: JSON.stringify({ type: 'custom', event: event, data: data }) })
     }
@@ -269,7 +283,7 @@ export class WxHmrRuntime extends DevRuntime {
     protected stopSocket(reason: string): void {
         const socket = this.socket
         if (!socket) {
-            throw new Error('WX HMR socket is not initialized')
+            throw new Error('Mini Program HMR socket is not initialized')
         }
 
         socket.close({ code: 1000, reason: reason })
@@ -384,7 +398,7 @@ export class WxHmrRuntime extends DevRuntime {
         if (!session) {
             // A report without initialize is a programming error; fail loudly instead of
             // silently dropping the sync traffic.
-            throw new Error('WX dev runtime is not initialized')
+            throw new Error('Mini Program dev runtime is not initialized')
         }
         const report: RuntimeReport = { buildId: session.buildId, ...data }
         this.sendSocketEvent(runtimeReportEvent, report)

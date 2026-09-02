@@ -3,7 +3,6 @@ import path from 'node:path'
 import test from 'node:test'
 import { build, type OutputChunk, type Plugin } from 'rolldown'
 import { normalizePath } from 'vite'
-import '../../../../runtime/wx/systemjs/system-core.js'
 import type { MiniContract } from '../mini-contract.ts'
 import { createMiniModuleClassifier } from '../module/module.ts'
 import { createPlacement, type Placement } from '../placer/placement.ts'
@@ -11,6 +10,11 @@ import { createPlacementRolldownOptions } from '../placer/placer.ts'
 import { renderCapsule } from '../render/capsule.ts'
 import { renderNative } from '../render/native.ts'
 import { materializeTransport } from '../render/transport.ts'
+
+// The source placeholder is normally specialized by the Mini plugin before SystemJS initializes.
+Reflect.set(globalThis, '__VPT_RUNTIME_GLOBAL__', global)
+await import('../../../../runtime/mini/systemjs/system-core.js')
+Reflect.deleteProperty(globalThis, '__VPT_RUNTIME_GLOBAL__')
 
 /**
  * Logical graph exercised by this production-output test (`──▶` static, `┄┄▶` dynamic):
@@ -47,7 +51,8 @@ const contract: MiniContract = {
     },
     taro: {
         env: 'test',
-        componentsReactPath: '/taro/components-react'
+        componentsReactPath: '/taro/components-react',
+        platformRuntimePath: '/taro/platform-runtime'
     },
     runtime: {
         globalObject: 'global',

@@ -5,6 +5,9 @@ import type { RuntimeModulesContract } from '../mini-contract.ts'
 /** Identifies Rolldown's generated helper module independently of its unstable output filename. */
 export const rolldownRuntimeId = '\0rolldown/runtime.js'
 
+/** Resolves the shared Taro facade's platform initialization side effect. */
+export const taroPlatformRuntimeId = '\0vpt:taro-platform-runtime'
+
 /** Redirects Vite's injected browser preload helper to the bootstrap identity loader. */
 export const vitePreloadId = '\0vite/preload-helper.js'
 

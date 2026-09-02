@@ -17,7 +17,8 @@ const contract: MiniContract = {
     },
     taro: {
         env: 'test',
-        componentsReactPath: '/taro/components-react'
+        componentsReactPath: '/taro/components-react',
+        platformRuntimePath: '/taro/platform-runtime'
     },
     runtime: {
         globalObject: 'host',

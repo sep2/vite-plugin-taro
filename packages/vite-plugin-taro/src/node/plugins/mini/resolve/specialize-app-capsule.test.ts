@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { specializeAppCapsule } from './specialize-app-capsule.ts'
 
-const id = '/plugin/runtime/wx/capsule/app.js'
+const id = '/plugin/runtime/mini/capsule/app.js'
 const source = 'export default createReactApp(AppComponent, React, ReactDOM, __VPT_APP_CONFIG__)'
 
 test('specializes the App capsule with its native configuration', async () => {

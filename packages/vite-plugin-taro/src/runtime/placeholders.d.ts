@@ -1,6 +1,7 @@
 import type { Route, SpaRouterConfig } from '@tarojs/router/types/router'
 
 declare global {
+    const __VPT_RUNTIME_GLOBAL__: object
     const __VPT_H5_APP_CONFIG__: SpaRouterConfig
     const __VPT_H5_ROUTES__: Route[]
     const __VPT_APP_CONFIG__: Record<string, unknown>

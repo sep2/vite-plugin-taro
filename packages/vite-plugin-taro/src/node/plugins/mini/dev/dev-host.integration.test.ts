@@ -7,11 +7,11 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { stripVTControlCharacters } from 'node:util'
 import { createLogger, createServer, type Logger, type Plugin, type ViteDevServer } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
+import { runtimeReportEvent } from '../../../../runtime/mini/dev/hmr-protocol.ts'
 import {
     type InterpreterServerMessage,
     interpreterServerEvent
-} from '../../../../runtime/wx/dev/modes/interpreter/interpreter-protocol.ts'
-import { runtimeReportEvent } from '../../../../runtime/wx/dev/wx-hmr-protocol.ts'
+} from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
 import { createMiniContract } from '../../wx/plugins.ts'

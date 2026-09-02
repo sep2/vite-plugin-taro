@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { interpreterServerEvent } from '../../../../../../runtime/wx/dev/modes/interpreter/interpreter-protocol.ts'
+import { interpreterServerEvent } from '../../../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
 import type { RuntimeModulesContract } from '../../../mini-contract.ts'
 import type { PatchPublication, PatchUpdate } from '../../hmr-protocol.ts'
 import { createInterpreterHmrMode } from './interpreter-hmr-mode.ts'

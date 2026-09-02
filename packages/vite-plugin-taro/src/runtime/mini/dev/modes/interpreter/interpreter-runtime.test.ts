@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { DevRuntime } from 'rolldown/experimental/runtime'
-import { type RuntimeControlMessage, runtimeControlEvent, runtimeReportEvent } from '../../wx-hmr-protocol.ts'
+import { type RuntimeControlMessage, runtimeControlEvent, runtimeReportEvent } from '../../hmr-protocol.ts'
 import { type InterpreterServerMessage, interpreterServerEvent } from './interpreter-protocol.ts'
 
 type TestHotContext = Readonly<{
@@ -79,6 +79,7 @@ async function createTestHarness(): Promise<TestHarness> {
     const sockets: CapturedSocket[] = []
     Object.assign(globalThis, {
         DevRuntime,
+        __VPT_RUNTIME_GLOBAL__: globalThis,
         wx: {
             connectSocket(options: ConnectOptions): CapturedSocket {
                 const socket = createSocket(options, reports)
@@ -89,9 +90,9 @@ async function createTestHarness(): Promise<TestHarness> {
     })
 
     runtimeId++
-    await import(`./interpreter-runtime.ts?test=${runtimeId}`)
+    await import(`../../../../wx/dev/modes/interpreter/interpreter-runtime.ts?test=${runtimeId}`)
     const runtime = (globalThis as typeof globalThis & { __rolldown_runtime__?: TestRuntime }).__rolldown_runtime__
-    if (!runtime) throw new Error('WX interpreter runtime was not installed')
+    if (!runtime) throw new Error('Mini Program interpreter runtime was not installed')
 
     runtime.initialize({
         buildId: 'build',

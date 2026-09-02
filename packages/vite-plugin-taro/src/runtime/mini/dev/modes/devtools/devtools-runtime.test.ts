@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { DevRuntime } from 'rolldown/experimental/runtime'
-import { runtimeReportEvent } from '../../wx-hmr-protocol.ts'
+import { runtimeReportEvent } from '../../hmr-protocol.ts'
 
 type TestHotContext = Readonly<{
     _internal: Readonly<{
@@ -68,6 +68,7 @@ async function createTestHarness(): Promise<TestHarness> {
     }
     Object.assign(globalThis, {
         DevRuntime,
+        __VPT_RUNTIME_GLOBAL__: globalThis,
         wx: {
             connectSocket(): WeChatSocketTask {
                 return socket
@@ -89,10 +90,10 @@ async function createTestHarness(): Promise<TestHarness> {
 
 async function importTestRuntime(): Promise<TestRuntime> {
     runtimeId++
-    await import(`./devtools-runtime.ts?test=${runtimeId}`)
+    await import(`../../../../wx/dev/modes/devtools/devtools-runtime.ts?test=${runtimeId}`)
 
     const runtime = (globalThis as typeof globalThis & { __rolldown_runtime__?: TestRuntime }).__rolldown_runtime__
-    if (!runtime) throw new Error('WX dev runtime was not installed')
+    if (!runtime) throw new Error('Mini Program dev runtime was not installed')
     return runtime
 }
 
@@ -283,6 +284,7 @@ test('fails invariant-only hot operations with local diagnostics', async () => {
 test('rejects reports before initialization', async () => {
     Object.assign(globalThis, {
         DevRuntime,
+        __VPT_RUNTIME_GLOBAL__: globalThis,
         wx: {
             connectSocket(): never {
                 assert.fail('An uninitialized runtime must not open a socket')

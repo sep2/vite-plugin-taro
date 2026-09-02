@@ -34,7 +34,7 @@ const { bootstrap: bootstrapPath, transport: transportPath } = runtime.modules
 const classifyModule = createMiniModuleClassifier(runtime.modules)
 
 const transportTypeScript = readFileSync(
-    fileURLToPath(new URL('../../../../runtime/wx/amphibious/transport.ts', import.meta.url)),
+    fileURLToPath(new URL('../../../../runtime/mini/amphibious/transport.ts', import.meta.url)),
     'utf8'
 )
 const transportJavaScript = (

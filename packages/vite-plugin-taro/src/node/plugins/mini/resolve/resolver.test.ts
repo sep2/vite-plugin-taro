@@ -4,7 +4,7 @@ import test from 'node:test'
 import { normalizePath } from 'vite'
 import { appComponentId } from '../../client/constant.ts'
 import { createMiniContract } from '../../wx/plugins.ts'
-import { pageCapsuleId, pageComponentId, vitePreloadId } from '../module/module.ts'
+import { pageCapsuleId, pageComponentId, taroPlatformRuntimeId, vitePreloadId } from '../module/module.ts'
 import { createResolver } from './resolver.ts'
 
 const contract = createMiniContract({
@@ -49,6 +49,7 @@ test('resolves fixed and route-specific private IDs', () => {
         'pages/home/index-capsule': `${modules.pageCapsule}?route=pages%2Fhome%2Findex`
     })
     assert.equal(resolver.resolveId(vitePreloadId, undefined, projectRoot), modules.bootstrap)
+    assert.equal(resolver.resolveId(taroPlatformRuntimeId, undefined, projectRoot), contract.taro.platformRuntimePath)
     assert.equal(
         resolver.resolveId(appComponentId, undefined, projectRoot),
         normalizePath(path.resolve(projectRoot, 'src/app.tsx'))

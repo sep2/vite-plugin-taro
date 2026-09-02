@@ -15,7 +15,7 @@
  * Core comes with no System.prototype.resolve or
  * System.prototype.instantiate implementations
  */
-var envGlobal = global
+var envGlobal = __VPT_RUNTIME_GLOBAL__
 var hasSymbol = typeof Symbol !== 'undefined'
 
 function createMissingRegistrationError(id) {
@@ -43,7 +43,7 @@ systemJSPrototype.import = function (id, parentId, meta) {
 /**
  * Instantiates, links, and evaluates a graph without yielding the current JavaScript turn.
  *
- * WX placement guarantees that every registration in a synchronous graph uses the main-package transport. Encountering
+ * Mini Program placement guarantees that every registration in a synchronous graph uses the main-package transport. Encountering
  * a thenable therefore indicates a fatal placement invariant violation. No rollback is attempted: rows already published
  * to the shared registry remain there and the current runtime heap must not be reused.
  */

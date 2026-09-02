@@ -2,7 +2,7 @@ type NativePage = {
     data: Record<string, unknown>
 }
 
-// A symbol cannot collide with WeChat or Taro's string-named Page options, and it lets a later injection recover the exact
+// A symbol cannot collide with native or Taro string-named Page options, and it lets a later injection recover the exact
 // config-local state without a route map or runtime-global WeakMap.
 const pageHmrStateKey: unique symbol = Symbol('vpt.pageHmrState')
 
@@ -52,7 +52,7 @@ export function injectPageHmr(config: HmrPageConfig): HmrPageConfig {
         /*
          * `Page(config)` reads `config.data` as the initial native view-model for this registration. The Page owns current app
          * and ordinary Page fields, while each mounted CustomWrapper owns the current snapshot below its native boundary. Join
-         * those already-serialized snapshots before registration so WeChat never publishes the stale initial placeholder tree.
+         * those already-serialized snapshots before registration so the native host never publishes the stale initial placeholder tree.
          * This lifecycle handoff performs no setData call and runs before React Refresh can publish another logical tree.
          */
         config.data = mountedPage.data
@@ -118,14 +118,14 @@ const customWrapperCacheKey = Symbol.for('customWrapperCache')
 
 /**
  * Replaces stale Page.data placeholders with each mounted CustomWrapper's current native snapshot in at most one O(n)
- * traversal. This mutates only the registration data before WeChat reads it; it performs no setData call and does not
+ * traversal. This mutates only the registration data before the native host reads it; it performs no setData call and does not
  * inspect React.
  */
 function applyCustomWrapperSnapshots(data: SnapshotRecord): void {
     const customWrapperCache: unknown = Reflect.get(global, customWrapperCacheKey)
 
     if (!(customWrapperCache instanceof Map)) {
-        throw new Error('WX CustomWrapper cache is not installed in the App global.')
+        throw new Error('Mini Program CustomWrapper cache is not installed in the App global.')
     }
 
     if (customWrapperCache.size === 0) {

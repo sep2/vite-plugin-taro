@@ -4,22 +4,22 @@ import { packageRequire, resolveRuntimeFile } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
 
-/** Adapts the shared Mini Program pipeline to the WX public target. */
-export function createWxMiniPlugins(vptOptions: VptOptions): PluginOption[] {
-    return createMiniTargetPlugins(createMiniContract(vptOptions))
+/** Adapts the shared Mini Program pipeline to the zfb public target. */
+export function createZfbMiniPlugins(vptOptions: VptOptions): PluginOption[] {
+    return createMiniTargetPlugins(createZfbMiniContract(vptOptions))
 }
 
-/** Creates the shared Mini Program contract for a WX target invocation. */
-export function createMiniContract(vptOptions: VptOptions): MiniContract {
+/** Binds the shared Mini Program core to Alipay runtime and output conventions. */
+export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
     return {
         options: vptOptions,
         taro: {
-            env: 'weapp',
-            componentsReactPath: packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react'),
-            platformRuntimePath: packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/runtime.js')
+            env: 'alipay',
+            componentsReactPath: packageRequire.resolve('@tarojs/plugin-platform-alipay/dist/components-react.js'),
+            platformRuntimePath: packageRequire.resolve('@tarojs/plugin-platform-alipay/dist/runtime.js')
         },
         runtime: {
-            globalObject: 'global',
+            globalObject: 'my',
             modules: {
                 bootstrap: resolveRuntimeFile('mini/amphibious/bootstrap'),
                 transport: resolveRuntimeFile('mini/amphibious/transport'),
@@ -30,13 +30,13 @@ export function createMiniContract(vptOptions: VptOptions): MiniContract {
                 customWrapperShell: resolveRuntimeFile('mini/native/custom-wrapper'),
                 pageShell: resolveRuntimeFile('mini/native/page'),
                 pageCapsule: resolveRuntimeFile('mini/capsule/page'),
-                devtoolsHmrRuntime: resolveRuntimeFile('wx/dev/modes/devtools/devtools-runtime'),
-                interpreterHmrRuntime: resolveRuntimeFile('wx/dev/modes/interpreter/interpreter-runtime')
+                devtoolsHmrRuntime: resolveRuntimeFile('zfb/dev/modes/devtools/devtools-runtime'),
+                interpreterHmrRuntime: resolveRuntimeFile('zfb/dev/modes/interpreter/interpreter-runtime')
             }
         },
         styles: {
-            appFileName: 'app.wxss',
-            globalFileName: 'assets/global.wxss'
+            appFileName: 'app.acss',
+            globalFileName: 'assets/global.acss'
         },
         output: {
             subpackagePlanningBudget: 1_900_000

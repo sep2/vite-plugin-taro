@@ -1,4 +1,4 @@
-import { interpreterServerEvent } from '../../../../../../runtime/wx/dev/modes/interpreter/interpreter-protocol.ts'
+import { interpreterServerEvent } from '../../../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
 import type { RuntimeModulesContract } from '../../../mini-contract.ts'
 import { appShellFileName } from '../../../module/module.ts'
 import { hmrInfoFileName } from '../../hmr-files.ts'

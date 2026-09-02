@@ -41,6 +41,7 @@ async function createTestHarness(): Promise<TestHarness> {
     Reflect.set(global, customWrapperCacheKey, customWrapperCache)
     Object.assign(globalThis, {
         DevRuntime,
+        __VPT_RUNTIME_GLOBAL__: globalThis,
         wx: {
             request(options: { success: () => void }): void {
                 options.success()
@@ -49,10 +50,10 @@ async function createTestHarness(): Promise<TestHarness> {
     })
 
     runtimeId++
-    await import(`./devtools-runtime.ts?page-hmr-test=${runtimeId}`)
+    await import(`../../../../wx/dev/modes/devtools/devtools-runtime.ts?page-hmr-test=${runtimeId}`)
 
     const runtime = (globalThis as typeof globalThis & { __rolldown_runtime__?: TestRuntime }).__rolldown_runtime__
-    if (!runtime) throw new Error('WX dev runtime was not installed')
+    if (!runtime) throw new Error('Mini Program dev runtime was not installed')
 
     return {
         createPage() {

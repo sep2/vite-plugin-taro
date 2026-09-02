@@ -4,13 +4,13 @@
 
 Alipay support is feasible, but it is not just another alias. Most of the current WX compiler—module rendering, placement, native asset collection, Tailwind projection, and runtime capsules—is platform-neutral and should become a shared **Mini Program core**. Templates, config conversion, globals, output extensions, project files, and development delivery need platform adapters.
 
-The investigation covered the exact pinned dependency version, `@tarojs/plugin-platform-alipay@4.2.1`. No Alipay Mini Program Studio or `minidev` is installed locally, so runtime behavior still needs an IDE proof phase.
+The investigation covered the exact pinned dependency version, `@tarojs/plugin-platform-alipay@4.2.1`. HMR behavior has been validated separately. Alipay Mini Program Studio and `minidev` are not installed on the current machine, so the remaining runtime and packaging behavior still needs the IDE proof phase.
 
 ## Required adaptations
 
 | Area | Current assumption | Alipay requirement |
 | --- | --- | --- |
-| Public target | `VptTarget = 'wx' \| 'h5'` in `src/options.ts` | Add standard target name `'alipay'` |
+| Public target | `VptTarget = 'wx' \| 'h5'` in `src/options.ts` | Add the existing public target name `'zfb'`; reserve `'alipay'` for `TARO_ENV` |
 | Plugin routing | `src/node/vpt.ts` dispatches only WX/H5 | Add Alipay through a shared Mini Program pipeline |
 | Taro platform | Hardcoded `plugin-platform-weapp` | Use `plugin-platform-alipay` runtime and `components-react` |
 | Compile constants | `TARO_ENV='weapp'` | `TARO_ENV='alipay'`; keep `TARO_PLATFORM='mini'` |
@@ -23,7 +23,7 @@ The investigation covered the exact pinned dependency version, `@tarojs/plugin-p
 | Subpackages | `pages: []` code-only packages | Alipay documents `pages` as mandatory; emit a generated anchor page per package |
 | Async loading | `require.async()` | Supported by Alipay’s asynchronous subpackage mechanism; validate in Studio |
 | Native components | WXML/WXSS folders and WX template registration | Target-specific `.axml`/`.acss` folders, Alipay registration and placeholder rules |
-| Development | WX DevTools lifecycle and `wx.connectSocket` | Alipay Studio watcher and `my.connectSocket({ multiple: true })`; WX `devtools` mode is not portable |
+| Development | WX DevTools lifecycle and `wx.connectSocket` | Reuse the validated shared DevTools/interpreter mechanics through thin target entries; Alipay opens its task-scoped socket with `my.connectSocket({ multiple: true })` |
 | Generator/docs | WX/H5 only | Scripts, config, examples, compatibility tables, and release tests need Alipay |
 
 Taro 4.2.1 recursively renames configuration keys such as:
@@ -66,17 +66,9 @@ Move genuinely shared code under `plugins/mini` and `runtime/mini`:
 
 Keep only real platform seams under `plugins/wx` and `plugins/alipay`.
 
-### 2. Make options a discriminated union
+### 2. Keep one public options contract
 
-```ts
-type VptOptions = VptWxOptions | VptAlipayOptions | VptH5Options
-```
-
-Recommended target-specific fields:
-
-- WX: current `projectConfigJson`, private config, sitemap, and WX HMR modes.
-- Alipay: required `miniProjectJson`; interpreter HMR only.
-- H5: no irrelevant Mini Program project fields.
+Keep `VptOptions` as the single public options type. Target adapters consume the relevant values and construct a private `MiniContract`; do not expose parallel WX, ZFB, or H5 option types.
 
 Keep `appJson` and page configs in Taro’s canonical WeChat-shaped schema, then translate them for Alipay output. Platform-only settings such as Skyline must be selected by the caller and never emitted into Alipay output.
 
@@ -99,9 +91,9 @@ Before restructuring production code, create a minimal generated project and ver
 6. A subpackage with a synthetic anchor page is accepted.
 7. A native Alipay component works behind the shared template renderer.
 8. Updating imported `global.acss` is observed by Studio.
-9. `my.connectSocket({ multiple: true })` can connect to the local Vite socket.
+9. `my.connectSocket({ multiple: true })` can connect to the local Vite socket. **Validated.**
 
-These are release gates, not assumptions. The current machine needs Alipay Mini Program Studio and optionally `minidev` installed for this phase.
+These are release gates, not assumptions. The current machine still needs Alipay Mini Program Studio and optionally `minidev` for the remaining proofs.
 
 ### Phase 1 — Extract the shared Mini Program core
 
@@ -119,7 +111,7 @@ This prevents Alipay support from creating two compiler implementations.
 ### Phase 2 — Add the Alipay target and runtime bindings
 
 - Add `@tarojs/plugin-platform-alipay@4.2.1`.
-- Route `'alipay'` in `src/node/vpt.ts`.
+- Route `'zfb'` in `src/node/vpt.ts` while defining `TARO_ENV='alipay'`.
 - Resolve:
   - `@tarojs/components` → Alipay `components-react`
   - platform runtime → Alipay `dist/runtime.js`
@@ -191,26 +183,26 @@ Register components in every generated renderer scope that can instantiate them.
 
 Generalize the shared DevEngine host, stable filenames, atomic writes, style publication, and React Refresh adaptation.
 
-For Alipay:
+For ZFB:
 
-- Store SystemJS, Rolldown runtime, and React Refresh hooks on `my`.
-- Adapt socket creation to Alipay’s SocketTask contract.
+- Keep the existing flat `devtoolsHmrRuntime` and `interpreterHmrRuntime` module paths as the platform seam; do not add a capability model or contract callbacks.
+- Move graph propagation, patch sequencing, DevTools Page re-registration, and interpreter execution into `runtime/mini`.
+- Keep thin WX and ZFB mode entries that install the shared runtime on `__VPT_RUNTIME_GLOBAL__`.
+- Inject only one function into the shared runtime: `(endpoint: string) => MiniSocketTask`.
+- WX opens it with `wx.connectSocket({ url, protocols: ['vite-hmr'] })`; ZFB opens it with `my.connectSocket({ url, multiple: true })`.
 - Use `app.acss` as the full-build identity boundary and update only imported `global.acss` incrementally.
-- Print `dist/alipay` as the directory to open in Alipay Mini Program Studio.
-- Do not expose WX `devtools` HMR mode.
-- Implement interpreter HMR only after the phase-0 WebSocket and state-retention tests pass.
-- If the socket proof fails, provide coherent full rebuild development rather than pretending WX HMR semantics work.
+- Print `dist/zfb` as the directory to open in Alipay Mini Program Studio.
 
 ### Phase 6 — Fixtures, CI, generator, and documentation
 
 - Extend `loan-genius` to build all three targets.
 - Generalize the native-component fixture or add an Alipay-native fixture.
 - Add root scripts:
-  - `build:loan-genius:alipay`
-  - `dev:loan-genius:alipay`
+  - `build:loan-genius:zfb`
+  - `dev:loan-genius:zfb`
 - Add the Alipay build to `.github/workflows/quality.yml`.
 - Update `create-vite-taro`:
-  - `dev:alipay` and `build:alipay`
+  - `dev:zfb` and `build:zfb`
   - `VITE_VPT_TARGET` typing
   - target parser
   - target-specific app configuration
@@ -219,7 +211,7 @@ For Alipay:
 - Update README/package descriptions and keywords.
 - Add Alipay sections to configuration, quick start, styles, automatic subpackages, native components, HMR, migration, and module-system docs.
 - Add Alipay columns to component/API compatibility references rather than implying every Taro API is portable.
-- Extend published-package validation to build and inspect `dist/alipay`.
+- Extend published-package validation to build and inspect `dist/zfb`.
 
 ## Completion criteria
 
@@ -242,3 +234,5 @@ Alipay support is complete when:
 - [Alipay project configuration](https://miniprogram.alipay.com/docs-alipayconnect/miniprogram_alipayconnect/mpdev/framework_project)
 - [Alipay subpackage loading](https://miniprogram.alipay.com/docs-alipayconnect/miniprogram_alipayconnect/mpdev/basic_capabilities_subpackage_loading)
 - [Alipay asynchronous subpackages](https://opendocs.alipay.com/mini/057ht3)
+- [Alipay `my.connectSocket`](https://opendocs.alipay.com/mini/038mkg)
+- [Alipay development HMR](https://opendocs.alipay.com/mini/02q2a0)

@@ -1,4 +1,4 @@
-import type { RuntimePatch } from '../../wx-hmr-runtime.ts'
+import type { RuntimePatch } from '../../mini-hmr-runtime.ts'
 
 export const interpreterServerEvent = 'vpt:wx-interpreter:source'
 

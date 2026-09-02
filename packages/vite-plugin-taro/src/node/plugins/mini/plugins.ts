@@ -39,7 +39,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
 
         config(_config, _env) {
             return {
-                define: createTaroDefines(contract.taro.env),
+                define: createTaroDefines(contract.taro.env, contract.runtime.globalObject),
 
                 appType: 'custom',
 
@@ -173,7 +173,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
 }
 
 /** Creates the build-time constants required by Taro's legacy feature gates. */
-function createTaroDefines(taroEnv: string): Record<string, string> {
+function createTaroDefines(taroEnv: string, runtimeGlobal: string): Record<string, string> {
     const taroVersion = String((packageRequire('@tarojs/taro/package.json') as { version: string }).version)
 
     return {
@@ -182,6 +182,7 @@ function createTaroDefines(taroEnv: string): Record<string, string> {
         'process.env.TARO_ENV': JSON.stringify(taroEnv),
         'process.env.TARO_PLATFORM': JSON.stringify('mini'),
         'process.env.TARO_VERSION': JSON.stringify(taroVersion),
+        __VPT_RUNTIME_GLOBAL__: runtimeGlobal,
         // React's development-only Suspense diagnostics call this browser API without guards.
         'performance.now': 'Date.now',
         ENABLE_ADJACENT_HTML: 'false',

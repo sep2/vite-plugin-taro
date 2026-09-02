@@ -2,7 +2,7 @@
 import { createReactApp, ReactDOM } from './taro-runtime.ts'
 import React from 'react'
 
-// @ts-expect-error: The wx build resolves this private App component.
+// @ts-expect-error: The active Mini contract resolves this private App component.
 import AppComponent from '\0vpt:app-component'
 
 const config = createReactApp(AppComponent, React, ReactDOM, __VPT_APP_CONFIG__)

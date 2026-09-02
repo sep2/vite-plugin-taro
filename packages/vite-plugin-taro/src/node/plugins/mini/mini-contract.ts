@@ -4,6 +4,7 @@ import type { VptOptions } from '../../../options.ts'
 export type TaroContract = {
     env: string
     componentsReactPath: string
+    platformRuntimePath: string
 }
 
 /** Physical runtime modules selected by one Mini Program target. */
