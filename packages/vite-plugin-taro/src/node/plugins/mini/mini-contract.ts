@@ -1,4 +1,4 @@
-import type { VptOptions } from '../../../options.ts'
+import type { VptJsonObject, VptOptions } from '../../../options.ts'
 
 /** Taro compiler bindings selected by one Mini Program target. */
 export type TaroContract = {
@@ -49,7 +49,7 @@ export type MiniContract = {
 }
 
 /** Application JSON represented by the current Mini Program contract. */
-export type MiniJsonObject = MiniContract['options']['appJson']
+export type MiniJsonObject = VptJsonObject
 
 /** One Page represented by the current Mini Program contract. */
 export type MiniPage = MiniContract['options']['pages'][number]

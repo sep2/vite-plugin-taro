@@ -1,10 +1,21 @@
-/** A JSON object used by generated target configs. */
-export type VptJsonObject = Record<string, unknown>
+/** One immutable JSON value accepted by generated target configuration files. */
+export type VptJsonValue = string | number | boolean | null | VptJsonObject | readonly VptJsonValue[]
+
+/** An immutable JSON object transformed and emitted by vpt. */
+export interface VptJsonObject {
+    readonly [key: string]: VptJsonValue | undefined
+}
+
+/** Canonical Taro-shaped application configuration transformed by the selected target adapter. */
+export type VptAppConfig = VptJsonObject
+
+/** Canonical Taro-shaped Page configuration transformed by the selected target adapter. */
+export type VptPageConfig = VptJsonObject
 
 /** Build target handled by this plugin. */
 export type VptTarget = 'wx' | 'zfb' | 'h5'
 
-/** Selects one implemented WX development HMR delivery and execution mechanism. */
+/** Selects one implemented Mini Program HMR delivery and execution mechanism. */
 export type VptHmrOptions = Readonly<{
     /** `devtools` executes native patch files; `interpreter` fetches source and evaluates it without native Page reload. */
     mode: 'devtools' | 'interpreter'
@@ -21,12 +32,12 @@ export type VptPageOption = {
     path: string
 
     /**
-     * Target-independent Taro page configuration.
+     * Canonical Taro Page configuration. Use the same WeChat-shaped keys accepted by `definePageConfig`.
      *
-     * For `wx`, these values form the generated `<path>.json`; the plugin augments `usingComponents` with its generated
-     * component registrations. For `h5`, the values are added to the corresponding Taro router entry.
+     * WX emits these values directly. ZFB recursively converts them to Alipay configuration keys before specializing the
+     * runtime capsule and emitting `<path>.json`. H5 adds them to the corresponding router entry.
      */
-    config: VptJsonObject
+    config: VptPageConfig
 }
 
 /** Configures vpt for one build target. */
@@ -34,8 +45,9 @@ export interface VptOptions {
     /**
      * Platform produced by the current Vite invocation.
      *
-     * Use `wx` to emit a WeChat Mini Program or `h5` to emit a browser application. The selected target controls Taro
-     * module resolution, conditional compilation, runtime bootstrapping, style processing, and output generation.
+     * Use `wx` to emit a WeChat Mini Program, `zfb` to emit an Alipay Mini Program, or `h5` to emit a browser application.
+     * The selected target controls Taro module resolution, conditional compilation, runtime bootstrapping, style processing,
+     * and output generation.
      */
     target: VptTarget
 
@@ -56,13 +68,14 @@ export interface VptOptions {
     pages: VptPageOption[]
 
     /**
-     * Target-independent Taro application configuration.
+     * Canonical Taro application configuration. Use the same WeChat-shaped keys accepted by `defineAppConfig`.
      *
-     * For `wx`, these values form the generated `app.json`. For `h5`, they configure the Taro application and router.
-     * The plugin always derives `pages` from {@link pages}; caller-provided `pages`, `subPackages`, and `subpackages`
-     * values are discarded because the build pipeline owns page order and generated package placement.
+     * WX emits these values directly. ZFB recursively converts them to Alipay configuration keys before runtime
+     * specialization and JSON emission. H5 uses them to configure the Taro application and router. The plugin always derives
+     * `pages` from {@link pages}; caller-provided `pages`, `subPackages`, and `subpackages` values are discarded because the
+     * build pipeline owns page order and generated package placement.
      */
-    appJson: VptJsonObject
+    appJson: VptAppConfig
 
     /**
      * WeChat DevTools project configuration written to `project.config.json` without merging.
@@ -87,9 +100,9 @@ export interface VptOptions {
     sitemapJson?: VptJsonObject
 
     /**
-     * Selects the WX development HMR mode. Omission uses `devtools`.
+     * Selects the Mini Program development HMR mode. Omission uses `devtools`.
      *
-     * This option affects only `vite serve` for the `wx` target and never changes H5 or production output.
+     * This option affects only `vite serve` for `wx` and `zfb` targets and never changes H5 or production output.
      */
     hmr?: VptHmrOptions
 }
