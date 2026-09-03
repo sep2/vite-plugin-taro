@@ -91,13 +91,13 @@ packages/loan-genius/dist/h5
 
 ## What this sample demonstrates
 
-- One React 19 + Taro source tree for both `wx` and `h5`.
+- One React 19 + Taro source tree for `wx`, `zfb`, and `h5`.
 - `vite-plugin-taro` target selection with `VITE_VPT_TARGET`.
 - App and page metadata declared in `vite.config.ts`.
-- WeChat Mini Program build output, H5 dev server, and H5 build output.
+- WeChat and Alipay Mini Program output, plus the H5 dev server and production build.
 - Tailwind CSS v4 imported from `src/app.css`.
 - App-facing imports from `virtual:taro/api` and `virtual:taro/components`.
-- WeChat `project.config.json`, `sitemap.json`, WXML, WXS, WXSS, and CommonJS chunk emission.
+- WX WXML/WXS/WXSS and ZFB AXML/SJS/ACSS skeletons with target-native project files and CommonJS entries.
 
 Application code must not import or install `@tarojs/*` packages directly. Use the plugin virtual modules instead:
 
@@ -110,8 +110,9 @@ import { Text, View } from 'virtual:taro/components'
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `VITE_VPT_TARGET` | Yes | Set by the root scripts to `wx` or `h5`. |
+| `VITE_VPT_TARGET` | Yes | Set by the root scripts to `wx`, `zfb`, or `h5`. |
 | `VITE_VPT_WECHAT_APP_ID` | No | WeChat Mini Program app id. Defaults to `touristappid`. |
+| `VITE_VPT_ALIPAY_APP_ID` | No | Alipay Mini Program app id written to `mini.project.json`. |
 
 For local WeChat testing, put your app id in `packages/loan-genius/.env.local`:
 
@@ -138,7 +139,7 @@ Important files:
 
 | File | Purpose |
 | --- | --- |
-| `vite.config.ts` | Selects the target, configures aliases, output directory, pages, app config, and WeChat project metadata. |
+| `vite.config.ts` | Selects the target and configures aliases, output, pages, app config, and native project metadata. |
 | `src/app.tsx` | Root React app component passed to `vite-plugin-taro`. |
 | `src/app.css` | Global Tailwind CSS v4 imports and app styles. |
 | `src/pages/calculator/index.tsx` | First page and default route. |

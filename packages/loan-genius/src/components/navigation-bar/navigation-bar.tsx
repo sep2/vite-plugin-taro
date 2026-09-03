@@ -31,9 +31,11 @@ function px(value: number): string {
 }
 
 const isWechatTarget = import.meta.env.VITE_VPT_TARGET === 'wx'
+const isAlipayTarget = import.meta.env.VITE_VPT_TARGET === 'zfb'
 
 function getNavigationBarMetrics(): NavigationBarMetrics {
-    const windowInfo = Taro.getWindowInfo()
+    // Alipay 4.2.1 exposes the established system-info API but not Taro's newer split window-info API.
+    const windowInfo = isAlipayTarget ? Taro.getSystemInfoSync() : Taro.getWindowInfo()
     const statusBarHeight = isWechatTarget ? (windowInfo.statusBarHeight ?? 44) : 0
     const menuButtonInfo = isWechatTarget
         ? Taro.getMenuButtonBoundingClientRect()

@@ -112,7 +112,7 @@ const TaroPickerSelectorH5: ComponentType<PropsWithChildren<TaroPickerSelectorPr
 TaroPickerSelector = TaroPickerSelectorH5
 /*  #endif  */
 
-/*  #ifdef  wx  */
+/*  #ifndef  h5  */
 const TaroPickerSelectorWx: ComponentType<PropsWithChildren<TaroPickerSelectorProps>> = (props) => {
     const {
         range = [],

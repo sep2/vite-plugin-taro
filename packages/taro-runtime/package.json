@@ -1,7 +1,7 @@
 {
     "name": "vite-plugin-taro-runtime",
     "version": "0.6.20",
-    "description": "Taro 4.2 runtime patched for vite-plugin-taro WX App wrapping.",
+    "description": "Taro 4.2 runtime patched for vite-plugin-taro Mini Program App wrapping.",
     "author": "sep2",
     "license": "MIT",
     "browser": "dist/index.js",
