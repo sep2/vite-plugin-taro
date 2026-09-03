@@ -3,19 +3,22 @@ import type { VptOptions } from '../../../options.ts'
 import { packageRequire, resolveRuntimeFile } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
+import { createWxSkeleton } from './create-wx-skeleton.ts'
 
 /** Adapts the shared Mini Program pipeline to the WX public target. */
 export function createWxMiniPlugins(vptOptions: VptOptions): PluginOption[] {
-    return createMiniTargetPlugins(createMiniContract(vptOptions))
+    return createMiniTargetPlugins(createWxMiniContract(vptOptions))
 }
 
-/** Creates the shared Mini Program contract for a WX target invocation. */
-export function createMiniContract(vptOptions: VptOptions): MiniContract {
+/** Binds the shared Mini Program core to WeChat runtime and output conventions. */
+export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
+    const componentsReactPath = packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
+
     return {
         options: vptOptions,
         taro: {
             env: 'weapp',
-            componentsReactPath: packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react'),
+            componentsReactPath: componentsReactPath,
             platformRuntimePath: packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/runtime.js')
         },
         runtime: {
@@ -39,7 +42,14 @@ export function createMiniContract(vptOptions: VptOptions): MiniContract {
             globalFileName: 'assets/global.wxss'
         },
         output: {
-            subpackagePlanningBudget: 1_900_000
+            subpackagePlanningBudget: 1_900_000,
+            generateProjectSkeleton(input) {
+                return createWxSkeleton({
+                    ...input,
+                    options: vptOptions,
+                    componentsModulePath: componentsReactPath
+                })
+            }
         }
     }
 }

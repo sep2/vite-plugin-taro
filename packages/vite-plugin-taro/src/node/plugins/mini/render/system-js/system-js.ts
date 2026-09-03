@@ -1,5 +1,5 @@
 /**
- * WX final-chunk ESM to SystemJS compiler.
+ * Mini Program final-chunk ESM to SystemJS compiler.
  *
  * This is deliberately not a general source-module transformer. It consumes JavaScript already normalized and bundled by
  * Rolldown, preserves the original source with range edits, and rejects module forms outside that final-chunk grammar. Keep
@@ -31,7 +31,7 @@ export type TransformSystemJsOptions = Readonly<{
     filename: string
     format: SystemJsOutputFormat
     sourcemap: boolean
-    /** Converts physical Rolldown references into the logical IDs used by the WX capsule registry. */
+    /** Converts physical Rolldown references into the logical IDs used by the Mini capsule registry. */
     resolveReference(reference: string, kind: SystemJsReferenceKind): string
 }>
 

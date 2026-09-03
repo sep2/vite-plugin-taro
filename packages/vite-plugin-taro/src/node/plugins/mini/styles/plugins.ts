@@ -13,7 +13,7 @@ import { createMiniTransformer } from './create-mini-transformer.ts'
 type TailwindRoot = Readonly<{
     /** Exact root source used to decide whether the existing compiler can accept another candidate-only update. */
     source: string
-    /** Authoritative raw candidates generated with the current source files; JavaScript and WXSS consume this same set. */
+    /** Authoritative raw candidates generated with the current source files; JavaScript and native styles share this set. */
     classSet: Set<string>
     /** CSS imports and compiler inputs whose changes invalidate the generator rather than only its candidate cache. */
     dependencies: ReadonlySet<string>
@@ -33,7 +33,7 @@ type StyleModule = Readonly<{
     tailwind: TailwindRoot | undefined
 }>
 
-/** JavaScript code plus the physical filename required by the WX JavaScript transformer. */
+/** JavaScript code plus the physical filename required by the Mini Program class-name transformer. */
 type JavaScriptArtifact = Readonly<{
     code: string
     filename: string
@@ -41,13 +41,13 @@ type JavaScriptArtifact = Readonly<{
 
 type MiniTransformer = ReturnType<typeof createMiniTransformer>
 
-/** Vite plugin with the development-host operation that finalizes one coherent WX style/JavaScript transaction. */
+/** Vite plugin with the host operation that finalizes one coherent native-style/JavaScript transaction. */
 export type MiniStylePlugin = Plugin &
     Readonly<{
-        /** Neutralizes browser CSS payloads and publishes their matching global WXSS through the host's atomic writer. */
+        /** Neutralizes browser CSS payloads and atomically publishes the matching global native stylesheet. */
         finalizeUpdate: <Artifact extends JavaScriptArtifact>(
             artifacts: readonly Artifact[],
-            writeWxss: (wxss: string) => Promise<void>
+            writeStylesheet: (stylesheet: string) => Promise<void>
         ) => Promise<readonly Artifact[]>
     }>
 
@@ -57,14 +57,14 @@ const tailwindRootImportPattern = /(@(?:import|reference)\s+(?:url\(\s*)?)(['"])
 const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.css'))
 
 /**
- * Creates the single owner of global WX style compilation, graph projection, JavaScript class rewriting, and publication.
+ * Creates the single owner of global native-style compilation, graph projection, class rewriting, and publication.
  *
  * ## Architectural invariant
  *
- * A WX transaction must expose JavaScript and WXSS produced from one class-identity snapshot. Tailwind utility names can be
- * rewritten for WeChat—for example, `py-5.5` becomes `py-5_d5`—so publishing either side independently can leave running code
+ * One Mini Program transaction must expose JavaScript and native CSS produced from one class-identity snapshot. Tailwind utility
+ * names can be escaped—for example, `py-5.5` becomes `py-5_d5`—so publishing either side independently can leave running code
  * referring to selectors that do not yet exist. This plugin therefore treats reachable CSS, Tailwind candidates, converted
- * WXSS, and converted JavaScript as one output. Complete builds and HMR updates both call `finalizeOutput()`; they differ only
+ * native CSS, and converted JavaScript as one output. Complete builds and HMR updates both call `finalizeOutput()`; they differ only
  * in how the returned bytes are materialized.
  *
  * ## Ownership boundaries
@@ -77,13 +77,13 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  *    the owning CSS root's Rolldown transform and never rescans the project during output publication.
  * 3. Vite owns preprocessors, PostCSS, CSS Modules, and final module CSS semantics. VPT observes the input to the resolved
  *    `vite:css-post` hook only after the original hook succeeds; it never rereads source files or repeats CSS preprocessing.
- * 4. The fixed WX transformer owns selector conversion and Oxc-based JavaScript class-string conversion. One retained
- *    transformer and one projected candidate set drive both operations without loading Weapp's generic framework context.
- * 5. VPT owns physical global WXSS and patch publication. Vite's browser CSS asset is only an intermediate carrier and is
- *    removed before VPT emits `assets/global.wxss`.
+ * 4. The fixed Mini transformer owns selector conversion and Oxc-based JavaScript class-string conversion. One retained
+ *    transformer and one projected candidate set drive both operations without loading a framework project context.
+ * 5. VPT owns physical global native CSS and patch publication. Vite's browser CSS asset is only an intermediate carrier and is
+ *    removed before VPT emits the contract-selected global stylesheet.
  *
- * Native Page and component WXSS are outside this global pipeline. The WX output plugin is registered after this style plugin
- * and emits those opaque companions later. The WX configuration also enforces `cssCodeSplit: false`, so Vite contributes at
+ * Native Page and component styles are outside this global pipeline. The target skeleton is generated after this style plugin
+ * and emits those opaque companions later. Mini output also enforces `cssCodeSplit: false`, so Vite contributes at
  * most one browser compiler stylesheet for this plugin to replace.
  *
  * ## Compilation phases
@@ -119,9 +119,9 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * and Tailwind candidates without a separate prune protocol or persistent topology cache. Candidate sets are unioned only from
  * the Tailwind roots whose captured CSS survives that exact traversal, preserving the CSS/class identity invariant.
  *
- * ### 4. Shared WX finalization
+ * ### 4. Shared native-style finalization
  *
- * `finalizeOutput()` first converts the concatenated reachable CSS to WXSS, then transforms every supplied JavaScript artifact
+ * `finalizeOutput()` first converts the concatenated reachable CSS to native CSS, then transforms each JavaScript artifact
  * with the same projected class set. It returns data and performs no bundle mutation or filesystem publication. If either
  * transformation fails, the promise rejects before callers expose partial output. JavaScript conversion is skipped when the
  * projection contains no Tailwind candidates, preserving ordinary bundle bytes.
@@ -130,18 +130,17 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  *
  * The post-order `generateBundle` hook gathers all JavaScript chunks, finalizes them as one operation, and only then mutates the
  * bundle. It assigns converted code, clears invalid source maps, removes Vite's intermediate browser stylesheet, and always
- * emits `assets/global.wxss`. Emitting an empty global file is required because `app.wxss` imports it even when the application
+ * emits the contract-selected global file. An empty file is required because the App stylesheet imports it even when the application
  * currently has no styles. Native output hooks run afterward and emit Page/component companion files independently.
  *
  * ### 5b. Development commit
  *
  * The development host calls `finalizeUpdate()` after Rolldown produces patch factories or a complete-output notification.
  * Finalization uses the `PluginContext` captured by `buildStart`, so it observes the same current graph as the compiler. After
- * all conversion succeeds, the host's atomic writer publishes changed WXSS before `finalizeUpdate()` returns converted patch
- * factories. Their captured Vite CSS literals are emptied first; factories, exports, changed IDs, and sequences remain intact.
- * The patch publisher therefore cannot expose newer JavaScript class identities before matching selectors exist.
- * `publishedWxss` advances only after a successful write and suppresses byte-identical writes that would otherwise trigger
- * unnecessary WeChat DevTools reload events.
+ * all conversion succeeds, the host's atomic writer publishes changed native CSS before `finalizeUpdate()` returns converted
+ * patch factories. Their captured Vite CSS literals are emptied first; factories, exports, changed IDs, and sequences remain
+ * intact. The patch publisher therefore cannot expose newer JavaScript class identities before matching selectors exist.
+ * `publishedStylesheet` advances only after a successful write and suppresses byte-identical native-tool reload events.
  *
  * ## Retained state and lifecycle
  *
@@ -150,7 +149,7 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * - `entryIds`: graph-exact App/Page entry identities resolved at the start of each build;
  * - `graphContext`: the active Rolldown graph reader needed by host calls made outside plugin hooks;
  * - `styleByModuleId`: the latest successful Vite CSS plus optional Tailwind state at one normalized module identity;
- * - `publishedWxss`: the last durably published development stylesheet used for unchanged-write suppression;
+ * - `publishedStylesheet`: the last durably published development stylesheet used for unchanged-write suppression;
  * - `miniTransformer`: fixed stylesheet options and escaped-class cache shared by CSS and JavaScript conversion.
  *
  * The state owners remain scoped to one plugin instance; `entryIds` is atomically replaced after each complete resolution.
@@ -165,7 +164,10 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * compiler dependencies, and watched file identities; no second application graph is retained. The Tailwind generator stays
  * alive across candidate edits to avoid repeating source normalization and compiler initialization.
  */
-export function createMiniStylePlugin(contract: MiniContract, applicationEntryIds: readonly string[]): MiniStylePlugin {
+export function createMiniStylePlugin(
+    contract: Pick<MiniContract, 'styles'>,
+    applicationEntryIds: readonly string[]
+): MiniStylePlugin {
     // This mutable root list is replaced in buildStart with Vite/Rolldown's exact cross-platform graph identities.
     let entryIds = applicationEntryIds
     // The fixed transformer retains only deterministic class-escape and PostCSS pipeline caches for this plugin instance.
@@ -175,8 +177,8 @@ export function createMiniStylePlugin(contract: MiniContract, applicationEntryId
     let graphContext: PluginContext
     // This mutable map is the only retained style store: Vite and Tailwind update separate fields at one module identity.
     const styleByModuleId = new Map<string, StyleModule>()
-    // This mutable frontier advances only after the host durably writes WXSS, suppressing byte-identical filesystem events.
-    let publishedWxss: string | undefined
+    // This mutable frontier advances only after the host durably writes native CSS, suppressing byte-identical filesystem events.
+    let publishedStylesheet: string | undefined
 
     /** Binds retained plugin state to the context of the complete build or development transaction being finalized. */
     const finalizeCurrentOutput = (context: PluginContext, javaScript: readonly JavaScriptArtifact[]) => {
@@ -214,7 +216,7 @@ export function createMiniStylePlugin(contract: MiniContract, applicationEntryId
                     // Run Vite first so a failed CSS transform never replaces the last successful retained artifact.
                     const result = await transform.call(this, css, id, options)
 
-                    // Only physical application styles participate in WX graph projection; virtual request modes keep Vite semantics.
+                    // Only physical application styles enter native graph projection; virtual request modes keep Vite semantics.
                     if (isApplicationStyle(id)) {
                         const styleId = normalizeModuleId(id)
                         styleByModuleId.set(styleId, {
@@ -287,7 +289,7 @@ export function createMiniStylePlugin(contract: MiniContract, applicationEntryId
             invalidateTailwindDependencies(normalizeModuleId(id))
         },
         generateBundle: {
-            // Vite must finish chunking and CSS extraction before VPT can finalize the complete WX output transaction.
+            // Vite must finish chunking and CSS extraction before VPT finalizes the complete native output transaction.
             order: 'post',
             /** Converts every JavaScript chunk and the reachable CSS projection with one authoritative class set. */
             async handler(_, bundle) {
@@ -308,7 +310,7 @@ export function createMiniStylePlugin(contract: MiniContract, applicationEntryId
                     chunk.map = null
                 })
 
-                // Step 4: remove Vite's browser CSS carrier; VPT owns the sole physical global WX stylesheet.
+                // Step 4: remove Vite's browser CSS carrier; VPT owns the sole physical global native stylesheet.
                 Object.entries(bundle).forEach(([fileName, output]) => {
                     if (isStyleAsset(output)) {
                         delete bundle[fileName]
@@ -316,7 +318,7 @@ export function createMiniStylePlugin(contract: MiniContract, applicationEntryId
                 })
 
                 // Step 5: always emit the imported global file, including an empty file for applications without styles.
-                this.emitFile({ type: 'asset', fileName: contract.styles.globalFileName, source: finalized.wxss })
+                this.emitFile({ type: 'asset', fileName: contract.styles.globalFileName, source: finalized.stylesheet })
             }
         },
         /** Releases build-only state after the final bundle has consumed it. */
@@ -329,10 +331,10 @@ export function createMiniStylePlugin(contract: MiniContract, applicationEntryId
         closeWatcher() {
             styleByModuleId.clear()
         },
-        /** Finalizes one development result and publishes matching WXSS before exposing converted patch factories. */
+        /** Finalizes one development result and publishes matching native CSS before exposing converted patch factories. */
         finalizeUpdate: async <Artifact extends JavaScriptArtifact>(
             artifacts: readonly Artifact[],
-            writeWxss: (wxss: string) => Promise<void>
+            writeStylesheet: (stylesheet: string) => Promise<void>
         ): Promise<readonly Artifact[]> => {
             // CSS is already captured for physical publication, so its browser payload need not enter JavaScript conversion.
             const javaScript = artifacts.map((artifact) => ({
@@ -343,11 +345,11 @@ export function createMiniStylePlugin(contract: MiniContract, applicationEntryId
             // Step 1: complete every fallible conversion against one snapshot of the current module graph.
             const output = await finalizeCurrentOutput(graphContext, javaScript)
 
-            // Step 2: publish changed WXSS first so DevTools cannot observe JavaScript containing newer class identities.
-            if (output.wxss !== publishedWxss) {
-                await writeWxss(output.wxss)
+            // Step 2: publish native CSS first so the tool cannot observe JavaScript with newer class identities.
+            if (output.stylesheet !== publishedStylesheet) {
+                await writeStylesheet(output.stylesheet)
                 // Advance the frontier only after the atomic writer succeeds; failed writes remain retryable.
-                publishedWxss = output.wxss
+                publishedStylesheet = output.stylesheet
             }
 
             // Step 3: preserve patch metadata and replace only code after the matching stylesheet is durable.
@@ -357,10 +359,10 @@ export function createMiniStylePlugin(contract: MiniContract, applicationEntryId
 }
 
 /**
- * Produces WXSS and JavaScript from one live-graph projection.
+ * Produces native CSS and JavaScript from one live-graph projection.
  *
  * The function receives every stateful dependency explicitly so tests and both output modes execute the same algorithm. It
- * completes WXSS conversion before JavaScript conversion and returns bytes without publishing or mutating caller artifacts.
+ * completes stylesheet conversion before JavaScript conversion and returns bytes without publishing or mutating caller artifacts.
  */
 export async function finalizeOutput(
     entryIds: readonly string[],
@@ -380,8 +382,8 @@ export async function finalizeOutput(
     // Step 1: derive cascade order, reachable CSS, and raw Tailwind candidates from the same current graph snapshot.
     const projection = projectStyles(entryIds, styleByModuleId, getModuleInfo)
 
-    // Step 2: convert the complete stylesheet with VPT's fixed Tailwind-v4/WX policy.
-    const wxss = await miniTransformer.transformStylesheet(projection.css)
+    // Step 2: convert the complete stylesheet with VPT's fixed Tailwind-v4 Mini Program policy.
+    const stylesheet = await miniTransformer.transformStylesheet(projection.css)
 
     // Step 3: transform artifacts independently with the exact candidate set projected from that stylesheet.
     const transformedJavaScript = javaScript.map((artifact) =>
@@ -393,7 +395,7 @@ export async function finalizeOutput(
     )
 
     // Returning data keeps physical bundle mutation and development filesystem publication at their respective owners.
-    return { javaScript: transformedJavaScript, wxss: wxss }
+    return { javaScript: transformedJavaScript, stylesheet: stylesheet }
 }
 
 /** Selects styles reachable from the configured entries in deterministic dependency-first cascade order. */
@@ -501,7 +503,7 @@ function resolveTailwindRootImport(css: string): string {
     })
 }
 
-/** Returns whether a Vite request represents a physical CSS module that contributes to application WXSS. */
+/** Returns whether a Vite request is a physical CSS module contributing to the native application stylesheet. */
 function isApplicationStyle(id: string): boolean {
     // Step 1: use Vite's predicate so every supported preprocessor extension follows the same path.
     if (!isCSSRequest(id)) {
@@ -552,5 +554,5 @@ function isTailwindRoot(code: string): boolean {
 
 /** Identifies Vite's browser stylesheet carrier, which VPT replaces after all final CSS has been captured. */
 function isStyleAsset(output: Rolldown.OutputBundle[string]): output is Rolldown.OutputAsset {
-    return output.type === 'asset' && /\.(?:css|wxss)$/.test(output.fileName)
+    return output.type === 'asset' && /\.(?:acss|css|wxss)$/.test(output.fileName)
 }

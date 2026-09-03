@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
-import { createMiniContract } from '../../wx/plugins.ts'
-import { createTemplateAssets, replaceExactlyOnce } from './templates.ts'
+import { createWxMiniContract } from './plugins.ts'
 
-const contract = createMiniContract({
+const contract = createWxMiniContract({
     target: 'wx',
     app: 'src/app.tsx',
     pages: [
@@ -46,23 +45,10 @@ const contract = createMiniContract({
     }
 })
 
-test('enforces exact pinned Taro template fragments', () => {
-    assert.equal(
-        replaceExactlyOnce('before TOKEN after', 'TOKEN', 'replacement', 'fixture'),
-        'before replacement after'
-    )
-    assert.throws(() => replaceExactlyOnce('before after', 'TOKEN', 'replacement', 'fixture'), /found 0/)
-    assert.throws(
-        () => replaceExactlyOnce('TOKEN before TOKEN after', 'TOKEN', 'replacement', 'fixture'),
-        /found multiple/
-    )
-})
-
 test('creates native rendering and configuration assets', () => {
-    const output = createTemplateAssets({
+    const output = contract.output.generateProjectSkeleton({
         bundle: {} as Rolldown.OutputBundle,
-        contract: contract,
-        subpackages: [{ name: 'p_example', root: 'sub/p_example', pages: [] }],
+        subpackages: [{ root: 'sub/p_example' }],
         isProduction: false,
         nativeComponents: [
             {

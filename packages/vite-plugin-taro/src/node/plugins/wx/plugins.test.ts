@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { VptOptions } from '../../../options.ts'
-import { createMiniContract } from './plugins.ts'
+import { createWxMiniContract } from './plugins.ts'
 
 test('creates the WX Mini Program contract without translating public options', () => {
     const options: VptOptions = {
@@ -12,7 +12,7 @@ test('creates the WX Mini Program contract without translating public options', 
         projectConfigJson: {}
     }
 
-    const contract = createMiniContract(options)
+    const contract = createWxMiniContract(options)
 
     assert.equal(contract.options, options)
     assert.equal(contract.taro.env, 'weapp')
@@ -26,5 +26,7 @@ test('creates the WX Mini Program contract without translating public options', 
         appFileName: 'app.wxss',
         globalFileName: 'assets/global.wxss'
     })
-    assert.deepEqual(contract.output, { subpackagePlanningBudget: 1_900_000 })
+    assert.deepEqual(Object.keys(contract.output), ['subpackagePlanningBudget', 'generateProjectSkeleton'])
+    assert.equal(contract.output.subpackagePlanningBudget, 1_900_000)
+    assert.equal(typeof contract.output.generateProjectSkeleton, 'function')
 })

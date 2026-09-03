@@ -35,7 +35,7 @@ test('uses an independent Alipay SocketTask and installs both shared HMR modes o
 
     const { connectZfbSocket } = await import('./connect-zfb-socket.ts')
     assert.strictEqual(connectZfbSocket('ws://localhost/hmr'), socket)
-    assert.deepEqual(connectOptions, [{ url: 'ws://localhost/hmr', multiple: true }])
+    assert.deepEqual(connectOptions, [{ url: 'ws://localhost/hmr', multiple: true, protocols: ['vite-hmr'] }])
 
     await importRuntimeEntry('devtools')
     const devtoolsRuntime = Reflect.get(runtimeGlobal, '__rolldown_runtime__')
@@ -49,8 +49,8 @@ test('uses an independent Alipay SocketTask and installs both shared HMR modes o
     initializeRuntime(interpreterRuntime, 'interpreter')
 
     assert.deepEqual(connectOptions, [
-        { url: 'ws://localhost/hmr', multiple: true },
-        { url: 'ws://localhost/devtools', multiple: true },
-        { url: 'ws://localhost/interpreter', multiple: true }
+        { url: 'ws://localhost/hmr', multiple: true, protocols: ['vite-hmr'] },
+        { url: 'ws://localhost/devtools', multiple: true, protocols: ['vite-hmr'] },
+        { url: 'ws://localhost/interpreter', multiple: true, protocols: ['vite-hmr'] }
     ])
 })

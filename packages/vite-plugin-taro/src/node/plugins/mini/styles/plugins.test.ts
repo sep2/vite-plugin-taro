@@ -43,7 +43,8 @@ const contract: MiniContract = {
     },
 
     output: {
-        subpackagePlanningBudget: 1_900_000
+        subpackagePlanningBudget: 1_900_000,
+        generateProjectSkeleton: () => []
     }
 }
 
@@ -80,7 +81,7 @@ test('transforms WXSS and JavaScript from one supplied class set without source 
     assert.equal(javaScript, "export const className = 'py-5_d5'")
 })
 
-test('finalizes the current graph into WXSS and JavaScript with one projected class set', async () => {
+test('finalizes the current graph into native CSS and JavaScript with one projected class set', async () => {
     const entryId = '/src/app.js'
     const styleId = '/src/app.css'
     const output = await finalizeOutput(
@@ -106,7 +107,7 @@ test('finalizes the current graph into WXSS and JavaScript with one projected cl
         [{ code: "export const className = 'py-5.5'", filename: 'entry.js' }]
     )
 
-    assert.match(output.wxss, /\.py-5_d5\s*\{/)
+    assert.match(output.stylesheet, /\.py-5_d5\s*\{/)
     assert.deepEqual(output.javaScript, ["export const className = 'py-5_d5'"])
 })
 
@@ -148,14 +149,14 @@ test('projects cyclic multi-entry graphs in dependency-first order without dupli
         [{ code: "export const classes = 'py-5.5 mr-4.5'", filename: 'entry.js' }]
     )
 
-    const sharedIndex = output.wxss.indexOf('.shared-order')
-    const lazyIndex = output.wxss.indexOf('.lazy-order')
-    const pageIndex = output.wxss.indexOf('.page-order')
+    const sharedIndex = output.stylesheet.indexOf('.shared-order')
+    const lazyIndex = output.stylesheet.indexOf('.lazy-order')
+    const pageIndex = output.stylesheet.indexOf('.page-order')
     assert.ok(sharedIndex >= 0)
     assert.ok(lazyIndex > sharedIndex)
     assert.ok(pageIndex > lazyIndex)
-    assert.equal((output.wxss.match(/\.shared-order/g) ?? []).length, 1)
-    assert.doesNotMatch(output.wxss, /\.unreachable/)
+    assert.equal((output.stylesheet.match(/\.shared-order/g) ?? []).length, 1)
+    assert.doesNotMatch(output.stylesheet, /\.unreachable/)
     assert.match(output.javaScript[0] ?? '', /py-5_d5/)
     assert.match(output.javaScript[0] ?? '', /mr-4\.5/)
 })

@@ -122,7 +122,7 @@ const customWrapperCacheKey = Symbol.for('customWrapperCache')
  * inspect React.
  */
 function applyCustomWrapperSnapshots(data: SnapshotRecord): void {
-    const customWrapperCache: unknown = Reflect.get(global, customWrapperCacheKey)
+    const customWrapperCache: unknown = Reflect.get(__VPT_RUNTIME_GLOBAL__, customWrapperCacheKey)
 
     if (!(customWrapperCache instanceof Map)) {
         throw new Error('Mini Program CustomWrapper cache is not installed in the App global.')

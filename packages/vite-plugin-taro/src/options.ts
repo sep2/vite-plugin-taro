@@ -27,7 +27,7 @@ export type VptPageOption = {
      * Taro route and output path without a file extension.
      *
      * The plugin resolves the page component from `src/${path}.tsx`, relative to the Vite project root. For example,
-     * `pages/home/index` resolves to `src/pages/home/index.tsx` and is emitted under `pages/home/index` for `wx`.
+     * `pages/home/index` resolves to `src/pages/home/index.tsx` and keeps that output route for every target.
      */
     path: string
 
@@ -78,24 +78,24 @@ export interface VptOptions {
     appJson: VptAppConfig
 
     /**
-     * WeChat DevTools project configuration written to `project.config.json` without merging.
+     * Native development-tool project configuration written without merging.
      *
-     * This option is required so one configuration shape can be shared between targets, but it is only emitted for a
-     * `wx` build and is ignored for `h5`.
+     * WX emits this object as `project.config.json`; ZFB emits it as `mini.project.json`; H5 ignores it. Supply the schema
+     * expected by the selected target rather than sharing one project's platform-specific values across invocations.
      */
     projectConfigJson: VptJsonObject
 
     /**
      * Local WeChat DevTools overrides written to `project.private.config.json` without merging.
      *
-     * The file is emitted only when this value is provided for a `wx` build. It is ignored for `h5`.
+     * The file is emitted only when this value is provided for a `wx` build. It is ignored for ZFB and H5.
      */
     projectPrivateConfigJson?: VptJsonObject
 
     /**
      * WeChat Mini Program indexing rules written to `sitemap.json` without merging.
      *
-     * The file is emitted only when this value is provided for a `wx` build. It is ignored for `h5`.
+     * The file is emitted only when this value is provided for a `wx` build. It is ignored for ZFB and H5.
      */
     sitemapJson?: VptJsonObject
 

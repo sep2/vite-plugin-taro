@@ -14,7 +14,7 @@ type Insertions = Readonly<{
 /**
  * Records non-overlapping range edits and renders them in one source-order pass.
  *
- * Final WX development chunks do not request source maps. RolldownMagicString's repeated relocation of hundreds of hoisted
+ * Final Mini Program development chunks do not request source maps. RolldownMagicString's repeated relocation of hoisted
  * functions is considerably more expensive than the semantic analysis itself, so this editor keeps the same range operations
  * while avoiding a mutable chunk graph when no mappings can be observed.
  */

@@ -92,7 +92,7 @@ test('renders initial and cumulative patches as inert CommonJS data', () => {
 })
 
 test('rejects an empty cumulative patch range', () => {
-    assert.throws(() => renderDevtoolsPatches('build', []), /Cannot render an empty WX patch range/)
+    assert.throws(() => renderDevtoolsPatches('build', []), /Cannot render an empty Mini Program patch range/)
 })
 
 test('describes reset and publication writes through the exact DevTools patch path', () => {

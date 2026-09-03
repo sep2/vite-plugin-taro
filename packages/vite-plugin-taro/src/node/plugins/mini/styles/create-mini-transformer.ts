@@ -13,11 +13,11 @@ const cssPreflight = {
     padding: '0'
 } as const
 
-/** Static replacement for the generic Weapp context, keeping VPT policy explicit and framework detection out of the bundle. */
+/** Fixed Mini Program style policy that avoids loading a framework project context into the bundle. */
 const miniStyleHandlerOptions = {
     appType: 'weapp-vite',
     /*
-     * Tailwind runs before this WX handler and emits vendor-prefixed and standard utility declarations together,
+     * Tailwind runs before this native-style handler and emits prefixed and standard utility declarations together,
      * such as `-webkit-user-select` and `user-select`. Running the standalone Autoprefixer afterward would
      * retarget completed Tailwind output through a second Browserslist policy and duplicate compatibility ownership.
      *
@@ -54,7 +54,7 @@ type CandidateTransform = Readonly<{
     replacements: ReadonlyMap<string, string>
 }>
 
-/** Creates VPT's fixed Tailwind-v4/WX transformer without loading Weapp's generic framework context. */
+/** Creates VPT's fixed Tailwind-v4 Mini Program transformer without loading a framework project context. */
 export function createMiniTransformer(): MiniTransformer {
     const styleHandler = createStyleHandler(miniStyleHandlerOptions)
     // Weak keys release each transaction's exact precheck and replacement table with its projected class set.

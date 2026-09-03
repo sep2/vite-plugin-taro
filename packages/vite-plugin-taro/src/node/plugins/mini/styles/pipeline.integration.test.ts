@@ -45,7 +45,8 @@ const contract: MiniContract = {
     },
 
     output: {
-        subpackagePlanningBudget: 1_900_000
+        subpackagePlanningBudget: 1_900_000,
+        generateProjectSkeleton: () => []
     }
 }
 const globalWxssFileName = contract.styles.globalFileName

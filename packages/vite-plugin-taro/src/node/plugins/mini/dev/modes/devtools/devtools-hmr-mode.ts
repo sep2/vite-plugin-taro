@@ -10,7 +10,7 @@ import type { PatchUpdate } from '../../hmr-protocol.ts'
 export const devtoolsPatchesFileName = 'hmr/patches.js'
 
 /**
- * Collects the behavior that depends on WeChat DevTools project-file compilation.
+ * Collects behavior that depends on native development-tool project-file compilation.
  *
  * Runtime entry, Page transform, entry banners, and patch delivery stay in one descriptor because they implement one protocol:
  * DevTools observes a changed Page dependency, re-executes the Page shell, and that shell synchronously gives the cumulative
@@ -52,7 +52,7 @@ export function renderInitialDevtoolsPatches(): string {
  */
 export function renderDevtoolsPatches(buildId: string, patches: readonly PatchUpdate[]): string {
     if (patches.length === 0) {
-        throw new Error('Cannot render an empty WX patch range.')
+        throw new Error('Cannot render an empty Mini Program patch range.')
     }
 
     const rendered = patches.map(
@@ -109,7 +109,7 @@ function createDevtoolsPagePlugin(pageShell: string): Plugin {
 export function injectPageShellHmr(code: string): { code: string; map: null } {
     const registration = 'Page(pageConfig)'
     if (!code.includes(registration)) {
-        throw new Error('WX native Page shell must register pageConfig')
+        throw new Error('Mini Program Page shell must register pageConfig')
     }
 
     return {

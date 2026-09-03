@@ -213,6 +213,78 @@ test('builds a complete native App and Page project for wx', async () => {
     )
 })
 
+test('builds a complete native App and Page project for zfb', async () => {
+    await inspectFixtureBuild(
+        {
+            options: createOptions('zfb'),
+            files: {
+                'src/app.tsx': appSource,
+                'src/pages/home/index.tsx': `
+                    import { View } from '@tarojs/components'
+
+                    export default function Home() {
+                        return <View id="zfb-home">ZFB page marker</View>
+                    }
+                `
+            }
+        },
+        (output) => {
+            const fileNames = new Set(output.map((entry) => entry.fileName))
+            const requiredFiles = [
+                '.browserslistrc',
+                'app.js',
+                'app.json',
+                'app.acss',
+                'base.axml',
+                'comp.js',
+                'comp.json',
+                'comp.axml',
+                'custom-wrapper.js',
+                'custom-wrapper.json',
+                'custom-wrapper.axml',
+                'mini.project.json',
+                'pages/home/index.js',
+                'pages/home/index.json',
+                'pages/home/index.axml',
+                'pages/home/index.acss',
+                'utils.sjs'
+            ]
+            const appJson = parseJsonAsset(output, 'app.json')
+            const pageJson = parseJsonAsset(output, 'pages/home/index.json')
+            const pageTemplate = String(requireAsset(output, 'pages/home/index.axml').source)
+            const javascript = output
+                .filter((candidate): candidate is OutputChunk => candidate.type === 'chunk')
+                .map((chunk) => chunk.code)
+                .join('\n')
+
+            assert.ok(requiredFiles.every((fileName) => fileNames.has(fileName)))
+            assert.equal(
+                [...fileNames].some((fileName) => /\.(?:wxml|wxs|wxss)$/.test(fileName)),
+                false
+            )
+            assert.deepEqual(appJson, {
+                window: {
+                    defaultTitle: 'Fixture App'
+                },
+                pages: ['pages/home/index']
+            })
+            assert.deepEqual(pageJson, {
+                defaultTitle: 'Home',
+                usingComponents: {
+                    comp: '../../comp',
+                    'custom-wrapper': '../../custom-wrapper'
+                }
+            })
+            assert.doesNotMatch(pageTemplate, /<import src="\.\.\/\.\.\/base\.axml"\s*\/>/)
+            assert.match(pageTemplate, /<comp i="{{app}}" p="{{page}}" \/>/)
+            assert.match(javascript, /ZFB page marker/)
+            assert.match(requireChunk(output, 'app.js').code, /my\.System\.importSync/)
+            assert.doesNotMatch(requireChunk(output, 'app.js').code, /^\s*import\s/m)
+            assert.doesNotMatch(requireChunk(output, 'pages/home/index.js').code, /^\s*import\s/m)
+        }
+    )
+})
+
 test('renders Page-local CustomWrapper through the standard recursive scopes', async () => {
     await inspectFixtureBuild(
         {
@@ -330,6 +402,63 @@ test('places a lazy wx feature in a declared code-only subpackage', async () => 
     )
 })
 
+test('places a lazy zfb feature in a declared package with its mandatory anchor Page', async () => {
+    await inspectFixtureBuild(
+        {
+            options: createOptions('zfb'),
+            files: {
+                'src/app.tsx': appSource,
+                'src/pages/home/index.tsx': `
+                    import { lazy, Suspense } from 'react'
+
+                    const Feature = lazy(() => import('./feature.tsx'))
+
+                    export default function Home() {
+                        return <Suspense fallback={null}><Feature /></Suspense>
+                    }
+                `,
+                'src/pages/home/feature.tsx': `
+                    import { View } from '@tarojs/components'
+
+                    export default function Feature() {
+                        return <View>Lazy zfb feature marker</View>
+                    }
+                `
+            }
+        },
+        (output) => {
+            const chunks = output.filter((candidate): candidate is OutputChunk => candidate.type === 'chunk')
+            const featureChunk = chunks.find((chunk) => chunk.code.includes('Lazy zfb feature marker'))
+            assert.ok(featureChunk)
+            const rootMatch = /^(sub\/p_[a-f0-9]{8})\//.exec(featureChunk.fileName)
+            assert.ok(rootMatch)
+            const root = rootMatch[1]
+            const anchorRoot = `${root}/__vpt_anchor__/index`
+            const appJson = parseJsonAsset(output, 'app.json')
+            const transport = chunks.find((chunk) => chunk.code.includes('require.async'))
+
+            assert.deepEqual(appJson.subPackages, [
+                {
+                    root: root,
+                    pages: ['__vpt_anchor__/index']
+                }
+            ])
+            assert.equal(String(requireAsset(output, `${anchorRoot}.js`).source), 'Page({})\n')
+            assert.deepEqual(parseJsonAsset(output, `${anchorRoot}.json`), {})
+            assert.equal(String(requireAsset(output, `${anchorRoot}.axml`).source), '')
+            assert.equal(String(requireAsset(output, `${anchorRoot}.acss`).source), '')
+            assert.ok(transport)
+            assert.match(transport.code, /require\.async/)
+            assert.equal(
+                chunks.some(
+                    (chunk) => !chunk.fileName.startsWith(`${root}/`) && chunk.code.includes('Lazy zfb feature marker')
+                ),
+                false
+            )
+        }
+    )
+})
+
 test('copies and registers an opaque native wx component end to end', async () => {
     await inspectFixtureBuild(
         {
@@ -385,6 +514,74 @@ test('copies and registers an opaque native wx component end to end', async () =
                 String(requireAsset(output, `${nativeRoot}/counter.wxml`).source),
                 '<view>Native counter marker</view>'
             )
+            assert.deepEqual(Buffer.from(binary), Buffer.from([0, 1, 2, 255]))
+            assert.equal(
+                output.some((entry) => entry.fileName.endsWith('native-counter.tsx')),
+                false
+            )
+        }
+    )
+})
+
+test('copies and registers an opaque native zfb component end to end', async () => {
+    await inspectFixtureBuild(
+        {
+            options: createOptions('zfb'),
+            files: {
+                'src/app.tsx': appSource,
+                'src/pages/home/index.tsx': `
+                    import { NativeCounter } from './native-counter.tsx'
+
+                    export default function Home() {
+                        return <NativeCounter count={1} />
+                    }
+                `,
+                'src/pages/home/native-counter.tsx': `
+                    import { defineNativeComponent } from 'virtual:taro/native'
+
+                    export const NativeCounter = defineNativeComponent<{
+                        count: number
+                        onIncrement?: (event: { detail: { value: number } }) => void
+                    }>(() => import('../../native/native-counter/counter.js'))
+                `,
+                'src/native/native-counter/counter.js': 'Component({ props: { count: 0 } })',
+                'src/native/native-counter/counter.json': '{"component":true,"styleIsolation":"apply-shared"}',
+                'src/native/native-counter/counter.axml': '<view>Native zfb counter marker</view>',
+                'src/native/native-counter/counter.acss': '.counter { color: red; }',
+                'src/native/native-counter/payload.bin': Uint8Array.from([0, 1, 2, 255])
+            }
+        },
+        (output) => {
+            const nativeRoot = 'components/native-counter'
+            const pageJson = parseJsonAsset(output, 'pages/home/index.json')
+            const componentJson = parseJsonAsset(output, 'comp.json')
+            const nativeJson = parseJsonAsset(output, `${nativeRoot}/counter.json`)
+            const pageTemplate = String(requireAsset(output, 'pages/home/index.axml').source)
+            const baseTemplate = String(requireAsset(output, 'base.axml').source)
+            const binary = requireAsset(output, `${nativeRoot}/payload.bin`).source
+
+            assert.deepEqual(pageJson.usingComponents, {
+                'native-counter': '/components/native-counter/counter',
+                comp: '../../comp',
+                'custom-wrapper': '../../custom-wrapper'
+            })
+            assert.deepEqual(componentJson.usingComponents, {
+                'native-counter': '/components/native-counter/counter',
+                comp: './comp',
+                'custom-wrapper': './custom-wrapper'
+            })
+            assert.deepEqual(nativeJson, {
+                component: true,
+                styleIsolation: 'apply-shared'
+            })
+            assert.equal(
+                String(requireAsset(output, `${nativeRoot}/counter.axml`).source),
+                '<view>Native zfb counter marker</view>'
+            )
+            assert.equal(String(requireAsset(output, `${nativeRoot}/counter.acss`).source), '.counter { color: red; }')
+            assert.match(pageTemplate, /<comp i="{{app}}" p="{{page}}" \/>/)
+            assert.match(baseTemplate, /<template name="tmpl_0_native-counter">/)
+            assert.match(baseTemplate, /data="{{i:item,p:p}}"/)
             assert.deepEqual(Buffer.from(binary), Buffer.from([0, 1, 2, 255]))
             assert.equal(
                 output.some((entry) => entry.fileName.endsWith('native-counter.tsx')),
