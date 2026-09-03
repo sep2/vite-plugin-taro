@@ -7,7 +7,8 @@ import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { DevOptions } from 'rolldown/experimental'
 import { createLogger, createServer } from 'vite'
-import { createMiniContract } from '../../wx/plugins.ts'
+import { resolveRuntimeFile } from '../../../utils/packages.ts'
+import type { MiniContract, RuntimeModulesContract } from '../mini-contract.ts'
 import type { MiniStylePlugin } from '../styles/plugins.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
 import { hmrEndpointPath } from './hmr-protocol.ts'
@@ -25,13 +26,33 @@ type SyntheticDev = (_input: unknown, _output: unknown, devOptions: DevOptions) 
 
 const devHostHarnessKey = '__vptDevHostTestHarness__'
 
-const contract = createMiniContract({
-    target: 'wx',
-    app: 'src/app.tsx',
-    pages: [],
-    appJson: {},
-    projectConfigJson: {}
-})
+const runtimeModules = {
+    bootstrap: resolveRuntimeFile('mini/amphibious/bootstrap'),
+    transport: resolveRuntimeFile('mini/amphibious/transport'),
+    appShell: resolveRuntimeFile('mini/native/app'),
+    appCapsule: resolveRuntimeFile('mini/capsule/app'),
+    componentShell: resolveRuntimeFile('mini/native/component'),
+    componentCapsule: resolveRuntimeFile('mini/capsule/component'),
+    customWrapperShell: resolveRuntimeFile('mini/native/custom-wrapper'),
+    pageShell: resolveRuntimeFile('mini/native/page'),
+    pageCapsule: resolveRuntimeFile('mini/capsule/page'),
+    devtoolsHmrRuntime: resolveRuntimeFile('wx/dev/devtools-runtime'),
+    interpreterHmrRuntime: resolveRuntimeFile('wx/dev/interpreter-runtime')
+} satisfies RuntimeModulesContract
+
+const contract = {
+    options: {
+        target: 'wx',
+        app: 'src/app.tsx',
+        pages: [],
+        appJson: {},
+        projectConfigJson: {}
+    },
+    styles: {
+        appFileName: 'app.wxss',
+        globalFileName: 'assets/global.wxss'
+    }
+} satisfies Pick<MiniContract, 'options' | 'styles'>
 
 async function importDevHost(dev: SyntheticDev): Promise<CreateMiniDevHost> {
     const devHostUrl = `${new URL('./dev-host.ts', import.meta.url).href}?synthetic-dev-host-test=${Date.now()}`
@@ -188,7 +209,7 @@ test('reduces synthetic engine update variants and unknown host failures without
             server: server,
             contract: contract,
             styles: styles,
-            hmrMode: createDevtoolsHmrMode(contract.runtime.modules)
+            hmrMode: createDevtoolsHmrMode(runtimeModules)
         })
         const bundledDev = requireBundledDev(server.environments.client.bundledDev)
 

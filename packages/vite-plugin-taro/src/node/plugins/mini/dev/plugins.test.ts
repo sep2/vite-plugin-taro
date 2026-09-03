@@ -1,18 +1,40 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { resolveConfig } from 'vite'
-import { createMiniContract } from '../../wx/plugins.ts'
+import type { MiniContract, RuntimeModulesContract } from '../mini-contract.ts'
 import { createMiniStylePlugin } from '../styles/plugins.ts'
 import { createMiniDevelopmentPlugin, isMiniClientEnvironment, removeDevelopmentAppStyle } from './plugins.ts'
 
-const contract = createMiniContract({
-    target: 'wx',
-    app: 'src/app.tsx',
-    pages: [],
-    appJson: {},
-    projectConfigJson: {},
-    sitemapJson: {}
-})
+const runtimeModules = {
+    bootstrap: '/runtime/bootstrap.ts',
+    transport: '/runtime/transport.ts',
+    appShell: '/runtime/app-shell.ts',
+    appCapsule: '/runtime/app-capsule.ts',
+    componentShell: '/runtime/component-shell.ts',
+    componentCapsule: '/runtime/component-capsule.ts',
+    customWrapperShell: '/runtime/custom-wrapper-shell.ts',
+    pageShell: '/runtime/page-shell.ts',
+    pageCapsule: '/runtime/page-capsule.ts',
+    devtoolsHmrRuntime: '/runtime/devtools-hmr.ts',
+    interpreterHmrRuntime: '/runtime/interpreter-hmr.ts'
+} satisfies RuntimeModulesContract
+
+const contract = {
+    options: {
+        target: 'wx',
+        app: 'src/app.tsx',
+        pages: [],
+        appJson: {},
+        projectConfigJson: {}
+    },
+    runtime: {
+        modules: runtimeModules
+    },
+    styles: {
+        appFileName: 'app.native.css',
+        globalFileName: 'assets/global.native.css'
+    }
+} satisfies Pick<MiniContract, 'options' | 'runtime' | 'styles'>
 
 test('assigns physical Mini Program host ownership only to the client environment', () => {
     assert.equal(isMiniClientEnvironment({ name: 'client' }), true)
@@ -33,14 +55,14 @@ test('preserves physical outputs and composes the selected mode across developme
 })
 
 test('transfers the App style entry from complete output to the development host', () => {
-    const appStyle = { type: 'asset', source: '@import "./assets/global.wxss";\n' }
+    const appStyle = { type: 'asset', source: '@import "./assets/global.native.css";\n' }
     const globalStyle = { type: 'asset', source: '.app {}' }
     const bundle = {
-        'app.wxss': appStyle,
-        'assets/global.wxss': globalStyle
+        'app.native.css': appStyle,
+        'assets/global.native.css': globalStyle
     }
 
     removeDevelopmentAppStyle(bundle, contract.styles.appFileName)
 
-    assert.deepEqual(bundle, { 'assets/global.wxss': globalStyle })
+    assert.deepEqual(bundle, { 'assets/global.native.css': globalStyle })
 })

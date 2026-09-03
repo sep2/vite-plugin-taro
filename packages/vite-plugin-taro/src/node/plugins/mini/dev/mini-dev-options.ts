@@ -23,7 +23,7 @@ export type BundledDev = {
 }
 
 /**
- * Installs physical WX output and runtime conventions over Vite's browser-oriented bundled-development options.
+ * Installs physical Mini Program output and runtime conventions over Vite's browser-oriented bundled-development options.
  * Build completion deliberately remains outside this options adapter: DevEngine onOutput is the single lifecycle authority.
  */
 export function installMiniDevOptions({
@@ -34,12 +34,12 @@ export function installMiniDevOptions({
 }: {
     bundledDev: BundledDev
     server: ViteDevServer
-    contract: MiniContract
+    contract: Pick<MiniContract, 'options'>
     hmrMode: MiniHmrMode
 }): void {
     /*
      * Vite owns this mutable adapter method and calls it later when constructing DevEngine. Replacing that one seam preserves
-     * Vite's resolved graph while applying WX physical-output conventions to every options generation. Capturing and mutating one
+     * Vite's resolved graph while applying native physical-output conventions to every options generation. Capturing and mutating one
      * options object here would be stale on later complete builds; creating a second engine would duplicate watchers and graphs.
      * The bound original remains immutable and is invoked exactly once per delegated options request.
      */
@@ -51,7 +51,7 @@ export function installMiniDevOptions({
 
         const configuredOutput = server.config.build.rolldownOptions.output
         if (Array.isArray(configuredOutput)) {
-            throw new Error('wx development supports one configured Rolldown output.')
+            throw new Error('Mini Program development supports one configured Rolldown output.')
         }
         const configured = configuredOutput ?? {}
 
@@ -63,12 +63,12 @@ export function installMiniDevOptions({
         /*
          * Rolldown passes this mutable output object onward by identity, and nested Vite plugins may already retain it. Mutating
          * that single object preserves their references while atomically replacing browser-oriented naming and format fields with
-         * stable physical WX conventions. Cloning only our fields would leave retained references on stale hashed filenames;
+         * stable native conventions. Cloning only our fields would leave retained references on stale hashed filenames;
          * mutating configuredOutput itself would leak development normalization back into the user's resolved Vite config.
          */
         Object.assign(output, configured, {
             // Development output is overwritten in place after every complete build. Strip hash placeholders from the
-            // configured asset pattern so old files cannot accumulate and native JSON/WXML references remain stable.
+            // configured asset pattern so old files cannot accumulate and native asset references remain stable.
             assetFileNames: createStableFileNames(configured.assetFileNames, 'assets/[name][extname]'),
             // These banners create physical CommonJS edges only after graph analysis. Every mode initializes its App runtime;
             // modes that need Page delivery can additionally prepend Page edges. Host-only metadata stays outside the application
@@ -80,13 +80,13 @@ export function installMiniDevOptions({
             // Native entry paths are public Mini Program routes (`app.js`, `pages/.../index.js`); development must never hash
             // or relocate them because DevTools determines App/Page reload behavior from those exact filenames.
             entryFileNames: createStableFileNames(configured.entryFileNames, '[name]'),
-            // Keep ESM until the existing WX renderChunk pipeline classifies each final chunk and converts capsules to
+            // Keep ESM until the shared Mini renderChunk pipeline classifies each final chunk and converts capsules to
             // System.register data or native/amphibious entries to CommonJS. Choosing CommonJS here would erase that boundary.
             format: 'es',
-            // Bundled development emits complete physical output repeatedly. Minifying bounds disk transfer and DevTools
+            // Bundled development emits complete physical output repeatedly. Minifying bounds disk transfer and native-tool
             // compile work; source-level HMR diagnostics still come from Vite/Rolldown before this final output pass.
             minify: true,
-            // DevTools executes physical WX files and HMR applies module factories rather than browser source maps. Disabling
+            // Native tools execute physical project files and HMR applies module factories rather than browser source maps. Disabling
             // maps avoids extra output files and prevents Vite's Oxc sourcemap transform from touching generated host code.
             sourcemap: false
         })
@@ -98,7 +98,7 @@ export function installMiniDevOptions({
         rolldownOptions.experimental ??= {}
         const existingDevMode = rolldownOptions.experimental.devMode
         rolldownOptions.experimental.devMode = {
-            // Retain unknown user/forward-compatible devMode fields while the three explicit WX invariants below win.
+            // Retain unknown user/forward-compatible devMode fields while the three explicit Mini invariants below win.
             ...(typeof existingDevMode === 'object' ? existingDevMode : {}),
             // Install the self-contained runtime selected once by the HMR mode. Nested bundling resolves all adapter imports into
             // one implementation string because Rolldown injects it into a generated runtime chunk where ordinary module imports
@@ -125,10 +125,10 @@ export function installMiniDevOptions({
     }
 }
 
-/** Returns the configured output after rejecting states unsupported by the physical WX engine. */
+/** Returns the configured output after rejecting states unsupported by the physical Mini Program engine. */
 export function requireSingleOutput(rolldownOptions: BundledDevRolldownOptions): OutputOptions {
     if (!rolldownOptions.output || Array.isArray(rolldownOptions.output)) {
-        throw new Error('wx development requires exactly one Rolldown output.')
+        throw new Error('Mini Program development requires exactly one Rolldown output.')
     }
 
     return rolldownOptions.output
@@ -137,7 +137,7 @@ export function requireSingleOutput(rolldownOptions: BundledDevRolldownOptions):
 /** Creates the one missing output object while rejecting a configured output array. */
 function ensureSingleOutput(rolldownOptions: BundledDevRolldownOptions): OutputOptions {
     if (Array.isArray(rolldownOptions.output)) {
-        throw new Error('wx development requires one configured Rolldown output.')
+        throw new Error('Mini Program development requires one configured Rolldown output.')
     }
     // Rolldown needs the created object attached to input options by identity; returning a detached fallback would be ignored.
     rolldownOptions.output ??= {}
@@ -174,7 +174,7 @@ function disableViteOxcSourcemap(pluginOption: unknown): void {
     if (plugin.name === 'builtin:vite-transform' && plugin._options?.transformOptions) {
         /*
          * Vite's private builtin retains this mutable transform options object and does not expose a public replacement hook.
-         * Updating its one sourcemap flag prevents Oxc from allocating maps that final WX output always discards; cloning the
+         * Updating its one sourcemap flag prevents Oxc from allocating maps that final native output always discards; cloning the
          * descriptor would not update the builtin closure that reads the original object during transforms.
          */
         plugin._options.transformOptions.sourcemap = false
@@ -196,15 +196,22 @@ function createViteReporter(server: ViteDevServer) {
 }
 
 /*
- * memoize owns one mutable Promise per runtime path. getRolldownOptions may run for multiple complete generations, and separate
- * Vite servers may select different mode entries in one process. Sharing each in-flight/result Promise prevents duplicate nested
- * builds without leaking mutable Rolldown output objects between engines.
+ * memoize owns one mutable Promise per runtime entry. getRolldownOptions may run for multiple complete generations, and separate
+ * Vite servers may select different targets or modes in one process. Sharing each in-flight/result Promise prevents duplicate
+ * nested builds without leaking mutable Rolldown output objects between engines.
  */
 const bundleRuntimeSource = memoize(async function bundleRuntimeSource(runtimeFile: string): Promise<string> {
-    // write: false keeps this nested helper build from creating a second dist directory in the application project.
+    // The runtime entries use the real Mini Program `global` directly. This nested build only closes their imports because
+    // Rolldown injects the resulting implementation into a generated runtime chunk where module imports are unavailable.
     const result = await build({
         input: runtimeFile,
-        output: { format: 'iife', minify: true, sourcemap: false },
+        output: {
+            format: 'iife',
+            // The combined physical runtime owns final minification, so minifying this embedded source would duplicate work.
+            minify: false,
+            sourcemap: false
+        },
+        // write: false keeps this nested helper build from creating a second dist directory in the application project.
         write: false
     })
     return result.output[0].code

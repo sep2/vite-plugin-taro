@@ -3,26 +3,43 @@ import path from 'node:path'
 import test from 'node:test'
 import type { OutputOptions, PreRenderedChunk, RenderedChunk } from 'rolldown'
 import { createLogger, createServer } from 'vite'
-import { packageRequire } from '../../../utils/packages.ts'
-import { createMiniContract } from '../../wx/plugins.ts'
+import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
+import { createZfbMiniContract } from '../../zfb/plugins.ts'
+import type { MiniContract, RuntimeModulesContract } from '../mini-contract.ts'
 import { type BundledDev, installMiniDevOptions, requireSingleOutput } from './mini-dev-options.ts'
 import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 
-const options = createMiniContract({
-    target: 'wx',
-    app: 'src/app.tsx',
-    pages: [
-        {
-            path: 'pages/home/index',
-            config: {}
-        }
-    ],
-    appJson: {},
-    projectConfigJson: {}
-})
-const hmrMode = createDevtoolsHmrMode(options.runtime.modules)
+const runtimeModules = {
+    bootstrap: resolveRuntimeFile('mini/amphibious/bootstrap'),
+    transport: resolveRuntimeFile('mini/amphibious/transport'),
+    appShell: resolveRuntimeFile('mini/native/app'),
+    appCapsule: resolveRuntimeFile('mini/capsule/app'),
+    componentShell: resolveRuntimeFile('mini/native/component'),
+    componentCapsule: resolveRuntimeFile('mini/capsule/component'),
+    customWrapperShell: resolveRuntimeFile('mini/native/custom-wrapper'),
+    pageShell: resolveRuntimeFile('mini/native/page'),
+    pageCapsule: resolveRuntimeFile('mini/capsule/page'),
+    devtoolsHmrRuntime: resolveRuntimeFile('wx/dev/devtools-runtime'),
+    interpreterHmrRuntime: resolveRuntimeFile('wx/dev/interpreter-runtime')
+} satisfies RuntimeModulesContract
+
+const options = {
+    options: {
+        target: 'wx',
+        app: 'src/app.tsx',
+        pages: [
+            {
+                path: 'pages/home/index',
+                config: {}
+            }
+        ],
+        appJson: {},
+        projectConfigJson: {}
+    }
+} satisfies Pick<MiniContract, 'options'>
+const hmrMode = createDevtoolsHmrMode(runtimeModules)
 
 function createPreRenderedChunk(name: string): PreRenderedChunk {
     return {
@@ -123,6 +140,8 @@ test('adapts configured output into a stable physical wx development project', a
     assert.equal(devMode.skipCommonRuntimeInjection, false)
     assert.equal(typeof devMode.implement, 'string')
     assert.match(String(devMode.implement), /__rolldown_runtime__/)
+    assert.match(String(devMode.implement), /Reflect\.set\(global,/)
+    assert.match(String(devMode.implement), /Reflect\.get\(global,/)
 
     const banner = output.banner
     assert.equal(typeof banner, 'function')
@@ -138,6 +157,45 @@ test('adapts configured output into a stable physical wx development project', a
         "__rolldown_runtime__.applyPatches(require('../../hmr/patches.js'));\n"
     )
     assert.equal(await banner(createRenderedChunk('assets/vendor.js', 'assets/vendor.js')), '')
+})
+
+test('installs the Alipay HMR adapter on the real Mini Program JavaScript global', async (context) => {
+    const contract = createZfbMiniContract({
+        target: 'zfb',
+        app: 'src/app.tsx',
+        pages: [{ path: 'pages/home/index', config: {} }],
+        appJson: {},
+        projectConfigJson: {}
+    })
+    const server = await createServer({
+        root: packageRoot,
+        configFile: false,
+        customLogger: createLogger('silent')
+    })
+    context.after(() => server.close())
+    const bundledDev: BundledDev = {
+        async getRolldownOptions() {
+            return {}
+        },
+        async listen() {},
+        async triggerBundleRegenerationIfStale() {
+            return true
+        }
+    }
+
+    installMiniDevOptions({
+        bundledDev: bundledDev,
+        server: server,
+        contract: contract,
+        hmrMode: createDevtoolsHmrMode(contract.runtime.modules)
+    })
+    const adapted = await bundledDev.getRolldownOptions()
+    const devMode = adapted.experimental?.devMode
+
+    assert.ok(devMode && typeof devMode === 'object')
+    assert.match(String(devMode.implement), /Reflect\.set\(global,/)
+    assert.match(String(devMode.implement), /Reflect\.get\(global,/)
+    assert.doesNotMatch(String(devMode.implement), /Reflect\.(?:get|set)\(my,/)
 })
 
 test('supplies stable output defaults when Vite has no configured output', async (context) => {
@@ -227,7 +285,7 @@ test('rejects output arrays from both Vite configuration and generated Rolldown 
     })
     await assert.rejects(
         () => configuredArrayBundledDev.getRolldownOptions(),
-        /wx development supports one configured Rolldown output/
+        /Mini Program development supports one configured Rolldown output/
     )
 
     const generatedArrayBundledDev: BundledDev = {
@@ -247,6 +305,6 @@ test('rejects output arrays from both Vite configuration and generated Rolldown 
     })
     await assert.rejects(
         () => generatedArrayBundledDev.getRolldownOptions(),
-        /wx development requires one configured Rolldown output/
+        /Mini Program development requires one configured Rolldown output/
     )
 })

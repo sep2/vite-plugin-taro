@@ -26,18 +26,18 @@ const externalPackages: ReadonlySet<string> = new Set([
 ])
 const nodeBuiltins: ReadonlySet<string> = new Set([...builtinModules, ...builtinModules.map((name) => `node:${name}`)])
 
-/** Removes generic branches that VPT's fixed WX style policy makes unreachable without externalizing their dependencies. */
-function pruneWxStyleDependencies(): Plugin {
-    const stubPrefix = '\0vpt:wx-style-stub:'
+/** Removes generic branches that VPT's fixed Mini style policy makes unreachable without externalizing their dependencies. */
+function pruneMiniStyleDependencies(): Plugin {
+    const stubPrefix = '\0vpt:mini-style-stub:'
 
     const dependencyStubs: Readonly<Record<string, string>> = {
-        autoprefixer: `export default function unavailable() { throw new Error('VPT disables WX autoprefixer') }`,
-        'postcss-load-config': `export default function unavailable() { throw new Error('VPT owns WX PostCSS configuration') }`,
-        'tailwindcss-config': `export function loadConfig() { throw new Error('VPT compiles Tailwind before WX PostCSS') }`
+        autoprefixer: `export default function unavailable() { throw new Error('VPT disables Mini Program autoprefixer') }`,
+        'postcss-load-config': `export default function unavailable() { throw new Error('VPT owns Mini Program PostCSS configuration') }`,
+        'tailwindcss-config': `export function loadConfig() { throw new Error('VPT compiles Tailwind before Mini Program PostCSS') }`
     }
 
     return {
-        name: 'vpt:prune-wx-style-dependencies',
+        name: 'vpt:prune-mini-style-dependencies',
         resolveId(id) {
             return Object.hasOwn(dependencyStubs, id) ? `${stubPrefix}${id}` : undefined
         },
@@ -58,7 +58,7 @@ async function main(): Promise<void> {
         input: path.join(packageRoot, 'src/index.ts'),
         platform: 'node',
         external: isExternal,
-        plugins: [pruneWxStyleDependencies()],
+        plugins: [pruneMiniStyleDependencies()],
         output: {
             file: path.join(distRoot, 'index.js'),
             format: 'esm',

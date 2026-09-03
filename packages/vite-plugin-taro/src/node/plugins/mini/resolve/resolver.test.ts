@@ -3,9 +3,8 @@ import path from 'node:path'
 import test from 'node:test'
 import { normalizePath } from 'vite'
 import { appComponentId } from '../../client/constant.ts'
-import type { MiniContract } from '../mini-contract.ts'
+import type { MiniContract, RuntimeModulesContract } from '../mini-contract.ts'
 import { pageCapsuleId, pageComponentId, taroPlatformRuntimeId, vitePreloadId } from '../module/module.ts'
-import type { MiniRuntimeModules } from '../runtime-modules.ts'
 import { createResolver } from './resolver.ts'
 
 const modules = {
@@ -20,7 +19,7 @@ const modules = {
     pageCapsule: '/runtime/page-capsule.ts',
     devtoolsHmrRuntime: '/runtime/devtools-hmr.ts',
     interpreterHmrRuntime: '/runtime/interpreter-hmr.ts'
-} satisfies MiniRuntimeModules
+} satisfies RuntimeModulesContract
 
 const contract = {
     options: {
@@ -46,11 +45,14 @@ const contract = {
         env: 'synthetic',
         componentsReactPath: '/runtime/components-react.ts',
         platformRuntimePath: '/runtime/platform.ts'
+    },
+    runtime: {
+        modules: modules
     }
-} satisfies Pick<MiniContract, 'options' | 'taro'>
+} satisfies Pick<MiniContract, 'options' | 'runtime' | 'taro'>
 
 test('resolves fixed and route-specific private IDs', () => {
-    const resolver = createResolver(contract, modules)
+    const resolver = createResolver(contract)
     const projectRoot = path.resolve('/project')
 
     assert.deepEqual(resolver.applicationEntryIds, [
@@ -84,7 +86,7 @@ test('resolves fixed and route-specific private IDs', () => {
 })
 
 test('rejects Page-private imports without one configured route origin', () => {
-    const resolver = createResolver(contract, modules)
+    const resolver = createResolver(contract)
     const projectRoot = path.resolve('/project')
 
     assert.throws(
@@ -102,7 +104,7 @@ test('rejects Page-private imports without one configured route origin', () => {
 })
 
 test('specializes the App capsule with the configured App JSON', async () => {
-    const resolver = createResolver(contract, modules)
+    const resolver = createResolver(contract)
     const result = await resolver.specialize('export default __VPT_APP_CONFIG__', modules.appCapsule)
 
     assert.ok(result)

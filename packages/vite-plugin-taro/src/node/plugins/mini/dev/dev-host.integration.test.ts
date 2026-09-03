@@ -12,9 +12,9 @@ import {
     type InterpreterServerMessage,
     interpreterServerEvent
 } from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
-import { packageRequire } from '../../../utils/packages.ts'
+import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
-import { createMiniContract } from '../../wx/plugins.ts'
+import type { MiniContract, RuntimeModulesContract } from '../mini-contract.ts'
 import { createMiniStylePlugin } from '../styles/plugins.ts'
 import { createMiniDevHost } from './dev-host.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
@@ -26,6 +26,20 @@ const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/packag
 const maximumWaitAttempts = 400
 const stableReadCount = 10
 const waitIntervalMilliseconds = 25
+
+const runtimeModules = {
+    bootstrap: resolveRuntimeFile('mini/amphibious/bootstrap'),
+    transport: resolveRuntimeFile('mini/amphibious/transport'),
+    appShell: resolveRuntimeFile('mini/native/app'),
+    appCapsule: resolveRuntimeFile('mini/capsule/app'),
+    componentShell: resolveRuntimeFile('mini/native/component'),
+    componentCapsule: resolveRuntimeFile('mini/capsule/component'),
+    customWrapperShell: resolveRuntimeFile('mini/native/custom-wrapper'),
+    pageShell: resolveRuntimeFile('mini/native/page'),
+    pageCapsule: resolveRuntimeFile('mini/capsule/page'),
+    devtoolsHmrRuntime: resolveRuntimeFile('wx/dev/devtools-runtime'),
+    interpreterHmrRuntime: resolveRuntimeFile('wx/dev/interpreter-runtime')
+} satisfies RuntimeModulesContract
 
 type DevFixture = Readonly<{
     close: () => Promise<void>
@@ -265,7 +279,13 @@ function waitForInterpreterMessage(socket: WebSocket): Promise<InterpreterServer
 }
 
 test('rejects a server without Vite bundled development ownership', async (context) => {
-    const contract = createMiniContract(createOptions())
+    const contract = {
+        options: createOptions(),
+        styles: {
+            appFileName: 'app.wxss',
+            globalFileName: 'assets/global.wxss'
+        }
+    } satisfies Pick<MiniContract, 'options' | 'styles'>
     const server = await createServer({
         configFile: false,
         customLogger: createLogger('silent')
@@ -278,9 +298,9 @@ test('rejects a server without Vite bundled development ownership', async (conte
                 server: server,
                 contract: contract,
                 styles: createMiniStylePlugin(contract, [import.meta.filename]),
-                hmrMode: createDevtoolsHmrMode(contract.runtime.modules)
+                hmrMode: createDevtoolsHmrMode(runtimeModules)
             }),
-        /Vite did not create the wx bundled-development environment/
+        /Vite did not create the Mini Program bundled-development environment/
     )
 })
 
@@ -457,7 +477,7 @@ test('prints physical project paths without compromising later patch publication
     assert.match(info.endpoint, /^ws:\/\/127\.0\.0\.1:/)
     assert.equal(await fixture.bundledDev.triggerBundleRegenerationIfStale(), false)
     fixture.server.printUrls()
-    assert.match(stripVTControlCharacters(infos.join('\n')), /WeChat DevTools.*\.\/dist/)
+    assert.match(stripVTControlCharacters(infos.join('\n')), /Mini Program project.*\.\/dist/)
     // Temporarily vary only the presentation path to exercise root and parent-relative DevTools banners.
     const originalOutDir = fixture.server.config.build.outDir
     const originalConfigFile = fixture.server.config.configFile
@@ -470,8 +490,8 @@ test('prints physical project paths without compromising later patch publication
     fixture.server.printUrls()
     fixture.server.config.build.outDir = originalOutDir
     const devToolsOutput = stripVTControlCharacters(infos.join('\n'))
-    assert.match(devToolsOutput, /WeChat DevTools.*: \./)
-    assert.match(devToolsOutput, /WeChat DevTools.*: \.\./)
+    assert.match(devToolsOutput, /Mini Program project.*: \./)
+    assert.match(devToolsOutput, /Mini Program project.*: \.\./)
 
     await publishSourceGeneration(fixture.pagePath, renderPage('healthy generation after invalid control traffic'))
     const patches = await waitForFile(

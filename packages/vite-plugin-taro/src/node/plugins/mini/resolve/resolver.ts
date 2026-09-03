@@ -19,7 +19,7 @@ import { specializePageCapsule } from './specialize-page-capsule.ts'
 type PrivateIdResolver = (importer: string | undefined, projectRoot: string) => string
 
 /** Creates the resolver and source specializer for one Mini Program module graph. */
-export function createResolver(contract: MiniContract) {
+export function createResolver(contract: Pick<MiniContract, 'options' | 'runtime' | 'taro'>) {
     const normalizedAppCapsulePath = normalizePath(contract.runtime.modules.appCapsule)
     const normalizedPageCapsulePath = normalizePath(contract.runtime.modules.pageCapsule)
 

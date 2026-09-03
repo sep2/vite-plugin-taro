@@ -22,7 +22,10 @@ export function isMiniClientEnvironment(environment: Readonly<{ name: string }>)
  * The shared style pipeline already owns the resolver's ordered App/Page cascade policy, so the host does not reconstruct it
  * from unrelated Rolldown shell and transport entries.
  */
-export function createMiniDevelopmentPlugin(contract: MiniContract, styles: MiniStylePlugin): PluginOption[] {
+export function createMiniDevelopmentPlugin(
+    contract: Pick<MiniContract, 'options' | 'runtime' | 'styles'>,
+    styles: MiniStylePlugin
+): PluginOption[] {
     // Resolve once so plugins, journal effects, entry banners, and runtime bundling cannot disagree about the active mechanism.
     const hmrMode = createMiniHmrMode(contract.options.hmr, contract.runtime.modules)
 
@@ -38,17 +41,17 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
         {
             name: 'vpt:mini-dev',
             apply: 'serve',
-            // The physical WX DevEngine is a client build. Native environment scoping gives its shared host exactly one
+            // The physical Mini Program DevEngine is a client build. Environment scoping gives its host exactly one
             // generate/close lifecycle instead of admitting hooks from Vite's unrelated SSR environment.
             applyToEnvironment: isMiniClientEnvironment,
 
             config() {
                 return {
                     build: {
-                        // The development output is the live Mini Program project opened by WeChat DevTools, not a disposable
-                        // build artifact. Deleting and recreating its directory tree during a dev-server restart detaches the
-                        // DevTools watcher; recreating identical paths does not reliably reattach it. Both HMR modes still depend
-                        // on that watcher for complete builds and WXSS, while DevTools mode also uses it for JavaScript patches.
+                        // Development output is the live project opened by the native tool, not a disposable build artifact.
+                        // Deleting and recreating its directory tree during a dev-server restart detaches the native watcher;
+                        // recreating identical paths does not reliably reattach it. Both HMR modes depend on that watcher for
+                        // complete builds and styles, while DevTools mode also uses it for JavaScript patches.
                         // Preserve watched paths and overwrite their contents. Production builds retain normal output cleanup.
                         emptyOutDir: false,
                         // Disable maps in resolved environment config as well as final output so Oxc and Babel skip producing
@@ -56,7 +59,7 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
                         sourcemap: false
                     },
                     experimental: {
-                        // Ask Vite to resolve its bundled-development graph and expose the private adapter instance. The wx
+                        // Ask Vite to resolve its bundled-development graph and expose the private adapter instance. The Mini
                         // configureServer hook replaces only its startup method with the directly writing DevEngine.
                         bundledDev: true
                     },
@@ -84,7 +87,7 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
             generateBundle: {
                 order: 'post',
                 handler(_, bundle) {
-                    // `vpt:wx` emits the production App wrapper during every complete build: initial startup and each
+                    // The shared output plugin emits the production App wrapper during every complete build: startup and each
                     // recovery build, not just once when this plugin instance is created. Development transfers that file
                     // to the host so its only physical write happens after the matching build identity is durable.
                     removeDevelopmentAppStyle(bundle, contract.styles.appFileName)
@@ -102,8 +105,8 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
                 order: 'post',
                 // The dev-mode transform assembles the runtime chunk (Rolldown's base runtime
                 // plus our injected implement) as this module's transform output, which
-                // bypasses the build's es2018 lowering. Real-device engines and WeChat's
-                // upload parser predate class fields and nullish operators, so the assembled
+                // bypasses the build's es2018 lowering. Real-device engines and native upload
+                // parsers predate class fields and nullish operators, so the assembled
                 // runtime is lowered here — the only module that needs it. The exact id
                 // filter needs no code scan and is constructed from the same authoritative Rolldown runtime ID.
                 filter: { id: createExactModuleIdFilter(rolldownRuntimeId) },
@@ -116,14 +119,14 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
             }
         },
         ...hmrMode.plugins,
-        ...createMiniReactRefreshTransforms(contract.runtime.globalObject)
+        ...createMiniReactRefreshTransforms()
     ]
 }
 
 /**
- * Transfers development ownership of `app.wxss` from complete output to the dev host.
+ * Transfers development ownership of the App stylesheet from complete output to the dev host.
  *
- * The ordinary WX output hook emits the static production wrapper during every complete build. In development, the existing
+ * The ordinary output hook emits the static production wrapper during every complete build. In development, the existing
  * physical wrapper instead contains the previous build ID. If the static asset remained in this bundle, the DevEngine would:
  *
  * 1. replace the versioned wrapper with static production bytes while JavaScript and HMR metadata are still being finalized;
@@ -131,9 +134,9 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
  * 3. let the host replace the wrapper again with the new build ID, causing a second App reload.
  *
  * Deleting only the in-memory bundle entry avoids both premature writes. Development sets `emptyOutDir: false`, so the prior
- * physical `app.wxss` remains available while the complete output is written. The host replaces it exactly once after the
- * selected mode has reset and the matching `hmr/info.js` identity is durable. Incremental HMR never enters this complete-
- * output hook and changes only `assets/global.wxss`; rewriting the App root would reload the heap while a JavaScript patch is
+ * physical App stylesheet remains available while complete output is written. The host replaces it exactly once after the
+ * selected mode has reset and the matching `hmr/info.js` identity is durable. Incremental HMR never enters this complete-output
+ * hook and changes only the imported global stylesheet; rewriting the App root would reload the heap while a JavaScript patch is
  * awaiting acknowledgement. The serve-only plugin leaves production output unchanged.
  */
 export function removeDevelopmentAppStyle(bundle: Record<string, unknown>, appStyleFileName: string): void {

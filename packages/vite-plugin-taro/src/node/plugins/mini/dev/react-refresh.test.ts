@@ -11,7 +11,7 @@ import {
     transformRefreshRuntime
 } from './react-refresh.ts'
 
-test('adapts the refresh runtime to the WeChat global object', () => {
+test('adapts the refresh runtime to the Mini Program JavaScript global', () => {
     const transformed = transformRefreshRuntime({
         code: `
             function injectIntoGlobalHook(target) { return target }
@@ -20,8 +20,7 @@ test('adapts the refresh runtime to the WeChat global object', () => {
             const ignored = window.__getReactRefreshIgnoredExports
             performReactRefresh()
         `,
-        id: '/@react-refresh',
-        globalObject: 'global'
+        id: '/@react-refresh'
     })
 
     assert.doesNotMatch(transformed.code, /window\.__/)
@@ -50,8 +49,7 @@ test('rewrites only reference uses of the React DevTools hook in an admitted mod
             const explicit = global.__REACT_DEVTOOLS_GLOBAL_HOOK__
             const record = { __REACT_DEVTOOLS_GLOBAL_HOOK__: explicit }
         `,
-        id: 'react-renderer.js',
-        globalObject: 'global'
+        id: 'react-renderer.js'
     })
 
     assert.match(transformed.code, /typeof global\.__REACT_DEVTOOLS_GLOBAL_HOOK__/)
@@ -60,7 +58,7 @@ test('rewrites only reference uses of the React DevTools hook in an admitted mod
 })
 
 test('routes renderer and preamble plugin hooks through their exact IDs', async () => {
-    const transforms = createMiniReactRefreshTransforms('global')
+    const transforms = createMiniReactRefreshTransforms()
     assert.equal(transforms.length, 4)
     const rendererHook = transforms[1]?.transform
     const preambleHook = transforms[3]?.transform
