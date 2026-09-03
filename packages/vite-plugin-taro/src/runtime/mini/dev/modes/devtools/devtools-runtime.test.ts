@@ -69,7 +69,6 @@ async function createTestHarness(): Promise<TestHarness> {
     }
     Object.assign(globalThis, {
         DevRuntime,
-        __VPT_RUNTIME_GLOBAL__: globalThis,
         wx: {
             connectSocket(): MiniSocketTask {
                 return socket
@@ -285,7 +284,6 @@ test('fails invariant-only hot operations with local diagnostics', async () => {
 test('rejects reports before initialization', async () => {
     Object.assign(globalThis, {
         DevRuntime,
-        __VPT_RUNTIME_GLOBAL__: globalThis,
         wx: {
             connectSocket(): never {
                 assert.fail('An uninitialized runtime must not open a socket')

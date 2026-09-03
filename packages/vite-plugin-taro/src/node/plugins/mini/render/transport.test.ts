@@ -4,7 +4,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { type Rolldown, transformWithOxc } from 'vite'
 import { esTarget } from '../../../utils/constant.ts'
-import type { RuntimeContract } from '../mini-contract.ts'
+import type { RuntimeModulesContract } from '../mini-contract.ts'
 import { createMiniModuleClassifier, rolldownRuntimeId } from '../module/module.ts'
 import { renderNative } from './native.ts'
 import { materializeTransport } from './transport.ts'
@@ -14,24 +14,21 @@ interface TransportExports {
     transport(moduleId: string): unknown
 }
 
-const runtime: RuntimeContract = {
-    globalObject: 'global',
-    modules: {
-        bootstrap: '/runtime/bootstrap',
-        transport: '/runtime/transport',
-        appShell: '/runtime/app-shell',
-        appCapsule: '/runtime/app-capsule',
-        componentShell: '/runtime/component-shell',
-        componentCapsule: '/runtime/component-capsule',
-        customWrapperShell: '/runtime/custom-wrapper-shell',
-        pageShell: '/runtime/page-shell',
-        pageCapsule: '/runtime/page-capsule',
-        devtoolsHmrRuntime: '/runtime/devtools-hmr',
-        interpreterHmrRuntime: '/runtime/interpreter-hmr'
-    }
-}
-const { bootstrap: bootstrapPath, transport: transportPath } = runtime.modules
-const classifyModule = createMiniModuleClassifier(runtime.modules)
+const runtimeModules = {
+    bootstrap: '/runtime/bootstrap',
+    transport: '/runtime/transport',
+    appShell: '/runtime/app-shell',
+    appCapsule: '/runtime/app-capsule',
+    componentShell: '/runtime/component-shell',
+    componentCapsule: '/runtime/component-capsule',
+    customWrapperShell: '/runtime/custom-wrapper-shell',
+    pageShell: '/runtime/page-shell',
+    pageCapsule: '/runtime/page-capsule',
+    devtoolsHmrRuntime: '/runtime/devtools-hmr',
+    interpreterHmrRuntime: '/runtime/interpreter-hmr'
+} satisfies RuntimeModulesContract
+const { bootstrap: bootstrapPath, transport: transportPath } = runtimeModules
+const classifyModule = createMiniModuleClassifier(runtimeModules)
 
 const transportTypeScript = readFileSync(
     fileURLToPath(new URL('../../../../runtime/mini/amphibious/transport.ts', import.meta.url)),
@@ -44,7 +41,6 @@ const transportCode = renderNative({
     code: transportJavaScript,
     chunk: { fileName: 'transport.js' } as Rolldown.RenderedChunk,
     chunks: {},
-    runtime: runtime,
     classifyModule: classifyModule,
     sourcemap: false
 }).code

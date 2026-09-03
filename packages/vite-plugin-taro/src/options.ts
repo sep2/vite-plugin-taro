@@ -81,7 +81,9 @@ export interface VptOptions {
      * Native development-tool project configuration written without merging.
      *
      * WX emits this object as `project.config.json`; ZFB emits it as `mini.project.json`; H5 ignores it. Supply the schema
-     * expected by the selected target rather than sharing one project's platform-specific values across invocations.
+     * expected by the selected target rather than sharing one project's platform-specific values across invocations. ZFB must
+     * use format 2 with `compileOptions.globalObjectMode: 'enable'` so shared runtime state lives on the real JavaScript global;
+     * its Taro-style ES6 output also relies on `compileOptions.transpile` for the developer tool's final syntax conversion.
      */
     projectConfigJson: VptJsonObject
 

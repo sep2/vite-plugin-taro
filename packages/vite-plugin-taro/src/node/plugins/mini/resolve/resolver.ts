@@ -20,19 +20,18 @@ type PrivateIdResolver = (importer: string | undefined, projectRoot: string) => 
 
 /** Creates the resolver and source specializer for one Mini Program module graph. */
 export function createResolver(contract: MiniContract) {
-    const modules = contract.runtime.modules
-    const normalizedAppCapsulePath = normalizePath(modules.appCapsule)
-    const normalizedPageCapsulePath = normalizePath(modules.pageCapsule)
+    const normalizedAppCapsulePath = normalizePath(contract.runtime.modules.appCapsule)
+    const normalizedPageCapsulePath = normalizePath(contract.runtime.modules.pageCapsule)
 
     // Construct output input and application traversal roots together once so style order cannot drift from route order.
-    const entryGraph = createEntryGraph(contract.options.pages, modules)
+    const entryGraph = createEntryGraph(contract.options.pages, contract.runtime.modules)
 
     // Provide constant-time route validation and access to each configured Page JSON object.
     const pageByPath = new Map(contract.options.pages.map((page) => [page.path, page]))
 
     const privateIdResolvers = new Map<string, PrivateIdResolver>([
         // Share bootstrap's preload identity through native require and its amphibious SystemJS registration.
-        [vitePreloadId, () => modules.bootstrap],
+        [vitePreloadId, () => contract.runtime.modules.bootstrap],
         [taroPlatformRuntimeId, () => contract.taro.platformRuntimePath],
         // Keep the configured App component behind one stable private import in the App capsule.
         [
@@ -53,7 +52,7 @@ export function createResolver(contract: MiniContract) {
                 // Query-qualify the capsule source so every Page retains a distinct graph identity.
                 const page = requireConfiguredPage({ moduleId: importer, pageByPath })
 
-                return createRouteModuleId({ moduleId: modules.pageCapsule, pagePath: page.path })
+                return createRouteModuleId({ moduleId: contract.runtime.modules.pageCapsule, pagePath: page.path })
             }
         ]
     ])

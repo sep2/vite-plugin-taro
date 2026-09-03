@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Rolldown } from 'vite'
+import type { MiniGeneratedSubpackage } from '../mini-contract.ts'
 
 const generatedSubpackageRootPrefix = 'sub/p_'
 
@@ -14,15 +15,8 @@ export type SubpackageLocation = {
 /** Physical package ownership for one final Rolldown chunk. */
 export type PackageLocation = { kind: 'main' } | SubpackageLocation
 
-/** Native app.json declaration for one generated code-only subpackage. */
-export type GeneratedSubpackage = {
-    /** Stable native alias derived from the generated root hash. */
-    name: string
-    /** Physical directory containing this subpackage's emitted capsules. */
-    root: string
-    /** Marks this as a code-only subpackage with no native Page routes. */
-    pages: readonly []
-}
+/** One generated code package retained by the final output graph. */
+export type GeneratedSubpackage = MiniGeneratedSubpackage
 
 /** Immutable ownership and materialization operations for one complete final-chunk graph. */
 export type Placement = Readonly<{
@@ -156,11 +150,7 @@ export function createPlacement({
                 roots.add(location.root)
             }
 
-            return [...roots].sort().map((root) => ({
-                name: root.slice(root.lastIndexOf('/') + 1),
-                root: root,
-                pages: []
-            }))
+            return [...roots].sort().map((root) => ({ root: root }))
         }
     }
 }

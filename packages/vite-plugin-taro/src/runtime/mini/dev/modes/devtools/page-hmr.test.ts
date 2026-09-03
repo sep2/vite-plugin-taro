@@ -41,7 +41,6 @@ async function createTestHarness(): Promise<TestHarness> {
     Reflect.set(global, customWrapperCacheKey, customWrapperCache)
     Object.assign(globalThis, {
         DevRuntime,
-        __VPT_RUNTIME_GLOBAL__: globalThis,
         wx: {
             request(options: { success: () => void }): void {
                 options.success()

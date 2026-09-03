@@ -12,5 +12,5 @@ import { customWrapperCache } from '@tarojs/runtime'
 
 // DevTools HMR runs in the bootstrap chunk, so publish the application graph's cache once on their shared App global.
 if (process.env.NODE_ENV === 'development') {
-    Reflect.set(__VPT_RUNTIME_GLOBAL__, Symbol.for('customWrapperCache'), customWrapperCache)
+    Reflect.set(global, Symbol.for('customWrapperCache'), customWrapperCache)
 }

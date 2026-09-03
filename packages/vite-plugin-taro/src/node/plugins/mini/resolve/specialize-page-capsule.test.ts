@@ -8,7 +8,7 @@ import PageComponent from '\0vpt:page-component'
 export default createPageConfig(PageComponent, __VPT_PAGE_PATH__, undefined, __VPT_PAGE_CONFIG__)`
 
 test('specializes the Page capsule for one route', async () => {
-    const id = '/plugin/runtime/wx/capsule/page.js?route=pages%2Fhome%2Findex'
+    const id = '/plugin/runtime/mini/capsule/page.js?route=pages%2Fhome%2Findex'
     const result = await specializePageCapsule({
         code: source,
         id,
@@ -33,7 +33,7 @@ test('rejects a Page capsule missing its specialization placeholders', async () 
         () =>
             specializePageCapsule({
                 code: 'export default {}',
-                id: '/plugin/runtime/wx/capsule/page.js?route=pages%2Fhome%2Findex',
+                id: '/plugin/runtime/mini/capsule/page.js?route=pages%2Fhome%2Findex',
                 page: {
                     path: 'pages/home/index',
                     config: {}

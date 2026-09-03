@@ -20,12 +20,10 @@ function initializeRuntime(runtime: unknown, buildId: string): void {
     Reflect.apply(runtime.initialize, runtime, [{ buildId: buildId, endpoint: `ws://localhost/${buildId}` }])
 }
 
-test('uses an independent Alipay SocketTask and installs both shared HMR modes on my', async () => {
-    // These mutable captures record the native connector input and the current App-global runtime installation.
+test('uses the Alipay API socket while installing both HMR modes on the shared runtime global', async () => {
+    // This mutable capture records native connector input while the imported entries replace the App-global runtime singleton.
     const connectOptions: unknown[] = []
-    const runtimeGlobal = {}
     Reflect.set(globalThis, 'DevRuntime', DevRuntime)
-    Reflect.set(globalThis, '__VPT_RUNTIME_GLOBAL__', runtimeGlobal)
     Reflect.set(globalThis, 'my', {
         connectSocket(options: unknown): MiniSocketTask {
             connectOptions.push(options)
@@ -38,12 +36,12 @@ test('uses an independent Alipay SocketTask and installs both shared HMR modes o
     assert.deepEqual(connectOptions, [{ url: 'ws://localhost/hmr', multiple: true, protocols: ['vite-hmr'] }])
 
     await importRuntimeEntry('devtools')
-    const devtoolsRuntime = Reflect.get(runtimeGlobal, '__rolldown_runtime__')
+    const devtoolsRuntime = Reflect.get(global, '__rolldown_runtime__')
     assert.ok(devtoolsRuntime instanceof DevRuntime)
     initializeRuntime(devtoolsRuntime, 'devtools')
 
     await importRuntimeEntry('interpreter')
-    const interpreterRuntime = Reflect.get(runtimeGlobal, '__rolldown_runtime__')
+    const interpreterRuntime = Reflect.get(global, '__rolldown_runtime__')
     assert.ok(interpreterRuntime instanceof DevRuntime)
     assert.notStrictEqual(interpreterRuntime, devtoolsRuntime)
     initializeRuntime(interpreterRuntime, 'interpreter')
@@ -53,4 +51,8 @@ test('uses an independent Alipay SocketTask and installs both shared HMR modes o
         { url: 'ws://localhost/devtools', multiple: true, protocols: ['vite-hmr'] },
         { url: 'ws://localhost/interpreter', multiple: true, protocols: ['vite-hmr'] }
     ])
+
+    Reflect.deleteProperty(global, '__rolldown_runtime__')
+    Reflect.deleteProperty(globalThis, 'DevRuntime')
+    Reflect.deleteProperty(globalThis, 'my')
 })

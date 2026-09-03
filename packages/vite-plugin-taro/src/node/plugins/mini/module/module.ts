@@ -41,7 +41,7 @@ export type MiniChunkClassification = Readonly<{
     isTransport: boolean
 }>
 
-/** Classifies final chunks against one immutable runtime-module contract. */
+/** Classifies final chunks against one immutable shared-runtime module table. */
 export type MiniModuleClassifier = (chunk: MiniChunk) => MiniChunkClassification
 
 type MiniRuntimeModuleKind = MiniEntryRole | 'amphibious' | 'transport'

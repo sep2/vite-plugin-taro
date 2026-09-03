@@ -5,10 +5,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { createContext, Script } from 'node:vm'
 
-// The source placeholder is normally specialized by the Mini plugin before evaluation.
-Reflect.set(globalThis, '__VPT_RUNTIME_GLOBAL__', global)
 createRequire(import.meta.url)('./system-core.js')
-Reflect.deleteProperty(globalThis, '__VPT_RUNTIME_GLOBAL__')
 
 const system = (global as unknown as { System: System.Loader }).System
 
@@ -33,11 +30,8 @@ test('uses the string registry and plain namespaces when Symbol is unavailable',
     const source = await readFile(filename, 'utf8')
     const exportList = 'export { REGISTRY, systemJSPrototype }'
     const exportedFunction = 'export function getOrCreateLoad'
-    const runtimeGlobalPlaceholder = '__VPT_RUNTIME_GLOBAL__'
-    // The VM script shares this source filename for coverage, so preserve byte offsets while specializing its placeholder.
-    const runtimeGlobalReplacement = 'global'.padEnd(runtimeGlobalPlaceholder.length)
+    // The VM script shares this source filename for coverage, so preserve byte offsets while removing ESM export syntax.
     const executable = source
-        .replaceAll(runtimeGlobalPlaceholder, runtimeGlobalReplacement)
         .replace(exportList, ' '.repeat(exportList.length))
         .replace(exportedFunction, `       ${exportedFunction.slice('export '.length)}`)
     // The isolated global receives the loader created by the fallback runtime.

@@ -80,7 +80,6 @@ async function createTestHarness(): Promise<TestHarness> {
     const sockets: CapturedSocket[] = []
     Object.assign(globalThis, {
         DevRuntime,
-        __VPT_RUNTIME_GLOBAL__: globalThis,
         wx: {
             connectSocket(options: ConnectOptions): CapturedSocket {
                 const socket = createSocket(options, reports)

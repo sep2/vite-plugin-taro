@@ -382,8 +382,7 @@ test('preserves WX capsule runtime initialization order and export identities', 
             `
         },
         defines: {
-            'process.env.NODE_ENV': JSON.stringify('development'),
-            __VPT_RUNTIME_GLOBAL__: 'global'
+            'process.env.NODE_ENV': JSON.stringify('development')
         }
     })
     const context = createExecutionContext(harness)
@@ -484,7 +483,6 @@ test('installs amphibious transport on SystemJS and preserves preload semantics'
         }
     }
     const defines = {
-        __VPT_RUNTIME_GLOBAL__: 'global',
         __VPT_TRANSPORT__: 'globalThis.harness.transport'
     }
     const transportCode = await bundleRuntimeEntry({

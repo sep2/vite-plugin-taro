@@ -2,7 +2,6 @@ import type { Rolldown } from 'vite'
 import type { MiniContract } from '../mini-contract.ts'
 import { createNativeComponentOutput } from '../native/create-native-component-output.ts'
 import type { GeneratedSubpackage, PackageLocation } from '../placer/placement.ts'
-import { createTemplateAssets } from './templates.ts'
 
 /** Creates every compiler-owned Mini Program file derived from the final Rolldown bundle. */
 export async function createOutputFiles({
@@ -14,7 +13,7 @@ export async function createOutputFiles({
     getPackageLocation
 }: {
     bundle: Rolldown.OutputBundle
-    contract: MiniContract
+    contract: Pick<MiniContract, 'output' | 'styles'>
     subpackages: readonly GeneratedSubpackage[]
     isProduction: boolean
     getModuleInfo: (moduleId: string) => { meta: Rolldown.CustomPluginOptions } | null
@@ -28,9 +27,8 @@ export async function createOutputFiles({
             fileName: contract.styles.appFileName,
             source: `@import "./${contract.styles.globalFileName}";\n`
         },
-        ...createTemplateAssets({
+        ...contract.output.generateProjectSkeleton({
             bundle: bundle,
-            contract: contract,
             subpackages: subpackages,
             nativeComponents: nativeOutput.registrations,
             isProduction: isProduction

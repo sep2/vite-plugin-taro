@@ -21,7 +21,7 @@ export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] 
 
     // Reuse the resolver instance's ordered application subset. Rolldown's complete input also contains bootstrap, transport,
     // shell, and component entries; entry membership alone cannot recover which roots define the App/Page CSS cascade.
-    const placement = createMiniPlacementPlugin(contract)
+    const placement = createMiniPlacementPlugin(contract.runtime.modules)
     const styles = createMiniStylePlugin(contract, resolver.applicationEntryIds)
 
     return [
@@ -39,7 +39,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
 
         config(_config, _env) {
             return {
-                define: createTaroDefines(contract.taro.env, contract.runtime.globalObject),
+                define: createTaroDefines(contract.taro.env),
 
                 appType: 'custom',
 
@@ -63,8 +63,8 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                     // Mini Program styles are intentionally global. This guarantees one compiler stylesheet for the CSS
                     // finalizer; enabling splitting would require Page ownership and must not be silently flattened.
                     cssCodeSplit: false,
-                    // Preserve readable source for the final platform compatibility pass; browser minification can emit syntax
-                    // unsupported by Mini Program engines and complicate the subsequent whole-file conversion.
+                    // Keep the intermediate browser stylesheet readable. The Mini style finalizer converts the complete CSS
+                    // graph to native syntax after class projection, then applies its own production optimization.
                     cssMinify: false,
 
                     // No base64 assets: Taro warns on image srcs above ~2KB, and inlined
@@ -122,7 +122,6 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                     code,
                     chunk,
                     chunks: meta.chunks,
-                    runtime: contract.runtime,
                     classifyModule: placement.classifyChunk,
                     sourcemap
                 })
@@ -172,8 +171,8 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
     }
 }
 
-/** Creates the build-time constants required by Taro's legacy feature gates. */
-function createTaroDefines(taroEnv: string, runtimeGlobal: string): Record<string, string> {
+/** Creates the build-time constants required by Taro and React feature gates. */
+function createTaroDefines(taroEnv: string): Record<string, string> {
     const taroVersion = String((packageRequire('@tarojs/taro/package.json') as { version: string }).version)
 
     return {
@@ -182,7 +181,6 @@ function createTaroDefines(taroEnv: string, runtimeGlobal: string): Record<strin
         'process.env.TARO_ENV': JSON.stringify(taroEnv),
         'process.env.TARO_PLATFORM': JSON.stringify('mini'),
         'process.env.TARO_VERSION': JSON.stringify(taroVersion),
-        __VPT_RUNTIME_GLOBAL__: runtimeGlobal,
         // React's development-only Suspense diagnostics call this browser API without guards.
         'performance.now': 'Date.now',
         ENABLE_ADJACENT_HTML: 'false',

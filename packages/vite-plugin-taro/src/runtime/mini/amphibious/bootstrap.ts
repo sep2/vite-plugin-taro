@@ -6,8 +6,8 @@ import { transport } from './transport.ts'
 // asynchronous subpackage or top-level-await graphs through this identity wrapper.
 export const __vitePreload = <Value>(load: () => Value): Value => load()
 
-// SystemJS installs on the contracted runtime global; its properties are not lexical bindings.
-const installedSystem = (__VPT_RUNTIME_GLOBAL__ as { System: System.Loader }).System
+// SystemJS installs on the App-wide JavaScript global; its properties are not lexical bindings.
+const installedSystem = global.System
 if (!installedSystem) {
     throw new Error('SystemJS failed to initialize in the WeChat runtime')
 }

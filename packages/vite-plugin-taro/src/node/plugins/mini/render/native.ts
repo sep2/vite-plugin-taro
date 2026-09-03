@@ -35,7 +35,6 @@ import { type ExistingRawSourceMap, RolldownMagicString } from 'rolldown'
 import { parseSync } from 'rolldown/utils'
 import type { Rolldown } from 'vite'
 import type { AstTransformResult } from '../../../utils/transform.ts'
-import type { RuntimeContract } from '../mini-contract.ts'
 import { resolveLogicalChunkReference, resolvePhysicalChunkReference } from '../module/chunk-path.ts'
 import type { MiniModuleClassifier } from '../module/module.ts'
 
@@ -92,14 +91,12 @@ export function renderNative({
     code,
     chunk,
     chunks,
-    runtime,
     classifyModule,
     sourcemap
 }: {
     code: string
     chunk: Rolldown.RenderedChunk
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
-    runtime: RuntimeContract
     classifyModule: MiniModuleClassifier
     sourcemap: boolean
 }): AstTransformResult {
@@ -123,7 +120,7 @@ export function renderNative({
     const hasExports = model.exportNamesByLocal.size > 0
     const helpers = renderInteropHelpers(model)
     const postfixTemp = model.usesPostfixTemp ? `var ${model.postfixTemp};` : ''
-    const imports = renderImports(model, runtime.globalObject)
+    const imports = renderImports(model)
     if (hasExports) {
         editor.prepend(
             `"use strict";Object.defineProperty(exports,"__esModule",{value:true});${helpers}${postfixTemp}${imports}`
@@ -569,12 +566,12 @@ function getImportedCapsule(
  * import declaration, while cross-domain capsule imports synchronously ask SystemJS for the namespace under its package-neutral
  * logical ID. Physical package placement remains the transport's responsibility.
  */
-function renderImports(model: NativeModuleModel, globalObject: string): string {
+function renderImports(model: NativeModuleModel): string {
     return model.imports
         .map((importModel) => {
             if (importModel.capsuleBinding) {
                 const { imported, local, logicalId } = importModel.capsuleBinding
-                const namespace = `${globalObject}.System.importSync(${JSON.stringify(logicalId)})`
+                const namespace = `global.System.importSync(${JSON.stringify(logicalId)})`
                 return `var ${local}=${memberExpression(namespace, imported)};`
             }
 

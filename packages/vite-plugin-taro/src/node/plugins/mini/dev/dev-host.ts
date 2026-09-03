@@ -56,7 +56,7 @@ const hmrSettleMilliseconds = 16
  *
  * The shared style plugin carries the resolver's immutable App/Page cascade policy while Rolldown remains authoritative for
  * every live import edge. Keeping those responsibilities in the same serialized host transaction prevents JavaScript factories,
- * physical WXSS, and Rolldown's published frontier from describing different source generations.
+ * physical native styles, and Rolldown's published frontier from describing different source generations.
  */
 export async function createMiniDevHost({
     server,
@@ -65,7 +65,7 @@ export async function createMiniDevHost({
     hmrMode
 }: {
     server: ViteDevServer
-    contract: MiniContract
+    contract: Pick<MiniContract, 'options' | 'styles'>
     styles: MiniStylePlugin
     hmrMode: MiniHmrMode
 }): Promise<MiniDevHost> {
@@ -73,7 +73,7 @@ export async function createMiniDevHost({
 
     // All callbacks admit typed actions through this edge; concatMap is the sole owner of effect ordering and mutable host state.
     const hostActions = createHostActions<HostAction>(applyHostAction, (action, error) =>
-        logMiniError(server.config.logger, `wx HMR ${action.kind} failed`, error)
+        logMiniError(server.config.logger, `${contract.options.target} HMR ${action.kind} failed`, error)
     )
 
     // Modes return declarative effects; this host alone owns physical writes, event dispatch, and journal publication ordering.
@@ -162,8 +162,8 @@ export async function createMiniDevHost({
     }
 
     /** Atomically materializes the style plugin's prepared global artifact. */
-    async function writeGlobalStyle(wxss: string): Promise<void> {
-        await writeFile(contract.styles.globalFileName, wxss)
+    async function writeGlobalStyle(source: string): Promise<void> {
+        await writeFile(contract.styles.globalFileName, source)
     }
 
     /** Rotates the build identity and materializes the App metadata for it. */
@@ -208,11 +208,11 @@ export async function createMiniDevHost({
 
         await dispatchModeAction(hmrMode.reset())
         await writeFile(hmrInfoFileName, renderHmrInfo(info))
-        // `removeDevelopmentAppWxss` kept the previous physical wrapper in place while the complete output was written. Replace it
-        // only now, after the selected mode is reset and matching identity is durable. DevTools treats `app.wxss` as an App root,
-        // so this write intentionally causes the one full refresh allowed at a complete-build boundary; the refreshed App reads
-        // the new info above. Incremental updates must never write this file because an App refresh could destroy the heap while
-        // its JavaScript patch is being acknowledged. They publish only the imported `assets/global.wxss` stylesheet instead.
+        // The complete-output hook kept the previous physical App-style wrapper in place. Replace it only now, after the selected
+        // mode is reset and matching identity is durable. Native development tools treat the App stylesheet as a root, so this
+        // write intentionally causes the one full refresh allowed at a complete-build boundary; the refreshed App reads the new
+        // info above. Incremental updates must never write this file because an App refresh could destroy the heap while its
+        // JavaScript patch is being acknowledged. They publish only the imported global stylesheet instead.
         await writeFile(contract.styles.appFileName, renderDevelopmentAppStyle(contract.styles.globalFileName, buildId))
     }
 
@@ -222,14 +222,14 @@ export async function createMiniDevHost({
             case 'publish':
                 return publishUpdates(action.result)
             case 'error':
-                logMiniError(server.config.logger, 'wx HMR update failed', action.error)
+                logMiniError(server.config.logger, `${contract.options.target} HMR update failed`, action.error)
                 return
             case 'report':
                 processReport(action.report)
                 return
             case 'output':
                 if (action.result instanceof Error) {
-                    logMiniError(server.config.logger, 'wx dev build failed', action.result)
+                    logMiniError(server.config.logger, `${contract.options.target} dev build failed`, action.result)
                     return
                 }
                 return publishCompleteStyles()
@@ -268,7 +268,7 @@ export async function createMiniDevHost({
         }
     }
 
-    /** Creates the physical DevEngine with the wx dev host hooks. */
+    /** Creates the physical DevEngine with the shared Mini Program host hooks. */
     async function createEngine(): Promise<DevEngine> {
         const rolldownOptions = await bundledDev.getRolldownOptions()
         const output = requireSingleOutput(rolldownOptions)
@@ -298,7 +298,9 @@ export async function createMiniDevHost({
 
     /** Centralizes the one diagnostic and DevEngine command used by every rebuild authority. */
     function requestFullBuild(reason: string | undefined): void {
-        server.config.logger.info(`[vpt] wx full rebuild required${reason ? `: ${reason}` : ''}`)
+        server.config.logger.info(
+            `[vpt] ${contract.options.target} full rebuild required${reason ? `: ${reason}` : ''}`
+        )
         engine.triggerFullBuild()
     }
 
@@ -326,17 +328,17 @@ export async function createMiniDevHost({
         await publishPatchBatch(patches)
     }
 
-    /** Publishes one coherent WXSS, selected-mode delivery, and Rolldown-frontier transaction. */
+    /** Publishes one coherent native stylesheet, selected-mode delivery, and Rolldown-frontier transaction. */
     async function publishPatchBatch(patches: readonly PatchUpdate[]): Promise<void> {
         if (patches.length === 0) {
             return
         }
 
         // `onHmrUpdates` runs after every affected transform has updated captured CSS and the live import graph. The style
-        // boundary finalizes every factory before atomically publishing their matching WXSS.
+        // boundary finalizes every factory before atomically publishing its matching native stylesheet.
         const finalizedPatches = await styles.finalizeUpdate(patches, writeGlobalStyle)
 
-        // Publish global.wxss before matching JavaScript delivery so the selected mode observes a coherent HMR transaction.
+        // Publish the global native stylesheet before JavaScript delivery so the mode observes one coherent HMR transaction.
         // Delivery must become durable before Rolldown advances: later patches may be generated relative to this batch even if
         // the runtime has not applied it. PatchJournal retains the unapplied range, so every later publication still bridges the
         // runtime's older application frontier.
@@ -375,7 +377,7 @@ function boundPort(server: ViteDevServer): number | undefined {
     return address.port
 }
 
-/** Materializes the authenticated Vite WebSocket endpoint used by every WX HMR runtime. */
+/** Materializes the authenticated Vite WebSocket endpoint used by every Mini Program HMR runtime. */
 function createSocketEndpoint(server: ViteDevServer, port: number): string {
     const socketOptions = typeof server.config.server.ws === 'object' ? server.config.server.ws : undefined
     if (
@@ -388,7 +390,7 @@ function createSocketEndpoint(server: ViteDevServer, port: number): string {
         socketOptions?.clientPort !== undefined ||
         socketOptions?.server !== undefined
     ) {
-        throw new Error('WX HMR requires Vite WebSocket on the development HTTP server.')
+        throw new Error('Mini Program HMR requires Vite WebSocket on the development HTTP server.')
     }
 
     const protocol = server.config.server.https ? 'wss' : 'ws'
@@ -397,24 +399,24 @@ function createSocketEndpoint(server: ViteDevServer, port: number): string {
     return endpointUrl.href
 }
 
-/** Replaces browser server URLs with the physical project directory consumed by WeChat DevTools. */
+/** Replaces browser server URLs with the physical project directory consumed by the native development tool. */
 function installDevToolsPrinter(server: ViteDevServer): void {
     /*
-     * Vite exposes printing as a mutable server callback because URLs are unknown until startup. WX uses its socket only for HMR
-     * control while users open the physical output directory, so the browser printer advertises unusable navigation URLs.
+     * Vite exposes printing as a mutable server callback because URLs are unknown until startup. The native project uses its
+     * socket only for HMR control while users open the physical output directory, so browser navigation URLs are unusable.
      * Replacing only this presentation callback leaves resolved URLs and server routing untouched and naturally dies with the
      * server instance; logging elsewhere would duplicate Vite's one readiness notification.
      */
     server.printUrls = () => {
         server.config.logger.info(
-            `  ${colors.green('➜')}  ${colors.bold('WeChat DevTools')}: ${colors.cyan(relativeToViteConfig(server.config.build.outDir, server.config.configFile, server.config.root))}`
+            `  ${colors.green('➜')}  ${colors.bold('Mini Program project')}: ${colors.cyan(relativeToViteConfig(server.config.build.outDir, server.config.configFile, server.config.root))}`
         )
     }
 }
 
 /**
- * The project directory shown in the DevTools banner, relative to the Vite config:
- * `dist/wx` instead of the absolute output path, so it can be pasted into DevTools.
+ * The native project directory shown in the readiness banner, relative to the Vite config, so it can be pasted into the
+ * selected development tool.
  */
 function relativeToViteConfig(outDir: string, configFile: string | undefined, root: string): string {
     const configDirectory = configFile ? path.dirname(configFile) : root
@@ -448,7 +450,7 @@ function resolveEndpointHost(server: ViteDevServer): string {
 function getBundledDev(server: ViteDevServer): BundledDev {
     const bundledDev = server.environments.client.bundledDev as unknown as BundledDev | undefined
     if (!bundledDev) {
-        throw new Error('Vite did not create the wx bundled-development environment.')
+        throw new Error('Vite did not create the Mini Program bundled-development environment.')
     }
     return bundledDev
 }

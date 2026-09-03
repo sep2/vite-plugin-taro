@@ -1,3 +1,6 @@
+/** SystemJS loader installed on the App-wide JavaScript global before any native shell imports a capsule. */
+declare var System: System.Loader
+
 /** Minimal mounted Page surface used by the shared App-data scheduler. */
 type MiniProgramPage = {
     setData(data: Readonly<Record<string, unknown>>, callback?: () => void): void

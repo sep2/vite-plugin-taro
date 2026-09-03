@@ -1,31 +1,28 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
-import type { RuntimeContract } from '../mini-contract.ts'
+import type { RuntimeModulesContract } from '../mini-contract.ts'
 import { createMiniModuleClassifier, rolldownRuntimeId } from '../module/module.ts'
 import { renderNative as renderNativeWithRuntime } from './native.ts'
 
-const runtime: RuntimeContract = {
-    globalObject: 'global',
-    modules: {
-        bootstrap: '/runtime/bootstrap',
-        transport: '/runtime/transport',
-        appShell: '/runtime/app-shell',
-        appCapsule: '/runtime/app-capsule',
-        componentShell: '/runtime/component-shell',
-        componentCapsule: '/runtime/component-capsule',
-        customWrapperShell: '/runtime/custom-wrapper-shell',
-        pageShell: '/runtime/page-shell',
-        pageCapsule: '/runtime/page-capsule',
-        devtoolsHmrRuntime: '/runtime/devtools-hmr',
-        interpreterHmrRuntime: '/runtime/interpreter-hmr'
-    }
-}
-const { appCapsule: appCapsulePath, bootstrap: bootstrapPath } = runtime.modules
-const classifyModule = createMiniModuleClassifier(runtime.modules)
+const runtimeModules = {
+    bootstrap: '/runtime/bootstrap',
+    transport: '/runtime/transport',
+    appShell: '/runtime/app-shell',
+    appCapsule: '/runtime/app-capsule',
+    componentShell: '/runtime/component-shell',
+    componentCapsule: '/runtime/component-capsule',
+    customWrapperShell: '/runtime/custom-wrapper-shell',
+    pageShell: '/runtime/page-shell',
+    pageCapsule: '/runtime/page-capsule',
+    devtoolsHmrRuntime: '/runtime/devtools-hmr',
+    interpreterHmrRuntime: '/runtime/interpreter-hmr'
+} satisfies RuntimeModulesContract
+const { appCapsule: appCapsulePath, bootstrap: bootstrapPath } = runtimeModules
+const classifyModule = createMiniModuleClassifier(runtimeModules)
 
-function renderNative(input: Omit<Parameters<typeof renderNativeWithRuntime>[0], 'runtime' | 'classifyModule'>) {
-    return renderNativeWithRuntime({ ...input, runtime: runtime, classifyModule: classifyModule })
+function renderNative(input: Omit<Parameters<typeof renderNativeWithRuntime>[0], 'classifyModule'>) {
+    return renderNativeWithRuntime({ ...input, classifyModule: classifyModule })
 }
 
 function chunk({
@@ -124,26 +121,6 @@ Page(config)`
     assert.doesNotMatch(result.code, /import\(/)
     assert.ok(result.map)
     assert.deepEqual(result.map.sources, ['app.js'])
-})
-
-test('uses the contracted runtime global for capsule imports', () => {
-    const nativeChunk = chunk({ fileName: 'app.js', moduleIds: ['/native-app'], isEntry: true })
-    const capsuleChunk = chunk({
-        fileName: 'assets/module.js',
-        moduleIds: [appCapsulePath],
-        isEntry: true
-    })
-    const result = renderNativeWithRuntime({
-        code: 'import config from "./assets/module.js"\nPage(config)',
-        chunk: nativeChunk,
-        chunks: { 'assets/module.js': capsuleChunk },
-        runtime: { ...runtime, globalObject: 'my' },
-        classifyModule: classifyModule,
-        sourcemap: false
-    })
-
-    assert.match(result.code, /my\.System\.importSync/)
-    assert.doesNotMatch(result.code, /global\.System\.importSync/)
 })
 
 test('renders declaration exports, quoted imports, and unrelated destructuring', () => {

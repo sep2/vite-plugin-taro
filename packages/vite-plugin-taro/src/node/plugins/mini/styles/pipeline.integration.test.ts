@@ -10,45 +10,12 @@ import type { BundledDev } from '../dev/mini-dev-options.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import { createMiniStylePlugin } from './plugins.ts'
 
-const contract: MiniContract = {
-    options: {
-        target: 'wx',
-        app: '/src/app.tsx',
-        pages: [],
-        appJson: {},
-        projectConfigJson: {}
-    },
-    taro: {
-        env: 'test',
-        componentsReactPath: '/taro/components-react',
-        platformRuntimePath: '/taro/platform-runtime'
-    },
-    runtime: {
-        globalObject: 'host',
-        modules: {
-            bootstrap: '/runtime/bootstrap',
-            transport: '/runtime/transport',
-            appShell: '/runtime/app-shell',
-            appCapsule: '/runtime/app-capsule',
-            componentShell: '/runtime/component-shell',
-            componentCapsule: '/runtime/component-capsule',
-            customWrapperShell: '/runtime/custom-wrapper-shell',
-            pageShell: '/runtime/page-shell',
-            pageCapsule: '/runtime/page-capsule',
-            devtoolsHmrRuntime: '/runtime/devtools-hmr',
-            interpreterHmrRuntime: '/runtime/interpreter-hmr'
-        }
-    },
+const contract = {
     styles: {
         appFileName: 'app.wxss',
         globalFileName: 'assets/global.wxss'
-    },
-
-    output: {
-        subpackagePlanningBudget: 1_900_000,
-        generateProjectSkeleton: () => []
     }
-}
+} satisfies Pick<MiniContract, 'styles'>
 const globalWxssFileName = contract.styles.globalFileName
 
 test('publishes processed CSS and live topology without identical rewrites', async () => {

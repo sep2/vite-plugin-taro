@@ -2,4 +2,4 @@ import { createDevtoolsHmrRuntime } from '../../mini/dev/modes/devtools/devtools
 import { connectWxSocket } from './connect-wx-socket.ts'
 
 // The App-global singleton survives Page shell re-evaluation and owns the retained module graph.
-Reflect.set(__VPT_RUNTIME_GLOBAL__, '__rolldown_runtime__', createDevtoolsHmrRuntime(connectWxSocket))
+Reflect.set(global, '__rolldown_runtime__', createDevtoolsHmrRuntime(connectWxSocket))

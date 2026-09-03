@@ -1,5 +1,5 @@
 import { normalizePath, type Plugin, type Rolldown } from 'vite'
-import type { MiniContract } from '../mini-contract.ts'
+import type { RuntimeModulesContract } from '../mini-contract.ts'
 import {
     createMiniModuleClassifier,
     type MiniChunkClassification,
@@ -13,6 +13,10 @@ export type { GeneratedSubpackage, Placement } from './placement.ts'
 const pnpmFrameworkPackagePattern =
     /\/node_modules\/\.pnpm\/(?:@tarojs\+|vite-plugin-taro-runtime@|react(?:-dom|-reconciler)?@|scheduler@)/
 const workspaceFrameworkPackagePattern = /\/packages\/(?:taro-react|taro-plugin-framework-react|taro-runtime)\//
+
+// Both supported Mini Program hosts impose the same 2 MB main/subpackage ceiling. Reserving 100 KB for native-tool metadata
+// keeps graph placement deterministic across targets; this belongs to the shared package planner, not to a platform adapter.
+const miniSubpackagePlanningBudget = 1_900_000
 
 /** Selects the explicit React/Taro roots whose complete dependency closure forms the framework vendor chunk. */
 export function isMiniFrameworkVendorModule(moduleId: string): boolean {
@@ -109,8 +113,8 @@ export function createPlacementRolldownOptions(classifyChunk: MiniModuleClassifi
  * performs one whole-state transition, so stale graph state, duplicate planning, and partially reset generations are
  * unrepresentable.
  */
-export function createMiniPlacementPlugin(contract: MiniContract): MiniPlacementPlugin {
-    const classifyChunk = createMiniModuleClassifier(contract.runtime.modules)
+export function createMiniPlacementPlugin(modules: RuntimeModulesContract): MiniPlacementPlugin {
+    const classifyChunk = createMiniModuleClassifier(modules)
 
     // This one mutable cell is the output-generation state machine described above; hooks replace it atomically by phase.
     let state: PlacementState = { phase: 'idle' }
@@ -150,7 +154,7 @@ export function createMiniPlacementPlugin(contract: MiniContract): MiniPlacement
                     phase: 'planned',
                     placement: createPlacement({
                         chunks: meta.chunks,
-                        planningBudgetBytes: contract.output.subpackagePlanningBudget,
+                        planningBudgetBytes: miniSubpackagePlanningBudget,
                         getAdditionalModuleBytes: (moduleId) =>
                             getNativeComponentAssetBytes(this.getModuleInfo(moduleId)?.meta)
                     })

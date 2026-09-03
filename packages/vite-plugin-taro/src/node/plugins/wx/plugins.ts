@@ -22,7 +22,6 @@ export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
             platformRuntimePath: packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/runtime.js')
         },
         runtime: {
-            globalObject: 'global',
             modules: {
                 bootstrap: resolveRuntimeFile('mini/amphibious/bootstrap'),
                 transport: resolveRuntimeFile('mini/amphibious/transport'),
@@ -42,7 +41,6 @@ export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
             globalFileName: 'assets/global.wxss'
         },
         output: {
-            subpackagePlanningBudget: 1_900_000,
             generateProjectSkeleton(input) {
                 return createWxSkeleton({
                     ...input,

@@ -2,55 +2,32 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
 import { build, type InputOption, type OutputBundle, type OutputChunk, type Plugin } from 'rolldown'
-import type { MiniContract } from '../mini-contract.ts'
+import type { RuntimeModulesContract } from '../mini-contract.ts'
 import { createMiniModuleClassifier } from '../module/module.ts'
 import { createPlacement, type GeneratedSubpackage, type Placement } from './placement.ts'
 import { createMiniPlacementPlugin, createPlacementRolldownOptions, isMiniFrameworkVendorModule } from './placer.ts'
 
-const contract: MiniContract = {
-    options: {
-        target: 'wx',
-        app: '/src/app.tsx',
-        pages: [],
-        appJson: {},
-        projectConfigJson: {}
-    },
-    taro: {
-        env: 'test',
-        componentsReactPath: '/taro/components-react',
-        platformRuntimePath: '/taro/platform-runtime'
-    },
-    runtime: {
-        globalObject: 'host',
-        modules: {
-            bootstrap: '/runtime/bootstrap',
-            transport: '/runtime/transport',
-            appShell: '/runtime/app-shell',
-            appCapsule: '/runtime/app-capsule',
-            componentShell: '/runtime/component-shell',
-            componentCapsule: '/runtime/component-capsule',
-            customWrapperShell: '/runtime/custom-wrapper-shell',
-            pageShell: '/runtime/page-shell',
-            pageCapsule: '/runtime/page-capsule',
-            devtoolsHmrRuntime: '/runtime/devtools-hmr',
-            interpreterHmrRuntime: '/runtime/interpreter-hmr'
-        }
-    },
-    styles: {
-        appFileName: 'app.style',
-        globalFileName: 'assets/global.style'
-    },
-    output: {
-        subpackagePlanningBudget: 1_900_000
-    }
-}
+const planningBudgetBytes = 1_900_000
+const runtimeModules = {
+    bootstrap: '/runtime/bootstrap',
+    transport: '/runtime/transport',
+    appShell: '/runtime/app-shell',
+    appCapsule: '/runtime/app-capsule',
+    componentShell: '/runtime/component-shell',
+    componentCapsule: '/runtime/component-capsule',
+    customWrapperShell: '/runtime/custom-wrapper-shell',
+    pageShell: '/runtime/page-shell',
+    pageCapsule: '/runtime/page-capsule',
+    devtoolsHmrRuntime: '/runtime/devtools-hmr',
+    interpreterHmrRuntime: '/runtime/interpreter-hmr'
+} satisfies RuntimeModulesContract
 const {
     appCapsule: appCapsulePath,
     appShell: appShellPath,
     bootstrap: bootstrapPath,
     transport: transportPath
-} = contract.runtime.modules
-const placementRolldownOptions = createPlacementRolldownOptions(createMiniModuleClassifier(contract.runtime.modules))
+} = runtimeModules
+const placementRolldownOptions = createPlacementRolldownOptions(createMiniModuleClassifier(runtimeModules))
 const fixtureRoot = '/placer-fixture'
 const contentHashPattern = '[A-Za-z0-9_-]{8}'
 
@@ -92,7 +69,7 @@ async function buildFixture({ modules, input, additionalBytes }: BuildFixture): 
         renderChunk(_code, _chunk, _outputOptions, meta) {
             placement ??= createPlacement({
                 chunks: meta.chunks,
-                planningBudgetBytes: contract.output.subpackagePlanningBudget,
+                planningBudgetBytes: planningBudgetBytes,
                 getAdditionalModuleBytes: (moduleId) => additionalBytes?.[moduleId] ?? 0
             })
         },
@@ -152,7 +129,7 @@ test('rejects placement services and chunk delivery outside their lifecycle phas
     })
     const chunk = output.chunks[0]
     assert.ok(chunk)
-    const plugin = createMiniPlacementPlugin(contract)
+    const plugin = createMiniPlacementPlugin(runtimeModules)
 
     assert.throws(() => plugin.getPackageLocation(chunk), /placement is unavailable/)
     assert.throws(() => plugin.getSubpackages(), /subpackages are unavailable/)
@@ -277,13 +254,7 @@ test('preserves Rolldown naming for one lazy static closure', async () => {
     assert.match(feature.fileName, new RegExp(`^${root}/assets/feature-panel-${contentHashPattern}\\.js$`))
     assert.equal(output.placement.getLoadMode(application), 'sync')
     assert.equal(output.placement.getLoadMode(feature), 'async')
-    assert.deepEqual(output.subpackages, [
-        {
-            name: root.slice('sub/'.length),
-            root,
-            pages: []
-        }
-    ])
+    assert.deepEqual(output.subpackages, [{ root: root }])
 })
 
 test('keeps same-named chunks from different source folders as distinct owners', async () => {

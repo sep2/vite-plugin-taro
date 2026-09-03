@@ -3,6 +3,8 @@ import type { VptOptions } from '../../../options.ts'
 import { packageRequire, resolveRuntimeFile } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
+import { createZfbSkeleton } from './create-zfb-skeleton.ts'
+import { transformZfbOptions } from './transform-zfb-options.ts'
 
 /** Adapts the shared Mini Program pipeline to the zfb public target. */
 export function createZfbMiniPlugins(vptOptions: VptOptions): PluginOption[] {
@@ -11,15 +13,17 @@ export function createZfbMiniPlugins(vptOptions: VptOptions): PluginOption[] {
 
 /** Binds the shared Mini Program core to Alipay runtime and output conventions. */
 export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
+    const options = transformZfbOptions(vptOptions)
+    const componentsReactPath = packageRequire.resolve('@tarojs/plugin-platform-alipay/dist/components-react.js')
+
     return {
-        options: vptOptions,
+        options: options,
         taro: {
             env: 'alipay',
-            componentsReactPath: packageRequire.resolve('@tarojs/plugin-platform-alipay/dist/components-react.js'),
+            componentsReactPath: componentsReactPath,
             platformRuntimePath: packageRequire.resolve('@tarojs/plugin-platform-alipay/dist/runtime.js')
         },
         runtime: {
-            globalObject: 'my',
             modules: {
                 bootstrap: resolveRuntimeFile('mini/amphibious/bootstrap'),
                 transport: resolveRuntimeFile('mini/amphibious/transport'),
@@ -39,7 +43,13 @@ export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
             globalFileName: 'assets/global.acss'
         },
         output: {
-            subpackagePlanningBudget: 1_900_000
+            generateProjectSkeleton(input) {
+                return createZfbSkeleton({
+                    ...input,
+                    options: options,
+                    componentsModulePath: componentsReactPath
+                })
+            }
         }
     }
 }

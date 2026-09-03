@@ -77,9 +77,19 @@ function createOptions(target: VptTarget): VptOptions {
                 navigationBarTitleText: 'Fixture App'
             }
         },
-        projectConfigJson: {
-            appid: 'fixture-app'
-        }
+        projectConfigJson:
+            target === 'zfb'
+                ? {
+                      appid: 'fixture-app',
+                      format: 2,
+                      compileOptions: {
+                          globalObjectMode: 'enable',
+                          transpile: {}
+                      }
+                  }
+                : {
+                      appid: 'fixture-app'
+                  }
     }
 }
 
@@ -251,6 +261,7 @@ test('builds a complete native App and Page project for zfb', async () => {
             ]
             const appJson = parseJsonAsset(output, 'app.json')
             const pageJson = parseJsonAsset(output, 'pages/home/index.json')
+            const projectJson = parseJsonAsset(output, 'mini.project.json')
             const pageTemplate = String(requireAsset(output, 'pages/home/index.axml').source)
             const javascript = output
                 .filter((candidate): candidate is OutputChunk => candidate.type === 'chunk')
@@ -275,10 +286,19 @@ test('builds a complete native App and Page project for zfb', async () => {
                     'custom-wrapper': '../../custom-wrapper'
                 }
             })
+            assert.deepEqual(projectJson, {
+                appid: 'fixture-app',
+                format: 2,
+                compileOptions: {
+                    globalObjectMode: 'enable',
+                    transpile: {}
+                }
+            })
             assert.doesNotMatch(pageTemplate, /<import src="\.\.\/\.\.\/base\.axml"\s*\/>/)
             assert.match(pageTemplate, /<comp i="{{app}}" p="{{page}}" \/>/)
             assert.match(javascript, /ZFB page marker/)
-            assert.match(requireChunk(output, 'app.js').code, /my\.System\.importSync/)
+            assert.match(requireChunk(output, 'app.js').code, /global\.System\.importSync/)
+            assert.doesNotMatch(requireChunk(output, 'app.js').code, /my\.System\.importSync/)
             assert.doesNotMatch(requireChunk(output, 'app.js').code, /^\s*import\s/m)
             assert.doesNotMatch(requireChunk(output, 'pages/home/index.js').code, /^\s*import\s/m)
         }
@@ -402,7 +422,7 @@ test('places a lazy wx feature in a declared code-only subpackage', async () => 
     )
 })
 
-test('places a lazy zfb feature in a declared package with its mandatory anchor Page', async () => {
+test('places a lazy zfb feature in a declared code-only package', async () => {
     await inspectFixtureBuild(
         {
             options: createOptions('zfb'),
@@ -433,20 +453,15 @@ test('places a lazy zfb feature in a declared package with its mandatory anchor 
             const rootMatch = /^(sub\/p_[a-f0-9]{8})\//.exec(featureChunk.fileName)
             assert.ok(rootMatch)
             const root = rootMatch[1]
-            const anchorRoot = `${root}/__vpt_anchor__/index`
             const appJson = parseJsonAsset(output, 'app.json')
             const transport = chunks.find((chunk) => chunk.code.includes('require.async'))
 
             assert.deepEqual(appJson.subPackages, [
                 {
                     root: root,
-                    pages: ['__vpt_anchor__/index']
+                    pages: []
                 }
             ])
-            assert.equal(String(requireAsset(output, `${anchorRoot}.js`).source), 'Page({})\n')
-            assert.deepEqual(parseJsonAsset(output, `${anchorRoot}.json`), {})
-            assert.equal(String(requireAsset(output, `${anchorRoot}.axml`).source), '')
-            assert.equal(String(requireAsset(output, `${anchorRoot}.acss`).source), '')
             assert.ok(transport)
             assert.match(transport.code, /require\.async/)
             assert.equal(

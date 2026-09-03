@@ -3,34 +3,54 @@ import path from 'node:path'
 import test from 'node:test'
 import { normalizePath } from 'vite'
 import { appComponentId } from '../../client/constant.ts'
-import { createMiniContract } from '../../wx/plugins.ts'
+import type { MiniContract } from '../mini-contract.ts'
 import { pageCapsuleId, pageComponentId, taroPlatformRuntimeId, vitePreloadId } from '../module/module.ts'
+import type { MiniRuntimeModules } from '../runtime-modules.ts'
 import { createResolver } from './resolver.ts'
 
-const contract = createMiniContract({
-    target: 'wx',
-    app: 'src/app.tsx',
-    pages: [
-        {
-            path: 'pages/home/index',
-            config: {
-                navigationBarTitleText: 'Home'
+const modules = {
+    bootstrap: '/runtime/bootstrap.ts',
+    transport: '/runtime/transport.ts',
+    appShell: '/runtime/app-shell.ts',
+    appCapsule: '/runtime/app-capsule.ts',
+    componentShell: '/runtime/component-shell.ts',
+    componentCapsule: '/runtime/component-capsule.ts',
+    customWrapperShell: '/runtime/custom-wrapper-shell.ts',
+    pageShell: '/runtime/page-shell.ts',
+    pageCapsule: '/runtime/page-capsule.ts',
+    devtoolsHmrRuntime: '/runtime/devtools-hmr.ts',
+    interpreterHmrRuntime: '/runtime/interpreter-hmr.ts'
+} satisfies MiniRuntimeModules
+
+const contract = {
+    options: {
+        target: 'wx',
+        app: 'src/app.tsx',
+        pages: [
+            {
+                path: 'pages/home/index',
+                config: {
+                    navigationBarTitleText: 'Home'
+                }
             }
-        }
-    ],
-    appJson: {
-        pages: ['stale/page'],
-        window: {
-            navigationBarTitleText: 'Example'
-        }
+        ],
+        appJson: {
+            pages: ['stale/page'],
+            window: {
+                navigationBarTitleText: 'Example'
+            }
+        },
+        projectConfigJson: {}
     },
-    projectConfigJson: {},
-    sitemapJson: {}
-})
-const modules = contract.runtime.modules
+    taro: {
+        env: 'synthetic',
+        componentsReactPath: '/runtime/components-react.ts',
+        platformRuntimePath: '/runtime/platform.ts'
+    }
+} satisfies Pick<MiniContract, 'options' | 'taro'>
 
 test('resolves fixed and route-specific private IDs', () => {
-    const resolver = createResolver(contract)
+    const resolver = createResolver(contract, modules)
     const projectRoot = path.resolve('/project')
 
     assert.deepEqual(resolver.applicationEntryIds, [
@@ -64,7 +84,7 @@ test('resolves fixed and route-specific private IDs', () => {
 })
 
 test('rejects Page-private imports without one configured route origin', () => {
-    const resolver = createResolver(contract)
+    const resolver = createResolver(contract, modules)
     const projectRoot = path.resolve('/project')
 
     assert.throws(
@@ -82,7 +102,7 @@ test('rejects Page-private imports without one configured route origin', () => {
 })
 
 test('specializes the App capsule with the configured App JSON', async () => {
-    const resolver = createResolver(contract)
+    const resolver = createResolver(contract, modules)
     const result = await resolver.specialize('export default __VPT_APP_CONFIG__', modules.appCapsule)
 
     assert.ok(result)
