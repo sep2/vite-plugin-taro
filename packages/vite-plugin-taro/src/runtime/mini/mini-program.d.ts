@@ -1,4 +1,4 @@
-/** SystemJS loader installed on the App-wide JavaScript global before any native shell imports a capsule. */
+/** SystemJS loader installed on the language global before any native shell imports a capsule. */
 declare var System: System.Loader
 
 /** Minimal mounted Page surface used by the shared App-data scheduler. */

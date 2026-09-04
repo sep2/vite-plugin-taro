@@ -38,7 +38,7 @@ let runtimeId = 0
 
 async function createTestHarness(): Promise<TestHarness> {
     customWrapperCache.clear()
-    Reflect.set(global, customWrapperCacheKey, customWrapperCache)
+    Reflect.set(globalThis, customWrapperCacheKey, customWrapperCache)
     Object.assign(globalThis, {
         DevRuntime,
         wx: {
@@ -163,7 +163,7 @@ test('requires the App-global CustomWrapper cache before mounted re-registration
     const harness = await createTestHarness()
     const config = harness.createConfig()
     config.onLoad.call(harness.createPage())
-    Reflect.deleteProperty(global, customWrapperCacheKey)
+    Reflect.deleteProperty(globalThis, customWrapperCacheKey)
 
     assert.throws(() => harness.reregisterPage(config), /cache is not installed/)
 })

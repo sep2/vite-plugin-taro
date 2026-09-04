@@ -6,10 +6,10 @@ import { transport } from './transport.ts'
 // asynchronous subpackage or top-level-await graphs through this identity wrapper.
 export const __vitePreload = <Value>(load: () => Value): Value => load()
 
-// SystemJS installs on the App-wide JavaScript global; its properties are not lexical bindings.
-const installedSystem = global.System
+// SystemJS installs on the language global before this dependent module evaluates.
+const installedSystem = globalThis.System
 if (!installedSystem) {
-    throw new Error('SystemJS failed to initialize in the WeChat runtime')
+    throw new Error('SystemJS failed to initialize in the Mini Program runtime')
 }
 
 // Transport returns synchronous registrations for main-package capsules and amphibious modules, and promise-like

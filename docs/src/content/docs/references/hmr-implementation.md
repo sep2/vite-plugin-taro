@@ -272,8 +272,8 @@ React 项目的更新边界通常由 `@vitejs/plugin-react` 生成，vpt 不另�
 组件签名、组件家族和边界兼容性仍由 `@vitejs/plugin-react` 与 React Refresh 判断。vpt 只适配它们对浏览器环境的假设：
 
 1. 在 React 渲染器执行前加载 Refresh 运行时；
-2. 把 React DevTools Hook 安装到微信的 `global` 对象；
-3. 把生成代码中的自由 Hook 引用改成显式的 `global.__REACT_DEVTOOLS_GLOBAL_HOOK__`；
+2. 把 React DevTools Hook 安装到 JavaScript 的 `globalThis`；
+3. 把生成代码中的自由 Hook 引用改成显式的 `globalThis.__REACT_DEVTOOLS_GLOBAL_HOOK__`；
 4. 移除依赖 HTML 前置脚本的浏览器检查。
 
 边界兼容时，React Refresh 在原有 React 树上更新组件，所以 Hook 状态得以保留。组件类型、Hook 顺序或导出形状不兼容时，Refresh 可以重新挂载局部组件；如果边界主动使本次模块更新失效，运行时会请求完整构建。
@@ -293,7 +293,7 @@ Page 热更新涉及四层不同的状态，不能混为一个快照：
 3. **Page 视图数据**：原生 Page 的 `data`，保存 App 投影、普通 Page 节点和每个 `CustomWrapper` 的初始占位记录；
 4. **CustomWrapper 视图数据**：每个已挂载原生包装组件自己的 `data.i`，保存该边界下面的当前渲染快照。
 
-Taro 会把 `CustomWrapper` 后代的后续更新直接发送给对应包装组件，因此第三层中的嵌套记录不会同步变成第四层的当前值。已经加载完成的懒组件尤其容易暴露这个差异：Page 初始数据仍可能是 `Suspense` 的 `Loading…`，而屏幕和 React 树早已显示真实组件。开发构建把应用图中的真实包装缓存发布到 App `global` 的 Symbol 属性，避免 HMR 启动块导入出第二个空缓存。
+Taro 会把 `CustomWrapper` 后代的后续更新直接发送给对应包装组件，因此第三层中的嵌套记录不会同步变成第四层的当前值。已经加载完成的懒组件尤其容易暴露这个差异：Page 初始数据仍可能是 `Suspense` 的 `Loading…`，而屏幕和 React 树早已显示真实组件。开发构建把应用图中的真实包装缓存发布到 `globalThis` 的 Symbol 属性，避免 HMR 启动块导入出第二个空缓存。
 
 React Refresh 负责更新第二层。Page 重新注册既要保护第一层不被卸载，也必须在微信读取初始数据前把第三、四层拼成一个一致的原生快照。微信视图数据不包含 React Hook 状态，也不能用于重建 React 树。
 

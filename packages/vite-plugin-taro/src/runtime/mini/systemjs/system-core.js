@@ -15,7 +15,6 @@
  * Core comes with no System.prototype.resolve or
  * System.prototype.instantiate implementations
  */
-var envGlobal = global
 var hasSymbol = typeof Symbol !== 'undefined'
 
 function createMissingRegistrationError(id) {
@@ -365,6 +364,6 @@ function postOrderExec(loader, load, seen) {
     }
 }
 
-envGlobal.System = new SystemJS()
+globalThis.System = new SystemJS()
 
 // biome-ignore-end lint: vendored SystemJS core

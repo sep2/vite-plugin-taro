@@ -389,7 +389,7 @@ test('preserves WX capsule runtime initialization order and export identities', 
     const exports = executeRuntimeEntry(code, context)
 
     assert.deepEqual(events, ['platform-runtime', 'framework', 'react-dom', 'taro-runtime'])
-    assert.strictEqual(Reflect.get(context.global, Symbol.for('customWrapperCache')), customWrapperCache)
+    assert.strictEqual(Reflect.get(context.globalThis, Symbol.for('customWrapperCache')), customWrapperCache)
     assert.strictEqual(exports.createReactApp, createReactApp)
     assert.strictEqual(exports.ReactDOM, ReactDOM)
     assert.strictEqual(exports.createPageConfig, createPageConfig)
@@ -472,16 +472,18 @@ test('installs amphibious transport on SystemJS and preserves preload semantics'
     const events: string[] = []
     const preloadCalls: string[] = []
     const loader: { instantiate?: unknown } = {}
-    const wechatGlobal: Record<string, unknown> = {}
+    const languageGlobal: Record<string, unknown> = {}
     const transport = (moduleId: string) => ({ moduleId })
     const harness = {
         events,
         transport,
         installSystem() {
             events.push('install-system')
-            wechatGlobal.System = loader
+            languageGlobal.System = loader
         }
     }
+    // This isolated global must expose the side-effect mock before the bundled bootstrap evaluates it.
+    languageGlobal.harness = harness
     const defines = {
         __VPT_TRANSPORT__: 'globalThis.harness.transport'
     }
@@ -499,7 +501,7 @@ test('installs amphibious transport on SystemJS and preserves preload semantics'
     })
     const context: ExecutionContext = {
         ...createExecutionContext(harness),
-        global: wechatGlobal
+        globalThis: languageGlobal
     }
 
     const transportExports = executeRuntimeEntry(transportCode, createExecutionContext(harness))
@@ -523,14 +525,14 @@ test('installs amphibious transport on SystemJS and preserves preload semantics'
 
     assert.throws(
         () =>
-            executeRuntimeEntry(code, {
-                ...createExecutionContext({
+            executeRuntimeEntry(
+                code,
+                createExecutionContext({
                     transport,
                     installSystem() {}
-                }),
-                global: {}
-            }),
-        /SystemJS failed to initialize in the WeChat runtime/
+                })
+            ),
+        /SystemJS failed to initialize in the Mini Program runtime/
     )
 })
 

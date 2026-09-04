@@ -331,7 +331,7 @@ test('executes a complex nested static and dynamic graph across production wx su
     const transportExports = native.evaluate(output.transport.fileName)
     requireTransportExports(transportExports)
 
-    const system = (global as unknown as { System: System.Loader }).System
+    const system = globalThis.System
     // The production bootstrap installs this mutable transport hook once for the application heap.
     system.instantiate = transportExports.transport
 

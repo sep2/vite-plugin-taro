@@ -201,8 +201,8 @@ function createViteReporter(server: ViteDevServer) {
  * nested builds without leaking mutable Rolldown output objects between engines.
  */
 const bundleRuntimeSource = memoize(async function bundleRuntimeSource(runtimeFile: string): Promise<string> {
-    // The runtime entries use the real Mini Program `global` directly. This nested build only closes their imports because
-    // Rolldown injects the resulting implementation into a generated runtime chunk where module imports are unavailable.
+    // The runtime entries install protocol state on `globalThis`. This nested build only closes their imports because Rolldown
+    // injects the resulting implementation into a generated runtime chunk where module imports are unavailable.
     const result = await build({
         input: runtimeFile,
         output: {

@@ -307,7 +307,7 @@ test('builds a complete native App and Page project for zfb', async () => {
             assert.doesNotMatch(pageTemplate, /<import src="\.\.\/\.\.\/base\.axml"\s*\/>/)
             assert.match(pageTemplate, /<comp i="{{app}}" p="{{page}}" \/>/)
             assert.match(javascript, /ZFB page marker/)
-            assert.match(requireChunk(output, 'app.js').code, /global\.System\.importSync/)
+            assert.match(requireChunk(output, 'app.js').code, /globalThis\.System\.importSync/)
             assert.doesNotMatch(requireChunk(output, 'app.js').code, /my\.System\.importSync/)
             assert.doesNotMatch(requireChunk(output, 'app.js').code, /^\s*import\s/m)
             assert.doesNotMatch(requireChunk(output, 'pages/home/index.js').code, /^\s*import\s/m)

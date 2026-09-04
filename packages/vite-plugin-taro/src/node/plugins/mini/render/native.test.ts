@@ -103,7 +103,7 @@ Page(config)`
 
     Function(
         'require',
-        'global',
+        'globalThis',
         'Page',
         result.code
     )(

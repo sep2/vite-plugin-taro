@@ -40,8 +40,8 @@ const refreshRuntimeWindowGlobals = ['__registerBeforePerformReactRefresh', '__g
  *   and injects its renderer hook at module evaluation, replacing the missing HTML preamble.
  * - React Reconciler is selected by exact physical ID. Its renderer injection receives a static dependency on the refresh
  *   runtime, so hook installation cannot race renderer initialization during cold startup.
- * - React-family modules are selected by the reserved free DevTools-hook identifier. Their expression references must resolve
- *   through the shared `global`; an AST visitor edits only those identifier ranges after the filter admits the module.
+ * - React-family modules are selected by the reserved free DevTools-hook identifier. Their expression references are rewritten
+ *   as explicit `globalThis` members; an AST visitor edits only those identifier ranges after the filter admits the module.
  * - Refresh boundaries are selected by Vite's generated `$RefreshReg$` guard. The AST transform removes only that web-preamble
  *   assertion because each boundary already owns local wrappers over the imported refresh runtime.
  *
@@ -103,13 +103,12 @@ export function createMiniReactRefreshTransforms(): Plugin[] {
 }
 
 /**
- * React-family modules: free `__REACT_DEVTOOLS_GLOBAL_HOOK__` reads must target the runtime global.
+ * React-family modules: free `__REACT_DEVTOOLS_GLOBAL_HOOK__` reads must target the language global.
  *
  * React checks the hook through free expressions such as `typeof __REACT_DEVTOOLS_GLOBAL_HOOK__` before calling
- * `hook.inject(...)`, while VPT deliberately installs the protocol as a member of the App-wide `global`. Prefixing the read makes
- * both sides address that same member on every host instead of relying on engine-specific reflection of global properties into
- * free identifiers. Otherwise renderer registration can be skipped silently, leaving React Refresh without a renderer on which
- * to schedule updates.
+ * `hook.inject(...)`, while VPT installs the protocol on `globalThis`. Prefixing the read makes both sides address that same
+ * language-global member without relying on host-specific free-name lookup. Otherwise renderer registration can be skipped
+ * silently, leaving React Refresh without a renderer on which to schedule updates.
  *
  * The protocol name can also occur as an explicit member, an object key, or string content. A textual replacement cannot
  * distinguish those forms. The AST predicate admits only reference identifiers, and MagicString changes only their source
@@ -127,9 +126,9 @@ function createReactDevtoolsHookVisitor(editor: RolldownMagicString): WalkerEnte
             return
         }
 
-        // Prefix only the free identifier so every host addresses the explicitly installed global member. Declarations, keys,
-        // strings, comments, formatting, and existing member expressions remain byte-for-byte unchanged.
-        editor.overwrite(node.start, node.end, `global.${reactDevtoolsHookProtocol}`)
+        // Prefix only the free identifier so every host addresses the explicitly installed language-global member. Declarations,
+        // keys, strings, comments, formatting, and existing member expressions remain byte-for-byte unchanged.
+        editor.overwrite(node.start, node.end, `globalThis.${reactDevtoolsHookProtocol}`)
     }
 }
 
@@ -150,13 +149,13 @@ function createReactDevtoolsHookVisitor(editor: RolldownMagicString): WalkerEnte
  * Appending the call is safe even when React has already registered its renderer: the refresh
  * runtime replays `hook.renderers` during injection, then its patched commit hooks observe all
  * later mounts and remounts. The same module also contains two browser-only `window` protocol
- * accesses; those must point at the runtime global or evaluation/update validation throws in the host.
+ * accesses; those must point at `globalThis` or evaluation/update validation throws in the host.
  */
 function createRefreshRuntimeVisitor(editor: RolldownMagicString): WalkerEnter {
     // The declarations must execute before self-injection, so the call is appended instead of
     // prepended. Removing it would leave the web preamble's only essential responsibility
     // unimplemented in a Mini Program.
-    editor.append('\ninjectIntoGlobalHook(global);')
+    editor.append('\ninjectIntoGlobalHook(globalThis);')
 
     return function enter(node) {
         if (
@@ -167,10 +166,10 @@ function createRefreshRuntimeVisitor(editor: RolldownMagicString): WalkerEnter {
             node.property.type === 'Identifier' &&
             refreshRuntimeWindowGlobals.some((globalName) => globalName === node.property.name)
         ) {
-            // The runtime global is the shared App heap used by the dev runtime and hook injection. Only
-            // replacing the object range preserves the upstream runtime byte-for-byte otherwise
-            // and prevents unrelated `window` expressions from being silently adapted.
-            editor.overwrite(node.object.start, node.object.end, 'global')
+            // The language global is the shared App heap used by the dev runtime and hook injection. Only replacing the object
+            // range preserves the upstream runtime byte-for-byte otherwise and prevents unrelated `window` expressions from
+            // being silently adapted.
+            editor.overwrite(node.object.start, node.object.end, 'globalThis')
         }
     }
 }

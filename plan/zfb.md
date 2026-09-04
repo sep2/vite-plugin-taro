@@ -14,7 +14,7 @@ The implementation and investigation use the exact pinned dependency version, `@
 | Plugin routing | `src/node/vpt.ts` dispatches only WX/H5 | Add Alipay through a shared Mini Program pipeline |
 | Taro platform | Hardcoded `plugin-platform-weapp` | Use `plugin-platform-alipay` runtime and `components-react` |
 | Compile constants | `TARO_ENV='weapp'` | `TARO_ENV='alipay'`; keep `TARO_PLATFORM='mini'` |
-| Runtime and API globals | WX exposes the JavaScript `global`; platform APIs use `wx` | Enable `compileOptions.globalObjectMode` and keep shared runtime state on the real `global`; use `my` only for Alipay APIs |
+| Runtime and API globals | WX exposes the platform `global`; platform APIs use `wx` | Enable `compileOptions.globalObjectMode` for upstream Taro, keep VPT runtime state on standard `globalThis`, and use `my` only for Alipay APIs |
 | JavaScript transpilation | WX consumes Vite's ES2018 output directly | Follow Taro's Alipay setup: emit its `.browserslistrc` and enable `compileOptions.transpile` in `mini.project.json`, leaving syntax conversion to the Alipay developer tool |
 | Templates | WXML/WXS, `wx:*`, Weapp builder | AXML/SJS, `a:*`, Alipay builder |
 | Styles | `app.wxss`, `global.wxss` | `app.acss`, `global.acss` |
@@ -73,7 +73,7 @@ Keep `appJson` and page configs in the selected target's native schema. Multi-ta
 The current implementation has established these executable facts:
 
 1. CommonJS `App`, `Page`, and `Component` shells compile and execute in the `minidev` web simulator.
-2. With `globalObjectMode` enabled, SystemJS and Rolldown's development runtime install directly on the real JavaScript `global`.
+2. With `globalObjectMode` enabled, upstream Taro can read the platform `global`; SystemJS and Rolldown's development runtime install on standard `globalThis`.
 3. Independent `app` and `page` roots render through one recursive `comp`; form interaction reaches React state.
 4. With `mini.project.json` transpilation enabled, the official compiler accepts an automatically generated asynchronous code subpackage declared with `pages: []` and no VPT-owned JavaScript recompilation stage.
 5. The same asynchronous-package build accepts a copied Alipay native component using `styleIsolation: 'apply-shared'`.
@@ -103,7 +103,7 @@ This prevents Alipay support from creating two compiler implementations.
   - `@tarojs/components` → Alipay `components-react`
   - platform runtime → Alipay `dist/runtime.js`
 - Define `TARO_ENV='alipay'`.
-- Enable Alipay's format-2 `compileOptions.globalObjectMode` and keep the shared SystemJS/runtime state on the real JavaScript `global`; reserve `my` for platform API calls.
+- Enable Alipay's format-2 `compileOptions.globalObjectMode` for upstream Taro while keeping shared SystemJS/runtime state on standard `globalThis`; reserve `my` for platform API calls.
 - Extend runtime execution tests to verify platform-runtime initialization occurs before framework, React renderer, and application modules.
 - Assert production Alipay chunks contain no unresolved browser/WX globals.
 - Keep Vite's shared ES2018 output instead of adding a ZFB-only JavaScript recompiler. Taro 4 emits
@@ -181,7 +181,7 @@ For ZFB:
 
 - Keep the existing flat `devtoolsHmrRuntime` and `interpreterHmrRuntime` module paths as the platform seam; do not add a capability model or contract callbacks.
 - Move graph propagation, patch sequencing, DevTools Page re-registration, and interpreter execution into `runtime/mini`.
-- Keep thin WX and ZFB mode entries that install the shared runtime directly on `global`; only their `wx`/`my` socket calls differ.
+- Keep thin WX and ZFB mode entries that install the shared runtime directly on `globalThis`; only their `wx`/`my` socket calls differ.
 - Inject only one function into the shared runtime: `(endpoint: string) => MiniSocketTask`.
 - WX opens it with `wx.connectSocket({ url, protocols: ['vite-hmr'] })`; ZFB opens it with `my.connectSocket({ url, multiple: true, protocols: ['vite-hmr'] })`.
 - Use `app.acss` as the full-build identity boundary and update only imported `global.acss` incrementally.

@@ -24,11 +24,11 @@ test('adapts the refresh runtime to the Mini Program JavaScript global', () => {
     })
 
     assert.doesNotMatch(transformed.code, /window\.__/)
-    assert.match(transformed.code, /global\.__registerBeforePerformReactRefresh/)
-    assert.match(transformed.code, /global\.__getReactRefreshIgnoredExports/)
+    assert.match(transformed.code, /globalThis\.__registerBeforePerformReactRefresh/)
+    assert.match(transformed.code, /globalThis\.__getReactRefreshIgnoredExports/)
     assert.match(transformed.code, /performReactRefresh\(\)/)
     assert.doesNotMatch(transformed.code, /finishReactRefresh/)
-    assert.match(transformed.code, /injectIntoGlobalHook\(global\);$/)
+    assert.match(transformed.code, /injectIntoGlobalHook\(globalThis\);$/)
 })
 
 test('orders React Refresh before renderer injection', () => {
@@ -46,13 +46,13 @@ test('rewrites only reference uses of the React DevTools hook in an admitted mod
     const transformed = transformReactDevtoolsHook({
         code: `
             const available = typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ !== 'undefined'
-            const explicit = global.__REACT_DEVTOOLS_GLOBAL_HOOK__
+            const explicit = globalThis.__REACT_DEVTOOLS_GLOBAL_HOOK__
             const record = { __REACT_DEVTOOLS_GLOBAL_HOOK__: explicit }
         `,
         id: 'react-renderer.js'
     })
 
-    assert.match(transformed.code, /typeof global\.__REACT_DEVTOOLS_GLOBAL_HOOK__/)
+    assert.match(transformed.code, /typeof globalThis\.__REACT_DEVTOOLS_GLOBAL_HOOK__/)
     assert.doesNotMatch(transformed.code, /typeof __REACT_DEVTOOLS_GLOBAL_HOOK__/)
     assert.match(transformed.code, /__REACT_DEVTOOLS_GLOBAL_HOOK__: explicit/)
 })

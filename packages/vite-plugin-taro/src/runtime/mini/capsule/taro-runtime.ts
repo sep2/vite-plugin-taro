@@ -10,7 +10,7 @@ export { createPageConfig, createRecursiveComponentConfig } from '@tarojs/runtim
 
 import { customWrapperCache } from '@tarojs/runtime'
 
-// DevTools HMR runs in the bootstrap chunk, so publish the application graph's cache once on their shared App global.
+// DevTools HMR runs in the bootstrap chunk, so publish the application graph's cache once on the language global.
 if (process.env.NODE_ENV === 'development') {
-    Reflect.set(global, Symbol.for('customWrapperCache'), customWrapperCache)
+    Reflect.set(globalThis, Symbol.for('customWrapperCache'), customWrapperCache)
 }

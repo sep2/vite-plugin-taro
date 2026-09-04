@@ -7,7 +7,7 @@ import { createContext, Script } from 'node:vm'
 
 createRequire(import.meta.url)('./system-core.js')
 
-const system = (global as unknown as { System: System.Loader }).System
+const system = globalThis.System
 
 function createRegistration(dependencies: readonly string[], declare: System.Declare): System.Registration {
     return [dependencies, declare]
@@ -34,9 +34,9 @@ test('uses the string registry and plain namespaces when Symbol is unavailable',
     const executable = source
         .replace(exportList, ' '.repeat(exportList.length))
         .replace(exportedFunction, `       ${exportedFunction.slice('export '.length)}`)
-    // The isolated global receives the loader created by the fallback runtime.
-    const runtimeGlobal: { System?: System.Loader } = {}
-    const context = createContext({ global: runtimeGlobal, Symbol: undefined })
+    // The isolated language global receives the loader created by the fallback runtime.
+    const runtimeGlobal: { System?: System.Loader; Symbol: undefined } = { Symbol: undefined }
+    const context = createContext(runtimeGlobal)
 
     new Script(executable, { filename }).runInContext(context)
 

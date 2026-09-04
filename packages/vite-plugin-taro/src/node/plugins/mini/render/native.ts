@@ -11,7 +11,7 @@
  * Rolldown still emits one ESM chunk graph before that runtime split is materialized. Mini Program hosts cannot execute final ESM
  * imports directly, so this renderer translates chunks classified as native or amphibious into CommonJS while preserving the
  * ESM behavior observable at their boundary. Ordinary native dependencies become `require` namespace cells; capsule imports
- * become synchronous platform-global `System.importSync` lookups; and exports are published through the CommonJS `exports` object.
+ * become synchronous language-global `System.importSync` lookups; and exports are published through the CommonJS `exports` object.
  *
  * This is deliberately a final-chunk compiler, not a general source-module compiler. Rolldown has already lowered TypeScript,
  * bundled source modules, selected chunk boundaries, and normalized the remaining imports and exports. Restricting the input
@@ -76,7 +76,7 @@ type NativeModuleModel = Readonly<{
  * 1. Static ESM imports are hoisted into source-order `require` calls. Named imports remain property reads from the required
  *    namespace so they observe current values. Default and namespace imports receive Babel-compatible CommonJS interop.
  * 2. An import whose target owns a capsule entry is not passed to native `require`. It becomes
- *    the platform-global `System.importSync(logicalChunkId)`, synchronously linking the capsule before the native lifecycle call.
+ *    the language-global `System.importSync(logicalChunkId)`, synchronously linking the capsule before the native lifecycle call.
  * 3. Local exports are published at declaration and mutation points. Imported re-exports use getters, while assignments and
  *    updates notify every alias without changing expression completion values or accidentally matching shadowed bindings.
  * 4. ESM top-level `this` becomes `undefined`. Direct imported calls and tags are explicitly unbound so converting an import
@@ -571,7 +571,7 @@ function renderImports(model: NativeModuleModel): string {
         .map((importModel) => {
             if (importModel.capsuleBinding) {
                 const { imported, local, logicalId } = importModel.capsuleBinding
-                const namespace = `global.System.importSync(${JSON.stringify(logicalId)})`
+                const namespace = `globalThis.System.importSync(${JSON.stringify(logicalId)})`
                 return `var ${local}=${memberExpression(namespace, imported)};`
             }
 
