@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { recursiveMerge } from '@tarojs/helper'
 import { Alipay as AlipayPlatform } from '@tarojs/plugin-platform-alipay'
 import type { Rolldown } from 'vite'
@@ -132,6 +133,9 @@ export function createZfbSkeleton({
             ]
         }),
         jsonAsset('mini.project.json', options.projectConfigJson),
+        ...(options.projectPrivateConfigJson
+            ? [jsonAsset(path.join('.mini-ide', 'project-ide.json'), options.projectPrivateConfigJson)]
+            : []),
         createTextAsset('.browserslistrc', 'defaults and fully supports es6-module')
     ]
 }

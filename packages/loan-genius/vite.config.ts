@@ -43,7 +43,7 @@ export default defineConfig(({ mode }) => {
                 ],
                 appJson: createAppJson(target),
                 projectConfigJson: createProjectConfigJson({ target, wechatAppId, alipayAppId }),
-                projectPrivateConfigJson: { setting: { urlCheck: false } },
+                projectPrivateConfigJson: createProjectPrivateConfigJson(target),
                 sitemapJson: { rules: [{ action: 'allow', page: '*' }] }
             })
         ]
@@ -154,6 +154,27 @@ function createProjectConfigJson({
                     sourcemap: false,
                     minify: false
                 }
+            }
+        }
+        default:
+            return {}
+    }
+}
+
+function createProjectPrivateConfigJson(target: VptTarget): VptJsonObject {
+    switch (target) {
+        case 'wx': {
+            return {
+                setting: {
+                    urlCheck: false
+                }
+            }
+        }
+        case 'zfb': {
+            return {
+                ignoreHttpDomainCheck: true,
+                ignoreCertificateDomainCheck: true,
+                ignoreWebViewDomainCheck: true
             }
         }
         default:
