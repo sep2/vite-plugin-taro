@@ -20,7 +20,7 @@ function initializeRuntime(runtime: unknown, buildId: string): void {
     Reflect.apply(runtime.initialize, runtime, [{ buildId: buildId, endpoint: `ws://localhost/${buildId}` }])
 }
 
-test('uses the Alipay API socket while installing both HMR modes on the shared runtime global', async () => {
+test('uses the Alipay API socket while installing both HMR modes on the language global', async () => {
     // This mutable capture records native connector input while the imported entries replace the App-global runtime singleton.
     const connectOptions: unknown[] = []
     const nativeQueueMicrotask = globalThis.queueMicrotask
@@ -39,7 +39,7 @@ test('uses the Alipay API socket while installing both HMR modes on the shared r
         assert.deepEqual(connectOptions, [{ url: 'ws://localhost/hmr', multiple: true, protocols: ['vite-hmr'] }])
 
         await importRuntimeEntry('devtools')
-        const installedQueueMicrotask = Reflect.get(global, 'queueMicrotask')
+        const installedQueueMicrotask = Reflect.get(globalThis, 'queueMicrotask')
         assert.ok(typeof installedQueueMicrotask === 'function')
         // This mutable observation proves entry evaluation installs the fallback before later Refresh work can be scheduled.
         let microtaskCompleted = false
@@ -48,12 +48,12 @@ test('uses the Alipay API socket while installing both HMR modes on the shared r
         await Promise.resolve()
         assert.equal(microtaskCompleted, true)
 
-        const devtoolsRuntime = Reflect.get(global, '__rolldown_runtime__')
+        const devtoolsRuntime = Reflect.get(globalThis, '__rolldown_runtime__')
         assert.ok(devtoolsRuntime instanceof DevRuntime)
         initializeRuntime(devtoolsRuntime, 'devtools')
 
         await importRuntimeEntry('interpreter')
-        const interpreterRuntime = Reflect.get(global, '__rolldown_runtime__')
+        const interpreterRuntime = Reflect.get(globalThis, '__rolldown_runtime__')
         assert.ok(interpreterRuntime instanceof DevRuntime)
         assert.notStrictEqual(interpreterRuntime, devtoolsRuntime)
         initializeRuntime(interpreterRuntime, 'interpreter')
@@ -64,7 +64,7 @@ test('uses the Alipay API socket while installing both HMR modes on the shared r
             { url: 'ws://localhost/interpreter', multiple: true, protocols: ['vite-hmr'] }
         ])
     } finally {
-        Reflect.deleteProperty(global, '__rolldown_runtime__')
+        Reflect.deleteProperty(globalThis, '__rolldown_runtime__')
         Reflect.deleteProperty(globalThis, 'DevRuntime')
         Reflect.deleteProperty(globalThis, 'my')
         Reflect.set(globalThis, 'queueMicrotask', nativeQueueMicrotask)

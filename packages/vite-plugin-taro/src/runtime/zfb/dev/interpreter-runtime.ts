@@ -1,5 +1,6 @@
 import { createInterpreterHmrRuntime } from '../../mini/dev/modes/interpreter/interpreter-runtime.ts'
 import { connectZfbSocket } from './connect-zfb-socket.ts'
 
-// The App-global singleton retains interpreted factories, the socket, module cache, and Refresh boundaries.
-Reflect.set(global, '__rolldown_runtime__', createInterpreterHmrRuntime(connectZfbSocket))
+// Rolldown reads this singleton as a free identifier, so install it on the language global. It retains interpreted factories,
+// the socket, module cache, and Refresh boundaries.
+Reflect.set(globalThis, '__rolldown_runtime__', createInterpreterHmrRuntime(connectZfbSocket))

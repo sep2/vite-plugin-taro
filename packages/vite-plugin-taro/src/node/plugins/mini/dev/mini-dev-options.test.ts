@@ -139,8 +139,7 @@ test('adapts configured output into a stable physical wx development project', a
     assert.equal(devMode.lazy, false)
     assert.equal(devMode.skipCommonRuntimeInjection, false)
     assert.equal(typeof devMode.implement, 'string')
-    assert.match(String(devMode.implement), /__rolldown_runtime__/)
-    assert.match(String(devMode.implement), /Reflect\.set\(global,/)
+    assert.match(String(devMode.implement), /Reflect\.set\(globalThis,\s*['"`]__rolldown_runtime__['"`]/)
     assert.match(String(devMode.implement), /Reflect\.get\(global,/)
 
     const banner = output.banner
@@ -193,7 +192,7 @@ test('installs the Alipay HMR adapter on the real Mini Program JavaScript global
     const devMode = adapted.experimental?.devMode
 
     assert.ok(devMode && typeof devMode === 'object')
-    assert.match(String(devMode.implement), /Reflect\.set\(global,/)
+    assert.match(String(devMode.implement), /Reflect\.set\(globalThis,\s*['"`]__rolldown_runtime__['"`]/)
     assert.match(String(devMode.implement), /Reflect\.get\(global,/)
     assert.doesNotMatch(String(devMode.implement), /Reflect\.(?:get|set)\(my,/)
 })
