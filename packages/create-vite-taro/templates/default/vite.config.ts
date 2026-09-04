@@ -128,7 +128,6 @@ function createProjectConfigJson({
             return {
                 appid: alipayAppId,
                 miniprogramRoot: './',
-                axmlStrictCheck: true,
                 format: 2,
                 compileOptions: {
                     component2: true,
