@@ -4,7 +4,22 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
-## [0.6.21-beta.0] - 2026-09-04
+## [0.6.21-beta.1] - 2026-09-04
+
+### Added
+
+- enable glass-easel webview (9d1a2bc)
+
+### Changed
+
+- remove unused Rollup dependency (116144f)
+- update Vite and Rolldown dependencies (add324b)
+
+### Fixed
+
+- normalize zfb private config path (e2d0eac)
+
+## [0.6.21-beta.0] - 2026-09-05
 
 ### Added
 

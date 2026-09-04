@@ -1,6 +1,6 @@
 {
     "name": "create-vite-taro",
-    "version": "0.6.21-beta.0",
+    "version": "0.6.21-beta.1",
     "description": "Create Vite 8 + React 19 + Taro apps for WeChat, Alipay, and H5 targets.",
     "type": "module",
     "bin": {
