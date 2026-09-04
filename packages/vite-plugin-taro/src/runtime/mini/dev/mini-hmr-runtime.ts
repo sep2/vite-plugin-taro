@@ -15,6 +15,7 @@ import {
     runtimeControlEvent,
     runtimeReportEvent
 } from './hmr-protocol.ts'
+import { polyfillQueueMicrotask } from './polyfill/polyfill-queue-microtask.ts'
 
 /** Lexical base class injected into the runtime chunk by Rolldown; typed via the contract. */
 declare const DevRuntime: new (clientId: string) => RolldownDevRuntime
@@ -142,6 +143,12 @@ export class MiniHmrRuntime extends DevRuntime {
         // The base has no messenger: the engine tracks per-client shipped payloads instead
         // of executed module ids, so the Mini Program host registers the client session itself.
         super('')
+
+        // Rolldown schedules each generated React Refresh boundary with queueMicrotask. This shared runtime is constructed before
+        // any application factory, so installing the fallback here covers every Mini target and both HMR modes at the one common
+        // execution boundary while leaving production output untouched.
+        polyfillQueueMicrotask(global)
+
         this.connectSocket = connectSocket
     }
 
