@@ -4,7 +4,6 @@ import { packageRequire, resolveRuntimeFile } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
 import { createZfbSkeleton } from './create-zfb-skeleton.ts'
-import { transformZfbOptions } from './transform-zfb-options.ts'
 
 /** Adapts the shared Mini Program pipeline to the zfb public target. */
 export function createZfbMiniPlugins(vptOptions: VptOptions): PluginOption[] {
@@ -13,11 +12,10 @@ export function createZfbMiniPlugins(vptOptions: VptOptions): PluginOption[] {
 
 /** Binds the shared Mini Program core to Alipay runtime and output conventions. */
 export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
-    const options = transformZfbOptions(vptOptions)
     const componentsReactPath = packageRequire.resolve('@tarojs/plugin-platform-alipay/dist/components-react.js')
 
     return {
-        options: options,
+        options: vptOptions,
         taro: {
             env: 'alipay',
             componentsReactPath: componentsReactPath,
@@ -46,7 +44,7 @@ export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
             generateProjectSkeleton(input) {
                 return createZfbSkeleton({
                     ...input,
-                    options: options,
+                    options: vptOptions,
                     componentsModulePath: componentsReactPath
                 })
             }

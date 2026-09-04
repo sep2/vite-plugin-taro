@@ -3,24 +3,24 @@ import test from 'node:test'
 import type { VptOptions } from '../../../options.ts'
 import { createZfbMiniContract, createZfbMiniPlugins } from './plugins.ts'
 
-test('creates the ZFB Mini Program contract with one normalized config snapshot', () => {
+test('creates the ZFB Mini Program contract without translating user configuration', () => {
     const options: VptOptions = {
         target: 'zfb',
         app: 'src/app.tsx',
         pages: [
             {
                 path: 'pages/home/index',
-                config: { navigationBarTitleText: 'Home' }
+                config: { defaultTitle: 'Home' }
             }
         ],
-        appJson: { window: { navigationBarBackgroundColor: '#ffffff' } },
+        appJson: { window: { titleBarColor: '#ffffff' } },
         projectConfigJson: {}
     }
 
     const contract = createZfbMiniContract(options)
     const plugins = createZfbMiniPlugins(options)
 
-    assert.notEqual(contract.options, options)
+    assert.equal(contract.options, options)
     assert.deepEqual(contract.options.appJson, { window: { titleBarColor: '#ffffff' } })
     assert.deepEqual(contract.options.pages, [
         {
@@ -28,7 +28,6 @@ test('creates the ZFB Mini Program contract with one normalized config snapshot'
             config: { defaultTitle: 'Home' }
         }
     ])
-    assert.deepEqual(options.appJson, { window: { navigationBarBackgroundColor: '#ffffff' } })
     assert.equal(plugins.length, 4)
     assert.equal(contract.taro.env, 'alipay')
     assert.match(contract.taro.componentsReactPath, /plugin-platform-alipay/)

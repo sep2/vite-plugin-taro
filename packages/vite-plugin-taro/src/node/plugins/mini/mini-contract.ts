@@ -1,3 +1,4 @@
+import type { Rolldown } from 'vite'
 import type { VptJsonObject, VptOptions } from '../../../options.ts'
 
 /** Taro compiler bindings selected by one Mini Program target. */
@@ -22,9 +23,8 @@ export type RuntimeModulesContract = {
     interpreterHmrRuntime: string
 }
 
-/** Runtime conventions selected by one Mini Program target. */
+/** Physical runtime selection for one Mini Program target. */
 export type RuntimeContract = {
-    globalObject: string
     modules: RuntimeModulesContract
 }
 
@@ -34,9 +34,29 @@ export type StyleContract = {
     globalFileName: string
 }
 
-/** Output planning constraints selected by one Mini Program target. */
+/** Native component registration discovered from the final Mini Program graph. */
+export type MiniNativeComponentRegistration = Readonly<{
+    name: string
+    componentPath: string
+    fields: readonly string[]
+}>
+
+/** Graph-retained generated code package awaiting target-specific declaration. */
+export type MiniGeneratedSubpackage = Readonly<{
+    root: string
+}>
+
+/** Complete final-graph input supplied to one target's project-skeleton generator. */
+export type MiniProjectSkeletonInput = Readonly<{
+    bundle: Rolldown.OutputBundle
+    subpackages: readonly MiniGeneratedSubpackage[]
+    nativeComponents: readonly MiniNativeComponentRegistration[]
+    isProduction: boolean
+}>
+
+/** One target-owned native project-skeleton generator. */
 export type OutputContract = {
-    subpackagePlanningBudget: number
+    generateProjectSkeleton(input: MiniProjectSkeletonInput): Rolldown.EmittedAsset[]
 }
 
 /** Complete input consumed by the shared Mini Program pipeline. */

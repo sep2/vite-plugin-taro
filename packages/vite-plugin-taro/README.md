@@ -9,7 +9,7 @@
 
 简体中文 | [English](README.en.md)
 
-使用 Vite 8、React 19、Taro 4 和 Tailwind CSS v4 构建微信小程序与 Web 应用。
+使用 Vite 8、React 19、Taro 4 和 Tailwind CSS v4 构建微信小程序、支付宝小程序与 Web 应用。
 
 官网：<https://vpt.js.org>
 
@@ -28,7 +28,7 @@ npm create vite-taro@latest my-app
 
 <video src="https://github.com/user-attachments/assets/c8289e1e-d8ad-429f-a0d9-a40656b4962a" controls autoplay muted loop playsinline width="100%"></video>
 
-- **Vite 8 + React 19** 基于 Vite 生态，一份代码覆盖微信小程序与 Web。
+- **Vite 8 + React 19** 基于 Vite 生态，一份代码覆盖微信小程序、支付宝小程序与 Web。
 - **热更新** 编辑代码时保留 App 数据、当前页面、React 组件状态与输入状态。
 - **全自动分包** 使用标准静态与动态导入，由 vpt 自动规划微信小程序分包。
 - **Tailwind CSS v4 开箱即用** 直接书写工具类，微信与 Web 样式自动适配。
@@ -41,7 +41,7 @@ npm create vite-taro@latest my-app
 - [AI 开发指南](https://vpt.js.org/guides/ai/)
 - [样式](https://vpt.js.org/guides/styles/)
 - [全自动分包](https://vpt.js.org/guides/automatic-subpackages/)
-- [微信原生组件](https://vpt.js.org/guides/native-components/)
+- [原生组件](https://vpt.js.org/guides/native-components/)
 - [开发热更新](https://vpt.js.org/guides/hot-module-replacement/)
 - [配置选项](https://vpt.js.org/guides/configuration/)
 - [条件编译](https://vpt.js.org/guides/conditional-directives/)

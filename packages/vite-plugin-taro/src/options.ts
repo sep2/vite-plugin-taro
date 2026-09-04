@@ -1,15 +1,15 @@
 /** One immutable JSON value accepted by generated target configuration files. */
 export type VptJsonValue = string | number | boolean | null | VptJsonObject | readonly VptJsonValue[]
 
-/** An immutable JSON object transformed and emitted by vpt. */
+/** An immutable JSON object accepted by vpt configuration. */
 export interface VptJsonObject {
     readonly [key: string]: VptJsonValue | undefined
 }
 
-/** Canonical Taro-shaped application configuration transformed by the selected target adapter. */
+/** Application configuration written in the selected target's native schema. */
 export type VptAppConfig = VptJsonObject
 
-/** Canonical Taro-shaped Page configuration transformed by the selected target adapter. */
+/** Page configuration written in the selected target's native schema. */
 export type VptPageConfig = VptJsonObject
 
 /** Build target handled by this plugin. */
@@ -32,10 +32,11 @@ export type VptPageOption = {
     path: string
 
     /**
-     * Canonical Taro Page configuration. Use the same WeChat-shaped keys accepted by `definePageConfig`.
+     * Native Page configuration for the selected target.
      *
-     * WX emits these values directly. ZFB recursively converts them to Alipay configuration keys before specializing the
-     * runtime capsule and emitting `<path>.json`. H5 adds them to the corresponding router entry.
+     * Use Taro/WeChat keys for WX and H5, and Alipay keys for ZFB. The plugin preserves these fields in the Page runtime capsule
+     * and `<path>.json`, adding generated native-component registrations separately. It does not translate configuration names
+     * between platforms.
      */
     config: VptPageConfig
 }
@@ -68,12 +69,12 @@ export interface VptOptions {
     pages: VptPageOption[]
 
     /**
-     * Canonical Taro application configuration. Use the same WeChat-shaped keys accepted by `defineAppConfig`.
+     * Native application configuration for the selected target.
      *
-     * WX emits these values directly. ZFB recursively converts them to Alipay configuration keys before runtime
-     * specialization and JSON emission. H5 uses them to configure the Taro application and router. The plugin always derives
-     * `pages` from {@link pages}; caller-provided `pages`, `subPackages`, and `subpackages` values are discarded because the
-     * build pipeline owns page order and generated package placement.
+     * Use Taro/WeChat keys for WX and H5, and Alipay keys for ZFB. The plugin otherwise preserves the supplied configuration for
+     * runtime specialization and `app.json`; it does not translate configuration names between platforms. The plugin always
+     * derives `pages` from {@link pages}; caller-provided `pages`, `subPackages`, and `subpackages` values are discarded because
+     * the build pipeline owns page order and generated package placement.
      */
     appJson: VptAppConfig
 

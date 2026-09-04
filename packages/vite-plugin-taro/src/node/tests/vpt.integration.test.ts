@@ -65,17 +65,27 @@ function createOptions(target: VptTarget): VptOptions {
         pages: [
             {
                 path: 'pages/home/index',
-                config: {
-                    navigationBarTitleText: 'Home'
-                }
+                config:
+                    target === 'zfb'
+                        ? {
+                              defaultTitle: 'Home'
+                          }
+                        : {
+                              navigationBarTitleText: 'Home'
+                          }
             }
         ],
         appJson: {
             pages: ['stale/route'],
             subPackages: [{ root: 'stale/package', pages: [] }],
-            window: {
-                navigationBarTitleText: 'Fixture App'
-            }
+            window:
+                target === 'zfb'
+                    ? {
+                          defaultTitle: 'Fixture App'
+                      }
+                    : {
+                          navigationBarTitleText: 'Fixture App'
+                      }
         },
         projectConfigJson:
             target === 'zfb'

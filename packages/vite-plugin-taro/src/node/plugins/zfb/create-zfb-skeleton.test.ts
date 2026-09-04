@@ -9,7 +9,7 @@ const contract = createZfbMiniContract({
     pages: [
         {
             path: 'pages/home/index',
-            config: { navigationBarTitleText: 'Home' }
+            config: { defaultTitle: 'Home' }
         },
         {
             path: 'pages/meta/index',
@@ -17,7 +17,7 @@ const contract = createZfbMiniContract({
         }
     ],
     appJson: {
-        window: { navigationBarTitleText: 'Example' }
+        window: { defaultTitle: 'Example' }
     },
     projectConfigJson: {
         format: 2,
