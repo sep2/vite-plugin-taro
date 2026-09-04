@@ -51,6 +51,7 @@ console.log('Next steps:')
 if (cdCommand) console.log(`  ${cdCommand}`)
 console.log(`  ${packageManager} install`)
 console.log(`  ${getScriptCommand(packageManager, 'dev:wx')}`)
+console.log(`  ${getScriptCommand(packageManager, 'dev:zfb')}`)
 console.log(`  ${getScriptCommand(packageManager, 'dev:h5')}`)
 
 function parseArgs(args) {
