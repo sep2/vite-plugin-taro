@@ -46,7 +46,7 @@ function createPreRenderedChunk(name: string): PreRenderedChunk {
         name,
         isEntry: false,
         isDynamicEntry: true,
-        facadeModuleId: undefined,
+        facadeModuleId: null,
         moduleIds: [],
         exports: []
     }
