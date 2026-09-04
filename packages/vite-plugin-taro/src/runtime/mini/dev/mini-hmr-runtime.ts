@@ -393,7 +393,7 @@ export class MiniHmrRuntime extends DevRuntime {
             console.warn('[vpt] patch batch failed; apply stopped', error)
             void this.sendReport({
                 kind: 'rebuild',
-                reason: Error.isError(error) ? error.message : String(error)
+                reason: error instanceof Error ? error.message : String(error)
             })
             return false
         }
