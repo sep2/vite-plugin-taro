@@ -26,7 +26,10 @@ export default defineConfig(({ mode }) => {
                 appJson: createAppJson(target),
                 projectConfigJson: createProjectConfigJson({ target, wechatAppId, alipayAppId }),
                 projectPrivateConfigJson: createProjectPrivateConfigJson(target),
-                sitemapJson: { rules: [{ action: 'allow', page: '*' }] }
+                sitemapJson: { rules: [{ action: 'allow', page: '*' }] },
+                hmr: {
+                    mode: target === 'zfb' ? 'interpreter' : 'devtools'
+                },
             })
         ]
     }

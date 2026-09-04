@@ -23,9 +23,6 @@ export default defineConfig(({ mode }) => {
         plugins: [
             vpt({
                 target,
-                hmr: {
-                    mode: 'interpreter'
-                },
                 app: 'src/app.tsx',
                 pages: [
                     {
@@ -44,7 +41,10 @@ export default defineConfig(({ mode }) => {
                 appJson: createAppJson(target),
                 projectConfigJson: createProjectConfigJson({ target, wechatAppId, alipayAppId }),
                 projectPrivateConfigJson: createProjectPrivateConfigJson(target),
-                sitemapJson: { rules: [{ action: 'allow', page: '*' }] }
+                sitemapJson: { rules: [{ action: 'allow', page: '*' }] },
+                hmr: {
+                    mode: target === 'zfb' ? 'interpreter' : 'devtools'
+                }
             })
         ]
     }
