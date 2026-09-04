@@ -6,7 +6,7 @@ import vpt, { type VptJsonObject, type VptTarget } from 'vite-plugin-taro'
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), 'VITE_VPT_')
     const target = getTarget(env)
-    const wechatAppId = env.VITE_VPT_WECHAT_APP_ID || 'touristappid'
+    const wechatAppId = env.VITE_VPT_WECHAT_APP_ID
     const alipayAppId = env.VITE_VPT_ALIPAY_APP_ID
 
     return {
@@ -24,70 +24,65 @@ export default defineConfig(({ mode }) => {
                     }
                 ],
                 appJson: createAppJson(target),
-                projectConfigJson: createProjectConfigJson({
-                    target: target,
-                    wechatAppId: wechatAppId,
-                    alipayAppId: alipayAppId
-                }),
-                projectPrivateConfigJson: {
-                    setting: {
-                        urlCheck: false
-                    }
-                },
-                sitemapJson: {
-                    rules: [{ action: 'allow', page: '*' }]
-                }
+                projectConfigJson: createProjectConfigJson({ target, wechatAppId, alipayAppId }),
+                projectPrivateConfigJson: { setting: { urlCheck: false } },
+                sitemapJson: { rules: [{ action: 'allow', page: '*' }] }
             })
         ]
     }
 })
 
-const targetEnvName = 'VITE_VPT_TARGET'
-const projectRoot = fileURLToPath(new URL('.', import.meta.url))
-
-function getTarget(env: Record<string, string>): VptTarget {
-    const target = env[targetEnvName]
-    if (target === 'wx' || target === 'zfb' || target === 'h5') return target
-    throw new Error(`${targetEnvName} must be "wx", "zfb", or "h5".`)
-}
-
 function createPageJson(target: VptTarget): VptJsonObject {
-    if (target === 'zfb') {
-        return {
-            transparentTitle: 'always',
-            titlePenetrate: 'YES'
+    switch (target) {
+        case 'wx': {
+            return {
+                navigationStyle: 'custom',
+                navigationBarTextStyle: 'black'
+            }
         }
-    }
-
-    return {
-        navigationStyle: 'custom',
-        navigationBarTextStyle: 'black'
-    }
-}
-
-function createAppJson(target: VptTarget): VptJsonObject {
-    if (target === 'zfb') {
-        return {
-            window: {
+        case 'zfb': {
+            return {
                 transparentTitle: 'always',
                 titlePenetrate: 'YES'
             }
         }
+        default: {
+            return {}
+        }
     }
+}
 
-    return {
-        lazyCodeLoading: 'requiredComponents',
-        window: {
-            navigationStyle: 'custom',
-            navigationBarTextStyle: 'black'
-        },
-        renderer: 'skyline',
-        componentFramework: 'glass-easel',
-        rendererOptions: {
-            skyline: {
-                defaultDisplayBlock: true,
-                defaultContentBox: true
+function createAppJson(target: VptTarget): VptJsonObject {
+    switch (target) {
+        case 'wx': {
+            return {
+                lazyCodeLoading: 'requiredComponents',
+                renderer: 'skyline',
+                componentFramework: 'glass-easel',
+                rendererOptions: {
+                    skyline: {
+                        defaultDisplayBlock: true,
+                        defaultContentBox: true
+                    }
+                },
+                window: {
+                    navigationStyle: 'custom',
+                    navigationBarTextStyle: 'black'
+                }
             }
+        }
+        case 'zfb': {
+            return {
+                lazyCodeLoading: 'renderedComponents',
+                useDynamicPlugins: true,
+                window: {
+                    transparentTitle: 'always',
+                    titlePenetrate: 'YES'
+                }
+            }
+        }
+        default: {
+            return {}
         }
     }
 }
@@ -101,49 +96,76 @@ function createProjectConfigJson({
     wechatAppId: string
     alipayAppId: string | undefined
 }): VptJsonObject {
-    if (target === 'zfb') {
-        return {
-            ...(alipayAppId ? { appid: alipayAppId } : {}),
-            miniprogramRoot: './',
-            component2: true,
-            axmlStrictCheck: true,
-            enableHMR: true,
-            format: 2,
-            compileOptions: {
-                // Expose the real JavaScript global for SystemJS and shared runtime state; `my` remains the Alipay API namespace.
-                globalObjectMode: 'enable',
-                // Taro keeps its Alipay output as ES6 and delegates final syntax conversion to the developer tool.
-                transpile: {}
+    switch (target) {
+        case 'wx': {
+            return {
+                appid: wechatAppId,
+                projectname: 'vpt',
+                description: '',
+                compileType: 'miniprogram',
+                setting: {
+                    skylineRenderEnable: false,
+                    urlCheck: false,
+                    es6: false,
+                    postcss: false,
+                    minified: false,
+                    enhance: false,
+                    uglifyFileName: false,
+                    minifyWXSS: false,
+                    minifyWXML: false,
+                    compileHotReLoad: true,
+                    preloadBackgroundData: false,
+                    newFeature: true,
+                    autoAudits: false,
+                    coverView: true,
+                    showShadowRootInWxmlPanel: false,
+                    scopeDataCheck: false,
+                    useCompilerModule: false
+                }
             }
         }
-    }
-
-    return {
-        appid: wechatAppId,
-        projectname: 'vite-taro-app',
-        description: '',
-        compileType: 'miniprogram',
-        setting: {
-            // WeChat DevTools does not support hot reload with Skyline yet.
-            skylineRenderEnable: false,
-            urlCheck: false,
-            es6: false,
-            postcss: false,
-            minified: false,
-            compileHotReLoad: true,
-            enhance: false,
-            uglifyFileName: false,
-            preloadBackgroundData: false,
-            newFeature: true,
-            autoAudits: false,
-            coverView: true,
-            showShadowRootInWxmlPanel: false,
-            scopeDataCheck: false,
-            useCompilerModule: false
+        case 'zfb': {
+            return {
+                appid: alipayAppId,
+                miniprogramRoot: './',
+                axmlStrictCheck: true,
+                format: 2,
+                compileOptions: {
+                    component2: true,
+                    globalObjectMode: 'enable',
+                    transpile: {
+                        script: {
+                            ignore: ['**']
+                        }
+                    }
+                },
+                developOptions: {
+                    hotReload: true,
+                    skipTranspile: true,
+                    sourcemap: false,
+                    minify: false
+                }
+            }
+        }
+        default: {
+            return {}
         }
     }
 }
 
+function getTarget(env: Record<string, string>): VptTarget {
+    const targetEnvName = 'VITE_VPT_TARGET'
+
+    const target = env[targetEnvName]
+
+    if (target === 'wx' || target === 'zfb' || target === 'h5') {
+        return target
+    }
+
+    throw new Error(`${targetEnvName} must be "wx", "zfb", or "h5".`)
+}
+
+const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 function fromRoot(...segments: string[]): string {
     return path.resolve(projectRoot, ...segments)
 }
