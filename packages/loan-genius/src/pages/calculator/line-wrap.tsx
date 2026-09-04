@@ -94,9 +94,7 @@ export function LineWrap({
                         </View>
 
                         <Button
-                            className={
-                                'after:content-none p-2 w-full rounded-xs leading-normal border-none bg-[rgba(35,201,147,1)]'
-                            }
+                            className="after:content-none flex w-full items-center justify-center rounded-xs border-none bg-[rgba(35,201,147,1)] p-2 leading-normal"
                             onClick={closeModal}
                         >
                             <Text className="font-pingfang-semibold text-base font-bold text-white">我知道了</Text>
