@@ -11,11 +11,11 @@ function px(value: number): string {
 }
 
 export function NavigationBar({ title }: NavigationBarProps) {
-    const { navBar, menuInfo } = useNavigationBar()
-    const containerStyle: CSSProperties = { height: px(navBar.height) }
-    const statusBarStyle: CSSProperties = { height: px(navBar.top) }
-    const contentStyle: CSSProperties = { padding: `${px(navBar.py)} ${px(navBar.px)}` }
-    const sideStyle: CSSProperties = { flexBasis: px(menuInfo.width), width: px(menuInfo.width) }
+    const { height, top, paddingX, paddingY, menuWidth } = useNavigationBar()
+    const containerStyle: CSSProperties = { height: px(height) }
+    const statusBarStyle: CSSProperties = { height: px(top) }
+    const contentStyle: CSSProperties = { padding: `${px(paddingY)} ${px(paddingX)}` }
+    const sideStyle: CSSProperties = { flexBasis: px(menuWidth), width: px(menuWidth) }
 
     return (
         <View className="flex w-full flex-col text-primary" style={containerStyle}>

@@ -12,6 +12,12 @@ interface NavigationBarMetrics {
     menuWidth: number
 }
 
+/** Alipay fields narrowed from Taro's shared system-info result type. */
+type AlipaySystemInfo = ReturnType<typeof Taro.getSystemInfoSync> & {
+    statusBarHeight: number
+    titleBarHeight: number
+}
+
 export interface NavigationBarProps {
     left?: ReactNode
     right?: ReactNode
@@ -33,9 +39,23 @@ function px(value: number): string {
 const isWechatTarget = import.meta.env.VITE_VPT_TARGET === 'wx'
 const isAlipayTarget = import.meta.env.VITE_VPT_TARGET === 'zfb'
 
+function getAlipayNavigationBarMetrics(): NavigationBarMetrics {
+    // Alipay 4.2.1 exposes these native title metrics through the established system-info API.
+    const { statusBarHeight, titleBarHeight } = Taro.getSystemInfoSync() as AlipaySystemInfo
+
+    return {
+        height: statusBarHeight + titleBarHeight,
+        top: statusBarHeight,
+        paddingX: 16,
+        paddingY: (titleBarHeight - 32) / 2,
+        menuWidth: 44
+    }
+}
+
 function getNavigationBarMetrics(): NavigationBarMetrics {
-    // Alipay 4.2.1 exposes the established system-info API but not Taro's newer split window-info API.
-    const windowInfo = isAlipayTarget ? Taro.getSystemInfoSync() : Taro.getWindowInfo()
+    if (isAlipayTarget) return getAlipayNavigationBarMetrics()
+
+    const windowInfo = Taro.getWindowInfo()
     const statusBarHeight = isWechatTarget ? (windowInfo.statusBarHeight ?? 44) : 0
     const menuButtonInfo = isWechatTarget
         ? Taro.getMenuButtonBoundingClientRect()
