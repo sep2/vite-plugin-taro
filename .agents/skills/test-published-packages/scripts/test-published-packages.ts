@@ -63,6 +63,8 @@ const nativeCounterId = 'published-native-counter'
 const pollIntervalMs = 3_000
 const transitionDeadlineMs = 120_000
 const commandTimeoutMs = 29_000
+const devServerReadyMarker = 'Mini Program project'
+const consoleDiagnosticsCommand = "grep -i -E 'error|fail|warn|exception'"
 
 function stage(message: string): void {
     console.log(`\n[published-packages] ${message}`)
@@ -383,7 +385,7 @@ function devServerReady(child: ChildProcess): boolean {
     if (child.exitCode !== null) {
         throw new Error(`Published dev server exited with code ${child.exitCode}`)
     }
-    return existsSync(projectPaths.viteLog) && readFileSync(projectPaths.viteLog, 'utf8').includes('WeChat DevTools')
+    return existsSync(projectPaths.viteLog) && readFileSync(projectPaths.viteLog, 'utf8').includes(devServerReadyMarker)
 }
 
 function hasCode(value: unknown, code: string): boolean {
@@ -543,16 +545,31 @@ function tail(text: string, lineCount: number): string {
     return text.split('\n').slice(-lineCount).join('\n')
 }
 
+function readConsoleDiagnostics(): readonly string[] {
+    const content = callWechatide(
+        'get_simulator_console',
+        ['--project', projectPaths.output, '--command', consoleDiagnosticsCommand],
+        true
+    )
+    if (typeof content !== 'string') {
+        throw new Error('DevTools console diagnostics must be text')
+    }
+
+    // DevTools repeats identical records across rebuilds, so HMR compares distinct diagnostic signatures.
+    const lines = content.split('\n').filter((line) => line.length > 0 && line !== '--')
+    return [...new Set(lines)].sort()
+}
+
 function collectHmrDiagnostics(rootHashes: Map<string, string>): void {
     stage('HMR diagnostics')
     const network = callWechatide(
-        'get_app_network_content',
+        'get_simulator_network',
         ['--project', projectPaths.output, '--command', "grep -n '__vpt_hmr__'"],
         false
     )
     const consoleContent = callWechatide(
-        'get_app_console_content',
-        ['--project', projectPaths.output, '--command', "grep -i -E 'error|fail|warn|exception'"],
+        'get_simulator_console',
+        ['--project', projectPaths.output, '--command', consoleDiagnosticsCommand],
         false
     )
     console.log(`Network HMR reports: ${JSON.stringify(network)}`)
@@ -619,6 +636,7 @@ async function proveHmr(): Promise<void> {
         readCounterCount,
         (count) => count === initialCount + 1
     )
+    const baselineConsoleDiagnostics = readConsoleDiagnostics()
     const rootHashes = readRootHashes()
     copyFileSync(projectPaths.source, projectPaths.backup)
 
@@ -649,13 +667,11 @@ async function proveHmr(): Promise<void> {
         rmSync(projectPaths.backup, { force: true })
     }
 
-    const consoleContent = callWechatide(
-        'get_app_console_content',
-        ['--project', projectPaths.output, '--command', "grep -i -E 'error|fail|warn|exception'"],
-        true
+    const newConsoleDiagnostics = readConsoleDiagnostics().filter(
+        (diagnostic) => !baselineConsoleDiagnostics.includes(diagnostic)
     )
-    if (consoleContent !== '') {
-        throw new Error(`Unexpected DevTools console diagnostics: ${JSON.stringify(consoleContent)}`)
+    if (newConsoleDiagnostics.length > 0) {
+        throw new Error(`HMR introduced DevTools console diagnostics: ${JSON.stringify(newConsoleDiagnostics)}`)
     }
 }
 
