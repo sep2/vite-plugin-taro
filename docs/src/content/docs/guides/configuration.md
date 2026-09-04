@@ -1,6 +1,6 @@
 ---
 title: 配置选项
-description: 配置构建目标、App、页面和微信项目文件。
+description: 配置构建目标、App、页面和小程序项目文件。
 ---
 
 `create-vite-taro` 生成的项目在 `vite.config.ts` 中调用 `vpt()`。以下是 `vpt()` 的全部公开选项。
@@ -16,9 +16,10 @@ target: 'wx'
 | 值 | 输出 |
 | --- | --- |
 | `wx` | 微信小程序 |
+| `zfb` | 支付宝小程序 |
 | `h5` | Web 应用 |
 
-一次 Vite 运行只构建一个目标。默认模板已经为 `dev:wx`、`dev:h5`、`build:wx` 和 `build:h5` 传入对应值。
+一次 Vite 运行只构建一个目标。默认模板已经提供 `dev:wx`、`dev:zfb`、`dev:h5`、`build:wx`、`build:zfb` 和 `build:h5`。
 
 输出目录由 Vite 配置，不属于 `vpt()`：
 
@@ -55,10 +56,10 @@ function App({ children }: PropsWithChildren) {
 export default App
 ```
 
-页面内容通过 `children` 传入。App 返回的 JSX 会在 H5 和微信小程序中包裹页面，因此全局布局、全局样式、
+页面内容通过 `children` 传入。App 返回的 JSX 会在 Web 和小程序目标中包裹页面，因此全局布局、全局样式、
 App 生命周期、React Provider 和应用级初始化都可以放在这里。
 
-微信构建仍然只有一个 React App 实例。页面切换不会为每个原生 Page 重新创建 App；App 的 Context、Hook
+小程序构建仍然只有一个 React App 实例。页面切换不会为每个原生 Page 重新创建 App；App 的 Context、Hook
 状态、Effect 和 Ref 都沿普通的 App → Page React 父子关系保留。每个原生 Page 仍使用独立的数据更新边界。
 完整用法和生命周期区别参见 [App 与页面](/guides/app-and-pages/)。
 
@@ -95,7 +96,7 @@ path: 'pages/profile/index'
 源码: src/pages/profile/index.tsx
 ```
 
-页面文件必须默认导出 React 组件。数组顺序决定微信 `app.json.pages` 和 H5 路由的顺序；第一项是微信小程序首页。
+页面文件必须默认导出 React 组件。数组顺序决定小程序 `app.json.pages` 和 H5 路由顺序；第一项是小程序首页。
 
 ### `pages[].config`
 
@@ -108,9 +109,9 @@ path: 'pages/profile/index'
 }
 ```
 
-微信构建将它写入对应的页面 JSON，H5 构建将它用于对应路由。
+小程序构建将它写入对应的页面 JSON，H5 构建将它用于对应路由。
 
-`usingComponents` 由 vpt 自动管理，无需填写。接入方式参见[微信原生组件](/guides/native-components/)。
+`usingComponents` 由 vpt 自动管理，无需填写。接入方式参见[原生组件](/guides/native-components/)。
 
 ## `appJson`
 
@@ -133,7 +134,7 @@ appJson: {
 }
 ```
 
-微信构建用它生成 `app.json`。H5 构建也会使用其中适用于 Taro Web 的应用配置。
+小程序构建用它生成 `app.json`。H5 构建也会使用其中适用于 Taro Web 的应用配置。
 
 以下由 vpt 自动维护，无需填写：
 
@@ -166,12 +167,11 @@ projectConfigJson: {
 
 微信构建将该对象写入 `project.config.json`。vpt 不添加默认值，建议在模板配置上修改，而不是从空对象重新编写。
 
-该选项始终必填，但 H5 构建会忽略它。只构建 H5 的项目可以传入 `{}`。
-
 微信 App ID 建议保存在被 Git 忽略的 `.env.local`：
 
 ```dotenv
 VITE_VPT_WECHAT_APP_ID=wx1234567890abcdef
+VITE_VPT_ALIPAY_APP_ID=2021000000000000
 ```
 
 热更新所需设置参见[开发热更新](/guides/hot-module-replacement/)。
@@ -188,11 +188,11 @@ projectPrivateConfigJson: {
 }
 ```
 
-H5 构建忽略该选项。
+ZFB 和 H5 构建忽略该选项。
 
 ## `sitemapJson`
 
-可选。提供时写入 `sitemap.json`：
+可选。仅 WX 提供时写入 `sitemap.json`；ZFB 和 H5 忽略它：
 
 ```ts
 sitemapJson: {
@@ -203,7 +203,7 @@ sitemapJson: {
 
 ## `hmr`
 
-可选。为 `vite serve` 的微信目标选择 JavaScript 热更新方式：
+可选。为 `vite serve` 的小程序开发者工具选择 JavaScript 热更新方式：
 
 ```ts
 hmr: {
@@ -211,9 +211,9 @@ hmr: {
 }
 ```
 
-| `mode` | 行为 |
-| --- | --- |
-| `devtools` | 默认值。把原生补丁写入项目，由微信开发者工具重新执行 Page。 |
+| `mode` | 行为                                                                                    |
+| --- |-----------------------------------------------------------------------------------------|
+| `devtools` | 默认值。把原生补丁写入项目，由小程序开发工具重新执行 Page。                             |
 | `interpreter` | 通过 Vite 现有 WebSocket 推送源码，在存活的 App 中使用 Sval 解释执行，不重新注册 Page。 |
 
 两种模式都为每个 App 运行环境创建一个经过 Vite token 认证的 WebSocket，并通过它发送运行时报告；不会创建 HTTP 报告接口，也不会重建连接。`interpreter` 还通过该连接接收累计补丁源码，但不使用轮询定时器，不把补丁交给 `eval()` 或 `Function()`，也不生成 `hmr/patches.js`。该模式可以避开开发者工具的 Page 热重载，但会增大开发运行时，并且更新后的模块以解释方式执行。两种模式共享补丁序号、样式更新、React Refresh、确认和完整构建恢复。
@@ -221,15 +221,15 @@ hmr: {
 该选项不改变 H5 或生产构建输出。
 
 
-## 生成的微信配置文件
+## 生成的小程序配置文件
 
-| vpt 配置 | 输出文件 |
-| --- | --- |
-| `appJson` 和 `pages` | `app.json` |
-| `pages[].config` | `${path}.json` |
-| `projectConfigJson` | `project.config.json` |
-| `projectPrivateConfigJson` | `project.private.config.json` |
-| `sitemapJson` | `sitemap.json` |
+| vpt 配置 | WX 输出 | ZFB 输出 |
+| --- | --- | --- |
+| `appJson` 和 `pages` | `app.json` | `app.json` |
+| `pages[].config` | `${path}.json` | `${path}.json` |
+| `projectConfigJson` | `project.config.json` | `mini.project.json` |
+| `projectPrivateConfigJson` | `project.private.config.json` | — |
+| `sitemapJson` | `sitemap.json` | — |
 
 ## Vite 配置
 
@@ -251,7 +251,7 @@ H5 需要项目根目录下的 `index.html`，其中包含挂载节点：
 <div id="app"></div>
 ```
 
-不需要 `src/main.tsx`，也不需要在 HTML 中添加入口脚本。vpt 会生成并注入入口。微信构建不使用 `index.html`。
+不需要 `src/main.tsx`，也不需要在 HTML 中添加入口脚本。vpt 会生成并注入入口。小程序构建都不使用 `index.html`。
 
 ## 不读取 Taro 配置
 
@@ -261,7 +261,7 @@ vpt 不读取：
 - `src/app.config.ts`；
 - 页面旁的 `*.config.ts`；
 - 手写的 `app.json` 或页面 JSON；
-- 手写的微信分包声明。
+- 手写的小程序分包声明。
 
 已有 Taro 项目需要把这些配置移入 `vite.config.ts`。参见[从 Taro 迁移](/guides/migrate-from-taro/)。
 

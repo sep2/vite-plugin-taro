@@ -36,6 +36,15 @@ jobs:
       - name: Enforce 100% coverage
         run: pnpm test:coverage
 
+      - name: Build sample WeChat Mini Program
+        run: pnpm build:loan-genius:wx
+
+      - name: Build sample Alipay Mini Program
+        run: pnpm build:loan-genius:zfb
+
+      - name: Build sample H5
+        run: pnpm build:loan-genius:h5
+
   windows:
     runs-on: windows-latest
     steps:
@@ -71,6 +80,9 @@ jobs:
 
       - name: Build sample WeChat Mini Program
         run: pnpm build:loan-genius:wx
+
+      - name: Build sample Alipay Mini Program
+        run: pnpm build:loan-genius:zfb
 
       - name: Build sample H5
         run: pnpm build:loan-genius:h5

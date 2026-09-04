@@ -27,7 +27,7 @@ VPT 可同时使用 Tailwind CSS v4、CSS Modules 和普通 CSS。样式也支�
 
 - 三个 `@import` 分别引入主题、基础规则和工具类。
 - `@source "./"` 扫描 `src` 中使用的 Tailwind 类名。
-- vpt 为微信和 Web 分别生成可用的目标样式。
+- vpt 为微信、支付宝和 Web 分别生成可用的目标样式。
 
 在 JSX 中直接使用 `className`：
 
@@ -101,7 +101,7 @@ return <View className={`rounded-xl p-4 ${toneClass}`} />
 }
 ```
 
-微信构建会把普通 CSS 中的 `px` 和 `rem` 转换为 `rpx`。
+小程序构建都会把普通 CSS 中的 `px` 和 `rem` 转换为 `rpx`。
 
 在组件中导入生成的类名映射：
 
@@ -149,7 +149,7 @@ body {
 }
 ```
 
-`page` 是微信小程序的页面根元素，`body` 是 Web 的文档根元素。
+`page` 是小程序页面根元素，`body` 是 Web 文档根元素。
 
 目标专用规则可以使用条件指令：
 
@@ -166,8 +166,6 @@ body {
 }
 /* #endif */
 ```
-
-支持的目标名是 `wx` 和 `h5`。
 
 ### Sass、Less 和 Stylus
 
@@ -187,13 +185,11 @@ PostCSS 配置使用 Vite 的 `css.postcss` 或项目根目录中的 PostCSS 配
 
 ## 样式热更新
 
-运行 `npm run dev:wx` 时，以下修改会触发样式热更新：
+运行 `npm run dev:wx` 或 `npm run dev:zfb` 时，以下修改会触发样式热更新：
 
 - 修改已导入的 CSS、CSS Modules 或预处理器文件。
 - 在 JSX 中新增、替换或删除 Tailwind 类名。
 - 添加或删除组件对样式文件的导入。
-
-VPT 会先写入新的 `dist/wx/assets/global.wxss`，再发布同一次代码更新，使样式与组件代码保持一致。Web 目标使用 Vite 自带的 CSS 热更新。
 
 ## 样式如何进入应用
 
@@ -212,18 +208,21 @@ export default App
 
 页面或组件也可以导入自己的样式；未被任何应用、页面或组件导入的样式不会进入构建结果。
 
-### 微信与 Web 的区别
+### 小程序与 Web 的区别
 
-Web 目标沿用 Vite 的 CSS 行为。微信目标会收集应用和所有页面可达的样式，转换为一个全局文件：
+Web 目标沿用 Vite 的 CSS 行为。小程序目标会收集应用和所有页面可达的样式，转换为一个全局文件：
 
 ```text
+// wx
 dist/wx/assets/global.wxss
+// zfb
+dist/zfb/assets/global.acss
 ```
 
-这包含普通导入、CSS Modules、Tailwind 生成结果和动态导入分支中的样式。因此，微信目标不会等到动态组件加载时再加载它的 CSS。
+这包含普通导入、CSS Modules、Tailwind 生成结果和动态导入分支中的样式。因此，小程序目标不会等到动态组件加载时再加载它的 CSS。
 
 :::note
-原生组件自带的 `.wxss` 会继续跟随原生组件输出，不会合并到 React 应用的 `global.wxss` 中。
+原生组件自带的 `.wxss` 或 `.acss` 会继续跟随原生组件输出，不会合并到 React 应用的全局样式中。
 :::
 
 ## 常见问题
@@ -244,10 +243,10 @@ dist/wx/assets/global.wxss
 }
 ```
 
-### 微信与 Web 显示不同
+### 小程序与 Web 显示不同
 
-检查所用属性和选择器是否受 WXSS 支持，并确认尺寸换算、默认元素样式和 Tailwind Preflight。不要依赖微信开发者工具的 PostCSS；模板将其关闭，样式转换由 vpt 完成。
+检查所用属性和选择器是否受当前 WXSS 或 ACSS 方言支持，并确认尺寸换算、默认元素样式和 Tailwind Preflight。不要依赖开发者工具的 PostCSS；样式转换由 vpt 完成。
 
 ### 修改样式后没有更新
 
-确认运行的是 `dev:wx`，微信开发者工具打开的是当前项目的 `dist/wx`，并检查终端是否有 CSS 语法或 Tailwind 生成错误。修复错误并再次保存后会继续热更新。
+确认运行的是 `dev:wx` 或 `dev:zfb`，开发者工具打开的是对应的 `dist/wx` 或 `dist/zfb`，并检查终端是否有 CSS 语法或 Tailwind 生成错误。修复后再次保存会继续热更新。

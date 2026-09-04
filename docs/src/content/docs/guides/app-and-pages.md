@@ -80,7 +80,7 @@ export function AppShell({ children }: PropsWithChildren) {
 
 工具组件及其依赖会等到首次打开时再加载。VPT 会自动规划这些动态模块的分包位置。这样可以减少启动时必须加载和执行的代码。完整规则参见[全自动分包](/guides/automatic-subpackages/)。
 
-App 中可以使用任意组件，包括[微信原生组件](/guides/native-components/)。
+App 中可以使用任意组件，包括[原生组件](/guides/native-components/)。
 
 ## 在页面之间共享状态
 

@@ -1,6 +1,5 @@
----
-title: 微信原生组件
-description: 在 React 中类型安全地使用微信原生组件，并让原生资源参与全自动分包。
+---title: 小程序原生组件
+description: 在 React 中类型安全地使用微信或支付宝原生组件，并让原生资源参与全自动分包。
 ---
 
 使用 `defineNativeComponent()` 为已有的微信原生组件声明一个 React 接口。vpt 会自动复制原生文件、注册组件并规划分包。
@@ -72,12 +71,11 @@ src/native-counter/
     └── child.wxml
 ```
 
-vpt 会递归复制目录中的文件并保留相对路径。WXS、图片、字体、子组件和 CommonJS 模块都可以放在里面。
+vpt 会递归复制目录中的文件并保留相对路径。组件脚本、图片、字体、子组件和 CommonJS 模块都可以放在里面。
 
 - `defineNativeComponent()` 必须指向真实的 `.js` 入口；
-- `.json`、`.wxml` 和 `.wxss` 必须与 `.js` 入口同名；
 - 所有运行时依赖必须在该目录内，并使用相对路径；
-- 原生文件不会经过 Vite 转换，因此不能使用 Vite alias；
+- 原生文件不会经过 Vite 转换；
 - 每个原生组件的目录名必须唯一。
 
 ## TypeScript 类型
@@ -112,7 +110,7 @@ export const NativeDivider = defineNativeComponent(
 
 ## 使用 Slot
 
-在原生 WXML 中声明 slot：
+在原生组件模版中声明 slot：
 
 ```xml
 <!-- src/native-counter/counter.wxml -->
@@ -216,22 +214,30 @@ export default function Page() {
 
 完整规划规则参见[全自动分包](/guides/automatic-subpackages/)。
 
-## 同时构建微信 与 Web
+## 同时构建微信、支付宝 与 Web
 
-Web 代码不能导入使用 `virtual:taro/native` 的接口文件。共享组件可以通过条件编译选择实现：
+Web 代码不能导入使用 `virtual:taro/native` 的接口文件。不同平台的原生目录也不能混用。共享组件可以通过条件编译选择实现：
 
 ```tsx
+// #ifdef wx
+import { WxNativeCounter } from './wx-native-counter.tsx'
+// #endif
+
+// #ifdef zfb
+import { ZfbNativeCounter } from './zfb-native-counter.tsx'
+// #endif
+
 // #ifdef h5
 import { WebCounter } from './web-counter.tsx'
 // #endif
 
-// #ifdef wx
-import { NativeCounter } from './native-counter.tsx'
-// #endif
-
 export default function Counter(props: { count: number }) {
     // #ifdef wx
-    return <NativeCounter count={props.count} />
+    return <WxNativeCounter count={props.count} />
+    // #endif
+
+    // #ifdef zfb
+    return <ZfbNativeCounter count={props.count} />
     // #endif
 
     // #ifdef h5

@@ -5,8 +5,10 @@
     "type": "module",
     "scripts": {
         "dev:wx": "cross-env NODE_ENV=development VITE_VPT_TARGET=wx vite",
+        "dev:zfb": "cross-env NODE_ENV=development VITE_VPT_TARGET=zfb vite",
         "dev:h5": "cross-env NODE_ENV=development VITE_VPT_TARGET=h5 vite",
         "build:wx": "cross-env NODE_ENV=production VITE_VPT_TARGET=wx vite build",
+        "build:zfb": "cross-env NODE_ENV=production VITE_VPT_TARGET=zfb vite build",
         "build:h5": "cross-env NODE_ENV=production VITE_VPT_TARGET=h5 vite build",
         "preview:h5": "cross-env NODE_ENV=production VITE_VPT_TARGET=h5 vite preview --outDir dist/h5",
         "typecheck": "tsc -b"

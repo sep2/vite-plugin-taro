@@ -1,7 +1,7 @@
 import { Button, Text, View } from 'virtual:taro/components'
 import type { CounterProps } from './counter.tsx'
 
-export function WebCounter({ count, onDecrement, onIncrement }: CounterProps) {
+export function SharedCounter({ count, onDecrement, onIncrement }: CounterProps) {
     return (
         <View className="flex flex-col rounded-2xl bg-surface-muted p-4">
             <Text className="text-center text-xs font-bold tracking-widest text-foreground">SHARED COUNTER</Text>

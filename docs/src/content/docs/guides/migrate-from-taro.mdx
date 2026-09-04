@@ -165,7 +165,7 @@ import Taro, { useDidShow, useLoad } from 'virtual:taro/api'
 import { Button, Text, View } from 'virtual:taro/components'
 ```
 
-`Taro.request()`、`Taro.navigateTo()`、`useLaunch()`、`useLoad()` 等调用方式不变。`process.env.TARO_ENV` 也可以继续用于目标判断，微信构建中的值仍为 `weapp`，Web 构建中的值仍为 `h5`。
+`Taro.request()`、`Taro.navigateTo()`、`useLaunch()`、`useLoad()` 等调用方式不变。`process.env.TARO_ENV` 也可以继续用于目标判断：微信、支付宝和 Web 构建中的值分别为 `weapp`、`alipay` 和 `h5`。
 
 :::caution
 不要把第三方包内部的 `@tarojs/*` 导入做全局文本替换。只修改项目自己维护的源码，并单独验证每个 Taro UI 库或构建插件是否兼容 React 19 和 vpt。
@@ -234,13 +234,15 @@ appJson: {
 }
 ```
 
+上面的字段适用于 WX/H5。ZFB 构建不会执行 Taro CLI 的配置转换，因此应在 `vite.config.ts` 的 ZFB 分支直接提供支付宝字段，例如把 `navigationBarTitleText` 写为 `defaultTitle`、把 `enablePullDownRefresh` 写为 `pullRefresh`，并使用支付宝的 tabBar 结构。可以参考生成模板中的 `createAppJson(target)` 和 `createPageJson(target)`。
+
 配置迁移规则：
 
 - `pages` 的顺序就是生成的 `app.json.pages` 顺序，也是 Web 路由顺序。
 - `appJson.pages` 会被 `pages` 覆盖，不要重复填写。
 - `appJson.subPackages` 和 `appJson.subpackages` 会被移除，不要从旧配置复制。
-- 每个页面的 `config` 会生成微信页面 JSON，同时参与 Web 路由配置。
-- `window`、普通 `tabBar`、权限与 Skyline 等应用配置可以保留在 `appJson`。
+- 每个页面的 `config` 会生成当前目标的页面 JSON，同时参与 Web 路由配置；字段名不会跨平台转换。
+- `window`、普通 `tabBar` 和权限配置可以保留在对应目标的 `appJson`；Skyline 配置只能进入 WX 分支。
 - `defineAppConfig()` 与 `definePageConfig()` 包装函数不再需要。
 
 ### 页面分包不能原样迁移
@@ -300,7 +302,7 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
 
 ### 条件编译
 
-构建时仍会替换 `process.env.TARO_ENV`：微信构建中的值为 `weapp`，Web 构建中的值为 `h5`。如果迁移后的 TypeScript 配置不再声明 `process`，优先改用下面的注释指令；也可以在项目自己的类型文件中为 `process.env.TARO_ENV` 添加窄类型声明。
+构建时仍会替换 `process.env.TARO_ENV`：WX、ZFB 和 H5 构建中的值分别为 `weapp`、`alipay` 和 `h5`。如果迁移后的 TypeScript 配置不再声明 `process`，优先改用下面的注释指令；也可以在项目自己的类型文件中为 `process.env.TARO_ENV` 添加窄类型声明。
 
 注释指令中的微信小程序需要从 `WEAPP` 改为 `wx`：
 

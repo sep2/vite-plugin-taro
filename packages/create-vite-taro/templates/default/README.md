@@ -1,6 +1,6 @@
 # VPT
 
-基于 Vite 8、React 19、Taro 4、TypeScript 和 Tailwind CSS v4，一套代码运行于微信小程序和 Web。
+基于 Vite 8、React 19、Taro 4、TypeScript 和 Tailwind CSS v4，一套代码运行于微信小程序、支付宝小程序和 Web。
 
 - [文档](https://vpt.js.org)
 - [GitHub](https://github.com/sep2/vite-plugin-taro)
@@ -41,6 +41,22 @@ npm install
 
 开发期间保持命令运行。模板已开启热更新、关闭本地开发的 URL 校验，并默认关闭开发者工具中暂不支持热更新的 Skyline。
 
+### 支付宝小程序
+
+1. 在 `.env.local` 中填写支付宝 App ID：
+
+    ```dotenv
+    VITE_VPT_ALIPAY_APP_ID=2021000000000000
+    ```
+
+2. 启动开发构建：
+
+    ```sh
+    npm run dev:zfb
+    ```
+
+3. 用支付宝小程序开发者工具导入 `dist/zfb`，不要导入项目根目录。
+
 ### Web
 
 ```sh
@@ -58,9 +74,9 @@ import Taro from 'virtual:taro/api'
 import { Button, Text, View } from 'virtual:taro/components'
 ```
 
-不要直接安装或导入 `@tarojs/*`。在 `vite.config.ts` 中添加页面并修改应用或微信项目配置。
+不要直接安装或导入 `@tarojs/*`。在 `vite.config.ts` 中添加页面，并按当前目标修改应用与开发工具项目配置。
 
-模板包含条件编译、微信原生组件、懒加载、自定义导航栏、Tailwind CSS、CSS Modules 和全局样式示例；不需要的示例可直接删除。
+模板包含条件编译、微信原生组件、支付宝与 Web 共用的 Taro 组件、懒加载、自定义导航栏、Tailwind CSS、CSS Modules 和全局样式示例；不需要的示例可直接删除。
 
 ### 样式
 
@@ -68,23 +84,25 @@ import { Button, Text, View } from 'virtual:taro/components'
 
 ### 热更新
 
-微信端热更新通常会保留 App 数据、当前页面、兼容的 React Hook 状态和原生输入值。修改 Vite 配置、组件或 Hook 结构不兼容，或更新无法安全应用时，会整页重载。详见[热更新指南](https://vpt.js.org/guides/hot-module-replacement/)。
+小程序端热更新通常会保留 App 数据、当前页面、兼容的 React Hook 状态和原生输入值。修改 Vite 配置、组件或 Hook 结构不兼容，或更新无法安全应用时，会整页重载。详见[热更新指南](https://vpt.js.org/guides/hot-module-replacement/)。
 
 ## 命令
 
 | 命令 | 用途 | 输出 |
 | --- | --- | --- |
 | `npm run dev:wx` | 开发微信小程序 | `dist/wx` |
+| `npm run dev:zfb` | 开发支付宝小程序 | `dist/zfb` |
 | `npm run dev:h5` | 开发 Web | — |
 | `npm run build:wx` | 构建微信小程序 | `dist/wx` |
+| `npm run build:zfb` | 构建支付宝小程序 | `dist/zfb` |
 | `npm run build:h5` | 构建 Web | `dist/h5` |
 | `npm run preview:h5` | 预览 Web 生产构建 | — |
 | `npm run typecheck` | TypeScript 类型检查 | — |
 
 ## 常见问题
 
-- **开发者工具无法打开项目：** 确认导入的是 `dist/wx`，且 `.env.local` 中的 App ID 可用。
-- **热更新失败：** 依次关闭微信开发者工具、停止 `dev:wx`、删除 `dist/wx`、重新运行 `npm run dev:wx`，再打开开发者工具并导入 `dist/wx`。
+- **开发者工具无法打开项目：** 确认导入的是当前目标的 `dist/wx` 或 `dist/zfb`，且 `.env.local` 中对应的 App ID 可用。
+- **热更新失败：** 关闭对应开发者工具，停止开发命令，删除当前目标的输出目录，重新运行 `dev:wx` 或 `dev:zfb`，再导入生成目录。
 - **Tailwind 类未生效：** 保留 `src/app.css` 中的 `@source "./";`，并使用完整类名。
 - **pnpm 忽略依赖构建脚本：** 运行 `pnpm approve-builds`，批准所需脚本后重新安装。
 

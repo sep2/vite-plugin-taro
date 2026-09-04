@@ -2,8 +2,8 @@
 import { NativeCounter } from './native-counter.tsx'
 // #endif
 
-// #ifdef h5
-import { WebCounter } from './web-counter.tsx'
+// #ifndef wx
+import { SharedCounter } from './shared-counter.tsx'
 // #endif
 
 export interface CounterProps {
@@ -17,7 +17,7 @@ export function Counter(props: CounterProps) {
     return <NativeCounter {...props} />
     // #endif
 
-    // #ifdef h5
-    return <WebCounter {...props} />
+    // #ifndef wx
+    return <SharedCounter {...props} />
     // #endif
 }

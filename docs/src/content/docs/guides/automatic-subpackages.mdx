@@ -1,12 +1,12 @@
 ---
 title: 全自动分包
-description: 使用动态导入，让 vpt 自动管理微信小程序的主包与分包。
+description: 使用动态导入，让 vpt 自动管理微信与支付宝小程序的主包和分包。
 ---
 
 import AutomaticSubpackagesDiagram from '../../../components/automatic-subpackages-diagram.astro'
 import FloatingContent from '../../../components/floating-content.astro'
 
-开发者不再需要关心微信小程序的单包 2M 限制。
+开发者不再需要关心小程序的单包 2M 限制。
 
 应用代码可按照标准 Web 规则互相引用。
 
@@ -99,7 +99,7 @@ function ReportEntry() {
 
 和 Web 一样，做个骨架屏，然后通过 `React.lazy()` 和 `<Suspense>` 去动态加载真正的页面组件。这个组件就会被自动分包。
 
-当然，页面也可以是原生页面，只要按照 [微信原生组件](/guides/native-components/) 设置，也可以通过同样的 `<Suspense>` 去加载。
+当然，页面内容也可以使用原生组件；按照[原生组件](/guides/native-components/)设置后，可以通过同样的 `<Suspense>` 按需加载。
 
 ## 设计原则
 
@@ -114,7 +114,7 @@ function ReportEntry() {
 
 | 源码关系                             | 结果                                               |
 |--------------------------------------|----------------------------------------------------|
-| App、页面及其静态依赖                | 微信要求同步启动，所以保留在主包                   |
+| App、页面及其静态依赖                | 小程序要求同步启动，所以保留在主包                 |
 | 仅通过动态 `import()` 到达的功能入口 | 参与全自动位置规划                                 |
 | 动态 `import()` 后面的静态依赖       | 参与全自动位置规划；若同时也是启动依赖，则留在主包 |
 | 按需功能内部的下一层动态 `import()`  | 参与全自动位置规划                                 |
@@ -124,12 +124,12 @@ function ReportEntry() {
 
 ## 原生组件与其他资源
 
-微信原生组件会参与位置规划。vpt 会把原生组件目录的文件体积计入声明模块，并将目录输出到该模块最终所属的主包或分包。接入方式、类型 schema 和动态加载示例参见[微信原生组件](/guides/native-components/)。
+小程序原生组件会参与位置规划。vpt 会把原生组件目录的文件体积计入声明模块，并将目录输出到该模块最终所属的主包或分包。接入方式、类型 schema 和动态加载示例参见[原生组件](/guides/native-components/)。
 只要整个原生组件的目录不超过 2M，可以完全交给 vpt 自动规划。
 
-固定入口 `app.wxss`、它导入的 `assets/global.wxss`、图片、字体和其他普通构建资源暂不参与位置规划；对这些资源的自动规划已列入后续版本，敬请期待。
+固定 App 样式入口、它导入的全局样式、图片、字体和其他普通构建资源暂不参与位置规划；对这些资源的自动规划已列入后续版本。
 
 
 ## 原理与实现
 
-位置规划算法、跨分包加载方式和微信运行时原理参见[模块系统](/references/module-system/)。
+位置规划算法、跨分包加载方式和小程序运行时原理参见[模块系统](/references/module-system/)。

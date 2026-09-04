@@ -1,19 +1,19 @@
 ---
 title: 快速开始
-description: 从创建项目到运行微信小程序与 Web 应用。
+description: 从创建项目到运行微信小程序、支付宝小程序与 Web 应用。
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components'
 import HmrVideoFrame from '../../../components/hmr-video-frame.astro'
 
-本指南使用 `create-vite-taro` 创建一个同时支持微信小程序和 Web 的应用。默认模板已经配置好 Vite 8、React 19、Taro 4、TypeScript 和 Tailwind CSS v4。
+本指南使用 `create-vite-taro` 创建一个同时支持微信小程序、支付宝小程序和 Web 的应用。默认模板已经配置好 Vite 8、React 19、Taro 4、TypeScript 和 Tailwind CSS v4。
 
 ## 准备工作
 
 - Node.js 24 或更高版本。
 - npm、pnpm 或 bun。推荐使用 pnpm。
-- 安装[微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)最新版。
-- 微信小程序 App ID。没有 App ID 时也可以先使用测试号体验部分功能。
+- 安装[微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)和/或支付宝小程序开发者工具最新版。
+- 对应平台的小程序 App ID。没有微信 App ID 时也可以先使用测试号体验部分功能。
 
 ## 1. 创建项目
 
@@ -47,12 +47,13 @@ bun install
     </TabItem>
 </Tabs>
 
-## 2. 配置微信 App ID
+## 2. 配置小程序 App ID
 
-创建工具会在 `.env.local` 中生成一个占位 App ID。开发自己的小程序前，请替换为真实值：
+创建工具会在 `.env.local` 中生成占位值。开发自己的小程序前，请替换当前平台的真实值：
 
 ```dotenv
 VITE_VPT_WECHAT_APP_ID=wx1234567890abcdef
+VITE_VPT_ALIPAY_APP_ID=2021000000000000
 ```
 
 `.env.local` 已被 Git 忽略，不会提交到仓库。
@@ -100,7 +101,17 @@ dist/wx
 
 <HmrVideoFrame variant="embedded" />
 
-## 4. 运行 Web 应用
+## 4. 运行支付宝小程序
+
+启动 ZFB 开发模式：
+
+```sh
+npm run dev:zfb
+```
+
+等待 Vite 完成初始构建，然后在支付宝小程序开发者工具中导入 `dist/zfb`。
+
+## 5. 运行 Web 应用
 
 在另一个终端中启动 H5 开发服务器：
 
@@ -130,7 +141,7 @@ bun run dev:h5
 
 浏览器访问终端显示的地址。Vite 默认从 [http://localhost:5173](http://localhost:5173) 开始选择端口；如果该端口已被微信开发服务占用，会自动使用下一个可用端口。`dev:wx` 和 `dev:h5` 可以同时运行。
 
-## 5. 编辑第一个页面
+## 6. 编辑第一个页面
 
 模板的默认首页组件位于 `src/pages/home/index.tsx`。应用代码通过 vpt 提供的模块使用 Taro 组件和 API：
 
@@ -159,19 +170,20 @@ export default HomePage
 | --- | --- |
 | `virtual:taro/components` | `View`、`Text`、`Button`、`Image`、`ScrollView` 等 Taro React 组件。 |
 | `virtual:taro/api` | `Taro.navigateTo`、`Taro.getWindowInfo`、`Taro.useLaunch` 等 API 和 hooks。 |
-| `virtual:taro/native` | 为微信小程序声明带类型的原生组件属性和事件。 |
+| `virtual:taro/native` | 为当前小程序目标声明带类型的原生组件属性和事件。 |
 
 :::caution
 不要安装或直接导入 `@tarojs/*` 包。
 :::
 
-## 6. 构建与检查
+## 7. 构建与检查
 
 <Tabs syncKey="package-manager">
     <TabItem label="npm">
 
 ```sh
 npm run build:wx     # 构建微信小程序到 dist/wx
+npm run build:zfb    # 构建支付宝小程序到 dist/zfb
 npm run build:h5     # 构建 Web 应用到 dist/h5
 npm run preview:h5   # 预览 Web 生产构建
 npm run typecheck    # 使用 tsc 检查类型
@@ -182,6 +194,7 @@ npm run typecheck    # 使用 tsc 检查类型
 
 ```sh
 pnpm build:wx        # 构建微信小程序到 dist/wx
+pnpm build:zfb       # 构建支付宝小程序到 dist/zfb
 pnpm build:h5        # 构建 Web 应用到 dist/h5
 pnpm preview:h5      # 预览 Web 生产构建
 pnpm typecheck       # 使用 tsc 检查类型
@@ -192,6 +205,7 @@ pnpm typecheck       # 使用 tsc 检查类型
 
 ```sh
 bun run build:wx     # 构建微信小程序到 dist/wx
+bun run build:zfb    # 构建支付宝小程序到 dist/zfb
 bun run build:h5     # 构建 Web 应用到 dist/h5
 bun run preview:h5   # 预览 Web 生产构建
 bun run typecheck    # 使用 tsc 检查类型
@@ -205,9 +219,10 @@ bun run typecheck    # 使用 tsc 检查类型
 | 目标 | 开发脚本 | 生产构建脚本 | 输出目录 |
 | --- | --- | --- | --- |
 | 微信小程序（`wx`） | `dev:wx` | `build:wx` | `dist/wx` |
+| 支付宝小程序（`zfb`） | `dev:zfb` | `build:zfb` | `dist/zfb` |
 | Web（`h5`） | `dev:h5` | `build:h5` | `dist/h5` |
 
-## 7. 了解项目结构
+## 8. 了解项目结构
 
 项目的核心文件如下：
 
@@ -226,16 +241,16 @@ my-app/
             └── index.tsx
 ```
 
-- `vite.config.ts` 配置构建目标、页面、应用和微信项目。
+- `vite.config.ts` 标准 vite 项目的配置文件。
 - `src/app.tsx` 是应用入口。
 - `src/app.css` 包含全局样式和 Tailwind CSS v4 配置。
 - `src/pages/home/index.tsx` 是模板的默认首页组件。
 
 ## 常见问题
 
-### 微信开发者工具无法打开项目
+### 小程序开发者工具无法打开项目
 
-确认导入的是 `dist/wx`，并检查 `.env.local` 中的 App ID 是否属于当前微信开发者账号。
+确认导入的是 `dist/wx` 或 `dist/zfb`，并检查 `.env.local` 中对应的 App ID 是否属于当前开发者账号。
 
 ### Tailwind 工具类没有生效
 
@@ -260,10 +275,10 @@ my-app/
 - 使用 [AI 开发指南](/guides/ai/)，让编程助手直接实现并验证功能。
 - 理解 [App 与页面](/guides/app-and-pages/) 的布局、状态和生命周期关系。
 - 了解[样式](/guides/styles/)，使用Tailwind CSS v4 和 CSS Modules。
-- 了解[全自动分包](/guides/automatic-subpackages/)，使用动态导入减小微信小程序主包。
-- 在 React 中接入[微信原生组件](/guides/native-components/)。
+- 了解[全自动分包](/guides/automatic-subpackages/)，使用动态导入减小小程序主包。
+- 在 React 中接入[原生组件](/guides/native-components/)。
 - 配置和调试[Skyline 模式](/guides/skyline-mode/)。
-- 阅读[配置选项](/guides/configuration/)，添加页面并调整应用与微信项目配置。
+- 阅读[配置选项](/guides/configuration/)，添加页面并调整项目配置。
 - 已有 Taro React 项目时，阅读[从 Taro 迁移](/guides/migrate-from-taro/)。
 - 查看完整的 [`loan-genius` 示例应用](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius)。
 - 深入了解[开发热更新](/guides/hot-module-replacement/)。

@@ -1,11 +1,11 @@
 ---
 title: 开发热更新
-description: 在微信开发者工具中更新代码和样式，并保留应用状态。
+description: 在微信或支付宝小程序开发工具中更新代码和样式，并保留应用状态。
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components'
 
-`create-vite-taro` 模板已经启用微信热更新，无需额外配置。
+`create-vite-taro` 模板已经启用小程序开发者工具热更新，无需额外配置。
 
 ## 使用
 
@@ -35,9 +35,9 @@ bun run dev:wx
     </TabItem>
 </Tabs>
 
-等待构建完成，在微信开发者工具中打开 `dist/wx`。
+等待构建完成，在微信开发者工具中打开 `dist/wx`。开发支付宝小程序时运行 `npm run dev:zfb`，在支付宝小程序开发者工具中打开 `dist/zfb`。
 
-保存 JavaScript、TypeScript、React 组件或样式后，开发者工具会自动显示更新。
+保存 JavaScript、TypeScript、React 组件或样式后，当前开发者工具会自动显示更新。
 
 ## 选择热更新模式
 
@@ -57,11 +57,11 @@ hmr: {
 }
 ```
 
-默认的 `devtools` 模式通过微信开发者工具执行更新，速度更快，开发运行时代码也更小。更新 JavaScript 时，开发者工具会重新注册当前 Page，但 vpt 会保留下文列出的应用和页面状态。
+默认的 `devtools` 模式通过小程序开发工具执行更新，速度更快，开发运行时代码也更小。更新 JavaScript 时，工具会重新注册当前 Page，但 vpt 会保留下文列出的应用和页面状态。
 
 `interpreter` 模式绕过 Page 重新注册，直接在当前 App 中执行更新。它的开发运行时更大，执行更新也更慢。除非默认模式出现问题，否则无需切换。
 
-该选项只影响微信本地开发中的 JavaScript 热更新，不影响 H5 或生产构建。
+该选项只影响小程序本地开发中的 JavaScript 热更新，不影响 H5 或生产构建。
 
 若希望每次构建都全量输出，不用热更新缓存，可这样调用：
 <Tabs syncKey="package-manager">
@@ -134,7 +134,7 @@ projectPrivateConfigJson: {
 以下情况会重新启动应用：
 
 - 点击开发者工具的“编译”；
-- 重启 `dev:wx` 或修改 Vite 配置；
+- 重启 `dev:wx` / `dev:zfb` 或修改 Vite 配置；
 - 某次代码变化无法安全热更新，vpt 自动执行完整构建。
 
 完整构建是热更新无法继续时的正常恢复方式，终端会显示相应提示。
@@ -143,12 +143,12 @@ projectPrivateConfigJson: {
 
 依次检查：
 
-1. `dev:wx` 仍在运行且终端没有构建错误；
-2. 开发者工具打开的是当前项目的 `dist/wx`；
-3. `compileHotReLoad` 已开启，`urlCheck` 已关闭；
-4. `skylineRenderEnable` 未开启。
+1. `dev:wx` 或 `dev:zfb` 仍在运行且终端没有构建错误；
+2. 开发者工具打开的是当前项目对应的 `dist/wx` 或 `dist/zfb`；
+3. 微信已开启 `compileHotReLoad` 并关闭 `urlCheck`，支付宝已开启 `enableHMR`；
+4. 微信调试时 `skylineRenderEnable` 未开启。
 
-仍然无效时，关闭开发者工具和开发命令，删除 `dist/wx`，重新运行 `dev:wx` 后再打开生成目录。
+仍然无效时，关闭开发者工具和开发命令，删除 `dist/wx` / `dist/zfb`，重新运行 `dev:wx` / `dev:zfb` 后再打开生成目录。
 
 
 实现细节参见[热更新实现原理](/references/hmr-implementation/)。
