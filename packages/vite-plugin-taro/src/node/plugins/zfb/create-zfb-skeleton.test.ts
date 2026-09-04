@@ -25,6 +25,9 @@ const contract = createZfbMiniContract({
             globalObjectMode: 'enable',
             transpile: {}
         }
+    },
+    projectPrivateConfigJson: {
+        ignoreHttpDomainCheck: true
     }
 })
 
@@ -67,6 +70,7 @@ test('assembles contract-selected Alipay templates without WX dialect output', (
             'pages/meta/index.axml',
             'pages/meta/index.acss',
             'mini.project.json',
+            '.mini-ide/project-ide.json',
             '.browserslistrc'
         ]
     )
@@ -86,6 +90,9 @@ test('assembles contract-selected Alipay templates without WX dialect output', (
             globalObjectMode: 'enable',
             transpile: {}
         }
+    })
+    assert.deepEqual(JSON.parse(assets.get('.mini-ide/project-ide.json') ?? ''), {
+        ignoreHttpDomainCheck: true
     })
     assert.equal(assets.get('.browserslistrc'), 'defaults and fully supports es6-module')
     assert.equal(
