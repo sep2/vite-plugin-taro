@@ -127,8 +127,9 @@ function createFixture(): LoanHmrFixture {
 
 async function configureAutomatableRenderer(fixture: LoanHmrFixture): Promise<void> {
     await replaceFixtureSource(fixture, 'vite.config.ts', [
+        ["                renderer: 'skyline',\n", ''],
         [
-            "                    renderer: 'skyline',\n                    componentFramework: 'glass-easel',\n                    rendererOptions: {\n                        skyline: {\n                            defaultDisplayBlock: true,\n                            defaultContentBox: true\n                        }\n                    },\n",
+            '                rendererOptions: {\n                    skyline: {\n                        defaultDisplayBlock: true,\n                        defaultContentBox: true\n                    }\n                },\n',
             ''
         ]
     ])

@@ -31,6 +31,8 @@ export default defineConfig(({ mode }) => {
                 ],
                 appJson: {
                     lazyCodeLoading: 'requiredComponents',
+                    componentFramework: 'glass-easel',
+                    glassEaselWebview: true,
                     window: {
                         navigationBarTitleText: 'Native component demo'
                     }

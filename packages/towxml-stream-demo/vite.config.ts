@@ -25,6 +25,8 @@ export default defineConfig(({ mode }) => {
                 ],
                 appJson: {
                     lazyCodeLoading: 'requiredComponents',
+                    componentFramework: 'glass-easel',
+                    glassEaselWebview: true,
                     window: {
                         backgroundColor: '#f1f5f9',
                         navigationBarBackgroundColor: '#ffffff',

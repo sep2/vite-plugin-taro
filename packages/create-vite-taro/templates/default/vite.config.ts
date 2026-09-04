@@ -62,6 +62,7 @@ function createAppJson(target: VptTarget): VptJsonObject {
                 lazyCodeLoading: 'requiredComponents',
                 renderer: 'skyline',
                 componentFramework: 'glass-easel',
+                glassEaselWebview: true,
                 rendererOptions: {
                     skyline: {
                         defaultDisplayBlock: true,
