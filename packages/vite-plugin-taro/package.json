@@ -1,6 +1,6 @@
 {
     "name": "vite-plugin-taro",
-    "version": "0.6.20",
+    "version": "0.6.21-beta.0",
     "author": "sep2",
     "description": "Vite 8 plugin for building one React/Taro codebase for WeChat, Alipay, and H5 targets.",
     "type": "module",

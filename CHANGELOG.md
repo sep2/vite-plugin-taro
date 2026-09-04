@@ -4,9 +4,52 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
-## [0.6.20] - 2026-08-31
+## [0.6.21-beta.0] - 2026-09-04
 
-Initial release.
+### Added
+
+- zfb hmr (2ce8e0d)
+- zfb lazyCompile: false (abbae54)
+- zfb lazyCompile: true (45797a5)
+- add zfb (40510db)
+
+### Changed
+
+- cover zfb private project config (4fc423f)
+- cache navigation bar metrics (8a27b88)
+- clarify zfb private project config (2a4ba84)
+- use globalThis for mini runtime state (f3b4c41)
+- vite config (006025d)
+- css (8e4d1ab)
+- deps (37aa031)
+- zfb (3a42baf)
+- zfb (bfaf8cf)
+- zfb (ce345dc)
+- zfb (64bc61d)
+- zfb (2dbf0ab)
+- zfb (7dba7ff)
+- zfb (b4b8d61)
+- define vpt config types (6714cd5)
+- isolate mini runtime platform adapters (603d802)
+- share mini program runtime (366b30d)
+- fix (15a238c)
+- define mini platform contract (a67fcc1)
+- neutralize mini plugin naming (4cf12d6)
+- redesign dark mode (2f90842)
+- introduce mini contract boundary (3df4373)
+- extract mini program plugin core (541db59)
+- fix names (8e38fd6)
+- clarify wx hmr mode tradeoffs (34d2ce6)
+
+### Fixed
+
+- execute zfb interpreter patches (596f682)
+- size Alipay navigation bars from native metrics (8f4e600)
+- avoid unsupported Error.isError in mini runtime (bf38589)
+- zfb private config (b026166)
+- remove axmlStrictCheck (2aecafd)
+- install mini HMR globals on globalThis (4f4ce46)
+- polyfill mini refresh microtasks (fe6a43a)
 
 ## [0.6.20-beta.3] - 2026-08-31
 
@@ -56,12 +99,44 @@ Initial release.
 
 ## [0.6.20-beta.0] - 2026-08-29
 
+Initial release.
+
+## [0.6.20] - 2026-08-31
+
+### Added
+
+- add WebSocket interpreter HMR mode (5b111fc)
+
 ### Changed
 
+- lazily materialize wrapper snapshots (eae206e)
+- stop wrapper snapshot traversal early (4b473ac)
+- add Alipay support plan (c390755)
+- docs (919202f)
+- send HMR reports over WebSocket (7b48551)
+- remove HMR subscription replay (673634a)
+- centralize HMR effects in dev host (945c572)
+- types (c522f36)
+- hmr interpreter mode (bc13ab0)
+- use WebSocket for HMR reports (7470232)
+- isolate DevTools HMR mode (ed9b6a6)
+- show latest version in llms index (08b1942)
+- explain wx autoprefixer policy (b7347ba)
+- prune unused wx style dependencies (43e6675)
+- restore wx transformer coverage (60be0d3)
+- simplify wx style pipeline (fcecfb6)
+- specialize wx tailwind pipeline (b6fee48)
 - reduce plugin bundle size (26bd290)
 - design wx hmr mode abstraction (e04627a)
 - reuse projected Tailwind class set (8d9cfeb)
 - bind style compiler to Vite root (d467827)
+
+### Fixed
+
+- fix h5 build (aa254aa)
+- fix demo (93335de)
+- preserve CustomWrapper snapshots during HMR (1ff3939)
+- release wx class transform caches (e817950)
 
 ## [0.6.19-beta.0] - 2026-08-28
 
