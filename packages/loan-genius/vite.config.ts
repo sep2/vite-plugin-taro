@@ -149,7 +149,7 @@ function createProjectConfigJson({
                     }
                 },
                 developOptions: {
-                    lazyCompile: true,
+                    lazyCompile: false,
                     hotReload: true,
                     skipTranspile: true,
                     sourcemap: false,
