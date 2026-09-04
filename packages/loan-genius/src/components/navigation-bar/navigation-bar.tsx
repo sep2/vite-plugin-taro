@@ -2,7 +2,6 @@ import Taro from 'virtual:taro/api'
 import { View } from 'virtual:taro/components'
 import clsx from 'clsx'
 import type { CSSProperties, PropsWithChildren, ReactNode } from 'react'
-import { useMemo } from 'react'
 
 interface NavigationBarMetrics {
     height: number
@@ -12,11 +11,21 @@ interface NavigationBarMetrics {
     menuWidth: number
 }
 
+interface MenuButtonMetrics {
+    height: number
+    right: number
+    top: number
+    width: number
+}
+
 /** Alipay fields narrowed from Taro's shared system-info result type. */
 type AlipaySystemInfo = ReturnType<typeof Taro.getSystemInfoSync> & {
     statusBarHeight: number
     titleBarHeight: number
 }
+
+// The app uses one immutable navigation layout per process; this mutable slot avoids repeated native reads across Page mounts.
+let cachedNavigationBarMetrics: NavigationBarMetrics | undefined
 
 export interface NavigationBarProps {
     left?: ReactNode
@@ -39,9 +48,8 @@ function px(value: number): string {
 const isWechatTarget = import.meta.env.VITE_VPT_TARGET === 'wx'
 const isAlipayTarget = import.meta.env.VITE_VPT_TARGET === 'zfb'
 
-function getAlipayNavigationBarMetrics(): NavigationBarMetrics {
-    // Alipay 4.2.1 exposes these native title metrics through the established system-info API.
-    const { statusBarHeight, titleBarHeight } = Taro.getSystemInfoSync() as AlipaySystemInfo
+function getAlipayNavigationBarMetrics(systemInfo: AlipaySystemInfo): NavigationBarMetrics {
+    const { statusBarHeight, titleBarHeight } = systemInfo
 
     return {
         height: statusBarHeight + titleBarHeight,
@@ -52,28 +60,43 @@ function getAlipayNavigationBarMetrics(): NavigationBarMetrics {
     }
 }
 
-function getNavigationBarMetrics(): NavigationBarMetrics {
-    if (isAlipayTarget) return getAlipayNavigationBarMetrics()
+function getNavigationBarMetrics(
+    screenWidth: number,
+    statusBarHeight: number,
+    menuButtonMetrics: MenuButtonMetrics
+): NavigationBarMetrics {
+    const menuButtonStatusBarGap = menuButtonMetrics.top - statusBarHeight
+
+    return {
+        height: menuButtonStatusBarGap * 2 + menuButtonMetrics.height + statusBarHeight,
+        top: statusBarHeight,
+        paddingX: screenWidth - menuButtonMetrics.right,
+        paddingY: menuButtonStatusBarGap,
+        menuWidth: menuButtonMetrics.width
+    }
+}
+
+function getNavigationBarMetricsCached(): NavigationBarMetrics {
+    if (cachedNavigationBarMetrics) return cachedNavigationBarMetrics
+
+    if (isAlipayTarget) {
+        cachedNavigationBarMetrics = getAlipayNavigationBarMetrics(Taro.getSystemInfoSync() as AlipaySystemInfo)
+        return cachedNavigationBarMetrics
+    }
 
     const windowInfo = Taro.getWindowInfo()
     const statusBarHeight = isWechatTarget ? (windowInfo.statusBarHeight ?? 44) : 0
-    const menuButtonInfo = isWechatTarget
+    const menuButtonMetrics = isWechatTarget
         ? Taro.getMenuButtonBoundingClientRect()
         : {
-              top: 6,
+              height: 32,
               right: windowInfo.screenWidth - 16,
-              width: 44,
-              height: 32
+              top: 6,
+              width: 44
           }
-    const menuButtonStatusBarGap = menuButtonInfo.top - statusBarHeight
 
-    return {
-        height: menuButtonStatusBarGap * 2 + menuButtonInfo.height + statusBarHeight,
-        top: statusBarHeight,
-        paddingX: windowInfo.screenWidth - menuButtonInfo.right,
-        paddingY: menuButtonStatusBarGap,
-        menuWidth: menuButtonInfo.width
-    }
+    cachedNavigationBarMetrics = getNavigationBarMetrics(windowInfo.screenWidth, statusBarHeight, menuButtonMetrics)
+    return cachedNavigationBarMetrics
 }
 
 function getBackgroundStyle(backgroundColor: string, background?: string): CSSProperties {
@@ -110,7 +133,7 @@ function BackButton(props: BackButtonProps) {
 }
 
 export function NavigationBar(props: PropsWithChildren<NavigationBarProps>) {
-    const metrics = useMemo(getNavigationBarMetrics, [])
+    const metrics = getNavigationBarMetricsCached()
 
     const color = props.color ?? '#0B0F12'
     const backgroundColor = props.backgroundColor ?? '#fff'

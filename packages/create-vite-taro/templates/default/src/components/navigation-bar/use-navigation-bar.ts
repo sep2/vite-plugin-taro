@@ -1,5 +1,4 @@
 import Taro from 'virtual:taro/api'
-import { useMemo } from 'react'
 
 const isWechatTarget = import.meta.env.VITE_VPT_TARGET === 'wx'
 const isAlipayTarget = import.meta.env.VITE_VPT_TARGET === 'zfb'
@@ -25,6 +24,9 @@ type AlipaySystemInfo = ReturnType<typeof Taro.getSystemInfoSync> & {
     titleBarHeight: number
 }
 
+// The app uses one immutable navigation layout per process; this mutable slot avoids repeated native reads across Page mounts.
+let cachedNavigationBarMetrics: NavigationBarMetrics | undefined
+
 function getFallbackMenuButtonMetrics(screenWidth: number): MenuButtonMetrics {
     return {
         height: 32,
@@ -43,9 +45,8 @@ function getMenuButtonMetrics(screenWidth: number): MenuButtonMetrics {
     return getFallbackMenuButtonMetrics(screenWidth)
 }
 
-function getAlipayNavigationBarMetrics(): NavigationBarMetrics {
-    // Alipay 4.2.1 exposes these native title metrics through the established system-info API.
-    const { statusBarHeight, titleBarHeight } = Taro.getSystemInfoSync() as AlipaySystemInfo
+function getAlipayNavigationBarMetrics(systemInfo: AlipaySystemInfo): NavigationBarMetrics {
+    const { statusBarHeight, titleBarHeight } = systemInfo
 
     return {
         height: statusBarHeight + titleBarHeight,
@@ -56,13 +57,11 @@ function getAlipayNavigationBarMetrics(): NavigationBarMetrics {
     }
 }
 
-function getNavigationBarMetrics(): NavigationBarMetrics {
-    if (isAlipayTarget) return getAlipayNavigationBarMetrics()
-
-    const windowInfo = Taro.getWindowInfo()
-    const screenWidth = windowInfo.screenWidth || 375
-    const statusBarHeight = isWechatTarget ? (windowInfo.statusBarHeight ?? 44) : 0
-    const menuButtonMetrics = getMenuButtonMetrics(screenWidth)
+function getNavigationBarMetrics(
+    screenWidth: number,
+    statusBarHeight: number,
+    menuButtonMetrics: MenuButtonMetrics
+): NavigationBarMetrics {
     const menuButtonStatusBarGap = Math.max(0, menuButtonMetrics.top - statusBarHeight)
 
     return {
@@ -74,6 +73,23 @@ function getNavigationBarMetrics(): NavigationBarMetrics {
     }
 }
 
+function getNavigationBarMetricsCached(): NavigationBarMetrics {
+    if (cachedNavigationBarMetrics) return cachedNavigationBarMetrics
+
+    if (isAlipayTarget) {
+        cachedNavigationBarMetrics = getAlipayNavigationBarMetrics(Taro.getSystemInfoSync() as AlipaySystemInfo)
+        return cachedNavigationBarMetrics
+    }
+
+    const windowInfo = Taro.getWindowInfo()
+    const screenWidth = windowInfo.screenWidth || 375
+    const statusBarHeight = isWechatTarget ? (windowInfo.statusBarHeight ?? 44) : 0
+    const menuButtonMetrics = getMenuButtonMetrics(screenWidth)
+
+    cachedNavigationBarMetrics = getNavigationBarMetrics(screenWidth, statusBarHeight, menuButtonMetrics)
+    return cachedNavigationBarMetrics
+}
+
 export function useNavigationBar(): NavigationBarMetrics {
-    return useMemo(getNavigationBarMetrics, [])
+    return getNavigationBarMetricsCached()
 }
