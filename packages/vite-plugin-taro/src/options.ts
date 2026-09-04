@@ -89,9 +89,11 @@ export interface VptOptions {
     projectConfigJson: VptJsonObject
 
     /**
-     * Local WeChat DevTools overrides written to `project.private.config.json` without merging.
+     * Local development-tool preferences written without merging.
      *
-     * The file is emitted only when this value is provided for a `wx` build. It is ignored for ZFB and H5.
+     * WX emits this object as `project.private.config.json`; ZFB emits it as `.mini-ide/project-ide.json`; H5 ignores it.
+     * These files control local IDE behavior rather than portable application metadata. In particular, the ZFB file does not
+     * associate the project with an Alipay App ID; Alipay Mini Program Studio keeps that selection in its workspace storage.
      */
     projectPrivateConfigJson?: VptJsonObject
 
