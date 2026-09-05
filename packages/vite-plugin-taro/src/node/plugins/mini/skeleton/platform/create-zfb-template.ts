@@ -1,6 +1,6 @@
+import { components as zfbComponents } from '@tarojs/plugin-platform-alipay/dist/runtime-utils.js'
 import { capitalize, RecursiveTemplate, toCamelCase } from '@tarojs/shared/dist/template.js'
 import { recursiveMerge } from '../recursive-merge.ts'
-import zfbComponents from './zfb-components.json' with { type: 'json' }
 
 type ComponentAttributes = Record<string, string>
 type ComponentDefinitions = Record<string, ComponentAttributes>

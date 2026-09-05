@@ -1,6 +1,6 @@
+import { components as wxComponents } from '@tarojs/plugin-platform-weapp/dist/runtime-utils.js'
 import { UnRecursiveTemplate } from '@tarojs/shared/dist/template.js'
 import { recursiveMerge } from '../recursive-merge.ts'
-import wxComponents from './wx-components.json' with { type: 'json' }
 
 type ComponentAttributes = Record<string, string>
 type ComponentDefinitions = Record<string, ComponentAttributes>
