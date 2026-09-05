@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { isReferenceIdentifier, type WalkerEnter } from 'oxc-walker'
+import type { WalkerEnter } from 'oxc-walker'
 import type { RolldownMagicString } from 'rolldown'
 import { normalizePath, type Plugin } from 'vite'
 import { memoize } from '../../../utils/memoize.ts'
@@ -17,6 +17,16 @@ const reactReconcilerDevelopmentId = normalizePath(
 
 /** The React DevTools hook protocol name; free references must target the real Mini Program JavaScript global. */
 const reactDevtoolsHookProtocol = '__REACT_DEVTOOLS_GLOBAL_HOOK__'
+
+/**
+ * Creates the serve-only Oxc substitution for React's free DevTools-hook references.
+ *
+ * Bundled Vite folds `define` into its existing native Oxc transform. Oxc rewrites only free references, preserving explicit
+ * members, property keys, string contents, and shadowed bindings without an all-module plugin filter or a second AST parse.
+ */
+export function createMiniReactRefreshDefines(isDevelopment: boolean): Record<string, string> {
+    return isDevelopment ? { [reactDevtoolsHookProtocol]: `globalThis.${reactDevtoolsHookProtocol}` } : {}
+}
 
 /**
  * Refresh protocol globals that must live on the real Mini Program JavaScript global:
@@ -40,14 +50,11 @@ const refreshRuntimeWindowGlobals = ['__registerBeforePerformReactRefresh', '__g
  *   and injects its renderer hook at module evaluation, replacing the missing HTML preamble.
  * - React Reconciler is selected by exact physical ID. Its renderer injection receives a static dependency on the refresh
  *   runtime, so hook installation cannot race renderer initialization during cold startup.
- * - React-family modules are selected by the reserved free DevTools-hook identifier. Their expression references are rewritten
- *   as explicit `globalThis` members; an AST visitor edits only those identifier ranges after the filter admits the module.
  *
- * These adaptations deliberately remain serve-only plugin transforms rather than target-wide `define` entries. That scope
- * prevents development protocol behavior from leaking into production or unrelated Mini Program modules. Plugin order also
- * matters: Reconciler receives its static refresh dependency before the later DevTools-hook transform lowers its free references.
- * The final capsule renderer removes React boundaries' browser-preamble assertion during its existing AST traversal, avoiding a
- * dedicated all-module source filter and second parse for every boundary.
+ * These adaptations deliberately remain serve-only plugin transforms rather than target-wide production behavior. Reconciler's
+ * static refresh dependency establishes hook installation order. The Mini config lowers React's free DevTools-hook protocol with
+ * a serve-only native Oxc define, while the final capsule renderer removes React boundaries' browser-preamble assertion during
+ * its existing AST traversal. Neither compatibility edge needs a dedicated all-module source filter or second parse.
  */
 export function createMiniReactRefreshTransforms(): Plugin[] {
     return [
@@ -73,51 +80,8 @@ export function createMiniReactRefreshTransforms(): Plugin[] {
                     return injectReactRefreshRendererDependency(code)
                 }
             }
-        },
-        {
-            name: 'vpt:mini-react-devtools-hook',
-            apply: 'serve',
-            transform: {
-                order: 'post',
-                // This reserved free identifier occurs in React-family modules. The AST visitor changes only reference
-                // identifiers, leaving explicit members, property keys, and string contents byte-for-byte intact.
-                filter: { code: /(^|[^.\w$])__REACT_DEVTOOLS_GLOBAL_HOOK__/ },
-                handler(code, id) {
-                    return fixReactDevtoolsHook({ code, id })
-                }
-            }
         }
     ]
-}
-
-/**
- * React-family modules: free `__REACT_DEVTOOLS_GLOBAL_HOOK__` reads must target the language global.
- *
- * React checks the hook through free expressions such as `typeof __REACT_DEVTOOLS_GLOBAL_HOOK__` before calling
- * `hook.inject(...)`, while VPT installs the protocol on `globalThis`. Prefixing the read makes both sides address that same
- * language-global member without relying on host-specific free-name lookup. Otherwise renderer registration can be skipped
- * silently, leaving React Refresh without a renderer on which to schedule updates.
- *
- * The protocol name can also occur as an explicit member, an object key, or string content. A textual replacement cannot
- * distinguish those forms. The AST predicate admits only reference identifiers, and MagicString changes only their source
- * ranges, preserving every unrelated byte in these large dependency modules. Keeping this operation inside the serve-only,
- * code-filtered hook is intentional: a target-wide Vite `define` would affect production and every user module merely to
- * optimize a handful of immutable React sources.
- */
-function createReactDevtoolsHookVisitor(editor: RolldownMagicString): WalkerEnter {
-    return function enter(node, parent) {
-        if (
-            node.type !== 'Identifier' ||
-            node.name !== reactDevtoolsHookProtocol ||
-            !isReferenceIdentifier(node, parent)
-        ) {
-            return
-        }
-
-        // Prefix only the free identifier so every host addresses the explicitly installed language-global member. Declarations,
-        // keys, strings, comments, formatting, and existing member expressions remain byte-for-byte unchanged.
-        editor.overwrite(node.start, node.end, `globalThis.${reactDevtoolsHookProtocol}`)
-    }
 }
 
 /**
@@ -183,25 +147,12 @@ export function transformRefreshRuntime({ code, id }: { code: string; id: string
     })
 }
 
-export function transformReactDevtoolsHook({ code, id }: { code: string; id: string }) {
-    return transformWithOxcWalker({
-        code,
-        filename: id,
-        sourcemap: false,
-        createVisitor: createReactDevtoolsHookVisitor
-    })
-}
-
 /*
- * Each memoized transform owns a mutable one-entry cache keyed only by source bytes. The matching runtime and React-family
- * modules are immutable between complete generations, so reparsing them would repeat O(source bytes) Oxc work without observing
- * new state. Source keys still produce a fresh result after a dependency upgrade or real module edit, unlike an ID-keyed or
- * once-only cache detached from its input. Separate caches prevent identical text in different transform domains from sharing
- * the wrong adaptation.
+ * The memoized transform owns a mutable one-entry cache keyed only by source bytes. The refresh runtime is immutable between
+ * complete generations, so reparsing it would repeat O(source bytes) Oxc work without observing new state. A source key still
+ * produces a fresh result after a dependency upgrade or real module edit, unlike an ID-keyed or once-only cache detached from
+ * its input.
  */
 const fixRefreshRuntime = memoize(transformRefreshRuntime, {
-    getCacheKey: ({ code }) => code
-})
-const fixReactDevtoolsHook = memoize(transformReactDevtoolsHook, {
     getCacheKey: ({ code }) => code
 })

@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { test } from 'node:test'
-import { normalizePath } from 'vite'
+import { normalizePath, transformWithOxc } from 'vite'
 import { packageRequire } from '../../../utils/packages.ts'
 import {
+    createMiniReactRefreshDefines,
     createMiniReactRefreshTransforms,
     injectReactRefreshRendererDependency,
-    transformReactDevtoolsHook,
     transformRefreshRuntime
 } from './react-refresh.ts'
 
@@ -41,24 +41,33 @@ test('rejects a Reconciler without the renderer injection contract', () => {
     assert.throws(() => injectReactRefreshRendererDependency('export const renderer = {}'), /must inject its renderer/)
 })
 
-test('rewrites only reference uses of the React DevTools hook in an admitted module', () => {
-    const transformed = transformReactDevtoolsHook({
-        code: `
+test('lowers only free React DevTools hook references through the development Oxc define', async () => {
+    const defines = createMiniReactRefreshDefines(true)
+    const transformed = await transformWithOxc(
+        `
             const available = typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ !== 'undefined'
             const explicit = globalThis.__REACT_DEVTOOLS_GLOBAL_HOOK__
             const record = { __REACT_DEVTOOLS_GLOBAL_HOOK__: explicit }
+            function readShadow(__REACT_DEVTOOLS_GLOBAL_HOOK__) {
+                return __REACT_DEVTOOLS_GLOBAL_HOOK__
+            }
         `,
-        id: 'react-renderer.js'
-    })
+        'react-renderer.js',
+        { define: defines, sourcemap: false }
+    )
 
+    assert.deepEqual(createMiniReactRefreshDefines(false), {})
+    assert.equal(defines.__REACT_DEVTOOLS_GLOBAL_HOOK__, 'globalThis.__REACT_DEVTOOLS_GLOBAL_HOOK__')
     assert.match(transformed.code, /typeof globalThis\.__REACT_DEVTOOLS_GLOBAL_HOOK__/)
-    assert.doesNotMatch(transformed.code, /typeof __REACT_DEVTOOLS_GLOBAL_HOOK__/)
+    assert.doesNotMatch(transformed.code, /globalThis\.globalThis/)
     assert.match(transformed.code, /__REACT_DEVTOOLS_GLOBAL_HOOK__: explicit/)
+    assert.match(transformed.code, /function readShadow\(__REACT_DEVTOOLS_GLOBAL_HOOK__\)/)
+    assert.match(transformed.code, /return __REACT_DEVTOOLS_GLOBAL_HOOK__;/)
 })
 
 test('routes the renderer plugin hook through its exact ID', async () => {
     const transforms = createMiniReactRefreshTransforms()
-    assert.equal(transforms.length, 3)
+    assert.equal(transforms.length, 2)
     const rendererHook = transforms[1]?.transform
     assert.ok(rendererHook && typeof rendererHook === 'object')
     const rendererIdFilter = rendererHook.filter?.id
