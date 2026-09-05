@@ -20,7 +20,7 @@ import type {
 import { ScopeTracker, walk } from 'oxc-walker'
 import { type ExistingRawSourceMap, RolldownMagicString } from 'rolldown'
 import { parseSync } from 'rolldown/utils'
-import { isRefreshPreambleGuard } from '../is-refresh-preamble-guard.ts'
+import { isRefreshPreambleGuard } from './is-refresh-preamble-guard.ts'
 import { StringEditor } from './string-editor.ts'
 
 export type SystemJsOutputFormat = 'system-register' | 'commonjs-registration'
