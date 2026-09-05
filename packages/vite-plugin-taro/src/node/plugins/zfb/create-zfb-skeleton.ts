@@ -2,6 +2,7 @@ import { recursiveMerge } from '@tarojs/helper'
 import { Alipay as AlipayPlatform } from '@tarojs/plugin-platform-alipay'
 import type { Rolldown } from 'vite'
 import type { VptOptions } from '../../../options.ts'
+import { getPageConfig } from '../../utils/project-config.ts'
 import type { MiniJsonObject, MiniProjectSkeletonInput } from '../mini/mini-contract.ts'
 import {
     collectTemplateComponentConfig,
@@ -115,7 +116,7 @@ export function createZfbSkeleton({
         ...options.pages.flatMap((page) => {
             const baseTemplatePath = toRootRelativePath(page.path, 'base.axml')
             const pageTemplateSource = template.buildPageTemplate(baseTemplatePath, {
-                content: page.config,
+                content: getPageConfig(page),
                 path: page.path
             })
 

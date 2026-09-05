@@ -97,8 +97,12 @@ test('rejects an empty cumulative patch range', () => {
 
 test('describes reset and publication writes through the exact DevTools patch path', () => {
     const mode = createDevtoolsHmrMode(modules)
-    const reset = mode.reset()
-    const publication = mode.publish({ buildId: 'build', patches: [patch] })
+    const resetMode = mode.reset
+    const publishMode = mode.publish
+    assert.ok(resetMode)
+    assert.ok(publishMode)
+    const reset = resetMode()
+    const publication = publishMode({ buildId: 'build', patches: [patch] })
 
     assert.equal(devtoolsPatchesFileName, 'hmr/patches.js')
     assert.deepEqual(reset, {

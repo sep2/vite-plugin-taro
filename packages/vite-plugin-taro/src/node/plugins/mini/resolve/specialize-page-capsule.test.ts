@@ -28,6 +28,18 @@ test('specializes the Page capsule for one route', async () => {
     assert.deepEqual(result.map.sources, [id])
 })
 
+test('specializes an omitted Page configuration as an empty object', async () => {
+    const result = await specializePageCapsule({
+        code: source,
+        id: '/plugin/runtime/mini/capsule/page.js?route=pages%2Fplain%2Findex',
+        page: {
+            path: 'pages/plain/index'
+        }
+    })
+
+    assert.match(result.code, /["']pages\/plain\/index["'], undefined, \{\}/)
+})
+
 test('rejects a Page capsule missing its specialization placeholders', async () => {
     await assert.rejects(
         () =>

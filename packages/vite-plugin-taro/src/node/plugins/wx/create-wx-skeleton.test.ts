@@ -20,10 +20,7 @@ const contract = createWxMiniContract({
             }
         },
         {
-            path: 'pages/account/index',
-            config: {
-                navigationBarTitleText: 'Account'
-            }
+            path: 'pages/account/index'
         }
     ],
     appJson: {
@@ -116,7 +113,6 @@ test('creates native rendering and configuration assets', () => {
         }
     })
     assert.deepEqual(JSON.parse(assets.get('pages/account/index.json') ?? ''), {
-        navigationBarTitleText: 'Account',
         usingComponents: {
             ...nativeUsingComponents,
             comp: '../../comp',

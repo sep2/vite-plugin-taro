@@ -13,6 +13,9 @@ const options: VptOptions = {
             config: {
                 navigationBarTitleText: 'Home'
             }
+        },
+        {
+            path: 'pages/about/index'
         }
     ],
     appJson: {
@@ -43,6 +46,7 @@ test('specializes the physical H5 App configuration and routes', async () => {
     assert.match(result.code, /pages: \[\s*["']pages\/home\/index["']/)
     assert.doesNotMatch(result.code, /stale\/page/)
     assert.match(result.code, /path: ["']pages\/home\/index["']/)
+    assert.match(result.code, /path: ["']pages\/about\/index["']/)
     assert.match(result.code, /navigationBarTitleText: ["']Home["']/)
     const pageComponentPath = path.resolve(projectRoot, 'src/pages/home/index.tsx').replaceAll('\\', '/')
     assert.ok(result.code.includes(`import(${JSON.stringify(`/@fs/${pageComponentPath}`)})`))

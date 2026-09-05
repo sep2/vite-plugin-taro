@@ -1,7 +1,7 @@
 import * as types from '@babel/types'
 import type { VptOptions, VptPageOption } from '../../../options.ts'
 import { createPageComponentImportPath } from '../../utils/modules.ts'
-import { createAppConfig } from '../../utils/project-config.ts'
+import { createAppConfig, getPageConfig } from '../../utils/project-config.ts'
 import { type AstTransformResult, replaceWithAst } from '../../utils/transform.ts'
 
 const appConfigPlaceholder = '__VPT_H5_APP_CONFIG__'
@@ -85,6 +85,6 @@ function createRoute({
     return types.objectExpression([
         types.objectProperty(types.identifier('path'), types.stringLiteral(page.path)),
         types.objectProperty(types.identifier('load'), load),
-        types.spreadElement(types.valueToNode(page.config))
+        types.spreadElement(types.valueToNode(getPageConfig(page)))
     ])
 }

@@ -2,6 +2,7 @@ import { recursiveMerge } from '@tarojs/helper'
 import { Weapp as WeappPlatform } from '@tarojs/plugin-platform-weapp'
 import type { Rolldown } from 'vite'
 import type { VptOptions } from '../../../options.ts'
+import { getPageConfig } from '../../utils/project-config.ts'
 import type { MiniJsonObject, MiniProjectSkeletonInput } from '../mini/mini-contract.ts'
 import {
     collectTemplateComponentConfig,
@@ -128,7 +129,7 @@ export function createWxSkeleton({
                 `${page.path}.wxml`,
                 buildWxPageTemplate(
                     template.buildPageTemplate(toRootRelativePath(page.path, 'base.wxml'), {
-                        content: page.config,
+                        content: getPageConfig(page),
                         path: page.path
                     })
                 )

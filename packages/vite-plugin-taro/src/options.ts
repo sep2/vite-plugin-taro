@@ -35,13 +35,13 @@ export type VptPageOption = {
     path: string
 
     /**
-     * Native Page configuration for the selected target.
+     * Optional native Page configuration for the selected target.
      *
      * Use Taro/WeChat keys for WX and H5, and Alipay keys for ZFB. The plugin preserves these fields in the Page runtime capsule
      * and `<path>.json`, adding generated native-component registrations separately. It does not translate configuration names
      * between platforms.
      */
-    config: VptPageConfig
+    config?: VptPageConfig
 }
 
 /** Configures vpt for one build target. */

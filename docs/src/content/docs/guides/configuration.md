@@ -100,12 +100,11 @@ path: 'pages/profile/index'
 
 ### `pages[].config`
 
-页面配置必须提供；没有配置时写 `{}`：
+页面配置可选；省略时等同于 `{}`：
 
 ```ts
 {
-    path: 'pages/about/index',
-    config: {}
+    path: 'pages/about/index'
 }
 ```
 

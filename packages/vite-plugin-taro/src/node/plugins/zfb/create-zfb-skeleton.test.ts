@@ -8,8 +8,7 @@ const contract = createZfbMiniContract({
     app: 'src/app.tsx',
     pages: [
         {
-            path: 'pages/home/index',
-            config: { defaultTitle: 'Home' }
+            path: 'pages/home/index'
         },
         {
             path: 'pages/meta/index',
@@ -128,7 +127,6 @@ test('assembles contract-selected Alipay templates without WX dialect output', (
     })
     assert.deepEqual(JSON.parse(assets.get('custom-wrapper.json') ?? ''), recursiveComponentJson)
     assert.deepEqual(JSON.parse(assets.get('pages/home/index.json') ?? ''), {
-        defaultTitle: 'Home',
         usingComponents: {
             'native-counter': '/components/native-counter/index',
             comp: '../../comp',

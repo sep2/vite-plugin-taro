@@ -2,7 +2,7 @@ import path from 'node:path'
 import type { Rolldown } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { normalizeModuleId } from '../../../utils/modules.ts'
-import { createAppConfig } from '../../../utils/project-config.ts'
+import { createAppConfig, getPageConfig } from '../../../utils/project-config.ts'
 import type { MiniJsonObject, MiniNativeComponentRegistration, MiniPage } from '../mini-contract.ts'
 import { isGeneratedSubpackageFile } from '../placer/placement.ts'
 
@@ -57,12 +57,13 @@ export function createSkeletonPageJson(
     page: MiniPage,
     nativeComponents: SkeletonNativeComponentConfig
 ): MiniJsonObject {
-    const usingComponents = isJsonObject(page.config.usingComponents) ? page.config.usingComponents : {}
-    const componentPlaceholder = isJsonObject(page.config.componentPlaceholder) ? page.config.componentPlaceholder : {}
+    const config = getPageConfig(page)
+    const usingComponents = isJsonObject(config.usingComponents) ? config.usingComponents : {}
+    const componentPlaceholder = isJsonObject(config.componentPlaceholder) ? config.componentPlaceholder : {}
     const hasNativeComponentPlaceholder = Object.keys(nativeComponents.componentPlaceholder).length > 0
 
     return {
-        ...page.config,
+        ...config,
         usingComponents: {
             ...usingComponents,
             ...nativeComponents.usingComponents,

@@ -58,8 +58,7 @@ function createOptions(): VptOptions {
         app: 'src/app.tsx',
         pages: [
             {
-                path: 'pages/home/index',
-                config: {}
+                path: 'pages/home/index'
             }
         ],
         appJson: {},

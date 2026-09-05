@@ -1,4 +1,5 @@
 import * as types from '@babel/types'
+import { getPageConfig } from '../../../utils/project-config.ts'
 import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
 import type { MiniPage } from '../mini-contract.ts'
 
@@ -22,7 +23,7 @@ export function specializePageCapsule({
         id,
         {
             [pagePathPlaceholder]: types.stringLiteral(page.path),
-            [pageConfigPlaceholder]: types.valueToNode(page.config)
+            [pageConfigPlaceholder]: types.valueToNode(getPageConfig(page))
         },
         sourcemap
     )
