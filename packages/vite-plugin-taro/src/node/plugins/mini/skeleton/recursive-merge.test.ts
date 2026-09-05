@@ -42,3 +42,27 @@ test('recursively merges objects and concatenates arrays into the retained targe
         }
     })
 })
+
+test('clones source-only records and arrays before attaching them to the mutable target', () => {
+    const source = {
+        component: {
+            events: ['tap']
+        },
+        definitions: [
+            {
+                attributes: {
+                    value: ''
+                }
+            }
+        ]
+    }
+    // The empty target is intentionally mutable because recursiveMerge populates it in place.
+    const target: Record<string, unknown> = {}
+
+    const result = recursiveMerge(target, source)
+
+    assert.equal(result, target)
+    assert.deepEqual(result, source)
+    assert.notEqual(result.component, source.component)
+    assert.notEqual(result.definitions, source.definitions)
+})

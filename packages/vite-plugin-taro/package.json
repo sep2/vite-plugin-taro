@@ -88,6 +88,7 @@
         "@tarojs/react": "workspace:vite-plugin-taro-react@*",
         "@tarojs/router": "4.2.1",
         "@tarojs/runtime": "workspace:vite-plugin-taro-runtime@*",
+        "@tarojs/shared": "4.2.1",
         "@tarojs/taro": "4.2.1",
         "@vitejs/plugin-react": "^6.1.1",
         "react-reconciler": "0.33.0",

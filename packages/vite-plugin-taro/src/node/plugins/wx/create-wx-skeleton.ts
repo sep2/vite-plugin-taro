@@ -1,9 +1,8 @@
-import { Weapp as WeappPlatform } from '@tarojs/plugin-platform-weapp'
 import type { Rolldown } from 'vite'
 import type { VptOptions } from '../../../options.ts'
 import { getPageConfig } from '../../utils/project-config.ts'
 import type { MiniJsonObject, MiniProjectSkeletonInput } from '../mini/mini-contract.ts'
-import { recursiveMerge } from '../mini/skeleton/recursive-merge.ts'
+import { createWxTemplate } from '../mini/skeleton/platform/create-wx-template.ts'
 import {
     collectTemplateComponentConfig,
     createJsonAsset,
@@ -78,23 +77,7 @@ export function createWxSkeleton({
     options,
     componentsModulePath
 }: WxSkeletonInput): Rolldown.EmittedAsset[] {
-    const platform = new WeappPlatform(
-        {
-            helper: {
-                recursiveMerge
-            },
-            // c8 cannot observe callbacks Taro accepts but intentionally never invokes.
-            /* c8 ignore next */
-            modifyWebpackChain() {},
-            /* c8 ignore next */
-            registerPlatform() {}
-        },
-        {},
-        {}
-    )
-    platform.modifyTemplate({})
-
-    const template = platform.template
+    const template = createWxTemplate()
 
     const nativeComponentConfig = createNativeComponentConfig(nativeComponents)
     const recursiveComponentJson = createRecursiveComponentJson(nativeComponentConfig)

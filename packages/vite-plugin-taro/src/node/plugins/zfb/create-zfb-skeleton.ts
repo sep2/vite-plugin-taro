@@ -1,9 +1,8 @@
-import { Alipay as AlipayPlatform } from '@tarojs/plugin-platform-alipay'
 import type { Rolldown } from 'vite'
 import type { VptOptions } from '../../../options.ts'
 import { getPageConfig } from '../../utils/project-config.ts'
 import type { MiniJsonObject, MiniProjectSkeletonInput } from '../mini/mini-contract.ts'
-import { recursiveMerge } from '../mini/skeleton/recursive-merge.ts'
+import { createZfbTemplate } from '../mini/skeleton/platform/create-zfb-template.ts'
 import {
     collectTemplateComponentConfig,
     createJsonAsset,
@@ -78,22 +77,7 @@ export function createZfbSkeleton({
     options,
     componentsModulePath
 }: ZfbSkeletonInput): Rolldown.EmittedAsset[] {
-    const platform = new AlipayPlatform(
-        {
-            helper: {
-                recursiveMerge
-            },
-            // c8 cannot observe callbacks Taro accepts but intentionally never invokes.
-            /* c8 ignore next */
-            modifyWebpackChain() {},
-            /* c8 ignore next */
-            registerPlatform() {}
-        },
-        {}
-    )
-    platform.modifyComponents()
-
-    const template = platform.template
+    const template = createZfbTemplate()
     const componentConfig = collectTemplateComponentConfig(bundle, componentsModulePath, nativeComponents)
     const nativeComponentConfig = createNativeComponentConfig(nativeComponents)
     const recursiveComponentJson = createRecursiveComponentJson(nativeComponentConfig)
