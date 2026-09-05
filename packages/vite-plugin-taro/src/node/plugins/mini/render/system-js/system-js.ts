@@ -20,6 +20,7 @@ import type {
 import { ScopeTracker, walk } from 'oxc-walker'
 import { type ExistingRawSourceMap, RolldownMagicString } from 'rolldown'
 import { parseSync } from 'rolldown/utils'
+import { isRefreshPreambleGuard } from '../is-refresh-preamble-guard.ts'
 import { StringEditor } from './string-editor.ts'
 
 export type SystemJsOutputFormat = 'system-register' | 'commonjs-registration'
@@ -33,6 +34,8 @@ export type TransformSystemJsOptions = Readonly<{
     sourcemap: boolean
     /** Converts physical Rolldown references into the logical IDs used by the Mini capsule registry. */
     resolveReference(reference: string, kind: SystemJsReferenceKind): string
+    /** Removes the browser-only React Refresh assertion while traversing a Mini development capsule. */
+    removeRefreshPreambleGuard: boolean
 }>
 
 export type TransformSystemJsResult = Readonly<{
@@ -410,6 +413,15 @@ function applyExpressionEdits(editor: SourceEditor, model: ModuleModel, options:
             if (isThisBoundary(node)) thisBoundaryDepth += 1
 
             switch (node.type) {
+                case 'IfStatement':
+                    // Host adaptations share this traversal so they add neither an all-module source scan nor another AST parse.
+                    // A selected assertion is declaration-free by contract; skipping it prevents descendant edits from
+                    // overlapping the removed statement range.
+                    if (options.removeRefreshPreambleGuard && isRefreshPreambleGuard(node)) {
+                        editor.remove(node.start, node.end)
+                        this.skip()
+                    }
+                    break
                 case 'ImportExpression':
                     // SystemJS owns dynamic loading; only string literals are canonicalized at build time.
                     if (node.options || node.phase)

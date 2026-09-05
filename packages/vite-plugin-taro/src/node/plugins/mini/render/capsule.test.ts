@@ -4,13 +4,14 @@ import type { Rolldown } from 'vite'
 import { renderCapsule } from './capsule.ts'
 
 test('converts a final ESM chunk into a System registration capsule', () => {
-    const result = renderCapsule(
-        `import { value } from './dependency.js'
+    const result = renderCapsule({
+        code: `import { value } from './dependency.js'
 const doubled = value * 2
 export { doubled }`,
-        { fileName: 'assets/root.js' } as Rolldown.RenderedChunk,
-        true
-    )
+        chunk: { fileName: 'assets/root.js' } as Rolldown.RenderedChunk,
+        removeRefreshPreambleGuard: false,
+        sourcemap: true
+    })
     const commonJsModule: { exports?: unknown } = {}
 
     Function('module', result.code)(commonJsModule)
@@ -21,14 +22,33 @@ export { doubled }`,
     assert.doesNotMatch(result.code, /System\.register/)
 })
 
+test('removes only the generated React Refresh preamble assertion when requested', () => {
+    const code = `
+        if (!window.$RefreshReg$) {
+            throw new Error("@vitejs/plugin-react can't detect preamble. Something is wrong.")
+        }
+        if (!window.$RefreshReg$) throw new Error('application invariant')
+        const rendered = true
+        export { rendered }
+    `
+    const chunk = { fileName: 'assets/root.js' } as Rolldown.RenderedChunk
+    const development = renderCapsule({ code, chunk, removeRefreshPreambleGuard: true, sourcemap: false })
+    const production = renderCapsule({ code, chunk, removeRefreshPreambleGuard: false, sourcemap: false })
+
+    assert.doesNotMatch(development.code, /can't detect preamble/)
+    assert.match(development.code, /application invariant/)
+    assert.match(production.code, /can't detect preamble/)
+})
+
 test('canonicalizes physical asset references as package-neutral logical IDs', () => {
-    const result = renderCapsule(
-        `import { value } from './shared.js'
+    const result = renderCapsule({
+        code: `import { value } from './shared.js'
 const load = () => import('./lazy.js')
 export { load, value }`,
-        { fileName: 'assets/page.js' } as Rolldown.RenderedChunk,
-        true
-    )
+        chunk: { fileName: 'assets/page.js' } as Rolldown.RenderedChunk,
+        removeRefreshPreambleGuard: false,
+        sourcemap: true
+    })
     const commonJsModule: { exports?: unknown } = {}
     Function('module', result.code)(commonJsModule)
 
@@ -38,24 +58,26 @@ export { load, value }`,
 })
 
 test('preserves package-like dynamic import identities', () => {
-    const result = renderCapsule(
-        `const load = () => import('external-feature')
+    const result = renderCapsule({
+        code: `const load = () => import('external-feature')
 export { load }`,
-        { fileName: 'assets/root.js' } as Rolldown.RenderedChunk,
-        false
-    )
+        chunk: { fileName: 'assets/root.js' } as Rolldown.RenderedChunk,
+        removeRefreshPreambleGuard: false,
+        sourcemap: false
+    })
 
     assert.match(result.code, /\.import\(['"]external-feature['"]\)/)
 })
 
 test('keeps Vite preload imports while converting dynamic imports', () => {
-    const result = renderCapsule(
-        `import { __vitePreload } from './bootstrap.js'
+    const result = renderCapsule({
+        code: `import { __vitePreload } from './bootstrap.js'
 const load = () => __vitePreload(() => import('./lazy.js'), __VITE_PRELOAD__)
 export { load }`,
-        { fileName: 'assets/root.js' } as Rolldown.RenderedChunk,
-        true
-    )
+        chunk: { fileName: 'assets/root.js' } as Rolldown.RenderedChunk,
+        removeRefreshPreambleGuard: false,
+        sourcemap: true
+    })
     const commonJsModule: { exports?: unknown } = {}
     Function('module', result.code)(commonJsModule)
 

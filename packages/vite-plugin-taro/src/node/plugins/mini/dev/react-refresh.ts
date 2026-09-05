@@ -42,12 +42,12 @@ const refreshRuntimeWindowGlobals = ['__registerBeforePerformReactRefresh', '__g
  *   runtime, so hook installation cannot race renderer initialization during cold startup.
  * - React-family modules are selected by the reserved free DevTools-hook identifier. Their expression references are rewritten
  *   as explicit `globalThis` members; an AST visitor edits only those identifier ranges after the filter admits the module.
- * - Refresh boundaries are selected by Vite's generated `$RefreshReg$` guard. The AST transform removes only that web-preamble
- *   assertion because each boundary already owns local wrappers over the imported refresh runtime.
  *
  * These adaptations deliberately remain serve-only plugin transforms rather than target-wide `define` entries. That scope
  * prevents development protocol behavior from leaking into production or unrelated Mini Program modules. Plugin order also
  * matters: Reconciler receives its static refresh dependency before the later DevTools-hook transform lowers its free references.
+ * The final capsule renderer removes React boundaries' browser-preamble assertion during its existing AST traversal, avoiding a
+ * dedicated all-module source filter and second parse for every boundary.
  */
 export function createMiniReactRefreshTransforms(): Plugin[] {
     return [
@@ -84,18 +84,6 @@ export function createMiniReactRefreshTransforms(): Plugin[] {
                 filter: { code: /(^|[^.\w$])__REACT_DEVTOOLS_GLOBAL_HOOK__/ },
                 handler(code, id) {
                     return fixReactDevtoolsHook({ code, id })
-                }
-            }
-        },
-        {
-            name: 'vpt:mini-refresh-preamble-guard',
-            apply: 'serve',
-            transform: {
-                order: 'post',
-                // Vite's documented refresh protocol global; generated boundary modules own its only expression use.
-                filter: { code: /window\.\$RefreshReg\$/ },
-                handler(code, id) {
-                    return removeRefreshPreambleGuard({ code, id })
                 }
             }
         }
@@ -174,41 +162,6 @@ function createRefreshRuntimeVisitor(editor: RolldownMagicString): WalkerEnter {
     }
 }
 
-/**
- * Removes the web-only `if (!window.$RefreshReg$) throw Error(...)` assertion from boundary modules.
- *
- * The assertion verifies that Vite's HTML preamble installed global registration helpers. A Mini Program has no HTML preamble,
- * and evaluating `window` itself fails. The assertion is unnecessary here because @vitejs/plugin-react generates local
- * `$RefreshReg$` and `$RefreshSig$` wrappers that delegate directly to the imported refresh runtime. Removing the complete
- * statement therefore removes only an invalid platform check; component registration continues through those local wrappers.
- *
- * This remains a structural AST edit rather than defining `window.$RefreshReg$` as truthy. A truthy substitution would hide the
- * invariant, retain an unreachable throw in every HMR patch, and make an unrelated `window.$RefreshReg$` expression silently
- * change meaning. Without either adaptation, every transformed refresh boundary crashes before its module body runs.
- */
-function createRefreshPreambleGuardVisitor(editor: RolldownMagicString): WalkerEnter {
-    return function enter(node) {
-        if (
-            node.type !== 'IfStatement' ||
-            node.test.type !== 'UnaryExpression' ||
-            node.test.operator !== '!' ||
-            node.test.argument.type !== 'MemberExpression' ||
-            node.test.argument.computed ||
-            node.test.argument.object.type !== 'Identifier' ||
-            node.test.argument.object.name !== 'window' ||
-            node.test.argument.property.type !== 'Identifier' ||
-            node.test.argument.property.name !== '$RefreshReg$'
-        ) {
-            return
-        }
-
-        // Matching the complete AST shape prevents an unrelated `$RefreshReg$` use from being removed. Skipping descendants is
-        // required because their ranges disappear with the parent and must not receive overlapping MagicString edits.
-        editor.remove(node.start, node.end)
-        this.skip()
-    }
-}
-
 /** Makes renderer hook injection statically depend on the refresh runtime. */
 export function injectReactRefreshRendererDependency(code: string): { code: string; map: null } {
     if (!/\bhook\.inject\(internals\)/.test(code)) {
@@ -236,15 +189,6 @@ export function transformReactDevtoolsHook({ code, id }: { code: string; id: str
         filename: id,
         sourcemap: false,
         createVisitor: createReactDevtoolsHookVisitor
-    })
-}
-
-export function removeRefreshPreambleGuard({ code, id }: { code: string; id: string }) {
-    return transformWithOxcWalker({
-        code,
-        filename: id,
-        sourcemap: false,
-        createVisitor: createRefreshPreambleGuardVisitor
     })
 }
 

@@ -36,7 +36,17 @@ import { type SystemJsReferenceKind, transformSystemJs } from './system-js/syste
  * partial or semantically incorrect capsule. Source maps remain optional because Mini Program development output deliberately disables
  * them on this startup-critical path.
  */
-export function renderCapsule(code: string, chunk: Rolldown.RenderedChunk, sourcemap: boolean): AstTransformResult {
+export function renderCapsule({
+    code,
+    chunk,
+    removeRefreshPreambleGuard,
+    sourcemap
+}: {
+    code: string
+    chunk: Rolldown.RenderedChunk
+    removeRefreshPreambleGuard: boolean
+    sourcemap: boolean
+}): AstTransformResult {
     return transformSystemJs({
         code,
         filename: chunk.fileName,
@@ -46,7 +56,10 @@ export function renderCapsule(code: string, chunk: Rolldown.RenderedChunk, sourc
         // Bind every compile-time chunk edge to the same logical identity understood by transport and SystemJS.
         resolveReference(reference, kind) {
             return resolveCapsuleReference(chunk.fileName, reference, kind)
-        }
+        },
+        // React Refresh's native wrapper already owns local registration helpers. Mini development has no HTML preamble, so
+        // discard only its browser sentinel while this final capsule is already parsed and traversed for SystemJS lowering.
+        removeRefreshPreambleGuard
     })
 }
 

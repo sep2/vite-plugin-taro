@@ -6,7 +6,6 @@ import { packageRequire } from '../../../utils/packages.ts'
 import {
     createMiniReactRefreshTransforms,
     injectReactRefreshRendererDependency,
-    removeRefreshPreambleGuard,
     transformReactDevtoolsHook,
     transformRefreshRuntime
 } from './react-refresh.ts'
@@ -57,13 +56,11 @@ test('rewrites only reference uses of the React DevTools hook in an admitted mod
     assert.match(transformed.code, /__REACT_DEVTOOLS_GLOBAL_HOOK__: explicit/)
 })
 
-test('routes renderer and preamble plugin hooks through their exact IDs', async () => {
+test('routes the renderer plugin hook through its exact ID', async () => {
     const transforms = createMiniReactRefreshTransforms()
-    assert.equal(transforms.length, 4)
+    assert.equal(transforms.length, 3)
     const rendererHook = transforms[1]?.transform
-    const preambleHook = transforms[3]?.transform
     assert.ok(rendererHook && typeof rendererHook === 'object')
-    assert.ok(preambleHook)
     const rendererIdFilter = rendererHook.filter?.id
     assert.ok(rendererIdFilter instanceof RegExp)
     const rendererId = normalizePath(
@@ -81,27 +78,4 @@ test('routes renderer and preamble plugin hooks through their exact IDs', async 
     ])
     assert.ok(rendererResult && typeof rendererResult === 'object' && 'code' in rendererResult)
     assert.match(String(rendererResult.code), /^import '\/@react-refresh'/)
-
-    const preamble = typeof preambleHook === 'function' ? preambleHook : preambleHook.handler
-    const transformed = await Reflect.apply(preamble, {}, [
-        "if (!window.$RefreshReg$) throw new Error('missing preamble')",
-        'boundary.js'
-    ])
-    assert.ok(transformed && typeof transformed === 'object' && 'code' in transformed)
-    assert.doesNotMatch(String(transformed.code), /missing preamble/)
-})
-
-test('structurally removes only the web refresh preamble guard', () => {
-    const transformed = removeRefreshPreambleGuard({
-        code: `
-            if (!window.$RefreshReg$) throw new Error('missing preamble')
-            if (!window.otherProtocol) throw new Error('preserved')
-            render()
-        `,
-        id: 'boundary.js'
-    })
-
-    assert.doesNotMatch(transformed.code, /missing preamble/)
-    assert.match(transformed.code, /window\.otherProtocol/)
-    assert.match(transformed.code, /render\(\)/)
 })
