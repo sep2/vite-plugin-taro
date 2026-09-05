@@ -12,14 +12,16 @@ export function createWxMiniPlugins(vptOptions: VptOptions): PluginOption[] {
 
 /** Binds the shared Mini Program core to WeChat runtime and output conventions. */
 export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
-    const componentsReactPath = packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/components-react')
+    const componentsReactPath = packageRequire.resolve(
+        'vite-plugin-taro-runtime/plugin-platform-weapp/components-react'
+    )
 
     return {
         options: vptOptions,
         taro: {
             env: 'weapp',
             componentsReactPath: componentsReactPath,
-            platformRuntimePath: packageRequire.resolve('@tarojs/plugin-platform-weapp/dist/runtime.js')
+            platformRuntimePath: packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-weapp/runtime')
         },
         runtime: {
             modules: {

@@ -52,8 +52,14 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                 resolve: {
                     alias: [
                         {
+                            find: /^@tarojs\/plugin-framework-react\/dist\/runtime$/,
+                            replacement: packageRequire.resolve(
+                                'vite-plugin-taro-runtime/plugin-framework-react/runtime'
+                            )
+                        },
+                        {
                             find: /^@tarojs\/runtime$/,
-                            replacement: packageRequire.resolve('@tarojs/runtime/dist/index.js')
+                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini')
                         },
                         {
                             find: /^@tarojs\/components$/,

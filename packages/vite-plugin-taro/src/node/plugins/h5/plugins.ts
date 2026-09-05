@@ -1,7 +1,7 @@
-import { createRequire } from 'node:module'
 import babel, { defineRolldownBabelPreset } from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
 import type { HtmlTagDescriptor, Plugin, PluginOption } from 'vite'
+import h5Definition from 'vite-plugin-taro-runtime/plugin-platform-h5/definition.json' with { type: 'json' }
 import type { VptOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
 import { toViteFileImportPath } from '../../utils/modules.ts'
@@ -44,11 +44,25 @@ function createH5Plugin(options: VptOptions): Plugin {
                             // The platform backend is compiler-owned and therefore may not be resolvable from the consumer
                             // root during Vite's initial dependency optimization.
                             find: /^@tarojs\/plugin-platform-h5\/dist\/runtime\/apis$/,
-                            replacement: packageRequire.resolve('@tarojs/plugin-platform-h5/dist/runtime/apis')
+                            replacement: packageRequire.resolve(
+                                'vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis'
+                            )
+                        },
+                        {
+                            find: /^@tarojs\/plugin-platform-h5\/dist\/definition\.json$/,
+                            replacement: packageRequire.resolve(
+                                'vite-plugin-taro-runtime/plugin-platform-h5/definition.json'
+                            )
+                        },
+                        {
+                            find: /^@tarojs\/plugin-framework-react\/dist\/runtime$/,
+                            replacement: packageRequire.resolve(
+                                'vite-plugin-taro-runtime/plugin-framework-react/runtime'
+                            )
                         },
                         {
                             find: /^@tarojs\/runtime$/,
-                            replacement: packageRequire.resolve('@tarojs/runtime/dist/runtime.esm.js')
+                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/runtime/h5')
                         },
                         {
                             // Taro H5 can resolve a second, peer-specific router package through taro-h5. Both the App
@@ -61,6 +75,8 @@ function createH5Plugin(options: VptOptions): Plugin {
                             replacement: packageRequire.resolve('@tarojs/components/lib/react')
                         },
                         {
+                            // The React entry self-imports this Stencil index by package name. Pinning both entries to the
+                            // compiler-owned package prevents Vite from transforming a second peer-qualified components graph.
                             find: /^@tarojs\/components\/dist\/components$/,
                             replacement: packageRequire.resolve('@tarojs/components/dist/components')
                         }
@@ -149,17 +165,13 @@ export const h5TaroApiTransformCodeFilter = /virtual:taro\/api|\baria[A-Z]/
 
 /** Babel preset body shared by Rolldown's filtered adapter and direct semantic tests. */
 export function h5TaroApiPreset() {
-    // Resolve Taro's private transform from the H5 package that owns it instead of promoting it into VPT's Babel graph.
-    const h5PlatformRequire = createRequire(packageRequire.resolve('@tarojs/plugin-platform-h5/package.json'))
-    const transformTaroApiPath = h5PlatformRequire.resolve('babel-plugin-transform-taroapi')
-    const definition = packageRequire(packageRequire.resolve('@tarojs/plugin-platform-h5/dist/definition.json'))
     return {
         plugins: [
             [
-                transformTaroApiPath,
+                packageRequire.resolve('babel-plugin-transform-taroapi'),
                 {
                     packageName: clientTaroApiId,
-                    definition
+                    definition: h5Definition
                 }
             ] satisfies [string, object]
         ]

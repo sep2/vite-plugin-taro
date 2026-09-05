@@ -2,8 +2,11 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { RecursiveTemplate, UnRecursiveTemplate } from '@tarojs/shared/dist/template.js'
+
+const packageRequire = createRequire(import.meta.url)
+const runtimePackageRequire = createRequire(packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini'))
 
 type Platform = 'wx' | 'zfb'
 type Implementation = 'local' | 'upstream'
@@ -66,19 +69,19 @@ async function createTemplate(platform: Platform, implementation: Implementation
     }
 
     const platformPackage = platform === 'wx' ? '@tarojs/plugin-platform-weapp' : '@tarojs/plugin-platform-alipay'
-    const upstreamHelper = createRequire(import.meta.resolve(platformPackage))('@tarojs/helper')
+    const platformPath = runtimePackageRequire.resolve(platformPackage)
+    const platformModule = await import(pathToFileURL(platformPath).href)
+    const upstreamHelper = createRequire(platformPath)('@tarojs/helper')
     const context = {
         helper: { recursiveMerge: upstreamHelper.recursiveMerge },
         paths: { outputPath: '' }
     }
     if (platform === 'wx') {
-        const { Weapp } = await import('@tarojs/plugin-platform-weapp')
-        const weapp = new Weapp(context, {})
+        const weapp = new platformModule.Weapp(context, {})
         weapp.modifyTemplate()
         return weapp.template
     }
-    const { Alipay } = await import('@tarojs/plugin-platform-alipay')
-    const alipay = new Alipay(context, {})
+    const alipay = new platformModule.Alipay(context, {})
     alipay.modifyComponents()
     return alipay.template
 }

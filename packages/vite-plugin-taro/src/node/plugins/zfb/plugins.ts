@@ -12,14 +12,16 @@ export function createZfbMiniPlugins(vptOptions: VptOptions): PluginOption[] {
 
 /** Binds the shared Mini Program core to Alipay runtime and output conventions. */
 export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
-    const componentsReactPath = packageRequire.resolve('@tarojs/plugin-platform-alipay/dist/components-react.js')
+    const componentsReactPath = packageRequire.resolve(
+        'vite-plugin-taro-runtime/plugin-platform-alipay/components-react'
+    )
 
     return {
         options: vptOptions,
         taro: {
             env: 'alipay',
             componentsReactPath: componentsReactPath,
-            platformRuntimePath: packageRequire.resolve('@tarojs/plugin-platform-alipay/dist/runtime.js')
+            platformRuntimePath: packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-alipay/runtime')
         },
         runtime: {
             modules: {

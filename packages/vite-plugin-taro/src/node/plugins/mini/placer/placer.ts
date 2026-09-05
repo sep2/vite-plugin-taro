@@ -12,7 +12,7 @@ export type { GeneratedSubpackage, Placement } from './placement.ts'
 
 const pnpmFrameworkPackagePattern =
     /\/node_modules\/\.pnpm\/(?:@tarojs\+|vite-plugin-taro-runtime@|react(?:-dom|-reconciler)?@|scheduler@)/
-const workspaceFrameworkPackagePattern = /\/packages\/(?:taro-react|taro-plugin-framework-react|taro-runtime)\//
+const workspaceFrameworkPackagePattern = /\/packages\/taro-runtime\//
 
 // Both supported Mini Program hosts impose the same 2 MB main/subpackage ceiling. Reserving 100 KB for native-tool metadata
 // keeps graph placement deterministic across targets; this belongs to the shared package planner, not to a platform adapter.

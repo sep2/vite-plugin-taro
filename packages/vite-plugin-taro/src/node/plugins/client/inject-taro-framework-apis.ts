@@ -1,6 +1,8 @@
 import { packageRequire } from '../../utils/packages.ts'
 
-const apiLoader: (source: string) => string = packageRequire('@tarojs/plugin-framework-react/dist/api-loader')
+const apiLoader: (source: string) => string = packageRequire(
+    'vite-plugin-taro-runtime/plugin-framework-react/api-loader'
+)
 
 /**
  * Applies Taro React's standard source-to-source API loader. It imports the framework lifecycle hooks, assigns them to

@@ -81,20 +81,16 @@
         "@tailwindcss/oxide": "4.3.3",
         "@tailwindcss/vite": "4.3.3",
         "@tarojs/components": "4.2.1",
-        "@tarojs/plugin-framework-react": "workspace:vite-plugin-taro-plugin-framework-react@*",
-        "@tarojs/plugin-platform-alipay": "4.2.1",
-        "@tarojs/plugin-platform-h5": "4.2.1",
-        "@tarojs/plugin-platform-weapp": "4.2.1",
-        "@tarojs/react": "workspace:vite-plugin-taro-react@*",
         "@tarojs/router": "4.2.1",
-        "@tarojs/runtime": "workspace:vite-plugin-taro-runtime@*",
         "@tarojs/shared": "4.2.1",
         "@tarojs/taro": "4.2.1",
         "@vitejs/plugin-react": "^6.1.1",
+        "babel-plugin-transform-taroapi": "4.2.1",
         "react-reconciler": "0.33.0",
         "rolldown": "1.2.7",
         "sval": "0.6.12",
-        "tailwindcss": "^4.3.3"
+        "tailwindcss": "^4.3.3",
+        "vite-plugin-taro-runtime": "workspace:*"
     },
     "peerDependencies": {
         "react": "^19.0.0",

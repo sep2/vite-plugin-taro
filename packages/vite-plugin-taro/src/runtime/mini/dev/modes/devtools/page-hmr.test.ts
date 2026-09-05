@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { customWrapperCache } from '@tarojs/runtime/dist/utils/index.js'
 import { DevRuntime } from 'rolldown/experimental/runtime'
 
 type TestPage = {
@@ -32,6 +31,8 @@ type TestHarness = Readonly<{
 }>
 
 const customWrapperCacheKey = Symbol.for('customWrapperCache')
+// This mutable cache models the App-global Taro cache without initializing the complete browser runtime in Node.
+const customWrapperCache = new Map<string, { data: { i: unknown } }>()
 
 // Mutable only to give each dynamic import a fresh App-global runtime singleton.
 let runtimeId = 0

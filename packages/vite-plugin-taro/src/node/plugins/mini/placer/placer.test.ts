@@ -198,12 +198,12 @@ test('matches only explicit React and Taro framework package roots', () => {
     )
     assert.equal(
         isMiniFrameworkVendorModule(
-            '/repo/node_modules/.pnpm/vite-plugin-taro-runtime@0.6.6/node_modules/vite-plugin-taro-runtime/dist/index.js'
+            '/repo/node_modules/.pnpm/vite-plugin-taro-runtime@0.7.0/node_modules/vite-plugin-taro-runtime/dist/runtime/index.js'
         ),
         true
     )
-    assert.equal(isMiniFrameworkVendorModule('/repo/packages/taro-react/dist/react.esm.js'), true)
-    assert.equal(isMiniFrameworkVendorModule('/repo/packages/taro-runtime/dist/index.js'), true)
+    assert.equal(isMiniFrameworkVendorModule('/repo/packages/taro-runtime/dist/react/react.esm.js'), true)
+    assert.equal(isMiniFrameworkVendorModule('/repo/packages/taro-runtime/dist/runtime/index.js'), true)
     assert.equal(isMiniFrameworkVendorModule('/repo/src/react-feature.ts'), false)
     assert.equal(isMiniFrameworkVendorModule('/repo/src/taro-page.ts'), false)
 })

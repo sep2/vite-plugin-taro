@@ -197,7 +197,7 @@ test('preserves H5 runtime facade side-effect order and export identities', asyn
             '@tarojs/components/global.css': "globalThis.harness.events.push('global-css')",
             '@tarojs/components/dist/taro-components/taro-components.css':
                 "globalThis.harness.events.push('component-css')",
-            '@tarojs/plugin-framework-react/dist/runtime': `
+            'vite-plugin-taro-runtime/plugin-framework-react/runtime': `
                 globalThis.harness.events.push('framework')
                 export const createReactApp = globalThis.harness.createReactApp
             `,
@@ -207,7 +207,7 @@ test('preserves H5 runtime facade side-effect order and export identities', asyn
                 export const createRouter = globalThis.harness.createRouter
                 export const handleAppMount = globalThis.harness.handleAppMount
             `,
-            '@tarojs/runtime': `
+            'vite-plugin-taro-runtime/runtime/h5': `
                 globalThis.harness.events.push('runtime')
                 export const window = globalThis.harness.window
             `
@@ -366,15 +366,15 @@ test('preserves WX capsule runtime initialization order and export identities', 
         entry: 'mini/capsule/taro-runtime.ts',
         mocks: {
             '\0vpt:taro-platform-runtime': "globalThis.harness.events.push('platform-runtime')",
-            '@tarojs/plugin-framework-react/dist/runtime': `
+            'vite-plugin-taro-runtime/plugin-framework-react/runtime': `
                 globalThis.harness.events.push('framework')
                 export const createReactApp = globalThis.harness.createReactApp
             `,
-            '@tarojs/react': `
+            'vite-plugin-taro-runtime/react': `
                 globalThis.harness.events.push('react-dom')
                 export default globalThis.harness.ReactDOM
             `,
-            '@tarojs/runtime': `
+            'vite-plugin-taro-runtime/runtime/mini': `
                 globalThis.harness.events.push('taro-runtime')
                 export const createPageConfig = globalThis.harness.createPageConfig
                 export const createRecursiveComponentConfig = globalThis.harness.createRecursiveComponentConfig

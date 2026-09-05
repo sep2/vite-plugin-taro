@@ -123,6 +123,13 @@ function parseJsonAsset(output: BuildOutput, fileName: string): Record<string, u
     return JSON.parse(String(requireAsset(output, fileName).source)) as Record<string, unknown>
 }
 
+function collectModuleIds(output: BuildOutput): string[] {
+    return output
+        .filter((candidate): candidate is OutputChunk => candidate.type === 'chunk')
+        .flatMap((chunk) => Object.keys(chunk.modules))
+        .map(normalizePath)
+}
+
 test('builds a routed H5 application through the public plugin entry', async () => {
     await inspectFixtureBuild(
         {
@@ -149,15 +156,20 @@ test('builds a routed H5 application through the public plugin entry', async () 
             const html = String(requireAsset(output, 'index.html').source)
             const chunks = output.filter((candidate): candidate is OutputChunk => candidate.type === 'chunk')
             const javascript = chunks.map((chunk) => chunk.code).join('\n')
+            const moduleIds = collectModuleIds(output)
             const routerModuleIds = new Set(
                 chunks
                     .flatMap((chunk) => Object.keys(chunk.modules))
                     .map(normalizePath)
                     .filter((id) => id.endsWith('/@tarojs/router/dist/index.esm.js'))
             )
-
             assert.match(html, /<script type="module" crossorigin src="\/assets\//)
             assert.equal(routerModuleIds.size, 1)
+            assert.ok(moduleIds.some((id) => id.endsWith('/taro-runtime/dist/runtime/runtime.esm.js')))
+            assert.equal(
+                moduleIds.some((id) => /\/taro-runtime\/dist\/plugin-platform-(?:weapp|alipay)\//.test(id)),
+                false
+            )
             assert.match(javascript, /H5 route marker/)
             assert.match(javascript, /pages\/home\/index/)
             assert.match(javascript, /Fixture App/)
@@ -209,8 +221,19 @@ test('builds a complete native App and Page project for wx', async () => {
                 .filter((candidate): candidate is OutputChunk => candidate.type === 'chunk')
                 .map((chunk) => chunk.code)
                 .join('\n')
+            const moduleIds = collectModuleIds(output)
 
             assert.ok(requiredFiles.every((fileName) => fileNames.has(fileName)))
+            assert.ok(moduleIds.some((id) => id.includes('/taro-runtime/dist/runtime/')))
+            assert.equal(
+                moduleIds.some((id) => id.endsWith('/taro-runtime/dist/runtime/runtime.esm.js')),
+                false
+            )
+            assert.ok(moduleIds.some((id) => id.endsWith('/taro-runtime/dist/plugin-platform-weapp/runtime.js')))
+            assert.equal(
+                moduleIds.some((id) => /\/taro-runtime\/dist\/plugin-platform-(?:alipay|h5)\//.test(id)),
+                false
+            )
             assert.deepEqual(appJson, {
                 window: {
                     navigationBarTitleText: 'Fixture App'
@@ -277,8 +300,19 @@ test('builds a complete native App and Page project for zfb', async () => {
                 .filter((candidate): candidate is OutputChunk => candidate.type === 'chunk')
                 .map((chunk) => chunk.code)
                 .join('\n')
+            const moduleIds = collectModuleIds(output)
 
             assert.ok(requiredFiles.every((fileName) => fileNames.has(fileName)))
+            assert.ok(moduleIds.some((id) => id.includes('/taro-runtime/dist/runtime/')))
+            assert.equal(
+                moduleIds.some((id) => id.endsWith('/taro-runtime/dist/runtime/runtime.esm.js')),
+                false
+            )
+            assert.ok(moduleIds.some((id) => id.endsWith('/taro-runtime/dist/plugin-platform-alipay/runtime.js')))
+            assert.equal(
+                moduleIds.some((id) => /\/taro-runtime\/dist\/plugin-platform-(?:weapp|h5)\//.test(id)),
+                false
+            )
             assert.equal(
                 [...fileNames].some((fileName) => /\.(?:wxml|wxs|wxss)$/.test(fileName)),
                 false

@@ -36,7 +36,27 @@ test('promotes compiler-owned H5 dependencies to optimizer entries', async () =>
         return alias.find instanceof RegExp && alias.find.test('@tarojs/plugin-platform-h5/dist/runtime/apis')
     })
     assert.ok(platformApiAlias)
-    assert.equal(platformApiAlias.replacement, packageRequire.resolve('@tarojs/plugin-platform-h5/dist/runtime/apis'))
+    assert.equal(
+        platformApiAlias.replacement,
+        packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis')
+    )
+
+    const definitionAlias = config.resolve.alias.find((alias) => {
+        return alias.find instanceof RegExp && alias.find.test('@tarojs/plugin-platform-h5/dist/definition.json')
+    })
+    assert.ok(definitionAlias)
+    assert.equal(
+        definitionAlias.replacement,
+        packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-h5/definition.json')
+    )
+
+    const runtimeAlias = config.resolve.alias.find((alias) => {
+        return alias.find instanceof RegExp && alias.find.test('@tarojs/runtime')
+    })
+    assert.ok(runtimeAlias)
+    assert.ok(runtimeAlias.find instanceof RegExp)
+    assert.equal(runtimeAlias.find.test('vite-plugin-taro-runtime/runtime/h5'), false)
+    assert.equal(runtimeAlias.replacement, packageRequire.resolve('vite-plugin-taro-runtime/runtime/h5'))
 
     const routerAlias = config.resolve.alias.find((alias) => {
         return alias.find instanceof RegExp && alias.find.test('@tarojs/router')
