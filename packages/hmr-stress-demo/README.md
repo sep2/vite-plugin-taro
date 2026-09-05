@@ -1,6 +1,6 @@
-# WX HMR stress demo
+# Mini Program HMR stress demo
 
-A repository-only Mini Program fixture for exercising Page replacement with a large retained React/Taro tree.
+A repository-only WeChat and Alipay Mini Program fixture for exercising HMR with a large retained React/Taro tree.
 
 > **AI-assisted development is recommended:** Follow the [VPT AI development guide](https://vpt.js.org/guides/ai/) and let a coding assistant create, develop, test, and validate your app.
 
@@ -12,11 +12,11 @@ Each page renders:
 - 96 additional stateful grid cells;
 - controlled input, counter, selection, density, and mount-token state.
 
-The singleton App projects the Page outlet through a 16-level host chain beside a second 16-level decorative branch, and it consumes the same edited marker as both Pages. Every marker generation also reverses the two keyed App branches, forcing structural App HMR while retaining the Page subtree. The mirror route mounts a second Page copy while the primary Page remains in the back stack. Together they stress App-view slot routing, App and Page React Refresh, cumulative patch delivery, repeated native Page replacement, large `data` snapshot restoration, hidden-page recovery, runtime-requested rebuilds, and invalid-source recovery.
+The singleton App projects the Page outlet through a 16-level host chain beside a second 16-level decorative branch, and it consumes the same edited marker as both Pages. Every marker generation also reverses the two keyed App branches, forcing structural App HMR while retaining the Page subtree. The mirror route mounts a second Page copy while the primary Page remains in the back stack. Together they stress App-view slot routing, App and Page React Refresh, cumulative patch delivery, native Page replacement on WX, in-place interpreter updates on ZFB, large `data` snapshot restoration, hidden-page recovery, runtime-requested rebuilds, and invalid-source recovery.
 
-## Automated DevTools suite
+## Automated WeChat DevTools suite
 
-The suite creates a clean fixed fixture at `/tmp/vite-plugin-taro-hmr-stress-v1`, starts Vite, opens or reuses the same WeChat DevTools project, performs assertions, and stops Vite. Authorize the fixed CLI client once; subsequent runs reuse both that trust and the fixed project path without another authorization prompt:
+The automated suite remains WeChat-specific because it uses the `wechatide` runtime. It creates a clean fixed fixture at `/tmp/vite-plugin-taro-hmr-stress-v1`, starts Vite, opens or reuses the same WeChat DevTools project, performs assertions, and stops Vite. Authorize the fixed CLI client once; subsequent runs reuse both that trust and the fixed project path without another authorization prompt:
 
 ```bash
 wechatide auth -c Pi
@@ -52,7 +52,8 @@ The complete suite checks:
 Useful environment overrides:
 
 ```text
-VITE_VPT_WECHAT_APP_ID   App ID; falls back to the demo .env.local, then touristappid
+VITE_VPT_WECHAT_APP_ID           WeChat App ID; falls back to the demo .env.local, then touristappid
+VITE_VPT_ALIPAY_APP_ID           Alipay App ID for manual ZFB development
 VPT_HMR_DEVTOOLS_CLIENT          wechatide client name; default Pi
 VPT_HMR_BUILD_PLUGIN             set to 1 to rebuild plugin dist before the suite
 VPT_HMR_STRESS_UPDATES           burst update count
@@ -69,6 +70,14 @@ For exploratory work rather than write-heavy pressure tests:
 ```bash
 pnpm build:plugin
 VITE_VPT_WECHAT_APP_ID=<appid> pnpm dev:hmr-stress-demo:wx
+VITE_VPT_ALIPAY_APP_ID=<appid> pnpm dev:hmr-stress-demo:zfb
 ```
 
-Open `packages/hmr-stress-demo/dist/wx` manually. Do not run burst publishers against this repository-backed server; use the automated commands above so source generations remain confined to the disposable fixture.
+Open `packages/hmr-stress-demo/dist/wx` in WeChat DevTools or `packages/hmr-stress-demo/dist/zfb` in Alipay Mini Program Studio. ZFB uses the interpreter HMR mode required by the Alipay development tool. Do not run burst publishers against either repository-backed server; use the automated WeChat commands above so source generations remain confined to the disposable fixture.
+
+Build-only validation is available for both targets:
+
+```bash
+pnpm build:hmr-stress-demo:wx
+pnpm build:hmr-stress-demo:zfb
+```

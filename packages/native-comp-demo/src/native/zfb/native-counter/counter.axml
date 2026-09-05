@@ -1,0 +1,7 @@
+<view class="native-counter">
+    <view class="native-counter__title">
+        <slot name="title"></slot>
+    </view>
+    <text class="native-counter__label">Native count: {{ count }}</text>
+    <button class="native-counter__button" onTap="increment">Increment from native</button>
+</view>

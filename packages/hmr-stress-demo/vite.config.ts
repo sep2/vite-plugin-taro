@@ -1,83 +1,187 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
-import vpt from 'vite-plugin-taro'
+import vpt, { type VptHmrOptions, type VptJsonObject, type VptTarget } from 'vite-plugin-taro'
+
+type MiniTarget = Exclude<VptTarget, 'h5'>
+
+const appTitle = 'HMR stress lab'
+const mirrorTitle = 'HMR mirror stack'
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), 'VITE_VPT_')
+    const target = getTarget(env)
     const wechatAppId = env.VITE_VPT_WECHAT_APP_ID || 'touristappid'
-    const hmrMode = process.env.VPT_HMR_MODE === 'interpreter' ? 'interpreter' : 'devtools'
+    const alipayAppId = env.VITE_VPT_ALIPAY_APP_ID
 
     return {
         build: {
-            outDir: fromRoot('dist', 'wx')
+            outDir: fromRoot('dist', target)
         },
         plugins: [
             vpt({
-                target: 'wx',
-                hmr: { mode: hmrMode },
+                target,
+                hmr: { mode: getHmrMode(target) },
                 app: 'src/app.tsx',
                 pages: [
                     {
                         path: 'pages/index/index',
-                        config: {
-                            navigationBarTitleText: 'HMR stress lab'
-                        }
+                        config: createPageJson(target, appTitle)
                     },
                     {
                         path: 'pages/mirror/index',
-                        config: {
-                            navigationBarTitleText: 'HMR mirror stack'
-                        }
+                        config: createPageJson(target, mirrorTitle)
                     }
                 ],
-                appJson: {
-                    lazyCodeLoading: 'requiredComponents',
-                    componentFramework: 'glass-easel',
-                    window: {
-                        backgroundColor: '#e2e8f0',
-                        navigationBarBackgroundColor: '#0f172a',
-                        navigationBarTextStyle: 'white',
-                        navigationBarTitleText: 'HMR stress lab'
-                    }
-                },
-                projectConfigJson: {
-                    appid: wechatAppId,
-                    projectname: 'hmr-stress-demo',
-                    description: 'Deep React tree fixture for WX HMR stress testing.',
-                    compileType: 'miniprogram',
-                    setting: {
-                        skylineRenderEnable: false,
-                        urlCheck: false,
-                        es6: false,
-                        postcss: false,
-                        minified: false,
-                        enhance: false,
-                        uglifyFileName: false,
-                        minifyWXSS: false,
-                        minifyWXML: false,
-                        compileHotReLoad: true,
-                        preloadBackgroundData: false,
-                        newFeature: true,
-                        autoAudits: false,
-                        coverView: true,
-                        showShadowRootInWxmlPanel: false,
-                        scopeDataCheck: false,
-                        useCompilerModule: false
-                    }
-                },
-                projectPrivateConfigJson: {
-                    setting: {
-                        urlCheck: false
-                    }
-                },
-                sitemapJson: {
-                    rules: [{ action: 'allow', page: '*' }]
-                }
+                appJson: createAppJson(target),
+                projectConfigJson: createProjectConfigJson({ target, wechatAppId, alipayAppId }),
+                projectPrivateConfigJson: createProjectPrivateConfigJson(target),
+                sitemapJson: { rules: [{ action: 'allow', page: '*' }] }
             })
         ]
     }
 })
+
+function getHmrMode(target: MiniTarget): VptHmrOptions['mode'] {
+    if (target === 'zfb') return 'interpreter'
+    return process.env.VPT_HMR_MODE === 'interpreter' ? 'interpreter' : 'devtools'
+}
+
+function createPageJson(target: MiniTarget, title: string): VptJsonObject {
+    switch (target) {
+        case 'wx': {
+            return {
+                navigationBarTitleText: title
+            }
+        }
+        case 'zfb': {
+            return {
+                defaultTitle: title
+            }
+        }
+    }
+}
+
+function createAppJson(target: MiniTarget): VptJsonObject {
+    switch (target) {
+        case 'wx': {
+            return {
+                lazyCodeLoading: 'requiredComponents',
+                componentFramework: 'glass-easel',
+                window: {
+                    backgroundColor: '#e2e8f0',
+                    navigationBarBackgroundColor: '#0f172a',
+                    navigationBarTextStyle: 'white',
+                    navigationBarTitleText: appTitle
+                }
+            }
+        }
+        case 'zfb': {
+            return {
+                lazyCodeLoading: 'renderedComponents',
+                useDynamicPlugins: true,
+                window: {
+                    backgroundColor: '#e2e8f0',
+                    defaultTitle: appTitle,
+                    titleBarColor: '#0f172a'
+                }
+            }
+        }
+    }
+}
+
+function createProjectConfigJson({
+    target,
+    wechatAppId,
+    alipayAppId
+}: {
+    target: MiniTarget
+    wechatAppId: string
+    alipayAppId: string | undefined
+}): VptJsonObject {
+    switch (target) {
+        case 'wx': {
+            return {
+                appid: wechatAppId,
+                projectname: 'hmr-stress-demo',
+                description: 'Deep React tree fixture for Mini Program HMR stress testing.',
+                compileType: 'miniprogram',
+                setting: {
+                    skylineRenderEnable: false,
+                    urlCheck: false,
+                    es6: false,
+                    postcss: false,
+                    minified: false,
+                    enhance: false,
+                    uglifyFileName: false,
+                    minifyWXSS: false,
+                    minifyWXML: false,
+                    compileHotReLoad: true,
+                    preloadBackgroundData: false,
+                    newFeature: true,
+                    autoAudits: false,
+                    coverView: true,
+                    showShadowRootInWxmlPanel: false,
+                    scopeDataCheck: false,
+                    useCompilerModule: false
+                }
+            }
+        }
+        case 'zfb': {
+            return {
+                appid: alipayAppId,
+                miniprogramRoot: './',
+                format: 2,
+                compileOptions: {
+                    component2: true,
+                    globalObjectMode: 'enable',
+                    transpile: {
+                        script: {
+                            ignore: ['**']
+                        }
+                    }
+                },
+                developOptions: {
+                    lazyCompile: false,
+                    hotReload: true,
+                    skipTranspile: true,
+                    sourcemap: false,
+                    minify: false
+                }
+            }
+        }
+    }
+}
+
+function createProjectPrivateConfigJson(target: MiniTarget): VptJsonObject {
+    switch (target) {
+        case 'wx': {
+            return {
+                setting: {
+                    urlCheck: false
+                }
+            }
+        }
+        case 'zfb': {
+            return {
+                ignoreHttpDomainCheck: true,
+                ignoreCertificateDomainCheck: true,
+                ignoreWebViewDomainCheck: true
+            }
+        }
+    }
+}
+
+function getTarget(env: Record<string, string>): MiniTarget {
+    const targetEnvName = 'VITE_VPT_TARGET'
+    const target = env[targetEnvName]
+
+    if (target === 'wx' || target === 'zfb') {
+        return target
+    }
+
+    throw new Error(`${targetEnvName} must be "wx" or "zfb".`)
+}
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 

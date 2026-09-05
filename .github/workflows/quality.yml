@@ -45,6 +45,13 @@ jobs:
       - name: Build sample H5
         run: pnpm build:loan-genius:h5
 
+      - name: Build repository Mini Program demos
+        run: |
+          pnpm build:native-comp-demo:wx
+          pnpm build:native-comp-demo:zfb
+          pnpm build:hmr-stress-demo:wx
+          pnpm build:hmr-stress-demo:zfb
+
   windows:
     runs-on: windows-latest
     steps:
@@ -86,3 +93,10 @@ jobs:
 
       - name: Build sample H5
         run: pnpm build:loan-genius:h5
+
+      - name: Build repository Mini Program demos
+        run: |
+          pnpm build:native-comp-demo:wx
+          pnpm build:native-comp-demo:zfb
+          pnpm build:hmr-stress-demo:wx
+          pnpm build:hmr-stress-demo:zfb

@@ -51,20 +51,21 @@ If the user's instructions conflict with any rule in AGENTS.md files, ask for ex
 # Monorepo Context
 
 This repository is a pnpm v11 workspace for `vite-plugin-taro`, a Vite 8 / React 19 / Taro integration that builds
-shared apps for WeChat Mini Program (`wx`) and H5 targets.
+shared apps for WeChat Mini Program (`wx`), Alipay Mini Program (`zfb`), and H5 targets.
 
 - `packages/vite-plugin-taro`: publishable Vite plugin package. Source lives in `src`, build output is `dist`, and
   package README files are synced during build.
 - `packages/create-vite-taro`: publishable project generator package (`create-vite-taro`) with templates under
   `templates/default`.
 - `packages/taro-react`: generated React 19-compatible fork of `@tarojs/react`, published as `vite-plugin-taro-react`.
-- `packages/taro-plugin-framework-react`: generated React 19 and WX App-wrap fork of `@tarojs/plugin-framework-react`,
-  published as `vite-plugin-taro-plugin-framework-react`.
-- `packages/taro-runtime`: generated WX App-wrap fork of `@tarojs/runtime`, published as
+- `packages/taro-plugin-framework-react`: generated React 19 and Mini Program App-wrap fork of
+  `@tarojs/plugin-framework-react`, published as `vite-plugin-taro-plugin-framework-react`.
+- `packages/taro-runtime`: generated Mini Program App-wrap fork of `@tarojs/runtime`, published as
   `vite-plugin-taro-runtime`.
-- `packages/loan-genius`: sample app used to test the plugin against `h5` and `wx` targets.
-- `packages/native-comp-demo`: wx-only development project for native custom-component integration.
-- `packages/hmr-stress-demo`: wx-only deep React tree fixture for paced and burst HMR stress tests.
+- `packages/loan-genius`: sample app used to test the plugin against `h5`, `wx`, and `zfb` targets.
+- `packages/native-comp-demo`: `wx` / `zfb` development project for native custom-component integration.
+- `packages/hmr-stress-demo`: `wx` / `zfb` deep React tree fixture for HMR stress testing; its automated IDE harness is WX-only.
+- `packages/towxml-stream-demo`: wx-only native Towxml streaming fixture.
 - `patches`: local patches applied to upstream Taro 4.2.1 packages when regenerating the generated packages.
 
 Node.js v26+ is available and can execute TypeScript natively.
@@ -73,22 +74,27 @@ Node.js v26+ is available and can execute TypeScript natively.
 
 - `pnpm prepare:taro`: regenerate patched Taro packages from upstream npm tarballs and local patch files.
 - `pnpm build:plugin`: build `packages/vite-plugin-taro`.
-- `pnpm build:native-comp-demo:wx`: build the native-component project.
-- `pnpm dev:native-comp-demo:wx`: start the native-component project with hot reload.
-- `pnpm build:hmr-stress-demo:wx`: build the deep-tree HMR stress fixture.
-- `pnpm dev:hmr-stress-demo:wx`: start the deep-tree HMR stress fixture with hot reload.
+- `pnpm build:native-comp-demo:wx` / `pnpm build:native-comp-demo:zfb`: build the native-component project.
+- `pnpm dev:native-comp-demo:wx` / `pnpm dev:native-comp-demo:zfb`: start the native-component project with hot reload.
+- `pnpm build:hmr-stress-demo:wx` / `pnpm build:hmr-stress-demo:zfb`: build the deep-tree HMR stress fixture.
+- `pnpm dev:hmr-stress-demo:wx` / `pnpm dev:hmr-stress-demo:zfb`: start the deep-tree HMR stress fixture with hot reload.
+- `pnpm build:towxml-stream-demo:wx`: build the native Towxml streaming fixture.
+- `pnpm dev:towxml-stream-demo:wx`: start the native Towxml streaming fixture with hot reload.
 - `pnpm stress:hmr-stress-demo`: publish paced source edits against the running stress fixture.
 - `pnpm stress:hmr-stress-demo:burst`: publish a rapid source-edit burst against the running stress fixture.
 - `pnpm typecheck:plugin`: typecheck plugin.
 - `pnpm typecheck:loan-genius`: typecheck loan-genius.
 - `pnpm typecheck:native-comp-demo`: typecheck native-comp-demo.
 - `pnpm typecheck:hmr-stress-demo`: typecheck hmr-stress-demo.
+- `pnpm typecheck:towxml-stream-demo`: typecheck towxml-stream-demo.
 - `pnpm lint`: run Biome checks.
 - `pnpm format`: run Biome checks with safe writes.
 - `pnpm build:loan-genius:h5`: build the sample H5 target.
 - `pnpm build:loan-genius:wx`: build the sample WeChat Mini Program target.
+- `pnpm build:loan-genius:zfb`: build the sample Alipay Mini Program target.
 - `pnpm dev:loan-genius:h5`: run the sample H5 dev server.
 - `pnpm dev:loan-genius:wx`: start the sample WeChat Mini Program target with hot reload.
+- `pnpm dev:loan-genius:zfb`: start the sample Alipay Mini Program target with hot reload.
 - `pnpm preview:loan-genius:h5`: preview the built sample H5 target.
 
 # Generated files and packages

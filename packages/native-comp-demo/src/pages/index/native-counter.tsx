@@ -1,10 +1,17 @@
-import { defineNativeComponent, type NativeComponentEvent } from 'virtual:taro/native'
+// #ifdef wx
+import { WxNativeCounter } from './wx-native-counter.tsx'
+// #endif
 
-type NativeCounterProps = {
-    count: number
-    onIncrement?: (event: NativeComponentEvent<{ value: number }>) => void
-}
+// #ifdef zfb
+import { ZfbNativeCounter } from './zfb-native-counter.tsx'
+// #endif
 
-export const NativeCounter = defineNativeComponent<NativeCounterProps>(
-    () => import('../../native/native-counter/counter.js')
-)
+// Conditional compilation leaves exactly one target-native component in this tuple.
+export const [NativeCounter] = [
+    // #ifdef wx
+    WxNativeCounter,
+    // #endif
+    // #ifdef zfb
+    ZfbNativeCounter
+    // #endif
+]

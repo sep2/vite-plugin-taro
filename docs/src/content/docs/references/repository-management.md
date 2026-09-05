@@ -26,12 +26,12 @@ pnpm build:plugin
 | `packages/vite-plugin-taro` | 发布到 npm 的 Vite 插件 |
 | `packages/create-vite-taro` | 项目生成器及默认模板 |
 | `packages/taro-react` | 生成的 React 19 兼容 Taro React 包 |
-| `packages/taro-plugin-framework-react` | 生成的 React 19 与 WX App 包裹框架插件 |
-| `packages/taro-runtime` | 生成的 WX App 包裹 Taro Runtime 包 |
-| `packages/loan-genius` | WX 与 H5 综合示例 |
-| `packages/native-comp-demo` | 微信原生组件示例 |
-| `packages/hmr-stress-demo` | 深层 React 树与页面栈 HMR 压力测试项目 |
-| `packages/towxml-stream-demo` | Towxml 原生组件与流式渲染示例 |
+| `packages/taro-plugin-framework-react` | 生成的 React 19 与小程序 App 包裹框架插件 |
+| `packages/taro-runtime` | 生成的小程序 App 包裹 Taro Runtime 包 |
+| `packages/loan-genius` | 微信、支付宝与 Web 综合示例 |
+| `packages/native-comp-demo` | 微信与支付宝原生组件示例 |
+| `packages/hmr-stress-demo` | 微信与支付宝深层 React 树及页面栈 HMR 压力测试项目 |
+| `packages/towxml-stream-demo` | 微信 Towxml 原生组件与流式渲染示例 |
 | `docs` | Astro Starlight 文档站 |
 
 ## 构建与验证
@@ -51,13 +51,16 @@ pnpm test
 ```sh
 pnpm typecheck:loan-genius
 pnpm build:loan-genius:wx
+pnpm build:loan-genius:zfb
 pnpm build:loan-genius:h5
 
 pnpm typecheck:native-comp-demo
 pnpm build:native-comp-demo:wx
+pnpm build:native-comp-demo:zfb
 
 pnpm typecheck:hmr-stress-demo
 pnpm build:hmr-stress-demo:wx
+pnpm build:hmr-stress-demo:zfb
 
 pnpm typecheck:towxml-stream-demo
 pnpm build:towxml-stream-demo:wx
@@ -78,13 +81,16 @@ pnpm --filter docs build
 
 ```sh
 pnpm dev:loan-genius:wx
+pnpm dev:loan-genius:zfb
 pnpm dev:loan-genius:h5
 pnpm dev:native-comp-demo:wx
+pnpm dev:native-comp-demo:zfb
 pnpm dev:hmr-stress-demo:wx
+pnpm dev:hmr-stress-demo:zfb
 pnpm dev:towxml-stream-demo:wx
 ```
 
-运行微信目标后，在微信开发者工具中打开对应项目的 `dist/wx`。HMR 压力项目启动后，可运行 `pnpm stress:hmr-stress-demo` 发送 30 次定时编辑，或运行 `pnpm stress:hmr-stress-demo:burst` 发送 60 次快速编辑。运行 H5 目标后，使用 Vite 输出的本地地址。
+运行微信目标后，在微信开发者工具中打开对应项目的 `dist/wx`；运行支付宝目标后，在支付宝小程序开发者工具中打开 `dist/zfb`。HMR 压力项目的自动编辑与断言工具当前仅连接微信开发者工具，应通过仓库根目录的 `pnpm stress:hmr-stress-demo:burst` 运行。运行 H5 目标后，使用 Vite 输出的本地地址。
 
 ## 生成文件
 

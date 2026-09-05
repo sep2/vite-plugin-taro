@@ -5,8 +5,10 @@
     "author": "sep2",
     "type": "module",
     "scripts": {
-        "build-wx": "cross-env NODE_ENV=production vite build",
-        "dev-wx": "cross-env NODE_ENV=development vite",
+        "build-wx": "cross-env NODE_ENV=production VITE_VPT_TARGET=wx vite build",
+        "build-zfb": "cross-env NODE_ENV=production VITE_VPT_TARGET=zfb vite build",
+        "dev-wx": "cross-env NODE_ENV=development VITE_VPT_TARGET=wx vite",
+        "dev-zfb": "cross-env NODE_ENV=development VITE_VPT_TARGET=zfb vite",
         "stress-hmr": "node scripts/run-devtools-tests.ts burst",
         "stress-hmr:burst": "node scripts/run-devtools-tests.ts burst",
         "setup-devtools": "cross-env VPT_HMR_SETUP=1 node scripts/run-devtools-tests.ts setup",

@@ -240,13 +240,18 @@ async function startServer(root: string): Promise<ServerProcess> {
     const log = createWriteStream(serverLogPath)
     const server = spawn(viteExecutable, [], {
         cwd: root,
-        env: { ...process.env, NODE_ENV: 'development', VITE_VPT_WECHAT_APP_ID: appId },
+        env: {
+            ...process.env,
+            NODE_ENV: 'development',
+            VITE_VPT_TARGET: 'wx',
+            VITE_VPT_WECHAT_APP_ID: appId
+        },
         stdio: ['ignore', 'pipe', 'pipe']
     })
     server.stdout.pipe(log)
     server.stderr.pipe(log)
     try {
-        await waitFor(async () => (await readFile(serverLogPath, 'utf8')).includes('WeChat DevTools'), 20_000, 100)
+        await waitFor(async () => (await readFile(serverLogPath, 'utf8')).includes('Mini Program project'), 20_000, 100)
         return server
     } catch (error) {
         await stopServer(server)

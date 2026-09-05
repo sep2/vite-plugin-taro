@@ -2,7 +2,7 @@
 description: 在 React 中类型安全地使用微信或支付宝原生组件，并让原生资源参与全自动分包。
 ---
 
-使用 `defineNativeComponent()` 为已有的微信原生组件声明一个 React 接口。vpt 会自动复制原生文件、注册组件并规划分包。
+使用 `defineNativeComponent()` 为当前目标的原生组件声明一个 React 接口。vpt 会自动复制原生文件、注册组件并规划分包。
 
 ## 在 React 中使用
 
@@ -285,7 +285,7 @@ React 和原生组件不共享 CommonJS 模块实例。使用属性和事件通�
 
 ### 属性或事件没有传递
 
-确认原生 `properties`、`triggerEvent()` 名称与 TypeScript 字段一致。
+确认微信组件的 `properties` / `triggerEvent()` 或支付宝组件的 `props` / `on*` 回调名称与 TypeScript 字段一致。
 
 ### 原生组件内部找不到文件
 
@@ -293,5 +293,5 @@ React 和原生组件不共享 CommonJS 模块实例。使用属性和事件通�
 
 ## 示例
 
-- [`native-comp-demo`](https://github.com/sep2/vite-plugin-taro/tree/main/packages/native-comp-demo)：属性与事件双向通信。
-- [`towxml-stream-demo`](https://github.com/sep2/vite-plugin-taro/tree/main/packages/towxml-stream-demo)：Towxml、增量 adapter 和自动分包。
+- [`native-comp-demo`](https://github.com/sep2/vite-plugin-taro/tree/main/packages/native-comp-demo)：微信与支付宝原生组件的属性、事件和命名 slot。
+- [`towxml-stream-demo`](https://github.com/sep2/vite-plugin-taro/tree/main/packages/towxml-stream-demo)：微信 Towxml、增量 adapter 和自动分包。

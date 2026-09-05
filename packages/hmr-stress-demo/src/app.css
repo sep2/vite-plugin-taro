@@ -10,7 +10,7 @@
     box-sizing: border-box;
 }
 
-/* biome-ignore lint/correctness/noUnknownTypeSelector: `page` is the WeChat Mini Program host element. */
+/* biome-ignore lint/correctness/noUnknownTypeSelector: `page` is the Mini Program host element. */
 page {
     height: 100%;
     background: #e2e8f0;
