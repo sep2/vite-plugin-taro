@@ -4,7 +4,24 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
-## [0.6.21-beta.1] - 2026-09-04
+## [0.7.0] - 2026-09-05
+
+### Added
+
+- make page config optional (5173897)
+- remove glassEaselWebview (81e84ad)
+- add rebuild hmr mode (c4dc33a)
+
+### Changed
+
+- zfb (9c7f895)
+- hmr rebuild (a8c844b)
+
+### Fixed
+
+- repair published package validation (1e076f1)
+
+## [0.6.21-beta.1] - 2026-09-05
 
 ### Added
 
