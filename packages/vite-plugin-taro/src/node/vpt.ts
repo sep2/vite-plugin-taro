@@ -6,9 +6,12 @@ import { createConditionalDirectivePlugin } from './plugins/conditional/conditio
 import { createH5TargetPlugins } from './plugins/h5/plugins.ts'
 import { createWxMiniPlugins } from './plugins/wx/plugins.ts'
 import { createZfbMiniPlugins } from './plugins/zfb/plugins.ts'
+import { assertRuntimeVersions } from './utils/assert-runtime-versions.ts'
 
 /** Creates the Vite plugins for one Taro target. */
 export default function vpt(options: VptOptions): PluginOption[] {
+    assertRuntimeVersions()
+
     return [
         createConditionalDirectivePlugin(options.target),
         createClientTaroPlugin(options.target),
