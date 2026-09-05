@@ -399,7 +399,7 @@ VPT 模块运行时与微信原生模块加载处于同一量级。
 
 微信开发模式的第一次完整构建使用相同的代码块格式、位置规划和运行时，只移除内容哈希以保持文件路径稳定。
 
-普通 JavaScript HMR 不重新生成完整代码块图。Rolldown 只生成源码模块补丁：`devtools` 模式改写 `hmr/patches.js`，`interpreter` 模式通过 Vite WebSocket 推送同一注册程序；两者都不会重新规划分包。只有初始构建或明确的完整构建才会再次执行位置规划。完整流程参见[热更新实现原理](/references/hmr-implementation/)。
+普通 JavaScript HMR 不重新生成完整代码块图。Rolldown 只生成源码模块补丁：`devtools` 模式改写 `hmr/patches.js`，`interpreter` 模式通过 Vite WebSocket 推送同一注册程序；两者都不会重新规划分包。`rebuild` 模式则在每次有效源码变化后生成完整代码块图并重新执行位置规划。完整流程参见[热更新实现原理](/references/hmr-implementation/)。
 
 ## 维护者附录
 

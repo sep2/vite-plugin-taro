@@ -1,5 +1,5 @@
 ---
-title: 开发热更新
+title: 小程序开发热更新
 description: 在微信或支付宝小程序开发工具中更新代码和样式，并保留应用状态。
 ---
 
@@ -57,39 +57,19 @@ hmr: {
 }
 ```
 
-默认的 `devtools` 模式通过小程序开发工具执行更新，速度更快，开发运行时代码也更小。更新 JavaScript 时，工具会重新注册当前 Page，但 vpt 会保留下文列出的应用和页面状态。
+若不需要保留运行状态，希望每次有效源码变化都生成完整原生项目，可选择完整重建：
 
-`interpreter` 模式绕过 Page 重新注册，直接在当前 App 中执行更新。它的开发运行时更大，执行更新也更慢。除非默认模式出现问题，否则无需切换。
+```ts
+hmr: {
+    mode: 'rebuild'
+}
+```
 
-该选项只影响小程序本地开发中的 JavaScript 热更新，不影响 H5 或生产构建。
+默认的 `devtools` 模式通过微信小程序开发工具执行更新，速度更快，开发运行时代码也更小。更新 JavaScript 时，工具会重新注册当前 Page， vpt 会保留下文列出的应用和页面状态。
 
-若希望每次构建都全量输出，不用热更新缓存，可这样调用：
-<Tabs syncKey="package-manager">
-    <TabItem label="npm">
+`interpreter` 模式绕过 Page 重新注册，直接在当前 App 中执行更新。它的开发运行时更大，执行更新也更慢。支付宝小程序开发者工具暂时仅支持此模式。
 
-        ```sh
-        npm run build:wx -- --watch
-        ```
-
-    </TabItem>
-    <TabItem label="pnpm">
-
-        ```sh
-        pnpm build:wx -- --watch
-        ```
-
-    </TabItem>
-    <TabItem label="bun">
-
-        ```sh
-        bun run build:wx -- --watch
-        ```
-
-    </TabItem>
-</Tabs>
-
-这样每次修改都会刷新开发者工具。一般在 AI 开发，或者 dev 模式出问题时临时使用。
-
+`rebuild` 模式每次修改都会替换完整输出并重启 App。
 
 ## 保留的状态
 
@@ -125,7 +105,7 @@ projectPrivateConfigJson: {
 
 `compileHotReLoad: true` 开启开发者工具的热重载。补丁文件变化后，开发者工具只重新加载受影响的页面，不重启整个小程序；vpt 依靠这个行为保留 App 和 React 状态。
 
-`urlCheck: false` 关闭开发者工具的服务器域名校验，让小程序可以连接本机 Vite WebSocket 并报告热更新结果。它只影响开发者工具中的调试连接，不会放宽正式版小程序的服务器域名限制。
+`urlCheck: false` 关闭开发者工具的服务器域名校验，让小程序可以连接本机 Vite WebSocket 并报告热更新结果。它只影响开发者工具中的调试连接，不会放宽正式版小程序的服务器域名限制；`rebuild` 模式不需要该连接。
 
 据[微信官方说明](https://developers.weixin.qq.com/miniprogram/dev/framework/runtime/skyline/migration/compatibility.html#常见的兼容问题)，开发者工具的 Skyline 调试模式暂不支持热更新。日常开发时保持 `skylineRenderEnable: false`；检查 Skyline 效果时再临时开启。参见[Skyline 模式](/guides/skyline-mode/)。
 
@@ -133,11 +113,10 @@ projectPrivateConfigJson: {
 
 以下情况会重新启动应用：
 
+- 使用 `rebuild` 模式保存任意有效源码变化；
 - 点击开发者工具的“编译”；
 - 重启 `dev:wx` / `dev:zfb` 或修改 Vite 配置；
-- 某次代码变化无法安全热更新，vpt 自动执行完整构建。
-
-完整构建是热更新无法继续时的正常恢复方式，终端会显示相应提示。
+- 补丁模式中的某次代码变化无法安全热更新，vpt 自动执行完整构建。
 
 ## 保存后没有更新
 
@@ -149,6 +128,5 @@ projectPrivateConfigJson: {
 4. 微信调试时 `skylineRenderEnable` 未开启。
 
 仍然无效时，关闭开发者工具和开发命令，删除 `dist/wx` / `dist/zfb`，重新运行 `dev:wx` / `dev:zfb` 后再打开生成目录。
-
 
 实现细节参见[热更新实现原理](/references/hmr-implementation/)。
