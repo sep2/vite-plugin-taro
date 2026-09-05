@@ -17,8 +17,18 @@ const modules: RuntimeModulesContract = {
     interpreterHmrRuntime: '/runtime/interpreter-runtime.ts'
 }
 
-test('defaults to DevTools and resolves each public mode', () => {
-    assert.match(createMiniHmrMode(undefined, modules).runtimeFile, /devtools-runtime\.(?:ts|js)$/)
-    assert.match(createMiniHmrMode({ mode: 'devtools' }, modules).runtimeFile, /devtools-runtime\.(?:ts|js)$/)
-    assert.match(createMiniHmrMode({ mode: 'interpreter' }, modules).runtimeFile, /interpreter-runtime\.(?:ts|js)$/)
+test('defaults to DevTools and resolves every public update mode', () => {
+    const defaultMode = createMiniHmrMode(undefined, modules)
+    const devtoolsMode = createMiniHmrMode({ mode: 'devtools' }, modules)
+    const interpreterMode = createMiniHmrMode({ mode: 'interpreter' }, modules)
+    const rebuildMode = createMiniHmrMode({ mode: 'rebuild' }, modules)
+
+    assert.equal(defaultMode.rebuildStrategy, 'on-failure')
+    assert.equal(devtoolsMode.rebuildStrategy, 'on-failure')
+    assert.equal(interpreterMode.rebuildStrategy, 'on-failure')
+    assert.equal(rebuildMode.rebuildStrategy, 'always')
+    assert.match(defaultMode.runtimeFile, /devtools-runtime\.(?:ts|js)$/)
+    assert.match(devtoolsMode.runtimeFile, /devtools-runtime\.(?:ts|js)$/)
+    assert.match(interpreterMode.runtimeFile, /interpreter-runtime\.(?:ts|js)$/)
+    assert.match(rebuildMode.runtimeFile, /devtools-runtime\.(?:ts|js)$/)
 })

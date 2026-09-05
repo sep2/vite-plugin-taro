@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -43,6 +43,7 @@ const runtimeModules = {
 
 type DevFixture = Readonly<{
     close: () => Promise<void>
+    outDir: string
     infoPath: string
     appStylePath: string
     bundledDev: BundledDev
@@ -72,6 +73,13 @@ function createInterpreterOptions(): VptOptions {
     return {
         ...createOptions(),
         hmr: { mode: 'interpreter' }
+    }
+}
+
+function createRebuildOptions(): VptOptions {
+    return {
+        ...createOptions(),
+        hmr: { mode: 'rebuild' }
     }
 }
 
@@ -138,6 +146,7 @@ async function startDevFixture(logger: Logger, host: string, options: VptOptions
 
     return {
         server,
+        outDir,
         bundledDev: requireBundledDev(server.environments.client.bundledDev),
         pagePath,
         appStylePath: path.join(outDir, 'app.wxss'),
@@ -178,6 +187,35 @@ async function waitForFile(
     }
     await delay(waitIntervalMilliseconds)
     return waitForFile(fileName, predicate, attemptsRemaining - 1)
+}
+
+async function readJavaScriptOutput(directory: string): Promise<readonly string[]> {
+    const entries = await readdir(directory, { withFileTypes: true })
+    const sources = await Promise.all(
+        entries.map(async (entry): Promise<readonly string[]> => {
+            const entryPath = path.join(directory, entry.name)
+            if (entry.isDirectory()) {
+                return readJavaScriptOutput(entryPath)
+            }
+            if (entry.isFile() && path.extname(entry.name) === '.js') {
+                return [await readFile(entryPath, 'utf8')]
+            }
+            return []
+        })
+    )
+    return sources.flat()
+}
+
+async function waitForJavaScriptOutput(directory: string, marker: string, attemptsRemaining: number): Promise<void> {
+    const sources = await readJavaScriptOutput(directory)
+    if (sources.some((source) => source.includes(marker))) {
+        return
+    }
+    if (attemptsRemaining === 0) {
+        assert.fail(`Timed out waiting for JavaScript output containing ${marker}`)
+    }
+    await delay(waitIntervalMilliseconds)
+    return waitForJavaScriptOutput(directory, marker, attemptsRemaining - 1)
 }
 
 async function waitForStableFile(
@@ -458,6 +496,34 @@ test('publishes interpreter source through Vite WebSocket', async (context) => {
     const secondSource = secondMessage.patches.map(({ code }) => code).join('\n')
     assert.match(secondSource, /second interpreted generation/)
     assert.doesNotMatch(secondSource, /first interpreted generation/)
+    assert.equal(await readExistingFile(fixture.patchesPath), undefined)
+})
+
+test('rebuild mode replaces complete output without creating patch transport artifacts', async (context) => {
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createRebuildOptions())
+    context.after(fixture.close)
+
+    const initialAppStyle = await waitForFile(
+        fixture.appStylePath,
+        (source) => source.includes('vpt-build:'),
+        maximumWaitAttempts
+    )
+    assert.equal(await readExistingFile(fixture.infoPath), undefined)
+    assert.equal(await readExistingFile(fixture.patchesPath), undefined)
+
+    const marker = 'complete rebuild generation'
+    await publishSourceGeneration(fixture.pagePath, renderPage(marker))
+    const rebuiltAppStyle = await waitForFile(
+        fixture.appStylePath,
+        (source) => source !== initialAppStyle,
+        maximumWaitAttempts
+    )
+    await waitForJavaScriptOutput(fixture.outDir, marker, maximumWaitAttempts)
+
+    const javaScriptOutput = (await readJavaScriptOutput(fixture.outDir)).join('\n')
+    assert.match(rebuiltAppStyle, /vpt-build:/)
+    assert.doesNotMatch(javaScriptOutput, /hmr\/(?:info|patches)\.js/)
+    assert.equal(await readExistingFile(fixture.infoPath), undefined)
     assert.equal(await readExistingFile(fixture.patchesPath), undefined)
 })
 

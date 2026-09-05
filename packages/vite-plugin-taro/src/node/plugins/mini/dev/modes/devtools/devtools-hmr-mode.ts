@@ -18,6 +18,7 @@ export const devtoolsPatchesFileName = 'hmr/patches.js'
  */
 export function createDevtoolsHmrMode(modules: RuntimeModulesContract): MiniHmrMode {
     return {
+        rebuildStrategy: 'on-failure',
         runtimeFile: modules.devtoolsHmrRuntime,
         plugins: [createDevtoolsPagePlugin(modules.pageShell)],
         createEntryBanner: createDevtoolsEntryBanner,
@@ -35,7 +36,7 @@ export function createDevtoolsHmrMode(modules: RuntimeModulesContract): MiniHmrM
             fileName: devtoolsPatchesFileName,
             source: renderDevtoolsPatches(publication.buildId, publication.patches)
         })
-    }
+    } satisfies MiniHmrMode
 }
 
 /** Provides a valid, inert CommonJS dependency before the host has a patch range to publish. */

@@ -145,8 +145,8 @@ export class MiniHmrRuntime extends DevRuntime {
         super('')
 
         // Rolldown schedules each generated React Refresh boundary with queueMicrotask. This shared runtime is constructed before
-        // any application factory, so installing the language-global fallback here covers every Mini target and both HMR modes at
-        // the one common execution boundary while leaving production output untouched.
+        // any application factory, so installing the language-global fallback here covers every Mini target and development mode
+        // at the one common execution boundary while leaving production output untouched.
         polyfillQueueMicrotask(globalThis)
 
         this.connectSocket = connectSocket

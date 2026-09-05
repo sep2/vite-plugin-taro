@@ -56,8 +56,8 @@ export function installMiniDevOptions({
         const configured = configuredOutput ?? {}
 
         // Entry banners run after Rolldown has assigned chunk names, so the mode receives route membership rather than source
-        // IDs. DevTools mode uses O(1) membership to add Page patch dependencies; interpreter mode emits only its App initializer.
-        // ReadonlySet prevents the resolved entry set from changing while Rolldown invokes the banner for later chunks.
+        // IDs. DevTools uses O(1) membership to add Page patch dependencies, interpreter initializes only App, and rebuild emits
+        // no host-only edge. ReadonlySet prevents the entry set from changing while Rolldown invokes later banners.
         const pageFiles: ReadonlySet<string> = new Set(contract.options.pages.map((page) => `${page.path}.js`))
 
         /*
@@ -70,9 +70,9 @@ export function installMiniDevOptions({
             // Development output is overwritten in place after every complete build. Strip hash placeholders from the
             // configured asset pattern so old files cannot accumulate and native asset references remain stable.
             assetFileNames: createStableFileNames(configured.assetFileNames, 'assets/[name][extname]'),
-            // These banners create physical CommonJS edges only after graph analysis. Every mode initializes its App runtime;
-            // modes that need Page delivery can additionally prepend Page edges. Host-only metadata stays outside the application
-            // chunk graph and therefore cannot affect placement or generate transport chunks of its own.
+            // These banners create physical CommonJS edges only after graph analysis. Patch modes initialize their App runtime;
+            // DevTools additionally prepends Page delivery edges, while rebuild needs neither. Host-only metadata stays outside
+            // the application chunk graph and therefore cannot affect placement or generate transport chunks of its own.
             banner: hmrMode.createEntryBanner(pageFiles),
             // Preserve the configured directory/name shape while removing content hashes. Stable chunk paths let DevTools
             // overwrite executable files and keep one persistent physical module identity across complete builds.
@@ -102,8 +102,8 @@ export function installMiniDevOptions({
             ...(typeof existingDevMode === 'object' ? existingDevMode : {}),
             // Install the self-contained runtime selected once by the HMR mode. Nested bundling resolves all adapter imports into
             // one implementation string because Rolldown injects it into a generated runtime chunk where ordinary module imports
-            // are unavailable. Shared ACK/rebuild reports use the host bridge; each adapter separately owns how executable module
-            // registrations reach that runtime.
+            // are unavailable. Patch adapters initialize delivery and reports; rebuild reuses the native adapter without adding
+            // its initialization or Page delivery edges.
             implement: await bundleRuntimeSource(hmrMode.runtimeFile),
             // Produce a complete output graph on the initial build. Lazy per-request compilation cannot establish the closed
             // App/Page graph, native companions, style sidecars, and build identity required before any patch is admitted.

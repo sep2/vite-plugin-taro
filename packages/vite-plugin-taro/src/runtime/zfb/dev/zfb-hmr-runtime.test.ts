@@ -17,7 +17,7 @@ function initializeRuntime(runtime: unknown, buildId: string): void {
     Reflect.apply(runtime.initialize, runtime, [{ buildId: buildId, endpoint: `ws://localhost/${buildId}` }])
 }
 
-test('adapts the Alipay socket while installing both HMR modes on the shared runtime global', async () => {
+test('adapts the Alipay socket while installing both patch modes on the shared runtime global', async () => {
     // These mutable captures model one native SocketTask and record every operation crossing the ZFB adapter boundary.
     const connectOptions: unknown[] = []
     const sentOptions: unknown[] = []

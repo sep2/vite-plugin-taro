@@ -44,7 +44,7 @@ test('describes publication events without owning their transport', () => {
     const mode = createInterpreterHmrMode(modules)
     const publication: PatchPublication = { buildId: 'build', patches: [patch] }
 
-    assert.equal(mode.reset(), undefined)
+    assert.equal('reset' in mode, false)
     assert.deepEqual(mode.publish(publication), {
         kind: 'event',
         event: interpreterServerEvent,

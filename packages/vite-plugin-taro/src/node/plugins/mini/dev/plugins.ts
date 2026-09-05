@@ -50,8 +50,8 @@ export function createMiniDevelopmentPlugin(
                     build: {
                         // Development output is the live project opened by the native tool, not a disposable build artifact.
                         // Deleting and recreating its directory tree during a dev-server restart detaches the native watcher;
-                        // recreating identical paths does not reliably reattach it. Both HMR modes depend on that watcher for
-                        // complete builds and styles, while DevTools mode also uses it for JavaScript patches.
+                        // recreating identical paths does not reliably reattach it. Every development mode depends on that
+                        // watcher for complete builds and styles, while DevTools mode also uses it for JavaScript patches.
                         // Preserve watched paths and overwrite their contents. Production builds retain normal output cleanup.
                         emptyOutDir: false,
                         // Disable maps in resolved environment config as well as final output so Oxc and Babel skip producing
@@ -64,7 +64,7 @@ export function createMiniDevelopmentPlugin(
                         bundledDev: true
                     },
                     server: {
-                        // Source and reports share Vite's existing socket at the one generated runtime endpoint.
+                        // Patch source and reports share Vite's existing socket; rebuild mode does not connect to it.
                         ws: { path: hmrEndpointPath }
                     }
                 }
@@ -89,7 +89,7 @@ export function createMiniDevelopmentPlugin(
                 handler(_, bundle) {
                     // The shared output plugin emits the production App wrapper during every complete build: startup and each
                     // recovery build, not just once when this plugin instance is created. Development transfers that file
-                    // to the host so its only physical write happens after the matching build identity is durable.
+                    // to the host so its only physical write happens after the complete output and matching mode state are durable.
                     removeDevelopmentAppStyle(bundle, contract.styles.appFileName)
                 }
             },
@@ -127,17 +127,20 @@ export function createMiniDevelopmentPlugin(
  * Transfers development ownership of the App stylesheet from complete output to the dev host.
  *
  * The ordinary output hook emits the static production wrapper during every complete build. In development, the existing
- * physical wrapper instead contains the previous build ID. If the static asset remained in this bundle, the DevEngine would:
+ * physical wrapper instead contains the previous complete-build marker. If the static asset remained in this bundle, the
+ * DevEngine would:
  *
  * 1. replace the versioned wrapper with static production bytes while JavaScript and HMR metadata are still being finalized;
- * 2. let DevTools observe that root-style change and reload the App against the previous build identity;
- * 3. let the host replace the wrapper again with the new build ID, causing a second App reload.
+ * 2. let the native tool observe that root-style change and reload the App against the previous patch identity, or before a
+ *    rebuild-mode transaction has completed;
+ * 3. let the host replace the wrapper again with the new marker, causing a second App reload.
  *
  * Deleting only the in-memory bundle entry avoids both premature writes. Development sets `emptyOutDir: false`, so the prior
- * physical App stylesheet remains available while complete output is written. The host replaces it exactly once after the
- * selected mode has reset and the matching `hmr/info.js` identity is durable. Incremental HMR never enters this complete-output
- * hook and changes only the imported global stylesheet; rewriting the App root would reload the heap while a JavaScript patch is
- * awaiting acknowledgement. The serve-only plugin leaves production output unchanged.
+ * physical App stylesheet remains available while complete output is written. The host replaces it exactly once afterward.
+ * Patch modes first reset delivery and publish matching `hmr/info.js`; rebuild mode has no patch state and writes a fresh marker
+ * directly. Incremental HMR never enters this complete-output hook and changes only the imported global stylesheet; rewriting
+ * the App root would reload the heap while a JavaScript patch is awaiting acknowledgement. The serve-only plugin leaves
+ * production output unchanged.
  */
 export function removeDevelopmentAppStyle(bundle: Record<string, unknown>, appStyleFileName: string): void {
     delete bundle[appStyleFileName]

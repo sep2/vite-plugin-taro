@@ -50,9 +50,9 @@ type HostAction =
 const hmrSettleMilliseconds = 16
 
 /**
- * Creates the Mini Program dev host: the adapter that owns the physical Rolldown DevEngine, shared patch journal, and selected mode effects.
+ * Creates the Mini Program dev host: the adapter that owns the physical Rolldown DevEngine and selected update mode effects.
  * It replaces Vite's browser-oriented `bundledDev.listen()` because a Mini Program cannot execute Vite's browser module graph;
- * its engine must write a complete native project while the selected mode supplies an environment-valid patch mechanism.
+ * its engine must write a native project and either replace complete output or deliver environment-valid patches.
  *
  * The shared style plugin carries the resolver's immutable App/Page cascade policy while Rolldown remains authoritative for
  * every live import edge. Keeping those responsibilities in the same serialized host transaction prevents JavaScript factories,
@@ -80,7 +80,7 @@ export async function createMiniDevHost({
     const writeFile = (fileName: string, source: string) =>
         writeDevelopmentFile(server.config.build.outDir, fileName, source)
 
-    const journal = new PatchJournal((publication) => dispatchModeAction(hmrMode.publish(publication)))
+    const journal = new PatchJournal((publication) => dispatchModeAction(hmrMode.publish?.(publication)))
 
     server.ws.on(runtimeReportEvent, (report) => {
         hostActions.next({ kind: 'report', report: report })
@@ -113,8 +113,8 @@ export async function createMiniDevHost({
     /*
      * BundledDev is Vite's mutable environment adapter. Transfer its engine slot to the one physical writer created above so
      * Vite middleware and close() address the same engine; leaving the slot untouched would make listen() create a second,
-     * skip-write browser engine with a divergent graph. Disable Vite's access-triggered regeneration because runtime reports and
-     * Rolldown HMR results now own every rebuild decision. Finally replace listen so readiness waits for physical initial output
+     * skip-write browser engine with a divergent graph. Disable Vite's access-triggered regeneration because the selected
+     * Rolldown update strategy owns every rebuild decision. Finally replace listen so readiness waits for physical initial output
      * instead of Vite's in-memory bundle. These assignments are installation-time ownership transfer, never per-update state.
      */
     bundledDev._devEngine = engine
@@ -142,10 +142,12 @@ export async function createMiniDevHost({
     // Vite binds the port only after initServer (and therefore the initial build) completes, so
     // the actual port is not observable while onOutput runs for the first build. The App metadata
     // is written once the port is real; later full builds rewrite it from onOutput.
-    server.httpServer?.once('listening', () => {
-        // Port availability is lifecycle data, so initial identity rotation follows prior output/capture actions in the reducer.
-        hostActions.next({ kind: 'listening' })
-    })
+    if (hmrMode.rebuildStrategy === 'on-failure') {
+        server.httpServer?.once('listening', () => {
+            // Port availability is lifecycle data, so initial identity rotation follows prior output actions in the reducer.
+            hostActions.next({ kind: 'listening' })
+        })
+    }
 
     installDevToolsPrinter(server)
 
@@ -166,12 +168,21 @@ export async function createMiniDevHost({
         await writeFile(contract.styles.globalFileName, source)
     }
 
-    /** Rotates the build identity and materializes the App metadata for it. */
-    async function rotateBuildSession(): Promise<void> {
+    /** Materializes one completed build and rotates patch-session state only when the selected mode has one. */
+    async function publishBuildBoundary(): Promise<void> {
+        if (hmrMode.rebuildStrategy === 'always') {
+            // A fresh marker makes every complete output an App-level native-tool reload even when its stylesheet is unchanged.
+            const { buildId } = journal.startBuild()
+            await writeFile(
+                contract.styles.appFileName,
+                renderDevelopmentAppStyle(contract.styles.globalFileName, buildId)
+            )
+            return
+        }
+
         const port = boundPort(server)
         if (port === undefined) {
-            // The initial output finishes before Vite binds its port. The listening listener
-            // starts the first real client build, avoiding a phantom registered client.
+            // Patch runtimes need the real socket port. The listening listener starts the first registered client build.
             return
         }
 
@@ -206,7 +217,7 @@ export async function createMiniDevHost({
             endpoint: createSocketEndpoint(server, port)
         }
 
-        await dispatchModeAction(hmrMode.reset())
+        await dispatchModeAction(hmrMode.reset?.())
         await writeFile(hmrInfoFileName, renderHmrInfo(info))
         // The complete-output hook kept the previous physical App-style wrapper in place. Replace it only now, after the selected
         // mode is reset and matching identity is durable. Native development tools treat the App stylesheet as a root, so this
@@ -234,14 +245,14 @@ export async function createMiniDevHost({
                 }
                 return publishCompleteStyles()
             case 'listening':
-                return rotateBuildSession()
+                return publishBuildBoundary()
         }
     }
 
     /** Publishes graph-complete styles before rotating the App-visible build identity. */
     async function publishCompleteStyles(): Promise<void> {
         await styles.finalizeUpdate([], writeGlobalStyle)
-        await rotateBuildSession()
+        await publishBuildBoundary()
     }
 
     /**
@@ -274,18 +285,18 @@ export async function createMiniDevHost({
         const output = requireSingleOutput(rolldownOptions)
 
         return dev(rolldownOptions, output, {
-            /**
-             * Admits Rolldown's non-awaited callback without starting asynchronous host work on the binding callback stack.
-             * The Subject retains Error values as control events and successful values as lossless patch data until its quiet edge.
-             */
-            onHmrUpdates: (result: HmrUpdatesResult) => {
-                hmrResults.next(result)
-            },
+            // Rebuild mode omits patch results because Rolldown writes complete output itself after every update.
+            onHmrUpdates:
+                hmrMode.rebuildStrategy === 'on-failure'
+                    ? (result: HmrUpdatesResult) => {
+                          hmrResults.next(result)
+                      }
+                    : undefined,
             // Initial and later complete builds share one admission path; startup merely observes the first OutputAction.
             onOutput: (result: DevOutputResult) => {
                 hostActions.next({ kind: 'output', result: result })
             },
-            rebuildStrategy: 'never',
+            rebuildStrategy: hmrMode.rebuildStrategy === 'always' ? 'always' : 'never',
             watch: {
                 // Normalize platform filesystem notifications before compilation. In particular, a single Windows full-file
                 // save can emit separate truncate and write events. Rolldown's debounce folds those physical events into one

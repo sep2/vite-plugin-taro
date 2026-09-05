@@ -54,6 +54,28 @@ test('preserves physical outputs and composes the selected mode across developme
     assert.ok(config.plugins.some((plugin) => plugin.name === 'vpt:mini-page-shell-hmr'))
 })
 
+test('composes rebuild mode without patch transforms', async () => {
+    const rebuildContract = {
+        ...contract,
+        options: {
+            ...contract.options,
+            hmr: { mode: 'rebuild' }
+        }
+    } satisfies Pick<MiniContract, 'options' | 'runtime' | 'styles'>
+    const config = await resolveConfig(
+        {
+            configFile: false,
+            plugins: createMiniDevelopmentPlugin(
+                rebuildContract,
+                createMiniStylePlugin(rebuildContract, [import.meta.filename])
+            )
+        },
+        'serve'
+    )
+
+    assert.ok(!config.plugins.some((plugin) => plugin.name === 'vpt:mini-page-shell-hmr'))
+})
+
 test('transfers the App style entry from complete output to the development host', () => {
     const appStyle = { type: 'asset', source: '@import "./assets/global.native.css";\n' }
     const globalStyle = { type: 'asset', source: '.app {}' }

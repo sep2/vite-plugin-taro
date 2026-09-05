@@ -8,10 +8,10 @@ import type { PatchPublication } from '../../hmr-protocol.ts'
 /** Creates the pure interpreter adapter whose events are dispatched by the shared development host. */
 export function createInterpreterHmrMode(modules: RuntimeModulesContract): MiniHmrMode {
     return {
+        rebuildStrategy: 'on-failure',
         runtimeFile: modules.interpreterHmrRuntime,
         plugins: [],
         createEntryBanner: createInterpreterEntryBanner,
-        reset: () => undefined,
         publish: (publication: PatchPublication) => ({
             kind: 'event',
             event: interpreterServerEvent,
@@ -21,11 +21,11 @@ export function createInterpreterHmrMode(modules: RuntimeModulesContract): MiniH
                 patches: publication.patches
             }
         })
-    }
+    } satisfies MiniHmrMode
 }
 
 /** Interpreter runtime starts from App only; Pages have no patch edge or lifecycle handoff. */
-function createInterpreterEntryBanner() {
+function createInterpreterEntryBanner(_pageFiles: ReadonlySet<string>) {
     return (chunk: Readonly<{ name: string; fileName: string }>): string => {
         if (chunk.name === appShellFileName) {
             return `__rolldown_runtime__.initialize(require('./${hmrInfoFileName}'));\n`

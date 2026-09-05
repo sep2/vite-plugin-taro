@@ -3,6 +3,7 @@ import type { MiniHmrOptions, RuntimeModulesContract } from '../mini-contract.ts
 import type { PatchPublication } from './hmr-protocol.ts'
 import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
 import { createInterpreterHmrMode } from './modes/interpreter/interpreter-hmr-mode.ts'
+import { createRebuildHmrMode } from './modes/rebuild/rebuild-hmr-mode.ts'
 
 /** One mode-selected effect executed by the development host. */
 export type MiniHmrAction =
@@ -18,18 +19,17 @@ export type MiniHmrAction =
       }>
 
 /**
- * The behavior that genuinely differs between Mini Program HMR implementations.
+ * The behavior that differs between Mini Program development update implementations.
  *
- * The descriptor is selected once during plugin composition and returns declarative effects. The shared host alone performs
- * physical writes and event transport, so neither mode receives a Vite server or owns asynchronous infrastructure.
+ * Every mode selects one runtime, plugin set, entry banner, Rolldown rebuild policy, and declarative patch effects. Rebuild mode
+ * uses `always` and returns no patch effects.
  */
 export type MiniHmrMode = Readonly<{
+    rebuildStrategy: 'always' | 'on-failure'
     runtimeFile: string
     plugins: readonly Plugin[]
-
-    reset: () => MiniHmrAction | undefined
-    publish: (publication: PatchPublication) => MiniHmrAction
-
+    reset?: () => MiniHmrAction
+    publish?: (publication: PatchPublication) => MiniHmrAction
     createEntryBanner: (
         pageFiles: ReadonlySet<string>
     ) => (chunk: Readonly<{ name: string; fileName: string }>) => string
@@ -43,5 +43,7 @@ export function createMiniHmrMode(options: MiniHmrOptions, modules: RuntimeModul
             return createDevtoolsHmrMode(modules)
         case 'interpreter':
             return createInterpreterHmrMode(modules)
+        case 'rebuild':
+            return createRebuildHmrMode(modules)
     }
 }

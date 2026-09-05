@@ -15,10 +15,13 @@ export type VptPageConfig = VptJsonObject
 /** Build target handled by this plugin. */
 export type VptTarget = 'wx' | 'zfb' | 'h5'
 
-/** Selects one implemented Mini Program HMR delivery and execution mechanism. */
+/** Selects one implemented Mini Program development update mechanism. */
 export type VptHmrOptions = Readonly<{
-    /** `devtools` executes native patch files; `interpreter` fetches source and evaluates it without native Page reload. */
-    mode: 'devtools' | 'interpreter'
+    /**
+     * `devtools` executes native patch files; `interpreter` evaluates pushed source without native Page reload; `rebuild`
+     * replaces the complete native output after every valid source change.
+     */
+    mode: 'devtools' | 'interpreter' | 'rebuild'
 }>
 
 /** Configures one Taro page. */
@@ -105,7 +108,7 @@ export interface VptOptions {
     sitemapJson?: VptJsonObject
 
     /**
-     * Selects the Mini Program development HMR mode. Omission uses `devtools`.
+     * Selects the Mini Program development update mode. Omission uses `devtools`.
      *
      * This option affects only `vite serve` for `wx` and `zfb` targets and never changes H5 or production output.
      */
