@@ -26,4 +26,7 @@ minimumReleaseAgeExclude:
   - vite@8.2.2
 
 patchedDependencies:
+  '@tarojs/plugin-framework-react@4.2.1': patches/@tarojs__plugin-framework-react@4.2.1-react19.patch
+  '@tarojs/react@4.2.1': patches/@tarojs__react@4.2.1-react19.patch
+  '@tarojs/runtime@4.2.1': patches/@tarojs__runtime@4.2.1.patch
   canvas-confetti@1.9.4: patches/canvas-confetti@1.9.4.patch

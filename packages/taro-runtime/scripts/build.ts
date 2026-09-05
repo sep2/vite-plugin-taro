@@ -12,7 +12,7 @@ const platformPackages = ['@tarojs/plugin-platform-weapp', '@tarojs/plugin-platf
 build()
 
 /**
- * Builds the publishable adapter from pinned Taro development dependencies.
+ * Builds the publishable runtime package from pinned Taro development dependencies.
  *
  * pnpm applies the repository patches before this script runs. The resulting files must be copied into this package because
  * development dependencies are absent from consumer installations and npm exports cannot address files outside the published
@@ -93,7 +93,7 @@ function copyPlatformPackage(dependency: (typeof platformPackages)[number]): voi
  * Copies the H5 runtime API implementation and the API definition consumed by VPT's Babel transform.
  *
  * The rest of @tarojs/plugin-platform-h5/dist implements Taro's compiler program. VPT owns that compilation pipeline, so its
- * index.js and compiler declarations are neither imported nor exported by the adapter.
+ * index.js and compiler declarations are neither imported nor exported by the runtime package.
  */
 function copyH5Platform(): void {
     const dependency = '@tarojs/plugin-platform-h5'
@@ -108,7 +108,8 @@ function copyH5Platform(): void {
  * Resolves the physical dist directory through Node's module resolver.
  *
  * cpSync requires a filesystem path rather than a package specifier. Resolving package.json from this build module selects the
- * adapter's exact direct dependency—including pnpm's patched instance—without assuming a hoisted node_modules or pnpm store path.
+ * runtime package's exact direct dependency—including pnpm's patched instance—without assuming a hoisted node_modules or pnpm
+ * store path.
  */
 function resolveDependencyDist(dependency: string): string {
     return fileURLToPath(new URL('./dist', import.meta.resolve(`${dependency}/package.json`)))

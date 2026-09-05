@@ -57,22 +57,20 @@ shared apps for WeChat Mini Program (`wx`), Alipay Mini Program (`zfb`), and H5 
   package README files are synced during build.
 - `packages/create-vite-taro`: publishable project generator package (`create-vite-taro`) with templates under
   `templates/default`.
-- `packages/taro-react`: generated React 19-compatible fork of `@tarojs/react`, published as `vite-plugin-taro-react`.
-- `packages/taro-plugin-framework-react`: generated React 19 and Mini Program App-wrap fork of
-  `@tarojs/plugin-framework-react`, published as `vite-plugin-taro-plugin-framework-react`.
-- `packages/taro-runtime`: generated Mini Program App-wrap fork of `@tarojs/runtime`, published as
-  `vite-plugin-taro-runtime`.
+- `packages/taro-runtime`: publishable `vite-plugin-taro-runtime` package built from pinned, patched Taro development
+  dependencies. It contains the Taro runtime, React renderer, React framework runtime, and WX / ZFB / H5 platform runtime
+  entries.
 - `packages/loan-genius`: sample app used to test the plugin against `h5`, `wx`, and `zfb` targets.
 - `packages/native-comp-demo`: `wx` / `zfb` development project for native custom-component integration.
 - `packages/hmr-stress-demo`: `wx` / `zfb` deep React tree fixture for HMR stress testing; its automated IDE harness is WX-only.
 - `packages/towxml-stream-demo`: wx-only native Towxml streaming fixture.
-- `patches`: local patches applied to upstream Taro 4.2.1 packages when regenerating the generated packages.
+- `patches`: local patches applied by pnpm to the Taro 4.2.1 development inputs used to build `vite-plugin-taro-runtime`.
 
 Node.js v26+ is available and can execute TypeScript natively.
 
 # Commands
 
-- `pnpm prepare:taro`: regenerate patched Taro packages from upstream npm tarballs and local patch files.
+- `pnpm prepare:taro`: build `packages/taro-runtime` from its installed, patched Taro inputs.
 - `pnpm build:plugin`: build `packages/vite-plugin-taro`.
 - `pnpm build:native-comp-demo:wx` / `pnpm build:native-comp-demo:zfb`: build the native-component project.
 - `pnpm dev:native-comp-demo:wx` / `pnpm dev:native-comp-demo:zfb`: start the native-component project with hot reload.
@@ -102,8 +100,5 @@ Node.js v26+ is available and can execute TypeScript natively.
 - User-facing documentation should show npm commands by default. Keep repository contributor/development instructions on
   pnpm.
 - Do not manually edit `packages/vite-plugin-taro/dist`; rebuild it with `pnpm build:plugin`.
-- Do not manually edit generated Taro package implementation files under `packages/taro-react`,
-  `packages/taro-plugin-framework-react`, or `packages/taro-runtime`. Change the relevant file in
-  `patches/*@4.2.1*.patch`, then run `pnpm prepare:taro`.
-- The generated Taro package `package.json` and `README.md` files are local metadata and are preserved by
-  `pnpm prepare:taro`.
+- Do not manually edit `packages/taro-runtime/dist`. Change the relevant `patches/*@4.2.1*.patch`, run
+  `pnpm install` to refresh the patched development dependency, then rebuild with `pnpm prepare:taro`.

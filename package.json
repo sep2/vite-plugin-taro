@@ -12,7 +12,7 @@
     },
     "homepage": "https://vpt.js.org",
     "scripts": {
-        "prepare:taro": "node scripts/build-patched-taro-packages.ts",
+        "prepare:taro": "pnpm --filter vite-plugin-taro-runtime build",
         "build:plugin": "pnpm --filter vite-plugin-taro build",
         "build:native-comp-demo:wx": "pnpm --filter native-comp-demo build-wx",
         "build:native-comp-demo:zfb": "pnpm --filter native-comp-demo build-zfb",
