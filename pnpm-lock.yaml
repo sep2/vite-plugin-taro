@@ -249,9 +249,6 @@ importers:
       '@tarojs/components':
         specifier: 4.2.1
         version: 4.2.1(@tarojs/helper@4.2.1(supports-color@7.2.0))(@types/react@19.2.18)(postcss@8.5.28)
-      '@tarojs/helper':
-        specifier: 4.2.1
-        version: 4.2.1(supports-color@7.2.0)
       '@tarojs/plugin-framework-react':
         specifier: workspace:vite-plugin-taro-plugin-framework-react@*
         version: link:../taro-plugin-framework-react

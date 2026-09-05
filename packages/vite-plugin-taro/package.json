@@ -81,7 +81,6 @@
         "@tailwindcss/oxide": "4.3.3",
         "@tailwindcss/vite": "4.3.3",
         "@tarojs/components": "4.2.1",
-        "@tarojs/helper": "4.2.1",
         "@tarojs/plugin-framework-react": "workspace:vite-plugin-taro-plugin-framework-react@*",
         "@tarojs/plugin-platform-alipay": "4.2.1",
         "@tarojs/plugin-platform-h5": "4.2.1",

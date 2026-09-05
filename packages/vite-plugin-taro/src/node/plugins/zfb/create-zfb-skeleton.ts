@@ -1,9 +1,9 @@
-import { recursiveMerge } from '@tarojs/helper'
 import { Alipay as AlipayPlatform } from '@tarojs/plugin-platform-alipay'
 import type { Rolldown } from 'vite'
 import type { VptOptions } from '../../../options.ts'
 import { getPageConfig } from '../../utils/project-config.ts'
 import type { MiniJsonObject, MiniProjectSkeletonInput } from '../mini/mini-contract.ts'
+import { recursiveMerge } from '../mini/skeleton/recursive-merge.ts'
 import {
     collectTemplateComponentConfig,
     createJsonAsset,
