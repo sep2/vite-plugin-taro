@@ -194,7 +194,7 @@ For ZFB:
 - Add root scripts:
   - `build:loan-genius:zfb`
   - `dev:loan-genius:zfb`
-- Add the Alipay build to `.github/workflows/quality.yml`.
+- Add the Alipay build to `../.github/workflows/quality.yml`.
 - Update `create-vite-taro`:
   - `dev:zfb` and `build:zfb`
   - `VITE_VPT_TARGET` typing
