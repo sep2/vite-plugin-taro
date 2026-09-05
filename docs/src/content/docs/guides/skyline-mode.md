@@ -18,7 +18,6 @@ vpt({
         lazyCodeLoading: 'requiredComponents',
         renderer: 'skyline',
         componentFramework: 'glass-easel',
-        glassEaselWebview: true,
         rendererOptions: {
             skyline: {
                 defaultDisplayBlock: true,
@@ -43,7 +42,6 @@ vpt({
 | --- | --- |
 | `renderer: 'skyline'` | 为页面选择 Skyline 渲染引擎。 |
 | `componentFramework: 'glass-easel'` | 使用支持 Skyline 的组件框架。 |
-| `glassEaselWebview: true` | WebView 回退时也固定使用 glass-easel 运行时。 |
 | `lazyCodeLoading: 'requiredComponents'` | 按需注入页面所需组件。 |
 | `defaultDisplayBlock` | 将 Skyline 节点的默认布局从 `flex` 调整为 `block`。 |
 | `defaultContentBox` | 将默认盒模型从 `border-box` 调整为 `content-box`，更接近 Web。 |
@@ -82,7 +80,6 @@ projectConfigJson: {
 appJson: {
     renderer: 'skyline',
     componentFramework: 'glass-easel',
-    glassEaselWebview: true,
     rendererOptions: {
         skyline: {
             defaultDisplayBlock: true,
@@ -103,7 +100,6 @@ pages: [
         config: {
             renderer: 'skyline',
             componentFramework: 'glass-easel',
-            glassEaselWebview: true,
             navigationStyle: 'custom'
         }
     },
@@ -146,7 +142,7 @@ Skyline 尽量保持小程序上层语法不变，但不是浏览器 CSS 的完�
 5. 使用预览或体验版在 Android 与 iOS 真机上测试。
 6. 检查 WebView 回退时页面仍可正常使用。
 
-微信基础库 3.0.2 开始支持 Skyline，`defaultContentBox` 需要基础库 3.1.0；WebView 使用 glass-easel 运行时需要基础库 3.8.12。默认模板同时配置 `componentFramework` 和 `glassEaselWebview`，避免 Skyline 回退到 WebView 时改用 exparser。OHOS 的支持版本要求更高，请以[微信 Skyline 起步文档](https://developers.weixin.qq.com/miniprogram/dev/framework/runtime/skyline/migration/)和 [glass-easel 迁移文档](https://developers.weixin.qq.com/miniprogram/dev/framework/custom-component/glass-easel/migration.html)为准。
+微信基础库 3.0.2 开始支持 Skyline，`defaultContentBox` 需要基础库 3.1.0；WebView 使用 glass-easel 运行时需要基础库 3.8.12。OHOS 的支持版本要求更高，请以[微信 Skyline 起步文档](https://developers.weixin.qq.com/miniprogram/dev/framework/runtime/skyline/migration/)和 [glass-easel 迁移文档](https://developers.weixin.qq.com/miniprogram/dev/framework/custom-component/glass-easel/migration.html)为准。
 
 ## 发布与灰度
 

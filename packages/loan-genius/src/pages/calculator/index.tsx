@@ -740,7 +740,7 @@ export default function LoanGenius() {
                     className="flex p-2 m-4 flex-1 items-center justify-center leading-normal rounded-xs bg-[rgba(35,201,147,1)] text-center"
                     onClick={submit}
                 >
-                    <Text className="font-pingfang-regular text-lg font-normal text-white">开始计算</Text>
+                    <Text className="font-pingfang-regular text-lg font-normal text-white">123开始计算</Text>
                 </Button>
             </BoxShadow>
         </View>
