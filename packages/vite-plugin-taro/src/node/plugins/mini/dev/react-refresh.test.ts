@@ -47,6 +47,81 @@ test('removes browser guards before complete and incremental rendering', () => {
     assert.deepEqual(plugin.transform.filter, { code: /window\.\$RefreshReg\$/ })
 })
 
+test('preserves assertions that do not match the generated preamble guard', () => {
+    const error = `new Error("@vitejs/plugin-react can't detect preamble. Something is wrong.")`
+    const statements = [
+        `if (!window.$RefreshReg$) throw ${error}`,
+        'if (!window.$RefreshReg$) {}',
+        `if (!window.$RefreshReg$) { reportMissing(); throw ${error} }`,
+        `if (!window.$RefreshReg$) { throw ${error} } else { recover() }`,
+        `if (window.$RefreshReg$) { throw ${error} }`,
+        `if (+window.$RefreshReg$) { throw ${error} }`,
+        `if (!ready) { throw ${error} }`,
+        `if (!window['$RefreshReg$']) { throw ${error} }`,
+        `if (!getWindow().$RefreshReg$) { throw ${error} }`,
+        `if (!globalThis.$RefreshReg$) { throw ${error} }`,
+        `if (!window.other) { throw ${error} }`,
+        'if (!window.$RefreshReg$) { reportMissing() }',
+        'if (!window.$RefreshReg$) { throw error }',
+        'if (!window.$RefreshReg$) { throw new errors.Error() }',
+        'if (!window.$RefreshReg$) { throw new TypeError() }',
+        'if (!window.$RefreshReg$) { throw new Error() }',
+        'if (!window.$RefreshReg$) { throw new Error("message", options) }',
+        'if (!window.$RefreshReg$) { throw new Error(message) }',
+        'if (!window.$RefreshReg$) { throw new Error("unrelated") }'
+    ]
+
+    for (const code of statements) {
+        assert.equal(removeRefreshPreambleGuard({ code, id: '/src/other.js' }).code, code)
+    }
+})
+
+test('preserves unrelated browser accesses in the refresh runtime', () => {
+    const code = `
+        window.unrelated = true
+        window['__registerBeforePerformReactRefresh'] = callback
+        globalThis.__getReactRefreshIgnoredExports
+        getWindow().__getReactRefreshIgnoredExports
+        const name = 'window.__getReactRefreshIgnoredExports'
+    `
+    assert.equal(
+        transformRefreshRuntime({ code, id: '/@react-refresh' }).code,
+        `${code}\ninjectIntoGlobalHook(globalThis);`
+    )
+})
+
+test('routes and caches the refresh runtime transform by source bytes', async () => {
+    const plugin = createMiniReactRefreshTransforms()[0]
+    assert.ok(plugin)
+    assert.equal(plugin.apply, 'serve')
+    const hook = plugin.transform
+    assert.ok(hook && typeof hook === 'object')
+    assert.equal(hook.order, 'post')
+    const filter = hook.filter?.id
+    assert.ok(filter instanceof RegExp)
+    assert.equal(filter.test('/@react-refresh'), true)
+    assert.equal(filter.test('/@react-refresh?v=1'), true)
+    assert.equal(filter.test('/src/@react-refresh.js'), false)
+    const code = 'window.__registerBeforePerformReactRefresh = callback'
+    const result = await Reflect.apply(hook.handler, {}, [code, '/@react-refresh'])
+    assert.deepEqual(result, transformRefreshRuntime({ code, id: '/@react-refresh' }))
+    assert.equal(await Reflect.apply(hook.handler, {}, [code, '/@react-refresh?v=1']), result)
+    const changed = 'const ignored = window.__getReactRefreshIgnoredExports'
+    const updated = await Reflect.apply(hook.handler, {}, [changed, '/@react-refresh'])
+    assert.notEqual(updated, result)
+    assert.deepEqual(updated, transformRefreshRuntime({ code: changed, id: '/@react-refresh' }))
+})
+
+test('removes the preamble assertion through the plugin transform hook', async () => {
+    const hook = createMiniReactRefreshTransforms()[2]?.transform
+    assert.ok(hook && typeof hook === 'object')
+    const registration = "$RefreshReg$(Component, 'Component')"
+    const code = `if (!window.$RefreshReg$) { throw new Error("@vitejs/plugin-react can't detect preamble. Something is wrong.") }\n${registration}`
+    const result = await Reflect.apply(hook.handler, {}, [code, '/src/component.jsx'])
+    assert.ok(result && typeof result === 'object' && 'code' in result)
+    assert.equal(result.code, `\n${registration}`)
+})
+
 test('orders React Refresh before renderer injection', () => {
     const transformed = injectReactRefreshRendererDependency('const rendererID = hook.inject(internals)')
 
