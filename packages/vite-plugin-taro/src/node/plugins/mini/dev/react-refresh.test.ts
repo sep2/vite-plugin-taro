@@ -7,6 +7,7 @@ import {
     createMiniReactRefreshDefines,
     createMiniReactRefreshTransforms,
     injectReactRefreshRendererDependency,
+    removeRefreshPreambleGuard,
     transformRefreshRuntime
 } from './react-refresh.ts'
 
@@ -28,6 +29,22 @@ test('adapts the refresh runtime to the Mini Program JavaScript global', () => {
     assert.match(transformed.code, /performReactRefresh\(\)/)
     assert.doesNotMatch(transformed.code, /finishReactRefresh/)
     assert.match(transformed.code, /injectIntoGlobalHook\(globalThis\);$/)
+})
+
+test('removes browser guards before complete and incremental rendering', () => {
+    const guard = `if (!window.$RefreshReg$) { throw new Error("@vitejs/plugin-react can't detect preamble. Something is wrong.") }`
+    for (const code of [guard, `function factory() { ${guard}; $RefreshReg$(Component, 'Component') }`]) {
+        const result = removeRefreshPreambleGuard({ code, id: '/src/component.jsx' })
+        assert.doesNotMatch(result.code, /can't detect preamble/)
+    }
+    const unrelated = 'if (!window.$RefreshReg$) { reportMissing() }'
+    assert.equal(removeRefreshPreambleGuard({ code: unrelated, id: '/src/other.js' }).code, unrelated)
+    const plugin = createMiniReactRefreshTransforms().find((entry) => entry.name === 'vpt:mini-refresh-preamble-guard')
+    assert.ok(plugin)
+    assert.equal(plugin.apply, 'serve')
+    assert.ok(plugin.transform && typeof plugin.transform === 'object')
+    assert.equal(plugin.transform.order, 'post')
+    assert.deepEqual(plugin.transform.filter, { code: /window\.\$RefreshReg\$/ })
 })
 
 test('orders React Refresh before renderer injection', () => {
@@ -67,7 +84,7 @@ test('lowers only free React DevTools hook references through the development Ox
 
 test('routes the renderer plugin hook through its exact ID', async () => {
     const transforms = createMiniReactRefreshTransforms()
-    assert.equal(transforms.length, 2)
+    assert.equal(transforms.length, 3)
     const rendererHook = transforms[1]?.transform
     assert.ok(rendererHook && typeof rendererHook === 'object')
     const rendererIdFilter = rendererHook.filter?.id

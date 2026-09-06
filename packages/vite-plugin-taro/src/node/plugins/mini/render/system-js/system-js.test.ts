@@ -248,8 +248,7 @@ test('resolves static and literal dynamic references by kind', () => {
         resolveReference(reference, kind) {
             references.push([reference, kind])
             return reference.slice(2)
-        },
-        removeRefreshPreambleGuard: false
+        }
     })
     const registration = evaluateCommonJsRegistration(result.code)
 
@@ -269,8 +268,7 @@ test('emits composable source maps while preserving hoisted function edits', asy
         sourcemap: true,
         resolveReference(reference) {
             return reference
-        },
-        removeRefreshPreambleGuard: false
+        }
     })
 
     const map = result.map
@@ -337,8 +335,7 @@ function compile(code: string) {
         sourcemap: false,
         resolveReference(reference) {
             return reference
-        },
-        removeRefreshPreambleGuard: false
+        }
     })
 }
 

@@ -123,12 +123,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                 const sourcemap = Boolean(outputOptions.sourcemap)
 
                 if (classification.executionKind === 'capsule') {
-                    return renderCapsule({
-                        code,
-                        chunk,
-                        removeRefreshPreambleGuard: this.environment.config.command === 'serve',
-                        sourcemap
-                    })
+                    return renderCapsule(code, chunk, sourcemap)
                 }
 
                 // Native and amphibious modules share the CommonJS renderer. Amphibious transport exposure is a

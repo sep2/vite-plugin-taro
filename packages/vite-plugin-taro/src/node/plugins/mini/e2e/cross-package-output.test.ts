@@ -185,12 +185,7 @@ function createMiniOutputPlugin(): Plugin {
             const sourcemap = Boolean(outputOptions.sourcemap)
             const classification = classifyModule(chunk)
             if (classification.executionKind === 'capsule') {
-                return renderCapsule({
-                    code,
-                    chunk,
-                    removeRefreshPreambleGuard: false,
-                    sourcemap
-                })
+                return renderCapsule(code, chunk, sourcemap)
             }
 
             const native = renderNative({

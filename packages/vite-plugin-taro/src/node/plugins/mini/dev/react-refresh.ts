@@ -1,4 +1,5 @@
 import path from 'node:path'
+import type { IfStatement } from '@oxc-project/types'
 import type { WalkerEnter } from 'oxc-walker'
 import type { RolldownMagicString } from 'rolldown'
 import { normalizePath, type Plugin } from 'vite'
@@ -7,6 +8,7 @@ import { createExactModuleIdFilter } from '../../../utils/modules.ts'
 import { transformWithOxcWalker } from '../../../utils/oxc-transform.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 
+const reactRefreshPreambleError = "@vitejs/plugin-react can't detect preamble. Something is wrong."
 const reactRefreshRuntimeId = '/@react-refresh'
 const reactReconcilerDevelopmentId = normalizePath(
     path.join(
@@ -53,8 +55,8 @@ const refreshRuntimeWindowGlobals = ['__registerBeforePerformReactRefresh', '__g
  *
  * These adaptations deliberately remain serve-only plugin transforms rather than target-wide production behavior. Reconciler's
  * static refresh dependency establishes hook installation order. The Mini config lowers React's free DevTools-hook protocol with
- * a serve-only native Oxc define, while the final capsule renderer removes React boundaries' browser-preamble assertion during
- * its existing AST traversal. Neither compatibility edge needs a dedicated all-module source filter or second parse.
+ * a serve-only native Oxc define. A filtered post-transform removes the browser-preamble assertion before both complete chunk
+ * rendering and incremental factory generation. Removing it only during renderChunk leaves HMR patches unadapted.
  */
 export function createMiniReactRefreshTransforms(): Plugin[] {
     return [
@@ -78,6 +80,17 @@ export function createMiniReactRefreshTransforms(): Plugin[] {
                 filter: { id: createExactModuleIdFilter(reactReconcilerDevelopmentId) },
                 handler(code) {
                     return injectReactRefreshRendererDependency(code)
+                }
+            }
+        },
+        {
+            name: 'vpt:mini-refresh-preamble-guard',
+            apply: 'serve',
+            transform: {
+                order: 'post',
+                filter: { code: /window\.\$RefreshReg\$/ },
+                handler(code, id) {
+                    return removeRefreshPreambleGuard({ code, id })
                 }
             }
         }
@@ -124,6 +137,56 @@ function createRefreshRuntimeVisitor(editor: RolldownMagicString): WalkerEnter {
             editor.overwrite(node.object.start, node.object.end, 'globalThis')
         }
     }
+}
+
+/**
+ * Removes only the generated browser assertion at the shared module-transform boundary.
+ * The native hook filter avoids parsing nonmatching modules. Matching modules cost O(n) time and memory; unchanged modules
+ * reuse the bundler's transform cache. Refresh registration and unrelated window expressions remain untouched.
+ */
+export function removeRefreshPreambleGuard({ code, id }: { code: string; id: string }) {
+    return transformWithOxcWalker({
+        code,
+        filename: id,
+        sourcemap: false,
+        createVisitor(editor) {
+            return function enter(node) {
+                if (node.type === 'IfStatement' && isRefreshPreambleGuard(node)) {
+                    editor.remove(node.start, node.end)
+                    this.skip()
+                }
+            }
+        }
+    })
+}
+
+/** Identifies only the browser-preamble assertion emitted by Rolldown's React Refresh wrapper. */
+function isRefreshPreambleGuard(statement: IfStatement): boolean {
+    const test = statement.test
+    const body = statement.consequent
+    if (body.type !== 'BlockStatement' || body.body.length !== 1) {
+        return false
+    }
+    const thrown = body.body[0]
+
+    return (
+        statement.alternate === null &&
+        test.type === 'UnaryExpression' &&
+        test.operator === '!' &&
+        test.argument.type === 'MemberExpression' &&
+        !test.argument.computed &&
+        test.argument.object.type === 'Identifier' &&
+        test.argument.object.name === 'window' &&
+        test.argument.property.type === 'Identifier' &&
+        test.argument.property.name === '$RefreshReg$' &&
+        thrown?.type === 'ThrowStatement' &&
+        thrown.argument.type === 'NewExpression' &&
+        thrown.argument.callee.type === 'Identifier' &&
+        thrown.argument.callee.name === 'Error' &&
+        thrown.argument.arguments.length === 1 &&
+        thrown.argument.arguments[0]?.type === 'Literal' &&
+        thrown.argument.arguments[0].value === reactRefreshPreambleError
+    )
 }
 
 /** Makes renderer hook injection statically depend on the refresh runtime. */
