@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.7.1-beta.1] - 2026-09-06
+
+### Changed
+
+- normalize distribution file paths for Windows (3b3e6f6)
+
 ## [0.7.1-beta.0] - 2026-09-06
 
 ### Added
