@@ -140,6 +140,9 @@ test('publishes a compiler that depends on the unified Taro runtime package', as
     }
     const compiler = await readFile(path.join(distRoot, 'index.js'), 'utf8')
     const componentFacade = await readFile(path.join(distRoot, 'runtime/client/taro/component.js'), 'utf8')
+    const miniApiFacade = await readFile(path.join(distRoot, 'runtime/client/taro/api.js'), 'utf8')
+    const h5ApiFacade = await readFile(path.join(distRoot, 'runtime/h5/taro-api.js'), 'utf8')
+    const h5ApiExports = await readFile(path.join(distRoot, 'runtime/h5/taro-api-exports.js'), 'utf8')
     const compilerModules = await readdir(path.join(distRoot, 'node'), { recursive: true })
 
     assert.equal(packageJson.main, './src/index.ts')
@@ -155,6 +158,12 @@ test('publishes a compiler that depends on the unified Taro runtime package', as
     assert.equal(packageJson.dependencies['@tarojs/runtime'], undefined)
     assert.equal(packageJson.dependencies['@tarojs/taro-h5'], undefined)
     assert.equal(packageJson.dependencies['lodash-es'], undefined)
+    assert.equal(packageJson.dependencies['babel-plugin-transform-taroapi'], undefined)
+    assert.equal(packageJson.devDependencies['@rolldown/plugin-babel'], undefined)
+    assert.doesNotMatch(
+        compiler,
+        /babel-plugin-transform-taroapi|@rolldown\/plugin-babel|plugin-framework-react\/api-loader/
+    )
     assert.equal(packageJson.dependencies['vite-plugin-taro-runtime'], 'workspace:*')
     assert.equal(packageJson.dependencies['@tarojs/plugin-platform-alipay'], undefined)
     assert.equal(packageJson.dependencies['@tarojs/plugin-platform-h5'], undefined)
@@ -176,6 +185,12 @@ test('publishes a compiler that depends on the unified Taro runtime package', as
     assert.match(compiler, /@tailwindcss\/vite/)
     assert.ok(Buffer.byteLength(compiler) < compilerSizeLimit)
     assert.match(componentFacade, /from 'vite-plugin-taro-runtime\/components'/)
+    assert.match(miniApiFacade, /import taro from 'vite-plugin-taro-runtime\/taro'/)
+    assert.match(miniApiFacade, /Object\.assign\(taro, frameworkApis\)/)
+    assert.match(miniApiFacade, /export default taro/)
+    assert.match(h5ApiFacade, /export \* as default from '\.\/taro-api-exports\.js'/)
+    assert.match(h5ApiExports, /export \* from 'vite-plugin-taro-runtime\/plugin-platform-h5\/runtime\/apis'/)
+    assert.match(h5ApiExports, /export \* from '\.\.\/client\/taro\/framework-apis\.js'/)
     assert.equal(
         compilerModules.some((file) => file.endsWith('.js')),
         false
@@ -227,7 +242,6 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         './taro-h5/dist/api/index',
         './react',
         './plugin-framework-react/runtime',
-        './plugin-framework-react/api-loader',
         './plugin-platform-weapp/runtime',
         './plugin-platform-weapp/components-react',
         './plugin-platform-weapp/runtime-utils',
@@ -352,8 +366,6 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         copiedDefinition,
         frameworkRuntime,
         copiedFrameworkRuntime,
-        apiLoader,
-        copiedApiLoader,
         documentRuntime,
         rootRuntime,
         nodeRuntime,
@@ -364,8 +376,6 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         readFile(path.join(runtimePackageDistRoot, 'plugin-platform-h5', 'definition.json')),
         readFile(path.join(frameworkDist, 'runtime.js')),
         readFile(path.join(runtimePackageDistRoot, 'plugin-framework-react', 'runtime.js')),
-        readFile(path.join(frameworkDist, 'api-loader.js')),
-        readFile(path.join(runtimePackageDistRoot, 'plugin-framework-react', 'api-loader.cjs')),
         readFile(path.join(runtimePackageDistRoot, 'runtime', 'bom', 'document.js'), 'utf8'),
         readFile(path.join(runtimePackageDistRoot, 'runtime', 'dom', 'root.js'), 'utf8'),
         readFile(path.join(runtimePackageDistRoot, 'runtime', 'dom', 'node.js'), 'utf8'),
@@ -375,15 +385,22 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
 
     assert.deepEqual(copiedDefinition, definition)
     assert.deepEqual(copiedFrameworkRuntime, frameworkRuntime)
-    assert.deepEqual(copiedApiLoader, apiLoader)
+    assert.deepEqual((await readdir(path.join(runtimePackageDistRoot, 'plugin-framework-react'))).toSorted(), [
+        'runtime.js',
+        'runtime.js.map'
+    ])
     assert.match(documentRuntime, /documentCreateElement\(ROOT_STR\)/)
     assert.match(rootRuntime, /\? 'app' : 'page'/)
     assert.match(nodeRuntime, /this\.nodeName === 'vpt_page_outlet'/)
     assert.match(hydrateRuntime, /nodeName === 'vpt_page_outlet'/)
     assert.match(reactRuntime, /reconcileVptPageOutletSpine/)
     assert.match(String(copiedFrameworkRuntime), /broadcastAppUpdate/)
+    assert.match(String(copiedFrameworkRuntime), /hooks\.tap\('initNativeApi'/)
+    assert.match(String(copiedFrameworkRuntime), /useLaunch = createTaroHook\('onLaunch'\)/)
 
     const runtimePackageFiles = await listRelativeFiles(runtimePackageDistRoot)
+    assert.equal(runtimePackageFiles.includes('mini-api.js'), false)
+    assert.equal(runtimePackageFiles.includes('mini-api.d.ts'), false)
     const runtimePackageFileSizes = await Promise.all(
         runtimePackageFiles.map(async (relativePath) => {
             return (await readFile(path.join(runtimePackageDistRoot, relativePath))).byteLength

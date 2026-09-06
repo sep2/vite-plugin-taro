@@ -159,6 +159,24 @@ export async function confirmSave() {
 
 [`Taro.showModal()`](/references/api/#taroshowmodaloption) 等异步 API 支持 Promise，可以使用 `await`，也可以传入回调函数。完整接口、参数和平台支持见 [API 参考](/references/api/)。
 
+### H5 的 Tree Shaking
+
+H5 的默认 `Taro` 导出是只读的 ESM 命名空间，不需要编译器改写 API 调用。以下写法均可让构建器移除未使用的平台 API 实现：
+
+```ts
+import Taro, { showToast } from 'virtual:taro/api'
+
+Taro.showToast({ title: '完成' })
+Taro['showToast']({ title: '完成' })
+showToast({ title: '完成' })
+```
+
+不要给命名空间增加或替换成员，例如 `Taro.showToast = replacement`。需要封装或 mock 时，在应用自己的模块中提供函数；`Taro.options` 等导出对象内部的共享状态仍然可用。
+
+动态访问 `Taro[key]`、枚举命名空间，或把整个 `Taro` 传给构建器无法分析的代码，可能保留更多 API。当前 Rolldown 对 `const { showToast } = Taro` 这样的命名空间解构也会保留完整导出；应改为具名导入。优先使用上面的静态成员访问或具名导入。H5 的 `canIUse` 在运行时判断能力；需要在构建时排除平台专用代码时，使用[条件编译](/guides/conditional-directives/)。
+
+生命周期 hooks 保留 Taro 原有的统一注册方式，不会按单个 hook 裁剪。小程序端（WX / 支付宝）也保留原有的共享 API 对象和批量初始化方式，不提供按单个原生 API 裁剪的保证；上述只读命名空间约定仅适用于 H5。
+
 ### API 分类
 
 #### [Hooks](/references/api/#hooks)

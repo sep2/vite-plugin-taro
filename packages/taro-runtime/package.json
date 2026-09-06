@@ -66,7 +66,6 @@
             "default": "./dist/react/react.esm.js"
         },
         "./plugin-framework-react/runtime": "./dist/plugin-framework-react/runtime.js",
-        "./plugin-framework-react/api-loader": "./dist/plugin-framework-react/api-loader.cjs",
         "./plugin-platform-weapp/runtime": "./dist/plugin-platform-weapp/runtime.js",
         "./plugin-platform-weapp/components-react": {
             "types": "./dist/plugin-platform-weapp/types/components-react.d.ts",

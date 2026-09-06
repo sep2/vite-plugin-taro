@@ -114,15 +114,8 @@ function copyPackageDist(dependency: string): void {
 }
 
 /**
- * Copies only the two framework artifacts VPT executes.
- *
- * runtime.js creates the React application runtime. api-loader.js injects Taro's framework lifecycle exports into VPT's API
- * facade. The remaining dist/index.js is Taro's complete CLI/compiler plugin; it imports @tarojs/helper, lodash, Acorn, and
- * webpack-specific integrations that VPT replaces and must not publish as application support code.
- *
- * Upstream api-loader.js uses CommonJS module.exports. This package is type=module, so preserving the .js extension would make
- * Node interpret the copied loader as ESM when VPT loads it with require(). The .cjs extension preserves its original module
- * semantics without changing its contents.
+ * Copies only the React application runtime. First-party facades statically export its lifecycle hooks, so the upstream
+ * api-loader and CLI/compiler entry are neither executed nor published.
  */
 function copyFrameworkReactAdapter(): void {
     const dependency = '@tarojs/plugin-framework-react'
@@ -131,8 +124,6 @@ function copyFrameworkReactAdapter(): void {
     mkdirSync(outputRoot, { recursive: true })
     copyFileSync(path.join(dependencyDist, 'runtime.js'), path.join(outputRoot, 'runtime.js'))
     copyFileSync(path.join(dependencyDist, 'runtime.js.map'), path.join(outputRoot, 'runtime.js.map'))
-    copyFileSync(path.join(dependencyDist, 'api-loader.js'), path.join(outputRoot, 'api-loader.cjs'))
-    copyFileSync(path.join(dependencyDist, 'api-loader.js.map'), path.join(outputRoot, 'api-loader.js.map'))
 }
 
 /**
@@ -156,7 +147,7 @@ function copyPlatformPackage(dependency: (typeof platformPackages)[number]): voi
 }
 
 /**
- * Copies the H5 runtime API implementation and the API definition consumed by VPT's Babel transform.
+ * Copies the H5 runtime API implementation and the definition consumed by its runtime canIUse implementation.
  *
  * The rest of @tarojs/plugin-platform-h5/dist implements Taro's compiler program. VPT owns that compilation pipeline, so its
  * index.js and compiler declarations are neither imported nor exported by the runtime package.

@@ -1,0 +1,27 @@
+/** Lifecycle exports used by the H5 namespace and attached to the shared Taro object by the Mini facade. */
+export {
+    useAddToFavorites,
+    useDidHide,
+    useDidShow,
+    useError,
+    useKeyboardHeight,
+    useLaunch,
+    useLoad,
+    useOptionMenuClick,
+    usePageNotFound,
+    usePageScroll,
+    usePullDownRefresh,
+    usePullIntercept,
+    useReachBottom,
+    useReady,
+    useResize,
+    useRouter,
+    useSaveExitState,
+    useScope,
+    useShareAppMessage,
+    useShareTimeline,
+    useTabItemTap,
+    useTitleClick,
+    useUnhandledRejection,
+    useUnload
+} from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'

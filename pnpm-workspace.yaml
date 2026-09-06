@@ -8,6 +8,8 @@ overrides:
   vite: 8.2.2
   # Taro 4.2.1 references Rollup only from declarations; VPT's runtime and build pipeline use Rolldown.
   '@tarojs/runner-utils@4.2.1>rollup': '-'
+  # The runtime build copies H5 APIs and metadata, never the upstream Babel-based compiler entry.
+  '@tarojs/plugin-platform-h5@4.2.1>babel-plugin-transform-taroapi': '-'
 
 peerDependencyRules:
   allowedVersions:

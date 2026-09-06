@@ -28,7 +28,7 @@ async function inspectFixtureBuild<Result>(
     fixture: BuildFixture,
     inspect: (output: BuildOutput) => Result | Promise<Result>
 ): Promise<Result> {
-    // Babel and React skip node_modules; fixtures must live outside it to exercise real application transforms.
+    // React skips node_modules; fixtures must live outside it to exercise real application transforms.
     const root = await mkdtemp(path.join(packageRoot, '.vpt-build-test-'))
     try {
         await Promise.all(
@@ -139,17 +139,22 @@ test('builds a routed H5 application through the public plugin entry', async () 
                 'index.html': '<main id="app"></main>',
                 'src/app.tsx': appSource,
                 'src/pages/home/index.tsx': `
-                    import Taro, { showToast } from 'virtual:taro/api'
+                    import Taro, { showToast, useLoad } from 'virtual:taro/api'
+                    import UpstreamTaro from '@tarojs/taro'
                     import { View } from 'virtual:taro/components'
 
                     export default function Home() {
+                        useLoad(() => {})
                         const pageCount = Taro.getCurrentPages().length
                         const notify = () => {
                             void Taro.setNavigationBarTitle({ title: 'default-title-marker' })
                             void Taro.showToast({ title: 'default-api-marker' })
                             void showToast({ title: 'named-api-marker' })
+                            void UpstreamTaro.showToast({ title: 'upstream-api-marker' })
                         }
-                        return <View id="h5-home" data-page-count={pageCount} onClick={notify}>H5 route marker</View>
+                        return <View id="h5-home"
+                            data-supported={Taro.canIUse('showToast')} data-page-count={pageCount}
+                            onClick={notify}>H5 route marker</View>
                     }
                 `
             }
@@ -189,6 +194,7 @@ test('builds a routed H5 application through the public plugin entry', async () 
             assert.match(javascript, /default-api-marker/)
             assert.match(javascript, /named-api-marker/)
             assert.match(javascript, /default-title-marker/)
+            assert.match(javascript, /upstream-api-marker/)
             // These APIs are named H5 exports, not properties on the default Taro object.
             assert.doesNotMatch(javascript, /\.\s*(?:setNavigationBarTitle|showToast)\s*\(/)
             assert.doesNotMatch(javascript, /stale\/route|virtual:taro/)

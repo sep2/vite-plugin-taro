@@ -1,12 +1,9 @@
-import babel, { defineRolldownBabelPreset } from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
 import type { HtmlTagDescriptor, Plugin, PluginOption } from 'vite'
-import h5Definition from 'vite-plugin-taro-runtime/plugin-platform-h5/definition.json' with { type: 'json' }
 import type { VptOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
 import { toViteFileImportPath } from '../../utils/modules.ts'
 import { packageRequire } from '../../utils/packages.ts'
-import { clientTaroApiId } from '../client/client-taro.ts'
 import { tailwindcssBasedir } from '../tailwind/tailwind-css.ts'
 import { h5AppPath } from './constant.ts'
 import { createStencilClientAdapter } from './create-stencil-client-adapter.ts'
@@ -17,7 +14,7 @@ export function createH5TargetPlugins(options: VptOptions): PluginOption[] {
     return [
         // Vite owns final H5 CSS optimization; disabling Tailwind's extra pass avoids duplicate transformations.
         ...tailwindcss({ optimize: false }),
-        ...createH5SupportPlugins(),
+        createStencilClientAdapter(),
         createH5Plugin(options)
     ]
 }
@@ -170,48 +167,9 @@ function createH5IndexHtmlTags(): HtmlTagDescriptor[] {
 }
 
 /**
- * Coarse source prefilter for the upstream Taro API transform.
- *
- * The plugin has two independent responsibilities: adapting imports from the compiler facade and normalizing camel-case
- * H5 ARIA attributes. Matching `aria` followed by any uppercase letter is intentionally broader than Taro's current
- * attribute table. A duplicated exact list would silently stop routing files through Babel when upstream adds another
- * attribute, while a broad false positive costs only one unnecessary transform. Ordinary application modules match
- * neither branch and remain entirely outside Babel's parser and generator.
- */
-export const h5TaroApiTransformCodeFilter = /virtual:taro\/api|\baria[A-Z]/
-
-/** Babel preset body shared by Rolldown's filtered adapter and direct semantic tests. */
-export function h5TaroApiPreset() {
-    return {
-        plugins: [
-            [
-                packageRequire.resolve('babel-plugin-transform-taroapi'),
-                {
-                    packageName: clientTaroApiId,
-                    definition: h5Definition
-                }
-            ] satisfies [string, object]
-        ]
-    }
-}
-
-/** Creates a filterable Babel preset containing Taro's upstream, scope-aware API transform. */
-function createH5TaroApiPreset() {
-    return defineRolldownBabelPreset({
-        preset: h5TaroApiPreset,
-        rolldown: {
-            // @rolldown/plugin-babel can lift a preset filter into its native transform hook. The Taro plugin must be
-            // nested in this preset rather than passed through Babel's top-level `plugins`: explicit plugins may apply
-            // to every module, so their presence deliberately disables Rolldown's preset-level code filtering.
-            filter: { code: h5TaroApiTransformCodeFilter }
-        }
-    })
-}
-
-/**
- * Optimized dependencies need the complete H5 API object, not the generic Mini facade. Resolve directly to the ESM backend
- * instead of importing VPT's lifecycle-extended application facade: that would pull framework initialization into the
- * components → H5 APIs → components cycle. Application imports extend the same backend after dependency evaluation.
+ * Optimized Taro components need the H5 core object, not the generic Mini facade. Resolve directly to the ESM backend
+ * instead of importing VPT's application namespace: that would pull framework initialization into the
+ * components → H5 APIs → components cycle. Application exports share the same backend's API functions and state objects.
  */
 function createH5TaroOptimizerResolver(): Plugin {
     return {
@@ -225,16 +183,6 @@ export function resolveH5OptimizerTaro(id: string): string | undefined {
     if (id === '@tarojs/taro') {
         return packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis')
     }
-}
-
-/** Creates H5-only transforms for Stencil CSS ordering and Taro API imports. */
-function createH5SupportPlugins(): PluginOption[] {
-    return [
-        createStencilClientAdapter(),
-        babel({
-            presets: [createH5TaroApiPreset()]
-        })
-    ]
 }
 
 /** Creates H5 Taro compile-time constants. */

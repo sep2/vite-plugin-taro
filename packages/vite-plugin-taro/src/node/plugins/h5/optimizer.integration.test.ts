@@ -6,7 +6,7 @@ import test from 'node:test'
 import { runInNewContext } from 'node:vm'
 import { build } from 'rolldown'
 import { optimizeDeps, resolveConfig } from 'vite'
-import { packageRequire } from '../../utils/packages.ts'
+import { packageRequire, resolveRuntimeFile } from '../../utils/packages.ts'
 import { createH5TargetPlugins } from './plugins.ts'
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
@@ -21,14 +21,16 @@ type TestWindow = Pick<Window, 'document' | 'navigator' | 'location' | 'customEl
 // Stencil's own DOM implementation executes the real optimized component classes without requiring a browser install.
 const { MockWindow } = runtimeRequire('@stencil/core/mock-doc') as { MockWindow: new () => TestWindow }
 
-/** Runs Vite's separate optimizer with both a consumer and the H5 backend as physical dependency entries. */
+/** Runs Vite's separate optimizer with the public namespace and dependency-owned core exported by one fixture entry. */
 async function bundleOptimizedNavigator(root: string): Promise<string> {
     const entry = path.join(root, 'entry.js')
     await writeFile(
         entry,
         `
+            export { default as applicationApi, showToast as applicationToast, useLaunch as applicationLaunch }
+                from ${JSON.stringify(resolveRuntimeFile('h5/taro-api'))}
             export { default as consumerApi } from '@tarojs/taro'
-            export { default as backendApi } from 'vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis'
+            export { default as backendApi, canIUse } from 'vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis'
             export { default as upstreamBackendApi } from '@tarojs/plugin-platform-h5/dist/runtime/apis'
             export { TaroNavigatorCore } from 'vite-plugin-taro-runtime/components/dist/components'
             export { TaroNavigatorCore as upstreamNavigator } from '@tarojs/components/dist/components'
@@ -83,11 +85,24 @@ function assertOptimizedNavigation(code: string): void {
         `${code}
             assert.equal(harness.consumerApi, harness.backendApi)
             assert.equal(harness.backendApi, harness.upstreamBackendApi)
+            assert.equal(harness.applicationApi.showToast, harness.applicationToast)
+            assert.equal(harness.applicationApi.useLaunch, harness.applicationLaunch)
+            assert.equal(harness.applicationApi.canIUse, harness.canIUse)
+            assert.equal(harness.applicationApi.navigateTo, harness.backendApi.navigateTo)
+            assert.equal(harness.applicationApi.options, harness.backendApi.options)
+            assert.equal(harness.applicationApi.eventCenter, harness.backendApi.eventCenter)
+            assert.equal('useLaunch' in harness.backendApi, false)
             assert.equal(harness.TaroNavigatorCore, harness.upstreamNavigator)
             assert.equal(harness.options, harness.upstreamOptions)
             assert.equal(harness.createHashHistory, harness.upstreamHistory)
             assert.equal(harness.createReactApp, harness.upstreamReactApp)
             assert.equal(typeof harness.backendApi.navigateTo, 'function')
+            assert.equal(harness.canIUse('showToast'), true)
+            assert.equal(harness.canIUse('eventCenter.anything'), true)
+            assert.equal(harness.canIUse('view'), true)
+            assert.equal(harness.canIUse('canIUse'), true)
+            assert.equal(harness.canIUse('missingApi'), false)
+            assert.equal(harness.canIUse(''), false)
             // Replace the router boundary only in this VM, leaving the optimized component's API import untouched.
             harness.backendApi.navigateTo = ({ url }) => {
                 navigations.push(url)
