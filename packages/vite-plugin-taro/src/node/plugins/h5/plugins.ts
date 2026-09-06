@@ -244,6 +244,7 @@ function createH5Defines(): Record<string, string> {
         'process.env.SUPPORT_TARO_POLYFILL': JSON.stringify('disabled'),
         'process.env.TARO_ENV': JSON.stringify('h5'),
         'process.env.TARO_PLATFORM': JSON.stringify('web'),
+        // Eliminate the router's optional DingTalk requires; the runtime does not install that SDK.
         'process.env.SUPPORT_DINGTALK_NAVIGATE': JSON.stringify('disabled'),
         DEPRECATED_ADAPTER_COMPONENT: 'false'
     }

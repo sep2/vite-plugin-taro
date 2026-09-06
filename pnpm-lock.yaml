@@ -170,9 +170,6 @@ importers:
       base64-js:
         specifier: ^1.5.1
         version: 1.5.1
-      dingtalk-jsapi:
-        specifier: ~2.15.2
-        version: 2.15.6
       hammerjs:
         specifier: ^2.0.8
         version: 2.0.8

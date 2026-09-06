@@ -171,6 +171,11 @@ test('builds a routed H5 application through the public plugin entry', async () 
                     /\/node_modules\/@tarojs\/(?:api|taro|components|router|taro-h5)\//.test(normalizePath(id))
                 )
             assert.deepEqual(upstreamRuntimeIds, [])
+            assert.equal(
+                moduleIds.some((id) => id.includes('dingtalk-jsapi')),
+                false
+            )
+            assert.doesNotMatch(javascript, /dingtalk-jsapi/)
             assert.ok(moduleIds.some((id) => id.endsWith('/taro-runtime/dist/runtime/runtime.esm.js')))
             assert.equal(
                 moduleIds.some((id) => /\/taro-runtime\/dist\/plugin-platform-(?:weapp|alipay)\//.test(id)),

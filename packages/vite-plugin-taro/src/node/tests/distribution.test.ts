@@ -238,6 +238,7 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         './plugin-platform-h5/definition.json'
     ])
     assert.equal(packageJson.dependencies['@tarojs/runtime'], undefined)
+    assert.equal(packageJson.dependencies['dingtalk-jsapi'], undefined)
     assert.equal(packageJson.dependencies['@tarojs/shared'], '4.2.1')
     for (const name of ['api', 'taro', 'components', 'router', 'taro-h5']) {
         assert.equal(packageJson.dependencies[`@tarojs/${name}`], undefined)

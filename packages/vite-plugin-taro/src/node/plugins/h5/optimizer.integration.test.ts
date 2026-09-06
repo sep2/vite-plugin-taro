@@ -125,7 +125,9 @@ function assertOptimizedNavigation(code: string): void {
 test('canonical and upstream H5 imports share optimized runtime identities and complete APIs', async () => {
     const root = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-h5-optimizer-'))
     try {
-        assertOptimizedNavigation(await bundleOptimizedNavigator(root))
+        const code = await bundleOptimizedNavigator(root)
+        assert.doesNotMatch(code, /dingtalk-jsapi/)
+        assertOptimizedNavigation(code)
     } finally {
         await rm(root, { recursive: true, force: true })
     }
