@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
+import { createRequire, registerHooks } from 'node:module'
 import { test } from 'node:test'
+import { pathToFileURL } from 'node:url'
 import { build, type OutputChunk } from 'rolldown'
 import { parseSync } from 'rolldown/utils'
 import type { VptTarget } from '../../../options.ts'
 import { packageRequire, resolveRuntimeFile } from '../../utils/packages.ts'
 import { createClientTaroPlugin } from './client-taro.ts'
 
+const frameworkId = 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
 const frameworkApisPath = resolveRuntimeFile('client/taro/framework-apis')
 const frameworkNames = exportedNames(await readFile(frameworkApisPath, 'utf8'))
 const frameworkSource = frameworkNames.map((name) => `export function ${name}() { return '${name}-marker' }`).join('\n')
@@ -41,7 +43,7 @@ async function bundleApi(source: string, target: VptTarget): Promise<OutputChunk
     const sources: ReadonlyMap<string, string> = new Map([
         ['\0entry', source],
         [backendId, backendSource],
-        ['vite-plugin-taro-runtime/plugin-framework-react/runtime', frameworkSource]
+        [frameworkId, frameworkSource]
     ])
     const result = await build({
         input: '\0entry',
@@ -69,9 +71,7 @@ async function execute(chunk: OutputChunk): Promise<unknown> {
 }
 
 test('static lifecycle exports match the pinned upstream React API inventory', () => {
-    const runtimeRequire = createRequire(
-        packageRequire.resolve('vite-plugin-taro-runtime/plugin-framework-react/runtime')
-    )
+    const runtimeRequire = createRequire(packageRequire.resolve(frameworkId))
     const apiLoader: (source: string) => string = runtimeRequire('@tarojs/plugin-framework-react/dist/api-loader.js')
     assert.deepEqual(frameworkNames, exportedNames(apiLoader('')))
 })
@@ -212,4 +212,58 @@ test('uses runtime canIUse for literal and dynamic schemes without discarding ar
         'h5'
     )
     assert.deepEqual(await execute(chunk), [true, true, false, 1])
+})
+
+test('executes the physical H5 ESM facades with shared platform and framework exports', async () => {
+    const sources: ReadonlyMap<string, string> = new Map([
+        [backendId, backendSource],
+        [frameworkId, frameworkSource]
+    ])
+    // Mock only browser-owned dependencies in this test process. Real facade modules execute natively, without bundling
+    // away their re-exports or losing source coverage; the temporary resolver is removed after all imports and assertions.
+    const registration = registerHooks({
+        resolve(specifier, context, nextResolve) {
+            const source = sources.get(specifier)
+            return source === undefined
+                ? nextResolve(specifier, context)
+                : { url: `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`, shortCircuit: true }
+        }
+    })
+    try {
+        const facade: Readonly<Record<string, unknown>> = await import(
+            pathToFileURL(resolveRuntimeFile('h5/taro-api')).href
+        )
+        const namespace: Readonly<Record<string, unknown>> = await import(
+            pathToFileURL(resolveRuntimeFile('h5/taro-api-exports')).href
+        )
+        const backend: Readonly<Record<string, unknown>> = await import(backendId)
+        const framework: Readonly<Record<string, unknown>> = await import(frameworkId)
+        const platformNames = Object.keys(backend).filter((name) => name !== 'default')
+
+        assert.equal(facade.default, namespace)
+        assert.deepEqual(Object.keys(namespace), [...platformNames, ...frameworkNames].toSorted())
+        for (const name of platformNames) {
+            assert.equal(namespace[name], backend[name])
+            assert.equal(facade[name], backend[name])
+        }
+        for (const name of frameworkNames) {
+            const hook = namespace[name]
+            assert.equal(hook, framework[name])
+            assert.equal(facade[name], hook)
+            assert.equal(name in backend, false)
+            assert.ok(typeof hook === 'function')
+            assert.equal(hook(), `${name}-marker`)
+        }
+        assert.equal(
+            Reflect.set(namespace, 'showToast', () => 'replacement'),
+            false
+        )
+        assert.equal(
+            Reflect.set(namespace, 'extraApi', () => undefined),
+            false
+        )
+        assert.equal(Object.isExtensible(namespace), false)
+    } finally {
+        registration.deregister()
+    }
 })
