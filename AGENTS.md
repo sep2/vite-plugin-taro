@@ -1,104 +1,59 @@
-# Global rules
+# Agent guidelines
 
-## Programming Paradigms
-- Never write defensive code. All logic must be backed by real evidence.
-- Compose functions, build abstractions, separate concerns, but not over-engineering.
-- Minimize side effects.
-- Prefer functional programming but keep performance in mind. Keep mutable states local or as less as possible.
-- Analyze O-notion complexity.
-- Keep it DRY.
-- Choose declarative programming over imperative programming.
+## Design
 
-## Code styles
+- Favor simple, readable architecture over compatibility or minimal patches. Unify overlapping behavior and remove redundant code.
+- Use small, descriptive, composable functions. Separate concerns, keep code DRY, and avoid over-engineering.
+- Prefer declarative, functional code. Minimize side effects and mutable state; keep mutation local.
+- Base all logic on evidence; never write defensive code.
+- Consider performance and analyze Big-O complexity.
 
-- Prefer small descriptive composable functions. Do NOT write mega functions.
-- Should use comments. Especially EVERY mutable states must be documented and explained and be justified.
-- TypeScript v7 strict mode. Use `tsc`, not `tsgo`.
-- Prefer `import type` for type-only imports.
-- Do not use wide type casts. In particular, never use `as any` or `as never`.
-  but narrow down cast like `as const` is allowed.
-- Do not use default arguments in functions or React components.
-- 4 spaces, single quotes, no trailing commas. Use biome to fix files directly.
-- File names are kebab-case.
-- React components are PascalCase.
-- Functions and variables are camelCase.
-- Hooks are camelCase and must start with `use`.
-- If a file has exactly one export, the file name must match that export in kebab-case.
-- conditional blocks code block should not use shorthand non-bracket syntax.
+## Code style
 
+- Use TypeScript v7 in strict mode with `tsc`, not `tsgo`. Prefer `import type` for type-only imports.
+- No broad casts, especially `as any` or `as never`. Narrow assertions such as `as const` are allowed.
+- No default arguments in functions or React components. Always use braces for conditional blocks.
+- Use comments; document and justify every mutable state.
+- Use 4 spaces, single quotes, and no trailing commas. Apply fixes with Biome.
+- Use kebab-case filenames, PascalCase React components, and camelCase functions and variables. Hooks must start with `use`.
+- If a file has exactly one export, its filename must match that export in kebab-case.
 
-## Git
-Multiple pi sessions may be running in this cwd at the same time, each modifying different files.
-Git operations that touch unstaged, staged, or untracked files outside your own changes will stomp on other sessions' work.
-Resolve conflicts only in files you modified.
-If a conflict is in a file you did not modify, abort and ask the user.
-Ignore unrelated files' changes.
+## Workflow
 
-## Bash Timeout
-bash timeout should never be longer than 30 seconds.
+- Other sessions may be editing this workspace. Ignore unrelated changes; never modify or stage others' unstaged, staged, or untracked work.
+- Resolve conflicts only in files you modified. For conflicts elsewhere, stop and ask the user.
+- Keep bash timeouts at 30 seconds or less.
+- If a user instruction conflicts with any `AGENTS.md` rule, ask for explicit confirmation before overriding it.
+- Use npm commands in user-facing docs and pnpm for repository development instructions.
 
-# Design Feature
-When designing a feature, I don't care about compatibility. I want the best architecture with the best readability and best simplicity.
-Do not over-engineering. I don't want many moving parts with duplicated slop code.
-If the new features intersect with old behaviors, design it more general that the new features cover broader cases so
-the old codes are no longer needed. You should never propose "minimalistic change". Suggest as elegant and simply as possible.
-Never be conservative, always be progressive.
+## Workspace
 
+pnpm v11 monorepo integrating Vite 8, React 19, and Taro for WeChat (`wx`), Alipay (`zfb`), and H5 (`h5`). Node.js v26+ runs TypeScript natively.
 
-# User Override
-If the user's instructions conflict with any rule in AGENTS.md files, ask for explicit confirmation before overriding. Only then execute their instructions.
+Under `packages/`:
 
-# Monorepo Context
+- `vite-plugin-taro`: published Vite plugin; source in `src`, output in `dist`, README files synced during build.
+- `create-vite-taro`: published project generator; templates in `templates/default`.
+- `taro-runtime`: published as `vite-plugin-taro-runtime`; bundles the Taro runtime, React renderer/framework runtime, and WX/ZFB/H5 entries from pinned, patched dependencies.
+- `loan-genius`: sample app for `h5`, `wx`, and `zfb`.
+- `native-comp-demo`: native custom-component fixture for `wx` and `zfb`.
+- `hmr-stress-demo`: deep React tree HMR fixture for `wx` and `zfb`; automated IDE harness is WX-only.
+- `towxml-stream-demo`: native Towxml streaming fixture for `wx` only.
 
-This repository is a pnpm v11 workspace for `vite-plugin-taro`, a Vite 8 / React 19 / Taro integration that builds
-shared apps for WeChat Mini Program (`wx`), Alipay Mini Program (`zfb`), and H5 targets.
+`patches/` contains pnpm patches for the Taro 4.2.1 inputs used to build the runtime.
 
-- `packages/vite-plugin-taro`: publishable Vite plugin package. Source lives in `src`, build output is `dist`, and
-  package README files are synced during build.
-- `packages/create-vite-taro`: publishable project generator package (`create-vite-taro`) with templates under
-  `templates/default`.
-- `packages/taro-runtime`: publishable `vite-plugin-taro-runtime` package built from pinned, patched Taro development
-  dependencies. It contains the Taro runtime, React renderer, React framework runtime, and WX / ZFB / H5 platform runtime
-  entries.
-- `packages/loan-genius`: sample app used to test the plugin against `h5`, `wx`, and `zfb` targets.
-- `packages/native-comp-demo`: `wx` / `zfb` development project for native custom-component integration.
-- `packages/hmr-stress-demo`: `wx` / `zfb` deep React tree fixture for HMR stress testing; its automated IDE harness is WX-only.
-- `packages/towxml-stream-demo`: wx-only native Towxml streaming fixture.
-- `patches`: local patches applied by pnpm to the Taro 4.2.1 development inputs used to build `vite-plugin-taro-runtime`.
+## Commands
 
-Node.js v26+ is available and can execute TypeScript natively.
+See root `package.json` for all scripts.
 
-# Commands
+- Build plugin/runtime: `pnpm build:plugin` / `pnpm prepare:taro`.
+- Build or develop an app: `pnpm build:<app>:<target>` / `pnpm dev:<app>:<target>`; supported targets are listed above. Dev commands enable hot reload.
+- Typecheck: `pnpm typecheck:plugin` or `pnpm typecheck:<app>`.
+- HMR stress edits: `pnpm stress:hmr-stress-demo` (paced) or `pnpm stress:hmr-stress-demo:burst` (rapid).
+- H5 preview: `pnpm preview:loan-genius:h5`.
+- Biome: `pnpm lint` (check) / `pnpm format` (safe fixes).
 
-- `pnpm prepare:taro`: build `packages/taro-runtime` from its installed, patched Taro inputs.
-- `pnpm build:plugin`: build `packages/vite-plugin-taro`.
-- `pnpm build:native-comp-demo:wx` / `pnpm build:native-comp-demo:zfb`: build the native-component project.
-- `pnpm dev:native-comp-demo:wx` / `pnpm dev:native-comp-demo:zfb`: start the native-component project with hot reload.
-- `pnpm build:hmr-stress-demo:wx` / `pnpm build:hmr-stress-demo:zfb`: build the deep-tree HMR stress fixture.
-- `pnpm dev:hmr-stress-demo:wx` / `pnpm dev:hmr-stress-demo:zfb`: start the deep-tree HMR stress fixture with hot reload.
-- `pnpm build:towxml-stream-demo:wx`: build the native Towxml streaming fixture.
-- `pnpm dev:towxml-stream-demo:wx`: start the native Towxml streaming fixture with hot reload.
-- `pnpm stress:hmr-stress-demo`: publish paced source edits against the running stress fixture.
-- `pnpm stress:hmr-stress-demo:burst`: publish a rapid source-edit burst against the running stress fixture.
-- `pnpm typecheck:plugin`: typecheck plugin.
-- `pnpm typecheck:loan-genius`: typecheck loan-genius.
-- `pnpm typecheck:native-comp-demo`: typecheck native-comp-demo.
-- `pnpm typecheck:hmr-stress-demo`: typecheck hmr-stress-demo.
-- `pnpm typecheck:towxml-stream-demo`: typecheck towxml-stream-demo.
-- `pnpm lint`: run Biome checks.
-- `pnpm format`: run Biome checks with safe writes.
-- `pnpm build:loan-genius:h5`: build the sample H5 target.
-- `pnpm build:loan-genius:wx`: build the sample WeChat Mini Program target.
-- `pnpm build:loan-genius:zfb`: build the sample Alipay Mini Program target.
-- `pnpm dev:loan-genius:h5`: run the sample H5 dev server.
-- `pnpm dev:loan-genius:wx`: start the sample WeChat Mini Program target with hot reload.
-- `pnpm dev:loan-genius:zfb`: start the sample Alipay Mini Program target with hot reload.
-- `pnpm preview:loan-genius:h5`: preview the built sample H5 target.
+## Generated files
 
-# Generated files and packages
-
-- User-facing documentation should show npm commands by default. Keep repository contributor/development instructions on
-  pnpm.
-- Do not manually edit `packages/vite-plugin-taro/dist`; rebuild it with `pnpm build:plugin`.
-- Do not manually edit `packages/taro-runtime/dist`. Change the relevant `patches/*@4.2.1*.patch`, run
-  `pnpm install` to refresh the patched development dependency, then rebuild with `pnpm prepare:taro`.
+- Never edit `packages/vite-plugin-taro/dist` manually; rebuild with `pnpm build:plugin`.
+- Never edit `packages/taro-runtime/dist` manually. Edit `patches/*@4.2.1*.patch`, run `pnpm install`, then rebuild with `pnpm prepare:taro`.
