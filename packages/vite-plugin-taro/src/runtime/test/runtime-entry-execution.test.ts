@@ -194,14 +194,14 @@ test('preserves H5 runtime facade side-effect order and export identities', asyn
     const code = await bundleRuntimeEntry({
         entry: 'h5/taro-runtime.ts',
         mocks: {
-            '@tarojs/components/global.css': "globalThis.harness.events.push('global-css')",
-            '@tarojs/components/dist/taro-components/taro-components.css':
+            'vite-plugin-taro-runtime/components/global.css': "globalThis.harness.events.push('global-css')",
+            'vite-plugin-taro-runtime/components/dist/taro-components/taro-components.css':
                 "globalThis.harness.events.push('component-css')",
             'vite-plugin-taro-runtime/plugin-framework-react/runtime': `
                 globalThis.harness.events.push('framework')
                 export const createReactApp = globalThis.harness.createReactApp
             `,
-            '@tarojs/router': `
+            'vite-plugin-taro-runtime/router': `
                 globalThis.harness.events.push('router')
                 export const createHashHistory = globalThis.harness.createHashHistory
                 export const createRouter = globalThis.harness.createRouter
@@ -544,7 +544,7 @@ test('preserves client Taro facade identities without invoking platform APIs', a
     const apiCode = await bundleRuntimeEntry({
         entry: 'client/taro/api.ts',
         mocks: {
-            '@tarojs/taro': `
+            'vite-plugin-taro-runtime/taro': `
                 export default globalThis.harness.taro
                 export const showToast = globalThis.harness.showToast
             `
@@ -554,7 +554,7 @@ test('preserves client Taro facade identities without invoking platform APIs', a
     const componentCode = await bundleRuntimeEntry({
         entry: 'client/taro/component.ts',
         mocks: {
-            '@tarojs/components': 'export const View = globalThis.harness.View'
+            'vite-plugin-taro-runtime/components': 'export const View = globalThis.harness.View'
         },
         defines: {}
     })

@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module'
 import type { WalkerEnter } from 'oxc-walker'
 import type { RolldownMagicString } from 'rolldown'
 import { normalizePath, type Plugin } from 'vite'
@@ -5,9 +6,8 @@ import { normalizeModuleId } from '../../utils/modules.ts'
 import { transformWithOxcWalker } from '../../utils/oxc-transform.ts'
 import { packageRequire } from '../../utils/packages.ts'
 
-const stencilClientPath = packageRequire.resolve('@stencil/core/internal/client', {
-    paths: [packageRequire.resolve('@tarojs/components/package.json')]
-})
+const runtimeRequire = createRequire(packageRequire.resolve('vite-plugin-taro-runtime/components'))
+const stencilClientPath = runtimeRequire.resolve('@stencil/core/internal/client')
 const normalizedStencilClientPath = normalizePath(stencilClientPath)
 
 /**

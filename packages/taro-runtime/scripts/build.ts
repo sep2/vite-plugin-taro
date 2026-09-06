@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-import { copyFileSync, cpSync, mkdirSync, rmSync } from 'node:fs'
+import { copyFileSync, cpSync, mkdirSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { relocateRuntimeDeclarations } from './relocate-runtime-declarations.ts'
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const distRoot = path.join(packageRoot, 'dist')
@@ -21,10 +22,16 @@ build()
 function build(): void {
     rmSync(distRoot, { recursive: true, force: true })
     copyRuntimeDist()
+    copyApiRuntime()
+    copyTaroFacade()
+    copyComponentsRuntime()
+    copyRouterRuntime()
+    copyTaroH5Runtime()
     copyPackageDist('@tarojs/react')
     copyFrameworkReactAdapter()
     platformPackages.forEach(copyPlatformPackage)
     copyH5Platform()
+    relocateRuntimeDeclarations(distRoot)
 }
 
 /**
@@ -40,6 +47,65 @@ function copyRuntimeDist(): void {
         recursive: true,
         filter: (source) => !runtimeCjsFilePattern.test(path.basename(source))
     })
+}
+
+/** Keeps the modular API graph, excluding its three duplicate bundled representations. */
+function copyApiRuntime(): void {
+    cpSync(resolveDependencyDist('@tarojs/api'), path.join(resolveOutputRoot('@tarojs/api'), 'dist'), {
+        recursive: true,
+        filter: (source) => !/^(?:index\.(?:cjs|esm)|taro)\.js(?:\.map)?$/.test(path.basename(source))
+    })
+}
+
+/** The unchanged CommonJS facade needs its nested package boundary inside this ESM package. */
+function copyTaroFacade(): void {
+    const output = resolveOutputRoot('@tarojs/taro')
+    mkdirSync(output, { recursive: true })
+    for (const entry of ['index.js', 'package.json', 'types']) {
+        cpSync(resolveDependencyPath('@tarojs/taro', entry), path.join(output, entry), { recursive: true })
+    }
+}
+
+/** Copies eager React/Stencil components, not the alternate lazy-loader JavaScript graph. */
+function copyComponentsRuntime(): void {
+    const output = resolveOutputRoot('@tarojs/components')
+    for (const entry of [
+        'lib/react',
+        'dist/components',
+        'types',
+        'global.css',
+        'dist/taro-components/taro-components.css'
+    ]) {
+        const destination = path.join(output, entry)
+        mkdirSync(path.dirname(destination), { recursive: true })
+        cpSync(resolveDependencyPath('@tarojs/components', entry), destination, { recursive: true })
+    }
+}
+
+/** Preserves the exact router bundle VPT uses and declarations, without duplicate CJS/browser bundles. */
+function copyRouterRuntime(): void {
+    const output = resolveOutputRoot('@tarojs/router')
+    cpSync(resolveDependencyDist('@tarojs/router'), path.join(output, 'dist'), {
+        recursive: true,
+        filter: (source) =>
+            statSync(source).isDirectory() ||
+            source.endsWith('.d.ts') ||
+            /^index\.esm\.js(?:\.map)?$/.test(path.basename(source))
+    })
+    cpSync(resolveDependencyPath('@tarojs/router', 'types'), path.join(output, 'types'), { recursive: true })
+}
+
+/** The modular H5 APIs close over utils and the generated relative style-inject module. */
+function copyTaroH5Runtime(): void {
+    for (const entry of ['dist/api', 'dist/utils', 'dist/node_modules', 'types']) {
+        cpSync(
+            resolveDependencyPath('@tarojs/taro-h5', entry),
+            path.join(resolveOutputRoot('@tarojs/taro-h5'), entry),
+            {
+                recursive: true
+            }
+        )
+    }
 }
 
 /** Copies a runtime-only package distribution without transforming its files. */
@@ -112,7 +178,12 @@ function copyH5Platform(): void {
  * store path.
  */
 function resolveDependencyDist(dependency: string): string {
-    return fileURLToPath(new URL('./dist', import.meta.resolve(`${dependency}/package.json`)))
+    return resolveDependencyPath(dependency, 'dist')
+}
+
+/** Resolves from the pinned direct build dependency, including pnpm's patched instance. */
+function resolveDependencyPath(dependency: string, entry: string): string {
+    return fileURLToPath(new URL(entry, import.meta.resolve(`${dependency}/package.json`)))
 }
 
 /** Mirrors an @tarojs package name directly below this package's dist directory. */

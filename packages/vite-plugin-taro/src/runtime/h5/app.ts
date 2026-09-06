@@ -1,7 +1,7 @@
 /** biome-ignore-all assist/source/organizeImports: keep side effect orders */
 
 import { createHashHistory, createReactApp, createRouter, handleAppMount, window } from './taro-runtime.ts'
-import type { SpaRouterConfig } from '@tarojs/router/types/router'
+import type { SpaRouterConfig } from 'vite-plugin-taro-runtime/router/types/router'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 

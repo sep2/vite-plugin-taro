@@ -9,8 +9,8 @@ import { injectTaroFrameworkApis } from './inject-taro-framework-apis.ts'
  * Taro API resolution uses one public facade while avoiding a recursive `@tarojs/taro` import:
  *
  * 1. Application imports of `virtual:taro/api` or `@tarojs/taro` resolve to the physical `api.js` facade.
- * 2. The facade itself imports `@tarojs/taro`; its importer identifies that request as the platform implementation.
- * 3. H5 receives `@tarojs/plugin-platform-h5` APIs, while WX receives the generic `@tarojs/taro` implementation.
+ * 2. The facade imports `vite-plugin-taro-runtime/taro`; its importer identifies the platform backend slot.
+ * 3. H5 receives copied platform APIs, while Mini receives the copied generic Taro implementation.
  * 4. React's framework API loader transforms the facade, assigning lifecycle hooks such as `useLaunch` to the same
  *    platform object and exposing them as named exports.
  *
@@ -41,10 +41,9 @@ export function createClientTaroPlugin(target: VptTarget): Plugin {
 
         async resolveId(id, importer) {
             if (id === '@tarojs/taro') {
-                if (!isClientTaroFacade(importer)) {
-                    return clientTaroApiPath
-                }
-
+                return clientTaroApiPath
+            }
+            if (id === 'vite-plugin-taro-runtime/taro' && isClientTaroFacade(importer)) {
                 // Delegate the platform backend to Vite instead of returning an absolute dependency path. H5 marks this
                 // backend as an optimization root, so delegation lets Vite substitute its prebundled facade. Removing it
                 // bypasses CommonJS interop and exposes backend details such as base64-js directly to the browser.
@@ -63,7 +62,9 @@ export function createClientTaroPlugin(target: VptTarget): Plugin {
 }
 
 function resolvePlatformTaroId(target: VptTarget): string {
-    return target === 'h5' ? '@tarojs/plugin-platform-h5/dist/runtime/apis' : '@tarojs/taro'
+    return target === 'h5'
+        ? 'vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis'
+        : 'vite-plugin-taro-runtime/taro'
 }
 
 function isClientTaroFacade(importer: string | undefined): boolean {

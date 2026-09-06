@@ -41,64 +41,81 @@ function createH5Plugin(options: VptOptions): Plugin {
                             replacement: tailwindcssBasedir
                         },
                         {
-                            // The platform backend is compiler-owned and therefore may not be resolvable from the consumer
-                            // root during Vite's initial dependency optimization.
-                            find: /^@tarojs\/plugin-platform-h5\/dist\/runtime\/apis$/,
+                            // Pin canonical and upstream requests to compiler-owned files, even when the consumer cannot
+                            // resolve the runtime package directly. Both spellings must share one optimized module.
+                            find: /^(?:@tarojs\/plugin-platform-h5\/dist|vite-plugin-taro-runtime\/plugin-platform-h5)\/runtime\/apis$/,
                             replacement: packageRequire.resolve(
                                 'vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis'
                             )
                         },
                         {
-                            find: /^@tarojs\/plugin-platform-h5\/dist\/definition\.json$/,
+                            find: /^(?:@tarojs\/plugin-platform-h5\/dist|vite-plugin-taro-runtime\/plugin-platform-h5)\/definition\.json$/,
                             replacement: packageRequire.resolve(
                                 'vite-plugin-taro-runtime/plugin-platform-h5/definition.json'
                             )
                         },
                         {
-                            find: /^@tarojs\/plugin-framework-react\/dist\/runtime$/,
+                            find: /^(?:@tarojs\/plugin-framework-react\/dist|vite-plugin-taro-runtime\/plugin-framework-react)\/runtime$/,
                             replacement: packageRequire.resolve(
                                 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
                             )
                         },
                         {
-                            find: /^@tarojs\/runtime$/,
+                            find: /^(?:@tarojs\/runtime|vite-plugin-taro-runtime\/runtime\/h5)$/,
                             replacement: packageRequire.resolve('vite-plugin-taro-runtime/runtime/h5')
                         },
                         {
-                            // Taro H5 can resolve a second, peer-specific router package through taro-h5. Both the App
-                            // bootstrap and API facade must share this stateful router instance.
-                            find: /^@tarojs\/router$/,
-                            replacement: packageRequire.resolve('@tarojs/router/dist/index.esm.js')
+                            find: /^(?:@tarojs|vite-plugin-taro-runtime)\/api$/,
+                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/api')
                         },
                         {
-                            find: /^@tarojs\/components$/,
-                            replacement: packageRequire.resolve('@tarojs/components/lib/react')
+                            find: /^(?:@tarojs|vite-plugin-taro-runtime)\/taro-h5\/dist\/api\/taro$/,
+                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/taro-h5/dist/api/taro')
+                        },
+                        {
+                            find: /^(?:@tarojs|vite-plugin-taro-runtime)\/taro-h5\/dist\/api\/index$/,
+                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/taro-h5/dist/api/index')
+                        },
+                        {
+                            find: /^(?:@tarojs|vite-plugin-taro-runtime)\/components\/global\.css$/,
+                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/components/global.css')
+                        },
+                        {
+                            find: /^(?:@tarojs|vite-plugin-taro-runtime)\/components\/dist\/taro-components\/taro-components\.css$/,
+                            replacement: packageRequire.resolve(
+                                'vite-plugin-taro-runtime/components/dist/taro-components/taro-components.css'
+                            )
+                        },
+                        {
+                            // The hidden App bootstrap and copied H5 APIs must share this stateful router instance.
+                            find: /^(?:@tarojs|vite-plugin-taro-runtime)\/router$/,
+                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/router')
+                        },
+                        {
+                            find: /^(?:@tarojs|vite-plugin-taro-runtime)\/components$/,
+                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/components')
                         },
                         {
                             // The React entry self-imports this Stencil index by package name. Pinning both entries to the
-                            // compiler-owned package prevents Vite from transforming a second peer-qualified components graph.
-                            find: /^@tarojs\/components\/dist\/components$/,
-                            replacement: packageRequire.resolve('@tarojs/components/dist/components')
+                            // runtime package prevents Vite from transforming a second component graph.
+                            find: /^(?:@tarojs|vite-plugin-taro-runtime)\/components\/dist\/components$/,
+                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/components/dist/components')
                         }
                     ]
                 },
                 optimizeDeps: {
-                    /*
-                     * The compiler-owned H5 app and Taro facade are injected after Vite's initial HTML scan, so declare their
-                     * optimization entries explicitly. The platform backend needs CommonJS interop, ReactDOM is imported by
-                     * the hidden app, and the stateful Taro router and runtime must be first-class entries so subsequently
-                     * discovered Taro packages cannot embed private singleton copies in their optimized chunks.
-                     */
+                    // The injected H5 entry is outside Vite's initial scan, so pre-bundle its stateful graph and ReactDOM.
                     include: [
-                        '@tarojs/plugin-platform-h5/dist/runtime/apis',
-                        '@tarojs/router',
-                        '@tarojs/runtime',
+                        'vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis',
+                        'vite-plugin-taro-runtime/plugin-framework-react/runtime',
+                        'vite-plugin-taro-runtime/router',
+                        'vite-plugin-taro-runtime/runtime/h5',
                         'react-dom/client'
                     ],
                     // Dependency optimization is its own Rolldown build and does not run application transform plugins.
                     // Register the same adapter there so optimized Taro components cannot embed Stencil's original client.
                     rolldownOptions: {
-                        plugins: [createStencilClientAdapter()]
+                        plugins: [createH5TaroOptimizerResolver(), createStencilClientAdapter()]
                     }
                 },
                 build: {
@@ -189,6 +206,25 @@ function createH5TaroApiPreset() {
             filter: { code: h5TaroApiTransformCodeFilter }
         }
     })
+}
+
+/**
+ * Optimized dependencies need the complete H5 API object, not the generic Mini facade. Resolve directly to the ESM backend
+ * instead of importing VPT's lifecycle-extended application facade: that would pull framework initialization into the
+ * components → H5 APIs → components cycle. Application imports extend the same backend after dependency evaluation.
+ */
+function createH5TaroOptimizerResolver(): Plugin {
+    return {
+        name: 'vpt:h5-optimizer-taro',
+        resolveId: resolveH5OptimizerTaro
+    }
+}
+
+/** Resolves only the Taro request that must remain within optimized component chunks. */
+export function resolveH5OptimizerTaro(id: string): string | undefined {
+    if (id === '@tarojs/taro') {
+        return packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis')
+    }
 }
 
 /** Creates H5-only transforms for Stencil CSS ordering and Taro API imports. */

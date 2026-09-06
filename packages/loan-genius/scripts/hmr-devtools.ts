@@ -61,7 +61,7 @@ export function createLoanHmrDevTools(fixture: LoanHmrFixture): LoanHmrDevTools 
             }
         },
         readConsoleErrors: async () => {
-            const result = await runTool('get_app_console_content', {
+            const result = await runTool('get_simulator_console', {
                 command: "grep -i -E 'error|warn|exception'"
             })
             if (typeof result !== 'string') {

@@ -10,6 +10,9 @@ export { createPageConfig, createRecursiveComponentConfig } from 'vite-plugin-ta
 
 import { customWrapperCache } from 'vite-plugin-taro-runtime/runtime/mini'
 
+// Replaced by the compiler; Mini runtimes do not provide Node's process global or its ambient types.
+declare const process: { readonly env: { readonly NODE_ENV: string } }
+
 // DevTools HMR runs in the bootstrap chunk, so publish the application graph's cache once on the language global.
 if (process.env.NODE_ENV === 'development') {
     Reflect.set(globalThis, Symbol.for('customWrapperCache'), customWrapperCache)

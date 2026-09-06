@@ -161,10 +161,16 @@ test('builds a routed H5 application through the public plugin entry', async () 
                 chunks
                     .flatMap((chunk) => Object.keys(chunk.modules))
                     .map(normalizePath)
-                    .filter((id) => id.endsWith('/@tarojs/router/dist/index.esm.js'))
+                    .filter((id) => id.endsWith('/taro-runtime/dist/router/dist/index.esm.js'))
             )
             assert.match(html, /<script type="module" crossorigin src="\/assets\//)
             assert.equal(routerModuleIds.size, 1)
+            const upstreamRuntimeIds = chunks
+                .flatMap((chunk) => Object.keys(chunk.modules))
+                .filter((id) =>
+                    /\/node_modules\/@tarojs\/(?:api|taro|components|router|taro-h5)\//.test(normalizePath(id))
+                )
+            assert.deepEqual(upstreamRuntimeIds, [])
             assert.ok(moduleIds.some((id) => id.endsWith('/taro-runtime/dist/runtime/runtime.esm.js')))
             assert.equal(
                 moduleIds.some((id) => /\/taro-runtime\/dist\/plugin-platform-(?:weapp|alipay)\//.test(id)),
@@ -187,10 +193,12 @@ test('builds a complete native App and Page project for wx', async () => {
             files: {
                 'src/app.tsx': appSource,
                 'src/pages/home/index.tsx': `
-                    import { View } from '@tarojs/components'
+                    import { View } from 'virtual:taro/components'
+                    import { Text } from 'vite-plugin-taro-runtime/components'
+                    import { Button } from '@tarojs/components'
 
                     export default function Home() {
-                        return <View id="wx-home">WX page marker</View>
+                        return <View id="wx-home"><Text>WX page marker</Text><Button>WX button</Button></View>
                     }
                 `
             }
@@ -230,6 +238,13 @@ test('builds a complete native App and Page project for wx', async () => {
                 false
             )
             assert.ok(moduleIds.some((id) => id.endsWith('/taro-runtime/dist/plugin-platform-weapp/runtime.js')))
+            assert.ok(
+                moduleIds.some((id) => id.endsWith('/taro-runtime/dist/plugin-platform-weapp/components-react.js'))
+            )
+            assert.equal(
+                moduleIds.some((id) => id.includes('/taro-runtime/dist/components/')),
+                false
+            )
             assert.equal(
                 moduleIds.some((id) => /\/taro-runtime\/dist\/plugin-platform-(?:alipay|h5)\//.test(id)),
                 false
@@ -263,10 +278,12 @@ test('builds a complete native App and Page project for zfb', async () => {
             files: {
                 'src/app.tsx': appSource,
                 'src/pages/home/index.tsx': `
-                    import { View } from '@tarojs/components'
+                    import { View } from 'virtual:taro/components'
+                    import { Text } from 'vite-plugin-taro-runtime/components'
+                    import { Button } from '@tarojs/components'
 
                     export default function Home() {
-                        return <View id="zfb-home">ZFB page marker</View>
+                        return <View id="zfb-home"><Text>ZFB page marker</Text><Button>ZFB button</Button></View>
                     }
                 `
             }
@@ -309,6 +326,13 @@ test('builds a complete native App and Page project for zfb', async () => {
                 false
             )
             assert.ok(moduleIds.some((id) => id.endsWith('/taro-runtime/dist/plugin-platform-alipay/runtime.js')))
+            assert.ok(
+                moduleIds.some((id) => id.endsWith('/taro-runtime/dist/plugin-platform-alipay/components-react.js'))
+            )
+            assert.equal(
+                moduleIds.some((id) => id.includes('/taro-runtime/dist/components/')),
+                false
+            )
             assert.equal(
                 moduleIds.some((id) => /\/taro-runtime\/dist\/plugin-platform-(?:weapp|h5)\//.test(id)),
                 false

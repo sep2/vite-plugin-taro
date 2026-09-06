@@ -1,4 +1,4 @@
-import type { Route, SpaRouterConfig } from '@tarojs/router/types/router'
+import type { Route, SpaRouterConfig } from 'vite-plugin-taro-runtime/router/types/router'
 
 declare global {
     const __VPT_H5_APP_CONFIG__: SpaRouterConfig

@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { test } from 'node:test'
 import { packageRequire } from '../../utils/packages.ts'
 import { adaptStencilClient } from './create-stencil-client-adapter.ts'
 
-const stencilClientPath = packageRequire.resolve('@stencil/core/internal/client', {
-    paths: [packageRequire.resolve('@tarojs/components/package.json')]
-})
+const runtimeRequire = createRequire(packageRequire.resolve('vite-plugin-taro-runtime/components'))
+const stencilClientPath = runtimeRequire.resolve('@stencil/core/internal/client')
 
 test('leaves identical insertion code outside the physical Stencil client untouched', async () => {
     const source = await readFile(stencilClientPath, 'utf8')

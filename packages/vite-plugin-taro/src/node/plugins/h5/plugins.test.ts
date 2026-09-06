@@ -4,7 +4,12 @@ import { transformSync } from '@babel/core'
 import { resolveConfig } from 'vite'
 import type { VptOptions } from '../../../options.ts'
 import { packageRequire } from '../../utils/packages.ts'
-import { createH5TargetPlugins, h5TaroApiPreset, h5TaroApiTransformCodeFilter } from './plugins.ts'
+import {
+    createH5TargetPlugins,
+    h5TaroApiPreset,
+    h5TaroApiTransformCodeFilter,
+    resolveH5OptimizerTaro
+} from './plugins.ts'
 
 const options: VptOptions = {
     target: 'h5',
@@ -15,7 +20,7 @@ const options: VptOptions = {
     sitemapJson: {}
 }
 
-test('promotes compiler-owned H5 dependencies to optimizer entries', async () => {
+test('configures H5 runtime resolution and optimization', async () => {
     const config = await resolveConfig(
         {
             configFile: false,
@@ -25,44 +30,42 @@ test('promotes compiler-owned H5 dependencies to optimizer entries', async () =>
     )
 
     assert.deepEqual(config.optimizeDeps.include, [
-        '@tarojs/plugin-platform-h5/dist/runtime/apis',
-        '@tarojs/router',
-        '@tarojs/runtime',
+        'vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis',
+        'vite-plugin-taro-runtime/plugin-framework-react/runtime',
+        'vite-plugin-taro-runtime/router',
+        'vite-plugin-taro-runtime/runtime/h5',
         'react-dom/client'
     ])
     assert.deepEqual(config.optimizeDeps.exclude, [])
 
-    const platformApiAlias = config.resolve.alias.find((alias) => {
-        return alias.find instanceof RegExp && alias.find.test('@tarojs/plugin-platform-h5/dist/runtime/apis')
+    const copiedAliases = [
+        ['@tarojs/plugin-platform-h5/dist/runtime/apis', 'vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis'],
+        [
+            '@tarojs/plugin-platform-h5/dist/definition.json',
+            'vite-plugin-taro-runtime/plugin-platform-h5/definition.json'
+        ],
+        ['@tarojs/plugin-framework-react/dist/runtime', 'vite-plugin-taro-runtime/plugin-framework-react/runtime'],
+        ['@tarojs/runtime', 'vite-plugin-taro-runtime/runtime/h5'],
+        ['@tarojs/router', 'vite-plugin-taro-runtime/router'],
+        ['@tarojs/api', 'vite-plugin-taro-runtime/api'],
+        ['@tarojs/taro-h5/dist/api/taro', 'vite-plugin-taro-runtime/taro-h5/dist/api/taro'],
+        ['@tarojs/taro-h5/dist/api/index', 'vite-plugin-taro-runtime/taro-h5/dist/api/index'],
+        ['@tarojs/components/global.css', 'vite-plugin-taro-runtime/components/global.css'],
+        [
+            '@tarojs/components/dist/taro-components/taro-components.css',
+            'vite-plugin-taro-runtime/components/dist/taro-components/taro-components.css'
+        ],
+        ['@tarojs/components', 'vite-plugin-taro-runtime/components'],
+        ['@tarojs/components/dist/components', 'vite-plugin-taro-runtime/components/dist/components']
+    ] as const
+    copiedAliases.forEach(([request, replacement]) => {
+        const alias = config.resolve.alias.find((entry) => entry.find instanceof RegExp && entry.find.test(request))
+        assert.ok(alias)
+        assert.ok(alias.find instanceof RegExp)
+        assert.equal(alias.find.test(replacement), true)
+        assert.equal(alias.find.test(`${replacement}/unrelated`), false)
+        assert.equal(alias.replacement, packageRequire.resolve(replacement))
     })
-    assert.ok(platformApiAlias)
-    assert.equal(
-        platformApiAlias.replacement,
-        packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis')
-    )
-
-    const definitionAlias = config.resolve.alias.find((alias) => {
-        return alias.find instanceof RegExp && alias.find.test('@tarojs/plugin-platform-h5/dist/definition.json')
-    })
-    assert.ok(definitionAlias)
-    assert.equal(
-        definitionAlias.replacement,
-        packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-h5/definition.json')
-    )
-
-    const runtimeAlias = config.resolve.alias.find((alias) => {
-        return alias.find instanceof RegExp && alias.find.test('@tarojs/runtime')
-    })
-    assert.ok(runtimeAlias)
-    assert.ok(runtimeAlias.find instanceof RegExp)
-    assert.equal(runtimeAlias.find.test('vite-plugin-taro-runtime/runtime/h5'), false)
-    assert.equal(runtimeAlias.replacement, packageRequire.resolve('vite-plugin-taro-runtime/runtime/h5'))
-
-    const routerAlias = config.resolve.alias.find((alias) => {
-        return alias.find instanceof RegExp && alias.find.test('@tarojs/router')
-    })
-    assert.ok(routerAlias)
-    assert.equal(routerAlias.replacement, packageRequire.resolve('@tarojs/router/dist/index.esm.js'))
 
     const babelPlugin = config.plugins.find((plugin) => plugin.name === '@rolldown/plugin-babel')
     assert.ok(babelPlugin)
@@ -71,7 +74,15 @@ test('promotes compiler-owned H5 dependencies to optimizer entries', async () =>
 
     const optimizerPlugins = config.optimizeDeps.rolldownOptions?.plugins
     assert.ok(Array.isArray(optimizerPlugins))
-    assert.equal(optimizerPlugins.length, 1)
+    assert.equal(optimizerPlugins.length, 2)
+})
+
+test('shares the H5 backend with optimized dependencies without importing the application facade', () => {
+    assert.equal(
+        resolveH5OptimizerTaro('@tarojs/taro'),
+        packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis')
+    )
+    assert.equal(resolveH5OptimizerTaro('virtual:taro/api'), undefined)
 })
 
 test('executes the H5 Taro API preset against default and named facade imports', () => {

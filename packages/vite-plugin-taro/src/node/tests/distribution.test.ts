@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readdir, readFile } from 'node:fs/promises'
+import { readdir, readFile, stat } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import test from 'node:test'
@@ -14,7 +14,8 @@ const runtimePackageDistRoot = path.resolve(path.dirname(runtimePackageEntry), '
 const runtimePackageRoot = path.resolve(runtimePackageDistRoot, '..')
 const runtimePackageRequire = createRequire(runtimePackageEntry)
 const compilerSizeLimit = 2_250_000
-const runtimePackageSizeLimit = 2_400_000
+// Includes the modular APIs, eager components, router, and declarations formerly shipped in four upstream packages.
+const runtimePackageSizeLimit = 5_000_000
 const runtimeCjsFilePattern = /^index\.cjs\.(?:d\.ts|js(?:\.map)?)$/
 
 const platformJavaScriptFiles: ReadonlyArray<readonly [dependencyId: string, outputPath: string]> = [
@@ -48,13 +49,43 @@ async function assertFilesCopied(
                 readFile(path.join(sourceRoot, relativePath)),
                 readFile(path.join(outputRoot, relativePath))
             ])
-            assert.deepEqual(output, source)
+            if (relativePath.endsWith('.d.ts')) {
+                // Only declaration module identities may change; runtime JavaScript stays byte-for-byte upstream.
+                assert.equal(
+                    String(output)
+                        .replaceAll('vite-plugin-taro-runtime/runtime/mini', '@tarojs/runtime')
+                        .replaceAll('vite-plugin-taro-runtime/', '@tarojs/'),
+                    String(source)
+                )
+            } else {
+                assert.deepEqual(output, source)
+            }
         })
     )
 }
 
 async function assertDirectoryCopied(sourceRoot: string, outputRoot: string): Promise<void> {
     await assertFilesCopied(sourceRoot, outputRoot, await listRelativeFiles(sourceRoot))
+}
+
+async function assertSelectedPackageFilesCopied(
+    sourceRoot: string,
+    outputRoot: string,
+    selections: readonly string[]
+): Promise<void> {
+    const selectedFiles = (
+        await Promise.all(
+            selections.map(async (selection) => {
+                const source = path.join(sourceRoot, selection)
+                if ((await stat(source)).isFile()) {
+                    return [selection]
+                }
+                return (await listRelativeFiles(source)).map((relativePath) => path.join(selection, relativePath))
+            })
+        )
+    ).flat()
+    assert.deepEqual((await listRelativeFiles(outputRoot)).toSorted(), selectedFiles.toSorted())
+    await assertFilesCopied(sourceRoot, outputRoot, selectedFiles)
 }
 
 async function assertRuntimeDistCopied(sourceRoot: string, outputRoot: string): Promise<void> {
@@ -83,7 +114,9 @@ test('publishes a compiler that depends on the unified Taro runtime package', as
     assert.ok(!packageJson.files.includes('src'))
     assert.match(h5AppPath, /\/src\/runtime\/h5\/app\.ts$/)
     assert.equal(packageJson.dependencies['@tailwindcss/vite'], '4.3.3')
-    assert.equal(packageJson.dependencies['@tarojs/helper'], undefined)
+    for (const name of ['helper', 'taro', 'api', 'components', 'router']) {
+        assert.equal(packageJson.dependencies[`@tarojs/${name}`], undefined)
+    }
     assert.equal(packageJson.dependencies['@tarojs/plugin-framework-react'], undefined)
     assert.equal(packageJson.dependencies['@tarojs/react'], undefined)
     assert.equal(packageJson.dependencies['@tarojs/runtime'], undefined)
@@ -109,10 +142,23 @@ test('publishes a compiler that depends on the unified Taro runtime package', as
     assert.match(compiler, /vite-plugin-taro-runtime\/plugin-platform-h5\/definition\.json/)
     assert.match(compiler, /@tailwindcss\/vite/)
     assert.ok(Buffer.byteLength(compiler) < compilerSizeLimit)
-    assert.match(componentFacade, /from '@tarojs\/components'/)
+    assert.match(componentFacade, /from 'vite-plugin-taro-runtime\/components'/)
     assert.equal(
         compilerModules.some((file) => file.endsWith('.js')),
         false
+    )
+})
+
+test('emits first-party runtime modules using canonical package imports', async () => {
+    const runtimeRoot = path.join(distRoot, 'runtime')
+    const runtimeFiles = await listRelativeFiles(runtimeRoot)
+    await Promise.all(
+        runtimeFiles
+            .filter((file) => file.endsWith('.js'))
+            .map(async (file) => {
+                const source = await readFile(path.join(runtimeRoot, file), 'utf8')
+                assert.doesNotMatch(source, /(?:from\s*|import\s*)['"]@tarojs\//, file)
+            })
     )
 })
 
@@ -134,6 +180,18 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
     assert.deepEqual(Object.keys(packageJson.exports), [
         './runtime/mini',
         './runtime/h5',
+        './api',
+        './taro',
+        './taro/package.json',
+        './taro/types/compile',
+        './components',
+        './components/dist/components',
+        './components/global.css',
+        './components/dist/taro-components/taro-components.css',
+        './router',
+        './router/types/router',
+        './taro-h5/dist/api/taro',
+        './taro-h5/dist/api/index',
         './react',
         './plugin-framework-react/runtime',
         './plugin-framework-react/api-loader',
@@ -148,7 +206,46 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
     ])
     assert.equal(packageJson.dependencies['@tarojs/runtime'], undefined)
     assert.equal(packageJson.dependencies['@tarojs/shared'], '4.2.1')
-    assert.equal(packageJson.dependencies['@tarojs/taro-h5'], '4.2.1')
+    for (const name of ['api', 'taro', 'components', 'router', 'taro-h5']) {
+        assert.equal(packageJson.dependencies[`@tarojs/${name}`], undefined)
+        assert.equal(packageJson.devDependencies[`@tarojs/${name}`], '4.2.1')
+    }
+
+    const apiSourceRoot = resolveAdapterDependencyRoot('@tarojs/api')
+    const apiOutputRoot = path.join(runtimePackageDistRoot, 'api')
+    const retainedApiFiles = (await listRelativeFiles(path.join(apiSourceRoot, 'dist')))
+        .filter((relativePath) => !/^(?:index\.(?:cjs|esm)|taro)\.js(?:\.map)?$/.test(relativePath))
+        .map((relativePath) => path.join('dist', relativePath))
+    assert.deepEqual((await listRelativeFiles(apiOutputRoot)).toSorted(), retainedApiFiles.toSorted())
+    await assertFilesCopied(apiSourceRoot, apiOutputRoot, retainedApiFiles)
+
+    await assertSelectedPackageFilesCopied(
+        resolveAdapterDependencyRoot('@tarojs/taro'),
+        path.join(runtimePackageDistRoot, 'taro'),
+        ['index.js', 'package.json', 'types']
+    )
+    await assertSelectedPackageFilesCopied(
+        resolveAdapterDependencyRoot('@tarojs/components'),
+        path.join(runtimePackageDistRoot, 'components'),
+        ['lib/react', 'dist/components', 'types', 'global.css', 'dist/taro-components/taro-components.css']
+    )
+
+    const routerSourceRoot = resolveAdapterDependencyRoot('@tarojs/router')
+    const routerOutputRoot = path.join(runtimePackageDistRoot, 'router')
+    const retainedRouterFiles = (await listRelativeFiles(path.join(routerSourceRoot, 'dist')))
+        .filter((relativePath) => relativePath.endsWith('.d.ts') || /^index\.esm\.js(?:\.map)?$/.test(relativePath))
+        .map((relativePath) => path.join('dist', relativePath))
+        .concat((await listRelativeFiles(path.join(routerSourceRoot, 'types'))).map((file) => path.join('types', file)))
+    assert.deepEqual((await listRelativeFiles(routerOutputRoot)).toSorted(), retainedRouterFiles.toSorted())
+    await assertFilesCopied(routerSourceRoot, routerOutputRoot, retainedRouterFiles)
+
+    await assertSelectedPackageFilesCopied(
+        resolveAdapterDependencyRoot('@tarojs/taro-h5'),
+        path.join(runtimePackageDistRoot, 'taro-h5'),
+        ['dist/api', 'dist/utils', 'dist/node_modules', 'types']
+    )
+    assert.equal(packageJson.dependencies['@tarojs/helper'], undefined)
+    assert.equal(packageJson.dependencies['@swc/core'], undefined)
     assert.equal(packageJson.dependencies['lodash-es'], '4.17.21')
     assert.equal(packageJson.dependencies['react-reconciler'], '0.33.0')
     assert.equal(packageJson.devDependencies['@tarojs/plugin-framework-react'], '4.2.1')
@@ -168,6 +265,21 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         packageRequire.resolve('vite-plugin-taro-runtime/runtime/h5'),
         path.join(runtimeOutputRoot, 'runtime.esm.js')
     )
+    const copiedRuntimeExports = [
+        ['api', 'api/dist/index.js'],
+        ['taro', 'taro/index.js'],
+        ['components', 'components/lib/react/index.js'],
+        ['components/dist/components', 'components/dist/components/index.js'],
+        ['router', 'router/dist/index.esm.js'],
+        ['taro-h5/dist/api/taro', 'taro-h5/dist/api/taro.js'],
+        ['taro-h5/dist/api/index', 'taro-h5/dist/api/index.js']
+    ] as const
+    copiedRuntimeExports.forEach(([request, output]) => {
+        assert.equal(
+            packageRequire.resolve(`vite-plugin-taro-runtime/${request}`),
+            path.join(runtimePackageDistRoot, output)
+        )
+    })
 
     await assertDirectoryCopied(
         path.join(resolveAdapterDependencyRoot('@tarojs/react'), 'dist'),

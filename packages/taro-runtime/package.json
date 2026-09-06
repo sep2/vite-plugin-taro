@@ -16,6 +16,50 @@
             "import": "./dist/runtime/runtime.esm.js",
             "default": "./dist/runtime/runtime.esm.js"
         },
+        "./api": {
+            "types": "./dist/api/dist/index.d.ts",
+            "import": "./dist/api/dist/index.js",
+            "default": "./dist/api/dist/index.js"
+        },
+        "./taro": {
+            "types": "./dist/taro/types/index.d.ts",
+            "import": "./dist/taro/index.js",
+            "default": "./dist/taro/index.js"
+        },
+        "./taro/package.json": "./dist/taro/package.json",
+        "./taro/types/compile": {
+            "types": "./dist/taro/types/compile/index.d.ts"
+        },
+        "./components": {
+            "types": "./dist/components/types/index.d.ts",
+            "import": "./dist/components/lib/react/index.js",
+            "default": "./dist/components/lib/react/index.js"
+        },
+        "./components/dist/components": {
+            "types": "./dist/components/dist/components/index.d.ts",
+            "import": "./dist/components/dist/components/index.js",
+            "default": "./dist/components/dist/components/index.js"
+        },
+        "./components/global.css": "./dist/components/global.css",
+        "./components/dist/taro-components/taro-components.css": "./dist/components/dist/taro-components/taro-components.css",
+        "./router": {
+            "types": "./dist/router/dist/index.d.ts",
+            "import": "./dist/router/dist/index.esm.js",
+            "default": "./dist/router/dist/index.esm.js"
+        },
+        "./router/types/router": {
+            "types": "./dist/router/types/router.d.ts"
+        },
+        "./taro-h5/dist/api/taro": {
+            "types": "./dist/taro-h5/dist/api/taro.d.ts",
+            "import": "./dist/taro-h5/dist/api/taro.js",
+            "default": "./dist/taro-h5/dist/api/taro.js"
+        },
+        "./taro-h5/dist/api/index": {
+            "types": "./dist/taro-h5/dist/api/index.d.ts",
+            "import": "./dist/taro-h5/dist/api/index.js",
+            "default": "./dist/taro-h5/dist/api/index.js"
+        },
         "./react": {
             "types": "./dist/react/index.d.ts",
             "import": "./dist/react/react.esm.js",
@@ -62,7 +106,11 @@
         "./dist/react/react.esm.js",
         "./dist/plugin-framework-react/runtime.js",
         "./dist/plugin-platform-weapp/runtime.js",
-        "./dist/plugin-platform-alipay/runtime.js"
+        "./dist/plugin-platform-alipay/runtime.js",
+        "**/*.css",
+        "**/*.css.js",
+        "**/*.scss",
+        "**/*.scss.js"
     ],
     "repository": {
         "type": "git",
@@ -81,16 +129,38 @@
         "typecheck": "tsc --project tsconfig.json --noEmit"
     },
     "dependencies": {
+        "@stencil/core": "2.22.3",
         "@tarojs/shared": "4.2.1",
-        "@tarojs/taro-h5": "4.2.1",
+        "abortcontroller-polyfill": "^1.7.5",
+        "base64-js": "^1.5.1",
+        "dingtalk-jsapi": "~2.15.2",
+        "hammerjs": "^2.0.8",
+        "history": "^5.3.0",
+        "hls.js": "^1.1.5",
+        "ics": "^3.7.2",
+        "is-mobile": "^4.0.0",
+        "jsonp-retry": "^1.0.3",
         "lodash-es": "4.17.21",
+        "platform": "^1.3.6",
+        "query-string": "^9.0.0",
+        "resolve-pathname": "^3.0.0",
+        "swiper": "11.1.15",
+        "universal-router": "^9.2.0",
+        "whatwg-fetch": "^3.6.20",
         "react-reconciler": "0.33.0",
         "tslib": "^2.8.1"
     },
     "peerDependencies": {
-        "react": "^19.0.0"
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0"
     },
     "devDependencies": {
+        "@tarojs/api": "4.2.1",
+        "@tarojs/components": "4.2.1",
+        "@tarojs/router": "4.2.1",
+        "@tarojs/taro": "4.2.1",
+        "@tarojs/taro-h5": "4.2.1",
+        "@types/react": "^19.2.18",
         "@tarojs/plugin-framework-react": "4.2.1",
         "@tarojs/plugin-platform-alipay": "4.2.1",
         "@tarojs/plugin-platform-h5": "4.2.1",

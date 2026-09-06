@@ -1,11 +1,11 @@
 declare module 'virtual:taro/api' {
-    import Taro = require('@tarojs/taro')
+    import Taro = require('vite-plugin-taro-runtime/taro')
     export = Taro
     export default Taro
 }
 
 declare module 'virtual:taro/components' {
-    export * from '@tarojs/components'
+    export * from 'vite-plugin-taro-runtime/components'
 }
 
 declare module 'virtual:taro/native' {

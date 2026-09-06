@@ -62,7 +62,12 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                             replacement: packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini')
                         },
                         {
-                            find: /^@tarojs\/components$/,
+                            find: /^@tarojs\/api$/,
+                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/api')
+                        },
+                        {
+                            // The typed shared facade and upstream imports select the same Mini component table.
+                            find: /^(?:@tarojs|vite-plugin-taro-runtime)\/components$/,
                             replacement: contract.taro.componentsReactPath
                         }
                     ]
@@ -183,7 +188,9 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
 
 /** Creates the build-time constants required by Taro and React feature gates. */
 function createTaroDefines(taroEnv: string): Record<string, string> {
-    const taroVersion = String((packageRequire('@tarojs/taro/package.json') as { version: string }).version)
+    const taroVersion = String(
+        (packageRequire('vite-plugin-taro-runtime/taro/package.json') as { version: string }).version
+    )
 
     return {
         'process.env.FRAMEWORK': JSON.stringify('react'),

@@ -85,9 +85,12 @@ async function prepareFixture(): Promise<LoanHmrFixture> {
             rm(path.join(fixtureRoot, entry), { recursive: true, force: true })
         )
     )
+    const publicDirectory = path.join(packageRoot, 'public')
     await Promise.all([
         cp(path.join(packageRoot, 'src'), path.join(fixtureRoot, 'src'), { recursive: true }),
-        cp(path.join(packageRoot, 'public'), path.join(fixtureRoot, 'public'), { recursive: true }),
+        ...(existsSync(publicDirectory)
+            ? [cp(publicDirectory, path.join(fixtureRoot, 'public'), { recursive: true })]
+            : []),
         ...['package.json', 'tsconfig.json', 'vite.config.ts'].map((file) =>
             cp(path.join(packageRoot, file), path.join(fixtureRoot, file))
         )
@@ -274,7 +277,7 @@ export async function startLoanHmrServer(fixture: LoanHmrFixture): Promise<LoanH
     })
     const handle = { logFile: logFile, process: server }
     try {
-        await waitFor(async () => (await readFile(logPath, 'utf8')).includes('WeChat DevTools'), 20_000)
+        await waitFor(async () => (await readFile(logPath, 'utf8')).includes('Mini Program project'), 20_000)
         return handle
     } catch (error) {
         await stopLoanHmrServer(handle)
