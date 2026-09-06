@@ -1,6 +1,6 @@
 {
     "name": "vite-plugin-taro-runtime",
-    "version": "0.7.0",
+    "version": "0.7.1-beta.0",
     "description": "Taro runtime, React, and platform support for vite-plugin-taro.",
     "author": "sep2",
     "license": "MIT",

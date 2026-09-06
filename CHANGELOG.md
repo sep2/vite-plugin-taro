@@ -4,6 +4,35 @@ All notable changes to this project are documented here.
 
 This file is generated from git release history by `pnpm changelog`.
 
+## [0.7.1-beta.0] - 2026-09-06
+
+### Added
+
+- validate Vite and Rolldown versions (e57cff4)
+- add unified Taro adapter package (b8de576)
+- add Alipay support to repository demos (02d822b)
+
+### Changed
+
+- consolidate Taro runtime packages and canonical imports (267c812)
+- accept Windows paths in mini platform contracts (ec15a3a)
+- cover mini React Refresh transforms (f993a70)
+- plan to draft (c005f44)
+- consume unified Taro runtime package (8c4ce59)
+- consolidate Taro runtime support (aac896a)
+- docs (744f2ea)
+- lower React DevTools hook with Oxc define (2c3af56)
+- colocate refresh guard matcher (02066d2)
+- fold refresh guard into capsule rendering (08f9f18)
+- reuse Taro platform component tables (8bf815a)
+- localize mini platform templates (39be8fa)
+- agents.md (0863162)
+
+### Fixed
+
+- fix typo (8d0d8fa)
+- strip refresh preamble guards before HMR generation (71209c3)
+
 ## [0.7.0] - 2026-09-05
 
 ### Added
