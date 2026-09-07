@@ -26,6 +26,6 @@ body:
       id: ai-analysis
       attributes:
           label: AI 分析与验证结果
-          description: 简述 AI 的分析、你尝试过的方案及实际结果，区分结论与推测，无需粘贴完整聊天记录。
+          description: 简述 AI 的分析、尝试过的方案及实际结果，区分结论与推测，无需粘贴完整聊天记录。
       validations:
           required: true
