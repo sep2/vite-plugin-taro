@@ -33,6 +33,9 @@ jobs:
       - name: Build plugin
         run: pnpm build:plugin
 
+      - name: Test release preparation and package artifacts
+        run: pnpm test:release
+
       - name: Enforce 100% coverage
         run: pnpm test:coverage
 
@@ -80,6 +83,9 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Test release preparation and package artifacts
+        run: pnpm test:release
 
       - name: Test
         # TAP preserves a failed test worker's exit code and signal; the spec reporter only prints "test failed".

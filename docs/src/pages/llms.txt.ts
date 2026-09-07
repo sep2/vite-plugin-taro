@@ -13,7 +13,7 @@ export const GET: APIRoute = async ({ site }) => {
 
     const entries = await getCollection('docs', (entry) => entry.data.draft !== true)
     const entriesById = new Map(entries.map((entry) => [entry.id, entry]))
-    const latestVersion = await resolveLatestStableVersion(pluginPackage.name, process.env.VPT_RELEASE_TAG)
+    const latestVersion = await resolveLatestStableVersion(pluginPackage.name, process.env.VPT_RELEASE_VERSION)
     const markdown = [
         `# VPT v${latestVersion}`,
         '> VPT 使用 Vite 8、Rolldown、oxc、React 19、Taro 4 和 Tailwind 4 构建微信小程序（wx）、支付宝小程序（zfb）与 Web（h5）应用。',

@@ -7,8 +7,8 @@ on:
         description: Deploy the completed build to GitHub Pages
         required: true
         type: boolean
-      release_tag:
-        description: Stable release tag already published by the caller
+      release_version:
+        description: Stable plugin version already published by the caller
         required: false
         type: string
 
@@ -20,7 +20,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VPT_RELEASE_TAG: ${{ inputs.release_tag }}
+      VPT_RELEASE_VERSION: ${{ inputs.release_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7

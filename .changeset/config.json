@@ -1,0 +1,16 @@
+{
+    "$schema": "https://unpkg.com/@changesets/config@4.0.0/schema.json",
+    "changelog": "@changesets/cli/changelog",
+    "commit": false,
+    "fixed": [["vite-plugin-taro", "vite-plugin-taro-runtime", "create-vite-taro"]],
+    "linked": [],
+    "access": "public",
+    "baseBranch": "main",
+    "format": false,
+    "privatePackages": {
+        "version": false,
+        "tag": false
+    },
+    "updateInternalDependencies": "patch",
+    "ignore": []
+}

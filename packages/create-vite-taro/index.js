@@ -5,6 +5,7 @@ import path from 'node:path'
 import process from 'node:process'
 import readline from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
+import generatorPackage from './package.json' with { type: 'json' }
 
 const packageRoot = path.dirname(fileURLToPath(import.meta.url))
 const defaultProjectName = 'vite-taro-app'
@@ -130,8 +131,16 @@ function copyTemplate(sourceDirectory, targetDirectory, projectName, projectTitl
 
 function transformTemplateFile(fileName, source, projectName, projectTitle, wechatAppId) {
     if (fileName === 'package.json') {
-        const packageJson = JSON.parse(source)
-        packageJson.name = projectName
+        const template = JSON.parse(source)
+        // The fixed Changesets group releases the generator and plugin at the same version.
+        const packageJson = {
+            ...template,
+            name: projectName,
+            devDependencies: {
+                ...template.devDependencies,
+                'vite-plugin-taro': `^${generatorPackage.version}`
+            }
+        }
         return `${JSON.stringify(packageJson, null, 4)}\n`
     }
 

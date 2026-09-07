@@ -7,7 +7,7 @@ interface Props {
 
 const { packageName } = Astro.props
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
-const latestVersion = await resolveLatestStableVersion(packageName, process.env.VPT_RELEASE_TAG)
+const latestVersion = await resolveLatestStableVersion(packageName, process.env.VPT_RELEASE_VERSION)
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
 const packageUrl = `https://www.npmjs.com/package/${packageName}`
 ---

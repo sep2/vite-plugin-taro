@@ -3,17 +3,20 @@ interface NpmPackageManifest {
 }
 
 const npmRequestTimeout = 10_000
-const stableReleaseTagPattern = /^v\d+\.\d+\.\d+$/
+const stableVersionPattern = /^\d+\.\d+\.\d+$/
 
-/** Resolves the stable release from its successful publish or npm's authoritative latest dist-tag. */
-export async function resolveLatestStableVersion(packageName: string, releaseTag: string | undefined): Promise<string> {
-    if (releaseTag === undefined || releaseTag.length === 0) {
+/** Uses the successfully published plugin version directly, avoiding stale npm CDN metadata after a release. */
+export async function resolveLatestStableVersion(
+    packageName: string,
+    releaseVersion: string | undefined
+): Promise<string> {
+    if (releaseVersion === undefined || releaseVersion.length === 0) {
         return fetchLatestStableVersion(packageName)
     }
-    if (!stableReleaseTagPattern.test(releaseTag)) {
-        throw new Error(`Expected a stable release tag for the documentation build, received ${releaseTag}`)
+    if (!stableVersionPattern.test(releaseVersion)) {
+        throw new Error(`Expected a stable version for the documentation build, received ${releaseVersion}`)
     }
-    return releaseTag.slice(1)
+    return releaseVersion
 }
 
 async function fetchLatestStableVersion(packageName: string): Promise<string> {

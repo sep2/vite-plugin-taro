@@ -52,6 +52,9 @@ See root `package.json` for all scripts.
 - HMR stress edits: `pnpm stress:hmr-stress-demo` (paced) or `pnpm stress:hmr-stress-demo:burst` (rapid).
 - H5 preview: `pnpm preview:loan-genius:h5`.
 - Biome: `pnpm lint` (check) / `pnpm format` (safe fixes).
+- Release notes: `pnpm changeset`; preview with `pnpm changeset status`.
+- Prepare release files: `pnpm release` (Changesets versioning, lockfile refresh, formatting only). Review, commit, and push `main` to publish in CI; never publish locally or create release tags manually.
+- Release tests: `pnpm test:release` after building the runtime and plugin. Public packages use a fixed Changesets group; private workspaces do not participate in versioning.
 
 ## Generated files
 

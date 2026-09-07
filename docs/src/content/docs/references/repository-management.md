@@ -42,7 +42,7 @@ pnpm typecheck
 pnpm test
 ```
 
-`pnpm typecheck` 会运行所有工作区中声明的类型检查。需要只检查插件时，运行 `pnpm typecheck:plugin`。
+`pnpm typecheck` 会检查仓库脚本并运行所有工作区中声明的类型检查。`pnpm test` 包含发布流程与包产物测试，因此需要先准备运行时并构建插件。需要只检查插件时，运行 `pnpm typecheck:plugin`。
 
 ### 示例应用
 
@@ -93,44 +93,71 @@ pnpm dev:towxml-stream-demo:wx
 ## 生成文件
 
 - 不要手动编辑 `packages/vite-plugin-taro/dist`；运行 `pnpm build:plugin` 重新生成。
-- 不要手动编辑 `CHANGELOG.md`；运行 `pnpm changelog`，或在发布时由 release 命令生成。
+- 根目录 `CHANGELOG.md` 保留迁移前的发布历史；后续日志由 Changesets 生成到三个发布包各自的 `CHANGELOG.md`。
 - 根目录的 `README.md` 与 `README.en.md` 是插件 README 的来源；`pnpm build:plugin` 会同步到 `packages/vite-plugin-taro`。
 
 ## 发布
 
-先验证待发布包：
+发布流程为 **本地准备版本，推送 `main` 后由 CI 发布**。不在本地执行 npm 发布，也不自动创建 release PR。
+
+### 记录改动与准备版本
 
 ```sh
-pnpm publish:dry
+pnpm changeset
+pnpm changeset status
+pnpm release
 ```
 
-更新全部包的版本：
+`pnpm changeset` 记录面向用户的改动说明与 patch / minor / major 级别，可以随功能提交一起提交。`pnpm changeset status` 预览累计版本计划。`pnpm release` 是一个不接受 bump 参数的准备命令：执行 `changeset version`、更新 `pnpm-lock.yaml`，并格式化 `.changeset`。它不会提交、创建 tag、推送或发布。
+
+`.changeset/config.json` 将 `vite-plugin-taro`、`vite-plugin-taro-runtime` 和 `create-vite-taro` 放在同一个 `fixed` 组中，始终一起更新版本。根工作区、文档和示例应用均为私有包，不参与版本发布。生成器创建项目时从自身版本推导插件依赖，不再单独同步模板中的版本号。
+
+检查生成的 `.changeset` 变更、包内 `package.json` / `CHANGELOG.md` 和 `pnpm-lock.yaml`，提交这些文件，然后推送：
 
 ```sh
-pnpm version:bump patch
-pnpm version:bump 1.0.0
+git push origin main
 ```
 
-完整发布流程会更新版本与 changelog、验证包、创建 commit 和 tag，并默认推送：
+仅有未消费 changeset 的 push 不发布，等待本地执行 `pnpm release`。没有待消费 changeset 且存在 npm 尚未发布的版本时，CI 自动发布；全部版本已发布时跳过。因此 **推送准备好的版本即授权发布**，不再需要额外的 `v*.*.*` tag。准备版本后不要夹入尚未包含在发布说明中的功能改动。
+
+### Beta 与稳定版本
+
+本次迁移保留了 `0.7.1-beta.1`，并进入 Changesets 3 的 beta 模式。下一个 patch changeset 会准备 `0.7.1-beta.2`，不会重置为 `beta.0`。当前状态保存在 `.changeset/pre.json` 中，不要重复进入预发布模式。
+
+从稳定版本开始下一轮 beta 时，只运行一次：
 
 ```sh
-pnpm release patch
-pnpm release 1.0.0
+pnpm changeset pre enter beta
 ```
 
-发布 beta 版本：
+之后照常记录 changeset、运行 `pnpm release`、提交并推送。Beta 发布到 npm 的 `beta` dist-tag，不移动 `latest`。已消费的 beta changeset 保存在 `.changeset/pre`，供最终稳定版汇总发布说明。
+
+准备转为稳定版本时：
 
 ```sh
-pnpm release beta
+pnpm changeset pre exit
+pnpm release
 ```
 
-该命令从稳定版本创建下一个 patch 的 `beta.0`，再次运行则递增为 `beta.1`。发布工作流会将预发布标识符用作 npm dist-tag，因此 beta 版本发布到 `beta`，不会移动 `latest`。测试完成后，运行 `pnpm release patch` 会移除预发布标识符并发布同一基础版本的稳定版本。
+检查、提交并推送后，CI 将不带 beta 后缀的版本发布到 `latest`。预发布模式作用于整个发布组；退出模式本身不会发布，必须应用版本并推送。
 
-常用选项：
+### 验证与 CI
+
+可以在本地运行与发布相关的检查，整个过程不会向 npm 发布：
 
 ```sh
-pnpm release patch --dry-run
-pnpm release patch --no-push
+pnpm prepare:taro
+pnpm build:plugin
+pnpm typecheck
+pnpm test:release
 ```
 
-release 命令会通过一次原子 push 同时更新 `main` 与 `v*.*.*` tag。`.github/workflows/publish.yml` 以指向该次 push HEAD 的 tag 作为发布信号，统一编排覆盖率、Windows 验证、npm Trusted Publishing 和文档部署；各子工作流不再独立响应同一次 push。稳定版本发布成功后始终重新部署文档，beta 版本只在本次 push 包含文档改动时部署。文档首页在静态构建阶段显示稳定版本：普通文档构建读取 npm 的 `latest` dist-tag，稳定发布完成后的部署直接使用已发布的 Git tag，避免 npm CDN 缓存造成版本回退，且不依赖浏览器 JavaScript。不要为该工作流配置 `NPM_TOKEN`。
+测试覆盖固定版本组、连续 beta 与转稳定版、私有包排除、真实 Changesets / pnpm 打包后的入口和运行时依赖，以及生成器的稳定版与 beta 依赖版本。
+
+`.github/workflows/publish.yml` 先运行现有的覆盖率和 Windows 验证，再进入一个发布 job：安装依赖、通过 Changesets 检查待消费 changeset 与 npm 未发布版本，仅在准备好发布时构建、检查类型，并调用 `changesets/action/publish@v2` 发布。没有独立的打包 job、跨 job 的发布产物传输或自动版本 PR。每次 `main` push 都先通过质量检查，包括补发先前未成功发布的版本。
+
+发布使用 pnpm，保留 `workspace:*` 依赖转换与 `publishConfig` 入口覆盖，并通过 npm Trusted Publishing / OIDC 认证。保留 `publish.yml` 文件名以匹配现有 npm Trusted Publisher 配置；不要配置 `NPM_TOKEN`。发布 job 同时负责构建和发布，拥有仓库写入与 OIDC 权限；文档部署 job 的 OIDC 权限仅用于 GitHub Pages。
+
+成功发布后，CI 创建各包的 tag（例如 `vite-plugin-taro@0.7.1`）和 GitHub Release，正文来自相应包的 changelog；beta Release 标记为预发布。旧 `v*.*.*` tag 与根 changelog 作为历史保留，不再生成。
+
+稳定版本发布成功后始终重新部署文档，beta 版本只在本次 push 包含文档改动时部署。普通文档构建读取 npm 的 `latest` dist-tag；稳定发布后的部署直接传入已发布的插件版本 `VPT_RELEASE_VERSION`，避免 npm CDN 缓存导致页面显示旧版本。

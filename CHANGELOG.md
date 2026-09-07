@@ -1,8 +1,12 @@
 # Changelog
 
-All notable changes to this project are documented here.
+Historical releases through 0.7.1-beta.1 are preserved here from the former Git-based release scripts.
 
-This file is generated from git release history by `pnpm changelog`.
+New release notes are maintained by Changesets in each published package:
+
+- [vite-plugin-taro](packages/vite-plugin-taro/CHANGELOG.md)
+- [vite-plugin-taro-runtime](packages/taro-runtime/CHANGELOG.md)
+- [create-vite-taro](packages/create-vite-taro/CHANGELOG.md)
 
 ## [0.7.1-beta.1] - 2026-09-06
 
