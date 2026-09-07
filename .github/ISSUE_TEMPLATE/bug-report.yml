@@ -1,0 +1,31 @@
+name: Bug 报告
+description: 报告 vpt 的问题。
+body:
+    - type: markdown
+      attributes:
+          value: |
+              提交前，请先使用 AI 助手分析问题。可复制以下提示词，补充问题描述后在项目中使用：
+
+              ```text
+              请帮我排查当前项目中的 vpt 问题：
+              [补充预期行为、实际行为及错误日志]
+
+              请先阅读 https://vpt.js.org/llms.txt，并按其中的指引查阅相关文档。
+              请检查相关代码、配置和依赖版本，基于证据分析可能的原因。
+              给出可验证的排查步骤，并尝试使用 vpt 默认模板在独立目录创建全新项目，先验证默认项目是否正常，再逐步加入触发问题所需的最少代码、配置和依赖，以隔离问题。不要修改或覆盖原项目。
+              如果仍未解决，请整理一份简洁的 Issue，包含问题描述、关键环境信息、已尝试的方案及结果，明确区分已验证的结论与推测。
+              ```
+    - type: textarea
+      id: description
+      attributes:
+          label: 问题描述
+          description: 描述预期行为与实际行为，附上相关错误日志或截图。
+      validations:
+          required: true
+    - type: textarea
+      id: ai-analysis
+      attributes:
+          label: AI 分析与验证结果
+          description: 简述 AI 的分析、你尝试过的方案及实际结果，区分结论与推测，无需粘贴完整聊天记录。
+      validations:
+          required: true
