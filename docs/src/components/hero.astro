@@ -4,6 +4,10 @@ import { LinkButton } from '@astrojs/starlight/components'
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
 import pluginPackage from '../../../packages/vite-plugin-taro/package.json'
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import LogoDark from '../../public/brand/vpt-logo-dark.svg'
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import LogoLight from '../../public/brand/vpt-logo-light.svg'
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
 import NpmPackageVersion from './npm-package-version.astro'
 
 const { data } = Astro.locals.starlightRoute.entry
@@ -100,7 +104,19 @@ const proofPoints = [
         <div class="hero-copy">
             <div class="eyebrow">— 微信小程序 · 支付宝小程序 · Web —</div>
             <NpmPackageVersion packageName={pluginPackage.name} />
-            <h1 id="_top" data-page-title set:html={title} />
+            <h1 id="_top" class="hero-title" aria-labelledby="hero-title-text" data-page-title>
+                <span id="hero-title-text" class="sr-only" set:html={title} />
+                <LogoLight
+                    class="hero-logo dark:sl-hidden print:block"
+                    aria-hidden="true"
+                    focusable="false"
+                />
+                <LogoDark
+                    class="hero-logo light:sl-hidden print:hidden"
+                    aria-hidden="true"
+                    focusable="false"
+                />
+            </h1>
             <div class="technology-line">
                 <span>Vite 8</span><i>✿</i><span>React 19</span><i>✿</i><span>Tailwind 4</span>
             </div>
@@ -492,6 +508,7 @@ const proofPoints = [
 
         .hero-copy {
             display: flex;
+            width: 100%;
             align-items: center;
             flex-direction: column;
             text-align: center;
@@ -507,41 +524,26 @@ const proofPoints = [
             text-box-trim: trim-both;
         }
 
-        h1 {
+        .hero-title {
+            /* Keep the original stamp in render-blocking CSS for the first paint. */
+            --vpt-stamp-texture: url('../assets/stamp-texture.svg?inline');
+            width: clamp(20rem, 38vw, 32rem);
+            max-width: 100%;
             margin: 0;
-            color: var(--vpt-heading-strong);
-            font-family: Georgia, 'Times New Roman', serif;
-            font-size: clamp(7rem, 16vw, 13.5rem);
-            font-weight: 600;
-            letter-spacing: -0.08em;
-            line-height: 1;
-            text-shadow: 0 5px 0 var(--vpt-shadow);
-            user-select: none;
+            mask-image: var(--vpt-stamp-texture);
+            mask-position: center;
+            mask-repeat: repeat;
+            mask-size: 15rem 10rem;
         }
 
-        @supports (background-clip: text) or (-webkit-background-clip: text) {
-            h1 {
-                /* Keep the mask in render-blocking CSS so the heading is visible in the first paint. */
-                --vpt-stamp-texture: url('../assets/stamp-texture.svg?inline');
-                background: linear-gradient(
-                    155deg,
-                    var(--vpt-heading-strong) 0 38%,
-                    color-mix(in srgb, var(--vpt-heading-strong) 95%, var(--vpt-page-bg)) 58%,
-                    var(--vpt-heading-strong) 100%
-                );
-                background-clip: text;
-                color: transparent;
-                mask-image: var(--vpt-stamp-texture);
-                mask-position: center;
-                mask-repeat: repeat;
-                mask-size: 15rem 10rem;
-                text-shadow: none;
-                -webkit-background-clip: text;
-                -webkit-mask-image: var(--vpt-stamp-texture);
-                -webkit-mask-position: center;
-                -webkit-mask-repeat: repeat;
-                -webkit-mask-size: 15rem 10rem;
-            }
+        .hero-logo {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        .hero-logo :global(.vpt-wordmark) {
+            fill: var(--vpt-heading-strong);
         }
 
         .technology-line {
@@ -967,10 +969,6 @@ const proofPoints = [
             .hero-grid {
                 display: flex;
                 flex-direction: column;
-            }
-
-            h1 {
-                font-size: clamp(6.5rem, 38vw, 10rem);
             }
 
             .technology-line {

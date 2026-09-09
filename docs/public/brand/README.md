@@ -28,4 +28,4 @@ The leaf V is the first letter of the wordmark, followed by tightly kerned, cust
 
 The palette pairs forest lettering `#174f32` with green leaf gradients, peach petals, and buttercream centers. Representative midtones are leaf `#58a564`, peach `#f5b098`, and buttercream `#ffefbe`. Light surfaces use `#fbfaf1`; dark surfaces use `#1b1d21` with cream lettering `#f4f3ef`.
 
-The documentation header switches between the full light and dark wordmarks with the site theme. The favicon follows the system theme.
+The documentation header and homepage hero reuse the same SVG artwork. The hero applies the original theme-green lettering and stamp texture; the downloadable assets keep their original colors. Both follow the site theme, while the favicon follows the system theme.
