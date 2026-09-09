@@ -243,22 +243,20 @@ const proofPoints = [
     }
 
     class VptRocketStageElement extends HTMLElement {
-        // This observer is retained so disconnecting the hero always stops visibility tracking.
-        private observer: IntersectionObserver | null = null
         // This geometry observer refreshes the cached nozzle position only when the stage changes size.
         private geometryObserver: ResizeObserver | null = null
-        // This interval exists only while the rocket is visible and is cleared as soon as it leaves the viewport.
+        // Emission continues off-screen; reduced motion and disconnection stop this interval.
         private emissionTimer: number | null = null
         // The cannon owns the worker-backed canvas animation and is reset when the element disconnects.
         private cannon: ReturnType<typeof confetti.create> | null = null
         // The cached origin avoids repeated layout reads for every particle emission.
         private origin: ExhaustOrigin | null = null
-        // Visibility is the only mutable presentation state needed to synchronize reduced-motion changes.
-        private isVisible = false
         private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
 
         connectedCallback(): void {
-            if (this.observer !== null) return
+            if (this.cannon !== null) {
+                return
+            }
 
             const flight = this.querySelector<HTMLElement>('.rocket-flight')
             const canvas = this.querySelector<HTMLCanvasElement>('.rocket-confetti')
@@ -275,36 +273,23 @@ const proofPoints = [
             this.geometryObserver = new ResizeObserver(this.updateExhaustGeometry)
             this.geometryObserver.observe(this)
             this.updateExhaustGeometry()
-            this.observer = new IntersectionObserver(
-                (entries) => {
-                    this.isVisible = entries.some((entry) => entry.isIntersecting)
-                    this.syncRocketActivity()
-                },
-                { threshold: 0.25 }
-            )
-            this.observer.observe(this)
             this.reducedMotion.addEventListener('change', this.syncRocketActivity)
-            document.addEventListener('visibilitychange', this.syncRocketActivity)
+            this.syncRocketActivity()
         }
 
         disconnectedCallback(): void {
-            this.observer?.disconnect()
-            this.observer = null
             this.geometryObserver?.disconnect()
             this.geometryObserver = null
             this.reducedMotion.removeEventListener('change', this.syncRocketActivity)
-            document.removeEventListener('visibilitychange', this.syncRocketActivity)
             this.classList.remove('is-live')
             this.stopEmission()
             this.cannon?.reset()
             this.cannon = null
             this.origin = null
-            this.isVisible = false
         }
 
         private readonly syncRocketActivity = (): void => {
-            const isActive = this.isVisible && !document.hidden && !this.reducedMotion.matches
-            if (isActive) {
+            if (!this.reducedMotion.matches) {
                 this.startEmission()
                 this.classList.add('is-live')
                 return
