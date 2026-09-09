@@ -4,9 +4,7 @@ import { LinkButton } from '@astrojs/starlight/components'
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
 import pluginPackage from '../../../packages/vite-plugin-taro/package.json'
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
-import LogoDark from '../../public/brand/vpt-logo-dark.svg'
-// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
-import LogoLight from '../../public/brand/vpt-logo-light.svg'
+import logo from '../../public/brand/vpt-logo.svg'
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
 import NpmPackageVersion from './npm-package-version.astro'
 
@@ -106,15 +104,12 @@ const proofPoints = [
             <NpmPackageVersion packageName={pluginPackage.name} />
             <h1 id="_top" class="hero-title" aria-labelledby="hero-title-text" data-page-title>
                 <span id="hero-title-text" class="sr-only" set:html={title} />
-                <LogoLight
-                    class="hero-logo dark:sl-hidden print:block"
-                    aria-hidden="true"
-                    focusable="false"
-                />
-                <LogoDark
-                    class="hero-logo light:sl-hidden print:hidden"
-                    aria-hidden="true"
-                    focusable="false"
+                <img
+                    class="hero-logo"
+                    src={logo.src}
+                    width={logo.width}
+                    height={logo.height}
+                    alt=""
                 />
             </h1>
             <div class="technology-line">
@@ -531,25 +526,24 @@ const proofPoints = [
         }
 
         .hero-title {
-            /* Keep the original stamp in render-blocking CSS for the first paint. */
-            --vpt-stamp-texture: url('../assets/stamp-texture.svg?inline');
-            width: clamp(20rem, 38vw, 32rem);
-            max-width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
             margin: 0;
-            mask-image: var(--vpt-stamp-texture);
-            mask-position: center;
-            mask-repeat: repeat;
-            mask-size: 15rem 10rem;
+            /* Use the old heading's responsive font metrics to size the P/T letters. */
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: clamp(7rem, 16vw, 13.5rem);
+            font-weight: 600;
+            line-height: 1;
         }
 
         .hero-logo {
             display: block;
-            width: 100%;
+            /* P/T are 72 units tall in the cropped 260-unit canvas; keep their original cap height. */
+            width: calc(260 / 72 * 1cap);
+            max-width: 100%;
             height: auto;
-        }
-
-        .hero-logo :global(.vpt-wordmark) {
-            fill: var(--vpt-heading-strong);
         }
 
         .technology-line {
@@ -975,6 +969,10 @@ const proofPoints = [
             .hero-grid {
                 display: flex;
                 flex-direction: column;
+            }
+
+            .hero-title {
+                font-size: clamp(6.5rem, 38vw, 10rem);
             }
 
             .technology-line {

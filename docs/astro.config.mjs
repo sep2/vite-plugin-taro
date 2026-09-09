@@ -16,8 +16,7 @@ export default defineConfig({
         starlight({
             title: 'VPT',
             logo: {
-                light: './public/brand/vpt-logo-light.svg',
-                dark: './public/brand/vpt-logo-dark.svg',
+                src: './public/brand/vpt-logo.svg',
                 replacesTitle: true
             },
             customCss: ['./src/styles/custom.css'],
