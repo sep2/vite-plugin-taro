@@ -4,11 +4,11 @@
 
 This document defines the planned JavaScript module, package-loading, and development-update architecture for the
 WeChat target. It is based on the probes and conclusions recorded in
-[`systemjs-probe-result.md`](./systemjs-probe-result.md).
+[`systemjs-probe-result.md`](systemjs-probe-result.md).
 
 Where this document conflicts with the current WX CommonJS or finalized-Rolldown-patch descriptions in
-[`core-architecture.md`](./core-architecture.md) or [`hmr/hmr-draft-1.md`](hmr/hmr-draft-1.md), this document is
-the intended replacement. The native hot-reload boundary established by [`hmr-probe-result.md`](./hmr-probe-result.md)
+[`core-architecture.md`](core-architecture.md) or [`hmr/hmr-draft-1.md`](hmr/hmr-draft-1.md), this document is
+the intended replacement. The native hot-reload boundary established by [`hmr-probe-result.md`](hmr-probe-result.md)
 remains valid and is reused; the payload applied through that boundary changes from finalized Rolldown patches to
 ordered System-definition transactions.
 
@@ -32,7 +32,7 @@ This document distinguishes four kinds of claims:
   [`17c238e`](https://github.com/systemjs/systemjs/blob/17c238ec00cf7c4bcabcf3579f876513fcedba30/src/system-core.js#L80-L180),
   Babel 7.29.7 for the probe transforms, and `miniprogram-ci@2.1.31`.
 - **Probe result:** behavior observed in the fixtures described by
-  [`systemjs-probe-result.md`](./systemjs-probe-result.md) and [`hmr-probe-result.md`](./hmr-probe-result.md). The System
+  [`systemjs-probe-result.md`](systemjs-probe-result.md) and [`hmr-probe-result.md`](hmr-probe-result.md). The System
   package probes used DevTools base library 3.16.2; the bare file-save HMR probe used 3.15.2.
 - **Design requirement:** behavior the implementation must provide but that is not yet integrated or release-validated.
 

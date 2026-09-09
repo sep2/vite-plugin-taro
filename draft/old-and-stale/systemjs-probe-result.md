@@ -1224,7 +1224,7 @@ do not claim that all production integration is complete.
 
 Remaining work includes:
 
-- integrating the compiler, planner, emitter, and runtime into `packages/vite-plugin-taro`;
+- integrating the compiler, planner, emitter, and runtime into `../../packages/vite-plugin-taro`;
 - extracting changed definitions and accepted boundaries from Vite's incremental bundled-development lifecycle rather
   than comparing repeated complete compiler snapshots and supplying a fixed proof boundary;
 - composing System definition transactions with the existing fixed `update.js` delivery and acknowledgement protocol;
