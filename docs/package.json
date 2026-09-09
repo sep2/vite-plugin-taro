@@ -8,6 +8,7 @@
         "start": "astro dev",
         "build": "astro build",
         "preview": "astro preview",
+        "test": "node --test scripts/*.test.ts",
         "astro": "astro"
     },
     "dependencies": {

@@ -261,9 +261,9 @@ const proofPoints = [
     class VptRocketStageElement extends HTMLElement {
         // This geometry observer refreshes the cached nozzle position only when the stage changes size.
         private geometryObserver: ResizeObserver | null = null
-        // Emission continues off-screen; reduced motion and disconnection stop this interval.
-        private emissionTimer: number | null = null
-        // The cannon owns the worker-backed canvas animation and is reset when the element disconnects.
+        // Track start/stop commands so preference changes cannot create duplicate emissions.
+        private isEmitting = false
+        // The cannon owns worker-side emission and animation and is reset on disconnection.
         private cannon: ReturnType<typeof confetti.create> | null = null
         // The cached origin avoids repeated layout reads for every particle emission.
         private origin: ExhaustOrigin | null = null
@@ -283,8 +283,7 @@ const proofPoints = [
             flight.style.animationDirection = Math.random() < 0.5 ? 'normal' : 'reverse'
             this.cannon = confetti.create(canvas, {
                 resize: true,
-                useWorker: true,
-                disableForReducedMotion: true
+                useWorker: true
             })
             this.geometryObserver = new ResizeObserver(this.updateExhaustGeometry)
             this.geometryObserver.observe(this)
@@ -315,16 +314,22 @@ const proofPoints = [
         }
 
         private startEmission(): void {
-            if (this.emissionTimer !== null) return
+            if (this.isEmitting) {
+                return
+            }
             this.updateExhaustGeometry()
             this.emitExhaust()
-            this.emissionTimer = window.setInterval(() => this.emitExhaust(), 560)
+            this.isEmitting = true
         }
 
         private stopEmission(): void {
-            if (this.emissionTimer === null) return
-            window.clearInterval(this.emissionTimer)
-            this.emissionTimer = null
+            if (!this.isEmitting) {
+                return
+            }
+            // Stop spawning without resetting particles that are already in flight.
+            const options = { particleCount: 0, repeatEvery: 0 }
+            void this.cannon?.(options)
+            this.isEmitting = false
         }
 
         private readonly updateExhaustGeometry = (): void => {
@@ -362,12 +367,13 @@ const proofPoints = [
                 angle: 232,
                 colors: botanicalColors,
                 decay: 0.9995,
-                disableForReducedMotion: true,
                 drift: 0,
                 flat: true,
                 gravity: 0.001,
                 origin: nozzleOrigin,
                 particleCount: 5,
+                // About 560ms at 60fps, measured on the worker's particle simulation clock.
+                repeatEvery: 34,
                 scalar: 2,
                 shapes: botanicalShapes,
                 spread: 68,

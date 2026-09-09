@@ -15,7 +15,7 @@ patchedDependencies:
   '@tarojs/plugin-framework-react@4.2.1': 51c0ade7887768fa8c452bf23cb091853c96f1433f43f32f5f3b54e299e0274f
   '@tarojs/react@4.2.1': 3e440987fc068060703baa7a7c0a3aee2b53f653f13e8c0e81f50a5429794d46
   '@tarojs/runtime@4.2.1': d83feee28999b5dbe9a9376b59b899f6f10aa991bc7cf0de1647abebf523d92b
-  canvas-confetti@1.9.4: a11dfdc640afc8af441edc53ff394b7d212b3493646c3525f21d41d58cccddd0
+  canvas-confetti@1.9.4: 3f4a594e24a7e49abb6d1e667918977b4679fe1b93dc4e9efe04f87e9539ea36
 
 importers:
 
@@ -47,7 +47,7 @@ importers:
         version: 7.2.7(@astrojs/markdown-remark@7.2.4(supports-color@7.2.0))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@types/node@26.3.0)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0)
       canvas-confetti:
         specifier: ^1.9.4
-        version: 1.9.4(patch_hash=a11dfdc640afc8af441edc53ff394b7d212b3493646c3525f21d41d58cccddd0)
+        version: 1.9.4(patch_hash=3f4a594e24a7e49abb6d1e667918977b4679fe1b93dc4e9efe04f87e9539ea36)
       mdast-util-mdx-jsx:
         specifier: ^3.2.0
         version: 3.2.0(supports-color@7.2.0)
@@ -7404,7 +7404,7 @@ snapshots:
 
   caniuse-lite@1.0.30001810: {}
 
-  canvas-confetti@1.9.4(patch_hash=a11dfdc640afc8af441edc53ff394b7d212b3493646c3525f21d41d58cccddd0): {}
+  canvas-confetti@1.9.4(patch_hash=3f4a594e24a7e49abb6d1e667918977b4679fe1b93dc4e9efe04f87e9539ea36): {}
 
   capital-case@1.0.4:
     dependencies:

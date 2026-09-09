@@ -1,7 +1,11 @@
 diff --git a/dist/confetti.browser.js b/dist/confetti.browser.js
+index 72b01eda768e94ae2a6d9d792d4f851a1c58c5df..43ad803bce971b3fb735b238844d568a180c8589 100644
 --- a/dist/confetti.browser.js
 +++ b/dist/confetti.browser.js
-@@ -348,0 +349,10 @@
+@@ -345,6 +345,16 @@
+       x: opts.x,
+       y: opts.y,
+       wobble: Math.random() * 10,
 +      rotation: Math.random() * Math.PI * 2,
 +      rotationSpeed: typeof opts.rotationSpeed === 'number'
 +        ? opts.rotationSpeed * (Math.random() < 0.5 ? -1 : 1) * (Math.random() * 0.5 + 0.5)
@@ -12,18 +16,27 @@ diff --git a/dist/confetti.browser.js b/dist/confetti.browser.js
 +      tiltSpeed: (typeof opts.tiltSpeed === 'number' ? opts.tiltSpeed : 0.012)
 +        * (Math.random() < 0.5 ? -1 : 1)
 +        * (Math.random() * 0.7 + 0.65),
-@@ -369,0 +380,6 @@
+       wobbleSpeed: Math.min(0.11, Math.random() * 0.1 + 0.05),
+       velocity: (opts.startVelocity * 0.5) + (Math.random() * opts.startVelocity),
+       angle2D: -radAngle + ((0.5 * radSpread) - (Math.random() * radSpread)),
+@@ -366,13 +376,28 @@
+       flat: opts.flat
+     };
+   }
 +  function getFettiRotation(fetti) {
 +    return typeof fetti.rotationSpeed === 'number'
 +      ? fetti.rotation
 +      : Math.PI / 10 * fetti.wobble;
 +  }
 +
-@@ -374,2 +390,11 @@
--
--    if (fetti.flat) {
+ 
+   function updateFetti(context, fetti) {
+     fetti.x += Math.cos(fetti.angle2D) * fetti.velocity + fetti.drift;
+     fetti.y += Math.sin(fetti.angle2D) * fetti.velocity + fetti.gravity;
+     fetti.velocity *= fetti.decay;
 +    fetti.rotation += fetti.rotationSpeed || 0;
-+
+ 
+-    if (fetti.flat) {
 +    if (typeof fetti.tiltAmplitude === 'number') {
 +      fetti.tiltPhaseX += fetti.tiltSpeed;
 +      fetti.tiltPhaseY += fetti.tiltSpeed * 0.73;
@@ -33,37 +46,186 @@ diff --git a/dist/confetti.browser.js b/dist/confetti.browser.js
 +      fetti.tiltCos = 0;
 +      fetti.random = 1;
 +    } else if (fetti.flat) {
-@@ -406 +431,2 @@
+       fetti.wobble = 0;
+       fetti.wobbleX = fetti.x + (10 * fetti.scalar);
+       fetti.wobbleY = fetti.y + (10 * fetti.scalar);
+@@ -403,17 +428,18 @@
+     context.beginPath();
+ 
+     if (canUsePaths && fetti.shape.type === 'path' && typeof fetti.shape.path === 'string' && Array.isArray(fetti.shape.matrix)) {
 -      context.fill(transformPath2D(
 +      drawPath2D(
 +        context,
-@@ -413,2 +439,2 @@
+         fetti.shape.path,
+         fetti.shape.matrix,
+         fetti.x,
+         fetti.y,
+         Math.abs(x2 - x1) * 0.1,
+         Math.abs(y2 - y1) * 0.1,
 -        Math.PI / 10 * fetti.wobble
 -      ));
 +        getFettiRotation(fetti)
 +      );
-@@ -416 +442 @@
+     } else if (fetti.shape.type === 'bitmap') {
 -      var rotation = Math.PI / 10 * fetti.wobble;
 +      var rotation = getFettiRotation(fetti);
-@@ -448,2 +474,2 @@
+       var scaleX = Math.abs(x2 - x1) * 0.1;
+       var scaleY = Math.abs(y2 - y1) * 0.1;
+       var width = fetti.shape.bitmap.width * fetti.scalar;
+@@ -445,8 +471,8 @@
+       context.globalAlpha = 1;
+     } else if (fetti.shape === 'circle') {
+       context.ellipse ?
 -        context.ellipse(fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, Math.PI / 10 * fetti.wobble, 0, 2 * Math.PI) :
 -        ellipse(context, fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, Math.PI / 10 * fetti.wobble, 0, 2 * Math.PI);
 +        context.ellipse(fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, getFettiRotation(fetti), 0, 2 * Math.PI) :
 +        ellipse(context, fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, getFettiRotation(fetti), 0, 2 * Math.PI);
-@@ -573,0 +600,3 @@
+     } else if (fetti.shape === 'star') {
+       var rot = Math.PI / 2 * 3;
+       var innerRadius = 4 * fetti.scalar;
+@@ -480,7 +506,8 @@
+     return fetti.tick < fetti.totalTicks;
+   }
+ 
+-  function animate(canvas, fettis, resizer, size, done) {
++  function animate(canvas, fettis, resizer, size, done, emitter) {
++    // The emitter and live particles share this animation clock, including in a worker.
+     var animatingFettis = fettis.slice();
+     var context = canvas.getContext('2d');
+     var animationFrame;
+@@ -511,11 +538,16 @@
+ 
+         context.clearRect(0, 0, size.width, size.height);
+ 
++        var emittedFettis = emitter && emitter();
++        if (emittedFettis) {
++          animatingFettis = animatingFettis.concat(emittedFettis);
++        }
++
+         animatingFettis = animatingFettis.filter(function (fetti) {
+           return updateFetti(context, fetti);
+         });
+ 
+-        if (animatingFettis.length) {
++        if (animatingFettis.length || emitter) {
+           animationFrame = raf.frame(update);
+         } else {
+           onDone();
+@@ -527,7 +559,10 @@
+     });
+ 
+     return {
+-      addFettis: function (fettis) {
++      addFettis: function (fettis, nextEmitter) {
++        if (nextEmitter !== undefined) {
++          emitter = nextEmitter;
++        }
+         animatingFettis = animatingFettis.concat(fettis);
+ 
+         return prom;
+@@ -570,42 +605,65 @@
+       var ticks = prop(options, 'ticks', Number);
+       var shapes = prop(options, 'shapes');
+       var scalar = prop(options, 'scalar');
 +      var rotationSpeed = prop(options, 'rotationSpeed');
 +      var tiltAmplitude = prop(options, 'tiltAmplitude');
 +      var tiltSpeed = prop(options, 'tiltSpeed');
-@@ -597 +626,4 @@
+       var flat = !!prop(options, 'flat');
+       var origin = getOrigin(options);
+ 
+-      var temp = particleCount;
+-      var fettis = [];
+-
+-      var startX = canvas.width * origin.x;
+-      var startY = canvas.height * origin.y;
+-
+-      while (temp--) {
+-        fettis.push(
+-          randomPhysics({
+-            x: startX,
+-            y: startY,
+-            angle: angle,
+-            spread: spread,
+-            startVelocity: startVelocity,
+-            color: colors[temp % colors.length],
+-            shape: shapes[randomInt(0, shapes.length)],
+-            ticks: ticks,
+-            decay: decay,
+-            gravity: gravity,
+-            drift: drift,
+-            scalar: scalar,
 -            flat: flat
-+            flat: flat,
-+            rotationSpeed: rotationSpeed,
-+            tiltAmplitude: tiltAmplitude,
-+            tiltSpeed: tiltSpeed
-@@ -730,18 +762,18 @@
+-          })
+-        );
++      function createFettis() {
++        // Each burst owns a fresh particle list and countdown.
++        var temp = particleCount;
++        var fettis = [];
++        var startX = canvas.width * origin.x;
++        var startY = canvas.height * origin.y;
++
++        while (temp--) {
++          fettis.push(
++            randomPhysics({
++              x: startX,
++              y: startY,
++              angle: angle,
++              spread: spread,
++              startVelocity: startVelocity,
++              color: colors[temp % colors.length],
++              shape: shapes[randomInt(0, shapes.length)],
++              ticks: ticks,
++              decay: decay,
++              gravity: gravity,
++              drift: drift,
++              scalar: scalar,
++              flat: flat,
++              rotationSpeed: rotationSpeed,
++              tiltAmplitude: tiltAmplitude,
++              tiltSpeed: tiltSpeed
++            })
++          );
++        }
++
++        return fettis;
++      }
++
++      // Repeat in simulation ticks, never wall time: suspended frames cannot queue bursts.
++      // Each configuration owns its countdown; changing it replaces the previous emitter.
++      var framesUntilEmission = options && options.repeatEvery;
++      var emitter = framesUntilEmission === undefined ? undefined : null;
++      if (framesUntilEmission > 0) {
++        emitter = function () {
++          framesUntilEmission -= 1;
++          if (framesUntilEmission > 0) {
++            return null;
++          }
++          framesUntilEmission = options.repeatEvery;
++          return createFettis();
++        };
+       }
+ 
+-      // if we have a previous canvas already animating,
+-      // add to it
+       if (animationObj) {
+-        return animationObj.addFettis(fettis);
++        return animationObj.addFettis(createFettis(), emitter);
+       }
+ 
+-      animationObj = animate(canvas, fettis, resizer, size , done);
++      animationObj = animate(canvas, createFettis(), resizer, size, done, emitter);
+ 
+       return animationObj.promise;
+     }
+@@ -727,24 +785,24 @@
+     return defaultFire;
+   }
+ 
 -  function transformPath2D(pathString, pathMatrix, x, y, scaleX, scaleY, rotation) {
 -    var path2d = new Path2D(pathString);
--
++  // Cached normalized paths are immutable and avoid rebuilding geometry for every particle frame.
++  var normalizedPathCache = new Map();
+ 
 -    var t1 = new Path2D();
 -    t1.addPath(path2d, new DOMMatrix(pathMatrix));
 -
@@ -77,11 +239,6 @@ diff --git a/dist/confetti.browser.js b/dist/confetti.browser.js
 -      x,
 -      y
 -    ]));
--
--    return t2;
-+  // Cached normalized paths are immutable and avoid rebuilding geometry for every particle frame.
-+  var normalizedPathCache = new Map();
-+
 +  function drawPath2D(context, pathString, pathMatrix, x, y, scaleX, scaleY, rotation) {
 +    var cacheKey = pathString + pathMatrix.join(',');
 +    var path2d = normalizedPathCache.get(cacheKey);
@@ -90,22 +247,36 @@ diff --git a/dist/confetti.browser.js b/dist/confetti.browser.js
 +      path2d.addPath(new Path2D(pathString), new DOMMatrix(pathMatrix));
 +      normalizedPathCache.set(cacheKey, path2d);
 +    }
-+
+ 
+-    return t2;
 +    context.save();
 +    context.translate(x, y);
 +    context.rotate(rotation);
 +    context.scale(scaleX, scaleY);
 +    context.fill(path2d);
 +    context.restore();
-@@ -763 +795,3 @@
+   }
+ 
+   function shapeFromPath(pathData) {
+@@ -760,7 +818,9 @@
+       path = pathData.path;
+       matrix = pathData.matrix;
+     }
 -
 +    if (matrix && !Array.isArray(matrix)) {
 +      matrix = [matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f];
 +    }
+     var path2d = new Path2D(path);
+     var tempCanvas = document.createElement('canvas');
+     var tempCtx = tempCanvas.getContext('2d');
 diff --git a/dist/confetti.module.mjs b/dist/confetti.module.mjs
+index ed8e521f624fd3040416b5ab5ec620b4379d3986..9a8aace27f5520ea7e7a010be104b1a1302591be 100644
 --- a/dist/confetti.module.mjs
 +++ b/dist/confetti.module.mjs
-@@ -349,0 +350,10 @@
+@@ -346,6 +346,16 @@ var module = {};
+       x: opts.x,
+       y: opts.y,
+       wobble: Math.random() * 10,
 +      rotation: Math.random() * Math.PI * 2,
 +      rotationSpeed: typeof opts.rotationSpeed === 'number'
 +        ? opts.rotationSpeed * (Math.random() < 0.5 ? -1 : 1) * (Math.random() * 0.5 + 0.5)
@@ -116,18 +287,27 @@ diff --git a/dist/confetti.module.mjs b/dist/confetti.module.mjs
 +      tiltSpeed: (typeof opts.tiltSpeed === 'number' ? opts.tiltSpeed : 0.012)
 +        * (Math.random() < 0.5 ? -1 : 1)
 +        * (Math.random() * 0.7 + 0.65),
-@@ -370,0 +381,6 @@
+       wobbleSpeed: Math.min(0.11, Math.random() * 0.1 + 0.05),
+       velocity: (opts.startVelocity * 0.5) + (Math.random() * opts.startVelocity),
+       angle2D: -radAngle + ((0.5 * radSpread) - (Math.random() * radSpread)),
+@@ -367,13 +377,28 @@ var module = {};
+       flat: opts.flat
+     };
+   }
 +  function getFettiRotation(fetti) {
 +    return typeof fetti.rotationSpeed === 'number'
 +      ? fetti.rotation
 +      : Math.PI / 10 * fetti.wobble;
 +  }
 +
-@@ -375,2 +391,11 @@
--
--    if (fetti.flat) {
+ 
+   function updateFetti(context, fetti) {
+     fetti.x += Math.cos(fetti.angle2D) * fetti.velocity + fetti.drift;
+     fetti.y += Math.sin(fetti.angle2D) * fetti.velocity + fetti.gravity;
+     fetti.velocity *= fetti.decay;
 +    fetti.rotation += fetti.rotationSpeed || 0;
-+
+ 
+-    if (fetti.flat) {
 +    if (typeof fetti.tiltAmplitude === 'number') {
 +      fetti.tiltPhaseX += fetti.tiltSpeed;
 +      fetti.tiltPhaseY += fetti.tiltSpeed * 0.73;
@@ -137,37 +317,186 @@ diff --git a/dist/confetti.module.mjs b/dist/confetti.module.mjs
 +      fetti.tiltCos = 0;
 +      fetti.random = 1;
 +    } else if (fetti.flat) {
-@@ -407 +432,2 @@
+       fetti.wobble = 0;
+       fetti.wobbleX = fetti.x + (10 * fetti.scalar);
+       fetti.wobbleY = fetti.y + (10 * fetti.scalar);
+@@ -404,17 +429,18 @@ var module = {};
+     context.beginPath();
+ 
+     if (canUsePaths && fetti.shape.type === 'path' && typeof fetti.shape.path === 'string' && Array.isArray(fetti.shape.matrix)) {
 -      context.fill(transformPath2D(
 +      drawPath2D(
 +        context,
-@@ -414,2 +440,2 @@
+         fetti.shape.path,
+         fetti.shape.matrix,
+         fetti.x,
+         fetti.y,
+         Math.abs(x2 - x1) * 0.1,
+         Math.abs(y2 - y1) * 0.1,
 -        Math.PI / 10 * fetti.wobble
 -      ));
 +        getFettiRotation(fetti)
 +      );
-@@ -417 +443 @@
+     } else if (fetti.shape.type === 'bitmap') {
 -      var rotation = Math.PI / 10 * fetti.wobble;
 +      var rotation = getFettiRotation(fetti);
-@@ -449,2 +475,2 @@
+       var scaleX = Math.abs(x2 - x1) * 0.1;
+       var scaleY = Math.abs(y2 - y1) * 0.1;
+       var width = fetti.shape.bitmap.width * fetti.scalar;
+@@ -446,8 +472,8 @@ var module = {};
+       context.globalAlpha = 1;
+     } else if (fetti.shape === 'circle') {
+       context.ellipse ?
 -        context.ellipse(fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, Math.PI / 10 * fetti.wobble, 0, 2 * Math.PI) :
 -        ellipse(context, fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, Math.PI / 10 * fetti.wobble, 0, 2 * Math.PI);
 +        context.ellipse(fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, getFettiRotation(fetti), 0, 2 * Math.PI) :
 +        ellipse(context, fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, getFettiRotation(fetti), 0, 2 * Math.PI);
-@@ -574,0 +601,3 @@
+     } else if (fetti.shape === 'star') {
+       var rot = Math.PI / 2 * 3;
+       var innerRadius = 4 * fetti.scalar;
+@@ -481,7 +507,8 @@ var module = {};
+     return fetti.tick < fetti.totalTicks;
+   }
+ 
+-  function animate(canvas, fettis, resizer, size, done) {
++  function animate(canvas, fettis, resizer, size, done, emitter) {
++    // The emitter and live particles share this animation clock, including in a worker.
+     var animatingFettis = fettis.slice();
+     var context = canvas.getContext('2d');
+     var animationFrame;
+@@ -512,11 +539,16 @@ var module = {};
+ 
+         context.clearRect(0, 0, size.width, size.height);
+ 
++        var emittedFettis = emitter && emitter();
++        if (emittedFettis) {
++          animatingFettis = animatingFettis.concat(emittedFettis);
++        }
++
+         animatingFettis = animatingFettis.filter(function (fetti) {
+           return updateFetti(context, fetti);
+         });
+ 
+-        if (animatingFettis.length) {
++        if (animatingFettis.length || emitter) {
+           animationFrame = raf.frame(update);
+         } else {
+           onDone();
+@@ -528,7 +560,10 @@ var module = {};
+     });
+ 
+     return {
+-      addFettis: function (fettis) {
++      addFettis: function (fettis, nextEmitter) {
++        if (nextEmitter !== undefined) {
++          emitter = nextEmitter;
++        }
+         animatingFettis = animatingFettis.concat(fettis);
+ 
+         return prom;
+@@ -571,42 +606,65 @@ var module = {};
+       var ticks = prop(options, 'ticks', Number);
+       var shapes = prop(options, 'shapes');
+       var scalar = prop(options, 'scalar');
 +      var rotationSpeed = prop(options, 'rotationSpeed');
 +      var tiltAmplitude = prop(options, 'tiltAmplitude');
 +      var tiltSpeed = prop(options, 'tiltSpeed');
-@@ -598 +627,4 @@
+       var flat = !!prop(options, 'flat');
+       var origin = getOrigin(options);
+ 
+-      var temp = particleCount;
+-      var fettis = [];
+-
+-      var startX = canvas.width * origin.x;
+-      var startY = canvas.height * origin.y;
+-
+-      while (temp--) {
+-        fettis.push(
+-          randomPhysics({
+-            x: startX,
+-            y: startY,
+-            angle: angle,
+-            spread: spread,
+-            startVelocity: startVelocity,
+-            color: colors[temp % colors.length],
+-            shape: shapes[randomInt(0, shapes.length)],
+-            ticks: ticks,
+-            decay: decay,
+-            gravity: gravity,
+-            drift: drift,
+-            scalar: scalar,
 -            flat: flat
-+            flat: flat,
-+            rotationSpeed: rotationSpeed,
-+            tiltAmplitude: tiltAmplitude,
-+            tiltSpeed: tiltSpeed
-@@ -731,18 +763,18 @@
+-          })
+-        );
++      function createFettis() {
++        // Each burst owns a fresh particle list and countdown.
++        var temp = particleCount;
++        var fettis = [];
++        var startX = canvas.width * origin.x;
++        var startY = canvas.height * origin.y;
++
++        while (temp--) {
++          fettis.push(
++            randomPhysics({
++              x: startX,
++              y: startY,
++              angle: angle,
++              spread: spread,
++              startVelocity: startVelocity,
++              color: colors[temp % colors.length],
++              shape: shapes[randomInt(0, shapes.length)],
++              ticks: ticks,
++              decay: decay,
++              gravity: gravity,
++              drift: drift,
++              scalar: scalar,
++              flat: flat,
++              rotationSpeed: rotationSpeed,
++              tiltAmplitude: tiltAmplitude,
++              tiltSpeed: tiltSpeed
++            })
++          );
++        }
++
++        return fettis;
++      }
++
++      // Repeat in simulation ticks, never wall time: suspended frames cannot queue bursts.
++      // Each configuration owns its countdown; changing it replaces the previous emitter.
++      var framesUntilEmission = options && options.repeatEvery;
++      var emitter = framesUntilEmission === undefined ? undefined : null;
++      if (framesUntilEmission > 0) {
++        emitter = function () {
++          framesUntilEmission -= 1;
++          if (framesUntilEmission > 0) {
++            return null;
++          }
++          framesUntilEmission = options.repeatEvery;
++          return createFettis();
++        };
+       }
+ 
+-      // if we have a previous canvas already animating,
+-      // add to it
+       if (animationObj) {
+-        return animationObj.addFettis(fettis);
++        return animationObj.addFettis(createFettis(), emitter);
+       }
+ 
+-      animationObj = animate(canvas, fettis, resizer, size , done);
++      animationObj = animate(canvas, createFettis(), resizer, size, done, emitter);
+ 
+       return animationObj.promise;
+     }
+@@ -728,24 +786,24 @@ var module = {};
+     return defaultFire;
+   }
+ 
 -  function transformPath2D(pathString, pathMatrix, x, y, scaleX, scaleY, rotation) {
 -    var path2d = new Path2D(pathString);
--
++  // Cached normalized paths are immutable and avoid rebuilding geometry for every particle frame.
++  var normalizedPathCache = new Map();
+ 
 -    var t1 = new Path2D();
 -    t1.addPath(path2d, new DOMMatrix(pathMatrix));
 -
@@ -181,11 +510,6 @@ diff --git a/dist/confetti.module.mjs b/dist/confetti.module.mjs
 -      x,
 -      y
 -    ]));
--
--    return t2;
-+  // Cached normalized paths are immutable and avoid rebuilding geometry for every particle frame.
-+  var normalizedPathCache = new Map();
-+
 +  function drawPath2D(context, pathString, pathMatrix, x, y, scaleX, scaleY, rotation) {
 +    var cacheKey = pathString + pathMatrix.join(',');
 +    var path2d = normalizedPathCache.get(cacheKey);
@@ -194,22 +518,36 @@ diff --git a/dist/confetti.module.mjs b/dist/confetti.module.mjs
 +      path2d.addPath(new Path2D(pathString), new DOMMatrix(pathMatrix));
 +      normalizedPathCache.set(cacheKey, path2d);
 +    }
-+
+ 
+-    return t2;
 +    context.save();
 +    context.translate(x, y);
 +    context.rotate(rotation);
 +    context.scale(scaleX, scaleY);
 +    context.fill(path2d);
 +    context.restore();
-@@ -764 +796,3 @@
+   }
+ 
+   function shapeFromPath(pathData) {
+@@ -761,7 +819,9 @@ var module = {};
+       path = pathData.path;
+       matrix = pathData.matrix;
+     }
 -
 +    if (matrix && !Array.isArray(matrix)) {
 +      matrix = [matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f];
 +    }
+     var path2d = new Path2D(path);
+     var tempCanvas = document.createElement('canvas');
+     var tempCtx = tempCanvas.getContext('2d');
 diff --git a/src/confetti.js b/src/confetti.js
+index 3eec864ebf6d07511b062d77cc3047c2108c6ee2..7dfaf23868f93d5c5db73438df1cdc42df9191d9 100644
 --- a/src/confetti.js
 +++ b/src/confetti.js
-@@ -345,0 +346,10 @@
+@@ -342,6 +342,16 @@
+       x: opts.x,
+       y: opts.y,
+       wobble: Math.random() * 10,
 +      rotation: Math.random() * Math.PI * 2,
 +      rotationSpeed: typeof opts.rotationSpeed === 'number'
 +        ? opts.rotationSpeed * (Math.random() < 0.5 ? -1 : 1) * (Math.random() * 0.5 + 0.5)
@@ -220,18 +558,27 @@ diff --git a/src/confetti.js b/src/confetti.js
 +      tiltSpeed: (typeof opts.tiltSpeed === 'number' ? opts.tiltSpeed : 0.012)
 +        * (Math.random() < 0.5 ? -1 : 1)
 +        * (Math.random() * 0.7 + 0.65),
-@@ -366,0 +377,6 @@
+       wobbleSpeed: Math.min(0.11, Math.random() * 0.1 + 0.05),
+       velocity: (opts.startVelocity * 0.5) + (Math.random() * opts.startVelocity),
+       angle2D: -radAngle + ((0.5 * radSpread) - (Math.random() * radSpread)),
+@@ -363,13 +373,28 @@
+       flat: opts.flat
+     };
+   }
 +  function getFettiRotation(fetti) {
 +    return typeof fetti.rotationSpeed === 'number'
 +      ? fetti.rotation
 +      : Math.PI / 10 * fetti.wobble;
 +  }
 +
-@@ -371,2 +387,11 @@
--
--    if (fetti.flat) {
+ 
+   function updateFetti(context, fetti) {
+     fetti.x += Math.cos(fetti.angle2D) * fetti.velocity + fetti.drift;
+     fetti.y += Math.sin(fetti.angle2D) * fetti.velocity + fetti.gravity;
+     fetti.velocity *= fetti.decay;
 +    fetti.rotation += fetti.rotationSpeed || 0;
-+
+ 
+-    if (fetti.flat) {
 +    if (typeof fetti.tiltAmplitude === 'number') {
 +      fetti.tiltPhaseX += fetti.tiltSpeed;
 +      fetti.tiltPhaseY += fetti.tiltSpeed * 0.73;
@@ -241,37 +588,186 @@ diff --git a/src/confetti.js b/src/confetti.js
 +      fetti.tiltCos = 0;
 +      fetti.random = 1;
 +    } else if (fetti.flat) {
-@@ -403 +428,2 @@
+       fetti.wobble = 0;
+       fetti.wobbleX = fetti.x + (10 * fetti.scalar);
+       fetti.wobbleY = fetti.y + (10 * fetti.scalar);
+@@ -400,17 +425,18 @@
+     context.beginPath();
+ 
+     if (canUsePaths && fetti.shape.type === 'path' && typeof fetti.shape.path === 'string' && Array.isArray(fetti.shape.matrix)) {
 -      context.fill(transformPath2D(
 +      drawPath2D(
 +        context,
-@@ -410,2 +436,2 @@
+         fetti.shape.path,
+         fetti.shape.matrix,
+         fetti.x,
+         fetti.y,
+         Math.abs(x2 - x1) * 0.1,
+         Math.abs(y2 - y1) * 0.1,
 -        Math.PI / 10 * fetti.wobble
 -      ));
 +        getFettiRotation(fetti)
 +      );
-@@ -413 +439 @@
+     } else if (fetti.shape.type === 'bitmap') {
 -      var rotation = Math.PI / 10 * fetti.wobble;
 +      var rotation = getFettiRotation(fetti);
-@@ -445,2 +471,2 @@
+       var scaleX = Math.abs(x2 - x1) * 0.1;
+       var scaleY = Math.abs(y2 - y1) * 0.1;
+       var width = fetti.shape.bitmap.width * fetti.scalar;
+@@ -442,8 +468,8 @@
+       context.globalAlpha = 1;
+     } else if (fetti.shape === 'circle') {
+       context.ellipse ?
 -        context.ellipse(fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, Math.PI / 10 * fetti.wobble, 0, 2 * Math.PI) :
 -        ellipse(context, fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, Math.PI / 10 * fetti.wobble, 0, 2 * Math.PI);
 +        context.ellipse(fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, getFettiRotation(fetti), 0, 2 * Math.PI) :
 +        ellipse(context, fetti.x, fetti.y, Math.abs(x2 - x1) * fetti.ovalScalar, Math.abs(y2 - y1) * fetti.ovalScalar, getFettiRotation(fetti), 0, 2 * Math.PI);
-@@ -570,0 +597,3 @@
+     } else if (fetti.shape === 'star') {
+       var rot = Math.PI / 2 * 3;
+       var innerRadius = 4 * fetti.scalar;
+@@ -477,7 +503,8 @@
+     return fetti.tick < fetti.totalTicks;
+   }
+ 
+-  function animate(canvas, fettis, resizer, size, done) {
++  function animate(canvas, fettis, resizer, size, done, emitter) {
++    // The emitter and live particles share this animation clock, including in a worker.
+     var animatingFettis = fettis.slice();
+     var context = canvas.getContext('2d');
+     var animationFrame;
+@@ -508,11 +535,16 @@
+ 
+         context.clearRect(0, 0, size.width, size.height);
+ 
++        var emittedFettis = emitter && emitter();
++        if (emittedFettis) {
++          animatingFettis = animatingFettis.concat(emittedFettis);
++        }
++
+         animatingFettis = animatingFettis.filter(function (fetti) {
+           return updateFetti(context, fetti);
+         });
+ 
+-        if (animatingFettis.length) {
++        if (animatingFettis.length || emitter) {
+           animationFrame = raf.frame(update);
+         } else {
+           onDone();
+@@ -524,7 +556,10 @@
+     });
+ 
+     return {
+-      addFettis: function (fettis) {
++      addFettis: function (fettis, nextEmitter) {
++        if (nextEmitter !== undefined) {
++          emitter = nextEmitter;
++        }
+         animatingFettis = animatingFettis.concat(fettis);
+ 
+         return prom;
+@@ -567,42 +602,65 @@
+       var ticks = prop(options, 'ticks', Number);
+       var shapes = prop(options, 'shapes');
+       var scalar = prop(options, 'scalar');
 +      var rotationSpeed = prop(options, 'rotationSpeed');
 +      var tiltAmplitude = prop(options, 'tiltAmplitude');
 +      var tiltSpeed = prop(options, 'tiltSpeed');
-@@ -594 +623,4 @@
+       var flat = !!prop(options, 'flat');
+       var origin = getOrigin(options);
+ 
+-      var temp = particleCount;
+-      var fettis = [];
+-
+-      var startX = canvas.width * origin.x;
+-      var startY = canvas.height * origin.y;
+-
+-      while (temp--) {
+-        fettis.push(
+-          randomPhysics({
+-            x: startX,
+-            y: startY,
+-            angle: angle,
+-            spread: spread,
+-            startVelocity: startVelocity,
+-            color: colors[temp % colors.length],
+-            shape: shapes[randomInt(0, shapes.length)],
+-            ticks: ticks,
+-            decay: decay,
+-            gravity: gravity,
+-            drift: drift,
+-            scalar: scalar,
 -            flat: flat
-+            flat: flat,
-+            rotationSpeed: rotationSpeed,
-+            tiltAmplitude: tiltAmplitude,
-+            tiltSpeed: tiltSpeed
-@@ -727,18 +759,18 @@
+-          })
+-        );
++      function createFettis() {
++        // Each burst owns a fresh particle list and countdown.
++        var temp = particleCount;
++        var fettis = [];
++        var startX = canvas.width * origin.x;
++        var startY = canvas.height * origin.y;
++
++        while (temp--) {
++          fettis.push(
++            randomPhysics({
++              x: startX,
++              y: startY,
++              angle: angle,
++              spread: spread,
++              startVelocity: startVelocity,
++              color: colors[temp % colors.length],
++              shape: shapes[randomInt(0, shapes.length)],
++              ticks: ticks,
++              decay: decay,
++              gravity: gravity,
++              drift: drift,
++              scalar: scalar,
++              flat: flat,
++              rotationSpeed: rotationSpeed,
++              tiltAmplitude: tiltAmplitude,
++              tiltSpeed: tiltSpeed
++            })
++          );
++        }
++
++        return fettis;
++      }
++
++      // Repeat in simulation ticks, never wall time: suspended frames cannot queue bursts.
++      // Each configuration owns its countdown; changing it replaces the previous emitter.
++      var framesUntilEmission = options && options.repeatEvery;
++      var emitter = framesUntilEmission === undefined ? undefined : null;
++      if (framesUntilEmission > 0) {
++        emitter = function () {
++          framesUntilEmission -= 1;
++          if (framesUntilEmission > 0) {
++            return null;
++          }
++          framesUntilEmission = options.repeatEvery;
++          return createFettis();
++        };
+       }
+ 
+-      // if we have a previous canvas already animating,
+-      // add to it
+       if (animationObj) {
+-        return animationObj.addFettis(fettis);
++        return animationObj.addFettis(createFettis(), emitter);
+       }
+ 
+-      animationObj = animate(canvas, fettis, resizer, size , done);
++      animationObj = animate(canvas, createFettis(), resizer, size, done, emitter);
+ 
+       return animationObj.promise;
+     }
+@@ -724,24 +782,24 @@
+     return defaultFire;
+   }
+ 
 -  function transformPath2D(pathString, pathMatrix, x, y, scaleX, scaleY, rotation) {
 -    var path2d = new Path2D(pathString);
--
++  // Cached normalized paths are immutable and avoid rebuilding geometry for every particle frame.
++  var normalizedPathCache = new Map();
+ 
 -    var t1 = new Path2D();
 -    t1.addPath(path2d, new DOMMatrix(pathMatrix));
 -
@@ -285,11 +781,6 @@ diff --git a/src/confetti.js b/src/confetti.js
 -      x,
 -      y
 -    ]));
--
--    return t2;
-+  // Cached normalized paths are immutable and avoid rebuilding geometry for every particle frame.
-+  var normalizedPathCache = new Map();
-+
 +  function drawPath2D(context, pathString, pathMatrix, x, y, scaleX, scaleY, rotation) {
 +    var cacheKey = pathString + pathMatrix.join(',');
 +    var path2d = normalizedPathCache.get(cacheKey);
@@ -298,15 +789,25 @@ diff --git a/src/confetti.js b/src/confetti.js
 +      path2d.addPath(new Path2D(pathString), new DOMMatrix(pathMatrix));
 +      normalizedPathCache.set(cacheKey, path2d);
 +    }
-+
+ 
+-    return t2;
 +    context.save();
 +    context.translate(x, y);
 +    context.rotate(rotation);
 +    context.scale(scaleX, scaleY);
 +    context.fill(path2d);
 +    context.restore();
-@@ -760 +792,3 @@
+   }
+ 
+   function shapeFromPath(pathData) {
+@@ -757,7 +815,9 @@
+       path = pathData.path;
+       matrix = pathData.matrix;
+     }
 -
 +    if (matrix && !Array.isArray(matrix)) {
 +      matrix = [matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f];
 +    }
+     var path2d = new Path2D(path);
+     var tempCanvas = document.createElement('canvas');
+     var tempCtx = tempCanvas.getContext('2d');
