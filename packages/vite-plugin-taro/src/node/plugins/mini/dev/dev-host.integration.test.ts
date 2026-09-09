@@ -578,8 +578,8 @@ test('keeps development chunk paths stable across complete builds', async (conte
     const initialInfo = parseHmrInfo(initialInfoSource)
     await waitForFile(fixture.appStylePath, (source) => source.includes(initialInfo.buildId), maximumWaitAttempts)
     const initialFiles = (await readdir(fixture.outDir, { recursive: true })).sort()
-    assert.ok(initialFiles.includes('assets/bootstrap.js'), JSON.stringify(initialFiles))
-    assert.ok(initialFiles.includes('assets/transport.js'), JSON.stringify(initialFiles))
+    assert.ok(initialFiles.includes(path.join('assets', 'bootstrap.js')), JSON.stringify(initialFiles))
+    assert.ok(initialFiles.includes(path.join('assets', 'transport.js')), JSON.stringify(initialFiles))
 
     await publishSourceGeneration(fixture.pagePath, renderPage('changed before complete build'))
     await waitForFile(
