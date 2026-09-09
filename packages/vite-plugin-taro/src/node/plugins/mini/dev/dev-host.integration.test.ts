@@ -567,6 +567,39 @@ test('prints physical project paths without compromising later patch publication
     assert.match(patches, /healthy generation after invalid control traffic/)
 })
 
+test('keeps development chunk paths stable across complete builds', async (context) => {
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions())
+    context.after(fixture.close)
+    const initialInfoSource = await waitForFile(
+        fixture.infoPath,
+        (source) => source.includes('buildId'),
+        maximumWaitAttempts
+    )
+    const initialInfo = parseHmrInfo(initialInfoSource)
+    await waitForFile(fixture.appStylePath, (source) => source.includes(initialInfo.buildId), maximumWaitAttempts)
+    const initialFiles = (await readdir(fixture.outDir, { recursive: true })).sort()
+    assert.ok(initialFiles.includes('assets/bootstrap.js'), JSON.stringify(initialFiles))
+    assert.ok(initialFiles.includes('assets/transport.js'), JSON.stringify(initialFiles))
+
+    await publishSourceGeneration(fixture.pagePath, renderPage('changed before complete build'))
+    await waitForFile(
+        fixture.patchesPath,
+        (source) => source.includes('changed before complete build'),
+        maximumWaitAttempts
+    )
+    await sendRuntimeReport(initialInfo, {
+        buildId: initialInfo.buildId,
+        kind: 'rebuild',
+        reason: 'verify stable physical paths'
+    })
+    const nextInfo = parseHmrInfo(
+        await waitForFile(fixture.infoPath, (source) => source !== initialInfoSource, maximumWaitAttempts)
+    )
+    await waitForFile(fixture.appStylePath, (source) => source.includes(nextInfo.buildId), maximumWaitAttempts)
+    assert.deepEqual((await readdir(fixture.outDir, { recursive: true })).sort(), initialFiles)
+    await waitForJavaScriptOutput(fixture.outDir, 'changed before complete build', maximumWaitAttempts)
+})
+
 test('rotates build identity on a current rebuild report and rejects delayed old-session reports', async (context) => {
     // This mutable journal records the one full-build command admitted for the active runtime session.
     const infos: string[] = []
