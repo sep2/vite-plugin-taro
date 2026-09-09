@@ -24,7 +24,7 @@
 - Resolve conflicts only in files you modified. For conflicts elsewhere, stop and ask the user.
 - Keep bash timeouts at 30 seconds or less.
 - If a user instruction conflicts with any `AGENTS.md` rule, ask for explicit confirmation before overriding it.
-- Use npm commands in user-facing docs and pnpm for repository development instructions.
+- Use pnpm for repository development instructions.
 
 ## Workspace
 

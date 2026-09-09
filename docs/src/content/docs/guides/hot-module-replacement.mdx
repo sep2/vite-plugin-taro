@@ -41,7 +41,7 @@ bun run dev:wx
 
 ## 选择热更新模式
 
-默认模式无需配置：
+`devtools`（微信默认，无需配置）：通过开发者工具重新注册 Page 并保留应用和页面状态，更新更快、开发运行时更小。
 
 ```ts
 hmr: {
@@ -49,7 +49,7 @@ hmr: {
 }
 ```
 
-若希望 JavaScript 更新不触发原生 Page 重新注册，可选择解释器：
+`interpreter`（支付宝目前唯一支持的模式）：通过解释器在当前 App 中执行更新并保留状态，不重新注册 Page，但更新更慢、开发运行时更大。
 
 ```ts
 hmr: {
@@ -57,7 +57,7 @@ hmr: {
 }
 ```
 
-若不需要保留运行状态，希望每次有效源码变化都生成完整原生项目，可选择完整重建：
+`rebuild`：每次有效源码变化都重新生成完整原生项目并重启 App，不保留运行状态。
 
 ```ts
 hmr: {
@@ -65,11 +65,37 @@ hmr: {
 }
 ```
 
-默认的 `devtools` 模式通过微信小程序开发工具执行更新，速度更快，开发运行时代码也更小。更新 JavaScript 时，工具会重新注册当前 Page， vpt 会保留下文列出的应用和页面状态。
+## 不需要热更新时：监听构建
 
-`interpreter` 模式绕过 Page 重新注册，直接在当前 App 中执行更新。它的开发运行时更大，执行更新也更慢。支付宝小程序开发者工具暂时仅支持此模式。
+如果不需要 HMR 或保留运行状态，例如让 AI 批量修改代码时，也可以使用 Vite 原生的监听构建：
 
-`rebuild` 模式每次修改都会替换完整输出并重启 App。
+<Tabs syncKey="package-manager">
+    <TabItem label="npm">
+
+```sh
+npm run build:wx -- --watch
+```
+
+    </TabItem>
+    <TabItem label="pnpm">
+
+```sh
+pnpm build:wx --watch
+```
+
+    </TabItem>
+    <TabItem label="bun">
+
+```sh
+bun run build:wx --watch
+```
+
+    </TabItem>
+</Tabs>
+
+这会运行 `vite build --watch`，在源码变化后重新构建 `dist/wx`，并重启应用，不保留运行状态，适合批量修改代码的场景。
+
+区别在于：`build:wx --watch` 生成生产构建，而 `dev:wx` 下的 `hmr.mode: 'rebuild'` 生成开发构建。
 
 ## 保留的状态
 
