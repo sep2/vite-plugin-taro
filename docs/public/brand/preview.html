@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="color-scheme" content="light" />
+        <meta name="description" content="VPT, naturally: two growing leaves form the V, with soft peach blossoms and custom serif lettering." />
+        <title>VPT — Naturally</title>
+        <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+        <style>
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                margin: 0;
+                padding: clamp(24px, 5vw, 64px);
+                background: #fbfaf1;
+                color: #174f32;
+                font-family: Arial, Helvetica, sans-serif;
+                -webkit-font-smoothing: antialiased;
+            }
+
+            main {
+                max-width: 1120px;
+                margin-inline: auto;
+            }
+
+            header,
+            footer,
+            .caption {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 16px;
+            }
+
+            header {
+                padding-bottom: 24px;
+                border-bottom: 1px solid #d2ddcd;
+                font-size: 11px;
+                letter-spacing: 0.16em;
+                text-transform: uppercase;
+            }
+
+            h1 {
+                margin: 32px 0 12px;
+                font-size: clamp(32px, 5vw, 52px);
+                font-weight: 500;
+                letter-spacing: -0.055em;
+                line-height: 1;
+            }
+
+            .intro {
+                margin: 0 0 32px;
+                color: #526b58;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+
+            .primary,
+            .secondary {
+                display: grid;
+                gap: 1px;
+                border: 1px solid #d2ddcd;
+                background: #d2ddcd;
+            }
+
+            .primary {
+                grid-template-columns: 2fr 1fr;
+            }
+
+            .secondary {
+                grid-template-columns: 1fr 1fr;
+                margin-top: 16px;
+            }
+
+            .panel {
+                display: flex;
+                min-width: 0;
+                flex-direction: column;
+                justify-content: space-between;
+                padding: 24px;
+                background: #fbfaf1;
+            }
+
+            .artwork {
+                display: grid;
+                min-height: 220px;
+                place-items: center;
+            }
+
+            .secondary .artwork {
+                min-height: 144px;
+            }
+
+            .lockup {
+                width: min(100%, 480px);
+                height: auto;
+            }
+
+            .secondary .lockup {
+                width: min(100%, 320px);
+            }
+
+            .symbol {
+                width: 168px;
+                height: 168px;
+            }
+
+            .forest {
+                background: #174f32;
+                color: #fbfaf1;
+            }
+
+            .forest .symbol {
+                filter: brightness(0) invert(1);
+            }
+
+            .dark {
+                background: #1b1d21;
+                color: #f4f3ef;
+            }
+
+            .caption {
+                margin-top: 20px;
+                font-size: 10px;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+            }
+
+            a {
+                color: inherit;
+                text-decoration-thickness: 1px;
+                text-underline-offset: 4px;
+            }
+
+            a:focus-visible {
+                outline: 2px solid currentColor;
+                outline-offset: 6px;
+            }
+
+            .sizes {
+                display: flex;
+                width: 100%;
+                align-items: baseline;
+                justify-content: space-evenly;
+                gap: 16px;
+            }
+
+            figure {
+                display: grid;
+                margin: 0;
+                justify-items: center;
+                gap: 16px;
+            }
+
+            figcaption {
+                color: #526b58;
+                font-size: 10px;
+            }
+
+            .palette {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                margin-top: 24px;
+                font-size: 11px;
+            }
+
+            .swatch {
+                padding: 16px;
+                border-top: 8px solid;
+            }
+
+            .swatch strong {
+                display: block;
+                margin-bottom: 6px;
+                font-size: 10px;
+                font-weight: 400;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+            }
+
+            footer {
+                margin-top: 16px;
+                padding-top: 16px;
+                border-top: 1px solid #d2ddcd;
+                color: #526b58;
+                font-size: 11px;
+                line-height: 1.6;
+            }
+
+            @media (max-width: 640px) {
+                .primary,
+                .secondary {
+                    grid-template-columns: 1fr;
+                }
+
+                .palette {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+
+                footer {
+                    align-items: flex-start;
+                    flex-direction: column;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <header>
+                <span>VPT / Botanical identity</span>
+                <span>Vite · Plugin · Taro</span>
+            </header>
+            <h1>VPT, naturally.</h1>
+            <p class="intro">The V is the foliage. One blossom at the tip, another halfway down the leaf.</p>
+            <section class="primary" aria-label="Primary logo and standalone mark">
+                <div class="panel">
+                    <div class="artwork">
+                        <img class="lockup" src="vpt-logo-light.svg" width="284" height="128" alt="VPT wordmark with a leafy V and two peach blossoms" />
+                    </div>
+                    <div class="caption">
+                        <span>01 / Primary lockup</span>
+                        <a href="vpt-logo-light.svg" download>Download SVG</a>
+                    </div>
+                </div>
+                <div class="panel forest">
+                    <div class="artwork">
+                        <img class="symbol" src="vpt-mark-mono.svg" width="128" height="128" alt="A V formed by two flowering leaves, rendered in white" />
+                    </div>
+                    <div class="caption">
+                        <span>02 / Monochrome</span>
+                        <a href="vpt-mark-mono.svg" download>Download SVG</a>
+                    </div>
+                </div>
+            </section>
+            <section class="secondary" aria-label="Dark logo and small-size samples">
+                <div class="panel dark">
+                    <div class="artwork">
+                        <img class="lockup" src="vpt-logo-dark.svg" width="284" height="128" alt="Botanical VPT wordmark with cream lettering on a dark background" />
+                    </div>
+                    <div class="caption">
+                        <span>03 / Dark surfaces</span>
+                        <a href="vpt-logo-dark.svg" download>Download SVG</a>
+                    </div>
+                </div>
+                <div class="panel">
+                    <div class="artwork">
+                        <div class="sizes">
+                            <figure>
+                                <img src="../favicon.svg" width="16" height="16" alt="VPT favicon at 16 pixels" />
+                                <figcaption>16 px</figcaption>
+                            </figure>
+                            <figure>
+                                <img src="../favicon.svg" width="24" height="24" alt="VPT favicon at 24 pixels" />
+                                <figcaption>24 px</figcaption>
+                            </figure>
+                            <figure>
+                                <img src="vpt-mark.svg" width="32" height="32" alt="VPT mark at 32 pixels" />
+                                <figcaption>32 px</figcaption>
+                            </figure>
+                            <figure>
+                                <img src="vpt-mark.svg" width="48" height="48" alt="VPT mark at 48 pixels" />
+                                <figcaption>48 px</figcaption>
+                            </figure>
+                        </div>
+                    </div>
+                    <div class="caption">
+                        <span>04 / Small-scale blooms</span>
+                        <a href="vpt-mark.svg" download>Download SVG</a>
+                    </div>
+                </div>
+            </section>
+            <section class="palette" aria-label="Brand colors">
+                <div class="swatch" style="border-color: #174f32"><strong>Forest</strong>#174F32</div>
+                <div class="swatch" style="border-color: #58a564"><strong>Leaf</strong>#58A564</div>
+                <div class="swatch" style="border-color: #f5b098"><strong>Peach blossom</strong>#F5B098</div>
+                <div class="swatch" style="border-color: #ffefbe"><strong>Buttercream</strong>#FFEFBE</div>
+            </section>
+            <footer>
+                <span>Two leaves form the V. Soft shading, fine veins, and gently irregular petals.</span>
+                <a href="../favicon.svg" download>Adaptive favicon ↗</a>
+            </footer>
+        </main>
+    </body>
+</html>

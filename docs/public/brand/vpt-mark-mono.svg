@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+    <title id="title">VPT</title>
+    <desc id="desc">Two leaves form a V in one color, with a blossom at the right tip, another midway down the left leaf, and transparent flower centers.</desc>
+    <defs>
+        <g id="blossom">
+            <path d="M0 2C-8-3-11-14-6-19C-2-23 5-20 7-15C11-7 5 1 0 2Z"/>
+            <path transform="rotate(74) scale(.92 1)" d="M0 2C-8-3-11-14-6-19C-2-23 5-20 7-15C11-7 5 1 0 2Z"/>
+            <path transform="rotate(145) scale(1.04 .95)" d="M0 2C-8-3-11-14-6-19C-2-23 5-20 7-15C11-7 5 1 0 2Z"/>
+            <path transform="rotate(219) scale(.96 1.02)" d="M0 2C-8-3-11-14-6-19C-2-23 5-20 7-15C11-7 5 1 0 2Z"/>
+            <path transform="rotate(290) scale(.93 .96)" d="M0 2C-8-3-11-14-6-19C-2-23 5-20 7-15C11-7 5 1 0 2Z"/>
+        </g>
+        <mask id="flower-centers" maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
+            <rect width="128" height="128" fill="#ffffff"/>
+            <circle cx="106" cy="24" r="2.924" fill="#000000"/>
+            <circle cx="24" cy="72" r="1.634" fill="#000000"/>
+        </mask>
+    </defs>
+    <g fill="currentColor" mask="url(#flower-centers)">
+        <path d="M15 35C27 46 36 48 44 62C52 77 54 96 63 114C44 104 31 92 24 77C18 63 20 48 15 35Z"/>
+        <path d="M109 28C97 38 87 39 77 56C68 72 67 92 63 114C82 104 97 86 103 68C108 51 105 39 109 28Z"/>
+        <use href="#blossom" transform="translate(106 24) rotate(12) scale(.68)"/>
+        <use href="#blossom" transform="translate(24 72) rotate(-16) scale(.38)"/>
+    </g>
+</svg>

@@ -107,11 +107,8 @@ html[data-has-hero] body {
     background-color: var(--vpt-page-bg);
 }
 
-html[data-has-hero] .site-title {
-    color: var(--vpt-heading-strong);
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 1.4rem;
-    letter-spacing: 0.08em;
+.site-title img {
+    height: 2.25rem;
 }
 
 html[data-has-hero] .content-panel {

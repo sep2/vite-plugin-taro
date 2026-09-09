@@ -15,6 +15,11 @@ export default defineConfig({
     integrations: [
         starlight({
             title: 'VPT',
+            logo: {
+                light: './public/brand/vpt-logo-light.svg',
+                dark: './public/brand/vpt-logo-dark.svg',
+                replacesTitle: true
+            },
             customCss: ['./src/styles/custom.css'],
             components: {
                 Hero: './src/components/hero.astro',

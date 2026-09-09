@@ -1,9 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="VPT"
-     overflow="hidden">
-    <style>svg{display:block}text{dominant-baseline:central;}</style>
-    <rect x="0" y="0" width="128" height="128" fill="#21834a"/>
-    <text x="49%" y="50%" text-anchor="middle" dominant-baseline="central" font-size="58"
-          font-family="Georgia,sans-serif" fill="#ffffff" font-weight="600" letter-spacing="-3.5">
-        VPT
-    </text>
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+    <title id="title">VPT</title>
+    <desc id="desc">Two naturally curved leaves form a V with one peach blossom, simplified for small sizes.</desc>
+    <style>
+        svg { color: #21834a; }
+        .blossom { fill: #e58e77; }
+        @media (prefers-color-scheme: dark) {
+            svg { color: #91dfa5; }
+            .blossom { fill: #f7ad95; }
+        }
+    </style>
+    <g fill="currentColor">
+        <path d="M15 35C27 46 36 48 44 62C52 77 54 96 63 114C44 104 31 92 24 77C18 63 20 48 15 35Z"/>
+        <path d="M109 28C97 38 87 39 77 56C68 72 67 92 63 114C82 104 97 86 103 68C108 51 105 39 109 28Z"/>
+    </g>
+    <g class="blossom" transform="translate(106 24) rotate(12) scale(.68)">
+        <path d="M0 2C-8-3-11-14-6-19C-2-23 5-20 7-15C11-7 5 1 0 2Z"/>
+        <path transform="rotate(74) scale(.92 1)" d="M0 2C-8-3-11-14-6-19C-2-23 5-20 7-15C11-7 5 1 0 2Z"/>
+        <path transform="rotate(145) scale(1.04 .95)" d="M0 2C-8-3-11-14-6-19C-2-23 5-20 7-15C11-7 5 1 0 2Z"/>
+        <path transform="rotate(219) scale(.96 1.02)" d="M0 2C-8-3-11-14-6-19C-2-23 5-20 7-15C11-7 5 1 0 2Z"/>
+        <path transform="rotate(290) scale(.93 .96)" d="M0 2C-8-3-11-14-6-19C-2-23 5-20 7-15C11-7 5 1 0 2Z"/>
+    </g>
 </svg>

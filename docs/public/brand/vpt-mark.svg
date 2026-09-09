@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+    <title id="title">VPT</title>
+    <desc id="desc">Two softly shaded, veined leaves form a V, with one peach blossom at the right tip and a smaller one midway down the left leaf.</desc>
+    <defs>
+        <linearGradient id="left-leaf" gradientUnits="userSpaceOnUse" x1="17" y1="42" x2="61" y2="111">
+            <stop stop-color="#91c37d"/>
+            <stop offset=".45" stop-color="#58a564"/>
+            <stop offset="1" stop-color="#2d764b"/>
+        </linearGradient>
+        <linearGradient id="right-leaf" gradientUnits="userSpaceOnUse" x1="65" y1="109" x2="107" y2="30">
+            <stop stop-color="#286f45"/>
+            <stop offset=".45" stop-color="#50a061"/>
+            <stop offset="1" stop-color="#abce84"/>
+        </linearGradient>
+        <linearGradient id="petal" gradientUnits="userSpaceOnUse" x1="-7" y1="-21" x2="7" y2="2">
+            <stop stop-color="#ffd3b5"/>
+            <stop offset=".55" stop-color="#f5b098"/>
+            <stop offset="1" stop-color="#e48d7b"/>
+        </linearGradient>
+        <g id="blossom">
+            <g fill="url(#petal)">
+                <path d="M0 2C-8-3-11-14-6-19C-2-23 5-20 7-15C11-7 5 1 0 2Z"/>
+                <path transform="rotate(74) scale(.92 1)" d="M0 2C-8-3-11-14-6-19C-2-23 5-20 7-15C11-7 5 1 0 2Z"/>
+                <path transform="rotate(145) scale(1.04 .95)" d="M0 2C-8-3-11-14-6-19C-2-23 5-20 7-15C11-7 5 1 0 2Z"/>
+                <path transform="rotate(219) scale(.96 1.02)" d="M0 2C-8-3-11-14-6-19C-2-23 5-20 7-15C11-7 5 1 0 2Z"/>
+                <path transform="rotate(290) scale(.93 .96)" d="M0 2C-8-3-11-14-6-19C-2-23 5-20 7-15C11-7 5 1 0 2Z"/>
+            </g>
+            <circle r="4.3" fill="#ffefbe"/>
+            <g fill="#c69a51" opacity=".65">
+                <circle cx="-1.6" cy="-.8" r=".6"/>
+                <circle cx="1.3" cy="-1.1" r=".5"/>
+                <circle cx=".2" cy="1.4" r=".6"/>
+            </g>
+        </g>
+    </defs>
+    <path fill="url(#left-leaf)" d="M15 35C27 46 36 48 44 62C52 77 54 96 63 114C44 104 31 92 24 77C18 63 20 48 15 35Z"/>
+    <path fill="url(#right-leaf)" d="M109 28C97 38 87 39 77 56C68 72 67 92 63 114C82 104 97 86 103 68C108 51 105 39 109 28Z"/>
+    <g fill="none" stroke="#e0edb9" stroke-linecap="round">
+        <g stroke-width=".85" opacity=".55">
+            <path d="M60 109C46 88 28 58 19 42"/>
+            <path d="M64 109C78 88 94 55 105 35"/>
+        </g>
+        <g stroke-width=".65" opacity=".4">
+            <path d="M47 89Q37 87 31 80M47 89Q48 80 45 73M35 70Q28 68 24 62M35 70Q35 63 34 56"/>
+            <path d="M77 88Q89 85 94 76M77 88Q76 80 78 72M88 68Q97 64 101 55M88 68Q87 61 88 54"/>
+        </g>
+    </g>
+    <use href="#blossom" transform="translate(106 24) rotate(12) scale(.68)"/>
+    <use href="#blossom" transform="translate(24 72) rotate(-16) scale(.38)"/>
+</svg>
