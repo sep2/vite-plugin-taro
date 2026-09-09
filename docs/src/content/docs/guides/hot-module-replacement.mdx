@@ -9,13 +9,14 @@ import { Tabs, TabItem } from '@astrojs/starlight/components'
 
 ## 使用
 
-启动微信开发模式：
+按目标选择开发命令（`wx` 为微信，`zfb` 为支付宝）：
 
 <Tabs syncKey="package-manager">
     <TabItem label="npm">
 
 ```sh
 npm run dev:wx
+npm run dev:zfb
 ```
 
     </TabItem>
@@ -23,6 +24,7 @@ npm run dev:wx
 
 ```sh
 pnpm dev:wx
+pnpm dev:zfb
 ```
 
     </TabItem>
@@ -30,12 +32,13 @@ pnpm dev:wx
 
 ```sh
 bun run dev:wx
+bun run dev:zfb
 ```
 
     </TabItem>
 </Tabs>
 
-等待构建完成，在微信开发者工具中打开 `dist/wx`。开发支付宝小程序时运行 `npm run dev:zfb`，在支付宝小程序开发者工具中打开 `dist/zfb`。
+等待构建完成，在微信开发者工具中打开 `dist/wx`，或在支付宝小程序开发者工具中打开 `dist/zfb`。
 
 保存 JavaScript、TypeScript、React 组件或样式后，当前开发者工具会自动显示更新。
 
@@ -65,15 +68,16 @@ hmr: {
 }
 ```
 
-## 不需要热更新时：监听构建
+## 不需要热更新时：修改后自动重新构建
 
-如果不需要 HMR 或保留运行状态，例如让 AI 批量修改代码时，也可以使用 Vite 原生的监听构建：
+如果不需要热更新或保留运行状态，例如让 AI 批量修改代码时，也可以使用 Vite 原生的 `--watch`，在文件修改后自动重新构建：
 
 <Tabs syncKey="package-manager">
     <TabItem label="npm">
 
 ```sh
 npm run build:wx -- --watch
+npm run build:zfb -- --watch
 ```
 
     </TabItem>
@@ -81,6 +85,7 @@ npm run build:wx -- --watch
 
 ```sh
 pnpm build:wx --watch
+pnpm build:zfb --watch
 ```
 
     </TabItem>
@@ -88,14 +93,19 @@ pnpm build:wx --watch
 
 ```sh
 bun run build:wx --watch
+bun run build:zfb --watch
 ```
 
     </TabItem>
 </Tabs>
 
-这会运行 `vite build --watch`，在源码变化后重新构建 `dist/wx`，并重启应用，不保留运行状态，适合批量修改代码的场景。
+这会运行 `vite build --watch`，在源码变化后重新构建 `dist/wx` 或 `dist/zfb`，并重启应用，不保留运行状态，适合批量修改代码的场景。
 
-区别在于：`build:wx --watch` 生成生产构建，而 `dev:wx` 下的 `hmr.mode: 'rebuild'` 生成开发构建。
+区别在于：`build:wx --watch` / `build:zfb --watch` 打包的是生产版本，而 `dev:wx` 下的 `hmr.mode: 'rebuild'` 打包的是开发版本。
+
+:::note
+使用 `build:wx --watch` 时，必须设置 `projectConfigJson.setting.compileHotReLoad: false`，否则微信开发者工具可能刷新异常；切回 `dev:wx` 时恢复为 `true`。
+:::
 
 ## 保留的状态
 
