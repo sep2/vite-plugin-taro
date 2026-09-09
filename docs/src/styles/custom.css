@@ -108,7 +108,9 @@ html[data-has-hero] body {
 }
 
 .site-title img {
-    height: 2.25rem;
+    /* Size by width so the SVG's bottom padding does not shrink the lettering. */
+    width: 4.75rem;
+    height: auto;
 }
 
 html[data-has-hero] .content-panel {

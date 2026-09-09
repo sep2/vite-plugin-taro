@@ -2,7 +2,7 @@
 
 **VPT, naturally.** The V itself is made from two growing leaves, not a solid letter decorated with foliage. Gently curved edges, soft green shading, fine branching veins, and two peach blossoms give the mark a botanical character: one flower sits at the right leaf's tip, and the smaller flower sits midway along the left leaf's outer edge. The petals have slightly different proportions and angles rather than perfect radial symmetry.
 
-The leaf V is the first letter of the wordmark, followed by tightly kerned, custom serif P and T lettering. The P sits close to the leaf, and the P and T serifs meet, echoing the compact spacing of the original VPT title. All artwork is self-contained SVG with outlined lettering. The wordmarks combine vector gradients with an SVG stamp filter; there are no fonts, external resources, raster textures, or scripts.
+The leaf V is the first letter of the wordmark, followed by actual **Georgia Bold** P and T outlines—the font face used by the original heading's `font-weight: 600`. The glyphs are exported from Georgia Bold 5.00x-4, normalized to a 72-unit cap height, and retain the original `-0.08em` tracking. The P sits close to the leaf, and the P and T serifs meet. The canvas leaves 20 units below the letter baseline to balance the blossom above. All artwork is self-contained SVG, combining outlined lettering, vector gradients, and an SVG stamp filter. No font files, external resources, raster textures, or scripts are required.
 
 ![VPT logo presentation](preview.png)
 
@@ -15,7 +15,7 @@ The leaf V is the first letter of the wordmark, followed by tightly kerned, cust
 | [vpt-mark-mono.svg](vpt-mark-mono.svg) | Single-color leaf silhouettes with transparent flower centers |
 | [../favicon.svg](../favicon.svg) | Adaptive small-size version with two leaves and one blossom |
 | [preview.html](preview.html) | Visual sheet with downloads and actual-size samples; open directly or at `/brand/preview.html` on the docs site |
-| [preview.png](preview.png) | Shareable 1280 × 1040 capture of the visual sheet |
+| [preview.png](preview.png) | Shareable 1280 × 1120 capture of the visual sheet |
 
 ## Usage
 

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="260" height="109" viewBox="13 6 260 109" filter="url(#stamp)" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="228" height="128" viewBox="13 6 228 128" filter="url(#stamp)" role="img" aria-labelledby="title desc">
     <title id="title">VPT</title>
     <desc id="desc">Two softly shaded, veined leaves grow into a V, with two peach blossoms, green serif lettering, and a subtle stamped finish. Colors adapt to light and dark backgrounds.</desc>
     <style>
@@ -13,6 +13,7 @@
             .wordmark { fill: #91dfa5; }
         }
     </style>
+    <!-- Leave 20 units below the letter baseline to balance the blossom above the cap height. -->
     <defs>
         <!-- Keep the stamp in the artwork so every size shares the same finish. -->
         <filter id="stamp" color-interpolation-filters="sRGB">
@@ -68,8 +69,9 @@
     </g>
     <use href="#blossom" transform="translate(106 24) rotate(12) scale(.68)"/>
     <use href="#blossom" transform="translate(24 72) rotate(-16) scale(.38)"/>
-    <g class="wordmark" fill="#17673d">
-        <path fill-rule="evenodd" transform="translate(108 42)" d="M0 0H42C66 0 80 10 80 28C80 46 65 54 42 54H28V58C28 65 30 66 39 66V72H0V66C9 66 11 64 11 58V14C11 7 9 6 0 6ZM28 7V47H39C54 47 61 40 61 28C61 15 54 7 39 7Z"/>
-        <path transform="translate(182 42)" d="M2 0H88L90 22H84C80 10 77 7 64 7H54V58C54 64 57 66 67 66V72H23V66C33 66 36 64 36 58V7H26C13 7 10 10 6 22H0Z"/>
+    <!-- Georgia Bold outlines: 2048 units/em, 1419-unit caps, original -0.08em tracking. -->
+    <g class="wordmark" fill="#17673d" transform="translate(104.498942918 114) scale(.050739957717 -.050739957717)">
+        <path id="letter-p" d="M1399 1064Q1399 944 1349.5 857.5Q1300 771 1213 717Q1123 661 1007.5 636.0Q892 611 748 611H632V212Q632 176 645.5 149.5Q659 123 697 107Q717 99 762.0 90.0Q807 81 838 78V0H69V78Q98 81 146.0 86.5Q194 92 213 100Q252 116 264.5 139.0Q277 162 277 203V1204Q277 1239 265.0 1264.5Q253 1290 213 1307Q185 1319 138.5 1328.5Q92 1338 69 1341V1419H852Q1127 1419 1263.0 1331.5Q1399 1244 1399 1064ZM1009 1013Q1009 1173 944.5 1250.5Q880 1328 715 1328H632V705H674Q838 705 923.5 780.5Q1009 856 1009 1013Z"/>
+        <path id="letter-t" transform="translate(1272.16)" d="M1388 1013H1311Q1280 1104 1211.5 1208.0Q1143 1312 1085 1320Q1053 1324 1006.0 1327.0Q959 1330 925 1330H878V217Q878 181 891.0 153.5Q904 126 942 110Q965 101 1013.5 91.5Q1062 82 1096 78V0H305V78Q334 81 386.5 86.5Q439 92 458 100Q497 116 510.0 143.0Q523 170 523 207V1330H476Q442 1330 395.0 1327.0Q348 1324 316 1320Q258 1312 189.5 1208.0Q121 1104 90 1013H13V1419H1388Z"/>
     </g>
 </svg>
