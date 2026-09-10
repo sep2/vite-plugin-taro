@@ -1,0 +1,46 @@
+<section class="sponsor" aria-labelledby="sponsor-heading">
+    <h2 id="sponsor-heading">赞助</h2>
+    <p>
+        VPT 由 <a href="https://weapp.dev" target="_blank" rel="noopener noreferrer">weapp.dev</a>{' '}
+        赞助，感谢赞助者对开源开发的支持。
+    </p>
+    <p class="sponsor-description">weapp.dev 致力于为小程序与 Web 构建开放、可组合的现代工具链。</p>
+</section>
+
+<style>
+    .sponsor {
+        width: min(100%, var(--home-content-width));
+        margin: 0 auto;
+        padding: clamp(1.5rem, 4vw, 3rem) clamp(1.25rem, 4vw, 2.75rem);
+        border-top: 1px solid var(--vpt-border);
+        text-align: center;
+    }
+
+    .sponsor h2 {
+        margin: 0 0 1rem;
+        color: var(--vpt-heading-strong);
+        font-size: var(--home-font-size-title);
+    }
+
+    .sponsor p {
+        margin: 0;
+        color: var(--vpt-text);
+        line-height: 1.8;
+    }
+
+    .sponsor a {
+        color: var(--vpt-accent-strong);
+        text-underline-offset: 0.2em;
+    }
+
+    .sponsor a:focus-visible {
+        outline: 2px solid var(--vpt-accent-strong);
+        outline-offset: 4px;
+    }
+
+    .sponsor .sponsor-description {
+        margin-top: 0.5rem;
+        color: var(--vpt-muted);
+        font-size: var(--home-font-size-small);
+    }
+</style>
