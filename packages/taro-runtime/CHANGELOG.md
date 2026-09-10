@@ -1,5 +1,12 @@
 # vite-plugin-taro-runtime
 
+## 0.7.2
+
+### 更新内容
+
+- 与 `vite-plugin-taro`、`create-vite-taro` 固定版本组同步升级至 `0.7.2`。
+- 本包运行时实现无改动；小程序 HMR 启动恢复修复位于 `vite-plugin-taro`。
+
 ## 0.7.1
 
 ### Patch Changes
