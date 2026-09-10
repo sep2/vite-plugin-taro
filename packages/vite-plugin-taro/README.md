@@ -26,7 +26,7 @@ npm create vite-taro@latest my-app
 
 ## 赞助
 
-本项目由 [weapp.dev](https://weapp.dev) 赞助，感谢其对 VPT 开源开发的支持。
+VPT 由 [weapp.dev](https://weapp.dev) 赞助，感谢赞助者对开源开发的支持。
 
 weapp.dev 致力于为小程序与 Web 构建开放、可组合的现代工具链。
 

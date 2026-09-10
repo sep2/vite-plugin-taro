@@ -25,7 +25,7 @@ Continue with the [Quick Start guide](https://vpt.js.org/guides/quick-start/).
 
 ## Sponsor
 
-This project is sponsored by [weapp.dev](https://weapp.dev). Thank you for supporting VPT's open-source development.
+VPT is sponsored by [weapp.dev](https://weapp.dev). Thank you to our sponsor for supporting open-source development.
 
 weapp.dev builds an open, composable modern toolchain for Mini Program and Web development.
 
