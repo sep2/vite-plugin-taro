@@ -24,6 +24,13 @@ npm create vite-taro@latest my-app
 接下来阅读[快速开始](https://vpt.js.org/guides/quick-start/)。
 
 
+## 赞助
+
+本项目由 [weapp.dev](https://weapp.dev) 赞助，感谢其对 VPT 开源开发的支持。
+
+weapp.dev 致力于为小程序与 Web 构建开放、可组合的现代工具链。
+
+
 ### 已支持微信开发者工具的 React 热更新
 
 <video src="https://github.com/user-attachments/assets/c8289e1e-d8ad-429f-a0d9-a40656b4962a" controls autoplay muted loop playsinline width="100%"></video>

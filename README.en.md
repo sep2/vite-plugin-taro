@@ -23,6 +23,12 @@ npm create vite-taro@latest my-app
 
 Continue with the [Quick Start guide](https://vpt.js.org/guides/quick-start/).
 
+## Sponsor
+
+This project is sponsored by [weapp.dev](https://weapp.dev). Thank you for supporting VPT's open-source development.
+
+weapp.dev builds an open, composable modern toolchain for Mini Program and Web development.
+
 ### React Hot Reload in WeChat DevTools
 
 <video src="https://github.com/user-attachments/assets/c8289e1e-d8ad-429f-a0d9-a40656b4962a" controls autoplay muted loop playsinline width="100%"></video>
