@@ -28,7 +28,6 @@ type TestRuntime = DevRuntime &
         initialize: (info: { buildId: string; endpoint: string }) => void
         applyPatches: (payload: { buildId: string; patches: TestPatch[] } | undefined) => void
         sendReport: (data: Record<string, unknown>) => void
-        sendSocketEvent: (event: string, data: unknown) => void
         stopSocket: (reason: string) => void
     }>
 
@@ -39,8 +38,12 @@ type CapturedSocketMessage = Readonly<{
 }>
 
 type TestHarness = Readonly<{
+    openSocket: () => void
+    closeSocket: () => void
+    failSocket: () => void
     emitSocketMessage: (data: string | ArrayBuffer) => void
     messages: CapturedSocketMessage[]
+    closed: Array<Readonly<{ code: number; reason: string }>>
     reports: unknown[]
     runtime: TestRuntime
 }>
@@ -49,20 +52,41 @@ type TestHarness = Readonly<{
 let runtimeId = 0
 
 /** Creates one isolated runtime and captures only its metadata reports. */
-async function createTestHarness(): Promise<TestHarness> {
+async function createConnectingTestHarness(): Promise<TestHarness> {
     // These mutable values capture socket output and the native message callback registered by one runtime.
     const reports: unknown[] = []
     const messages: CapturedSocketMessage[] = []
+    const closed: Array<Readonly<{ code: number; reason: string }>> = []
     let receiveSocketMessage = (_result: Readonly<{ data: string | ArrayBuffer }>) => {}
+    // Native lifecycle callbacks remain under test control so sends before OPEN fail like DevTools.
+    let opened = false
+    let onOpen = () => {}
+    let onClose = () => {}
+    let onError = () => {}
     const socket: MiniSocketTask = {
+        onOpen(listener) {
+            onOpen = listener
+        },
+        onClose(listener) {
+            onClose = listener
+        },
+        onError(listener) {
+            onError = listener
+        },
         send(options) {
+            assert.ok(opened, 'SocketTask.readyState is not OPEN')
             const envelope = JSON.parse(String(options.data)) as CapturedSocketMessage
             messages.push(envelope)
             if (envelope.event === runtimeReportEvent) {
                 reports.push(envelope.data)
             }
         },
-        close() {},
+        close(options) {
+            assert.ok(opened)
+            closed.push(options)
+            opened = false
+            // Do not emit onClose: the runtime must stop immediately, not wait for the native callback.
+        },
         onMessage(listener) {
             receiveSocketMessage = listener
         }
@@ -79,13 +103,118 @@ async function createTestHarness(): Promise<TestHarness> {
     const runtime = await importTestRuntime()
     runtime.initialize({ buildId: 'build', endpoint: 'ws://localhost/hmr' })
     return {
+        openSocket() {
+            opened = true
+            onOpen()
+        },
+        closeSocket() {
+            opened = false
+            onClose()
+        },
+        failSocket() {
+            opened = false
+            onError()
+        },
         emitSocketMessage(data) {
             receiveSocketMessage({ data: data })
         },
         messages: messages,
+        closed: closed,
         reports: reports,
         runtime: runtime
     }
+}
+
+async function createTestHarness(): Promise<TestHarness> {
+    const harness = await createConnectingTestHarness()
+    harness.openSocket()
+    // Existing graph tests observe application reports only; startup has its own lifecycle regressions below.
+    harness.messages.length = 0
+    harness.reports.length = 0
+    return harness
+}
+
+test('Compile with a pruned patch suffix synchronizes without applying or sending before OPEN', async (context) => {
+    const warn = context.mock.method(console, 'warn', () => {})
+    const { runtime, reports, openSocket } = await createConnectingTestHarness()
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            {
+                seq: 2,
+                changedIds: ['page'],
+                factory() {
+                    assert.fail('Incomplete history must not execute')
+                }
+            }
+        ]
+    })
+    assert.deepEqual(reports, [])
+    assert.equal(warn.mock.callCount(), 0)
+    openSocket()
+    assert.deepEqual(reports, [{ buildId: 'build', kind: 'startup' }])
+})
+
+test('startup announces the build without executing or queuing pre-OPEN Page patches', async () => {
+    const { runtime, reports, openSocket } = await createConnectingTestHarness()
+    for (const seq of [1, 2]) {
+        runtime.applyPatches({
+            buildId: 'build',
+            patches: [
+                {
+                    seq,
+                    changedIds: [],
+                    factory() {
+                        assert.fail('Startup must not replay patch history')
+                    }
+                }
+            ]
+        })
+    }
+    assert.deepEqual(reports, [])
+    openSocket()
+    assert.deepEqual(reports, [{ buildId: 'build', kind: 'startup' }])
+})
+
+test('reports patch failure before closing the socket and stops subsequent installation', async (context) => {
+    context.mock.method(console, 'warn', () => {})
+    const { runtime, reports, closed } = await createTestHarness()
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            {
+                seq: 1,
+                changedIds: [],
+                factory() {
+                    throw new Error('broken factory')
+                }
+            }
+        ]
+    })
+    const laterPayload = {
+        buildId: 'build',
+        patches: [
+            {
+                seq: 1,
+                changedIds: [],
+                factory() {
+                    assert.fail('Failed heaps must not install further patches')
+                }
+            }
+        ]
+    }
+    runtime.applyPatches(laterPayload)
+    assert.deepEqual(reports, [{ buildId: 'build', kind: 'rebuild', reason: 'broken factory' }])
+    assert.deepEqual(closed, [{ code: 1000, reason: 'patch application stopped' }])
+})
+
+for (const event of ['closeSocket', 'failSocket'] as const) {
+    test(`does not send reports after native ${event}`, async () => {
+        const harness = await createTestHarness()
+        harness[event]()
+        harness.runtime.applyPatches({ buildId: 'build', patches: [{ seq: 1, changedIds: [], factory() {} }] })
+        assert.deepEqual(harness.reports, [])
+    })
 }
 
 async function importTestRuntime(): Promise<TestRuntime> {
@@ -292,7 +421,6 @@ test('rejects reports before initialization', async () => {
     })
     const uninitializedRuntime = await importTestRuntime()
     assert.throws(() => uninitializedRuntime.sendReport({ kind: 'applied', seq: 1 }), /runtime is not initialized/)
-    assert.throws(() => uninitializedRuntime.sendSocketEvent('event', {}), /socket is not initialized/)
     assert.throws(() => uninitializedRuntime.stopSocket('stop'), /socket is not initialized/)
 })
 
@@ -643,7 +771,7 @@ test('detects a sequence gap after skipping a replayed physical prefix', async (
     assert.match(JSON.stringify(newReports), /missing patch sequence 2/)
 })
 
-test('requests a rebuild before mutating registries when a sequence is missing', async (context) => {
+test('requests startup synchronization before mutating registries when the initial prefix is missing', async (context) => {
     context.mock.method(console, 'warn', () => {})
     const { reports, runtime } = await createTestHarness()
     // Proves the invalid patch factory is rejected before it can mutate Rolldown's registries.
@@ -670,9 +798,7 @@ test('requests a rebuild before mutating registries when a sequence is missing',
     const newReports = getNewReports(reports, reportCount)
     assert.equal(factoryRuns, 0)
     assert.deepEqual(runtime.loadExports('page'), { value: 'old' })
-    assert.match(JSON.stringify(newReports), /"kind":"rebuild"/)
-    assert.doesNotMatch(JSON.stringify(newReports), /"kind":"applied"/)
-    assert.match(JSON.stringify(newReports), /missing patch sequence 1/)
+    assert.deepEqual(newReports, [{ buildId: 'build', kind: 'startup' }])
 })
 
 test('rejects a duplicate new sequence instead of treating it as a replay', async (context) => {

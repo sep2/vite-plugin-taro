@@ -453,6 +453,79 @@ test('publishes and acknowledges cumulative wx patches without rotating the App 
     assert.equal(await readFile(fixture.appStylePath, 'utf8'), initialAppStyle)
 })
 
+test('startup rebuilds after one published patch even when its complete history is retained', async (context) => {
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions())
+    context.after(fixture.close)
+    const info = parseHmrInfo(
+        await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
+    )
+    await publishSourceGeneration(fixture.pagePath, renderPage('applied before OPEN'))
+    await waitForFile(fixture.patchesPath, (source) => source.includes('applied before OPEN'), maximumWaitAttempts)
+    // No ACK was sent: retaining every patch must not turn startup into a replay optimization.
+    await sendRuntimeReport(info, { buildId: info.buildId, kind: 'startup' })
+    const freshInfo = parseHmrInfo(
+        await waitForFile(
+            fixture.infoPath,
+            (source) => parseHmrInfo(source).buildId !== info.buildId,
+            maximumWaitAttempts
+        )
+    )
+    await waitForFile(fixture.appStylePath, (source) => source.includes(freshInfo.buildId), maximumWaitAttempts)
+    await waitForJavaScriptOutput(fixture.outDir, 'applied before OPEN', maximumWaitAttempts)
+    assert.doesNotMatch(await readFile(fixture.patchesPath, 'utf8'), /\{seq:/)
+
+    // Baseline-only startup and delayed startup from the previous build must not cause a rebuild loop.
+    await sendRuntimeReport(freshInfo, { buildId: freshInfo.buildId, kind: 'startup' })
+    await sendRuntimeReport(freshInfo, { buildId: info.buildId, kind: 'startup' })
+    await delay(100)
+    assert.equal(parseHmrInfo(await readFile(fixture.infoPath, 'utf8')).buildId, freshInfo.buildId)
+})
+
+test('Compile after two acknowledged edits rebuilds the baseline and resumes HMR', async (context) => {
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions())
+    context.after(fixture.close)
+    const initialSource = await waitForFile(
+        fixture.infoPath,
+        (source) => source.includes('buildId'),
+        maximumWaitAttempts
+    )
+    const info = parseHmrInfo(initialSource)
+
+    for (const seq of [1, 2]) {
+        await publishSourceGeneration(fixture.pagePath, renderPage(`compile regression edit ${seq}`))
+        const patches = await waitForFile(
+            fixture.patchesPath,
+            (source) => source.includes(`compile regression edit ${seq}`),
+            maximumWaitAttempts
+        )
+        assert.deepEqual(
+            [...patches.matchAll(/\{seq: (\d+)/g)].map((match) => Number(match[1])),
+            [seq]
+        )
+        await sendRuntimeReport(info, { buildId: info.buildId, kind: 'applied', seq })
+        await delay(50)
+    }
+
+    // Compile creates a new App heap from the unchanged baseline, not the previously acknowledged runtime.
+    await sendRuntimeReport(info, { buildId: info.buildId, kind: 'startup' })
+    const freshInfo = parseHmrInfo(
+        await waitForFile(fixture.infoPath, (source) => source !== initialSource, maximumWaitAttempts)
+    )
+    await waitForFile(fixture.appStylePath, (source) => source.includes(freshInfo.buildId), maximumWaitAttempts)
+    await waitForJavaScriptOutput(fixture.outDir, 'compile regression edit 2', maximumWaitAttempts)
+    assert.doesNotMatch(await readFile(fixture.patchesPath, 'utf8'), /\{seq:/)
+
+    await sendRuntimeReport(freshInfo, { buildId: freshInfo.buildId, kind: 'startup' })
+    await publishSourceGeneration(fixture.pagePath, renderPage('HMR after Compile recovery'))
+    const resumed = await waitForFile(
+        fixture.patchesPath,
+        (source) => source.includes('HMR after Compile recovery'),
+        maximumWaitAttempts
+    )
+    assert.match(resumed, /\{seq: 1,/)
+    assert.equal(parseHmrInfo(await readFile(fixture.infoPath, 'utf8')).buildId, freshInfo.buildId)
+})
+
 test('publishes interpreter source through Vite WebSocket', async (context) => {
     const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createInterpreterOptions())
     context.after(fixture.close)

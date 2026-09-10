@@ -23,6 +23,9 @@ export const connectZfbSocket: ConnectMiniSocket = (endpoint) => {
     return {
         send: (options) => socket.send(options),
         close: (options) => socket.close(options),
+        onOpen: (listener) => socket.onOpen(listener),
+        onClose: (listener) => socket.onClose(listener),
+        onError: (listener) => socket.onError(listener),
         onMessage: (listener) => {
             socket.onMessage(({ message }) => listener({ data: message }))
         }

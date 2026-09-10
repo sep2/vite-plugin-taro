@@ -72,7 +72,9 @@ test('retains a patch after failed delivery and republishes it with the next gen
     journal.startBuild()
 
     await assert.rejects(() => journal.produce([patch(1, 'p1')]), /delivery unavailable/)
+    assert.equal(journal.isBaselineCurrent(), true)
     await journal.produce([patch(2, 'p2')])
+    assert.equal(journal.isBaselineCurrent(), false)
 
     assert.deepEqual(
         attempts.map(({ patches }) => patches.map(({ seq }) => seq)),
@@ -113,6 +115,22 @@ test('application acknowledgements prune only their covered prefix', async () =>
         publications[2]?.patches.map(({ seq }) => seq),
         [3, 4]
     )
+})
+
+test('startup requires a new baseline after any publication regardless of ACK pruning', async () => {
+    const { journal, publications } = createJournal()
+    journal.startBuild()
+    assert.equal(journal.isBaselineCurrent(), true)
+    await journal.produce([])
+    assert.equal(journal.isBaselineCurrent(), true)
+    await journal.produce([patch(1, 'p1')])
+    assert.equal(journal.isBaselineCurrent(), false)
+    journal.acknowledge(1)
+    assert.equal(journal.isBaselineCurrent(), false)
+    assert.equal(publications.length, 1)
+    journal.startBuild()
+    assert.equal(journal.isBaselineCurrent(), true)
+    assert.equal(publications.length, 1)
 })
 
 test('a fresh build restarts the Rolldown sequence', async () => {

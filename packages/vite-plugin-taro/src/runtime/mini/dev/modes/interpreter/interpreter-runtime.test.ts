@@ -55,6 +55,11 @@ function createSocket(connectOptions: ConnectOptions, reports: unknown[]): Captu
         close(options) {
             closed.push(options)
         },
+        onOpen(listener) {
+            listener()
+        },
+        onClose() {},
+        onError() {},
         onMessage(listener) {
             messageListener = listener
         },
@@ -98,6 +103,8 @@ async function createTestHarness(): Promise<TestHarness> {
         buildId: 'build',
         endpoint: 'ws://localhost/__vpt_hmr__?token=test'
     })
+    // Startup synchronization is tested by the shared runtime lifecycle regressions; these assertions focus on interpretation.
+    reports.length = 0
     return { reports: reports, runtime: runtime, sockets: sockets }
 }
 
@@ -171,6 +178,12 @@ test('stops the socket after interpreter failure and requests a complete build',
         patches: [{ seq: 1, changedIds: ['page'], code: "throw new Error('broken program')" }]
     })
 
+    // A late message must not install factories after shared failure handling has stopped this socket.
+    socket.emitMessage({
+        kind: 'patches',
+        buildId: 'build',
+        patches: [{ seq: 1, changedIds: ['page'], code: interpretedCode }]
+    })
     assert.deepEqual(reports, [{ buildId: 'build', kind: 'rebuild', reason: 'broken program' }])
     assert.deepEqual(runtime.loadExports('page'), { value: 'old' })
     assert.deepEqual(socket.closed, [{ code: 1000, reason: 'patch application stopped' }])

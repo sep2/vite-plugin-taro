@@ -10,6 +10,7 @@ export type HmrInfo = Readonly<{
 }>
 
 export type RuntimeReport =
+    | Readonly<{ kind: 'startup'; buildId: string }>
     | Readonly<{ kind: 'applied'; buildId: string; seq: number }>
     | Readonly<{ kind: 'rebuild'; buildId: string; reason: string }>
 

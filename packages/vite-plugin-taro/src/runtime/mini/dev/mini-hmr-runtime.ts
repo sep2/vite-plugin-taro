@@ -39,7 +39,10 @@ export type RuntimePatch = Readonly<{
     changedIds: readonly string[]
 }>
 
-type RuntimeReportData = Readonly<{ kind: 'applied'; seq: number }> | Readonly<{ kind: 'rebuild'; reason: string }>
+type RuntimeReportData =
+    | Readonly<{ kind: 'startup' }>
+    | Readonly<{ kind: 'applied'; seq: number }>
+    | Readonly<{ kind: 'rebuild'; reason: string }>
 
 type HmrUpdate = Readonly<{
     boundaries: readonly string[]
@@ -111,6 +114,9 @@ class MiniHotContext {
 export type MiniSocketTask = Readonly<{
     send(options: Readonly<{ data: string }>): void
     close(options: Readonly<{ code: number; reason: string }>): void
+    onOpen(listener: () => void): void
+    onClose(listener: () => void): void
+    onError(listener: () => void): void
     onMessage(listener: (result: Readonly<{ data: unknown }>) => void): void
 }>
 
@@ -125,7 +131,7 @@ export class MiniHmrRuntime extends DevRuntime {
      */
     private session: HmrSession | undefined
 
-    /** The App heap's sole SocketTask, assigned once by initialize and retained for its lifetime. */
+    // Set only by native OPEN and cleared on close/error: this reference is the authority for whether reports can be sent.
     private socket: MiniSocketTask | undefined
 
     /**
@@ -251,11 +257,22 @@ export class MiniHmrRuntime extends DevRuntime {
      * either change could acknowledge factories against another host client or replay already committed application generations.
      */
     initialize(info: HmrInfo): void {
-        if (this.session) return
+        if (this.session) {
+            return
+        }
+
         this.session = { buildId: info.buildId, appliedSeq: 0 }
 
         const socket = this.connectSocket(info.endpoint)
-        this.socket = socket
+        const clearSocket = () => {
+            this.socket = undefined
+        }
+        socket.onClose(clearSocket)
+        socket.onError(clearSocket)
+        socket.onOpen(() => {
+            this.socket = socket
+            this.sendReport({ kind: 'startup' })
+        })
 
         socket.onMessage(({ data }) => {
             if (typeof data !== 'string') return
@@ -277,23 +294,14 @@ export class MiniHmrRuntime extends DevRuntime {
     /** Receives mode-specific Vite custom events after shared control messages have been handled. */
     protected onSocketEvent(_info: HmrInfo, _event: string, _data: unknown): void {}
 
-    /** Sends one typed Vite custom event through the current App-level socket. */
-    protected sendSocketEvent(event: string, data: unknown): void {
-        const socket = this.socket
-        if (!socket) {
-            throw new Error('Mini Program HMR socket is not initialized')
-        }
-        socket.send({ data: JSON.stringify({ type: 'custom', event: event, data: data }) })
-    }
-
-    /** Closes the sole socket after terminal host control or interpreter failure. */
+    /** Closes the sole socket after terminal host control or patch failure in either mode. */
     protected stopSocket(reason: string): void {
-        const socket = this.socket
-        if (!socket) {
+        if (!this.session) {
             throw new Error('Mini Program HMR socket is not initialized')
         }
-
-        socket.close({ code: 1000, reason: reason })
+        const socket = this.socket
+        this.socket = undefined
+        socket?.close({ code: 1000, reason: reason })
     }
 
     /**
@@ -305,20 +313,33 @@ export class MiniHmrRuntime extends DevRuntime {
     protected applyPatchPayload<Patch extends RuntimePatch>(
         payload: Readonly<{ buildId: string; patches: readonly Patch[] }>,
         installPatch: (patch: Patch) => void
-    ): boolean {
+    ): void {
         const session = this.session
         if (!session || payload.buildId !== session.buildId) {
             console.warn('[vpt] patches for a stale build')
-            return false
+            return
+        }
+
+        if (!this.socket) {
+            // Before OPEN the new heap uses only the disk baseline. Startup requests a rebuild if patches were published;
+            // do not replay their factories early or queue them for later. Closed connections likewise cannot acknowledge updates.
+            return
+        }
+
+        if (session.appliedSeq === 0 && payload.patches.length > 0 && payload.patches[0].seq > 1) {
+            // Compile starts from the original bundle, but the physical file can be an ACK-pruned suffix. Do not install it or
+            // classify an expected new-heap synchronization as patch corruption. OPEN reports startup automatically; if already
+            // connected, ask the host to rebuild the baseline now.
+            this.sendReport({ kind: 'startup' })
+            return
         }
 
         const applied = this.applyPatchBatch(session, payload.patches, installPatch)
         if (applied) {
             // The host may publish later generations while synchronous application runs. Reporting only afterward makes this the
             // application frontier: journal history is never pruned merely because a delivery became observable.
-            void this.sendReport({ kind: 'applied', seq: session.appliedSeq })
+            this.sendReport({ kind: 'applied', seq: session.appliedSeq })
         }
-        return applied
     }
 
     /**
@@ -391,10 +412,8 @@ export class MiniHmrRuntime extends DevRuntime {
             // An installer may already have replaced some factories and the module registry has no inverse operation. Keep the
             // old application watermark unacknowledged and request a complete build, the only coherent rollback boundary.
             console.warn('[vpt] patch batch failed; apply stopped', error)
-            void this.sendReport({
-                kind: 'rebuild',
-                reason: error instanceof Error ? error.message : String(error)
-            })
+            this.sendReport({ kind: 'rebuild', reason: error instanceof Error ? error.message : String(error) })
+            this.stopSocket('patch application stopped')
             return false
         }
     }
@@ -408,6 +427,6 @@ export class MiniHmrRuntime extends DevRuntime {
             throw new Error('Mini Program dev runtime is not initialized')
         }
         const report: RuntimeReport = { buildId: session.buildId, ...data }
-        this.sendSocketEvent(runtimeReportEvent, report)
+        this.socket?.send({ data: JSON.stringify({ type: 'custom', event: runtimeReportEvent, data: report }) })
     }
 }

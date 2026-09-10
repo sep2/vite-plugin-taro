@@ -31,6 +31,11 @@ test('adapts the Alipay socket while installing both patch modes on the shared r
         close: (options: unknown): void => {
             closeOptions.push(options)
         },
+        onOpen: (listener: () => void): void => {
+            listener()
+        },
+        onClose: (): void => {},
+        onError: (): void => {},
         onMessage: (listener: NativeMessageListener): void => {
             emitNativeMessage = (message) => listener({ message: message })
         }

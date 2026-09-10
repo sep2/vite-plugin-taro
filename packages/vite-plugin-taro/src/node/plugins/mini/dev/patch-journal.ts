@@ -37,6 +37,9 @@ export class PatchJournal {
      */
     private readonly pendingPatches: PatchUpdate[] = []
 
+    // Set after durable publication and reset with the baseline; ACK pruning must not erase that patches were published.
+    private hasPublishedPatches = false
+
     // Explicit field assignment: node --test strips types and does not support parameter properties.
     constructor(publishPatches: PublishPatches) {
         this.publishPatches = publishPatches
@@ -53,6 +56,7 @@ export class PatchJournal {
         const buildId = randomUUID()
         this.buildId = buildId
         this.pendingPatches.length = 0
+        this.hasPublishedPatches = false
         return { buildId: buildId, previousBuildId: previousBuildId }
     }
 
@@ -71,6 +75,12 @@ export class PatchJournal {
         this.pendingPatches.push(...patches)
 
         await this.publishPatches({ buildId: this.buildId, patches: this.pendingPatches })
+        this.hasPublishedPatches = true
+    }
+
+    /** A new App can use the disk baseline only while no patches have been published against it. */
+    isBaselineCurrent(): boolean {
+        return !this.hasPublishedPatches
     }
 
     /**

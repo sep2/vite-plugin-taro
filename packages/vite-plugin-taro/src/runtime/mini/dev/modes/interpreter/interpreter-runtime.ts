@@ -27,12 +27,16 @@ class InterpreterHmrRuntime extends MiniHmrRuntime {
     }
 
     protected override onSocketEvent(info: HmrInfo, event: string, data: unknown): void {
-        if (event !== interpreterServerEvent) return
+        if (event !== interpreterServerEvent) {
+            return
+        }
 
         const message = data as InterpreterServerMessage
-        if (message.buildId !== info.buildId || !this.applyPatchPayload(message, this.installPatch)) {
+        if (message.buildId !== info.buildId) {
             this.stopSocket('patch application stopped')
+            return
         }
+        this.applyPatchPayload(message, this.installPatch)
     }
 }
 

@@ -236,8 +236,7 @@ export async function createMiniDevHost({
                 logMiniError(server.config.logger, `${contract.options.target} HMR update failed`, action.error)
                 return
             case 'report':
-                processReport(action.report)
-                return
+                return processReport(action.report)
             case 'output':
                 if (action.result instanceof Error) {
                     logMiniError(server.config.logger, `${contract.options.target} dev build failed`, action.result)
@@ -268,6 +267,12 @@ export async function createMiniDevHost({
         }
 
         switch (report.kind) {
+            case 'startup': {
+                if (!journal.isBaselineCurrent()) {
+                    requestFullBuild('App started after published patches; replacing baseline')
+                }
+                return
+            }
             case 'rebuild': {
                 requestFullBuild(report.reason)
                 return
