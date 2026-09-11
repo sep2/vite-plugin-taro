@@ -5,6 +5,7 @@ import { type DevEngine, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
 import { memoize } from '../../../utils/memoize.ts'
 import type { MiniContract } from '../mini-contract.ts'
+import { createStableOutputOptions } from '../output/create-stable-output-options.ts'
 import type { MiniHmrMode } from './hmr-mode.ts'
 
 type BundledDevRolldownOptions = InputOptions & {
@@ -67,19 +68,12 @@ export function installMiniDevOptions({
          * mutating configuredOutput itself would leak development normalization back into the user's resolved Vite config.
          */
         Object.assign(output, configured, {
-            // Development output is overwritten in place after every complete build. Strip hash placeholders from the
-            // configured asset pattern so old files cannot accumulate and native asset references remain stable.
-            assetFileNames: createStableFileNames(configured.assetFileNames, 'assets/[name][extname]'),
+            // Serve and ordinary watch share stable asset, dependency, and native-entry identities in the live output tree.
+            ...createStableOutputOptions(configured),
             // These banners create physical CommonJS edges only after graph analysis. Patch modes initialize their App runtime;
             // DevTools additionally prepends Page delivery edges, while rebuild needs neither. Host-only metadata stays outside
             // the application chunk graph and therefore cannot affect placement or generate transport chunks of its own.
             banner: hmrMode.createEntryBanner(pageFiles),
-            // Preserve the configured directory/name shape while removing content hashes. Stable chunk paths let DevTools
-            // overwrite executable files and keep one persistent physical module identity across complete builds.
-            chunkFileNames: createStableFileNames(configured.chunkFileNames, 'assets/[name].js'),
-            // Native entry paths are public Mini Program routes (`app.js`, `pages/.../index.js`); development must never hash
-            // or relocate them because DevTools determines App/Page reload behavior from those exact filenames.
-            entryFileNames: createStableFileNames(configured.entryFileNames, '[name]'),
             // Keep ESM until the shared Mini renderChunk pipeline classifies each final chunk and converts capsules to
             // System.register data or native/amphibious entries to CommonJS. Choosing CommonJS here would erase that boundary.
             format: 'es',
@@ -142,20 +136,6 @@ function ensureSingleOutput(rolldownOptions: BundledDevRolldownOptions): OutputO
     // Rolldown needs the created object attached to input options by identity; returning a detached fallback would be ignored.
     rolldownOptions.output ??= {}
     return rolldownOptions.output
-}
-
-function createStableFileNames<Value>(addon: unknown, fallback: string): string | ((value: Value) => string) {
-    if (typeof addon === 'function') {
-        return (value) => toStableFileName(String(addon(value)))
-    }
-    return toStableFileName(typeof addon === 'string' ? addon : fallback)
-}
-
-function toStableFileName(fileName: string): string {
-    return fileName
-        .replace(/(^|\/)\[hash(?::\d+)?\](?=\.|$)/g, '$1[name]')
-        .replace(/[-_.]\[hash(?::\d+)?\]/g, '')
-        .replace(/\[hash(?::\d+)?\]/g, '[name]')
 }
 
 type ViteTransformPlugin = {

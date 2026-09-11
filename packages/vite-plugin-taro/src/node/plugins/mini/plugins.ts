@@ -2,6 +2,7 @@ import type { Plugin, PluginOption } from 'vite'
 import { esTarget } from '../../utils/constant.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { clientTaroNativeId } from '../client/constant.ts'
+import { createMiniWatchPlugin } from './dev/create-mini-watch-plugin.ts'
 import { createMiniDevelopmentPlugin } from './dev/plugins.ts'
 import { createMiniReactRefreshDefines } from './dev/react-refresh.ts'
 import type { MiniContract } from './mini-contract.ts'
@@ -29,7 +30,8 @@ export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] 
         placement,
         styles,
         createMiniPlugin(contract, resolver, placement),
-        createMiniDevelopmentPlugin(contract, styles)
+        createMiniDevelopmentPlugin(contract, styles),
+        createMiniWatchPlugin()
     ]
 }
 
@@ -166,7 +168,8 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
             async handler(_, bundle) {
                 // LTHP joins OutputChunks to their preliminary logical IDs and assigns Rolldown-owned physical filenames.
                 // createOutputFiles then observes those paths to relocate native component folders, emit placeholders, and
-                // declare only surviving package roots in app.json. No JavaScript chunk is manually emitted or copied.
+                // declare only surviving package roots in app.json. All JavaScript is still rendered by Rolldown; ordinary
+                // watch transfers only the finished App shell to its final publication hook after this output is complete.
                 const subpackages = placement.getSubpackages()
 
                 const outputFiles = await createOutputFiles({

@@ -28,7 +28,7 @@ test('creates the ZFB Mini Program contract without translating user configurati
             config: { defaultTitle: 'Home' }
         }
     ])
-    assert.equal(plugins.length, 4)
+    assert.equal(plugins.length, 5)
     assert.equal(contract.taro.env, 'alipay')
     assert.match(
         contract.taro.componentsReactPath,
