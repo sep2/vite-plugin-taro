@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { VptOptions } from '../../../options.ts'
-import { createWxMiniContract } from './plugins.ts'
+import { createWxMiniContract, createWxMiniPlugins } from './plugins.ts'
 
 test('creates the WX Mini Program contract without translating public options', () => {
     const options: VptOptions = {
@@ -33,4 +33,11 @@ test('creates the WX Mini Program contract without translating public options', 
     })
     assert.deepEqual(Object.keys(contract.output), ['generateProjectSkeleton'])
     assert.equal(typeof contract.output.generateProjectSkeleton, 'function')
+    const plugins = createWxMiniPlugins(options)
+    assert.equal(plugins.length, 5)
+    assert.ok(
+        plugins.some(
+            (plugin) => plugin && typeof plugin === 'object' && 'name' in plugin && plugin.name === 'vpt:wx-watch'
+        )
+    )
 })
