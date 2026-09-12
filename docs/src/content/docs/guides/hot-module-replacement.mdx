@@ -101,13 +101,7 @@ bun run build:zfb --watch
 
 这会运行 `vite build --watch`，在源码变化后重新构建 `dist/wx` 或 `dist/zfb`，并重启应用，不保留运行状态，适合批量修改代码的场景。
 
-微信监听构建由 `vpt:wx-watch` 保留输出目录及所有子目录，每轮开始时只删除文件，避免开发者工具在目录删除、重建后继续使用旧的子文件缓存。仅保留 `dist/wx` 根目录不够。文件名继续使用正常的内容哈希，旧文件会在下一轮清理。
-
-输出写入完成后，插件生成未被应用引用的 `hmr/watch.js`，内容只有一条随机 UUID 注释，作为最后的文件变更提示；不修改 `app.js` 或 `app.json`，也不保证多文件原子更新。编译或写入失败时不会发布完成标记，但由于清理发生在构建开始时，**不会保留上一轮完整产物**。
-
-不要在开发者工具仍打开项目时手动删除输出目录。正式发布前应运行不带 `--watch` 的完整构建。此适配不改变支付宝、单次生产构建及开发服务器 HMR 的行为。
-
-区别在于：`build:wx --watch` / `build:zfb --watch` 默认打包的是生产版本，而 `dev:wx` 下的 `hmr.mode: 'rebuild'` 打包的是开发版本。监听构建不启用 Vite 开发服务器的 HMR 协议，也不会保留 React 状态。
+区别在于：`build:wx --watch` / `build:zfb --watch` 打包的是生产版本，而 `dev:wx` 下的 `hmr.mode: 'rebuild'` 打包的是开发版本。
 
 :::note
 使用 `build:wx --watch` 时，必须设置 `projectConfigJson.setting.compileHotReLoad: false`，否则微信开发者工具可能刷新异常；切回 `dev:wx` 时恢复为 `true`。
