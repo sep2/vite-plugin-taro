@@ -3,11 +3,24 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import type { Plugin } from 'vite'
+import type { InlineConfig, Plugin } from 'vite'
 import { build, resolveConfig } from 'vite'
 import { createMiniWatchPlugin } from './create-mini-watch-plugin.ts'
 
 const completionPattern = /\/\/ vpt-build:([\da-f-]+)\n$/
+
+/** Supplies one side-effectful entry through Vite's real resolver without needing application dependencies. */
+function createVirtualApp(): Plugin {
+    return {
+        name: 'test:virtual-app',
+        resolveId(id) {
+            return id === 'virtual:watch-app' ? '\0virtual:watch-app' : null
+        },
+        load(id) {
+            return id === '\0virtual:watch-app' ? 'globalThis.watchFixture = true;' : null
+        }
+    }
+}
 
 test('applies live output policy only to build/watch, including production-mode watchers', async () => {
     const watched = await resolveConfig(
@@ -35,20 +48,101 @@ test('applies live output policy only to build/watch, including production-mode 
     }
 })
 
+test('rejects configured output arrays before starting a watch build', async () => {
+    await assert.rejects(
+        resolveConfig(
+            {
+                configFile: false,
+                build: { watch: {}, rolldownOptions: { output: [{}, {}] } },
+                plugins: [createMiniWatchPlugin()]
+            },
+            'build'
+        ),
+        /Mini Program watch requires one configured Rolldown output\./
+    )
+})
+
+test('rejects missing and asset-only App entries without changing previously published files', async (context) => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-watch-invalid-entry-'))
+    context.after(() => fs.rm(root, { recursive: true, force: true }))
+    const outDir = path.join(root, 'dist')
+    const appFile = path.join(outDir, 'app.js')
+    const previous = '// previous completed App entry\n'
+    await fs.mkdir(outDir)
+    await fs.writeFile(appFile, previous)
+    for (const assetOnly of [false, true]) {
+        const fixture: Plugin = {
+            ...createVirtualApp(),
+            generateBundle() {
+                if (assetOnly) {
+                    this.emitFile({ type: 'asset', fileName: 'app.js', source: 'not an entry chunk' })
+                }
+            }
+        }
+        await assert.rejects(
+            build({
+                root,
+                configFile: false,
+                logLevel: 'silent',
+                // A single physical write exercises the same hooks without leaving a watcher running after the error.
+                plugins: [fixture, { ...createMiniWatchPlugin(), apply: 'build' }],
+                build: {
+                    outDir,
+                    rolldownOptions: {
+                        input: { 'other.js': 'virtual:watch-app' },
+                        output: { entryFileNames: '[name]' }
+                    }
+                }
+            }),
+            /Mini Program watch output requires an app\.js entry chunk\./
+        )
+        assert.equal(await fs.readFile(appFile, 'utf8'), previous)
+        assert.deepEqual(await fs.readdir(outDir), ['app.js'])
+    }
+})
+
+test('rejects publication without an App handoff, including after an earlier successful build', async (context) => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-watch-entry-handoff-'))
+    context.after(() => fs.rm(root, { recursive: true, force: true }))
+    const outDir = path.join(root, 'dist')
+    const appFile = path.join(outDir, 'app.js')
+    const plugin = { ...createMiniWatchPlugin(), apply: 'build' as const }
+    const config = {
+        root,
+        configFile: false,
+        logLevel: 'silent',
+        build: {
+            outDir,
+            rolldownOptions: {
+                input: { 'app.js': 'virtual:watch-app' },
+                output: { entryFileNames: '[name]' }
+            }
+        }
+    } satisfies InlineConfig
+    async function rejectMissingHandoff(): Promise<void> {
+        await assert.rejects(
+            build({
+                ...config,
+                // Suppress only the handoff; Vite still supplies the real buildStart/writeBundle contexts. Reusing the
+                // descriptor after success proves buildStart discards the previous generation rather than publishing it.
+                plugins: [createVirtualApp(), { ...plugin, generateBundle: undefined }]
+            }),
+            /Mini Program watch has no completed App entry to publish\./
+        )
+        assert.doesNotMatch(await fs.readFile(appFile, 'utf8'), completionPattern)
+    }
+    await rejectMissingHandoff()
+    await build({ ...config, plugins: [createVirtualApp(), plugin] })
+    assert.match(await fs.readFile(appFile, 'utf8'), completionPattern)
+    await rejectMissingHandoff()
+})
+
 test('keeps the App chunk in generate-only output instead of transferring it to the file writer', async () => {
     const result = await build({
         configFile: false,
         logLevel: 'silent',
         plugins: [
-            {
-                name: 'test:virtual-app',
-                resolveId(id) {
-                    return id === 'virtual:watch-app' ? '\0virtual:watch-app' : null
-                },
-                load(id) {
-                    return id === '\0virtual:watch-app' ? 'globalThis.watchFixture = true;' : null
-                }
-            },
+            createVirtualApp(),
             // Exercise the generate-only lifecycle without starting a persistent watcher in this single-build test.
             { ...createMiniWatchPlugin(), apply: 'build' }
         ],
