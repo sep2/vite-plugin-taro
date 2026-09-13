@@ -130,8 +130,8 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  *
  * The post-order `generateBundle` hook gathers all JavaScript chunks, finalizes them as one operation, and only then mutates the
  * bundle. It assigns converted code, clears invalid source maps, removes Vite's intermediate browser stylesheet, and always
- * emits the contract-selected global file. An empty file is required because the App stylesheet imports it even when the application
- * currently has no styles. Native output hooks run afterward and emit Page/component companion files independently.
+ * emits the contract-selected global file, including the HTML compatibility base even when the application has no styles.
+ * Native output hooks run afterward and emit Page/component companion files independently.
  *
  * ### 5b. Development commit
  *
@@ -317,7 +317,7 @@ export function createMiniStylePlugin(
                     }
                 })
 
-                // Step 5: always emit the imported global file, including an empty file for applications without styles.
+                // Step 5: always emit the imported global file, including the HTML base for applications without styles.
                 this.emitFile({ type: 'asset', fileName: contract.styles.globalFileName, source: finalized.stylesheet })
             }
         },

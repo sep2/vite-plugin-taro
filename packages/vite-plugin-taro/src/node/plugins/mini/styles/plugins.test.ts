@@ -272,7 +272,7 @@ test('finalizes the complete compiler stylesheet before later WX output hooks', 
     }
 })
 
-test('emits an empty global stylesheet when the application has no styles', async () => {
+test('emits the HTML base once even when the application has no styles', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'vpt-empty-wxss-'))
 
     try {
@@ -292,7 +292,10 @@ test('emits an empty global stylesheet when the application has no styles', asyn
             }
         })
 
-        assert.equal(await readFile(path.join(root, 'dist/assets/global.wxss'), 'utf8'), '')
+        const css = await readFile(path.join(root, 'dist/assets/global.wxss'), 'utf8')
+        assert.equal((css.match(/\.h5-span/g) ?? []).length, 1)
+        assert.match(css, /display:\s*inline/)
+        assert.doesNotMatch(css, /@layer/)
     } finally {
         await rm(root, { recursive: true, force: true })
     }

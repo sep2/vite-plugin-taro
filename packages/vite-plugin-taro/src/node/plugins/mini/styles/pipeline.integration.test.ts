@@ -18,6 +18,12 @@ const contract = {
 } satisfies Pick<MiniContract, 'styles'>
 const globalWxssFileName = contract.styles.globalFileName
 
+function assertGlobalStylesheet(css: string, applicationCss: string): void {
+    assert.equal((css.match(/\.h5-span/g) ?? []).length, 1)
+    assert.match(css, /display:\s*inline/)
+    assert.ok(css.endsWith(applicationCss))
+}
+
 test('publishes processed CSS and live topology without identical rewrites', async () => {
     const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-style-plugin-')))
     const appId = normalizePath(path.join(root, 'app.js'))
@@ -142,7 +148,7 @@ test('publishes processed CSS and live topology without identical rewrites', asy
         await engine.ensureCurrentBuildFinish()
         await waitForEventCount(outputResults, 1)
         const globalWxssPath = path.join(outDir, globalWxssFileName)
-        assert.equal(await readFile(globalWxssPath, 'utf8'), '.app { color: #ff0000; }\n')
+        assertGlobalStylesheet(await readFile(globalWxssPath, 'utf8'), '.app { color: #ff0000; }\n')
         await engine.registerClient('style-plugin-test')
 
         const colorResultCount = hmrResults.length
@@ -151,11 +157,11 @@ test('publishes processed CSS and live topology without identical rewrites', asy
         await waitForPublishedStyle(
             publishedStyles,
             colorStyleCount,
-            (wxss) => wxss === '.app { color: #0000ff; }\n',
+            (wxss) => wxss.endsWith('.app { color: #0000ff; }\n'),
             hmrResults
         )
         await waitForEventCount(hmrResults, colorResultCount + 1)
-        assert.equal(await readFile(globalWxssPath, 'utf8'), '.app { color: #0000ff; }\n')
+        assertGlobalStylesheet(await readFile(globalWxssPath, 'utf8'), '.app { color: #0000ff; }\n')
 
         const additionResultCount = hmrResults.length
         const additionStyleCount = publishedStyles.length
@@ -200,7 +206,7 @@ test('publishes processed CSS and live topology without identical rewrites', asy
         assert.equal(await readFile(globalWxssPath, 'utf8'), durableWxss)
 
         await styles.finalizeUpdate([], writeStyle)
-        assert.equal(await readFile(globalWxssPath, 'utf8'), '.app { color: black; }\n')
+        assertGlobalStylesheet(await readFile(globalWxssPath, 'utf8'), '.app { color: black; }\n')
     } finally {
         await engine.close()
         await publicationWork

@@ -4,6 +4,58 @@ import { createMiniTransformer } from './create-mini-transformer.ts'
 
 const classSet = new Set(['px-1.25', 'py-5.5', 'w-1/2'])
 
+test('provides only scoped HTML display defaults once in every complete global projection', async () => {
+    const transformer = createMiniTransformer()
+    const css = await transformer.transformStylesheet('')
+    assert.match(css, /\.h5-span,\s*\.h5-a\s*\{\s*display:\s*inline/)
+    assert.match(css, /\.h5-button,\s*\.h5-input,\s*\.h5-textarea,\s*\.h5-progress\s*\{\s*display:\s*inline-block/)
+    assert.match(css, /\.h5-template,\s*\.h5-datalist\s*\{\s*display:\s*none/)
+    assert.doesNotMatch(css, /\.h5-(?:li|meter)\b/)
+    assert.equal((css.match(/\.h5-span/g) ?? []).length, 1)
+    assert.deepEqual(
+        Array.from(css.matchAll(/([\w-]+)\s*:/g), (match) => match[1]),
+        ['display', 'display', 'display']
+    )
+    assert.doesNotMatch(css, /@layer|!important/)
+    // Runtime provides br's newline; unmapped tags and the unsupported select need more than CSS.
+    assert.doesNotMatch(css, /\.h5-(?:br|ins|select|table|tr|td|th|thead|tbody|tfoot|h[1-6])\b/)
+    assert.doesNotMatch(css, /(?:^|})\s*(?:view|text|navigator)\s*\{/)
+    assert.equal(await transformer.transformStylesheet(''), css)
+})
+
+test('prepends HTML defaults before flattened utilities and application overrides', async () => {
+    const css = await createMiniTransformer().transformStylesheet(`
+        @layer theme, base, components, utilities;
+        @layer utilities { .block { display: block } .flex { display: flex } }
+        @layer base { span { display: inline-block } }
+        .custom { display: grid }
+    `)
+    const baseIndex = css.indexOf('display: inline;')
+    const overrideIndex = css.lastIndexOf('display: inline-block')
+    assert.ok(baseIndex >= 0)
+    assert.ok(overrideIndex > baseIndex)
+    assert.ok(css.indexOf('.block') > overrideIndex)
+    assert.ok(css.indexOf('.flex') > overrideIndex)
+    assert.ok(css.indexOf('.custom') > css.indexOf('.flex'))
+    assert.doesNotMatch(css, /@layer/)
+})
+
+test('preserves explicit and implicit application layer ordering without reserving base', async () => {
+    for (const order of ['', '@layer utilities, base;', '@layer base, utilities;']) {
+        const css = await createMiniTransformer().transformStylesheet(`
+            ${order}
+            @layer utilities { .utility { display: block } }
+            @layer base { .application-base { display: flex } }
+        `)
+        const utilityIndex = css.indexOf('.utility')
+        const baseIndex = css.indexOf('.application-base')
+        assert.ok(utilityIndex > css.indexOf('.h5-span'))
+        assert.ok(baseIndex > css.indexOf('.h5-span'))
+        assert.equal(baseIndex < utilityIndex, order === '@layer base, utilities;')
+        assert.doesNotMatch(css, /@layer/)
+    }
+})
+
 test('maps HTML selectors without another reset or changing native view selectors', async () => {
     const css = await createMiniTransformer().transformStylesheet(
         'div.card, span { color: red } a[href] { color: blue } view, .utility { display: flex }'
