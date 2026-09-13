@@ -242,6 +242,7 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         './taro-h5/dist/api/index',
         './react',
         './plugin-framework-react/runtime',
+        './plugin-html/runtime',
         './plugin-platform-weapp/runtime',
         './plugin-platform-weapp/components-react',
         './plugin-platform-weapp/runtime-utils',
@@ -258,6 +259,17 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         assert.equal(packageJson.dependencies[`@tarojs/${name}`], undefined)
         assert.equal(packageJson.devDependencies[`@tarojs/${name}`], '4.2.1')
     }
+
+    assert.equal(packageJson.devDependencies['@tarojs/plugin-html'], '4.2.1')
+    assert.equal(packageJson.dependencies['@tarojs/plugin-html'], undefined)
+    const htmlOutputRoot = path.join(runtimePackageDistRoot, 'plugin-html')
+    assert.deepEqual((await listRelativeFiles(htmlOutputRoot)).toSorted(), ['runtime.js', 'runtime.js.map'])
+    await assertFilesCopied(path.join(resolveAdapterDependencyRoot('@tarojs/plugin-html'), 'dist'), htmlOutputRoot, [
+        'runtime.js',
+        'runtime.js.map'
+    ])
+    const htmlRuntime = await readFile(path.join(htmlOutputRoot, 'runtime.js'), 'utf8')
+    assert.doesNotMatch(htmlRuntime, /new Set\(\[\]\)/)
 
     const apiSourceRoot = resolveAdapterDependencyRoot('@tarojs/api')
     const apiOutputRoot = path.join(runtimePackageDistRoot, 'api')

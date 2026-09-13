@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -32,6 +32,44 @@ test('handles physical and ignored query fragments before watcher cleanup', asyn
 
     await Reflect.apply(closeWatcher, {}, [])
     await Reflect.apply(closeWatcher, {}, [])
+})
+
+test('invalidates Tailwind compiler dependencies through the HMR hook', async () => {
+    const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'vpt-style-hot-update-')))
+
+    try {
+        const styleId = path.join(root, 'app.css')
+        const themeId = path.join(root, 'theme.css')
+        const source = ['@import "tailwindcss";', '@import "./theme.css";', '@source inline("bg-brand");'].join('\n')
+        await writeFile(themeId, '@theme { --color-brand: #123456; }')
+        const styles = createMiniStylePlugin(contract, [path.join(root, 'app.ts')])
+        const transformHook = styles.transform
+        const hotUpdateHook = styles.hotUpdate
+        assert.ok(transformHook)
+        assert.ok(hotUpdateHook)
+        const transform = typeof transformHook === 'function' ? transformHook : transformHook.handler
+        const hotUpdate = typeof hotUpdateHook === 'function' ? hotUpdateHook : hotUpdateHook.handler
+        // Collect compiler inputs to verify the changed theme is a registered dependency.
+        const watchedFiles = new Set<string>()
+        const context = {
+            environment: { config: { root } },
+            addWatchFile(file: string) {
+                watchedFiles.add(normalizePath(file))
+            }
+        }
+
+        const initial = await Reflect.apply(transform, context, [source, styleId])
+        assert.match(initial.code, /#123456/)
+        assert.ok(watchedFiles.has(normalizePath(themeId)))
+
+        await writeFile(themeId, '@theme { --color-brand: #654321; }')
+        await Reflect.apply(hotUpdate, context, [{ file: themeId }])
+        const updated = await Reflect.apply(transform, context, [source, styleId])
+        assert.match(updated.code, /#654321/)
+        assert.doesNotMatch(updated.code, /#123456/)
+    } finally {
+        await rm(root, { recursive: true, force: true })
+    }
 })
 
 test('transforms WXSS and JavaScript from one supplied class set without source discovery', async () => {

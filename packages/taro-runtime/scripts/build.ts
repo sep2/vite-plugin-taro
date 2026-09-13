@@ -29,6 +29,7 @@ function build(): void {
     copyTaroH5Runtime()
     copyPackageDist('@tarojs/react')
     copyFrameworkReactAdapter()
+    copyHtmlRuntime()
     platformPackages.forEach(copyPlatformPackage)
     copyH5Platform()
     relocateRuntimeDeclarations(distRoot)
@@ -124,6 +125,21 @@ function copyFrameworkReactAdapter(): void {
     mkdirSync(outputRoot, { recursive: true })
     copyFileSync(path.join(dependencyDist, 'runtime.js'), path.join(outputRoot, 'runtime.js'))
     copyFileSync(path.join(dependencyDist, 'runtime.js.map'), path.join(outputRoot, 'runtime.js.map'))
+}
+
+/**
+ * Keeps only HTML's runtime hooks: tag/attribute/event mappings and their incremental DOM update counterparts.
+ * The pnpm patch fills upstream's empty tag sets, which its compiler normally rewrites on disk. We never execute that
+ * compiler or copy its CLI dependencies. Marking this entry side-effectful preserves hook registration during tree shaking.
+ * No html.css/html5.css is copied: VPT already owns the Tailwind reset; selector conversion belongs to its style pipeline.
+ */
+function copyHtmlRuntime(): void {
+    const dependency = '@tarojs/plugin-html'
+    const output = resolveOutputRoot(dependency)
+    mkdirSync(output, { recursive: true })
+    for (const entry of ['runtime.js', 'runtime.js.map']) {
+        copyFileSync(path.join(resolveDependencyDist(dependency), entry), path.join(output, entry))
+    }
 }
 
 /**

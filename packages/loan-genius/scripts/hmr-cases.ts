@@ -336,8 +336,8 @@ async function runNavigationFlows(context: HmrContext): Promise<void> {
         textFlow(
             '23-history-current-page',
             'src/pages/calculator/history/index.tsx',
-            '<Text>计算历史</Text>',
-            '<Text>计算历史·23</Text>'
+            '<span>计算历史</span>',
+            '<span>计算历史·23</span>'
         ),
         () => assertRoute(context, historyRoute)
     )

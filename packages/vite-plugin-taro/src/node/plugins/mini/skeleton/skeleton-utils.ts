@@ -133,6 +133,23 @@ export function collectTemplateComponentConfig(
             'static-image',
             'text',
             'static-text',
+            // HTML strings do not import @tarojs/components exports: <a> can become navigator without a Navigator import.
+            // Include every additional upstream HTML mapping target so hydration never references an absent native template.
+            // This small fixed set also covers document.createElement/innerHTML, which a JSX-only scanner would miss.
+            'navigator',
+            'web-view',
+            'input',
+            'checkbox',
+            'radio',
+            'slot',
+            'form',
+            'audio',
+            'video',
+            'canvas',
+            'label',
+            'textarea',
+            'progress',
+            'button',
             ...renderedComponentNames.filter((name) => name !== customWrapperName)
         ]),
         exclude: new Set(),

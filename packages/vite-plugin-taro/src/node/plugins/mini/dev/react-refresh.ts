@@ -1,14 +1,8 @@
 import path from 'node:path'
-import type { IfStatement } from '@oxc-project/types'
-import type { WalkerEnter } from 'oxc-walker'
-import type { RolldownMagicString } from 'rolldown'
 import { normalizePath, type Plugin } from 'vite'
-import { memoize } from '../../../utils/memoize.ts'
 import { createExactModuleIdFilter } from '../../../utils/modules.ts'
-import { transformWithOxcWalker } from '../../../utils/oxc-transform.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 
-const reactRefreshPreambleError = "@vitejs/plugin-react can't detect preamble. Something is wrong."
 const reactRefreshRuntimeId = '/@react-refresh'
 const reactReconcilerDevelopmentId = normalizePath(
     path.join(
@@ -31,32 +25,9 @@ export function createMiniReactRefreshDefines(isDevelopment: boolean): Record<st
 }
 
 /**
- * Refresh protocol globals that must live on the real Mini Program JavaScript global:
- * - `__registerBeforePerformReactRefresh` is assigned at module evaluation so the HMR client can register work that
- *   must finish before a refresh. Leaving it on `window` throws before the refresh runtime can initialize.
- * - `__getReactRefreshIgnoredExports` is an optional extension point read while validating a refresh boundary.
- *   Leaving that read on the nonexistent `window` crashes every update validation pass.
- *
- * Keeping this list explicit prevents the adapter from rewriting unrelated browser accesses if the refresh runtime
- * gains new code. Any future React Refresh protocol addition therefore requires a deliberate compatibility decision.
- */
-const refreshRuntimeWindowGlobals = ['__registerBeforePerformReactRefresh', '__getReactRefreshIgnoredExports'] as const
-
-/**
- * Creates the serve-only React Refresh adaptation transforms for a Mini Program target.
- *
- * @vitejs/plugin-react assumes an HTML preamble and browser global scope; Mini Program hosts provide neither. Each
- * transform owns one distinct compatibility boundary:
- *
- * - The refresh runtime is selected by exact ID. It rewrites only the two browser protocol globals that React Refresh evaluates
- *   and injects its renderer hook at module evaluation, replacing the missing HTML preamble.
- * - React Reconciler is selected by exact physical ID. Its renderer injection receives a static dependency on the refresh
- *   runtime, so hook installation cannot race renderer initialization during cold startup.
- *
- * These adaptations deliberately remain serve-only plugin transforms rather than target-wide production behavior. Reconciler's
- * static refresh dependency establishes hook installation order. The Mini config lowers React's free DevTools-hook protocol with
- * a serve-only native Oxc define. A filtered post-transform removes the browser-preamble assertion before both complete chunk
- * rendering and incremental factory generation. Removing it only during renderChunk leaves HMR patches unadapted.
+ * Installs the missing HTML preamble inside the Refresh runtime. Boundary modules import that runtime before evaluating
+ * their preamble guards, including during incremental updates. Reconciler also imports it before registering its renderer.
+ * The shared Rolldown injection binds free `window` references to the same Taro window in the preamble and boundaries.
  */
 export function createMiniReactRefreshTransforms(): Plugin[] {
     return [
@@ -65,10 +36,9 @@ export function createMiniReactRefreshTransforms(): Plugin[] {
             apply: 'serve',
             transform: {
                 order: 'post',
-                // The refresh runtime module is id-filtered, so no code scan is needed.
                 filter: { id: createExactModuleIdFilter(reactRefreshRuntimeId) },
-                handler(code, id) {
-                    return fixRefreshRuntime({ code, id })
+                handler(code) {
+                    return transformRefreshRuntime(code)
                 }
             }
         },
@@ -82,111 +52,24 @@ export function createMiniReactRefreshTransforms(): Plugin[] {
                     return injectReactRefreshRendererDependency(code)
                 }
             }
-        },
-        {
-            name: 'vpt:mini-refresh-preamble-guard',
-            apply: 'serve',
-            transform: {
-                order: 'post',
-                filter: { code: /window\.\$RefreshReg\$/ },
-                handler(code, id) {
-                    return removeRefreshPreambleGuard({ code, id })
-                }
-            }
         }
     ]
 }
 
 /**
- * Refresh runtime module: self-inject at evaluation and rewrite its browser protocol globals.
- *
- * In web Vite, an HTML preamble calls `injectIntoGlobalHook(window)` before application
- * modules load. Mini Program hosts have no HTML document or preamble, so nothing performs that bootstrap.
- * The call must live in the refresh runtime module itself:
- * - this module's closure owns `helpersByRendererID`, mounted roots, and the update helpers;
- * - the selected Mini Program HMR runtime chunk cannot call into it because the refresh module is in a later, lazily loaded
- *   chunk and does not exist when the HMR runtime chunk evaluates.
- *
- * Unlike the preamble's `$RefreshReg$` globals, which boundary modules replace with local
- * wrappers, the renderer-hook machinery has no local equivalent. Without this injected call,
- * the runtime never learns about the renderer or mounted roots and updates cannot refresh UI.
- *
- * Appending the call is safe even when React has already registered its renderer: the refresh
- * runtime replays `hook.renderers` during injection, then its patched commit hooks observe all
- * later mounts and remounts. The same module also contains two browser-only `window` protocol
- * accesses; those must point at `globalThis` or evaluation/update validation throws in the host.
+ * Reproduces the browser preamble at runtime evaluation, after its declarations initialize.
+ * The renderer hook belongs to the real global used by Reconciler. The no-op registration and identity signature belong
+ * to the injected Taro window, satisfying upstream guards without replacing module-local Refresh registration.
+ * These shared protocol properties are initialized once per runtime module evaluation, not for each updated boundary.
  */
-function createRefreshRuntimeVisitor(editor: RolldownMagicString): WalkerEnter {
-    // The declarations must execute before self-injection, so the call is appended instead of
-    // prepended. Removing it would leave the web preamble's only essential responsibility
-    // unimplemented in a Mini Program.
-    editor.append('\ninjectIntoGlobalHook(globalThis);')
-
-    return function enter(node) {
-        if (
-            node.type === 'MemberExpression' &&
-            !node.computed &&
-            node.object.type === 'Identifier' &&
-            node.object.name === 'window' &&
-            node.property.type === 'Identifier' &&
-            refreshRuntimeWindowGlobals.some((globalName) => globalName === node.property.name)
-        ) {
-            // The language global is the shared App heap used by the dev runtime and hook injection. Only replacing the object
-            // range preserves the upstream runtime byte-for-byte otherwise and prevents unrelated `window` expressions from
-            // being silently adapted.
-            editor.overwrite(node.object.start, node.object.end, 'globalThis')
-        }
+export function transformRefreshRuntime(code: string): { code: string; map: null } {
+    return {
+        code: `${code}
+injectIntoGlobalHook(globalThis);
+window.$RefreshReg$ = () => {};
+window.$RefreshSig$ = () => (type) => type;`,
+        map: null
     }
-}
-
-/**
- * Removes only the generated browser assertion at the shared module-transform boundary.
- * The native hook filter avoids parsing nonmatching modules. Matching modules cost O(n) time and memory; unchanged modules
- * reuse the bundler's transform cache. Refresh registration and unrelated window expressions remain untouched.
- */
-export function removeRefreshPreambleGuard({ code, id }: { code: string; id: string }) {
-    return transformWithOxcWalker({
-        code,
-        filename: id,
-        sourcemap: false,
-        createVisitor(editor) {
-            return function enter(node) {
-                if (node.type === 'IfStatement' && isRefreshPreambleGuard(node)) {
-                    editor.remove(node.start, node.end)
-                    this.skip()
-                }
-            }
-        }
-    })
-}
-
-/** Identifies only the browser-preamble assertion emitted by Rolldown's React Refresh wrapper. */
-function isRefreshPreambleGuard(statement: IfStatement): boolean {
-    const test = statement.test
-    const body = statement.consequent
-    if (body.type !== 'BlockStatement' || body.body.length !== 1) {
-        return false
-    }
-    const thrown = body.body[0]
-
-    return (
-        statement.alternate === null &&
-        test.type === 'UnaryExpression' &&
-        test.operator === '!' &&
-        test.argument.type === 'MemberExpression' &&
-        !test.argument.computed &&
-        test.argument.object.type === 'Identifier' &&
-        test.argument.object.name === 'window' &&
-        test.argument.property.type === 'Identifier' &&
-        test.argument.property.name === '$RefreshReg$' &&
-        thrown?.type === 'ThrowStatement' &&
-        thrown.argument.type === 'NewExpression' &&
-        thrown.argument.callee.type === 'Identifier' &&
-        thrown.argument.callee.name === 'Error' &&
-        thrown.argument.arguments.length === 1 &&
-        thrown.argument.arguments[0]?.type === 'Literal' &&
-        thrown.argument.arguments[0].value === reactRefreshPreambleError
-    )
 }
 
 /** Makes renderer hook injection statically depend on the refresh runtime. */
@@ -200,22 +83,3 @@ export function injectReactRefreshRendererDependency(code: string): { code: stri
         map: null
     }
 }
-
-export function transformRefreshRuntime({ code, id }: { code: string; id: string }) {
-    return transformWithOxcWalker({
-        code,
-        filename: id,
-        sourcemap: false,
-        createVisitor: createRefreshRuntimeVisitor
-    })
-}
-
-/*
- * The memoized transform owns a mutable one-entry cache keyed only by source bytes. The refresh runtime is immutable between
- * complete generations, so reparsing it would repeat O(source bytes) Oxc work without observing new state. A source key still
- * produces a fresh result after a dependency upgrade or real module edit, unlike an ID-keyed or once-only cache detached from
- * its input.
- */
-const fixRefreshRuntime = memoize(transformRefreshRuntime, {
-    getCacheKey: ({ code }) => code
-})

@@ -13,6 +13,7 @@ overrides:
 
 patchedDependencies:
   '@tarojs/plugin-framework-react@4.2.1': 51c0ade7887768fa8c452bf23cb091853c96f1433f43f32f5f3b54e299e0274f
+  '@tarojs/plugin-html@4.2.1': d4a3d8c6813a79b8763ee4e0f567d933f41ce57449697effd1b98e494e469a49
   '@tarojs/react@4.2.1': 3e440987fc068060703baa7a7c0a3aee2b53f653f13e8c0e81f50a5429794d46
   '@tarojs/runtime@4.2.1': d83feee28999b5dbe9a9376b59b899f6f10aa991bc7cf0de1647abebf523d92b
   canvas-confetti@1.9.4: 3f4a594e24a7e49abb6d1e667918977b4679fe1b93dc4e9efe04f87e9539ea36
@@ -238,6 +239,9 @@ importers:
       '@tarojs/plugin-framework-react':
         specifier: 4.2.1
         version: 4.2.1(patch_hash=51c0ade7887768fa8c452bf23cb091853c96f1433f43f32f5f3b54e299e0274f)(@tarojs/helper@4.2.1(supports-color@7.2.0))(@tarojs/runtime@4.2.1(patch_hash=d83feee28999b5dbe9a9376b59b899f6f10aa991bc7cf0de1647abebf523d92b))(@tarojs/shared@4.2.1)(react@19.3.0)(vite@8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0))
+      '@tarojs/plugin-html':
+        specifier: 4.2.1
+        version: 4.2.1(patch_hash=d4a3d8c6813a79b8763ee4e0f567d933f41ce57449697effd1b98e494e469a49)(@tarojs/helper@4.2.1(supports-color@7.2.0))(@tarojs/runtime@4.2.1(patch_hash=d83feee28999b5dbe9a9376b59b899f6f10aa991bc7cf0de1647abebf523d92b))(@tarojs/shared@4.2.1)
       '@tarojs/plugin-platform-alipay':
         specifier: 4.2.1
         version: 4.2.1(@tarojs/service@4.2.1(supports-color@7.2.0))(@tarojs/shared@4.2.1)
@@ -2273,6 +2277,14 @@ packages:
         optional: true
       webpack:
         optional: true
+
+  '@tarojs/plugin-html@4.2.1':
+    resolution: {integrity: sha512-GPB8P1OkmGvMfwtelOGiERVET5DoPpcpFobQVW7cgY4IyYvtPRUjV/jcIBRHmGE5J+LkF/r6uEPBSF8hioKN+Q==}
+    engines: {node: '>= 18'}
+    peerDependencies:
+      '@tarojs/helper': 4.2.1
+      '@tarojs/runtime': 4.2.1
+      '@tarojs/shared': 4.2.1
 
   '@tarojs/plugin-platform-alipay@4.2.1':
     resolution: {integrity: sha512-/+AWN8uCaC8btkx7sD5ByoH8YpWWS1r0TkowQGkp+UEhO+xh2Fi42ujucFFDt2zsP5OxPN9WnN57exu2joogGg==}
@@ -6750,6 +6762,12 @@ snapshots:
     optionalDependencies:
       react: 19.3.0
       vite: 8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0)
+
+  '@tarojs/plugin-html@4.2.1(patch_hash=d4a3d8c6813a79b8763ee4e0f567d933f41ce57449697effd1b98e494e469a49)(@tarojs/helper@4.2.1(supports-color@7.2.0))(@tarojs/runtime@4.2.1(patch_hash=d83feee28999b5dbe9a9376b59b899f6f10aa991bc7cf0de1647abebf523d92b))(@tarojs/shared@4.2.1)':
+    dependencies:
+      '@tarojs/helper': 4.2.1(supports-color@7.2.0)
+      '@tarojs/runtime': 4.2.1(patch_hash=d83feee28999b5dbe9a9376b59b899f6f10aa991bc7cf0de1647abebf523d92b)
+      '@tarojs/shared': 4.2.1
 
   '@tarojs/plugin-platform-alipay@4.2.1(@tarojs/service@4.2.1(supports-color@7.2.0))(@tarojs/shared@4.2.1)':
     dependencies:

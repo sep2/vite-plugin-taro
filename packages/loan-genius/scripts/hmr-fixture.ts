@@ -231,8 +231,8 @@ async function instrumentSources(fixture: LoanHmrFixture): Promise<void> {
                 "import { getStorageData } from '@utils'\nimport { hmrMarker } from './hmr-marker'"
             ],
             [
-                '            <NavigationBar>\n                <Text>计算历史</Text>',
-                '            <Text id="loan-hmr-marker">{hmrMarker}</Text>\n            <NavigationBar>\n                <Text>计算历史</Text>'
+                '            <NavigationBar>\n                <span>计算历史</span>',
+                '            <span id="loan-hmr-marker">{hmrMarker}</span>\n            <NavigationBar>\n                <span>计算历史</span>'
             ]
         ])
     ])

@@ -1,7 +1,7 @@
 import type { Node, StringLiteral, TemplateElement } from '@oxc-project/types'
 import { splitCandidateTokens } from '@tailwindcss-mangle/engine'
 import { escape as escapeClassName, MappingChars2String } from '@weapp-core/escape'
-import { createStyleHandler, type IStyleHandlerOptions } from '@weapp-tailwindcss/postcss'
+import { createStyleHandler, type IStyleHandlerOptions, postcssHtmlTransform } from '@weapp-tailwindcss/postcss'
 import { type WalkerEnter, walk } from 'oxc-walker'
 import { RolldownMagicString } from 'rolldown'
 import { parseSync } from 'rolldown/utils'
@@ -26,6 +26,12 @@ const miniStyleHandlerOptions = {
      * by application CSS. Disabling both entry points preserves those declarations and lets the compiler build
      * eliminate Autoprefixer and its browser-data graph.
      */
+    // Tailwind reset and HTML selector mapping solve different problems: .card still matches a mapped <div>, but
+    // `div` must become `.h5-div`, the class maintained by Taro's HTML hooks. Reuse the selector pass already exported by
+    // our style dependency inside this pipeline; do not add Taro's compiler/PostCSS stack or a second browser reset.
+    postcssOptions: {
+        plugins: [postcssHtmlTransform({ platform: 'weapp' })]
+    },
     autoprefixer: false,
     cssPresetEnv: { autoprefixer: false },
     cssCalc: false,

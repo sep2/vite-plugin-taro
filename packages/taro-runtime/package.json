@@ -66,6 +66,7 @@
             "default": "./dist/react/react.esm.js"
         },
         "./plugin-framework-react/runtime": "./dist/plugin-framework-react/runtime.js",
+        "./plugin-html/runtime": "./dist/plugin-html/runtime.js",
         "./plugin-platform-weapp/runtime": "./dist/plugin-platform-weapp/runtime.js",
         "./plugin-platform-weapp/components-react": {
             "types": "./dist/plugin-platform-weapp/types/components-react.d.ts",
@@ -104,6 +105,7 @@
         "./dist/runtime/dom-external/index.js",
         "./dist/react/react.esm.js",
         "./dist/plugin-framework-react/runtime.js",
+        "./dist/plugin-html/runtime.js",
         "./dist/plugin-platform-weapp/runtime.js",
         "./dist/plugin-platform-alipay/runtime.js",
         "**/*.css",
@@ -156,6 +158,7 @@
         "@tarojs/api": "4.2.1",
         "@tarojs/components": "4.2.1",
         "@tarojs/plugin-framework-react": "4.2.1",
+        "@tarojs/plugin-html": "4.2.1",
         "@tarojs/plugin-platform-alipay": "4.2.1",
         "@tarojs/plugin-platform-h5": "4.2.1",
         "@tarojs/plugin-platform-weapp": "4.2.1",

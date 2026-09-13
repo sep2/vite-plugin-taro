@@ -4,6 +4,11 @@
 // @ts-expect-error: The active Mini contract resolves its Taro target initialization module.
 import '\0vpt:taro-target-runtime'
 
+// Native templates cannot render HTML names directly. These upstream hooks translate div -> view, img -> image,
+// href -> url and click -> tap, including later attribute removal and event-listener changes, not just first render.
+// Keep registration in the shared runtime dependency, rather than App/Page bodies that execute again during HMR.
+import 'vite-plugin-taro-runtime/plugin-html/runtime'
+
 export { createReactApp } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
 export { default as ReactDOM } from 'vite-plugin-taro-runtime/react'
 export { createPageConfig, createRecursiveComponentConfig } from 'vite-plugin-taro-runtime/runtime/mini'

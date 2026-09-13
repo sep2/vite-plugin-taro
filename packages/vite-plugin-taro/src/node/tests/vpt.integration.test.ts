@@ -131,6 +131,44 @@ function collectModuleIds(output: BuildOutput): string[] {
         .map(normalizePath)
 }
 
+for (const target of ['wx', 'zfb'] as const) {
+    test(`builds HTML-only ${target} pages with mapped native templates and CSS`, async () => {
+        await inspectFixtureBuild(
+            {
+                options: createOptions(target),
+                files: {
+                    'src/app.tsx': appSource,
+                    'src/pages/home/index.tsx': `
+                        import './index.css'
+                        export default function Page() {
+                            return <div className="card" onClick={() => document.getElementById('link')?.cloneNode(true)}>
+                                <a id="link" href="/pages/home/index">Home</a>
+                                <input type="checkbox" />
+                                <iframe src="https://example.com" />
+                            </div>
+                        }
+                    `,
+                    'src/pages/home/index.css': 'div.card { color: red }'
+                }
+            },
+            (output) => {
+                const template = String(requireAsset(output, target === 'wx' ? 'base.wxml' : 'base.axml').source)
+                for (const name of ['navigator', 'checkbox', 'radio', 'input', 'web-view']) {
+                    assert.match(template, new RegExp(`<${name}\\s`))
+                }
+                const css = output
+                    .filter(
+                        (item): item is OutputAsset => item.type === 'asset' && /\.(?:wxss|acss)$/.test(item.fileName)
+                    )
+                    .map((item) => String(item.source))
+                    .join('\n')
+                assert.match(css, /\.h5-div\.card/)
+                assert.ok(collectModuleIds(output).some((id) => id.endsWith('/plugin-html/runtime.js')))
+            }
+        )
+    })
+}
+
 test('builds a routed H5 application through the public plugin entry', async () => {
     await inspectFixtureBuild(
         {

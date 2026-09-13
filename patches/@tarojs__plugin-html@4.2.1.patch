@@ -1,0 +1,15 @@
+--- a/dist/runtime.js
++++ b/dist/runtime.js
+@@ -18,8 +18,10 @@
+     };
+     return fn;
+ }
+-const inlineElements = new Set([]);
+-const blockElements = new Set([]);
++// Taro normally fills this set by rewriting runtime.js from its compiler plugin.
++// VPT pins the upstream defaults at install time instead: no CLI, Babel, or per-build file mutation.
++const inlineElements = new Set(['i', 'abbr', 'select', 'acronym', 'small', 'bdi', 'kbd', 'strong', 'big', 'sub', 'sup', 'br', 'mark', 'meter', 'template', 'cite', 'object', 'time', 'code', 'output', 'u', 'data', 'picture', 'tt', 'datalist', 'var', 'dfn', 'del', 'q', 'em', 's', 'embed', 'samp', 'b']);
++const blockElements = new Set(['body', 'svg', 'address', 'fieldset', 'li', 'span', 'article', 'figcaption', 'main', 'aside', 'figure', 'nav', 'blockquote', 'footer', 'ol', 'details', 'p', 'dialog', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'dd', 'header', 'section', 'div', 'hgroup', 'table', 'dl', 'hr', 'ul', 'dt', 'view', 'view-block']);
+ const specialElements = new Map([
+     ['slot', 'slot'],
+     ['form', 'form'],

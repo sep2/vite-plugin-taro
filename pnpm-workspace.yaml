@@ -22,6 +22,7 @@ allowBuilds:
   esbuild: true
 
 patchedDependencies:
+  '@tarojs/plugin-html@4.2.1': patches/@tarojs__plugin-html@4.2.1.patch
   '@tarojs/plugin-framework-react@4.2.1': patches/@tarojs__plugin-framework-react@4.2.1-react19.patch
   '@tarojs/react@4.2.1': patches/@tarojs__react@4.2.1-react19.patch
   '@tarojs/runtime@4.2.1': patches/@tarojs__runtime@4.2.1.patch

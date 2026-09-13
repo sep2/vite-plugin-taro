@@ -13,7 +13,7 @@
 
 ## Skill 安装时检查
 
-在本 skill **根目录**、非沙箱执行：
+在本 skill **根目录**执行。不要仅凭 sandbox 标签跳过检查；若实际执行被系统权限或隔离策略阻止，报告具体错误并请求所需授权或切换环境，不绕过系统限制：
 
 ```bash
 node skills/installer/scripts/check-installation.mjs

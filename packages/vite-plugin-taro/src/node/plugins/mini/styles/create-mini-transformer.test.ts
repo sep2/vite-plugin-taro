@@ -4,6 +4,18 @@ import { createMiniTransformer } from './create-mini-transformer.ts'
 
 const classSet = new Set(['px-1.25', 'py-5.5', 'w-1/2'])
 
+test('maps HTML selectors without another reset or changing native view selectors', async () => {
+    const css = await createMiniTransformer().transformStylesheet(
+        'div.card, span { color: red } a[href] { color: blue } view, .utility { display: flex }'
+    )
+    assert.match(css, /\.h5-div\.card/)
+    assert.match(css, /\.h5-span/)
+    assert.match(css, /\.h5-a\[href\]/)
+    assert.match(css, /view/)
+    assert.match(css, /\.utility/)
+    assert.doesNotMatch(css, /\.h5-view/)
+})
+
 test('rewrites only generated Tailwind classes in strings and template elements', () => {
     const transformer = createMiniTransformer()
     const code = [
