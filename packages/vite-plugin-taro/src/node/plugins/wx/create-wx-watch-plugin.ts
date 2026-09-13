@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Plugin } from 'vite'
+import { cleanOutputFiles } from '../../utils/clean-output-files.ts'
 import { isMiniClientEnvironment } from '../mini/dev/plugins.ts'
 
 /** Adapts ordinary WeChat build/watch output; the serve HMR protocol and other targets are unchanged. */
@@ -35,15 +36,9 @@ export function createWxWatchPlugin(): Plugin {
             const { root, build } = this.environment.config
             const outDir = path.resolve(root, build.outDir)
 
-            mkdirSync(outDir, { recursive: true })
-            // Keep normal content-hashed filenames, but remove obsolete chunks and native companions on every rebuild.
-            // Unlink all files, including the previous hmr/watch.js; retaining directories does not mean retaining files.
-            // This O(output entries) cleanup happens before compilation, so a failed build does NOT preserve good output.
-            for (const entry of readdirSync(outDir, { recursive: true, withFileTypes: true })) {
-                if (!entry.isDirectory()) {
-                    unlinkSync(path.join(entry.parentPath, entry.name))
-                }
-            }
+            // Remove obsolete chunks, native companions and the prior marker without replacing watched directories.
+            // Cleanup happens before compilation, so a failed build does NOT preserve good output.
+            cleanOutputFiles(outDir)
         },
         closeWatcher() {
             closed = true

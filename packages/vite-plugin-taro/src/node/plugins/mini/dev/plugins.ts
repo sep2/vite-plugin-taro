@@ -1,4 +1,6 @@
+import path from 'node:path'
 import { type PluginOption, transformWithOxc } from 'vite'
+import { cleanOutputFiles } from '../../../utils/clean-output-files.ts'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
 import { createExactModuleIdFilter } from '../../../utils/modules.ts'
@@ -52,7 +54,8 @@ export function createMiniDevelopmentPlugin(
                         // Deleting and recreating its directory tree during a dev-server restart detaches the native watcher;
                         // recreating identical paths does not reliably reattach it. Every development mode depends on that
                         // watcher for complete builds and styles, while DevTools mode also uses it for JavaScript patches.
-                        // Preserve watched paths and overwrite their contents. Production builds retain normal output cleanup.
+                        // Startup cleans files below without removing directories. Live rebuilds retain cached assets.
+                        // Production builds retain normal output cleanup.
                         emptyOutDir: false,
                         // Disable maps in resolved environment config as well as final output so Oxc and Babel skip producing
                         // intermediate maps that Rolldown would discard.
@@ -75,6 +78,10 @@ export function createMiniDevelopmentPlugin(
                 // asks bundledDev to create its hard-coded skip-write DevEngine.
                 order: 'post',
                 async handler(server) {
+                    // Clean once before creating the engine. Its live full builds reuse cached asset emissions, so cleaning
+                    // again would delete unchanged native companions. Startup removes every file, including App styles.
+                    cleanOutputFiles(path.resolve(server.config.root, server.config.build.outDir))
+
                     host = await createMiniDevHost({
                         server: server,
                         contract: contract,
@@ -135,8 +142,8 @@ export function createMiniDevelopmentPlugin(
  *    rebuild-mode transaction has completed;
  * 3. let the host replace the wrapper again with the new marker, causing a second App reload.
  *
- * Deleting only the in-memory bundle entry avoids both premature writes. Development sets `emptyOutDir: false`, so the prior
- * physical App stylesheet remains available while complete output is written. The host replaces it exactly once afterward.
+ * Deleting the in-memory bundle entry avoids both premature writes. Startup cleanup removes all physical files; live recovery
+ * builds do not clean, so their prior App stylesheet remains available. The host publishes the stylesheet once afterward.
  * Patch modes first reset delivery and publish matching `hmr/info.js`; rebuild mode has no patch state and writes a fresh marker
  * directly. Incremental HMR never enters this complete-output hook and changes only the imported global stylesheet; rewriting
  * the App root would reload the heap while a JavaScript patch is awaiting acknowledgement. The serve-only plugin leaves

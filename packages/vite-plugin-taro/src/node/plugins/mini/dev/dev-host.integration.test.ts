@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -106,6 +106,13 @@ async function publishSourceGeneration(filePath: string, source: string): Promis
 async function startDevFixture(logger: Logger, host: string, options: VptOptions): Promise<DevFixture> {
     const root = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-dev-test-'))
     const outDir = path.join(root, 'dist')
+    const oldDirectory = path.join(outDir, 'obsolete/nested')
+    await mkdir(oldDirectory, { recursive: true })
+    const directoryInode = (await stat(oldDirectory)).ino
+    const oldFile = path.join(oldDirectory, 'old.js')
+    await writeFile(oldFile, 'previous dev session')
+    const oldAppStyle = path.join(outDir, 'app.wxss')
+    await writeFile(oldAppStyle, 'previous App stylesheet')
     const pagePath = path.join(root, 'src/pages/home/index.tsx')
     await mkdir(path.dirname(pagePath), { recursive: true })
     await writeFile(
@@ -136,7 +143,10 @@ async function startDevFixture(logger: Logger, host: string, options: VptOptions
     })
 
     try {
+        await assert.rejects(readFile(oldAppStyle), { code: 'ENOENT' })
         await server.listen()
+        assert.equal((await stat(oldDirectory)).ino, directoryInode, 'Startup must preserve watched directories')
+        await assert.rejects(readFile(oldFile), { code: 'ENOENT' })
     } catch (error) {
         await server.close()
         await rm(root, { force: true, recursive: true })
@@ -640,7 +650,7 @@ test('prints physical project paths without compromising later patch publication
     assert.match(patches, /healthy generation after invalid control traffic/)
 })
 
-test('keeps development chunk paths stable across complete builds', async (context) => {
+test('preserves live files and directory identities across patches and recovery builds', async (context) => {
     const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions())
     context.after(fixture.close)
     const initialInfoSource = await waitForFile(
@@ -650,6 +660,11 @@ test('keeps development chunk paths stable across complete builds', async (conte
     )
     const initialInfo = parseHmrInfo(initialInfoSource)
     await waitForFile(fixture.appStylePath, (source) => source.includes(initialInfo.buildId), maximumWaitAttempts)
+    const obsoleteDirectory = path.join(fixture.outDir, 'obsolete/nested')
+    await mkdir(obsoleteDirectory, { recursive: true })
+    const directoryInode = (await stat(obsoleteDirectory)).ino
+    const obsoleteFile = path.join(obsoleteDirectory, 'old.js')
+    await writeFile(obsoleteFile, 'live session file')
     const initialFiles = (await readdir(fixture.outDir, { recursive: true })).sort()
     assert.ok(initialFiles.includes(path.join('assets', 'bootstrap.js')), JSON.stringify(initialFiles))
     assert.ok(initialFiles.includes(path.join('assets', 'transport.js')), JSON.stringify(initialFiles))
@@ -660,6 +675,8 @@ test('keeps development chunk paths stable across complete builds', async (conte
         (source) => source.includes('changed before complete build'),
         maximumWaitAttempts
     )
+    assert.equal(await readFile(obsoleteFile, 'utf8'), 'live session file', 'Patches must not clean output')
+    assert.ok((await readFile(fixture.appStylePath, 'utf8')).includes(initialInfo.buildId))
     await sendRuntimeReport(initialInfo, {
         buildId: initialInfo.buildId,
         kind: 'rebuild',
@@ -670,6 +687,8 @@ test('keeps development chunk paths stable across complete builds', async (conte
     )
     await waitForFile(fixture.appStylePath, (source) => source.includes(nextInfo.buildId), maximumWaitAttempts)
     assert.deepEqual((await readdir(fixture.outDir, { recursive: true })).sort(), initialFiles)
+    assert.equal((await stat(obsoleteDirectory)).ino, directoryInode)
+    assert.equal(await readFile(obsoleteFile, 'utf8'), 'live session file')
     await waitForJavaScriptOutput(fixture.outDir, 'changed before complete build', maximumWaitAttempts)
 })
 
