@@ -94,7 +94,7 @@ test('public packages preserve their published entrypoints and scaffold dependen
             assert.equal(project.private, true)
             assert.equal(project.version, '0.0.0')
             assert.equal(project.devDependencies['vite-plugin-taro'], `^${version}`)
-            assert.equal(project.devDependencies.vite, '8.2.2')
+            assert.equal(project.devDependencies.vite, '8.3.0')
         })
     }
 })
