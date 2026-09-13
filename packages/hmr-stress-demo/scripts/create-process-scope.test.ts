@@ -53,6 +53,31 @@ test('scope cleanup kills descendants after their wrapper exits', {
     }
 })
 
+test('scope cleanup escalates when a child ignores SIGTERM', {
+    skip: process.platform === 'win32'
+}, async () => {
+    const scope = createProcessScope()
+    const child = scope.start(
+        process.execPath,
+        [
+            '-e',
+            `
+        process.on('SIGTERM', () => {});
+        setTimeout(() => {}, 10000);
+        console.log('ready');
+    `
+        ],
+        {}
+    )
+    try {
+        await once(child.stdout, 'data')
+        await scope.close()
+        assert.equal(child.signalCode, 'SIGKILL')
+    } finally {
+        await scope.close()
+    }
+})
+
 async function assertEventuallyExited(pid: number): Promise<void> {
     for (const attempt of Array.from({ length: 100 }, (_, index) => index)) {
         try {
