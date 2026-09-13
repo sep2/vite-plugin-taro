@@ -10,8 +10,8 @@ import { createBundleDependenciesPlugin } from './create-bundle-dependencies-plu
 const packageRoot = fileURLToPath(new URL('../', import.meta.url))
 
 // Execute the existing behavioral suites through the published bundle's dependency specialization,
-// not just native TS imports: ESM tree-shaking must preserve HMR scheduling and action delivery.
-for (const suite of ['dev/create-hmr-results-stream', 'dev/host-actions']) {
+// not just native TS imports: disabled dependency stubs must never be reached at runtime.
+for (const suite of ['styles/create-mini-transformer', 'dev/create-hmr-results-stream', 'dev/host-actions']) {
     test(`bundled ${suite} preserves behavior without unused dependencies`, async () => {
         const directory = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-bundle-test-'))
         try {
@@ -37,8 +37,11 @@ for (const suite of ['dev/create-hmr-results-stream', 'dev/host-actions']) {
             const modules = result.output.flatMap((chunk) => (chunk.type === 'chunk' ? Object.keys(chunk.modules) : []))
             assert.ok(modules.length > 0)
             assert.ok(!modules.some((id) => id.includes('/rxjs/dist/cjs/')))
-            assert.ok(modules.some((id) => id.includes('/rxjs/dist/esm/')))
-            assert.ok(!modules.some((id) => id.includes('/internal/observable/dom/')))
+            assert.ok(!modules.some((id) => id.includes('/@weapp-tailwindcss/postcss-calc/')))
+            if (suite.startsWith('dev/')) {
+                assert.ok(modules.some((id) => id.includes('/rxjs/dist/esm/')))
+                assert.ok(!modules.some((id) => id.includes('/internal/observable/dom/')))
+            }
             execFileSync(process.execPath, ['--test', output], { timeout: 20_000, stdio: 'pipe' })
         } finally {
             await rm(directory, { recursive: true, force: true })

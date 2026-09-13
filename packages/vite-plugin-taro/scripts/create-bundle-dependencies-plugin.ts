@@ -12,7 +12,9 @@ export function createBundleDependenciesPlugin(packageRoot: string): Plugin {
     const dependencyStubs: Readonly<Record<string, string>> = {
         autoprefixer: `export default function unavailable() { throw new Error('VPT disables Mini Program autoprefixer') }`,
         'postcss-load-config': `export default function unavailable() { throw new Error('VPT owns Mini Program PostCSS configuration') }`,
-        'tailwindcss-config': `export function loadConfig() { throw new Error('VPT compiles Tailwind before Mini Program PostCSS') }`
+        'tailwindcss-config': `export function loadConfig() { throw new Error('VPT compiles Tailwind before Mini Program PostCSS') }`,
+        // cssCalc is false; the other calculator callers are exclusive to uni-app x and Lynx, not weapp-vite.
+        '@weapp-tailwindcss/postcss-calc': `export default function unavailable() { throw new Error('VPT disables Mini Program CSS calculation') }`
     }
 
     return {
