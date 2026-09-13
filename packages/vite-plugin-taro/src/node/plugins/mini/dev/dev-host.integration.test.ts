@@ -5,7 +5,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 import { stripVTControlCharacters } from 'node:util'
-import { createLogger, createServer, type Logger, type Plugin, type ViteDevServer } from 'vite'
+import { createLogger, createServer, type Logger, normalizePath, type Plugin, type ViteDevServer } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { runtimeReportEvent } from '../../../../runtime/mini/dev/hmr-protocol.ts'
 import {
@@ -85,9 +85,10 @@ function createRebuildOptions(): VptOptions {
 function renderPage(marker: string): string {
     return `
         import { View } from '@tarojs/components'
+        import { suffix } from './suffix'
 
         export default function Home() {
-            return <View>${marker}</View>
+            return <View>{${JSON.stringify(marker)} + suffix}</View>
         }
     `
 }
@@ -125,13 +126,33 @@ async function startDevFixture(logger: Logger, host: string, options: VptOptions
             }
         `
     )
+    await writeFile(path.join(path.dirname(pagePath), 'suffix.ts'), 'export const suffix = "";\n')
     await writeFile(pagePath, renderPage('initial page marker'))
 
     const server = await createServer({
         root,
         configFile: false,
         customLogger: logger,
-        plugins: vpt(options),
+        plugins: [
+            vpt(options),
+            {
+                name: 'test:capsule-layout',
+                generateBundle: {
+                    order: 'post',
+                    handler(_output, bundle) {
+                        const app = bundle['app-capsule.js']
+                        const page = bundle['pages/home/index-capsule.js']
+                        assert.ok(app?.type === 'chunk' && page?.type === 'chunk')
+                        assert.ok(app.moduleIds.includes(normalizePath(path.join(root, 'src/app.tsx'))))
+                        assert.ok(app.moduleIds.includes(runtimeModules.appCapsule))
+                        assert.ok(page.moduleIds.includes(normalizePath(pagePath)))
+                        assert.ok(page.moduleIds.includes(`${runtimeModules.pageCapsule}?route=pages%2Fhome%2Findex`))
+                        assert.ok(bundle['app.js'])
+                        assert.ok(bundle['pages/home/index.js'])
+                    }
+                }
+            }
+        ],
         build: {
             outDir
         },
@@ -356,6 +377,7 @@ test('rejects startup with the original complete-output failure', async () => {
     const pagePath = path.join(root, 'src/pages/home/index.tsx')
     await mkdir(path.dirname(pagePath), { recursive: true })
     await writeFile(path.join(root, 'src/app.tsx'), 'export default function App() { return null }\n')
+    await writeFile(path.join(path.dirname(pagePath), 'suffix.ts'), 'export const suffix = "";\n')
     await writeFile(pagePath, renderPage('initial output failure'))
     const failure = new Error('expected complete-output failure')
     const failOutput: Plugin = {
@@ -386,6 +408,28 @@ test('rejects startup with the original complete-output failure', async () => {
         await server.close()
         await rm(root, { force: true, recursive: true })
     }
+})
+
+test('patches a bundled utility without rewriting its Page capsule or rotating the App', async (context) => {
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions())
+    context.after(fixture.close)
+    const infoSource = await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
+    const info = parseHmrInfo(infoSource)
+    const appStyle = await waitForFile(
+        fixture.appStylePath,
+        (source) => source.includes(info.buildId),
+        maximumWaitAttempts
+    )
+    const capsulePath = path.join(fixture.outDir, 'pages/home/index-capsule.js')
+    const originalCapsule = await readFile(capsulePath, 'utf8')
+    await publishSourceGeneration(
+        path.join(path.dirname(fixture.pagePath), 'suffix.ts'),
+        'export const suffix = "utility edit";\n'
+    )
+    await waitForFile(fixture.patchesPath, (source) => source.includes('utility edit'), maximumWaitAttempts)
+    assert.equal(await readFile(fixture.infoPath, 'utf8'), infoSource)
+    assert.equal(await readFile(fixture.appStylePath, 'utf8'), appStyle)
+    assert.equal(await readFile(capsulePath, 'utf8'), originalCapsule)
 })
 
 test('coalesces one full-file save into one wx patch', async (context) => {
@@ -666,8 +710,8 @@ test('preserves live files and directory identities across patches and recovery 
     const obsoleteFile = path.join(obsoleteDirectory, 'old.js')
     await writeFile(obsoleteFile, 'live session file')
     const initialFiles = (await readdir(fixture.outDir, { recursive: true })).sort()
-    assert.ok(initialFiles.includes(path.join('assets', 'bootstrap.js')), JSON.stringify(initialFiles))
-    assert.ok(initialFiles.includes(path.join('assets', 'transport.js')), JSON.stringify(initialFiles))
+    assert.ok(initialFiles.includes(path.join('common', 'bootstrap.js')), JSON.stringify(initialFiles))
+    assert.ok(initialFiles.includes(path.join('common', 'transport.js')), JSON.stringify(initialFiles))
 
     await publishSourceGeneration(fixture.pagePath, renderPage('changed before complete build'))
     await waitForFile(

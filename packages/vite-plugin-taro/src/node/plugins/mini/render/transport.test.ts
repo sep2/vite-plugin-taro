@@ -165,7 +165,7 @@ test('materializes capsule switch cases with literal physical paths', async () =
     const evaluated = evaluateTransport(source, () => capsule)
     const transport = evaluated.runtime.transport
 
-    assert.strictEqual(transport('chunks/lazy-b.js'), capsule)
+    assert.strictEqual(transport('assets/chunks/lazy-b.js'), capsule)
     assert.deepEqual(evaluated.requiredPaths, ['./assets/chunks/lazy-b.js'])
     assert.throws(() => transport('missing.js'), /Unknown System module: missing\.js/)
 
@@ -194,8 +194,8 @@ test('bridges amphibious bootstrap and Rolldown runtime namespaces lazily', asyn
     const transport = evaluated.runtime.transport
 
     // Neither creating nor selecting transport may recursively require bootstrap while bootstrap imports transport.
-    const bootstrapRegistration = transport('bootstrap.js')
-    const runtimeRegistration = transport('rolldown-runtime-a.js')
+    const bootstrapRegistration = transport('assets/bootstrap.js')
+    const runtimeRegistration = transport('assets/rolldown-runtime-a.js')
     assert.deepEqual(evaluated.requiredPaths, [])
 
     const publishedBootstrap = executeAmphibiousRegistration(bootstrapRegistration)
@@ -220,7 +220,7 @@ test('waits for mocked require.async before resolving a subpackage capsule', asy
     const deferredLoad = Promise.withResolvers<unknown>()
     const evaluated = evaluateTransport(source, () => deferredLoad.promise)
 
-    const loading = Promise.resolve(evaluated.runtime.transport('page.js'))
+    const loading = Promise.resolve(evaluated.runtime.transport('assets/page.js'))
     // Mutable observation proves the transport promise cannot settle before mocked native download completion.
     let settled = false
     void loading.then(() => {

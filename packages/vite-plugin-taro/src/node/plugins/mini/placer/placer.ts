@@ -47,15 +47,15 @@ export type MiniPlacementPlugin = Plugin &
 export function createPlacementRolldownOptions(classifyChunk: MiniModuleClassifier) {
     return {
         /**
-         * Output-stage naming remains under Rolldown's ownership. These options establish physical candidates and hash
-         * participation only; LTHP mutates the resulting OutputChunk filenames later without replacing the chunks.
+         * Rolldown owns shared chunk names and collision handling. LTHP adds physical package prefixes
+         * to those names later without copying or replacing the chunks.
          */
         output: {
             /**
              * React and Taro form one stable framework boundary shared by the App and every Page capsule. Keeping their complete
              * dependency closure together prevents application edits from invalidating framework chunk identity and makes later
-             * development generations eligible to reuse the unchanged vendor. All remaining modules use Rolldown's automatic
-             * chunking; physical Mini Program package placement operates on those final chunks without another split strategy.
+             * development generations eligible to reuse the unchanged vendor. Application code and other dependencies
+             * use Rolldown's automatic chunking without source-path groups or a blanket external vendor group.
              */
             codeSplitting: {
                 groups: [
@@ -67,29 +67,19 @@ export function createPlacementRolldownOptions(classifyChunk: MiniModuleClassifi
                     }
                 ]
             },
-            /**
-             * Native App/Page/Component shells are files addressed directly by the host and must retain the exact names configured
-             * in `input`, such as `app.js` and `pages/home/index.js`. Transport is excluded even though it is CommonJS:
-             * application chunks import its content-hashed path, so it belongs with hashed runtime/capsule entries. `[hash]`
-             * remains a Rolldown placeholder here and is resolved only after renderChunk transforms finish.
-             */
+            /** Native shells retain their public routes; capsules live beside them and shared runtime entries live in common/. */
             entryFileNames(chunk: Rolldown.PreRenderedChunk): string {
                 const classification = classifyChunk(chunk)
-                return classification.executionKind === 'native' && !classification.isTransport
-                    ? '[name]'
-                    : 'assets/[name]-[hash].js'
+                if (classification.entryRole === 'shell') {
+                    return '[name]'
+                }
+                return classification.entryRole === 'capsule' ? '[name].js' : 'common/[name].js'
             },
             /**
              * Leaves chunk identity and collision handling entirely to Rolldown. This package-neutral physical pattern deliberately
              * contains no LTHP owner; generateBundle adds only the selected package root to the existing Rolldown filename.
              */
-            chunkFileNames: 'assets/[name]-[hash].js',
-            /**
-             * Emits generic Rolldown assets under one collision-resistant hashed namespace. Native-component folders are not
-             * governed by this option: createNativeComponentOutput preserves their required relative filenames and relocates the
-             * complete folder beside its owning JavaScript chunk after LTHP finalization.
-             */
-            assetFileNames: 'assets/[name]-[hash][extname]'
+            chunkFileNames: 'common/[name].js'
         },
         /**
          * Keeps every native entry's required exports while allowing Rolldown to add cross-chunk bindings created by natural code

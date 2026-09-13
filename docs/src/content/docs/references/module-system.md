@@ -189,12 +189,24 @@ module.exports = [
 
 ### 5. 写入目录并生成 `app.json`
 
-Rolldown 继续负责文件名、内容哈希和名称碰撞处理。主包代码块保留 `assets/...` 路径；分包代码块只增加一层自动生成的目录前缀：
+应用代码和非框架依赖由 Vite/Rolldown 自动分块，不按源码目录创建自定义分组，也不假设源码目录名。App、Page 胶囊沿用配置的入口路径，放在原生壳旁边；自动生成的共享代码块放入 `common/`。
+
+React/Taro 及其依赖闭包保留现有的 `common/vendor.js` 分组，其他第三方依赖不统一提取到 vendor。JavaScript 默认文件名不包含内容哈希，名称碰撞仍由 Rolldown 处理。导入资源沿用 Vite 的资源处理和构建命名规则，`public/` 文件按原目录复制，不增加源码路径映射。
 
 ```text
-assets/report-<hash>.js
-sub/p_abcd1234/assets/report-<hash>.js
+app.js
+app-capsule.js
+pages/home/index.js
+pages/home/index-capsule.js
+common/vendor.js
+common/bootstrap.js
+assets/logo-<hash>.png
+sub/p_abcd1234/common/report.js
 ```
+
+自动分包在 Rolldown 完成分块后进行，只增加生成的目录前缀，不改变代码块边界。
+
+监听构建仅在启动时清理输出文件，保留所有目录；后续构建直接覆盖产物，不再逐轮清空。已不再使用的文件会保留到重启监听或执行干净构建。成功写入后才更新完成标记；失败不会更新标记，但写入失败可能留下部分新产物，不提供原子更新或回滚保证。
 
 每个分包目录名由该分包内排序后的代码块名称计算得出，所以同一份构建图会得到稳定结果。每个代码块只更改最终文件名，不会被复制或重新发射。
 
@@ -218,11 +230,11 @@ sub/p_abcd1234/assets/report-<hash>.js
 
 ### 模块 ID 与文件路径分离
 
-模块运行时使用不含分包目录和开头 `assets/` 的 ID。例如：
+模块运行时使用不含生成分包目录前缀的包内路径作为 ID。例如：
 
 ```text
-模块 ID：   report-A1b2C3.js
-文件路径： sub/p_abcd1234/assets/report-A1b2C3.js
+模块 ID：   common/report.js
+文件路径： sub/p_abcd1234/common/report.js
 ```
 
 代码块之间的静态导入和动态导入都引用左侧 ID。构建生成的文件加载表负责把它转换为右侧路径：
@@ -230,10 +242,10 @@ sub/p_abcd1234/assets/report-<hash>.js
 ```js
 function loadModule(moduleId) {
     switch (moduleId) {
-        case 'shared-D4e5F6.js':
-            return require('./shared-D4e5F6.js')
-        case 'report-A1b2C3.js':
-            return require.async('../sub/p_abcd1234/assets/report-A1b2C3.js')
+        case 'common/shared.js':
+            return require('./shared.js')
+        case 'common/report.js':
+            return require.async('../sub/p_abcd1234/common/report.js')
         default:
             throw new Error(`Unknown module: ${moduleId}`)
     }
@@ -397,7 +409,7 @@ VPT 模块运行时与微信原生模块加载处于同一量级。
 
 ## 开发模式
 
-微信开发模式的第一次完整构建使用相同的代码块格式、位置规划和运行时，只移除内容哈希以保持文件路径稳定。
+微信开发模式的第一次完整构建使用与生产构建相同的分块策略、无内容哈希的默认 JavaScript 文件名、位置规划和运行时。增量 HMR 仍发布模块补丁，不重写整个代码块文件。
 
 普通 JavaScript HMR 不重新生成完整代码块图。Rolldown 只生成源码模块补丁：`devtools` 模式改写 `hmr/patches.js`，`interpreter` 模式通过 Vite WebSocket 推送同一注册程序；两者都不会重新规划分包。`rebuild` 模式则在每次有效源码变化后生成完整代码块图并重新执行位置规划。完整流程参见[热更新实现原理](/references/hmr-implementation/)。
 

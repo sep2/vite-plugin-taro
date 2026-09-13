@@ -16,7 +16,7 @@ export { doubled }`,
     Function('module', result.code)(commonJsModule)
 
     assert.ok(Array.isArray(commonJsModule.exports))
-    assert.deepEqual(commonJsModule.exports[0], ['dependency.js'])
+    assert.deepEqual(commonJsModule.exports[0], ['assets/dependency.js'])
     assert.equal(typeof commonJsModule.exports[1], 'function')
     assert.doesNotMatch(result.code, /System\.register/)
 })
@@ -33,8 +33,8 @@ export { load, value }`,
     Function('module', result.code)(commonJsModule)
 
     assert.ok(Array.isArray(commonJsModule.exports))
-    assert.deepEqual(commonJsModule.exports[0], ['shared.js'])
-    assert.match(result.code, /\b\w+\.import\(['"]lazy\.js['"]\)/)
+    assert.deepEqual(commonJsModule.exports[0], ['assets/shared.js'])
+    assert.match(result.code, /\b\w+\.import\(['"]assets\/lazy\.js['"]\)/)
 })
 
 test('preserves package-like dynamic import identities', () => {
@@ -60,8 +60,8 @@ export { load }`,
     Function('module', result.code)(commonJsModule)
 
     assert.ok(Array.isArray(commonJsModule.exports))
-    assert.deepEqual(commonJsModule.exports[0], ['bootstrap.js'])
-    assert.match(result.code, /\b\w+\.import\(['"]lazy\.js['"]\)/)
+    assert.deepEqual(commonJsModule.exports[0], ['assets/bootstrap.js'])
+    assert.match(result.code, /\b\w+\.import\(['"]assets\/lazy\.js['"]\)/)
     assert.match(result.code, /VITE_PRELOAD/)
     assert.ok(result.map)
     assert.notEqual(typeof result.map, 'string')

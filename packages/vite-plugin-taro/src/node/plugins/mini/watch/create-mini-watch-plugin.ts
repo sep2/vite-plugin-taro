@@ -27,18 +27,15 @@ export function createMiniWatchPlugin(): Plugin {
         config() {
             // Vite already keeps the output root, but recursively removes its children. WeChat DevTools can keep stale
             // child buffers after unlinkDir/addDir: unlike individual unlink/change events, those events do not clear
-            // its cached file contents. Preserve EVERY directory, not just dist/wx; unlink the files explicitly below.
+            // its cached file contents. Preserve EVERY directory, not just dist/wx; unlink files once at startup.
             return { build: { emptyOutDir: false } }
+        },
+        configResolved({ root, build }) {
+            // A new watch session starts clean. Later builds overwrite files in place; obsolete files remain until restart.
+            cleanOutputFiles(path.resolve(root, build.outDir))
         },
         buildStart() {
             closed = false
-
-            const { root, build } = this.environment.config
-            const outDir = path.resolve(root, build.outDir)
-
-            // Remove obsolete chunks, native companions and the prior marker without replacing watched directories.
-            // Cleanup happens before compilation, so a failed build does NOT preserve good output.
-            cleanOutputFiles(outDir)
         },
         closeWatcher() {
             closed = true

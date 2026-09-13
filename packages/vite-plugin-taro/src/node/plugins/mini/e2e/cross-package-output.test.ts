@@ -335,7 +335,7 @@ test('executes a complex nested static and dynamic graph across production wx su
     // The production bootstrap installs this mutable transport hook once for the application heap.
     system.instantiate = transportExports.transport
 
-    const application = system.importSync(output.application.fileName.slice('assets/'.length))
+    const application = system.importSync(output.application.fileName)
     const readMain = application.readMain
     const loadSubpackage = application.loadSubpackage
     if (typeof readMain !== 'function' || typeof loadSubpackage !== 'function') {

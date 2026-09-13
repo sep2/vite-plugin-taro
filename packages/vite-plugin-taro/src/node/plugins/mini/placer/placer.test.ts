@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
-import { build, type InputOption, type OutputBundle, type OutputChunk, type Plugin } from 'rolldown'
+import { build, type InputOption, type OutputBundle, type OutputChunk, type OutputOptions, type Plugin } from 'rolldown'
 import type { RuntimeModulesContract } from '../mini-contract.ts'
 import { createMiniModuleClassifier } from '../module/module.ts'
 import { createPlacement, type GeneratedSubpackage, type Placement } from './placement.ts'
@@ -29,7 +29,6 @@ const {
 } = runtimeModules
 const placementRolldownOptions = createPlacementRolldownOptions(createMiniModuleClassifier(runtimeModules))
 const fixtureRoot = '/placer-fixture'
-const contentHashPattern = '[A-Za-z0-9_-]{8}'
 
 type BuildFixture = {
     readonly modules: Readonly<Record<string, string>>
@@ -120,6 +119,21 @@ function moduleId(fileName: string): string {
     return `${fixtureRoot}/${fileName}`
 }
 
+test('leaves application grouping and asset naming to Vite and Rolldown', () => {
+    const { config } = createMiniPlacementPlugin(runtimeModules)
+    assert.ok(typeof config === 'function')
+    const resolved: ReturnType<typeof config> = Reflect.apply(config, null, [{}])
+    assert.ok(resolved && 'build' in resolved)
+    const output: OutputOptions | OutputOptions[] | undefined = resolved.build?.rolldownOptions?.output
+    assert.ok(output && !Array.isArray(output))
+    assert.equal(output.assetFileNames, undefined)
+    assert.ok(output.codeSplitting && typeof output.codeSplitting === 'object')
+    assert.deepEqual(
+        output.codeSplitting.groups?.map((group) => group.name),
+        ['vendor']
+    )
+})
+
 test('rejects placement services and chunk delivery outside their lifecycle phases', async () => {
     const output = await buildFixture({
         input: { application: moduleId('lifecycle.js') },
@@ -147,6 +161,29 @@ test('rejects placement services and chunk delivery outside their lifecycle phas
     const renderStart = typeof renderStartHook === 'function' ? renderStartHook : renderStartHook.handler
     Reflect.apply(renderStart, {}, [])
     assert.throws(() => plugin.getLoadMode(chunk), /placement is unavailable/)
+})
+
+test('automatically bundles application modules and non-framework dependencies together', async () => {
+    const sourceRoot = path.resolve('/placer-fixture/src').replaceAll('\\', '/')
+    const firstId = `${sourceRoot}/utils/first.js`
+    const secondId = `${sourceRoot}/utils/second.js`
+    const dependencyId = '/node_modules/standalone-library/index.js'
+    const output = await buildFixture({
+        input: { application: moduleId('source-groups.js') },
+        modules: {
+            [moduleId('source-groups.js')]: `export { first } from ${JSON.stringify(firstId)};
+                export { second } from ${JSON.stringify(secondId)};`,
+            [firstId]: `import { value } from ${JSON.stringify(dependencyId)}; export const first = value + 1`,
+            [secondId]: `export const second = 2`,
+            [dependencyId]: `export const value = Math.random()`
+        }
+    })
+    const first = findChunk(output.chunks, firstId)
+    const second = findChunk(output.chunks, secondId)
+    assert.equal(first, second)
+    assert.equal(findChunk(output.chunks, dependencyId), first)
+    assert.equal(findChunk(output.chunks, moduleId('source-groups.js')), first)
+    assert.ok(output.chunks.every((chunk) => chunk.name !== 'vendor'))
 })
 
 test('extracts the recursive React/Taro vendor closure without absorbing application modules', async () => {
@@ -177,7 +214,7 @@ test('extracts the recursive React/Taro vendor closure without absorbing applica
     const vendor = findChunk(output.chunks, reactId)
     const application = findChunk(output.chunks, applicationId)
 
-    assert.match(vendor.fileName, new RegExp(`^assets/vendor-${contentHashPattern}\\.js$`))
+    assert.equal(vendor.fileName, 'common/vendor.js')
     assert.ok(vendor.moduleIds.includes(taroId))
     assert.ok(vendor.moduleIds.includes(frameworkDependencyId))
     assert.ok(!vendor.moduleIds.includes(applicationId))
@@ -223,7 +260,7 @@ test('emits an eager application closure entirely in the synchronous main packag
     })
 
     const application = findChunk(output.chunks, applicationId)
-    assert.match(application.fileName, new RegExp(`^assets/application-${contentHashPattern}\\.js$`))
+    assert.equal(application.fileName, 'common/application.js')
     assert.ok(application.moduleIds.includes(eagerId))
     assert.deepEqual(output.subpackages, [])
     assert.ok(output.chunks.every((chunk) => output.placement.getLoadMode(chunk) === 'sync'))
@@ -251,7 +288,7 @@ test('preserves Rolldown naming for one lazy static closure', async () => {
 
     assert.equal(feature.moduleIds[0], dependencyId)
     assert.ok(feature.moduleIds.includes(featureId))
-    assert.match(feature.fileName, new RegExp(`^${root}/assets/feature-panel-${contentHashPattern}\\.js$`))
+    assert.equal(feature.fileName, `${root}/common/feature-panel.js`)
     assert.equal(output.placement.getLoadMode(application), 'sync')
     assert.equal(output.placement.getLoadMode(feature), 'async')
     assert.deepEqual(output.subpackages, [{ root: root }])
@@ -311,7 +348,7 @@ test('keeps an eagerly shared dependency in main when a subpackage also imports 
     const feature = findChunk(output.chunks, featureId)
 
     assert.doesNotMatch(shared.fileName, /^sub\//)
-    assert.match(feature.fileName, new RegExp(`^sub/p_[a-f0-9]{8}/assets/lazy-feature-${contentHashPattern}\\.js$`))
+    assert.match(feature.fileName, /^sub\/p_[a-f0-9]{8}\/common\/lazy-feature\.js$/)
     assert.equal(output.placement.getLoadMode(shared), 'sync')
     assert.equal(output.placement.getLoadMode(feature), 'async')
     assert.equal(output.subpackages.length, 1)
@@ -343,8 +380,8 @@ test('emits independently named chunks when the package budget splits lazy roots
     const reportRoot = getSubpackageRoot(report)
 
     assert.notEqual(accountRoot, reportRoot)
-    assert.match(account.fileName, new RegExp(`^${accountRoot}/assets/account-panel-${contentHashPattern}\\.js$`))
-    assert.match(report.fileName, new RegExp(`^${reportRoot}/assets/report-panel-${contentHashPattern}\\.js$`))
+    assert.equal(account.fileName, `${accountRoot}/common/account-panel.js`)
+    assert.equal(report.fileName, `${reportRoot}/common/report-panel.js`)
     assert.deepEqual(
         output.subpackages.map((subpackage) => subpackage.root),
         [accountRoot, reportRoot].sort()
@@ -352,7 +389,7 @@ test('emits independently named chunks when the package budget splits lazy roots
     assert.ok([account, report].every((chunk) => output.placement.getLoadMode(chunk) === 'async'))
 })
 
-test('preserves native shell paths while hashing real capsule and runtime entries in main', async () => {
+test('preserves native shell paths with adjacent capsules and hash-free shared runtime entries', async () => {
     const output = await buildFixture({
         input: {
             'app.js': appShellPath,
@@ -374,9 +411,9 @@ test('preserves native shell paths while hashing real capsule and runtime entrie
     const transport = findChunk(output.chunks, transportPath)
 
     assert.equal(shell.fileName, 'app.js')
-    assert.match(capsule.fileName, new RegExp(`^assets/app-capsule-${contentHashPattern}\\.js$`))
-    assert.match(bootstrap.fileName, new RegExp(`^assets/bootstrap-${contentHashPattern}\\.js$`))
-    assert.match(transport.fileName, new RegExp(`^assets/transport-${contentHashPattern}\\.js$`))
+    assert.equal(capsule.fileName, 'app-capsule.js')
+    assert.equal(bootstrap.fileName, 'common/bootstrap.js')
+    assert.equal(transport.fileName, 'common/transport.js')
     assert.deepEqual(output.subpackages, [])
     assert.ok(output.chunks.every((chunk) => output.placement.getLoadMode(chunk) === 'sync'))
 })

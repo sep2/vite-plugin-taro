@@ -1,11 +1,8 @@
 import path from 'node:path'
 
-/** Physical directory in which Rolldown writes generated JavaScript chunks inside each native package. */
-export const generatedChunkDirectory = 'assets'
-
-/** Projects one Rolldown-owned physical candidate path into the package-neutral SystemJS identity. */
+/** Uses package-relative paths as logical IDs so source groups and runtime chunks share one namespace. */
 export function toLogicalChunkId(physicalChunkId: string): string {
-    return path.posix.relative(generatedChunkDirectory, physicalChunkId)
+    return path.posix.normalize(physicalChunkId)
 }
 
 /** Resolves one relative Rolldown-generated import to its preliminary physical chunk path. */

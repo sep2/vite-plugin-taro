@@ -68,7 +68,7 @@ function createRenderedChunk(name: string, fileName: string): RenderedChunk {
     }
 }
 
-test('adapts configured output into a stable physical wx development project', async (context) => {
+test('adapts physical wx development output without changing configured filenames', async (context) => {
     const configuredChunkFileNames = (chunk: PreRenderedChunk): string => `chunks/${chunk.name}.[hash].js`
     const configuredOutput: OutputOptions = {
         assetFileNames: 'static/[name]-[hash:8][extname]',
@@ -117,13 +117,14 @@ test('adapts configured output into a stable physical wx development project', a
     const devMode = adaptedOptions.experimental?.devMode
 
     assert.equal(output, generatedOutput)
-    assert.equal(output.assetFileNames, 'static/[name][extname]')
+    assert.equal(output.assetFileNames, configuredOutput.assetFileNames)
+    assert.equal(output.chunkFileNames, configuredChunkFileNames)
     assert.equal(typeof output.chunkFileNames, 'function')
     if (typeof output.chunkFileNames !== 'function') {
         assert.fail('Expected configured chunk naming to remain a function')
     }
-    assert.equal(output.chunkFileNames(createPreRenderedChunk('feature')), 'chunks/feature.js')
-    assert.equal(output.entryFileNames, '[name]')
+    assert.equal(output.chunkFileNames(createPreRenderedChunk('feature')), 'chunks/feature.[hash].js')
+    assert.equal(output.entryFileNames, configuredOutput.entryFileNames)
     assert.equal(output.format, 'es')
     assert.equal(output.minify, true)
     assert.equal(output.sourcemap, false)
@@ -197,7 +198,7 @@ test('installs the Alipay HMR adapter on the real Mini Program JavaScript global
     assert.doesNotMatch(String(devMode.implement), /Reflect\.(?:get|set)\(my,/)
 })
 
-test('supplies stable output defaults when Vite has no configured output', async (context) => {
+test('leaves naming unspecified when Vite has no configured output', async (context) => {
     // These process-global presentation flags are restored after this isolated test-file process invokes the reporter factory.
     const ttyDescriptor = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY')
     const previousCi = process.env.CI
@@ -238,9 +239,9 @@ test('supplies stable output defaults when Vite has no configured output', async
     const adapted = await bundledDev.getRolldownOptions()
     const output = requireSingleOutput(adapted)
 
-    assert.equal(output.assetFileNames, 'assets/[name][extname]')
-    assert.equal(output.chunkFileNames, 'assets/[name].js')
-    assert.equal(output.entryFileNames, '[name]')
+    assert.equal(output.assetFileNames, undefined)
+    assert.equal(output.chunkFileNames, undefined)
+    assert.equal(output.entryFileNames, undefined)
     assert.deepEqual(adapted.experimental?.devMode, {
         implement:
             typeof adapted.experimental?.devMode === 'object' ? adapted.experimental.devMode.implement : undefined,
