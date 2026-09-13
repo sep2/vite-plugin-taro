@@ -1,10 +1,12 @@
-import { type ChildProcessByStdio, spawn } from 'node:child_process'
+import type { ChildProcessByStdio } from 'node:child_process'
 import { createWriteStream, existsSync } from 'node:fs'
 import { cp, type FileHandle, mkdir, open, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Readable } from 'node:stream'
+import { finished } from 'node:stream/promises'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { createProcessScope } from './create-process-scope.ts'
 
 export type DevToolsHarness = Readonly<{
     inputElement: (selector: string, value: string) => Promise<void>
@@ -24,6 +26,12 @@ type ToolParameters = Readonly<Record<string, string>>
 type TestCase = (harness: DevToolsHarness) => Promise<void>
 type ServerProcess = ChildProcessByStdio<null, Readable, Readable>
 
+const processes = createProcessScope()
+// Each server registers its log completion so finalization also drains file handles.
+const logCompletions: Promise<unknown>[] = []
+// Only quit DevTools once this invocation has attempted to attach to its runtime.
+let devToolsUsed = false
+
 const scriptsRoot = path.dirname(fileURLToPath(import.meta.url))
 const fixtureRoot = path.dirname(scriptsRoot)
 const repositoryRoot = path.resolve(fixtureRoot, '../..')
@@ -39,11 +47,49 @@ export async function withDevToolsHarness(testName: string, testCase: TestCase):
     // One fixed lock prevents concurrent standalone cases from deleting or mutating the same disposable project.
     const lockPath = '/tmp/vite-plugin-taro-hmr-stress.lock'
     const lock = await acquireHarnessLock(lockPath)
+    // Memoize cleanup because a signal can arrive while normal finalization is already running.
+    let cleanupPromise: Promise<void> | undefined
+    const cleanup = (): Promise<void> => {
+        cleanupPromise ??= (async () => {
+            try {
+                try {
+                    if (testName !== 'setup' && devToolsUsed) {
+                        await quitDevTools()
+                    }
+                } finally {
+                    await processes.close()
+                }
+                const errors = (await Promise.all(logCompletions)).filter((error) => error !== undefined)
+                if (errors.length > 0) {
+                    throw new AggregateError(errors, 'Failed to close Vite logs')
+                }
+            } finally {
+                await lock.close()
+                await unlink(lockPath)
+            }
+        })()
+        return cleanupPromise
+    }
+    const interrupt = (): void => {
+        void cleanup().then(
+            () => process.exit(130),
+            (error: unknown) => {
+                console.error(error)
+                process.exit(1)
+            }
+        )
+    }
+    process.once('SIGINT', interrupt)
+    process.once('SIGTERM', interrupt)
     try {
         await runLockedHarness(resolveTestRoot(), testName, testCase)
     } finally {
-        await lock.close()
-        await unlink(lockPath)
+        try {
+            await cleanup()
+        } finally {
+            process.removeListener('SIGINT', interrupt)
+            process.removeListener('SIGTERM', interrupt)
+        }
     }
 }
 
@@ -85,6 +131,7 @@ function hasErrorCode(error: unknown, code: string): boolean {
 }
 
 async function runLockedHarness(root: string, testName: string, testCase: TestCase): Promise<void> {
+    // Assigned after startup so finalization owns only a successfully started server.
     let server: ServerProcess | undefined
     try {
         await buildPlugin()
@@ -92,6 +139,7 @@ async function runLockedHarness(root: string, testName: string, testCase: TestCa
         server = await startServer(root)
         const outDir = path.join(root, 'dist/wx')
         await validateProjectConfig(path.join(outDir, 'project.config.json'))
+        devToolsUsed = true
         await openProject(outDir)
         // Measured DevTools app-service reloads complete within five seconds after Vite publishes the new app.wxss build marker.
         await delay(5_000)
@@ -107,7 +155,7 @@ async function runLockedHarness(root: string, testName: string, testCase: TestCa
         }
         console.log(`[hmr-devtools] ${testName} passed`)
     } finally {
-        // Stop Vite but keep the fixed output and DevTools window warm. The next run clears the complete fixture.
+        // Stop Vite before outer cleanup quits DevTools and releases the fixture lock.
         if (server) {
             await stopServer(server)
         }
@@ -212,7 +260,13 @@ async function buildPlugin(): Promise<void> {
     if (process.env.VPT_HMR_BUILD_PLUGIN !== '1') {
         return
     }
-    await runCommand('pnpm', ['build:plugin'], repositoryRoot, process.env, commandTimeoutMilliseconds)
+    await runCommand(
+        'pnpm',
+        ['build:plugin'],
+        repositoryRoot,
+        process.env,
+        remainingTimeout(commandTimeoutMilliseconds)
+    )
 }
 
 async function prepareFixture(root: string): Promise<void> {
@@ -238,23 +292,28 @@ async function startServer(root: string): Promise<ServerProcess> {
     const serverLogPath = path.join(root, 'vite.log')
     await writeFile(serverLogPath, '')
     const log = createWriteStream(serverLogPath)
-    const server = spawn(viteExecutable, [], {
+    const server = processes.start(viteExecutable, [], {
         cwd: root,
         env: {
             ...process.env,
             NODE_ENV: 'development',
             VITE_VPT_TARGET: 'wx',
             VITE_VPT_WECHAT_APP_ID: appId
-        },
-        stdio: ['ignore', 'pipe', 'pipe']
+        }
     })
-    server.stdout.pipe(log)
-    server.stderr.pipe(log)
+    server.stdout.pipe(log, { end: false })
+    server.stderr.pipe(log, { end: false })
+    const logClosed = finished(log).catch((error: unknown) => error)
+    logCompletions.push(logClosed)
+    // Both output pipes share one destination; close it only after both pipes have closed.
+    server.once('close', () => log.end())
+    server.once('error', () => log.end())
     try {
         await waitFor(async () => (await readFile(serverLogPath, 'utf8')).includes('Mini Program project'), 20_000, 100)
         return server
     } catch (error) {
         await stopServer(server)
+        await logClosed
         throw error
     }
 }
@@ -277,6 +336,26 @@ async function validateProjectConfig(configPath: string): Promise<void> {
     }
 }
 
+async function quitDevTools(): Promise<void> {
+    // Cleanup gets its own budget, even when the test deadline has already elapsed.
+    const output = await runCommand(
+        'wechatide',
+        ['-c', devToolsClient, 'quit'],
+        repositoryRoot,
+        process.env,
+        commandTimeoutMilliseconds
+    )
+    const response = parseToolResponse(output)
+    if (
+        response.ok !== true ||
+        !isRecord(response.result) ||
+        response.result.success !== true ||
+        response.result.canceled === true
+    ) {
+        throw new Error(`wechatide quit failed: ${output}`)
+    }
+}
+
 async function runTool(tool: string, project: string, parameters: ToolParameters): Promise<unknown> {
     return runToolWithTimeout(tool, project, parameters, commandTimeoutMilliseconds)
 }
@@ -293,7 +372,7 @@ async function runToolWithTimeout(
         ['-c', devToolsClient, '-t', tool, '--project', project, ...parameterArguments],
         repositoryRoot,
         process.env,
-        timeoutMilliseconds
+        remainingTimeout(timeoutMilliseconds)
     )
     const response = parseToolResponse(output)
     if (response.ok !== true) {
@@ -321,7 +400,7 @@ async function runCommand(
     environment: NodeJS.ProcessEnv,
     timeoutMilliseconds: number
 ): Promise<string> {
-    const child = spawn(command, arguments_, { cwd: cwd, env: environment, stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = processes.start(command, arguments_, { cwd: cwd, env: environment })
     // These buffers are command-local mutable journals; each child owns them until its one exit result is assembled.
     let stdout = ''
     let stderr = ''
@@ -331,12 +410,23 @@ async function runCommand(
     child.stderr.on('data', (chunk: Buffer) => {
         stderr += chunk.toString('utf8')
     })
-    const timeout = setTimeout(() => child.kill('SIGKILL'), remainingTimeout(timeoutMilliseconds))
-    const exitCode = await new Promise<number | null>((resolve, reject) => {
+    // Assigned by the synchronous Promise executor; finalization owns cancellation.
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    const completion = new Promise<number | null>((resolve, reject) => {
         child.once('error', reject)
-        child.once('exit', resolve)
+        child.once('close', resolve)
+        timeout = setTimeout(() => {
+            reject(new Error(`${command} timed out`))
+        }, timeoutMilliseconds)
     })
-    clearTimeout(timeout)
+    const exitCode = await (async () => {
+        try {
+            return await completion
+        } finally {
+            clearTimeout(timeout)
+            await processes.stop(child)
+        }
+    })()
     if (exitCode !== 0) {
         throw new Error(`${command} exited with ${exitCode}:\nstdout:\n${stdout}\nstderr:\n${stderr}`)
     }
@@ -344,17 +434,8 @@ async function runCommand(
 }
 
 async function stopServer(server: ServerProcess): Promise<void> {
-    if (server.exitCode !== null || server.signalCode !== null) {
-        return
-    }
-    // Register before signaling so an immediate clean exit cannot race past the observer. A forced kill is a test failure: it
-    // would hide a host action, output, or DevEngine generation dropped by shutdown instead of validating the lifecycle drain.
-    const exited = new Promise<void>((resolve) => server.once('exit', () => resolve()))
-    server.kill('SIGTERM')
-    const graceful = await Promise.race([exited.then(() => true), delay(2_000).then(() => false)])
-    if (!graceful) {
-        server.kill('SIGKILL')
-        await exited
+    await processes.stop(server)
+    if (server.signalCode === 'SIGKILL') {
         throw new Error('Vite did not drain the WX host within two seconds')
     }
 }

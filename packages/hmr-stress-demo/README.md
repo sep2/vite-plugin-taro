@@ -16,17 +16,17 @@ The singleton App projects the Page outlet through a 16-level host chain beside 
 
 ## Automated WeChat DevTools suite
 
-The automated suite remains WeChat-specific because it uses the `wechatide` runtime. It creates a clean fixed fixture at `/tmp/vite-plugin-taro-hmr-stress-v1`, starts Vite, opens or reuses the same WeChat DevTools project, performs assertions, and stops Vite. Authorize the fixed CLI client once; subsequent runs reuse both that trust and the fixed project path without another authorization prompt:
+The automated suite remains WeChat-specific because it uses the `wechatide` runtime. It creates a clean fixed fixture at `/tmp/vite-plugin-taro-hmr-stress-v1`, starts Vite, opens or reuses the same WeChat DevTools project, performs assertions, stops Vite, and quits DevTools through `wechatide -c Pi quit` (using the configured client name). Quitting DevTools closes all of its project windows. Authorize the fixed CLI client once; subsequent runs reuse both that trust and the fixed project path without another authorization prompt:
 
 ```bash
 wechatide auth -c Pi
-pnpm setup:hmr-stress-demo:devtools   # one cold window setup
+pnpm setup:hmr-stress-demo:devtools   # open DevTools before each test invocation
 pnpm test:hmr-stress-demo:devtools
 ```
 
 Setup and the aggregate suite may each use up to 60 seconds. Every standalone case has a hard 30-second deadline and reuses the fixed runtime. The complete suite runs only the strict burst, rebuild storm, and syntax recovery cases. Runtime assertions replace long fixed settle sleeps, and plugin rebuilding is opt-in.
 
-Individual cases can be run independently:
+Individual cases can be run independently. Run `pnpm setup:hmr-stress-demo:devtools` before each invocation, since each test quits DevTools afterward:
 
 ```bash
 pnpm stress:hmr-stress-demo:burst         # 30 edits at 8 ms
@@ -36,7 +36,13 @@ pnpm test:hmr-stress-demo:recovery        # syntax failures and passive HMR reco
 
 No stress edit touches `packages/hmr-stress-demo/src`. The portable harness deliberately avoids RAM-disk provisioning: it confines writes to one fixed temporary project and bounds the strict burst to 30 source generations, plus two restoration writes. Syntax recovery uses one invalid generation plus restoration, and post-recovery health uses five edits. This retains the failure-producing profiles without thousands of filesystem writes or platform-specific mount setup.
 
-Every invocation replaces the complete temporary `src` tree from the repository baseline. The fixed directory, last complete output, and DevTools window remain warm to preserve project authorization and avoid cold automator attachment. Vite overwrites the active development output before a case starts, and a fixed process lock prevents concurrent runs from sharing the workspace.
+Every invocation replaces the complete temporary `src` tree from the repository baseline. The fixed directory and last complete output remain on disk to preserve project identity. Setup intentionally leaves the DevTools window open for the next test. Vite overwrites the active development output before a case starts, and a fixed process lock prevents concurrent runs from sharing the workspace. Normal completion, failures, and SIGINT/SIGTERM terminate owned subprocess groups, drain the Vite log stream, and release the lock. On POSIX this includes descendants of command wrappers; Windows termination currently covers direct children only. Test cleanup uses the supported `wechatide quit` command rather than OS-level commands to close DevTools. It has a separate 12-second timeout, independent of the test deadline; cancellation or a failed quit is reported as an error. The fixture remains on disk for inspection.
+
+Subprocess cleanup regression tests (no DevTools required):
+
+```bash
+node --test packages/hmr-stress-demo/scripts/create-process-scope.test.ts
+```
 
 The complete suite checks:
 
