@@ -1,5 +1,15 @@
 # create-vite-taro
 
+## 0.7.3
+
+### 更新内容
+
+- f9be2ab: 默认模板的 Footer、ApiCard 和 BotanicalSprig 改用 HTML 标签，保留原有布局与 Taro API 调用。
+
+### 升级说明
+
+使用 `pnpm create vite-taro@0.7.3 my-app` 创建新项目。已有项目从 `0.7.2` 或 `0.7.3-beta.2` 升级到 `0.7.3` 无需重新生成；升级插件时请参阅 `vite-plugin-taro` 的升级说明。
+
 ## 0.7.3-beta.2
 
 ### 更新内容
