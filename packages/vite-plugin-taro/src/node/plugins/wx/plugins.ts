@@ -4,11 +4,10 @@ import { packageRequire, resolveRuntimeFile } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
 import { createWxSkeleton } from './create-wx-skeleton.ts'
-import { createWxWatchPlugin } from './create-wx-watch-plugin.ts'
 
 /** Adapts the shared Mini Program pipeline to the WX public target. */
 export function createWxMiniPlugins(vptOptions: VptOptions): PluginOption[] {
-    return [...createMiniTargetPlugins(createWxMiniContract(vptOptions)), createWxWatchPlugin()]
+    return createMiniTargetPlugins(createWxMiniContract(vptOptions))
 }
 
 /** Binds the shared Mini Program core to WeChat runtime and output conventions. */

@@ -5,15 +5,15 @@ import path from 'node:path'
 import test from 'node:test'
 import type { InlineConfig, Plugin } from 'vite'
 import { build, resolveConfig } from 'vite'
-import { createWxWatchPlugin } from './create-wx-watch-plugin.ts'
+import { createMiniWatchPlugin } from './create-mini-watch-plugin.ts'
 
 const markerPattern = /^\/\/ [\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}\n$/
 
 test('enables the filesystem policy only for physical watch builds, including production mode', async () => {
-    const options = { configFile: false, mode: 'production', plugins: [createWxWatchPlugin()] } satisfies InlineConfig
+    const options = { configFile: false, mode: 'production', plugins: [createMiniWatchPlugin()] } satisfies InlineConfig
     const watched = await resolveConfig({ ...options, build: { watch: {}, emptyOutDir: true } }, 'build')
     assert.equal(watched.build.emptyOutDir, false)
-    assert.ok(watched.plugins.some(({ name }) => name === 'vpt:wx-watch'))
+    assert.ok(watched.plugins.some(({ name }) => name === 'vpt:mini-watch'))
     const excluded = [
         { command: 'serve', build: { watch: {} } },
         { command: 'build', build: {} },
@@ -23,19 +23,19 @@ test('enables the filesystem policy only for physical watch builds, including pr
     for (const { command, build } of excluded) {
         const config = await resolveConfig({ ...options, build: { ...build, emptyOutDir: true } }, command)
         assert.equal(config.build.emptyOutDir, true)
-        assert.ok(!config.plugins.some(({ name }) => name === 'vpt:wx-watch'))
+        assert.ok(!config.plugins.some(({ name }) => name === 'vpt:mini-watch'))
     }
 })
 
 test('closing a failed watcher never publishes a successful completion marker', async (context) => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-wx-watch-error-'))
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-mini-watch-error-'))
     context.after(() => fs.rm(root, { recursive: true, force: true }))
     const failed = Promise.withResolvers<void>()
     const watcher = await build({
         root,
         configFile: false,
         logLevel: 'silent',
-        plugins: [createWxWatchPlugin()],
+        plugins: [createMiniWatchPlugin()],
         build: { watch: {}, rolldownOptions: { input: path.join(root, 'missing.js') } }
     })
     assert.ok(!Array.isArray(watcher) && 'on' in watcher)
@@ -47,7 +47,7 @@ test('closing a failed watcher never publishes a successful completion marker', 
     })
     await failed.promise
     await watcher.close()
-    const { closeBundle } = createWxWatchPlugin()
+    const { closeBundle } = createMiniWatchPlugin()
     assert.ok(closeBundle && typeof closeBundle === 'object')
     assert.equal(Reflect.apply(closeBundle.handler, null, [new Error('failed close')]), undefined)
     await assert.rejects(fs.access(path.join(root, 'dist/hmr/watch.js')), { code: 'ENOENT' })
@@ -56,7 +56,7 @@ test('closing a failed watcher never publishes a successful completion marker', 
 test('watch retains directories and hashes, cleans all files and signals only after completed writes', {
     timeout: 30_000
 }, async (context) => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-wx-watch-'))
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-mini-watch-'))
     const outDir = path.join(root, 'dist')
     const appFile = path.join(outDir, 'app.js')
     const markerFile = path.join(outDir, 'hmr/watch.js')
@@ -117,7 +117,7 @@ test('watch retains directories and hashes, cleans all files and signals only af
         root,
         configFile: false,
         logLevel: 'silent',
-        plugins: [createWxWatchPlugin(), fixture],
+        plugins: [createMiniWatchPlugin(), fixture],
         build: {
             outDir,
             watch: {},

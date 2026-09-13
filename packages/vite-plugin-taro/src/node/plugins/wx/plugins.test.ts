@@ -37,7 +37,7 @@ test('creates the WX Mini Program contract without translating public options', 
     assert.equal(plugins.length, 5)
     assert.ok(
         plugins.some(
-            (plugin) => plugin && typeof plugin === 'object' && 'name' in plugin && plugin.name === 'vpt:wx-watch'
+            (plugin) => plugin && typeof plugin === 'object' && 'name' in plugin && plugin.name === 'vpt:mini-watch'
         )
     )
 })

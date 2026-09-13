@@ -2,17 +2,17 @@ import { randomUUID } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Plugin } from 'vite'
-import { cleanOutputFiles } from '../../utils/clean-output-files.ts'
-import { isMiniClientEnvironment } from '../mini/dev/plugins.ts'
+import { cleanOutputFiles } from '../../../utils/clean-output-files.ts'
+import { isMiniClientEnvironment } from '../dev/plugins.ts'
 
-/** Adapts ordinary WeChat build/watch output; the serve HMR protocol and other targets are unchanged. */
-export function createWxWatchPlugin(): Plugin {
+/** Preserves watched directories and signals completed Mini Program watch output without changing serve HMR. */
+export function createMiniWatchPlugin(): Plugin {
     // Rolldown also closes an unsuccessful result when its watcher shuts down, without passing an error.
     // Track that lifecycle boundary so shutdown cannot publish a false completion marker.
     let closed = false
 
     return {
-        name: 'vpt:wx-watch',
+        name: 'vpt:mini-watch',
         enforce: 'post',
         // One-shot production, serve HMR and generate-only consumers keep their existing output policies.
         apply: (config, { command }) => {

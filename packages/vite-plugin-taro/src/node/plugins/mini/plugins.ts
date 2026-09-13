@@ -13,6 +13,7 @@ import { renderNative } from './render/native.ts'
 import { materializeTransport } from './render/transport.ts'
 import { createResolver } from './resolve/resolver.ts'
 import { createMiniStylePlugin } from './styles/plugins.ts'
+import { createMiniWatchPlugin } from './watch/create-mini-watch-plugin.ts'
 
 type MiniResolver = ReturnType<typeof createResolver>
 
@@ -29,7 +30,8 @@ export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] 
         placement,
         styles,
         createMiniPlugin(contract, resolver, placement),
-        createMiniDevelopmentPlugin(contract, styles)
+        createMiniDevelopmentPlugin(contract, styles),
+        createMiniWatchPlugin()
     ]
 }
 
