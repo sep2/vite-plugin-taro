@@ -251,6 +251,17 @@ H5 需要项目根目录下的 `index.html`，其中包含挂载节点：
 
 不需要 `src/main.tsx`，也不需要在 HTML 中添加入口脚本。vpt 会生成并注入入口。小程序构建都不使用 `index.html`。
 
+### 小程序中的浏览器式全局变量
+
+WX 和 ZFB 中可以直接使用以下名称，无需额外安装依赖或手动导入：
+
+- `window`、`document`、`navigator`；
+- `requestAnimationFrame`、`cancelAnimationFrame`；
+- `Element`、`SVGElement`、`MutationObserver`；
+- `history`、`location`、`URLSearchParams`、`URL`。
+
+这些 API 由 VPT 提供小程序兼容实现。
+
 ## 不读取 Taro 配置
 
 vpt 不读取：
