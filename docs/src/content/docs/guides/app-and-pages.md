@@ -16,16 +16,15 @@ VPT 项目中有两类入口：
 
 ```tsx title="src/app.tsx"
 import type { PropsWithChildren } from 'react'
-import { Text, View } from 'virtual:taro/components'
 import './app.css'
 
 function App({ children }: PropsWithChildren) {
     return (
-        <View className="app-shell">
-            <Text className="app-title">我的应用</Text>
+        <div className="app-shell">
+            <span className="app-title">我的应用</span>
             {children}
-            <Text className="app-footer">示例页脚</Text>
-        </View>
+            <span className="app-footer">示例页脚</span>
+        </div>
     )
 }
 
