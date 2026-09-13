@@ -4,11 +4,10 @@ import path from 'node:path'
 import { test } from 'node:test'
 import { runInNewContext } from 'node:vm'
 import { build } from 'rolldown'
-import { normalizePath, resolveConfig, transformWithOxc } from 'vite'
+import { normalizePath, resolveConfig } from 'vite'
 import vpt from '../../../../index.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import {
-    createMiniReactRefreshDefines,
     createMiniReactRefreshTransforms,
     injectReactRefreshRendererDependency,
     transformRefreshRuntime
@@ -81,7 +80,12 @@ export function evaluateBoundary() {
         // Isolate the shared protocol state from Node and from the other target's runtime.
         const context = { exports: {}, global: {}, setTimeout, clearTimeout, console }
         runInNewContext(chunk.code, context)
+        assert.equal(config.define?.__REACT_DEVTOOLS_GLOBAL_HOOK__, undefined)
         assert.equal(runInNewContext('typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.inject', context), 'function')
+        assert.equal(
+            runInNewContext('__REACT_DEVTOOLS_GLOBAL_HOOK__ === globalThis.__REACT_DEVTOOLS_GLOBAL_HOOK__', context),
+            true
+        )
         assert.equal(runInNewContext('typeof globalThis.$RefreshReg$', context), 'undefined')
         assert.equal(runInNewContext('typeof globalThis.__registerBeforePerformReactRefresh', context), 'undefined')
         assert.equal(runInNewContext('exports.evaluateBoundary()', context), true)
@@ -142,27 +146,4 @@ test('orders React Refresh before renderer injection', async () => {
     assert.deepEqual(result, { code: `import '/@react-refresh'\n${code}`, map: null })
     assert.deepEqual(await Reflect.apply(hook.handler, {}, [code, rendererId]), result)
     assert.throws(() => injectReactRefreshRendererDependency('export const renderer = {}'), /must inject its renderer/)
-})
-
-test('lowers only free React DevTools hook references through the development Oxc define', async () => {
-    const defines = createMiniReactRefreshDefines(true)
-    const transformed = await transformWithOxc(
-        `
-            const available = typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ !== 'undefined'
-            const explicit = globalThis.__REACT_DEVTOOLS_GLOBAL_HOOK__
-            const record = { __REACT_DEVTOOLS_GLOBAL_HOOK__: explicit }
-            function readShadow(__REACT_DEVTOOLS_GLOBAL_HOOK__) {
-                return __REACT_DEVTOOLS_GLOBAL_HOOK__
-            }
-        `,
-        'react-renderer.js',
-        { define: defines, sourcemap: false }
-    )
-    assert.deepEqual(createMiniReactRefreshDefines(false), {})
-    assert.equal(defines.__REACT_DEVTOOLS_GLOBAL_HOOK__, 'globalThis.__REACT_DEVTOOLS_GLOBAL_HOOK__')
-    assert.match(transformed.code, /typeof globalThis\.__REACT_DEVTOOLS_GLOBAL_HOOK__/)
-    assert.doesNotMatch(transformed.code, /globalThis\.globalThis/)
-    assert.match(transformed.code, /__REACT_DEVTOOLS_GLOBAL_HOOK__: explicit/)
-    assert.match(transformed.code, /function readShadow\(__REACT_DEVTOOLS_GLOBAL_HOOK__\)/)
-    assert.match(transformed.code, /return __REACT_DEVTOOLS_GLOBAL_HOOK__;/)
 })

@@ -3,7 +3,6 @@ import { esTarget } from '../../utils/constant.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { clientTaroNativeId } from '../client/constant.ts'
 import { createMiniDevelopmentPlugin } from './dev/plugins.ts'
-import { createMiniReactRefreshDefines } from './dev/react-refresh.ts'
 import type { MiniContract } from './mini-contract.ts'
 import { compileNativeComponentInterface } from './native/compile-native-component-interface.ts'
 import { createOutputFiles } from './output/files.ts'
@@ -43,12 +42,9 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
     return {
         name: 'vpt:mini',
 
-        config(_config, { command }) {
+        config() {
             return {
-                define: {
-                    ...createTaroDefines(contract.taro.env),
-                    ...createMiniReactRefreshDefines(command === 'serve')
-                },
+                define: createTaroDefines(contract.taro.env),
 
                 appType: 'custom',
 

@@ -11,19 +11,6 @@ const reactReconcilerDevelopmentId = normalizePath(
     )
 )
 
-/** The React DevTools hook protocol name; free references must target the real Mini Program JavaScript global. */
-const reactDevtoolsHookProtocol = '__REACT_DEVTOOLS_GLOBAL_HOOK__'
-
-/**
- * Creates the serve-only Oxc substitution for React's free DevTools-hook references.
- *
- * Bundled Vite folds `define` into its existing native Oxc transform. Oxc rewrites only free references, preserving explicit
- * members, property keys, string contents, and shadowed bindings without an all-module plugin filter or a second AST parse.
- */
-export function createMiniReactRefreshDefines(isDevelopment: boolean): Record<string, string> {
-    return isDevelopment ? { [reactDevtoolsHookProtocol]: `globalThis.${reactDevtoolsHookProtocol}` } : {}
-}
-
 /**
  * Installs the missing HTML preamble inside the Refresh runtime. Boundary modules import that runtime before evaluating
  * their preamble guards, including during incremental updates. Reconciler also imports it before registering its renderer.
