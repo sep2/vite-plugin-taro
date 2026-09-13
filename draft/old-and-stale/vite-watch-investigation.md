@@ -2,7 +2,7 @@
 
 Investigation snapshot: 2026-09-11. Related issue: [#22](https://github.com/sep2/vite-plugin-taro/issues/22).
 
-This report is committed separately from its evidence and reproduction helpers. Unless stated otherwise, their paths and commands refer to this local investigation directory, not the repository's `draft/` directory:
+This report is committed separately from its evidence and reproduction helpers. Unless stated otherwise, their paths and commands refer to this local investigation directory, not the repository's `..` directory:
 
 ```text
 C:/Users/james/AppData/Local/Temp/vpt-issue22-watch-c3523db-pi-7ad6/investigation
