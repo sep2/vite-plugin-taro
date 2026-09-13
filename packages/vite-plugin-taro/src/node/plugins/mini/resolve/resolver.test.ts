@@ -4,7 +4,7 @@ import test from 'node:test'
 import { normalizePath } from 'vite'
 import { appComponentId } from '../../client/constant.ts'
 import type { MiniContract, RuntimeModulesContract } from '../mini-contract.ts'
-import { pageCapsuleId, pageComponentId, taroPlatformRuntimeId, vitePreloadId } from '../module/module.ts'
+import { pageCapsuleId, pageComponentId, taroTargetRuntimeId, vitePreloadId } from '../module/module.ts'
 import { createResolver } from './resolver.ts'
 
 const modules = {
@@ -44,7 +44,7 @@ const contract = {
     taro: {
         env: 'synthetic',
         componentsReactPath: '/runtime/components-react.ts',
-        platformRuntimePath: '/runtime/platform.ts'
+        targetRuntimePath: '/runtime/target.ts'
     },
     runtime: {
         modules: modules
@@ -71,7 +71,7 @@ test('resolves fixed and route-specific private IDs', () => {
         'pages/home/index-capsule': `${modules.pageCapsule}?route=pages%2Fhome%2Findex`
     })
     assert.equal(resolver.resolveId(vitePreloadId, undefined, projectRoot), modules.bootstrap)
-    assert.equal(resolver.resolveId(taroPlatformRuntimeId, undefined, projectRoot), contract.taro.platformRuntimePath)
+    assert.equal(resolver.resolveId(taroTargetRuntimeId, undefined, projectRoot), contract.taro.targetRuntimePath)
     assert.equal(
         resolver.resolveId(appComponentId, undefined, projectRoot),
         normalizePath(path.resolve(projectRoot, 'src/app.tsx'))

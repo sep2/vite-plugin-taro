@@ -9,7 +9,7 @@ import {
     customWrapperShellFileName,
     pageCapsuleId,
     pageComponentId,
-    taroPlatformRuntimeId,
+    taroTargetRuntimeId,
     vitePreloadId
 } from '../module/module.ts'
 import { specializeAppCapsule } from './specialize-app-capsule.ts'
@@ -32,7 +32,7 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'runtime
     const privateIdResolvers = new Map<string, PrivateIdResolver>([
         // Share bootstrap's preload identity through native require and its amphibious SystemJS registration.
         [vitePreloadId, () => contract.runtime.modules.bootstrap],
-        [taroPlatformRuntimeId, () => contract.taro.platformRuntimePath],
+        [taroTargetRuntimeId, () => contract.taro.targetRuntimePath],
         // Keep the configured App component behind one stable private import in the App capsule.
         [
             appComponentId,

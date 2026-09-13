@@ -21,7 +21,7 @@ export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
         taro: {
             env: 'weapp',
             componentsReactPath: componentsReactPath,
-            platformRuntimePath: packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-weapp/runtime')
+            targetRuntimePath: packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-weapp/runtime')
         },
         runtime: {
             modules: {

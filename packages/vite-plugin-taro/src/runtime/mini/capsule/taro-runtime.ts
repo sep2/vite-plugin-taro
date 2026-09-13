@@ -1,8 +1,8 @@
 /** biome-ignore-all assist/source/organizeImports: keep side effect order */
 
 /** Taro runtime exports shared by the App, Page, and generated recursive component capsules. */
-// @ts-expect-error: The active Mini contract resolves its Taro platform initialization module.
-import '\0vpt:taro-platform-runtime'
+// @ts-expect-error: The active Mini contract resolves its Taro target initialization module.
+import '\0vpt:taro-target-runtime'
 
 export { createReactApp } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
 export { default as ReactDOM } from 'vite-plugin-taro-runtime/react'

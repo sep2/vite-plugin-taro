@@ -365,7 +365,7 @@ test('preserves WX capsule runtime initialization order and export identities', 
     const code = await bundleRuntimeEntry({
         entry: 'mini/capsule/taro-runtime.ts',
         mocks: {
-            '\0vpt:taro-platform-runtime': "globalThis.harness.events.push('platform-runtime')",
+            '\0vpt:taro-target-runtime': "globalThis.harness.events.push('target-runtime')",
             'vite-plugin-taro-runtime/plugin-framework-react/runtime': `
                 globalThis.harness.events.push('framework')
                 export const createReactApp = globalThis.harness.createReactApp
@@ -388,7 +388,7 @@ test('preserves WX capsule runtime initialization order and export identities', 
     const context = createExecutionContext(harness)
     const exports = executeRuntimeEntry(code, context)
 
-    assert.deepEqual(events, ['platform-runtime', 'framework', 'react-dom', 'taro-runtime'])
+    assert.deepEqual(events, ['target-runtime', 'framework', 'react-dom', 'taro-runtime'])
     assert.strictEqual(Reflect.get(context.globalThis, Symbol.for('customWrapperCache')), customWrapperCache)
     assert.strictEqual(exports.createReactApp, createReactApp)
     assert.strictEqual(exports.ReactDOM, ReactDOM)

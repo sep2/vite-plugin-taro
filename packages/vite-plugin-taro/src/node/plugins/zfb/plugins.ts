@@ -21,7 +21,7 @@ export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
         taro: {
             env: 'alipay',
             componentsReactPath: componentsReactPath,
-            platformRuntimePath: packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-alipay/runtime')
+            targetRuntimePath: packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-alipay/runtime')
         },
         runtime: {
             modules: {

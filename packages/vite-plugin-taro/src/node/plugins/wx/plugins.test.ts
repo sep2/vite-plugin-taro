@@ -20,7 +20,7 @@ test('creates the WX Mini Program contract without translating public options', 
         contract.taro.componentsReactPath,
         /taro-runtime[/\\]dist[/\\]plugin-platform-weapp[/\\]components-react\.js$/
     )
-    assert.match(contract.taro.platformRuntimePath, /taro-runtime[/\\]dist[/\\]plugin-platform-weapp[/\\]runtime\.js$/)
+    assert.match(contract.taro.targetRuntimePath, /taro-runtime[/\\]dist[/\\]plugin-platform-weapp[/\\]runtime\.js$/)
     assert.match(contract.runtime.modules.bootstrap, /runtime[/\\]mini[/\\]amphibious[/\\]bootstrap\.(?:js|ts)$/)
     assert.match(contract.runtime.modules.devtoolsHmrRuntime, /runtime[/\\]wx[/\\]dev[/\\]devtools-runtime\.(?:js|ts)$/)
     assert.match(
