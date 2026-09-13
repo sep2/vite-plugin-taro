@@ -27,6 +27,8 @@ for (const target of ['wx', 'zfb'] as const) {
             'build'
         )
         const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), 'html-runtime-fixture.js')
+        const platform = target === 'wx' ? 'weapp' : 'alipay'
+        const targetRuntime = packageRequire.resolve(`vite-plugin-taro-runtime/plugin-platform-${platform}/runtime`)
         const result = await build({
             input: entry,
             plugins: [
@@ -42,7 +44,7 @@ for (const target of ['wx', 'zfb'] as const) {
                     },
                     load(id) {
                         if (id === entry) {
-                            return fixture
+                            return `import ${JSON.stringify(targetRuntime)}\n${fixture}`
                         }
                     }
                 }
@@ -106,6 +108,7 @@ test('injected globals resolve outside the plugin dependency tree', async () => 
 
 const fixture = `
 import 'vite-plugin-taro-runtime/plugin-html/runtime'
+import { internalComponents, getComponentsAlias as createComponentsAlias } from '@tarojs/shared'
 import { document as runtimeDocument, window as runtimeWindow, TaroElement, SVGElement as RuntimeSVGElement, hooks, getComponentsAlias } from 'vite-plugin-taro-runtime/runtime/mini'
 
 function check(condition, message) {
@@ -117,6 +120,9 @@ function localBinding(document) {
 check(localBinding('local') === 'local', 'injection must respect local bindings')
 check(document === runtimeDocument && window === runtimeWindow, 'injected singleton identity')
 check(window.document === document, 'window.document identity')
+check(document.getElementById('app').id === 'app', 'App root remains indexed by id')
+const expectedAliases = createComponentsAlias(internalComponents)
+check(JSON.stringify(getComponentsAlias()) === JSON.stringify(expectedAliases), 'cached aliases must include target components')
 check(Element === TaroElement, 'Element constructor binding')
 check(SVGElement === RuntimeSVGElement, 'SVGElement constructor binding')
 check(typeof requestAnimationFrame === 'function', 'animation frame binding')

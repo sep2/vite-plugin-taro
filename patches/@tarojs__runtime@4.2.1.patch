@@ -2,11 +2,12 @@ diff --git a/dist/bom/document.js b/dist/bom/document.js
 index abb2d3e..423a5c6 100644
 --- a/dist/bom/document.js
 +++ b/dist/bom/document.js
-@@ -1,5 +1,5 @@
+@@ -1,5 +1,6 @@
  import { isEnableTTDom, DEFAULT_COMPONENTS, TT_SPECIFIC_COMPONENTS } from '@tarojs/shared';
 -import { HTML, HEAD, BODY, APP, CONTAINER } from '../constants/index.js';
 +import { HTML, HEAD, BODY, APP, CONTAINER, ROOT_STR } from '../constants/index.js';
  import { TaroDocument } from '../dom/document.js';
++import { eventSource } from '../dom/event-source.js';
  import env from '../env.js';
 
 @@ -10,7 +10,7 @@ function createDocument() {
@@ -18,7 +19,7 @@ index abb2d3e..423a5c6 100644
         *       </container>
         *     </body>
         *   </html>
-@@ -21,7 +21,19 @@ function createDocument() {
+@@ -21,7 +22,23 @@ function createDocument() {
      const html = documentCreateElement(HTML);
      const head = documentCreateElement(HEAD);
      const body = documentCreateElement(BODY);
@@ -36,7 +37,12 @@ index abb2d3e..423a5c6 100644
 +     * runtime.esm.js entry and therefore retains the upstream <app> element.
 +     */
 +    const app = documentCreateElement(ROOT_STR);
-     app.id = APP;
+-    app.id = APP;
++    // Bootstrap identity without serializing an update: this root has no native host yet. The id setter would
++    // eagerly cache component aliases before the target runtime merges its component definitions, because a
++    // TaroRootElement is its own _root even while detached. Preserve both the DOM id and event-source lookup.
++    app.props.id = app.uid = APP;
++    eventSource.set(APP, app);
      const container = documentCreateElement(CONTAINER); // 多包一层主要为了兼容 vue
      doc.appendChild(html);
 diff --git a/dist/dom/node.js b/dist/dom/node.js
