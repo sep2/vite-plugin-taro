@@ -4,7 +4,8 @@ import { readFileSync, rmSync } from 'node:fs'
 import { builtinModules, createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { build, type Plugin } from 'rolldown'
+import { build } from 'rolldown'
+import { createBundleDependenciesPlugin } from './create-bundle-dependencies-plugin.ts'
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -26,27 +27,6 @@ const externalPackages: ReadonlySet<string> = new Set([
 ])
 const nodeBuiltins: ReadonlySet<string> = new Set([...builtinModules, ...builtinModules.map((name) => `node:${name}`)])
 
-/** Removes generic branches that VPT's fixed Mini style policy makes unreachable without externalizing their dependencies. */
-function pruneMiniStyleDependencies(): Plugin {
-    const stubPrefix = '\0vpt:mini-style-stub:'
-
-    const dependencyStubs: Readonly<Record<string, string>> = {
-        autoprefixer: `export default function unavailable() { throw new Error('VPT disables Mini Program autoprefixer') }`,
-        'postcss-load-config': `export default function unavailable() { throw new Error('VPT owns Mini Program PostCSS configuration') }`,
-        'tailwindcss-config': `export function loadConfig() { throw new Error('VPT compiles Tailwind before Mini Program PostCSS') }`
-    }
-
-    return {
-        name: 'vpt:prune-mini-style-dependencies',
-        resolveId(id) {
-            return Object.hasOwn(dependencyStubs, id) ? `${stubPrefix}${id}` : undefined
-        },
-        load(id) {
-            return id.startsWith(stubPrefix) ? dependencyStubs[id.slice(stubPrefix.length)] : undefined
-        }
-    }
-}
-
 await main()
 
 async function main(): Promise<void> {
@@ -58,7 +38,7 @@ async function main(): Promise<void> {
         input: path.join(packageRoot, 'src/index.ts'),
         platform: 'node',
         external: isExternal,
-        plugins: [pruneMiniStyleDependencies()],
+        plugins: [createBundleDependenciesPlugin(packageRoot)],
         output: {
             file: path.join(distRoot, 'index.js'),
             format: 'esm',
