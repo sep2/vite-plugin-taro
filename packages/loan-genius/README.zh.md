@@ -66,6 +66,8 @@ pnpm test:loan-genius:hmr
 
 测试会将 Loan Genius 复制到 `/tmp/vite-plugin-taro-loan-genius-hmr-v1`，注入稳定的自动化 ID，并覆盖组件修改、多文件更新、突发更新、已打开浮层、隐藏页面、页面导航、语法错误恢复和正常重新挂载。测试还会在适用的更新和还原后拒绝 WX 不安全的生成类名，使已知样式回归继续以失败形式暴露。测试不会修改包内源码，并会在清理阶段停止 Vite 服务和关闭开发者工具项目窗口。
 
+测试通过原子替换发布每个源文件，避免 Vite 读到写入期间被截断的内容。无需开发者工具即可运行发布器回归测试：`pnpm --filter loan-genius test`。
+
 如果已授权的 `wechatide` 客户端名称不是 `Pi`，请设置 `VPT_LOAN_HMR_DEVTOOLS_CLIENT`。
 
 ## H5

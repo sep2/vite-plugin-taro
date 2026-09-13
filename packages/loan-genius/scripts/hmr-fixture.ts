@@ -1,10 +1,11 @@
 import { type ChildProcess, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { cp, type FileHandle, mkdir, open, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises'
+import { cp, type FileHandle, mkdir, open, readFile, rm, symlink, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { writeFixtureSource } from './write-fixture-source.ts'
 
 export type LoanHmrFixture = Readonly<{
     outDir: string
@@ -111,7 +112,8 @@ async function prepareFixture(): Promise<LoanHmrFixture> {
 }
 
 function createFixture(): LoanHmrFixture {
-    const write = (relativePath: string, source: string) => writeFile(path.join(fixtureRoot, relativePath), source)
+    const write = (relativePath: string, source: string) =>
+        writeFixtureSource(path.join(fixtureRoot, relativePath), source)
     return {
         outDir: path.join(fixtureRoot, 'dist/wx'),
         read: async (relativePath) =>

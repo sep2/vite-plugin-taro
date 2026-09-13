@@ -66,6 +66,8 @@ pnpm test:loan-genius:hmr
 
 The suite copies Loan Genius into `/tmp/vite-plugin-taro-loan-genius-hmr-v1`, instruments stable automation IDs, and exercises component edits, multi-file updates, bursts, open overlays, hidden pages, navigation, syntax-error recovery, and normal remounting. It also rejects WX-unsafe generated class names after applicable updates and restorations, so known style regressions remain visible as failures. It never edits the package source fixture and stops its Vite server and DevTools project window during cleanup.
 
+Fixture edits atomically replace each source file so Vite never observes a truncated generation. Run the publisher regression tests without DevTools using `pnpm --filter loan-genius test`.
+
 Set `VPT_LOAN_HMR_DEVTOOLS_CLIENT` when the authorized `wechatide` client is not named `Pi`.
 
 ## H5

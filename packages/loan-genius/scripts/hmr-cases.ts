@@ -31,6 +31,8 @@ const monthlyRoute = 'pages/calculator/monthly-payments/index'
 const historyRoute = 'pages/calculator/history/index'
 const initialLoanValue = '888'
 const primaryInput = '#loan-input-loanAmount'
+// Vite emits imported images with content hashes; require the checked icon's actual asset URL.
+const checkedPaymentIcon = /src="\/assets\/comm_form_icon_gouxuan-[\w-]+\.png"/
 
 /** Exercises stateful Page replacement across component, overlay, navigation, burst and recovery boundaries. */
 export async function runLoanHmrCases(context: HmrContext): Promise<void> {
@@ -277,10 +279,7 @@ async function runNavigationFlows(context: HmrContext): Promise<void> {
     await waitForRoute(context, monthlyRoute)
     await waitForMarker(context, monthlyMarker, 'baseline')
     await context.devTools.tapElement('#loan-payment-equalPrincipal')
-    assert.match(
-        await context.devTools.readElement('#loan-payment-equalPrincipal', 'outerWxml'),
-        /comm_form_icon_gouxuan\.png/
-    )
+    assert.match(await context.devTools.readElement('#loan-payment-equalPrincipal', 'outerWxml'), checkedPaymentIcon)
 
     await runFlow(
         context,
@@ -295,7 +294,7 @@ async function runNavigationFlows(context: HmrContext): Promise<void> {
             await assertRoute(context, monthlyRoute)
             assert.match(
                 await context.devTools.readElement('#loan-payment-equalPrincipal', 'outerWxml'),
-                /comm_form_icon_gouxuan\.png/
+                checkedPaymentIcon
             )
         }
     )
@@ -312,7 +311,7 @@ async function runNavigationFlows(context: HmrContext): Promise<void> {
             await assertRoute(context, monthlyRoute)
             assert.match(
                 await context.devTools.readElement('#loan-payment-equalPrincipal', 'outerWxml'),
-                /comm_form_icon_gouxuan\.png/
+                checkedPaymentIcon
             )
         }
     )
