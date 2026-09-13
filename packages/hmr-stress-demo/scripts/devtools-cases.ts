@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { setTimeout as delay } from 'node:timers/promises'
 import type { DevToolsHarness } from './devtools-harness.ts'
 import { isRecord, waitFor } from './devtools-harness.ts'
 import { type HmrEditProfile, publishHmrEdits } from './publish-hmr-edits.ts'
@@ -16,15 +15,11 @@ type HmrInfo = Readonly<{
 const runtimeReportEvent = 'vpt:mini-hmr:report'
 
 const burstProfile: HmrEditProfile = {
-    applicationDelayMilliseconds: 4_000,
     intervalMilliseconds: readPositiveInteger('VPT_HMR_STRESS_INTERVAL_MS', 8),
-    restorationDelayMilliseconds: readPositiveInteger('VPT_HMR_STRESS_SETTLE_MS', 100),
     updateCount: readPositiveInteger('VPT_HMR_STRESS_UPDATES', 30)
 }
 const postRecoveryProfile: HmrEditProfile = {
-    applicationDelayMilliseconds: 4_000,
     intervalMilliseconds: 40,
-    restorationDelayMilliseconds: 100,
     updateCount: 5
 }
 
@@ -54,9 +49,7 @@ async function testStateRetention(name: string, profile: HmrEditProfile, harness
     await assertCurrentRoute('pages/mirror/index', harness)
     await setPageState(mirrorValue, harness)
 
-    await publishHmrEdits(harness.markerPath, profile)
-
-    await waitForBaselineMarker(harness)
+    await publishHmrEdits(harness.markerPath, profile, (marker) => waitForMarker(marker, harness))
     await assertAppProjectionBaseline(harness)
     const restoredMarkerSource = await readFile(harness.markerPath, 'utf8')
     assert.match(restoredMarkerSource, /hmrMarker = 'baseline'/)
@@ -85,8 +78,7 @@ async function testRuntimeRebuild(harness: DevToolsHarness): Promise<void> {
     }
 
     assert.equal((await countLog(harness.serverLogPath, 'wx full rebuild required')) - rebuildLogsBefore, rounds)
-    await delay(3_000)
-    await harness.readCurrentPage()
+    await waitForBaselineMarker(harness)
     await assertCleanConsole(harness)
 }
 
@@ -114,9 +106,8 @@ async function testSyntaxRecovery(harness: DevToolsHarness): Promise<void> {
 
     // The corrected save resumes ordinary HMR. Five real marker generations prove the stream remains live without rotating the
     // complete-build identity or resetting Page state.
-    await publishHmrEdits(harness.markerPath, postRecoveryProfile)
+    await publishHmrEdits(harness.markerPath, postRecoveryProfile, (marker) => waitForMarker(marker, harness))
     assert.equal((await readHmrInfo(infoPath)).buildId, before.buildId)
-    await waitForBaselineMarker(harness)
     await assertAppProjectionBaseline(harness)
     await assertPageState('syntax-retained', harness)
     await assertWxss(harness.outDir)
@@ -172,7 +163,11 @@ async function assertPageState(value: string, harness: DevToolsHarness): Promise
 }
 
 async function waitForBaselineMarker(harness: DevToolsHarness): Promise<void> {
-    await waitFor(async () => (await harness.readElement('#hmr-status', 'text')) === 'marker:baseline', 6_000, 100)
+    await waitForMarker('baseline', harness)
+}
+
+async function waitForMarker(marker: string, harness: DevToolsHarness): Promise<void> {
+    await waitFor(async () => (await harness.readElement('#hmr-status', 'text')) === `marker:${marker}`, 6_000, 100)
 }
 
 async function assertAppProjectionBaseline(harness: DevToolsHarness): Promise<void> {

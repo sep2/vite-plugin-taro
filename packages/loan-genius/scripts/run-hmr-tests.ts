@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { setTimeout as delay } from 'node:timers/promises'
 import { runLoanHmrCases } from './hmr-cases.ts'
 import { createLoanHmrDevTools } from './hmr-devtools.ts'
 import { startLoanHmrServer, stopLoanHmrServer, withLoanHmrFixture } from './hmr-fixture.ts'
@@ -11,8 +10,6 @@ await withLoanHmrFixture(async (fixture) => {
         const devTools = createLoanHmrDevTools(fixture)
         await devTools.openProject()
         try {
-            // The first App service reload follows project compilation; interactions begin only after that runtime is stable.
-            await delay(5_000)
             console.log(`[loan-hmr] running 26 flows in ${fixture.root}`)
             await runLoanHmrCases({ devTools: devTools, fixture: fixture })
             console.log('[loan-hmr] all 26 complex flows passed')

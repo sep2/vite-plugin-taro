@@ -24,7 +24,7 @@ pnpm setup:hmr-stress-demo:devtools   # open DevTools before each test invocatio
 pnpm test:hmr-stress-demo:devtools
 ```
 
-Setup and the aggregate suite may each use up to 60 seconds. Every standalone case has a hard 30-second deadline and reuses the fixed runtime. The complete suite runs only the strict burst, rebuild storm, and syntax recovery cases. Runtime assertions replace long fixed settle sleeps, and plugin rebuilding is opt-in.
+Setup and the aggregate suite may each use up to 60 seconds. Every standalone case has a hard 30-second deadline and reuses the fixed runtime. The complete suite runs only the strict burst, rebuild storm, and syntax recovery cases. Runtime assertions replace fixed settle sleeps, including observing the restoration marker before publishing and awaiting the baseline. Plugin rebuilding is opt-in.
 
 Individual cases can be run independently. Run `pnpm setup:hmr-stress-demo:devtools` before each invocation, since each test quits DevTools afterward:
 
@@ -64,7 +64,6 @@ VPT_HMR_DEVTOOLS_CLIENT          wechatide client name; default Pi
 VPT_HMR_BUILD_PLUGIN             set to 1 to rebuild plugin dist before the suite
 VPT_HMR_STRESS_UPDATES           burst update count
 VPT_HMR_STRESS_INTERVAL_MS       burst interval
-VPT_HMR_STRESS_SETTLE_MS         delay separating restoring and baseline generations; default 100
 VPT_HMR_REBUILD_ROUNDS           rebuild storm rounds; default 1
 VPT_HMR_REPORTS_PER_ROUND        reports per rebuild round; default 100
 ```

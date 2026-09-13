@@ -196,11 +196,10 @@ async function runBurstFlow(context: HmrContext): Promise<void> {
                     file,
                     replaceOnce(original, '<Text>房贷计算器</Text>', `<Text>房贷计算器·15-${index}</Text>`)
                 ),
-                context.fixture.writeMarkerSource(calculatorMarker, `flow-15-${index}`)
+                context.fixture.publishMarker(calculatorMarker, `flow-15-${index}`)
             ])
             await delay(12)
         }
-        await delay(700)
         await waitForMarker(context, calculatorMarker, 'flow-15-11')
         await assertCalculatorState(context)
     } finally {
@@ -240,7 +239,6 @@ async function runOverlayFlows(context: HmrContext): Promise<void> {
         }
     )
     await context.devTools.tapElement('#loan-picker-confirm')
-    await delay(250)
 
     await context.devTools.tapElement('#loan-explain-loanLrp')
     await waitForElement(context, '#loan-explain-dialog')
@@ -259,7 +257,6 @@ async function runOverlayFlows(context: HmrContext): Promise<void> {
         }
     )
     await context.devTools.tapElement('#loan-explain-dialog button')
-    await delay(100)
 
     await runFlow(
         context,
@@ -368,9 +365,11 @@ async function runNavigationFlows(context: HmrContext): Promise<void> {
 async function runRecoveryFlow(context: HmrContext): Promise<void> {
     const file = 'src/pages/calculator/index.tsx'
     const original = await context.fixture.read(file)
+    const failureCount = async () => (await context.fixture.read('vite.log')).split('wx HMR update failed').length - 1
+    const failuresBefore = await failureCount()
     try {
         await context.fixture.write(file, 'export default function Broken(\n')
-        await delay(500)
+        await waitFor(async () => (await failureCount()) > failuresBefore, 5_000, 20)
         assert.equal(await context.devTools.readElement('#loan-hmr-marker', 'text'), 'baseline')
         await assertCalculatorState(context)
     } finally {

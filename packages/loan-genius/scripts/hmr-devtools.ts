@@ -52,7 +52,6 @@ export function createLoanHmrDevTools(fixture: LoanHmrFixture): LoanHmrDevTools 
         },
         openProject: async () => {
             await runToolWithTimeout(fixture, 'open_project_window', {}, 30_000)
-            await delay(10_000)
             try {
                 await runTool('automation_runtime_info', { action: 'currentPage' })
             } catch {

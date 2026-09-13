@@ -46,8 +46,7 @@ test('scope cleanup kills descendants after their wrapper exits', {
         const pid = Number(output.trim())
         assert.ok(pid > 0)
         await scope.close()
-        // Reaping is asynchronous; bound polling rather than depending on a fixed sleep.
-        await assertEventuallyExited(pid)
+        assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' })
     } finally {
         await scope.close()
     }
@@ -77,16 +76,3 @@ test('scope cleanup escalates when a child ignores SIGTERM', {
         await scope.close()
     }
 })
-
-async function assertEventuallyExited(pid: number): Promise<void> {
-    for (const attempt of Array.from({ length: 100 }, (_, index) => index)) {
-        try {
-            process.kill(pid, 0)
-        } catch (error) {
-            assert.ok(error instanceof Error && 'code' in error && error.code === 'ESRCH')
-            return
-        }
-        assert.ok(attempt < 99, `Descendant ${pid} survived cleanup`)
-        await new Promise((resolve) => setTimeout(resolve, 10))
-    }
-}

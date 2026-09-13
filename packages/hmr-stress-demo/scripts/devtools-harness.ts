@@ -141,8 +141,6 @@ async function runLockedHarness(root: string, testName: string, testCase: TestCa
         await validateProjectConfig(path.join(outDir, 'project.config.json'))
         devToolsUsed = true
         await openProject(outDir)
-        // Measured DevTools app-service reloads complete within five seconds after Vite publishes the new app.wxss build marker.
-        await delay(5_000)
 
         console.log(`[hmr-devtools] running ${testName} in ${root}`)
         try {
@@ -181,7 +179,6 @@ async function openProject(outDir: string): Promise<void> {
         // No window is the expected first setup state.
     }
     await runTool('open_project_window', outDir, {})
-    await delay(10_000)
     try {
         await runTool('automation_runtime_info', outDir, { action: 'currentPage' })
     } catch {

@@ -14,7 +14,6 @@ export type LoanHmrFixture = Readonly<{
     root: string
     publishMarker: (markerFile: string, value: string) => Promise<void>
     write: (relativePath: string, source: string) => Promise<void>
-    writeMarkerSource: (markerFile: string, value: string) => Promise<void>
 }>
 
 export type LoanHmrServer = Readonly<{
@@ -120,13 +119,8 @@ function createFixture(): LoanHmrFixture {
             (await readFile(path.join(fixtureRoot, relativePath), 'utf8')).replaceAll('\r\n', '\n'),
         repositoryRoot: repositoryRoot,
         root: fixtureRoot,
-        publishMarker: async (markerFile, value) => {
-            await writeMarker(write, markerFile, value)
-            // Rolldown's quiet window must close before DevTools is polled for the newly published Page shell.
-            await delay(700)
-        },
-        write: write,
-        writeMarkerSource: (markerFile, value) => writeMarker(write, markerFile, value)
+        publishMarker: (markerFile, value) => writeMarker(write, markerFile, value),
+        write: write
     }
 }
 
@@ -146,7 +140,7 @@ async function instrumentSources(fixture: LoanHmrFixture): Promise<void> {
         'src/pages/calculator/monthly-payments/hmr-marker.ts',
         'src/pages/calculator/history/hmr-marker.ts'
     ]
-    await Promise.all(markerFiles.map((file) => fixture.writeMarkerSource(file, 'baseline')))
+    await Promise.all(markerFiles.map((file) => fixture.publishMarker(file, 'baseline')))
     await Promise.all([
         replaceFixtureSource(fixture, 'src/pages/calculator/index.tsx', [
             [
@@ -288,17 +282,23 @@ export async function startLoanHmrServer(fixture: LoanHmrFixture): Promise<LoanH
 }
 
 export async function stopLoanHmrServer(server: LoanHmrServer): Promise<void> {
-    if (server.process.exitCode === null && server.process.signalCode === null) {
-        const exited = new Promise<void>((resolve) => server.process.once('exit', () => resolve()))
-        server.process.kill('SIGTERM')
-        const graceful = await Promise.race([exited.then(() => true), delay(3_000).then(() => false)])
-        if (!graceful) {
-            server.process.kill('SIGKILL')
-            await exited
-            throw new Error('Loan Genius Vite server did not drain within three seconds')
+    try {
+        if (server.process.exitCode === null && server.process.signalCode === null) {
+            const exited = new Promise<void>((resolve) => server.process.once('exit', () => resolve()))
+            const timeout = setTimeout(() => server.process.kill('SIGKILL'), 3_000)
+            try {
+                server.process.kill('SIGTERM')
+                await exited
+            } finally {
+                clearTimeout(timeout)
+            }
+            if (server.process.signalCode === 'SIGKILL') {
+                throw new Error('Loan Genius Vite server did not drain within three seconds')
+            }
         }
+    } finally {
+        await server.logFile.close()
     }
-    await server.logFile.close()
 }
 
 async function waitFor(predicate: () => boolean | Promise<boolean>, timeoutMilliseconds: number): Promise<void> {
