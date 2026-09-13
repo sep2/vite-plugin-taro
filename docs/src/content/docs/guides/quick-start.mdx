@@ -143,28 +143,29 @@ bun run dev:h5
 
 ## 6. 编辑第一个页面
 
-模板的默认首页组件位于 `src/pages/home/index.tsx`。应用代码通过 vpt 提供的模块使用 Taro 组件和 API：
+模板的默认首页组件位于 `src/pages/home/index.tsx`。可以直接使用 `div`、`span`、`button` 等 HTML 标签编写 React 组件；vpt 在小程序端将支持的标签映射为原生组件：
 
 ```tsx
 import Taro from 'virtual:taro/api'
-import { Button, Text, View } from 'virtual:taro/components'
 import { useState } from 'react'
 
 function HomePage() {
     const [count, setCount] = useState(0)
 
     return (
-        <View className="flex min-h-screen flex-col gap-4 p-6">
-            <Text className="text-2xl font-bold">你好，VPT</Text>
-            <Text>计数：{count}</Text>
-            <Button onClick={() => setCount((currentCount) => currentCount + 1)}>增加</Button>
-            <Button onClick={() => Taro.showToast({ title: '来自 Taro' })}>显示提示</Button>
-        </View>
+        <div className="flex min-h-screen flex-col gap-4 p-6">
+            <span className="text-2xl font-bold">你好，VPT</span>
+            <span>计数：{count}</span>
+            <button type="button" onClick={() => setCount((currentCount) => currentCount + 1)}>增加</button>
+            <button type="button" onClick={() => Taro.showToast({ title: '来自 Taro' })}>显示提示</button>
+        </div>
     )
 }
 
 export default HomePage
 ```
+
+HTML 标签可以与 `ScrollView` 等 Taro 组件混用。
 
 | 导入 | 用途 |
 | --- | --- |
