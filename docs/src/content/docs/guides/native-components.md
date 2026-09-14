@@ -140,7 +140,7 @@ import { Slot, Text } from 'virtual:taro/components'
 </NativeCounter>
 ```
 
-完整示例见 [`native-comp-demo`](https://github.com/sep2/vite-plugin-taro/tree/main/packages/native-comp-demo)。
+完整示例见 [`native-comp-demo`](https://github.com/sep2/vite-plugin-taro/tree/main/demo/native-comp-demo)。
 
 ## 全自动分包
 
@@ -293,5 +293,5 @@ React 和原生组件不共享 CommonJS 模块实例。使用属性和事件通�
 
 ## 示例
 
-- [`native-comp-demo`](https://github.com/sep2/vite-plugin-taro/tree/main/packages/native-comp-demo)：微信与支付宝原生组件的属性、事件和命名 slot。
-- [`towxml-stream-demo`](https://github.com/sep2/vite-plugin-taro/tree/main/packages/towxml-stream-demo)：微信 Towxml、增量 adapter 和自动分包。
+- [`native-comp-demo`](https://github.com/sep2/vite-plugin-taro/tree/main/demo/native-comp-demo)：微信与支付宝原生组件的属性、事件和命名 slot。
+- [`towxml-stream-demo`](https://github.com/sep2/vite-plugin-taro/tree/main/demo/towxml-stream-demo)：微信 Towxml、增量 adapter 和自动分包。

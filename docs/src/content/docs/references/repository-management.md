@@ -26,10 +26,10 @@ pnpm build:plugin
 | `packages/vite-plugin-taro` | 发布到 npm 的 Vite 插件 |
 | `packages/create-vite-taro` | 项目生成器及默认模板 |
 | `packages/taro-runtime` | 从固定版本 Taro 开发依赖构建的统一运行时、React 与平台适配包 |
-| `packages/loan-genius` | 微信、支付宝与 Web 综合示例 |
-| `packages/native-comp-demo` | 微信与支付宝原生组件示例 |
-| `packages/hmr-stress-demo` | 微信与支付宝深层 React 树及页面栈 HMR 压力测试项目 |
-| `packages/towxml-stream-demo` | 微信 Towxml 原生组件与流式渲染示例 |
+| `demo/loan-genius` | 微信、支付宝与 Web 综合示例 |
+| `demo/native-comp-demo` | 微信与支付宝原生组件示例 |
+| `demo/hmr-stress-demo` | 微信与支付宝深层 React 树及页面栈 HMR 压力测试项目 |
+| `demo/towxml-stream-demo` | 微信 Towxml 原生组件与流式渲染示例 |
 | `docs` | Astro Starlight 文档站 |
 
 ## 构建与验证

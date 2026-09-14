@@ -8,7 +8,7 @@ Loan Genius 是 `vite-plugin-taro` 的示例应用。它是一个基于 React 19
 
 该应用改造自 [`wuba/Taro-Mortgage-Calculator`](https://github.com/wuba/Taro-Mortgage-Calculator)，用于演示 `vite-plugin-taro` 的用法。
 
-- 源码：[`packages/loan-genius`](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius)
+- 源码：[`demo/loan-genius`](https://github.com/sep2/vite-plugin-taro/tree/main/demo/loan-genius)
 - 官网：<https://vpt.js.org>
 
 ## 环境要求
@@ -49,10 +49,10 @@ pnpm dev:loan-genius:wx
 微信小程序产物会写入：
 
 ```text
-packages/loan-genius/dist/wx
+demo/loan-genius/dist/wx
 ```
 
-请在微信开发者工具中打开 `packages/loan-genius/dist/wx`，不要打开源码包目录。
+请在微信开发者工具中打开 `demo/loan-genius/dist/wx`，不要打开源码包目录。
 
 ### WX HMR 回归测试
 
@@ -88,7 +88,7 @@ pnpm preview:loan-genius:h5
 H5 产物会写入：
 
 ```text
-packages/loan-genius/dist/h5
+demo/loan-genius/dist/h5
 ```
 
 ## 本示例演示的内容
@@ -116,7 +116,7 @@ import { Text, View } from 'virtual:taro/components'
 | `VITE_VPT_WECHAT_APP_ID` | 否 | 微信小程序 app id。默认值为 `touristappid`。 |
 | `VITE_VPT_ALIPAY_APP_ID` | 否 | 写入 `mini.project.json` 的支付宝小程序 App ID。 |
 
-如需在本地测试微信小程序，请将 app id 写入 `packages/loan-genius/.env.local`：
+如需在本地测试微信小程序，请将 app id 写入 `demo/loan-genius/.env.local`：
 
 ```env
 VITE_VPT_WECHAT_APP_ID=your_app_id
@@ -125,7 +125,7 @@ VITE_VPT_WECHAT_APP_ID=your_app_id
 ## 项目结构
 
 ```text
-packages/loan-genius/
+demo/loan-genius/
 ├── index.html
 ├── vite.config.ts
 └── src/

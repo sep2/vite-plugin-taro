@@ -11,7 +11,7 @@ pnpm --filter native-comp-demo dev-wx
 pnpm --filter native-comp-demo dev-zfb
 ```
 
-Open `packages/native-comp-demo/dist/wx` in WeChat DevTools or `packages/native-comp-demo/dist/zfb` in Alipay Mini Program Studio.
+Open `demo/native-comp-demo/dist/wx` in WeChat DevTools or `demo/native-comp-demo/dist/zfb` in Alipay Mini Program Studio.
 Set `VITE_VPT_WECHAT_APP_ID` or `VITE_VPT_ALIPAY_APP_ID` in `.env.local` for the selected target.
 
 The target-native component sources live under `src/native/wx/native-counter` and `src/native/zfb/native-counter`. Conditional

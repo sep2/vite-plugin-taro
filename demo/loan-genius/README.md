@@ -8,7 +8,7 @@ Loan Genius is the sample app for `vite-plugin-taro`. It is a React 19 + Taro lo
 
 The app is forked from [`wuba/Taro-Mortgage-Calculator`](https://github.com/wuba/Taro-Mortgage-Calculator) and adapted to demonstrate `vite-plugin-taro`.
 
-- Source: [`packages/loan-genius`](https://github.com/sep2/vite-plugin-taro/tree/main/packages/loan-genius)
+- Source: [`demo/loan-genius`](https://github.com/sep2/vite-plugin-taro/tree/main/demo/loan-genius)
 - Official Website: <https://vpt.js.org>
 
 ## Requirements
@@ -49,10 +49,10 @@ pnpm dev:loan-genius:wx
 WeChat output is written to:
 
 ```text
-packages/loan-genius/dist/wx
+demo/loan-genius/dist/wx
 ```
 
-Open `packages/loan-genius/dist/wx` in WeChat DevTools. Do not open the source package directory.
+Open `demo/loan-genius/dist/wx` in WeChat DevTools. Do not open the source package directory.
 
 ### WX HMR regression suite
 
@@ -88,7 +88,7 @@ pnpm preview:loan-genius:h5
 H5 output is written to:
 
 ```text
-packages/loan-genius/dist/h5
+demo/loan-genius/dist/h5
 ```
 
 ## What this sample demonstrates
@@ -116,7 +116,7 @@ import { Text, View } from 'virtual:taro/components'
 | `VITE_VPT_WECHAT_APP_ID` | No | WeChat Mini Program app id. Defaults to `touristappid`. |
 | `VITE_VPT_ALIPAY_APP_ID` | No | Alipay Mini Program app id written to `mini.project.json`. |
 
-For local WeChat testing, put your app id in `packages/loan-genius/.env.local`:
+For local WeChat testing, put your app id in `demo/loan-genius/.env.local`:
 
 ```env
 VITE_VPT_WECHAT_APP_ID=your_app_id
@@ -125,7 +125,7 @@ VITE_VPT_WECHAT_APP_ID=your_app_id
 ## Project structure
 
 ```text
-packages/loan-genius/
+demo/loan-genius/
 ├── index.html
 ├── vite.config.ts
 └── src/

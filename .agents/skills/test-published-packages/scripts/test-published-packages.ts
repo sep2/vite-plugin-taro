@@ -54,7 +54,7 @@ const projectPaths: ProjectPaths = {
     backup: resolve(temporaryRoot, '.hmr-test-index.tsx.backup'),
     viteLog: resolve(temporaryDirectory, 'vpt-published-packages-test-vite.log')
 }
-const appIdSource = resolve(repositoryRoot, 'packages/loan-genius/.env.local')
+const appIdSource = resolve(repositoryRoot, 'demo/loan-genius/.env.local')
 const miniProgramSkill = resolve(repositoryRoot, '.agents/skills/miniprogram-dev-skill')
 const originalText = 'Build naturally. Ship everywhere.'
 const updatedText = 'Published HMR keeps React state.'

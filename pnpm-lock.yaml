@@ -35,6 +35,115 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  demo/hmr-stress-demo:
+    dependencies:
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
+      vite-plugin-taro:
+        specifier: workspace:*
+        version: link:../../packages/vite-plugin-taro
+    devDependencies:
+      '@types/node':
+        specifier: ^26.5.1
+        version: 26.5.1
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      cross-env:
+        specifier: ^10.1.0
+        version: 10.1.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: 8.3.0
+        version: 8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0)
+
+  demo/loan-genius:
+    dependencies:
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
+      vite-plugin-taro:
+        specifier: workspace:*
+        version: link:../../packages/vite-plugin-taro
+    devDependencies:
+      '@types/node':
+        specifier: ^26.5.1
+        version: 26.5.1
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      cross-env:
+        specifier: ^10.1.0
+        version: 10.1.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: 8.3.0
+        version: 8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0)
+
+  demo/native-comp-demo:
+    dependencies:
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
+      vite-plugin-taro:
+        specifier: workspace:*
+        version: link:../../packages/vite-plugin-taro
+    devDependencies:
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      cross-env:
+        specifier: ^10.1.0
+        version: 10.1.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: 8.3.0
+        version: 8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0)
+
+  demo/towxml-stream-demo:
+    dependencies:
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
+      vite-plugin-taro:
+        specifier: workspace:*
+        version: link:../../packages/vite-plugin-taro
+    devDependencies:
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      cross-env:
+        specifier: ^10.1.0
+        version: 10.1.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: 8.3.0
+        version: 8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0)
+
   docs:
     dependencies:
       '@astrojs/markdown-remark':
@@ -79,90 +188,6 @@ importers:
         version: 4.0.4
 
   packages/create-vite-taro: {}
-
-  packages/hmr-stress-demo:
-    dependencies:
-      react:
-        specifier: ^19.3.0
-        version: 19.3.0
-      react-dom:
-        specifier: ^19.3.0
-        version: 19.3.0(react@19.3.0)
-      vite-plugin-taro:
-        specifier: workspace:*
-        version: link:../vite-plugin-taro
-    devDependencies:
-      '@types/node':
-        specifier: ^26.5.1
-        version: 26.5.1
-      '@types/react':
-        specifier: ^19.3.0
-        version: 19.3.0
-      cross-env:
-        specifier: ^10.1.0
-        version: 10.1.0
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-      vite:
-        specifier: 8.3.0
-        version: 8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0)
-
-  packages/loan-genius:
-    dependencies:
-      clsx:
-        specifier: ^2.1.1
-        version: 2.1.1
-      react:
-        specifier: ^19.3.0
-        version: 19.3.0
-      react-dom:
-        specifier: ^19.3.0
-        version: 19.3.0(react@19.3.0)
-      vite-plugin-taro:
-        specifier: workspace:*
-        version: link:../vite-plugin-taro
-    devDependencies:
-      '@types/node':
-        specifier: ^26.5.1
-        version: 26.5.1
-      '@types/react':
-        specifier: ^19.3.0
-        version: 19.3.0
-      cross-env:
-        specifier: ^10.1.0
-        version: 10.1.0
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-      vite:
-        specifier: 8.3.0
-        version: 8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0)
-
-  packages/native-comp-demo:
-    dependencies:
-      react:
-        specifier: ^19.3.0
-        version: 19.3.0
-      react-dom:
-        specifier: ^19.3.0
-        version: 19.3.0(react@19.3.0)
-      vite-plugin-taro:
-        specifier: workspace:*
-        version: link:../vite-plugin-taro
-    devDependencies:
-      '@types/react':
-        specifier: ^19.3.0
-        version: 19.3.0
-      cross-env:
-        specifier: ^10.1.0
-        version: 10.1.0
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-      vite:
-        specifier: 8.3.0
-        version: 8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0)
 
   packages/taro-runtime:
     dependencies:
@@ -275,31 +300,6 @@ importers:
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
-
-  packages/towxml-stream-demo:
-    dependencies:
-      react:
-        specifier: ^19.3.0
-        version: 19.3.0
-      react-dom:
-        specifier: ^19.3.0
-        version: 19.3.0(react@19.3.0)
-      vite-plugin-taro:
-        specifier: workspace:*
-        version: link:../vite-plugin-taro
-    devDependencies:
-      '@types/react':
-        specifier: ^19.3.0
-        version: 19.3.0
-      cross-env:
-        specifier: ^10.1.0
-        version: 10.1.0
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-      vite:
-        specifier: 8.3.0
-        version: 8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0)
 
   packages/vite-plugin-taro:
     dependencies:

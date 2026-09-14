@@ -28,7 +28,12 @@ interface PackageManifest {
 
 const repoRoot = fileURLToPath(new URL('../', import.meta.url))
 const cliPath = path.join(repoRoot, 'node_modules/@changesets/cli/bin.js')
-const packageDirectories = ['docs', ...readdirSync(path.join(repoRoot, 'packages')).map((name) => `packages/${name}`)]
+const packageDirectories = [
+    'docs',
+    ...['packages', 'demo'].flatMap((directory) =>
+        readdirSync(path.join(repoRoot, directory)).map((name) => `${directory}/${name}`)
+    )
+]
 const publicNames = config.fixed.flat()
 const execFileAsync = promisify(execFile)
 
@@ -52,7 +57,7 @@ function createWorkspace(t: TestContext, version: string): string {
     t.after(() => rmSync(root, { recursive: true, force: true }))
     writeJson(path.join(root, 'package.json'), { name: 'release-fixture', private: true, type: 'module' })
     writeJson(path.join(root, '.changeset/config.json'), config)
-    writeFileSync(path.join(root, 'pnpm-workspace.yaml'), 'packages:\n  - packages/*\n  - docs\n')
+    writeFileSync(path.join(root, 'pnpm-workspace.yaml'), 'packages:\n  - packages/*\n  - demo/*\n  - docs\n')
     for (const directory of packageDirectories) {
         const manifest = readPackage(repoRoot, directory)
         writeJson(path.join(root, directory, 'package.json'), {

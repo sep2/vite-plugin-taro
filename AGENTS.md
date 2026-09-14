@@ -34,6 +34,9 @@ Under `packages/`:
 - `vite-plugin-taro`: published Vite plugin; source in `src`, output in `dist`, README files synced during build.
 - `create-vite-taro`: published project generator; templates in `templates/default`.
 - `taro-runtime`: published as `vite-plugin-taro-runtime`; bundles the Taro runtime, React renderer/framework runtime, and WX/ZFB/H5 entries from pinned, patched dependencies.
+
+Under `demo/`:
+
 - `loan-genius`: sample app for `h5`, `wx`, and `zfb`.
 - `native-comp-demo`: native custom-component fixture for `wx` and `zfb`.
 - `hmr-stress-demo`: deep React tree HMR fixture for `wx` and `zfb`; automated IDE harness is WX-only.

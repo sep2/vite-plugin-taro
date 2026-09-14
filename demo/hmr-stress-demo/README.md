@@ -34,14 +34,14 @@ pnpm test:hmr-stress-demo:rebuild         # mixed ACK/rebuild report storms
 pnpm test:hmr-stress-demo:recovery        # syntax failures and passive HMR recovery
 ```
 
-No stress edit touches `packages/hmr-stress-demo/src`. The portable harness deliberately avoids RAM-disk provisioning: it confines writes to one fixed temporary project and bounds the strict burst to 30 source generations, plus two restoration writes. Syntax recovery uses one invalid generation plus restoration, and post-recovery health uses five edits. This retains the failure-producing profiles without thousands of filesystem writes or platform-specific mount setup.
+No stress edit touches `demo/hmr-stress-demo/src`. The portable harness deliberately avoids RAM-disk provisioning: it confines writes to one fixed temporary project and bounds the strict burst to 30 source generations, plus two restoration writes. Syntax recovery uses one invalid generation plus restoration, and post-recovery health uses five edits. This retains the failure-producing profiles without thousands of filesystem writes or platform-specific mount setup.
 
 Every invocation replaces the complete temporary `src` tree from the repository baseline. The fixed directory and last complete output remain on disk to preserve project identity. Setup intentionally leaves the DevTools window open for the next test. Vite overwrites the active development output before a case starts, and a fixed process lock prevents concurrent runs from sharing the workspace. Normal completion, failures, and SIGINT/SIGTERM terminate owned subprocess groups, drain the Vite log stream, and release the lock. On POSIX this includes descendants of command wrappers; Windows termination currently covers direct children only. Test cleanup uses the supported `wechatide quit` command rather than OS-level commands to close DevTools. It has a separate 12-second timeout, independent of the test deadline; cancellation or a failed quit is reported as an error. The fixture remains on disk for inspection.
 
 Subprocess cleanup regression tests (no DevTools required):
 
 ```bash
-node --test packages/hmr-stress-demo/scripts/create-process-scope.test.ts
+node --test demo/hmr-stress-demo/scripts/create-process-scope.test.ts
 ```
 
 The complete suite checks:
@@ -78,7 +78,7 @@ VITE_VPT_WECHAT_APP_ID=<appid> pnpm dev:hmr-stress-demo:wx
 VITE_VPT_ALIPAY_APP_ID=<appid> pnpm dev:hmr-stress-demo:zfb
 ```
 
-Open `packages/hmr-stress-demo/dist/wx` in WeChat DevTools or `packages/hmr-stress-demo/dist/zfb` in Alipay Mini Program Studio. ZFB uses the interpreter HMR mode required by the Alipay development tool. Do not run burst publishers against either repository-backed server; use the automated WeChat commands above so source generations remain confined to the disposable fixture.
+Open `demo/hmr-stress-demo/dist/wx` in WeChat DevTools or `demo/hmr-stress-demo/dist/zfb` in Alipay Mini Program Studio. ZFB uses the interpreter HMR mode required by the Alipay development tool. Do not run burst publishers against either repository-backed server; use the automated WeChat commands above so source generations remain confined to the disposable fixture.
 
 Build-only validation is available for both targets:
 
