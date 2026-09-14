@@ -10,13 +10,14 @@ await withLoanHmrFixture(async (fixture) => {
         const devTools = createLoanHmrDevTools(fixture)
         await devTools.openProject()
         try {
-            console.log(`[loan-hmr] running 26 flows in ${fixture.root}`)
+            console.log(`[loan-hmr] running 27 flows in ${fixture.root}`)
             await runLoanHmrCases({ devTools: devTools, fixture: fixture })
-            console.log('[loan-hmr] all 26 complex flows passed')
+            console.log('[loan-hmr] all 27 complex flows passed')
         } catch (error) {
             console.error(
                 `[loan-hmr] Vite log before cleanup:\n${await readFile(path.join(fixture.root, 'vite.log'), 'utf8')}`
             )
+            console.error(`[loan-hmr] DevTools console before cleanup:\n${await devTools.readConsoleErrors()}`)
             throw error
         } finally {
             await devTools.closeProject()

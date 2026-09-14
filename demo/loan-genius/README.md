@@ -56,7 +56,7 @@ Open `demo/loan-genius/dist/wx` in WeChat DevTools. Do not open the source packa
 
 ### WX HMR regression suite
 
-After building the current plugin, run the stateful 25-flow DevTools suite from the repository root:
+After building the current plugin, run the stateful 27-flow DevTools suite from the repository root:
 
 ```sh
 pnpm build:plugin
@@ -64,7 +64,9 @@ wechatide auth -c Pi
 pnpm test:loan-genius:hmr
 ```
 
-The suite copies Loan Genius into `/tmp/vite-plugin-taro-loan-genius-hmr-v1`, instruments stable automation IDs, and exercises component edits, multi-file updates, bursts, open overlays, hidden pages, navigation, syntax-error recovery, and normal remounting. It also rejects WX-unsafe generated class names after applicable updates and restorations, so known style regressions remain visible as failures. It never edits the package source fixture and stops its Vite server and DevTools project window during cleanup.
+The suite copies Loan Genius into `vite-plugin-taro-loan-genius-hmr-v1` under the system temporary directory, instruments stable automation IDs, and exercises polyfill access, component edits, multi-file updates, bursts, open overlays, hidden pages, navigation, syntax-error recovery, and normal remounting. It also rejects WX-unsafe generated class names after applicable updates and restorations, so known style regressions remain visible as failures. It never edits the package source fixture and stops its Vite server and DevTools project window during cleanup.
+
+The sample enables `polyfills: ['web.url']` for mini programs. Its Vite `define: { URL: 'globalThis.URL' }` makes bare `URL` references use the native or polyfilled global on every target. The polyfill flow checks `globalThis.URL` at startup, switches to bare `URL` through HMR, then restores the original code while checking that calculator state is retained.
 
 Fixture edits atomically replace each source file so Vite never observes a truncated generation. Run the publisher regression tests without DevTools using `pnpm --filter loan-genius test`.
 

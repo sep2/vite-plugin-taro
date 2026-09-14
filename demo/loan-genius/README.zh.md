@@ -56,7 +56,7 @@ demo/loan-genius/dist/wx
 
 ### WX HMR 回归测试
 
-构建当前插件后，在仓库根目录运行包含 25 个有状态流程的开发者工具测试：
+构建当前插件后，在仓库根目录运行包含 27 个有状态流程的开发者工具测试：
 
 ```sh
 pnpm build:plugin
@@ -64,7 +64,9 @@ wechatide auth -c Pi
 pnpm test:loan-genius:hmr
 ```
 
-测试会将 Loan Genius 复制到 `/tmp/vite-plugin-taro-loan-genius-hmr-v1`，注入稳定的自动化 ID，并覆盖组件修改、多文件更新、突发更新、已打开浮层、隐藏页面、页面导航、语法错误恢复和正常重新挂载。测试还会在适用的更新和还原后拒绝 WX 不安全的生成类名，使已知样式回归继续以失败形式暴露。测试不会修改包内源码，并会在清理阶段停止 Vite 服务和关闭开发者工具项目窗口。
+测试会将 Loan Genius 复制到系统临时目录下的 `vite-plugin-taro-loan-genius-hmr-v1`，注入稳定的自动化 ID，并覆盖 polyfill 访问、组件修改、多文件更新、突发更新、已打开浮层、隐藏页面、页面导航、语法错误恢复和正常重新挂载。测试还会在适用的更新和还原后拒绝 WX 不安全的生成类名，使已知样式回归继续以失败形式暴露。测试不会修改包内源码，并会在清理阶段停止 Vite 服务和关闭开发者工具项目窗口。
+
+示例通过 `polyfills: ['web.url']` 为小程序启用 URL API，并使用 Vite 的 `define: { URL: 'globalThis.URL' }`，让所有目标中直接引用的 `URL` 都使用原生或 polyfill 提供的全局实现。polyfill 流程会验证启动时的 `globalThis.URL`，通过 HMR 切换到 `URL`，再还原代码，并检查计算器状态始终保留。
 
 测试通过原子替换发布每个源文件，避免 Vite 读到写入期间被截断的内容。无需开发者工具即可运行发布器回归测试：`pnpm --filter loan-genius test`。
 

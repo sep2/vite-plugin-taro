@@ -108,10 +108,11 @@ export interface VptOptions {
     sitemapJson?: VptJsonObject
 
     /**
-     * Add JavaScript and Web APIs that your WX or ZFB app needs but its host may not provide.
+     * Add JavaScript and Web APIs that your mini app needs but its host may not provide.
      *
      * Use core-js module names without the `core-js/modules/` prefix or `.js` suffix; no separate core-js installation is needed.
      * For example, `web.url` provides `URL` and `URLSearchParams`, while `es.array.at` provides `Array.prototype.at`.
+     * On WX, use `globalThis.URL` or add `define: { URL: 'globalThis.URL' }` to your Vite config for bare `URL` references.
      *
      * Selected polyfills run before your app in development and production, updating global APIs and prototypes when needed.
      * Omit this option or use `[]` to add no optional polyfills. H5 ignores this option.

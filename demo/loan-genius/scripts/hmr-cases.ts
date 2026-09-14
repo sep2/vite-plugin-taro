@@ -48,6 +48,7 @@ export async function runLoanHmrCases(context: HmrContext): Promise<void> {
     await context.devTools.tapElement('#loan-submit')
     await waitForElement(context, '#loan-result-header')
 
+    await runPolyfillFlow(context)
     await runIsolatedPageFlow(context)
     await runCalculatorFlows(context)
     await runOverlayFlows(context)
@@ -55,6 +56,27 @@ export async function runLoanHmrCases(context: HmrContext): Promise<void> {
     await runRecoveryFlow(context)
     await runNormalRemountFlow(context)
     assert.equal(await context.devTools.readConsoleErrors(), '')
+}
+
+async function runPolyfillFlow(context: HmrContext): Promise<void> {
+    const file = 'src/pages/calculator/index.tsx'
+    const original = await context.fixture.read(file)
+    const selector = '#loan-polyfill-probe'
+    const href = 'https://example.com/loan/child'
+    await waitForElementText(context, selector, `globalThis.URL:${href}`)
+    console.log('[loan-hmr] polyfill: globalThis.URL works at startup')
+    try {
+        // Distinct labels prove the bare-identifier update actually rendered, rather than observing the previous generation.
+        const updated = replaceOnce(replaceOnce(original, 'globalThis.URL:', 'URL:'), 'new globalThis.URL(', 'new URL(')
+        await context.fixture.write(file, updated)
+        await waitForElementText(context, selector, `URL:${href}`)
+        await assertCalculatorState(context)
+    } finally {
+        await context.fixture.write(file, original)
+    }
+    await waitForElementText(context, selector, `globalThis.URL:${href}`)
+    await assertCalculatorState(context)
+    console.log('[loan-hmr] polyfill-global-bindings passed')
 }
 
 async function runIsolatedPageFlow(context: HmrContext): Promise<void> {

@@ -202,30 +202,36 @@ sitemapJson: {
 
 ## `polyfills`
 
-可选。当小程序应用或第三方依赖需要运行环境尚未提供的 JavaScript / Web API 时，用此选项补充：
+可选。当小程序需要运行环境尚未提供的 JavaScript / Web API 时，用此选项补充：
 
 ```ts
-polyfills: ['web.url', 'es.array.at']
+polyfills: ['web.url', 'es.array.at', '...']
 ```
-
-| 模块名 | 提供的 API |
-| --- | --- |
-| `web.url` | `URL` 和 `URLSearchParams` |
-| `es.array.at` | `Array.prototype.at`，例如 `[1, 2].at(-1)` |
 
 使用 [core-js 模块名](https://github.com/zloirock/core-js#web-standards)，不带 `core-js/modules/` 前缀或 `.js` 后缀。
 无需额外安装 core-js，也无需在应用代码中手动导入。
 
-- 开发和生产构建均生效，所选 API 会在应用代码运行前准备好。
 - 缺失或不符合标准的全局 API 和原型方法会被补充或修复，符合标准的原生实现会保留。
 - 省略或传入 `[]` 时，不添加任何可选 polyfill。
 - 只打包所选模块及其依赖。polyfill 会增加小程序包体积，请按应用实际需求选择。
 - H5 忽略该选项；H5 的旧浏览器支持可另行配置 `@vitejs/plugin-legacy`。
 
 需要 `URL` 和 `URLSearchParams` 时，选择 `web.url` 即可。如果还需要 `URL.parse`，使用
-`polyfills: ['web.url', 'web.url.parse']`，确保运行环境缺少 `URL` 时也能使用。
+`polyfills: ['web.url', 'web.url.parse']`。
 
-此选项不提供完整的浏览器环境，也不提供 `fetch`；小程序网络请求请使用平台或 Taro 的请求 API。
+全局 API 安装在 `globalThis` 上。在微信中，可以直接使用 `new globalThis.URL(...)`。
+由于微信默认并不支持全局对象的写法 `new URL(...)`，请在 **Vite 顶层配置**（不是 `vpt()` 选项）中添加：
+
+```ts
+define: { URL: 'globalThis.URL' }
+```
+
+这样就可以直接使用 `new URL(...)`。
+
+`polyfills` 负责为小程序提供 API，`define` 让小程序里支持直接使用全局的 `URL` 名称。
+它不会修改字符串、注释或局部变量中的 `URL`。
+
+同理，选择 `web.self` 后，如果微信代码需要直接引用 `self`，可添加 `self: 'globalThis.self'`。
 
 
 ## `hmr`
@@ -266,6 +272,7 @@ hmr: {
 | 输出目录 | `build.outDir` |
 | H5 部署基础路径 | `base` |
 | 源码别名 | `resolve.alias` |
+| 全局标识符替换 | `define` |
 | PostCSS | `css.postcss` 或 PostCSS 配置文件 |
 | 静态文件 | `public` 目录 |
 | 开发服务器 | `server` |
