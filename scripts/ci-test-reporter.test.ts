@@ -6,15 +6,16 @@ import path from 'node:path'
 import { Readable } from 'node:stream'
 import test, { type TestContext } from 'node:test'
 import type { TestEvent } from 'node:test/reporters'
-import { fileURLToPath } from 'node:url'
 import ciTestReporter from './ci-test-reporter.ts'
+
+// Node imports custom reporters as ESM; Windows drive-letter paths are not valid module URLs.
+const reporter = new URL('./ci-test-reporter.ts', import.meta.url).href
 
 function runFixture(t: TestContext, source: string) {
     const root = mkdtempSync(path.join(tmpdir(), 'vpt-ci-reporter-'))
     t.after(() => rmSync(root, { recursive: true, force: true }))
     const fixture = path.join(root, 'fixture.test.mjs')
     writeFileSync(fixture, source)
-    const reporter = fileURLToPath(new URL('./ci-test-reporter.ts', import.meta.url))
     const result = spawnSync(process.execPath, ['--test', `--test-reporter=${reporter}`, fixture], {
         cwd: root,
         encoding: 'utf8',
@@ -26,6 +27,10 @@ function runFixture(t: TestContext, source: string) {
     assert.equal(result.signal, null)
     return result
 }
+
+test('CI reporter module specifier is a file URL, not a native absolute path', () => {
+    assert.equal(new URL(reporter).protocol, 'file:')
+})
 
 test('CI reporter hides passing, skipped and TODO tests while retaining totals and logs', (t) => {
     const result = runFixture(
