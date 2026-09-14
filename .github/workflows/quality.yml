@@ -34,10 +34,10 @@ jobs:
         run: pnpm build:plugin
 
       - name: Test release preparation and package artifacts
-        run: pnpm test:release
+        run: node --test --test-reporter=./scripts/ci-test-reporter.ts scripts/*.test.ts
 
       - name: Enforce 100% coverage
-        run: pnpm test:coverage
+        run: pnpm test:coverage --test-reporter=../../scripts/ci-test-reporter.ts
 
       - name: Build sample WeChat Mini Program
         run: pnpm build:loan-genius:wx
@@ -85,11 +85,10 @@ jobs:
         run: pnpm typecheck
 
       - name: Test release preparation and package artifacts
-        run: pnpm test:release
+        run: node --test --test-reporter=./scripts/ci-test-reporter.ts scripts/*.test.ts
 
       - name: Test
-        # TAP preserves a failed test worker's exit code and signal; the spec reporter only prints "test failed".
-        run: pnpm --filter vite-plugin-taro exec node --test --test-reporter=tap --test-concurrency=1
+        run: pnpm --filter vite-plugin-taro exec node --test --test-reporter=../../scripts/ci-test-reporter.ts --test-concurrency=1
 
       - name: Build sample WeChat Mini Program
         run: pnpm build:loan-genius:wx
