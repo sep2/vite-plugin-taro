@@ -3,6 +3,7 @@ import type { RuntimeModulesContract } from '../mini-contract.ts'
 import {
     createMiniModuleClassifier,
     isMiniFrameworkVendorModule,
+    isMiniPolyfillModule,
     type MiniChunkClassification,
     type MiniModuleClassifier
 } from '../module/module.ts'
@@ -43,13 +44,20 @@ export function createPlacementRolldownOptions(classifyChunk: MiniModuleClassifi
          */
         output: {
             /**
-             * React and Taro form one stable framework boundary shared by the App and every Page capsule. Keeping their complete
-             * dependency closure together prevents application edits from invalidating framework chunk identity and makes later
+             * React and Taro form one stable framework boundary shared by the App and every Page capsule. Keeping their framework
+             * dependencies together prevents application edits from invalidating framework chunk identity and makes later
              * development generations eligible to reuse the unchanged vendor. Application code and other dependencies
              * use Rolldown's automatic chunking without source-path groups or a blanket external vendor group.
              */
             codeSplitting: {
                 groups: [
+                    {
+                        name: 'polyfills',
+                        test: isMiniPolyfillModule,
+                        // Keep core-js out of the recursive vendor group, without pulling its injected Taro bindings into this file.
+                        priority: 200,
+                        includeDependenciesRecursively: false
+                    },
                     {
                         name: 'vendor',
                         test: isMiniFrameworkVendorModule,

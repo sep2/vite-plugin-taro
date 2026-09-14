@@ -468,8 +468,8 @@ test('registers every native WX shell after its amphibious bootstrap', async () 
     }
 })
 
-test('installs amphibious transport on SystemJS and preserves preload semantics', async () => {
-    // These mutable observations verify SystemJS installation order and one synchronous preload invocation.
+test('loads polyfills before SystemJS, installs amphibious transport and preserves preload semantics', async () => {
+    // These mutable observations verify polyfill/SystemJS startup order and one synchronous preload invocation.
     const events: string[] = []
     const preloadCalls: string[] = []
     const loader: { instantiate?: unknown } = {}
@@ -496,6 +496,7 @@ test('installs amphibious transport on SystemJS and preserves preload semantics'
     const code = await bundleRuntimeEntry({
         entry: 'mini/amphibious/bootstrap.ts',
         mocks: {
+            '\0vpt:mini-polyfills': "globalThis.harness.events.push('polyfills')",
             '../systemjs/system-core.js': 'globalThis.harness.installSystem()'
         },
         defines
@@ -518,7 +519,7 @@ test('installs amphibious transport on SystemJS and preserves preload semantics'
         }
     ])
 
-    assert.deepEqual(events, ['install-system'])
+    assert.deepEqual(events, ['polyfills', 'install-system'])
     assert.strictEqual(transportExports.transport, transport)
     assert.strictEqual(loader.instantiate, transport)
     assert.equal(loaded, 'loaded')
@@ -529,6 +530,7 @@ test('installs amphibious transport on SystemJS and preserves preload semantics'
             executeRuntimeEntry(
                 code,
                 createExecutionContext({
+                    events: [],
                     transport,
                     installSystem() {}
                 })

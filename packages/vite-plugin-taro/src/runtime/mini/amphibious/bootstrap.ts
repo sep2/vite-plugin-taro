@@ -1,3 +1,7 @@
+// Install the selected polyfills before the runtime or application uses them.
+// @ts-expect-error: The Mini build resolves this private polyfills entry.
+import '\0vpt:mini-polyfills'
+
 // Install the minimal SystemJS loader and its synchronous-import extension before any native entry requests a capsule.
 import '../systemjs/system-core.js'
 import { transport } from './transport.ts'

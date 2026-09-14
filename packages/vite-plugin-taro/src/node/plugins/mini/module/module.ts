@@ -10,6 +10,9 @@ export const miniRuntimeId = packageRequire.resolve('vite-plugin-taro-runtime/ru
 /** Identifies Rolldown's generated helper module independently of its unstable output filename. */
 export const rolldownRuntimeId = '\0rolldown/runtime.js'
 
+/** Generates the selected core-js imports as one independently executable output entry. */
+export const miniPolyfillsId = '\0vpt:mini-polyfills'
+
 /** Resolves the shared Taro facade's target initialization side effect. */
 export const taroTargetRuntimeId = '\0vpt:taro-target-runtime'
 
@@ -57,6 +60,13 @@ const frameworkPackageRoots = [
     ...['react', 'react-dom'].map((name) => path.dirname(packageRequire.resolve(`${name}/package.json`)))
 ].map((root) => `${normalizePath(root)}/`)
 
+const polyfillPackageRoot = `${normalizePath(path.dirname(packageRequire.resolve('core-js/package.json')))}/`
+
+/** Groups the generated entry and core-js into common/polyfills.js. */
+export function isMiniPolyfillModule(moduleId: string): boolean {
+    return moduleId === miniPolyfillsId || normalizePath(moduleId).startsWith(polyfillPackageRoot)
+}
+
 /** Uses the same resolved roots for vendor grouping and amphibious execution; Rolldown includes their dependencies. */
 export function isMiniFrameworkVendorModule(moduleId: string): boolean {
     const normalizedId = normalizePath(moduleId)
@@ -65,7 +75,7 @@ export function isMiniFrameworkVendorModule(moduleId: string): boolean {
 
 /**
  * Classifies runtime entries and framework vendor chunks in one module-ID scan.
- * The vendor shares bootstrap's amphibious bridge so native and SystemJS callers use the same framework exports.
+ * Amphibious chunks share bootstrap's bridge so native and SystemJS callers reuse the same exports.
  * Construction is O(1); each lookup is O(M), where M is the number of modules in the chunk.
  */
 export function createMiniModuleClassifier(modules: RuntimeModulesContract): MiniModuleClassifier {
@@ -78,6 +88,7 @@ export function createMiniModuleClassifier(modules: RuntimeModulesContract): Min
         [modules.componentCapsule, 'capsule'],
         [modules.pageCapsule, 'capsule'],
         [modules.bootstrap, 'amphibious'],
+        [miniPolyfillsId, 'amphibious'],
         [rolldownRuntimeId, 'amphibious'],
         [modules.transport, 'transport']
     ])

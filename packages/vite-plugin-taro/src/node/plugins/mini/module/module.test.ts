@@ -7,7 +7,7 @@ import test from 'node:test'
 import type { Rolldown } from 'vite'
 import { packageRequire } from '../../../utils/packages.ts'
 import type { RuntimeModulesContract } from '../mini-contract.ts'
-import { createMiniModuleClassifier, rolldownRuntimeId } from './module.ts'
+import { createMiniModuleClassifier, isMiniPolyfillModule, miniPolyfillsId, rolldownRuntimeId } from './module.ts'
 
 const modules: RuntimeModulesContract = {
     bootstrap: '/runtime/bootstrap',
@@ -71,18 +71,38 @@ test('framework vendor is amphibious by module identity, not its output name', (
     assert.equal(classifyModule({ ...chunk('/repo/src/vendor.ts'), name: 'vendor' }).executionKind, 'capsule')
 })
 
+test('polyfill execution follows the virtual entry while package paths only control grouping', () => {
+    assert.equal(isMiniPolyfillModule(miniPolyfillsId), true)
+    assert.equal(classifyModule({ ...chunk(miniPolyfillsId), name: 'renamed-polyfills' }).executionKind, 'amphibious')
+    for (const moduleId of [
+        packageRequire.resolve('core-js/modules/web.url.js'),
+        packageRequire.resolve('core-js/internals/global-this.js')
+    ]) {
+        assert.equal(isMiniPolyfillModule(moduleId), true)
+        assert.equal(classifyModule(chunk(moduleId)).executionKind, 'capsule')
+        assert.equal(classifyModule(chunk(miniPolyfillsId, moduleId)).executionKind, 'amphibious')
+    }
+    assert.equal(isMiniPolyfillModule('/repo/src/polyfills.ts'), false)
+    assert.equal(classifyModule({ ...chunk('/repo/src/polyfills.ts'), name: 'polyfills' }).executionKind, 'capsule')
+})
+
 for (const layout of ['installed', 'linked'] as const) {
-    test(`framework roots follow Node resolution in the ${layout} package layout`, async (context) => {
+    test(`framework and polyfill roots follow Node resolution in the ${layout} package layout`, async (context) => {
         const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-framework-roots-')))
         context.after(() => rm(root, { recursive: true, force: true }))
         const runtimeRoot = path.join(
             root,
             layout === 'installed' ? 'node_modules/vite-plugin-taro-runtime' : 'renamed-runtime-source'
         )
+        const polyfillRoot = path.join(
+            root,
+            layout === 'installed' ? 'node_modules/core-js' : 'renamed-polyfill-source'
+        )
         const packageRoots = {
             'vite-plugin-taro-runtime': runtimeRoot,
             react: path.join(root, 'node_modules/react'),
-            'react-dom': path.join(root, 'node_modules/react-dom')
+            'react-dom': path.join(root, 'node_modules/react-dom'),
+            'core-js': polyfillRoot
         }
         for (const [name, packageRoot] of Object.entries(packageRoots)) {
             await mkdir(packageRoot, { recursive: true })
@@ -102,6 +122,7 @@ for (const layout of ['installed', 'linked'] as const) {
         await writeFile(path.join(runtimeRoot, 'dist/runtime/index.js'), '')
         if (layout === 'linked') {
             await symlink(runtimeRoot, path.join(root, 'node_modules/vite-plugin-taro-runtime'), 'junction')
+            await symlink(polyfillRoot, path.join(root, 'node_modules/core-js'), 'junction')
         }
 
         const fixtureRequire = createRequire(path.join(root, 'consumer.js'))
@@ -111,11 +132,13 @@ for (const layout of ['installed', 'linked'] as const) {
             new URL(`./module.ts?layout=${layout}`, import.meta.url).href
         )
         const classifyFixture = fixtureModule.createMiniModuleClassifier(modules)
-        for (const packageRoot of Object.values(packageRoots)) {
+        for (const [name, packageRoot] of Object.entries(packageRoots)) {
             const moduleId = path.join(packageRoot, 'index.js')
-            assert.equal(fixtureModule.isMiniFrameworkVendorModule(moduleId), true)
-            assert.equal(classifyFixture(chunk(moduleId)).executionKind, 'amphibious')
+            assert.equal(fixtureModule.isMiniFrameworkVendorModule(moduleId), name !== 'core-js')
+            assert.equal(fixtureModule.isMiniPolyfillModule(moduleId), name === 'core-js')
+            assert.equal(classifyFixture(chunk(moduleId)).executionKind, name === 'core-js' ? 'capsule' : 'amphibious')
             assert.equal(fixtureModule.isMiniFrameworkVendorModule(`${packageRoot}-other/index.js`), false)
+            assert.equal(fixtureModule.isMiniPolyfillModule(`${packageRoot}-other/index.js`), false)
         }
         assert.equal(fixtureModule.miniRuntimeId, path.join(runtimeRoot, 'dist/runtime/index.js'))
         assert.equal(fixtureModule.isMiniFrameworkVendorModule(path.join(root, 'src/react.ts')), false)

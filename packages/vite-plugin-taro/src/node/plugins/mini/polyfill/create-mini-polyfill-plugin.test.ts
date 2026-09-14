@@ -3,6 +3,7 @@ import test from 'node:test'
 import { resolveConfig } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import vpt from '../../../vpt.ts'
+import { miniPolyfillsId } from '../module/module.ts'
 import { miniBrowserBindings } from './mini-browser-bindings.ts'
 
 async function resolvePolyfillConfig(
@@ -22,6 +23,9 @@ async function resolvePolyfillConfig(
 for (const polyfills of [undefined, [], ['web.url'], ['web.url-search-params'], ['es.array.at']]) {
     test(`keeps only renderer bindings with polyfills ${JSON.stringify(polyfills)}`, async () => {
         const config = await resolvePolyfillConfig('wx', polyfills, 'build')
+        const input = config.build.rolldownOptions.input
+        assert.ok(input && typeof input === 'object' && !Array.isArray(input))
+        assert.equal(input.polyfills, miniPolyfillsId)
         const inject = config.build.rolldownOptions.transform?.inject
         assert.deepEqual(inject, miniBrowserBindings)
         assert.ok(inject)
@@ -31,9 +35,12 @@ for (const polyfills of [undefined, [], ['web.url'], ['web.url-search-params'], 
 }
 
 for (const name of ['URL', '../index', 'core-js/stable', 'web.url.js', 'not-a-polyfill']) {
-    test(`rejects unsupported core-js module selection ${JSON.stringify(name)}`, async () => {
+    test(`rejects unsupported core-js module selection ${JSON.stringify(name)} when polyfills load`, async () => {
+        const config = await resolvePolyfillConfig('wx', [name], 'build')
+        const load = config.plugins.find((plugin) => plugin.name === 'vpt:mini-polyfills')?.load
+        assert.ok(load && typeof load === 'object')
         await assert.rejects(
-            resolvePolyfillConfig('wx', [name], 'build'),
+            async () => Reflect.apply(load.handler, { environment: { config } }, [miniPolyfillsId]),
             /(?:Invalid|Unknown) core-js polyfill module/
         )
     })

@@ -6,7 +6,7 @@ import { createContext, runInContext } from 'node:vm'
 import { walk } from 'oxc-walker'
 import type { OutputChunk } from 'rolldown'
 import { parseSync } from 'rolldown/utils'
-import { build, createServer, type Plugin } from 'vite'
+import { build, createServer, normalizePath, type Plugin } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { interpreterServerEvent } from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
 import { packageRequire } from '../../../utils/packages.ts'
@@ -16,6 +16,7 @@ type MiniTarget = 'wx' | 'zfb'
 type Mode = 'production' | 'devtools' | 'interpreter' | 'rebuild'
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
+const coreJsRoot = `${normalizePath(path.dirname(packageRequire.resolve('core-js/package.json')))}/`
 const optionalPolyfills = ['web.url', 'es.array.at']
 
 /** Compiles a real disposable consumer through the public Vite build/server APIs. */
@@ -34,6 +35,16 @@ async function compileFixture(
             order: 'post',
             handler(_options, bundle) {
                 const chunks = Object.values(bundle).filter((item): item is OutputChunk => item.type === 'chunk')
+                const hasPolyfills = mode !== 'production' || polyfills.length > 0
+                const polyfillChunks = chunks.filter((chunk) =>
+                    chunk.moduleIds.some((id) => normalizePath(id).startsWith(coreJsRoot))
+                )
+                assert.deepEqual(
+                    polyfillChunks.map((chunk) => chunk.fileName),
+                    hasPolyfills ? ['common/polyfills.js'] : [],
+                    'core-js modules must stay in one dedicated polyfills file'
+                )
+                assert.ok(chunks.some((chunk) => chunk.fileName === 'common/polyfills.js' && chunk.isEntry))
                 // Alipay rejects import() at compile time, even inside an unused React Refresh export that Node can parse.
                 for (const chunk of chunks) {
                     const parsed = parseSync(chunk.fileName, chunk.code)
@@ -61,6 +72,9 @@ async function compileFixture(
         polyfills,
         ...(mode === 'production' ? {} : { hmr: { mode } })
     }
+    // Each fixture selects its React environment explicitly; Vite otherwise retains NODE_ENV from an earlier build in this process.
+    const previousNodeEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = mode === 'production' ? 'production' : 'development'
     try {
         await mkdir(path.dirname(pagePath), { recursive: true })
         await writeFile(
@@ -109,6 +123,13 @@ async function compileFixture(
             const sourceMap: { mappings: string; sources: string[] } = JSON.parse(String(bootstrapMap.source))
             assert.ok(sourceMap.mappings.length > 0)
             assert.ok(sourceMap.sources.some((source) => source.endsWith('/mini/amphibious/bootstrap.ts')))
+            if (polyfills.length > 0) {
+                const polyfillsMap = result.output.find((item) => item.fileName === 'common/polyfills.js.map')
+                assert.ok(polyfillsMap?.type === 'asset')
+                const map: { mappings: string; sources: string[] } = JSON.parse(String(polyfillsMap.source))
+                assert.ok(map.mappings.length > 0)
+                assert.ok(map.sources.length > 0)
+            }
             return result.output.filter((item): item is OutputChunk => item.type === 'chunk')
         } else {
             const server = await createServer(config)
@@ -120,6 +141,11 @@ async function compileFixture(
         }
         return await output.promise
     } finally {
+        if (previousNodeEnv === undefined) {
+            delete process.env.NODE_ENV
+        } else {
+            process.env.NODE_ENV = previousNodeEnv
+        }
         await rm(root, { recursive: true, force: true })
     }
 }
@@ -210,19 +236,23 @@ function createAppHeap(chunks: readonly OutputChunk[], nativeURLs: boolean, targ
     }
 }
 
-/** Bootstrap must install the selection without needing App registration or any application capsule to execute. */
+/** The standalone polyfills file installs the selection without needing SystemJS, App registration, or an application capsule. */
 function assertPolyfilledBootstrap(
     chunks: readonly OutputChunk[],
     target: MiniTarget,
     structuredClone: 'function' | 'undefined'
 ): void {
     const heap = createAppHeap(chunks, false, target)
-    heap.evaluate('common/bootstrap.js')
+    heap.evaluate('common/polyfills.js')
+    assert.equal(heap.read('typeof System'), 'undefined')
     assert.equal(heap.read('typeof URL'), 'function')
     assert.equal(heap.read('typeof URLSearchParams'), 'function')
     assert.equal(heap.read('[1, 2].at(-1)'), 2)
     assert.equal(heap.read('typeof structuredClone'), structuredClone)
     assert.equal(heap.read('typeof globalThis.polyfillProbe'), 'undefined')
+    const installedURL = heap.read('URL')
+    heap.evaluate('common/bootstrap.js')
+    assert.equal(heap.read('URL'), installedURL)
 }
 
 function assertPolyfilledApp(heap: ReturnType<typeof createAppHeap>, structuredClone: 'function' | 'undefined'): void {

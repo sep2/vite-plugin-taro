@@ -132,7 +132,7 @@ test('leaves application grouping and asset naming to Vite and Rolldown', () => 
     assert.ok(output.codeSplitting && typeof output.codeSplitting === 'object')
     assert.deepEqual(
         output.codeSplitting.groups?.map((group) => group.name),
-        ['vendor']
+        ['polyfills', 'vendor']
     )
 })
 
@@ -189,10 +189,12 @@ test('automatically bundles application modules and non-framework dependencies t
     assert.ok(output.chunks.every((chunk) => chunk.name !== 'vendor'))
 })
 
-test('extracts the recursive React/Taro vendor closure without absorbing application modules', async () => {
+test('keeps core-js separate from recursive framework dependencies and application modules', async () => {
     const applicationId = moduleId('application.js')
     const reactId = normalizePath(packageRequire.resolve('react'))
     const taroId = normalizePath(packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini'))
+    const polyfillId = normalizePath(packageRequire.resolve('core-js/modules/web.url.js'))
+    const polyfillHelperId = normalizePath(packageRequire.resolve('core-js/internals/global-this.js'))
     const frameworkDependencyId = moduleId('framework-dependency.js')
     const applicationDependencyId = moduleId('application-dependency.js')
     const output = await buildFixture({
@@ -206,8 +208,15 @@ test('extracts the recursive React/Taro vendor closure without absorbing applica
             [reactId]: `
                 import { taro } from '${taroId}'
                 import { helper } from '${frameworkDependencyId}'
-                export const react = taro + helper
+                import { polyfill } from '${polyfillId}'
+                export const react = taro + helper + polyfill
             `,
+            [polyfillId]: `
+                import { taro } from '${taroId}'
+                import { value } from '${polyfillHelperId}'
+                export const polyfill = taro + value
+            `,
+            [polyfillHelperId]: `export const value = Math.random()`,
             [taroId]: `export const taro = 'taro'`,
             [frameworkDependencyId]: `export const helper = 'helper'`,
             [applicationDependencyId]: `export const application = 'application'`
@@ -216,8 +225,15 @@ test('extracts the recursive React/Taro vendor closure without absorbing applica
 
     const vendor = findChunk(output.chunks, reactId)
     const application = findChunk(output.chunks, applicationId)
+    const polyfills = findChunk(output.chunks, polyfillId)
 
+    assert.equal(polyfills.fileName, 'common/polyfills.js')
+    assert.ok(polyfills.moduleIds.includes(polyfillHelperId))
+    assert.ok(!polyfills.moduleIds.includes(taroId))
+    assert.ok(!polyfills.moduleIds.includes(reactId))
+    assert.equal(output.placement.getLoadMode(polyfills), 'sync')
     assert.equal(vendor.fileName, 'common/vendor.js')
+    assert.ok(!vendor.moduleIds.includes(polyfillId))
     assert.ok(vendor.moduleIds.includes(taroId))
     assert.ok(vendor.moduleIds.includes(frameworkDependencyId))
     assert.ok(!vendor.moduleIds.includes(applicationId))

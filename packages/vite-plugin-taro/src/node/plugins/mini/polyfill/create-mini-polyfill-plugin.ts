@@ -1,13 +1,13 @@
-import { RolldownMagicString } from 'rolldown'
 import type { Plugin } from 'vite'
 import { createExactModuleIdFilter } from '../../../utils/modules.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import type { MiniContract } from '../mini-contract.ts'
+import { miniPolyfillsId } from '../module/module.ts'
 import { miniBrowserBindings } from './mini-browser-bindings.ts'
 
-/** Adds selected core-js imports to bootstrap and retains Taro's renderer bindings. */
-export function createMiniPolyfillPlugin(contract: Pick<MiniContract, 'options' | 'runtime'>): Plugin {
-    const polyfills = (contract.options.polyfills ?? []).map(resolvePolyfillModule)
+/** Loads a standalone polyfills entry before bootstrap and retains Taro's renderer bindings. */
+export function createMiniPolyfillPlugin(contract: Pick<MiniContract, 'options'>): Plugin {
+    const polyfills = new Set(contract.options.polyfills ?? [])
 
     return {
         name: 'vpt:mini-polyfills',
@@ -15,36 +15,27 @@ export function createMiniPolyfillPlugin(contract: Pick<MiniContract, 'options' 
             return {
                 build: {
                     rolldownOptions: {
+                        input: { polyfills: miniPolyfillsId },
                         transform: { inject: miniBrowserBindings }
                     }
                 }
             }
         },
-        transform: {
-            order: 'post',
-            filter: { id: createExactModuleIdFilter(contract.runtime.modules.bootstrap) },
-            handler(code, id) {
+        resolveId: {
+            filter: { id: createExactModuleIdFilter(miniPolyfillsId) },
+            handler() {
+                return miniPolyfillsId
+            }
+        },
+        load: {
+            filter: { id: createExactModuleIdFilter(miniPolyfillsId) },
+            handler() {
                 // Support React's development act() microtask scheduling; production includes it only if selected.
-                const modules = this.environment.config.isProduction
-                    ? polyfills
-                    : [resolvePolyfillModule('web.queue-microtask'), ...polyfills]
-
-                const imports = [...new Set(modules)].map((id) => `import ${JSON.stringify(id)};`).join('\n')
-
-                if (!imports) {
-                    return
+                if (!this.environment.config.isProduction) {
+                    polyfills.add('web.queue-microtask')
                 }
 
-                // This local editor only shifts the original runtime source; user source mappings remain owned by Vite.
-                const editor = new RolldownMagicString(code, { filename: id })
-                editor.prepend(`${imports}\n`)
-
-                return {
-                    code: editor.toString(),
-                    map: this.environment.config.build.sourcemap
-                        ? JSON.stringify(editor.generateMap({ hires: 'boundary', includeContent: true }))
-                        : null
-                }
+                return [...polyfills].map((id) => `import ${JSON.stringify(resolvePolyfillModule(id))};`).join('\n')
             }
         }
     }
