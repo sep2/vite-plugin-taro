@@ -9,6 +9,38 @@ import { createBundleDependenciesPlugin } from './create-bundle-dependencies-plu
 
 const packageRoot = fileURLToPath(new URL('../', import.meta.url))
 
+function assertBundledDependencies(moduleIds: readonly string[], requiresRxjs: boolean): void {
+    // Rolldown module IDs use native separators; all dependency checks below use forward slashes.
+    const modules = moduleIds.map((id) => id.replaceAll('\\', '/'))
+    assert.ok(modules.length > 0)
+    assert.ok(!modules.some((id) => id.includes('/rxjs/dist/cjs/')))
+    assert.ok(!modules.some((id) => id.includes('/@weapp-tailwindcss/postcss-calc/')))
+    if (requiresRxjs) {
+        assert.ok(modules.some((id) => id.includes('/rxjs/dist/esm/')))
+        assert.ok(!modules.some((id) => id.includes('/internal/observable/dom/')))
+    }
+}
+
+for (const [platform, paths] of [
+    ['POSIX', path.posix],
+    ['Windows', path.win32]
+] as const) {
+    test(`bundle dependency assertions recognize ${platform} module paths`, () => {
+        const root = 'C:/workspace/node_modules'
+        const esmModule = paths.join(root, 'rxjs/dist/esm/index.js')
+        assertBundledDependencies([esmModule], true)
+        for (const dependency of [
+            'rxjs/dist/cjs/index.js',
+            '@weapp-tailwindcss/postcss-calc/dist/index.js',
+            'rxjs/dist/esm/internal/observable/dom/WebSocketSubject.js'
+        ]) {
+            assert.throws(() => assertBundledDependencies([esmModule, paths.join(root, dependency)], true), {
+                code: 'ERR_ASSERTION'
+            })
+        }
+    })
+}
+
 // Execute the existing behavioral suites through the published bundle's dependency specialization,
 // not just native TS imports: disabled dependency stubs must never be reached at runtime.
 for (const suite of ['styles/create-mini-transformer', 'dev/create-hmr-results-stream', 'dev/host-actions']) {
@@ -35,13 +67,7 @@ for (const suite of ['styles/create-mini-transformer', 'dev/create-hmr-results-s
                 output: { file: output, format: 'esm', codeSplitting: false, minify: true }
             })
             const modules = result.output.flatMap((chunk) => (chunk.type === 'chunk' ? Object.keys(chunk.modules) : []))
-            assert.ok(modules.length > 0)
-            assert.ok(!modules.some((id) => id.includes('/rxjs/dist/cjs/')))
-            assert.ok(!modules.some((id) => id.includes('/@weapp-tailwindcss/postcss-calc/')))
-            if (suite.startsWith('dev/')) {
-                assert.ok(modules.some((id) => id.includes('/rxjs/dist/esm/')))
-                assert.ok(!modules.some((id) => id.includes('/internal/observable/dom/')))
-            }
+            assertBundledDependencies(modules, suite.startsWith('dev/'))
             execFileSync(process.execPath, ['--test', output], { timeout: 20_000, stdio: 'pipe' })
         } finally {
             await rm(directory, { recursive: true, force: true })
