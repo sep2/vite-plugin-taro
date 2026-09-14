@@ -24,11 +24,10 @@ export function createMiniPolyfillPlugin(contract: Pick<MiniContract, 'options' 
             order: 'post',
             filter: { id: createExactModuleIdFilter(contract.runtime.modules.bootstrap) },
             handler(code, id) {
-                // Mini development needs queueMicrotask for React Refresh; production includes it only if selected.
-                const modules =
-                    this.environment.config.command === 'serve'
-                        ? [resolvePolyfillModule('web.queue-microtask'), ...polyfills]
-                        : polyfills
+                // Support React's development act() microtask scheduling; production includes it only if selected.
+                const modules = this.environment.config.isProduction
+                    ? polyfills
+                    : [resolvePolyfillModule('web.queue-microtask'), ...polyfills]
 
                 const imports = [...new Set(modules)].map((id) => `import ${JSON.stringify(id)};`).join('\n')
 
