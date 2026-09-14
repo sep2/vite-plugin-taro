@@ -11,7 +11,8 @@
  * Rolldown still emits one ESM chunk graph before that runtime split is materialized. Mini Program hosts cannot execute final ESM
  * imports directly, so this renderer translates chunks classified as native or amphibious into CommonJS while preserving the
  * ESM behavior observable at their boundary. Ordinary native dependencies become `require` namespace cells; capsule imports
- * become synchronous language-global `System.importSync` lookups; and exports are published through the CommonJS `exports` object.
+ * become synchronous language-global `System.importSync` lookups. Dynamic imports use `System.import`, and exports are published
+ * through the CommonJS `exports` object.
  *
  * This is deliberately a final-chunk compiler, not a general source-module compiler. Rolldown has already lowered TypeScript,
  * bundled source modules, selected chunk boundaries, and normalized the remaining imports and exports. Restricting the input
@@ -71,7 +72,7 @@ type NativeModuleModel = Readonly<{
 /**
  * Materializes one final native/amphibious Rolldown chunk as executable Mini Program CommonJS.
  *
- * The transform performs four semantic operations:
+ * The transform performs five semantic operations:
  *
  * 1. Static ESM imports are hoisted into source-order `require` calls. Named imports remain property reads from the required
  *    namespace so they observe current values. Default and namespace imports receive Babel-compatible CommonJS interop.
@@ -81,6 +82,8 @@ type NativeModuleModel = Readonly<{
  *    updates notify every alias without changing expression completion values or accidentally matching shadowed bindings.
  * 4. ESM top-level `this` becomes `undefined`. Direct imported calls and tags are explicitly unbound so converting an import
  *    into a namespace property does not introduce a false CommonJS receiver.
+ * 5. Dynamic imports call the shared SystemJS loader. Relative string literals become logical chunk IDs, while computed IDs
+ *    are preserved, matching capsule loading and leaving physical require/require.async selection to transport.
  *
  * Static dependency loading is emitted before the untouched module body because ESM evaluates dependencies before body
  * statements regardless of where import declarations appear textually. Generated helper names are allocated against every
@@ -106,8 +109,7 @@ export function renderNative({
         throw new Error(`Failed to parse ${chunk.fileName} with Oxc: ${diagnostics}`)
     }
 
-    // Analysis owns grammar validation, scope resolution, helper allocation, and physical-to-logical capsule classification.
-    // It completes before an editor exists, so failure cannot leak a partially rewritten chunk into Rolldown's output graph.
+    // Resolve scopes, helper names, and capsule identities before creating the local source editor.
     const model = analyzeNativeModule(parsed.program, chunk, chunks, classifyModule)
     const editor = new RolldownMagicString(code, { filename: chunk.fileName })
 
@@ -282,7 +284,7 @@ function rewriteModuleDeclarations(editor: RolldownMagicString, model: NativeMod
 }
 
 /**
- * Rewrites imported references and live-export mutations in one scope-aware O(n) pass.
+ * Rewrites dynamic imports, imported references, and live-export mutations in one scope-aware O(n) pass.
  *
  * A named import such as `fn` becomes a namespace property read. In call or tag position it is wrapped as `(0, ns.fn)` to
  * preserve ESM's unbound receiver; in `new fn()` it remains `ns.fn` because construction has no method receiver. Exported
@@ -317,6 +319,24 @@ function rewriteExpressionSemantics(editor: RolldownMagicString, model: NativeMo
             }
 
             switch (node.type) {
+                case 'ImportExpression':
+                    if (node.options || node.phase) {
+                        throw unsupported(filename, 'dynamic import options or phases')
+                    }
+                    editor.overwrite(node.start, node.source.start, 'globalThis.System.import(')
+                    // Use the same logical IDs as capsule imports; computed IDs are already owned by the caller.
+                    if (
+                        node.source.type === 'Literal' &&
+                        typeof node.source.value === 'string' &&
+                        (node.source.value.startsWith('./') || node.source.value.startsWith('../'))
+                    ) {
+                        editor.overwrite(
+                            node.source.start,
+                            node.source.end,
+                            JSON.stringify(resolveLogicalChunkReference(filename, node.source.value))
+                        )
+                    }
+                    break
                 case 'AssignmentExpression':
                     rewriteExportAssignment(editor, node.left, node.start, model, filename)
                     break

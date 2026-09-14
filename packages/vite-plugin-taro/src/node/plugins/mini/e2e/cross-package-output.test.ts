@@ -73,6 +73,10 @@ const modules: Readonly<Record<string, string>> = {
     [transportPath]: `
         export const transport = __VPT_TRANSPORT__
     `,
+    [runtimeModules.bootstrap]: `
+        export const loadSubpackage = () => import('${subpackageAId}')
+        export const loadById = (id) => import(/* @vite-ignore */ id)
+    `,
     [applicationId]: `
         import { mainName } from './main-dependency.js'
         export const readMain = () => mainName
@@ -125,6 +129,7 @@ const modules: Readonly<Record<string, string>> = {
 type CrossPackageOutput = {
     readonly chunks: readonly OutputChunk[]
     readonly application: OutputChunk
+    readonly nativeEntry: OutputChunk
     readonly mainDependency: OutputChunk
     readonly subpackageA: OutputChunk
     readonly subpackageB: OutputChunk
@@ -220,6 +225,7 @@ async function buildCrossPackageOutput(): Promise<CrossPackageOutput> {
     const result = await build({
         input: {
             application: applicationId,
+            native: runtimeModules.bootstrap,
             transport: transportPath
         },
         plugins: [createVirtualModulesPlugin(), createMiniOutputPlugin()],
@@ -237,6 +243,7 @@ async function buildCrossPackageOutput(): Promise<CrossPackageOutput> {
     return {
         chunks,
         application: findEntryChunk(chunks, 'application'),
+        nativeEntry: findEntryChunk(chunks, 'native'),
         mainDependency: findChunk(chunks, mainDependencyId),
         subpackageA: findChunk(chunks, subpackageAId),
         subpackageB: findChunk(chunks, subpackageBId),
@@ -335,6 +342,13 @@ test('executes a complex nested static and dynamic graph across production wx su
     // The production bootstrap installs this mutable transport hook once for the application heap.
     system.instantiate = transportExports.transport
 
+    const nativeEntry = native.evaluate(output.nativeEntry.fileName)
+    assert.ok(
+        nativeEntry && typeof nativeEntry === 'object' && 'loadSubpackage' in nativeEntry && 'loadById' in nativeEntry
+    )
+    assert.ok(typeof nativeEntry.loadSubpackage === 'function' && typeof nativeEntry.loadById === 'function')
+    assert.equal(classifyModule(output.nativeEntry).executionKind, 'amphibious')
+
     const application = system.importSync(output.application.fileName)
     const readMain = application.readMain
     const loadSubpackage = application.loadSubpackage
@@ -343,15 +357,23 @@ test('executes a complex nested static and dynamic graph across production wx su
     }
     assert.equal(readMain(), 'main')
 
-    // Calling the main entry's dynamic import proves the main-package to subpackage edge. The mocked require.async must
-    // return before native evaluation starts, rather than behaving like a synchronous require wrapped in Promise.resolve.
+    // Native and capsule callers share one lazy load and namespace. The mocked require.async must return before native
+    // evaluation starts, rather than behaving like a synchronous require wrapped in Promise.resolve.
+    const loadingFromNative = nativeEntry.loadSubpackage()
     const loadingSubpackageA = loadSubpackage()
+    assert.ok(loadingFromNative instanceof Promise)
     assert.ok(loadingSubpackageA instanceof Promise)
     assert.equal(
         native.loads.some((load) => load.fileName === output.subpackageA.fileName),
         false
     )
     const subpackageA = await loadingSubpackageA
+    assert.strictEqual(await loadingFromNative, subpackageA)
+    // Computed IDs address whole output chunks, not Rolldown's projected source-module namespace.
+    assert.strictEqual(
+        await nativeEntry.loadById(output.subpackageA.preliminaryFileName),
+        await system.import(output.subpackageA.preliminaryFileName)
+    )
     assert.equal(
         native.loads.some((load) => load.fileName === output.subpackageA.fileName && load.mode === 'async'),
         true

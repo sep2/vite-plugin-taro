@@ -3,7 +3,9 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { createContext, runInContext } from 'node:vm'
+import { walk } from 'oxc-walker'
 import type { OutputChunk } from 'rolldown'
+import { parseSync } from 'rolldown/utils'
 import { build, createServer, type Plugin } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { interpreterServerEvent } from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
@@ -31,7 +33,22 @@ async function compileFixture(
         generateBundle: {
             order: 'post',
             handler(_options, bundle) {
-                output.resolve(Object.values(bundle).filter((item): item is OutputChunk => item.type === 'chunk'))
+                const chunks = Object.values(bundle).filter((item): item is OutputChunk => item.type === 'chunk')
+                // Alipay rejects import() at compile time, even inside an unused React Refresh export that Node can parse.
+                for (const chunk of chunks) {
+                    const parsed = parseSync(chunk.fileName, chunk.code)
+                    assert.deepEqual(parsed.errors, [])
+                    walk(parsed.program, {
+                        enter(node) {
+                            assert.notEqual(
+                                node.type,
+                                'ImportExpression',
+                                `${target} ${mode}: raw import() in ${chunk.fileName}`
+                            )
+                        }
+                    })
+                }
+                output.resolve(chunks)
             }
         }
     }

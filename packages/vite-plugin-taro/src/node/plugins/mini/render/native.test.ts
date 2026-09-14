@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { walk } from 'oxc-walker'
+import { parseSync } from 'rolldown/utils'
 import type { Rolldown } from 'vite'
 import type { RuntimeModulesContract } from '../mini-contract.ts'
 import { createMiniModuleClassifier, rolldownRuntimeId } from '../module/module.ts'
@@ -123,6 +125,89 @@ Page(config)`
     assert.deepEqual(result.map.sources, ['app.js'])
 })
 
+test('routes native dynamic imports through SystemJS without changing promises or namespaces', async () => {
+    const filename = 'common/vendor.js'
+    const result = renderNative({
+        code: `
+            import { resolveId } from './resolver.js'
+            // Keep import(moduleId) in comments and strings unchanged.
+            export const text = 'import(moduleId)'
+            export const loadRelative = () => import('./lazy.js')
+            export const loadParent = () => import('../sub/p_lazy/feature.js')
+            export const loadExternal = () => import('external-feature')
+            export const __hmr_import = (moduleId) => import(/* @vite-ignore */ moduleId)
+            export const loadComputed = () => import(resolveId())
+        `,
+        chunk: chunk({ fileName: filename, moduleIds: [bootstrapPath], isEntry: false }),
+        chunks: {},
+        sourcemap: true
+    })
+    const parsed = parseSync(filename, result.code)
+    assert.deepEqual(parsed.errors, [])
+    walk(parsed.program, {
+        enter(node) {
+            assert.notEqual(node.type, 'ImportExpression', 'Mini Program native output must not retain import() syntax')
+        }
+    })
+    assert.match(result.code, /\/\/ Keep import\(moduleId\) in comments and strings unchanged\./)
+    assert.ok(result.map?.mappings)
+    assert.deepEqual(result.map.sources, [filename])
+
+    const namespace = { value: 42 }
+    const loaded = Promise.resolve(namespace)
+    const missing = new Error('Unknown System module: missing')
+    // The generated CommonJS module publishes its bindings into this local export cell.
+    const exports: Record<string, unknown> = {}
+    // This journal proves argument evaluation order and one loader call per import expression.
+    const events: string[] = []
+    const system = {
+        import(id: string) {
+            assert.equal(this, system)
+            events.push(`load:${id}`)
+            return id === 'missing' ? Promise.reject(missing) : loaded
+        }
+    }
+    Function(
+        'require',
+        'exports',
+        'globalThis',
+        result.code
+    )(
+        (id: string) => {
+            assert.equal(id, './resolver.js')
+            return {
+                resolveId() {
+                    events.push('resolve')
+                    return 'common/lazy.js'
+                }
+            }
+        },
+        exports,
+        { System: system }
+    )
+    assert.equal(exports.text, 'import(moduleId)')
+    assert.deepEqual(events, [])
+    for (const name of ['loadRelative', 'loadParent', 'loadExternal', '__hmr_import', 'loadComputed']) {
+        const load = exports[name]
+        assert.ok(typeof load === 'function')
+        const loading: unknown = load('common/lazy.js')
+        assert.equal(loading, loaded)
+        assert.equal(await loading, namespace)
+    }
+    const load = exports.__hmr_import
+    assert.ok(typeof load === 'function')
+    await assert.rejects(load('missing'), (error) => error === missing)
+    assert.deepEqual(events, [
+        'load:common/lazy.js',
+        'load:sub/p_lazy/feature.js',
+        'load:external-feature',
+        'load:common/lazy.js',
+        'resolve',
+        'load:common/lazy.js',
+        'load:missing'
+    ])
+})
+
 test('renders declaration exports, quoted imports, and unrelated destructuring', () => {
     const result = renderNative({
         code: `
@@ -197,6 +282,10 @@ test('rejects unsupported final native chunk grammar before rewriting', () => {
     assert.throws(
         () => compile("import value from './dependency.json' with { type: 'json' }; export { value }"),
         /import phases, attributes, or type-only imports/
+    )
+    assert.throws(
+        () => compile("const load = () => import('./dependency.json', { with: { type: 'json' } })"),
+        /dynamic import options or phases/
     )
     assert.throws(
         () => compile('let value; for ({ value } of values) {} export { value }'),
