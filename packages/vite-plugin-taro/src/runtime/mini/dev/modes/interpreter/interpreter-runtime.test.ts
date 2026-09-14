@@ -147,6 +147,46 @@ test('interprets cumulative source and reports its application frontier', async 
     assert.equal(sockets.length, 1)
 })
 
+test('reads live app globals while retaining patch-local bindings outside the host global', async (context) => {
+    const { reports, runtime, sockets } = await createTestHarness()
+    registerInitialBoundary(runtime, () => {})
+
+    // Install a host API after the interpreter exists, just as ordinary app-startup polyfill imports do.
+    Reflect.set(globalThis, '__vpt_late_api__', () => 'installed')
+    context.after(() => {
+        Reflect.deleteProperty(globalThis, '__vpt_late_api__')
+        Reflect.deleteProperty(globalThis, '__vpt_patch_local__')
+    })
+
+    const socket = sockets[0]
+    assert.ok(socket)
+    socket.emitMessage({
+        kind: 'patches',
+        buildId: 'build',
+        patches: [
+            {
+                seq: 1,
+                changedIds: ['page'],
+                code: `
+                var __vpt_patch_local__ = __vpt_late_api__();
+                __rolldown_runtime__.registerFactory('page', 'esm', function(moduleId) {
+                    __rolldown_runtime__.registerModule(moduleId, { exports: {
+                        value: __vpt_patch_local__,
+                        host: globalThis,
+                        microtask: queueMicrotask === globalThis.queueMicrotask
+                    } });
+                    __rolldown_runtime__.createModuleHotContext(moduleId).accept();
+                });
+            `
+            }
+        ]
+    })
+
+    assert.deepEqual(runtime.loadExports('page'), { value: 'installed', host: globalThis, microtask: true })
+    assert.equal(Object.hasOwn(globalThis, '__vpt_patch_local__'), false)
+    assert.deepEqual(reports, [{ buildId: 'build', kind: 'applied', seq: 1 }])
+})
+
 test('ignores unrelated events and stops stale-build source without interpreting it', async () => {
     const { reports, sockets } = await createTestHarness()
     const socket = sockets[0]

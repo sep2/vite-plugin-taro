@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
+import { packageRequire } from '../../../utils/packages.ts'
 import type { RuntimeModulesContract } from '../mini-contract.ts'
 import { createMiniModuleClassifier, rolldownRuntimeId } from './module.ts'
 
@@ -50,3 +55,69 @@ test('classifies native, capsule, amphibious, and transport execution in one pas
     assert.equal(classifyModule(chunk(rolldownRuntimeId)).executionKind, 'amphibious')
     assert.equal(classifyModule(chunk(modules.appCapsule, rolldownRuntimeId)).executionKind, 'amphibious')
 })
+
+test('framework vendor is amphibious by module identity, not its output name', () => {
+    for (const moduleId of [
+        packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini'),
+        packageRequire.resolve('react'),
+        packageRequire.resolve('react-dom')
+    ]) {
+        assert.deepEqual(classifyModule({ ...chunk(moduleId), name: 'renamed-framework' }), {
+            entryRole: undefined,
+            executionKind: 'amphibious',
+            isTransport: false
+        })
+    }
+    assert.equal(classifyModule({ ...chunk('/repo/src/vendor.ts'), name: 'vendor' }).executionKind, 'capsule')
+})
+
+for (const layout of ['installed', 'linked'] as const) {
+    test(`framework roots follow Node resolution in the ${layout} package layout`, async (context) => {
+        const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-framework-roots-')))
+        context.after(() => rm(root, { recursive: true, force: true }))
+        const runtimeRoot = path.join(
+            root,
+            layout === 'installed' ? 'node_modules/vite-plugin-taro-runtime' : 'renamed-runtime-source'
+        )
+        const packageRoots = {
+            'vite-plugin-taro-runtime': runtimeRoot,
+            react: path.join(root, 'node_modules/react'),
+            'react-dom': path.join(root, 'node_modules/react-dom')
+        }
+        for (const [name, packageRoot] of Object.entries(packageRoots)) {
+            await mkdir(packageRoot, { recursive: true })
+            await writeFile(
+                path.join(packageRoot, 'package.json'),
+                JSON.stringify({
+                    name,
+                    main: 'index.js',
+                    ...(name === 'vite-plugin-taro-runtime'
+                        ? { exports: { './runtime/mini': './dist/runtime/index.js' } }
+                        : {})
+                })
+            )
+            await writeFile(path.join(packageRoot, 'index.js'), '')
+        }
+        await mkdir(path.join(runtimeRoot, 'dist/runtime'), { recursive: true })
+        await writeFile(path.join(runtimeRoot, 'dist/runtime/index.js'), '')
+        if (layout === 'linked') {
+            await symlink(runtimeRoot, path.join(root, 'node_modules/vite-plugin-taro-runtime'), 'junction')
+        }
+
+        const fixtureRequire = createRequire(path.join(root, 'consumer.js'))
+        // Re-evaluate only the module table against this fixture's resolver; no production configuration hook is added for tests.
+        context.mock.method(packageRequire, 'resolve', fixtureRequire.resolve)
+        const fixtureModule: typeof import('./module.ts') = await import(
+            new URL(`./module.ts?layout=${layout}`, import.meta.url).href
+        )
+        const classifyFixture = fixtureModule.createMiniModuleClassifier(modules)
+        for (const packageRoot of Object.values(packageRoots)) {
+            const moduleId = path.join(packageRoot, 'index.js')
+            assert.equal(fixtureModule.isMiniFrameworkVendorModule(moduleId), true)
+            assert.equal(classifyFixture(chunk(moduleId)).executionKind, 'amphibious')
+            assert.equal(fixtureModule.isMiniFrameworkVendorModule(`${packageRoot}-other/index.js`), false)
+        }
+        assert.equal(fixtureModule.miniRuntimeId, path.join(runtimeRoot, 'dist/runtime/index.js'))
+        assert.equal(fixtureModule.isMiniFrameworkVendorModule(path.join(root, 'src/react.ts')), false)
+    })
+}

@@ -1,6 +1,11 @@
-import type { Rolldown } from 'vite'
+import path from 'node:path'
+import { normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
+import { packageRequire } from '../../../utils/packages.ts'
 import type { RuntimeModulesContract } from '../mini-contract.ts'
+
+// Resolve from the plugin: pnpm consumers do not expose this transitive dependency to injected app imports.
+export const miniRuntimeId = packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini')
 
 /** Identifies Rolldown's generated helper module independently of its unstable output filename. */
 export const rolldownRuntimeId = '\0rolldown/runtime.js'
@@ -41,16 +46,27 @@ export type MiniChunkClassification = Readonly<{
     isTransport: boolean
 }>
 
-/** Classifies final chunks against one immutable shared-runtime module table. */
+/** Classifies chunks by runtime roles and framework vendor membership. */
 export type MiniModuleClassifier = (chunk: MiniChunk) => MiniChunkClassification
 
 type MiniRuntimeModuleKind = MiniEntryRole | 'amphibious' | 'transport'
 
+const frameworkPackageRoots = [
+    // The exported Mini entry is <runtime package>/dist/runtime/index.js, regardless of where the package is installed or linked.
+    path.resolve(path.dirname(miniRuntimeId), '../..'),
+    ...['react', 'react-dom'].map((name) => path.dirname(packageRequire.resolve(`${name}/package.json`)))
+].map((root) => `${normalizePath(root)}/`)
+
+/** Uses the same resolved roots for vendor grouping and amphibious execution; Rolldown includes their dependencies. */
+export function isMiniFrameworkVendorModule(moduleId: string): boolean {
+    const normalizedId = normalizePath(moduleId)
+    return frameworkPackageRoots.some((root) => normalizedId.startsWith(root))
+}
+
 /**
- * Creates a classifier whose fixed identity sets are shared by every chunk in one plugin instance.
- *
- * Construction is O(1). Each classification normalizes every module ID exactly once and runs in O(M), where M is the number
- * of modules in the chunk. This replaces separate shell, capsule, amphibious, and transport scans.
+ * Classifies runtime entries and framework vendor chunks in one module-ID scan.
+ * The vendor shares bootstrap's amphibious bridge so native and SystemJS callers use the same framework exports.
+ * Construction is O(1); each lookup is O(M), where M is the number of modules in the chunk.
  */
 export function createMiniModuleClassifier(modules: RuntimeModulesContract): MiniModuleClassifier {
     const moduleKindById: ReadonlyMap<string, MiniRuntimeModuleKind> = new Map([
@@ -74,7 +90,13 @@ export function createMiniModuleClassifier(modules: RuntimeModulesContract): Min
         let isTransport = false
 
         for (const moduleId of chunk.moduleIds) {
-            switch (moduleKindById.get(normalizeModuleId(moduleId))) {
+            const normalizedId = normalizeModuleId(moduleId)
+
+            const kind =
+                moduleKindById.get(normalizedId) ??
+                (isMiniFrameworkVendorModule(normalizedId) ? 'amphibious' : undefined)
+
+            switch (kind) {
                 case 'shell':
                     ownsShell = true
                     break

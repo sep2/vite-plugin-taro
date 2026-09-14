@@ -4,18 +4,17 @@ import { packageRequire } from '../../utils/packages.ts'
 import { clientTaroNativeId } from '../client/constant.ts'
 import { createMiniDevelopmentPlugin } from './dev/plugins.ts'
 import type { MiniContract } from './mini-contract.ts'
+import { miniRuntimeId } from './module/module.ts'
 import { compileNativeComponentInterface } from './native/compile-native-component-interface.ts'
 import { createOutputFiles } from './output/files.ts'
 import { createMiniPlacementPlugin, type MiniPlacementPlugin } from './placer/placer.ts'
+import { createMiniPolyfillPlugin } from './polyfill/create-mini-polyfill-plugin.ts'
 import { renderCapsule } from './render/capsule.ts'
 import { renderNative } from './render/native.ts'
 import { materializeTransport } from './render/transport.ts'
 import { createResolver } from './resolve/resolver.ts'
 import { createMiniStylePlugin } from './styles/plugins.ts'
 import { createMiniWatchPlugin } from './watch/create-mini-watch-plugin.ts'
-
-// Resolve from the plugin: pnpm consumers do not expose this transitive dependency to injected app imports.
-const miniRuntimeId = packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini')
 
 type MiniResolver = ReturnType<typeof createResolver>
 
@@ -32,6 +31,7 @@ export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] 
         placement,
         styles,
         createMiniPlugin(contract, resolver, placement),
+        createMiniPolyfillPlugin(contract),
         createMiniDevelopmentPlugin(contract, styles),
         createMiniWatchPlugin()
     ]
@@ -87,26 +87,6 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                     target: esTarget,
 
                     rolldownOptions: {
-                        // Mini hosts have no browser document/window. Scope-aware injection binds only free identifiers,
-                        // including those in dependencies, to the same Taro instances used by the renderer. Local variables
-                        // remain untouched; no host globals are overwritten and H5 retains its native browser APIs.
-                        transform: {
-                            // Match Taro 4.2.1's Mini Webpack ProvidePlugin bindings.
-                            inject: {
-                                window: [miniRuntimeId, 'window'],
-                                document: [miniRuntimeId, 'document'],
-                                navigator: [miniRuntimeId, 'navigator'],
-                                requestAnimationFrame: [miniRuntimeId, 'requestAnimationFrame'],
-                                cancelAnimationFrame: [miniRuntimeId, 'cancelAnimationFrame'],
-                                Element: [miniRuntimeId, 'TaroElement'],
-                                SVGElement: [miniRuntimeId, 'SVGElement'],
-                                MutationObserver: [miniRuntimeId, 'MutationObserver'],
-                                history: [miniRuntimeId, 'history'],
-                                location: [miniRuntimeId, 'location'],
-                                URLSearchParams: [miniRuntimeId, 'URLSearchParams'],
-                                URL: [miniRuntimeId, 'URL']
-                            }
-                        },
                         // The dedicated Mini placement plugin owns output naming and entry-signature semantics. This plugin owns
                         // only the closed named input set of native shells, lifecycle capsules, bootstrap, and transport entries.
                         input: resolver.input

@@ -28,7 +28,7 @@ test('creates the ZFB Mini Program contract without translating user configurati
             config: { defaultTitle: 'Home' }
         }
     ])
-    assert.equal(plugins.length, 5)
+    assert.equal(plugins.length, 6)
     assert.ok(
         plugins.some(
             (plugin) => plugin && typeof plugin === 'object' && 'name' in plugin && plugin.name === 'vpt:mini-watch'

@@ -1,7 +1,8 @@
-import { normalizePath, type Plugin, type Rolldown } from 'vite'
+import type { Plugin, Rolldown } from 'vite'
 import type { RuntimeModulesContract } from '../mini-contract.ts'
 import {
     createMiniModuleClassifier,
+    isMiniFrameworkVendorModule,
     type MiniChunkClassification,
     type MiniModuleClassifier
 } from '../module/module.ts'
@@ -10,19 +11,9 @@ import { createPlacement, type GeneratedSubpackage, type PackageLocation, type P
 
 export type { GeneratedSubpackage, Placement } from './placement.ts'
 
-const pnpmFrameworkPackagePattern =
-    /\/node_modules\/\.pnpm\/(?:@tarojs\+|vite-plugin-taro-runtime@|react(?:-dom|-reconciler)?@|scheduler@)/
-const workspaceFrameworkPackagePattern = /\/packages\/taro-runtime\//
-
 // Both supported Mini Program hosts impose the same 2 MB main/subpackage ceiling. Reserving 100 KB for native-tool metadata
 // keeps graph placement deterministic across targets; this belongs to the shared package planner, not to a platform adapter.
 const miniSubpackagePlanningBudget = 1_900_000
-
-/** Selects the explicit React/Taro roots whose complete dependency closure forms the framework vendor chunk. */
-export function isMiniFrameworkVendorModule(moduleId: string): boolean {
-    const normalizedId = normalizePath(moduleId)
-    return pnpmFrameworkPackagePattern.test(normalizedId) || workspaceFrameworkPackagePattern.test(normalizedId)
-}
 
 type PlacementState =
     | { phase: 'idle' }

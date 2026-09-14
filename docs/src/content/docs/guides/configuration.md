@@ -200,6 +200,34 @@ sitemapJson: {
 ```
 
 
+## `polyfills`
+
+可选。当小程序应用或第三方依赖需要运行环境尚未提供的 JavaScript / Web API 时，用此选项补充：
+
+```ts
+polyfills: ['web.url', 'es.array.at']
+```
+
+| 模块名 | 提供的 API |
+| --- | --- |
+| `web.url` | `URL` 和 `URLSearchParams` |
+| `es.array.at` | `Array.prototype.at`，例如 `[1, 2].at(-1)` |
+
+使用 [core-js 模块名](https://github.com/zloirock/core-js#web-standards)，不带 `core-js/modules/` 前缀或 `.js` 后缀。
+无需额外安装 core-js，也无需在应用代码中手动导入。
+
+- 开发和生产构建均生效，所选 API 会在应用代码运行前准备好。
+- 缺失或不符合标准的全局 API 和原型方法会被补充或修复，符合标准的原生实现会保留。
+- 省略或传入 `[]` 时，不添加任何可选 polyfill。
+- 只打包所选模块及其依赖。polyfill 会增加小程序包体积，请按应用实际需求选择。
+- H5 忽略该选项；H5 的旧浏览器支持可另行配置 `@vitejs/plugin-legacy`。
+
+需要 `URL` 和 `URLSearchParams` 时，选择 `web.url` 即可。如果还需要 `URL.parse`，使用
+`polyfills: ['web.url', 'web.url.parse']`，确保运行环境缺少 `URL` 时也能使用。
+
+此选项不提供完整的浏览器环境，也不提供 `fetch`；小程序网络请求请使用平台或 Taro 的请求 API。
+
+
 ## `hmr`
 
 可选。为 `vite serve` 的小程序开发者工具选择源码更新方式：
@@ -258,9 +286,10 @@ WX 和 ZFB 中可以直接使用以下名称，无需额外安装依赖或手动
 - `window`、`document`、`navigator`；
 - `requestAnimationFrame`、`cancelAnimationFrame`；
 - `Element`、`SVGElement`、`MutationObserver`；
-- `history`、`location`、`URLSearchParams`、`URL`。
+- `history`、`location`。
 
-这些 API 由 VPT 提供小程序兼容实现。
+这些 API 是 Taro 提供的小程序兼容实现，并不提供完整的浏览器环境。需要 `URL` 和 `URLSearchParams` 时，
+如果运行环境未提供，请配置 [`polyfills: ['web.url']`](#polyfills)。
 
 ## 不读取 Taro 配置
 

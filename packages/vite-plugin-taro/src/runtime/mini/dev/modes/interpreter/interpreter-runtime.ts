@@ -15,15 +15,10 @@ class InterpreterHmrRuntime extends MiniHmrRuntime {
 
     constructor(connectSocket: ConnectMiniSocket) {
         super(connectSocket)
-        const interpreter = new Sval()
-        interpreter.import('__rolldown_runtime__', this)
-        /*
-         * Sval snapshots its sandbox built-ins while its module evaluates, before this runtime's base constructor can install
-         * Mini polyfills. Import the resulting host function explicitly so interpreted Rolldown Refresh wrappers resolve the
-         * same queue as physical chunks; otherwise their first free `queueMicrotask` lookup aborts the patch before registration.
-         */
-        interpreter.import('queueMicrotask', globalThis.queueMicrotask)
-        this.installPatch = (patch) => interpreter.run(patch.code)
+        // Trusted application patches share live host globals, including APIs installed during app startup, rather than Sval's
+        // module-time sandbox snapshot. A function scope keeps patch-local declarations isolated, as in native HMR factories.
+        const interpreter = new Sval({ sandBox: false })
+        this.installPatch = (patch) => interpreter.run(`(() => {\n${patch.code}\n})();`)
     }
 
     protected override onSocketEvent(info: HmrInfo, event: string, data: unknown): void {

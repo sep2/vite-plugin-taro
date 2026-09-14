@@ -2,10 +2,12 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
 import { build, type InputOption, type OutputBundle, type OutputChunk, type OutputOptions, type Plugin } from 'rolldown'
+import { normalizePath } from 'vite'
+import { packageRequire } from '../../../utils/packages.ts'
 import type { RuntimeModulesContract } from '../mini-contract.ts'
-import { createMiniModuleClassifier } from '../module/module.ts'
+import { createMiniModuleClassifier, isMiniFrameworkVendorModule } from '../module/module.ts'
 import { createPlacement, type GeneratedSubpackage, type Placement } from './placement.ts'
-import { createMiniPlacementPlugin, createPlacementRolldownOptions, isMiniFrameworkVendorModule } from './placer.ts'
+import { createMiniPlacementPlugin, createPlacementRolldownOptions } from './placer.ts'
 
 const planningBudgetBytes = 1_900_000
 const runtimeModules = {
@@ -145,6 +147,7 @@ test('rejects placement services and chunk delivery outside their lifecycle phas
     assert.ok(chunk)
     const plugin = createMiniPlacementPlugin(runtimeModules)
 
+    assert.doesNotThrow(() => plugin.classifyChunk(chunk))
     assert.throws(() => plugin.getPackageLocation(chunk), /placement is unavailable/)
     assert.throws(() => plugin.getSubpackages(), /subpackages are unavailable/)
 
@@ -188,9 +191,9 @@ test('automatically bundles application modules and non-framework dependencies t
 
 test('extracts the recursive React/Taro vendor closure without absorbing application modules', async () => {
     const applicationId = moduleId('application.js')
-    const reactId = '/workspace/node_modules/.pnpm/react@19.2.8/node_modules/react/index.js'
-    const taroId = '/workspace/node_modules/.pnpm/@tarojs+runtime@4.2.1/node_modules/@tarojs/runtime/index.js'
-    const frameworkDependencyId = '/workspace/node_modules/.pnpm/tslib@2.8.1/node_modules/tslib/tslib.es6.mjs'
+    const reactId = normalizePath(packageRequire.resolve('react'))
+    const taroId = normalizePath(packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini'))
+    const frameworkDependencyId = moduleId('framework-dependency.js')
     const applicationDependencyId = moduleId('application-dependency.js')
     const output = await buildFixture({
         input: { application: applicationId },
@@ -225,22 +228,17 @@ test('extracts the recursive React/Taro vendor closure without absorbing applica
     assert.deepEqual(output.subpackages, [])
 })
 
-test('matches only explicit React and Taro framework package roots', () => {
-    assert.equal(isMiniFrameworkVendorModule('/repo/node_modules/.pnpm/react@19.2.8/node_modules/react/index.js'), true)
-    assert.equal(
-        isMiniFrameworkVendorModule(
-            '/repo/node_modules/.pnpm/@tarojs+runtime@4.2.1/node_modules/@tarojs/runtime/index.js'
-        ),
-        true
-    )
-    assert.equal(
-        isMiniFrameworkVendorModule(
-            '/repo/node_modules/.pnpm/vite-plugin-taro-runtime@0.7.0/node_modules/vite-plugin-taro-runtime/dist/runtime/index.js'
-        ),
-        true
-    )
-    assert.equal(isMiniFrameworkVendorModule('/repo/packages/taro-runtime/dist/react/react.esm.js'), true)
-    assert.equal(isMiniFrameworkVendorModule('/repo/packages/taro-runtime/dist/runtime/index.js'), true)
+test('matches resolved framework package roots without absorbing similarly named paths', () => {
+    for (const specifier of [
+        'react',
+        'react-dom',
+        'vite-plugin-taro-runtime/runtime/mini',
+        'vite-plugin-taro-runtime/react'
+    ]) {
+        assert.equal(isMiniFrameworkVendorModule(packageRequire.resolve(specifier)), true)
+    }
+    const reactRoot = path.dirname(packageRequire.resolve('react/package.json'))
+    assert.equal(isMiniFrameworkVendorModule(`${reactRoot}-other/index.js`), false)
     assert.equal(isMiniFrameworkVendorModule('/repo/src/react-feature.ts'), false)
     assert.equal(isMiniFrameworkVendorModule('/repo/src/taro-page.ts'), false)
 })

@@ -108,6 +108,20 @@ export interface VptOptions {
     sitemapJson?: VptJsonObject
 
     /**
+     * Add JavaScript and Web APIs that your WX or ZFB app needs but its host may not provide.
+     *
+     * Use core-js module names without the `core-js/modules/` prefix or `.js` suffix; no separate core-js installation is needed.
+     * For example, `web.url` provides `URL` and `URLSearchParams`, while `es.array.at` provides `Array.prototype.at`.
+     *
+     * Selected polyfills run before your app in development and production, updating global APIs and prototypes when needed.
+     * Omit this option or use `[]` to add no optional polyfills. H5 ignores this option.
+     *
+     * @example
+     * polyfills: ['web.url', 'es.array.at']
+     */
+    polyfills?: readonly string[]
+
+    /**
      * Selects the Mini Program development update mode. Omission uses `devtools`.
      *
      * This option affects only `vite serve` for `wx` and `zfb` targets and never changes H5 or production output.
