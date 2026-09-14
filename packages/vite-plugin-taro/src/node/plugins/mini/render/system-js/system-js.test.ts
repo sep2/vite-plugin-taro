@@ -84,6 +84,28 @@ test('matches Babel across compound, logical, nested, prefix, and postfix export
     )
 })
 
+test('matches Babel for property updates without republishing exported objects', async () => {
+    const code = await buildFinalChunk(`
+        const state = { value: 1 }
+        function mutate() {
+            return [state.value++, ++state.value, state['value']--, --state['value']]
+        }
+        export { mutate, state }
+    `)
+
+    await compareOracle(
+        code,
+        async ({ namespace }) => {
+            const mutate = requireFunction(namespace.mutate)
+            const results = mutate()
+            assert.deepEqual(results, [1, 3, 3, 1])
+            assert.deepEqual(namespace.state, { value: 1 })
+            return [results, namespace.state]
+        },
+        undefined
+    )
+})
+
 test('matches Babel for module var declarations nested in control flow', async () => {
     const code = `
         if (true) { var count = 1; }
