@@ -70,6 +70,7 @@ async function compileFixture(
             `
                 import { probe } from './probe'
                 globalThis.polyfillProbe = probe
+                globalThis.readPerformanceNow = () => performance.now()
                 export default function App({ children }) { return children }
             `
         )
@@ -245,7 +246,11 @@ for (const target of ['wx', 'zfb'] as const) {
 
     for (const mode of ['devtools', 'interpreter', 'rebuild'] as const) {
         test(`${target}: ${mode} installs optional APIs before the app and exposes them to HMR`, async () => {
-            const chunks = await compileFixture(target, mode, [...optionalPolyfills, 'web.structured-clone'])
+            const chunks = await compileFixture(target, mode, [
+                ...optionalPolyfills,
+                'web.structured-clone',
+                'web.queue-microtask'
+            ])
             assertPolyfilledBootstrap(chunks, target, 'function')
             const heap = createAppHeap(chunks, false, target)
             assertPolyfilledApp(heap, 'function')
@@ -275,37 +280,93 @@ for (const target of ['wx', 'zfb'] as const) {
     }
 }
 
-for (const mode of ['production', 'interpreter'] as const) {
-    test(`${mode}: the empty selection adds no core-js code or optional APIs`, async () => {
-        const chunks = await compileFixture('wx', mode, [])
-        const missing = createAppHeap(chunks, false, 'wx')
-        assert.throws(() => missing.evaluate('app.js'), { name: 'ReferenceError', message: 'URL is not defined' })
-        assert.equal(missing.read('typeof URLSearchParams'), 'undefined')
+for (const target of ['wx', 'zfb'] as const) {
+    for (const mode of ['production', 'devtools', 'interpreter', 'rebuild'] as const) {
+        test(`${target} ${mode}: the empty selection adds only development's required microtask API`, async () => {
+            const chunks = await compileFixture(target, mode, [])
+            const missing = createAppHeap(chunks, false, target)
+            assert.throws(() => missing.evaluate('app.js'), { name: 'ReferenceError', message: 'URL is not defined' })
+            assert.equal(missing.read('typeof URLSearchParams'), 'undefined')
 
-        const heap = createAppHeap(chunks, true, 'wx')
-        heap.evaluate('app.js')
-        assert.equal(Array.isArray(heap.evaluate('common/vendor.js')), false, 'vendor must export a native namespace')
-        assert.equal(heap.read('URL'), URL)
-        assert.equal(heap.read('URLSearchParams'), URLSearchParams)
-        assert.equal(heap.read('typeof globalThis["__core-js_shared__"]'), 'undefined')
-        assert.equal(heap.read('typeof Array.prototype.at'), 'undefined')
-        assert.equal(heap.read('typeof queueMicrotask'), mode === 'production' ? 'undefined' : 'function')
-        assert.deepEqual(heap.json('polyfillProbe'), {
-            href: 'https://example.com/dir/child',
-            params: 'a=1&b=2&a=3',
-            entries: [
-                ['a', '1'],
-                ['b', '2'],
-                ['a', '3']
-            ],
-            at: null,
-            hostURL: true,
-            hostParams: true,
-            document: true,
-            local: 'local',
-            structuredClone: 'undefined'
+            const heap = createAppHeap(chunks, true, target)
+            heap.evaluate('common/bootstrap.js')
+            assert.equal(heap.read('typeof globalThis.polyfillProbe'), 'undefined')
+            assert.equal(heap.read('typeof queueMicrotask'), mode === 'production' ? 'undefined' : 'function')
+            if (mode === 'production') {
+                assert.equal(heap.read('typeof globalThis["__core-js_shared__"]'), 'undefined')
+            } else {
+                assert.equal(heap.read('globalThis["__core-js_shared__"].versions.length'), 1)
+                await assertMicrotaskQueue(heap)
+            }
+
+            heap.evaluate('app.js')
+            assert.equal(
+                Array.isArray(heap.evaluate('common/vendor.js')),
+                false,
+                'vendor must export a native namespace'
+            )
+            assert.equal(heap.read('URL'), URL)
+            assert.equal(heap.read('URLSearchParams'), URLSearchParams)
+            assert.equal(heap.read('typeof Array.prototype.at'), 'undefined')
+            assert.deepEqual(heap.json('polyfillProbe'), {
+                href: 'https://example.com/dir/child',
+                params: 'a=1&b=2&a=3',
+                entries: [
+                    ['a', '1'],
+                    ['b', '2'],
+                    ['a', '3']
+                ],
+                at: null,
+                hostURL: true,
+                hostParams: true,
+                document: true,
+                local: 'local',
+                structuredClone: 'undefined'
+            })
+            // Fixed clocks in this isolated heap distinguish the development rewrite from production's original call.
+            assert.equal(
+                heap.read('globalThis.performance = { now: () => 123 }; Date.now = () => 456; readPerformanceNow()'),
+                mode === 'production' ? 123 : 456
+            )
+
+            const native = createAppHeap(chunks, true, target)
+            const nativeQueue = native.read(
+                'globalThis.queueMicrotask = (callback) => { void Promise.resolve().then(callback) }'
+            )
+            native.evaluate('app.js')
+            assert.equal(native.read('queueMicrotask'), nativeQueue)
         })
+    }
+
+    test(`${target}: production can opt into queueMicrotask without other APIs`, async () => {
+        const chunks = await compileFixture(target, 'production', ['web.queue-microtask'])
+        const heap = createAppHeap(chunks, true, target)
+        heap.evaluate('common/bootstrap.js')
+        await assertMicrotaskQueue(heap)
+        const installedQueue = heap.read('queueMicrotask')
+        heap.evaluate('app.js')
+        heap.evaluate('pages/home/index.js')
+        heap.evaluate('comp.js')
+        assert.equal(heap.read('queueMicrotask'), installedQueue)
+        assert.equal(heap.read('globalThis["__core-js_shared__"].versions.length'), 1)
+        assert.equal(heap.read('typeof Array.prototype.at'), 'undefined')
     })
+}
+
+async function assertMicrotaskQueue(heap: ReturnType<typeof createAppHeap>): Promise<void> {
+    assert.equal(heap.read('typeof queueMicrotask'), 'function')
+    assert.throws(() => heap.read('queueMicrotask()'), { name: 'TypeError' })
+    assert.throws(() => heap.read('queueMicrotask(null)'), { name: 'TypeError' })
+    // This heap-local journal records callback order without changing the test runner's globals.
+    heap.read(`
+        globalThis.microtaskOrder = ['sync'];
+        queueMicrotask(() => microtaskOrder.push('first'));
+        queueMicrotask(() => microtaskOrder.push('second'));
+        microtaskOrder.push('after-schedule');
+    `)
+    assert.deepEqual(heap.json('microtaskOrder'), ['sync', 'after-schedule'])
+    await Promise.resolve()
+    assert.deepEqual(heap.json('microtaskOrder'), ['sync', 'after-schedule', 'first', 'second'])
 }
 
 test('a prototype-only selection does not install unselected URL APIs', async () => {

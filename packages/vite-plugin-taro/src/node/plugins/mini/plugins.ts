@@ -196,8 +196,6 @@ function createTaroDefines(taroEnv: string): Record<string, string> {
         'process.env.TARO_ENV': JSON.stringify(taroEnv),
         'process.env.TARO_PLATFORM': JSON.stringify('mini'),
         'process.env.TARO_VERSION': JSON.stringify(taroVersion),
-        // React's development-only Suspense diagnostics call this browser API without guards.
-        'performance.now': 'Date.now',
         // These implementations already ship in Taro; false makes the bundler erase their installation branches.
         // Enable them together: insertAdjacentHTML is nested under the innerHTML gate. This is Taro's Mini DOM, not a
         // browser emulator (notably, element measurements are asynchronous). Legacy Object/Array polyfills above remain

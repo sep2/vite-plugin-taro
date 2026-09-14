@@ -49,6 +49,8 @@ export function createMiniDevelopmentPlugin(
 
             config() {
                 return {
+                    // React's development-only Suspense diagnostics call this browser API without guards.
+                    define: { 'performance.now': 'Date.now' },
                     build: {
                         // Development output is the live project opened by the native tool, not a disposable build artifact.
                         // Deleting and recreating its directory tree during a dev-server restart detaches the native watcher;

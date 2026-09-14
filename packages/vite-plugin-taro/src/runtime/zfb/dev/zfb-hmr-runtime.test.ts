@@ -69,21 +69,15 @@ test('adapts the Alipay socket while installing both patch modes on the shared r
         assert.deepEqual(sentOptions, [{ data: 'client message' }])
         assert.deepEqual(closeOptions, [{ code: 1000, reason: 'test complete' }])
 
-        // Load interpreter mode while the host primitive is still absent. Sval therefore snapshots the same ZFB environment
-        // that exposed the real bug before MiniHmrRuntime installs its language-global fallback.
+        // Construct the interpreter before bootstrap provides queueMicrotask, matching native startup order.
         await importRuntimeEntry('interpreter')
         const interpreterRuntime = Reflect.get(globalThis, '__rolldown_runtime__')
         assert.ok(interpreterRuntime instanceof DevRuntime)
         initializeRuntime(interpreterRuntime, 'interpreter')
 
-        const installedQueueMicrotask = Reflect.get(globalThis, 'queueMicrotask')
-        assert.ok(typeof installedQueueMicrotask === 'function')
-        // This mutable observation proves entry evaluation installs the fallback before later Refresh work can be scheduled.
-        let microtaskCompleted = false
-        Reflect.apply(installedQueueMicrotask, undefined, [() => (microtaskCompleted = true)])
-        assert.equal(microtaskCompleted, false)
-        await Promise.resolve()
-        assert.equal(microtaskCompleted, true)
+        assert.equal(Reflect.get(globalThis, 'queueMicrotask'), undefined)
+        // Simulate bootstrap publishing the API; interpreted patches must read the live global rather than an earlier snapshot.
+        Reflect.set(globalThis, 'queueMicrotask', nativeQueueMicrotask)
 
         emitNativeMessage(
             JSON.stringify({
