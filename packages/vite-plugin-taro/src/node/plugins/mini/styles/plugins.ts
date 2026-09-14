@@ -2,12 +2,13 @@ import path from 'node:path'
 import { Scanner } from '@tailwindcss/oxide'
 import { createTailwindV4Engine, resolveTailwindV4Source, type TailwindV4Engine } from '@tailwindcss-mangle/engine/v4'
 import type { PluginContext } from 'rolldown'
-import { isCSSRequest, normalizePath, type Plugin, type Rolldown } from 'vite'
+import { type BuildOptions, isCSSRequest, normalizePath, type Plugin, type Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { wrapPluginTransform } from '../../../utils/vite.ts'
 import { tailwindcssBasedir } from '../../tailwind/tailwind-css.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import { createMiniTransformer } from './create-mini-transformer.ts'
+import { minifyMiniStylesheet } from './minify-mini-stylesheet.ts'
 
 /** Persistent Tailwind state owned by one physical CSS root across incremental Rolldown transforms. */
 type TailwindRoot = Readonly<{
@@ -121,10 +122,12 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  *
  * ### 4. Shared native-style finalization
  *
- * `finalizeOutput()` first converts the concatenated reachable CSS to native CSS, then transforms each JavaScript artifact
- * with the same projected class set. It returns data and performs no bundle mutation or filesystem publication. If either
- * transformation fails, the promise rejects before callers expose partial output. JavaScript conversion is skipped when the
- * projection contains no Tailwind candidates, preserving ordinary bundle bytes.
+ * `finalizeOutput()` converts the concatenated reachable CSS to native CSS, optionally minifies that complete global file
+ * (including HTML defaults), then transforms each JavaScript artifact with the same projected class set. Both builds and HMR
+ * follow `build.cssMinify`, defaulting to `build.minify`, using Lightning CSS. Vite's intermediate CSS minification
+ * remains disabled so only final native bytes are optimized. The function returns data without bundle mutation or filesystem
+ * publication. Any conversion or minification failure rejects before callers expose partial output. JavaScript conversion is
+ * skipped when the projection contains no Tailwind candidates, preserving ordinary bundle bytes.
  *
  * ### 5a. Complete-build commit
  *
@@ -144,8 +147,9 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  *
  * ## Retained state and lifecycle
  *
- * The factory retains four explicit mutable state owners plus one fixed transformation service:
+ * The factory retains five explicit mutable state owners plus one fixed transformation service:
  *
+ * - `cssMinify`: requested global-style minification captured before disabling Vite's intermediate pass, then resolved once;
  * - `entryIds`: graph-exact App/Page entry identities resolved at the start of each build;
  * - `graphContext`: the active Rolldown graph reader needed by host calls made outside plugin hooks;
  * - `styleByModuleId`: the latest successful Vite CSS plus optional Tailwind state at one normalized module identity;
@@ -162,12 +166,16 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * chunks then parse and walk in `O(J)`; replacing `Kᵢ` candidate tokens in literal `i` costs `O(LᵢKᵢ)` while preserving
  * untouched bytes through Rolldown's native editor. Retained memory is `O(B + C + D + F)` for latest CSS, candidate sets,
  * compiler dependencies, and watched file identities; no second application graph is retained. The Tailwind generator stays
- * alive across candidate edits to avoid repeating source normalization and compiler initialization.
+ * alive across candidate edits to avoid repeating source normalization and compiler initialization. Enabled minification parses
+ * the one final global stylesheet in builds and HMR; no extra source reads or graph traversals are needed.
  */
 export function createMiniStylePlugin(
     contract: Pick<MiniContract, 'styles'>,
     applicationEntryIds: readonly string[]
 ): MiniStylePlugin {
+    // Late config captures the requested switch before disabling Vite's intermediate pass; configResolved supplies the
+    // resolved JS-minification default. The same policy stays fixed throughout builds and HMR.
+    let cssMinify: BuildOptions['cssMinify']
     // This mutable root list is replaced in buildStart with Vite/Rolldown's exact cross-platform graph identities.
     let entryIds = applicationEntryIds
     // The fixed transformer retains only deterministic class-escape and PostCSS pipeline caches for this plugin instance.
@@ -187,7 +195,8 @@ export function createMiniStylePlugin(
             styleByModuleId,
             context.getModuleInfo.bind(context),
             miniTransformer,
-            javaScript
+            javaScript,
+            { filename: contract.styles.globalFileName, minify: cssMinify }
         )
     }
 
@@ -206,8 +215,18 @@ export function createMiniStylePlugin(
 
     return {
         name: 'vpt:mini-styles',
-        /** Installs the single private Vite integration used to observe fully processed module CSS. */
+        config: {
+            // Observe user and ordinary plugin configuration before reserving minification for the native global output.
+            order: 'post',
+            handler(config) {
+                cssMinify = config.build?.cssMinify
+                return { build: { cssMinify: false } }
+            }
+        },
+        /** Resolves the output policy and installs the private Vite integration that observes fully processed module CSS. */
         configResolved(config) {
+            cssMinify ??= Boolean(config.build.minify)
+
             // `vite:css-post` is the boundary after all public CSS processing and before browser-module serialization.
             const cssPostPlugin = config.plugins.find((plugin) => plugin.name === 'vite:css-post')!
 
@@ -362,7 +381,7 @@ export function createMiniStylePlugin(
  * Produces native CSS and JavaScript from one live-graph projection.
  *
  * The function receives every stateful dependency explicitly so tests and both output modes execute the same algorithm. It
- * completes stylesheet conversion before JavaScript conversion and returns bytes without publishing or mutating caller artifacts.
+ * completes stylesheet conversion and optional minification before JavaScript conversion and returns bytes without publication.
  */
 export async function finalizeOutput(
     entryIds: readonly string[],
@@ -377,13 +396,17 @@ export async function finalizeOutput(
         moduleId: string
     ) => Readonly<{ importedIds: readonly string[]; dynamicallyImportedIds: readonly string[] }> | null | undefined,
     miniTransformer: MiniTransformer,
-    javaScript: readonly JavaScriptArtifact[]
+    javaScript: readonly JavaScriptArtifact[],
+    stylesheetOptions: Parameters<typeof minifyMiniStylesheet>[1]
 ) {
     // Step 1: derive cascade order, reachable CSS, and raw Tailwind candidates from the same current graph snapshot.
     const projection = projectStyles(entryIds, styleByModuleId, getModuleInfo)
 
-    // Step 2: convert the complete stylesheet with VPT's fixed Tailwind-v4 Mini Program policy.
-    const stylesheet = await miniTransformer.transformStylesheet(projection.css)
+    // Step 2: convert the complete stylesheet before minifying, so native units, selectors, and HTML defaults are included.
+    const stylesheet = await minifyMiniStylesheet(
+        await miniTransformer.transformStylesheet(projection.css),
+        stylesheetOptions
+    )
 
     // Step 3: transform artifacts independently with the exact candidate set projected from that stylesheet.
     const transformedJavaScript = javaScript.map((artifact) =>

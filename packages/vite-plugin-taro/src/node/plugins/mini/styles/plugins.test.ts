@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { build, normalizePath, type Plugin } from 'vite'
+import { type BuildOptions, build, normalizePath, type Plugin } from 'vite'
 import type { MiniContract } from '../mini-contract.ts'
 import { createMiniTransformer } from './create-mini-transformer.ts'
 import { createMiniStylePlugin, finalizeOutput } from './plugins.ts'
@@ -109,7 +109,8 @@ test('finalizes the current graph into native CSS and JavaScript with one projec
             }
         },
         createMiniTransformer(),
-        [{ code: "export const className = 'py-5.5'", filename: 'entry.js' }]
+        [{ code: "export const className = 'py-5.5'", filename: 'entry.js' }],
+        { filename: contract.styles.globalFileName, minify: false }
     )
 
     assert.match(output.stylesheet, /\.py-5_d5\s*\{/)
@@ -151,7 +152,8 @@ test('projects cyclic multi-entry graphs in dependency-first order without dupli
         ]),
         (moduleId) => moduleGraph.get(moduleId),
         createMiniTransformer(),
-        [{ code: "export const classes = 'py-5.5 mr-4.5'", filename: 'entry.js' }]
+        [{ code: "export const classes = 'py-5.5 mr-4.5'", filename: 'entry.js' }],
+        { filename: contract.styles.globalFileName, minify: false }
     )
 
     const sharedIndex = output.stylesheet.indexOf('.shared-order')
@@ -184,7 +186,8 @@ test('rejects the complete style transaction when JavaScript conversion fails', 
                 ]),
                 (moduleId) => (moduleId === '/entry.js' ? { importedIds: [], dynamicallyImportedIds: [] } : undefined),
                 createMiniTransformer(),
-                [{ code: source, filename: 'entry.js' }]
+                [{ code: source, filename: 'entry.js' }],
+                { filename: contract.styles.globalFileName, minify: false }
             ),
         Error
     )
@@ -192,7 +195,29 @@ test('rejects the complete style transaction when JavaScript conversion fails', 
     assert.equal(source, "export const = 'py-5.5'")
 })
 
-test('finalizes the complete compiler stylesheet before later WX output hooks', async () => {
+test('rejects the complete style transaction when final native minification fails', async () => {
+    await assert.rejects(
+        () =>
+            finalizeOutput(
+                ['/entry.js'],
+                new Map(),
+                () => ({ importedIds: [], dynamicallyImportedIds: [] }),
+                {
+                    async transformStylesheet() {
+                        return '.broken { color: red; } }'
+                    },
+                    transformJavaScript() {
+                        return assert.fail('JavaScript must not be finalized after failed CSS minification')
+                    }
+                },
+                [{ code: 'export {}', filename: 'entry.js' }],
+                { filename: contract.styles.globalFileName, minify: true }
+            ),
+        Error
+    )
+})
+
+test('minifies the complete compiler stylesheet before later WX output hooks', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'vpt-wxss-'))
 
     try {
@@ -201,7 +226,7 @@ test('finalizes the complete compiler stylesheet before later WX output hooks', 
         await mkdir(pageRoot, { recursive: true })
         await writeFile(
             path.join(sourceRoot, 'app.ts'),
-            "import './app.css';\nconsole.log({ className: 'mt-2.5' });\nvoid import('./pages/example/index.ts')\n"
+            "import './app.css';\nimport styles from './card.module.css';\nconsole.log({ className: 'mt-2.5', module: styles.card });\nvoid import('./pages/example/index.ts')\n"
         )
         await writeFile(
             path.join(sourceRoot, 'app.css'),
@@ -213,6 +238,7 @@ test('finalizes the complete compiler stylesheet before later WX output hooks', 
                 '.app { margin: 1rem; }'
             ].join('\n')
         )
+        await writeFile(path.join(sourceRoot, 'card.module.css'), '.card { padding: 1px; }\n')
         await writeFile(path.join(pageRoot, 'index.ts'), "import './index.css'\n")
         await writeFile(path.join(pageRoot, 'index.css'), '.page-marker { color: red; }\n')
 
@@ -235,7 +261,7 @@ test('finalizes the complete compiler stylesheet before later WX output hooks', 
             plugins: [styles, verifyAssetOwnership],
             build: {
                 cssCodeSplit: false,
-                cssMinify: false,
+                cssMinify: true,
                 outDir: 'dist',
                 rolldownOptions: {
                     input: applicationEntry
@@ -251,10 +277,12 @@ test('finalizes the complete compiler stylesheet before later WX output hooks', 
         assert.deepEqual(styleFileNames, ['assets/global.wxss'])
 
         const globalStyle = await readFile(path.join(outputRoot, 'assets/global.wxss'), 'utf8')
-        assert.match(globalStyle, /\.app\s*\{\s*margin:\s*32rpx;/)
-        assert.match(globalStyle, /\.mt-2_d5\s*\{/)
-        assert.match(globalStyle, /\.page-marker\s*\{/)
+        assert.match(globalStyle, /\.app\{margin:32rpx\}/)
+        assert.match(globalStyle, /\.mt-2_d5\{/)
+        assert.match(globalStyle, /\.page-marker\{/)
         assert.doesNotMatch(globalStyle, /\drem\b/)
+        const moduleClassName = /\.([\w-]+)\{padding:1rpx\}/.exec(globalStyle)?.[1]
+        assert.ok(moduleClassName)
 
         const javaScript = (
             await Promise.all(
@@ -267,6 +295,126 @@ test('finalizes the complete compiler stylesheet before later WX output hooks', 
         ).join('\n')
         assert.match(javaScript, /mt-2_d5/)
         assert.doesNotMatch(javaScript, /mt-2\.5/)
+        assert.ok(javaScript.includes(moduleClassName))
+    } finally {
+        await rm(root, { recursive: true, force: true })
+    }
+})
+
+const minificationCases = [
+    { name: 'default build', build: {}, minified: true },
+    { name: 'JavaScript opt-out', build: { minify: false }, minified: false },
+    { name: 'CSS opt-out', build: { cssMinify: false }, minified: false },
+    { name: 'independent CSS opt-in', build: { minify: false, cssMinify: true }, minified: true },
+    { name: 'explicit Lightning CSS', build: { cssMinify: 'lightningcss' }, minified: true }
+] as const satisfies readonly Readonly<{ name: string; build: BuildOptions; minified: boolean }>[]
+
+for (const extension of ['wxss', 'acss']) {
+    for (const scenario of minificationCases) {
+        test(`preserves authored rpx while minifying only global.${extension}: ${scenario.name}`, async () => {
+            const root = await mkdtemp(path.join(os.tmpdir(), 'vpt-global-minify-'))
+            const appPath = path.join(root, 'app.ts')
+            const globalFileName = `assets/global.${extension}`
+            const nativeFileName = `components/counter/index.${extension}`
+            const nativeStyle = '.native-counter { padding: 1px; }\n'
+
+            try {
+                await writeFile(appPath, "import './app.css'\nconsole.log('application')\n")
+                await writeFile(
+                    path.join(root, 'app.css'),
+                    [
+                        '.global-marker { margin: 16px; }',
+                        '.native-rpx { padding: 12.5rpx; margin-left: -0.5rpx; width: calc(100% - 32rpx); }',
+                        '.converted-rem { margin: 1rem; }'
+                    ].join('\n')
+                )
+                const styles = createMiniStylePlugin({ styles: { appFileName: `app.${extension}`, globalFileName } }, [
+                    appPath
+                ])
+                const result = await build({
+                    root,
+                    configFile: false,
+                    logLevel: 'silent',
+                    plugins: [
+                        {
+                            name: 'test:intermediate-css',
+                            generateBundle: {
+                                order: 'post',
+                                handler(_, bundle) {
+                                    const intermediate = Object.values(bundle).find(
+                                        (asset) => asset.type === 'asset' && asset.fileName.endsWith('.css')
+                                    )
+                                    assert.equal(intermediate?.type, 'asset')
+                                    assert.match(String(intermediate.source), /\.global-marker \{ margin: 16px; \}/)
+                                }
+                            }
+                        },
+                        styles,
+                        {
+                            name: 'test:later-native-output',
+                            generateBundle: {
+                                order: 'post',
+                                handler() {
+                                    this.emitFile({ type: 'asset', fileName: nativeFileName, source: nativeStyle })
+                                }
+                            }
+                        }
+                    ],
+                    build: {
+                        ...scenario.build,
+                        write: false,
+                        cssCodeSplit: false,
+                        rolldownOptions: { input: appPath }
+                    }
+                })
+                assert.ok(!Array.isArray(result) && 'output' in result)
+                const globalStyle = result.output.find((asset) => asset.fileName === globalFileName)
+                const nativeOutput = result.output.find((asset) => asset.fileName === nativeFileName)
+                assert.equal(globalStyle?.type, 'asset')
+                assert.equal(nativeOutput?.type, 'asset')
+                const css = String(globalStyle.source)
+                assert.equal(css.includes('.global-marker{margin:16rpx}'), scenario.minified)
+                assert.equal(css.includes('.h5-span,.h5-a{display:inline}'), scenario.minified)
+                assert.equal(css.includes('.global-marker { margin: 16rpx; }'), !scenario.minified)
+                // Authored rpx must survive both conversion and minification, alongside newly converted px/rem values.
+                assert.match(css, /\.native-rpx\s*\{\s*padding:\s*12\.5rpx;\s*margin-left:\s*-0?\.5rpx;/)
+                assert.match(css, /width:\s*calc\(100% - 32rpx\)/)
+                assert.match(css, /\.converted-rem\s*\{\s*margin:\s*32rpx[;}]/)
+                assert.doesNotMatch(css, /[\d.](?:px|rem)\b/)
+                assert.equal(String(nativeOutput.source), nativeStyle)
+                assert.ok(!result.output.some((asset) => asset.fileName.endsWith('.css')))
+            } finally {
+                await rm(root, { recursive: true, force: true })
+            }
+        })
+    }
+}
+
+test('captures CSS minification configured by a later ordinary plugin', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'vpt-style-minify-config-'))
+    const appPath = path.join(root, 'app.ts')
+
+    try {
+        await writeFile(appPath, 'export {}\n')
+        const result = await build({
+            root,
+            configFile: false,
+            logLevel: 'silent',
+            plugins: [
+                createMiniStylePlugin(contract, [appPath]),
+                {
+                    name: 'test:configure-css-minify',
+                    config() {
+                        return { build: { cssMinify: true } }
+                    }
+                }
+            ],
+            build: { minify: false, write: false, rolldownOptions: { input: appPath } }
+        })
+        assert.ok(!Array.isArray(result) && 'output' in result)
+        const globalStyle = result.output.find((asset) => asset.fileName === contract.styles.globalFileName)
+        assert.equal(globalStyle?.type, 'asset')
+        assert.match(String(globalStyle.source), /\.h5-span,\.h5-a\{display:inline\}/)
     } finally {
         await rm(root, { recursive: true, force: true })
     }

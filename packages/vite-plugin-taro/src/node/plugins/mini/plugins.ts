@@ -79,9 +79,6 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                     // Mini Program styles are intentionally global. This guarantees one compiler stylesheet for the CSS
                     // finalizer; enabling splitting would require Page ownership and must not be silently flattened.
                     cssCodeSplit: false,
-                    // Keep the intermediate browser stylesheet readable. The Mini style finalizer converts the complete CSS
-                    // graph to native syntax after class projection, then applies its own production optimization.
-                    cssMinify: false,
 
                     // No base64 assets: Taro warns on image srcs above ~2KB, and inlined
                     // images bloat the JS bundle toward the mini program package limit.

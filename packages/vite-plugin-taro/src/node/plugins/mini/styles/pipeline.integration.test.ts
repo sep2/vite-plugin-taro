@@ -20,11 +20,11 @@ const globalWxssFileName = contract.styles.globalFileName
 
 function assertGlobalStylesheet(css: string, applicationCss: string): void {
     assert.equal((css.match(/\.h5-span/g) ?? []).length, 1)
-    assert.match(css, /display:\s*inline/)
+    assert.match(css, /\.h5-span,\.h5-a\{display:inline\}/)
     assert.ok(css.endsWith(applicationCss))
 }
 
-test('publishes processed CSS and live topology without identical rewrites', async () => {
+test('minifies development CSS and live rpx updates without identical rewrites', async () => {
     const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-style-plugin-')))
     const appId = normalizePath(path.join(root, 'app.js'))
     const cssId = normalizePath(path.join(root, 'app.css'))
@@ -34,7 +34,7 @@ test('publishes processed CSS and live topology without identical rewrites', asy
     await Promise.all([
         writeFile(appId, initialSource),
         writeFile(cssId, '.app { color: red; }\n'),
-        writeFile(extraCssId, '.extra {}\n')
+        writeFile(extraCssId, '.extra { color: gold; padding: 12.5rpx; }\n')
     ])
 
     // These mutable journals retain DevEngine's non-awaited lifecycle results for test synchronization.
@@ -90,10 +90,10 @@ test('publishes processed CSS and live topology without identical rewrites', asy
                                         postcssPlugin: 'test:rewrite-color-postcss',
                                         Declaration(declaration) {
                                             if (declaration.prop === 'color' && declaration.value === 'red') {
-                                                declaration.value = '#ff0000'
+                                                declaration.value = '#123456'
                                             }
                                             if (declaration.prop === 'color' && declaration.value === 'blue') {
-                                                declaration.value = '#0000ff'
+                                                declaration.value = '#654321'
                                             }
                                         }
                                     }
@@ -106,6 +106,8 @@ test('publishes processed CSS and live topology without identical rewrites', asy
         ],
         build: {
             outDir: outDir,
+            // The same minification policy applies to initial development output, full rebuilds, and HMR publications.
+            cssMinify: true,
             rolldownOptions: { input: appId }
         }
     })
@@ -148,7 +150,7 @@ test('publishes processed CSS and live topology without identical rewrites', asy
         await engine.ensureCurrentBuildFinish()
         await waitForEventCount(outputResults, 1)
         const globalWxssPath = path.join(outDir, globalWxssFileName)
-        assertGlobalStylesheet(await readFile(globalWxssPath, 'utf8'), '.app { color: #ff0000; }\n')
+        assertGlobalStylesheet(await readFile(globalWxssPath, 'utf8'), '.app{color:#123456}')
         await engine.registerClient('style-plugin-test')
 
         const colorResultCount = hmrResults.length
@@ -157,11 +159,11 @@ test('publishes processed CSS and live topology without identical rewrites', asy
         await waitForPublishedStyle(
             publishedStyles,
             colorStyleCount,
-            (wxss) => wxss.endsWith('.app { color: #0000ff; }\n'),
+            (wxss) => wxss.endsWith('.app{color:#654321}'),
             hmrResults
         )
         await waitForEventCount(hmrResults, colorResultCount + 1)
-        assertGlobalStylesheet(await readFile(globalWxssPath, 'utf8'), '.app { color: #0000ff; }\n')
+        assertGlobalStylesheet(await readFile(globalWxssPath, 'utf8'), '.app{color:#654321}')
 
         const additionResultCount = hmrResults.length
         const additionStyleCount = publishedStyles.length
@@ -169,23 +171,32 @@ test('publishes processed CSS and live topology without identical rewrites', asy
         await waitForPublishedStyle(
             publishedStyles,
             additionStyleCount,
-            (wxss) => /\.extra \{\}/.test(wxss),
+            (wxss) => /\.extra\{color:gold;padding:12\.5rpx\}/.test(wxss),
             hmrResults
         )
         await waitForEventCount(hmrResults, additionResultCount + 1)
-        assert.match(await readFile(globalWxssPath, 'utf8'), /\.extra \{\}/)
+        assert.match(await readFile(globalWxssPath, 'utf8'), /\.extra\{color:gold;padding:12\.5rpx\}/)
+
+        const rpxResultCount = hmrResults.length
+        const rpxStyleCount = publishedStyles.length
+        await writeFile(extraCssId, '.extra { color: gold; padding: 24.25rpx; }\n')
+        await waitForPublishedStyle(
+            publishedStyles,
+            rpxStyleCount,
+            (wxss) => /\.extra\{color:gold;padding:24\.25rpx\}/.test(wxss),
+            hmrResults
+        )
+        await waitForEventCount(hmrResults, rpxResultCount + 1)
+        const updatedRpx = await readFile(globalWxssPath, 'utf8')
+        assert.match(updatedRpx, /\.extra\{color:gold;padding:24\.25rpx\}/)
+        assert.doesNotMatch(updatedRpx, /12\.5rpx/)
 
         const removalResultCount = hmrResults.length
         const removalStyleCount = publishedStyles.length
         await writeFile(appId, initialSource)
-        await waitForPublishedStyle(
-            publishedStyles,
-            removalStyleCount,
-            (wxss) => !/\.extra \{\}/.test(wxss),
-            hmrResults
-        )
+        await waitForPublishedStyle(publishedStyles, removalStyleCount, (wxss) => !/\.extra\{/.test(wxss), hmrResults)
         await waitForEventCount(hmrResults, removalResultCount + 1)
-        assert.doesNotMatch(await readFile(globalWxssPath, 'utf8'), /\.extra \{\}/)
+        assert.doesNotMatch(await readFile(globalWxssPath, 'utf8'), /\.extra\{/)
 
         const unchangedInode = (await stat(globalWxssPath)).ino
         const priorResultCount = hmrResults.length
@@ -193,8 +204,14 @@ test('publishes processed CSS and live topology without identical rewrites', asy
         await waitForEventCount(hmrResults, priorResultCount + 1)
         assert.equal((await stat(globalWxssPath)).ino, unchangedInode)
 
+        const formattingResultCount = hmrResults.length
+        await writeFile(cssId, '.app{color:blue}')
+        await waitForEventCount(hmrResults, formattingResultCount + 1)
+        assert.equal((await stat(globalWxssPath)).ino, unchangedInode)
+
         engine.triggerFullBuild()
         await waitForEventCount(outputResults, 2)
+        assertGlobalStylesheet(await readFile(globalWxssPath, 'utf8'), '.app{color:#654321}')
 
         const durableWxss = await readFile(globalWxssPath, 'utf8')
         const failedResultCount = hmrResults.length
@@ -206,7 +223,7 @@ test('publishes processed CSS and live topology without identical rewrites', asy
         assert.equal(await readFile(globalWxssPath, 'utf8'), durableWxss)
 
         await styles.finalizeUpdate([], writeStyle)
-        assertGlobalStylesheet(await readFile(globalWxssPath, 'utf8'), '.app { color: black; }\n')
+        assertGlobalStylesheet(await readFile(globalWxssPath, 'utf8'), '.app{color:#000}')
     } finally {
         await engine.close()
         await publicationWork
@@ -215,7 +232,7 @@ test('publishes processed CSS and live topology without identical rewrites', asy
     }
 })
 
-test('renders Tailwind CSS and final patch factories from one class set', async () => {
+test('respects cssMinify:false while rendering Tailwind CSS and matching patch factories', async () => {
     const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-tailwind-style-hmr-')))
     const appId = normalizePath(path.join(root, 'app.js'))
     const cssId = normalizePath(path.join(root, 'app.css'))
@@ -308,6 +325,7 @@ test('renders Tailwind CSS and final patch factories from one class set', async 
         const initialWxss = await readFile(globalWxssPath, 'utf8')
         assert.match(initialWxss, /\.mt-2\b/)
         assert.match(initialWxss, /--color-brand:\s*red/)
+        assert.match(initialWxss, /display: inline;/)
         await engine.registerClient('tailwind-style-hmr-test')
 
         const additionStart = hmrResults.length
@@ -349,7 +367,7 @@ test('renders Tailwind CSS and final patch factories from one class set', async 
 
         const plainCssStart = hmrResults.length
         const plainStyleCount = publishedStyles.length
-        await writeFile(cssId, '.plain-root { color: green; }\n')
+        await writeFile(cssId, '.plain-root { color: green; padding: 18.25rpx; }\n')
         await waitForPublishedStyle(
             publishedStyles,
             plainStyleCount,
@@ -358,8 +376,9 @@ test('renders Tailwind CSS and final patch factories from one class set', async 
         )
         await waitForEventCount(hmrResults, plainCssStart + 1)
         const plainWxss = await readFile(globalWxssPath, 'utf8')
-        assert.match(plainWxss, /\.plain-root/)
+        assert.match(plainWxss, /\.plain-root \{ color: green; padding: 18\.25rpx; \}/)
         assert.doesNotMatch(plainWxss, /\.mt-2\b/)
+        assert.match(plainWxss, /display: inline;/)
     } finally {
         await engine.close()
         await hmrWork

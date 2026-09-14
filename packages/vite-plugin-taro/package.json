@@ -82,6 +82,7 @@
         "@tailwindcss/vite": "4.3.3",
         "@tarojs/shared": "4.2.1",
         "@vitejs/plugin-react": "^6.1.1",
+        "lightningcss": "1.33.0",
         "react-reconciler": "0.34.0",
         "rolldown": "1.2.8",
         "sval": "0.6.12",

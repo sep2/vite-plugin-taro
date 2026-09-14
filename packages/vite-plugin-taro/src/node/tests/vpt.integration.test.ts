@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import type { OutputAsset, OutputChunk } from 'rolldown'
-import { createLogger, normalizePath, build as viteBuild } from 'vite'
+import { type BuildOptions, createLogger, normalizePath, build as viteBuild } from 'vite'
 import vpt, { type VptOptions, type VptTarget } from '../../index.ts'
 import { packageRequire } from '../utils/packages.ts'
 
@@ -21,6 +21,7 @@ type BuildOutput = readonly (OutputAsset | OutputChunk)[]
 type BuildFixture = Readonly<{
     files: Readonly<Record<string, string | Uint8Array>>
     options: VptOptions
+    build?: Pick<BuildOptions, 'minify' | 'cssMinify'>
 }>
 
 /** Builds one disposable consumer project through Vite's public build API. */
@@ -46,6 +47,7 @@ async function inspectFixtureBuild<Result>(
             plugins: vpt(fixture.options),
             build: {
                 minify: false,
+                ...fixture.build,
                 write: false
             }
         })
@@ -136,6 +138,7 @@ for (const target of ['wx', 'zfb'] as const) {
         await inspectFixtureBuild(
             {
                 options: createOptions(target),
+                build: { cssMinify: true },
                 files: {
                     'src/app.tsx': appSource,
                     'src/pages/home/index.tsx': `
@@ -162,7 +165,8 @@ for (const target of ['wx', 'zfb'] as const) {
                     )
                     .map((item) => String(item.source))
                     .join('\n')
-                assert.match(css, /\.h5-div\.card/)
+                assert.match(css, /\.h5-div\.card\{color:red\}/)
+                assert.match(css, /\.h5-span,\.h5-a\{display:inline\}/)
                 assert.ok(collectModuleIds(output).some((id) => id.endsWith('/plugin-html/runtime.js')))
             }
         )
