@@ -3,75 +3,15 @@
 import { Icon } from '@astrojs/starlight/components'
 ---
 
-<vpt-navigation-menu class="print:hidden">
-    <button
-        type="button"
-        aria-expanded="false"
-        aria-label={Astro.locals.t('menuButton.accessibleLabel')}
-        aria-controls="starlight__sidebar"
-    >
-        <Icon name="bars" class="open-menu" />
-        <Icon name="close" class="close-menu" />
-    </button>
-</vpt-navigation-menu>
-
-<script>
-    class VptNavigationMenuElement extends HTMLElement {
-        // The controller owns this connection's listeners so view transitions cannot duplicate them.
-        private listeners: AbortController | null = null
-        private readonly button = this.querySelector<HTMLButtonElement>('button')
-
-        connectedCallback(): void {
-            if (this.listeners !== null || this.button === null) return
-
-            this.listeners = new AbortController()
-            const options = { signal: this.listeners.signal }
-            this.button.addEventListener('click', this.toggleExpanded, options)
-            this.closest('nav')?.addEventListener('keyup', this.closeOnEscape, options)
-            document.addEventListener('pointerdown', this.closeOnOutsidePointer, options)
-        }
-
-        disconnectedCallback(): void {
-            this.listeners?.abort()
-            this.listeners = null
-            this.setExpanded(false)
-        }
-
-        private readonly toggleExpanded = (): void => {
-            this.setExpanded(this.button?.getAttribute('aria-expanded') !== 'true')
-        }
-
-        private readonly closeOnEscape = (event: KeyboardEvent): void => {
-            if (event.code !== 'Escape') return
-            this.setExpanded(false)
-            this.button?.focus()
-        }
-
-        private readonly closeOnOutsidePointer = (event: PointerEvent): void => {
-            if (!this.hasAttribute('data-expanded')) return
-
-            const controlledId = this.button?.getAttribute('aria-controls')
-            const drawer = controlledId === null || controlledId === undefined ? null : document.getElementById(controlledId)
-            const eventPath = event.composedPath()
-            if (eventPath.includes(this) || (drawer !== null && eventPath.includes(drawer))) return
-
-            this.setExpanded(false)
-        }
-
-        private setExpanded(expanded: boolean): void {
-            this.toggleAttribute('data-expanded', expanded)
-            this.button?.setAttribute('aria-expanded', String(expanded))
-            document.body.toggleAttribute('data-navigation-drawer-expanded', expanded)
-            document.querySelectorAll<HTMLElement>('.main-frame, .sl-skip-link').forEach((element) => {
-                element.toggleAttribute('inert', expanded)
-            })
-        }
-    }
-
-    if (customElements.get('vpt-navigation-menu') === undefined) {
-        customElements.define('vpt-navigation-menu', VptNavigationMenuElement)
-    }
-</script>
+<button
+    type="button"
+    popovertarget="starlight__sidebar"
+    aria-label={Astro.locals.t('menuButton.accessibleLabel')}
+    class="print:hidden"
+>
+    <Icon name="bars" class="open-menu" />
+    <Icon name="close" class="close-menu" />
+</button>
 
 <style>
     @layer starlight.core {
@@ -94,13 +34,13 @@ import { Icon } from '@astrojs/starlight/components'
             cursor: pointer;
         }
 
-        [data-expanded] button {
+        button:has(~ :popover-open) {
             background-color: var(--sl-color-gray-2);
             box-shadow: none;
         }
 
-        vpt-navigation-menu[data-expanded] .open-menu,
-        vpt-navigation-menu:not([data-expanded]) .close-menu {
+        button:has(~ :popover-open) .open-menu,
+        button:not(:has(~ :popover-open)) .close-menu {
             display: none;
         }
 
@@ -109,16 +49,8 @@ import { Icon } from '@astrojs/starlight/components'
             color: var(--sl-color-white);
         }
 
-        :global([data-theme='light']) [data-expanded] button {
+        :global([data-theme='light']) button:has(~ :popover-open) {
             background-color: var(--sl-color-gray-5);
-        }
-    }
-</style>
-
-<style is:global>
-    @layer starlight.utils {
-        body[data-navigation-drawer-expanded] {
-            overflow: hidden;
         }
     }
 </style>

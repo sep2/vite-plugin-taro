@@ -3,7 +3,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { dev } from 'astro'
 
-/** Render the real overrides so a Starlight upgrade cannot leave its button targeting a non-popover pane. */
+/** Render the real overrides to keep both menus usable before JavaScript loads or when it is disabled. */
 test('page frames preserve the navigation contract and forwarded slots', async (context) => {
     const server = await dev({
         root: fileURLToPath(new URL('../', import.meta.url)),
@@ -13,11 +13,7 @@ test('page frames preserve the navigation contract and forwarded slots', async (
     })
     context.after(() => server.stop())
 
-    for (const [route, hasSidebar] of [
-        ['/guides/quick-start/', true],
-        ['/guides/configuration/', true],
-        ['/', false]
-    ] as const) {
+    for (const route of ['/guides/quick-start/', '/guides/configuration/', '/']) {
         await context.test(route, async () => {
             const response = await fetch(`http://127.0.0.1:${server.address.port}${route}`)
             assert.equal(response.status, 200)
@@ -29,13 +25,10 @@ test('page frames preserve the navigation contract and forwarded slots', async (
             assert.match(html, /<h1\b/, 'the default slot must retain the page content')
             assert.match(html, /href="\/guides\/configuration\/"/, 'the sidebar must retain documentation links')
 
-            if (hasSidebar) {
-                assert.match(html, /<button\b[^>]*\bpopovertarget="starlight__sidebar"[^>]*>/)
-                assert.match(pane, /\spopover(?:=|\s|>)/, 'the Starlight menu button requires a popover target')
-            } else {
-                assert.match(html, /<vpt-navigation-menu\b/, 'the homepage must retain its custom drawer')
-                assert.match(html, /<button\b[^>]*\baria-controls="starlight__sidebar"[^>]*>/)
-            }
+            const toggle = html.match(/<button\b[^>]*\bpopovertarget="starlight__sidebar"[^>]*>/)?.[0]
+            assert.ok(toggle, 'the menu button must toggle its sidebar without JavaScript')
+            assert.match(pane, /\spopover(?:=|\s|>)/, 'the menu button requires a native popover target')
+            assert.doesNotMatch(toggle, /\saria-expanded=/, 'the browser must manage the implicit expanded state')
         })
     }
 })

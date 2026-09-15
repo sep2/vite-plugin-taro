@@ -9,14 +9,37 @@ import NavigationDrawerToggle from './navigation-drawer-toggle.astro'
     <header class="header"><slot name="header" /></header>
     <nav class="sidebar print:hidden" aria-label={Astro.locals.t('sidebarNav.accessibleLabel')}>
         <NavigationDrawerToggle />
-        <div id="starlight__sidebar" class="sidebar-pane">
+        <vpt-navigation-drawer popover="auto" id="starlight__sidebar" class="sidebar-pane">
             <div class="sidebar-content sl-flex">
                 <Sidebar />
             </div>
-        </div>
+        </vpt-navigation-drawer>
     </nav>
     <div class="main-frame"><slot /></div>
 </div>
+
+<script>
+    // The browser owns opening, dismissal, and focus restoration, even without JavaScript.
+    // Enhance the native popover by keeping keyboard focus out of the covered page content.
+    class VptNavigationDrawer extends HTMLElement {
+        constructor() {
+            super()
+            this.addEventListener('toggle', ({ newState }) => this.trapFocus(newState === 'open'))
+        }
+
+        disconnectedCallback(): void {
+            this.trapFocus(false)
+        }
+
+        private trapFocus(expanded: boolean): void {
+            document.querySelectorAll<HTMLElement>('.main-frame, .sl-skip-link').forEach((element) => {
+                element.toggleAttribute('inert', expanded)
+            })
+        }
+    }
+
+    customElements.define('vpt-navigation-drawer', VptNavigationDrawer)
+</script>
 
 <style>
     @layer starlight.core {
@@ -39,19 +62,19 @@ import NavigationDrawerToggle from './navigation-drawer-toggle.astro'
         }
 
         .sidebar-pane {
-            visibility: var(--sl-sidebar-visibility, hidden);
+            /* Reset the user-agent popover box without overriding its native display state. */
+            margin: 0;
+            border: 0;
+            padding: 0;
+            height: auto;
+            color: inherit;
             position: fixed;
-            z-index: var(--sl-z-index-menu);
             inset-block: var(--sl-nav-height) 0;
-            inset-inline-start: 0;
+            inset-inline: 0;
             width: 100%;
             background-color: var(--sl-color-black);
             overflow-y: auto;
             scrollbar-gutter: stable;
-        }
-
-        :global([data-expanded]) ~ .sidebar-pane {
-            --sl-sidebar-visibility: visible;
         }
 
         .sidebar-content {
@@ -80,6 +103,15 @@ import NavigationDrawerToggle from './navigation-drawer-toggle.astro'
                 background-color: var(--sl-color-bg-sidebar);
                 box-shadow: var(--sl-shadow-lg);
             }
+        }
+    }
+</style>
+
+<style is:global>
+    @layer starlight.utils {
+        /* Derive scroll locking from native state so it also works before scripts load. */
+        body:has(vpt-navigation-drawer:popover-open) {
+            overflow: hidden;
         }
     }
 </style>
