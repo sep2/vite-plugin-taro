@@ -1,6 +1,6 @@
 ---
 name: cut-new-release
-description: Prepare and commit a VPT release using Changesets. Use when asked to cut a new release, prepare a patch release, or bump the release version. Write Chinese release notes with explicit upgrade instructions. Stop after the local release commit; never push unless the user explicitly requests it.
+description: Prepare and commit a VPT release using Changesets. Use when asked to cut a new release, prepare a patch release, or bump the release version. Audit net changes from the published baseline and write Chinese release notes with verified migration instructions. Stop after the local release commit; never push unless the user explicitly requests it.
 compatibility: Requires Node.js 26+, pnpm 11, and Git. GitHub CLI is needed only for explicitly requested remote release verification or editing published release notes.
 ---
 
@@ -21,7 +21,7 @@ Run commands from the repository root, identified by `git rev-parse --show-tople
 Read the current sources of truth before preparing a release:
 
 - Root scripts: `package.json`
-- Changesets configuration: `.changeset/config.json`, pending changesets, and `.changeset/pre.json` if present
+- Changesets configuration: `.changeset/config.json`, pending changesets, `.changeset/pre.json`, and saved drafts in `.changeset/pre/` if present
 - Publication workflow: `.github/workflows/publish.yml`
 - Quality workflow: `.github/workflows/quality.yml`
 - Repository release documentation: `docs/src/content/docs/references/repository-management.md`
@@ -39,32 +39,47 @@ Private workspaces do not participate. The generator derives its generated plugi
 1. Check `git status --short`, branch, recent commits, and current package versions.
 2. Inspect pending changesets and run `pnpm changeset status` before versioning.
 3. Confirm the requested bump and channel. A patch release increments the stable patch version unless the user requests a prerelease. Do not silently exit prerelease mode or override a pending minor/major bump.
-4. Reuse an appropriate pending changeset. If none exists, add one describing the actual unreleased changes and requested bump.
-5. Compare with published versions when needed using read-only registry queries. A local release commit is not proof of publication.
+4. Identify the published comparison baseline and complete the audit below before drafting notes. Use read-only registry queries when publication or channel state is uncertain; a local release commit is not proof of publication.
+5. Reuse and consolidate appropriate pending changesets, including saved prerelease drafts. Add a changeset only for an actual net change not already covered; do not create one merely because a recent commit exists.
 
-## 2. Write Chinese release notes
+## 2. Audit and write Chinese release notes
 
-Translate or write the changeset before running version preparation. Keep change descriptions short and relevant to package users:
+### Establish the baseline and net changes
 
-- Describe the problem fixed, the capability added, or the behavior users will notice.
-- Include the corresponding short commit hash with each change description for traceability. Verify it with Git; preserve valid Changesets-generated commit references when translating or shortening notes. Reference the implementation commit, not the release-version commit.
-- Omit internal implementation details, refactoring, test additions/counts, coverage, CI changes, and release bookkeeping unless they directly affect how users use or upgrade the package.
-- Mention dependency changes only when they affect compatibility, security, behavior, or required user actions; omit routine fixed-group version synchronization.
-- Keep validation evidence in the completion report, not the release notes.
+Release notes describe the difference users receive, not a list of commits. Complete this audit before running version preparation:
 
-For example: `12685e7: 修复微信开发者工具点击「编译」后热更新失效的问题（#22）。` Do not expand this into Socket lifecycle, patch-journal, or regression-test implementation details.
+1. **For a stable release, compare against the previous published stable version**, even when promoting a beta. Do not use the most recent beta or local release commit as the stable baseline. For a prerelease, compare against the previous published prerelease in that release line, or the previous stable version when starting a new line.
+2. Resolve the baseline to its package tag or verified release commit. Inspect `git log <baseline>..HEAD` for candidates, then `git diff <baseline>..HEAD -- <paths>` for the final behavior. Include package source, manifests, shared build inputs, patches, and resolved dependencies that affect the published package.
+3. For every proposed change, verify that its implementation commit is in the release and not already in the baseline. `git merge-base --is-ancestor <fix> <baseline>` succeeding means that fix already shipped; it is not a new fix in this release. A valid hash alone does not prove a change is new.
+4. Collapse intermediate implementations and reverts into the **net user-visible result**. Omit a beta-only change followed by a rollback when stable behavior is unchanged. Mention a beta migration separately only if beta users must take action.
+5. Audit each public package independently. A fixed version group does not imply shared features or fixes. If runtime source and build inputs are unchanged, do not copy a plugin fix into its notes.
+6. Treat existing changelogs and `.changeset/pre/` as draft material, not evidence. Correct or remove superseded, duplicate, already-released, and no-op drafts before versioning. Consolidate each package's upgrade instructions; do not concatenate beta notes into a stable release. Leave historical package changelog entries unchanged unless the user explicitly requests a historical correction.
 
-Include this section in each public package's new changelog entry so CI-generated GitHub Release bodies contain it:
+Keep a short working audit of each included change: package, baseline behavior, new behavior, implementation evidence, affected users, and required action. This audit is for preparation, not the published release body.
 
-```markdown
-### 升级说明
+### Audit compatibility and migration
 
-无需额外操作。从 `PREVIOUS` 升级到 `NEXT` 无需修改代码或配置。
-```
+- Inspect removed exports and automatic global bindings, changed defaults, config interpretation, output paths, supported environments, and dependency requirements. Check application dependencies as well as direct application usage when global behavior changes.
+- For every compatibility change, state **who is affected, what stopped being automatic or changed, and the exact migration**. Verify code/config examples against current implementation and tests; distinguish Vite top-level options from `vpt()` options and identify target-specific steps.
+- Never assume a patch bump means no migration. If compatibility findings conflict with the requested release scope, raise them before versioning rather than hide them in a generic upgrade assurance.
+- Do not write `无需修改代码或配置` unless every relevant migration path supports that claim. If only some users need changes, name those conditions instead of preceding them with a blanket assurance.
+- Do not disguise a removed default as an optional new capability. For example, if `URL` bindings were previously injected and are now opt-in, describe the removal and required configuration for existing users, not just the new `polyfills` option.
 
-Replace the placeholders with actual versions. Use this wording only when no migration actions are required. Otherwise list the concrete code, configuration, command, or environment changes users must make.
+### Write concise user-facing notes
 
-For packages with no user-visible changes, use `本包无面向用户的变更。` rather than filling the description with version synchronization details. Do not attribute another package's fix to an unchanged package.
+Translate or rewrite the changesets from the audit:
+
+- Describe the problem fixed, the capability added, or the behavior users will notice. Lead with compatibility changes when users must act.
+- Include a verified implementation commit's short hash with each change description. Remove misleading Changesets-generated release-commit references rather than preserving them blindly.
+- Omit internal implementation details, refactoring, tests, coverage, CI, dependency housekeeping, and version synchronization unless they directly affect users. Keep validation evidence in the completion report.
+- Keep optional configuration recipes and troubleshooting in documentation. Release notes need only the minimal steps required by this upgrade, not a general installation guide.
+- For packages with no user-visible changes, use `本包无面向用户的变更。`; do not invent work to fill an entry.
+
+For example: `12685e7: 修复微信开发者工具点击「编译」后热更新失效的问题（#22）。` Do not expand this into Socket lifecycle or patch-journal implementation details.
+
+Each public package's new entry must have Chinese headings and a **升级说明** section with actual previous/next versions, the applicable upgrade command, and verified migration steps. For generators, distinguish new-project creation from upgrading an existing project; do not tell existing users to regenerate an application. For transitive packages, explain whether a separate upgrade is needed.
+
+**Final editorial check:** Is every bullet new relative to the correct baseline? Does it belong to this package? Does the final code support it? Can an affected user complete the upgrade without guessing? Are assurances contradicted by later instructions? Remove any bullet that only explains development history.
 
 ## 3. Prepare versions
 
@@ -79,8 +94,8 @@ This runs Changesets versioning, refreshes the lockfile, and formats `.changeset
 Review:
 
 - The three public `package.json` versions agree and match the intended bump/channel.
-- Each new package `CHANGELOG.md` entry has Chinese headings and content, including **升级说明**, and contains only user-relevant change descriptions with verified commit hashes.
-- Replace generated English placeholders such as `Patch Changes` or `No changes in this release.` only in the new entries; leave historical entries alone.
+- Audit each generated entry against the baseline and migration findings again. It must describe net changes, use verified implementation hashes, and have one coherent Chinese **升级说明** section. Generating successfully does not validate the notes.
+- Remove copied beta instructions, stale fixes, duplicate headings, and no-change placeholders that contradict actual changes. Replace generated English headings or placeholders only in the new entries; leave historical entries alone.
 - The consumed changeset is removed as expected; prerelease state changes are intentional.
 - Any lockfile changes are expected. An unchanged lockfile is valid for workspace-only version bumps.
 - Do not manually edit or stage generated `dist` files.
