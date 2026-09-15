@@ -58,6 +58,9 @@ See root `package.json` for all scripts.
 - Prepare release files: `pnpm release` (Changesets versioning, lockfile refresh, formatting only). Review, commit, and push `main` to publish in CI; never publish locally or create release tags manually.
 - Release tests: `pnpm test:release` after building the runtime and plugin. Public packages use a fixed Changesets group; private workspaces do not participate in versioning.
 
+## Git And Push
+- the vpt plugin should have 100% test coverage before push.
+
 ## Generated files
 
 - Never edit `packages/vite-plugin-taro/dist` manually; rebuild with `pnpm build:plugin`.
