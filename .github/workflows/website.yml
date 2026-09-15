@@ -29,7 +29,7 @@ jobs:
         uses: withastro/action@v6
         with:
           node-version: 26
-          build-cmd: pnpm --filter docs build
+          build-cmd: pnpm --filter docs test && pnpm --filter docs build
           cache-dir: docs/node_modules/.astro
           out-dir: docs/dist
 
