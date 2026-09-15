@@ -17,7 +17,6 @@ import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
 
 type DevHooks = Readonly<{
     onHmrUpdates: (result: unknown) => void
-    onOutput: (result: unknown) => void
 }>
 
 type CreateMiniDevHost = typeof import('./dev-host.ts')['createMiniDevHost']
@@ -119,7 +118,8 @@ async function waitForFileChange(fileName: string, previousSource: string): Prom
 }
 
 test('reduces synthetic engine update variants and unknown host failures without changing host internals', {
-    skip: process.platform === 'win32' ? 'Node module interception terminates the Windows test worker' : false
+    skip: process.platform === 'win32' ? 'Node module interception terminates the Windows test worker' : false,
+    timeout: 10_000
 }, async () => {
     // These mutable cells expose the callbacks and current synthetic engine state owned by the redirected DevEngine substitute.
     let hooks: DevHooks | undefined
@@ -136,9 +136,6 @@ test('reduces synthetic engine update variants and unknown host failures without
         hooks = {
             onHmrUpdates(result) {
                 Reflect.apply(onHmrUpdates, undefined, [result])
-            },
-            onOutput(result) {
-                Reflect.apply(onOutput, undefined, [result])
             }
         }
         triggerFullBuild = () => Reflect.apply(onOutput, undefined, [{}])
@@ -167,10 +164,14 @@ test('reduces synthetic engine update variants and unknown host failures without
     // These mutable journals capture host diagnostics and permit one injected unknown style failure.
     const errors: string[] = []
     const infos: string[] = []
+    const updateFailureLogged = Promise.withResolvers<void>()
     let styleFailure: unknown
     const logger = createLogger('silent')
     logger.error = (message) => {
         errors.push(message)
+        if (message === '[vpt] wx HMR update failed') {
+            updateFailureLogged.resolve()
+        }
     }
     logger.info = (message) => {
         infos.push(message)
@@ -217,21 +218,20 @@ test('reduces synthetic engine update variants and unknown host failures without
         await bundledDev.listen()
         assert.ok(hooks)
 
+        // The synthetic run emits a complete output on every listen. Await the host's drain before changing
+        // address state: a fixed sleep can expire while asynchronous style writes are still in progress on CI.
         Reflect.set(server, 'httpServer', null)
-        hooks.onOutput({})
-        await delay(30)
+        await bundledDev.listen()
         Reflect.set(server, 'httpServer', httpServer)
         httpServer.address = () => 'named-pipe'
-        hooks.onOutput({})
-        await delay(30)
+        await bundledDev.listen()
         assert.equal(await readFile(path.join(outDir, hmrInfoFileName), 'utf8').catch(() => undefined), undefined)
 
         // Temporarily replace the resolved socket contract to exercise endpoint rejection before restoring this server instance.
         const originalSocketOptions = server.config.server.ws
         Reflect.set(server.config.server, 'ws', false)
         httpServer.address = () => ({ address: '127.0.0.1', family: 'IPv4', port: 43123 })
-        hooks.onOutput({})
-        await delay(30)
+        await bundledDev.listen()
         assert.match(errors.join('\n'), /wx HMR output failed/)
         Reflect.set(server.config.server, 'ws', originalSocketOptions)
 
@@ -241,7 +241,7 @@ test('reduces synthetic engine update variants and unknown host failures without
             addressCalls++
             return addressCalls === 1 ? { address: '127.0.0.1', family: 'IPv4', port: 43123 } : null
         }
-        hooks.onOutput({})
+        await bundledDev.listen()
         const firstInfo = await waitForFile(path.join(outDir, hmrInfoFileName))
         const firstBuildId = /"buildId":"([^"]+)"/.exec(firstInfo)?.[1]
         assert.ok(firstBuildId)
@@ -252,11 +252,14 @@ test('reduces synthetic engine update variants and unknown host failures without
             addressCalls++
             return addressCalls === 1 ? { address: '127.0.0.1', family: 'IPv4', port: 43123 } : 'named-pipe'
         }
-        hooks.onOutput({})
+        await bundledDev.listen()
         const stringAddressInfo = await waitForFileChange(path.join(outDir, hmrInfoFileName), firstInfo)
         const activeBuildId = /"buildId":"([^"]+)"/.exec(stringAddressInfo)?.[1]
         assert.ok(activeBuildId)
 
+        // A diagnostic in this window signals its admission without relying on the debounce timer's wall-clock duration.
+        // Wait for it before sending FullReload so the stale/Noop-only batch reaches the empty-patch branch independently.
+        hooks.onHmrUpdates(new Error('synthetic transient update failure'))
         hooks.onHmrUpdates({
             changedFiles: [],
             updates: [
@@ -276,7 +279,7 @@ test('reduces synthetic engine update variants and unknown host failures without
                 }
             ]
         })
-        await delay(30)
+        await updateFailureLogged.promise
 
         // A current non-patch update dominates the batch and requests a complete build without a reason suffix.
         httpServer.address = () => ({ address: '::1', family: 'IPv6', port: 43124 })
@@ -291,10 +294,8 @@ test('reduces synthetic engine update variants and unknown host failures without
                 }
             ]
         })
-        await delay(30)
-        assert.match(infos.join('\n'), /wx full rebuild required(?:\n|$)/)
-
         const nextInfo = await waitForFileChange(path.join(outDir, hmrInfoFileName), stringAddressInfo)
+        assert.match(infos.join('\n'), /wx full rebuild required(?:\n|$)/)
         const nextBuildId = /"buildId":"([^"]+)"/.exec(nextInfo)?.[1]
         assert.ok(nextBuildId)
         assert.notEqual(nextBuildId, activeBuildId)
@@ -316,11 +317,10 @@ test('reduces synthetic engine update variants and unknown host failures without
                 }
             ]
         })
-        await delay(30)
-
+        // Closing flushes the pending HMR window and drains its publication, including the injected failure.
+        await host.close()
         assert.match(errors.join('\n'), /wx HMR publish failed with unknown error/)
         assert.deepEqual(deliveredFiles, [])
-        await host.close()
     } finally {
         httpServer.address = originalAddress
         await server.close()
