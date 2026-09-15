@@ -56,7 +56,7 @@ test('classifies native, capsule, amphibious, and transport execution in one pas
     assert.equal(classifyModule(chunk(modules.appCapsule, rolldownRuntimeId)).executionKind, 'amphibious')
 })
 
-test('framework vendor is amphibious by module identity, not its output name', () => {
+test('framework vendor remains a capsule regardless of its output name', () => {
     for (const moduleId of [
         packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini'),
         packageRequire.resolve('react'),
@@ -64,7 +64,7 @@ test('framework vendor is amphibious by module identity, not its output name', (
     ]) {
         assert.deepEqual(classifyModule({ ...chunk(moduleId), name: 'renamed-framework' }), {
             entryRole: undefined,
-            executionKind: 'amphibious',
+            executionKind: 'capsule',
             isTransport: false
         })
     }
@@ -136,7 +136,7 @@ for (const layout of ['installed', 'linked'] as const) {
             const moduleId = path.join(packageRoot, 'index.js')
             assert.equal(fixtureModule.isMiniFrameworkVendorModule(moduleId), name !== 'core-js')
             assert.equal(fixtureModule.isMiniPolyfillModule(moduleId), name === 'core-js')
-            assert.equal(classifyFixture(chunk(moduleId)).executionKind, name === 'core-js' ? 'capsule' : 'amphibious')
+            assert.equal(classifyFixture(chunk(moduleId)).executionKind, 'capsule')
             assert.equal(fixtureModule.isMiniFrameworkVendorModule(`${packageRoot}-other/index.js`), false)
             assert.equal(fixtureModule.isMiniPolyfillModule(`${packageRoot}-other/index.js`), false)
         }

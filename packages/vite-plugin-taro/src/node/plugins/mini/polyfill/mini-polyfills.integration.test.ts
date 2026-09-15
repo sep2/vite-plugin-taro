@@ -44,7 +44,12 @@ async function compileFixture(
                     hasPolyfills ? ['common/polyfills.js'] : [],
                     'core-js modules must stay in one dedicated polyfills file'
                 )
-                assert.ok(chunks.some((chunk) => chunk.fileName === 'common/polyfills.js' && chunk.isEntry))
+                const polyfillEntry = chunks.find((chunk) => chunk.fileName === 'common/polyfills.js')
+                assert.ok(polyfillEntry?.isEntry)
+                assert.ok(
+                    !polyfillEntry.imports.includes('common/vendor.js'),
+                    'pre-bootstrap polyfills must not depend on the framework capsule'
+                )
                 // Alipay rejects import() at compile time, even inside an unused React Refresh export that Node can parse.
                 for (const chunk of chunks) {
                     const parsed = parseSync(chunk.fileName, chunk.code)
@@ -347,8 +352,8 @@ for (const target of ['wx', 'zfb'] as const) {
             heap.evaluate('app.js')
             assert.equal(
                 Array.isArray(heap.evaluate('common/vendor.js')),
-                false,
-                'vendor must export a native namespace'
+                true,
+                'vendor must export a capsule registration'
             )
             assert.equal(heap.read('URL'), URL)
             assert.equal(heap.read('URLSearchParams'), URLSearchParams)

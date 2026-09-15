@@ -49,7 +49,7 @@ export type MiniChunkClassification = Readonly<{
     isTransport: boolean
 }>
 
-/** Classifies chunks by runtime roles and framework vendor membership. */
+/** Classifies chunks by explicit runtime roles. */
 export type MiniModuleClassifier = (chunk: MiniChunk) => MiniChunkClassification
 
 type MiniRuntimeModuleKind = MiniEntryRole | 'amphibious' | 'transport'
@@ -67,14 +67,14 @@ export function isMiniPolyfillModule(moduleId: string): boolean {
     return moduleId === miniPolyfillsId || normalizePath(moduleId).startsWith(polyfillPackageRoot)
 }
 
-/** Uses the same resolved roots for vendor grouping and amphibious execution; Rolldown includes their dependencies. */
+/** Groups framework modules by resolved package roots; Rolldown includes their dependencies. */
 export function isMiniFrameworkVendorModule(moduleId: string): boolean {
     const normalizedId = normalizePath(moduleId)
     return frameworkPackageRoots.some((root) => normalizedId.startsWith(root))
 }
 
 /**
- * Classifies runtime entries and framework vendor chunks in one module-ID scan.
+ * Classifies explicit runtime entries in one module-ID scan; framework vendor remains a capsule.
  * Amphibious chunks share bootstrap's bridge so native and SystemJS callers reuse the same exports.
  * Construction is O(1); each lookup is O(M), where M is the number of modules in the chunk.
  */
@@ -103,9 +103,7 @@ export function createMiniModuleClassifier(modules: RuntimeModulesContract): Min
         for (const moduleId of chunk.moduleIds) {
             const normalizedId = normalizeModuleId(moduleId)
 
-            const kind =
-                moduleKindById.get(normalizedId) ??
-                (isMiniFrameworkVendorModule(normalizedId) ? 'amphibious' : undefined)
+            const kind = moduleKindById.get(normalizedId)
 
             switch (kind) {
                 case 'shell':

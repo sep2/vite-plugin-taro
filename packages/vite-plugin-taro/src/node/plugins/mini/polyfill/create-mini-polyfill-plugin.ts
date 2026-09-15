@@ -1,9 +1,15 @@
-import type { Plugin } from 'vite'
+import { type Plugin, transformWithOxc } from 'vite'
 import { createExactModuleIdFilter } from '../../../utils/modules.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import type { MiniContract } from '../mini-contract.ts'
-import { miniPolyfillsId } from '../module/module.ts'
+import { isMiniPolyfillModule, miniPolyfillsId } from '../module/module.ts'
 import { miniBrowserBindings } from './mini-browser-bindings.ts'
+
+// Core-js probes the host, not Taro's emulated DOM. Explicit global accesses also keep its pre-bootstrap graph independent
+// of the framework capsule when Rolldown later injects renderer bindings into application and dependency modules.
+const polyfillHostBindings = Object.fromEntries(
+    Object.keys(miniBrowserBindings).map((name) => [name, `globalThis.${name}`])
+)
 
 /** Loads a standalone polyfills entry before bootstrap and retains Taro's renderer bindings. */
 export function createMiniPolyfillPlugin(contract: Pick<MiniContract, 'options'>): Plugin {
@@ -20,6 +26,12 @@ export function createMiniPolyfillPlugin(contract: Pick<MiniContract, 'options'>
                     }
                 }
             }
+        },
+        transform(code, id) {
+            if (!isMiniPolyfillModule(id)) {
+                return
+            }
+            return transformWithOxc(code, id, { define: polyfillHostBindings, sourcemap: true })
         },
         resolveId: {
             filter: { id: createExactModuleIdFilter(miniPolyfillsId) },
