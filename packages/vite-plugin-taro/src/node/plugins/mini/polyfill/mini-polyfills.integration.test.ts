@@ -35,7 +35,7 @@ async function compileFixture(
             order: 'post',
             handler(_options, bundle) {
                 const chunks = Object.values(bundle).filter((item): item is OutputChunk => item.type === 'chunk')
-                const hasPolyfills = mode !== 'production' || polyfills.length > 0
+                const hasPolyfills = polyfills.length > 0
                 const polyfillChunks = chunks.filter((chunk) =>
                     chunk.moduleIds.some((id) => normalizePath(id).startsWith(coreJsRoot))
                 )
@@ -329,7 +329,7 @@ for (const target of ['wx', 'zfb'] as const) {
 
 for (const target of ['wx', 'zfb'] as const) {
     for (const mode of ['production', 'devtools', 'interpreter', 'rebuild'] as const) {
-        test(`${target} ${mode}: the empty selection adds only development's required microtask API`, async () => {
+        test(`${target} ${mode}: the empty selection keeps core-js out while development retains its microtask fallback`, async () => {
             const chunks = await compileFixture(target, mode, [])
             const missing = createAppHeap(chunks, false, target)
             assert.throws(() => missing.evaluate('app.js'), { name: 'ReferenceError', message: 'URL is not defined' })
@@ -339,10 +339,8 @@ for (const target of ['wx', 'zfb'] as const) {
             heap.evaluate('common/bootstrap.js')
             assert.equal(heap.read('typeof globalThis.polyfillProbe'), 'undefined')
             assert.equal(heap.read('typeof queueMicrotask'), mode === 'production' ? 'undefined' : 'function')
-            if (mode === 'production') {
-                assert.equal(heap.read('typeof globalThis["__core-js_shared__"]'), 'undefined')
-            } else {
-                assert.equal(heap.read('globalThis["__core-js_shared__"].versions.length'), 1)
+            assert.equal(heap.read('typeof globalThis["__core-js_shared__"]'), 'undefined')
+            if (mode !== 'production') {
                 await assertMicrotaskQueue(heap)
             }
 
@@ -390,6 +388,8 @@ for (const target of ['wx', 'zfb'] as const) {
         const heap = createAppHeap(chunks, true, target)
         heap.evaluate('common/bootstrap.js')
         await assertMicrotaskQueue(heap)
+        assert.throws(() => heap.read('queueMicrotask()'), { name: 'TypeError' })
+        assert.throws(() => heap.read('queueMicrotask(null)'), { name: 'TypeError' })
         const installedQueue = heap.read('queueMicrotask')
         heap.evaluate('app.js')
         heap.evaluate('pages/home/index.js')
@@ -402,8 +402,6 @@ for (const target of ['wx', 'zfb'] as const) {
 
 async function assertMicrotaskQueue(heap: ReturnType<typeof createAppHeap>): Promise<void> {
     assert.equal(heap.read('typeof queueMicrotask'), 'function')
-    assert.throws(() => heap.read('queueMicrotask()'), { name: 'TypeError' })
-    assert.throws(() => heap.read('queueMicrotask(null)'), { name: 'TypeError' })
     // This heap-local journal records callback order without changing the test runner's globals.
     heap.read(`
         globalThis.microtaskOrder = ['sync'];

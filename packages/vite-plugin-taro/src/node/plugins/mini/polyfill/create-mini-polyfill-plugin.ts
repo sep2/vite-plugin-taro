@@ -7,7 +7,7 @@ import { miniBrowserBindings } from './mini-browser-bindings.ts'
 
 /** Loads a standalone polyfills entry before bootstrap and retains Taro's renderer bindings. */
 export function createMiniPolyfillPlugin(contract: Pick<MiniContract, 'options'>): Plugin {
-    const polyfills = new Set(contract.options.polyfills ?? [])
+    const polyfills = [...new Set(contract.options.polyfills ?? [])]
 
     return {
         name: 'vpt:mini-polyfills',
@@ -30,12 +30,7 @@ export function createMiniPolyfillPlugin(contract: Pick<MiniContract, 'options'>
         load: {
             filter: { id: createExactModuleIdFilter(miniPolyfillsId) },
             handler() {
-                // Support React's development act() microtask scheduling; production includes it only if selected.
-                if (!this.environment.config.isProduction) {
-                    polyfills.add('web.queue-microtask')
-                }
-
-                return [...polyfills].map((id) => `import ${JSON.stringify(resolvePolyfillModule(id))};`).join('\n')
+                return polyfills.map((id) => `import ${JSON.stringify(resolvePolyfillModule(id))};`).join('\n')
             }
         }
     }

@@ -69,15 +69,20 @@ test('adapts the Alipay socket while installing both patch modes on the shared r
         assert.deepEqual(sentOptions, [{ data: 'client message' }])
         assert.deepEqual(closeOptions, [{ code: 1000, reason: 'test complete' }])
 
-        // Construct the interpreter before bootstrap provides queueMicrotask, matching native startup order.
+        // Load interpreter mode without the host primitive so the shared runtime must install its lightweight fallback.
         await importRuntimeEntry('interpreter')
         const interpreterRuntime = Reflect.get(globalThis, '__rolldown_runtime__')
         assert.ok(interpreterRuntime instanceof DevRuntime)
         initializeRuntime(interpreterRuntime, 'interpreter')
 
-        assert.equal(Reflect.get(globalThis, 'queueMicrotask'), undefined)
-        // Simulate bootstrap publishing the API; interpreted patches must read the live global rather than an earlier snapshot.
-        Reflect.set(globalThis, 'queueMicrotask', nativeQueueMicrotask)
+        const installedQueueMicrotask = Reflect.get(globalThis, 'queueMicrotask')
+        assert.ok(typeof installedQueueMicrotask === 'function')
+        // This mutable observation proves runtime construction installs the fallback before Refresh work can be scheduled.
+        let microtaskCompleted = false
+        Reflect.apply(installedQueueMicrotask, undefined, [() => (microtaskCompleted = true)])
+        assert.equal(microtaskCompleted, false)
+        await Promise.resolve()
+        assert.equal(microtaskCompleted, true)
 
         emitNativeMessage(
             JSON.stringify({
@@ -115,6 +120,7 @@ test('adapts the Alipay socket while installing both patch modes on the shared r
         assert.ok(devtoolsRuntime instanceof DevRuntime)
         assert.notStrictEqual(devtoolsRuntime, interpreterRuntime)
         initializeRuntime(devtoolsRuntime, 'devtools')
+        assert.equal(Reflect.get(globalThis, 'queueMicrotask'), installedQueueMicrotask)
 
         assert.deepEqual(connectOptions, [
             { url: 'ws://localhost/hmr', multiple: true, protocols: ['vite-hmr'] },
