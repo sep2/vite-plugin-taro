@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -83,18 +83,35 @@ test('public packages preserve their published entrypoints and scaffold dependen
     const manifestPath = path.join(generatorRoot, 'package.json')
     const manifest: typeof creatorPackage = JSON.parse(readFileSync(manifestPath, 'utf8'))
     for (const version of [creatorPackage.version, '1.2.3', '1.2.4-beta.7']) {
-        await t.test(`the packed generator scaffolds the plugin matching its own version ${version}`, () => {
-            // Only the extracted package is varied to cover stable and beta scaffolding without source sync scripts.
-            writeFileSync(manifestPath, JSON.stringify({ ...manifest, version }))
-            const projectPath = path.join(root, `app-${version}`)
-            execFileSync(process.execPath, [path.join(generatorRoot, 'index.js'), projectPath], { stdio: 'pipe' })
-            const project: { private: boolean; version: string; devDependencies: Record<string, string> } = JSON.parse(
-                readFileSync(path.join(projectPath, 'package.json'), 'utf8')
-            )
-            assert.equal(project.private, true)
-            assert.equal(project.version, '0.0.0')
-            assert.equal(project.devDependencies['vite-plugin-taro'], `^${version}`)
-            assert.equal(project.devDependencies.vite, '8.3.0')
-        })
+        for (const packageManager of ['pnpm', 'npm', 'yarn', 'bun', undefined]) {
+            const invocation = packageManager ?? 'node'
+            await t.test(`the packed generator scaffolds version ${version} via ${invocation}`, () => {
+                // Only the extracted package is varied to cover stable and beta scaffolding without source sync scripts.
+                writeFileSync(manifestPath, JSON.stringify({ ...manifest, version }))
+                const projectPath = path.join(root, `app-${version}-${invocation}`)
+                const output = execFileSync(process.execPath, [path.join(generatorRoot, 'index.js'), projectPath], {
+                    encoding: 'utf8',
+                    env: {
+                        ...process.env,
+                        npm_config_user_agent: packageManager ? `${packageManager}/1.0.0` : undefined
+                    }
+                })
+                const project: { private: boolean; version: string; devDependencies: Record<string, string> } =
+                    JSON.parse(readFileSync(path.join(projectPath, 'package.json'), 'utf8'))
+                assert.equal(project.private, true)
+                assert.equal(project.version, '0.0.0')
+                assert.equal(project.devDependencies['vite-plugin-taro'], `^${version}`)
+                assert.equal(project.devDependencies.vite, '8.3.0')
+                assert.ok(output.includes(`  ${packageManager ?? 'npm'} install\n`))
+                assert.equal(existsSync(path.join(projectPath, 'pnpm-workspace.yaml')), packageManager === 'pnpm')
+                if (packageManager === 'pnpm') {
+                    const allowBuilds = execFileSync('pnpm', ['config', 'get', 'allowBuilds', '--json'], {
+                        cwd: projectPath,
+                        encoding: 'utf8'
+                    })
+                    assert.deepEqual(JSON.parse(allowBuilds), { 'core-js': false })
+                }
+            })
+        }
     }
 })

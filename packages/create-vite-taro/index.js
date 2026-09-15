@@ -38,12 +38,15 @@ const projectPath = path.resolve(targetDirectory)
 const projectName = toValidPackageName(path.basename(projectPath))
 const projectTitle = toTitle(projectName)
 const wechatAppId = createWechatAppId()
+const packageManager = getPackageManager()
 
 assertCanCreateProject(projectPath, options.force)
 mkdirSync(projectPath, { recursive: true })
 copyTemplate(path.join(packageRoot, 'templates/default'), projectPath, projectName, projectTitle, wechatAppId)
+if (packageManager === 'pnpm') {
+    copyTemplate(path.join(packageRoot, 'templates/pnpm'), projectPath, projectName, projectTitle, wechatAppId)
+}
 
-const packageManager = getPackageManager()
 const displayProjectPath = getDisplayProjectPath(projectPath)
 const cdCommand = displayProjectPath === '.' ? undefined : `cd ${quotePath(displayProjectPath)}`
 

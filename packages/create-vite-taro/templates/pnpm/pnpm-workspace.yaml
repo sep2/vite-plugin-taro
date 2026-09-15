@@ -1,0 +1,3 @@
+allowBuilds:
+    # core-js postinstall only prints a donation banner; no build is needed.
+    core-js: false
