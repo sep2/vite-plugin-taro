@@ -105,11 +105,17 @@ test('public packages preserve their published entrypoints and scaffold dependen
                 assert.ok(output.includes(`  ${packageManager ?? 'npm'} install\n`))
                 assert.equal(existsSync(path.join(projectPath, 'pnpm-workspace.yaml')), packageManager === 'pnpm')
                 if (packageManager === 'pnpm') {
-                    const allowBuilds = execFileSync('pnpm', ['config', 'get', 'allowBuilds', '--json'], {
-                        cwd: projectPath,
-                        encoding: 'utf8'
-                    })
-                    assert.deepEqual(JSON.parse(allowBuilds), { 'core-js': false })
+                    // Check the emitted policy without launching pnpm's platform-specific command shim.
+                    const workspace = readFileSync(path.join(projectPath, 'pnpm-workspace.yaml'), 'utf8')
+                    assert.equal(
+                        workspace.replaceAll('\r\n', '\n'),
+                        [
+                            'allowBuilds:',
+                            '    # core-js postinstall only prints a donation banner; no build is needed.',
+                            '    core-js: false',
+                            ''
+                        ].join('\n')
+                    )
                 }
             })
         }
