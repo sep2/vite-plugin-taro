@@ -1,0 +1,26 @@
+{
+    "name": "polyfill-demo",
+    "version": "0.3.2",
+    "private": true,
+    "author": "sep2",
+    "type": "module",
+    "scripts": {
+        "build-wx": "cross-env NODE_ENV=production VITE_VPT_TARGET=wx vite build",
+        "build-zfb": "cross-env NODE_ENV=production VITE_VPT_TARGET=zfb vite build",
+        "dev-wx": "cross-env NODE_ENV=development VITE_VPT_TARGET=wx vite",
+        "dev-zfb": "cross-env NODE_ENV=development VITE_VPT_TARGET=zfb vite",
+        "typecheck": "tsc --project tsconfig.json",
+        "test": "node --test src/*.test.ts"
+    },
+    "dependencies": {
+        "react": "^19.3.0",
+        "react-dom": "^19.3.0",
+        "vite-plugin-taro": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/react": "^19.3.0",
+        "cross-env": "^10.1.0",
+        "typescript": "^7.0.2",
+        "vite": "8.3.0"
+    }
+}

@@ -1,0 +1,52 @@
+/* biome-ignore lint/correctness/noUnknownTypeSelector: Native mini-program page root. */
+page {
+    background: #f3f4f6;
+    color: #111827;
+    font-family: sans-serif;
+}
+
+.page {
+    padding: 24px;
+}
+
+.title,
+.description,
+.summary,
+.name,
+.module,
+.detail {
+    display: block;
+}
+
+.title {
+    font-size: 26px;
+    font-weight: bold;
+}
+
+.description,
+.module {
+    color: #4b5563;
+    margin-top: 6px;
+    font-size: 13px;
+}
+
+.summary {
+    margin: 20px 0;
+    font-weight: bold;
+}
+
+.result {
+    margin-top: 12px;
+    padding: 16px;
+    border-radius: 8px;
+    background: white;
+    border-left: 4px solid #15803d;
+}
+
+.fail {
+    border-color: #b91c1c;
+}
+
+.detail {
+    margin-top: 8px;
+}
