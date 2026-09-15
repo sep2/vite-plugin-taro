@@ -1,10 +1,12 @@
 ---
 name: test-published-packages
 description: Validates the newest published create-vite-taro and vite-plugin-taro release across the npm latest and beta channels, including registry provenance, typecheck, WX build, and WeChat DevTools HMR state retention. Use after publishing or when testing npm artifacts independently from the workspace.
-compatibility: Requires Node.js 26+, npm, WeChat DevTools, wechatide, and the repository's fixed test AppID.
+compatibility: Requires Node.js 26+, npm, WeChat DevTools, wechatide, and an authorized test AppID in VITE_VPT_WECHAT_APP_ID.
 ---
 
 # Test Published Packages
+
+Set `VITE_VPT_WECHAT_APP_ID` in the process environment to an authorized test AppID (available through `wechatide -c Pi get_user_appids --type miniprogram`). Randomly generated AppIDs are rejected by DevTools. No demo `.env.local` is required.
 
 Run the bundled test script from this skill directory:
 

@@ -54,7 +54,6 @@ const projectPaths: ProjectPaths = {
     backup: resolve(temporaryRoot, '.hmr-test-index.tsx.backup'),
     viteLog: resolve(temporaryDirectory, 'vpt-published-packages-test-vite.log')
 }
-const appIdSource = resolve(repositoryRoot, 'demo/loan-genius/.env.local')
 const miniProgramSkill = resolve(repositoryRoot, '.agents/skills/miniprogram-dev-skill')
 const originalText = 'Build naturally. Ship everywhere.'
 const updatedText = 'Published HMR keeps React state.'
@@ -275,14 +274,9 @@ function validateInstalledPlugin(identity: PackageIdentity): void {
 }
 
 function readAppId(): string {
-    const env = readFileSync(appIdSource, 'utf8')
-    const match = /^VITE_VPT_WECHAT_APP_ID=(.+)$/m.exec(env)
-    if (match === null) {
-        throw new Error(`VITE_VPT_WECHAT_APP_ID is missing from ${appIdSource}`)
-    }
-    const appId = match[1].trim()
+    const appId = requireString(process.env.VITE_VPT_WECHAT_APP_ID, 'VITE_VPT_WECHAT_APP_ID').trim()
     if (appId.length === 0 || appId === 'touristappid') {
-        throw new Error('The fixed test AppID is invalid')
+        throw new Error('The test AppID is invalid')
     }
     return appId
 }
