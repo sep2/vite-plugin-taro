@@ -1,6 +1,6 @@
 import { capitalize, RecursiveTemplate, toCamelCase } from '@tarojs/shared/dist/template.js'
 import { components as zfbComponents } from 'vite-plugin-taro-runtime/plugin-platform-alipay/runtime-utils'
-import { recursiveMerge } from '../recursive-merge.ts'
+import { recursiveMerge } from '../mini/skeleton/recursive-merge.ts'
 
 type ComponentAttributes = Record<string, string>
 type ComponentDefinitions = Record<string, ComponentAttributes>

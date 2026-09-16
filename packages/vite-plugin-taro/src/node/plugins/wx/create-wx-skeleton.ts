@@ -2,7 +2,6 @@ import type { Rolldown } from 'vite'
 import type { VptOptions } from '../../../options.ts'
 import { getPageConfig } from '../../utils/project-config.ts'
 import type { MiniJsonObject, MiniProjectSkeletonInput } from '../mini/mini-contract.ts'
-import { createWxTemplate } from '../mini/skeleton/platform/create-wx-template.ts'
 import {
     collectTemplateComponentConfig,
     createJsonAsset,
@@ -14,6 +13,7 @@ import {
     replaceExactlyOnce,
     toRootRelativePath
 } from '../mini/skeleton/skeleton-utils.ts'
+import { createWxTemplate } from './create-wx-template.ts'
 
 type WxSkeletonInput = MiniProjectSkeletonInput &
     Readonly<{

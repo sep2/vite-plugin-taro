@@ -61,10 +61,10 @@ function createComponentConfig(platform: Platform, scenario: Scenario): Componen
 async function createTemplate(platform: Platform, implementation: Implementation): Promise<Template> {
     if (implementation === 'local') {
         if (platform === 'wx') {
-            const { createWxTemplate } = await import('./create-wx-template.ts')
+            const { createWxTemplate } = await import('../../wx/create-wx-template.ts')
             return createWxTemplate()
         }
-        const { createZfbTemplate } = await import('./create-zfb-template.ts')
+        const { createZfbTemplate } = await import('../../zfb/create-zfb-template.ts')
         return createZfbTemplate()
     }
 

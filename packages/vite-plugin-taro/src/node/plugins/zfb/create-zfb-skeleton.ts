@@ -2,7 +2,6 @@ import type { Rolldown } from 'vite'
 import type { VptOptions } from '../../../options.ts'
 import { getPageConfig } from '../../utils/project-config.ts'
 import type { MiniJsonObject, MiniProjectSkeletonInput } from '../mini/mini-contract.ts'
-import { createZfbTemplate } from '../mini/skeleton/platform/create-zfb-template.ts'
 import {
     collectTemplateComponentConfig,
     createJsonAsset,
@@ -14,6 +13,7 @@ import {
     replaceExactlyOnce,
     toRootRelativePath
 } from '../mini/skeleton/skeleton-utils.ts'
+import { createZfbTemplate } from './create-zfb-template.ts'
 
 type ZfbSkeletonInput = MiniProjectSkeletonInput &
     Readonly<{

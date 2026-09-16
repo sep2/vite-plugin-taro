@@ -1,6 +1,6 @@
 import { UnRecursiveTemplate } from '@tarojs/shared/dist/template.js'
 import { components as wxComponents } from 'vite-plugin-taro-runtime/plugin-platform-weapp/runtime-utils'
-import { recursiveMerge } from '../recursive-merge.ts'
+import { recursiveMerge } from '../mini/skeleton/recursive-merge.ts'
 
 type ComponentAttributes = Record<string, string>
 type ComponentDefinitions = Record<string, ComponentAttributes>
