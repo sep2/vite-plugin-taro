@@ -2,7 +2,7 @@ import tailwindcss from '@tailwindcss/vite'
 import type { HtmlTagDescriptor, Plugin, PluginOption } from 'vite'
 import type { VptOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
-import { toViteFileImportPath } from '../../utils/modules.ts'
+import { createExactModuleIdFilter, toViteFileImportPath } from '../../utils/modules.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { tailwindcssBasedir } from '../tailwind/tailwind-css.ts'
 import { h5AppPath } from './constant.ts'
@@ -133,6 +133,7 @@ function createH5Plugin(options: VptOptions): Plugin {
 
         transform: {
             order: 'pre',
+            filter: { id: createExactModuleIdFilter(h5AppPath) },
             handler(code, id) {
                 return moduleResolver.transform({
                     code,

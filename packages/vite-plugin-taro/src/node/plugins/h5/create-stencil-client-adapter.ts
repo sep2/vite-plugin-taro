@@ -2,7 +2,7 @@ import { createRequire } from 'node:module'
 import type { WalkerEnter } from 'oxc-walker'
 import type { RolldownMagicString } from 'rolldown'
 import { normalizePath, type Plugin } from 'vite'
-import { normalizeModuleId } from '../../utils/modules.ts'
+import { createExactModuleIdFilter, normalizeModuleId } from '../../utils/modules.ts'
 import { transformWithOxcWalker } from '../../utils/oxc-transform.ts'
 import { packageRequire } from '../../utils/packages.ts'
 
@@ -22,7 +22,10 @@ const normalizedStencilClientPath = normalizePath(stencilClientPath)
 export function createStencilClientAdapter(): Plugin {
     return {
         name: 'vpt:h5-stencil-client',
-        transform: adaptStencilClient
+        transform: {
+            filter: { id: createExactModuleIdFilter(stencilClientPath) },
+            handler: adaptStencilClient
+        }
     }
 }
 
