@@ -49,6 +49,7 @@ type DevFixture = Readonly<{
     bundledDev: BundledDev
     pagePath: string
     patchesPath: string
+    readJavaScript: () => Promise<readonly string[]>
     server: ViteDevServer
 }>
 
@@ -104,7 +105,12 @@ async function publishSourceGeneration(filePath: string, source: string): Promis
     }
 }
 
-async function startDevFixture(logger: Logger, host: string, options: VptOptions): Promise<DevFixture> {
+async function startDevFixture(
+    logger: Logger,
+    host: string,
+    options: VptOptions,
+    bundleOutput: 'memory' | 'disk'
+): Promise<DevFixture> {
     const root = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-dev-test-'))
     const outDir = path.join(root, 'dist')
     const oldDirectory = path.join(outDir, 'obsolete/nested')
@@ -129,6 +135,8 @@ async function startDevFixture(logger: Logger, host: string, options: VptOptions
     await writeFile(path.join(path.dirname(pagePath), 'suffix.ts'), 'export const suffix = "";\n')
     await writeFile(pagePath, renderPage('initial page marker'))
 
+    // Each complete build replaces this fixture-local snapshot; HMR assertions do not need physical runtime bundles.
+    let javaScriptOutput: readonly string[] = []
     const server = await createServer({
         root,
         configFile: false,
@@ -149,6 +157,16 @@ async function startDevFixture(logger: Logger, host: string, options: VptOptions
                         assert.ok(page.moduleIds.includes(`${runtimeModules.pageCapsule}?route=pages%2Fhome%2Findex`))
                         assert.ok(bundle['app.js'])
                         assert.ok(bundle['pages/home/index.js'])
+                        javaScriptOutput = Object.values(bundle).flatMap((item) =>
+                            item.type === 'chunk' ? [item.code] : []
+                        )
+                        if (bundleOutput === 'memory') {
+                            // The native host ignores build.write. Discard only final output, after the real pipeline and
+                            // layout assertions, so watchers, patches and host-owned metadata still exercise real I/O.
+                            for (const fileName of Object.keys(bundle)) {
+                                delete bundle[fileName]
+                            }
+                        }
                     }
                 }
             }
@@ -182,9 +200,27 @@ async function startDevFixture(logger: Logger, host: string, options: VptOptions
         appStylePath: path.join(outDir, 'app.wxss'),
         infoPath: path.join(outDir, hmrInfoFileName),
         patchesPath: path.join(outDir, devtoolsPatchesFileName),
+        readJavaScript: async () => (bundleOutput === 'disk' ? readJavaScriptOutput(outDir) : javaScriptOutput),
         close: async () => {
             try {
                 await server.close()
+                if (bundleOutput === 'memory') {
+                    // Check after shutdown drains atomic writes. Even recovery builds must not materialize full bundles.
+                    const hostFiles = new Set([
+                        'app.wxss',
+                        'assets/global.wxss',
+                        hmrInfoFileName,
+                        devtoolsPatchesFileName
+                    ])
+                    const files = (await readdir(outDir, { recursive: true, withFileTypes: true }))
+                        .filter((entry) => entry.isFile())
+                        .map((entry) => normalizePath(path.relative(outDir, path.join(entry.parentPath, entry.name))))
+                    assert.deepEqual(
+                        files.filter((fileName) => !hostFiles.has(fileName)),
+                        [],
+                        'Only host-owned styles and HMR metadata may reach disk'
+                    )
+                }
             } finally {
                 await rm(root, { force: true, recursive: true })
             }
@@ -236,8 +272,8 @@ async function readJavaScriptOutput(directory: string): Promise<readonly string[
     return sources.flat()
 }
 
-async function waitForJavaScriptOutput(directory: string, marker: string, attemptsRemaining: number): Promise<void> {
-    const sources = await readJavaScriptOutput(directory)
+async function waitForJavaScriptOutput(fixture: DevFixture, marker: string, attemptsRemaining: number): Promise<void> {
+    const sources = await fixture.readJavaScript()
     if (sources.some((source) => source.includes(marker))) {
         return
     }
@@ -245,7 +281,7 @@ async function waitForJavaScriptOutput(directory: string, marker: string, attemp
         assert.fail(`Timed out waiting for JavaScript output containing ${marker}`)
     }
     await delay(waitIntervalMilliseconds)
-    return waitForJavaScriptOutput(directory, marker, attemptsRemaining - 1)
+    return waitForJavaScriptOutput(fixture, marker, attemptsRemaining - 1)
 }
 
 async function waitForStableFile(
@@ -414,7 +450,7 @@ test('rejects startup with the original complete-output failure', async () => {
 })
 
 test('patches a bundled utility without rewriting its Page capsule or rotating the App', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions())
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'disk')
     context.after(fixture.close)
     const infoSource = await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
     const info = parseHmrInfo(infoSource)
@@ -436,7 +472,7 @@ test('patches a bundled utility without rewriting its Page capsule or rotating t
 })
 
 test('coalesces one full-file save into one wx patch', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions())
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'memory')
     context.after(fixture.close)
 
     await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
@@ -460,7 +496,7 @@ test('coalesces one full-file save into one wx patch', async (context) => {
 })
 
 test('publishes and acknowledges cumulative wx patches without rotating the App heap', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions())
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'memory')
     context.after(fixture.close)
 
     const initialInfoSource = await waitForFile(
@@ -511,7 +547,7 @@ test('publishes and acknowledges cumulative wx patches without rotating the App 
 })
 
 test('startup rebuilds after one published patch even when its complete history is retained', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions())
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'memory')
     context.after(fixture.close)
     const info = parseHmrInfo(
         await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
@@ -528,7 +564,7 @@ test('startup rebuilds after one published patch even when its complete history 
         )
     )
     await waitForFile(fixture.appStylePath, (source) => source.includes(freshInfo.buildId), maximumWaitAttempts)
-    await waitForJavaScriptOutput(fixture.outDir, 'applied before OPEN', maximumWaitAttempts)
+    await waitForJavaScriptOutput(fixture, 'applied before OPEN', maximumWaitAttempts)
     assert.doesNotMatch(await readFile(fixture.patchesPath, 'utf8'), /\{seq:/)
 
     // Baseline-only startup and delayed startup from the previous build must not cause a rebuild loop.
@@ -539,7 +575,7 @@ test('startup rebuilds after one published patch even when its complete history 
 })
 
 test('Compile after two acknowledged edits rebuilds the baseline and resumes HMR', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions())
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'memory')
     context.after(fixture.close)
     const initialSource = await waitForFile(
         fixture.infoPath,
@@ -569,7 +605,7 @@ test('Compile after two acknowledged edits rebuilds the baseline and resumes HMR
         await waitForFile(fixture.infoPath, (source) => source !== initialSource, maximumWaitAttempts)
     )
     await waitForFile(fixture.appStylePath, (source) => source.includes(freshInfo.buildId), maximumWaitAttempts)
-    await waitForJavaScriptOutput(fixture.outDir, 'compile regression edit 2', maximumWaitAttempts)
+    await waitForJavaScriptOutput(fixture, 'compile regression edit 2', maximumWaitAttempts)
     assert.doesNotMatch(await readFile(fixture.patchesPath, 'utf8'), /\{seq:/)
 
     await sendRuntimeReport(freshInfo, { buildId: freshInfo.buildId, kind: 'startup' })
@@ -584,7 +620,7 @@ test('Compile after two acknowledged edits rebuilds the baseline and resumes HMR
 })
 
 test('publishes interpreter source through Vite WebSocket', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createInterpreterOptions())
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createInterpreterOptions(), 'memory')
     context.after(fixture.close)
 
     const info = parseHmrInfo(
@@ -629,7 +665,7 @@ test('publishes interpreter source through Vite WebSocket', async (context) => {
 })
 
 test('rebuild mode replaces complete output without creating patch transport artifacts', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createRebuildOptions())
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createRebuildOptions(), 'disk')
     context.after(fixture.close)
 
     const initialAppStyle = await waitForFile(
@@ -647,9 +683,9 @@ test('rebuild mode replaces complete output without creating patch transport art
         (source) => source !== initialAppStyle,
         maximumWaitAttempts
     )
-    await waitForJavaScriptOutput(fixture.outDir, marker, maximumWaitAttempts)
+    await waitForJavaScriptOutput(fixture, marker, maximumWaitAttempts)
 
-    const javaScriptOutput = (await readJavaScriptOutput(fixture.outDir)).join('\n')
+    const javaScriptOutput = (await fixture.readJavaScript()).join('\n')
     assert.match(rebuiltAppStyle, /vpt-build:/)
     assert.doesNotMatch(javaScriptOutput, /hmr\/(?:info|patches)\.js/)
     assert.equal(await readExistingFile(fixture.infoPath), undefined)
@@ -663,7 +699,7 @@ test('prints physical project paths without compromising later patch publication
     logger.info = (message) => {
         infos.push(message)
     }
-    const fixture = await startDevFixture(logger, '0.0.0.0', createOptions())
+    const fixture = await startDevFixture(logger, '0.0.0.0', createOptions(), 'memory')
     context.after(fixture.close)
     const info = parseHmrInfo(
         await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
@@ -698,7 +734,7 @@ test('prints physical project paths without compromising later patch publication
 })
 
 test('preserves live files and directory identities across patches and recovery builds', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions())
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'disk')
     context.after(fixture.close)
     const initialInfoSource = await waitForFile(
         fixture.infoPath,
@@ -736,7 +772,7 @@ test('preserves live files and directory identities across patches and recovery 
     assert.deepEqual((await readdir(fixture.outDir, { recursive: true })).sort(), initialFiles)
     assert.equal((await stat(obsoleteDirectory)).ino, directoryInode)
     assert.equal(await readFile(obsoleteFile, 'utf8'), 'live session file')
-    await waitForJavaScriptOutput(fixture.outDir, 'changed before complete build', maximumWaitAttempts)
+    await waitForJavaScriptOutput(fixture, 'changed before complete build', maximumWaitAttempts)
 })
 
 test('rotates build identity on a current rebuild report and rejects delayed old-session reports', async (context) => {
@@ -746,7 +782,7 @@ test('rotates build identity on a current rebuild report and rejects delayed old
     logger.info = (message) => {
         infos.push(message)
     }
-    const fixture = await startDevFixture(logger, '127.0.0.1', createOptions())
+    const fixture = await startDevFixture(logger, '127.0.0.1', createOptions(), 'memory')
     context.after(fixture.close)
 
     const initialInfoSource = await waitForFile(
@@ -829,7 +865,7 @@ test('reports a failed physical patch transaction through the serialized host bo
     logger.error = (message) => {
         errors.push(message)
     }
-    const fixture = await startDevFixture(logger, '127.0.0.1', createOptions())
+    const fixture = await startDevFixture(logger, '127.0.0.1', createOptions(), 'memory')
     context.after(fixture.close)
     await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
     const hmrDirectory = path.dirname(fixture.infoPath)
@@ -853,7 +889,7 @@ test('resumes wx patch publication after a transient syntax error', async (conte
     logger.error = (message) => {
         errors.push(message)
     }
-    const fixture = await startDevFixture(logger, '127.0.0.1', createOptions())
+    const fixture = await startDevFixture(logger, '127.0.0.1', createOptions(), 'memory')
     context.after(fixture.close)
 
     const initialInfoSource = await waitForFile(
