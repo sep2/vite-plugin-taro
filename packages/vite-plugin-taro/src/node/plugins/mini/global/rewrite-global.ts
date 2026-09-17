@@ -20,10 +20,12 @@ import type { RolldownMagicString } from 'rolldown'
  * Performance model shared by the individual transforms below:
  * - N = AST nodes, D = maximum nesting depth, U = distinct free assignment-target names, E = generated text characters.
  *   L in a local analysis is the length of that emitted fragment, including original and generated identifier spellings.
- * - Build time: two AST walks plus bounded pattern/parenthesis scans do expected O(N) structural work with O(N) table
- *   entries and O(D) traversal stacks. Map/Set operations are assumed amortized O(1); hashing, escaping and constructing
- *   strings additionally depend on their lengths. There are O(N) editor operations and O(E) generated text, not duplicated
- *   RHS trees. These are algorithmic costs here, not a bound on Rolldown's internal editing or caller-owned map generation.
+ * - Build time: one AST walk records declarations, scope boundaries and identifier contexts; a linear scan of those
+ *   records resolves references without revisiting AST children. Together with bounded pattern/parenthesis scans this
+ *   does expected O(N) structural work with O(N) records and O(D) traversal stacks. Map/Set operations are assumed
+ *   amortized O(1); hashing, escaping and constructing strings additionally depend on their lengths. There are O(N)
+ *   editor operations and O(E) generated text, not duplicated RHS trees. These are algorithmic costs here, not a bound
+ *   on Rolldown's internal editing or caller-owned map generation.
  * - Runtime time: O(1) routing below assumes ordinary property/binding lookup and bounded prototype depth. The `in`
  *   operator can traverse a prototype chain; patched prototypes/proxies/getters/setters can add arbitrary work. Original
  *   operand evaluation, function bodies, coercions, BigInt arithmetic and iterator work are not counted as routing overhead.
@@ -38,9 +40,9 @@ import type { RolldownMagicString } from 'rolldown'
  */
 export function rewriteGlobal(program: Program, editor: RolldownMagicString): string | null {
     const scopes = new SourceScopes()
-    // Analysis before edits: collect every declaration before resolving any use, preserving hoisting and TDZ rather than
-    // mistaking a later local declaration for a host global. The second walk replays the same scope IDs over the same AST.
-    // Time: O(N) structural work per walk. Space: O(N) invocation-local names/boundaries/write leaves; nothing is global.
+    // One AST traversal collects declarations and reference contexts before resolving any use, preserving hoisting and
+    // TDZ. Resolution scans only recorded scope boundaries and identifiers, not the AST's children or other expressions.
+    // Time/space: O(N) structural work and invocation-local records; nothing is global.
     // Reserve all original names, including nested locals, before allocating identifiers that must never be shadowed.
     const names = new Set<string>()
     // A new leading '(' must not join the preceding statement.
@@ -49,12 +51,21 @@ export function rewriteGlobal(program: Program, editor: RolldownMagicString): st
     const terminatorEnds = new Set<number>()
     // Only assignment-pattern leaves need native accessor targets; computed keys, defaults and member receivers are reads.
     const writes = new Set<Identifier>()
+    // Carry transparent-parenthesis/shorthand ownership to identifiers during the single AST traversal.
+    const contexts = new WeakMap<Node, Node>()
     walk(program, {
         scopeTracker: scopes,
         enter(node, parent) {
             if (node.type === 'Identifier') {
                 names.add(node.name)
-            } else if (
+                scopes.recordIdentifier(
+                    node,
+                    parent,
+                    contexts.get(node) ?? (parent?.type === 'Property' ? parent : null)
+                )
+                return
+            }
+            if (
                 node.type === 'ExpressionStatement' &&
                 (parent?.type === 'Program' ||
                     parent?.type === 'BlockStatement' ||
@@ -81,9 +92,41 @@ export function rewriteGlobal(program: Program, editor: RolldownMagicString): st
             ) {
                 terminatorEnds.add(node.end)
             }
+            /*
+             * Switch-scope boundary (classification, not an extra runtime wrapper):
+             *   Before: switch (slot) { case slot: let slot; }
+             *   After:  switch (R(slot)) { case slot: let slot; }
+             * Record activation after the discriminant, at the first case. Nested scopes within the discriminant finish
+             * before this event, so the completed case bindings cannot capture discriminant references during resolution.
+             * Time: O(1) recording, O(B) resolution per boundary for B bindings. Space: O(1) record, no runtime storage.
+             */
+            if (node.type === 'SwitchCase' && parent?.type === 'SwitchStatement' && parent.cases[0] === node) {
+                scopes.enterCases()
+            }
+            /*
+             * Transparent-parenthesis/context propagation:
+             *   Before: typeof ((slot)) / ((slot))++ / ({ slot = fallback } = source)
+             *   After:  ("slot" in G ? typeof G.slot : typeof slot) / ("slot" in G ? G.slot++ : slot++)
+             *           / ({ ["slot"]: T(slot) = R(fallback) } = R(source))
+             * Carry the owning typeof/update through parentheses to replace the WHOLE operation. Carry shorthand
+             * ownership through AssignmentPattern to expand its key, not just its identifier. For an ordinary read,
+             * ((slot)) instead becomes ((R(slot))); parentheses need no independent edit or runtime helper.
+             * Time: expected O(1) WeakMap work per visited wrapper/owner, O(P) for a chain of P parentheses.
+             * Space: O(N) maximum context entries for this call, zero runtime objects beyond the selected transform.
+             * Leak: weak keys do not establish AST roots; this entire analysis map is discarded on return.
+             */
+            if ((node.type === 'UnaryExpression' && node.operator === 'typeof') || node.type === 'UpdateExpression') {
+                contexts.set(node.argument, node)
+            } else if (node.type === 'ParenthesizedExpression') {
+                const context = contexts.get(node)
+                if (context) {
+                    contexts.set(node.expression, context)
+                }
+            } else if (node.type === 'Property' && node.shorthand && node.value.type === 'AssignmentPattern') {
+                contexts.set(node.value.left, node)
+            }
         }
     })
-    scopes.freeze()
 
     /*
      * Hygienic generated identifiers (original identifiers are not renamed):
@@ -204,8 +247,6 @@ export function rewriteGlobal(program: Program, editor: RolldownMagicString): st
     }
     // Delay name-inference wrappers until reference overwrites are complete, so nested edits retain their closing suffixes.
     const initializers: { node: Node; name: string }[] = []
-    // Transparent parentheses and shorthand defaults need context beyond the immediate parent.
-    const contexts = new WeakMap<Node, Node>()
     /*
      * Trailing ASI repair (the \n below denotes an original line break):
      *   Before: slot++\n[1].forEach(visit)
@@ -243,181 +284,120 @@ export function rewriteGlobal(program: Program, editor: RolldownMagicString): st
         terminate(range.end)
         editor.overwrite(range.start, range.end, statementStarts.has(range.start) ? `;${replacement}` : replacement)
     }
-    walk(program, {
-        scopeTracker: scopes,
-        enter(node, parent) {
-            if (node.type === 'Identifier') {
-                /*
-                 * Deliberate non-transforms:
-                 *   Before -> after: slot; let slot; / import { slot } from 'host'; / export { local as slot };
-                 *                    object.slot / ({ slot: local }) / label: while (true) { break label }
-                 * All stay unchanged for their bound/non-reference identifiers. Imports, exports, keys, private names
-                 * and labels are interfaces/syntax, not global reads. Even a free-looking ExportSpecifier is excluded.
-                 * Later declarations, TDZ, parameters, catch/loop bindings and named expressions count as locals.
-                 * Time: expected O(1) scope/reference classification per identifier, independent of scope depth.
-                 * Space: no edit/output/runtime allocation for a skipped identifier; scope tables are shared analysis.
-                 * Leak: no new runtime reference is introduced, and classification tables remain invocation-local.
-                 */
-                if (
-                    scopes.hasBinding(node.name) ||
-                    parent?.type === 'ExportSpecifier' ||
-                    !isReferenceIdentifier(node, parent)
-                ) {
-                    return
-                }
-                const context = contexts.get(node) ?? (parent?.type === 'Property' ? parent : null)
-                const name = node.name
-                const member = `${global}.${name}`
-                /*
-                 * Bare typeof (including parenthesized operands):
-                 *   Before: typeof slot / typeof ((slot))
-                 *   After:  ("slot" in G ? typeof G.slot : typeof slot)
-                 * Replacing only slot would evaluate an ordinary read before typeof, incorrectly throwing for an
-                 * unresolved native name. Replace the whole operation instead: typeof missing remains 'undefined',
-                 * while native lexical TDZ/getter failures still throw and managed present-undefined stays managed.
-                 * Time: O(L) generated text and O(1) membership/typeof routing; only one branch executes.
-                 * Space: O(L) text and O(1) runtime temporaries, with no adapter or closure.
-                 * Leak: neither the operand nor typeof result is stored by generated code.
-                 *
-                 * Prefix increment/decrement:
-                 *   Before: ++slot / --slot
-                 *   After:  ("slot" in G ? ++G.slot : ++slot) / ("slot" in G ? --G.slot : --slot)
-                 * Postfix increment/decrement:
-                 *   Before: slot++ / slot--
-                 *   After:  ("slot" in G ? G.slot++ : slot++) / ("slot" in G ? G.slot-- : slot--)
-                 * In both cases replacing the complete operation leaves ToNumeric, BigInt behavior, get/coerce/set
-                 * order and strict native write failures to JavaScript. Prefix returns the new value; postfix returns
-                 * the old numeric value, not an uncoerced read. A read conditional alone cannot be incremented.
-                 * Time (each form): O(L) text; one membership check plus the original update, O(1) routing overhead.
-                 * Space (each form): O(L) text and O(1) routing space; no cached holder/accessor is needed.
-                 * Leak (each form): no value cache/captured scope; original binding retention is unchanged.
-                 */
-                // Select the syntax operation, not a runtime interpreter: native reads/typeof/updates remain native.
-                const range =
-                    context?.type === 'UnaryExpression' || context?.type === 'UpdateExpression' ? context : node
-                /*
-                 * Simple assignment:
-                 *   Before: slot = rhs
-                 *   After:  ("slot" in G ? G : (C || init())).slot = rhs
-                 * Select the base before evaluating rhs, then keep that Reference through the write. If rhs adds an
-                 * override, a native-selected write still goes native; if rhs deletes a managed property, writing to
-                 * the already selected G property recreates it (ordinary property semantics, not global-environment
-                 * binding semantics). Readonly/accessor descriptor changes during rhs remain observable at the set.
-                 * Time: O(L) target text and O(1) selection/set overhead, plus the original rhs once.
-                 * Space: O(L) text, O(1) live Reference, and the shared O(1)-per-name adapter on first native use.
-                 * Leak: rhs is not cached/captured; only the chosen destination intentionally retains its assigned value.
-                 *
-                 * Arithmetic/bitwise compound assignments:
-                 *   Before: slot op= rhs
-                 *   After:  T(slot) op= rhs
-                 * op= covers +=, -=, *=, /=, %=, **=, <<=, >>=, >>>=, &=, |= and ^=.
-                 * The engine reads once, evaluates rhs once, applies the original operator/coercion, then writes once
-                 * to the same Reference. Even a native getter that installs a namespace override cannot reroute the set.
-                 * Time: O(L) target text; O(1) selection and forwarding overhead, excluding original arithmetic/rhs.
-                 * Space: O(L) text; O(1) live target/old-value slots plus the shared adapter, not an rhs-sized copy.
-                 * Leak: no old/new value history is kept; completion releases temporaries under normal engine lifetime.
-                 *
-                 * Logical assignments:
-                 *   Before: slot &&= rhs / slot ||= rhs / slot ??= rhs
-                 *   After:  T(slot) &&= rhs / T(slot) ||= rhs / T(slot) ??= rhs
-                 * Keeping the operator preserves its truthy/falsy/nullish test and expression result. The selected
-                 * target is read once, but rhs and the setter execute only if needed; there is no eager value argument.
-                 * Time: O(L) text and O(1) routing, including a possible adapter initialization even on a skipped write.
-                 * Space: O(L) text, O(1) runtime temporaries/shared per-name adapter; skipped rhs allocates nothing extra.
-                 * Leak: skipped/evaluated rhs values are never retained by routing code; the adapter stores no values.
-                 *
-                 * Await/yield and nested assignments use the same target replacement, not an IIFE/callback:
-                 *   Before: slot += await rhs / slot = yield value / slot += (other += rhs)
-                 *   After:  T(slot) += await rhs / T(slot) = yield value / T(slot) += (T(other) += rhs)
-                 * The engine keeps each selected target (and compound old value) across suspension. Concurrent writes
-                 * share a stateless native adapter, not pending values. this/super/arguments and control flow remain in
-                 * the original async/generator scope. Conditionalizing the WHOLE assignment would duplicate rhs text;
-                 * recursively doing so can grow output exponentially, whereas each target here is emitted only once.
-                 * Time: O(L) per target; nested output grows with targets/name lengths, not copies of rhs subtrees.
-                 * Runtime adds O(1) routing per reached target; suspension/resumption timing is the application's.
-                 * Space: O(1) extra live target per in-flight operation plus shared adapters; no new Promise/generator.
-                 * Leak: suspended frames can retain selected targets until completed/released, as normal References do;
-                 * the transform introduces no pending-operation registry or callback holding those frames alive.
-                 * Destructuring and loop target forms use this same branch; their cases are detailed below.
-                 */
-                const replacement =
-                    context?.type === 'UnaryExpression'
-                        ? select(name, `typeof ${member}`, `typeof ${name}`)
-                        : context?.type === 'UpdateExpression'
-                          ? context.prefix
-                              ? select(name, `${context.operator}${member}`, `${context.operator}${name}`)
-                              : select(name, `${member}${context.operator}`, `${name}${context.operator}`)
-                          : writes.has(node)
-                            ? `${select(name, global, nativeTarget(name))}.${name}`
-                            : read(name)
-                /*
-                 * Shorthand object reads and assignment-pattern leaves/defaults:
-                 *   Before: ({ slot }) / ({ slot } = source) / ({ slot = fallback } = source)
-                 *   After:  ({ ["slot"]: R(slot) }) / ({ ["slot"]: T(slot) } = R(source))
-                 *           / ({ ["slot"]: T(slot) = R(fallback) } = R(source))
-                 * Expanding shorthand keeps the ORIGINAL property key while the value/target becomes an expression.
-                 * A computed string key is essential for __proto__: { __proto__: value } can set the object prototype,
-                 * but { ["__proto__"]: value } defines an ordinary own data property, just like shorthand. Repeated
-                 * __proto__ shorthand keys also remain legal. Pattern defaults keep their normal conditional evaluation.
-                 * Time: O(L) quoted-key/replacement text; O(1) runtime literal-key evaluation plus read/write routing.
-                 * Space: O(L) text, O(1) key evaluation; the object is the original object literal, not an added wrapper.
-                 * Assignment patterns only incur the existing per-name adapter when the native branch is selected.
-                 * Leak: no new object beyond the original literal and no property-value cache; patterns create no wrapper.
-                 */
-                overwrite(
-                    range,
-                    context?.type === 'Property' && context.shorthand
-                        ? `[${JSON.stringify(name)}]: ${replacement}`
-                        : replacement
-                )
-                return
-            }
-            /*
-             * Switch-scope boundary (classification, not an extra runtime wrapper):
-             *   Before: switch (slot) { case slot: let slot; }
-             *   After:  switch (R(slot)) { case slot: let slot; }
-             * The discriminant runs outside the shared case lexical environment; case tests/bodies are inside it,
-             * including TDZ before the declaration. Delay activation until the first case, even for nested switches.
-             * Time: O(B) once to activate B case bindings, O(B) on exit; no per-reference ancestor scan.
-             * Space: O(B) active counts within the O(N) analysis tables, no runtime storage or new retention/leak.
-             */
-            if (node.type === 'SwitchCase' && parent?.type === 'SwitchStatement' && parent.cases[0] === node) {
-                scopes.updateActiveBindings(1)
-            }
-            /*
-             * Transparent-parenthesis/context propagation:
-             *   Before: typeof ((slot)) / ((slot))++ / ({ slot = fallback } = source)
-             *   After:  ("slot" in G ? typeof G.slot : typeof slot) / ("slot" in G ? G.slot++ : slot++)
-             *           / ({ ["slot"]: T(slot) = R(fallback) } = R(source))
-             * Carry the owning typeof/update through parentheses to replace the WHOLE operation. Carry shorthand
-             * ownership through AssignmentPattern to expand its key, not just its identifier. For an ordinary read,
-             * ((slot)) instead becomes ((R(slot))); parentheses need no independent edit or runtime helper.
-             * Time: expected O(1) WeakMap work per visited wrapper/owner, O(P) for a chain of P parentheses.
-             * Space: O(N) maximum context entries for this call, zero runtime objects beyond the selected transform.
-             * Leak: weak keys do not establish AST roots; this entire analysis map is discarded on return.
-             */
-            if ((node.type === 'UnaryExpression' && node.operator === 'typeof') || node.type === 'UpdateExpression') {
-                contexts.set(node.argument, node)
-            } else if (node.type === 'ParenthesizedExpression') {
-                const context = contexts.get(node)
-                if (context) {
-                    contexts.set(node.expression, context)
-                }
-            } else if (node.type === 'Property' && node.shorthand && node.value.type === 'AssignmentPattern') {
-                contexts.set(node.value.left, node)
-            }
-            if (
-                (node.type === 'AssignmentPattern' ||
-                    (node.type === 'AssignmentExpression' &&
-                        (node.operator === '=' ||
-                            node.operator === '&&=' ||
-                            node.operator === '||=' ||
-                            node.operator === '??='))) &&
-                node.left.type === 'Identifier' &&
-                !scopes.hasBinding(node.left.name)
-            ) {
-                initializers.push({ node: node.right, name: node.left.name })
-            }
+    scopes.visitFreeReferences(({ node, parent, context }) => {
+        const name = node.name
+        const member = `${global}.${name}`
+        /*
+         * Bare typeof (including parenthesized operands):
+         *   Before: typeof slot / typeof ((slot))
+         *   After:  ("slot" in G ? typeof G.slot : typeof slot)
+         * Replacing only slot would evaluate an ordinary read before typeof, incorrectly throwing for an
+         * unresolved native name. Replace the whole operation instead: typeof missing remains 'undefined',
+         * while native lexical TDZ/getter failures still throw and managed present-undefined stays managed.
+         * Time: O(L) generated text and O(1) membership/typeof routing; only one branch executes.
+         * Space: O(L) text and O(1) runtime temporaries, with no adapter or closure.
+         * Leak: neither the operand nor typeof result is stored by generated code.
+         *
+         * Prefix increment/decrement:
+         *   Before: ++slot / --slot
+         *   After:  ("slot" in G ? ++G.slot : ++slot) / ("slot" in G ? --G.slot : --slot)
+         * Postfix increment/decrement:
+         *   Before: slot++ / slot--
+         *   After:  ("slot" in G ? G.slot++ : slot++) / ("slot" in G ? G.slot-- : slot--)
+         * In both cases replacing the complete operation leaves ToNumeric, BigInt behavior, get/coerce/set
+         * order and strict native write failures to JavaScript. Prefix returns the new value; postfix returns
+         * the old numeric value, not an uncoerced read. A read conditional alone cannot be incremented.
+         * Time (each form): O(L) text; one membership check plus the original update, O(1) routing overhead.
+         * Space (each form): O(L) text and O(1) routing space; no cached holder/accessor is needed.
+         * Leak (each form): no value cache/captured scope; original binding retention is unchanged.
+         */
+        // Select the syntax operation, not a runtime interpreter: native reads/typeof/updates remain native.
+        const range = context?.type === 'UnaryExpression' || context?.type === 'UpdateExpression' ? context : node
+        /*
+         * Simple assignment:
+         *   Before: slot = rhs
+         *   After:  ("slot" in G ? G : (C || init())).slot = rhs
+         * Select the base before evaluating rhs, then keep that Reference through the write. If rhs adds an
+         * override, a native-selected write still goes native; if rhs deletes a managed property, writing to
+         * the already selected G property recreates it (ordinary property semantics, not global-environment
+         * binding semantics). Readonly/accessor descriptor changes during rhs remain observable at the set.
+         * Time: O(L) target text and O(1) selection/set overhead, plus the original rhs once.
+         * Space: O(L) text, O(1) live Reference, and the shared O(1)-per-name adapter on first native use.
+         * Leak: rhs is not cached/captured; only the chosen destination intentionally retains its assigned value.
+         *
+         * Arithmetic/bitwise compound assignments:
+         *   Before: slot op= rhs
+         *   After:  T(slot) op= rhs
+         * op= covers +=, -=, *=, /=, %=, **=, <<=, >>=, >>>=, &=, |= and ^=.
+         * The engine reads once, evaluates rhs once, applies the original operator/coercion, then writes once
+         * to the same Reference. Even a native getter that installs a namespace override cannot reroute the set.
+         * Time: O(L) target text; O(1) selection and forwarding overhead, excluding original arithmetic/rhs.
+         * Space: O(L) text; O(1) live target/old-value slots plus the shared adapter, not an rhs-sized copy.
+         * Leak: no old/new value history is kept; completion releases temporaries under normal engine lifetime.
+         *
+         * Logical assignments:
+         *   Before: slot &&= rhs / slot ||= rhs / slot ??= rhs
+         *   After:  T(slot) &&= rhs / T(slot) ||= rhs / T(slot) ??= rhs
+         * Keeping the operator preserves its truthy/falsy/nullish test and expression result. The selected
+         * target is read once, but rhs and the setter execute only if needed; there is no eager value argument.
+         * Time: O(L) text and O(1) routing, including a possible adapter initialization even on a skipped write.
+         * Space: O(L) text, O(1) runtime temporaries/shared per-name adapter; skipped rhs allocates nothing extra.
+         * Leak: skipped/evaluated rhs values are never retained by routing code; the adapter stores no values.
+         *
+         * Await/yield and nested assignments use the same target replacement, not an IIFE/callback:
+         *   Before: slot += await rhs / slot = yield value / slot += (other += rhs)
+         *   After:  T(slot) += await rhs / T(slot) = yield value / T(slot) += (T(other) += rhs)
+         * The engine keeps each selected target (and compound old value) across suspension. Concurrent writes
+         * share a stateless native adapter, not pending values. this/super/arguments and control flow remain in
+         * the original async/generator scope. Conditionalizing the WHOLE assignment would duplicate rhs text;
+         * recursively doing so can grow output exponentially, whereas each target here is emitted only once.
+         * Time: O(L) per target; nested output grows with targets/name lengths, not copies of rhs subtrees.
+         * Runtime adds O(1) routing per reached target; suspension/resumption timing is the application's.
+         * Space: O(1) extra live target per in-flight operation plus shared adapters; no new Promise/generator.
+         * Leak: suspended frames can retain selected targets until completed/released, as normal References do;
+         * the transform introduces no pending-operation registry or callback holding those frames alive.
+         * Destructuring and loop target forms use this same branch; their cases are detailed below.
+         */
+        const replacement =
+            context?.type === 'UnaryExpression'
+                ? select(name, `typeof ${member}`, `typeof ${name}`)
+                : context?.type === 'UpdateExpression'
+                  ? context.prefix
+                      ? select(name, `${context.operator}${member}`, `${context.operator}${name}`)
+                      : select(name, `${member}${context.operator}`, `${name}${context.operator}`)
+                  : writes.has(node)
+                    ? `${select(name, global, nativeTarget(name))}.${name}`
+                    : read(name)
+        /*
+         * Shorthand object reads and assignment-pattern leaves/defaults:
+         *   Before: ({ slot }) / ({ slot } = source) / ({ slot = fallback } = source)
+         *   After:  ({ ["slot"]: R(slot) }) / ({ ["slot"]: T(slot) } = R(source))
+         *           / ({ ["slot"]: T(slot) = R(fallback) } = R(source))
+         * Expanding shorthand keeps the ORIGINAL property key while the value/target becomes an expression.
+         * A computed string key is essential for __proto__: { __proto__: value } can set the object prototype,
+         * but { ["__proto__"]: value } defines an ordinary own data property, just like shorthand. Repeated
+         * __proto__ shorthand keys also remain legal. Pattern defaults keep their normal conditional evaluation.
+         * Time: O(L) quoted-key/replacement text; O(1) runtime literal-key evaluation plus read/write routing.
+         * Space: O(L) text, O(1) key evaluation; the object is the original object literal, not an added wrapper.
+         * Assignment patterns only incur the existing per-name adapter when the native branch is selected.
+         * Leak: no new object beyond the original literal and no property-value cache; patterns create no wrapper.
+         */
+        overwrite(
+            range,
+            context?.type === 'Property' && context.shorthand
+                ? `[${JSON.stringify(name)}]: ${replacement}`
+                : replacement
+        )
+        if (
+            (parent?.type === 'AssignmentPattern' ||
+                (parent?.type === 'AssignmentExpression' &&
+                    (parent.operator === '=' ||
+                        parent.operator === '&&=' ||
+                        parent.operator === '||=' ||
+                        parent.operator === '??='))) &&
+            parent.left === node
+        ) {
+            initializers.push({ node: parent.right, name })
         }
     })
     for (const { node, name } of initializers) {
@@ -574,36 +554,33 @@ function preserveInferredName(value: Node, name: string, editor: RolldownMagicSt
     return false
 }
 
+type ReferenceCandidate = { node: Identifier; parent: Node | null; context: Node | null }
+type ScopeBoundary = { scope: string; change: 1 | -1 }
+
 /**
  * Scope classification supporting every transform; this class emits no runtime code.
  *   Before -> after: slot; let slot; / function run(value = slot) { var slot; }
  *                   unchanged     / function run(value = R(slot)) { var slot; }
- * Hoisted declarations/TDZ are resolved from the completed first pass. Function parameter/default and body var scopes
- * remain distinct; static-block vars stay inside their block; implicit arguments belongs to ordinary functions, not
- * arrows; named function/class expression names remain local. Counts restore outer shadowed bindings on scope exit.
+ * One AST walk records scope boundaries and identifiers, retaining the declarations populated by Oxc. Only after all
+ * declarations are known does a linear record scan activate/deactivate completed binding sets and resolve references.
+ * Function parameter/default and body var scopes remain distinct; static-block vars stay inside their block; implicit
+ * arguments belongs to ordinary functions, not arrows; named function/class expression names remain local.
  *
- * Time: O(N) expected structural collection/replay work. Reuse Oxc declaration rules but replace hierarchical scope keys
- * and ancestor searches: flat IDs avoid depth-length keys, cached var scopes avoid O(D) searches per var declaration,
- * and an active-count map avoids O(D) searches per reference. Activating/deactivating B bindings costs O(B) for that scope;
- * across all scopes, each stored binding is processed a bounded number of times. Decimal ID formatting/hash costs still
- * depend on ID length (O(log N) characters), not nesting depth. No worst-case constant hash-table time is promised.
- * Space: O(N) declaration/count entries and O(D) scope stacks, plus identifier/ID text; zero generated runtime storage.
- * Leak: declaration maps intentionally keep AST nodes until the second walk ends, but the tracker is local to rewriteGlobal
- * and never escapes. Zero-count names and retained first-pass scopes are released with the tracker.
+ * Time: O(N) expected structural collection/resolution work. Flat IDs avoid depth-length keys, cached var scopes avoid
+ * O(D) searches per var declaration, and active counts avoid O(D) searches per reference. Each binding is activated and
+ * deactivated once; each identifier is classified once. Bound names are skipped before syntax classification, avoiding
+ * O(P²) parameter-pattern searches in Oxc's isReferenceIdentifier for functions with P parameters. Decimal ID formatting
+ * and hashing still depend on ID length (O(log N) characters). No worst-case constant hash-table time is promised.
+ * Space: O(N) records/declarations/counts and O(D) collection stacks, plus identifier/ID text; no generated runtime storage.
+ * Leak: records and declarations retain AST nodes only within rewriteGlobal. All records/counts die with this invocation.
  */
 class SourceScopes extends ScopeTracker {
-    // Replay flat IDs in the same order after freeze; key length no longer grows with nesting depth.
+    // Allocate stable flat IDs once; resolution uses recorded boundaries rather than traversing the AST again.
     private nextScope = 0
     // Cache the nearest var environment, including distinct function bodies and static blocks.
     private readonly varScopes: string[] = []
-    // Counts restore shadowed names on exit and make reference lookup independent of scope depth. Keep zero counts
-    // until this invocation ends: deleting/reinserting common locals repeatedly rehashes a large module's active map.
-    private readonly activeBindings = new Map<string, number>()
-
-    override freeze(): void {
-        super.freeze()
-        this.nextScope = 0
-    }
+    // Append in traversal order so completed bindings can later be activated at exactly their original boundaries.
+    private readonly records: (ReferenceCandidate | ScopeBoundary)[] = []
 
     protected override pushScope(owner: Node): void {
         const parent = this.scopeOwnerStack[this.scopeOwnerStack.length - 1]
@@ -620,20 +597,19 @@ class SourceScopes extends ScopeTracker {
                     parent?.type === 'ArrowFunctionExpression') &&
                 parent.body === owner)
         this.varScopes.push(ownsVars ? this.scopeIndexKey : outerVarScope)
-        if (!this.isFrozen) {
-            // Implicit arguments is a language binding in ordinary functions, not a predefined host global.
-            if (owner.type === 'FunctionDeclaration' || owner.type === 'FunctionExpression') {
-                this.declareIdentifier('arguments', new ScopeTrackerFunctionArguments(owner, this.scopeIndexKey))
-            }
-        } else if (owner.type !== 'SwitchStatement') {
-            this.updateActiveBindings(1)
+        // Implicit arguments is a language binding in ordinary functions, not a predefined host global.
+        if (owner.type === 'FunctionDeclaration' || owner.type === 'FunctionExpression') {
+            this.declareIdentifier('arguments', new ScopeTrackerFunctionArguments(owner, this.scopeIndexKey))
+        }
+        if (owner.type !== 'SwitchStatement') {
+            this.records.push({ scope: this.scopeIndexKey, change: 1 })
         }
     }
 
     protected override popScope(): void {
-        if (this.isFrozen) {
-            // Empty switches never activate, but have no case bindings to remove either.
-            this.updateActiveBindings(-1)
+        const owner = this.scopeOwnerStack[this.scopeOwnerStack.length - 1]
+        if (owner.type !== 'SwitchStatement' || owner.cases.length > 0) {
+            this.records.push({ scope: this.scopeIndexKey, change: -1 })
         }
         this.varScopes.pop()
         this.scopeOwnerStack.pop()
@@ -645,13 +621,36 @@ class SourceScopes extends ScopeTracker {
         return this.varScopes[this.varScopes.length - 1]
     }
 
-    updateActiveBindings(change: 1 | -1): void {
-        for (const name of this.scopes.get(this.scopeIndexKey)?.keys() ?? []) {
-            this.activeBindings.set(name, (this.activeBindings.get(name) ?? 0) + change)
-        }
+    enterCases(): void {
+        this.records.push({ scope: this.scopeIndexKey, change: 1 })
     }
 
-    hasBinding(name: string): boolean {
-        return (this.activeBindings.get(name) ?? 0) > 0
+    recordIdentifier(node: Identifier, parent: Node | null, context: Node | null): void {
+        this.records.push({ node, parent, context })
+    }
+
+    visitFreeReferences(visit: (reference: ReferenceCandidate) => void): void {
+        // Counts restore shadowed names on exit. Retain zero counts until resolution ends to avoid delete/reinsert
+        // rehashing when many sibling functions share local names alongside a large module's live bindings.
+        const activeBindings = new Map<string, number>()
+        for (const record of this.records) {
+            if ('change' in record) {
+                for (const name of this.scopes.get(record.scope)?.keys() ?? []) {
+                    activeBindings.set(name, (activeBindings.get(name) ?? 0) + record.change)
+                }
+                continue
+            }
+            const { node, parent } = record
+            // Imports/exports, keys, labels and declared identifiers are syntax/interfaces, not free reads. Resolve
+            // against completed bindings before inspecting syntax, preserving later declarations, hoisting and TDZ.
+            if (
+                (activeBindings.get(node.name) ?? 0) > 0 ||
+                parent?.type === 'ExportSpecifier' ||
+                !isReferenceIdentifier(node, parent)
+            ) {
+                continue
+            }
+            visit(record)
+        }
     }
 }

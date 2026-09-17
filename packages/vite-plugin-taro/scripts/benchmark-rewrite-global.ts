@@ -21,6 +21,23 @@ const fixtures = [
     { name: 'free reads', code: 'Math.max(slot, 1);\n'.repeat(10000) },
     { name: 'free writes', code: 'slot += other;\n'.repeat(10000) },
     {
+        name: 'deep scopes',
+        // Deferred resolution must not replace the second AST walk with ancestor searches for every reference.
+        code: `${'{ let local;'.repeat(256)}${'var repeated;'.repeat(1000)}${'Math; fetch;'.repeat(500)}${'}'.repeat(256)}`
+    },
+    {
+        name: 'later enclosing declarations',
+        code: Array.from(
+            { length: 1000 },
+            (_, index) => `function run${index}() {
+                function nested() { slot = () => slot; return { slot, other, Math }; }
+                { var slot; }
+                let other;
+                return nested;
+            }`
+        ).join('\n')
+    },
+    {
         name: 'React reconciler',
         code: readFileSync(join(reconcilerRoot, 'cjs/react-reconciler.development.js'), 'utf8')
     }

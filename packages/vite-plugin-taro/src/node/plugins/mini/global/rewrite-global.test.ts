@@ -664,6 +664,60 @@ test('restores zero-count bindings across many sibling scopes without leaking lo
     assertNames(`let slot; ${siblings}\nslot; next;`, ['next'])
 })
 
+test('resolves later enclosing declarations before editing queued reads, writes and inferred names', () => {
+    const code = `
+        function run() {
+            function nested() {
+                slot = () => slot;
+                return { slot, other };
+            }
+            { var slot; }
+            let other;
+            return nested;
+        }
+        run();
+    `
+    assertNames(code, [])
+    assertNames(`${code}\nslot; other;`, ['slot', 'other'])
+})
+
+test('traverses AST children once, then resolves references and allocates aliases without revisiting them', () => {
+    const source = 'function read() { return [later, Math] } const later = 1; function reserve(__miniGlobal0) {}'
+    const program = parse(source, false)
+    const body = program.body
+    const declaration = body[0]
+    assert.ok(declaration.type === 'FunctionDeclaration' && declaration.body)
+    const statement = declaration.body.body[0]
+    assert.ok(statement.type === 'ReturnStatement' && statement.argument?.type === 'ArrayExpression')
+    const array = statement.argument
+    const elements = array.elements
+    // Count only traversal-owned child accesses, not declaration/pattern scans or emitted-code parsing.
+    let bodyReads = 0
+    let elementReads = 0
+    Object.defineProperty(program, 'body', {
+        get() {
+            bodyReads++
+            return body
+        }
+    })
+    Object.defineProperty(array, 'elements', {
+        get() {
+            elementReads++
+            return elements
+        }
+    })
+    const editor = new RolldownMagicString(source)
+    const alias = rewriteGlobal(program, editor)
+    assert.equal(bodyReads, 1)
+    assert.equal(elementReads, 1)
+    assert.equal(alias, '__miniGlobal1')
+    assert.equal(
+        editor.toString(),
+        `function read() { return [later, ("Math" in ${alias} ? ${alias}.Math : Math)] } const later = 1; function reserve(__miniGlobal0) {}`
+    )
+    parse(editor.toString(), false)
+})
+
 test('combines leading ASI repair with overwrites instead of adding one editor call per statement', (context) => {
     const source = 'visit()\nslot++\nMath\n'
     // Instrument the caller-owned editor without changing its behavior; operation counts are deterministic.
