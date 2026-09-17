@@ -7,13 +7,24 @@ export function createConditionalDirectivePlugin(target: VptTarget): Plugin {
     return {
         name: 'vpt:conditional-directives',
         enforce: 'pre',
-        transform(code, id) {
-            if (!isConditionalDirectiveSource(id) || !code.includes('#if')) {
-                return
-            }
-            return {
-                code: transformConditionalDirectives(code, target),
-                map: null
+        transform: {
+            // Keep irrelevant sources on Rolldown's native side instead of crossing into JS for an early return.
+            filter: {
+                id: {
+                    // Match the physical path, not extension or dependency names inside a Vite query.
+                    include: /^[^?]*\.(?:[cm]?[jt]sx?|css|s[ac]ss|less|styl)(?:\?.*)?$/,
+                    exclude: /^[^?]*\/node_modules\//
+                },
+                code: '#if'
+            },
+            handler(code, id) {
+                if (!isConditionalDirectiveSource(id) || !code.includes('#if')) {
+                    return
+                }
+                return {
+                    code: transformConditionalDirectives(code, target),
+                    map: null
+                }
             }
         }
     }
