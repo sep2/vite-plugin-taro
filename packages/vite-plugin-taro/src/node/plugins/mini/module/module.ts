@@ -62,6 +62,9 @@ const frameworkPackageRoots = [
 
 const polyfillPackageRoot = `${normalizePath(path.dirname(packageRequire.resolve('core-js/package.json')))}/`
 
+/** Native hook filter for the physical core-js graph; the generated import-only entry needs no host rewriting. */
+export const miniPolyfillSourceFilter = new RegExp(`^${polyfillPackageRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`)
+
 /** Groups the generated entry and core-js into common/polyfills.js. */
 export function isMiniPolyfillModule(moduleId: string): boolean {
     return moduleId === miniPolyfillsId || normalizePath(moduleId).startsWith(polyfillPackageRoot)

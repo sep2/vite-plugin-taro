@@ -2,7 +2,7 @@ import { type Plugin, transformWithOxc } from 'vite'
 import { createExactModuleIdFilter } from '../../../utils/modules.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import type { MiniContract } from '../mini-contract.ts'
-import { isMiniPolyfillModule, miniPolyfillsId } from '../module/module.ts'
+import { miniPolyfillSourceFilter, miniPolyfillsId } from '../module/module.ts'
 import { miniBrowserBindings } from './mini-browser-bindings.ts'
 
 // Core-js probes the host, not Taro's emulated DOM. Explicit global accesses also keep its pre-bootstrap graph independent
@@ -27,11 +27,19 @@ export function createMiniPolyfillPlugin(contract: Pick<MiniContract, 'options'>
                 }
             }
         },
-        transform(code, id) {
-            if (!isMiniPolyfillModule(id)) {
-                return
+        transform: {
+            filter: {
+                id: miniPolyfillSourceFilter,
+                // A backslash admits escaped identifier spellings too. False positives are harmless: Oxc still owns
+                // lexical binding semantics; this precheck only excludes modules that cannot reference a host binding.
+                code: new RegExp(`\\\\|\\b(?:${Object.keys(miniBrowserBindings).join('|')})\\b`)
+            },
+            handler(code, id) {
+                return transformWithOxc(code, id, {
+                    define: polyfillHostBindings,
+                    sourcemap: Boolean(this.environment.config.build.sourcemap)
+                })
             }
-            return transformWithOxc(code, id, { define: polyfillHostBindings, sourcemap: true })
         },
         resolveId: {
             filter: { id: createExactModuleIdFilter(miniPolyfillsId) },
