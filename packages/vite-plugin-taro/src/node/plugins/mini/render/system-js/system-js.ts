@@ -47,7 +47,6 @@ type SourceEditor = {
     appendRight(position: number, content: string): unknown
     overwrite(start: number, end: number, content: string): unknown
     prependLeft(position: number, content: string): unknown
-    remove(start: number, end: number): unknown
 }
 
 type GeneratedNames = Readonly<{
@@ -292,7 +291,8 @@ function applyProgramEdits(editor: SourceEditor, model: ModuleModel): void {
     for (const node of model.program.body) {
         switch (node.type) {
             case 'ImportDeclaration':
-                editor.remove(node.start, node.end)
+                // Imports own no expression edits; deleting their original syntax is an empty replacement.
+                editor.overwrite(node.start, node.end, '')
                 break
             case 'ExportNamedDeclaration':
                 editor.overwrite(node.start, node.end, renderImportedExports(node.specifiers, model))
@@ -517,20 +517,18 @@ function requireNoExportedPattern(
 
 type RegistrationShell = Readonly<{ prefix: string; suffix: string }>
 
-/** Renders the no-map fast path through one source-order edit journal. */
+/** Compiles one edit plan, then renders hoisted functions and the complementary body as non-mutating views. */
 function assembleUnmappedRegistration(
     editor: StringEditor,
     model: ModuleModel,
     options: TransformSystemJsOptions
 ): string {
     const shell = createRegistrationShell(model, options)
+    const plan = editor.compile()
     const hoistedFunctions = model.functions
-        .map((declaration) => editor.render(declaration.start, declaration.end))
+        .map((declaration) => plan.render(declaration.start, declaration.end))
         .join('')
-    model.functions.forEach((declaration) => {
-        editor.remove(declaration.start, declaration.end)
-    })
-    return `${shell.prefix}${editor.render(0, editor.original.length)}}};${hoistedFunctions}${shell.suffix}`
+    return `${shell.prefix}${plan.renderOutside(model.functions)}}};${hoistedFunctions}${shell.suffix}`
 }
 
 /** Places mapped hoisted functions after the declaration return while retaining every original source segment. */

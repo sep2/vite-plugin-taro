@@ -303,6 +303,44 @@ test('emits composable source maps while preserving hoisted function edits', asy
     assert.equal(instance.namespace.value, 2)
 })
 
+test('preserves adjacent hoisted functions and an unmapped function ending at EOF', async () => {
+    const code =
+        "function first(){return ++count}function second(){return count++}import{value}from'./dependency.js';let count=value;export{count,first,second,last};function last(){return count+=value}"
+    const dependencies = new Map([['./dependency.js', { value: 2 }]])
+    for (const sourcemap of [false, true]) {
+        const result = transformSystemJs({
+            // MagicString's existing move path needs a destination beyond the function, as in newline-ended Rolldown output.
+            code: sourcemap ? `${code}\n` : code,
+            filename: 'assets/chunk.js',
+            format: 'commonjs-registration',
+            sourcemap,
+            resolveReference(reference) {
+                return reference
+            }
+        })
+        const instance = await instantiate(evaluateCommonJsRegistration(result.code), dependencies)
+        assert.equal(instance.beforeExecute.first, 'function')
+        assert.equal(instance.beforeExecute.second, 'function')
+        assert.equal(instance.beforeExecute.last, 'function')
+        assert.equal(instance.namespace.count, 2)
+        assert.equal(requireFunction(instance.namespace.first)(), 3)
+        assert.equal(requireFunction(instance.namespace.second)(), 3)
+        assert.equal(requireFunction(instance.namespace.last)(), 6)
+        assert.equal(instance.namespace.count, 6)
+    }
+})
+
+test('renders a large hoisted function set without losing declaration-time exports or nested edits', async () => {
+    const names = Array.from({ length: 512 }, (_, index) => `increment${index}`)
+    const code = `let count = 0;${names.map((name) => `function ${name}() { return ++count; }`).join('')}export { count, ${names.join(',')} };`
+    const instance = await instantiate(evaluateCommonJsRegistration(compile(code).code), new Map())
+    for (const [index, name] of names.entries()) {
+        assert.equal(instance.beforeExecute[name], 'function')
+        assert.equal(requireFunction(instance.namespace[name])(), index + 1)
+    }
+    assert.equal(instance.namespace.count, names.length)
+})
+
 test('rejects source-level module forms outside final Rolldown chunk grammar', () => {
     assert.throws(() => compile(`export const value = 1;`), /declaration exports/)
     assert.throws(() => compile(`export default 1;`), /source-level ExportDefaultDeclaration/)

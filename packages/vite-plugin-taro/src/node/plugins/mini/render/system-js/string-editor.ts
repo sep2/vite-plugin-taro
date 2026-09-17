@@ -1,26 +1,36 @@
-/** One half-open source range replaced atomically during rendering. */
-type Replacement = Readonly<{
-    content: string
-    end: number
-    start: number
-}>
+/** One half-open source range; omitted ranges also own insertions at both boundaries. */
+type SourceRange = Readonly<{ start: number; end: number }>
 
-/** Ordered zero-width edits attached to one source boundary. */
+/** One half-open source range replaced atomically during rendering. */
+type Replacement = SourceRange & Readonly<{ content: string }>
+
+/** Append-only journals; prepend calls are reversed once when the edit plan is compiled. */
 type Insertions = Readonly<{
     append: string[]
     prepend: string[]
 }>
 
+type Insertion = Readonly<{ start: number; content: string }>
+type EditPlan = Readonly<{
+    original: string
+    replacements: readonly Replacement[]
+    insertions: readonly Insertion[]
+}>
+
 /**
- * Records non-overlapping range edits and renders them in one source-order pass.
+ * Collects range edits, then compiles one immutable, source-ordered plan for every rendered view.
  *
- * Final Mini Program development chunks do not request source maps. RolldownMagicString's repeated relocation of hoisted
- * functions is considerably more expensive than the semantic analysis itself, so this editor keeps the same range operations
- * while avoiding a mutable chunk graph when no mappings can be observed.
+ * Final Mini Program development chunks do not request source maps. Hoisted functions and the remaining module body
+ * are disjoint views of the same plan, rather than repeated scans/sorts followed by destructive function removals.
+ *
+ * For E edits and F hoisted functions, compilation costs O(E log E) plus insertion text assembly. Each view uses binary
+ * searches followed by forward-only cursors over its edits. Rendering all functions and the remaining body costs
+ * O(E + F log E + output characters); views never scan the complete insertion journal per replacement or function.
+ * Storage is O(E + inserted text) plus rendered output, owned by this compilation only.
  */
 export class StringEditor {
     readonly original: string
-    // These journals are the editor's intentionally mutable transaction; rendering reads but never changes them.
+    // Only collection mutates these journals. compile() snapshots them so rendering needs no cache or invalidation state.
     readonly #insertions = new Map<number, Insertions>()
     readonly #replacements: Replacement[] = []
 
@@ -28,89 +38,129 @@ export class StringEditor {
         this.original = original
     }
 
-    /** Records a half-open replacement; semantic passes guarantee ranges are nested or disjoint. */
+    /** Records a replacement, including empty replacements for removed import declarations. */
     overwrite(start: number, end: number, content: string): void {
         this.#replacements.push({ content, end, start })
     }
 
-    /** Removes a range and discards insertions that were owned only by that removed source. */
-    remove(start: number, end: number): void {
-        this.overwrite(start, end, '')
-        // Removed ranges own their boundary insertions; hoisted function text has already rendered those edits separately.
-        for (const position of this.#insertions.keys()) {
-            if (position >= start && position <= end) this.#insertions.delete(position)
-        }
-    }
-
-    /** Inserts before prior insertions at a boundary, matching MagicString's prependLeft ordering. */
+    /** Records prepend order in O(1), avoiding unshift's repeated movement of earlier insertions. */
     prependLeft(position: number, content: string): void {
-        const insertions = this.#insertionAt(position)
-        insertions.prepend.unshift(content)
+        this.#insertionAt(position).prepend.push(content)
     }
 
-    /** Inserts after prior insertions at the left side of a boundary. */
     appendLeft(position: number, content: string): void {
-        const insertions = this.#insertionAt(position)
-        insertions.append.push(content)
+        this.#insertionAt(position).append.push(content)
     }
 
     /** Matches the subset of appendRight ordering used by the capsule compiler. */
     appendRight(position: number, content: string): void {
-        const insertions = this.#insertionAt(position)
-        insertions.append.push(content)
+        this.#insertionAt(position).append.push(content)
     }
 
-    /** Materializes one source slice without mutating its edit journal, allowing functions to be rendered before relocation. */
-    render(start: number, end: number): string {
-        const replacements = this.#replacements
-            .filter((replacement) => replacement.start >= start && replacement.end <= end)
-            .sort((left, right) => left.start - right.start || right.end - left.end)
-        // The cursor advances monotonically; outer removals dominate nested edits when hoisted function ranges are removed.
-        let sourcePosition = start
-        let output = ''
-
-        for (const replacement of replacements) {
-            if (replacement.end <= sourcePosition) continue
-            if (replacement.start < sourcePosition) {
-                throw new Error(`Partially overlapping source edits at ${replacement.start}:${replacement.end}`)
-            }
-            output += this.#renderOriginal(sourcePosition, replacement.start, false)
-            output += replacement.content
-            sourcePosition = replacement.end
+    /** Sorts once after semantic edits finish; all function/body views share this immutable snapshot. */
+    compile() {
+        const plan: EditPlan = {
+            original: this.original,
+            replacements: this.#replacements.toSorted(
+                (left, right) => left.start - right.start || right.end - left.end
+            ),
+            insertions: [...this.#insertions]
+                .sort(([left], [right]) => left - right)
+                .map(([start, insertions]) => ({
+                    start,
+                    content: insertions.prepend.toReversed().join('') + insertions.append.join('')
+                }))
         }
-
-        output += this.#renderOriginal(sourcePosition, end, true)
-        return output
+        return {
+            /** Includes boundary insertions so relocated functions keep every edit they own. */
+            render: (start: number, end: number): string => renderRange(plan, start, end, true, true),
+            /** Ranges must be disjoint and in source order, as direct Program function declarations are. */
+            renderOutside: (ranges: readonly SourceRange[]): string => renderOutside(plan, ranges)
+        }
     }
 
-    #insertionAt(position: number): { append: string[]; prepend: string[] } {
+    #insertionAt(position: number): Insertions {
         const existing = this.#insertions.get(position)
-        if (existing) return existing
-        // Each position owns mutable ordered lists because prependLeft reverses calls while appendRight preserves them.
+        if (existing) {
+            return existing
+        }
+        // Each boundary owns mutable append-only lists until compile() assembles their final insertion order.
         const created = { append: [], prepend: [] }
         this.#insertions.set(position, created)
         return created
     }
+}
 
-    #renderOriginal(start: number, end: number, includeEnd: boolean): string {
-        const positions = [...this.#insertions.keys()]
-            .filter((position) => position >= start && (position < end || (includeEnd && position === end)))
-            .sort((left, right) => left - right)
-        // Segment rendering appends immutable source slices around the small ordered insertion set.
-        let sourcePosition = start
-        let output = ''
-        for (const position of positions) {
-            output += this.original.slice(sourcePosition, position)
-            output += this.#renderInsertions(position)
-            sourcePosition = position
+/** Renders only the gaps between hoisted ranges, excluding their boundary insertions without deleting any edits. */
+function renderOutside(plan: EditPlan, ranges: readonly SourceRange[]): string {
+    // These local output pieces and the gap cursor advance once through source-ordered declarations.
+    const output: string[] = []
+    let start = 0
+    let includeStart = true
+    for (const range of ranges) {
+        output.push(renderRange(plan, start, range.start, includeStart, false))
+        start = range.end
+        includeStart = false
+    }
+    output.push(renderRange(plan, start, plan.original.length, includeStart, true))
+    return output.join('')
+}
+
+/** Binary searches once per journal, then merges only the edits within this view. */
+function renderRange(plan: EditPlan, start: number, end: number, includeStart: boolean, includeEnd: boolean): string {
+    // Both cursors advance monotonically; replaced source suppresses its interior insertions and nested replacements.
+    let sourcePosition = start
+    let insertionIndex = lowerBound(plan.insertions, start)
+    const output: string[] = []
+    const appendOriginal = (until: number, includeUntil: boolean): void => {
+        while (insertionIndex < plan.insertions.length) {
+            const insertion = plan.insertions[insertionIndex]
+            if (insertion.start > until || (insertion.start === until && !includeUntil)) {
+                break
+            }
+            insertionIndex++
+            if (insertion.start < sourcePosition || (insertion.start === start && !includeStart)) {
+                continue
+            }
+            output.push(plan.original.slice(sourcePosition, insertion.start), insertion.content)
+            sourcePosition = insertion.start
         }
-        output += this.original.slice(sourcePosition, end)
-        return output
+        output.push(plan.original.slice(sourcePosition, until))
+        sourcePosition = until
     }
 
-    #renderInsertions(position: number): string {
-        // Callers enumerate this map's keys, so the matching insertion journal is guaranteed to exist.
-        const insertions = this.#insertions.get(position) as Insertions
-        return `${insertions.prepend.join('')}${insertions.append.join('')}`
+    // Start at this view's first possible replacement instead of filtering the complete module journal.
+    for (let index = lowerBound(plan.replacements, start); index < plan.replacements.length; index++) {
+        const replacement = plan.replacements[index]
+        if (replacement.start >= end) {
+            break
+        }
+        if (replacement.end > end || replacement.end <= sourcePosition) {
+            continue
+        }
+        if (replacement.start < sourcePosition) {
+            throw new Error(`Partially overlapping source edits at ${replacement.start}:${replacement.end}`)
+        }
+        appendOriginal(replacement.start, false)
+        output.push(replacement.content)
+        sourcePosition = replacement.end
     }
+    appendOriginal(end, includeEnd)
+    return output.join('')
+}
+
+/** First edit whose source start is at or after the requested boundary. */
+function lowerBound(edits: readonly Readonly<{ start: number }>[], position: number): number {
+    // This local half-open search window shrinks on every iteration, independent of the number of other rendered views.
+    let low = 0
+    let high = edits.length
+    while (low < high) {
+        const middle = Math.floor((low + high) / 2)
+        if (edits[middle].start < position) {
+            low = middle + 1
+        } else {
+            high = middle
+        }
+    }
+    return low
 }

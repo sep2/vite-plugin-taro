@@ -40,6 +40,7 @@
     "scripts": {
         "build": "node ../../scripts/sync-plugin-readme.ts && node ./scripts/build.ts",
         "bench:rewrite-global": "node scripts/benchmark-rewrite-global.ts",
+        "bench:string-editor": "node scripts/benchmark-string-editor.ts",
         "test": "node --test --test-concurrency=2",
         "test:coverage": "c8 node --test --test-concurrency=2",
         "typecheck": "tsc --project tsconfig.json --noEmit"
