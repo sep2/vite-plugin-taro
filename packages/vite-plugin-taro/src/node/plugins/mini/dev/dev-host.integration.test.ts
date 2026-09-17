@@ -26,6 +26,7 @@ const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/packag
 const maximumWaitAttempts = 400
 const stableReadCount = 10
 const waitIntervalMilliseconds = 25
+const pageCapsuleFileName = 'pages/home/index-capsule.js'
 
 const runtimeModules = {
     bootstrap: resolveRuntimeFile('mini/amphibious/bootstrap'),
@@ -109,8 +110,9 @@ async function startDevFixture(
     logger: Logger,
     host: string,
     options: VptOptions,
-    bundleOutput: 'memory' | 'disk'
+    bundleOutput: 'memory' | 'capsule' | 'disk'
 ): Promise<DevFixture> {
+    const persistedBundleFiles = bundleOutput === 'capsule' ? [pageCapsuleFileName] : []
     const root = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-dev-test-'))
     const outDir = path.join(root, 'dist')
     const oldDirectory = path.join(outDir, 'obsolete/nested')
@@ -149,7 +151,7 @@ async function startDevFixture(
                     order: 'post',
                     handler(_output, bundle) {
                         const app = bundle['app-capsule.js']
-                        const page = bundle['pages/home/index-capsule.js']
+                        const page = bundle[pageCapsuleFileName]
                         assert.ok(app?.type === 'chunk' && page?.type === 'chunk')
                         assert.ok(app.moduleIds.includes(normalizePath(path.join(root, 'src/app.tsx'))))
                         assert.ok(app.moduleIds.includes(runtimeModules.appCapsule))
@@ -160,11 +162,13 @@ async function startDevFixture(
                         javaScriptOutput = Object.values(bundle).flatMap((item) =>
                             item.type === 'chunk' ? [item.code] : []
                         )
-                        if (bundleOutput === 'memory') {
-                            // The native host ignores build.write. Discard only final output, after the real pipeline and
-                            // layout assertions, so watchers, patches and host-owned metadata still exercise real I/O.
+                        if (bundleOutput !== 'disk') {
+                            // Only the directory-preservation case needs a complete physical project. Capsule cases keep
+                            // their real write/read assertions without also rewriting unrelated vendor and template files.
                             for (const fileName of Object.keys(bundle)) {
-                                delete bundle[fileName]
+                                if (!persistedBundleFiles.includes(fileName)) {
+                                    delete bundle[fileName]
+                                }
                             }
                         }
                     }
@@ -204,21 +208,22 @@ async function startDevFixture(
         close: async () => {
             try {
                 await server.close()
-                if (bundleOutput === 'memory') {
-                    // Check after shutdown drains atomic writes. Even recovery builds must not materialize full bundles.
-                    const hostFiles = new Set([
+                if (bundleOutput !== 'disk') {
+                    // Check after shutdown drains atomic writes. Even recovery builds must respect the selected file set.
+                    const allowedFiles = new Set([
                         'app.wxss',
                         'assets/global.wxss',
                         hmrInfoFileName,
-                        devtoolsPatchesFileName
+                        devtoolsPatchesFileName,
+                        ...persistedBundleFiles
                     ])
                     const files = (await readdir(outDir, { recursive: true, withFileTypes: true }))
                         .filter((entry) => entry.isFile())
                         .map((entry) => normalizePath(path.relative(outDir, path.join(entry.parentPath, entry.name))))
                     assert.deepEqual(
-                        files.filter((fileName) => !hostFiles.has(fileName)),
+                        files.filter((fileName) => !allowedFiles.has(fileName)),
                         [],
-                        'Only host-owned styles and HMR metadata may reach disk'
+                        'Only explicitly selected bundle files, host styles and HMR metadata may reach disk'
                     )
                 }
             } finally {
@@ -450,7 +455,7 @@ test('rejects startup with the original complete-output failure', async () => {
 })
 
 test('patches a bundled utility without rewriting its Page capsule or rotating the App', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'disk')
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'capsule')
     context.after(fixture.close)
     const infoSource = await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
     const info = parseHmrInfo(infoSource)
@@ -459,7 +464,7 @@ test('patches a bundled utility without rewriting its Page capsule or rotating t
         (source) => source.includes(info.buildId),
         maximumWaitAttempts
     )
-    const capsulePath = path.join(fixture.outDir, 'pages/home/index-capsule.js')
+    const capsulePath = path.join(fixture.outDir, pageCapsuleFileName)
     const originalCapsule = await readFile(capsulePath, 'utf8')
     await publishSourceGeneration(
         path.join(path.dirname(fixture.pagePath), 'suffix.ts'),
@@ -665,7 +670,7 @@ test('publishes interpreter source through Vite WebSocket', async (context) => {
 })
 
 test('rebuild mode replaces complete output without creating patch transport artifacts', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createRebuildOptions(), 'disk')
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createRebuildOptions(), 'capsule')
     context.after(fixture.close)
 
     const initialAppStyle = await waitForFile(
@@ -684,6 +689,7 @@ test('rebuild mode replaces complete output without creating patch transport art
         maximumWaitAttempts
     )
     await waitForJavaScriptOutput(fixture, marker, maximumWaitAttempts)
+    assert.ok((await readFile(path.join(fixture.outDir, pageCapsuleFileName), 'utf8')).includes(marker))
 
     const javaScriptOutput = (await fixture.readJavaScript()).join('\n')
     assert.match(rebuiltAppStyle, /vpt-build:/)
