@@ -1,11 +1,11 @@
 import type { Plugin, PluginOption } from 'vite'
 import { esTarget } from '../../utils/constant.ts'
+import { createExactModuleIdFilter } from '../../utils/modules.ts'
 import { packageRequire } from '../../utils/packages.ts'
-import { clientTaroNativeId } from '../client/constant.ts'
 import { createMiniDevelopmentPlugin } from './dev/plugins.ts'
 import type { MiniContract } from './mini-contract.ts'
 import { miniRuntimeId } from './module/module.ts'
-import { compileNativeComponentInterface } from './native/compile-native-component-interface.ts'
+import { createMiniNativeComponentPlugin } from './native/create-mini-native-component-plugin.ts'
 import { createOutputFiles } from './output/files.ts'
 import { createMiniPlacementPlugin, type MiniPlacementPlugin } from './placer/placer.ts'
 import { createMiniPolyfillPlugin } from './polyfill/create-mini-polyfill-plugin.ts'
@@ -31,6 +31,7 @@ export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] 
         placement,
         styles,
         createMiniPlugin(contract, resolver, placement),
+        createMiniNativeComponentPlugin(),
         createMiniPolyfillPlugin(contract),
         createMiniDevelopmentPlugin(contract, styles),
         createMiniWatchPlugin()
@@ -101,19 +102,13 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
 
         transform: {
             order: 'pre',
-            async handler(code, id) {
-                const sourcemap = Boolean(this.environment.config.build.sourcemap)
-
-                if (code.includes(clientTaroNativeId)) {
-                    return compileNativeComponentInterface({
-                        code,
-                        id,
-                        sourcemap,
-                        addWatchFile: (file) => this.addWatchFile(file)
-                    })
-                }
-
-                return resolver.specialize(code, id, sourcemap)
+            filter: {
+                id: [contract.runtime.modules.appCapsule, contract.runtime.modules.pageCapsule].map(
+                    createExactModuleIdFilter
+                )
+            },
+            handler(code, id) {
+                return resolver.specialize(code, id, Boolean(this.environment.config.build.sourcemap))
             }
         },
 
