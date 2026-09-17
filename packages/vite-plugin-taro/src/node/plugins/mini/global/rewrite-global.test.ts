@@ -650,6 +650,37 @@ test('keeps analysis bounded across deep scopes, many vars and large parameter l
     assertNames(`function run(${parameters}) { return [${parameters}, vendorBridge] }`, ['vendorBridge'])
 })
 
+test('restores zero-count bindings across many sibling scopes without leaking locals', () => {
+    const siblings = Array.from(
+        { length: 1000 },
+        (_, index) => `function run${index}(slot) {
+            const next = slot;
+            { let slot; slot; next; }
+            return slot;
+        }`
+    ).join('\n')
+    assertNames(siblings, [])
+    assertNames(`${siblings}\nslot; next; arguments;`, ['slot', 'next', 'arguments'])
+    assertNames(`let slot; ${siblings}\nslot; next;`, ['next'])
+})
+
+test('combines leading ASI repair with overwrites instead of adding one editor call per statement', (context) => {
+    const source = 'visit()\nslot++\nMath\n'
+    // Instrument the caller-owned editor without changing its behavior; operation counts are deterministic.
+    const editor = new RolldownMagicString(source)
+    const prependLeft = context.mock.method(editor, 'prependLeft')
+    const overwrite = context.mock.method(editor, 'overwrite')
+    const alias = rewriteGlobal(parse(source, false), editor)
+    assert.ok(alias)
+    assert.equal(prependLeft.mock.callCount(), 0)
+    assert.equal(overwrite.mock.callCount(), 3)
+    assert.equal(
+        editor.toString(),
+        `;("visit" in ${alias} ? ${alias}.visit : visit)()\n;("slot" in ${alias} ? ${alias}.slot++ : slot++);\n;("Math" in ${alias} ? ${alias}.Math : Math);\n`
+    )
+    parse(editor.toString(), false)
+})
+
 test('does not confuse other unary operators or member updates with bare typeof/update operations', async () => {
     await assertEquivalent(`(() => {
         slot = 7;

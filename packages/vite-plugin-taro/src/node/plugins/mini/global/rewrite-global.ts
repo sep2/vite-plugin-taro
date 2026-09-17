@@ -240,11 +240,8 @@ export function rewriteGlobal(program: Program, editor: RolldownMagicString): st
      */
     const overwrite = (range: Node, replacement: string) => {
         changed = true
-        if (statementStarts.has(range.start)) {
-            editor.prependLeft(range.start, ';')
-        }
         terminate(range.end)
-        editor.overwrite(range.start, range.end, replacement)
+        editor.overwrite(range.start, range.end, statementStarts.has(range.start) ? `;${replacement}` : replacement)
     }
     walk(program, {
         scopeTracker: scopes,
@@ -592,14 +589,15 @@ function preserveInferredName(value: Node, name: string, editor: RolldownMagicSt
  * depend on ID length (O(log N) characters), not nesting depth. No worst-case constant hash-table time is promised.
  * Space: O(N) declaration/count entries and O(D) scope stacks, plus identifier/ID text; zero generated runtime storage.
  * Leak: declaration maps intentionally keep AST nodes until the second walk ends, but the tracker is local to rewriteGlobal
- * and never escapes. Exiting a scope deletes zero-count active names; retained first-pass scopes are released with tracker.
+ * and never escapes. Zero-count names and retained first-pass scopes are released with the tracker.
  */
 class SourceScopes extends ScopeTracker {
     // Replay flat IDs in the same order after freeze; key length no longer grows with nesting depth.
     private nextScope = 0
     // Cache the nearest var environment, including distinct function bodies and static blocks.
     private readonly varScopes: string[] = []
-    // Counts restore shadowed names on exit and make reference lookup independent of scope depth.
+    // Counts restore shadowed names on exit and make reference lookup independent of scope depth. Keep zero counts
+    // until this invocation ends: deleting/reinserting common locals repeatedly rehashes a large module's active map.
     private readonly activeBindings = new Map<string, number>()
 
     override freeze(): void {
@@ -649,16 +647,11 @@ class SourceScopes extends ScopeTracker {
 
     updateActiveBindings(change: 1 | -1): void {
         for (const name of this.scopes.get(this.scopeIndexKey)?.keys() ?? []) {
-            const count = (this.activeBindings.get(name) ?? 0) + change
-            if (count === 0) {
-                this.activeBindings.delete(name)
-            } else {
-                this.activeBindings.set(name, count)
-            }
+            this.activeBindings.set(name, (this.activeBindings.get(name) ?? 0) + change)
         }
     }
 
     hasBinding(name: string): boolean {
-        return this.activeBindings.has(name)
+        return (this.activeBindings.get(name) ?? 0) > 0
     }
 }
