@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { createContext, runInContext } from 'node:vm'
@@ -19,18 +19,57 @@ const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/packag
 const coreJsRoot = `${normalizePath(path.dirname(packageRequire.resolve('core-js/package.json')))}/`
 const optionalPolyfills = ['web.url', 'es.array.at']
 
-/** Compiles a real disposable consumer through the public Vite build/server APIs. */
+/** Exercises the public build/server pipelines with in-memory sources and captured, rather than written, bundles. */
 async function compileFixture(
     target: MiniTarget,
     mode: Mode,
     polyfills: readonly string[]
 ): Promise<readonly OutputChunk[]> {
     const root = await mkdtemp(path.join(packageRoot, '.vpt-polyfills-test-'))
-    const pagePath = path.join(root, 'src/pages/home/index.tsx')
+    const sources: ReadonlyMap<string, string> = new Map([
+        [
+            normalizePath(path.join(root, 'src/probe.ts')),
+            `
+            import { document as taroDocument } from 'vite-plugin-taro-runtime/runtime/mini'
+            const url = new URL('child', 'https://example.com/dir/page')
+            const params = new URLSearchParams('a=1&b=2&a=3')
+            export const probe = {
+                href: url.href,
+                params: params.toString(),
+                entries: [...params.entries()],
+                at: typeof [].at === 'function' ? [1, 2].at(-1) : null,
+                hostURL: URL === globalThis.URL,
+                hostParams: URLSearchParams === globalThis.URLSearchParams,
+                document: document === taroDocument,
+                local: ((URL) => URL)('local'),
+                structuredClone: typeof structuredClone
+            }
+        `
+        ],
+        [
+            normalizePath(path.join(root, 'src/app.tsx')),
+            `
+            import { probe } from './probe.ts'
+            globalThis.polyfillProbe = probe
+            globalThis.readPerformanceNow = () => performance.now()
+            export default function App({ children }) { return children }
+        `
+        ],
+        [normalizePath(path.join(root, 'src/pages/home/index.tsx')), 'export default function Home() { return null }']
+    ])
     // This completion cell captures exactly one initial output graph; the server is closed before returning it.
     const output = Promise.withResolvers<readonly OutputChunk[]>()
     const capture: Plugin = {
         name: 'test:polyfill-output',
+        resolveId(id, importer) {
+            const resolved = normalizePath(
+                importer && id.startsWith('.') ? path.resolve(path.dirname(importer), id) : id
+            )
+            return sources.has(resolved) ? resolved : undefined
+        },
+        load(id) {
+            return sources.get(normalizePath(id))
+        },
         generateBundle: {
             order: 'post',
             handler(_options, bundle) {
@@ -65,6 +104,13 @@ async function compileFixture(
                     })
                 }
                 output.resolve(chunks)
+                if (mode !== 'production') {
+                    // The Mini dev host deliberately writes regardless of build.write. These tests execute the captured
+                    // chunks in a VM, so discard the bundle after all output assertions instead of writing a native project.
+                    for (const fileName of Object.keys(bundle)) {
+                        delete bundle[fileName]
+                    }
+                }
             }
         }
     }
@@ -81,42 +127,18 @@ async function compileFixture(
     const previousNodeEnv = process.env.NODE_ENV
     process.env.NODE_ENV = mode === 'production' ? 'production' : 'development'
     try {
-        await mkdir(path.dirname(pagePath), { recursive: true })
-        await writeFile(
-            path.join(root, 'src/probe.ts'),
-            `
-                import { document as taroDocument } from 'vite-plugin-taro-runtime/runtime/mini'
-                const url = new URL('child', 'https://example.com/dir/page')
-                const params = new URLSearchParams('a=1&b=2&a=3')
-                export const probe = {
-                    href: url.href,
-                    params: params.toString(),
-                    entries: [...params.entries()],
-                    at: typeof [].at === 'function' ? [1, 2].at(-1) : null,
-                    hostURL: URL === globalThis.URL,
-                    hostParams: URLSearchParams === globalThis.URLSearchParams,
-                    document: document === taroDocument,
-                    local: ((URL) => URL)('local'),
-                    structuredClone: typeof structuredClone
-                }
-            `
-        )
-        await writeFile(
-            path.join(root, 'src/app.tsx'),
-            `
-                import { probe } from './probe'
-                globalThis.polyfillProbe = probe
-                globalThis.readPerformanceNow = () => performance.now()
-                export default function App({ children }) { return children }
-            `
-        )
-        await writeFile(pagePath, 'export default function Home() { return null }')
         const config = {
             root,
             configFile: false as const,
             logLevel: 'silent' as const,
             plugins: [vpt(options), capture],
-            build: { write: false, minify: false as const, sourcemap: mode === 'production' },
+            // The host writes metadata relative to outDir itself, so a relative default would pollute the package's dist.
+            build: {
+                outDir: path.join(root, 'dist'),
+                write: false,
+                minify: false as const,
+                sourcemap: mode === 'production'
+            },
             server: { host: '127.0.0.1', port: 0 }
         }
         if (mode === 'production') {
@@ -135,6 +157,7 @@ async function compileFixture(
                 assert.ok(map.mappings.length > 0)
                 assert.ok(map.sources.length > 0)
             }
+            assert.deepEqual(await readdir(root), [], 'Production fixtures must not materialize sources or output')
             return result.output.filter((item): item is OutputChunk => item.type === 'chunk')
         } else {
             const server = await createServer(config)
@@ -143,6 +166,22 @@ async function compileFixture(
             } finally {
                 await server.close()
             }
+            // close() drains the listening action and its atomic metadata writes before inspecting the final file set.
+            const files = (await readdir(root, { recursive: true, withFileTypes: true }))
+                .filter((entry) => entry.isFile())
+                .map((entry) => normalizePath(path.relative(root, path.join(entry.parentPath, entry.name))))
+                .sort()
+            const extension = target === 'wx' ? 'wxss' : 'acss'
+            assert.deepEqual(
+                files,
+                [
+                    `dist/app.${extension}`,
+                    `dist/assets/global.${extension}`,
+                    ...(mode === 'rebuild' ? [] : ['dist/hmr/info.js']),
+                    ...(mode === 'devtools' ? ['dist/hmr/patches.js'] : [])
+                ],
+                'Only the host-owned style and HMR metadata may reach disk'
+            )
         }
         return await output.promise
     } finally {

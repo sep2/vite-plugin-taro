@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -281,7 +281,8 @@ test('respects cssMinify:false while rendering Tailwind CSS and matching patch f
     engine = await dev(rolldownOptions, output, {
         rebuildStrategy: 'never',
         watch: {
-            skipWrite: false,
+            // This suite inspects patch factories in memory; only writeStyle needs to materialize the native stylesheet.
+            skipWrite: true,
             useDebounce: false,
             usePolling: true,
             pollInterval: 20,
@@ -379,6 +380,10 @@ test('respects cssMinify:false while rendering Tailwind CSS and matching patch f
         assert.match(plainWxss, /\.plain-root \{ color: green; padding: 18\.25rpx; \}/)
         assert.doesNotMatch(plainWxss, /\.mt-2\b/)
         assert.match(plainWxss, /display: inline;/)
+        const outputFiles = (await readdir(outDir, { recursive: true, withFileTypes: true }))
+            .filter((entry) => entry.isFile())
+            .map((entry) => normalizePath(path.relative(outDir, path.join(entry.parentPath, entry.name))))
+        assert.deepEqual(outputFiles, [globalWxssFileName], 'Unobserved JavaScript and source maps must stay in memory')
     } finally {
         await engine.close()
         await hmrWork

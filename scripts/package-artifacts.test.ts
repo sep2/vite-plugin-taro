@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+    copyFileSync,
+    existsSync,
+    mkdirSync,
+    mkdtempSync,
+    readdirSync,
+    readFileSync,
+    rmSync,
+    writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -61,6 +70,39 @@ function readPackedFile(root: string, pkg: { name: string; version: string }, fi
     )
 }
 
+/** Version and package-manager branches need only the real generator plus the two manifests they transform/select. */
+function createManifestGenerator(root: string, generatorRoot: string): string {
+    const directory = path.join(root, 'manifest-generator')
+    for (const file of [
+        'index.js',
+        'package.json',
+        'templates/default/package.json',
+        'templates/pnpm/pnpm-workspace.yaml'
+    ]) {
+        const destination = path.join(directory, file)
+        mkdirSync(path.dirname(destination), { recursive: true })
+        copyFileSync(path.join(generatorRoot, file), destination)
+    }
+    return directory
+}
+
+function listFiles(root: string): string[] {
+    return readdirSync(root, { recursive: true, withFileTypes: true })
+        .filter((entry) => entry.isFile())
+        .map((entry) => path.relative(root, path.join(entry.parentPath, entry.name)))
+        .sort()
+}
+
+function runGenerator(generatorRoot: string, projectPath: string, packageManager: string | undefined): string {
+    return execFileSync(process.execPath, [path.join(generatorRoot, 'index.js'), projectPath], {
+        encoding: 'utf8',
+        env: {
+            ...process.env,
+            npm_config_user_agent: packageManager ? `${packageManager}/1.0.0` : undefined
+        }
+    })
+}
+
 test('public packages preserve their published entrypoints and scaffold dependencies', async (t) => {
     // Packed files and generated projects are disposable; source manifests stay unchanged.
     const root = mkdtempSync(path.join(tmpdir(), 'vpt-package-artifacts-'))
@@ -93,22 +135,38 @@ test('public packages preserve their published entrypoints and scaffold dependen
     const generatorRoot = extractGenerator(root)
     assert.equal(existsSync(path.join(root, 'unpacked', pluginPackage.name)), false)
     assert.equal(existsSync(path.join(root, 'unpacked', runtimePackage.name)), false)
-    const manifestPath = path.join(generatorRoot, 'package.json')
+    await t.test('the packed generator copies the complete default and pnpm templates once', () => {
+        const projectPath = path.join(root, 'complete-app')
+        runGenerator(generatorRoot, projectPath, 'pnpm')
+        const expectedFiles = ['default', 'pnpm']
+            .flatMap((template) => listFiles(path.join(generatorRoot, 'templates', template)))
+            .map((file) => (file === '_env.local' ? '.env.local' : file === '_gitignore' ? '.gitignore' : file))
+            .sort()
+        assert.deepEqual(listFiles(projectPath), expectedFiles)
+        assert.equal(
+            readFileSync(path.join(projectPath, 'src/app.tsx'), 'utf8'),
+            readFileSync(path.join(generatorRoot, 'templates/default/src/app.tsx'), 'utf8')
+        )
+        const project = JSON.parse(readFileSync(path.join(projectPath, 'package.json'), 'utf8'))
+        assert.equal(project.name, 'complete-app')
+        assert.equal(project.devDependencies['vite-plugin-taro'], `^${creatorPackage.version}`)
+    })
+
+    const manifestGenerator = createManifestGenerator(root, generatorRoot)
+    const manifestPath = path.join(manifestGenerator, 'package.json')
     const manifest: typeof creatorPackage = JSON.parse(readFileSync(manifestPath, 'utf8'))
     for (const version of [creatorPackage.version, '1.2.3', '1.2.4-beta.7']) {
         for (const packageManager of ['pnpm', 'npm', 'yarn', 'bun', undefined]) {
             const invocation = packageManager ?? 'node'
             await t.test(`the packed generator scaffolds version ${version} via ${invocation}`, () => {
-                // Only the extracted package is varied to cover stable and beta scaffolding without source sync scripts.
+                // Keep all version/manager combinations, but do not copy the same application tree fifteen times.
                 writeFileSync(manifestPath, JSON.stringify({ ...manifest, version }))
                 const projectPath = path.join(root, `app-${version}-${invocation}`)
-                const output = execFileSync(process.execPath, [path.join(generatorRoot, 'index.js'), projectPath], {
-                    encoding: 'utf8',
-                    env: {
-                        ...process.env,
-                        npm_config_user_agent: packageManager ? `${packageManager}/1.0.0` : undefined
-                    }
-                })
+                const output = runGenerator(manifestGenerator, projectPath, packageManager)
+                assert.deepEqual(
+                    listFiles(projectPath),
+                    packageManager === 'pnpm' ? ['package.json', 'pnpm-workspace.yaml'] : ['package.json']
+                )
                 const project: { private: boolean; version: string; devDependencies: Record<string, string> } =
                     JSON.parse(readFileSync(path.join(projectPath, 'package.json'), 'utf8'))
                 assert.equal(project.private, true)
