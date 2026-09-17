@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { access, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { access, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -14,6 +15,27 @@ const contract = {
         globalFileName: 'assets/global.wxss'
     }
 } satisfies Pick<MiniContract, 'styles'>
+
+/** Serve ordinary absolute module IDs from memory so the real Vite/CSS transforms still run, without creating source files. */
+function createSourceFixture(files: Readonly<Record<string, string>>, entryName: string) {
+    const root = path.join(os.tmpdir(), `vpt-memory-styles-${randomUUID()}`)
+    const sources: ReadonlyMap<string, string> = new Map(
+        Object.entries(files).map(([file, source]) => [normalizePath(path.join(root, file)), source])
+    )
+    const plugin: Plugin = {
+        name: 'test:memory-style-sources',
+        resolveId(id, importer) {
+            const resolved = normalizePath(
+                importer && id.startsWith('.') ? path.resolve(path.dirname(importer), id) : id
+            )
+            return sources.has(resolved) ? resolved : undefined
+        },
+        load(id) {
+            return sources.get(normalizePath(id))
+        }
+    }
+    return { root, entry: path.join(root, entryName), plugin }
+}
 
 test('handles physical and ignored query fragments before watcher cleanup', async () => {
     const styles = createMiniStylePlugin(contract, ['/src/app.js'])
@@ -218,87 +240,81 @@ test('rejects the complete style transaction when final native minification fail
 })
 
 test('minifies the complete compiler stylesheet before later WX output hooks', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'vpt-wxss-'))
-
-    try {
-        const sourceRoot = path.join(root, 'src')
-        const pageRoot = path.join(sourceRoot, 'pages/example')
-        await mkdir(pageRoot, { recursive: true })
-        await writeFile(
-            path.join(sourceRoot, 'app.ts'),
-            "import './app.css';\nimport styles from './card.module.css';\nconsole.log({ className: 'mt-2.5', module: styles.card });\nvoid import('./pages/example/index.ts')\n"
-        )
-        await writeFile(
-            path.join(sourceRoot, 'app.css'),
-            [
+    const {
+        root,
+        entry: applicationEntry,
+        plugin
+    } = createSourceFixture(
+        {
+            'src/app.ts':
+                "import './app.css';\nimport styles from './card.module.css';\nconsole.log({ className: 'mt-2.5', module: styles.card });\nvoid import('./pages/example/index.ts')\n",
+            'src/app.css': [
                 '@import "tailwindcss/theme.css";',
                 '@import "tailwindcss/preflight.css";',
                 '@import "tailwindcss/utilities.css";',
                 '@source inline("mt-2.5");',
                 '.app { margin: 1rem; }'
-            ].join('\n')
-        )
-        await writeFile(path.join(sourceRoot, 'card.module.css'), '.card { padding: 1px; }\n')
-        await writeFile(path.join(pageRoot, 'index.ts'), "import './index.css'\n")
-        await writeFile(path.join(pageRoot, 'index.css'), '.page-marker { color: red; }\n')
-
-        const applicationEntry = path.join(sourceRoot, 'app.ts')
-        const styles = createMiniStylePlugin(contract, [applicationEntry])
-        const verifyAssetOwnership: Plugin = {
-            name: 'test:verify-wx-style-ownership',
-            generateBundle: {
-                order: 'post',
-                handler(_, bundle) {
-                    const globalStyle = bundle['assets/global.wxss']
-                    assert.equal(globalStyle?.type, 'asset')
-                }
+            ].join('\n'),
+            'src/card.module.css': '.card { padding: 1px; }\n',
+            'src/pages/example/index.ts': "import './index.css'\n",
+            'src/pages/example/index.css': '.page-marker { color: red; }\n'
+        },
+        'src/app.ts'
+    )
+    const styles = createMiniStylePlugin(contract, [applicationEntry])
+    const verifyAssetOwnership: Plugin = {
+        name: 'test:verify-wx-style-ownership',
+        generateBundle: {
+            order: 'post',
+            handler(_, bundle) {
+                const globalStyle = bundle['assets/global.wxss']
+                assert.equal(globalStyle?.type, 'asset')
             }
         }
-
-        const result = await build({
-            root,
-            configFile: false,
-            logLevel: 'silent',
-            plugins: [styles, verifyAssetOwnership],
-            build: {
-                cssCodeSplit: false,
-                cssMinify: true,
-                write: false,
-                rolldownOptions: {
-                    input: applicationEntry
-                }
-            }
-        })
-
-        // Output ownership and contents are build results, not filesystem behavior.
-        assert.ok(!Array.isArray(result) && 'output' in result)
-        await assert.rejects(access(path.join(root, 'dist')), { code: 'ENOENT' })
-        const styleFileNames = result.output
-            .filter((asset) => asset.fileName.endsWith('.wxss'))
-            .map((asset) => asset.fileName)
-            .sort()
-        assert.deepEqual(styleFileNames, ['assets/global.wxss'])
-
-        const styleAsset = result.output.find((asset) => asset.fileName === 'assets/global.wxss')
-        assert.ok(styleAsset?.type === 'asset')
-        const globalStyle = String(styleAsset.source)
-        assert.match(globalStyle, /\.app\{margin:32rpx\}/)
-        assert.match(globalStyle, /\.mt-2_d5\{/)
-        assert.match(globalStyle, /\.page-marker\{/)
-        assert.doesNotMatch(globalStyle, /\drem\b/)
-        const moduleClassName = /\.([\w-]+)\{padding:1rpx\}/.exec(globalStyle)?.[1]
-        assert.ok(moduleClassName)
-
-        const javaScript = result.output
-            .filter((chunk) => chunk.type === 'chunk')
-            .map((chunk) => chunk.code)
-            .join('\n')
-        assert.match(javaScript, /mt-2_d5/)
-        assert.doesNotMatch(javaScript, /mt-2\.5/)
-        assert.ok(javaScript.includes(moduleClassName))
-    } finally {
-        await rm(root, { recursive: true, force: true })
     }
+
+    const result = await build({
+        root,
+        configFile: false,
+        logLevel: 'silent',
+        plugins: [plugin, styles, verifyAssetOwnership],
+        build: {
+            cssCodeSplit: false,
+            cssMinify: true,
+            write: false,
+            rolldownOptions: {
+                input: applicationEntry
+            }
+        }
+    })
+
+    // Output ownership and contents are build results, not filesystem behavior.
+    assert.ok(!Array.isArray(result) && 'output' in result)
+    await assert.rejects(access(path.join(root, 'dist')), { code: 'ENOENT' })
+    const styleFileNames = result.output
+        .filter((asset) => asset.fileName.endsWith('.wxss'))
+        .map((asset) => asset.fileName)
+        .sort()
+    assert.deepEqual(styleFileNames, ['assets/global.wxss'])
+
+    const styleAsset = result.output.find((asset) => asset.fileName === 'assets/global.wxss')
+    assert.ok(styleAsset?.type === 'asset')
+    const globalStyle = String(styleAsset.source)
+    assert.match(globalStyle, /\.app\{margin:32rpx\}/)
+    assert.match(globalStyle, /\.mt-2_d5\{/)
+    assert.match(globalStyle, /\.page-marker\{/)
+    assert.doesNotMatch(globalStyle, /\drem\b/)
+    const moduleClassName = /\.([\w-]+)\{padding:1rpx\}/.exec(globalStyle)?.[1]
+    assert.ok(moduleClassName)
+
+    const javaScript = result.output
+        .filter((chunk) => chunk.type === 'chunk')
+        .map((chunk) => chunk.code)
+        .join('\n')
+    assert.match(javaScript, /mt-2_d5/)
+    assert.doesNotMatch(javaScript, /mt-2\.5/)
+    assert.ok(javaScript.includes(moduleClassName))
+    await assert.rejects(access(root), { code: 'ENOENT' })
 })
 
 const minificationCases = [
@@ -312,144 +328,135 @@ const minificationCases = [
 for (const extension of ['wxss', 'acss']) {
     for (const scenario of minificationCases) {
         test(`preserves authored rpx while minifying only global.${extension}: ${scenario.name}`, async () => {
-            const root = await mkdtemp(path.join(os.tmpdir(), 'vpt-global-minify-'))
-            const appPath = path.join(root, 'app.ts')
-            const globalFileName = `assets/global.${extension}`
-            const nativeFileName = `components/counter/index.${extension}`
-            const nativeStyle = '.native-counter { padding: 1px; }\n'
-
-            try {
-                await writeFile(appPath, "import './app.css'\nconsole.log('application')\n")
-                await writeFile(
-                    path.join(root, 'app.css'),
-                    [
+            const {
+                root,
+                entry: appPath,
+                plugin
+            } = createSourceFixture(
+                {
+                    'app.ts': "import './app.css'\nconsole.log('application')\n",
+                    'app.css': [
                         '.global-marker { margin: 16px; }',
                         '.native-rpx { padding: 12.5rpx; margin-left: -0.5rpx; width: calc(100% - 32rpx); }',
                         '.converted-rem { margin: 1rem; }'
                     ].join('\n')
-                )
-                const styles = createMiniStylePlugin({ styles: { appFileName: `app.${extension}`, globalFileName } }, [
-                    appPath
-                ])
-                const result = await build({
-                    root,
-                    configFile: false,
-                    logLevel: 'silent',
-                    plugins: [
-                        {
-                            name: 'test:intermediate-css',
-                            generateBundle: {
-                                order: 'post',
-                                handler(_, bundle) {
-                                    const intermediate = Object.values(bundle).find(
-                                        (asset) => asset.type === 'asset' && asset.fileName.endsWith('.css')
-                                    )
-                                    assert.equal(intermediate?.type, 'asset')
-                                    assert.match(String(intermediate.source), /\.global-marker \{ margin: 16px; \}/)
-                                }
-                            }
-                        },
-                        styles,
-                        {
-                            name: 'test:later-native-output',
-                            generateBundle: {
-                                order: 'post',
-                                handler() {
-                                    this.emitFile({ type: 'asset', fileName: nativeFileName, source: nativeStyle })
-                                }
+                },
+                'app.ts'
+            )
+            const globalFileName = `assets/global.${extension}`
+            const nativeFileName = `components/counter/index.${extension}`
+            const nativeStyle = '.native-counter { padding: 1px; }\n'
+
+            const styles = createMiniStylePlugin({ styles: { appFileName: `app.${extension}`, globalFileName } }, [
+                appPath
+            ])
+            const result = await build({
+                root,
+                configFile: false,
+                logLevel: 'silent',
+                plugins: [
+                    plugin,
+                    {
+                        name: 'test:intermediate-css',
+                        generateBundle: {
+                            order: 'post',
+                            handler(_, bundle) {
+                                const intermediate = Object.values(bundle).find(
+                                    (asset) => asset.type === 'asset' && asset.fileName.endsWith('.css')
+                                )
+                                assert.equal(intermediate?.type, 'asset')
+                                assert.match(String(intermediate.source), /\.global-marker \{ margin: 16px; \}/)
                             }
                         }
-                    ],
-                    build: {
-                        ...scenario.build,
-                        write: false,
-                        cssCodeSplit: false,
-                        rolldownOptions: { input: appPath }
+                    },
+                    styles,
+                    {
+                        name: 'test:later-native-output',
+                        generateBundle: {
+                            order: 'post',
+                            handler() {
+                                this.emitFile({ type: 'asset', fileName: nativeFileName, source: nativeStyle })
+                            }
+                        }
                     }
-                })
-                assert.ok(!Array.isArray(result) && 'output' in result)
-                const globalStyle = result.output.find((asset) => asset.fileName === globalFileName)
-                const nativeOutput = result.output.find((asset) => asset.fileName === nativeFileName)
-                assert.equal(globalStyle?.type, 'asset')
-                assert.equal(nativeOutput?.type, 'asset')
-                const css = String(globalStyle.source)
-                assert.equal(css.includes('.global-marker{margin:16rpx}'), scenario.minified)
-                assert.equal(css.includes('.h5-span,.h5-a{display:inline}'), scenario.minified)
-                assert.equal(css.includes('.global-marker { margin: 16rpx; }'), !scenario.minified)
-                // Authored rpx must survive both conversion and minification, alongside newly converted px/rem values.
-                assert.match(css, /\.native-rpx\s*\{\s*padding:\s*12\.5rpx;\s*margin-left:\s*-0?\.5rpx;/)
-                assert.match(css, /width:\s*calc\(100% - 32rpx\)/)
-                assert.match(css, /\.converted-rem\s*\{\s*margin:\s*32rpx[;}]/)
-                assert.doesNotMatch(css, /[\d.](?:px|rem)\b/)
-                assert.equal(String(nativeOutput.source), nativeStyle)
-                assert.ok(!result.output.some((asset) => asset.fileName.endsWith('.css')))
-            } finally {
-                await rm(root, { recursive: true, force: true })
-            }
+                ],
+                build: {
+                    ...scenario.build,
+                    write: false,
+                    cssCodeSplit: false,
+                    rolldownOptions: { input: appPath }
+                }
+            })
+            assert.ok(!Array.isArray(result) && 'output' in result)
+            const globalStyle = result.output.find((asset) => asset.fileName === globalFileName)
+            const nativeOutput = result.output.find((asset) => asset.fileName === nativeFileName)
+            assert.equal(globalStyle?.type, 'asset')
+            assert.equal(nativeOutput?.type, 'asset')
+            const css = String(globalStyle.source)
+            assert.equal(css.includes('.global-marker{margin:16rpx}'), scenario.minified)
+            assert.equal(css.includes('.h5-span,.h5-a{display:inline}'), scenario.minified)
+            assert.equal(css.includes('.global-marker { margin: 16rpx; }'), !scenario.minified)
+            // Authored rpx must survive both conversion and minification, alongside newly converted px/rem values.
+            assert.match(css, /\.native-rpx\s*\{\s*padding:\s*12\.5rpx;\s*margin-left:\s*-0?\.5rpx;/)
+            assert.match(css, /width:\s*calc\(100% - 32rpx\)/)
+            assert.match(css, /\.converted-rem\s*\{\s*margin:\s*32rpx[;}]/)
+            assert.doesNotMatch(css, /[\d.](?:px|rem)\b/)
+            assert.equal(String(nativeOutput.source), nativeStyle)
+            assert.ok(!result.output.some((asset) => asset.fileName.endsWith('.css')))
+            await assert.rejects(access(root), { code: 'ENOENT' })
         })
     }
 }
 
 test('captures CSS minification configured by a later ordinary plugin', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'vpt-style-minify-config-'))
-    const appPath = path.join(root, 'app.ts')
-
-    try {
-        await writeFile(appPath, 'export {}\n')
-        const result = await build({
-            root,
-            configFile: false,
-            logLevel: 'silent',
-            plugins: [
-                createMiniStylePlugin(contract, [appPath]),
-                {
-                    name: 'test:configure-css-minify',
-                    config() {
-                        return { build: { cssMinify: true } }
-                    }
+    const { root, entry: appPath, plugin } = createSourceFixture({ 'app.ts': 'export {}\n' }, 'app.ts')
+    const result = await build({
+        root,
+        configFile: false,
+        logLevel: 'silent',
+        plugins: [
+            plugin,
+            createMiniStylePlugin(contract, [appPath]),
+            {
+                name: 'test:configure-css-minify',
+                config() {
+                    return { build: { cssMinify: true } }
                 }
-            ],
-            build: { minify: false, write: false, rolldownOptions: { input: appPath } }
-        })
-        assert.ok(!Array.isArray(result) && 'output' in result)
-        const globalStyle = result.output.find((asset) => asset.fileName === contract.styles.globalFileName)
-        assert.equal(globalStyle?.type, 'asset')
-        assert.match(String(globalStyle.source), /\.h5-span,\.h5-a\{display:inline\}/)
-    } finally {
-        await rm(root, { recursive: true, force: true })
-    }
+            }
+        ],
+        build: { minify: false, write: false, rolldownOptions: { input: appPath } }
+    })
+    assert.ok(!Array.isArray(result) && 'output' in result)
+    const globalStyle = result.output.find((asset) => asset.fileName === contract.styles.globalFileName)
+    assert.equal(globalStyle?.type, 'asset')
+    assert.match(String(globalStyle.source), /\.h5-span,\.h5-a\{display:inline\}/)
+    await assert.rejects(access(root), { code: 'ENOENT' })
 })
 
 test('emits the HTML base once even when the application has no styles', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'vpt-empty-wxss-'))
+    const { root, entry: appPath, plugin } = createSourceFixture({ 'app.ts': 'export {}\n' }, 'app.ts')
 
-    try {
-        const appPath = path.join(root, 'app.ts')
-        await writeFile(appPath, 'export {}\n')
-
-        const styles = createMiniStylePlugin(contract, [appPath])
-        const result = await build({
-            root,
-            configFile: false,
-            logLevel: 'silent',
-            plugins: [styles],
-            build: {
-                write: false,
-                rolldownOptions: {
-                    input: appPath
-                }
+    const styles = createMiniStylePlugin(contract, [appPath])
+    const result = await build({
+        root,
+        configFile: false,
+        logLevel: 'silent',
+        plugins: [plugin, styles],
+        build: {
+            write: false,
+            rolldownOptions: {
+                input: appPath
             }
-        })
+        }
+    })
 
-        assert.ok(!Array.isArray(result) && 'output' in result)
-        await assert.rejects(access(path.join(root, 'dist')), { code: 'ENOENT' })
-        const styleAsset = result.output.find((asset) => asset.fileName === 'assets/global.wxss')
-        assert.ok(styleAsset?.type === 'asset')
-        const css = String(styleAsset.source)
-        assert.equal((css.match(/\.h5-span/g) ?? []).length, 1)
-        assert.match(css, /display:\s*inline/)
-        assert.doesNotMatch(css, /@layer/)
-    } finally {
-        await rm(root, { recursive: true, force: true })
-    }
+    assert.ok(!Array.isArray(result) && 'output' in result)
+    await assert.rejects(access(path.join(root, 'dist')), { code: 'ENOENT' })
+    const styleAsset = result.output.find((asset) => asset.fileName === 'assets/global.wxss')
+    assert.ok(styleAsset?.type === 'asset')
+    const css = String(styleAsset.source)
+    assert.equal((css.match(/\.h5-span/g) ?? []).length, 1)
+    assert.match(css, /display:\s*inline/)
+    assert.doesNotMatch(css, /@layer/)
+    await assert.rejects(access(root), { code: 'ENOENT' })
 })

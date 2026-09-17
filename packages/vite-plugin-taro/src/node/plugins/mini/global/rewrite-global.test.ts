@@ -1,12 +1,9 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { stripTypeScriptTypes } from 'node:module'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import test from 'node:test'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import { constants, createContext, Script } from 'node:vm'
 import { walk } from 'oxc-walker'
 import { RolldownMagicString } from 'rolldown'
@@ -16,6 +13,31 @@ import { rewriteGlobal } from './rewrite-global.ts'
 const runtimeFilename = fileURLToPath(new URL('../../../../runtime/mini/global/mini-global.ts', import.meta.url))
 const runtimeSource = stripTypeScriptTypes(readFileSync(runtimeFilename, 'utf8')).replace(/^export /gm, '       ')
 type Observation = { result: { value: unknown } | { error: unknown } }
+
+/** Keep Node's native ESM linking, cycles and GC semantics, but load the fixture modules from stdin instead of disk. */
+function runMemoryModules(modules: Readonly<Record<string, string>>, driver: string, flags: readonly string[]): string {
+    return execFileSync(process.execPath, [...flags, '--input-type=module'], {
+        input: `
+            import { registerHooks } from 'node:module';
+            const sources = new Map(Object.entries(${JSON.stringify(modules)}).map(([name, source]) => ['fixture:/' + name, source]));
+            registerHooks({
+                resolve(specifier, context, nextResolve) {
+                    const url = context.parentURL?.startsWith('fixture:/')
+                        ? new URL(specifier, context.parentURL).href : specifier;
+                    return sources.has(url) ? { url, shortCircuit: true } : nextResolve(specifier, context);
+                },
+                load(url, context, nextLoad) {
+                    return sources.has(url)
+                        ? { format: 'module', source: sources.get(url), shortCircuit: true }
+                        : nextLoad(url, context);
+                }
+            });
+            ${driver}
+        `,
+        encoding: 'utf8',
+        timeout: 10000
+    })
+}
 
 function parse(code: string, preserveParens: boolean) {
     const parsed = parseSync('module.js', code, { sourceType: 'module', preserveParens })
@@ -606,39 +628,32 @@ test('terminates inferred-name wrappers once, outside nested suffixes and never 
     }
 })
 
-test('supports reads and writes through cyclic ESM calls before module evaluation, without native globalThis', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'vpt-global-cycle-'))
-    try {
-        await writeFile(join(directory, 'runtime.mjs'), `${runtimeSource}\nexport { miniGlobal };`)
-        const a = rewrite(
-            'import "./b.mjs"; export function answer() { nativeSlot += (0, 1); return Math.max(nativeSlot, 1) } export const noArguments = typeof arguments;',
-            false
-        )
-        assert.ok(a.alias)
-        await writeFile(
-            join(directory, 'a.mjs'),
-            `import { miniGlobal as ${a.alias} } from './runtime.mjs';\n${a.code}`
-        )
-        await writeFile(join(directory, 'b.mjs'), 'import { answer } from "./a.mjs"; export const early = answer();')
-        const driver = `
-            globalThis.nativeSlot = 0;
-            delete globalThis.globalThis;
-            const module = await import(${JSON.stringify(pathToFileURL(join(directory, 'a.mjs')).href)});
-            const dependency = await import(${JSON.stringify(pathToFileURL(join(directory, 'b.mjs')).href)});
-            const runtime = await import(${JSON.stringify(pathToFileURL(join(directory, 'runtime.mjs')).href)});
-            const values = [dependency.early, module.answer(), module.noArguments];
-            runtime.miniGlobal.Math = { max() { return 99 } };
-            values.push(module.answer());
-            console.log(JSON.stringify(values));
+test('supports reads and writes through cyclic ESM calls before module evaluation, without native globalThis', () => {
+    const a = rewrite(
+        'import "./b.mjs"; export function answer() { nativeSlot += (0, 1); return Math.max(nativeSlot, 1) } export const noArguments = typeof arguments;',
+        false
+    )
+    assert.ok(a.alias)
+    const output = runMemoryModules(
+        {
+            'runtime.mjs': `${runtimeSource}\nexport { miniGlobal };`,
+            'a.mjs': `import { miniGlobal as ${a.alias} } from './runtime.mjs';\n${a.code}`,
+            'b.mjs': 'import { answer } from "./a.mjs"; export const early = answer();'
+        },
         `
-        const output = execFileSync(process.execPath, ['--input-type=module', '-e', driver], {
-            encoding: 'utf8',
-            timeout: 10000
-        })
-        assert.deepEqual(JSON.parse(output), [1, 2, 'undefined', 99])
-    } finally {
-        await rm(directory, { recursive: true, force: true })
-    }
+        globalThis.nativeSlot = 0;
+        delete globalThis.globalThis;
+        const module = await import('fixture:/a.mjs');
+        const dependency = await import('fixture:/b.mjs');
+        const runtime = await import('fixture:/runtime.mjs');
+        const values = [dependency.early, module.answer(), module.noArguments];
+        runtime.miniGlobal.Math = { max() { return 99 } };
+        values.push(module.answer());
+        console.log(JSON.stringify(values));
+    `,
+        []
+    )
+    assert.deepEqual(JSON.parse(output), [1, 2, 'undefined', 99])
 })
 
 test('keeps analysis bounded across deep scopes, many vars and large parameter lists', () => {
@@ -876,55 +891,48 @@ test('allocates an assignment adapter only on first native use and reuses it acr
     assert.equal(instance.target(), target)
 })
 
-test('does not retain caller closures through cached native assignment adapters', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'vpt-global-gc-'))
-    try {
-        const source = `export function attach(data) {
-            subscribe(() => data);
-            slot = 1;
-        }`
-        const result = rewrite(source, false)
-        assert.ok(result.alias)
-        await writeFile(join(directory, 'runtime.mjs'), `${runtimeSource}\nexport { miniGlobal };`)
-        await writeFile(join(directory, 'original.mjs'), source)
-        await writeFile(
-            join(directory, 'rewritten.mjs'),
-            `import { miniGlobal as ${result.alias} } from './runtime.mjs';\n${result.code}`
-        )
-        const driver = `
-            import assert from 'node:assert/strict';
-            const host = globalThis;
-            host.slot = 0;
-            // The subscription is the application's only strong reference to each caller's data.
-            host.callback = null;
-            host.subscribe = callback => { host.callback = callback };
-            delete host.globalThis;
-            const original = await import(${JSON.stringify(pathToFileURL(join(directory, 'original.mjs')).href)});
-            const rewritten = await import(${JSON.stringify(pathToFileURL(join(directory, 'rewritten.mjs')).href)});
-            function probe(module) {
-                const data = { payload: new Array(10000).fill('payload') };
-                module.attach(data);
-                assert.equal(host.callback(), data);
-                const reference = new WeakRef(data);
-                host.callback = null;
-                return reference;
-            }
-            const references = [probe(original), probe(rewritten)];
-            // Leave the WeakRef creation job before forcing collection; do not dereference between GC passes.
-            for (let pass = 0; pass < 10; pass++) {
-                await new Promise(resolve => setImmediate(resolve));
-                gc();
-            }
-            console.log(JSON.stringify(references.map(reference => reference.deref() === undefined)));
+test('does not retain caller closures through cached native assignment adapters', () => {
+    const source = `export function attach(data) {
+        subscribe(() => data);
+        slot = 1;
+    }`
+    const result = rewrite(source, false)
+    assert.ok(result.alias)
+    const output = runMemoryModules(
+        {
+            'runtime.mjs': `${runtimeSource}\nexport { miniGlobal };`,
+            'original.mjs': source,
+            'rewritten.mjs': `import { miniGlobal as ${result.alias} } from './runtime.mjs';\n${result.code}`
+        },
         `
-        const output = execFileSync(process.execPath, ['--expose-gc', '--input-type=module', '-e', driver], {
-            encoding: 'utf8',
-            timeout: 10000
-        })
-        assert.deepEqual(JSON.parse(output), [true, true], 'unsubscribed data must be collectable in both modules')
-    } finally {
-        await rm(directory, { recursive: true, force: true })
-    }
+        import assert from 'node:assert/strict';
+        const host = globalThis;
+        host.slot = 0;
+        // The subscription is the application's only strong reference to each caller's data.
+        host.callback = null;
+        host.subscribe = callback => { host.callback = callback };
+        delete host.globalThis;
+        const original = await import('fixture:/original.mjs');
+        const rewritten = await import('fixture:/rewritten.mjs');
+        function probe(module) {
+            const data = { payload: new Array(10000).fill('payload') };
+            module.attach(data);
+            assert.equal(host.callback(), data);
+            const reference = new WeakRef(data);
+            host.callback = null;
+            return reference;
+        }
+        const references = [probe(original), probe(rewritten)];
+        // Leave the WeakRef creation job before forcing collection; do not dereference between GC passes.
+        for (let pass = 0; pass < 10; pass++) {
+            await new Promise(resolve => setImmediate(resolve));
+            gc();
+        }
+        console.log(JSON.stringify(references.map(reference => reference.deref() === undefined)));
+    `,
+        ['--expose-gc']
+    )
+    assert.deepEqual(JSON.parse(output), [true, true], 'unsubscribed data must be collectable in both modules')
 })
 
 test('retains the selected assignment target across await and yield without moving the RHS into a callback', async () => {
