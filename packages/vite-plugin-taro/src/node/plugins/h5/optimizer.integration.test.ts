@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import test from 'node:test'
@@ -55,11 +55,30 @@ async function bundleOptimizedNavigator(root: string): Promise<string> {
                 appJson: {},
                 projectConfigJson: {}
             }),
-            optimizeDeps: { include: [entry], noDiscovery: true }
+            optimizeDeps: {
+                include: [entry],
+                noDiscovery: true,
+                rolldownOptions: {
+                    plugins: [
+                        {
+                            name: 'test:optimizer-without-sourcemaps',
+                            outputOptions(options) {
+                                // Vite forces hidden maps after merging config; this final hook avoids unused disk output.
+                                return { ...options, sourcemap: false }
+                            }
+                        }
+                    ]
+                }
+            }
         },
         'serve'
     )
     const metadata = await optimizeDeps(config, true)
+    assert.deepEqual(
+        (await readdir(config.cacheDir, { recursive: true })).filter((fileName) => fileName.endsWith('.map')),
+        [],
+        'The optimizer fixture must not write unused sourcemaps'
+    )
     const optimizedEntry = metadata.optimized[entry]
     assert.ok(optimizedEntry)
     const result = await build({

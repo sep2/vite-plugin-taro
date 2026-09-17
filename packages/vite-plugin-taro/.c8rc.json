@@ -2,7 +2,7 @@
     "all": true,
     "include": ["src/**/*.{ts,js}"],
     "exclude": ["src/**/*.test.ts", "src/**/*.d.ts", "src/node/plugins/mini/mini-contract.ts", "src/options.ts"],
-    "reporter": ["text", "html", "lcov"],
+    "reporter": ["text"],
     "reports-dir": "coverage",
     "check-coverage": true,
     "statements": 100,
