@@ -36,17 +36,29 @@ function packArtifacts(root: string): void {
     )
 }
 
-function extractArtifacts(root: string): void {
-    // Extract each archive once: linear in total artifact size, without buffering compiler output through a subprocess.
-    for (const pkg of publicPackages) {
-        const directory = path.join(root, 'unpacked', pkg.name)
-        mkdirSync(directory, { recursive: true })
-        execFileSync('tar', ['-xf', path.join(root, 'packages', `${pkg.name}-${pkg.version}.tgz`), '-C', directory])
-    }
+function extractGenerator(root: string): string {
+    // Only the generator must exist on disk to exercise real scaffolding; compiler/runtime archives stay compressed.
+    const directory = path.join(root, 'unpacked', creatorPackage.name)
+    mkdirSync(directory, { recursive: true })
+    execFileSync('tar', [
+        '-xf',
+        path.join(root, 'packages', `${creatorPackage.name}-${creatorPackage.version}.tgz`),
+        '-C',
+        directory
+    ])
+    return path.join(directory, 'package')
 }
 
-function readPackedFile(root: string, pkg: { name: string }, file: string): string {
-    return readFileSync(path.join(root, 'unpacked', pkg.name, 'package', file), 'utf8')
+function readPackedFile(root: string, pkg: { name: string; version: string }, file: string): string {
+    // Inspect the actual archive member via stdout instead of unpacking entire dependency trees.
+    return execFileSync(
+        'tar',
+        ['-xOf', path.join(root, 'packages', `${pkg.name}-${pkg.version}.tgz`), `package/${file}`],
+        {
+            encoding: 'utf8',
+            maxBuffer: 4 * 1024 * 1024
+        }
+    )
 }
 
 test('public packages preserve their published entrypoints and scaffold dependencies', async (t) => {
@@ -54,7 +66,6 @@ test('public packages preserve their published entrypoints and scaffold dependen
     const root = mkdtempSync(path.join(tmpdir(), 'vpt-package-artifacts-'))
     t.after(() => rmSync(root, { recursive: true, force: true }))
     packArtifacts(root)
-    extractArtifacts(root)
 
     await t.test('plugin entrypoints use dist and workspace dependencies resolve to the matching runtime', () => {
         const manifest: typeof pluginPackage = JSON.parse(readPackedFile(root, pluginPackage, 'package.json'))
@@ -79,7 +90,9 @@ test('public packages preserve their published entrypoints and scaffold dependen
         }
     })
 
-    const generatorRoot = path.join(root, 'unpacked', creatorPackage.name, 'package')
+    const generatorRoot = extractGenerator(root)
+    assert.equal(existsSync(path.join(root, 'unpacked', pluginPackage.name)), false)
+    assert.equal(existsSync(path.join(root, 'unpacked', runtimePackage.name)), false)
     const manifestPath = path.join(generatorRoot, 'package.json')
     const manifest: typeof creatorPackage = JSON.parse(readFileSync(manifestPath, 'utf8'))
     for (const version of [creatorPackage.version, '1.2.3', '1.2.4-beta.7']) {

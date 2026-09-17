@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -255,28 +255,33 @@ test('minifies the complete compiler stylesheet before later WX output hooks', a
             }
         }
 
-        await build({
+        const result = await build({
             root,
+            configFile: false,
             logLevel: 'silent',
             plugins: [styles, verifyAssetOwnership],
             build: {
                 cssCodeSplit: false,
                 cssMinify: true,
-                outDir: 'dist',
+                write: false,
                 rolldownOptions: {
                     input: applicationEntry
                 }
             }
         })
 
-        const outputRoot = path.join(root, 'dist')
-        const styleFileNames = (await readdir(outputRoot, { recursive: true }))
-            .filter((fileName) => fileName.endsWith('.wxss'))
-            .map(normalizePath)
+        // Output ownership and contents are build results, not filesystem behavior.
+        assert.ok(!Array.isArray(result) && 'output' in result)
+        await assert.rejects(access(path.join(root, 'dist')), { code: 'ENOENT' })
+        const styleFileNames = result.output
+            .filter((asset) => asset.fileName.endsWith('.wxss'))
+            .map((asset) => asset.fileName)
             .sort()
         assert.deepEqual(styleFileNames, ['assets/global.wxss'])
 
-        const globalStyle = await readFile(path.join(outputRoot, 'assets/global.wxss'), 'utf8')
+        const styleAsset = result.output.find((asset) => asset.fileName === 'assets/global.wxss')
+        assert.ok(styleAsset?.type === 'asset')
+        const globalStyle = String(styleAsset.source)
         assert.match(globalStyle, /\.app\{margin:32rpx\}/)
         assert.match(globalStyle, /\.mt-2_d5\{/)
         assert.match(globalStyle, /\.page-marker\{/)
@@ -284,15 +289,10 @@ test('minifies the complete compiler stylesheet before later WX output hooks', a
         const moduleClassName = /\.([\w-]+)\{padding:1rpx\}/.exec(globalStyle)?.[1]
         assert.ok(moduleClassName)
 
-        const javaScript = (
-            await Promise.all(
-                (
-                    await readdir(outputRoot, { recursive: true })
-                )
-                    .filter((fileName) => fileName.endsWith('.js'))
-                    .map((fileName) => readFile(path.join(outputRoot, fileName), 'utf8'))
-            )
-        ).join('\n')
+        const javaScript = result.output
+            .filter((chunk) => chunk.type === 'chunk')
+            .map((chunk) => chunk.code)
+            .join('\n')
         assert.match(javaScript, /mt-2_d5/)
         assert.doesNotMatch(javaScript, /mt-2\.5/)
         assert.ok(javaScript.includes(moduleClassName))
@@ -428,19 +428,24 @@ test('emits the HTML base once even when the application has no styles', async (
         await writeFile(appPath, 'export {}\n')
 
         const styles = createMiniStylePlugin(contract, [appPath])
-        await build({
+        const result = await build({
             root,
+            configFile: false,
             logLevel: 'silent',
             plugins: [styles],
             build: {
-                outDir: 'dist',
+                write: false,
                 rolldownOptions: {
                     input: appPath
                 }
             }
         })
 
-        const css = await readFile(path.join(root, 'dist/assets/global.wxss'), 'utf8')
+        assert.ok(!Array.isArray(result) && 'output' in result)
+        await assert.rejects(access(path.join(root, 'dist')), { code: 'ENOENT' })
+        const styleAsset = result.output.find((asset) => asset.fileName === 'assets/global.wxss')
+        assert.ok(styleAsset?.type === 'asset')
+        const css = String(styleAsset.source)
         assert.equal((css.match(/\.h5-span/g) ?? []).length, 1)
         assert.match(css, /display:\s*inline/)
         assert.doesNotMatch(css, /@layer/)

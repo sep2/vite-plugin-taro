@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
-import test from 'node:test'
+import test, { type TestContext } from 'node:test'
 import type { OutputOptions, PreRenderedChunk, RenderedChunk } from 'rolldown'
-import { createLogger, createServer } from 'vite'
+import { type BuildOptions, createLogger, createServer } from 'vite'
 import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
 import { createZfbMiniContract } from '../../zfb/plugins.ts'
 import type { MiniContract, RuntimeModulesContract } from '../mini-contract.ts'
@@ -41,6 +41,21 @@ const options = {
 } satisfies Pick<MiniContract, 'options'>
 const hmrMode = createDevtoolsHmrMode(runtimeModules)
 
+/** These tests inspect options only: never watch workspace files or populate its shared dependency cache. */
+async function createOptionsServer(context: TestContext, build: BuildOptions) {
+    const server = await createServer({
+        root: packageRoot,
+        configFile: false,
+        customLogger: createLogger('silent'),
+        optimizeDeps: { noDiscovery: true, include: [] },
+        server: { watch: null },
+        build
+    })
+    context.after(() => server.close())
+    assert.equal(server.environments.client.depsOptimizer, undefined)
+    return server
+}
+
 function createPreRenderedChunk(name: string): PreRenderedChunk {
     return {
         name,
@@ -75,17 +90,7 @@ test('adapts physical wx development output without changing configured filename
         chunkFileNames: configuredChunkFileNames,
         entryFileNames: '[name]-[hash]'
     }
-    const server = await createServer({
-        root: packageRoot,
-        configFile: false,
-        customLogger: createLogger('silent'),
-        build: {
-            rolldownOptions: {
-                output: configuredOutput
-            }
-        }
-    })
-    context.after(() => server.close())
+    const server = await createOptionsServer(context, { rolldownOptions: { output: configuredOutput } })
 
     const generatedOutput: OutputOptions = {}
     const viteTransformOptions = { sourcemap: true }
@@ -167,12 +172,7 @@ test('installs the Alipay HMR adapter on the real Mini Program JavaScript global
         appJson: {},
         projectConfigJson: {}
     })
-    const server = await createServer({
-        root: packageRoot,
-        configFile: false,
-        customLogger: createLogger('silent')
-    })
-    context.after(() => server.close())
+    const server = await createOptionsServer(context, {})
     const bundledDev: BundledDev = {
         async getRolldownOptions() {
             return {}
@@ -216,12 +216,7 @@ test('leaves naming unspecified when Vite has no configured output', async (cont
             process.env.CI = previousCi
         }
     })
-    const server = await createServer({
-        root: packageRoot,
-        configFile: false,
-        customLogger: createLogger('silent')
-    })
-    context.after(() => server.close())
+    const server = await createOptionsServer(context, {})
     const bundledDev: BundledDev = {
         async getRolldownOptions() {
             return {
@@ -256,17 +251,7 @@ test('rejects missing and multiple generated outputs before creating a developme
 })
 
 test('rejects output arrays from both Vite configuration and generated Rolldown options', async (context) => {
-    const server = await createServer({
-        root: packageRoot,
-        configFile: false,
-        customLogger: createLogger('silent'),
-        build: {
-            rolldownOptions: {
-                output: [{}, {}]
-            }
-        }
-    })
-    context.after(() => server.close())
+    const server = await createOptionsServer(context, { rolldownOptions: { output: [{}, {}] } })
 
     const configuredArrayBundledDev: BundledDev = {
         async getRolldownOptions() {

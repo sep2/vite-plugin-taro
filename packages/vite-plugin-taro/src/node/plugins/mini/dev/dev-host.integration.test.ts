@@ -356,7 +356,10 @@ test('rejects a server without Vite bundled development ownership', async (conte
     } satisfies Pick<MiniContract, 'options' | 'styles'>
     const server = await createServer({
         configFile: false,
-        customLogger: createLogger('silent')
+        customLogger: createLogger('silent'),
+        // Ownership validation needs no watcher or dependency cache in the real workspace.
+        optimizeDeps: { noDiscovery: true, include: [] },
+        server: { watch: null }
     })
     context.after(() => server.close())
 

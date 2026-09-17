@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -20,7 +20,14 @@ async function prepareConsumer(root: string): Promise<void> {
     await Promise.all([mkdir(plugin, { recursive: true }), mkdir(runtime, { recursive: true })])
     await Promise.all([
         cp(path.join(runtimeRoot, 'package.json'), path.join(runtime, 'package.json')),
-        cp(path.join(runtimeRoot, 'dist'), path.join(runtime, 'dist'), { recursive: true }),
+        // tsc needs declarations and package metadata, not megabytes of runtime JavaScript and source maps.
+        cp(path.join(runtimeRoot, 'dist'), path.join(runtime, 'dist'), {
+            recursive: true,
+            filter: async (source) =>
+                /\.d\.[cm]?ts$/.test(source) ||
+                path.basename(source) === 'package.json' ||
+                (await stat(source)).isDirectory()
+        }),
         cp(path.join(pluginRoot, 'client.d.ts'), path.join(plugin, 'client.d.ts')),
         writeFile(
             path.join(plugin, 'package.json'),
@@ -55,6 +62,16 @@ test('preserves API and router types without upstream Taro packages or Vite alia
     const root = await mkdtemp(path.join(tmpdir(), 'vpt-consumer-types-'))
     try {
         await prepareConsumer(root)
+        const runtimeFiles = await readdir(path.join(root, 'node_modules/vite-plugin-taro-runtime/dist'), {
+            recursive: true,
+            withFileTypes: true
+        })
+        assert.ok(runtimeFiles.some((entry) => entry.isFile() && entry.name.endsWith('.d.ts')))
+        assert.ok(
+            runtimeFiles.every(
+                (entry) => entry.isDirectory() || /\.d\.[cm]?ts$/.test(entry.name) || entry.name === 'package.json'
+            )
+        )
         await writeFile(
             path.join(root, 'consumer.ts'),
             `

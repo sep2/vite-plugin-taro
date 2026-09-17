@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -73,37 +73,43 @@ for (const target of ['wx', 'zfb'] as const) {
 }
 
 test('injected globals resolve outside the plugin dependency tree', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'vpt-inject-'))
-    try {
-        const entry = path.join(root, 'entry.js')
-        await writeFile(entry, 'console.log(document, window, Element, SVGElement)')
-        const config = await resolveConfig(
+    // Keep the importer outside the workspace for the resolution regression, but supply its source in memory.
+    const entry = path.join(tmpdir(), `vpt-inject-${randomUUID()}`, 'entry.js')
+    const config = await resolveConfig(
+        {
+            configFile: false,
+            plugins: vpt({
+                target: 'wx',
+                app: 'src/app.tsx',
+                pages: [{ path: 'pages/home/index' }],
+                appJson: {},
+                projectConfigJson: {}
+            })
+        },
+        'build'
+    )
+    const result = await build({
+        input: entry,
+        plugins: [
             {
-                configFile: false,
-                plugins: vpt({
-                    target: 'wx',
-                    app: 'src/app.tsx',
-                    pages: [{ path: 'pages/home/index' }],
-                    appJson: {},
-                    projectConfigJson: {}
-                })
-            },
-            'build'
-        )
-        const result = await build({
-            input: entry,
-            transform: {
-                ...config.build.rolldownOptions.transform,
-                define: { ...config.define, 'process.env.NODE_ENV': JSON.stringify('production') }
-            },
-            write: false
-        })
-        const chunk = result.output[0]
-        assert.ok(chunk?.type === 'chunk')
-        assert.deepEqual(chunk.imports, [])
-    } finally {
-        await rm(root, { recursive: true, force: true })
-    }
+                name: 'test:external-html-entry',
+                resolveId(id) {
+                    return id === entry ? entry : undefined
+                },
+                load(id) {
+                    return id === entry ? 'console.log(document, window, Element, SVGElement)' : undefined
+                }
+            }
+        ],
+        transform: {
+            ...config.build.rolldownOptions.transform,
+            define: { ...config.define, 'process.env.NODE_ENV': JSON.stringify('production') }
+        },
+        write: false
+    })
+    const chunk = result.output[0]
+    assert.ok(chunk?.type === 'chunk')
+    assert.deepEqual(chunk.imports, [])
 })
 
 const fixture = `
