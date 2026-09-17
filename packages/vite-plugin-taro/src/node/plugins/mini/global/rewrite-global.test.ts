@@ -601,7 +601,7 @@ test('terminates inferred-name wrappers once, outside nested suffixes and never 
     for (const preserveParens of [false, true]) {
         assert.deepEqual(
             parse(rewrite(source, preserveParens).code, preserveParens).body.map((node) => node.type),
-            ['ExportDefaultDeclaration', 'ExpressionStatement', 'VariableDeclaration']
+            ['ExportDefaultDeclaration', 'ExpressionStatement', 'FunctionDeclaration', 'VariableDeclaration']
         )
     }
 })
@@ -789,6 +789,57 @@ test('allocates an assignment adapter only on first native use and reuses it acr
     Reflect.deleteProperty(namespace, 'slot')
     assert.equal(instance.write(3), 3)
     assert.equal(instance.target(), target)
+})
+
+test('does not retain caller closures through cached native assignment adapters', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'vpt-global-gc-'))
+    try {
+        const source = `export function attach(data) {
+            subscribe(() => data);
+            slot = 1;
+        }`
+        const result = rewrite(source, false)
+        assert.ok(result.alias)
+        await writeFile(join(directory, 'runtime.mjs'), `${runtimeSource}\nexport { miniGlobal };`)
+        await writeFile(join(directory, 'original.mjs'), source)
+        await writeFile(
+            join(directory, 'rewritten.mjs'),
+            `import { miniGlobal as ${result.alias} } from './runtime.mjs';\n${result.code}`
+        )
+        const driver = `
+            import assert from 'node:assert/strict';
+            const host = globalThis;
+            host.slot = 0;
+            // The subscription is the application's only strong reference to each caller's data.
+            host.callback = null;
+            host.subscribe = callback => { host.callback = callback };
+            delete host.globalThis;
+            const original = await import(${JSON.stringify(pathToFileURL(join(directory, 'original.mjs')).href)});
+            const rewritten = await import(${JSON.stringify(pathToFileURL(join(directory, 'rewritten.mjs')).href)});
+            function probe(module) {
+                const data = { payload: new Array(10000).fill('payload') };
+                module.attach(data);
+                assert.equal(host.callback(), data);
+                const reference = new WeakRef(data);
+                host.callback = null;
+                return reference;
+            }
+            const references = [probe(original), probe(rewritten)];
+            // Leave the WeakRef creation job before forcing collection; do not dereference between GC passes.
+            for (let pass = 0; pass < 10; pass++) {
+                await new Promise(resolve => setImmediate(resolve));
+                gc();
+            }
+            console.log(JSON.stringify(references.map(reference => reference.deref() === undefined)));
+        `
+        const output = execFileSync(process.execPath, ['--expose-gc', '--input-type=module', '-e', driver], {
+            encoding: 'utf8',
+            timeout: 10000
+        })
+        assert.deepEqual(JSON.parse(output), [true, true], 'unsubscribed data must be collectable in both modules')
+    } finally {
+        await rm(directory, { recursive: true, force: true })
+    }
 })
 
 test('retains the selected assignment target across await and yield without moving the RHS into a callback', async () => {

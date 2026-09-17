@@ -10,8 +10,8 @@ import type { RolldownMagicString } from 'rolldown'
  *
  * Reads, typeof, calls and updates use direct conditional expressions. Assignment targets select their base before the RHS;
  * cached native-only accessors keep that RHS single, including destructuring, await and yield. Selected namespace properties
- * retain ordinary property semantics, even if deleted during the RHS. No runtime binding factory or value snapshots.
- * Only native assignment targets allocate, once per name/module; reads and updates allocate nothing.
+ * retain ordinary property semantics, even if deleted during the RHS. No shared runtime binding helper or value snapshots.
+ * Hoisted module-local initializers allocate native holders once per name/module on first use; reads and updates allocate nothing.
  * Analysis is expected O(N) time/space. Emits O(N) edits; generated text scales with reference/name lengths, never duplicated
  * RHS trees. Assignment caches use O(U) holders for U natively written names; generated reads have one membership check.
  */
@@ -78,19 +78,22 @@ export function rewriteGlobal(program: Program, editor: RolldownMagicString): st
         `(${JSON.stringify(name)} in ${global} ? ${managed} : ${native})`
     const read = (name: string) => select(name, `${global}.${name}`, name)
     // Keep each native assignment adapter private to this module, shared by all assignment sites for that name.
-    const targets = new Map<string, { cache: string; expression: string }>()
+    const targets = new Map<string, { cache: string; expression: string; declaration: string }>()
     const nativeTarget = (name: string) => {
         const existing = targets.get(name)
         if (existing) {
             return existing.expression
         }
         const cache = takeName()
-        // These methods contain only this native name, at a site proven free of a lexical binding for it. Strict modules
-        // cannot assign to eval/arguments, so accessor methods cannot accidentally introduce a binding for the target name.
+        const initialize = takeName()
+        // A free name has no module binding either. Hoisted initializers keep cached accessors outside caller scopes,
+        // where even unrelated captured locals could otherwise stay alive for the module's lifetime.
+        // Strict modules cannot assign to eval/arguments, so accessor methods cannot shadow the native target name.
         // Prototype accessors give engines a stable holder to optimize; own dynamic accessors were much slower in Node.
         // The __proto__ literal sets the prototype directly, without consulting patchable Object helpers or setters.
-        const expression = `(${cache} || (${cache} = { __proto__: { get ${name}() { return ${name}; }, set ${name}(${value}) { ${name} = ${value}; } } }))`
-        targets.set(name, { cache, expression })
+        const expression = `(${cache} || ${initialize}())`
+        const declaration = `function ${initialize}() { return ${cache} = { __proto__: { get ${name}() { return ${name}; }, set ${name}(${value}) { ${name} = ${value}; } } }; }`
+        targets.set(name, { cache, expression, declaration })
         return expression
     }
     // Delay name-inference wrappers until reference overwrites are complete, so nested edits retain their closing suffixes.
@@ -183,8 +186,9 @@ export function rewriteGlobal(program: Program, editor: RolldownMagicString): st
         }
     }
     if (targets.size > 0) {
-        // Uninitialized vars work during cyclic ESM calls before evaluation; no later initializer resets an early adapter.
-        editor.append(`\nvar ${Array.from(targets.values(), (target) => target.cache).join(', ')};\n`)
+        // Both functions and uninitialized vars work during cyclic ESM calls before evaluation; nothing resets an early adapter.
+        const declarations = Array.from(targets.values(), (target) => target.declaration).join('\n')
+        editor.append(`\n${declarations}\nvar ${Array.from(targets.values(), (target) => target.cache).join(', ')};\n`)
     }
     return changed ? global : null
 }
