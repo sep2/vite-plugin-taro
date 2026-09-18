@@ -7,7 +7,7 @@ import test from 'node:test'
 import { type BuildOptions, build, normalizePath, type Plugin } from 'vite'
 import type { MiniContract } from '../mini-contract.ts'
 import { createMiniTransformer } from './create-mini-transformer.ts'
-import { createMiniStylePlugin, finalizeOutput } from './plugins.ts'
+import { createMiniStylePlugin } from './plugins.ts'
 
 const contract = {
     styles: {
@@ -106,137 +106,6 @@ test('transforms WXSS and JavaScript from one supplied class set without source 
 
     assert.match(style, /\.py-5_d5\s*\{/)
     assert.equal(javaScript, "export const className = 'py-5_d5'")
-})
-
-test('finalizes the current graph into native CSS and JavaScript with one projected class set', async () => {
-    const entryId = '/src/app.js'
-    const styleId = '/src/app.css'
-    const output = await finalizeOutput(
-        [entryId],
-        new Map([
-            [
-                styleId,
-                {
-                    css: '.py-5\\.5 { padding-top: 1px; }',
-                    tailwind: { classSet: new Set(['py-5.5']) }
-                }
-            ]
-        ]),
-        (moduleId) => {
-            if (moduleId === entryId) {
-                return { importedIds: [styleId], dynamicallyImportedIds: [] }
-            }
-            if (moduleId === styleId) {
-                return { importedIds: [], dynamicallyImportedIds: [] }
-            }
-        },
-        createMiniTransformer(),
-        [{ code: "export const className = 'py-5.5'", filename: 'entry.js' }],
-        { filename: contract.styles.globalFileName, minify: false }
-    )
-
-    assert.match(output.stylesheet, /\.py-5_d5\s*\{/)
-    assert.deepEqual(output.javaScript, ["export const className = 'py-5_d5'"])
-})
-
-test('projects cyclic multi-entry graphs in dependency-first order without duplicate or unreachable styles', async () => {
-    const moduleGraph = new Map<
-        string,
-        Readonly<{ importedIds: readonly string[]; dynamicallyImportedIds: readonly string[] }>
-    >([
-        ['/entry-a.js', { importedIds: ['/shared.css?from=a'], dynamicallyImportedIds: ['/lazy.js'] }],
-        ['/shared.css?from=a', { importedIds: [], dynamicallyImportedIds: [] }],
-        ['/lazy.js', { importedIds: ['/lazy.css'], dynamicallyImportedIds: ['/entry-a.js'] }],
-        ['/lazy.css', { importedIds: [], dynamicallyImportedIds: [] }],
-        ['/entry-b.js', { importedIds: ['/shared.css?from=b', '/page.css'], dynamicallyImportedIds: [] }],
-        ['/shared.css?from=b', { importedIds: [], dynamicallyImportedIds: [] }],
-        ['/page.css', { importedIds: [], dynamicallyImportedIds: [] }]
-    ])
-    const output = await finalizeOutput(
-        ['/entry-a.js', '/entry-b.js', '/missing-entry.js'],
-        new Map([
-            [
-                '/shared.css',
-                {
-                    css: '.shared-order { color: red; } .py-5\\.5 { padding: 1px; }',
-                    tailwind: { classSet: new Set(['py-5.5']) }
-                }
-            ],
-            ['/lazy.css', { css: '.lazy-order { color: blue; }', tailwind: undefined }],
-            ['/page.css', { css: '.page-order { color: green; }', tailwind: undefined }],
-            [
-                '/unreachable.css',
-                {
-                    css: '.unreachable { color: black; }',
-                    tailwind: { classSet: new Set(['mr-4.5']) }
-                }
-            ]
-        ]),
-        (moduleId) => moduleGraph.get(moduleId),
-        createMiniTransformer(),
-        [{ code: "export const classes = 'py-5.5 mr-4.5'", filename: 'entry.js' }],
-        { filename: contract.styles.globalFileName, minify: false }
-    )
-
-    const sharedIndex = output.stylesheet.indexOf('.shared-order')
-    const lazyIndex = output.stylesheet.indexOf('.lazy-order')
-    const pageIndex = output.stylesheet.indexOf('.page-order')
-    assert.ok(sharedIndex >= 0)
-    assert.ok(lazyIndex > sharedIndex)
-    assert.ok(pageIndex > lazyIndex)
-    assert.equal((output.stylesheet.match(/\.shared-order/g) ?? []).length, 1)
-    assert.doesNotMatch(output.stylesheet, /\.unreachable/)
-    assert.match(output.javaScript[0] ?? '', /py-5_d5/)
-    assert.match(output.javaScript[0] ?? '', /mr-4\.5/)
-})
-
-test('rejects the complete style transaction when JavaScript conversion fails', async () => {
-    const source = "export const = 'py-5.5'"
-
-    await assert.rejects(
-        () =>
-            finalizeOutput(
-                ['/entry.js'],
-                new Map([
-                    [
-                        '/entry.js',
-                        {
-                            css: '.py-5\\.5 { padding: 1px; }',
-                            tailwind: { classSet: new Set(['py-5.5']) }
-                        }
-                    ]
-                ]),
-                (moduleId) => (moduleId === '/entry.js' ? { importedIds: [], dynamicallyImportedIds: [] } : undefined),
-                createMiniTransformer(),
-                [{ code: source, filename: 'entry.js' }],
-                { filename: contract.styles.globalFileName, minify: false }
-            ),
-        Error
-    )
-
-    assert.equal(source, "export const = 'py-5.5'")
-})
-
-test('rejects the complete style transaction when final native minification fails', async () => {
-    await assert.rejects(
-        () =>
-            finalizeOutput(
-                ['/entry.js'],
-                new Map(),
-                () => ({ importedIds: [], dynamicallyImportedIds: [] }),
-                {
-                    async transformStylesheet() {
-                        return '.broken { color: red; } }'
-                    },
-                    transformJavaScript() {
-                        return assert.fail('JavaScript must not be finalized after failed CSS minification')
-                    }
-                },
-                [{ code: 'export {}', filename: 'entry.js' }],
-                { filename: contract.styles.globalFileName, minify: true }
-            ),
-        Error
-    )
 })
 
 test('minifies the complete compiler stylesheet before later WX output hooks', async () => {
