@@ -395,8 +395,11 @@ import HomeSectionHeading from './home-section-heading.astro'
                 else tab.removeAttribute('aria-current')
             })
 
-            const labels: Record<PageId, string> = { home: '首页', discover: '发现页', profile: '我的页面' }
-            requireDeckElement<HTMLOutputElement>(this, '[data-page-announcement]').value = `已切换到${labels[nextPage]}`
+            const labels: Record<PageId, string> = document.documentElement.lang === 'en'
+                ? { home: 'Home', discover: 'Discover', profile: 'Profile' }
+                : { home: '首页', discover: '发现页', profile: '我的页面' }
+            const prefix = document.documentElement.lang === 'en' ? 'Switched to ' : '已切换到'
+            requireDeckElement<HTMLOutputElement>(this, '[data-page-announcement]').value = `${prefix}${labels[nextPage]}`
         }
     }
 

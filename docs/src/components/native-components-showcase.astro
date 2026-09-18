@@ -136,7 +136,9 @@ import HomeSectionHeading from './home-section-heading.astro'
             const eventLabel = requireDemoElement<HTMLElement>(this, '[data-native-event]')
             const announcement = requireDemoElement<HTMLOutputElement>(this, '[data-native-announcement]')
             eventLabel.textContent = `triggerEvent('${eventName}')`
-            announcement.value = `原生组件触发 ${eventName}，React count 更新为 ${this.count}`
+            announcement.value = document.documentElement.lang === 'en'
+                ? `Native component triggered ${eventName}; React count updated to ${this.count}`
+                : `原生组件触发 ${eventName}，React count 更新为 ${this.count}`
 
             if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
             const reactState = requireDemoElement<HTMLElement>(this, '[data-react-state]')

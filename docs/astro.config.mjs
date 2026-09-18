@@ -22,6 +22,7 @@ export default defineConfig({
             customCss: ['./src/styles/custom.css'],
             components: {
                 Hero: './src/components/hero.astro',
+                LanguageSelect: './src/components/language-select.astro',
                 PageFrame: './src/components/page-frame.astro',
                 SocialIcons: './src/components/social-icons.astro',
                 ThemeSelect: './src/components/theme-select.astro'

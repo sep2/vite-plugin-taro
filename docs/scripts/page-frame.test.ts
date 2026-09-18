@@ -25,6 +25,14 @@ test('page frames preserve the navigation contract and forwarded slots', async (
             assert.match(html, /<h1\b/, 'the default slot must retain the page content')
             assert.match(html, /href="\/guides\/configuration\/"/, 'the sidebar must retain documentation links')
 
+            if (route === '/') {
+                assert.match(html, /<home-language-switch\b/, 'the homepage must offer an in-place language switch')
+                assert.match(html, /<button\b[^>]*aria-label="Switch to English"/)
+                assert.doesNotMatch(html, /href="\/en(?:\/|")/, 'switching must not navigate to another path')
+            } else {
+                assert.doesNotMatch(html, /<home-language-switch\b/, 'documentation must not offer a language switch')
+            }
+
             const toggle = html.match(/<button\b[^>]*\bpopovertarget="starlight__sidebar"[^>]*>/)?.[0]
             assert.ok(toggle, 'the menu button must toggle its sidebar without JavaScript')
             assert.match(pane, /\spopover(?:=|\s|>)/, 'the menu button requires a native popover target')

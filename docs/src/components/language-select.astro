@@ -1,0 +1,100 @@
+---
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import { Icon } from '@astrojs/starlight/components'
+
+// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
+const isHome = Astro.url.pathname === '/'
+---
+
+{isHome && (
+    <home-language-switch hidden>
+        <button type="button" aria-label="Switch to English" title="Switch to English" lang="en">
+            <Icon name="translate" />
+            <span>EN</span>
+        </button>
+    </home-language-switch>
+)}
+
+<script>
+    import type { HomeLanguage } from '../lib/home-language.ts'
+    import { applyHomeLanguage } from '../lib/home-language.ts'
+
+    const storageKey = 'vpt-home-language'
+
+    function setLanguage(language: HomeLanguage): void {
+        applyHomeLanguage(document, language)
+        document.querySelectorAll<HTMLButtonElement>('home-language-switch button').forEach((button) => {
+            const isEnglish = language === 'en'
+            const label = isEnglish ? '切换到简体中文' : 'Switch to English'
+            button.lang = isEnglish ? 'zh-CN' : 'en'
+            button.ariaLabel = label
+            button.title = label
+            button.querySelector('span')!.textContent = isEnglish ? '中文' : 'EN'
+        })
+    }
+
+    class HomeLanguageSwitch extends HTMLElement {
+        connectedCallback(): void {
+            setLanguage(localStorage.getItem(storageKey) === 'en' ? 'en' : 'zh-CN')
+            this.addEventListener('click', this.switchLanguage)
+            this.hidden = false
+        }
+
+        disconnectedCallback(): void {
+            this.removeEventListener('click', this.switchLanguage)
+        }
+
+        private readonly switchLanguage = (): void => {
+            const language = document.documentElement.lang === 'en' ? 'zh-CN' : 'en'
+            setLanguage(language)
+            localStorage.setItem(storageKey, language)
+        }
+    }
+
+    customElements.define('home-language-switch', HomeLanguageSwitch)
+</script>
+
+<style>
+    home-language-switch:not([hidden]) {
+        display: inline-flex;
+        flex-shrink: 0;
+    }
+
+    button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        min-height: 2rem;
+        padding: 0.25rem 0.5rem;
+        border: 1px solid var(--sl-color-hairline-light);
+        border-radius: 0.5rem;
+        background: transparent;
+        color: var(--sl-color-gray-2);
+        font: inherit;
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background: var(--sl-color-accent-low);
+        color: var(--sl-color-text-accent);
+    }
+
+    button:focus-visible {
+        outline: 2px solid var(--sl-color-accent-high);
+        outline-offset: 3px;
+    }
+
+    button :global(svg) {
+        width: 1.1rem;
+        height: 1.1rem;
+    }
+
+    /* The header already exposes the switch on mobile, so do not duplicate it in the drawer. */
+    :global(.mobile-preferences) home-language-switch:not([hidden]) {
+        display: none;
+    }
+</style>

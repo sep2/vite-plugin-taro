@@ -1,0 +1,13 @@
+WEBVTT
+
+00:00.000 --> 00:03.000
+Open a VPT app in WeChat DevTools
+
+00:03.000 --> 00:06.500
+Edit a deeply nested React component
+
+00:06.500 --> 00:10.000
+Instant hot update, with page state preserved
+
+00:10.000 --> 00:12.000
+Keep using the updated app without a refresh
