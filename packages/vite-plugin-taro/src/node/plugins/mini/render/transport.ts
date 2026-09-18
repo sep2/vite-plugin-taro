@@ -1,25 +1,17 @@
 import path from 'node:path'
-import * as types from '@babel/types'
 import type { Rolldown } from 'vite'
-import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
+import { type AstTransformResult, replaceTemplate } from '../../../utils/transform.ts'
 import { toLogicalChunkId } from '../module/chunk-path.ts'
 import type { MiniModuleClassifier } from '../module/module.ts'
 
-const transportPlaceholder = '__VPT_TRANSPORT__'
-const moduleIdParameter = 'moduleId'
-const exportBindingParameter = 'exportBinding'
-
-type TransportedChunk = {
-    chunk: Rolldown.RenderedChunk
-    kind: 'capsule' | 'amphibious'
-}
+export const transportPlaceholder = '__VPT_TRANSPORT__'
 
 /**
  * Materializes transport while Rolldown's preliminary hash placeholders are still active. Each switch case deliberately has
- * two IDs: the package-neutral preliminary filename without its `assets/` directory becomes the SystemJS registration
- * identity, while the LTHP-selected assets/package-qualified filename becomes the literal native require path. Rolldown
- * substitutes both hashes after this transform, so the
- * generated transport code and its own content hash describe the exact files that `generateBundle` later materializes.
+ * two IDs: the normalized preliminary filename becomes the SystemJS registration identity, while the LTHP-selected
+ * assets/package-qualified filename becomes the literal native require path. Rolldown
+ * substitutes both hashes after this transform, so the generated transport code and its own content hash describe the exact
+ * files that `generateBundle` later materializes.
  *
  * This intentionally creates broad hash invalidation: changing one capsule can rename transport, then bootstrap, then
  * chunks that import bootstrap. A Mini Program ships one application package rather than independently cached HTTP
@@ -31,8 +23,8 @@ export async function materializeTransport({
     chunks,
     classifyModule,
     getLoadMode,
-    getPhysicalChunkId = (chunk) => chunk.fileName,
-    sourcemap = true
+    getPhysicalChunkId,
+    sourcemap
 }: {
     code: string
     transportChunk: Rolldown.RenderedChunk
@@ -42,137 +34,67 @@ export async function materializeTransport({
     getPhysicalChunkId?: (chunk: Rolldown.RenderedChunk) => string
     sourcemap?: boolean
 }): Promise<AstTransformResult> {
-    const physicalTransportId = getPhysicalChunkId(transportChunk)
+    const expression = createTransportExpression({
+        transportChunk,
+        chunks,
+        classifyModule,
+        getLoadMode,
+        getPhysicalChunkId: getPhysicalChunkId ?? ((chunk) => chunk.fileName)
+    })
+    return replaceTemplate(code, transportChunk.fileName, { [transportPlaceholder]: expression }, sourcemap ?? true)
+}
 
-    // Babel constructs and safely serializes an expression shaped like:
-    // (moduleId) => {
+/**
+ * Generates the closed transport expression from fixed ES2018-compatible syntax and JSON-encoded IDs and paths.
+ * All require arguments stay literal; inserting this expression needs neither Babel AST construction nor another Oxc pass.
+ */
+export function createTransportExpression({
+    transportChunk,
+    chunks,
+    classifyModule,
+    getLoadMode,
+    getPhysicalChunkId
+}: {
+    transportChunk: Rolldown.RenderedChunk
+    chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
+    classifyModule: MiniModuleClassifier
+    getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async'
+    getPhysicalChunkId(chunk: Rolldown.RenderedChunk): string
+}): string {
+    const from = path.posix.dirname(getPhysicalChunkId(transportChunk))
+
+    // Fixed syntax and JSON-encoded paths produce an expression shaped like:
+    // function(moduleId) {
     //     switch (moduleId) {
     //         case 'assets/app.js': return require('./app.js')
     //         case 'sub/p_account/page.js': return require.async('../sub/p_account/page.js')
     //         case 'assets/bootstrap.js':
-    //             return [[], (exportBinding) => ({ execute() { exportBinding(require('./bootstrap.js')) } })]
+    //             return [[], function(exportBinding) { return { execute() { exportBinding(require('./bootstrap.js')) } } }]
     //         default: throw new Error(`Unknown System module: ${moduleId}`)
     //     }
     // }
-    const cases = getTransportedChunks(chunks, classifyModule)
+    // Keep only capsule and amphibious chunks, in deterministic output order.
+    const cases = Object.values(chunks)
+        .map((chunk) => ({ chunk, kind: classifyModule(chunk).executionKind }))
+        .filter(({ kind }) => kind !== 'native')
         .sort((left, right) => left.chunk.fileName.localeCompare(right.chunk.fileName))
         .map(({ chunk, kind }) => {
             const loadMode = getLoadMode(chunk)
-
-            const logicalChunkId = toLogicalChunkId(chunk.fileName)
-            // Only native loading crosses the logical/physical boundary and receives the assets/package-qualified path.
-            const physicalChunkId = getPhysicalChunkId(chunk)
-
             if (kind === 'amphibious' && loadMode !== 'sync') {
                 throw new Error(`Amphibious Mini Program module must be in the main package: ${chunk.fileName}`)
             }
-
-            return createTransportCase({
-                chunkId: logicalChunkId,
-                transportFileName: physicalTransportId,
-                physicalChunkId: physicalChunkId,
-                loadMode,
-                kind
-            })
+            // Only native loading crosses the logical/physical boundary and receives the assets/package-qualified path.
+            const relative = path.posix.relative(from, getPhysicalChunkId(chunk))
+            const requirePath = JSON.stringify(relative.startsWith('.') ? relative : `./${relative}`)
+            const loaded = `${loadMode === 'sync' ? 'require' : 'require.async'}(${requirePath})`
+            // Amphibious namespaces must be required lazily during execution, never while bootstrap imports transport.
+            const registration =
+                kind === 'capsule'
+                    ? loaded
+                    : `[[],function(exportBinding){return {execute:function(){exportBinding(${loaded})}}}]`
+            return `case ${JSON.stringify(toLogicalChunkId(chunk.fileName))}:return ${registration};`
         })
-
-    return await replaceWithAst(
-        code,
-        transportChunk.fileName,
-        {
-            [transportPlaceholder]: types.arrowFunctionExpression(
-                [types.identifier(moduleIdParameter)],
-                types.blockStatement([
-                    types.switchStatement(types.identifier(moduleIdParameter), [
-                        ...cases,
-                        createUnknownModuleCase(moduleIdParameter)
-                    ])
-                ])
-            )
-        },
-        sourcemap
-    )
-}
-
-/** Keeps only capsule and amphibious chunks and carries their narrowed kind into source generation. */
-function getTransportedChunks(
-    chunks: Readonly<Record<string, Rolldown.RenderedChunk>>,
-    classifyModule: MiniModuleClassifier
-): TransportedChunk[] {
-    const transportedChunks: TransportedChunk[] = []
-
-    for (const chunk of Object.values(chunks)) {
-        const kind = classifyModule(chunk).executionKind
-        if (kind !== 'native') {
-            transportedChunks.push({ chunk, kind })
-        }
-    }
-
-    return transportedChunks
-}
-
-/** Creates one logical-ID switch case while keeping its physical native require argument literal. */
-function createTransportCase({
-    chunkId,
-    transportFileName,
-    loadMode,
-    kind,
-    physicalChunkId
-}: {
-    chunkId: string
-    transportFileName: string
-    loadMode: 'sync' | 'async'
-    physicalChunkId: string
-    kind: 'capsule' | 'amphibious'
-}): ReturnType<typeof types.switchCase> {
-    const requirePath = toNativeRequirePath(transportFileName, physicalChunkId)
-
-    const requireCallee =
-        loadMode === 'sync'
-            ? types.identifier('require')
-            : types.memberExpression(types.identifier('require'), types.identifier('async'))
-
-    const loadedModule = types.callExpression(requireCallee, [types.stringLiteral(requirePath)])
-    const registration = kind === 'capsule' ? loadedModule : createAmphibiousRegistrationExpression(loadedModule)
-
-    return types.switchCase(types.stringLiteral(chunkId), [types.returnStatement(registration)])
-}
-
-/** Creates a registration that loads and publishes an amphibious CommonJS namespace only when executed. */
-function createAmphibiousRegistrationExpression(namespace: types.Expression): ReturnType<typeof types.arrayExpression> {
-    return types.arrayExpression([
-        types.arrayExpression([]),
-        types.arrowFunctionExpression(
-            [types.identifier(exportBindingParameter)],
-            types.objectExpression([
-                types.objectMethod(
-                    'method',
-                    types.identifier('execute'),
-                    [],
-                    types.blockStatement([
-                        types.expressionStatement(
-                            types.callExpression(types.identifier(exportBindingParameter), [namespace])
-                        )
-                    ])
-                )
-            ])
-        )
-    ])
-}
-
-/** Rejects module IDs absent from the closed output graph. */
-function createUnknownModuleCase(moduleId: string): ReturnType<typeof types.switchCase> {
-    return types.switchCase(null, [
-        types.throwStatement(
-            types.newExpression(types.identifier('Error'), [
-                types.binaryExpression('+', types.stringLiteral('Unknown System module: '), types.identifier(moduleId))
-            ])
-        )
-    ])
-}
-
-/** Converts one preliminary output path to a literal require path relative to transport. */
-function toNativeRequirePath(fromFileName: string, toFileName: string): string {
-    const relativePath = path.posix.relative(path.posix.dirname(fromFileName), toFileName)
-    return relativePath.startsWith('.') ? relativePath : `./${relativePath}`
+        .join('')
+    // Reject module IDs absent from the closed output graph.
+    return `function(moduleId){switch(moduleId){${cases}default:throw new Error('Unknown System module: '+moduleId)}}`
 }

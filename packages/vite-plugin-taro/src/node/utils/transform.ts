@@ -1,43 +1,9 @@
-import { generate } from '@babel/generator'
 import { RolldownMagicString } from 'rolldown'
-import { type Rolldown, transformWithOxc } from 'vite'
-import { esTarget } from './constant.ts'
+import type { Rolldown } from 'vite'
 
 export type AstTransformResult = {
     code: string
     map: Rolldown.ExistingRawSourceMap | null
-}
-
-/** Replaces each placeholder with a Babel AST expression while transforming the module through Oxc. */
-export async function replaceWithAst(
-    code: string,
-    filename: string,
-    replacement: Readonly<Record<string, Parameters<typeof generate>[0]>>,
-    sourcemap = true
-): Promise<AstTransformResult> {
-    const define: Record<string, string> = {}
-
-    for (const [placeholder, node] of Object.entries(replacement)) {
-        requireOnePlaceholder(code, placeholder)
-        define[placeholder] = ast2str(node)
-    }
-
-    const transformed = await transformWithOxc(code, filename, { define, sourcemap, target: esTarget })
-
-    for (const placeholder of Object.keys(replacement)) {
-        if (transformed.code.includes(placeholder)) {
-            throw new Error(`Failed to replace placeholder ${placeholder} in ${filename}`)
-        }
-    }
-    return {
-        code: transformed.code,
-        map: sourcemap ? (transformed.map as Rolldown.ExistingRawSourceMap) : null
-    }
-}
-
-/** Serializes a Babel AST node as a compact expression for Oxc substitution. */
-function ast2str(node: Parameters<typeof generate>[0]): string {
-    return generate(node, { comments: false, compact: true, concise: true, minified: true }).code
 }
 
 /** Validates a unique reserved slot before recording its replacement. */
