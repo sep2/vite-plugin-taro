@@ -1,90 +1,35 @@
-import * as types from '@babel/types'
 import type { VptOptions, VptPageOption } from '../../../options.ts'
 import { createPageComponentImportPath } from '../../utils/modules.ts'
 import { createAppConfig, getPageConfig } from '../../utils/project-config.ts'
-import { type AstTransformResult, replaceWithAst } from '../../utils/transform.ts'
+import { type AstTransformResult, replaceTemplate } from '../../utils/transform.ts'
 
-const appConfigPlaceholder = '__VPT_H5_APP_CONFIG__'
-const routesPlaceholder = '__VPT_H5_ROUTES__'
-
-/** Specializes the physical H5 App for one configured project. */
-export async function transformH5App({
+/** Specializes only the reserved expressions in VPT's physical H5 App; Vite lowers its TypeScript once afterward. */
+export function transformH5App({
     code,
     id,
     options,
     projectRoot,
-    sourcemap = true
+    sourcemap
 }: {
     code: string
     id: string
     options: VptOptions
     projectRoot: string
     sourcemap?: boolean
-}): Promise<AstTransformResult> {
-    const transformed = await replaceWithAst(
+}): AstTransformResult {
+    return replaceTemplate(
         code,
         id,
         {
-            [appConfigPlaceholder]: types.valueToNode({
-                router: {},
-                ...createAppConfig(options)
-            }),
-            [routesPlaceholder]: types.arrayExpression(
-                options.pages.map((page) => {
-                    return createRoute({ page, projectRoot })
-                })
-            )
+            __VPT_H5_APP_CONFIG__: JSON.stringify({ router: {}, ...createAppConfig(options) }),
+            __VPT_H5_ROUTES__: `[${options.pages.map((page) => createRoute(page, projectRoot)).join(',')}]`
         },
-        sourcemap
+        sourcemap ?? true
     )
-
-    return { code: transformed.code, map: transformed.map }
 }
 
-/**
- * Creates one lazy H5 route shaped like:
- * {
- *     path: 'pages/home/index',
- *     load: async function (context, params) {
- *         const page = await import('/@fs/project/src/pages/home/index.tsx')
- *         return [page, context, params]
- *     },
- *     ...pageConfig
- * }
- */
-function createRoute({
-    page,
-    projectRoot
-}: {
-    page: VptPageOption
-    projectRoot: string
-}): ReturnType<typeof types.objectExpression> {
-    const pageComponentPath = createPageComponentImportPath({ pagePath: page.path, projectRoot })
-
-    const load = types.functionExpression(
-        null,
-        [types.identifier('context'), types.identifier('params')],
-        types.blockStatement([
-            types.variableDeclaration('const', [
-                types.variableDeclarator(
-                    types.identifier('page'),
-                    types.awaitExpression(types.importExpression(types.stringLiteral(pageComponentPath)))
-                )
-            ]),
-            types.returnStatement(
-                types.arrayExpression([
-                    types.identifier('page'),
-                    types.identifier('context'),
-                    types.identifier('params')
-                ])
-            )
-        ]),
-        false,
-        true
-    )
-    return types.objectExpression([
-        types.objectProperty(types.identifier('path'), types.stringLiteral(page.path)),
-        types.objectProperty(types.identifier('load'), load),
-        types.spreadElement(types.valueToNode(getPageConfig(page)))
-    ])
+/** Every application-controlled value is JSON-encoded; the route loader itself is fixed compiler-owned syntax. */
+function createRoute(page: VptPageOption, projectRoot: string): string {
+    const component = JSON.stringify(createPageComponentImportPath({ pagePath: page.path, projectRoot }))
+    return `{path:${JSON.stringify(page.path)},load:async function(context,params){const page=await import(${component});return [page,context,params]},...${JSON.stringify(getPageConfig(page))}}`
 }

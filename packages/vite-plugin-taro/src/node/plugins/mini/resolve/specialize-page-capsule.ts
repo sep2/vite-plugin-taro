@@ -1,6 +1,5 @@
-import * as types from '@babel/types'
 import { getPageConfig } from '../../../utils/project-config.ts'
-import { type AstTransformResult, replaceWithAst } from '../../../utils/transform.ts'
+import { type AstTransformResult, replaceTemplate } from '../../../utils/transform.ts'
 import type { MiniPage } from '../mini-contract.ts'
 
 const pagePathPlaceholder = '__VPT_PAGE_PATH__'
@@ -11,20 +10,20 @@ export function specializePageCapsule({
     code,
     id,
     page,
-    sourcemap = true
+    sourcemap
 }: {
     code: string
     id: string
     page: MiniPage
     sourcemap?: boolean
-}): Promise<AstTransformResult> {
-    return replaceWithAst(
+}): AstTransformResult {
+    return replaceTemplate(
         code,
         id,
         {
-            [pagePathPlaceholder]: types.stringLiteral(page.path),
-            [pageConfigPlaceholder]: types.valueToNode(getPageConfig(page))
+            [pagePathPlaceholder]: JSON.stringify(page.path),
+            [pageConfigPlaceholder]: JSON.stringify(getPageConfig(page))
         },
-        sourcemap
+        sourcemap ?? false
     )
 }

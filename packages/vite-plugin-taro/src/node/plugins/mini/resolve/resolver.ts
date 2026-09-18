@@ -65,7 +65,7 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'runtime
             return privateIdResolvers.get(id)?.(importer, projectRoot)
         },
 
-        specialize(code: string, id: string, sourcemap = true) {
+        specialize(code: string, id: string, sourcemap?: boolean) {
             const normalizedId = normalizeModuleId(id)
 
             if (normalizedId === normalizedAppCapsulePath) {

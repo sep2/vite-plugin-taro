@@ -108,7 +108,7 @@ test('specializes the App capsule with the configured App JSON', async () => {
     const result = await resolver.specialize('export default __VPT_APP_CONFIG__', modules.appCapsule)
 
     assert.ok(result)
-    assert.match(result.code, /pages:\s*\[\s*["']pages\/home\/index["']/)
+    assert.match(result.code, /"pages":\s*\[\s*["']pages\/home\/index["']/)
     assert.doesNotMatch(result.code, /stale\/page/)
-    assert.match(result.code, /navigationBarTitleText:\s*["']Example["']/)
+    assert.match(result.code, /"navigationBarTitleText":\s*["']Example["']/)
 })

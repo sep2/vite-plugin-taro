@@ -5,8 +5,8 @@ import { specializeAppCapsule } from './specialize-app-capsule.ts'
 const id = '/plugin/runtime/mini/capsule/app.js'
 const source = 'export default createReactApp(AppComponent, React, ReactDOM, __VPT_APP_CONFIG__)'
 
-test('specializes the App capsule with its native configuration', async () => {
-    const result = await specializeAppCapsule({
+test('specializes the App capsule with its native configuration', () => {
+    const result = specializeAppCapsule({
         code: source,
         id,
         appConfig: {
@@ -17,18 +17,29 @@ test('specializes the App capsule with its native configuration', async () => {
         }
     })
 
-    assert.match(result.code, /pages:\s*\[\s*["']pages\/home\/index["']/)
-    assert.match(result.code, /navigationBarTitleText:\s*["']Example["']/)
+    assert.match(result.code, /"pages":\s*\[\s*["']pages\/home\/index["']/)
+    assert.match(result.code, /"navigationBarTitleText":\s*["']Example["']/)
     assert.doesNotMatch(result.code, /__VPT_APP_CONFIG__/)
     assert.ok(result.map)
     assert.deepEqual(result.map.sources, [id])
 
-    const withoutSourceMap = await specializeAppCapsule({ code: source, id, appConfig: {}, sourcemap: false })
+    const withoutSourceMap = specializeAppCapsule({ code: source, id, appConfig: {}, sourcemap: false })
     assert.equal(withoutSourceMap.map, null)
 })
 
-test('rejects an App capsule missing its configuration placeholder', async () => {
-    await assert.rejects(
+test('normalizes App configuration as JSON while preserving reserved slot names and escaped characters', () => {
+    const appConfig = {
+        text: '__VPT_APP_CONFIG__ " \\ \n',
+        values: [true, null, -0],
+        absent: undefined
+    }
+    const result = specializeAppCapsule({ code: 'const config = __VPT_APP_CONFIG__', id, appConfig })
+    const config: unknown = Function(`${result.code}; return config`)()
+    assert.deepEqual(config, { text: appConfig.text, values: [true, null, 0] })
+})
+
+test('rejects an App capsule missing its configuration placeholder', () => {
+    assert.throws(
         () =>
             specializeAppCapsule({
                 code: 'export default {}',
