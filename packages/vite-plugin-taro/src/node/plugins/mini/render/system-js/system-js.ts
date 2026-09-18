@@ -673,34 +673,35 @@ function exportCallWith(exportBinding: string, exported: string, value: string):
 
 /** Creates collision-free identifiers without requiring Babel's scope allocator. */
 function createGeneratedNames(identifierNames: ReadonlySet<string>, dependencyCount: number): GeneratedNames {
-    // The used-name set is locally mutable because each selected helper reserves its name for the next helper.
-    const used = new Set(identifierNames)
+    // The three fixed helper-name families are disjoint, so only authored identifiers can collide with generated names.
+    // Read the collected names directly: neither copying the set nor reserving generated names serves a later lookup.
     const take = (base: string): string => {
         // The suffix cursor advances only on an actual source collision and never escapes this allocation call.
         let suffix = 0
         let candidate = base
-        while (used.has(candidate)) {
+        while (identifierNames.has(candidate)) {
             suffix += 1
             candidate = `${base}${suffix}`
         }
-        used.add(candidate)
         return candidate
     }
 
     const takeDependencyPrefix = (base: string): string => {
-        // Prefix selection tests every concrete setter argument because the unsuffixed base may itself be collision-free.
+        // These local cursors try prefixes against concrete setter arguments, not just the possibly collision-free base.
         let suffix = 0
         let candidate = base
-        while (
-            Array.from({ length: dependencyCount }, (_, index) => `${candidate}${index}`).some((name) => used.has(name))
-        ) {
+        while (true) {
+            // This per-prefix cursor stops at the first collision without materializing a dependency-name array.
+            let index = 0
+            while (index < dependencyCount && !identifierNames.has(`${candidate}${index}`)) {
+                index += 1
+            }
+            if (index === dependencyCount) {
+                return candidate
+            }
             suffix += 1
             candidate = `${base}${suffix}`
         }
-        Array.from({ length: dependencyCount }, (_, index) => `${candidate}${index}`).forEach((name) => {
-            used.add(name)
-        })
-        return candidate
     }
 
     return {

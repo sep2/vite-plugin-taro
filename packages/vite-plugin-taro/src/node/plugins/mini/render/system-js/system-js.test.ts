@@ -297,6 +297,133 @@ test('allocates a dependency prefix beyond every concrete source collision', () 
     assert.doesNotMatch(result.code, /function\(__systemDependency0\)/)
 })
 
+const nameAllocationCases = [
+    {
+        name: 'no dependencies',
+        dependencies: 0,
+        reserved: ['__systemDependency0', '__systemDependency10'],
+        exportBinding: '__systemExport',
+        context: '__systemContext',
+        dependencyPrefix: '__systemDependency'
+    },
+    {
+        name: 'unused prefix base and sparse helper suffixes',
+        dependencies: 1,
+        reserved: ['__systemDependency', '__systemContext1', '__systemExport1'],
+        exportBinding: '__systemExport',
+        context: '__systemContext',
+        dependencyPrefix: '__systemDependency'
+    },
+    {
+        name: 'first, middle, and last setter collisions',
+        dependencies: 3,
+        reserved: [
+            '__systemContext',
+            '__systemContext1',
+            '__systemExport',
+            '__systemExport1',
+            '__systemDependency2',
+            '__systemDependency10',
+            '__systemDependency21'
+        ],
+        exportBinding: '__systemExport2',
+        context: '__systemContext2',
+        dependencyPrefix: '__systemDependency3'
+    },
+    {
+        name: '1024 dependencies with late collisions',
+        dependencies: 1024,
+        reserved: ['__systemDependency1023', '__systemDependency1999', '__systemDependency2512'],
+        exportBinding: '__systemExport',
+        context: '__systemContext',
+        dependencyPrefix: '__systemDependency3'
+    }
+]
+
+for (const scenario of nameAllocationCases) {
+    for (const sourcemap of [false, true]) {
+        test(`allocates SystemJS names without temporary collections: ${scenario.name} (maps: ${sourcemap})`, async () => {
+            const indices = Array.from({ length: scenario.dependencies }, (_, index) => index)
+            const code = [
+                ...indices.map((index) => `import { value as value${index} } from './dependency-${index}.js';`),
+                ...scenario.reserved.map((name, index) => `const ${name} = 'authored-${index}';`),
+                // This property name belongs only to the source-identifier set, not to any binding or export set.
+                'const marker = { __systemNameAllocationSentinel: true };',
+                `const values = [${indices.map((index) => `value${index}`).join(',')}];`,
+                `const authored = [${scenario.reserved.join(',')}];`,
+                'const url = import.meta.url;',
+                "const load = () => import('./lazy.js');",
+                'export { values, authored, url, load };'
+            ].join('\n')
+            const { output, stats } = compileWithNameAllocationStats(code, sourcemap)
+            assert.ok(output.code.includes(`function(${scenario.exportBinding},${scenario.context})`))
+            const setterNames = [...output.code.matchAll(/function\((__systemDependency\d+)\)\{/g)].map(
+                (match) => match[1]
+            )
+            assert.deepEqual(
+                setterNames,
+                indices.map((index) => `${scenario.dependencyPrefix}${index}`)
+            )
+
+            const lazy = { value: 'lazy' }
+            const dependencies = new Map<string, ModuleNamespace>([
+                ...indices.map((index): [string, ModuleNamespace] => [`./dependency-${index}.js`, { value: index }]),
+                ['./lazy.js', lazy]
+            ])
+            const registration = evaluateCommonJsRegistration(output.code)
+            assert.deepEqual(
+                registration[0],
+                indices.map((index) => `./dependency-${index}.js`)
+            )
+            const instance = await instantiate(registration, dependencies)
+            assert.deepEqual(instance.namespace.values, indices)
+            assert.deepEqual(
+                instance.namespace.authored,
+                scenario.reserved.map((_, index) => `authored-${index}`)
+            )
+            assert.equal(instance.namespace.url, 'assets/chunk.js')
+            assert.equal(await requireFunction(instance.namespace.load)(), lazy)
+            if (sourcemap) {
+                assert.deepEqual(output.map?.sourcesContent, [code])
+                assert.ok(output.map?.mappings)
+            } else {
+                assert.equal(output.map, null)
+            }
+            assert.deepEqual(stats, { identifierSetIterations: 0, candidateArrays: 0, candidateArrayEntries: 0 })
+        })
+    }
+}
+
+test('avoids imported setter names and nested context/export bindings without changing published values', async () => {
+    const code = [
+        "import { value as __systemDependency0 } from './dependency.js';",
+        'function inspect(__systemContext, __systemExport) {',
+        '    return [__systemDependency0, import.meta.url, __systemContext, __systemExport];',
+        '}',
+        "const load = (__systemContext1) => import('./lazy.js');",
+        'export { __systemDependency0, inspect, load };'
+    ].join('\n')
+    const output = compile(code)
+    assert.match(output.code, /function\(__systemExport1,__systemContext2\)/)
+    assert.match(output.code, /function\(__systemDependency10\)/)
+    const lazy = { value: 9 }
+    const instance = await instantiate(
+        evaluateCommonJsRegistration(output.code),
+        new Map([
+            ['./dependency.js', { value: 7 }],
+            ['./lazy.js', lazy]
+        ])
+    )
+    assert.equal(instance.namespace.__systemDependency0, 7)
+    assert.deepEqual(requireFunction(instance.namespace.inspect)('context', 'export'), [
+        7,
+        'assets/chunk.js',
+        'context',
+        'export'
+    ])
+    assert.equal(await requireFunction(instance.namespace.load)('unused'), lazy)
+})
+
 test('matches Babel for unexported object rest bindings consumed by a hoisted function', async () => {
     const code = `
         const { first, ...rest } = { first: 1, second: 2 };
@@ -496,6 +623,44 @@ function compile(code: string) {
             return reference
         }
     })
+}
+
+/** Observe allocation work through the public compiler without adding a production test seam or writing fixtures. */
+function compileWithNameAllocationStats(code: string, sourcemap: boolean) {
+    const originalIterator = Set.prototype[Symbol.iterator]
+    const originalFrom = Array.from
+    // These counters are local to one synchronous transform; no call histories or fixture outputs are retained.
+    const stats = { identifierSetIterations: 0, candidateArrays: 0, candidateArrayEntries: 0 }
+    // Instrument only while compiling in this isolated test worker and restore both builtins before any async work.
+    Set.prototype[Symbol.iterator] = function (this: Set<unknown>) {
+        if (this.has('__systemNameAllocationSentinel')) {
+            stats.identifierSetIterations += 1
+        }
+        return originalIterator.call(this)
+    }
+    Array.from = new Proxy(originalFrom, {
+        apply(target, thisArgument: unknown, argumentsList: unknown[]) {
+            const result: unknown = Reflect.apply(target, thisArgument, argumentsList)
+            if (Array.isArray(result) && typeof result[0] === 'string' && result[0].startsWith('__systemDependency')) {
+                stats.candidateArrays += 1
+                stats.candidateArrayEntries += result.length
+            }
+            return result
+        }
+    })
+    try {
+        const output = transformSystemJs({
+            code,
+            filename: 'assets/chunk.js',
+            format: 'commonjs-registration',
+            sourcemap,
+            resolveReference: (reference) => reference
+        })
+        return { output, stats }
+    } finally {
+        Set.prototype[Symbol.iterator] = originalIterator
+        Array.from = originalFrom
+    }
 }
 
 /** Compiles the same fixture through Babel's generic SystemJS implementation as the correctness baseline. */
