@@ -73,13 +73,13 @@ type HoistedVariable = Readonly<{
 /** Immutable facts shared by the declaration and expression rewrite passes. */
 type ModuleModel = Readonly<{
     dependencies: readonly MutableDependency[]
-    directVariables: ReadonlySet<VariableDeclaration>
     exportNamesByLocal: ReadonlyMap<string, readonly string[]>
     functions: readonly OxcFunction[]
     generatedNames: GeneratedNames
     hasTopLevelAwait: boolean
-    hoistedVariables: readonly HoistedVariable[]
     importBindings: ReadonlySet<string>
+    moduleVariables: readonly VariableDeclaration[]
+    nestedHoistedVariables: readonly HoistedVariable[]
     outerBindings: ReadonlySet<string>
     program: Program
     scopes: ScopeTracker
@@ -123,11 +123,11 @@ export function transformSystemJs(options: TransformSystemJsOptions): TransformS
 function analyzeModule(program: Program, filename: string): ModuleModel {
     // These journals are mutable only during this one linear analysis pass; all are exposed as readonly compilation facts.
     const identifierNames = new Set<string>()
-    const directVariables = new Set<VariableDeclaration>()
     const exportNamesByLocal = new Map<string, string[]>()
     const dependencyBySource = new Map<string, MutableDependency>()
     const functions: OxcFunction[] = []
-    const hoistedVariables: HoistedVariable[] = []
+    const moduleVariables: VariableDeclaration[] = []
+    const nestedHoistedVariables: HoistedVariable[] = []
     const importBindings = new Set<string>()
     const outerBindings = new Set<string>()
     // ScopeTracker mutates only during this shared analysis walk, then freezes into the immutable model used by edit passes.
@@ -146,13 +146,25 @@ function analyzeModule(program: Program, filename: string): ModuleModel {
             }
             if (isModuleBoundary(node)) moduleBoundaryDepth += 1
             if (node.type === 'AwaitExpression' && moduleBoundaryDepth === 0) hasTopLevelAwait = true
-            if (node.type === 'VariableDeclaration' && node.kind === 'var' && moduleBoundaryDepth === 0) {
-                const isForIterationBinding =
-                    (parent?.type === 'ForInStatement' || parent?.type === 'ForOfStatement') && parent.left === node
-                hoistedVariables.push({ declaration: node, isForIterationBinding })
-                bindingNamesFromDeclaration(node).forEach((name) => {
-                    outerBindings.add(name)
-                })
+            if (
+                node.type === 'VariableDeclaration' &&
+                moduleBoundaryDepth === 0 &&
+                (node.kind === 'var' || parent?.type === 'Program')
+            ) {
+                // The existing walk visits module cells in source order; retain that order instead of merging and sorting later.
+                moduleVariables.push(node)
+                if (node.kind === 'var') {
+                    // Direct declarations are edited through Program.body; only nested vars need a separate edit journal.
+                    if (parent?.type !== 'Program') {
+                        const isForIterationBinding =
+                            (parent?.type === 'ForInStatement' || parent?.type === 'ForOfStatement') &&
+                            parent.left === node
+                        nestedHoistedVariables.push({ declaration: node, isForIterationBinding })
+                    }
+                    bindingNamesFromDeclaration(node).forEach((name) => {
+                        outerBindings.add(name)
+                    })
+                }
             }
         },
         leave(node) {
@@ -175,7 +187,6 @@ function analyzeModule(program: Program, filename: string): ModuleModel {
                 throw unsupported(filename, `source-level ${node.type}`)
             case 'VariableDeclaration':
                 requireSupportedVariableKind(node, filename)
-                directVariables.add(node)
                 node.declarations
                     .flatMap((declaration) => bindingNames(declaration.id))
                     .forEach((name) => {
@@ -205,13 +216,13 @@ function analyzeModule(program: Program, filename: string): ModuleModel {
 
     return {
         dependencies: [...dependencyBySource.values()],
-        directVariables,
         exportNamesByLocal,
         functions,
         generatedNames,
         hasTopLevelAwait,
-        hoistedVariables,
         importBindings,
+        moduleVariables,
+        nestedHoistedVariables,
         outerBindings,
         program,
         scopes
@@ -310,17 +321,15 @@ function applyProgramEdits(editor: SourceEditor, model: ModuleModel): void {
         }
     }
 
-    model.hoistedVariables
-        .filter(({ declaration }) => !model.directVariables.has(declaration))
-        .forEach(({ declaration, isForIterationBinding }) => {
-            transformNestedHoistedVariables(
-                editor,
-                declaration,
-                isForIterationBinding,
-                model.generatedNames.exportBinding,
-                model.exportNamesByLocal
-            )
-        })
+    for (const { declaration, isForIterationBinding } of model.nestedHoistedVariables) {
+        transformNestedHoistedVariables(
+            editor,
+            declaration,
+            isForIterationBinding,
+            model.generatedNames.exportBinding,
+            model.exportNamesByLocal
+        )
+    }
 }
 
 /** Changes module variables into assignments to declaration-scope cells shared with setters and hoisted functions. */
@@ -574,19 +583,13 @@ function renderEarlyExports(model: ModuleModel): string {
     const functionNames = new Set(
         model.functions.map((declaration) => (declaration.id as NonNullable<typeof declaration.id>).name)
     )
-    const nestedHoistedVariables = model.hoistedVariables
-        .map(({ declaration }) => declaration)
-        .filter((declaration) => !model.directVariables.has(declaration))
-    const variablesInSourceOrder = [...model.directVariables, ...nestedHoistedVariables].sort(
-        (left, right) => left.start - right.start
-    )
     const entries: Array<Readonly<{ exported: string; value: string }>> = []
 
     for (const [local, exportedNames] of model.exportNamesByLocal) {
         if (!functionNames.has(local)) continue
         for (const exported of exportedNames) entries.push({ exported, value: local })
     }
-    for (const declaration of variablesInSourceOrder) {
+    for (const declaration of model.moduleVariables) {
         for (const declarator of declaration.declarations) {
             if (declarator.init) continue
             for (const local of bindingNames(declarator.id)) {

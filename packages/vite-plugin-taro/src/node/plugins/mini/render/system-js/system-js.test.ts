@@ -225,6 +225,93 @@ test('indexes a large interleaved declaration set without duplicate initializati
     )
 })
 
+for (const sourcemap of [false, true]) {
+    for (const format of ['commonjs-registration', 'system-register'] as const) {
+        test(`collects declaration order across blocks and loops without leaking nested scopes (${format}, maps: ${sourcemap})`, async () => {
+            const code = [
+                'var first;',
+                'if (true) { let last; var branch, initialized = 2; }',
+                'let second;',
+                'for (var index = 0; index < 1; index++) { var loop; }',
+                'for (var key in { entry: 1 }) { var fromIn; }',
+                'for (var item of [3]) { var fromOf; }',
+                'switch (1) { case 1: var switched; break; default: var skipped; }',
+                'try { var tried; } catch (error) { var caught; } finally { var finished; }',
+                'function read() { var last; return [initialized, index, key, item]; }',
+                'const arrow = () => { var last; };',
+                'class Local { static { var last; } method() { var last; } };',
+                'var repeated;',
+                'if (false) { var repeated; }',
+                'var last;',
+                'export { last, repeated, finished, caught, tried, skipped, switched, fromOf, item, fromIn, key, loop, index, second, branch, initialized, first as alias, first, read as get, read };'
+            ].join('\n')
+            const result = transformSystemJs({
+                code,
+                filename: 'assets/declarations.js',
+                format,
+                sourcemap,
+                resolveReference: (reference) => reference
+            })
+            const actual = await instantiate(
+                format === 'commonjs-registration'
+                    ? evaluateCommonJsRegistration(result.code)
+                    : evaluateSystemRegistration(result.code),
+                new Map()
+            )
+            const babel = await instantiate(evaluateSystemRegistration(compileWithBabel(code)), new Map())
+            assert.deepEqual(actual.beforeExecute, babel.beforeExecute)
+            assert.deepEqual(actual.publications, babel.publications)
+            // Export-list order is deliberately reversed; variable availability must follow declaration source order.
+            assert.deepEqual(Object.keys(actual.beforeExecute), [
+                'get',
+                'read',
+                'alias',
+                'first',
+                'branch',
+                'second',
+                'loop',
+                'key',
+                'fromIn',
+                'item',
+                'fromOf',
+                'switched',
+                'skipped',
+                'tried',
+                'caught',
+                'finished',
+                'repeated',
+                'last'
+            ])
+            assert.deepEqual(requireFunction(actual.namespace.read)(), [2, 1, 'entry', 3])
+            assert.deepEqual(requireFunction(actual.namespace.get)(), requireFunction(babel.namespace.get)())
+            if (sourcemap) {
+                assert.deepEqual(result.map?.sourcesContent, [code])
+                assert.ok(result.map?.mappings)
+            } else {
+                assert.equal(result.map, null)
+            }
+        })
+    }
+
+    test(`does not sort a large interleaved module declaration list (maps: ${sourcemap})`, async () => {
+        const declarations = Array.from({ length: 1024 }, (_, index) => ({
+            direct: `direct${index}`,
+            nested: `nested${index}`
+        }))
+        const names = declarations.flatMap(({ direct, nested }) => [direct, nested])
+        // The fixture and observations stay entirely in memory, including the 2,048 declaration-time exports.
+        const code = `${declarations
+            .map(({ direct, nested }) => `var ${direct}; if (false) { var ${nested}; }`)
+            .join('\n')}\nexport { ${names.toReversed().join(',')} };`
+        const { output, sortedDeclarations } = compileWithDeclarationSortStats(code, sourcemap)
+        const actual = await instantiate(evaluateCommonJsRegistration(output.code), new Map())
+        assert.deepEqual(Object.keys(actual.beforeExecute), names)
+        assert.deepEqual(actual.publications, names)
+        assert.deepEqual(actual.namespace, Object.fromEntries(names.map((name) => [name, undefined])))
+        assert.equal(sortedDeclarations, 0)
+    })
+}
+
 test('matches Babel for imports, exported imports, dynamic imports, and import.meta', async () => {
     const code = `
         import defaultValue, * as all from './dependency.js';
@@ -660,6 +747,41 @@ function compileWithNameAllocationStats(code: string, sourcemap: boolean) {
     } finally {
         Set.prototype[Symbol.iterator] = originalIterator
         Array.from = originalFrom
+    }
+}
+
+/** Counts declaration sorting only during one synchronous transform, restoring the builtin before async execution. */
+function compileWithDeclarationSortStats(code: string, sourcemap: boolean) {
+    const originalSort = Array.prototype.sort
+    // This invocation-local counter observes work, not elapsed time or retained mock-call histories.
+    let sortedDeclarations = 0
+    Array.prototype.sort = new Proxy(originalSort, {
+        apply(target, thisArgument: unknown, argumentsList: unknown[]) {
+            if (Array.isArray(thisArgument)) {
+                const first: unknown = thisArgument[0]
+                if (
+                    typeof first === 'object' &&
+                    first !== null &&
+                    'type' in first &&
+                    first.type === 'VariableDeclaration'
+                ) {
+                    sortedDeclarations += thisArgument.length
+                }
+            }
+            return Reflect.apply(target, thisArgument, argumentsList)
+        }
+    })
+    try {
+        const output = transformSystemJs({
+            code,
+            filename: 'assets/declarations.js',
+            format: 'commonjs-registration',
+            sourcemap,
+            resolveReference: (reference) => reference
+        })
+        return { output, sortedDeclarations }
+    } finally {
+        Array.prototype.sort = originalSort
     }
 }
 
