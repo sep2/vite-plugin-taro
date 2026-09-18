@@ -173,6 +173,8 @@ function analyzeNativeModule(
         throw unsupported(chunk.fileName, 'direct eval')
     }
 
+    // This analysis-local cursor checks each import namespace candidate once: O(I + C) probes for imports and collisions.
+    let nextImportSuffix = 0
     for (const node of program.body) {
         switch (node.type) {
             case 'ImportDeclaration': {
@@ -202,7 +204,14 @@ function analyzeNativeModule(
                     continue
                 }
 
-                const namespace = takeGeneratedName('__nativeImport', identifierNames)
+                // This local candidate advances only over authored collisions; earlier allocations are behind the cursor.
+                let namespace = nextImportSuffix === 0 ? '__nativeImport' : `__nativeImport${nextImportSuffix}`
+                while (identifierNames.has(namespace)) {
+                    nextImportSuffix += 1
+                    namespace = `__nativeImport${nextImportSuffix}`
+                }
+                identifierNames.add(namespace)
+                nextImportSuffix += 1
                 const bindings = node.specifiers.map((specifier): ImportBinding => {
                     const binding = {
                         imported:
