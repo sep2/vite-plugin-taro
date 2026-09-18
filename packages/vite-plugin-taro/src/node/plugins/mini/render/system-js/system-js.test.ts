@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { SourceMap } from 'node:module'
 import test from 'node:test'
 import { type PluginItem, type PluginTarget, transformSync } from '@babel/core'
 import transformDynamicImport from '@babel/plugin-transform-dynamic-import'
@@ -123,6 +124,104 @@ test('matches Babel for module var declarations nested in control flow', async (
             return [read(), namespace.count, namespace.index, namespace.key, namespace.item]
         },
         undefined
+    )
+})
+
+for (const sourcemap of [false, true]) {
+    test(`indexes direct and nested declarations without changing export timing or order (maps: ${sourcemap})`, async () => {
+        const code = [
+            'var first;',
+            'if (true) { var nestedBefore; var nestedValue = 2; }',
+            'let second;',
+            'var directValue = 3, sibling = directValue + nestedValue;',
+            'if (true) { var nestedAfter; }',
+            'const fixed = sibling * 2;',
+            'for (var index = 0; index < 1; index++) { var loopValue = index; }',
+            'function read() { var first = 99; return [nestedValue, directValue, sibling, fixed, first]; }',
+            'export { first, first as alias, nestedBefore, second, nestedAfter, directValue, nestedValue, sibling, fixed, index, loopValue, read };'
+        ].join('\n')
+        const filename = 'assets/declarations.js'
+        const result = transformSystemJs({
+            code,
+            filename,
+            format: 'commonjs-registration',
+            sourcemap,
+            resolveReference: (reference) => reference
+        })
+        const actual = await instantiate(evaluateCommonJsRegistration(result.code), new Map())
+        const babel = await instantiate(evaluateSystemRegistration(compileWithBabel(code)), new Map())
+        assert.deepEqual(actual.beforeExecute, babel.beforeExecute)
+        assert.deepEqual(actual.publications, babel.publications)
+        assert.deepEqual(Object.keys(actual.beforeExecute), [
+            'read',
+            'first',
+            'alias',
+            'nestedBefore',
+            'second',
+            'nestedAfter'
+        ])
+        assert.deepEqual(actual.publications.slice(6), [
+            'nestedValue',
+            'directValue',
+            'sibling',
+            'fixed',
+            'index',
+            'loopValue',
+            'index'
+        ])
+        assert.deepEqual(requireFunction(actual.namespace.read)(), [2, 3, 5, 10, 99])
+        assert.equal(actual.namespace.first, undefined)
+        assert.equal(actual.namespace.alias, undefined)
+        assert.equal(actual.namespace.index, 1)
+        assert.equal(actual.namespace.loopValue, 0)
+
+        if (!sourcemap) {
+            assert.equal(result.map, null)
+            return
+        }
+        assert.ok(result.map)
+        assert.deepEqual(result.map.sources, [filename])
+        assert.deepEqual(result.map.sourcesContent, [code])
+        const map = new SourceMap({
+            file: filename,
+            version: 3,
+            sources: [filename],
+            sourcesContent: [code],
+            names: [],
+            mappings: result.map.mappings,
+            sourceRoot: ''
+        })
+        for (const text of ['nestedValue = 2', 'directValue = 3', 'directValue + nestedValue', 'first = 99']) {
+            const entry = map.findEntry(...position(result.code, text))
+            assert.ok('originalLine' in entry)
+            assert.equal(entry.originalSource, filename)
+            assert.deepEqual([entry.originalLine, entry.originalColumn], position(code, text))
+        }
+    })
+}
+
+test('indexes a large interleaved declaration set without duplicate initialization or publication', async () => {
+    const declarations = Array.from({ length: 512 }, (_, value) => ({
+        direct: `direct${value}`,
+        nested: `nested${value}`,
+        value
+    }))
+    const names = declarations.flatMap(({ direct, nested }) => [direct, nested])
+    // Generate and execute all fixture source in memory; no disk fixtures or timing-sensitive assertions are needed.
+    const code = `${declarations
+        .map(({ direct, nested, value }) => `var ${direct} = ${value}; if (true) { var ${nested} = ${direct} + 1; }`)
+        .join('\n')}\nexport { ${names.join(',')} };`
+    const actual = await instantiate(evaluateCommonJsRegistration(compile(code).code), new Map())
+    assert.deepEqual(actual.beforeExecute, {})
+    assert.deepEqual(actual.publications, names)
+    assert.deepEqual(
+        actual.namespace,
+        Object.fromEntries(
+            declarations.flatMap(({ direct, nested, value }) => [
+                [direct, value],
+                [nested, value + 1]
+            ])
+        )
     )
 })
 
@@ -518,4 +617,11 @@ function requireFunction(value: unknown): (...args: unknown[]) => unknown {
 function requireClass(value: unknown): { value: unknown } {
     if (typeof value !== 'function') assert.fail('Expected a class export')
     return { value: Reflect.get(value, 'value') }
+}
+
+function position(code: string, text: string): readonly [number, number] {
+    const offset = code.indexOf(text)
+    assert.notEqual(offset, -1, `Expected ${text} in generated or original source`)
+    const prefix = code.slice(0, offset)
+    return [prefix.split('\n').length - 1, offset - prefix.lastIndexOf('\n') - 1]
 }

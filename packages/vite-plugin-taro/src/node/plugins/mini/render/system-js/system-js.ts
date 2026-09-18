@@ -73,6 +73,7 @@ type HoistedVariable = Readonly<{
 /** Immutable facts shared by the declaration and expression rewrite passes. */
 type ModuleModel = Readonly<{
     dependencies: readonly MutableDependency[]
+    directVariables: ReadonlySet<VariableDeclaration>
     exportNamesByLocal: ReadonlyMap<string, readonly string[]>
     functions: readonly OxcFunction[]
     generatedNames: GeneratedNames
@@ -122,6 +123,7 @@ export function transformSystemJs(options: TransformSystemJsOptions): TransformS
 function analyzeModule(program: Program, filename: string): ModuleModel {
     // These journals are mutable only during this one linear analysis pass; all are exposed as readonly compilation facts.
     const identifierNames = new Set<string>()
+    const directVariables = new Set<VariableDeclaration>()
     const exportNamesByLocal = new Map<string, string[]>()
     const dependencyBySource = new Map<string, MutableDependency>()
     const functions: OxcFunction[] = []
@@ -173,6 +175,7 @@ function analyzeModule(program: Program, filename: string): ModuleModel {
                 throw unsupported(filename, `source-level ${node.type}`)
             case 'VariableDeclaration':
                 requireSupportedVariableKind(node, filename)
+                directVariables.add(node)
                 node.declarations
                     .flatMap((declaration) => bindingNames(declaration.id))
                     .forEach((name) => {
@@ -202,6 +205,7 @@ function analyzeModule(program: Program, filename: string): ModuleModel {
 
     return {
         dependencies: [...dependencyBySource.values()],
+        directVariables,
         exportNamesByLocal,
         functions,
         generatedNames,
@@ -306,11 +310,8 @@ function applyProgramEdits(editor: SourceEditor, model: ModuleModel): void {
         }
     }
 
-    const directDeclarations = new Set(
-        model.program.body.flatMap((node) => (node.type === 'VariableDeclaration' ? [node] : []))
-    )
     model.hoistedVariables
-        .filter(({ declaration }) => !directDeclarations.has(declaration))
+        .filter(({ declaration }) => !model.directVariables.has(declaration))
         .forEach(({ declaration, isForIterationBinding }) => {
             transformNestedHoistedVariables(
                 editor,
@@ -573,11 +574,10 @@ function renderEarlyExports(model: ModuleModel): string {
     const functionNames = new Set(
         model.functions.map((declaration) => (declaration.id as NonNullable<typeof declaration.id>).name)
     )
-    const directVariables = model.program.body.flatMap((node) => (node.type === 'VariableDeclaration' ? [node] : []))
     const nestedHoistedVariables = model.hoistedVariables
         .map(({ declaration }) => declaration)
-        .filter((declaration) => !directVariables.includes(declaration))
-    const variablesInSourceOrder = [...directVariables, ...nestedHoistedVariables].sort(
+        .filter((declaration) => !model.directVariables.has(declaration))
+    const variablesInSourceOrder = [...model.directVariables, ...nestedHoistedVariables].sort(
         (left, right) => left.start - right.start
     )
     const entries: Array<Readonly<{ exported: string; value: string }>> = []
