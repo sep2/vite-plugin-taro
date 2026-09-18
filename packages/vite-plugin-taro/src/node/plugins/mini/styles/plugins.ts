@@ -260,6 +260,8 @@ export function createMiniStylePlugin(
             graphContext = this
         },
         transform: {
+            // Ordinary CSS must still clear retained state when Tailwind imports are removed.
+            filter: { id: /\.(css|less|sass|scss|styl|stylus|pcss|postcss|sss)(?:$|\?)/ },
             // Tailwind must expand before Vite's normal CSS pipeline produces the final module CSS captured above.
             order: 'pre',
             /** Compiles only Tailwind roots and registers every input needed for Rolldown-driven invalidation. */
