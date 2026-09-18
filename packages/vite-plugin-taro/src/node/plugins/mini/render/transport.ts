@@ -80,21 +80,28 @@ export function createTransportExpression({
         .sort((left, right) => left.chunk.fileName.localeCompare(right.chunk.fileName))
         .map(({ chunk, kind }) => {
             const loadMode = getLoadMode(chunk)
+
             if (kind === 'amphibious' && loadMode !== 'sync') {
                 throw new Error(`Amphibious Mini Program module must be in the main package: ${chunk.fileName}`)
             }
+
             // Only native loading crosses the logical/physical boundary and receives the assets/package-qualified path.
             const relative = path.posix.relative(from, getPhysicalChunkId(chunk))
+
             const requirePath = JSON.stringify(relative.startsWith('.') ? relative : `./${relative}`)
+
             const loaded = `${loadMode === 'sync' ? 'require' : 'require.async'}(${requirePath})`
+
             // Amphibious namespaces must be required lazily during execution, never while bootstrap imports transport.
             const registration =
                 kind === 'capsule'
                     ? loaded
                     : `[[],function(exportBinding){return {execute:function(){exportBinding(${loaded})}}}]`
+
             return `case ${JSON.stringify(toLogicalChunkId(chunk.fileName))}:return ${registration};`
         })
         .join('')
+
     // Reject module IDs absent from the closed output graph.
     return `function(moduleId){switch(moduleId){${cases}default:throw new Error('Unknown System module: '+moduleId)}}`
 }
