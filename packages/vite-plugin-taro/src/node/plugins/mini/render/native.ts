@@ -66,7 +66,6 @@ type NativeModuleModel = Readonly<{
     postfixTemp: string
     program: Program
     scopes: ScopeTracker
-    usesPostfixTemp: boolean
 }>
 
 /**
@@ -115,13 +114,12 @@ export function renderNative({
 
     // Expression edits split untouched source ranges first. Declaration replacement runs afterwards because MagicString must
     // not split a range after that complete range has already been overwritten or removed.
-    rewriteExpressionSemantics(editor, model, chunk.fileName)
-    rewriteTopLevelThis(editor, model.program)
+    const usesPostfixTemp = rewriteExpressionSemantics(editor, model, chunk.fileName)
     rewriteModuleDeclarations(editor, model)
 
     const hasExports = model.exportNamesByLocal.size > 0
     const helpers = renderInteropHelpers(model)
-    const postfixTemp = model.usesPostfixTemp ? `var ${model.postfixTemp};` : ''
+    const postfixTemp = usesPostfixTemp ? `var ${model.postfixTemp};` : ''
     const imports = renderImports(model)
     if (hasExports) {
         editor.prepend(
@@ -150,20 +148,30 @@ function analyzeNativeModule(
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>,
     classifyModule: MiniModuleClassifier
 ): NativeModuleModel {
-    const identifierNames = collectIdentifierNames(program)
+    // Analysis-local collections accumulate the complete module model before any source edits.
+    const identifierNames = new Set<string>()
     const exportNamesByLocal = new Map<string, string[]>()
     const imports: ImportModel[] = []
     const importBindingsByLocal = new Map<string, ImportBinding>()
+    const scopes = new ScopeTracker({ preserveExitedScopes: true })
     let hasDirectEval = false
 
+    // Collect names, validation facts, and declarations together instead of three full AST walks.
     walk(program, {
+        scopeTracker: scopes,
         enter(node) {
+            if (node.type === 'Identifier') {
+                identifierNames.add(node.name)
+            }
             if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'eval') {
                 hasDirectEval = true
             }
         }
     })
-    if (hasDirectEval) throw unsupported(chunk.fileName, 'direct eval')
+    scopes.freeze()
+    if (hasDirectEval) {
+        throw unsupported(chunk.fileName, 'direct eval')
+    }
 
     for (const node of program.body) {
         switch (node.type) {
@@ -230,11 +238,6 @@ function analyzeNativeModule(
     const defaultInterop = takeGeneratedName('__nativeDefault', identifierNames)
     const namespaceInterop = takeGeneratedName('__nativeNamespace', identifierNames)
     const postfixTemp = takeGeneratedName('__nativePostfix', identifierNames)
-    const scopes = new ScopeTracker({ preserveExitedScopes: true })
-    walk(program, { scopeTracker: scopes })
-    scopes.freeze()
-    const usesPostfixTemp = hasPostfixExportUpdate(program, scopes, exportNamesByLocal)
-
     return {
         defaultInterop,
         exportNamesByLocal,
@@ -243,8 +246,7 @@ function analyzeNativeModule(
         namespaceInterop,
         postfixTemp,
         program,
-        scopes,
-        usesPostfixTemp
+        scopes
     }
 }
 
@@ -284,18 +286,28 @@ function rewriteModuleDeclarations(editor: RolldownMagicString, model: NativeMod
 }
 
 /**
- * Rewrites dynamic imports, imported references, and live-export mutations in one scope-aware O(n) pass.
+ * Rewrites dynamic imports, imported references, live-export mutations, and lexical `this` in one scope-aware O(n) pass.
+ * Returns whether those edits need a postfix completion-value cell, avoiding a separate detection walk.
  *
  * A named import such as `fn` becomes a namespace property read. In call or tag position it is wrapped as `(0, ns.fn)` to
  * preserve ESM's unbound receiver; in `new fn()` it remains `ns.fn` because construction has no method receiver. Exported
  * writes are instrumented only when ScopeTracker resolves the target to the root module declaration.
  */
-function rewriteExpressionSemantics(editor: RolldownMagicString, model: NativeModuleModel, filename: string): void {
+function rewriteExpressionSemantics(editor: RolldownMagicString, model: NativeModuleModel, filename: string): boolean {
     // This mutable traversal stack exists only to see through explicit ParenthesizedExpression nodes around imported calls.
     const ancestors: Node[] = []
+    // Traversal-local facts replace separate top-level-this and exported-postfix scans.
+    let thisBoundaryDepth = 0
+    let usesPostfixTemp = false
     walk(model.program, {
         scopeTracker: model.scopes,
         enter(node, parent) {
+            if (isThisBoundary(node)) {
+                thisBoundaryDepth += 1
+            }
+            if (node.type === 'ThisExpression' && thisBoundaryDepth === 0) {
+                editor.overwrite(node.start, node.end, 'void 0')
+            }
             if (
                 node.type === 'Identifier' &&
                 parent?.type !== 'ImportDeclaration' &&
@@ -341,7 +353,9 @@ function rewriteExpressionSemantics(editor: RolldownMagicString, model: NativeMo
                     rewriteExportAssignment(editor, node.left, node.start, model, filename)
                     break
                 case 'UpdateExpression':
-                    rewriteExportUpdate(editor, node, model)
+                    if (rewriteExportUpdate(editor, node, model)) {
+                        usesPostfixTemp = true
+                    }
                     break
                 case 'ForInStatement':
                 case 'ForOfStatement':
@@ -352,10 +366,14 @@ function rewriteExpressionSemantics(editor: RolldownMagicString, model: NativeMo
             }
             ancestors.push(node)
         },
-        leave() {
+        leave(node) {
             ancestors.pop()
+            if (isThisBoundary(node)) {
+                thisBoundaryDepth -= 1
+            }
         }
     })
+    return usesPostfixTemp
 }
 
 /** Prefixes a direct exported assignment; assignment operators already preserve their own completion value. */
@@ -379,17 +397,22 @@ function rewriteExportUpdate(
     editor: RolldownMagicString,
     update: Extract<Node, { type: 'UpdateExpression' }>,
     model: NativeModuleModel
-): void {
-    if (update.argument.type !== 'Identifier') return
+): boolean {
+    if (update.argument.type !== 'Identifier') {
+        return false
+    }
     const names = exportedRootNames(update.argument.name, model)
-    if (names.length === 0) return
+    if (names.length === 0) {
+        return false
+    }
     if (update.prefix) {
         editor.prependLeft(update.start, exportAssignmentPrefix(names))
-        return
+        return false
     }
 
     editor.prependLeft(update.start, `(${model.postfixTemp}=`)
     editor.appendRight(update.end, `,${exportAssignmentExpression(names, update.argument.name)},${model.postfixTemp})`)
+    return true
 }
 
 /** Rejects destructuring writes because wrapping them would change their completion value. */
@@ -404,39 +427,6 @@ function exportedRootNames(local: string, model: NativeModuleModel): readonly st
     const names = model.exportNamesByLocal.get(local) ?? []
     if (names.length === 0) return names
     return model.scopes.getDeclaration(local)?.scope === '' ? names : []
-}
-
-/** Detects whether the generated declaration header needs one postfix completion-value cell. */
-function hasPostfixExportUpdate(
-    program: Program,
-    scopes: ScopeTracker,
-    exportNamesByLocal: ReadonlyMap<string, readonly string[]>
-): boolean {
-    let found = false
-    walk(program, {
-        scopeTracker: scopes,
-        enter(node) {
-            if (found || node.type !== 'UpdateExpression' || node.prefix || node.argument.type !== 'Identifier') return
-            const names = exportNamesByLocal.get(node.argument.name) ?? []
-            if (names.length > 0 && scopes.getDeclaration(node.argument.name)?.scope === '') found = true
-        }
-    })
-    return found
-}
-
-/** Rewrites ESM top-level this, including arrow functions that lexically inherit it. */
-function rewriteTopLevelThis(editor: RolldownMagicString, program: Program): void {
-    let thisBoundaryDepth = 0
-    walk(program, {
-        enter(node) {
-            if (isThisBoundary(node)) thisBoundaryDepth += 1
-            if (node.type === 'ThisExpression' && thisBoundaryDepth === 0)
-                editor.overwrite(node.start, node.end, 'void 0')
-        },
-        leave(node) {
-            if (isThisBoundary(node)) thisBoundaryDepth -= 1
-        }
-    })
 }
 
 /** Records aliases from Rolldown's normalized terminal `export { ... }` declaration. */
@@ -631,17 +621,6 @@ function requirePlainImport(declaration: ImportDeclaration, filename: string): v
     if (declaration.phase || declaration.attributes.length > 0 || declaration.importKind === 'type') {
         throw unsupported(filename, 'import phases, attributes, or type-only imports')
     }
-}
-
-/** Collects every occupied identifier before helper allocation. */
-function collectIdentifierNames(program: Program): Set<string> {
-    const names = new Set<string>()
-    walk(program, {
-        enter(node) {
-            if (node.type === 'Identifier') names.add(node.name)
-        }
-    })
-    return names
 }
 
 function takeGeneratedName(base: string, used: Set<string>): string {
