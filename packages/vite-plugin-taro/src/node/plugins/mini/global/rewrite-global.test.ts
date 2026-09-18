@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { stripTypeScriptTypes } from 'node:module'
+import { SourceMap, stripTypeScriptTypes } from 'node:module'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { constants, createContext, Script } from 'node:vm'
+import type { Program } from '@oxc-project/types'
 import { walk } from 'oxc-walker'
 import { RolldownMagicString } from 'rolldown'
 import { parseSync } from 'rolldown/utils'
@@ -12,6 +13,7 @@ import { rewriteGlobal } from './rewrite-global.ts'
 
 const runtimeFilename = fileURLToPath(new URL('../../../../runtime/mini/global/mini-global.ts', import.meta.url))
 const runtimeSource = stripTypeScriptTypes(readFileSync(runtimeFilename, 'utf8')).replace(/^export /gm, '       ')
+const miniGlobalId = './runtime.mjs'
 type Observation = { result: { value: unknown } | { error: unknown } }
 
 /** Keep Node's native ESM linking, cycles and GC semantics, but load the fixture modules from stdin instead of disk. */
@@ -46,12 +48,32 @@ function parse(code: string, preserveParens: boolean) {
 }
 
 function rewrite(code: string, preserveParens: boolean) {
-    // Each invocation owns its editor; import insertion and source maps remain with the caller.
+    // The rewriter owns every source edit, including imports; this caller only parses and supplies its editor/module ID.
     const editor = new RolldownMagicString(code, { filename: 'module.js' })
-    const alias = rewriteGlobal(parse(code, preserveParens), editor)
+    const changed = rewriteGlobal(parse(code, preserveParens), editor, miniGlobalId)
     const output = editor.toString()
-    parse(output, preserveParens)
+    const program = parse(output, preserveParens)
+    const alias = changed ? globalImport(program).alias : null
     return { code: output, alias }
+}
+
+/** Inspect the generated import instead of relying on a compiler-returned alias. */
+function globalImport(program: Program) {
+    const declaration = program.body.find(
+        (node) => node.type === 'ImportDeclaration' && node.source.value === miniGlobalId
+    )
+    assert.ok(declaration?.type === 'ImportDeclaration')
+    assert.equal(declaration.specifiers.length, 1)
+    const specifier = declaration.specifiers[0]
+    assert.ok(specifier.type === 'ImportSpecifier' && specifier.imported.type === 'Identifier')
+    assert.equal(specifier.imported.name, 'miniGlobal')
+    return { start: declaration.start, end: declaration.end, alias: specifier.local.name }
+}
+
+/** Script-only fixtures receive the imported object as a parameter; real ESM tests execute generated imports unchanged. */
+function withoutGlobalImport(code: string): string {
+    const { start, end } = globalImport(parse(code, false))
+    return code.slice(0, start) + code.slice(end)
 }
 
 function assertNames(code: string, expected: string[]) {
@@ -99,7 +121,7 @@ async function observe(code: string, transformed: boolean, setup: string): Promi
         const value =
             result.alias && namespace
                 ? await new Script(
-                      `"use strict"; (${result.alias}) => { return ${result.code.trimStart()} }`
+                      `"use strict"; (${result.alias}) => { return ${withoutGlobalImport(result.code).trimStart()} }`
                   ).runInContext(context)(namespace)
                 : await new Script(`"use strict"; ${code}`).runInContext(context)
         return { result: { value: structuredClone(value) } }
@@ -115,6 +137,134 @@ async function assertEquivalent(code: string) {
     assert.ok('value' in expected.result, 'Native oracle must complete')
     assert.deepEqual((await observe(code, true, '')).result, expected.result, 'synthetic global')
 }
+
+test('returns false and leaves source untouched when no global rewrite is needed', () => {
+    for (const code of [
+        '',
+        '// only a comment',
+        '#!/usr/bin/env node\n"use client";\nexport const answer = 42;',
+        'import { value } from "./dependency.mjs"; export { value };',
+        'const globalThis = 1; function read(Math) { return [Math, globalThis] }'
+    ]) {
+        const editor = new RolldownMagicString(code)
+        assert.equal(rewriteGlobal(parse(code, false), editor, miniGlobalId), false)
+        assert.equal(editor.toString(), code)
+    }
+})
+
+test('owns one hygienic runtime import before existing dependencies without binding the globalThis name', () => {
+    const code = `
+        import { Math as localMath } from './dependency.mjs';
+        const globalThis = 1, miniGlobal = 2, __miniGlobal0 = 3;
+        function run(__miniGlobal1) { return [Math, fetch, localMath, globalThis, miniGlobal, __miniGlobal0, __miniGlobal1] }
+    `
+    const result = rewrite(code, false)
+    const imports = parse(result.code, false).body.filter((node) => node.type === 'ImportDeclaration')
+    assert.equal(result.alias, '__miniGlobal2')
+    assert.deepEqual(
+        imports.map((node) => node.source.value),
+        [miniGlobalId, './dependency.mjs']
+    )
+    assert.equal(imports[0].specifiers[0].local.name, '__miniGlobal2')
+    assert.ok(result.code.includes('const globalThis = 1, miniGlobal = 2, __miniGlobal0 = 3;'))
+    assertNames(code, ['Math', 'fetch'])
+})
+
+test('inserts after hashbangs and the complete directive prologue, before body comments and imports', () => {
+    for (const prefix of [
+        '#!/usr/bin/env node\n',
+        '"use client"\n',
+        '#!/usr/bin/env node\r\n"use strict";\r\n""\r\n',
+        '/* license */\n"use client"; // directive comment\n"use strict"\n'
+    ]) {
+        const code = `${prefix}/* body comment */\nimport './dependency.mjs';\nMath;`
+        const original = parse(code, false)
+        const result = rewrite(code, false)
+        const output = parse(result.code, false)
+        const directives = (program: Program) =>
+            program.body.flatMap((node) =>
+                node.type === 'ExpressionStatement' && typeof node.directive === 'string' ? [node.directive] : []
+            )
+        assert.deepEqual(output.hashbang, original.hashbang)
+        assert.deepEqual(directives(output), directives(original))
+        const imports = output.body.filter((node) => node.type === 'ImportDeclaration')
+        assert.deepEqual(
+            imports.map((node) => node.source.value),
+            [miniGlobalId, './dependency.mjs']
+        )
+        assert.ok(globalImport(output).end < result.code.indexOf('/* body comment */'))
+    }
+    for (const code of ['function run() { "use strict"; return Math; }', 'Math; "not a directive"; fetch;']) {
+        const result = rewrite(code, false)
+        assert.equal(parse(result.code, false).body[0].type, 'ImportDeclaration')
+        assert.ok(result.code.startsWith('import { miniGlobal as '))
+    }
+})
+
+test('serializes the caller-supplied runtime module ID as a string literal', () => {
+    for (const id of [
+        '\0vpt:mini-global',
+        '/a path/"quoted"/mini-global.js?line=\n#hash',
+        String.raw`C:\mini\global's.ts`
+    ]) {
+        const code = 'Math; fetch;'
+        const editor = new RolldownMagicString(code)
+        assert.equal(rewriteGlobal(parse(code, false), editor, id), true)
+        const declaration = parse(editor.toString(), false).body[0]
+        assert.ok(declaration.type === 'ImportDeclaration')
+        assert.equal(declaration.source.value, id)
+        assert.equal(declaration.specifiers[0].local.name, '__miniGlobal0')
+    }
+})
+
+test('generated imports initialize one shared namespace before dependencies and reuse it across module instances', () => {
+    const writer = rewrite(
+        `
+        import { value } from './dependency.mjs';
+        const __miniGlobal0 = 'local';
+        globalThis.shared = value;
+        export const root = globalThis;
+    `,
+        false
+    )
+    const reader = rewrite(
+        'export function read() { return [globalThis, shared, Math.max(1, 2), typeof missing] }',
+        false
+    )
+    const update = rewrite('globalThis.shared += 1; export const root = globalThis;', false)
+    const output = runMemoryModules(
+        {
+            'runtime.mjs': `${runtimeSource}\nevents.push('runtime');\nexport { miniGlobal };`,
+            'dependency.mjs': 'events.push("dependency"); export const value = 1;',
+            'writer.mjs': writer.code,
+            'reader.mjs': reader.code,
+            'writer.mjs?updated': update.code
+        },
+        `
+        const host = globalThis;
+        host.events = [];
+        delete host.globalThis;
+        const writer = await import('fixture:/writer.mjs');
+        const reader = await import('fixture:/reader.mjs');
+        const before = reader.read();
+        const update = await import('fixture:/writer.mjs?updated');
+        const after = reader.read();
+        console.log(JSON.stringify({
+            events: host.events,
+            before: before.slice(1),
+            after: after.slice(1),
+            same: writer.root === before[0] && before[0] === update.root && update.root === after[0]
+        }));
+    `,
+        []
+    )
+    assert.deepEqual(JSON.parse(output), {
+        events: ['runtime', 'dependency'],
+        before: [1, 2, 'undefined'],
+        after: [2, 2, 'undefined'],
+        same: true
+    })
+})
 
 test('discovers arbitrary free names, without whitelisting built-ins or scanning strings', () => {
     assertNames('Math.max(value, 1); fetch(url); vendorBridge.read(); missing?.(); typeof anotherMissing;', [
@@ -209,7 +359,8 @@ test('allocates hygienic names across all scopes and preserves directives, hashb
         '#!/usr/bin/env node\n"use client";\n// 🚀 keep\nconst __miniGlobal0 = 1; function read(__miniGlobal1) { return Math.max(__miniGlobal0, __miniGlobal1) }\n'
     const result = rewrite(code, false)
     assert.equal(result.alias, '__miniGlobal2')
-    assert.ok(result.code.startsWith('#!/usr/bin/env node\n"use client";\n// 🚀 keep\n'))
+    assert.ok(result.code.startsWith('#!/usr/bin/env node\n"use client";\nimport { miniGlobal as __miniGlobal2 }'))
+    assert.ok(result.code.includes('\n// 🚀 keep\nconst __miniGlobal0 = 1;'))
     assertNames(code, ['Math'])
 })
 
@@ -623,7 +774,13 @@ test('terminates inferred-name wrappers once, outside nested suffixes and never 
     for (const preserveParens of [false, true]) {
         assert.deepEqual(
             parse(rewrite(source, preserveParens).code, preserveParens).body.map((node) => node.type),
-            ['ExportDefaultDeclaration', 'ExpressionStatement', 'FunctionDeclaration', 'VariableDeclaration']
+            [
+                'ImportDeclaration',
+                'ExportDefaultDeclaration',
+                'ExpressionStatement',
+                'FunctionDeclaration',
+                'VariableDeclaration'
+            ]
         )
     }
 })
@@ -637,7 +794,7 @@ test('supports reads and writes through cyclic ESM calls before module evaluatio
     const output = runMemoryModules(
         {
             'runtime.mjs': `${runtimeSource}\nexport { miniGlobal };`,
-            'a.mjs': `import { miniGlobal as ${a.alias} } from './runtime.mjs';\n${a.code}`,
+            'a.mjs': a.code,
             'b.mjs': 'import { answer } from "./a.mjs"; export const early = answer();'
         },
         `
@@ -722,13 +879,14 @@ test('traverses AST children once, then resolves references and allocates aliase
         }
     })
     const editor = new RolldownMagicString(source)
-    const alias = rewriteGlobal(program, editor)
+    assert.equal(rewriteGlobal(program, editor, miniGlobalId), true)
     assert.equal(bodyReads, 1)
     assert.equal(elementReads, 1)
+    const { alias } = globalImport(parse(editor.toString(), false))
     assert.equal(alias, '__miniGlobal1')
     assert.equal(
         editor.toString(),
-        `function read() { return [later, ("Math" in ${alias} ? ${alias}.Math : Math)] } const later = 1; function reserve(__miniGlobal0) {}`
+        `import { miniGlobal as ${alias} } from "./runtime.mjs";\nfunction read() { return [later, ("Math" in ${alias} ? ${alias}.Math : Math)] } const later = 1; function reserve(__miniGlobal0) {}`
     )
     parse(editor.toString(), false)
 })
@@ -739,13 +897,14 @@ test('combines leading ASI repair with overwrites instead of adding one editor c
     const editor = new RolldownMagicString(source)
     const prependLeft = context.mock.method(editor, 'prependLeft')
     const overwrite = context.mock.method(editor, 'overwrite')
-    const alias = rewriteGlobal(parse(source, false), editor)
-    assert.ok(alias)
-    assert.equal(prependLeft.mock.callCount(), 0)
+    assert.equal(rewriteGlobal(parse(source, false), editor, miniGlobalId), true)
+    const { alias } = globalImport(parse(editor.toString(), false))
+    // Exactly one insertion for the import, not another insertion per rewritten statement.
+    assert.equal(prependLeft.mock.callCount(), 1)
     assert.equal(overwrite.mock.callCount(), 3)
     assert.equal(
         editor.toString(),
-        `;("visit" in ${alias} ? ${alias}.visit : visit)()\n;("slot" in ${alias} ? ${alias}.slot++ : slot++);\n;("Math" in ${alias} ? ${alias}.Math : Math);\n`
+        `import { miniGlobal as ${alias} } from "./runtime.mjs";\n;("visit" in ${alias} ? ${alias}.visit : visit)()\n;("slot" in ${alias} ? ${alias}.slot++ : slot++);\n;("Math" in ${alias} ? ${alias}.Math : Math);\n`
     )
     parse(editor.toString(), false)
 })
@@ -864,7 +1023,7 @@ test('allocates an assignment adapter only on first native use and reuses it acr
     const instance: { write: (value: number) => number; target: () => object | undefined } = new Script(`
         "use strict";
         (${result.alias}) => {
-            const write = ${result.code};
+            const write = ${withoutGlobalImport(result.code)};
             return { write, target: () => ${declaration.id.name} };
         }
     `).runInContext(context)(namespace)
@@ -902,7 +1061,7 @@ test('does not retain caller closures through cached native assignment adapters'
         {
             'runtime.mjs': `${runtimeSource}\nexport { miniGlobal };`,
             'original.mjs': source,
-            'rewritten.mjs': `import { miniGlobal as ${result.alias} } from './runtime.mjs';\n${result.code}`
+            'rewritten.mjs': result.code
         },
         `
         import assert from 'node:assert/strict';
@@ -1052,7 +1211,7 @@ test('preserves ASI after postfix updates in statements, declarations, returns a
     const source = 'export default slot++\n[1].forEach(() => {});'
     assert.deepEqual(
         parse(rewrite(source, false).code, false).body.map((node) => node.type),
-        ['ExportDefaultDeclaration', 'ExpressionStatement']
+        ['ImportDeclaration', 'ExportDefaultDeclaration', 'ExpressionStatement']
     )
 })
 
@@ -1099,13 +1258,26 @@ test('leaves the original AST unchanged and source-map generation with the calle
     const code = 'const host = Math;\nconst object = { fetch };\n'
     const program = parse(code, false)
     const before = JSON.stringify(program)
-    // The caller owns this mutable buffer and generates its map after all source edits and import insertion.
+    // The caller owns this mutable buffer and generates its map after the rewriter finishes all edits, including the import.
     const editor = new RolldownMagicString(code, { filename: 'module.js' })
-    assert.ok(rewriteGlobal(program, editor))
+    assert.equal(rewriteGlobal(program, editor, miniGlobalId), true)
     assert.equal(JSON.stringify(program), before)
     const map = editor.generateMap({ source: 'module.js', includeContent: true, hires: 'boundary' })
     assert.deepEqual(map.sources, ['module.js'])
     assert.deepEqual(map.sourcesContent, [code])
     assert.ok(map.mappings.length > 0)
+    const entry = new SourceMap({
+        file: 'module.js',
+        version: map.version,
+        sources: map.sources,
+        sourcesContent: map.sourcesContent,
+        names: map.names,
+        mappings: map.mappings,
+        sourceRoot: ''
+    }).findEntry(1, 0)
+    assert.ok('originalLine' in entry)
+    assert.equal(entry.originalLine, 0)
+    assert.equal(entry.originalColumn, 0)
+    assert.equal(entry.originalSource, 'module.js')
     assert.equal(rewrite(code, false).code, editor.toString())
 })

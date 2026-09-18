@@ -3,8 +3,9 @@ import { type Identifier, isReferenceIdentifier, ScopeTracker, ScopeTrackerFunct
 import type { RolldownMagicString } from 'rolldown'
 
 /**
- * Rewrites static free bindings in lowered JavaScript modules ONLY for targets without native globalThis. Import miniGlobal
- * under the returned alias before other dependencies; null means no edits. Target gating, import insertion and source maps
+ * Rewrites static free bindings in lowered JavaScript modules ONLY for targets without native globalThis. When references
+ * change, imports miniGlobal from miniGlobalId under a private alias before other dependencies, preserving the hashbang and
+ * directive prologue. Returns whether edits were made. Target gating, excluding the runtime module itself and source maps
  * belong to the caller. Apply once to original code: generated native references must stay native. No host-name whitelist;
  * lexical bindings and module interfaces stay unchanged. Dynamic eval/with are outside this contract.
  *
@@ -38,8 +39,10 @@ import type { RolldownMagicString } from 'rolldown'
  *   listeners or timers. Adapter caches intentionally live with their module, so repeated writes do not grow retained state;
  *   host module caches/HMR policy and values deliberately stored in globals remain outside this function's ownership.
  */
-export function rewriteGlobal(program: Program, editor: RolldownMagicString): string | null {
+export function rewriteGlobal(program: Program, editor: RolldownMagicString, miniGlobalId: string): boolean {
     const scopes = new SourceScopes()
+    // Advance only over top-level directives during the existing walk; do not traverse the program body a second time.
+    let importOffset = program.hashbang?.end ?? 0
     // One AST traversal collects declarations and reference contexts before resolving any use, preserving hoisting and
     // TDZ. Resolution scans only recorded scope boundaries and identifiers, not the AST's children or other expressions.
     // Time/space: O(N) structural work and invocation-local records; nothing is global.
@@ -73,6 +76,9 @@ export function rewriteGlobal(program: Program, editor: RolldownMagicString): st
                     parent?.type === 'SwitchCase')
             ) {
                 statementStarts.add(node.start)
+                if (parent?.type === 'Program' && typeof node.directive === 'string') {
+                    importOffset = node.end
+                }
             } else if (
                 node.type === 'AssignmentExpression' ||
                 node.type === 'ForInStatement' ||
@@ -133,7 +139,7 @@ export function rewriteGlobal(program: Program, editor: RolldownMagicString): st
      *   Before: function run(__miniGlobal0) { return slot }
      *   After:  function run(__miniGlobal0) { return ("slot" in __miniGlobal1 ? __miniGlobal1.slot : slot) }
      * Reserving identifiers in ALL scopes prevents an import, cache, initializer or setter parameter from being captured
-     * by an inner local. The example's __miniGlobal1 is G; the caller inserts its import only if an edit was made.
+     * by an inner local. The example's __miniGlobal1 is G; its import is emitted below only if an edit was made.
      * Time: one monotonic counter skips each occupied candidate at most once, so total candidate checks are O(N + U),
      * not a restart-and-rescan for each generated name. Formatting/hashing each candidate also costs its string length.
      * Space: O(N + U) reserved names, plus their characters, for this call only. Runtime adds O(U) helper bindings.
@@ -266,7 +272,7 @@ export function rewriteGlobal(program: Program, editor: RolldownMagicString): st
             editor.appendRight(end, ';')
         }
     }
-    // Mutable per invocation: the caller needs an import only when at least one reference was actually rewritten.
+    // Mutable per invocation: inject an import and report a change only when a reference was actually rewritten.
     let changed = false
     /*
      * Leading ASI repair:
@@ -405,6 +411,16 @@ export function rewriteGlobal(program: Program, editor: RolldownMagicString): st
             terminate(node.end)
         }
     }
+    if (!changed) {
+        return false
+    }
+    // Insert before leading body comments so annotations stay with the original statement, not the new import. A newline
+    // ends a hashbang or an unterminated directive; the trailing newline also isolates the untouched body. No extra AST pass
+    // or runtime lookup is needed. The caller supplies the canonical module ID so all rewritten modules share one namespace.
+    editor.prependLeft(
+        importOffset,
+        `${importOffset === 0 ? '' : '\n'}import { miniGlobal as ${global} } from ${JSON.stringify(miniGlobalId)};\n`
+    )
     if (targets.size > 0) {
         /*
          * Module footer emission:
@@ -416,7 +432,7 @@ export function rewriteGlobal(program: Program, editor: RolldownMagicString): st
          * Emit one initializer/cache pair per distinct written name, regardless of the number of assignment sites.
          * Function declarations and uninitialized var bindings are usable by cyclic ESM calls before module evaluation.
          * A let/const cache would be in TDZ; `var C = undefined` would overwrite an adapter created by an early call.
-         * Appending avoids disturbing directives/hashbangs/import placement; source-map/import policy stays with caller.
+         * Appending avoids disturbing directives/hashbangs and the import inserted above; source maps stay with the caller.
          * Time: O(U) records plus O(F) footer characters to assemble; O(1) lazy runtime initialization per used name.
          * Space: O(U + F) temporary arrays/joined text, O(U) module bindings/initializer functions, lazy adapter objects.
          * Leak: module-lifetime caches are intentional and bounded by source names. No cache is allocated per write,
@@ -426,7 +442,7 @@ export function rewriteGlobal(program: Program, editor: RolldownMagicString): st
         const declarations = Array.from(targets.values(), (target) => target.declaration).join('\n')
         editor.append(`\n${declarations}\nvar ${Array.from(targets.values(), (target) => target.cache).join(', ')};\n`)
     }
-    return changed ? global : null
+    return true
 }
 
 /**

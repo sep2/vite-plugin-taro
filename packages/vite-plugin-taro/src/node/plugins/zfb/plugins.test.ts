@@ -36,6 +36,7 @@ test('creates the ZFB Mini Program contract without translating user configurati
         )
     }
     assert.equal(contract.taro.env, 'alipay')
+    assert.equal(contract.runtime.miniGlobal, false)
     assert.match(
         contract.taro.componentsReactPath,
         /taro-runtime[/\\]dist[/\\]plugin-platform-alipay[/\\]components-react\.js$/

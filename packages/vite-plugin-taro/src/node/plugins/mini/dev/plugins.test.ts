@@ -28,6 +28,7 @@ const contract = {
         projectConfigJson: {}
     },
     runtime: {
+        miniGlobal: false,
         modules: runtimeModules
     },
     styles: {
