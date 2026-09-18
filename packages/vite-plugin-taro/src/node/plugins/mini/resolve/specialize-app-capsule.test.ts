@@ -9,6 +9,7 @@ test('specializes the App capsule with its native configuration', () => {
     const result = specializeAppCapsule({
         code: source,
         id,
+        sourcemap: true,
         appConfig: {
             pages: ['pages/home/index'],
             window: {
@@ -22,6 +23,8 @@ test('specializes the App capsule with its native configuration', () => {
     assert.doesNotMatch(result.code, /__VPT_APP_CONFIG__/)
     assert.ok(result.map)
     assert.deepEqual(result.map.sources, [id])
+    assert.deepEqual(result.map.sourcesContent, [source])
+    assert.ok(result.map.mappings)
 
     const withoutSourceMap = specializeAppCapsule({ code: source, id, appConfig: {}, sourcemap: false })
     assert.equal(withoutSourceMap.map, null)
@@ -36,6 +39,7 @@ test('normalizes App configuration as JSON while preserving reserved slot names 
     const result = specializeAppCapsule({ code: 'const config = __VPT_APP_CONFIG__', id, appConfig })
     const config: unknown = Function(`${result.code}; return config`)()
     assert.deepEqual(config, { text: appConfig.text, values: [true, null, 0] })
+    assert.equal(result.map, null)
 })
 
 test('rejects an App capsule missing its configuration placeholder', () => {

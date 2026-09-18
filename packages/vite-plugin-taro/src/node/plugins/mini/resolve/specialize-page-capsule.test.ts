@@ -12,6 +12,7 @@ test('specializes the Page capsule for one route', () => {
     const result = specializePageCapsule({
         code: source,
         id,
+        sourcemap: true,
         page: {
             path: 'pages/home/index',
             config: {
@@ -26,6 +27,8 @@ test('specializes the Page capsule for one route', () => {
     assert.doesNotMatch(result.code, /__VPT_PAGE_/)
     assert.ok(result.map)
     assert.deepEqual(result.map.sources, [id])
+    assert.deepEqual(result.map.sourcesContent, [source])
+    assert.ok(result.map.mappings)
 })
 
 test('specializes an omitted Page configuration as an empty object', () => {
@@ -38,6 +41,7 @@ test('specializes an omitted Page configuration as an empty object', () => {
     })
 
     assert.match(result.code, /["']pages\/plain\/index["'], undefined, \{\}/)
+    assert.equal(result.map, null)
 })
 
 test('preserves Page paths and configuration containing quotes and other reserved slot names', () => {
