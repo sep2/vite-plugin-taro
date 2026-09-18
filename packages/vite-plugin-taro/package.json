@@ -39,8 +39,6 @@
     ],
     "scripts": {
         "build": "node ../../scripts/sync-plugin-readme.ts && node ./scripts/build.ts",
-        "bench:rewrite-global": "node scripts/benchmark-rewrite-global.ts",
-        "bench:string-editor": "node scripts/benchmark-string-editor.ts",
         "test": "node --test --test-concurrency=2",
         "test:coverage": "c8 node --test --test-concurrency=2",
         "typecheck": "tsc --project tsconfig.json --noEmit"
@@ -103,7 +101,6 @@
         "@babel/plugin-transform-dynamic-import": "^8.0.1",
         "@babel/plugin-transform-modules-commonjs": "^8.0.1",
         "@babel/plugin-transform-modules-systemjs": "^8.0.1",
-        "@babel/types": "^8.0.5",
         "@oxc-project/types": "0.149.0",
         "@tailwindcss-mangle/engine": "0.2.0",
         "@types/node": "^26.5.1",

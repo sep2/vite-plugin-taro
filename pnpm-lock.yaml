@@ -386,9 +386,6 @@ importers:
       '@babel/plugin-transform-modules-systemjs':
         specifier: ^8.0.1
         version: 8.0.1(@babel/core@8.0.5)
-      '@babel/types':
-        specifier: ^8.0.5
-        version: 8.0.5
       '@oxc-project/types':
         specifier: 0.149.0
         version: 0.149.0
