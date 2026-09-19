@@ -17,9 +17,8 @@ target: 'wx'
 | --- | --- |
 | `wx` | 微信小程序 |
 | `zfb` | 支付宝小程序 |
+| `tt` | 抖音小程序 |
 | `h5` | Web 应用 |
-
-一次 Vite 运行只构建一个目标。默认模板已经提供 `dev:wx`、`dev:zfb`、`dev:h5`、`build:wx`、`build:zfb` 和 `build:h5`。
 
 输出目录由 Vite 配置，不属于 `vpt()`：
 
@@ -145,7 +144,7 @@ appJson: {
 
 即使传入这些字段，vpt 也会用构建结果替换它们。
 
-`appJson` 接受普通 JSON 对象。字段名称和取值以微信小程序与 Taro 文档为准。Skyline 配置也写在这里，参见[Skyline 模式](/guides/skyline-mode/)。
+`appJson` 接受普通 JSON 对象，按当前目标的原生配置原样输出，不在微信、支付宝和抖音之间翻译字段。字段名称和取值以对应平台文档为准。
 
 ## `projectConfigJson`
 
@@ -164,20 +163,11 @@ projectConfigJson: {
 }
 ```
 
-微信构建将该对象写入 `project.config.json`。vpt 不添加默认值，建议在模板配置上修改，而不是从空对象重新编写。
-
-微信 App ID 建议保存在被 Git 忽略的 `.env.local`：
-
-```dotenv
-VITE_VPT_WECHAT_APP_ID=wx1234567890abcdef
-VITE_VPT_ALIPAY_APP_ID=2021000000000000
-```
-
-热更新所需设置参见[开发热更新](/guides/hot-module-replacement/)。
+微信写入 `project.config.json`，支付宝写入 `mini.project.json`，抖音写入 `project.config.json`。
 
 ## `projectPrivateConfigJson`
 
-可选。提供时写入 `project.private.config.json`：
+可选。提供时原样写入对应平台的私有配置文件，不与 `projectConfigJson` 合并：
 
 ```ts
 projectPrivateConfigJson: {
@@ -187,11 +177,11 @@ projectPrivateConfigJson: {
 }
 ```
 
-ZFB 和 H5 构建忽略该选项。
+微信写入 `project.private.config.json`；支付宝写入 `.mini-ide/project-ide.json`；抖音写入 `project.private.config.json`；H5 构建忽略该选项。
 
 ## `sitemapJson`
 
-可选。仅 WX 提供时写入 `sitemap.json`；ZFB 和 H5 忽略它：
+可选。仅微信提供时写入 `sitemap.json`；其它目标忽略它：
 
 ```ts
 sitemapJson: {
@@ -255,13 +245,13 @@ hmr: {
 
 ## 生成的小程序配置文件
 
-| vpt 配置 | WX 输出 | ZFB 输出 |
-| --- | --- | --- |
-| `appJson` 和 `pages` | `app.json` | `app.json` |
-| `pages[].config` | `${path}.json` | `${path}.json` |
-| `projectConfigJson` | `project.config.json` | `mini.project.json` |
-| `projectPrivateConfigJson` | `project.private.config.json` | — |
-| `sitemapJson` | `sitemap.json` | — |
+| vpt 配置 | WX 输出 | ZFB 输出 | TT 输出 |
+| --- | --- | --- | --- |
+| `appJson` 和 `pages` | `app.json` | `app.json` | `app.json` |
+| `pages[].config` | `${path}.json` | `${path}.json` | `${path}.json` |
+| `projectConfigJson` | `project.config.json` | `mini.project.json` | `project.config.json` |
+| `projectPrivateConfigJson` | `project.private.config.json` | `.mini-ide/project-ide.json` | `project.private.config.json` |
+| `sitemapJson` | `sitemap.json` | — | — |
 
 ## Vite 配置
 

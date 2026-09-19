@@ -50,6 +50,7 @@ pnpm test
 pnpm typecheck:loan-genius
 pnpm build:loan-genius:wx
 pnpm build:loan-genius:zfb
+pnpm build:loan-genius:tt
 pnpm build:loan-genius:h5
 
 pnpm typecheck:native-comp-demo
@@ -80,6 +81,7 @@ pnpm --filter docs build
 ```sh
 pnpm dev:loan-genius:wx
 pnpm dev:loan-genius:zfb
+pnpm dev:loan-genius:tt
 pnpm dev:loan-genius:h5
 pnpm dev:native-comp-demo:wx
 pnpm dev:native-comp-demo:zfb

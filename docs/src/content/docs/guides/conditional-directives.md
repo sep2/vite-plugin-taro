@@ -16,6 +16,10 @@ console.log('仅微信小程序')
 console.log('仅支付宝小程序')
 // #endif
 
+// #ifdef tt
+console.log('仅抖音小程序')
+// #endif
+
 // #ifdef h5
 console.log('仅 H5')
 // #else
@@ -41,7 +45,7 @@ console.log('非 H5 目标')
 
 支持：
 
-- `#ifdef wx`、`#ifdef zfb` 和 `#ifdef h5`；
+- `#ifdef wx`、`#ifdef zfb`、`#ifdef tt` 和 `#ifdef h5`；
 - `#ifndef`；
 - `#else`；
 - `#endif`；
