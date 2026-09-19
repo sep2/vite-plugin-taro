@@ -21,7 +21,8 @@ export type GeneratedSubpackage = MiniGeneratedSubpackage
 /** Immutable ownership and materialization operations for one complete final-chunk graph. */
 export type Placement = Readonly<{
     getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation
-    getPhysicalChunkId(chunk: Rolldown.RenderedChunk): string
+    /** Resolves a rendered chunk or its exact entry module ID to its planned physical path. */
+    getPhysicalChunkId(chunk: Rolldown.RenderedChunk | string): string
     getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async'
     finalize(bundle: Rolldown.OutputBundle): readonly GeneratedSubpackage[]
 }>
@@ -77,6 +78,15 @@ export function createPlacement({
     getAdditionalModuleBytes(moduleId: string): number
 }): Placement {
     const chunkById = new Map(Object.entries(chunks).sort(([left], [right]) => left.localeCompare(right)))
+
+    // Index entry identities once per immutable plan: O(C) construction and O(1) lookup without rescanning output chunks.
+    // Shared chunks without a facade remain addressable by their rendered chunk object.
+    const chunkByEntryModuleId = new Map(
+        [...chunkById.values()].flatMap((chunk) =>
+            chunk.facadeModuleId === null ? [] : [[chunk.facadeModuleId, chunk] as const]
+        )
+    )
+
     const mainChunkIds = findMainChunkIds(chunkById)
     const transitionsByChunk = collectTransitionsByChunk({ chunks: chunkById, mainChunkIds: mainChunkIds })
     const placeableChunks = [...chunkById]
@@ -120,9 +130,13 @@ export function createPlacement({
         getPackageLocation: getPackageLocation,
 
         /** Adds the planned package root to a physical preliminary path without changing the chunk's SystemJS identity. */
-        getPhysicalChunkId(chunk: Rolldown.RenderedChunk): string {
-            const location = getPackageLocation(chunk)
-            return location.kind === 'main' ? chunk.fileName : `${location.root}/${chunk.fileName}`
+        getPhysicalChunkId(chunk: Rolldown.RenderedChunk | string): string {
+            const resolved = typeof chunk === 'string' ? chunkByEntryModuleId.get(chunk) : chunk
+            if (!resolved) {
+                throw new Error(`Mini Program placement is missing entry module: ${chunk}`)
+            }
+            const location = getPackageLocation(resolved)
+            return location.kind === 'main' ? resolved.fileName : `${location.root}/${resolved.fileName}`
         },
 
         /** Selects the native loading API directly from typed package ownership. */

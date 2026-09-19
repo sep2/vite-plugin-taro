@@ -10,6 +10,7 @@ type TestChunk = {
     imports?: readonly string[]
     dynamicImports?: readonly string[]
     isEntry?: boolean
+    facadeModuleId?: string | null
 }
 
 type TestPlacement = {
@@ -41,7 +42,7 @@ function renderedChunk(chunkId: string, chunk: TestChunk): Rolldown.RenderedChun
         name: chunkId,
         isEntry: chunk.isEntry ?? false,
         isDynamicEntry: false,
-        facadeModuleId: moduleId,
+        facadeModuleId: chunk.facadeModuleId === undefined ? moduleId : chunk.facadeModuleId,
         moduleIds: [moduleId],
         modules: {
             [moduleId]: { code: '', renderedLength: 0, renderedExports: [] }
@@ -103,6 +104,38 @@ test('keeps every entry static chunk closure in main', () => {
         assert.equal(getLocation(output, chunkId).kind, 'main')
     }
     assert.equal(getLocation(output, '/feature.js').kind, 'subpackage')
+})
+
+test('resolves exact entry module IDs and chunk objects through the same physical placement', () => {
+    const bootstrapId = '/runtime/bootstrap.ts?target=wx'
+    const featureId = '/app/feature.ts?variant=compact#entry'
+    const output = createTestPlacement({
+        'runtime/loader.js': {
+            isEntry: true,
+            facadeModuleId: bootstrapId,
+            imports: ['common/shared.js'],
+            dynamicImports: ['common/feature.js']
+        },
+        'common/shared.js': { facadeModuleId: null },
+        'common/feature.js': { facadeModuleId: featureId }
+    })
+    const bootstrap = output.chunks['runtime/loader.js']
+    const shared = output.chunks['common/shared.js']
+    const feature = output.chunks['common/feature.js']
+    assert.ok(bootstrap && shared && feature)
+    assert.equal(output.placement.getPhysicalChunkId(bootstrapId), 'runtime/loader.js')
+    assert.equal(output.placement.getPhysicalChunkId(bootstrap), 'runtime/loader.js')
+    assert.equal(output.placement.getPhysicalChunkId(shared), 'common/shared.js')
+    const location = output.placement.getPackageLocation(feature)
+    assert.equal(location.kind, 'subpackage')
+    const physicalFeature = `${location.root}/common/feature.js`
+    assert.equal(output.placement.getPhysicalChunkId(featureId), physicalFeature)
+    assert.equal(output.placement.getPhysicalChunkId(feature), physicalFeature)
+    for (const missing of ['/runtime/bootstrap.ts', 'runtime/loader.js', '/fixturecommon/shared.js']) {
+        assert.throws(() => output.placement.getPhysicalChunkId(missing), {
+            message: `Mini Program placement is missing entry module: ${missing}`
+        })
+    }
 })
 
 test('plans the final chunk graph after Rolldown tree shaking and scope hoisting', () => {

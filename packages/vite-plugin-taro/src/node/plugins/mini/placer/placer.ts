@@ -28,7 +28,7 @@ export type MiniPlacementPlugin = Plugin &
     Readonly<{
         classifyChunk(chunk: Rolldown.PreRenderedChunk | Rolldown.RenderedChunk): MiniChunkClassification
         getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation
-        getPhysicalChunkId(chunk: Rolldown.RenderedChunk): string
+        getPhysicalChunkId(chunk: Rolldown.RenderedChunk | string): string
         getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async'
         getSubpackages(): readonly GeneratedSubpackage[]
     }>
@@ -179,7 +179,7 @@ export function createMiniPlacementPlugin(modules: RuntimeModulesContract): Mini
             return requirePlacement().getPackageLocation(chunk)
         },
 
-        getPhysicalChunkId(chunk: Rolldown.RenderedChunk): string {
+        getPhysicalChunkId(chunk: Rolldown.RenderedChunk | string): string {
             return requirePlacement().getPhysicalChunkId(chunk)
         },
 

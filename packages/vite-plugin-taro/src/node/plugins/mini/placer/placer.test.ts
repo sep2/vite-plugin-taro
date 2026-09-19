@@ -149,6 +149,8 @@ test('rejects placement services and chunk delivery outside their lifecycle phas
 
     assert.doesNotThrow(() => plugin.classifyChunk(chunk))
     assert.throws(() => plugin.getPackageLocation(chunk), /placement is unavailable/)
+    assert.throws(() => plugin.getPhysicalChunkId(chunk), /placement is unavailable/)
+    assert.throws(() => plugin.getPhysicalChunkId(moduleId('lifecycle.js')), /placement is unavailable/)
     assert.throws(() => plugin.getSubpackages(), /subpackages are unavailable/)
 
     const renderChunkHook = plugin.renderChunk
