@@ -6,10 +6,12 @@ import type { OutputOptions, PreRenderedChunk, RenderedChunk } from 'rolldown'
 import { DevRuntime } from 'rolldown/experimental/runtime'
 import { type BuildOptions, createLogger, createServer } from 'vite'
 import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
+import { createTtMiniContract } from '../../tt/plugins.ts'
 import { createZfbMiniContract } from '../../zfb/plugins.ts'
 import type { MiniContract, RuntimeModulesContract } from '../mini-contract.ts'
 import { type BundledDev, installMiniDevOptions, requireSingleOutput } from './mini-dev-options.ts'
 import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
+import { createInterpreterHmrMode } from './modes/interpreter/interpreter-hmr-mode.ts'
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 
@@ -192,37 +194,47 @@ test('adapts physical wx development output without changing configured filename
     assert.equal(await banner(createRenderedChunk('assets/vendor.js', 'assets/vendor.js')), '')
 })
 
-test('passes the shared global to the Alipay HMR implementation without virtual imports', async (context) => {
-    const contract = createZfbMiniContract({
-        target: 'zfb',
-        app: 'src/app.tsx',
-        pages: [{ path: 'pages/home/index', config: {} }],
-        appJson: {},
-        projectConfigJson: {}
-    })
-    const server = await createOptionsServer(context, {})
-    const bundledDev: BundledDev = {
-        async getRolldownOptions() {
-            return {}
-        },
-        async listen() {},
-        async triggerBundleRegenerationIfStale() {
-            return true
-        }
+for (const [target, createContract] of [
+    ['zfb', createZfbMiniContract],
+    ['tt', createTtMiniContract]
+] as const) {
+    for (const [mode, createMode] of [
+        ['devtools', createDevtoolsHmrMode],
+        ['interpreter', createInterpreterHmrMode]
+    ] as const) {
+        test(`passes the shared global to ${target} ${mode} HMR without virtual imports`, async (context) => {
+            const contract = createContract({
+                target,
+                app: 'src/app.tsx',
+                pages: [{ path: 'pages/home/index', config: {} }],
+                appJson: {},
+                projectConfigJson: {}
+            })
+            const server = await createOptionsServer(context, {})
+            const bundledDev: BundledDev = {
+                async getRolldownOptions() {
+                    return {}
+                },
+                async listen() {},
+                async triggerBundleRegenerationIfStale() {
+                    return true
+                }
+            }
+
+            installMiniDevOptions({
+                bundledDev: bundledDev,
+                server: server,
+                contract: contract,
+                hmrMode: createMode(contract.runtime.modules)
+            })
+            const adapted = await bundledDev.getRolldownOptions()
+            const devMode = adapted.experimental?.devMode
+
+            assert.ok(devMode && typeof devMode === 'object')
+            assertRuntimeWrapper(devMode.implement)
+        })
     }
-
-    installMiniDevOptions({
-        bundledDev: bundledDev,
-        server: server,
-        contract: contract,
-        hmrMode: createDevtoolsHmrMode(contract.runtime.modules)
-    })
-    const adapted = await bundledDev.getRolldownOptions()
-    const devMode = adapted.experimental?.devMode
-
-    assert.ok(devMode && typeof devMode === 'object')
-    assertRuntimeWrapper(devMode.implement)
-})
+}
 
 test('leaves naming unspecified when Vite has no configured output', async (context) => {
     // These process-global presentation flags are restored after this isolated test-file process invokes the reporter factory.

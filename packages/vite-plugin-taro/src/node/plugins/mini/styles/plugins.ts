@@ -589,5 +589,5 @@ function isTailwindRoot(code: string): boolean {
 
 /** Identifies Vite's browser stylesheet carrier, which VPT replaces after all final CSS has been captured. */
 function isStyleAsset(output: Rolldown.OutputBundle[string]): output is Rolldown.OutputAsset {
-    return output.type === 'asset' && /\.(?:acss|css|wxss)$/.test(output.fileName)
+    return output.type === 'asset' && /\.(?:acss|css|ttss|wxss)$/.test(output.fileName)
 }

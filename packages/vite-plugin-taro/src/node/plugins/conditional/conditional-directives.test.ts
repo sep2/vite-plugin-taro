@@ -29,7 +29,7 @@ test('bypasses sources without directives and dependencies outside application s
     assert.equal(await Reflect.apply(handler, {}, ['// #ifdef wx\nvalue\n// #endif\n', 'example.txt']), undefined)
 })
 
-for (const target of ['wx', 'zfb', 'h5'] as const) {
+for (const target of ['wx', 'zfb', 'tt', 'h5'] as const) {
     test(`${target}: native filters invoke the handler only for eligible application sources`, async () => {
         const plugin = createConditionalDirectivePlugin(target)
         assert.equal(plugin.enforce, 'pre')

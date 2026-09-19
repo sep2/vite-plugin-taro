@@ -39,7 +39,7 @@ function resolveRefreshConfig(target: VptOptions['target'], command: 'serve' | '
     )
 }
 
-for (const target of ['wx', 'zfb', 'h5'] as const) {
+for (const target of ['wx', 'zfb', 'tt', 'h5'] as const) {
     for (const command of ['serve', 'build'] as const) {
         test(`${target} ${command}: only Mini development redirects Refresh globals`, async () => {
             const config = await resolveRefreshConfig(target, command)
@@ -59,7 +59,7 @@ for (const target of ['wx', 'zfb', 'h5'] as const) {
     }
 }
 
-for (const target of ['wx', 'zfb'] as const) {
+for (const target of ['wx', 'zfb', 'tt'] as const) {
     test(`${target}: runtime preamble satisfies cold and repeated boundary evaluation without removing guards`, async () => {
         const config = await resolveRefreshConfig(target, 'serve')
         const runtimePath = path.join(

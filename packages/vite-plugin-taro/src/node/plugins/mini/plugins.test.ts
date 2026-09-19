@@ -4,6 +4,7 @@ import { rolldown } from 'rolldown'
 import { build, normalizePath, resolveConfig } from 'vite'
 import { wrapPluginTransform } from '../../utils/vite.ts'
 import { clientTaroNativeId } from '../client/constant.ts'
+import { createTtMiniContract } from '../tt/plugins.ts'
 import { createWxMiniContract } from '../wx/plugins.ts'
 import { createZfbMiniContract } from '../zfb/plugins.ts'
 import { createMiniTargetPlugins } from './plugins.ts'
@@ -88,7 +89,8 @@ test('native rendering resolves bootstrap from each output generation rather tha
 
 for (const [target, createContract] of [
     ['wx', createWxMiniContract],
-    ['zfb', createZfbMiniContract]
+    ['zfb', createZfbMiniContract],
+    ['tt', createTtMiniContract]
 ] as const) {
     test(`${target}: native filters specialize only App and route-qualified Page capsules`, async () => {
         const contract = createContract({

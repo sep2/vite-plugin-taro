@@ -25,7 +25,10 @@ const platformJavaScriptFiles: ReadonlyArray<readonly [dependencyId: string, out
     ['@tarojs/plugin-platform-weapp/dist/runtime-utils.js', 'plugin-platform-weapp/runtime-utils.js'],
     ['@tarojs/plugin-platform-alipay/dist/runtime.js', 'plugin-platform-alipay/runtime.js'],
     ['@tarojs/plugin-platform-alipay/dist/components-react.js', 'plugin-platform-alipay/components-react.js'],
-    ['@tarojs/plugin-platform-alipay/dist/runtime-utils.js', 'plugin-platform-alipay/runtime-utils.js']
+    ['@tarojs/plugin-platform-alipay/dist/runtime-utils.js', 'plugin-platform-alipay/runtime-utils.js'],
+    ['@tarojs/plugin-platform-tt/dist/runtime.js', 'plugin-platform-tt/runtime.js'],
+    ['@tarojs/plugin-platform-tt/dist/components-react.js', 'plugin-platform-tt/components-react.js'],
+    ['@tarojs/plugin-platform-tt/dist/runtime-utils.js', 'plugin-platform-tt/runtime-utils.js']
 ]
 
 function resolveAdapterDependencyRoot(dependency: string): string {
@@ -165,12 +168,14 @@ test('publishes a compiler that depends on the unified Taro runtime package', as
         /babel-plugin-transform-taroapi|@rolldown\/plugin-babel|plugin-framework-react\/api-loader/
     )
     assert.equal(packageJson.dependencies['vite-plugin-taro-runtime'], 'workspace:*')
-    assert.equal(packageJson.dependencies['@tarojs/plugin-platform-alipay'], undefined)
-    assert.equal(packageJson.dependencies['@tarojs/plugin-platform-h5'], undefined)
     assert.equal(packageJson.dependencies['@tarojs/plugin-platform-weapp'], undefined)
-    assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-alipay'], undefined)
-    assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-h5'], undefined)
+    assert.equal(packageJson.dependencies['@tarojs/plugin-platform-alipay'], undefined)
+    assert.equal(packageJson.dependencies['@tarojs/plugin-platform-tt'], undefined)
+    assert.equal(packageJson.dependencies['@tarojs/plugin-platform-h5'], undefined)
     assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-weapp'], undefined)
+    assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-alipay'], undefined)
+    assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-tt'], undefined)
+    assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-h5'], undefined)
     assert.equal(packageJson.devDependencies['@tailwindcss-mangle/engine'], '0.2.0')
     assert.equal(packageJson.devDependencies['@weapp-core/escape'], '8.0.0')
     assert.equal(packageJson.devDependencies['@weapp-tailwindcss/postcss'], '3.3.3')
@@ -181,6 +186,7 @@ test('publishes a compiler that depends on the unified Taro runtime package', as
     assert.doesNotMatch(compiler, /\bfrom\s*['"]@tarojs\/plugin-platform-/)
     assert.match(compiler, /vite-plugin-taro-runtime\/plugin-platform-weapp\/runtime-utils/)
     assert.match(compiler, /vite-plugin-taro-runtime\/plugin-platform-alipay\/runtime-utils/)
+    assert.match(compiler, /vite-plugin-taro-runtime\/plugin-platform-tt\/runtime-utils/)
     assert.match(compiler, /vite-plugin-taro-runtime\/plugin-platform-h5\/definition\.json/)
     assert.match(compiler, /@tailwindcss\/vite/)
     assert.ok(Buffer.byteLength(compiler) < compilerSizeLimit)
@@ -205,7 +211,8 @@ test('emits first-party runtime modules using canonical package imports', async 
             .filter((file) => file.endsWith('.js'))
             .map(async (file) => {
                 const source = await readFile(path.join(runtimeRoot, file), 'utf8')
-                assert.doesNotMatch(source, /(?:from\s*|import\s*)['"]@tarojs\//, file)
+                // Shared is an intentional public dependency; platform/framework/runtime packages must use our distribution.
+                assert.doesNotMatch(source, /(?:from\s*|import\s*)['"]@tarojs\/(?!shared['"])/, file)
             })
     )
 })
@@ -249,6 +256,9 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         './plugin-platform-alipay/runtime',
         './plugin-platform-alipay/components-react',
         './plugin-platform-alipay/runtime-utils',
+        './plugin-platform-tt/runtime',
+        './plugin-platform-tt/components-react',
+        './plugin-platform-tt/runtime-utils',
         './plugin-platform-h5/runtime/apis',
         './plugin-platform-h5/definition.json'
     ])
@@ -313,6 +323,7 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
     assert.equal(packageJson.devDependencies['@tarojs/runtime'], '4.2.1')
     assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-weapp'], '4.2.1')
     assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-alipay'], '4.2.1')
+    assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-tt'], '4.2.1')
     assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-h5'], '4.2.1')
 
     const runtimeOutputRoot = path.join(runtimePackageDistRoot, 'runtime')
@@ -352,6 +363,10 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
     await assertDirectoryCopied(
         path.join(resolveAdapterDependencyRoot('@tarojs/plugin-platform-alipay'), 'dist', 'types'),
         path.join(runtimePackageDistRoot, 'plugin-platform-alipay', 'types')
+    )
+    await assertDirectoryCopied(
+        path.join(resolveAdapterDependencyRoot('@tarojs/plugin-platform-tt'), 'dist', 'types'),
+        path.join(runtimePackageDistRoot, 'plugin-platform-tt', 'types')
     )
     await assertDirectoryCopied(
         path.join(resolveAdapterDependencyRoot('@tarojs/plugin-platform-h5'), 'dist', 'runtime', 'apis'),

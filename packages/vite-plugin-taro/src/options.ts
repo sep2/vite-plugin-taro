@@ -13,7 +13,7 @@ export type VptAppConfig = VptJsonObject
 export type VptPageConfig = VptJsonObject
 
 /** Build target handled by this plugin. */
-export type VptTarget = 'wx' | 'zfb' | 'h5'
+export type VptTarget = 'wx' | 'zfb' | 'tt' | 'h5'
 
 /** Selects one implemented Mini Program development update mechanism. */
 export type VptHmrOptions = Readonly<{
@@ -37,9 +37,9 @@ export type VptPageOption = {
     /**
      * Optional native Page configuration for the selected target.
      *
-     * Use Taro/WeChat keys for WX and H5, and Alipay keys for ZFB. The plugin preserves these fields in the Page runtime capsule
-     * and `<path>.json`, adding generated native-component registrations separately. It does not translate configuration names
-     * between platforms.
+     * Use WeChat keys for WX, Alipay keys for ZFB, TikTok keys for TT, and Taro/WeChat keys for H5. The plugin preserves these
+     * fields in the Page runtime capsule and `<path>.json`, adding generated native-component registrations separately.
+     * It does not translate configuration names between platforms.
      */
     config?: VptPageConfig
 }
@@ -49,7 +49,7 @@ export interface VptOptions {
     /**
      * Platform produced by the current Vite invocation.
      *
-     * Use `wx` to emit a WeChat Mini Program, `zfb` to emit an Alipay Mini Program, or `h5` to emit a browser application.
+     * Use `wx` for WeChat, `zfb` for Alipay, `tt` for TikTok Mini Programs, or `h5` for a browser application.
      * The selected target controls Taro module resolution, conditional compilation, runtime bootstrapping, style processing,
      * and output generation.
      */
@@ -74,8 +74,8 @@ export interface VptOptions {
     /**
      * Native application configuration for the selected target.
      *
-     * Use Taro/WeChat keys for WX and H5, and Alipay keys for ZFB. The plugin otherwise preserves the supplied configuration for
-     * runtime specialization and `app.json`; it does not translate configuration names between platforms. The plugin always
+     * Use WeChat keys for WX, Alipay keys for ZFB, TikTok keys for TT, and Taro/WeChat keys for H5. The plugin preserves the supplied
+     * configuration for runtime specialization and `app.json`; it does not translate configuration names between platforms. The plugin always
      * derives `pages` from {@link pages}; caller-provided `pages`, `subPackages`, and `subpackages` values are discarded because
      * the build pipeline owns page order and generated package placement.
      */
@@ -84,7 +84,7 @@ export interface VptOptions {
     /**
      * Native development-tool project configuration written without merging.
      *
-     * WX emits this object as `project.config.json`; ZFB emits it as `mini.project.json`; H5 ignores it. Supply the schema
+     * WX emits `project.config.json`; ZFB emits `mini.project.json`; TT emits `project.config.json`; H5 ignores it. Supply the schema
      * expected by the selected target rather than sharing one project's platform-specific values across invocations. ZFB must
      * use format 2 with `compileOptions.globalObjectMode: 'enable'` because the upstream Taro runtime reads the platform `global`;
      * its Taro-style ES6 output also relies on `compileOptions.transpile` for the developer tool's final syntax conversion.
@@ -94,7 +94,7 @@ export interface VptOptions {
     /**
      * Local development-tool preferences written without merging.
      *
-     * WX emits this object as `project.private.config.json`; ZFB emits it as `.mini-ide/project-ide.json`; H5 ignores it.
+     * WX emits this object as `project.private.config.json`; ZFB emits it as `.mini-ide/project-ide.json`; TT and H5 ignore it.
      * These files control local IDE behavior rather than portable application metadata. In particular, the ZFB file does not
      * associate the project with an Alipay App ID; Alipay Mini Program Studio keeps that selection in its workspace storage.
      */
@@ -103,7 +103,7 @@ export interface VptOptions {
     /**
      * WeChat Mini Program indexing rules written to `sitemap.json` without merging.
      *
-     * The file is emitted only when this value is provided for a `wx` build. It is ignored for ZFB and H5.
+     * The file is emitted only when this value is provided for a `wx` build. It is ignored for ZFB, TT, and H5.
      */
     sitemapJson?: VptJsonObject
 
@@ -125,7 +125,8 @@ export interface VptOptions {
     /**
      * Selects the Mini Program development update mode. Omission uses `devtools`.
      *
-     * This option affects only `vite serve` for `wx` and `zfb` targets and never changes H5 or production output.
+     * This option affects only `vite serve` for `wx`, `zfb`, and `tt` targets and never changes H5 or production output.
+     * Prefer `interpreter` on TT; native DevTools patch execution has not been verified in TikTok DevTools.
      */
     hmr?: VptHmrOptions
 }

@@ -4,6 +4,7 @@ import type { VptOptions } from '../options.ts'
 import { createClientTaroPlugin } from './plugins/client/client-taro.ts'
 import { createConditionalDirectivePlugin } from './plugins/conditional/conditional-directives.ts'
 import { createH5TargetPlugins } from './plugins/h5/plugins.ts'
+import { createTtMiniPlugins } from './plugins/tt/plugins.ts'
 import { createWxMiniPlugins } from './plugins/wx/plugins.ts'
 import { createZfbMiniPlugins } from './plugins/zfb/plugins.ts'
 import { assertRuntimeVersions } from './utils/assert-runtime-versions.ts'
@@ -18,6 +19,7 @@ export default function vpt(options: VptOptions): PluginOption[] {
         ...react(),
         ...(options.target === 'wx' ? createWxMiniPlugins(options) : []),
         ...(options.target === 'zfb' ? createZfbMiniPlugins(options) : []),
+        ...(options.target === 'tt' ? createTtMiniPlugins(options) : []),
         ...(options.target === 'h5' ? createH5TargetPlugins(options) : [])
     ]
 }

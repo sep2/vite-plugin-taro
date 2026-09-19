@@ -8,7 +8,7 @@ import type { RecursiveTemplate, UnRecursiveTemplate } from '@tarojs/shared/dist
 const packageRequire = createRequire(import.meta.url)
 const runtimePackageRequire = createRequire(packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini'))
 
-type Platform = 'wx' | 'zfb'
+type Platform = 'wx' | 'zfb' | 'tt'
 type Implementation = 'local' | 'upstream'
 type Scenario = 'all-components' | 'filtered-complex'
 type Template = RecursiveTemplate | UnRecursiveTemplate
@@ -64,11 +64,19 @@ async function createTemplate(platform: Platform, implementation: Implementation
             const { createWxTemplate } = await import('../../wx/create-wx-template.ts')
             return createWxTemplate()
         }
-        const { createZfbTemplate } = await import('../../zfb/create-zfb-template.ts')
-        return createZfbTemplate()
+        if (platform === 'zfb') {
+            const { createZfbTemplate } = await import('../../zfb/create-zfb-template.ts')
+            return createZfbTemplate()
+        }
+        const { createTtTemplate } = await import('../../tt/create-tt-template.ts')
+        return createTtTemplate()
     }
 
-    const platformPackage = platform === 'wx' ? '@tarojs/plugin-platform-weapp' : '@tarojs/plugin-platform-alipay'
+    const platformPackage = {
+        wx: '@tarojs/plugin-platform-weapp',
+        zfb: '@tarojs/plugin-platform-alipay',
+        tt: '@tarojs/plugin-platform-tt'
+    }[platform]
     const platformPath = runtimePackageRequire.resolve(platformPackage)
     const platformModule = await import(pathToFileURL(platformPath).href)
     const upstreamHelper = createRequire(platformPath)('@tarojs/helper')
@@ -81,9 +89,14 @@ async function createTemplate(platform: Platform, implementation: Implementation
         weapp.modifyTemplate()
         return weapp.template
     }
-    const alipay = new platformModule.Alipay(context, {})
-    alipay.modifyComponents()
-    return alipay.template
+    if (platform === 'zfb') {
+        const alipay = new platformModule.Alipay(context, {})
+        alipay.modifyComponents()
+        return alipay.template
+    }
+    const tt = new platformModule.TT(context, {})
+    tt.modifyTemplate()
+    return tt.template
 }
 
 async function collectTemplateSurface(
@@ -92,8 +105,8 @@ async function collectTemplateSurface(
     scenario: Scenario
 ): Promise<Record<string, unknown>> {
     const template = await createTemplate(platform, implementation)
-    const extension = platform === 'wx' ? '.wxml' : '.axml'
-    const baseTemplatePath = platform === 'wx' ? '../../base.wxml' : '../../base.axml'
+    const extension = { wx: '.wxml', zfb: '.axml', tt: '.ttml' }[platform]
+    const baseTemplatePath = `../../base${extension}`
     const generatedTemplate = template.buildTemplate(createComponentConfig(platform, scenario))
 
     return {
@@ -160,26 +173,22 @@ if (process.argv[2] === 'collect') {
     const implementation = process.argv[4]
     const scenario = process.argv[5]
     if (
-        (platform === 'wx' || platform === 'zfb') &&
+        (platform === 'wx' || platform === 'zfb' || platform === 'tt') &&
         (implementation === 'local' || implementation === 'upstream') &&
         (scenario === 'all-components' || scenario === 'filtered-complex')
     ) {
         process.stdout.write(JSON.stringify(await collectTemplateSurface(platform, implementation, scenario)))
     }
 } else {
-    test('matches upstream WX output for the complete host-component catalog', () => {
-        assertMatchesUpstream('wx', 'all-components')
-    })
-
-    test('matches upstream WX output for filtered complex and third-party components', () => {
-        assertMatchesUpstream('wx', 'filtered-complex')
-    })
-
-    test('matches upstream Alipay output for the complete host-component catalog', () => {
-        assertMatchesUpstream('zfb', 'all-components')
-    })
-
-    test('matches upstream Alipay output for filtered complex and third-party components', () => {
-        assertMatchesUpstream('zfb', 'filtered-complex')
-    })
+    for (const [platform, name] of [
+        ['wx', 'WeChat'],
+        ['zfb', 'Alipay'],
+        ['tt', 'TikTok']
+    ] as const) {
+        for (const scenario of ['all-components', 'filtered-complex'] as const) {
+            test(`matches upstream ${name} output for ${scenario}`, () => {
+                assertMatchesUpstream(platform, scenario)
+            })
+        }
+    }
 }
