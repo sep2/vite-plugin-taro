@@ -88,8 +88,8 @@ function createRenderedChunk(name: string, fileName: string): RenderedChunk {
 /** The wrapper supplies the shared global exactly once, without discovery or virtual imports in the nested build. */
 function assertRuntimeWrapper(source: unknown): void {
     assert.ok(typeof source === 'string')
-    assert.match(source, /^\(function \(globalThis\) \{/)
-    assert.match(source, /\}\)\(__VPT_GLOBAL__\);$/)
+    assert.match(source, /^__rolldown_runtime__ = \(function \(globalThis\) \{/)
+    assert.match(source, /return globalThis\.__rolldown_runtime__;\n\}\)\(__VPT_GLOBAL__\);$/)
     assert.equal(source.match(/__VPT_GLOBAL__/g)?.length, 1)
     assert.doesNotMatch(source, /vpt\.fake\.global|getGlobalThis|vptGlobal|vpt:global-binding/)
     assert.match(source, /Reflect\.set\(globalThis,\s*['"`]__rolldown_runtime__['"`]/)
@@ -103,7 +103,11 @@ function assertRuntimeWrapper(source: unknown): void {
             assert.fail('The HMR wrapper must not read ambient globalThis')
         }
     })
-    runInNewContext(source, context, { contextCodeGeneration: { strings: false, wasm: false } })
+    // Final rendering declares this local cell; the wrapper initializes it before generated registrations execute.
+    const runtime: unknown = runInNewContext(`let __rolldown_runtime__;\n${source}\n__rolldown_runtime__;`, context, {
+        contextCodeGeneration: { strings: false, wasm: false }
+    })
+    assert.strictEqual(runtime, shared.__rolldown_runtime__)
     assert.ok(shared.__rolldown_runtime__ instanceof DevRuntime)
     assert.equal(typeof shared.queueMicrotask, 'function')
     assert.equal(Reflect.has(context, '__rolldown_runtime__'), false)

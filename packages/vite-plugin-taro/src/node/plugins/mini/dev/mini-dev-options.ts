@@ -189,7 +189,7 @@ const bundleRuntimeSource = memoize(async function bundleRuntimeSource(runtimeFi
         write: false
     })
 
-    // Bind once, before initialization. The parameter also prevents the outer build from injecting a virtual-module import.
-    // Final rendering resolves the single provider-load slot relative to the assembled runtime's physical path.
-    return `(function (globalThis) {\n${result.output[0].code}\n})(__VPT_GLOBAL__);`
+    // The lexical global prevents self-injection. Assign the completed instance to the chunk-local cell added at render time,
+    // before Rolldown's graph prelude and any co-located modules use it. No host-global runtime binding is required.
+    return `__rolldown_runtime__ = (function (globalThis) {\n${result.output[0].code}\nreturn globalThis.__rolldown_runtime__;\n})(__VPT_GLOBAL__);`
 })
