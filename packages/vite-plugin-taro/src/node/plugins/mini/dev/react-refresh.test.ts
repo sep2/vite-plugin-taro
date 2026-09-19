@@ -68,7 +68,7 @@ for (const target of ['wx', 'zfb'] as const) {
         )
         const runtime = transformRefreshRuntime(await readFile(runtimePath, 'utf8'))
         const entry = path.join(path.dirname(runtimePath), 'preamble-test.js')
-        const globalPlugin = createMiniGlobalPlugin({
+        const [globalPlugin] = createMiniGlobalPlugin({
             getPhysicalChunkId(chunk) {
                 assert.ok(typeof chunk !== 'string')
                 return chunk.fileName

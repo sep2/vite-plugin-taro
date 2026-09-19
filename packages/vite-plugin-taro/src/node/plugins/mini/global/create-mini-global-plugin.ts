@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { build, type OutputOptions } from 'rolldown'
+import { build, type OutputOptions, type RenderedChunk } from 'rolldown'
 import { type Plugin, transformWithOxc } from 'vite'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
@@ -12,86 +12,106 @@ const vptGlobalSrcFile = resolveRuntimeFile('global/vpt-global')
 const vptGlobalDistFile = 'common/vpt-global.js'
 
 /** Shares one standalone native provider between the application's virtual binding and the wrapped HMR runtime. */
-export function createMiniGlobalPlugin(placement: Pick<MiniPlacementPlugin, 'getPhysicalChunkId'>): Plugin {
-    return {
-        name: 'vpt:mini-global',
-        resolveId: {
-            filter: { id: createExactModuleIdFilter(vptGlobalBindingId) },
-            handler() {
-                return vptGlobalBindingId
-            }
-        },
-        load: {
-            filter: { id: createExactModuleIdFilter(vptGlobalBindingId) },
-            handler() {
-                return 'export const vptGlobal = __VPT_GLOBAL__;'
-            }
-        },
-        config() {
-            return {
-                build: {
-                    rolldownOptions: {
-                        transform: {
-                            inject: {
-                                globalThis: [vptGlobalBindingId, 'vptGlobal']
+export function createMiniGlobalPlugin(placement: Pick<MiniPlacementPlugin, 'getPhysicalChunkId'>): Plugin[] {
+    function getGlobalReference(chunk: RenderedChunk): string {
+        // Insert the physical edge only after linking. A source-level require would pull discovery back into HMR.
+        // Placement has already assigned the caller's path; the provider always lives in the main package.
+        const relative = path.posix.relative(path.posix.dirname(placement.getPhysicalChunkId(chunk)), vptGlobalDistFile)
+        const reference = relative.startsWith('.') ? relative : `./${relative}`
+        return `require(${JSON.stringify(reference)}).vptGlobal`
+    }
+
+    return [
+        {
+            name: 'vpt:mini-global',
+            resolveId: {
+                filter: { id: createExactModuleIdFilter(vptGlobalBindingId) },
+                handler() {
+                    return vptGlobalBindingId
+                }
+            },
+            load: {
+                filter: { id: createExactModuleIdFilter(vptGlobalBindingId) },
+                handler() {
+                    return 'export const vptGlobal = __VPT_GLOBAL__;'
+                }
+            },
+            config() {
+                return {
+                    build: {
+                        rolldownOptions: {
+                            transform: {
+                                inject: {
+                                    globalThis: [vptGlobalBindingId, 'vptGlobal']
+                                }
                             }
+                        }
+                    }
+                }
+            },
+            renderChunk: {
+                order: 'pre',
+                filter: { code: /__VPT_GLOBAL__/ },
+                handler(code, chunk, options) {
+                    if (!chunk.moduleIds.includes(vptGlobalBindingId) && !chunk.moduleIds.includes(rolldownRuntimeId)) {
+                        return
+                    }
+
+                    return transformWithOxc(code, chunk.fileName, {
+                        define: { __VPT_GLOBAL__: getGlobalReference(chunk) },
+                        sourcemap: Boolean(options.sourcemap)
+                    })
+                }
+            },
+            generateBundle: {
+                order: 'post',
+                async handler(options) {
+                    // Emit after placement/rendering, not as an input: this file must never enter the application or HMR graph.
+                    // Only the binding participates in SystemJS transport and HMR's module registry.
+                    // Normalized minifier settings contain internal targets, not reusable input options. Discovery follows
+                    // the enabled/disabled choice and the same ES target as the rest of the Mini output.
+                    const result = await bundleGlobal({
+                        dir: options.dir,
+                        minify: options.minify !== false,
+                        sourcemap: options.sourcemap
+                    })
+
+                    for (const output of result.output) {
+                        if (output.type === 'asset') {
+                            this.emitFile({ type: 'asset', fileName: output.fileName, source: output.source })
+                        } else {
+                            this.emitFile({
+                                type: 'prebuilt-chunk',
+                                fileName: output.fileName,
+                                code: output.code,
+                                exports: output.exports,
+                                facadeModuleId: vptGlobalSrcFile,
+                                isEntry: true
+                            })
                         }
                     }
                 }
             }
         },
-        renderChunk: {
-            order: 'pre',
-            filter: { code: /__VPT_GLOBAL__/ },
-            handler(code, chunk, options) {
-                if (!chunk.moduleIds.includes(vptGlobalBindingId) && !chunk.moduleIds.includes(rolldownRuntimeId)) {
-                    return
-                }
+        {
+            name: 'vpt:mini-global-dev',
+            apply: 'serve',
+            renderChunk: {
+                order: 'pre',
+                filter: { code: /__rolldown_runtime__/ },
+                handler(code, chunk) {
+                    // The owner assigns its local cell once, after constructing the runtime. Other chunks capture the same
+                    // App-lifetime singleton after their static dependencies initialize; generated calls stay untouched.
+                    const binding = chunk.moduleIds.includes(rolldownRuntimeId)
+                        ? 'let __rolldown_runtime__;\n'
+                        : `const __rolldown_runtime__ = ${getGlobalReference(chunk)}.__rolldown_runtime__;\n`
 
-                // Insert the physical edge only after linking. A source-level require would pull discovery back into HMR.
-                // Placement has already assigned the caller's path; the provider always lives in the main package.
-                const relative = path.posix.relative(
-                    path.posix.dirname(placement.getPhysicalChunkId(chunk)),
-                    vptGlobalDistFile
-                )
-                const reference = relative.startsWith('.') ? relative : `./${relative}`
-
-                return transformWithOxc(code, chunk.fileName, {
-                    define: { __VPT_GLOBAL__: `require(${JSON.stringify(reference)}).vptGlobal` },
-                    sourcemap: Boolean(options.sourcemap)
-                })
-            }
-        },
-        generateBundle: {
-            order: 'post',
-            async handler(options) {
-                // Emit after placement/rendering, not as an input: this file must never enter the application or HMR graph.
-                // Only the binding participates in SystemJS transport and HMR's module registry.
-                // Normalized minifier settings contain internal targets, not reusable input options. Discovery follows
-                // the enabled/disabled choice and the same ES target as the rest of the Mini output.
-                const result = await bundleGlobal({
-                    dir: options.dir,
-                    minify: options.minify !== false,
-                    sourcemap: options.sourcemap
-                })
-
-                for (const output of result.output) {
-                    if (output.type === 'asset') {
-                        this.emitFile({ type: 'asset', fileName: output.fileName, source: output.source })
-                    } else {
-                        this.emitFile({
-                            type: 'prebuilt-chunk',
-                            fileName: output.fileName,
-                            code: output.code,
-                            exports: output.exports,
-                            facadeModuleId: vptGlobalSrcFile,
-                            isEntry: true
-                        })
-                    }
+                    // Mini development disables source maps. Ordinary chunks need only a prefix, not another AST pass.
+                    return { code: binding + code, map: null }
                 }
             }
         }
-    }
+    ]
 }
 
 // Cache immutable output by its rendering options, including the directory used for relative source-map paths. Complete

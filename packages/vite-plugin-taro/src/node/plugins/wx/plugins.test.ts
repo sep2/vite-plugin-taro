@@ -35,9 +35,11 @@ test('creates the WX Mini Program contract without translating public options', 
     assert.equal(typeof contract.output.generateProjectSkeleton, 'function')
     const plugins = createWxMiniPlugins(options)
     assert.equal(plugins.length, 8)
-    for (const name of ['vpt:mini-native-component', 'vpt:mini-global', 'vpt:mini-watch']) {
+    for (const name of ['vpt:mini-native-component', 'vpt:mini-global', 'vpt:mini-global-dev', 'vpt:mini-watch']) {
         assert.ok(
-            plugins.some((plugin) => plugin && typeof plugin === 'object' && 'name' in plugin && plugin.name === name),
+            plugins
+                .flat()
+                .some((plugin) => plugin && typeof plugin === 'object' && 'name' in plugin && plugin.name === name),
             name
         )
     }

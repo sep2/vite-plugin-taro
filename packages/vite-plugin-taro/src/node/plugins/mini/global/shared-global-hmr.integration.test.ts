@@ -74,7 +74,7 @@ test('real HMR factories reuse the registered binding without rediscovering the 
     t.after(() => rm(root, { recursive: true, force: true }))
     const entry = path.join(root, 'entry.js')
     await writeFile(entry, moduleSource(1))
-    const globalPlugin = createMiniGlobalPlugin({
+    const [globalPlugin, globalDevPlugin] = createMiniGlobalPlugin({
         getPhysicalChunkId(chunk) {
             assert.ok(typeof chunk !== 'string')
             return chunk.fileName
@@ -93,7 +93,7 @@ test('real HMR factories reuse the registered binding without rediscovering the 
                 devMode: {
                     lazy: false,
                     skipCommonRuntimeInjection: true,
-                    implement: 'var __rolldown_runtime__ = __createRuntime(__VPT_GLOBAL__);'
+                    implement: '__rolldown_runtime__ = __createRuntime(__VPT_GLOBAL__);'
                 }
             },
             plugins: [
@@ -104,6 +104,7 @@ test('real HMR factories reuse the registered binding without rediscovering the 
                     renderChunk: globalPlugin.renderChunk,
                     generateBundle: globalPlugin.generateBundle
                 },
+                { name: globalDevPlugin.name, renderChunk: globalDevPlugin.renderChunk },
                 {
                     name: 'test:capture-global-output',
                     generateBundle: {

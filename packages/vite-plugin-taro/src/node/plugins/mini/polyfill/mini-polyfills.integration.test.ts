@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
+import { setTimeout as delay } from 'node:timers/promises'
 import { createContext, runInContext } from 'node:vm'
 import { walk } from 'oxc-walker'
 import type { OutputChunk } from 'rolldown'
@@ -19,13 +20,16 @@ const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/packag
 const coreJsRoot = `${normalizePath(path.dirname(packageRequire.resolve('core-js/package.json')))}/`
 const optionalPolyfills = ['web.url', 'es.array.at']
 
-/** Exercises the public build/server pipelines with in-memory sources and captured, rather than written, bundles. */
+/** Captures public build/server output; only patch probes materialize an editable page for the real watcher. */
 async function compileFixture(
     target: MiniTarget,
     mode: Mode,
-    polyfills: readonly string[]
+    polyfills: readonly string[],
+    onDevReady?: (chunks: readonly OutputChunk[], root: string) => Promise<void>
 ): Promise<readonly OutputChunk[]> {
     const root = await mkdtemp(path.join(packageRoot, '.vpt-polyfills-test-'))
+    const pagePath = normalizePath(path.join(root, 'src/pages/home/index.tsx'))
+    const pageSource = 'export default function Home() { return null }'
     const sources: ReadonlyMap<string, string> = new Map([
         [
             normalizePath(path.join(root, 'src/probe.ts')),
@@ -55,7 +59,7 @@ async function compileFixture(
             export default function App({ children }) { return children }
         `
         ],
-        [normalizePath(path.join(root, 'src/pages/home/index.tsx')), 'export default function Home() { return null }']
+        [pagePath, pageSource]
     ])
     // This completion cell captures exactly one initial output graph; the server is closed before returning it.
     const output = Promise.withResolvers<readonly OutputChunk[]>()
@@ -68,6 +72,10 @@ async function compileFixture(
             return sources.has(resolved) ? resolved : undefined
         },
         load(id) {
+            // A patch test uses the real watcher and file loader for this one editable module.
+            if (onDevReady && normalizePath(id) === pagePath) {
+                return
+            }
             return sources.get(normalizePath(id))
         },
         generateBundle: {
@@ -180,9 +188,14 @@ async function compileFixture(
             assert.deepEqual(await readdir(root), [], 'Production fixtures must not materialize sources or output')
             return result.output.filter((item): item is OutputChunk => item.type === 'chunk')
         } else {
+            if (onDevReady) {
+                await mkdir(path.dirname(pagePath), { recursive: true })
+                await writeFile(pagePath, pageSource)
+            }
             const server = await createServer(config)
             try {
                 await server.listen()
+                await onDevReady?.(await output.promise, root)
             } finally {
                 await server.close()
             }
@@ -198,9 +211,10 @@ async function compileFixture(
                     `dist/app.${extension}`,
                     `dist/assets/global.${extension}`,
                     ...(mode === 'rebuild' ? [] : ['dist/hmr/info.js']),
-                    ...(mode === 'devtools' ? ['dist/hmr/patches.js'] : [])
+                    ...(mode === 'devtools' ? ['dist/hmr/patches.js'] : []),
+                    ...(onDevReady ? ['src/pages/home/index.tsx'] : [])
                 ],
-                'Only the host-owned style and HMR metadata may reach disk'
+                'Only the editable fixture page and host-owned style/HMR metadata may reach disk'
             )
         }
         return await output.promise
@@ -460,7 +474,7 @@ for (const target of ['wx', 'zfb'] as const) {
 
 for (const target of ['wx', 'zfb'] as const) {
     for (const mode of ['production', 'devtools', 'interpreter', 'rebuild'] as const) {
-        test(`${target} ${mode}: the empty selection keeps core-js out while development retains its microtask fallback`, async () => {
+        test(`${target} ${mode}: the empty selection keeps core-js out while development retains its microtask fallback`, async (t) => {
             const chunks = await compileFixture(target, mode, [])
             const missing = createAppHeap(chunks, false, target)
             assert.throws(() => missing.evaluate('app.js'), { name: 'ReferenceError', message: 'URL is not defined' })
@@ -511,6 +525,48 @@ for (const target of ['wx', 'zfb'] as const) {
             )
             native.evaluate('app.js')
             assert.equal(native.read('queueMicrotask'), nativeQueue)
+
+            for (const setup of ['delete this.globalThis;', 'let globalThis;']) {
+                await t.test(`failed discovery: ${setup}`, async () => {
+                    const restricted = createAppHeap(chunks, true, target)
+                    restricted.read(`
+                        ${setup}
+                        Object.preventExtensions(Object.prototype);
+                        this.diagnostics = [];
+                        this.console = { ...console, error: (...args) => diagnostics.push(args) };
+                    `)
+                    const provider = restricted.evaluate('common/vpt-global.js')
+                    assert.ok(provider && typeof provider === 'object')
+                    restricted.read('const sharedGlobal = Object[Symbol.for("vpt.fake.global")];')
+                    assert.strictEqual(Reflect.get(provider, 'vptGlobal'), restricted.read('sharedGlobal'))
+                    assert.notStrictEqual(restricted.read('sharedGlobal'), restricted.read('this'))
+                    restricted.evaluate('common/bootstrap.js')
+                    // Sval publishes its imported runtime on the host's global alias; generated app code must not need it.
+                    restricted.read('this.__rolldown_runtime__ = undefined;')
+                    restricted.evaluate('app.js')
+                    restricted.evaluate('pages/home/index.js')
+                    restricted.evaluate('comp.js')
+                    restricted.evaluate('custom-wrapper.js')
+                    assert.deepEqual(restricted.registrations, ['App', 'Page', 'Component', 'Component'])
+                    assert.equal(restricted.read('sharedGlobal.polyfillProbe.href'), 'https://example.com/dir/child')
+                    assert.equal(restricted.read('typeof globalThis'), 'undefined')
+                    assert.equal(restricted.read('typeof __rolldown_runtime__'), 'undefined')
+                    assert.equal(restricted.read('typeof queueMicrotask'), 'undefined')
+                    if (mode !== 'production') {
+                        assert.equal(restricted.read('typeof sharedGlobal.__rolldown_runtime__'), 'object')
+                        restricted.read(`
+                            this.microtaskOrder = ['sync'];
+                            sharedGlobal.queueMicrotask(() => microtaskOrder.push('queued'));
+                            microtaskOrder.push('after-schedule');
+                        `)
+                        assert.deepEqual(restricted.json('microtaskOrder'), ['sync', 'after-schedule'])
+                        await Promise.resolve()
+                        assert.deepEqual(restricted.json('microtaskOrder'), ['sync', 'after-schedule', 'queued'])
+                    }
+                    assert.equal(restricted.read('globalDiscoveries'), 1)
+                    assert.equal(restricted.read('diagnostics.length'), 1)
+                })
+            }
         })
     }
 
@@ -529,6 +585,83 @@ for (const target of ['wx', 'zfb'] as const) {
         assert.equal(heap.read('globalThis["__core-js_shared__"].versions.length'), 1)
         assert.equal(heap.read('typeof Array.prototype.at'), 'undefined')
     })
+}
+
+for (const target of ['wx', 'zfb'] as const) {
+    test(`${target}: a real React Refresh patch uses the shared global after failed discovery`, async () => {
+        await compileFixture(target, 'devtools', [], async (chunks, root) => {
+            const patchesPath = path.join(root, 'dist/hmr/patches.js')
+            await waitForPatchSource(patchesPath, 'module.exports')
+            const heaps = [false, true].map((restricted) => {
+                const heap = createAppHeap(chunks, true, target)
+                if (restricted) {
+                    heap.read(`
+                        delete this.globalThis;
+                        Object.preventExtensions(Object.prototype);
+                        this.console = { ...console, error() {} };
+                    `)
+                }
+                const provider = heap.evaluate('common/vpt-global.js')
+                assert.ok(provider && typeof provider === 'object')
+                heap.read(`const sharedGlobal = ${restricted ? 'Object[Symbol.for("vpt.fake.global")]' : 'this'};`)
+                assert.strictEqual(Reflect.get(provider, 'vptGlobal'), heap.read('sharedGlobal'))
+                heap.evaluate('app.js')
+                heap.evaluate('pages/home/index.js')
+                return heap
+            })
+            const pagePath = path.join(root, 'src/pages/home/index.tsx')
+            for (const seq of [1, 2]) {
+                // Both cold and patched Refresh boundaries must arm their next accept callback in a microtask.
+                await Promise.resolve()
+                const marker = `refreshed page ${seq}`
+                await writeFile(
+                    `${pagePath}.tmp`,
+                    `export default function Home() { return ${JSON.stringify(marker)} }`
+                )
+                await rename(`${pagePath}.tmp`, pagePath)
+                const source = await waitForPatchSource(patchesPath, marker)
+                assert.match(source, /validateRefreshBoundaryAndEnqueueUpdate/)
+                assert.doesNotMatch(source, /vpt\.fake\.global|__VPT_GLOBAL__/)
+                for (const heap of heaps) {
+                    // Keep the real factory and changed IDs; only the fixture socket uses a deterministic build ID.
+                    const rendered = heap.read(`(() => {
+                        const module = { exports: {} };
+                        ${source}
+                        const runtime = sharedGlobal.__rolldown_runtime__;
+                        runtime.applyPatches({ ...module.exports, buildId: 'test' });
+                        const patches = module.exports.patches;
+                        return runtime.loadExports(patches[patches.length - 1].changedIds[0]).default();
+                    })()`)
+                    const reports = heap.reports.map((report) => JSON.parse(report).data)
+                    assert.ok(
+                        reports.some((report) => report.kind === 'applied' && report.seq === seq),
+                        JSON.stringify(reports)
+                    )
+                    assert.equal(
+                        reports.some((report) => report.kind === 'rebuild'),
+                        false
+                    )
+                    assert.equal(rendered, marker)
+                }
+            }
+        })
+    })
+}
+
+/** The dev host publishes metadata asynchronously, after bundle capture, and replaces patch files atomically. */
+async function waitForPatchSource(fileName: string, marker: string): Promise<string> {
+    const deadline = Date.now() + 10_000
+    while (true) {
+        assert.ok(Date.now() < deadline, `Timed out waiting for patch source containing ${marker}`)
+        const source = await readFile(fileName, 'utf8').catch((error: unknown) => {
+            assert.ok(error instanceof Error && 'code' in error && error.code === 'ENOENT')
+            return ''
+        })
+        if (source.includes(marker)) {
+            return source
+        }
+        await delay(10)
+    }
 }
 
 async function assertMicrotaskQueue(heap: ReturnType<typeof createAppHeap>): Promise<void> {

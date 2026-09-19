@@ -38,7 +38,7 @@ const fixtureGrouping = {
         }
     ]
 }
-const globalPlugin = createMiniGlobalPlugin({
+const [globalPlugin] = createMiniGlobalPlugin({
     getPhysicalChunkId(chunk) {
         assert.ok(typeof chunk !== 'string')
         return chunk.fileName
