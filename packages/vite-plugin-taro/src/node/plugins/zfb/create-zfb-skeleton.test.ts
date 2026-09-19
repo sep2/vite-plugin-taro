@@ -33,7 +33,7 @@ const contract = createZfbMiniContract({
 test('rejects a Taro base template that lost its recursive child contract', () => {
     assert.throws(
         () => buildZfbBaseTemplate('<template name="taro_tmpl" />'),
-        /Alipay base templates must recurse through compact child data/
+        /Recursive base templates must recurse through compact child data/
     )
 })
 

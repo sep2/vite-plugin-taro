@@ -3,6 +3,11 @@ import type { VptOptions } from '../../../options.ts'
 import { getPageConfig } from '../../utils/project-config.ts'
 import type { MiniJsonObject, MiniProjectSkeletonInput } from '../mini/mini-contract.ts'
 import {
+    buildRecursiveBaseTemplate,
+    buildRecursiveComponentTemplate,
+    buildRecursiveCustomWrapperTemplate
+} from '../mini/skeleton/recursive-page-templates.ts'
+import {
     collectTemplateComponentConfig,
     createJsonAsset,
     createNativeComponentConfig,
@@ -82,10 +87,12 @@ export function createZfbSkeleton({
     const nativeComponentConfig = createNativeComponentConfig(nativeComponents)
     const recursiveComponentJson = createRecursiveComponentJson(nativeComponentConfig)
     const baseTemplateSource = buildZfbBaseTemplate(template.buildTemplate(componentConfig))
-    const recursiveComponentTemplateSource = buildZfbRecursiveComponentTemplate(
+    const recursiveComponentTemplateSource = buildRecursiveComponentTemplate(
         template.buildBaseComponentTemplate('.axml')
     )
-    const customWrapperTemplateSource = buildZfbCustomWrapperTemplate(template.buildCustomComponentTemplate('.axml'))
+    const customWrapperTemplateSource = buildRecursiveCustomWrapperTemplate(
+        template.buildCustomComponentTemplate('.axml')
+    )
     const generatedSubpackages = subpackages.map((subpackage) => createZfbSubpackageJson(subpackage.root))
     const jsonAsset = (fileName: string, value: MiniJsonObject) => createJsonAsset(fileName, value, isProduction)
 
@@ -126,42 +133,7 @@ export function createZfbSkeleton({
 
 /** Adds Alipay's transparent App collection and threads the independent Page root through every recursive data scope. */
 export function buildZfbBaseTemplate(source: string): string {
-    const recursiveData = 'data="{{i:item}}"'
-    if (!source.includes(recursiveData)) {
-        throw new Error('Alipay base templates must recurse through compact child data')
-    }
-
-    const pageRootRecursion = source.replaceAll(recursiveData, 'data="{{i:item,p:p}}"')
-    const customWrapperRecursion = replaceExactlyOnce(
-        pageRootRecursion,
-        '<custom-wrapper i="{{i}}"',
-        '<custom-wrapper i="{{i}}" p="{{p}}"',
-        'Alipay CustomWrapper Page-root bridge'
-    )
-
-    return `${customWrapperRecursion}
-<template name="tmpl_0_vpt_fragment">
-  <template
-    is="{{xs.a(0, item.nn)}}"
-    data="{{i:item,p:p}}"
-    a:for="{{i.cn}}"
-    a:key="sid"
-  />
-</template>
-<template name="tmpl_0_vpt_page_outlet">
-  <template is="taro_tmpl" data="{{root:p}}" />
-</template>
-`
-}
-
-/** Gives the recursive component's first named-template scope both independent native roots. */
-function buildZfbRecursiveComponentTemplate(source: string): string {
-    return replaceExactlyOnce(source, 'data="{{i:i}}"', 'data="{{i:i,p:p}}"', 'Alipay recursive component entry')
-}
-
-/** Preserves the Page root when App recursion crosses Taro's real CustomWrapper component boundary. */
-function buildZfbCustomWrapperTemplate(source: string): string {
-    return replaceExactlyOnce(source, 'data="{{i:item}}"', 'data="{{i:item,p:p}}"', 'Alipay CustomWrapper recursion')
+    return buildRecursiveBaseTemplate(source, 'a')
 }
 
 /** Keeps Taro's optional PageMeta output while replacing its Page-owned template table with the two-root component bridge. */
