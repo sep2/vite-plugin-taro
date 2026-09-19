@@ -43,5 +43,5 @@ function getGlobalThis(this: typeof globalThis | void): typeof globalThis {
     }
 }
 
-/** One object shared by application, polyfill, and runtime modules. This module is excluded from globalThis injection. */
+/** One shared host object. Its native probe is restored in an isolated output entry after globalThis injection. */
 export const vptGlobal = getGlobalThis()

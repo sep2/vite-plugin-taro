@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
-import { packageRequire } from '../../../utils/packages.ts'
+import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
 import type { RuntimeModulesContract } from '../mini-contract.ts'
 
 // Resolve from the plugin: pnpm consumers do not expose this transitive dependency to injected app imports.
@@ -9,6 +9,9 @@ export const miniRuntimeId = packageRequire.resolve('vite-plugin-taro-runtime/ru
 
 /** Identifies Rolldown's generated helper module independently of its unstable output filename. */
 export const rolldownRuntimeId = '\0rolldown/runtime.js'
+
+/** Resolves the isolated language-global entry imported by native files and application capsules. */
+export const vptGlobalId = resolveRuntimeFile('global/vpt-global')
 
 /** Generates the selected core-js imports as one independently executable output entry. */
 export const miniPolyfillsId = '\0vpt:mini-polyfills'
@@ -91,6 +94,7 @@ export function createMiniModuleClassifier(modules: RuntimeModulesContract): Min
         [modules.componentCapsule, 'capsule'],
         [modules.pageCapsule, 'capsule'],
         [modules.bootstrap, 'amphibious'],
+        [vptGlobalId, 'amphibious'],
         [miniPolyfillsId, 'amphibious'],
         [rolldownRuntimeId, 'amphibious'],
         [modules.transport, 'transport']

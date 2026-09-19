@@ -1,25 +1,56 @@
 import assert from 'node:assert/strict'
 import { posix } from 'node:path'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
 import { constants, createContext, Script } from 'node:vm'
-import { build, type OutputChunk } from 'rolldown'
-import { transform } from 'rolldown/utils'
+import { build, type OutputChunk, RUNTIME_MODULE_ID } from 'rolldown'
+import { resolveConfig } from 'vite'
+import vpt from '../../../vpt.ts'
+import { vptGlobalId as runtimeId } from '../module/module.ts'
 
-const runtimeId = fileURLToPath(new URL('../../../../runtime/global/vpt-global.ts', import.meta.url))
+// Exercise the production injection, grouping and late-define hook; only the application sources and CJS loader are fixtures.
+const config = await resolveConfig(
+    {
+        configFile: false,
+        plugins: vpt({ target: 'wx', app: 'app.tsx', pages: [], appJson: {}, projectConfigJson: {} })
+    },
+    'build'
+)
+const options = config.build.rolldownOptions
+const configuredInput = options.input
+assert.ok(configuredInput && typeof configuredInput === 'object' && !Array.isArray(configuredInput))
+assert.equal(configuredInput['vpt-global'], runtimeId)
+const outputOptions = options.output
+assert.ok(outputOptions && !Array.isArray(outputOptions))
+const splitting = outputOptions.codeSplitting
+assert.ok(splitting && typeof splitting === 'object')
+const groups = splitting.groups
+assert.ok(groups)
+const fixtureGrouping = {
+    ...splitting,
+    groups: [
+        ...groups,
+        {
+            name: 'fixture-vendor',
+            test: (id: string) => id.startsWith('/vpt-global-fixture/node_modules/'),
+            priority: 100,
+            includeDependenciesRecursively: true
+        }
+    ]
+}
+const renderChunk = config.plugins.find((plugin) => plugin.name === 'vpt:mini-polyfills')?.renderChunk
+assert.ok(renderChunk)
 const entryId = '/vpt-global-fixture/entry.js'
 const peerId = '/vpt-global-fixture/peer.js'
 const localId = '/vpt-global-fixture/local.js'
 const lazyId = '/vpt-global-fixture/lazy.js'
-const inject = { globalThis: [runtimeId, 'vptGlobal'] } satisfies Record<string, [string, string]>
-const define = { __VPT_NATIVE_GLOBAL_THIS__: 'globalThis' }
 
-/** Exercise the compiler's two passes before linking, without modifying or excluding the real runtime source. */
+/** Keep native injection, then materialize the native probe only inside its isolated runtime entry. */
 async function bundleFixture(sources: ReadonlyMap<string, string>, input: string[], minify: boolean) {
     // Record the resolved graph to detect self-injection even when bundling would erase the circular import.
     const imports = new Map<string, readonly string[]>()
     const result = await build({
-        input,
+        input: [...input, runtimeId],
+        preserveEntrySignatures: options.preserveEntrySignatures,
         plugins: [
             {
                 name: 'test:global-injection-fixtures',
@@ -29,26 +60,35 @@ async function bundleFixture(sources: ReadonlyMap<string, string>, input: string
                     imports.set(info.id, info.importedIds)
                 }
             },
-            {
-                name: 'test:inject-before-define',
-                async transform(code, id) {
-                    // A separate inject-only pass is intentional: combined options currently self-inject the runtime.
-                    const result = await transform(id, code, { inject, sourcemap: true })
-                    assert.deepEqual(result.errors, [])
-                    assert.deepEqual(result.warnings, [])
-                    return { code: result.code, map: result.map }
-                }
-            }
+            { name: 'test:production-global-render', renderChunk }
         ],
-        transform: { define },
+        transform: options.transform,
         checks: { circularDependency: true },
         onwarn(warning) {
             assert.fail(warning.message)
         },
-        output: { format: 'cjs', entryFileNames: '[name].cjs', chunkFileNames: '[name]-[hash].cjs', minify },
+        output: {
+            ...outputOptions,
+            format: 'cjs',
+            entryFileNames: '[name].cjs',
+            chunkFileNames: '[name]-[hash].cjs',
+            minify,
+            codeSplitting: fixtureGrouping
+        },
         write: false
     })
-    return { chunks: result.output.filter((chunk) => chunk.type === 'chunk'), imports }
+    const chunks = result.output.filter((chunk) => chunk.type === 'chunk')
+    const entry = chunks.find((chunk) => chunk.facadeModuleId === input[0])
+    assert.ok(entry)
+    const runtime = chunks.find((chunk) => chunk.facadeModuleId === runtimeId)
+    assert.ok(runtime)
+    assert.deepEqual(
+        runtime.moduleIds.filter((id) => id !== RUNTIME_MODULE_ID),
+        [runtimeId]
+    )
+    assert.deepEqual(imports.get(runtimeId), [], 'Native probing must never inject a dependency on the runtime itself')
+    assert.doesNotMatch(runtime.code, /__VPT_NATIVE_GLOBAL_THIS__/)
+    return { chunks, imports, entry, runtime }
 }
 
 /** Execute emitted CommonJS, including split chunks, in a strict host realm with eval and Function disabled. */
@@ -134,9 +174,9 @@ const applicationSources: ReadonlyMap<string, string> = new Map([
 
 for (const minify of [false, true]) {
     for (const state of ['native', 'absent', 'shadowed'] as const) {
-        test(`ordered injection: ${state} globalThis, minify ${minify}`, async () => {
-            const { chunks, imports } = await bundleFixture(applicationSources, [entryId], minify)
-            assert.equal(chunks.length, 1)
+        test(`native injection with late define: ${state} globalThis, minify ${minify}`, async () => {
+            const { chunks, imports, entry } = await bundleFixture(applicationSources, [entryId], minify)
+            assert.equal(chunks.length, 2)
             assert.deepEqual(imports.get(runtimeId), [], 'The runtime must have no injected dependency on itself')
             assert.deepEqual(imports.get(peerId), [runtimeId])
             assert.deepEqual(imports.get(localId), [])
@@ -149,7 +189,7 @@ for (const minify of [false, true]) {
                 shadowed: 'let globalThis;'
             }[state]
             const heap = createBundleHeap(chunks, setup)
-            heap.context.fixture = heap.load(chunks[0].fileName)
+            heap.context.fixture = heap.load(entry.fileName)
             heap.run(`
                 assert.equal(fixture.root, host);
                 assert.equal(fixture.peerRoot, host);
@@ -181,13 +221,33 @@ for (const minify of [false, true]) {
         })
     }
 
+    test(`recursive vendor grouping cannot capture the native probe, minify ${minify}`, async () => {
+        const vendorId = '/vpt-global-fixture/node_modules/framework/index.js'
+        const sources = new Map([
+            [localId, 'export const globalThis = { marker: "vendor local" };'],
+            [vendorId, `export { globalThis as local } from '${localId}'; export const root = globalThis;`],
+            [entryId, `export { local, root } from '${vendorId}';`]
+        ])
+        const { chunks, entry, runtime } = await bundleFixture(sources, [entryId], minify)
+        const vendor = chunks.find((chunk) => chunk.moduleIds.includes(vendorId))
+        assert.ok(vendor)
+        assert.ok(vendor.moduleIds.includes(localId), 'The recursive group must actually include its dependency')
+        assert.notEqual(vendor.fileName, runtime.fileName)
+        const heap = createBundleHeap(chunks, 'delete this.globalThis;')
+        heap.context.fixture = heap.load(entry.fileName)
+        heap.run(`
+            assert.equal(fixture.root, host);
+            assert.deepEqual(fixture.local, { marker: 'vendor local' });
+            assert.equal(discoveries, 1);
+        `)
+    })
+
     test(`typeof-only use still injects the recovered global, minify ${minify}`, async () => {
         const sources = new Map([[entryId, 'export const kind = typeof globalThis;']])
-        const { chunks, imports } = await bundleFixture(sources, [entryId], minify)
+        const { chunks, imports, entry } = await bundleFixture(sources, [entryId], minify)
         assert.deepEqual(imports.get(entryId), [runtimeId])
-        assert.deepEqual(imports.get(runtimeId), [])
         const heap = createBundleHeap(chunks, 'delete this.globalThis;')
-        heap.context.fixture = heap.load(chunks[0].fileName)
+        heap.context.fixture = heap.load(entry.fileName)
         heap.run(`
             assert.equal(fixture.kind, 'object');
             assert.equal(typeof globalThis, 'undefined');
@@ -195,24 +255,28 @@ for (const minify of [false, true]) {
         `)
     })
 
-    test(`CommonJS .js dependencies share the injected global with ESM consumers, minify ${minify}`, async () => {
-        const commonJsId = '/vpt-global-fixture/dependency.js'
-        const sources = new Map([
-            [commonJsId, 'module.exports = { root: globalThis, matchesMath: globalThis.Math === Math };'],
-            [entryId, `import dependency from '${commonJsId}'; export { dependency }; export const root = globalThis;`]
-        ])
-        const { chunks, imports } = await bundleFixture(sources, [entryId], minify)
-        assert.deepEqual(imports.get(commonJsId), [runtimeId])
-        assert.deepEqual(imports.get(runtimeId), [])
-        const heap = createBundleHeap(chunks, 'delete this.globalThis;')
-        heap.context.fixture = heap.load(chunks[0].fileName)
-        heap.run(`
-            assert.equal(fixture.dependency.root, host);
-            assert.equal(fixture.root, host);
-            assert.equal(fixture.dependency.matchesMath, true);
-            assert.equal(discoveries, 1);
-        `)
-    })
+    for (const extension of ['js', 'cjs']) {
+        test(`CommonJS .${extension} shares the injected global with ESM, minify ${minify}`, async () => {
+            const commonJsId = `/vpt-global-fixture/dependency.${extension}`
+            const sources = new Map([
+                [commonJsId, 'module.exports = { root: globalThis, matchesMath: globalThis.Math === Math };'],
+                [
+                    entryId,
+                    `import dependency from '${commonJsId}'; export { dependency }; export const root = globalThis;`
+                ]
+            ])
+            const { chunks, imports, entry } = await bundleFixture(sources, [entryId], minify)
+            assert.deepEqual(imports.get(commonJsId), [runtimeId])
+            const heap = createBundleHeap(chunks, 'delete this.globalThis;')
+            heap.context.fixture = heap.load(entry.fileName)
+            heap.run(`
+                assert.equal(fixture.dependency.root, host);
+                assert.equal(fixture.root, host);
+                assert.equal(fixture.dependency.matchesMath, true);
+                assert.equal(discoveries, 1);
+            `)
+        })
+    }
 
     test(`split entries and a lazy module share one recovered global, minify ${minify}`, async () => {
         const sources = new Map([
@@ -224,7 +288,7 @@ for (const minify of [false, true]) {
         assert.deepEqual(imports.get(runtimeId), [])
         const runtimeChunks = chunks.filter((chunk) => chunk.moduleIds.includes(runtimeId))
         assert.equal(runtimeChunks.length, 1)
-        assert.equal(runtimeChunks[0].isEntry, false)
+        assert.equal(runtimeChunks[0].isEntry, true)
         const entry = chunks.find((chunk) => chunk.facadeModuleId === entryId)
         const peer = chunks.find((chunk) => chunk.facadeModuleId === peerId)
         assert.ok(entry && peer)
@@ -273,12 +337,12 @@ test('local globalThis bindings, property names, text and comments never trigger
             `
         ]
     ])
-    const { chunks, imports } = await bundleFixture(sources, [entryId], false)
-    assert.equal(imports.has(runtimeId), false)
+    const { chunks, imports, entry } = await bundleFixture(sources, [entryId], false)
     assert.deepEqual(imports.get(entryId), [peerId])
-    assert.ok(chunks[0].code.includes(comment))
+    assert.deepEqual(entry.imports, [])
+    assert.ok(entry.code.includes(comment))
     const heap = createBundleHeap(chunks, 'delete this.globalThis;')
-    heap.context.fixture = heap.load(chunks[0].fileName)
+    heap.context.fixture = heap.load(entry.fileName)
     heap.run(`
         assert.equal(fixture.imported, 'imported local');
         assert.equal(fixture.text, 'globalThis __VPT_NATIVE_GLOBAL_THIS__');
@@ -306,11 +370,11 @@ test('other free globals remain native and do not load the runtime', async () =>
             `
         ]
     ])
-    const { chunks, imports } = await bundleFixture(sources, [entryId], false)
+    const { chunks, imports, entry } = await bundleFixture(sources, [entryId], false)
     assert.deepEqual(imports.get(entryId), [])
-    assert.equal(imports.has(runtimeId), false)
+    assert.deepEqual(entry.imports, [])
     const heap = createBundleHeap(chunks, 'delete this.globalThis;')
-    heap.context.fixture = heap.load(chunks[0].fileName)
+    heap.context.fixture = heap.load(entry.fileName)
     heap.run(`
         assert.deepEqual(fixture.bindings, [Math, Promise, fetch, tt]);
         assert.deepEqual(fixture.callFetch(3), [undefined, 3]);
@@ -322,41 +386,21 @@ test('other free globals remain native and do not load the runtime', async () =>
     `)
 })
 
-test('ordered source injection currently fails to reparse its ESM import in a .cjs file', async () => {
-    const commonJsId = '/vpt-global-fixture/dependency.cjs'
-    const sources = new Map([
-        [commonJsId, 'module.exports = globalThis;'],
-        [entryId, `export { default as root } from '${commonJsId}';`]
-    ])
-    // Characterize the current boundary rather than treating the successful .js case as proof of .cjs support.
-    await assert.rejects(bundleFixture(sources, [entryId], false), /Cannot use import statement outside a module/)
-})
-
-test('combined Rolldown inject and define options currently self-inject the runtime', async () => {
-    // Keep this failure mode observable: the runtime must not acquire its native probe through its own export.
-    const imports: string[] = []
-    const warnings: string[] = []
-    const result = await build({
-        input: runtimeId,
-        plugins: [
-            {
-                name: 'test:combined-global-passes',
-                moduleParsed(info) {
-                    imports.push(...info.importedIds)
-                }
-            }
-        ],
-        transform: { inject, define },
-        checks: { circularDependency: true },
-        onwarn(warning) {
-            warnings.push(warning.code ?? warning.message)
-        },
-        output: { format: 'cjs', minify: false },
-        write: false
-    })
-    assert.deepEqual(imports, [runtimeId])
-    assert.deepEqual(warnings, ['CIRCULAR_DEPENDENCY'])
-    const chunks = result.output.filter((chunk) => chunk.type === 'chunk')
+test('the isolated runtime entry initializes without application execution or a self-import', async () => {
+    const sources = new Map([[entryId, 'globalThis.events.push("application"); export const root = globalThis;']])
+    const { chunks, runtime, entry } = await bundleFixture(sources, [entryId], false)
+    assert.deepEqual(runtime.imports, [])
     const heap = createBundleHeap(chunks, 'Object.freeze(Object.prototype);')
-    assert.throws(() => heap.load(chunks[0].fileName), { name: 'ReferenceError' })
+    heap.context.runtime = heap.load(runtime.fileName)
+    heap.run(`
+        assert.equal(runtime.vptGlobal, host);
+        assert.deepEqual(events, []);
+        assert.equal(discoveries, 0);
+    `)
+    heap.context.fixture = heap.load(entry.fileName)
+    heap.run(`
+        assert.equal(fixture.root, runtime.vptGlobal);
+        assert.deepEqual(events, ['application']);
+        assert.equal(discoveries, 0);
+    `)
 })

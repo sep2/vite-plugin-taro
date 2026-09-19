@@ -7,7 +7,13 @@ import test from 'node:test'
 import type { Rolldown } from 'vite'
 import { packageRequire } from '../../../utils/packages.ts'
 import type { RuntimeModulesContract } from '../mini-contract.ts'
-import { createMiniModuleClassifier, isMiniPolyfillModule, miniPolyfillsId, rolldownRuntimeId } from './module.ts'
+import {
+    createMiniModuleClassifier,
+    isMiniPolyfillModule,
+    miniPolyfillsId,
+    rolldownRuntimeId,
+    vptGlobalId
+} from './module.ts'
 
 const modules: RuntimeModulesContract = {
     bootstrap: '/runtime/bootstrap',
@@ -52,6 +58,8 @@ test('classifies native, capsule, amphibious, and transport execution in one pas
     })
     assert.equal(classifyModule(chunk(modules.appCapsule)).executionKind, 'capsule')
     assert.equal(classifyModule(chunk(modules.bootstrap)).executionKind, 'amphibious')
+    assert.equal(classifyModule(chunk(vptGlobalId)).executionKind, 'amphibious')
+    assert.equal(classifyModule(chunk(vptGlobalId, rolldownRuntimeId)).executionKind, 'amphibious')
     assert.equal(classifyModule(chunk(rolldownRuntimeId)).executionKind, 'amphibious')
     assert.equal(classifyModule(chunk(modules.appCapsule, rolldownRuntimeId)).executionKind, 'amphibious')
 })

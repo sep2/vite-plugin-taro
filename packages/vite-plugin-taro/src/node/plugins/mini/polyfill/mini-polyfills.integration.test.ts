@@ -4,13 +4,14 @@ import path from 'node:path'
 import test from 'node:test'
 import { createContext, runInContext } from 'node:vm'
 import { walk } from 'oxc-walker'
-import type { OutputChunk } from 'rolldown'
+import { type OutputChunk, RUNTIME_MODULE_ID } from 'rolldown'
 import { parseSync } from 'rolldown/utils'
 import { build, createServer, normalizePath, type Plugin } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { interpreterServerEvent } from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
+import { vptGlobalId } from '../module/module.ts'
 
 type MiniTarget = 'wx' | 'zfb'
 type Mode = 'production' | 'devtools' | 'interpreter' | 'rebuild'
@@ -74,6 +75,15 @@ async function compileFixture(
             order: 'post',
             handler(_options, bundle) {
                 const chunks = Object.values(bundle).filter((item): item is OutputChunk => item.type === 'chunk')
+                const globalEntry = chunks.find((chunk) => chunk.facadeModuleId === vptGlobalId)
+                assert.ok(globalEntry?.isEntry)
+                assert.equal(globalEntry.fileName, 'common/vpt-global.js')
+                assert.deepEqual(
+                    globalEntry.moduleIds.filter((id) => id !== RUNTIME_MODULE_ID),
+                    [vptGlobalId],
+                    'the native probe must remain isolated from every application and framework binding'
+                )
+                assert.doesNotMatch(globalEntry.code, /__VPT_NATIVE_GLOBAL_THIS__/)
                 const hasPolyfills = polyfills.length > 0
                 const polyfillChunks = chunks.filter((chunk) =>
                     chunk.moduleIds.some((id) => normalizePath(id).startsWith(coreJsRoot))
@@ -150,6 +160,11 @@ async function compileFixture(
             const sourceMap: { mappings: string; sources: string[] } = JSON.parse(String(bootstrapMap.source))
             assert.ok(sourceMap.mappings.length > 0)
             assert.ok(sourceMap.sources.some((source) => source.endsWith('/mini/amphibious/bootstrap.ts')))
+            const globalMap = result.output.find((item) => item.fileName === 'common/vpt-global.js.map')
+            assert.ok(globalMap?.type === 'asset')
+            const globalSourceMap: { mappings: string; sources: string[] } = JSON.parse(String(globalMap.source))
+            assert.ok(globalSourceMap.mappings.length > 0)
+            assert.ok(globalSourceMap.sources.some((source) => source.endsWith('/global/vpt-global.ts')))
             if (polyfills.length > 0) {
                 const polyfillsMap = result.output.find((item) => item.fileName === 'common/polyfills.js.map')
                 assert.ok(polyfillsMap?.type === 'asset')
@@ -333,6 +348,19 @@ for (const target of ['wx', 'zfb'] as const) {
         assertPolyfilledApp(native, 'undefined')
         assert.equal(native.read('URL'), URL)
         assert.equal(native.read('URLSearchParams'), URLSearchParams)
+
+        // Execute the real pre-bootstrap graph and application capsule without installing a host globalThis alias.
+        // Native shells' renderer-generated System lookups are a separate integration boundary.
+        const recovered = createAppHeap(chunks, false, target)
+        recovered.read('delete this.globalThis;')
+        recovered.evaluate('common/polyfills.js')
+        assert.equal(recovered.read('typeof globalThis'), 'undefined')
+        assert.equal(recovered.read('typeof URL'), 'function')
+        recovered.evaluate('common/bootstrap.js')
+        recovered.read('System.importSync("app-capsule.js")')
+        assert.equal(recovered.read('polyfillProbe.hostURL'), true)
+        assert.equal(recovered.read('polyfillProbe.hostParams'), true)
+        assert.equal(recovered.read('typeof globalThis'), 'undefined')
     })
 
     for (const mode of ['devtools', 'interpreter', 'rebuild'] as const) {
