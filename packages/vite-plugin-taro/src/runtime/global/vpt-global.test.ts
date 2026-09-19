@@ -267,6 +267,31 @@ test('cleans up after lookup fails on a host that does not inherit Object.protot
     assertDiscoveryFailure('delete this.globalThis; Object.setPrototypeOf(this, null);', 'ReferenceError')
 })
 
+for (const outcome of ['return', 'throw'] as const) {
+    test(`preserves a native cleanup error when host lookup attempts to ${outcome}`, () => {
+        const context = createHeap(`
+            delete this.globalThis;
+            Object.defineProperty(this, '__vpt_global__', {
+                get() {
+                    // Restrict only this realm after recovery installs its temporary getter, forcing cleanup to fail.
+                    Object.freeze(Object.prototype);
+                    ${outcome === 'return' ? 'return this;' : "throw new RangeError('lookup failed');"}
+                }
+            });
+        `)
+        assert.throws(
+            () => runtimeScript.runInContext(context),
+            (error) => {
+                assert.ok(isNativeError(error))
+                assert.equal(error.name, 'TypeError')
+                assert.match(error.message, /Cannot delete property '__vpt_global__'/)
+                assert.equal(error.cause, undefined)
+                return true
+            }
+        )
+    })
+}
+
 // Adapt the old rewriter's behavioral cases to the actual host object, without rewriting any free identifiers.
 for (const state of ['native', 'recovered'] as const) {
     const setup = `"use strict"; this.host = this; ${state === 'recovered' ? 'delete this.globalThis;' : ''}`
