@@ -26,19 +26,21 @@ function getGlobalThis(this: typeof globalThis | void): typeof globalThis {
     // This fallback requires a host that inherits Object.prototype and permits its temporary modification.
     // Separate error translation from cleanup to avoid V8's unreachable catch-to-finally coverage branch.
     try {
-        try {
-            Object.defineProperty(Object.prototype, '__vpt_global__', {
-                get(this: typeof globalThis | undefined) {
-                    return this || self
-                },
-                configurable: true
-            })
+        Object.defineProperty(Object.prototype, '__vpt_global__', {
+            get(this: typeof globalThis | undefined) {
+                return this || self
+            },
+            configurable: true
+        })
 
-            return __vpt_global__
-        } catch (cause) {
-            // Hosts may prohibit prototype changes with preventExtensions, seal, or freeze.
-            throw new Error('Unable to resolve globalThis', { cause })
-        }
+        return __vpt_global__
+    } catch (cause) {
+        // Hosts may prohibit prototype changes with preventExtensions, seal, or freeze.
+        console.error('Unable to resolve globalThis', cause)
+
+        const fakeGlobal = {}
+
+        return fakeGlobal as unknown as typeof globalThis
     } finally {
         delete (Object.prototype as { __vpt_global__?: typeof globalThis }).__vpt_global__
     }
