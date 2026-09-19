@@ -147,9 +147,13 @@ test('public packages preserve their published entrypoints and scaffold dependen
             readFileSync(path.join(projectPath, 'src/app.tsx'), 'utf8'),
             readFileSync(path.join(generatorRoot, 'templates/default/src/app.tsx'), 'utf8')
         )
+        assert.match(readFileSync(path.join(projectPath, '.env.local'), 'utf8'), /^VITE_VPT_TIKTOK_APP_ID=testAppId$/m)
+        assert.match(readFileSync(path.join(projectPath, 'vite.config.ts'), 'utf8'), /env\.VITE_VPT_TIKTOK_APP_ID\b/)
         const project = JSON.parse(readFileSync(path.join(projectPath, 'package.json'), 'utf8'))
         assert.equal(project.name, 'complete-app')
         assert.equal(project.devDependencies['vite-plugin-taro'], `^${creatorPackage.version}`)
+        assert.equal(project.scripts['dev:tt'], 'cross-env NODE_ENV=development VITE_VPT_TARGET=tt vite')
+        assert.equal(project.scripts['build:tt'], 'cross-env NODE_ENV=production VITE_VPT_TARGET=tt vite build')
     })
 
     const manifestGenerator = createManifestGenerator(root, generatorRoot)
@@ -173,7 +177,10 @@ test('public packages preserve their published entrypoints and scaffold dependen
                 assert.equal(project.version, '0.0.0')
                 assert.equal(project.devDependencies['vite-plugin-taro'], `^${version}`)
                 assert.equal(project.devDependencies.vite, '8.3.0')
+                assert.equal(project.devDependencies.rolldown, '1.2.8')
                 assert.ok(output.includes(`  ${packageManager ?? 'npm'} install\n`))
+                const run = packageManager === 'pnpm' || packageManager === 'yarn' ? '' : 'run '
+                assert.ok(output.includes(`  ${packageManager ?? 'npm'} ${run}dev:tt\n`))
                 assert.equal(existsSync(path.join(projectPath, 'pnpm-workspace.yaml')), packageManager === 'pnpm')
                 if (packageManager === 'pnpm') {
                     // Check the emitted policy without launching pnpm's platform-specific command shim.
