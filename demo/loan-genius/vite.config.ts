@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => {
     const target = getTarget(env)
     const wechatAppId = env.VITE_VPT_WECHAT_APP_ID
     const alipayAppId = env.VITE_VPT_ALIPAY_APP_ID
+    const ttAppId = env.VITE_VPT_TIKTOK_APP_ID
 
     return {
         base: target === 'h5' ? './' : undefined,
@@ -42,11 +43,11 @@ export default defineConfig(({ mode }) => {
                     }
                 ],
                 appJson: createAppJson(target),
-                projectConfigJson: createProjectConfigJson({ target, wechatAppId, alipayAppId }),
+                projectConfigJson: createProjectConfigJson({ target, wechatAppId, alipayAppId, ttAppId }),
                 projectPrivateConfigJson: createProjectPrivateConfigJson(target),
                 sitemapJson: { rules: [{ action: 'allow', page: '*' }] },
                 hmr: {
-                    mode: target === 'zfb' ? 'interpreter' : 'devtools'
+                    mode: target === 'wx' ? 'devtools' : 'interpreter'
                 }
             })
         ]
@@ -58,11 +59,11 @@ function getTarget(env: Record<string, string>): VptTarget {
 
     const target = env[targetEnvName]
 
-    if (target === 'wx' || target === 'zfb' || target === 'h5') {
+    if (target === 'wx' || target === 'zfb' || target === 'tt' || target === 'h5') {
         return target
     }
 
-    throw new Error(`${targetEnvName} must be "wx", "zfb", or "h5".`)
+    throw new Error(`${targetEnvName} must be "wx", "zfb", "tt", or "h5".`)
 }
 
 /** Selects only configuration keys supported by the active Mini Program runtime. */
@@ -94,6 +95,13 @@ function createAppJson(target: VptTarget): VptJsonObject {
                 }
             }
         }
+        case 'tt': {
+            return {
+                window: {
+                    navigationStyle: 'custom'
+                }
+            }
+        }
         default:
             return {}
     }
@@ -103,11 +111,13 @@ function createAppJson(target: VptTarget): VptJsonObject {
 function createProjectConfigJson({
     target,
     wechatAppId,
-    alipayAppId
+    alipayAppId,
+    ttAppId
 }: {
     target: VptTarget
     wechatAppId: string
     alipayAppId: string
+    ttAppId: string
 }): VptJsonObject {
     switch (target) {
         case 'wx': {
@@ -160,6 +170,21 @@ function createProjectConfigJson({
                 }
             }
         }
+        case 'tt': {
+            return {
+                appid: ttAppId,
+                projectname: '房贷计算器',
+                miniprogramRoot: './',
+                compileHotReload: true,
+                setting: {
+                    urlCheck: false,
+                    es6: false,
+                    postcss: false,
+                    minified: false,
+                    autoCompile: true
+                }
+            }
+        }
         default:
             return {}
     }
@@ -179,6 +204,13 @@ function createProjectPrivateConfigJson(target: VptTarget): VptJsonObject {
                 ignoreHttpDomainCheck: true,
                 ignoreCertificateDomainCheck: true,
                 ignoreWebViewDomainCheck: true
+            }
+        }
+        case 'tt': {
+            return {
+                setting: {
+                    urlCheck: false
+                }
             }
         }
         default:

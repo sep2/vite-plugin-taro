@@ -8,7 +8,9 @@
 import Taro from 'virtual:taro/api'
 
 export const isAndroid = () => {
-    const { platform, system } = Taro.getDeviceInfo()
+    // TT's split device API is named getDeviceInfoSync; the shared system-info API provides the fields used here.
+    const { platform, system } =
+        import.meta.env.VITE_VPT_TARGET === 'tt' ? Taro.getSystemInfoSync() : Taro.getDeviceInfo()
     const normalizedPlatform = platform.toLowerCase()
     const normalizedSystem = system.toLowerCase()
 

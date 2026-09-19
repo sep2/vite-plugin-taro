@@ -18,6 +18,8 @@ Loan Genius 是 `vite-plugin-taro` 的示例应用。它是一个基于 React 19
 | Node.js | `>=22` |
 | pnpm | `11.x` |
 | 微信开发者工具 | 打开 `dist/wx` 和运行 WX HMR 测试时需要。 |
+| 支付宝小程序开发者工具 | 打开 `dist/zfb` 时需要。 |
+| 抖音开发者工具 | 打开 `dist/tt` 时需要。 |
 | `wechatide` | 仅自动化 WX HMR 测试需要。 |
 
 ## 从全新克隆运行
@@ -72,6 +74,31 @@ pnpm test:loan-genius:hmr
 
 如果已授权的 `wechatide` 客户端名称不是 `Pi`，请设置 `VPT_LOAN_HMR_DEVTOOLS_CLIENT`。
 
+## 支付宝小程序
+
+在 `demo/loan-genius/.env.local` 设置 `VITE_VPT_ALIPAY_APP_ID`，然后在仓库根目录运行：
+
+```sh
+pnpm build:loan-genius:zfb
+pnpm dev:loan-genius:zfb
+```
+
+用支付宝小程序开发者工具导入 `demo/loan-genius/dist/zfb`。
+
+## 抖音小程序（TT）
+
+在 `demo/loan-genius/.env.local` 设置 `VITE_VPT_TIKTOK_APP_ID` 为你的抖音小程序 App ID，然后在仓库根目录运行：
+
+```sh
+pnpm build:loan-genius:tt
+# 或保持开发构建运行：
+pnpm dev:loan-genius:tt
+```
+
+用抖音开发者工具导入 `demo/loan-genius/dist/tt`，不要导入源码目录。TT 使用自定义导航栏和 `interpreter` 热更新，不包含微信的 Skyline 配置。异步通用分包需要基础库 2.86.1+；原生样式热重载需要开发者工具 4.1.4+、基础库 2.98.0.0+。
+
+TT 构建产物有测试覆盖，但渲染和 HMR 状态保留仍需在抖音开发者工具中验证。自动化 IDE HMR 测试仍仅覆盖 WX。
+
 ## H5
 
 启动 H5 开发服务器：
@@ -95,13 +122,13 @@ demo/loan-genius/dist/h5
 
 ## 本示例演示的内容
 
-- 使用同一套 React 19 + Taro 源码同时支持 `wx`、`zfb` 和 `h5`。
+- 使用同一套 React 19 + Taro 源码同时支持 `wx`、`zfb`、`tt` 和 `h5`。
 - 通过 `VITE_VPT_TARGET` 进行 `vite-plugin-taro` 目标选择。
 - 在 `vite.config.ts` 中声明应用和页面元数据。
-- 微信小程序构建产物、H5 开发服务器和 H5 构建产物。
+- 微信、支付宝、抖音小程序构建产物，以及 H5 开发服务器和 H5 构建产物。
 - 从 `src/app.css` 引入 Tailwind CSS v4。
 - 应用侧通过 `virtual:taro/api` 和 `virtual:taro/components` 导入能力。
-- 生成微信 `project.config.json`、`sitemap.json`、WXML、WXS、WXSS 和 CommonJS chunk。
+- 生成 WX 的 WXML/WXS/WXSS、ZFB 的 AXML/SJS/ACSS、TT 的 TTML/SJS/TTSS，以及各目标的原生项目配置和 CommonJS chunk。
 
 应用代码不要直接导入或安装 `@tarojs/*` 包。请改用插件提供的虚拟模块：
 
@@ -114,9 +141,10 @@ import { Text, View } from 'virtual:taro/components'
 
 | 变量 | 是否必需 | 说明 |
 | --- | --- | --- |
-| `VITE_VPT_TARGET` | 是 | 由根目录脚本设置为 `wx`、`zfb` 或 `h5`。 |
+| `VITE_VPT_TARGET` | 是 | 由根目录脚本设置为 `wx`、`zfb`、`tt` 或 `h5`。 |
 | `VITE_VPT_WECHAT_APP_ID` | 否 | 微信小程序 app id。默认值为 `touristappid`。 |
 | `VITE_VPT_ALIPAY_APP_ID` | 否 | 写入 `mini.project.json` 的支付宝小程序 App ID。 |
+| `VITE_VPT_TIKTOK_APP_ID` | TT 开发者工具需要 | 写入 `dist/tt/project.config.json` 的抖音小程序 App ID。 |
 
 如需在本地测试微信小程序，请将 app id 写入 `demo/loan-genius/.env.local`：
 

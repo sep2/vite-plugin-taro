@@ -18,6 +18,8 @@ The app is forked from [`wuba/Taro-Mortgage-Calculator`](https://github.com/wuba
 | Node.js | `>=22` |
 | pnpm | `11.x` |
 | WeChat DevTools | Needed for opening `dist/wx` and running WX HMR tests. |
+| Alipay Mini Program Studio | Needed for opening `dist/zfb`. |
+| TikTok DevTools | Needed for opening `dist/tt`. |
 | `wechatide` | Needed only for the automated WX HMR suite. |
 
 ## Run from a fresh clone
@@ -72,6 +74,31 @@ Fixture edits atomically replace each source file so Vite never observes a trunc
 
 Set `VPT_LOAN_HMR_DEVTOOLS_CLIENT` when the authorized `wechatide` client is not named `Pi`.
 
+## Alipay Mini Program
+
+Set `VITE_VPT_ALIPAY_APP_ID` in `demo/loan-genius/.env.local`, then run from the repository root:
+
+```sh
+pnpm build:loan-genius:zfb
+pnpm dev:loan-genius:zfb
+```
+
+Open `demo/loan-genius/dist/zfb` in Alipay Mini Program Studio.
+
+## TikTok Mini Program (TT)
+
+Set `VITE_VPT_TIKTOK_APP_ID` in `demo/loan-genius/.env.local` to your TikTok Mini Program App ID. From the repository root:
+
+```sh
+pnpm build:loan-genius:tt
+# Or keep the development build running:
+pnpm dev:loan-genius:tt
+```
+
+Open `demo/loan-genius/dist/tt` in TikTok DevTools, not the source directory. TT uses native custom navigation and `interpreter` HMR, without WeChat's Skyline settings. Async common packages require base library 2.86.1+; native style hot reload requires DevTools 4.1.4+ and base library 2.98.0.0+.
+
+TT build output is tested, but rendering and HMR state retention still need validation in TikTok DevTools. The automated IDE HMR suite remains WX-only.
+
 ## H5
 
 Start the H5 dev server:
@@ -95,13 +122,13 @@ demo/loan-genius/dist/h5
 
 ## What this sample demonstrates
 
-- One React 19 + Taro source tree for `wx`, `zfb`, and `h5`.
+- One React 19 + Taro source tree for `wx`, `zfb`, `tt`, and `h5`.
 - `vite-plugin-taro` target selection with `VITE_VPT_TARGET`.
 - App and page metadata declared in `vite.config.ts`.
-- WeChat and Alipay Mini Program output, plus the H5 dev server and production build.
+- WeChat, Alipay, and TikTok Mini Program output, plus the H5 dev server and production build.
 - Tailwind CSS v4 imported from `src/app.css`.
 - App-facing imports from `virtual:taro/api` and `virtual:taro/components`.
-- WX WXML/WXS/WXSS and ZFB AXML/SJS/ACSS skeletons with target-native project files and CommonJS entries.
+- WX WXML/WXS/WXSS, ZFB AXML/SJS/ACSS, and TT TTML/SJS/TTSS skeletons with target-native project files and CommonJS entries.
 
 Application code must not import or install `@tarojs/*` packages directly. Use the plugin virtual modules instead:
 
@@ -114,9 +141,10 @@ import { Text, View } from 'virtual:taro/components'
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `VITE_VPT_TARGET` | Yes | Set by the root scripts to `wx`, `zfb`, or `h5`. |
+| `VITE_VPT_TARGET` | Yes | Set by the root scripts to `wx`, `zfb`, `tt`, or `h5`. |
 | `VITE_VPT_WECHAT_APP_ID` | No | WeChat Mini Program app id. Defaults to `touristappid`. |
 | `VITE_VPT_ALIPAY_APP_ID` | No | Alipay Mini Program app id written to `mini.project.json`. |
+| `VITE_VPT_TIKTOK_APP_ID` | For TT DevTools | TikTok Mini Program App ID written to `dist/tt/project.config.json`. |
 
 For local WeChat testing, put your app id in `demo/loan-genius/.env.local`:
 
