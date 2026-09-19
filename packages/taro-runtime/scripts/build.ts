@@ -8,7 +8,11 @@ const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const distRoot = path.join(packageRoot, 'dist')
 const runtimeCjsFilePattern = /^index\.cjs\.(?:d\.ts|js(?:\.map)?)$/
 const platformModules = ['runtime', 'components-react', 'runtime-utils'] as const
-const platformPackages = ['@tarojs/plugin-platform-weapp', '@tarojs/plugin-platform-alipay'] as const
+const platformPackages = [
+    '@tarojs/plugin-platform-weapp',
+    '@tarojs/plugin-platform-alipay',
+    '@tarojs/plugin-platform-tt'
+] as const
 
 build()
 

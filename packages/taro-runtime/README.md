@@ -8,7 +8,7 @@ This is an internal support package. Applications should install `vite-plugin-ta
 
 ## Architecture
 
-The package build consumes pinned development dependencies for Taro's runtime, generic APIs, Taro facade, components, router, H5 APIs, React renderer, React framework runtime, and WX, Alipay, and H5 platform packages. It emits only the application runtime files used by VPT, so Taro's compiler packages do not become production dependencies of generated projects.
+The package build consumes pinned development dependencies for Taro's runtime, generic APIs, Taro facade, components, router, H5 APIs, React renderer, React framework runtime, and WX, Alipay, TT (Douyin/ByteDance), and H5 platform packages. It emits only the application runtime files used by VPT, so Taro's compiler packages do not become production dependencies of generated projects.
 
 Output directories and exports mirror the upstream Taro package names (`runtime`, `api`, `taro`, `components`, `router`, `taro-h5`, `react`, `plugin-framework-react`, and each `plugin-platform-*` package). The upstream ESM runtime graph is copied unchanged while the unexported CommonJS duplicate is omitted. Its entries are exposed through the explicit `runtime/mini` and `runtime/h5` export names. Application builds therefore load only the selected package entry and retain normal Rolldown tree-shaking.
 

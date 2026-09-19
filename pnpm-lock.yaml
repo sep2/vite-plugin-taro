@@ -298,6 +298,9 @@ importers:
       '@tarojs/plugin-platform-h5':
         specifier: 4.2.1
         version: 4.2.1(@tarojs/taro@4.2.1(@tarojs/components@4.2.1(@tarojs/helper@4.2.1(supports-color@7.2.0))(@types/react@19.3.0)(postcss@8.5.28))(@tarojs/helper@4.2.1(supports-color@7.2.0))(@tarojs/shared@4.2.1)(@types/react@19.3.0)(postcss@8.5.28))(@types/react@19.3.0)(postcss@8.5.28)(react@19.3.0)(solid-js@1.9.13)(supports-color@7.2.0)
+      '@tarojs/plugin-platform-tt':
+        specifier: 4.2.1
+        version: 4.2.1(@tarojs/service@4.2.1(supports-color@7.2.0))(@tarojs/shared@4.2.1)
       '@tarojs/plugin-platform-weapp':
         specifier: 4.2.1
         version: 4.2.1(@tarojs/service@4.2.1(supports-color@7.2.0))(@tarojs/shared@4.2.1)
@@ -2323,6 +2326,13 @@ packages:
 
   '@tarojs/plugin-platform-h5@4.2.1':
     resolution: {integrity: sha512-dSq83kvWokaju7gfPyddQCzjCd9gi57T5YNQqXkfqLLEPHnR3xfZHN2qdO3Vf6Qjob3woms/hEwIi4HUFWOTgg==}
+
+  '@tarojs/plugin-platform-tt@4.2.1':
+    resolution: {integrity: sha512-Q09Tu8R1T8BF2j5XwFRehh9JAoWLLSwPFDApqanjIsNAv6VpUzw3jGyxxKxRSonUaAP95jneqbZYbScmYy1O6g==}
+    engines: {node: '>= 18'}
+    peerDependencies:
+      '@tarojs/service': 4.2.1
+      '@tarojs/shared': 4.2.1
 
   '@tarojs/plugin-platform-weapp@4.2.1':
     resolution: {integrity: sha512-5XKHqGAQLqd7JQJcM3OVZXOJJXo0IX8O4CZpQ0U1cuTTkfamQU+GEV/XmYNJ8kNxO/KASNQ/rDVkcMGMX2LqEQ==}
@@ -4996,6 +5006,10 @@ packages:
     resolution: {integrity: sha512-+4zXKdx7UnO+1jaN4l2lHVD+mFvnlZQP/6ljaJVb4SZiwIKeUnrT5l0gkT8z+n4hKpC+jpOv6O9R+gLtag7pSA==}
     engines: {node: '>=10.0.0'}
 
+  webpack-sources@3.5.1:
+    resolution: {integrity: sha512-jyuiGJdtvY434z5bUZrjz67v76/ePNvFZTp9Mdz29IlH4+GPsgyGjiv0fKI+M7BdkU6ADjulUcKAd3tUK3WlEw==}
+    engines: {node: '>=10.13.0'}
+
   whatwg-fetch@3.6.20:
     resolution: {integrity: sha512-EqhiFU6daOA8kpjOWTL0olhVOF3i7OrFzSYiGsEMB8GcXS+RrzauAERX65xMeNWVqxA6HXH2m69Z9LaKKdisfg==}
 
@@ -6832,6 +6846,12 @@ snapshots:
       - webpack
       - webpack-chain
       - webpack-dev-server
+
+  '@tarojs/plugin-platform-tt@4.2.1(@tarojs/service@4.2.1(supports-color@7.2.0))(@tarojs/shared@4.2.1)':
+    dependencies:
+      '@tarojs/service': 4.2.1(supports-color@7.2.0)
+      '@tarojs/shared': 4.2.1
+      webpack-sources: 3.5.1
 
   '@tarojs/plugin-platform-weapp@4.2.1(@tarojs/service@4.2.1(supports-color@7.2.0))(@tarojs/shared@4.2.1)':
     dependencies:
@@ -10065,6 +10085,8 @@ snapshots:
       clone-deep: 4.0.1
       flat: 5.0.2
       wildcard: 2.0.1
+
+  webpack-sources@3.5.1: {}
 
   whatwg-fetch@3.6.20: {}
 
