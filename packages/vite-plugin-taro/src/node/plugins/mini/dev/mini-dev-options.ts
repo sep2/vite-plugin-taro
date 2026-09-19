@@ -5,6 +5,7 @@ import { type DevEngine, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
 import { memoize } from '../../../utils/memoize.ts'
 import type { MiniContract } from '../mini-contract.ts'
+import { vptGlobalId } from '../module/module.ts'
 import type { MiniHmrMode } from './hmr-mode.ts'
 
 type BundledDevRolldownOptions = InputOptions & {
@@ -177,10 +178,11 @@ function createViteReporter(server: ViteDevServer) {
  * nested builds without leaking mutable Rolldown output objects between engines.
  */
 const bundleRuntimeSource = memoize(async function bundleRuntimeSource(runtimeFile: string): Promise<string> {
-    // The runtime entries install protocol state on `globalThis`. This nested build only closes their imports because Rolldown
-    // injects the resulting implementation into a generated runtime chunk where module imports are unavailable.
+    // Rolldown inserts this self-contained implementation after the application's source injection. Apply the same global
+    // discovery here, without importing the application bootstrap or its HMR-dependent global entry during runtime startup.
     const result = await build({
         input: runtimeFile,
+        transform: { inject: { globalThis: [vptGlobalId, 'vptGlobal'] } },
         output: {
             format: 'iife',
             // The combined physical runtime owns final minification, so minifying this embedded source would duplicate work.
@@ -190,5 +192,7 @@ const bundleRuntimeSource = memoize(async function bundleRuntimeSource(runtimeFi
         // write: false keeps this nested helper build from creating a second dist directory in the application project.
         write: false
     })
+
+    // Keep the native probe opaque until the assembled runtime's existing lowering pass restores it after injection.
     return result.output[0].code
 })

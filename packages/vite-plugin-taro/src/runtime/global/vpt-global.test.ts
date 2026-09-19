@@ -13,11 +13,11 @@ const moduleSource = stripTypeScriptTypes(await readFile(filename, 'utf8')).repl
     nativePlaceholder,
     'globalThis'.padEnd(nativePlaceholder.length)
 )
-// ESM is strict. Strip its export and replace the opening comment without shifting any runtime source offsets.
+// ESM is strict. Replace its first comment, after erased types, without shifting any runtime source offsets.
 const runtimeScript = new Script(
     moduleSource
         .replace(/^export /gm, '       ')
-        .replace(/^\/\/[^\n]*/, (comment) => '"use strict";'.padEnd(comment.length)),
+        .replace(/^\/\/[^\n]*/m, (comment) => '"use strict";'.padEnd(comment.length)),
     { filename }
 )
 
@@ -28,38 +28,39 @@ function createHeap(setup: string) {
     return context
 }
 
-function assertDiscoveryFallback(context: ReturnType<typeof createHeap>): unknown {
+function assertDiscoveryFallback(context: ReturnType<typeof createHeap>, cacheKey: string | symbol): unknown {
     // Capture diagnostics only in this isolated heap, without changing the test runner's console.
     const errors: unknown[][] = []
     context.console = { error: (...args: unknown[]) => errors.push(args) }
+    context.cacheKey = cacheKey
     runtimeScript.runInContext(context)
     const fallback: unknown = new Script('vptGlobal').runInContext(context)
     assert.ok(fallback && typeof fallback === 'object')
-    const keys = Reflect.ownKeys(fallback)
-    assert.equal(keys.length, 1)
-    const [marker] = keys
-    assert.ok(typeof marker === 'symbol')
-    assert.equal(marker.description, 'fallback')
-    assert.equal(Symbol.keyFor(marker), undefined)
-    const cause: unknown = Reflect.get(fallback, marker)
-    assert.deepEqual(errors, [['Unable to resolve globalThis', cause]])
-    assert.deepEqual(Object.getOwnPropertyDescriptor(fallback, marker), {
-        value: cause,
-        writable: true,
-        enumerable: true,
-        configurable: true
-    })
+    assert.deepEqual(Reflect.ownKeys(fallback), [])
+    assert.equal(errors.length, 1)
+    const [message, cause] = errors[0]
+    assert.equal(message, 'Unable to resolve globalThis')
     new Script(`
         assert.equal(Object.hasOwn(Object.prototype, '__vpt_global__'), false);
         assert.notEqual(vptGlobal, this);
         assert.equal(Object.getPrototypeOf(vptGlobal), Object.prototype);
         assert.equal(typeof globalThis, 'undefined');
         assert.equal(vptGlobal.Math, undefined);
-        // A fallback is a writable local object, not a recovered host or a copy of its built-ins.
+        assert.deepEqual(Object.getOwnPropertyDescriptor(Object, cacheKey), {
+            value: vptGlobal,
+            writable: false,
+            enumerable: false,
+            configurable: false
+        });
+        // A fallback is writable, but it does not copy built-ins or turn its properties into host bindings.
         vptGlobal.fixtureValue = 42;
-        assert.equal(vptGlobal.fixtureValue, 42);
+        assert.equal(getGlobalThis(), vptGlobal);
+        assert.equal(getGlobalThis().fixtureValue, 42);
         assert.equal(Object.hasOwn(this, 'fixtureValue'), false);
+        assert.equal(Object.hasOwn(Object.prototype, '__vpt_global__'), false);
     `).runInContext(context)
+    assert.equal(errors.length, 3, 'Each failed discovery reports its cause, even when the fallback is cached')
+    assert.ok(errors.every(([message]) => message === 'Unable to resolve globalThis'))
     return cause
 }
 
@@ -255,33 +256,60 @@ for (const name of ['globalThis', 'self', 'window']) {
     })
 }
 
-test('logs an arbitrary lookup cause, retains it on the fallback and removes only the temporary getter', () => {
+test('logs an arbitrary lookup cause and removes only the temporary getter', () => {
     const context = createHeap(`
         delete this.globalThis;
         this.failure = { reason: 'host lookup failed' };
         Object.defineProperty(this, '__vpt_global__', { get() { throw failure; }, configurable: true });
         const descriptor = Object.getOwnPropertyDescriptor(this, '__vpt_global__');
     `)
-    assert.strictEqual(assertDiscoveryFallback(context), context.failure)
+    assert.strictEqual(assertDiscoveryFallback(context, Symbol.for('vpt.fake.global')), context.failure)
     new Script(`
         assert.deepEqual(Object.getOwnPropertyDescriptor(this, '__vpt_global__'), descriptor);
     `).runInContext(context)
 })
 
 for (const restriction of ['preventExtensions', 'seal', 'freeze']) {
-    test(`returns a diagnostic fallback when Object.${restriction} blocks discovery`, () => {
+    test(`returns a shared empty fallback when Object.${restriction} blocks discovery`, () => {
         const context = createHeap(`delete this.globalThis; Object.${restriction}(Object.prototype);`)
-        const cause = assertDiscoveryFallback(context)
+        const cause = assertDiscoveryFallback(context, Symbol.for('vpt.fake.global'))
         assert.ok(isNativeError(cause))
         assert.equal(cause.name, 'TypeError')
     })
 }
 
-test('returns a diagnostic fallback and cleans up when the host does not inherit Object.prototype', () => {
+test('returns a shared empty fallback and cleans up when the host does not inherit Object.prototype', () => {
     const context = createHeap('delete this.globalThis; Object.setPrototypeOf(this, null);')
-    const cause = assertDiscoveryFallback(context)
+    const cause = assertDiscoveryFallback(context, Symbol.for('vpt.fake.global'))
     assert.ok(isNativeError(cause))
     assert.equal(cause.name, 'ReferenceError')
+})
+
+for (const setup of ['delete this.Symbol;', 'this.Symbol = undefined;', 'Symbol.for = undefined;']) {
+    test(`shares the fallback through a string key when ${setup}`, () => {
+        const context = createHeap(`delete this.globalThis; Object.freeze(Object.prototype); ${setup}`)
+        const cause = assertDiscoveryFallback(context, 'vpt.fake.global')
+        assert.ok(isNativeError(cause))
+        assert.equal(cause.name, 'TypeError')
+    })
+}
+
+test('propagates cache installation failure when the Object constructor is not extensible', () => {
+    const context = createHeap('delete this.globalThis; Object.freeze(Object.prototype); Object.freeze(Object);')
+    // Suppress only this heap's expected discovery diagnostic; the cache failure itself must remain observable.
+    context.console = { error() {} }
+    assert.throws(
+        () => runtimeScript.runInContext(context),
+        (error) => {
+            assert.ok(isNativeError(error))
+            assert.equal(error.name, 'TypeError')
+            return true
+        }
+    )
+    new Script(`
+        assert.equal(Object.hasOwn(Object, Symbol.for('vpt.fake.global')), false);
+        assert.equal(Object.hasOwn(Object.prototype, '__vpt_global__'), false);
+    `).runInContext(context)
 })
 
 test('cleans up the temporary getter even when fallback logging throws', () => {
@@ -306,6 +334,7 @@ test('cleans up the temporary getter even when fallback logging throws', () => {
     new Script(`
         assert.equal(Object.hasOwn(Object.prototype, '__vpt_global__'), false);
         assert.deepEqual(Object.getOwnPropertyDescriptor(this, '__vpt_global__'), descriptor);
+        assert.equal(Object.hasOwn(Object, Symbol.for('vpt.fake.global')), false);
     `).runInContext(context)
 })
 

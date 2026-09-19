@@ -319,6 +319,64 @@ for (const minify of [false, true]) {
     })
 }
 
+for (const { name, setup } of [
+    { name: 'frozen prototype', setup: 'Object.freeze(Object.prototype);' },
+    { name: 'null-prototype host', setup: 'Object.setPrototypeOf(this, null);' }
+]) {
+    test(`independent bundles share one fallback in the same realm: ${name}`, async () => {
+        const sources = new Map([[entryId, 'export const root = globalThis;']])
+        const [first, second] = await Promise.all([
+            bundleFixture(sources, [entryId], false),
+            bundleFixture(sources, [entryId], true)
+        ])
+        // Separate file roots force independent evaluation of both compiled providers, not CommonJS cache reuse.
+        const chunks = [
+            ...first.chunks.map((chunk) => ({ ...chunk, fileName: `first/${chunk.fileName}` })),
+            ...second.chunks.map((chunk) => ({ ...chunk, fileName: `second/${chunk.fileName}` }))
+        ]
+        const hostSetup = `
+            delete this.globalThis;
+            // This heap-local journal captures failed discovery independently of fallback cache reuse.
+            this.diagnostics = [];
+            this.console = { error: (...args) => diagnostics.push(args) };
+            ${setup}
+        `
+        const heap = createBundleHeap(chunks, hostSetup)
+        heap.context.first = heap.load(`first/${first.entry.fileName}`)
+        heap.run(`
+            first.root.fixtureValue = 42;
+            // A cached fallback remains readable even if the constructor is locked after its creation.
+            Object.freeze(Object);
+        `)
+        heap.context.second = heap.load(`second/${second.entry.fileName}`)
+        heap.run(`
+            assert.equal(first.root, second.root);
+            assert.notEqual(first.root, host);
+            assert.equal(second.root.fixtureValue, 42);
+            assert.equal(discoveries, 2, 'Both bundled initializers must actually execute');
+            assert.equal(diagnostics.length, 2);
+            assert.ok(diagnostics.every(([message, cause]) =>
+                message === 'Unable to resolve globalThis' && cause instanceof Error
+            ));
+            assert.deepEqual(Reflect.ownKeys(first.root), ['fixtureValue']);
+            assert.deepEqual(Object.getOwnPropertyDescriptor(Object, Symbol.for('vpt.fake.global')), {
+                value: first.root,
+                writable: false,
+                enumerable: false,
+                configurable: false
+            });
+            assert.equal(Object.hasOwn(Object.prototype, '__vpt_global__'), false);
+            assert.equal(typeof globalThis, 'undefined');
+            assert.equal(typeof fixtureValue, 'undefined');
+        `)
+
+        const otherHeap = createBundleHeap(chunks, hostSetup)
+        otherHeap.context.first = otherHeap.load(`first/${first.entry.fileName}`)
+        assert.notStrictEqual(otherHeap.run('first.root'), heap.run('first.root'), 'Caches must remain realm-local')
+        assert.equal(otherHeap.run('first.root.fixtureValue'), undefined)
+    })
+}
+
 test('local globalThis bindings, property names, text and comments never trigger injection', async () => {
     const comment = '/*! globalThis and __VPT_NATIVE_GLOBAL_THIS__ must remain text. */'
     const sources = new Map([

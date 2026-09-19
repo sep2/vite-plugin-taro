@@ -83,6 +83,15 @@ function createRenderedChunk(name: string, fileName: string): RenderedChunk {
     }
 }
 
+/** Injection finishes here; native-probe restoration belongs to the assembled runtime's existing lowering pass. */
+function assertRuntimeInjection(source: unknown): void {
+    assert.ok(typeof source === 'string')
+    assert.match(source, /__VPT_NATIVE_GLOBAL_THIS__/)
+    assert.match(source, /Reflect\.set\(vptGlobal,\s*['"`]__rolldown_runtime__['"`]/)
+    assert.match(source, /Reflect\.get\(vptGlobal,/)
+    assert.doesNotMatch(source, /Reflect\.(?:get|set)\((?:globalThis|wx|my),/)
+}
+
 test('adapts physical wx development output without changing configured filenames', async (context) => {
     const configuredChunkFileNames = (chunk: PreRenderedChunk): string => `chunks/${chunk.name}.[hash].js`
     const configuredOutput: OutputOptions = {
@@ -144,9 +153,7 @@ test('adapts physical wx development output without changing configured filename
     assert.equal(devMode.retainedFixtureOption, 'retained')
     assert.equal(devMode.lazy, false)
     assert.equal(devMode.skipCommonRuntimeInjection, false)
-    assert.equal(typeof devMode.implement, 'string')
-    assert.match(String(devMode.implement), /Reflect\.set\(globalThis,\s*['"`]__rolldown_runtime__['"`]/)
-    assert.match(String(devMode.implement), /Reflect\.get\(globalThis,/)
+    assertRuntimeInjection(devMode.implement)
 
     const banner = output.banner
     assert.equal(typeof banner, 'function')
@@ -164,7 +171,7 @@ test('adapts physical wx development output without changing configured filename
     assert.equal(await banner(createRenderedChunk('assets/vendor.js', 'assets/vendor.js')), '')
 })
 
-test('installs the Alipay HMR adapter on the real Mini Program JavaScript global', async (context) => {
+test('injects the shared global into the Alipay HMR implementation', async (context) => {
     const contract = createZfbMiniContract({
         target: 'zfb',
         app: 'src/app.tsx',
@@ -193,9 +200,7 @@ test('installs the Alipay HMR adapter on the real Mini Program JavaScript global
     const devMode = adapted.experimental?.devMode
 
     assert.ok(devMode && typeof devMode === 'object')
-    assert.match(String(devMode.implement), /Reflect\.set\(globalThis,\s*['"`]__rolldown_runtime__['"`]/)
-    assert.match(String(devMode.implement), /Reflect\.get\(globalThis,/)
-    assert.doesNotMatch(String(devMode.implement), /Reflect\.(?:get|set)\(my,/)
+    assertRuntimeInjection(devMode.implement)
 })
 
 test('leaves naming unspecified when Vite has no configured output', async (context) => {

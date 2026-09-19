@@ -83,7 +83,6 @@ async function compileFixture(
                     [vptGlobalId],
                     'the native probe must remain isolated from every application and framework binding'
                 )
-                assert.doesNotMatch(globalEntry.code, /__VPT_NATIVE_GLOBAL_THIS__/)
                 const hasPolyfills = polyfills.length > 0
                 const polyfillChunks = chunks.filter((chunk) =>
                     chunk.moduleIds.some((id) => normalizePath(id).startsWith(coreJsRoot))
@@ -101,6 +100,8 @@ async function compileFixture(
                 )
                 // Alipay rejects import() at compile time, even inside an unused React Refresh export that Node can parse.
                 for (const chunk of chunks) {
+                    // Both the isolated global entry and generated HMR runtime must restore their native probes.
+                    assert.doesNotMatch(chunk.code, /__VPT_NATIVE_GLOBAL_THIS__/, chunk.fileName)
                     const parsed = parseSync(chunk.fileName, chunk.code)
                     assert.deepEqual(parsed.errors, [])
                     walk(parsed.program, {
@@ -370,36 +371,65 @@ for (const target of ['wx', 'zfb'] as const) {
     })
 
     for (const mode of ['devtools', 'interpreter', 'rebuild'] as const) {
-        test(`${target}: ${mode} installs optional APIs before the app and exposes them to HMR`, async () => {
+        test(`${target}: ${mode} installs optional APIs before the app and exposes them to HMR`, async (t) => {
             const chunks = await compileFixture(target, mode, [
                 ...optionalPolyfills,
                 'web.structured-clone',
                 'web.queue-microtask'
             ])
             assertPolyfilledBootstrap(chunks, target, 'function')
-            const heap = createAppHeap(chunks, false, target)
-            assertPolyfilledApp(heap, 'function')
-            assert.equal(heap.read('typeof queueMicrotask'), 'function')
-            if (mode === 'interpreter') {
-                heap.read(`
-                    __rolldown_runtime__.registerGraph({ ids: ['probe'], localCount: 1, edges: [[]], dynamicEdges: [[]] });
-                    __rolldown_runtime__.registerModule('probe', { exports: {} });
-                    __rolldown_runtime__.createModuleHotContext('probe').accept();
-                `)
-                heap.sendPatch(`
-                    __rolldown_runtime__.registerFactory('probe', 'esm', function(moduleId) {
-                        __rolldown_runtime__.registerModule(moduleId, { exports: {
-                            href: new URL('child', 'https://example.com/dir/page').href,
-                            clone: structuredClone({ value: [1, 2].at(-1) })
-                        } });
-                        __rolldown_runtime__.createModuleHotContext(moduleId).accept();
-                    });
-                `)
-                assert.deepEqual(heap.json('__rolldown_runtime__.loadExports("probe")'), {
-                    href: 'https://example.com/dir/child',
-                    clone: { value: 2 }
+            // Reuse the emitted graph, but give every host configuration its own heap and CommonJS cache.
+            // Each case requires successful startup; asserting the current exception would hide the missing runtime binding.
+            for (const { name, setup, globalType } of [
+                { name: 'native globalThis', setup: '', globalType: 'object' },
+                { name: 'deleted globalThis', setup: 'delete this.globalThis;', globalType: 'undefined' },
+                { name: 'shadowed globalThis', setup: 'let globalThis;', globalType: 'undefined' }
+            ]) {
+                await t.test(name, () => {
+                    const heap = createAppHeap(chunks, false, target)
+                    heap.read(setup)
+                    assert.equal(heap.read('typeof globalThis'), globalType)
+                    // Record the install target inside this heap, then restore Reflect before exercising any HMR patches.
+                    heap.read(`
+                        let runtimeGlobal;
+                        const nativeReflectSet = Reflect.set;
+                        Reflect.set = (target, key, ...args) => {
+                            if (key === '__rolldown_runtime__') {
+                                runtimeGlobal = target;
+                            }
+                            return nativeReflectSet(target, key, ...args);
+                        };
+                    `)
+                    assertPolyfilledApp(heap, 'function')
+                    heap.read('Reflect.set = nativeReflectSet;')
+                    const globalEntry = heap.evaluate('common/vpt-global.js')
+                    assert.ok(globalEntry && typeof globalEntry === 'object')
+                    assert.strictEqual(Reflect.get(globalEntry, 'vptGlobal'), heap.read('runtimeGlobal'))
+                    assert.strictEqual(heap.read('runtimeGlobal'), heap.read('this'))
+                    assert.equal(heap.read('typeof queueMicrotask'), 'function')
+                    if (mode === 'interpreter') {
+                        heap.read(`
+                            __rolldown_runtime__.registerGraph({ ids: ['probe'], localCount: 1, edges: [[]], dynamicEdges: [[]] });
+                            __rolldown_runtime__.registerModule('probe', { exports: {} });
+                            __rolldown_runtime__.createModuleHotContext('probe').accept();
+                        `)
+                        heap.sendPatch(`
+                            __rolldown_runtime__.registerFactory('probe', 'esm', function(moduleId) {
+                                __rolldown_runtime__.registerModule(moduleId, { exports: {
+                                    href: new URL('child', 'https://example.com/dir/page').href,
+                                    clone: structuredClone({ value: [1, 2].at(-1) })
+                                } });
+                                __rolldown_runtime__.createModuleHotContext(moduleId).accept();
+                            });
+                        `)
+                        assert.deepEqual(heap.json('__rolldown_runtime__.loadExports("probe")'), {
+                            href: 'https://example.com/dir/child',
+                            clone: { value: 2 }
+                        })
+                        assert.ok(heap.reports.some((report) => JSON.parse(report).data.kind === 'applied'))
+                    }
+                    assert.equal(heap.read('typeof globalThis'), globalType, 'startup must not install a host alias')
                 })
-                assert.ok(heap.reports.some((report) => JSON.parse(report).data.kind === 'applied'))
             }
         })
     }
