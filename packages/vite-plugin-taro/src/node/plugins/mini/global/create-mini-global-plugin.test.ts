@@ -146,8 +146,10 @@ for (const command of ['serve', 'build'] as const) {
     }
 }
 
-for (const minify of [false, true]) {
-    test(`the runtime owner initializes its binding before co-located graph registrations, minify ${minify}`, async (t) => {
+for (const { minify, pathStyle } of [false, true].flatMap((minify) =>
+    (['posix', 'win32'] as const).map((pathStyle) => ({ minify, pathStyle }))
+)) {
+    test(`the runtime owner initializes its binding before co-located graph registrations, ${pathStyle} paths, minify ${minify}`, async (t) => {
         const [owner, ownerDev] = createMiniGlobalPlugin({
             getPhysicalChunkId(chunk) {
                 assert.ok(typeof chunk !== 'string')
@@ -210,7 +212,8 @@ for (const minify of [false, true]) {
             input: 'combined',
             external: (id) => id !== 'combined',
             plugins: [{ name: 'test:execute-owner', resolveId: (id) => id, load: () => chunk.code }],
-            output: { format: 'cjs' },
+            // Exercise both separator styles on every host, including Windows external paths from this second build.
+            output: { format: 'cjs', paths: (id) => id.replaceAll('\\', '/').replaceAll('/', path[pathStyle].sep) },
             write: false
         })
         const executable = native.output[0]
@@ -245,7 +248,7 @@ for (const minify of [false, true]) {
                     return runtime
                 },
                 require(request: string) {
-                    assert.equal(path.posix.normalize(request), 'common/vpt-global.js')
+                    assert.equal(path.posix.normalize(request.replaceAll('\\', '/')), 'common/vpt-global.js')
                     return { vptGlobal: shared }
                 }
             },
