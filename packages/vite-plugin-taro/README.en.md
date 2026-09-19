@@ -9,7 +9,7 @@
 
 [简体中文](README.md) | English
 
-Build WeChat, Alipay, TikTok (`tt`) Mini Programs, and Web apps with Vite 8, React 19, Taro 4, and Tailwind CSS v4.
+Build WeChat, Alipay, TikTok Mini Programs, and Web apps with Vite 8, React 19, Taro 4, and Tailwind CSS v4.
 
 Website: <https://vpt.js.org>
 

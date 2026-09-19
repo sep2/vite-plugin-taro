@@ -9,7 +9,7 @@
 
 简体中文 | [English](README.en.md)
 
-使用 Vite 8、React 19、Taro 4 和 Tailwind CSS v4 构建微信小程序、支付宝小程序、抖音小程序（`tt`）与 Web 应用。
+使用 Vite 8、React 19、Taro 4 和 Tailwind CSS v4 构建微信、支付宝、抖音小程序与 Web 应用。
 
 官网：<https://vpt.js.org>
 
