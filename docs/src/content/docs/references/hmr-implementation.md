@@ -289,15 +289,17 @@ React 项目的更新边界通常由 `@vitejs/plugin-react` 生成，vpt 不另�
 
 1. 为 React Reconciler 添加 Refresh 运行时的静态导入，在渲染器注册前完成初始化；
 2. 在 Refresh 运行时模块末尾调用 `injectIntoGlobalHook(globalThis)`，把 React DevTools Hook 安装到 JavaScript 全局对象；
-3. 在同一个模块中初始化 Taro `window` 上的 `$RefreshReg$` 和 `$RefreshSig$`，补齐浏览器 HTML 前置脚本的职责。
+3. 通过仅在小程序开发模式启用的 `define`，把 Refresh 的四个 `window.*` 协议属性映射到 `globalThis.*`。运行时与生成的组件边界共享同一个全局对象，不移除边界的前置检查。
+
+前置初始化编译后为：
 
 ```js
 injectIntoGlobalHook(globalThis);
-window.$RefreshReg$ = () => {};
-window.$RefreshSig$ = () => (type) => type;
+globalThis.$RefreshReg$ = () => {};
+globalThis.$RefreshSig$ = () => (type) => type;
 ```
 
-这里的 `window` 由 Rolldown 的 `transform.inject` 绑定到 Taro 运行时导出的对象，不是宿主的 `globalThis`。Refresh 运行时与组件边界使用同一个 Taro `window`；组件边界静态导入 Refresh 运行时，因此首次执行前已经完成前置初始化，后续增量更新复用已初始化的运行时。
+映射仅覆盖 `$RefreshReg$`、`$RefreshSig$`、`__registerBeforePerformReactRefresh` 和 `__getReactRefreshIgnoredExports`。VPT 不会创建或整体替换 `window`；普通 `window`、`typeof window`、`window.document` 以及局部声明的 `window` 保持原有语义。生产构建和 H5 不启用这些映射。
 
 边界兼容时，React Refresh 在原有 React 树上更新组件，所以 Hook 状态得以保留。组件类型、Hook 顺序或导出形状不兼容时，Refresh 可以重新挂载局部组件；如果边界主动使本次模块更新失效，运行时会请求完整构建。
 

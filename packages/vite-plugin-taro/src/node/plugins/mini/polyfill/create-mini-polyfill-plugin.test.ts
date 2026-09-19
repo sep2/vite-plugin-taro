@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
 import { runInNewContext } from 'node:vm'
+import { build as bundle } from 'rolldown'
 import { build, normalizePath, resolveConfig } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { packageRequire } from '../../../utils/packages.ts'
@@ -44,6 +45,7 @@ for (const polyfills of [
         const inject = config.build.rolldownOptions.transform?.inject
         assert.deepEqual(inject, miniBrowserBindings)
         assert.ok(inject)
+        assert.equal(Object.hasOwn(inject, 'window'), false)
         assert.equal(Object.hasOwn(inject, 'URL'), false)
         assert.equal(Object.hasOwn(inject, 'URLSearchParams'), false)
         const plugin = config.plugins.find((plugin) => plugin.name === 'vpt:mini-polyfills')
@@ -57,6 +59,58 @@ for (const polyfills of [
                 .map((name) => `import ${JSON.stringify(packageRequire.resolve(`core-js/modules/${name}.js`))};`)
                 .join('\n')
         )
+    })
+}
+
+for (const target of ['wx', 'zfb'] as const) {
+    test(`${target}: window remains a native free binding without importing Taro`, async () => {
+        const config = await resolvePolyfillConfig(target, [], 'build')
+        const entry = '/fixture/native-window.js'
+        const result = await bundle({
+            input: entry,
+            plugins: [
+                {
+                    name: 'test:native-window',
+                    resolveId: (id) => (id === entry ? entry : undefined),
+                    load: (id) =>
+                        id === entry
+                            ? `
+                    export const kind = typeof window;
+                    export function read() { return window; }
+                    export function local(window) { return window; }
+                `
+                            : undefined
+                }
+            ],
+            transform: config.build.rolldownOptions.transform,
+            output: { format: 'cjs' },
+            write: false
+        })
+        const chunk = result.output[0]
+        assert.ok(chunk?.type === 'chunk')
+        assert.deepEqual(chunk.moduleIds, [entry])
+        for (const available of [false, true]) {
+            const nativeWindow = { native: true }
+            // Only the emitted CommonJS module populates this execution-local exports object.
+            const exports: Record<string, unknown> = {}
+            runInNewContext(
+                chunk.code,
+                { exports, ...(available ? { window: nativeWindow } : {}) },
+                {
+                    contextCodeGeneration: { strings: false, wasm: false }
+                }
+            )
+            assert.equal(exports.kind, available ? 'object' : 'undefined')
+            const read = exports.read
+            assert.ok(typeof read === 'function')
+            if (available) {
+                assert.equal(read(), nativeWindow)
+            } else {
+                assert.throws(() => read(), { name: 'ReferenceError', message: 'window is not defined' })
+            }
+            assert.ok(typeof exports.local === 'function')
+            assert.equal(exports.local('local'), 'local')
+        }
     })
 }
 
@@ -91,6 +145,7 @@ test('the content precheck admits browser bindings and both Unicode escape spell
     assert.ok(filter && !Array.isArray(filter) && filter.code instanceof RegExp)
     assert.equal(filter.code.test('module.exports = Object.keys'), false)
     assert.equal(filter.code.test('const documentInfo = 1'), false)
+    assert.equal(filter.code.test('module.exports = typeof window'), false)
     for (const name of Object.keys(miniBrowserBindings)) {
         assert.equal(filter.code.test(`module.exports = ${name}`), true, name)
     }
@@ -105,17 +160,18 @@ test('native filters dispatch only physical core-js sources that may reference b
         ),
         [`${coreJsRoot}/internals/vpt-escaped.js`, String.raw`export const value = [wi\u006Edow, do\u{63}ument]`],
         [`${coreJsRoot}/internals/vpt-query.js?import`, 'export const value = document'],
-        [`${coreJsRoot}/internals/vpt-local.js`, 'export function identity(window) { return window }'],
+        [`${coreJsRoot}/internals/vpt-local.js`, 'export function identity(document) { return document }'],
         [`${coreJsRoot}/internals/vpt-text.js`, "export const value = 'window navigator'"]
     ])
     const sources: ReadonlyMap<string, string> = new Map([
         ...eligibleSources,
         [`${coreJsRoot}/internals/vpt-no-host.js`, 'export const value = Object.keys({})'],
         [`${coreJsRoot}/internals/vpt-substring.js`, 'const documentInfo = 1; export const value = documentInfo'],
-        [`${coreJsRoot}-other/index.js`, 'export const value = window'],
-        ['/fixture/app.js', 'export const value = window'],
-        [`/fixture/query.js?module=${coreJsRoot}/internals/global-this.js`, 'export const value = window'],
-        [miniPolyfillsId, 'export const value = window']
+        [`${coreJsRoot}/internals/vpt-native-window.js`, 'export const value = typeof window'],
+        [`${coreJsRoot}-other/index.js`, 'export const value = document'],
+        ['/fixture/app.js', 'export const value = document'],
+        [`/fixture/query.js?module=${coreJsRoot}/internals/global-this.js`, 'export const value = document'],
+        [miniPolyfillsId, 'export const value = document']
     ])
     const plugin = createMiniPolyfillPlugin({ options })
     // Count actual JS dispatches, including conservative false positives for local names and text.
@@ -184,16 +240,16 @@ for (const sourcemap of [false, true, 'inline', 'hidden'] as const) {
             assert.ok(typeof result.map.mappings === 'string' && result.map.mappings.length > 0)
         }
 
-        // Shadow every browser name after transformation, as the native host does, without changing Node's globals.
+        // Managed names resolve on the host; unmanaged window keeps ordinary lexical lookup.
         runInNewContext(
-            `(function(${names.join(',')}) {
+            `(function(window, ${names.join(',')}) {
                 ${result.code}
                 assert.deepEqual(module.exports.hosts, [${names.map((name) => `globalThis.${name}`).join(',')}])
                 assert.deepEqual(module.exports.parameters(...${JSON.stringify(localValues)}), ${JSON.stringify(localValues)})
                 assert.deepEqual(module.exports.locals(), ${JSON.stringify(localValues)})
-                assert.deepEqual(module.exports.escaped, [globalThis.window, globalThis.document])
+                assert.deepEqual(module.exports.escaped, ['local:window', globalThis.document])
                 assert.equal(module.exports.text, ${JSON.stringify(names.join(' '))})
-            })(...${JSON.stringify(localValues)})`,
+            })('local:window', ...${JSON.stringify(localValues)})`,
             {
                 assert,
                 module: { exports: {} },

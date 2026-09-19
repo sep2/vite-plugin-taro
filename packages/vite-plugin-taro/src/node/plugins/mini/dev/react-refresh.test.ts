@@ -6,6 +6,7 @@ import { runInNewContext } from 'node:vm'
 import { build } from 'rolldown'
 import { normalizePath, resolveConfig } from 'vite'
 import vpt from '../../../../index.ts'
+import type { VptOptions } from '../../../../options.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import {
     createMiniReactRefreshTransforms,
@@ -14,22 +15,48 @@ import {
 } from './react-refresh.ts'
 
 const preambleGuard = `if (!window.$RefreshReg$) { throw new Error("@vitejs/plugin-react can't detect preamble. Something is wrong.") }`
+const refreshProperties = [
+    '$RefreshReg$',
+    '$RefreshSig$',
+    '__registerBeforePerformReactRefresh',
+    '__getReactRefreshIgnoredExports'
+]
+
+function resolveRefreshConfig(target: VptOptions['target'], command: 'serve' | 'build') {
+    return resolveConfig(
+        {
+            configFile: false,
+            plugins: vpt({
+                target,
+                app: 'src/app.tsx',
+                pages: [{ path: 'pages/home/index' }],
+                appJson: {},
+                projectConfigJson: {}
+            })
+        },
+        command
+    )
+}
+
+for (const target of ['wx', 'zfb', 'h5'] as const) {
+    for (const command of ['serve', 'build'] as const) {
+        test(`${target} ${command}: only Mini development redirects Refresh properties`, async () => {
+            const config = await resolveRefreshConfig(target, command)
+            for (const name of refreshProperties) {
+                assert.equal(
+                    config.define?.[`window.${name}`],
+                    target !== 'h5' && command === 'serve' ? `globalThis.${name}` : undefined
+                )
+            }
+            assert.equal(config.define?.window, undefined)
+            assert.equal(config.build.rolldownOptions.transform?.inject?.window, undefined)
+        })
+    }
+}
 
 for (const target of ['wx', 'zfb'] as const) {
     test(`${target}: runtime preamble satisfies cold and repeated boundary evaluation without removing guards`, async () => {
-        const config = await resolveConfig(
-            {
-                configFile: false,
-                plugins: vpt({
-                    target,
-                    app: 'src/app.tsx',
-                    pages: [{ path: 'pages/home/index' }],
-                    appJson: {},
-                    projectConfigJson: {}
-                })
-            },
-            'serve'
-        )
+        const config = await resolveRefreshConfig(target, 'serve')
         const runtimePath = path.join(
             path.dirname(packageRequire.resolve('@vitejs/plugin-react')),
             'refresh-runtime.js'
@@ -48,8 +75,11 @@ for (const target of ['wx', 'zfb'] as const) {
                         if (id === entry) {
                             return `
 import { validateRefreshBoundaryAndEnqueueUpdate } from './refresh-runtime.js'
-export { window as runtimeWindow } from 'vite-plugin-taro-runtime/runtime/mini'
 export { validateRefreshBoundaryAndEnqueueUpdate }
+export function nativeWindowType() { return typeof window }
+export function readNativeWindow() { return window }
+export function readNativeDocument() { return window.document }
+export function localWindow(window) { return [${refreshProperties.map((name) => `window.${name}`).join(',')}] }
 ${preambleGuard}
 export function evaluateBoundary() {
     ${preambleGuard}
@@ -86,16 +116,50 @@ export function evaluateBoundary() {
             runInNewContext('__REACT_DEVTOOLS_GLOBAL_HOOK__ === globalThis.__REACT_DEVTOOLS_GLOBAL_HOOK__', context),
             true
         )
-        assert.equal(runInNewContext('typeof globalThis.$RefreshReg$', context), 'undefined')
-        assert.equal(runInNewContext('typeof globalThis.__registerBeforePerformReactRefresh', context), 'undefined')
+        for (const name of refreshProperties.slice(0, 3)) {
+            assert.equal(runInNewContext(`typeof globalThis.${name}`, context), 'function')
+        }
+        assert.equal(runInNewContext('exports.nativeWindowType()', context), 'undefined')
+        assert.throws(() => runInNewContext('exports.readNativeWindow()', context), { name: 'ReferenceError' })
+        assert.throws(() => runInNewContext('exports.readNativeDocument()', context), { name: 'ReferenceError' })
+        const localValues = refreshProperties.map((name) => `local:${name}`)
+        const localWindow = Object.fromEntries(refreshProperties.map((name, index) => [name, localValues[index]]))
+        assert.equal(
+            runInNewContext(`JSON.stringify(exports.localWindow(${JSON.stringify(localWindow)}))`, context),
+            JSON.stringify(localValues)
+        )
+        // The host may also expose a real window. Only the reserved Refresh properties belong on globalThis.
+        runInNewContext('globalThis.window = { document: "native-document" }', context)
+        assert.equal(runInNewContext('exports.nativeWindowType()', context), 'object')
+        assert.equal(runInNewContext('exports.readNativeWindow() === window', context), true)
+        assert.equal(runInNewContext('exports.readNativeDocument()', context), 'native-document')
+        assert.equal(runInNewContext('typeof window.$RefreshReg$', context), 'undefined')
         assert.equal(runInNewContext('exports.evaluateBoundary()', context), true)
         assert.equal(runInNewContext('exports.evaluateBoundary()', context), true)
         assert.equal(
             runInNewContext("exports.validateRefreshBoundaryAndEnqueueUpdate('fixture', { removed: 1 }, {})", context),
             'Could not Fast Refresh (export removed)'
         )
+        // Record the optional upstream hook's invocation in this isolated realm, not in Node's global state.
+        runInNewContext(
+            `
+            globalThis.__getReactRefreshIgnoredExports = ({ id }) => {
+                globalThis.ignoredRefreshId = id;
+                return [];
+            };
+        `,
+            context
+        )
+        assert.equal(
+            runInNewContext(
+                "exports.validateRefreshBoundaryAndEnqueueUpdate('with-hook', { removed: 1 }, {})",
+                context
+            ),
+            'Could not Fast Refresh (export removed)'
+        )
+        assert.equal(runInNewContext('ignoredRefreshId', context), 'with-hook')
         // Prove that the guard is still active rather than erased by a transform.
-        runInNewContext('delete exports.runtimeWindow.$RefreshReg$', context)
+        runInNewContext('delete globalThis.$RefreshReg$', context)
         assert.throws(() => runInNewContext('exports.evaluateBoundary()', context), /can't detect preamble/)
     })
 }
@@ -104,8 +168,8 @@ test('appends the preamble without rewriting existing runtime code', () => {
     const code = 'window.__registerBeforePerformReactRefresh = callback'
     const transformed = transformRefreshRuntime(code)
     assert.ok(transformed.code.startsWith(`${code}\ninjectIntoGlobalHook(globalThis);`))
-    assert.match(transformed.code, /window\.\$RefreshReg\$ = \(\) => \{\};/)
-    assert.match(transformed.code, /window\.\$RefreshSig\$ = \(\) => \(type\) => type;/)
+    assert.match(transformed.code, /globalThis\.\$RefreshReg\$ = \(\) => \{\};/)
+    assert.match(transformed.code, /globalThis\.\$RefreshSig\$ = \(\) => \(type\) => type;/)
     assert.equal(transformed.map, null)
 })
 

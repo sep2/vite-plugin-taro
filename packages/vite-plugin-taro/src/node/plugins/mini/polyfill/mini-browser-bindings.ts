@@ -1,8 +1,7 @@
 import { miniRuntimeId } from '../module/module.ts'
 
-/** Taro's renderer-owned browser bindings; portable APIs use native globals or explicit polyfills. */
+/** Taro's renderer-owned bindings. window stays native; portable APIs use native globals or explicit polyfills. */
 export const miniBrowserBindings = {
-    window: [miniRuntimeId, 'window'],
     document: [miniRuntimeId, 'document'],
     navigator: [miniRuntimeId, 'navigator'],
     requestAnimationFrame: [miniRuntimeId, 'requestAnimationFrame'],

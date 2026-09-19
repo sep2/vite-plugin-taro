@@ -14,13 +14,24 @@ const reactReconcilerDevelopmentId = normalizePath(
 /**
  * Installs the missing HTML preamble inside the Refresh runtime. Boundary modules import that runtime before evaluating
  * their preamble guards, including during incremental updates. Reconciler also imports it before registering its renderer.
- * The shared Rolldown injection binds free `window` references to the same Taro window in the preamble and boundaries.
+ * Development defines map only Refresh's reserved window properties to globalThis; ordinary window lookups stay native.
  */
 export function createMiniReactRefreshTransforms(): Plugin[] {
     return [
         {
             name: 'vpt:mini-react-refresh-runtime',
             apply: 'serve',
+            config() {
+                return {
+                    // Apply to the runtime and generated component guards without aliasing window or erasing guards.
+                    define: {
+                        'window.$RefreshReg$': 'globalThis.$RefreshReg$',
+                        'window.$RefreshSig$': 'globalThis.$RefreshSig$',
+                        'window.__registerBeforePerformReactRefresh': 'globalThis.__registerBeforePerformReactRefresh',
+                        'window.__getReactRefreshIgnoredExports': 'globalThis.__getReactRefreshIgnoredExports'
+                    }
+                }
+            },
             transform: {
                 order: 'post',
                 filter: { id: createExactModuleIdFilter(reactRefreshRuntimeId) },
@@ -45,16 +56,16 @@ export function createMiniReactRefreshTransforms(): Plugin[] {
 
 /**
  * Reproduces the browser preamble at runtime evaluation, after its declarations initialize.
- * The renderer hook belongs to the real global used by Reconciler. The no-op registration and identity signature belong
- * to the injected Taro window, satisfying upstream guards without replacing module-local Refresh registration.
+ * The renderer hook, no-op registration and identity signature share Reconciler's real global. Development defines point
+ * upstream guards at these same properties without replacing module-local Refresh registration.
  * These shared protocol properties are initialized once per runtime module evaluation, not for each updated boundary.
  */
 export function transformRefreshRuntime(code: string): { code: string; map: null } {
     return {
         code: `${code}
 injectIntoGlobalHook(globalThis);
-window.$RefreshReg$ = () => {};
-window.$RefreshSig$ = () => (type) => type;`,
+globalThis.$RefreshReg$ = () => {};
+globalThis.$RefreshSig$ = () => (type) => type;`,
         map: null
     }
 }
