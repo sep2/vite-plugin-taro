@@ -358,7 +358,9 @@ for (const { name, setup } of [
             assert.ok(diagnostics.every(([message, cause]) =>
                 message === 'Unable to resolve globalThis' && cause instanceof Error
             ));
-            assert.deepEqual(Reflect.ownKeys(first.root), ['fixtureValue']);
+            assert.deepEqual(Reflect.ownKeys(first.root), ['Object', 'globalThis', 'fixtureValue']);
+            assert.equal(first.root.Object, Object);
+            assert.equal(first.root.globalThis, first.root);
             assert.deepEqual(Object.getOwnPropertyDescriptor(Object, Symbol.for('vpt.fake.global')), {
                 value: first.root,
                 writable: false,

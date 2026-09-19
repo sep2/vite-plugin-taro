@@ -36,7 +36,7 @@ function assertDiscoveryFallback(context: ReturnType<typeof createHeap>, cacheKe
     runtimeScript.runInContext(context)
     const fallback: unknown = new Script('vptGlobal').runInContext(context)
     assert.ok(fallback && typeof fallback === 'object')
-    assert.deepEqual(Reflect.ownKeys(fallback), [])
+    assert.deepEqual(Reflect.ownKeys(fallback), ['Object', 'globalThis'])
     assert.equal(errors.length, 1)
     const [message, cause] = errors[0]
     assert.equal(message, 'Unable to resolve globalThis')
@@ -44,6 +44,8 @@ function assertDiscoveryFallback(context: ReturnType<typeof createHeap>, cacheKe
         assert.equal(Object.hasOwn(Object.prototype, '__vpt_global__'), false);
         assert.notEqual(vptGlobal, this);
         assert.equal(Object.getPrototypeOf(vptGlobal), Object.prototype);
+        assert.equal(vptGlobal.Object, Object);
+        assert.equal(vptGlobal.globalThis, vptGlobal);
         assert.equal(typeof globalThis, 'undefined');
         assert.equal(vptGlobal.Math, undefined);
         assert.deepEqual(Object.getOwnPropertyDescriptor(Object, cacheKey), {
@@ -52,7 +54,7 @@ function assertDiscoveryFallback(context: ReturnType<typeof createHeap>, cacheKe
             enumerable: false,
             configurable: false
         });
-        // A fallback is writable, but it does not copy built-ins or turn its properties into host bindings.
+        // A fallback is writable, but it does not copy other built-ins or turn its properties into host bindings.
         vptGlobal.fixtureValue = 42;
         assert.equal(getGlobalThis(), vptGlobal);
         assert.equal(getGlobalThis().fixtureValue, 42);
@@ -270,7 +272,7 @@ test('logs an arbitrary lookup cause and removes only the temporary getter', () 
 })
 
 for (const restriction of ['preventExtensions', 'seal', 'freeze']) {
-    test(`returns a shared empty fallback when Object.${restriction} blocks discovery`, () => {
+    test(`returns a shared fallback when Object.${restriction} blocks discovery`, () => {
         const context = createHeap(`delete this.globalThis; Object.${restriction}(Object.prototype);`)
         const cause = assertDiscoveryFallback(context, Symbol.for('vpt.fake.global'))
         assert.ok(isNativeError(cause))
@@ -278,7 +280,7 @@ for (const restriction of ['preventExtensions', 'seal', 'freeze']) {
     })
 }
 
-test('returns a shared empty fallback and cleans up when the host does not inherit Object.prototype', () => {
+test('returns a shared fallback and cleans up when the host does not inherit Object.prototype', () => {
     const context = createHeap('delete this.globalThis; Object.setPrototypeOf(this, null);')
     const cause = assertDiscoveryFallback(context, Symbol.for('vpt.fake.global'))
     assert.ok(isNativeError(cause))
