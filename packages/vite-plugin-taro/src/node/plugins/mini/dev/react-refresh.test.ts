@@ -41,7 +41,7 @@ function resolveRefreshConfig(target: VptOptions['target'], command: 'serve' | '
 
 for (const target of ['wx', 'zfb', 'h5'] as const) {
     for (const command of ['serve', 'build'] as const) {
-        test(`${target} ${command}: only Mini development redirects Refresh properties`, async () => {
+        test(`${target} ${command}: only Mini development redirects Refresh globals`, async () => {
             const config = await resolveRefreshConfig(target, command)
             for (const name of refreshProperties) {
                 assert.equal(
@@ -49,6 +49,10 @@ for (const target of ['wx', 'zfb', 'h5'] as const) {
                     target !== 'h5' && command === 'serve' ? `globalThis.${name}` : undefined
                 )
             }
+            assert.equal(
+                config.define?.queueMicrotask,
+                target !== 'h5' && command === 'serve' ? 'globalThis.queueMicrotask' : undefined
+            )
             assert.equal(config.define?.window, undefined)
             assert.equal(config.build.rolldownOptions.transform?.inject?.window, undefined)
         })

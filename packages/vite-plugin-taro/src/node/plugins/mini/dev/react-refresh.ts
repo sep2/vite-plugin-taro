@@ -14,7 +14,7 @@ const reactReconcilerDevelopmentId = normalizePath(
 /**
  * Installs the missing HTML preamble inside the Refresh runtime. Boundary modules import that runtime before evaluating
  * their preamble guards, including during incremental updates. Reconciler also imports it before registering its renderer.
- * Development defines map only Refresh's reserved window properties to globalThis; ordinary window lookups stay native.
+ * Development defines route Refresh's globals to globalThis; ordinary window lookups stay native.
  */
 export function createMiniReactRefreshTransforms(): Plugin[] {
     return [
@@ -25,6 +25,8 @@ export function createMiniReactRefreshTransforms(): Plugin[] {
                 return {
                     // Apply to the runtime and generated component guards without aliasing window or erasing guards.
                     define: {
+                        // Refresh patches bypass renderChunk; source defines use the injected global binding instead.
+                        queueMicrotask: 'globalThis.queueMicrotask',
                         'window.$RefreshReg$': 'globalThis.$RefreshReg$',
                         'window.$RefreshSig$': 'globalThis.$RefreshSig$',
                         'window.__registerBeforePerformReactRefresh': 'globalThis.__registerBeforePerformReactRefresh',
