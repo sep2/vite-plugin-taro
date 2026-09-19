@@ -3,6 +3,7 @@ declare const __vpt_global__: typeof globalThis
 
 /** Use the native object when available; otherwise recover it with the ungap/global-this getter technique. */
 function getGlobalThis(this: typeof globalThis | void): typeof globalThis {
+    // This native probe is restored in an isolated output entry after globalThis injection.
     if (typeof __VPT_NATIVE_GLOBAL_THIS__ === 'object' && __VPT_NATIVE_GLOBAL_THIS__) {
         return __VPT_NATIVE_GLOBAL_THIS__
     }
@@ -43,5 +44,5 @@ function getGlobalThis(this: typeof globalThis | void): typeof globalThis {
     }
 }
 
-/** One shared host object. Its native probe is restored in an isolated output entry after globalThis injection. */
+/** One shared host object. */
 export const vptGlobal = getGlobalThis()
