@@ -23,6 +23,7 @@
 - Other sessions may be editing this workspace. Ignore unrelated changes; never modify or stage others' unstaged, staged, or untracked work.
 - Resolve conflicts only in files you modified. For conflicts elsewhere, stop and ask the user.
 - Keep bash timeouts at 30 seconds or less.
+- Tests also run on Windows, consider path variants.
 - If a user instruction conflicts with any `AGENTS.md` rule, ask for explicit confirmation before overriding it.
 
 ## Workspace
