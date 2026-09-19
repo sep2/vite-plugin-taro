@@ -1,13 +1,11 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { createContext, Script } from 'node:vm'
+import { System as createdSystem } from './system-core.js'
 
-createRequire(import.meta.url)('./system-core.js')
-
-const system = globalThis.System
+const system: System.Loader = createdSystem
 
 function createRegistration(dependencies: readonly string[], declare: System.Declare): System.Registration {
     return [dependencies, declare]
@@ -31,11 +29,15 @@ test('uses the string registry and plain namespaces when Symbol is unavailable',
     const exportList = 'export { REGISTRY, systemJSPrototype }'
     const exportedFunction = 'export function getOrCreateLoad'
     // The VM script shares this source filename for coverage, so preserve byte offsets while removing ESM export syntax.
+    // A same-width var exposes the exported loader to this harness without requiring an ambient globalThis binding.
     const executable = source
         .replace(exportList, ' '.repeat(exportList.length))
         .replace(exportedFunction, `       ${exportedFunction.slice('export '.length)}`)
-    // The isolated language global receives the loader created by the fallback runtime.
-    const runtimeGlobal: { System?: System.Loader; Symbol: undefined } = { Symbol: undefined }
+        .replace('export const System', '       var   System')
+    const runtimeGlobal: { System?: System.Loader; Symbol: undefined; globalThis: undefined } = {
+        Symbol: undefined,
+        globalThis: undefined
+    }
     const context = createContext(runtimeGlobal)
 
     new Script(executable, { filename }).runInContext(context)

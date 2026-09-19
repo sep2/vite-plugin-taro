@@ -22,6 +22,8 @@ function compile(code: string, sourcemap: boolean) {
         code,
         chunk,
         chunks: {},
+        bootstrapModuleId: '/bootstrap.js',
+        getPhysicalChunkId: () => assert.fail('These external imports need no loader dependency'),
         classifyModule: () => assert.fail('These external imports need no chunk classification'),
         sourcemap
     })
@@ -149,10 +151,12 @@ test('preserves namespace numbering and loading order across side-effect and cap
     const code = [
         "import 'before'",
         "import config from './capsule.js'",
+        "import './bootstrap.js'",
+        "import laterConfig from './capsule.js'",
         "import { value as first } from 'first'",
         "import 'between'",
         "import { value as second } from 'second'",
-        'const values = [config, first, second]',
+        'const values = [config, laterConfig, first, second]',
         'export { values }'
     ].join('\n')
     const capsule: Rolldown.RenderedChunk = { ...chunk, fileName: 'capsule.js', moduleIds: ['/capsule.js'] }
@@ -160,6 +164,8 @@ test('preserves namespace numbering and loading order across side-effect and cap
         code,
         chunk,
         chunks: { 'capsule.js': capsule },
+        bootstrapModuleId: '/bootstrap.js',
+        getPhysicalChunkId: (chunk) => (typeof chunk === 'string' ? 'bootstrap.js' : chunk.fileName),
         classifyModule(imported) {
             assert.equal(imported, capsule)
             return { entryRole: 'capsule', executionKind: 'capsule', isTransport: false }
@@ -167,8 +173,8 @@ test('preserves namespace numbering and loading order across side-effect and cap
         sourcemap: false
     })
     // Side-effect imports still reserve their original slots; capsule imports never allocate a native namespace.
-    assert.match(output.code, /var __nativeImport1=require\("first"\)/)
-    assert.match(output.code, /var __nativeImport3=require\("second"\)/)
+    assert.match(output.code, /var __nativeImport2=require\("first"\)/)
+    assert.match(output.code, /var __nativeImport4=require\("second"\)/)
     // These test-local cells observe the interleaved native and SystemJS dependency loading without filesystem output.
     const exports: Record<string, unknown> = {}
     const events: string[] = []
@@ -180,24 +186,29 @@ test('preserves namespace numbering and loading order across side-effect and cap
     )(
         (id: string) => {
             events.push(`require:${id}`)
+            if (id === './bootstrap.js') {
+                return {
+                    System: {
+                        importSync(moduleId: string) {
+                            events.push(`capsule:${moduleId}`)
+                            return { default: 'capsule-value' }
+                        }
+                    }
+                }
+            }
             return { value: id }
         },
         exports,
-        {
-            System: {
-                importSync(id: string) {
-                    events.push(`capsule:${id}`)
-                    return { default: 'capsule-value' }
-                }
-            }
-        }
+        undefined
     )
     assert.deepEqual(events, [
+        'require:./bootstrap.js',
         'require:before',
+        'capsule:capsule.js',
         'capsule:capsule.js',
         'require:first',
         'require:between',
         'require:second'
     ])
-    assert.deepEqual(exports.values, ['capsule-value', 'first', 'second'])
+    assert.deepEqual(exports.values, ['capsule-value', 'capsule-value', 'first', 'second'])
 })

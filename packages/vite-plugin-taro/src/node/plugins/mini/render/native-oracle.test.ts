@@ -174,6 +174,8 @@ function compile(code: string) {
         code,
         chunk,
         chunks: {},
+        bootstrapModuleId: runtimeModules.bootstrap,
+        getPhysicalChunkId: () => assert.fail('These oracle fixtures need no loader dependency'),
         classifyModule: classifyModule,
         sourcemap: false
     })

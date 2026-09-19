@@ -70,7 +70,7 @@ export function createTransportExpression({
     //         case 'sub/p_account/page.js': return require.async('../sub/p_account/page.js')
     //         case 'assets/bootstrap.js':
     //             return [[], function(exportBinding) { return { execute() { exportBinding(require('./bootstrap.js')) } } }]
-    //         default: throw new Error(`Unknown System module: ${moduleId}`)
+    //         default: throw new Error(`Unknown module: ${moduleId}`)
     //     }
     // }
     // Keep only capsule and amphibious chunks, in deterministic output order.
@@ -82,7 +82,7 @@ export function createTransportExpression({
             const loadMode = getLoadMode(chunk)
 
             if (kind === 'amphibious' && loadMode !== 'sync') {
-                throw new Error(`Amphibious Mini Program module must be in the main package: ${chunk.fileName}`)
+                throw new Error(`Amphibious module must be in the main package: ${chunk.fileName}`)
             }
 
             // Only native loading crosses the logical/physical boundary and receives the assets/package-qualified path.
@@ -103,5 +103,5 @@ export function createTransportExpression({
         .join('')
 
     // Reject module IDs absent from the closed output graph.
-    return `function(moduleId){switch(moduleId){${cases}default:throw new Error('Unknown System module: '+moduleId)}}`
+    return `function(moduleId){switch(moduleId){${cases}default:throw new Error('Unknown module: '+moduleId)}}`
 }

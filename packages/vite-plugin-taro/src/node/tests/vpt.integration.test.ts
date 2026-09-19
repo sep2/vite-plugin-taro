@@ -122,6 +122,17 @@ function requireChunk(output: BuildOutput, fileName: string): OutputChunk {
     return chunk
 }
 
+/** Every native shell loads bootstrap once and uses that namespace rather than an ambient System binding. */
+function assertNativeShells(output: BuildOutput): void {
+    for (const fileName of ['app.js', 'pages/home/index.js', 'comp.js', 'custom-wrapper.js']) {
+        const { code } = requireChunk(output, fileName)
+        assert.equal([...code.matchAll(/\brequire\(["'](?:\.\.?\/)+common\/bootstrap\.js["']\)/g)].length, 1, fileName)
+        assert.match(code, /\.System\.importSync/)
+        assert.doesNotMatch(code, /(?:globalThis|wx|my)\.System\.importSync/)
+        assert.doesNotMatch(code, /^\s*import\s/m)
+    }
+}
+
 function parseJsonAsset(output: BuildOutput, fileName: string): Record<string, unknown> {
     return JSON.parse(String(requireAsset(output, fileName).source)) as Record<string, unknown>
 }
@@ -323,8 +334,7 @@ test('builds a complete native App and Page project for wx', async () => {
             assert.equal(String(requireAsset(output, 'app.json').source), JSON.stringify(appJson))
             assert.equal(String(requireAsset(output, 'pages/home/index.json').source), JSON.stringify(pageJson))
             assert.match(javascript, /WX page marker/)
-            assert.doesNotMatch(requireChunk(output, 'app.js').code, /^\s*import\s/m)
-            assert.doesNotMatch(requireChunk(output, 'pages/home/index.js').code, /^\s*import\s/m)
+            assertNativeShells(output)
         }
     )
 })
@@ -423,10 +433,7 @@ test('builds a complete native App and Page project for zfb', async () => {
             assert.doesNotMatch(pageTemplate, /<import src="\.\.\/\.\.\/base\.axml"\s*\/>/)
             assert.match(pageTemplate, /<comp i="{{app}}" p="{{page}}" \/>/)
             assert.match(javascript, /ZFB page marker/)
-            assert.match(requireChunk(output, 'app.js').code, /globalThis\.System\.importSync/)
-            assert.doesNotMatch(requireChunk(output, 'app.js').code, /my\.System\.importSync/)
-            assert.doesNotMatch(requireChunk(output, 'app.js').code, /^\s*import\s/m)
-            assert.doesNotMatch(requireChunk(output, 'pages/home/index.js').code, /^\s*import\s/m)
+            assertNativeShells(output)
         }
     )
 })

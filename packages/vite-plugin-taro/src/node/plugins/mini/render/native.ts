@@ -11,7 +11,7 @@
  * Rolldown still emits one ESM chunk graph before that runtime split is materialized. Mini Program hosts cannot execute final ESM
  * imports directly, so this renderer translates chunks classified as native or amphibious into CommonJS while preserving the
  * ESM behavior observable at their boundary. Ordinary native dependencies become `require` namespace cells; capsule imports
- * become synchronous language-global `System.importSync` lookups. Dynamic imports use `System.import`, and exports are published
+ * become synchronous lookups through bootstrap's exported `System`. Dynamic imports use that same loader, and exports are published
  * through the CommonJS `exports` object.
  *
  * This is deliberately a final-chunk compiler, not a general source-module compiler. Rolldown has already lowered TypeScript,
@@ -22,10 +22,12 @@
  * Babel's CommonJS transform remains beside this implementation only as a differential-test oracle. Those tests compare
  * runtime observations for import interop, receiver semantics, live export writes, declaration timing, and top-level `this`.
  */
+import path from 'node:path'
 import type {
     AssignmentTarget,
     ExportSpecifier,
     ImportDeclaration,
+    ImportExpression,
     ModuleExportName,
     Node,
     Program,
@@ -59,6 +61,7 @@ type ImportModel = Readonly<{
 
 type NativeModuleModel = Readonly<{
     defaultInterop: string
+    dynamicImports: readonly ImportExpression[]
     exportNamesByLocal: ReadonlyMap<string, readonly string[]>
     imports: readonly ImportModel[]
     importBindingsByLocal: ReadonlyMap<string, ImportBinding>
@@ -76,7 +79,7 @@ type NativeModuleModel = Readonly<{
  * 1. Static ESM imports are hoisted into source-order `require` calls. Named imports remain property reads from the required
  *    namespace so they observe current values. Default and namespace imports receive Babel-compatible CommonJS interop.
  * 2. An import whose target owns a capsule entry is not passed to native `require`. It becomes
- *    the language-global `System.importSync(logicalChunkId)`, synchronously linking the capsule before the native lifecycle call.
+ *    bootstrap's `System.importSync(logicalChunkId)`, synchronously linking the capsule before the native lifecycle call.
  * 3. Local exports are published at declaration and mutation points. Imported re-exports use getters, while assignments and
  *    updates notify every alias without changing expression completion values or accidentally matching shadowed bindings.
  * 4. ESM top-level `this` becomes `undefined`. Direct imported calls and tags are explicitly unbound so converting an import
@@ -93,12 +96,16 @@ export function renderNative({
     code,
     chunk,
     chunks,
+    bootstrapModuleId,
+    getPhysicalChunkId,
     classifyModule,
     sourcemap
 }: {
     code: string
     chunk: Rolldown.RenderedChunk
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
+    bootstrapModuleId: string
+    getPhysicalChunkId: (chunk: Rolldown.RenderedChunk | string) => string
     classifyModule: MiniModuleClassifier
     sourcemap: boolean
 }): AstTransformResult {
@@ -109,11 +116,19 @@ export function renderNative({
     }
 
     // Resolve scopes, helper names, and capsule identities before creating the local source editor.
-    const model = analyzeNativeModule(parsed.program, chunk, chunks, classifyModule)
+    const model = analyzeNativeModule(
+        parsed.program,
+        chunk,
+        chunks,
+        bootstrapModuleId,
+        getPhysicalChunkId,
+        classifyModule
+    )
     const editor = new RolldownMagicString(code, { filename: chunk.fileName })
 
     // Expression edits split untouched source ranges first. Declaration replacement runs afterwards because MagicString must
     // not split a range after that complete range has already been overwritten or removed.
+    rewriteDynamicImports(editor, model, chunk.fileName)
     const usesPostfixTemp = rewriteExpressionSemantics(editor, model, chunk.fileName)
     rewriteModuleDeclarations(editor, model)
 
@@ -146,6 +161,8 @@ function analyzeNativeModule(
     program: Program,
     chunk: Rolldown.RenderedChunk,
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>,
+    bootstrapModuleId: string,
+    getPhysicalChunkId: (chunk: Rolldown.RenderedChunk | string) => string,
     classifyModule: MiniModuleClassifier
 ): NativeModuleModel {
     // Analysis-local collections accumulate the complete module model before any source edits.
@@ -154,9 +171,10 @@ function analyzeNativeModule(
     const imports: ImportModel[] = []
     const importBindingsByLocal = new Map<string, ImportBinding>()
     const scopes = new ScopeTracker({ preserveExitedScopes: true })
+    const dynamicImports: ImportExpression[] = []
     let hasDirectEval = false
 
-    // Collect names, validation facts, and declarations together instead of three full AST walks.
+    // Collect names, validation facts, loader usage and declarations together instead of separate AST walks.
     walk(program, {
         scopeTracker: scopes,
         enter(node) {
@@ -165,6 +183,9 @@ function analyzeNativeModule(
             }
             if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'eval') {
                 hasDirectEval = true
+            }
+            if (node.type === 'ImportExpression') {
+                dynamicImports.push(node)
             }
         }
     })
@@ -175,6 +196,43 @@ function analyzeNativeModule(
 
     // This analysis-local cursor checks each import namespace candidate once: O(I + C) probes for imports and collisions.
     let nextImportSuffix = 0
+
+    function analyzeImport(node: ImportDeclaration, reusedNamespace: string | undefined): ImportModel {
+        // Existing dependencies reuse their namespace; new dependencies advance the shared linear naming cursor.
+        let namespace = reusedNamespace
+        if (namespace === undefined) {
+            namespace = nextImportSuffix === 0 ? '__nativeImport' : `__nativeImport${nextImportSuffix}`
+            while (identifierNames.has(namespace)) {
+                nextImportSuffix += 1
+                namespace = `__nativeImport${nextImportSuffix}`
+            }
+            identifierNames.add(namespace)
+            nextImportSuffix += 1
+        }
+        const importNamespace = namespace
+        const bindings = node.specifiers.map((specifier): ImportBinding => {
+            const binding = {
+                imported:
+                    specifier.type === 'ImportNamespaceSpecifier'
+                        ? null
+                        : specifier.type === 'ImportDefaultSpecifier'
+                          ? 'default'
+                          : moduleExportName(specifier.imported),
+                local: specifier.local.name,
+                namespace: importNamespace
+            }
+            importBindingsByLocal.set(binding.local, binding)
+            return binding
+        })
+        return {
+            bindings,
+            capsuleBinding: null,
+            interop: importInterop(node),
+            namespace: importNamespace,
+            reference: node.source.value
+        }
+    }
+
     for (const node of program.body) {
         switch (node.type) {
             case 'ImportDeclaration': {
@@ -204,35 +262,7 @@ function analyzeNativeModule(
                     continue
                 }
 
-                // This local candidate advances only over authored collisions; earlier allocations are behind the cursor.
-                let namespace = nextImportSuffix === 0 ? '__nativeImport' : `__nativeImport${nextImportSuffix}`
-                while (identifierNames.has(namespace)) {
-                    nextImportSuffix += 1
-                    namespace = `__nativeImport${nextImportSuffix}`
-                }
-                identifierNames.add(namespace)
-                nextImportSuffix += 1
-                const bindings = node.specifiers.map((specifier): ImportBinding => {
-                    const binding = {
-                        imported:
-                            specifier.type === 'ImportNamespaceSpecifier'
-                                ? null
-                                : specifier.type === 'ImportDefaultSpecifier'
-                                  ? 'default'
-                                  : moduleExportName(specifier.imported),
-                        local: specifier.local.name,
-                        namespace
-                    }
-                    importBindingsByLocal.set(binding.local, binding)
-                    return binding
-                })
-                imports.push({
-                    bindings,
-                    capsuleBinding: null,
-                    interop: importInterop(node),
-                    namespace,
-                    reference: node.source.value
-                })
+                imports.push(analyzeImport(node, undefined))
                 break
             }
             case 'ExportNamedDeclaration':
@@ -244,11 +274,30 @@ function analyzeNativeModule(
         }
     }
 
+    if (dynamicImports.length > 0 || imports.some((entry) => entry.capsuleBinding)) {
+        // Placement owns physical paths; capsule identities below stay package-neutral. Resolve only loader users.
+        const relative = path.posix.relative(
+            path.posix.dirname(getPhysicalChunkId(chunk)),
+            getPhysicalChunkId(bootstrapModuleId)
+        )
+        const reference = relative.startsWith('../') ? relative : `./${relative}`
+        const local = takeGeneratedName('__nativeSystem', identifierNames)
+        // Parse only this compiler-owned ESM import; the complete chunk is still parsed once. Its ordinary binding is
+        // first in the import plan so generated loader calls use the same lowering as authored named imports.
+        const declaration = parseSync(chunk.fileName, `import { System as ${local} } from ${JSON.stringify(reference)}`)
+            .program.body[0] as ImportDeclaration
+        const existingIndex = imports.findIndex((entry) => entry.reference === reference)
+        const existing = existingIndex < 0 ? undefined : imports.splice(existingIndex, 1)[0]
+        const injected = analyzeImport(declaration, existing?.namespace)
+        imports.unshift(existing ? { ...existing, bindings: [...injected.bindings, ...existing.bindings] } : injected)
+    }
+
     const defaultInterop = takeGeneratedName('__nativeDefault', identifierNames)
     const namespaceInterop = takeGeneratedName('__nativeNamespace', identifierNames)
     const postfixTemp = takeGeneratedName('__nativePostfix', identifierNames)
     return {
         defaultInterop,
+        dynamicImports,
         exportNamesByLocal,
         imports,
         importBindingsByLocal,
@@ -294,8 +343,31 @@ function rewriteModuleDeclarations(editor: RolldownMagicString, model: NativeMod
     }
 }
 
+/** Lowers import() through the first, ordinary System import binding installed by analysis. */
+function rewriteDynamicImports(editor: RolldownMagicString, model: NativeModuleModel, filename: string): void {
+    for (const node of model.dynamicImports) {
+        if (node.options || node.phase) {
+            throw unsupported(filename, 'dynamic import options or phases')
+        }
+        const system = importedExpression(model.imports[0]!.bindings[0]!)
+        editor.overwrite(node.start, node.source.start, `${system}.import(`)
+        // Use the same logical IDs as capsule imports; computed IDs are already owned by the caller.
+        if (
+            node.source.type === 'Literal' &&
+            typeof node.source.value === 'string' &&
+            (node.source.value.startsWith('./') || node.source.value.startsWith('../'))
+        ) {
+            editor.overwrite(
+                node.source.start,
+                node.source.end,
+                JSON.stringify(resolveLogicalChunkReference(filename, node.source.value))
+            )
+        }
+    }
+}
+
 /**
- * Rewrites dynamic imports, imported references, live-export mutations, and lexical `this` in one scope-aware O(n) pass.
+ * Rewrites imported references, live-export mutations, and lexical `this` in one scope-aware O(n) pass.
  * Returns whether those edits need a postfix completion-value cell, avoiding a separate detection walk.
  *
  * A named import such as `fn` becomes a namespace property read. In call or tag position it is wrapped as `(0, ns.fn)` to
@@ -340,24 +412,6 @@ function rewriteExpressionSemantics(editor: RolldownMagicString, model: NativeMo
             }
 
             switch (node.type) {
-                case 'ImportExpression':
-                    if (node.options || node.phase) {
-                        throw unsupported(filename, 'dynamic import options or phases')
-                    }
-                    editor.overwrite(node.start, node.source.start, 'globalThis.System.import(')
-                    // Use the same logical IDs as capsule imports; computed IDs are already owned by the caller.
-                    if (
-                        node.source.type === 'Literal' &&
-                        typeof node.source.value === 'string' &&
-                        (node.source.value.startsWith('./') || node.source.value.startsWith('../'))
-                    ) {
-                        editor.overwrite(
-                            node.source.start,
-                            node.source.end,
-                            JSON.stringify(resolveLogicalChunkReference(filename, node.source.value))
-                        )
-                    }
-                    break
                 case 'AssignmentExpression':
                     rewriteExportAssignment(editor, node.left, node.start, model, filename)
                     break
@@ -578,24 +632,21 @@ function getImportedCapsule(
     return imported && classifyModule(imported).entryRole === 'capsule' ? imported : undefined
 }
 
-/**
- * Renders the dependency header in original import order.
- *
- * Side-effect imports always remain standalone `require` calls. Ordinary value imports share one required namespace per final
- * import declaration, while cross-domain capsule imports synchronously ask SystemJS for the namespace under its package-neutral
- * logical ID. Physical package placement remains the transport's responsibility.
- */
+/** Renders all native dependencies through the same import lowering, including the generated System import. */
 function renderImports(model: NativeModuleModel): string {
     return model.imports
         .map((importModel) => {
             if (importModel.capsuleBinding) {
                 const { imported, local, logicalId } = importModel.capsuleBinding
-                const namespace = `globalThis.System.importSync(${JSON.stringify(logicalId)})`
+                const system = importedExpression(model.imports[0]!.bindings[0]!)
+                const namespace = `${system}.importSync(${JSON.stringify(logicalId)})`
                 return `var ${local}=${memberExpression(namespace, imported)};`
             }
 
             const requireCall = `require(${JSON.stringify(importModel.reference)})`
-            if (importModel.bindings.length === 0) return `${requireCall};`
+            if (importModel.bindings.length === 0) {
+                return `${requireCall};`
+            }
             const importedValue =
                 importModel.interop === 'default'
                     ? `${model.defaultInterop}(${requireCall})`

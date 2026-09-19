@@ -28,19 +28,39 @@ function createHeap(setup: string) {
     return context
 }
 
-function assertDiscoveryFailure(setup: string, causeName: string): void {
-    const context = createHeap(setup)
-    assert.throws(
-        () => runtimeScript.runInContext(context),
-        (error) => {
-            assert.ok(isNativeError(error))
-            assert.equal(error.message, 'Unable to resolve globalThis')
-            assert.ok(isNativeError(error.cause))
-            assert.equal(error.cause.name, causeName)
-            return true
-        }
-    )
-    new Script('assert.equal(Object.hasOwn(Object.prototype, "__vpt_global__"), false)').runInContext(context)
+function assertDiscoveryFallback(context: ReturnType<typeof createHeap>): unknown {
+    // Capture diagnostics only in this isolated heap, without changing the test runner's console.
+    const errors: unknown[][] = []
+    context.console = { error: (...args: unknown[]) => errors.push(args) }
+    runtimeScript.runInContext(context)
+    const fallback: unknown = new Script('vptGlobal').runInContext(context)
+    assert.ok(fallback && typeof fallback === 'object')
+    const keys = Reflect.ownKeys(fallback)
+    assert.equal(keys.length, 1)
+    const [marker] = keys
+    assert.ok(typeof marker === 'symbol')
+    assert.equal(marker.description, 'fallback')
+    assert.equal(Symbol.keyFor(marker), undefined)
+    const cause: unknown = Reflect.get(fallback, marker)
+    assert.deepEqual(errors, [['Unable to resolve globalThis', cause]])
+    assert.deepEqual(Object.getOwnPropertyDescriptor(fallback, marker), {
+        value: cause,
+        writable: true,
+        enumerable: true,
+        configurable: true
+    })
+    new Script(`
+        assert.equal(Object.hasOwn(Object.prototype, '__vpt_global__'), false);
+        assert.notEqual(vptGlobal, this);
+        assert.equal(Object.getPrototypeOf(vptGlobal), Object.prototype);
+        assert.equal(typeof globalThis, 'undefined');
+        assert.equal(vptGlobal.Math, undefined);
+        // A fallback is a writable local object, not a recovered host or a copy of its built-ins.
+        vptGlobal.fixtureValue = 42;
+        assert.equal(vptGlobal.fixtureValue, 42);
+        assert.equal(Object.hasOwn(this, 'fixtureValue'), false);
+    `).runInContext(context)
+    return cause
 }
 
 test('exports only one shared native object across repeated ESM imports', async () => {
@@ -235,36 +255,58 @@ for (const name of ['globalThis', 'self', 'window']) {
     })
 }
 
-test('preserves an arbitrary thrown lookup cause and removes only the temporary prototype getter', () => {
+test('logs an arbitrary lookup cause, retains it on the fallback and removes only the temporary getter', () => {
     const context = createHeap(`
         delete this.globalThis;
         this.failure = { reason: 'host lookup failed' };
         Object.defineProperty(this, '__vpt_global__', { get() { throw failure; }, configurable: true });
         const descriptor = Object.getOwnPropertyDescriptor(this, '__vpt_global__');
     `)
-    assert.throws(
-        () => runtimeScript.runInContext(context),
-        (error) => {
-            assert.ok(isNativeError(error))
-            assert.equal(error.message, 'Unable to resolve globalThis')
-            assert.equal(error.cause, context.failure)
-            return true
-        }
-    )
+    assert.strictEqual(assertDiscoveryFallback(context), context.failure)
     new Script(`
-        assert.equal(Object.hasOwn(Object.prototype, '__vpt_global__'), false);
         assert.deepEqual(Object.getOwnPropertyDescriptor(this, '__vpt_global__'), descriptor);
     `).runInContext(context)
 })
 
 for (const restriction of ['preventExtensions', 'seal', 'freeze']) {
-    test(`preserves the failure cause when Object.${restriction} blocks discovery`, () => {
-        assertDiscoveryFailure(`delete this.globalThis; Object.${restriction}(Object.prototype);`, 'TypeError')
+    test(`returns a diagnostic fallback when Object.${restriction} blocks discovery`, () => {
+        const context = createHeap(`delete this.globalThis; Object.${restriction}(Object.prototype);`)
+        const cause = assertDiscoveryFallback(context)
+        assert.ok(isNativeError(cause))
+        assert.equal(cause.name, 'TypeError')
     })
 }
 
-test('cleans up after lookup fails on a host that does not inherit Object.prototype', () => {
-    assertDiscoveryFailure('delete this.globalThis; Object.setPrototypeOf(this, null);', 'ReferenceError')
+test('returns a diagnostic fallback and cleans up when the host does not inherit Object.prototype', () => {
+    const context = createHeap('delete this.globalThis; Object.setPrototypeOf(this, null);')
+    const cause = assertDiscoveryFallback(context)
+    assert.ok(isNativeError(cause))
+    assert.equal(cause.name, 'ReferenceError')
+})
+
+test('cleans up the temporary getter even when fallback logging throws', () => {
+    const context = createHeap(`
+        delete this.globalThis;
+        const lookupFailure = { reason: 'host lookup failed' };
+        this.loggingFailure = new Error('logging failed');
+        Object.defineProperty(this, '__vpt_global__', { get() { throw lookupFailure; }, configurable: true });
+        const descriptor = Object.getOwnPropertyDescriptor(this, '__vpt_global__');
+        this.console = {
+            error(message, cause) {
+                assert.equal(message, 'Unable to resolve globalThis');
+                assert.equal(cause, lookupFailure);
+                throw loggingFailure;
+            }
+        };
+    `)
+    assert.throws(
+        () => runtimeScript.runInContext(context),
+        (error) => error === context.loggingFailure
+    )
+    new Script(`
+        assert.equal(Object.hasOwn(Object.prototype, '__vpt_global__'), false);
+        assert.deepEqual(Object.getOwnPropertyDescriptor(this, '__vpt_global__'), descriptor);
+    `).runInContext(context)
 })
 
 for (const outcome of ['return', 'throw'] as const) {

@@ -130,6 +130,8 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                     code,
                     chunk,
                     chunks: meta.chunks,
+                    bootstrapModuleId: contract.runtime.modules.bootstrap,
+                    getPhysicalChunkId: placement.getPhysicalChunkId,
                     classifyModule: placement.classifyChunk,
                     sourcemap
                 })

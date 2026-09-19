@@ -217,6 +217,8 @@ function createAppHeap(chunks: readonly OutputChunk[], nativeURLs: boolean, targ
     sources.set('hmr/patches.js', 'module.exports = undefined;')
     // Native CommonJS caching preserves one bootstrap execution across App, Page, and component entry points.
     const cache = new Map<string, { exports: unknown }>()
+    // Record host lifecycle registrations to prove every emitted shell executes once, rather than returning an inert capsule.
+    const registrations: string[] = []
     // These native socket callbacks are assigned only by the emitted HMR runtime and driven explicitly by each test.
     let onMessage: ((event: { data: string } | { message: string }) => void) | undefined
     // This append-only journal records acknowledgements emitted through the fake native socket.
@@ -243,9 +245,15 @@ function createAppHeap(chunks: readonly OutputChunk[], nativeURLs: boolean, targ
             clearTimeout,
             wx: host,
             my: host,
-            App() {},
-            Page() {},
-            Component() {},
+            App() {
+                registrations.push('App')
+            },
+            Page() {
+                registrations.push('Page')
+            },
+            Component() {
+                registrations.push('Component')
+            },
             getCurrentPages: () => [],
             ...(nativeURLs ? { URL, URLSearchParams } : {})
         },
@@ -291,7 +299,8 @@ function createAppHeap(chunks: readonly OutputChunk[], nativeURLs: boolean, targ
             })
             onMessage(target === 'wx' ? { data } : { message: data })
         },
-        reports
+        reports,
+        registrations
     }
 }
 
@@ -334,8 +343,10 @@ function assertPolyfilledApp(heap: ReturnType<typeof createAppHeap>, structuredC
     const installedURL = heap.read('URL')
     heap.evaluate('pages/home/index.js')
     heap.evaluate('comp.js')
+    heap.evaluate('custom-wrapper.js')
+    assert.deepEqual(heap.registrations, ['App', 'Page', 'Component', 'Component'])
     assert.equal(heap.read('URL'), installedURL)
-    assert.equal(heap.read('globalThis["__core-js_shared__"].versions.length'), 1)
+    assert.equal(heap.read('this["__core-js_shared__"].versions.length'), 1)
 }
 
 for (const target of ['wx', 'zfb'] as const) {
@@ -349,18 +360,13 @@ for (const target of ['wx', 'zfb'] as const) {
         assert.equal(native.read('URL'), URL)
         assert.equal(native.read('URLSearchParams'), URLSearchParams)
 
-        // Execute the real pre-bootstrap graph and application capsule without installing a host globalThis alias.
-        // Native shells' renderer-generated System lookups are a separate integration boundary.
-        const recovered = createAppHeap(chunks, false, target)
-        recovered.read('delete this.globalThis;')
-        recovered.evaluate('common/polyfills.js')
-        assert.equal(recovered.read('typeof globalThis'), 'undefined')
-        assert.equal(recovered.read('typeof URL'), 'function')
-        recovered.evaluate('common/bootstrap.js')
-        recovered.read('System.importSync("app-capsule.js")')
-        assert.equal(recovered.read('polyfillProbe.hostURL'), true)
-        assert.equal(recovered.read('polyfillProbe.hostParams'), true)
-        assert.equal(recovered.read('typeof globalThis'), 'undefined')
+        // Enter through the real App/Page/Component shells, without a host globalThis alias or a manual System import.
+        for (const setup of ['delete this.globalThis;', 'let globalThis;']) {
+            const recovered = createAppHeap(chunks, false, target)
+            recovered.read(setup)
+            assertPolyfilledApp(recovered, 'undefined')
+            assert.equal(recovered.read('typeof globalThis'), 'undefined')
+        }
     })
 
     for (const mode of ['devtools', 'interpreter', 'rebuild'] as const) {

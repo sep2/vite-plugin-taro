@@ -1,11 +1,90 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { rolldown } from 'rolldown'
 import { build, normalizePath, resolveConfig } from 'vite'
 import { wrapPluginTransform } from '../../utils/vite.ts'
 import { clientTaroNativeId } from '../client/constant.ts'
 import { createWxMiniContract } from '../wx/plugins.ts'
 import { createZfbMiniContract } from '../zfb/plugins.ts'
 import { createMiniTargetPlugins } from './plugins.ts'
+
+test('native rendering resolves bootstrap from each output generation rather than an ambient global', async () => {
+    const contract = createWxMiniContract({
+        target: 'wx',
+        app: 'src/app.tsx',
+        pages: [],
+        appJson: {},
+        projectConfigJson: {}
+    })
+    const config = await resolveConfig({ configFile: false, plugins: createMiniTargetPlugins(contract) }, 'build')
+    const plugin = config.plugins.find((candidate) => candidate.name === 'vpt:mini')
+    const placement = config.plugins.find((candidate) => candidate.name === 'vpt:mini-placer')
+    assert.ok(plugin?.renderChunk)
+    assert.ok(placement?.renderStart && placement.renderChunk)
+    const { appShell, appCapsule, bootstrap } = contract.runtime.modules
+    const sources: ReadonlyMap<string, string> = new Map([
+        [appShell, `import config from ${JSON.stringify(appCapsule)}; App(config)`],
+        [appCapsule, 'export default { value: 42 }'],
+        [bootstrap, 'export const System = fixtureSystem']
+    ])
+    const plugins = [
+        {
+            name: 'test:mini-render-sources',
+            resolveId: (id: string) => (sources.has(id) ? id : undefined),
+            load: (id: string) => sources.get(id)
+        },
+        { name: placement.name, renderStart: placement.renderStart, renderChunk: placement.renderChunk },
+        { name: plugin.name, renderChunk: plugin.renderChunk }
+    ]
+    const bundle = await rolldown({
+        input: { app: appShell, capsule: appCapsule, loader: bootstrap },
+        plugins,
+        preserveEntrySignatures: 'strict'
+    })
+    try {
+        for (const prefix of ['first', 'second']) {
+            const result = await bundle.generate({ format: 'es', entryFileNames: `${prefix}/[name].js` })
+            const app = result.output.find((chunk) => chunk.type === 'chunk' && chunk.facadeModuleId === appShell)
+            assert.ok(app?.type === 'chunk')
+            const value = {}
+            // These per-generation journals prove the physical bootstrap path and exactly one shell activation.
+            const required: string[] = []
+            const registered: unknown[] = []
+            Function(
+                'require',
+                'App',
+                'globalThis',
+                app.code
+            )(
+                (id: string) => {
+                    required.push(id)
+                    return {
+                        System: {
+                            importSync(moduleId: string) {
+                                assert.equal(moduleId, `${prefix}/capsule.js`)
+                                return { default: value }
+                            }
+                        }
+                    }
+                },
+                (config: unknown) => registered.push(config),
+                undefined
+            )
+            assert.deepEqual(required, ['./loader.js'])
+            assert.deepEqual(registered, [value])
+        }
+    } finally {
+        await bundle.close()
+    }
+
+    // Placement owns generation isolation: a missing entry must not resolve through the preceding output plan.
+    const missing = await rolldown({ input: { app: appShell, capsule: appCapsule }, plugins })
+    try {
+        await assert.rejects(missing.generate({ format: 'es' }), /Mini Program placement is missing entry module:/)
+    } finally {
+        await missing.close()
+    }
+})
 
 for (const [target, createContract] of [
     ['wx', createWxMiniContract],

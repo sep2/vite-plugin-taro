@@ -13,8 +13,8 @@ import { type SystemJsReferenceKind, transformSystemJs } from './system-js/syste
  * - Native App, Page, and Component shells must start through the host's synchronous lifecycle APIs, while their application
  *   graph still needs ESM linking semantics such as cycles, live exports, dynamic imports, `import.meta`, and top-level await.
  * - The plugin therefore keeps native lifecycle shells as CommonJS and executes application "capsules" through the bundled
- *   SystemJS runtime. Native shells enter that graph through the language-global `System.importSync`, and asynchronous boundaries use
- *   the same runtime through `System.import`.
+ *   SystemJS runtime. Native shells enter that graph through bootstrap's exported `System.importSync`, and asynchronous
+ *   boundaries use the same runtime through `System.import`.
  *
  * What this renderer emits:
  *

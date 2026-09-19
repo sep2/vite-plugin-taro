@@ -268,6 +268,8 @@ System.importSync() 取得对应的注册参数对象
 调用 App()、Page() 或 Component()
 ```
 
+使用加载器的原生代码统一静态加载 bootstrap，复用一次 `require('./common/bootstrap.js')` 返回的命名空间，通过其中的 `System` 执行同步加载和动态导入，不依赖宿主提供 `globalThis` 变量。已有的 bootstrap 导入不会产生重复的 `require`。
+
 `System.importSync()` 会同步取得目标模块及其递归静态依赖，建立导出绑定，按依赖优先顺序执行，并返回模块命名空间。构建阶段已经保证这条同步依赖图全部位于主包。
 
 这个 API 只供 vpt 生成的原生入口使用，不是业务 API。启动依赖中如果出现顶层 `await`，模块图将无法同步完成，运行时会直接报错；需要异步工作的代码应放到启动后的动态导入边界。

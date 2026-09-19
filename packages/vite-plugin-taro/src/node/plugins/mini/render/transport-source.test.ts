@@ -148,7 +148,7 @@ for (const sourcemap of [false, true]) {
         assert.equal(load(lazy.fileName), pending.promise)
         pending.resolve(namespace)
         assert.equal(await pending.promise, namespace)
-        assert.throws(() => load(shell.fileName), /Unknown System module: app\.js/)
+        assert.throws(() => load(shell.fileName), { message: 'Unknown module: app.js' })
 
         if (!sourcemap) {
             assert.equal(result.map, null)
@@ -186,7 +186,7 @@ test('keeps default source maps and physical paths while normalizing logical rou
     })
     const load = evaluate(result.code, (id) => id)
     assert.equal(load('assets/page.js'), './page.js')
-    assert.throws(() => load(page.fileName), /Unknown System module/)
+    assert.throws(() => load(page.fileName), { message: `Unknown module: ${page.fileName}` })
     assert.ok(result.map?.mappings)
 })
 
@@ -201,7 +201,7 @@ test('emits a closed empty transport without loading native-only chunks', async 
     })
     assert.deepEqual(parseSync(transportChunk.fileName, result.code).errors, [])
     const load = evaluate(result.code, () => assert.fail('Empty transport must not require a module'))
-    assert.throws(() => load('missing.js'), /Unknown System module: missing\.js/)
+    assert.throws(() => load('missing.js'), { message: 'Unknown module: missing.js' })
 })
 
 test('requires exactly one transport slot before inserting generated routes', async () => {

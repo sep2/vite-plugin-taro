@@ -478,9 +478,9 @@ test('loads polyfills before SystemJS, installs amphibious transport and preserv
     const harness = {
         events,
         transport,
-        installSystem() {
-            events.push('install-system')
-            languageGlobal.System = loader
+        createSystem() {
+            events.push('create-system')
+            return loader
         }
     }
     // This isolated global must expose the side-effect mock before the bundled bootstrap evaluates it.
@@ -497,7 +497,8 @@ test('loads polyfills before SystemJS, installs amphibious transport and preserv
         entry: 'mini/amphibious/bootstrap.ts',
         mocks: {
             '\0vpt:mini-polyfills': "globalThis.harness.events.push('polyfills')",
-            '../systemjs/system-core.js': 'globalThis.harness.installSystem()'
+            '../../global/vpt-global.ts': 'export const vptGlobal = globalThis',
+            '../systemjs/system-core.js': 'export const System = globalThis.harness.createSystem()'
         },
         defines
     })
@@ -519,24 +520,13 @@ test('loads polyfills before SystemJS, installs amphibious transport and preserv
         }
     ])
 
-    assert.deepEqual(events, ['polyfills', 'install-system'])
+    assert.deepEqual(events, ['polyfills', 'create-system'])
     assert.strictEqual(transportExports.transport, transport)
+    assert.strictEqual(exports.System, loader)
+    assert.strictEqual(languageGlobal.System, loader)
     assert.strictEqual(loader.instantiate, transport)
     assert.equal(loaded, 'loaded')
     assert.deepEqual(preloadCalls, ['load'])
-
-    assert.throws(
-        () =>
-            executeRuntimeEntry(
-                code,
-                createExecutionContext({
-                    events: [],
-                    transport,
-                    installSystem() {}
-                })
-            ),
-        /SystemJS failed to initialize in the Mini Program runtime/
-    )
 })
 
 test('attaches Mini hooks to the original API object without invoking platform APIs', async () => {

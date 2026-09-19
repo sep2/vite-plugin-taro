@@ -23,8 +23,18 @@ const runtimeModules = {
 const { appCapsule: appCapsulePath, bootstrap: bootstrapPath } = runtimeModules
 const classifyModule = createMiniModuleClassifier(runtimeModules)
 
-function renderNative(input: Omit<Parameters<typeof renderNativeWithRuntime>[0], 'classifyModule'>) {
-    return renderNativeWithRuntime({ ...input, classifyModule: classifyModule })
+function renderNative(
+    input: Omit<
+        Parameters<typeof renderNativeWithRuntime>[0],
+        'classifyModule' | 'bootstrapModuleId' | 'getPhysicalChunkId'
+    >
+) {
+    return renderNativeWithRuntime({
+        ...input,
+        bootstrapModuleId: bootstrapPath,
+        getPhysicalChunkId: (chunk) => (typeof chunk === 'string' ? 'assets/bootstrap-a.js' : chunk.fileName),
+        classifyModule: classifyModule
+    })
 }
 
 function chunk({
@@ -69,6 +79,7 @@ export { instantiate }`
     )
 
     assert.deepEqual(requiredPaths, ['../transport.js'])
+    assert.doesNotMatch(result.code, /bootstrap-a|\.System/)
     assert.strictEqual(commonJsModule.exports.instantiate, instantiate)
     assert.ok(result.map)
     assert.deepEqual(result.map.sources, ['assets/bootstrap-a.js'])
@@ -111,19 +122,88 @@ Page(config)`
     )(
         (id: string) => {
             requiredPaths.push(id)
-            return {}
+            return { System: system }
         },
-        { System: system },
+        undefined,
         (registeredConfig: unknown) => registrations.push(registeredConfig)
     )
 
     assert.strictEqual(registrations[0], config)
     assert.deepEqual(requiredPaths, ['./assets/bootstrap-a.js'])
     assert.deepEqual(importedModuleIds, ['assets/module-b.js'])
-    assert.doesNotMatch(result.code, /import\(/)
+    assert.doesNotMatch(result.code, /import\(|__nativeRequire/)
     assert.ok(result.map)
     assert.deepEqual(result.map.sources, ['app.js'])
+    assert.deepEqual(result.map.sourcesContent, [source])
 })
+
+for (const { declaration, read } of [
+    { declaration: "import './assets/bootstrap-a.js'", read: 'undefined' },
+    { declaration: "import { System as loader } from './assets/bootstrap-a.js'", read: 'loader' },
+    { declaration: "import * as bootstrap from './assets/bootstrap-a.js'", read: 'bootstrap.System' },
+    { declaration: "import bootstrap from './assets/bootstrap-a.js'", read: 'bootstrap.System' }
+]) {
+    test(`reuses the bootstrap namespace for dynamic imports: ${declaration}`, async () => {
+        const result = renderNative({
+            code: `${declaration};
+                export const value = ${read};
+                export const read = () => ${read};
+                export const load = (__nativeImport, __nativeSystem, require, System, globalThis) => import('feature.js');
+            `,
+            chunk: chunk({ fileName: 'app.js', moduleIds: ['/native-app'], isEntry: true }),
+            chunks: {},
+            sourcemap: false
+        })
+        // The export cell and journal capture generated module behavior without an ambient globalThis binding.
+        const exports: Record<string, unknown> = {}
+        const requiredPaths: string[] = []
+        const namespace = { value: 42 }
+        const pending = Promise.resolve(namespace)
+        const system = {
+            import(id: string) {
+                assert.strictEqual(this, system)
+                assert.equal(id, 'feature.js')
+                return pending
+            }
+        }
+        // This mutable dependency models live named and default exports without re-evaluating the importer.
+        const dependency = { __esModule: true, System: system, default: { System: system } }
+        Function(
+            'require',
+            'exports',
+            'globalThis',
+            result.code
+        )(
+            (id: string) => {
+                requiredPaths.push(id)
+                return dependency
+            },
+            exports,
+            undefined
+        )
+        assert.strictEqual(exports.value, read === 'undefined' ? undefined : system)
+        const load = exports.load
+        assert.ok(typeof load === 'function')
+        assert.strictEqual(load(), pending)
+        assert.strictEqual(await load(), namespace)
+        const replacement = Promise.resolve({ value: 43 })
+        const replacementSystem = {
+            import(id: string) {
+                assert.strictEqual(this, replacementSystem)
+                assert.equal(id, 'feature.js')
+                return replacement
+            }
+        }
+        dependency.System = replacementSystem
+        dependency.default.System = replacementSystem
+        const readValue = exports.read
+        assert.ok(typeof readValue === 'function')
+        assert.strictEqual(readValue(), read === 'undefined' ? undefined : replacementSystem)
+        assert.strictEqual(load(), replacement)
+        assert.deepEqual(requiredPaths, ['./assets/bootstrap-a.js'])
+        assert.doesNotMatch(result.code, /__nativeRequire|globalThis\.System/)
+    })
+}
 
 test('routes native dynamic imports through SystemJS without changing promises or namespaces', async () => {
     const filename = 'common/vendor.js'
@@ -160,6 +240,8 @@ test('routes native dynamic imports through SystemJS without changing promises o
     const exports: Record<string, unknown> = {}
     // This journal proves argument evaluation order and one loader call per import expression.
     const events: string[] = []
+    // Bootstrap is a static dependency; dynamic loader calls must not require it again.
+    const requiredPaths: string[] = []
     const system = {
         import(id: string) {
             assert.equal(this, system)
@@ -174,6 +256,10 @@ test('routes native dynamic imports through SystemJS without changing promises o
         result.code
     )(
         (id: string) => {
+            requiredPaths.push(id)
+            if (id === '../assets/bootstrap-a.js') {
+                return { System: system }
+            }
             assert.equal(id, './resolver.js')
             return {
                 resolveId() {
@@ -183,8 +269,9 @@ test('routes native dynamic imports through SystemJS without changing promises o
             }
         },
         exports,
-        { System: system }
+        undefined
     )
+    assert.deepEqual(requiredPaths, ['../assets/bootstrap-a.js', './resolver.js'])
     assert.equal(exports.text, 'import(moduleId)')
     assert.deepEqual(events, [])
     for (const name of ['loadRelative', 'loadParent', 'loadExternal', '__hmr_import', 'loadComputed']) {
@@ -197,6 +284,7 @@ test('routes native dynamic imports through SystemJS without changing promises o
     const load = exports.__hmr_import
     assert.ok(typeof load === 'function')
     await assert.rejects(load('missing'), (error) => error === missing)
+    assert.deepEqual(requiredPaths, ['../assets/bootstrap-a.js', './resolver.js'])
     assert.deepEqual(events, [
         'load:common/lazy.js',
         'load:sub/p_lazy/feature.js',
@@ -206,6 +294,109 @@ test('routes native dynamic imports through SystemJS without changing promises o
         'load:common/lazy.js',
         'load:missing'
     ])
+})
+
+test('resolves loader imports from placed paths without changing logical dynamic-import identities', async () => {
+    const nativeChunk = chunk({ fileName: 'common/worker.js', moduleIds: ['/worker'], isEntry: false })
+    // Observe the exact inputs to placement: the importer chunk and bootstrap entry identity, not guessed filenames.
+    const lookups: (Rolldown.RenderedChunk | string)[] = []
+    const result = renderNativeWithRuntime({
+        code: 'export const load = () => import("./feature.js")',
+        chunk: nativeChunk,
+        chunks: {},
+        bootstrapModuleId: bootstrapPath,
+        getPhysicalChunkId(input) {
+            lookups.push(input)
+            return typeof input === 'string' ? 'runtime/loader.js' : 'sub/p_fixture/common/worker.js'
+        },
+        classifyModule,
+        sourcemap: false
+    })
+    assert.deepEqual(lookups, [nativeChunk, bootstrapPath])
+    // These local cells capture the generated dependency and published function before executing the dynamic load.
+    const required: string[] = []
+    const exports: Record<string, unknown> = {}
+    const value = { feature: true }
+    Function(
+        'require',
+        'exports',
+        result.code
+    )((id: string) => {
+        required.push(id)
+        return {
+            System: {
+                import(moduleId: string) {
+                    assert.equal(moduleId, 'common/feature.js')
+                    return Promise.resolve(value)
+                }
+            }
+        }
+    }, exports)
+    assert.deepEqual(required, ['../../../runtime/loader.js'])
+    assert.ok(typeof exports.load === 'function')
+    assert.strictEqual(await exports.load(), value)
+})
+
+test('keeps loader access hygienic across a static bootstrap cycle', async () => {
+    const filename = 'common/bootstrap.js'
+    const result = renderNativeWithRuntime({
+        code: `
+            export function load(require, System, globalThis, __nativeImport, __nativeImport1, __nativeSystem, __nativeSystem1, id) {
+                return import(id)
+            }
+        `,
+        chunk: chunk({ fileName: filename, moduleIds: [bootstrapPath], isEntry: true }),
+        chunks: {},
+        bootstrapModuleId: bootstrapPath,
+        getPhysicalChunkId: () => filename,
+        classifyModule,
+        sourcemap: false
+    })
+    // CommonJS caches the export cell before evaluation. Capture that namespace, not its still-uninitialized System value.
+    const exports: Record<string, unknown> = {}
+    const requiredPaths: string[] = []
+    const namespace = { value: 42 }
+    const pending = Promise.resolve(namespace)
+    const system = {
+        import(id: string) {
+            assert.strictEqual(this, system)
+            assert.equal(id, 'feature.js')
+            return pending
+        }
+    }
+    Function(
+        'require',
+        'exports',
+        'globalThis',
+        result.code
+    )(
+        (id: string) => {
+            requiredPaths.push(id)
+            assert.equal(id, './bootstrap.js')
+            return exports
+        },
+        exports,
+        undefined
+    )
+    assert.deepEqual(requiredPaths, ['./bootstrap.js'])
+    exports.System = system
+    const load = exports.load
+    assert.ok(typeof load === 'function')
+    const unavailable = () => assert.fail('A nested binding captured the generated loader reference')
+    const loading = load(
+        unavailable,
+        undefined,
+        undefined,
+        unavailable,
+        unavailable,
+        unavailable,
+        unavailable,
+        'feature.js'
+    )
+    assert.strictEqual(loading, pending)
+    assert.strictEqual(await loading, namespace)
+    assert.deepEqual(requiredPaths, ['./bootstrap.js'])
+    assert.doesNotMatch(result.code, /globalThis\.System/)
 })
 
 test('renders declaration exports, quoted imports, and unrelated destructuring', () => {

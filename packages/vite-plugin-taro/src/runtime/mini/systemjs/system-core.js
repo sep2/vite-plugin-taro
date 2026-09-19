@@ -364,6 +364,6 @@ function postOrderExec(loader, load, seen) {
     }
 }
 
-globalThis.System = new SystemJS()
+export const System = new SystemJS()
 
 // biome-ignore-end lint: vendored SystemJS core

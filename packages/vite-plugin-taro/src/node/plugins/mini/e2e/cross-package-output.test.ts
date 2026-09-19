@@ -3,6 +3,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { build, type OutputChunk, type Plugin } from 'rolldown'
 import { normalizePath } from 'vite'
+import { System as createdSystem } from '../../../../runtime/mini/systemjs/system-core.js'
 import type { RuntimeModulesContract } from '../mini-contract.ts'
 import { createMiniModuleClassifier } from '../module/module.ts'
 import { createPlacement, type Placement } from '../placer/placement.ts'
@@ -11,7 +12,7 @@ import { renderCapsule } from '../render/capsule.ts'
 import { renderNative } from '../render/native.ts'
 import { materializeTransport } from '../render/transport.ts'
 
-await import('../../../../runtime/mini/systemjs/system-core.js')
+const system: System.Loader = createdSystem
 
 /**
  * Logical graph exercised by this production-output test (`──▶` static, `┄┄▶` dynamic):
@@ -74,6 +75,7 @@ const modules: Readonly<Record<string, string>> = {
         export const transport = __VPT_TRANSPORT__
     `,
     [runtimeModules.bootstrap]: `
+        export const System = fixtureSystem
         export const loadSubpackage = () => import('${subpackageAId}')
         export const loadById = (id) => import(/* @vite-ignore */ id)
     `,
@@ -197,6 +199,8 @@ function createMiniOutputPlugin(): Plugin {
                 code,
                 chunk,
                 chunks: meta.chunks,
+                bootstrapModuleId: runtimeModules.bootstrap,
+                getPhysicalChunkId: placement.getPhysicalChunkId,
                 classifyModule: classifyModule,
                 sourcemap
             })
@@ -300,7 +304,14 @@ function createNativeEvaluator(chunks: readonly OutputChunk[]): NativeEvaluator 
             // A microtask boundary mocks WeChat's promise-returning require.async instead of evaluating the file eagerly.
             async: (specifier: string) => Promise.resolve().then(() => load(specifier, 'async'))
         })
-        Function('require', 'module', 'exports', chunk.code)(nativeRequire, commonJsModule, commonJsModule.exports)
+        Function(
+            'require',
+            'module',
+            'exports',
+            'fixtureSystem',
+            'globalThis',
+            chunk.code
+        )(nativeRequire, commonJsModule, commonJsModule.exports, system, undefined)
         return commonJsModule.exports
     }
 
@@ -338,7 +349,6 @@ test('executes a complex nested static and dynamic graph across production wx su
     const transportExports = native.evaluate(output.transport.fileName)
     requireTransportExports(transportExports)
 
-    const system = globalThis.System
     // The production bootstrap installs this mutable transport hook once for the application heap.
     system.instantiate = transportExports.transport
 

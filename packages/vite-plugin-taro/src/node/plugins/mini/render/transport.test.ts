@@ -41,6 +41,8 @@ const transportCode = renderNative({
     code: transportJavaScript,
     chunk: { fileName: 'transport.js' } as Rolldown.RenderedChunk,
     chunks: {},
+    bootstrapModuleId: runtimeModules.bootstrap,
+    getPhysicalChunkId: () => assert.fail('Transport needs no loader dependency'),
     classifyModule: classifyModule,
     sourcemap: false
 }).code
@@ -167,7 +169,7 @@ test('materializes capsule switch cases with literal physical paths', async () =
 
     assert.strictEqual(transport('assets/chunks/lazy-b.js'), capsule)
     assert.deepEqual(evaluated.requiredPaths, ['./assets/chunks/lazy-b.js'])
-    assert.throws(() => transport('missing.js'), /Unknown System module: missing\.js/)
+    assert.throws(() => transport('missing.js'), { message: 'Unknown module: missing.js' })
 
     const requireArguments = [...source.matchAll(/\brequire\(([^)]+)\)/g)].map((match) => JSON.parse(match[1]))
     assert.deepEqual(requireArguments, [
@@ -248,6 +250,6 @@ test('rejects an amphibious module outside the main package', async () => {
                 'assets/runtime.js': 'sub/p_runtime/assets/runtime.js'
             }
         }),
-        /Amphibious Mini Program module must be in the main package/
+        { message: 'Amphibious module must be in the main package: assets/runtime.js' }
     )
 })
