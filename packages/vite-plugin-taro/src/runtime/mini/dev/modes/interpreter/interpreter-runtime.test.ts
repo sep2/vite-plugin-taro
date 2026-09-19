@@ -187,6 +187,54 @@ test('reads live app globals while retaining patch-local bindings outside the ho
     assert.deepEqual(reports, [{ buildId: 'build', kind: 'applied', seq: 1 }])
 })
 
+for (const ambient of ['undefined', 'another runtime'] as const) {
+    test(`interpreted patches retain their caller when the host runtime binding is ${ambient}`, async (context) => {
+        const first = await createTestHarness()
+        const second = await createTestHarness()
+        const descriptor = Object.getOwnPropertyDescriptor(globalThis, '__rolldown_runtime__')
+        assert.ok(descriptor)
+        context.after(() => Object.defineProperty(globalThis, '__rolldown_runtime__', descriptor))
+        if (ambient === 'undefined') {
+            // Sval creates a non-configurable but writable host slot. Clear its value to test interpreter-local lookup.
+            assert.equal(Reflect.set(globalThis, '__rolldown_runtime__', undefined), true)
+        }
+        const before = Object.getOwnPropertyDescriptor(globalThis, '__rolldown_runtime__')
+        for (const harness of [first, second]) {
+            registerInitialBoundary(harness.runtime, () => {})
+            const socket = harness.sockets[0]
+            assert.ok(socket)
+            socket.emitMessage({
+                kind: 'patches',
+                buildId: 'build',
+                patches: [
+                    {
+                        seq: 1,
+                        changedIds: ['page'],
+                        code: `
+                        __rolldown_runtime__.registerFactory('page', 'esm', function(moduleId) {
+                            __rolldown_runtime__.registerModule(moduleId, { exports: {
+                                readRuntime: () => __rolldown_runtime__
+                            } });
+                            __rolldown_runtime__.createModuleHotContext(moduleId).accept();
+                        });
+                    `
+                    }
+                ]
+            })
+            assert.deepEqual(harness.reports, [{ buildId: 'build', kind: 'applied', seq: 1 }])
+        }
+        // Read after both wrappers have finished to detect global lookup or one shared mutable interpreter binding.
+        for (const { runtime } of [first, second]) {
+            runtime.removeModuleCache('page')
+            const exports: unknown = runtime.initModule('page')
+            assert.ok(exports && typeof exports === 'object' && 'readRuntime' in exports)
+            assert.ok(typeof exports.readRuntime === 'function')
+            assert.strictEqual(exports.readRuntime(), runtime)
+        }
+        assert.deepEqual(Object.getOwnPropertyDescriptor(globalThis, '__rolldown_runtime__'), before)
+    })
+}
+
 test('ignores unrelated events and stops stale-build source without interpreting it', async () => {
     const { reports, sockets } = await createTestHarness()
     const socket = sockets[0]

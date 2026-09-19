@@ -12,7 +12,7 @@ import { injectPageHmr as injectDevtoolsPageHmr } from './page-hmr.ts'
  * factories but does not execute application modules, allowing the shared runtime to install a complete batch before one render.
  */
 type DevtoolsPatch = RuntimePatch & {
-    readonly factory: () => void
+    readonly factory: (runtime: MiniHmrRuntime) => void
 }
 
 type HmrPageConfig = Parameters<typeof injectDevtoolsPageHmr>[0]
@@ -23,20 +23,18 @@ class DevtoolsHmrRuntime extends MiniHmrRuntime {
     applyPatches(payload: Readonly<{ buildId: string; patches: readonly DevtoolsPatch[] }> | undefined): void {
         // The initial physical dependency exports undefined until the host has a patch range. Once present, apply synchronously:
         // imports below the Page banner must resolve against the new registry during this same native Page evaluation.
-        if (!payload) return
+        if (!payload) {
+            return
+        }
 
-        this.applyPatchPayload(payload, installDevtoolsPatch)
+        // The wrapper's lexical parameter replaces the generated patch's assumption of a host-global runtime binding.
+        this.applyPatchPayload(payload, (patch) => patch.factory(this))
     }
 
     /** Preserves the mounted Page connection while DevTools re-registers its static config. */
     injectPageHmr(config: HmrPageConfig): HmrPageConfig {
         return injectDevtoolsPageHmr(config)
     }
-}
-
-/** Executes only the native registration program; graph application remains owned by `MiniHmrRuntime`. */
-function installDevtoolsPatch(patch: DevtoolsPatch): void {
-    patch.factory()
 }
 
 /** Creates one platform-connected adapter for installation by a thin target runtime entry. */

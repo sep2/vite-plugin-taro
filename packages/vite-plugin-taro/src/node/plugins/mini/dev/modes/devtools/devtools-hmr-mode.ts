@@ -50,6 +50,7 @@ export function renderInitialDevtoolsPatches(): string {
  * DevTools re-executes a live Page because this physical dependency changed. The Page banner passes the exported payload to the
  * persistent App runtime before importing its capsule. Keeping the module inert—rather than applying factories at top level—
  * makes that ordering explicit, lets the runtime reject stale build IDs, and makes replay by several live Pages safe.
+ * The caller-supplied parameter binds every generated runtime reference, including closures retained for lazy modules.
  */
 export function renderDevtoolsPatches(buildId: string, patches: readonly PatchUpdate[]): string {
     if (patches.length === 0) {
@@ -58,7 +59,7 @@ export function renderDevtoolsPatches(buildId: string, patches: readonly PatchUp
 
     const rendered = patches.map(
         (patch) =>
-            `{seq: ${patch.seq}, changedIds: ${JSON.stringify(patch.changedIds)}, factory: () => {\n${patch.code}\n}}`
+            `{seq: ${patch.seq}, changedIds: ${JSON.stringify(patch.changedIds)}, factory: (__rolldown_runtime__) => {\n${patch.code}\n}}`
     )
 
     return `module.exports = {buildId: ${JSON.stringify(buildId)}, patches: [${rendered.join(',')}]};\n`

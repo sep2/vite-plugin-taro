@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { runInNewContext } from 'node:vm'
 import type { RuntimeModulesContract } from '../../../mini-contract.ts'
 import type { PatchUpdate } from '../../hmr-protocol.ts'
 import {
@@ -89,6 +90,41 @@ test('renders initial and cumulative patches as inert CommonJS data', () => {
     assert.match(source, /^module\.exports = \{buildId: "build", patches:/)
     assert.match(source, /registerLatestFactory\(\)/)
     assert.doesNotMatch(source, /^__rolldown_runtime__/)
+})
+
+test('native patch wrappers capture the supplied runtime without looking up a host binding', () => {
+    const code = `
+        __rolldown_runtime__.registerFactory(() => __rolldown_runtime__);
+        // The patch body, including this spelling in text, is never rewritten.
+        const marker = '__rolldown_runtime__';
+    `
+    const source = renderDevtoolsPatches('build', [{ ...patch, code }])
+    assert.ok(source.includes(code))
+    const module: { exports: unknown } = { exports: undefined }
+    const context = { module }
+    Object.defineProperty(context, '__rolldown_runtime__', {
+        get() {
+            assert.fail('Patch execution must not read the host runtime binding')
+        }
+    })
+    runInNewContext(`"use strict";\n${source}`, context, { contextCodeGeneration: { strings: false, wasm: false } })
+    const payload = module.exports
+    assert.ok(payload && typeof payload === 'object' && 'patches' in payload && Array.isArray(payload.patches))
+    const factory: unknown = payload.patches[0].factory
+    assert.ok(typeof factory === 'function')
+    // The same inert payload may be installed by separate heaps; closures must retain each call's own parameter.
+    const closures: Array<() => unknown> = []
+    const runtimes = [0, 1].map(() => ({
+        registerFactory(closure: () => unknown) {
+            closures.push(closure)
+        }
+    }))
+    for (const runtime of runtimes) {
+        factory(runtime)
+    }
+    assert.equal(closures.length, 2)
+    assert.strictEqual(closures[0](), runtimes[0])
+    assert.strictEqual(closures[1](), runtimes[1])
 })
 
 test('rejects an empty cumulative patch range', () => {

@@ -18,7 +18,7 @@ type TestHotContext = Readonly<{
 type TestPatch = Readonly<{
     seq: number
     changedIds: string[]
-    factory: () => void
+    factory: (runtime: TestRuntime) => void
 }>
 
 type TestRuntime = DevRuntime &
@@ -351,6 +351,31 @@ test('reports the committed application frontier through the exact host protocol
             data: { buildId: 'build', kind: 'applied', seq: 1 }
         }
     ])
+})
+
+test('passes the receiving runtime to patch factories and their retained module closures', async () => {
+    const { runtime, reports } = await createTestHarness()
+    registerInitialModule({ runtime, moduleId: 'page', moduleExports: { value: 'old' } })
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            {
+                seq: 1,
+                changedIds: ['page'],
+                factory(receivingRuntime) {
+                    assert.strictEqual(receivingRuntime, runtime)
+                    receivingRuntime.registerFactory('page', 'esm', (moduleId) => {
+                        receivingRuntime.registerModule(moduleId, { exports: { value: 'new' } })
+                        receivingRuntime.createModuleHotContext(moduleId).accept()
+                    })
+                }
+            }
+        ]
+    })
+    assert.deepEqual(runtime.loadExports('page'), { value: 'new' })
+    assert.deepEqual(reports, [{ buildId: 'build', kind: 'applied', seq: 1 }])
+    runtime.removeModuleCache('page')
+    assert.deepEqual(runtime.initModule('page'), { value: 'new' })
 })
 
 test('keeps the first App-heap identity when initialize is replayed', async (context) => {

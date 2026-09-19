@@ -18,6 +18,8 @@ class InterpreterHmrRuntime extends MiniHmrRuntime {
         // Trusted application patches share live host globals, including APIs installed during app startup, rather than Sval's
         // module-time sandbox snapshot. A function scope keeps patch-local declarations isolated, as in native HMR factories.
         const interpreter = new Sval({ sandBox: false })
+        // Bind this interpreter's runtime once; Sval also publishes the same singleton on its selected global object.
+        interpreter.import({ __rolldown_runtime__: this })
         this.installPatch = (patch) => interpreter.run(`(() => {\n${patch.code}\n})();`)
     }
 
