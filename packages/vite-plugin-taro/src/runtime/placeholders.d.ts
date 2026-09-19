@@ -1,6 +1,7 @@
 import type { Route, SpaRouterConfig } from 'vite-plugin-taro-runtime/router/types/router'
 
 declare global {
+    const __VPT_NATIVE_GLOBAL_THIS__: typeof globalThis
     const __VPT_H5_APP_CONFIG__: SpaRouterConfig
     const __VPT_H5_ROUTES__: Route[]
     const __VPT_APP_CONFIG__: Record<string, unknown>
