@@ -166,8 +166,6 @@ const fixRolldownRuntime = memoize((code: string) => {
         lang: 'js',
         target: esTarget,
         sourcemap: false,
-        // The nested build has finished injection. Restore its native probe while lowering syntax, without another parse.
-        define: { __VPT_NATIVE_GLOBAL_THIS__: 'globalThis' },
         assumptions: { setPublicClassFields: true }
     })
 })

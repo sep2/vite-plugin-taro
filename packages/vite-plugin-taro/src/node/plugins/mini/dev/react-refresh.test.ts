@@ -8,6 +8,7 @@ import { normalizePath, resolveConfig } from 'vite'
 import vpt from '../../../../index.ts'
 import type { VptOptions } from '../../../../options.ts'
 import { packageRequire } from '../../../utils/packages.ts'
+import { createMiniGlobalPlugin } from '../global/create-mini-global-plugin.ts'
 import {
     createMiniReactRefreshTransforms,
     injectReactRefreshRendererDependency,
@@ -63,6 +64,12 @@ for (const target of ['wx', 'zfb'] as const) {
         )
         const runtime = transformRefreshRuntime(await readFile(runtimePath, 'utf8'))
         const entry = path.join(path.dirname(runtimePath), 'preamble-test.js')
+        const globalPlugin = createMiniGlobalPlugin({
+            getPhysicalChunkId(chunk) {
+                assert.ok(typeof chunk !== 'string')
+                return chunk.fileName
+            }
+        })
         const result = await build({
             input: entry,
             plugins: [
@@ -95,6 +102,13 @@ export function evaluateBoundary() {
                             return entry
                         }
                     }
+                },
+                {
+                    name: globalPlugin.name,
+                    resolveId: globalPlugin.resolveId,
+                    load: globalPlugin.load,
+                    renderChunk: globalPlugin.renderChunk,
+                    generateBundle: globalPlugin.generateBundle
                 }
             ],
             transform: {
@@ -108,7 +122,23 @@ export function evaluateBoundary() {
         assert.ok(chunk?.type === 'chunk')
         assert.match(chunk.code, /can't detect preamble/)
         // Isolate the shared protocol state from Node and from the other target's runtime.
-        const context = { exports: {}, global: {}, setTimeout, clearTimeout, console }
+        const provider = result.output.find((chunk) => chunk.fileName === 'common/vpt-global.js')
+        assert.ok(provider?.type === 'chunk')
+        const context = {
+            exports: {},
+            global: {},
+            setTimeout,
+            clearTimeout,
+            console,
+            require(request: string) {
+                assert.equal(request, './common/vpt-global.js')
+                return globalExports
+            }
+        }
+        const globalExports: unknown = runInNewContext(
+            `(function(exports) { ${provider.code}; return exports; })({})`,
+            context
+        )
         runInNewContext(chunk.code, context)
         assert.equal(config.define?.__REACT_DEVTOOLS_GLOBAL_HOOK__, undefined)
         assert.equal(runInNewContext('typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.inject', context), 'function')

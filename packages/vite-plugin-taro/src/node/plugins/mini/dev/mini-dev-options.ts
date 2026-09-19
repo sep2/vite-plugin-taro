@@ -5,7 +5,6 @@ import { type DevEngine, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
 import { memoize } from '../../../utils/memoize.ts'
 import type { MiniContract } from '../mini-contract.ts'
-import { vptGlobalId } from '../module/module.ts'
 import type { MiniHmrMode } from './hmr-mode.ts'
 
 type BundledDevRolldownOptions = InputOptions & {
@@ -91,10 +90,9 @@ export function installMiniDevOptions({
         rolldownOptions.experimental.devMode = {
             // Retain unknown user/forward-compatible devMode fields while the three explicit Mini invariants below win.
             ...(typeof existingDevMode === 'object' ? existingDevMode : {}),
-            // Install the self-contained runtime selected once by the HMR mode. Nested bundling resolves all adapter imports into
-            // one implementation string because Rolldown injects it into a generated runtime chunk where ordinary module imports
-            // are unavailable. Patch adapters initialize delivery and reports; rebuild reuses the native adapter without adding
-            // its initialization or Page delivery edges.
+            // Bundle the selected adapter and pass the shared provider into its lexical globalThis wrapper at startup.
+            // This needs neither the application's virtual binding nor its HMR registry. Patch adapters initialize delivery
+            // and reports; rebuild omits delivery edges.
             implement: await bundleRuntimeSource(hmrMode.runtimeFile),
             // Produce a complete output graph on the initial build. Lazy per-request compilation cannot establish the closed
             // App/Page graph, native companions, style sidecars, and build identity required before any patch is admitted.
@@ -178,11 +176,9 @@ function createViteReporter(server: ViteDevServer) {
  * nested builds without leaking mutable Rolldown output objects between engines.
  */
 const bundleRuntimeSource = memoize(async function bundleRuntimeSource(runtimeFile: string): Promise<string> {
-    // Rolldown inserts this self-contained implementation after the application's source injection. Apply the same global
-    // discovery here, without importing the application bootstrap or its HMR-dependent global entry during runtime startup.
+    // Keep this build ordinary: a lexical parameter below supplies the shared global to every bundled runtime module.
     const result = await build({
         input: runtimeFile,
-        transform: { inject: { globalThis: [vptGlobalId, 'vptGlobal'] } },
         output: {
             format: 'iife',
             // The combined physical runtime owns final minification, so minifying this embedded source would duplicate work.
@@ -193,6 +189,7 @@ const bundleRuntimeSource = memoize(async function bundleRuntimeSource(runtimeFi
         write: false
     })
 
-    // Keep the native probe opaque until the assembled runtime's existing lowering pass restores it after injection.
-    return result.output[0].code
+    // Bind once, before initialization. The parameter also prevents the outer build from injecting a virtual-module import.
+    // Final rendering resolves the single provider-load slot relative to the assembled runtime's physical path.
+    return `(function (globalThis) {\n${result.output[0].code}\n})(__VPT_GLOBAL__);`
 })

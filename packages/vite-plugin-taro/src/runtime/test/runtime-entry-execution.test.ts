@@ -496,8 +496,8 @@ test('loads polyfills before SystemJS, installs amphibious transport and preserv
     const code = await bundleRuntimeEntry({
         entry: 'mini/amphibious/bootstrap.ts',
         mocks: {
+            '\0vpt:global-binding': 'export const vptGlobal = globalThis',
             '\0vpt:mini-polyfills': "globalThis.harness.events.push('polyfills')",
-            '../../global/vpt-global.ts': 'export const vptGlobal = globalThis',
             '../systemjs/system-core.js': 'export const System = globalThis.harness.createSystem()'
         },
         defines

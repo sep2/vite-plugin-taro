@@ -7,12 +7,7 @@ import { isNativeError } from 'node:util/types'
 import { constants, createContext, Script } from 'node:vm'
 
 const filename = fileURLToPath(new URL('./vpt-global.ts', import.meta.url))
-const nativePlaceholder = '__VPT_NATIVE_GLOBAL_THIS__'
-// Materialize only the compiler-owned placeholder, preserving offsets for coverage of isolated VM executions.
-const moduleSource = stripTypeScriptTypes(await readFile(filename, 'utf8')).replaceAll(
-    nativePlaceholder,
-    'globalThis'.padEnd(nativePlaceholder.length)
-)
+const moduleSource = stripTypeScriptTypes(await readFile(filename, 'utf8'))
 // ESM is strict. Replace its first comment, after erased types, without shifting any runtime source offsets.
 const runtimeScript = new Script(
     moduleSource

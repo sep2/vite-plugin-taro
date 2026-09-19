@@ -5,11 +5,9 @@ declare const __vpt_global__: GlobalThisType
 
 /** Use the native object when available; otherwise recover it with the ungap/global-this getter technique. */
 function getGlobalThis(this: GlobalThisType | void): GlobalThisType {
-    // This file must not have any raw reference to the `globalThis` free binding,
-    // Otherwise it creates a circular dependency because rolldown inject globalThis import from this file.
-    // This native probe is restored in an isolated output entry after globalThis injection.
-    if (typeof __VPT_NATIVE_GLOBAL_THIS__ === 'object' && __VPT_NATIVE_GLOBAL_THIS__) {
-        return __VPT_NATIVE_GLOBAL_THIS__
+    // This provider is bundled independently, without global injection or HMR instrumentation.
+    if (typeof globalThis === 'object' && globalThis) {
+        return globalThis
     }
 
     // worker

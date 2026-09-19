@@ -3,6 +3,7 @@ import { esTarget } from '../../utils/constant.ts'
 import { createExactModuleIdFilter } from '../../utils/modules.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { createMiniDevelopmentPlugin } from './dev/plugins.ts'
+import { createMiniGlobalPlugin } from './global/create-mini-global-plugin.ts'
 import type { MiniContract } from './mini-contract.ts'
 import { miniRuntimeId } from './module/module.ts'
 import { createMiniNativeComponentPlugin } from './native/create-mini-native-component-plugin.ts'
@@ -33,6 +34,7 @@ export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] 
         createMiniPlugin(contract, resolver, placement),
         createMiniNativeComponentPlugin(),
         createMiniPolyfillPlugin(contract),
+        createMiniGlobalPlugin(placement),
         createMiniDevelopmentPlugin(contract, styles),
         createMiniWatchPlugin()
     ]
@@ -161,7 +163,8 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
             async handler(_, bundle) {
                 // LTHP joins OutputChunks to their preliminary logical IDs and assigns Rolldown-owned physical filenames.
                 // createOutputFiles then observes those paths to relocate native component folders, emit placeholders, and
-                // declare only surviving package roots in app.json. No JavaScript chunk is manually emitted or copied.
+                // declare only surviving package roots in app.json. The standalone global provider is emitted separately
+                // after this hook; it has no graph edges, native components, or subpackage ownership to plan.
                 const subpackages = placement.getSubpackages()
 
                 const outputFiles = await createOutputFiles({

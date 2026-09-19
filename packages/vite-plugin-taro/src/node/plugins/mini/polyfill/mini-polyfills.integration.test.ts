@@ -4,14 +4,13 @@ import path from 'node:path'
 import test from 'node:test'
 import { createContext, runInContext } from 'node:vm'
 import { walk } from 'oxc-walker'
-import { type OutputChunk, RUNTIME_MODULE_ID } from 'rolldown'
+import type { OutputChunk } from 'rolldown'
 import { parseSync } from 'rolldown/utils'
 import { build, createServer, normalizePath, type Plugin } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { interpreterServerEvent } from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
-import { vptGlobalId } from '../module/module.ts'
 
 type MiniTarget = 'wx' | 'zfb'
 type Mode = 'production' | 'devtools' | 'interpreter' | 'rebuild'
@@ -75,14 +74,20 @@ async function compileFixture(
             order: 'post',
             handler(_options, bundle) {
                 const chunks = Object.values(bundle).filter((item): item is OutputChunk => item.type === 'chunk')
-                const globalEntry = chunks.find((chunk) => chunk.facadeModuleId === vptGlobalId)
+                const globalEntry = chunks.find((chunk) => chunk.fileName === 'common/vpt-global.js')
                 assert.ok(globalEntry?.isEntry)
                 assert.equal(globalEntry.fileName, 'common/vpt-global.js')
                 assert.deepEqual(
-                    globalEntry.moduleIds.filter((id) => id !== RUNTIME_MODULE_ID),
-                    [vptGlobalId],
-                    'the native probe must remain isolated from every application and framework binding'
+                    globalEntry.moduleIds,
+                    [],
+                    'the provider must be emitted outside the instrumented graph'
                 )
+                assert.deepEqual(globalEntry.imports, [])
+                assert.doesNotMatch(
+                    globalEntry.code,
+                    /require\(|__rolldown_runtime__|registerGraph|createModuleHotContext/
+                )
+                assert.equal(chunks.filter((chunk) => chunk.code.includes('vpt.fake.global')).length, 1)
                 const hasPolyfills = polyfills.length > 0
                 const polyfillChunks = chunks.filter((chunk) =>
                     chunk.moduleIds.some((id) => normalizePath(id).startsWith(coreJsRoot))
@@ -100,8 +105,7 @@ async function compileFixture(
                 )
                 // Alipay rejects import() at compile time, even inside an unused React Refresh export that Node can parse.
                 for (const chunk of chunks) {
-                    // Both the isolated global entry and generated HMR runtime must restore their native probes.
-                    assert.doesNotMatch(chunk.code, /__VPT_NATIVE_GLOBAL_THIS__/, chunk.fileName)
+                    assert.doesNotMatch(chunk.code, /__VPT_GLOBAL__/, chunk.fileName)
                     const parsed = parseSync(chunk.fileName, chunk.code)
                     assert.deepEqual(parsed.errors, [])
                     walk(parsed.program, {
@@ -261,7 +265,20 @@ function createAppHeap(chunks: readonly OutputChunk[], nativeURLs: boolean, targ
         { codeGeneration: { strings: false, wasm: false } }
     )
     // Only this isolated realm loses the optional prototype method; Node and other App heaps retain their native built-ins.
-    runInContext('globalThis.global = globalThis; delete Array.prototype.at;', context)
+    runInContext(
+        `
+        globalThis.global = globalThis;
+        delete Array.prototype.at;
+        // Count discovery attempts in this realm, independently of native module cache lookups.
+        this.globalDiscoveries = 0;
+        const nativeDefineProperty = Object.defineProperty;
+        Object.defineProperty = (object, key, descriptor) => {
+            if (key === '__vpt_global__') { globalDiscoveries += 1; }
+            return nativeDefineProperty(object, key, descriptor);
+        };
+    `,
+        context
+    )
 
     function evaluate(fileName: string): unknown {
         const existing = cache.get(fileName)
@@ -389,6 +406,11 @@ for (const target of ['wx', 'zfb'] as const) {
                     const heap = createAppHeap(chunks, false, target)
                     heap.read(setup)
                     assert.equal(heap.read('typeof globalThis'), globalType)
+                    const provider = heap.evaluate('common/vpt-global.js')
+                    assert.ok(provider && typeof provider === 'object')
+                    assert.strictEqual(Reflect.get(provider, 'vptGlobal'), heap.read('this'))
+                    assert.equal(heap.read('typeof __rolldown_runtime__'), 'undefined')
+                    assert.deepEqual(heap.registrations, [])
                     // Record the install target inside this heap, then restore Reflect before exercising any HMR patches.
                     heap.read(`
                         let runtimeGlobal;
@@ -429,6 +451,7 @@ for (const target of ['wx', 'zfb'] as const) {
                         assert.ok(heap.reports.some((report) => JSON.parse(report).data.kind === 'applied'))
                     }
                     assert.equal(heap.read('typeof globalThis'), globalType, 'startup must not install a host alias')
+                    assert.equal(heap.read('globalDiscoveries'), globalType === 'object' ? 0 : 1)
                 })
             }
         })

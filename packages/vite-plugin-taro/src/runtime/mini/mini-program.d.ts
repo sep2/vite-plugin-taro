@@ -1,3 +1,8 @@
+/** Private graph binding; the Mini plugin supplies its source without loading the standalone discovery module. */
+declare module '\0vpt:global-binding' {
+    export const vptGlobal: typeof globalThis
+}
+
 /** SystemJS loader installed on the language global before any native shell imports a capsule. */
 declare var System: System.Loader
 

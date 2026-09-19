@@ -8,7 +8,7 @@ import type { VptOptions } from '../../../../options.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import { wrapPluginTransform } from '../../../utils/vite.ts'
 import vpt from '../../../vpt.ts'
-import { miniPolyfillsId, vptGlobalId } from '../module/module.ts'
+import { miniPolyfillsId, vptGlobalBindingId } from '../module/module.ts'
 import { createMiniPolyfillPlugin } from './create-mini-polyfill-plugin.ts'
 import { miniBrowserBindings } from './mini-browser-bindings.ts'
 
@@ -42,10 +42,10 @@ for (const polyfills of [
         const input = config.build.rolldownOptions.input
         assert.ok(input && typeof input === 'object' && !Array.isArray(input))
         assert.equal(input.polyfills, miniPolyfillsId)
-        assert.equal(input['vpt-global'], vptGlobalId)
+        assert.equal(input['vpt-global'], undefined)
         const inject = config.build.rolldownOptions.transform?.inject
-        assert.deepEqual(inject, { ...miniBrowserBindings, globalThis: [vptGlobalId, 'vptGlobal'] })
-        assert.equal(config.build.rolldownOptions.transform?.define?.__VPT_NATIVE_GLOBAL_THIS__, undefined)
+        assert.deepEqual(inject, { ...miniBrowserBindings, globalThis: [vptGlobalBindingId, 'vptGlobal'] })
+        assert.equal(config.build.rolldownOptions.transform?.define?.__VPT_GLOBAL__, undefined)
         assert.ok(inject)
         assert.equal(Object.hasOwn(inject, 'window'), false)
         assert.equal(Object.hasOwn(inject, 'URL'), false)

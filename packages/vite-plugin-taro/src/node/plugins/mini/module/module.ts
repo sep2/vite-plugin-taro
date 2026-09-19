@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
-import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
+import { packageRequire } from '../../../utils/packages.ts'
 import type { RuntimeModulesContract } from '../mini-contract.ts'
 
 // Resolve from the plugin: pnpm consumers do not expose this transitive dependency to injected app imports.
@@ -10,8 +10,8 @@ export const miniRuntimeId = packageRequire.resolve('vite-plugin-taro-runtime/ru
 /** Identifies Rolldown's generated helper module independently of its unstable output filename. */
 export const rolldownRuntimeId = '\0rolldown/runtime.js'
 
-/** Resolves the isolated language-global entry imported by native files and application capsules. */
-export const vptGlobalId = resolveRuntimeFile('global/vpt-global')
+/** Identifies the virtual binding shared by native files, SystemJS capsules and HMR factories. */
+export const vptGlobalBindingId = '\0vpt:global-binding'
 
 /** Generates the selected core-js imports as one independently executable output entry. */
 export const miniPolyfillsId = '\0vpt:mini-polyfills'
@@ -68,9 +68,14 @@ const polyfillPackageRoot = `${normalizePath(path.dirname(packageRequire.resolve
 /** Native hook filter for the physical core-js graph; the generated import-only entry needs no host rewriting. */
 export const miniPolyfillSourceFilter = new RegExp(`^${polyfillPackageRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`)
 
-/** Groups the generated entry and core-js into common/polyfills.js. */
+/** Keeps the global binding and core-js in the pre-bootstrap native chunk, outside the recursive framework group. */
 export function isMiniPolyfillModule(moduleId: string): boolean {
-    return moduleId === miniPolyfillsId || normalizePath(moduleId).startsWith(polyfillPackageRoot)
+    const normalizedId = normalizePath(moduleId)
+    return (
+        normalizedId === miniPolyfillsId ||
+        normalizedId === vptGlobalBindingId ||
+        normalizedId.startsWith(polyfillPackageRoot)
+    )
 }
 
 /** Groups framework modules by resolved package roots; Rolldown includes their dependencies. */
@@ -94,7 +99,7 @@ export function createMiniModuleClassifier(modules: RuntimeModulesContract): Min
         [modules.componentCapsule, 'capsule'],
         [modules.pageCapsule, 'capsule'],
         [modules.bootstrap, 'amphibious'],
-        [vptGlobalId, 'amphibious'],
+        [vptGlobalBindingId, 'amphibious'],
         [miniPolyfillsId, 'amphibious'],
         [rolldownRuntimeId, 'amphibious'],
         [modules.transport, 'transport']

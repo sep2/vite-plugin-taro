@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import test, { type TestContext } from 'node:test'
+import { runInNewContext } from 'node:vm'
 import type { OutputOptions, PreRenderedChunk, RenderedChunk } from 'rolldown'
+import { DevRuntime } from 'rolldown/experimental/runtime'
 import { type BuildOptions, createLogger, createServer } from 'vite'
 import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
 import { createZfbMiniContract } from '../../zfb/plugins.ts'
@@ -83,13 +85,28 @@ function createRenderedChunk(name: string, fileName: string): RenderedChunk {
     }
 }
 
-/** Injection finishes here; native-probe restoration belongs to the assembled runtime's existing lowering pass. */
-function assertRuntimeInjection(source: unknown): void {
+/** The wrapper supplies the shared global exactly once, without discovery or virtual imports in the nested build. */
+function assertRuntimeWrapper(source: unknown): void {
     assert.ok(typeof source === 'string')
-    assert.match(source, /__VPT_NATIVE_GLOBAL_THIS__/)
-    assert.match(source, /Reflect\.set\(vptGlobal,\s*['"`]__rolldown_runtime__['"`]/)
-    assert.match(source, /Reflect\.get\(vptGlobal,/)
-    assert.doesNotMatch(source, /Reflect\.(?:get|set)\((?:globalThis|wx|my),/)
+    assert.match(source, /^\(function \(globalThis\) \{/)
+    assert.match(source, /\}\)\(__VPT_GLOBAL__\);$/)
+    assert.equal(source.match(/__VPT_GLOBAL__/g)?.length, 1)
+    assert.doesNotMatch(source, /vpt\.fake\.global|getGlobalThis|vptGlobal|vpt:global-binding/)
+    assert.match(source, /Reflect\.set\(globalThis,\s*['"`]__rolldown_runtime__['"`]/)
+    assert.doesNotMatch(source, /Reflect\.(?:get|set)\((?:wx|my),/)
+
+    // Runtime installation may mutate only the supplied provider, never the VM's ambient global object.
+    const shared: Record<string, unknown> = {}
+    const context = { DevRuntime, __VPT_GLOBAL__: shared }
+    Object.defineProperty(context, 'globalThis', {
+        get() {
+            assert.fail('The HMR wrapper must not read ambient globalThis')
+        }
+    })
+    runInNewContext(source, context, { contextCodeGeneration: { strings: false, wasm: false } })
+    assert.ok(shared.__rolldown_runtime__ instanceof DevRuntime)
+    assert.equal(typeof shared.queueMicrotask, 'function')
+    assert.equal(Reflect.has(context, '__rolldown_runtime__'), false)
 }
 
 test('adapts physical wx development output without changing configured filenames', async (context) => {
@@ -153,7 +170,7 @@ test('adapts physical wx development output without changing configured filename
     assert.equal(devMode.retainedFixtureOption, 'retained')
     assert.equal(devMode.lazy, false)
     assert.equal(devMode.skipCommonRuntimeInjection, false)
-    assertRuntimeInjection(devMode.implement)
+    assertRuntimeWrapper(devMode.implement)
 
     const banner = output.banner
     assert.equal(typeof banner, 'function')
@@ -171,7 +188,7 @@ test('adapts physical wx development output without changing configured filename
     assert.equal(await banner(createRenderedChunk('assets/vendor.js', 'assets/vendor.js')), '')
 })
 
-test('injects the shared global into the Alipay HMR implementation', async (context) => {
+test('passes the shared global to the Alipay HMR implementation without virtual imports', async (context) => {
     const contract = createZfbMiniContract({
         target: 'zfb',
         app: 'src/app.tsx',
@@ -200,7 +217,7 @@ test('injects the shared global into the Alipay HMR implementation', async (cont
     const devMode = adapted.experimental?.devMode
 
     assert.ok(devMode && typeof devMode === 'object')
-    assertRuntimeInjection(devMode.implement)
+    assertRuntimeWrapper(devMode.implement)
 })
 
 test('leaves naming unspecified when Vite has no configured output', async (context) => {

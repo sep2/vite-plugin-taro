@@ -132,7 +132,7 @@ test('leaves application grouping and asset naming to Vite and Rolldown', () => 
     assert.ok(output.codeSplitting && typeof output.codeSplitting === 'object')
     assert.deepEqual(
         output.codeSplitting.groups?.map((group) => group.name),
-        ['vpt-global', 'polyfills', 'vendor']
+        ['polyfills', 'vendor']
     )
 })
 

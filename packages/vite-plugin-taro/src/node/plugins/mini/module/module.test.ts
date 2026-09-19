@@ -12,7 +12,7 @@ import {
     isMiniPolyfillModule,
     miniPolyfillsId,
     rolldownRuntimeId,
-    vptGlobalId
+    vptGlobalBindingId
 } from './module.ts'
 
 const modules: RuntimeModulesContract = {
@@ -58,8 +58,8 @@ test('classifies native, capsule, amphibious, and transport execution in one pas
     })
     assert.equal(classifyModule(chunk(modules.appCapsule)).executionKind, 'capsule')
     assert.equal(classifyModule(chunk(modules.bootstrap)).executionKind, 'amphibious')
-    assert.equal(classifyModule(chunk(vptGlobalId)).executionKind, 'amphibious')
-    assert.equal(classifyModule(chunk(vptGlobalId, rolldownRuntimeId)).executionKind, 'amphibious')
+    assert.equal(classifyModule(chunk(vptGlobalBindingId)).executionKind, 'amphibious')
+    assert.equal(classifyModule(chunk(vptGlobalBindingId, rolldownRuntimeId)).executionKind, 'amphibious')
     assert.equal(classifyModule(chunk(rolldownRuntimeId)).executionKind, 'amphibious')
     assert.equal(classifyModule(chunk(modules.appCapsule, rolldownRuntimeId)).executionKind, 'amphibious')
 })
@@ -81,6 +81,7 @@ test('framework vendor remains a capsule regardless of its output name', () => {
 
 test('polyfill execution follows the virtual entry while package paths only control grouping', () => {
     assert.equal(isMiniPolyfillModule(miniPolyfillsId), true)
+    assert.equal(isMiniPolyfillModule(vptGlobalBindingId), true)
     assert.equal(classifyModule({ ...chunk(miniPolyfillsId), name: 'renamed-polyfills' }).executionKind, 'amphibious')
     for (const moduleId of [
         packageRequire.resolve('core-js/modules/web.url.js'),

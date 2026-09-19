@@ -1,4 +1,4 @@
-import { vptGlobal } from '../../global/vpt-global.ts'
+import { vptGlobal } from '\0vpt:global-binding'
 
 // This file must not have any raw reference to the `globalThis` free binding.
 // biome-ignore lint/suspicious/noShadowRestrictedNames: intentional shadow

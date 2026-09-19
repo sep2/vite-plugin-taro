@@ -5,8 +5,7 @@ import {
     isMiniFrameworkVendorModule,
     isMiniPolyfillModule,
     type MiniChunkClassification,
-    type MiniModuleClassifier,
-    vptGlobalId
+    type MiniModuleClassifier
 } from '../module/module.ts'
 import { getNativeComponentAssetBytes } from '../native/native-component-assets.ts'
 import { createPlacement, type GeneratedSubpackage, type PackageLocation, type Placement } from './placement.ts'
@@ -53,16 +52,9 @@ export function createPlacementRolldownOptions(classifyChunk: MiniModuleClassifi
             codeSplitting: {
                 groups: [
                     {
-                        name: 'vpt-global',
-                        test: (moduleId: string) => moduleId === vptGlobalId,
-                        // The late native probe must not share application bindings or enter the recursive vendor group.
-                        priority: 300,
-                        includeDependenciesRecursively: false
-                    },
-                    {
                         name: 'polyfills',
                         test: isMiniPolyfillModule,
-                        // Keep core-js out of the recursive vendor group, without pulling its injected Taro bindings into this file.
+                        // Keep pre-bootstrap infrastructure out of the recursive vendor group without pulling Taro into this file.
                         priority: 200,
                         includeDependenciesRecursively: false
                     },

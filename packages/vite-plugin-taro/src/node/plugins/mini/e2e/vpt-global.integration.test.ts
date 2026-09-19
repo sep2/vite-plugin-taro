@@ -2,12 +2,13 @@ import assert from 'node:assert/strict'
 import { posix } from 'node:path'
 import test from 'node:test'
 import { constants, createContext, Script } from 'node:vm'
-import { build, type OutputChunk, RUNTIME_MODULE_ID } from 'rolldown'
+import { build, type OutputChunk } from 'rolldown'
 import { resolveConfig } from 'vite'
 import vpt from '../../../vpt.ts'
-import { vptGlobalId as runtimeId } from '../module/module.ts'
+import { createMiniGlobalPlugin } from '../global/create-mini-global-plugin.ts'
+import { vptGlobalBindingId as bindingId } from '../module/module.ts'
 
-// Exercise the production injection, grouping and late-define hook; only the application sources and CJS loader are fixtures.
+// Exercise production injection, grouping and standalone emission; only application sources and the CJS loader are fixtures.
 const config = await resolveConfig(
     {
         configFile: false,
@@ -18,7 +19,7 @@ const config = await resolveConfig(
 const options = config.build.rolldownOptions
 const configuredInput = options.input
 assert.ok(configuredInput && typeof configuredInput === 'object' && !Array.isArray(configuredInput))
-assert.equal(configuredInput['vpt-global'], runtimeId)
+assert.equal(configuredInput['vpt-global'], undefined)
 const outputOptions = options.output
 assert.ok(outputOptions && !Array.isArray(outputOptions))
 const splitting = outputOptions.codeSplitting
@@ -37,32 +38,41 @@ const fixtureGrouping = {
         }
     ]
 }
-const renderChunk = config.plugins.find((plugin) => plugin.name === 'vpt:mini-polyfills')?.renderChunk
-assert.ok(renderChunk)
+const globalPlugin = createMiniGlobalPlugin({
+    getPhysicalChunkId(chunk) {
+        assert.ok(typeof chunk !== 'string')
+        return chunk.fileName
+    }
+})
 const entryId = '/vpt-global-fixture/entry.js'
 const peerId = '/vpt-global-fixture/peer.js'
 const localId = '/vpt-global-fixture/local.js'
 const lazyId = '/vpt-global-fixture/lazy.js'
 
-/** Keep native injection, then materialize the native probe only inside its isolated runtime entry. */
+/** Inject the graph binding, then emit discovery independently of application bindings and minification. */
 async function bundleFixture(sources: ReadonlyMap<string, string>, input: string[], minify: boolean) {
     // Record the resolved graph to detect self-injection even when bundling would erase the circular import.
     const imports = new Map<string, readonly string[]>()
     const result = await build({
-        input: [...input, runtimeId],
+        input: [...input, bindingId],
         preserveEntrySignatures: options.preserveEntrySignatures,
         plugins: [
             {
                 name: 'test:global-injection-fixtures',
-                // Match Vite's normalized IDs: bare Rolldown's filesystem resolver uses backslashes on Windows.
-                // Resolve the real runtime explicitly so grouping, late define and graph assertions share its identity.
-                resolveId: (id) => (id === runtimeId || sources.has(id) ? id : undefined),
+                // Resolve application fixtures only; the production hooks own the virtual global binding.
+                resolveId: (id) => (sources.has(id) ? id : undefined),
                 load: (id) => sources.get(id),
                 moduleParsed(info) {
                     imports.set(info.id, info.importedIds)
                 }
             },
-            { name: 'test:production-global-render', renderChunk }
+            {
+                name: globalPlugin.name,
+                resolveId: globalPlugin.resolveId,
+                load: globalPlugin.load,
+                renderChunk: globalPlugin.renderChunk,
+                generateBundle: globalPlugin.generateBundle
+            }
         ],
         transform: options.transform,
         checks: { circularDependency: true },
@@ -82,14 +92,13 @@ async function bundleFixture(sources: ReadonlyMap<string, string>, input: string
     const chunks = result.output.filter((chunk) => chunk.type === 'chunk')
     const entry = chunks.find((chunk) => chunk.facadeModuleId === input[0])
     assert.ok(entry)
-    const runtime = chunks.find((chunk) => chunk.facadeModuleId === runtimeId)
-    assert.ok(runtime)
-    assert.deepEqual(
-        runtime.moduleIds.filter((id) => id !== RUNTIME_MODULE_ID),
-        [runtimeId]
-    )
-    assert.deepEqual(imports.get(runtimeId), [], 'Native probing must never inject a dependency on the runtime itself')
-    assert.doesNotMatch(runtime.code, /__VPT_NATIVE_GLOBAL_THIS__/)
+    const runtime = chunks.find((chunk) => chunk.fileName === 'common/vpt-global.js')
+    assert.ok(runtime?.facadeModuleId)
+    assert.deepEqual(runtime.moduleIds, [], 'Discovery must not enter the application graph')
+    assert.deepEqual(runtime.imports, [])
+    assert.equal(imports.has(runtime.facadeModuleId), false)
+    assert.deepEqual(imports.get(bindingId), [])
+    assert.doesNotMatch(runtime.code, /__VPT_GLOBAL__|require\(|__rolldown_runtime__/)
     return { chunks, imports, entry, runtime }
 }
 
@@ -176,14 +185,14 @@ const applicationSources: ReadonlyMap<string, string> = new Map([
 
 for (const minify of [false, true]) {
     for (const state of ['native', 'absent', 'shadowed'] as const) {
-        test(`native injection with late define: ${state} globalThis, minify ${minify}`, async () => {
+        test(`injection with a standalone provider: ${state} globalThis, minify ${minify}`, async () => {
             const { chunks, imports, entry } = await bundleFixture(applicationSources, [entryId], minify)
-            assert.equal(chunks.length, 2)
-            assert.deepEqual(imports.get(runtimeId), [], 'The runtime must have no injected dependency on itself')
-            assert.deepEqual(imports.get(peerId), [runtimeId])
+            assert.equal(chunks.length, 3)
+            assert.deepEqual(imports.get(bindingId), [])
+            assert.deepEqual(imports.get(peerId), [bindingId])
             assert.deepEqual(imports.get(localId), [])
-            assert.deepEqual(imports.get(entryId)?.toSorted(), [peerId, localId, runtimeId].toSorted())
-            assert.doesNotMatch(chunks[0].code, /__VPT_NATIVE_GLOBAL_THIS__/)
+            assert.deepEqual(imports.get(entryId)?.toSorted(), [peerId, localId, bindingId].toSorted())
+            assert.doesNotMatch(chunks[0].code, /__VPT_GLOBAL__/)
 
             const setup = {
                 native: 'Object.freeze(Object.prototype);',
@@ -247,7 +256,7 @@ for (const minify of [false, true]) {
     test(`typeof-only use still injects the recovered global, minify ${minify}`, async () => {
         const sources = new Map([[entryId, 'export const kind = typeof globalThis;']])
         const { chunks, imports, entry } = await bundleFixture(sources, [entryId], minify)
-        assert.deepEqual(imports.get(entryId), [runtimeId])
+        assert.deepEqual(imports.get(entryId), [bindingId])
         const heap = createBundleHeap(chunks, 'delete this.globalThis;')
         heap.context.fixture = heap.load(entry.fileName)
         heap.run(`
@@ -268,7 +277,7 @@ for (const minify of [false, true]) {
                 ]
             ])
             const { chunks, imports, entry } = await bundleFixture(sources, [entryId], minify)
-            assert.deepEqual(imports.get(commonJsId), [runtimeId])
+            assert.deepEqual(imports.get(commonJsId), [bindingId])
             const heap = createBundleHeap(chunks, 'delete this.globalThis;')
             heap.context.fixture = heap.load(entry.fileName)
             heap.run(`
@@ -287,8 +296,8 @@ for (const minify of [false, true]) {
             [lazyId, "globalThis.events.push('lazy'); export const root = globalThis;"]
         ])
         const { chunks, imports } = await bundleFixture(sources, [entryId, peerId], minify)
-        assert.deepEqual(imports.get(runtimeId), [])
-        const runtimeChunks = chunks.filter((chunk) => chunk.moduleIds.includes(runtimeId))
+        assert.deepEqual(imports.get(bindingId), [])
+        const runtimeChunks = chunks.filter((chunk) => chunk.moduleIds.includes(bindingId))
         assert.equal(runtimeChunks.length, 1)
         assert.equal(runtimeChunks[0].isEntry, true)
         const entry = chunks.find((chunk) => chunk.facadeModuleId === entryId)
@@ -380,7 +389,7 @@ for (const { name, setup } of [
 }
 
 test('local globalThis bindings, property names, text and comments never trigger injection', async () => {
-    const comment = '/*! globalThis and __VPT_NATIVE_GLOBAL_THIS__ must remain text. */'
+    const comment = '/*! globalThis and __VPT_GLOBAL__ must remain text. */'
     const sources = new Map([
         [peerId, "export const value = 'imported local';"],
         [
@@ -389,13 +398,13 @@ test('local globalThis bindings, property names, text and comments never trigger
                 ${comment}
                 import { value as globalThis } from '${peerId}';
                 export { globalThis as imported };
-                export const text = 'globalThis __VPT_NATIVE_GLOBAL_THIS__';
+                export const text = 'globalThis __VPT_GLOBAL__';
                 export const property = { globalThis: 'property' };
                 export function parameter(globalThis) { return globalThis; }
                 export function destructured({ globalThis }) { return globalThis; }
                 export function local() { const globalThis = 'local'; return globalThis; }
                 export function caught() { try { throw 'caught'; } catch (globalThis) { return globalThis; } }
-                export function placeholder(__VPT_NATIVE_GLOBAL_THIS__) { return __VPT_NATIVE_GLOBAL_THIS__; }
+                export function placeholder(__VPT_GLOBAL__) { return __VPT_GLOBAL__; }
             `
         ]
     ])
@@ -407,7 +416,7 @@ test('local globalThis bindings, property names, text and comments never trigger
     heap.context.fixture = heap.load(entry.fileName)
     heap.run(`
         assert.equal(fixture.imported, 'imported local');
-        assert.equal(fixture.text, 'globalThis __VPT_NATIVE_GLOBAL_THIS__');
+        assert.equal(fixture.text, 'globalThis __VPT_GLOBAL__');
         assert.deepEqual(fixture.property, { globalThis: 'property' });
         assert.equal(fixture.parameter('parameter'), 'parameter');
         assert.equal(fixture.destructured({ globalThis: 'destructured' }), 'destructured');
