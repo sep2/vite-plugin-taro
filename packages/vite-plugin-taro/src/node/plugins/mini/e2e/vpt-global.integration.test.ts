@@ -54,7 +54,9 @@ async function bundleFixture(sources: ReadonlyMap<string, string>, input: string
         plugins: [
             {
                 name: 'test:global-injection-fixtures',
-                resolveId: (id) => (sources.has(id) ? id : undefined),
+                // Match Vite's normalized IDs: bare Rolldown's filesystem resolver uses backslashes on Windows.
+                // Resolve the real runtime explicitly so grouping, late define and graph assertions share its identity.
+                resolveId: (id) => (id === runtimeId || sources.has(id) ? id : undefined),
                 load: (id) => sources.get(id),
                 moduleParsed(info) {
                     imports.set(info.id, info.importedIds)
