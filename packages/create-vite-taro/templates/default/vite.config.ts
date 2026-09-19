@@ -5,9 +5,9 @@ import vpt, { type VptJsonObject, type VptTarget } from 'vite-plugin-taro'
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), 'VITE_VPT_')
+
     const target = getTarget(env)
-    const wechatAppId = env.VITE_VPT_WECHAT_APP_ID
-    const alipayAppId = env.VITE_VPT_ALIPAY_APP_ID
+    const appId = getAppId(env, target)
 
     return {
         build: {
@@ -24,12 +24,12 @@ export default defineConfig(({ mode }) => {
                     }
                 ],
                 appJson: createAppJson(target),
-                projectConfigJson: createProjectConfigJson({ target, wechatAppId, alipayAppId }),
+                projectConfigJson: createProjectConfigJson({ target, appId }),
                 projectPrivateConfigJson: createProjectPrivateConfigJson(target),
                 sitemapJson: { rules: [{ action: 'allow', page: '*' }] },
                 hmr: {
-                    mode: target === 'zfb' ? 'interpreter' : 'devtools'
-                },
+                    mode: target === 'wx' ? 'devtools' : 'interpreter'
+                }
             })
         ]
     }
@@ -47,6 +47,12 @@ function createPageJson(target: VptTarget): VptJsonObject {
             return {
                 transparentTitle: 'always',
                 titlePenetrate: 'YES'
+            }
+        }
+        case 'tt': {
+            return {
+                navigationStyle: 'custom',
+                navigationBarTextStyle: 'black'
             }
         }
         default: {
@@ -85,25 +91,25 @@ function createAppJson(target: VptTarget): VptJsonObject {
                 }
             }
         }
+        case 'tt': {
+            return {
+                window: {
+                    navigationStyle: 'custom',
+                    navigationBarTextStyle: 'black'
+                }
+            }
+        }
         default: {
             return {}
         }
     }
 }
 
-function createProjectConfigJson({
-    target,
-    wechatAppId,
-    alipayAppId
-}: {
-    target: VptTarget
-    wechatAppId: string
-    alipayAppId: string | undefined
-}): VptJsonObject {
+function createProjectConfigJson({ target, appId }: { target: VptTarget; appId: string | undefined }): VptJsonObject {
     switch (target) {
         case 'wx': {
             return {
-                appid: wechatAppId,
+                appid: appId,
                 projectname: 'vpt-project',
                 description: '',
                 compileType: 'miniprogram',
@@ -130,7 +136,7 @@ function createProjectConfigJson({
         }
         case 'zfb': {
             return {
-                appid: alipayAppId,
+                appid: appId,
                 miniprogramRoot: './',
                 format: 2,
                 compileOptions: {
@@ -148,6 +154,21 @@ function createProjectConfigJson({
                     skipTranspile: true,
                     sourcemap: false,
                     minify: false
+                }
+            }
+        }
+        case 'tt': {
+            return {
+                appid: appId,
+                projectname: 'vpt-project',
+                miniprogramRoot: './',
+                compileHotReload: true,
+                setting: {
+                    urlCheck: false,
+                    es6: false,
+                    postcss: false,
+                    minified: false,
+                    autoCompile: true
                 }
             }
         }
@@ -173,8 +194,32 @@ function createProjectPrivateConfigJson(target: VptTarget): VptJsonObject {
                 ignoreWebViewDomainCheck: true
             }
         }
+        case 'tt': {
+            return {
+                setting: {
+                    urlCheck: false
+                }
+            }
+        }
         default:
             return {}
+    }
+}
+
+function getAppId(env: Record<string, string>, target: VptTarget): string {
+    switch (target) {
+        case 'wx': {
+            return env.VITE_VPT_WECHAT_APP_ID ?? ''
+        }
+        case 'zfb': {
+            return env.VITE_VPT_ALIPAY_APP_ID ?? ''
+        }
+        case 'tt': {
+            return env.VITE_VPT_TIKTOK_APP_ID ?? ''
+        }
+        default: {
+            return ''
+        }
     }
 }
 
@@ -183,11 +228,11 @@ function getTarget(env: Record<string, string>): VptTarget {
 
     const target = env[targetEnvName]
 
-    if (target === 'wx' || target === 'zfb' || target === 'h5') {
+    if (target === 'wx' || target === 'zfb' || target === 'tt' || target === 'h5') {
         return target
     }
 
-    throw new Error(`${targetEnvName} must be "wx", "zfb", or "h5".`)
+    throw new Error(`${targetEnvName} must be "wx", "zfb", "tt", or "h5".`)
 }
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url))
