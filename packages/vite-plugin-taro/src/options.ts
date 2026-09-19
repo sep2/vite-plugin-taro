@@ -94,7 +94,8 @@ export interface VptOptions {
     /**
      * Local development-tool preferences written without merging.
      *
-     * WX emits this object as `project.private.config.json`; ZFB emits it as `.mini-ide/project-ide.json`; TT and H5 ignore it.
+     * WX emits `project.private.config.json`; ZFB emits `.mini-ide/project-ide.json`; TT emits `project.private.config.json`;
+     * H5 ignores it. TT private configuration requires TikTok DevTools 4.0.7+ and supports only its documented fields.
      * These files control local IDE behavior rather than portable application metadata. In particular, the ZFB file does not
      * associate the project with an Alipay App ID; Alipay Mini Program Studio keeps that selection in its workspace storage.
      */

@@ -9,7 +9,7 @@
 
 [简体中文](README.md) | English
 
-Build WeChat Mini Program, Alipay Mini Program, and Web apps with Vite 8, React 19, Taro 4, and Tailwind CSS v4.
+Build WeChat, Alipay, TikTok (`tt`) Mini Programs, and Web apps with Vite 8, React 19, Taro 4, and Tailwind CSS v4.
 
 Website: <https://vpt.js.org>
 
@@ -33,7 +33,7 @@ weapp.dev builds an open, composable modern toolchain for Mini Program and Web d
 
 <video src="https://github.com/user-attachments/assets/c8289e1e-d8ad-429f-a0d9-a40656b4962a" controls autoplay muted loop playsinline width="100%"></video>
 
-- **Vite 8 + React 19** Build one codebase for WeChat Mini Program, Alipay Mini Program, and Web.
+- **Vite 8 + React 19** Build one codebase for WeChat, Alipay, TikTok Mini Programs, and Web.
 - **Hot reload** Preserve App data, the active page, React component state, and input state while editing.
 - **Automatic subpackages** Use standard static and dynamic imports while vpt plans Mini Program packages automatically.
 - **Tailwind CSS v4 ready** Write utility classes directly; styles adapt automatically for every target.

@@ -261,7 +261,10 @@ test('builds a routed H5 application through the public plugin entry', async () 
 test('builds TT runtime, common packages, native components and target-specific sources end to end', async () => {
     await inspectFixtureBuild(
         {
-            options: createOptions('tt'),
+            options: {
+                ...createOptions('tt'),
+                projectPrivateConfigJson: { setting: { urlCheck: false } }
+            },
             files: {
                 'src/app.tsx': `
                 import { CustomWrapper, View } from '@tarojs/components'
@@ -315,7 +318,8 @@ test('builds TT runtime, common packages, native components and target-specific 
                 'pages/home/index.json',
                 'pages/home/index.ttml',
                 'pages/home/index.ttss',
-                'project.config.json'
+                'project.config.json',
+                'project.private.config.json'
             ]) {
                 assert.ok(
                     output.some((entry) => entry.fileName === name),
@@ -347,6 +351,7 @@ test('builds TT runtime, common packages, native components and target-specific 
             assert.match(String(requireAsset(output, 'pages/home/index.ttml').source), /<comp i="{{app}}" p="{{page}}"/)
             assert.match(String(requireAsset(output, 'assets/global.ttss').source), /color: red/)
             assert.deepEqual(parseJsonAsset(output, 'project.config.json'), { appid: 'fixture-app' })
+            assert.deepEqual(parseJsonAsset(output, 'project.private.config.json'), { setting: { urlCheck: false } })
             assert.equal(String(requireAsset(output, 'components/card/index.ttml').source), '<view>{{count}}</view>')
             assert.equal(String(requireAsset(output, 'components/card/index.ttss').source), '.card { color: blue; }')
             assert.deepEqual(parseJsonAsset(output, 'pages/home/index.json').usingComponents, {

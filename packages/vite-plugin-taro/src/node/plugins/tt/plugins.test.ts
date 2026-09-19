@@ -8,8 +8,8 @@ const options: VptOptions = {
     app: 'src/app.tsx',
     pages: [{ path: 'pages/home/index', config: { navigationBarTitleText: 'Home' } }, { path: 'pages/other/index' }],
     appJson: { pages: ['stale/index'], subpackages: [{ root: 'stale' }], window: { navigationBarTitleText: 'TT' } },
-    projectConfigJson: { appid: 'tt-example', compileHotReload: true },
-    projectPrivateConfigJson: { ignored: true },
+    projectConfigJson: { appid: 'tt-example', compileHotReload: true, setting: { urlCheck: true } },
+    projectPrivateConfigJson: { setting: { urlCheck: false, autoCompile: true } },
     sitemapJson: { rules: [] }
 }
 
@@ -57,7 +57,8 @@ for (const isProduction of [false, true]) {
                 'pages/other/index.json',
                 'pages/other/index.ttml',
                 'pages/other/index.ttss',
-                'project.config.json'
+                'project.config.json',
+                'project.private.config.json'
             ]
         )
         assert.deepEqual(JSON.parse(asset('app.json')), {
@@ -67,6 +68,8 @@ for (const isProduction of [false, true]) {
         })
         assert.equal(asset('app.json').includes('\n'), !isProduction)
         assert.deepEqual(JSON.parse(asset('project.config.json')), options.projectConfigJson)
+        assert.deepEqual(JSON.parse(asset('project.private.config.json')), options.projectPrivateConfigJson)
+        assert.equal(asset('project.private.config.json').includes('\n'), !isProduction)
         const base = asset('base.ttml')
         assert.match(base, /tt:for="{{i.cn}}"/)
         assert.match(base, /tt:key="sid"/)
@@ -91,5 +94,25 @@ for (const isProduction of [false, true]) {
         assert.equal(JSON.parse(asset('pages/home/index.json')).navigationBarTitleText, 'Home')
         assert.deepEqual(JSON.parse(asset('comp.json')), JSON.parse(asset('custom-wrapper.json')))
         assert.equal(JSON.parse(asset('comp.json')).component, true)
+    })
+}
+
+for (const [description, projectPrivateConfigJson, expected] of [
+    ['omitted', undefined, []],
+    ['empty', {}, ['{}']]
+] as const) {
+    test(`preserves ${description} TT private configuration without adding defaults`, () => {
+        const output = createTtMiniContract({ ...options, projectPrivateConfigJson }).output.generateProjectSkeleton({
+            bundle: {},
+            subpackages: [],
+            nativeComponents: [],
+            isProduction: true
+        })
+        assert.deepEqual(
+            output
+                .filter((asset) => asset.fileName === 'project.private.config.json')
+                .map((asset) => String(asset.source)),
+            expected
+        )
     })
 }
