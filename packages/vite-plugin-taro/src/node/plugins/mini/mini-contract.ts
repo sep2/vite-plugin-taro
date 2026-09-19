@@ -25,8 +25,6 @@ export type RuntimeModulesContract = {
 
 /** Physical runtime selection for one Mini Program target. */
 export type RuntimeContract = {
-    /** This target needs a synthetic global namespace instead of native globalThis. */
-    miniGlobal: boolean
     modules: RuntimeModulesContract
 }
 

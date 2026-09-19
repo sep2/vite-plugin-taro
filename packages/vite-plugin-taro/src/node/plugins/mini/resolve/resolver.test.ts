@@ -47,7 +47,6 @@ const contract = {
         targetRuntimePath: '/runtime/target.ts'
     },
     runtime: {
-        miniGlobal: false,
         modules: modules
     }
 } satisfies Pick<MiniContract, 'options' | 'runtime' | 'taro'>

@@ -24,7 +24,6 @@ export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
             targetRuntimePath: packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-weapp/runtime')
         },
         runtime: {
-            miniGlobal: false,
             modules: {
                 bootstrap: resolveRuntimeFile('mini/amphibious/bootstrap'),
                 transport: resolveRuntimeFile('mini/amphibious/transport'),
