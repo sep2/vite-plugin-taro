@@ -59,8 +59,9 @@ Keep a short working audit of each included change: package, baseline behavior, 
 
 ### Audit compatibility and migration
 
-- Inspect removed exports and automatic global bindings, changed defaults, config interpretation, output paths, supported environments, and dependency requirements. Check application dependencies as well as direct application usage when global behavior changes.
-- For every compatibility change, state **who is affected, what stopped being automatic or changed, and the exact migration**. Verify code/config examples against current implementation and tests; distinguish Vite top-level options from `vpt()` options and identify target-specific steps.
+- Inspect removed public exports and automatic global bindings, changed defaults, config interpretation, documented output contracts, supported environments, and dependency requirements. Check application dependencies as well as direct application usage when global behavior changes.
+- Keep internal implementation changes out of upgrade instructions. Generated transport/global filenames and internal chunk layout are not public contracts; do not invent migration caveats for hypothetical scripts that depend on them. Include migration steps only when an evidenced change to supported APIs, configuration, or workflows requires user action.
+- For every user-facing compatibility change, state **who is affected, what stopped being automatic or changed, and the exact migration**. Verify code/config examples against current implementation and tests; distinguish Vite top-level options from `vpt()` options and identify target-specific steps.
 - Never assume a patch bump means no migration. If compatibility findings conflict with the requested release scope, raise them before versioning rather than hide them in a generic upgrade assurance.
 - Do not write `无需修改代码或配置` unless every relevant migration path supports that claim. If only some users need changes, name those conditions instead of preceding them with a blanket assurance.
 - Do not disguise a removed default as an optional new capability. For example, if `URL` bindings were previously injected and are now opt-in, describe the removal and required configuration for existing users, not just the new `polyfills` option.
@@ -72,14 +73,14 @@ Translate or rewrite the changesets from the audit:
 - Describe the problem fixed, the capability added, or the behavior users will notice. Lead with compatibility changes when users must act.
 - Include a verified implementation commit's short hash with each change description. Remove misleading Changesets-generated release-commit references rather than preserving them blindly.
 - Omit internal implementation details, refactoring, tests, coverage, CI, dependency housekeeping, and version synchronization unless they directly affect users. Keep validation evidence in the completion report.
-- Keep optional configuration recipes and troubleshooting in documentation. Release notes need only the minimal steps required by this upgrade, not a general installation guide.
+- Keep optional configuration recipes and troubleshooting in documentation. Do not append routine reminders to restart development services, rebuild, clear caches, or reinstall dependencies. Beyond the applicable upgrade command, include only migration actions specifically required by this release.
 - For packages with no user-visible changes, use `本包无面向用户的变更。`; do not invent work to fill an entry.
 
 For example: `12685e7: 修复微信开发者工具点击「编译」后热更新失效的问题（#22）。` Do not expand this into Socket lifecycle or patch-journal implementation details.
 
-Each public package's new entry must have Chinese headings and a **升级说明** section with actual previous/next versions, the applicable upgrade command, and verified migration steps. For generators, distinguish new-project creation from upgrading an existing project; do not tell existing users to regenerate an application. For transitive packages, explain whether a separate upgrade is needed.
+Each public package's new entry must have Chinese headings and a **升级说明** section with actual previous/next versions and only the applicable upgrade command or automatic-upgrade explanation, plus any verified migration steps. For generators, provide the new-project creation command only; omit boilerplate about existing projects, regeneration, plugin upgrades, or consulting another package's notes. Add existing-project instructions only for a verified generator-specific migration. For transitive packages that update with the plugin, state that automatic upgrade without adding hypothetical direct-dependency installation instructions.
 
-**Final editorial check:** Is every bullet new relative to the correct baseline? Does it belong to this package? Does the final code support it? Can an affected user complete the upgrade without guessing? Are assurances contradicted by later instructions? Remove any bullet that only explains development history.
+**Final editorial check:** Is every bullet new relative to the correct baseline? Does it belong to this package? Does the final code support it? Is each migration step required by supported usage rather than speculative reliance on internals? Can an affected user complete the upgrade without guessing? Are assurances contradicted by later instructions? Remove any bullet that only explains development history or implementation details.
 
 ## 3. Prepare versions
 
