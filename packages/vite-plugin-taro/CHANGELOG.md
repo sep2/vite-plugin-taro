@@ -1,5 +1,18 @@
 # vite-plugin-taro
 
+## 0.7.5
+
+### 变更
+
+- 487e88e: 新增抖音小程序支持。
+- f0b24f3: 小程序不再自动注入 Taro 的 `window`。
+
+### 升级说明
+
+从 `0.7.4` 升级到 `0.7.5`：运行 `pnpm add -D vite-plugin-taro@0.7.5`。
+
+若小程序代码或依赖使用旧版自动注入的 Taro `window`，运行 `pnpm add vite-plugin-taro-runtime@0.7.5`，并在 Vite 顶层 `build.rolldownOptions.transform.inject` 中加入 `window: ['vite-plugin-taro-runtime/runtime/mini', 'window']`。H5 不受影响。
+
 ## 0.7.5-beta.1
 
 ### 修复
