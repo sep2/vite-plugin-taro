@@ -1,5 +1,15 @@
 # create-vite-taro
 
+## 0.7.5-beta.1
+
+### 变更
+
+本包无面向用户的变更。
+
+### 升级说明
+
+从 `0.7.5-beta.0` 升级到 `0.7.5-beta.1`：新项目使用 `pnpm create vite-taro@0.7.5-beta.1 my-app`。
+
 ## 0.7.5-beta.0
 
 ### 变更
