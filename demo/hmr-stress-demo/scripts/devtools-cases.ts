@@ -72,9 +72,14 @@ async function testRuntimeRebuild(harness: DevToolsHarness): Promise<void> {
 
     for (let round = 1; round <= rounds; round++) {
         const before = await readHmrInfo(infoPath)
+        const previousState = `before-rebuild-${round}`
+        await setPageState(previousState, harness)
+        await assertPageState(previousState, harness)
         await sendReportStorm(before, round, reportsPerRound)
         await waitFor(async () => (await readHmrInfo(infoPath)).buildId !== before.buildId, 6_000, 20)
         await assertWxss(harness.outDir)
+        // Metadata is written before DevTools reloads. Baseline text alone can still belong to the old Page.
+        await waitFor(async () => (await harness.readElement('#stress-input', 'value')) === 'seed-000', 12_000, 100)
     }
 
     assert.equal((await countLog(harness.serverLogPath, 'wx full rebuild required')) - rebuildLogsBefore, rounds)
