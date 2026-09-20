@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
+import { setTimeout as delay } from 'node:timers/promises'
 import { writeFixtureSource } from './write-fixture-source.ts'
 
 test('concurrent readers only observe complete source generations during a burst', async () => {
@@ -21,6 +22,8 @@ test('concurrent readers only observe complete source generations during a burst
     const reader = (async () => {
         while (publishing) {
             observed.add(await readFile(file, 'utf8'))
+            // Give the publisher a chance to acquire Windows replacement access between reader handles.
+            await delay(1)
         }
     })()
     try {
@@ -31,7 +34,7 @@ test('concurrent readers only observe complete source generations during a burst
         publishing = false
         try {
             await reader
-            assert.ok(observed.size > 0)
+            assert.ok(observed.size > 1)
             for (const source of observed) {
                 assert.ok(completeSources.has(source), `Reader observed an incomplete source (${source.length} bytes)`)
             }

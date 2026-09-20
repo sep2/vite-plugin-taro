@@ -118,7 +118,6 @@ async function waitForFileChange(fileName: string, previousSource: string): Prom
 }
 
 test('reduces synthetic engine update variants and unknown host failures without changing host internals', {
-    skip: process.platform === 'win32' ? 'Node module interception terminates the Windows test worker' : false,
     timeout: 10_000
 }, async () => {
     // These mutable cells expose the callbacks and current synthetic engine state owned by the redirected DevEngine substitute.
