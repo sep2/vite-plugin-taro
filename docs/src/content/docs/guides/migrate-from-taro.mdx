@@ -60,15 +60,6 @@ vpt 当前构建 **React 19 + 微信小程序 + Web**。Vue、Preact、Solid、R
 在原项目旁创建一个新目录：
 
 <Tabs syncKey="package-manager">
-    <TabItem label="npm">
-
-```sh
-npm create vite-taro@latest my-app-vpt
-cd my-app-vpt
-npm install
-```
-
-    </TabItem>
     <TabItem label="pnpm">
 
 ```sh
@@ -78,12 +69,21 @@ pnpm install
 ```
 
     </TabItem>
-    <TabItem label="bun">
+    <TabItem label="npm">
 
 ```sh
-bun create vite-taro my-app-vpt
+npm create vite-taro@latest my-app-vpt
 cd my-app-vpt
-bun install
+npm install
+```
+
+    </TabItem>
+    <TabItem label="yarn">
+
+```sh
+yarn create vite-taro my-app-vpt
+cd my-app-vpt
+yarn install
 ```
 
     </TabItem>
@@ -92,14 +92,6 @@ bun install
 先运行模板，确认微信和 Web 都能启动，再复制业务代码：
 
 <Tabs syncKey="package-manager">
-    <TabItem label="npm">
-
-```sh
-npm run dev:wx
-npm run dev:h5
-```
-
-    </TabItem>
     <TabItem label="pnpm">
 
 ```sh
@@ -108,11 +100,19 @@ pnpm dev:h5
 ```
 
     </TabItem>
-    <TabItem label="bun">
+    <TabItem label="npm">
 
 ```sh
-bun run dev:wx
-bun run dev:h5
+npm run dev:wx
+npm run dev:h5
+```
+
+    </TabItem>
+    <TabItem label="yarn">
+
+```sh
+yarn dev:wx
+yarn dev:h5
 ```
 
     </TabItem>
@@ -365,15 +365,6 @@ vpt 支持 `#ifdef`、`#ifndef`、`#else` 和 `#endif`，不支持 `#if` 与 `#e
 10. 使用微信开发者工具检查最终主包、分包和上传体积。
 
 <Tabs syncKey="package-manager">
-    <TabItem label="npm">
-
-```sh
-npm run typecheck
-npm run build:wx
-npm run build:h5
-```
-
-    </TabItem>
     <TabItem label="pnpm">
 
 ```sh
@@ -383,12 +374,21 @@ pnpm build:h5
 ```
 
     </TabItem>
-    <TabItem label="bun">
+    <TabItem label="npm">
 
 ```sh
-bun run typecheck
-bun run build:wx
-bun run build:h5
+npm run typecheck
+npm run build:wx
+npm run build:h5
+```
+
+    </TabItem>
+    <TabItem label="yarn">
+
+```sh
+yarn typecheck
+yarn build:wx
+yarn build:h5
 ```
 
     </TabItem>

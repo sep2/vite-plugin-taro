@@ -12,14 +12,6 @@ import { Tabs, TabItem } from '@astrojs/starlight/components'
 按目标选择开发命令（`wx` 为微信，`zfb` 为支付宝）：
 
 <Tabs syncKey="package-manager">
-    <TabItem label="npm">
-
-```sh
-npm run dev:wx
-npm run dev:zfb
-```
-
-    </TabItem>
     <TabItem label="pnpm">
 
 ```sh
@@ -28,11 +20,19 @@ pnpm dev:zfb
 ```
 
     </TabItem>
-    <TabItem label="bun">
+    <TabItem label="npm">
 
 ```sh
-bun run dev:wx
-bun run dev:zfb
+npm run dev:wx
+npm run dev:zfb
+```
+
+    </TabItem>
+    <TabItem label="yarn">
+
+```sh
+yarn dev:wx
+yarn dev:zfb
 ```
 
     </TabItem>
@@ -73,14 +73,6 @@ hmr: {
 如果不需要热更新或保留运行状态，例如让 AI 批量修改代码时，也可以使用 Vite 原生的 `--watch`，在文件修改后自动重新构建：
 
 <Tabs syncKey="package-manager">
-    <TabItem label="npm">
-
-```sh
-npm run build:wx -- --watch
-npm run build:zfb -- --watch
-```
-
-    </TabItem>
     <TabItem label="pnpm">
 
 ```sh
@@ -89,11 +81,19 @@ pnpm build:zfb --watch
 ```
 
     </TabItem>
-    <TabItem label="bun">
+    <TabItem label="npm">
 
 ```sh
-bun run build:wx --watch
-bun run build:zfb --watch
+npm run build:wx -- --watch
+npm run build:zfb -- --watch
+```
+
+    </TabItem>
+    <TabItem label="yarn">
+
+```sh
+yarn build:wx --watch
+yarn build:zfb --watch
 ```
 
     </TabItem>
