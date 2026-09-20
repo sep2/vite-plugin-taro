@@ -194,8 +194,8 @@ function createMiniOutputPlugin(): Plugin {
                 getAdditionalModuleBytes: (moduleId) => (largeLazyModuleIds.has(moduleId) ? 1_000_000 : 0)
             })
             const sourcemap = Boolean(outputOptions.sourcemap)
-            const classification = classifyModule(chunk)
-            if (classification.executionKind === 'capsule') {
+            const kind = classifyModule(chunk)
+            if (kind === 'entry-capsule' || kind === 'normal-capsule') {
                 return renderCapsule(code, chunk, sourcemap)
             }
 
@@ -359,7 +359,7 @@ test('executes a complex nested static and dynamic graph across production wx su
         nativeEntry && typeof nativeEntry === 'object' && 'loadSubpackage' in nativeEntry && 'loadById' in nativeEntry
     )
     assert.ok(typeof nativeEntry.loadSubpackage === 'function' && typeof nativeEntry.loadById === 'function')
-    assert.equal(classifyModule(output.nativeEntry).executionKind, 'amphibious')
+    assert.equal(classifyModule(output.nativeEntry), 'amphibious')
 
     const application = system.importSync(output.application.fileName)
     const readMain = application.readMain

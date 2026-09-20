@@ -4,7 +4,7 @@ import {
     createMiniModuleClassifier,
     isMiniFrameworkVendorModule,
     isMiniPolyfillModule,
-    type MiniChunkClassification,
+    type MiniChunkKind,
     type MiniModuleClassifier
 } from '../module/module.ts'
 import { getNativeComponentAssetBytes } from '../native/native-component-assets.ts'
@@ -25,7 +25,7 @@ type PlacementState =
 /** Placement services consumed by the later Mini Program rendering and output hooks. */
 export type MiniPlacementPlugin = Plugin &
     Readonly<{
-        classifyChunk(chunk: Rolldown.PreRenderedChunk | Rolldown.RenderedChunk): MiniChunkClassification
+        classifyChunk(chunk: Rolldown.PreRenderedChunk | Rolldown.RenderedChunk): MiniChunkKind
         getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation
         getPhysicalChunkId(chunk: Rolldown.RenderedChunk | string): string
         getSubpackages(): readonly GeneratedSubpackage[]
@@ -67,11 +67,14 @@ export function createPlacementRolldownOptions(classifyChunk: MiniModuleClassifi
             },
             /** Native shells retain their public routes; capsules live beside them and shared runtime entries live in common/. */
             entryFileNames(chunk: Rolldown.PreRenderedChunk): string {
-                const classification = classifyChunk(chunk)
-                if (classification.entryRole === 'shell') {
-                    return '[name]'
+                switch (classifyChunk(chunk)) {
+                    case 'native':
+                        return '[name]'
+                    case 'entry-capsule':
+                        return '[name].js'
+                    default:
+                        return 'common/[name].js'
                 }
-                return classification.entryRole === 'capsule' ? '[name].js' : 'common/[name].js'
             },
             /**
              * Leaves chunk identity and collision handling entirely to Rolldown. This package-neutral physical pattern deliberately
@@ -162,7 +165,7 @@ export function createMiniPlacementPlugin(modules: RuntimeModulesContract): Mini
             }
         },
 
-        classifyChunk(chunk: Rolldown.PreRenderedChunk | Rolldown.RenderedChunk): MiniChunkClassification {
+        classifyChunk(chunk: Rolldown.PreRenderedChunk | Rolldown.RenderedChunk): MiniChunkKind {
             return classifyChunk(chunk)
         },
 

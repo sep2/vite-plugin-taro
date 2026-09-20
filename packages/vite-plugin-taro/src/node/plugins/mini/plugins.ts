@@ -119,23 +119,31 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
             handler(code, chunk, outputOptions, meta) {
                 // The placement plugin runs first and has already created immutable placement from this complete chunk graph.
 
-                const classification = placement.classifyChunk(chunk)
+                const kind = placement.classifyChunk(chunk)
                 const sourcemap = Boolean(outputOptions.sourcemap)
 
-                if (classification.executionKind === 'capsule') {
-                    return renderCapsule(code, chunk, sourcemap)
+                switch (kind) {
+                    case 'entry-capsule':
+                    case 'normal-capsule': {
+                        return renderCapsule(code, chunk, sourcemap)
+                    }
+                    case 'native':
+                    case 'amphibious': {
+                        // Native and amphibious modules share the CommonJS renderer
+                        return renderNative({
+                            code,
+                            chunk,
+                            chunks: meta.chunks,
+                            bootstrapModuleId: contract.runtime.modules.bootstrap,
+                            getPhysicalChunkId: placement.getPhysicalChunkId,
+                            classifyModule: placement.classifyChunk,
+                            sourcemap
+                        })
+                    }
+                    default: {
+                        throw new Error(`Unknown module kind ${kind}`)
+                    }
                 }
-
-                // Native and amphibious modules share the CommonJS renderer; transport is emitted separately from final paths.
-                return renderNative({
-                    code,
-                    chunk,
-                    chunks: meta.chunks,
-                    bootstrapModuleId: contract.runtime.modules.bootstrap,
-                    getPhysicalChunkId: placement.getPhysicalChunkId,
-                    classifyModule: placement.classifyChunk,
-                    sourcemap
-                })
             }
         },
 

@@ -31,60 +31,69 @@ const modules: RuntimeModulesContract = {
 const classifyModule = createMiniModuleClassifier(modules)
 
 function chunk(...moduleIds: string[]): Rolldown.PreRenderedChunk {
-    return { moduleIds } as Rolldown.PreRenderedChunk
+    return {
+        name: 'fixture',
+        isEntry: false,
+        isDynamicEntry: false,
+        facadeModuleId: null,
+        moduleIds,
+        exports: []
+    }
 }
 
-test('identifies shell and capsule entry roles independently from output execution', () => {
-    assert.equal(classifyModule(chunk(modules.appShell)).entryRole, 'shell')
-    assert.equal(classifyModule(chunk(modules.appCapsule)).entryRole, 'capsule')
-    assert.equal(classifyModule(chunk(modules.customWrapperShell)).entryRole, 'shell')
-    assert.equal(classifyModule(chunk(`${modules.pageCapsule}?route=page`)).entryRole, 'capsule')
-    assert.equal(classifyModule(chunk('/application')).entryRole, undefined)
-    assert.throws(() => classifyModule(chunk(modules.appShell, modules.appCapsule)), /mixes shell and capsule entries/)
+test('classifies native lifecycle shells and entry capsules by module identity', () => {
+    for (const moduleId of [modules.appShell, modules.pageShell, modules.componentShell, modules.customWrapperShell]) {
+        assert.equal(classifyModule(chunk('/dependency', moduleId)), 'native')
+    }
+    for (const moduleId of [modules.appCapsule, modules.pageCapsule, modules.componentCapsule]) {
+        assert.equal(classifyModule(chunk('/dependency', moduleId)), 'entry-capsule')
+    }
 })
 
-test('classifies native, capsule and amphibious execution in one pass', () => {
-    assert.deepEqual(classifyModule(chunk('/application')), {
-        entryRole: undefined,
-        executionKind: 'capsule'
-    })
-    assert.equal(classifyModule(chunk(modules.appShell)).executionKind, 'native')
-    assert.equal(classifyModule(chunk(modules.appCapsule)).executionKind, 'capsule')
-    assert.equal(classifyModule(chunk(modules.bootstrap)).executionKind, 'amphibious')
-    assert.equal(classifyModule(chunk(vptGlobalBindingId)).executionKind, 'amphibious')
-    assert.equal(classifyModule(chunk(vptGlobalBindingId, rolldownRuntimeId)).executionKind, 'amphibious')
-    assert.equal(classifyModule(chunk(rolldownRuntimeId)).executionKind, 'amphibious')
-    assert.equal(classifyModule(chunk(modules.appCapsule, rolldownRuntimeId)).executionKind, 'amphibious')
+test('recognizes route-qualified lifecycle entries', () => {
+    assert.equal(classifyModule(chunk(`${modules.pageShell}?route=pages%2Fhome`)), 'native')
+    assert.equal(classifyModule(chunk(`${modules.pageCapsule}?route=pages%2Fhome`)), 'entry-capsule')
 })
 
-test('framework vendor remains a capsule regardless of its output name', () => {
+test('classifies application-only and empty chunks as normal capsules', () => {
+    assert.equal(classifyModule(chunk('/application', '/dependency')), 'normal-capsule')
+    assert.equal(classifyModule(chunk()), 'normal-capsule')
+})
+
+test('classifies standalone and grouped infrastructure as amphibious', () => {
+    for (const moduleId of [modules.bootstrap, vptGlobalBindingId, miniPolyfillsId, rolldownRuntimeId]) {
+        assert.equal(classifyModule(chunk('/dependency', moduleId)), 'amphibious')
+    }
+    // Bundled development groups these infrastructure modules together, separately from lifecycle capsules.
+    assert.equal(classifyModule(chunk(rolldownRuntimeId, vptGlobalBindingId, miniPolyfillsId)), 'amphibious')
+    assert.equal(classifyModule(chunk(miniPolyfillsId, vptGlobalBindingId, rolldownRuntimeId)), 'amphibious')
+})
+
+test('framework vendor remains a normal capsule regardless of its output name', () => {
     for (const moduleId of [
         packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini'),
         packageRequire.resolve('react'),
         packageRequire.resolve('react-dom')
     ]) {
-        assert.deepEqual(classifyModule({ ...chunk(moduleId), name: 'renamed-framework' }), {
-            entryRole: undefined,
-            executionKind: 'capsule'
-        })
+        assert.equal(classifyModule({ ...chunk(moduleId), name: 'renamed-framework' }), 'normal-capsule')
     }
-    assert.equal(classifyModule({ ...chunk('/repo/src/vendor.ts'), name: 'vendor' }).executionKind, 'capsule')
+    assert.equal(classifyModule({ ...chunk('/repo/src/vendor.ts'), name: 'vendor' }), 'normal-capsule')
 })
 
 test('polyfill execution follows the virtual entry while package paths only control grouping', () => {
     assert.equal(isMiniPolyfillModule(miniPolyfillsId), true)
     assert.equal(isMiniPolyfillModule(vptGlobalBindingId), true)
-    assert.equal(classifyModule({ ...chunk(miniPolyfillsId), name: 'renamed-polyfills' }).executionKind, 'amphibious')
+    assert.equal(classifyModule({ ...chunk(miniPolyfillsId), name: 'renamed-polyfills' }), 'amphibious')
     for (const moduleId of [
         packageRequire.resolve('core-js/modules/web.url.js'),
         packageRequire.resolve('core-js/internals/global-this.js')
     ]) {
         assert.equal(isMiniPolyfillModule(moduleId), true)
-        assert.equal(classifyModule(chunk(moduleId)).executionKind, 'capsule')
-        assert.equal(classifyModule(chunk(miniPolyfillsId, moduleId)).executionKind, 'amphibious')
+        assert.equal(classifyModule(chunk(moduleId)), 'normal-capsule')
+        assert.equal(classifyModule(chunk(miniPolyfillsId, moduleId)), 'amphibious')
     }
     assert.equal(isMiniPolyfillModule('/repo/src/polyfills.ts'), false)
-    assert.equal(classifyModule({ ...chunk('/repo/src/polyfills.ts'), name: 'polyfills' }).executionKind, 'capsule')
+    assert.equal(classifyModule({ ...chunk('/repo/src/polyfills.ts'), name: 'polyfills' }), 'normal-capsule')
 })
 
 for (const layout of ['installed', 'linked'] as const) {
@@ -137,7 +146,7 @@ for (const layout of ['installed', 'linked'] as const) {
             const moduleId = path.join(packageRoot, 'index.js')
             assert.equal(fixtureModule.isMiniFrameworkVendorModule(moduleId), name !== 'core-js')
             assert.equal(fixtureModule.isMiniPolyfillModule(moduleId), name === 'core-js')
-            assert.equal(classifyFixture(chunk(moduleId)).executionKind, 'capsule')
+            assert.equal(classifyFixture(chunk(moduleId)), 'normal-capsule')
             assert.equal(fixtureModule.isMiniFrameworkVendorModule(`${packageRoot}-other/index.js`), false)
             assert.equal(fixtureModule.isMiniPolyfillModule(`${packageRoot}-other/index.js`), false)
         }

@@ -629,7 +629,7 @@ function getImportedCapsule(
 ): Rolldown.RenderedChunk | undefined {
     if (!reference.startsWith('./') && !reference.startsWith('../')) return undefined
     const imported = chunks[resolvePhysicalChunkReference(fileName, reference)]
-    return imported && classifyModule(imported).entryRole === 'capsule' ? imported : undefined
+    return imported && classifyModule(imported) === 'entry-capsule' ? imported : undefined
 }
 
 /** Renders all native dependencies through the same import lowering, including the generated System import. */

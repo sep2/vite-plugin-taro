@@ -3,18 +3,18 @@ import test from 'node:test'
 import { walk } from 'oxc-walker'
 import { parseSync } from 'rolldown/utils'
 import type { Rolldown } from 'vite'
-import { type MiniExecutionKind, type MiniModuleClassifier, miniTransportFileName } from '../module/module.ts'
+import { type MiniChunkKind, type MiniModuleClassifier, miniTransportFileName } from '../module/module.ts'
 import type { PackageLocation } from '../placer/placement.ts'
 import { createTransportOutput } from './create-transport-output.ts'
 
 // Fixture identities carry explicit classifications; the cross-package execution test uses the production classifier.
 const classifyModule: MiniModuleClassifier = ({ moduleIds }) => {
-    const executionKind = moduleIds[0]
-    assert.ok(executionKind === 'native' || executionKind === 'capsule' || executionKind === 'amphibious')
-    return { entryRole: undefined, executionKind }
+    const kind = moduleIds[0]
+    assert.ok(kind === 'native' || kind === 'entry-capsule' || kind === 'normal-capsule' || kind === 'amphibious')
+    return kind
 }
 
-function createChunk(fileName: string, kind: MiniExecutionKind): Rolldown.OutputChunk {
+function createChunk(fileName: string, kind: MiniChunkKind): Rolldown.OutputChunk {
     return {
         __rolldown_external_memory_handle__: () => ({ freed: false }),
         type: 'chunk',
@@ -55,8 +55,8 @@ function evaluate(code: string, require: (id: string) => unknown): (id: string) 
 
 test('emits compact deterministic routes with final physical paths and resolved logical hashes', () => {
     const bootstrap = createChunk('common/bootstrap-resolved.js', 'amphibious')
-    const eager = createChunk('common/eager-resolved.js', 'capsule')
-    const lazy = createChunk('sub/p_test/common/lazy-resolved.js', 'capsule')
+    const eager = createChunk('common/eager-resolved.js', 'entry-capsule')
+    const lazy = createChunk('sub/p_test/common/lazy-resolved.js', 'normal-capsule')
     const shell = createChunk('app.js', 'native')
     const bundle: Rolldown.OutputBundle = {
         [lazy.fileName]: lazy,
@@ -150,7 +150,7 @@ test('bridges amphibious namespaces lazily to avoid requiring bootstrap during i
 })
 
 test('preserves the native asynchronous promise until the subpackage finishes loading', async () => {
-    const lazy = createChunk('sub/p_test/common/lazy.js', 'capsule')
+    const lazy = createChunk('sub/p_test/common/lazy.js', 'normal-capsule')
     const output = emit({ [lazy.fileName]: lazy })
     const pending = Promise.withResolvers<unknown>()
     const namespace = {}
@@ -178,8 +178,8 @@ test('preserves the native asynchronous promise until the subpackage finishes lo
 })
 
 test('normalizes logical route IDs and physical paths for main and subpackage capsules', async () => {
-    const main = createChunk('assets/pages/../page.js', 'capsule')
-    const lazy = createChunk('sub/p_test/assets/pages/../lazy.js', 'capsule')
+    const main = createChunk('assets/pages/../page.js', 'entry-capsule')
+    const lazy = createChunk('sub/p_test/assets/pages/../lazy.js', 'normal-capsule')
     const output = emit({ [main.fileName]: main, [lazy.fileName]: lazy })
     const load = evaluate(
         output.source,
@@ -201,7 +201,7 @@ for (const name of [
 ]) {
     test(`preserves the quoted async path ${JSON.stringify(name)}`, async () => {
         const logicalId = `common/${name}`
-        const chunk = createChunk(`sub/p_test/${logicalId}`, 'capsule')
+        const chunk = createChunk(`sub/p_test/${logicalId}`, 'normal-capsule')
         const output = emit({ [chunk.fileName]: chunk })
         const requirePath = `../../${chunk.fileName}`
         assert.deepEqual(parseSync(miniTransportFileName, output.source).errors, [])
@@ -223,7 +223,7 @@ for (const name of [
 
 test('JSON-encodes special characters without changing module IDs or literal require paths', () => {
     const name = 'quoted-"\'`\\\n抖音.js'
-    const chunk = createChunk(`common/vpt/${name}`, 'capsule')
+    const chunk = createChunk(`common/vpt/${name}`, 'normal-capsule')
     const output = emit({ [chunk.fileName]: chunk })
     assert.deepEqual(parseSync(miniTransportFileName, output.source).errors, [])
     const load = evaluate(output.source, (id) => id)
@@ -232,8 +232,8 @@ test('JSON-encodes special characters without changing module IDs or literal req
 })
 
 test('regenerates a closed routing table from each final bundle without retaining removed routes', () => {
-    const oldChunk = createChunk('common/old.js', 'capsule')
-    const newChunk = createChunk('sub/p_test/common/new.js', 'capsule')
+    const oldChunk = createChunk('common/old.js', 'normal-capsule')
+    const newChunk = createChunk('sub/p_test/common/new.js', 'normal-capsule')
     const first = emit({ [oldChunk.fileName]: oldChunk })
     const second = emit({ [newChunk.fileName]: newChunk })
     assert.ok(first.source.includes('common/old.js'))

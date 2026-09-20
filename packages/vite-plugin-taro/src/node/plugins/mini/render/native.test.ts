@@ -4,7 +4,7 @@ import { walk } from 'oxc-walker'
 import { parseSync } from 'rolldown/utils'
 import type { Rolldown } from 'vite'
 import type { RuntimeModulesContract } from '../mini-contract.ts'
-import { createMiniModuleClassifier, rolldownRuntimeId } from '../module/module.ts'
+import { createMiniModuleClassifier } from '../module/module.ts'
 import { renderNative as renderNativeWithRuntime } from './native.ts'
 
 const runtimeModules = {
@@ -84,7 +84,7 @@ export { instantiate }`
     assert.deepEqual(result.map.sources, ['assets/bootstrap-a.js'])
 })
 
-test('synchronously activates a statically imported capsule even when its chunk is amphibious', () => {
+test('synchronously activates a statically imported entry capsule', () => {
     const source = `import "./assets/bootstrap-a.js"
 import config from "./assets/module-b.js"
 Page(config)`
@@ -97,7 +97,7 @@ Page(config)`
         }),
         'assets/module-b.js': chunk({
             fileName: 'assets/module-b.js',
-            moduleIds: [appCapsulePath, rolldownRuntimeId],
+            moduleIds: [appCapsulePath],
             isEntry: true
         })
     }

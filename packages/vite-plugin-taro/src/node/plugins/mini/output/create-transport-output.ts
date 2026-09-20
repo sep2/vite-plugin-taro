@@ -50,7 +50,7 @@ export function createTransportOutput({
         if (chunk.type !== 'chunk') {
             continue
         }
-        const kind = classifyModule(chunk).executionKind
+        const kind = classifyModule(chunk)
         if (kind === 'native') {
             continue
         }
@@ -71,7 +71,7 @@ export function createTransportOutput({
         const load = `${asynchronous ? 'require.async' : 'require'}(${requirePath})`
         // Amphibious namespaces must be required lazily during registration execution, never while bootstrap imports transport.
         // Capsules already export registrations; bridging only native namespaces avoids eager bootstrap recursion.
-        const registration = kind === 'capsule' ? load : `[[],function(e){return{execute:function(){e(${load})}}}]`
+        const registration = kind === 'amphibious' ? `[[],function(e){return{execute:function(){e(${load})}}}]` : load
         cases.push(`case ${JSON.stringify(logicalId)}:return ${registration};`)
     }
 

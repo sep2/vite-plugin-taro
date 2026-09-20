@@ -43,22 +43,11 @@ export const pageCapsuleId = '\0vpt:page-capsule'
 
 export type MiniChunk = Rolldown.PreRenderedChunk | Rolldown.RenderedChunk
 
-/** Build-graph role of an explicit native lifecycle entry. */
-export type MiniEntryRole = 'shell' | 'capsule'
+/** Distinguishes native shells, lifecycle entry capsules, ordinary capsules, and shared native/SystemJS infrastructure. */
+export type MiniChunkKind = 'native' | 'entry-capsule' | 'normal-capsule' | 'amphibious'
 
-/** Runtime domain in which one final Mini Program JavaScript chunk executes. */
-export type MiniExecutionKind = 'native' | 'capsule' | 'amphibious'
-
-/** Complete execution classification derived from one pass over a chunk's module IDs. */
-export type MiniChunkClassification = Readonly<{
-    entryRole: MiniEntryRole | undefined
-    executionKind: MiniExecutionKind
-}>
-
-/** Classifies chunks by explicit runtime roles. */
-export type MiniModuleClassifier = (chunk: MiniChunk) => MiniChunkClassification
-
-type MiniRuntimeModuleKind = MiniEntryRole | 'amphibious'
+/** Classifies chunks by their compiler-owned modules; ordinary application chunks are normal capsules. */
+export type MiniModuleClassifier = (chunk: MiniChunk) => MiniChunkKind
 
 const frameworkPackageRoots = [
     // The exported Mini entry is <runtime package>/dist/runtime/index.js, regardless of where the package is installed or linked.
@@ -88,19 +77,19 @@ export function isMiniFrameworkVendorModule(moduleId: string): boolean {
 }
 
 /**
- * Classifies explicit runtime entries in one module-ID scan; framework vendor remains a capsule.
- * Amphibious chunks share bootstrap's bridge so native and SystemJS callers reuse the same exports.
- * Construction is O(1); each lookup is O(M), where M is the number of modules in the chunk.
+ * The Mini graph separates lifecycle entries from bootstrap/polyfill/runtime infrastructure. A compiler-owned module
+ * identifies its chunk's kind; chunks containing only application or framework modules are normal capsules.
+ * One scan stops at the first known identity: O(M) worst-case time and O(1) extra space, without per-chunk collections.
  */
 export function createMiniModuleClassifier(modules: RuntimeModulesContract): MiniModuleClassifier {
-    const moduleKindById: ReadonlyMap<string, MiniRuntimeModuleKind> = new Map([
-        [modules.appShell, 'shell'],
-        [modules.componentShell, 'shell'],
-        [modules.customWrapperShell, 'shell'],
-        [modules.pageShell, 'shell'],
-        [modules.appCapsule, 'capsule'],
-        [modules.componentCapsule, 'capsule'],
-        [modules.pageCapsule, 'capsule'],
+    const moduleKindById: ReadonlyMap<string, MiniChunkKind> = new Map([
+        [modules.appShell, 'native'],
+        [modules.componentShell, 'native'],
+        [modules.customWrapperShell, 'native'],
+        [modules.pageShell, 'native'],
+        [modules.appCapsule, 'entry-capsule'],
+        [modules.componentCapsule, 'entry-capsule'],
+        [modules.pageCapsule, 'entry-capsule'],
         [modules.bootstrap, 'amphibious'],
         [vptGlobalBindingId, 'amphibious'],
         [miniPolyfillsId, 'amphibious'],
@@ -108,37 +97,12 @@ export function createMiniModuleClassifier(modules: RuntimeModulesContract): Min
     ])
 
     return (chunk) => {
-        // These local flags accumulate one chunk's classification during its sole module-ID traversal.
-        let ownsShell = false
-        let ownsCapsule = false
-        let isAmphibious = false
-
         for (const moduleId of chunk.moduleIds) {
-            const normalizedId = normalizeModuleId(moduleId)
-
-            const kind = moduleKindById.get(normalizedId)
-
-            switch (kind) {
-                case 'shell':
-                    ownsShell = true
-                    break
-                case 'capsule':
-                    ownsCapsule = true
-                    break
-                case 'amphibious':
-                    isAmphibious = true
-                    break
+            const kind = moduleKindById.get(normalizeModuleId(moduleId))
+            if (kind !== undefined) {
+                return kind
             }
         }
-
-        if (ownsShell && ownsCapsule) {
-            throw new Error(`Mini Program chunk mixes shell and capsule entries: ${chunk.moduleIds.join(', ')}`)
-        }
-
-        const entryRole = ownsShell ? 'shell' : ownsCapsule ? 'capsule' : undefined
-        return {
-            entryRole: entryRole,
-            executionKind: isAmphibious ? 'amphibious' : entryRole === 'shell' ? 'native' : 'capsule'
-        }
+        return 'normal-capsule'
     }
 }
