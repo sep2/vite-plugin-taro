@@ -6,10 +6,18 @@ import { createProcessScope } from './create-process-scope.ts'
 test('scope cleanup terminates children and is repeatable', async () => {
     const scope = createProcessScope()
     const child = scope.start(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {})
-    await once(child, 'spawn')
-    await Promise.all([scope.stop(child), scope.close()])
-    assert.notEqual(child.signalCode, null)
-    await scope.close()
+    try {
+        await once(child, 'spawn')
+        const pid = child.pid
+        assert.ok(pid !== undefined)
+        await Promise.all([scope.stop(child), scope.close()])
+        // Windows reports forced termination as an exit code, not a POSIX signal.
+        assert.ok(child.exitCode !== null || child.signalCode !== null)
+        assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' })
+        await scope.close()
+    } finally {
+        await scope.close()
+    }
 })
 
 test('scope cleanup handles spawn failures', async () => {

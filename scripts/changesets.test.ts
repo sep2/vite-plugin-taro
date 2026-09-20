@@ -4,9 +4,9 @@ import { once } from 'node:events'
 import {
     appendFileSync,
     existsSync,
+    globSync,
     mkdirSync,
     mkdtempSync,
-    readdirSync,
     readFileSync,
     rmSync,
     writeFileSync
@@ -28,12 +28,10 @@ interface PackageManifest {
 
 const repoRoot = fileURLToPath(new URL('../', import.meta.url))
 const cliPath = path.join(repoRoot, 'node_modules/@changesets/cli/bin.js')
-const packageDirectories = [
-    'docs',
-    ...['packages', 'demo'].flatMap((directory) =>
-        readdirSync(path.join(repoRoot, directory)).map((name) => `${directory}/${name}`)
-    )
-]
+// Match manifests, not leftover directories containing ignored build output or node_modules.
+const packageDirectories = globSync(['docs/package.json', 'packages/*/package.json', 'demo/*/package.json'], {
+    cwd: repoRoot
+}).map((manifest) => path.dirname(manifest))
 const publicNames = config.fixed.flat()
 const execFileAsync = promisify(execFile)
 
@@ -166,7 +164,6 @@ interface PublishPlan {
 async function createRegistry(t: TestContext, versions: Readonly<Record<string, readonly string[]>>): Promise<string> {
     // Test-local requests prove the CLI used this fixture registry rather than the public npm registry.
     const requestedPackages = new Set<string>()
-    t.after(() => assert.deepEqual([...requestedPackages].toSorted(), publicNames.toSorted()))
     const server = createServer((request, response) => {
         assert.equal(request.method, 'GET')
         assert.ok(request.url)
@@ -182,7 +179,11 @@ async function createRegistry(t: TestContext, versions: Readonly<Record<string, 
             })
         )
     })
-    t.after(() => server[Symbol.asyncDispose]())
+    t.after(async () => {
+        // Dispose the server before asserting so a failed request expectation cannot keep the worker alive.
+        await server[Symbol.asyncDispose]()
+        assert.deepEqual([...requestedPackages].toSorted(), publicNames.toSorted())
+    })
     server.listen(0, '127.0.0.1')
     await once(server, 'listening')
     const address = server.address()

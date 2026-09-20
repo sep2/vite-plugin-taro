@@ -1,6 +1,7 @@
 import type { ChildProcessByStdio } from 'node:child_process'
 import { createWriteStream, existsSync } from 'node:fs'
 import { cp, type FileHandle, mkdir, open, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { Readable } from 'node:stream'
 import { finished } from 'node:stream/promises'
@@ -26,10 +27,23 @@ type ToolParameters = Readonly<Record<string, string>>
 type TestCase = (harness: DevToolsHarness) => Promise<void>
 type ServerProcess = ChildProcessByStdio<null, Readable, Readable>
 
+/** Only observation polling may retry the temporary detach/missing-node responses of a simulator reload. */
+export class DevToolsToolError extends Error {
+    readonly retryableObservation: boolean
+
+    constructor(tool: string, response: Record<string, unknown>) {
+        super(`wechatide ${tool} failed: ${JSON.stringify(response)}`)
+        this.retryableObservation =
+            response.message === 'timeout waiting for automator response' ||
+            response.message === 'no such element' ||
+            response.message === 'page node not found'
+    }
+}
+
 const processes = createProcessScope()
 // Each server registers its log completion so finalization also drains file handles.
 const logCompletions: Promise<unknown>[] = []
-// Only quit DevTools once this invocation has attempted to attach to its runtime.
+// Close only this fixture's window after this invocation has attempted to attach to its runtime.
 let devToolsUsed = false
 
 const scriptsRoot = path.dirname(fileURLToPath(import.meta.url))
@@ -38,14 +52,14 @@ const repositoryRoot = path.resolve(fixtureRoot, '../..')
 const commandTimeoutMilliseconds = 12_000
 const requestedCase = process.argv[2] ?? 'all'
 const testDeadline = Date.now() + (process.env.VPT_HMR_SETUP === '1' || requestedCase === 'all' ? 60_000 : 30_000)
-// Keep both this client name and the RAM-disk project path fixed. WeChat DevTools persists trust by identity/path; random temp
+// Keep both this client name and the temporary project path fixed. WeChat DevTools persists trust by identity/path; random temp
 // directories or per-run clients would force a new authorization prompt and make standalone cases slower and interactive.
 const devToolsClient = process.env.VPT_HMR_DEVTOOLS_CLIENT ?? 'Pi'
 
 /** Runs cases against one fixed temporary project, cleaning it completely before every invocation. */
 export async function withDevToolsHarness(testName: string, testCase: TestCase): Promise<void> {
     // One fixed lock prevents concurrent standalone cases from deleting or mutating the same disposable project.
-    const lockPath = '/tmp/vite-plugin-taro-hmr-stress.lock'
+    const lockPath = path.join(tmpdir(), 'vite-plugin-taro-hmr-stress.lock')
     const lock = await acquireHarnessLock(lockPath)
     // Memoize cleanup because a signal can arrive while normal finalization is already running.
     let cleanupPromise: Promise<void> | undefined
@@ -54,7 +68,7 @@ export async function withDevToolsHarness(testName: string, testCase: TestCase):
             try {
                 try {
                     if (testName !== 'setup' && devToolsUsed) {
-                        await quitDevTools()
+                        await closeProject(path.join(resolveTestRoot(), 'dist/wx'))
                     }
                 } finally {
                     await processes.close()
@@ -104,7 +118,7 @@ async function acquireHarnessLock(lockPath: string): Promise<FileHandle> {
         }
         const ownerPid = Number(await readFile(lockPath, 'utf8'))
         if (Number.isSafeInteger(ownerPid) && ownerPid > 0 && isProcessAlive(ownerPid)) {
-            throw new Error(`HMR DevTools suite already owns the fixed RAM fixture in process ${ownerPid}`)
+            throw new Error(`HMR DevTools suite already owns the fixed temporary fixture in process ${ownerPid}`)
         }
         // A killed test cannot execute finally; reclaim only a lock whose recorded owner no longer exists.
         await unlink(lockPath)
@@ -153,7 +167,7 @@ async function runLockedHarness(root: string, testName: string, testCase: TestCa
         }
         console.log(`[hmr-devtools] ${testName} passed`)
     } finally {
-        // Stop Vite before outer cleanup quits DevTools and releases the fixture lock.
+        // Stop Vite before outer cleanup closes this project window and releases the fixture lock.
         if (server) {
             await stopServer(server)
         }
@@ -161,31 +175,16 @@ async function runLockedHarness(root: string, testName: string, testCase: TestCa
 }
 
 async function openProject(outDir: string): Promise<void> {
-    try {
-        await runTool('automation_runtime_info', outDir, { action: 'currentPage' })
-        return
-    } catch (error) {
-        if (process.env.VPT_HMR_SETUP !== '1') {
-            throw new Error('Fixed DevTools runtime is not warm; run pnpm setup:hmr-stress-demo:devtools once', {
-                cause: error
-            })
-        }
-    }
-
-    // Setup alone pays the cold-window cost. Every actual case reuses this fixed trusted runtime and remains below 30 seconds.
-    try {
-        await runToolWithTimeout('close_project_window', outDir, {}, 2_000)
-    } catch {
-        // No window is the expected first setup state.
-    }
-    await runTool('open_project_window', outDir, {})
-    try {
-        await runTool('automation_runtime_info', outDir, { action: 'currentPage' })
-    } catch {
-        // On a clean dist, DevTools can finish compiling just after the automator's first internal response deadline. One second
-        // attachment attempt stays inside the setup-only 60-second budget; actual warm test cases still fail on their first call.
-        await runTool('automation_runtime_info', outDir, { action: 'currentPage' })
-    }
+    // Rebuilding the fixture invalidates an earlier automator attachment, even when its window is still open.
+    await runToolWithTimeout('open_project_window', outDir, {}, 30_000)
+    await waitFor(
+        async () => {
+            const result = await runTool('automation_runtime_info', outDir, { action: 'currentPage' })
+            return isRecord(result) && isRecord(result.currentPage)
+        },
+        20_000,
+        100
+    )
 }
 
 function createHarness(root: string, outDir: string): DevToolsHarness {
@@ -210,13 +209,22 @@ function createHarness(root: string, outDir: string): DevToolsHarness {
         },
         outDir: outDir,
         readConsoleErrors: async () => {
-            const result = await runTool('get_app_console_content', outDir, {
+            const result = await runTool('get_simulator_console', outDir, {
                 command: "grep -i -E 'error|fail|warn|exception'"
             })
             if (typeof result !== 'string') {
                 throw new Error('Expected console text')
             }
             return result
+                .split('\n')
+                .filter((line) => {
+                    if (line.length === 0) {
+                        return false
+                    }
+                    const entry: unknown = JSON.parse(line)
+                    return Array.isArray(entry) && (entry[0] === '[error]' || entry[0] === '[warn]')
+                })
+                .join('\n')
         },
         readCurrentPage: async () => {
             const result = await runTool('automation_runtime_info', outDir, { action: 'currentPage' })
@@ -250,7 +258,7 @@ function createHarness(root: string, outDir: string): DevToolsHarness {
 function resolveTestRoot(): string {
     // The fixed path preserves DevTools trust. Source-pressure profiles are intentionally bounded, so portability and a quick
     // one-command run are more valuable than provisioning a platform-specific RAM disk for a few dozen temporary writes.
-    return '/tmp/vite-plugin-taro-hmr-stress-v1'
+    return path.join(tmpdir(), 'vite-plugin-taro-hmr-stress-v1')
 }
 
 async function buildPlugin(): Promise<void> {
@@ -279,17 +287,21 @@ async function prepareFixture(root: string): Promise<void> {
     ])
     const nodeModules = path.join(root, 'node_modules')
     if (!existsSync(nodeModules)) {
-        await symlink(path.join(fixtureRoot, 'node_modules'), nodeModules, 'dir')
+        await symlink(
+            path.join(fixtureRoot, 'node_modules'),
+            nodeModules,
+            process.platform === 'win32' ? 'junction' : 'dir'
+        )
     }
 }
 
 async function startServer(root: string): Promise<ServerProcess> {
-    const viteExecutable = path.join(root, 'node_modules/.bin/vite')
+    const viteExecutable = path.join(root, 'node_modules/vite/bin/vite.js')
     const appId = process.env.VITE_VPT_WECHAT_APP_ID ?? (await readFixtureAppId()) ?? 'touristappid'
     const serverLogPath = path.join(root, 'vite.log')
     await writeFile(serverLogPath, '')
     const log = createWriteStream(serverLogPath)
-    const server = processes.start(viteExecutable, [], {
+    const server = processes.start(process.execPath, [viteExecutable], {
         cwd: root,
         env: {
             ...process.env,
@@ -333,11 +345,11 @@ async function validateProjectConfig(configPath: string): Promise<void> {
     }
 }
 
-async function quitDevTools(): Promise<void> {
+async function closeProject(outDir: string): Promise<void> {
     // Cleanup gets its own budget, even when the test deadline has already elapsed.
     const output = await runCommand(
         'wechatide',
-        ['-c', devToolsClient, 'quit'],
+        ['-c', devToolsClient, 'close_project_window', '--project', outDir],
         repositoryRoot,
         process.env,
         commandTimeoutMilliseconds
@@ -349,7 +361,7 @@ async function quitDevTools(): Promise<void> {
         response.result.success !== true ||
         response.result.canceled === true
     ) {
-        throw new Error(`wechatide quit failed: ${output}`)
+        throw new Error(`wechatide close_project_window failed: ${output}`)
     }
 }
 
@@ -373,7 +385,7 @@ async function runToolWithTimeout(
     )
     const response = parseToolResponse(output)
     if (response.ok !== true) {
-        throw new Error(`wechatide ${tool} failed: ${output}`)
+        throw new DevToolsToolError(tool, response)
     }
     return response.result
 }
@@ -397,7 +409,10 @@ async function runCommand(
     environment: NodeJS.ProcessEnv,
     timeoutMilliseconds: number
 ): Promise<string> {
-    const child = processes.start(command, arguments_, { cwd: cwd, env: environment })
+    // pnpm and wechatide are command shims on Windows; Vite itself runs directly under Node.
+    const executable = process.platform === 'win32' ? 'cmd.exe' : command
+    const args = process.platform === 'win32' ? ['/d', '/s', '/c', command, ...arguments_] : arguments_
+    const child = processes.start(executable, args, { cwd: cwd, env: environment })
     // These buffers are command-local mutable journals; each child owns them until its one exit result is assembled.
     let stdout = ''
     let stderr = ''
@@ -444,7 +459,21 @@ export async function waitFor(
 ): Promise<void> {
     const startedAt = Date.now()
     const effectiveTimeout = remainingTimeout(timeoutMilliseconds)
-    while (!(await predicate())) {
+    const observe = async (): Promise<boolean> => {
+        try {
+            return await predicate()
+        } catch (error) {
+            if (
+                !(error instanceof DevToolsToolError) ||
+                !error.retryableObservation ||
+                Date.now() - startedAt > effectiveTimeout
+            ) {
+                throw error
+            }
+            return false
+        }
+    }
+    while (!(await observe())) {
         if (Date.now() - startedAt > effectiveTimeout) {
             throw new Error(`Timed out after ${effectiveTimeout}ms`)
         }
