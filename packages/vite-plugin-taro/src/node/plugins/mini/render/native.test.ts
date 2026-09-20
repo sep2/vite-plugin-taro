@@ -9,7 +9,6 @@ import { renderNative as renderNativeWithRuntime } from './native.ts'
 
 const runtimeModules = {
     bootstrap: '/runtime/bootstrap',
-    transport: '/runtime/transport',
     appShell: '/runtime/app-shell',
     appCapsule: '/runtime/app-capsule',
     componentShell: '/runtime/component-shell',

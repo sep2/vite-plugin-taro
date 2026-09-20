@@ -7,7 +7,6 @@ import { createInterpreterHmrMode } from './interpreter-hmr-mode.ts'
 
 const modules: RuntimeModulesContract = {
     bootstrap: '/runtime/bootstrap',
-    transport: '/runtime/transport',
     appShell: '/runtime/app-shell',
     appCapsule: '/runtime/app-capsule',
     componentShell: '/runtime/component-shell',

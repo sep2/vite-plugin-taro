@@ -114,7 +114,7 @@ for (const command of ['serve', 'build'] as const) {
                 exports: {},
                 require(request: string) {
                     assert.equal(command, 'serve', 'production must not add a native provider dependency')
-                    assert.equal(path.posix.join(path.posix.dirname(physicalFile), request), 'common/vpt-global.js')
+                    assert.equal(path.posix.join(path.posix.dirname(physicalFile), request), 'common/vpt/global.js')
                     providerLoads += 1
                     return { vptGlobal: shared }
                 }
@@ -140,7 +140,7 @@ for (const command of ['serve', 'build'] as const) {
                 assert.equal(linkedSources[1].slice(linkedSources[1].indexOf('\n') + 1), linkedSources[0])
             } else {
                 assert.equal(linkedSources[1], linkedSources[0])
-                assert.doesNotMatch(chunk.code, /vpt-global\.js/)
+                assert.doesNotMatch(chunk.code, /vpt\/global\.js/)
             }
         })
     }
@@ -248,7 +248,7 @@ for (const { minify, pathStyle } of [false, true].flatMap((minify) =>
                     return runtime
                 },
                 require(request: string) {
-                    assert.equal(path.posix.normalize(request.replaceAll('\\', '/')), 'common/vpt-global.js')
+                    assert.equal(path.posix.normalize(request.replaceAll('\\', '/')), 'common/vpt/global.js')
                     return { vptGlobal: shared }
                 }
             },
@@ -313,15 +313,15 @@ for (const minify of [false, true]) {
             const binding = result.output.find(
                 (chunk) => chunk.type === 'chunk' && chunk.facadeModuleId === vptGlobalBindingId
             )
-            const provider = result.output.find((chunk) => chunk.fileName === 'common/vpt-global.js')
+            const provider = result.output.find((chunk) => chunk.fileName === 'common/vpt/global.js')
             assert.ok(binding?.type === 'chunk' && provider?.type === 'chunk')
-            assert.equal(provider.fileName, 'common/vpt-global.js')
+            assert.equal(provider.fileName, 'common/vpt/global.js')
             assert.deepEqual(provider.imports, [])
             assert.deepEqual(provider.moduleIds, [])
             assert.match(provider.code, /^["']use strict["']/)
             assert.doesNotMatch(provider.code, /require\(|__rolldown_runtime__|__VPT_GLOBAL__/)
             assert.doesNotMatch(binding.code, /__VPT_GLOBAL__|vpt\.fake\.global/)
-            assert.match(binding.code, /\.\.\/common\/vpt-global\.js/)
+            assert.match(binding.code, /\.\.\/common\/vpt\/global\.js/)
             const context = createContext({}, { codeGeneration: { strings: false, wasm: false } })
             const globalExports: unknown = runInContext(
                 `(function(exports) {\n${provider.code}\nreturn exports; })({})`,
@@ -348,7 +348,7 @@ for (const minify of [false, true]) {
             )
             assert.equal(runInContext('typeof globalThis', restricted), 'undefined')
 
-            const map = result.output.find((output) => output.fileName === 'common/vpt-global.js.map')
+            const map = result.output.find((output) => output.fileName === 'common/vpt/global.js.map')
             if (sourcemap === false || sourcemap === 'inline') {
                 assert.equal(map, undefined)
             } else {
@@ -363,7 +363,7 @@ for (const minify of [false, true]) {
             if (sourcemap === 'inline') {
                 assert.match(provider.code, /sourceMappingURL=data:application\/json;.*base64,/)
             } else if (sourcemap === true) {
-                assert.match(provider.code, /sourceMappingURL=vpt-global\.js\.map/)
+                assert.match(provider.code, /sourceMappingURL=global\.js\.map/)
             } else {
                 assert.doesNotMatch(provider.code, /sourceMappingURL=/)
             }

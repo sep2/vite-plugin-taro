@@ -124,6 +124,10 @@ function requireChunk(output: BuildOutput, fileName: string): OutputChunk {
 
 /** Every native shell loads bootstrap once and uses that namespace rather than an ambient System binding. */
 function assertNativeShells(output: BuildOutput): void {
+    const transport = requireAsset(output, 'common/vpt/transport.js')
+    requireChunk(output, 'common/vpt/global.js')
+    assert.doesNotMatch(String(transport.source), /registerModule|case ["']common\/vpt\//)
+    assert.match(requireChunk(output, 'common/bootstrap.js').code, /require\(["']\.\/vpt\/transport\.js["']\)/)
     for (const fileName of ['app.js', 'pages/home/index.js', 'comp.js', 'custom-wrapper.js']) {
         const { code } = requireChunk(output, fileName)
         assert.equal([...code.matchAll(/\brequire\(["'](?:\.\.?\/)+common\/bootstrap\.js["']\)/g)].length, 1, fileName)
@@ -265,6 +269,7 @@ test('builds TT runtime, common packages, native components and target-specific 
                 ...createOptions('tt'),
                 projectPrivateConfigJson: { setting: { urlCheck: false } }
             },
+            build: { minify: true },
             files: {
                 'src/app.tsx': `
                 import { CustomWrapper, View } from '@tarojs/components'
@@ -345,11 +350,15 @@ test('builds TT runtime, common packages, native components and target-specific 
             assert.deepEqual(parseJsonAsset(output, 'app.json').subPackages, [
                 { root: rootMatch[1], pages: [], common: true }
             ])
-            assert.match(javascript, /require\.async/)
+            assert.ok(
+                String(requireAsset(output, 'common/vpt/transport.js').source).includes(
+                    `require.async(${JSON.stringify(`../../${feature.fileName}`)})`
+                )
+            )
             assert.match(String(requireAsset(output, 'base.ttml').source), /<aweme-data\s/)
             assert.match(String(requireAsset(output, 'base.ttml').source), /p="{{p}}"/)
             assert.match(String(requireAsset(output, 'pages/home/index.ttml').source), /<comp i="{{app}}" p="{{page}}"/)
-            assert.match(String(requireAsset(output, 'assets/global.ttss').source), /color: red/)
+            assert.match(String(requireAsset(output, 'assets/global.ttss').source), /color:red/)
             assert.deepEqual(parseJsonAsset(output, 'project.config.json'), { appid: 'fixture-app' })
             assert.deepEqual(parseJsonAsset(output, 'project.private.config.json'), { setting: { urlCheck: false } })
             assert.equal(String(requireAsset(output, 'components/card/index.ttml').source), '<view>{{count}}</view>')
@@ -646,7 +655,7 @@ test('places a lazy wx feature in a declared code-only subpackage', async () => 
             assert.ok(rootMatch)
             const root = rootMatch[1]
             const appJson = parseJsonAsset(output, 'app.json')
-            const transport = chunks.find((chunk) => chunk.code.includes('require.async'))
+            const transport = requireAsset(output, 'common/vpt/transport.js')
 
             assert.deepEqual(appJson.subPackages, [
                 {
@@ -655,8 +664,7 @@ test('places a lazy wx feature in a declared code-only subpackage', async () => 
                     pages: []
                 }
             ])
-            assert.ok(transport)
-            assert.match(transport.code, /require\.async/)
+            assert.match(String(transport.source), /require\.async/)
             assert.equal(
                 chunks.some(
                     (chunk) => !chunk.fileName.startsWith(`${root}/`) && chunk.code.includes('Lazy wx feature marker')
@@ -699,7 +707,7 @@ test('places a lazy zfb feature in a declared code-only package', async () => {
             assert.ok(rootMatch)
             const root = rootMatch[1]
             const appJson = parseJsonAsset(output, 'app.json')
-            const transport = chunks.find((chunk) => chunk.code.includes('require.async'))
+            const transport = requireAsset(output, 'common/vpt/transport.js')
 
             assert.deepEqual(appJson.subPackages, [
                 {
@@ -707,8 +715,7 @@ test('places a lazy zfb feature in a declared code-only package', async () => {
                     pages: []
                 }
             ])
-            assert.ok(transport)
-            assert.match(transport.code, /require\.async/)
+            assert.match(String(transport.source), /require\.async/)
             assert.equal(
                 chunks.some(
                     (chunk) => !chunk.fileName.startsWith(`${root}/`) && chunk.code.includes('Lazy zfb feature marker')

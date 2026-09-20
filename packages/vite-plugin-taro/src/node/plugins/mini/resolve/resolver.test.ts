@@ -4,12 +4,17 @@ import test from 'node:test'
 import { normalizePath } from 'vite'
 import { appComponentId } from '../../client/constant.ts'
 import type { MiniContract, RuntimeModulesContract } from '../mini-contract.ts'
-import { pageCapsuleId, pageComponentId, taroTargetRuntimeId, vitePreloadId } from '../module/module.ts'
+import {
+    miniTransportId,
+    pageCapsuleId,
+    pageComponentId,
+    taroTargetRuntimeId,
+    vitePreloadId
+} from '../module/module.ts'
 import { createResolver } from './resolver.ts'
 
 const modules = {
     bootstrap: '/runtime/bootstrap.ts',
-    transport: '/runtime/transport.ts',
     appShell: '/runtime/app-shell.ts',
     appCapsule: '/runtime/app-capsule.ts',
     componentShell: '/runtime/component-shell.ts',
@@ -63,12 +68,15 @@ test('resolves fixed and route-specific private IDs', () => {
         'app.js': modules.appShell,
         'comp.js': modules.componentShell,
         bootstrap: modules.bootstrap,
-        transport: modules.transport,
         'app-capsule': modules.appCapsule,
         'component-capsule': modules.componentCapsule,
         'custom-wrapper.js': modules.customWrapperShell,
         'pages/home/index.js': `${modules.pageShell}?route=pages%2Fhome%2Findex`,
         'pages/home/index-capsule': `${modules.pageCapsule}?route=pages%2Fhome%2Findex`
+    })
+    assert.deepEqual(resolver.resolveId(miniTransportId, modules.bootstrap, projectRoot), {
+        id: './vpt/transport.js',
+        external: true
     })
     assert.equal(resolver.resolveId(vitePreloadId, undefined, projectRoot), modules.bootstrap)
     assert.equal(resolver.resolveId(taroTargetRuntimeId, undefined, projectRoot), contract.taro.targetRuntimePath)

@@ -485,29 +485,21 @@ test('loads polyfills before SystemJS, installs amphibious transport and preserv
     }
     // This isolated global must expose the side-effect mock before the bundled bootstrap evaluates it.
     languageGlobal.harness = harness
-    const defines = {
-        __VPT_TRANSPORT__: 'globalThis.harness.transport'
-    }
-    const transportCode = await bundleRuntimeEntry({
-        entry: 'mini/amphibious/transport.ts',
-        mocks: {},
-        defines
-    })
     const code = await bundleRuntimeEntry({
         entry: 'mini/amphibious/bootstrap.ts',
         mocks: {
             '\0vpt:global-binding': 'export const vptGlobal = globalThis',
             '\0vpt:mini-polyfills': "globalThis.harness.events.push('polyfills')",
-            '../systemjs/system-core.js': 'export const System = globalThis.harness.createSystem()'
+            '../systemjs/system-core.js': 'export const System = globalThis.harness.createSystem()',
+            '\0vpt:mini-transport': 'export const transport = globalThis.harness.transport'
         },
-        defines
+        defines: {}
     })
     const context: ExecutionContext = {
         ...createExecutionContext(harness),
         globalThis: languageGlobal
     }
 
-    const transportExports = executeRuntimeEntry(transportCode, createExecutionContext(harness))
     const exports = executeRuntimeEntry(code, context)
     const preload = exports.__vitePreload
     if (typeof preload !== 'function') {
@@ -521,7 +513,6 @@ test('loads polyfills before SystemJS, installs amphibious transport and preserv
     ])
 
     assert.deepEqual(events, ['polyfills', 'create-system'])
-    assert.strictEqual(transportExports.transport, transport)
     assert.strictEqual(exports.System, loader)
     assert.strictEqual(languageGlobal.System, loader)
     assert.strictEqual(loader.instantiate, transport)

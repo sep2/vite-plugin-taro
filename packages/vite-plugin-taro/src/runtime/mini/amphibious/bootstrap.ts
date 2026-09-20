@@ -8,9 +8,10 @@ const globalThis = vptGlobal
 // @ts-expect-error: The Mini build resolves this private polyfills entry.
 import '\0vpt:mini-polyfills'
 
+import { transport } from '\0vpt:mini-transport'
+
 // Install the minimal SystemJS loader and its synchronous-import extension before any native entry requests a capsule.
 import { System as createdSystem } from '../systemjs/system-core.js'
-import { transport } from './transport.ts'
 
 // install the System on globalThis
 globalThis.System = createdSystem

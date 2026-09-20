@@ -168,7 +168,7 @@ test('preserves namespace numbering and loading order across side-effect and cap
         getPhysicalChunkId: (chunk) => (typeof chunk === 'string' ? 'bootstrap.js' : chunk.fileName),
         classifyModule(imported) {
             assert.equal(imported, capsule)
-            return { entryRole: 'capsule', executionKind: 'capsule', isTransport: false }
+            return { entryRole: 'capsule', executionKind: 'capsule' }
         },
         sourcemap: false
     })

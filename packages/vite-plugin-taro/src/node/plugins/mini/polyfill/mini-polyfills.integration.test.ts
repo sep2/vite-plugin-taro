@@ -15,6 +15,7 @@ import vpt from '../../../vpt.ts'
 
 type MiniTarget = 'wx' | 'zfb'
 type Mode = 'production' | 'devtools' | 'interpreter' | 'rebuild'
+type NativeFile = Pick<OutputChunk, 'fileName' | 'code'>
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 const coreJsRoot = `${normalizePath(path.dirname(packageRequire.resolve('core-js/package.json')))}/`
@@ -25,8 +26,8 @@ async function compileFixture(
     target: MiniTarget,
     mode: Mode,
     polyfills: readonly string[],
-    onDevReady?: (chunks: readonly OutputChunk[], root: string) => Promise<void>
-): Promise<readonly OutputChunk[]> {
+    onDevReady?: (chunks: readonly NativeFile[], root: string) => Promise<void>
+): Promise<readonly NativeFile[]> {
     const root = await mkdtemp(path.join(packageRoot, '.vpt-polyfills-test-'))
     const pagePath = normalizePath(path.join(root, 'src/pages/home/index.tsx'))
     const pageSource = 'export default function Home() { return null }'
@@ -62,7 +63,7 @@ async function compileFixture(
         [pagePath, pageSource]
     ])
     // This completion cell captures exactly one initial output graph; the server is closed before returning it.
-    const output = Promise.withResolvers<readonly OutputChunk[]>()
+    const output = Promise.withResolvers<readonly NativeFile[]>()
     const capture: Plugin = {
         name: 'test:polyfill-output',
         resolveId(id, importer) {
@@ -82,9 +83,9 @@ async function compileFixture(
             order: 'post',
             handler(_options, bundle) {
                 const chunks = Object.values(bundle).filter((item): item is OutputChunk => item.type === 'chunk')
-                const globalEntry = chunks.find((chunk) => chunk.fileName === 'common/vpt-global.js')
+                const globalEntry = chunks.find((chunk) => chunk.fileName === 'common/vpt/global.js')
                 assert.ok(globalEntry?.isEntry)
-                assert.equal(globalEntry.fileName, 'common/vpt-global.js')
+                assert.equal(globalEntry.fileName, 'common/vpt/global.js')
                 assert.deepEqual(
                     globalEntry.moduleIds,
                     [],
@@ -111,8 +112,12 @@ async function compileFixture(
                     !polyfillEntry.imports.includes('common/vendor.js'),
                     'pre-bootstrap polyfills must not depend on the framework capsule'
                 )
+                // Compiler-owned JavaScript assets execute through native require just like rendered chunks.
+                const transport = bundle['common/vpt/transport.js']
+                assert.ok(transport?.type === 'asset' && typeof transport.source === 'string')
+                const files = [...chunks, { fileName: transport.fileName, code: transport.source }]
                 // Alipay rejects import() at compile time, even inside an unused React Refresh export that Node can parse.
-                for (const chunk of chunks) {
+                for (const chunk of files) {
                     assert.doesNotMatch(chunk.code, /__VPT_GLOBAL__/, chunk.fileName)
                     const parsed = parseSync(chunk.fileName, chunk.code)
                     assert.deepEqual(parsed.errors, [])
@@ -126,7 +131,7 @@ async function compileFixture(
                         }
                     })
                 }
-                output.resolve(chunks)
+                output.resolve(files)
                 if (mode !== 'production') {
                     // The Mini dev host deliberately writes regardless of build.write. These tests execute the captured
                     // chunks in a VM, so discard the bundle after all output assertions instead of writing a native project.
@@ -173,7 +178,7 @@ async function compileFixture(
             const sourceMap: { mappings: string; sources: string[] } = JSON.parse(String(bootstrapMap.source))
             assert.ok(sourceMap.mappings.length > 0)
             assert.ok(sourceMap.sources.some((source) => source.endsWith('/mini/amphibious/bootstrap.ts')))
-            const globalMap = result.output.find((item) => item.fileName === 'common/vpt-global.js.map')
+            const globalMap = result.output.find((item) => item.fileName === 'common/vpt/global.js.map')
             assert.ok(globalMap?.type === 'asset')
             const globalSourceMap: { mappings: string; sources: string[] } = JSON.parse(String(globalMap.source))
             assert.ok(globalSourceMap.mappings.length > 0)
@@ -186,7 +191,7 @@ async function compileFixture(
                 assert.ok(map.sources.length > 0)
             }
             assert.deepEqual(await readdir(root), [], 'Production fixtures must not materialize sources or output')
-            return result.output.filter((item): item is OutputChunk => item.type === 'chunk')
+            return await output.promise
         } else {
             if (onDevReady) {
                 await mkdir(path.dirname(pagePath), { recursive: true })
@@ -229,7 +234,7 @@ async function compileFixture(
 }
 
 /** Evaluates emitted native files in a separate AppService-like realm with no browser DOM or dynamic code generation. */
-function createAppHeap(chunks: readonly OutputChunk[], nativeURLs: boolean, target: MiniTarget) {
+function createAppHeap(chunks: readonly NativeFile[], nativeURLs: boolean, target: MiniTarget) {
     // Add the host-published HMR files, which deliberately live outside Rolldown's chunk graph, to this fixture's source table.
     const sources = new Map(chunks.map((chunk) => [chunk.fileName, chunk.code]))
     sources.set('hmr/info.js', 'module.exports = { buildId: "test", endpoint: "ws://localhost/test" };')
@@ -338,7 +343,7 @@ function createAppHeap(chunks: readonly OutputChunk[], nativeURLs: boolean, targ
 
 /** The standalone polyfills file installs the selection without needing SystemJS, App registration, or an application capsule. */
 function assertPolyfilledBootstrap(
-    chunks: readonly OutputChunk[],
+    chunks: readonly NativeFile[],
     target: MiniTarget,
     structuredClone: 'function' | 'undefined'
 ): void {
@@ -420,7 +425,7 @@ for (const target of ['wx', 'zfb'] as const) {
                     const heap = createAppHeap(chunks, false, target)
                     heap.read(setup)
                     assert.equal(heap.read('typeof globalThis'), globalType)
-                    const provider = heap.evaluate('common/vpt-global.js')
+                    const provider = heap.evaluate('common/vpt/global.js')
                     assert.ok(provider && typeof provider === 'object')
                     assert.strictEqual(Reflect.get(provider, 'vptGlobal'), heap.read('this'))
                     assert.equal(heap.read('typeof __rolldown_runtime__'), 'undefined')
@@ -438,7 +443,7 @@ for (const target of ['wx', 'zfb'] as const) {
                     `)
                     assertPolyfilledApp(heap, 'function')
                     heap.read('Reflect.set = nativeReflectSet;')
-                    const globalEntry = heap.evaluate('common/vpt-global.js')
+                    const globalEntry = heap.evaluate('common/vpt/global.js')
                     assert.ok(globalEntry && typeof globalEntry === 'object')
                     assert.strictEqual(Reflect.get(globalEntry, 'vptGlobal'), heap.read('runtimeGlobal'))
                     assert.strictEqual(heap.read('runtimeGlobal'), heap.read('this'))
@@ -535,7 +540,7 @@ for (const target of ['wx', 'zfb'] as const) {
                         this.diagnostics = [];
                         this.console = { ...console, error: (...args) => diagnostics.push(args) };
                     `)
-                    const provider = restricted.evaluate('common/vpt-global.js')
+                    const provider = restricted.evaluate('common/vpt/global.js')
                     assert.ok(provider && typeof provider === 'object')
                     restricted.read('const sharedGlobal = Object[Symbol.for("vpt.fake.global")];')
                     assert.strictEqual(Reflect.get(provider, 'vptGlobal'), restricted.read('sharedGlobal'))
@@ -601,7 +606,7 @@ for (const target of ['wx', 'zfb'] as const) {
                         this.console = { ...console, error() {} };
                     `)
                 }
-                const provider = heap.evaluate('common/vpt-global.js')
+                const provider = heap.evaluate('common/vpt/global.js')
                 assert.ok(provider && typeof provider === 'object')
                 heap.read(`const sharedGlobal = ${restricted ? 'Object[Symbol.for("vpt.fake.global")]' : 'this'};`)
                 assert.strictEqual(Reflect.get(provider, 'vptGlobal'), heap.read('sharedGlobal'))

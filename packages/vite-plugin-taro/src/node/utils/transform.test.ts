@@ -71,7 +71,6 @@ test('does not rescan replacement values for other reserved slots', () => {
 for (const [file, placeholders] of [
     ['mini/capsule/app', ['__VPT_APP_CONFIG__']],
     ['mini/capsule/page', ['__VPT_PAGE_PATH__', '__VPT_PAGE_CONFIG__']],
-    ['mini/amphibious/transport', ['__VPT_TRANSPORT__']],
     ['h5/app', ['__VPT_H5_APP_CONFIG__', '__VPT_H5_ROUTES__']]
 ] as const) {
     test(`${file} owns each reserved slot as one expression identifier`, () => {

@@ -22,7 +22,7 @@ export function isMiniClientEnvironment(environment: Readonly<{ name: string }>)
  * Refresh adaptation transforms.
  *
  * The shared style pipeline already owns the resolver's ordered App/Page cascade policy, so the host does not reconstruct it
- * from unrelated Rolldown shell and transport entries.
+ * from unrelated Rolldown shell and bootstrap entries.
  */
 export function createMiniDevelopmentPlugin(
     contract: Pick<MiniContract, 'options' | 'runtime' | 'styles'>,

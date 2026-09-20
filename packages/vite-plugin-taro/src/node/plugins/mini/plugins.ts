@@ -7,12 +7,12 @@ import { createMiniGlobalPlugin } from './global/create-mini-global-plugin.ts'
 import type { MiniContract } from './mini-contract.ts'
 import { miniRuntimeId } from './module/module.ts'
 import { createMiniNativeComponentPlugin } from './native/create-mini-native-component-plugin.ts'
+import { createTransportOutput } from './output/create-transport-output.ts'
 import { createOutputFiles } from './output/files.ts'
 import { createMiniPlacementPlugin, type MiniPlacementPlugin } from './placer/placer.ts'
 import { createMiniPolyfillPlugin } from './polyfill/create-mini-polyfill-plugin.ts'
 import { renderCapsule } from './render/capsule.ts'
 import { renderNative } from './render/native.ts'
-import { materializeTransport } from './render/transport.ts'
 import { createResolver } from './resolve/resolver.ts'
 import { createMiniStylePlugin } from './styles/plugins.ts'
 import { createMiniWatchPlugin } from './watch/create-mini-watch-plugin.ts'
@@ -23,7 +23,7 @@ type MiniResolver = ReturnType<typeof createResolver>
 export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] {
     const resolver = createResolver(contract)
 
-    // Reuse the resolver instance's ordered application subset. Rolldown's complete input also contains bootstrap, transport,
+    // Reuse the resolver instance's ordered application subset. Rolldown's complete input also contains bootstrap,
     // shell, and component entries; entry membership alone cannot recover which roots define the App/Page CSS cascade.
     const placement = createMiniPlacementPlugin(contract.runtime.modules)
     const styles = createMiniStylePlugin(contract, resolver.applicationEntryIds)
@@ -91,7 +91,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
 
                     rolldownOptions: {
                         // The dedicated Mini placement plugin owns output naming and entry-signature semantics. This plugin owns
-                        // only the closed named input set of native shells, lifecycle capsules, bootstrap, and transport entries.
+                        // only the closed named input set of native shells, lifecycle capsules, and bootstrap entries.
                         input: resolver.input
                     }
                 }
@@ -116,7 +116,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
 
         renderChunk: {
             order: 'post',
-            async handler(code, chunk, outputOptions, meta) {
+            handler(code, chunk, outputOptions, meta) {
                 // The placement plugin runs first and has already created immutable placement from this complete chunk graph.
 
                 const classification = placement.classifyChunk(chunk)
@@ -126,9 +126,8 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                     return renderCapsule(code, chunk, sourcemap)
                 }
 
-                // Native and amphibious modules share the CommonJS renderer. Amphibious transport exposure is a
-                // separate concern materialized from final output paths after the physical transport itself is rendered.
-                const native = renderNative({
+                // Native and amphibious modules share the CommonJS renderer; transport is emitted separately from final paths.
+                return renderNative({
                     code,
                     chunk,
                     chunks: meta.chunks,
@@ -137,20 +136,6 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                     classifyModule: placement.classifyChunk,
                     sourcemap
                 })
-
-                if (classification.isTransport) {
-                    return materializeTransport({
-                        code: native.code,
-                        transportChunk: chunk,
-                        chunks: meta.chunks,
-                        classifyModule: placement.classifyChunk,
-                        getLoadMode: placement.getLoadMode,
-                        getPhysicalChunkId: placement.getPhysicalChunkId,
-                        sourcemap
-                    })
-                }
-
-                return native
             }
         },
 
@@ -166,6 +151,15 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                 // declare only surviving package roots in app.json. The standalone global provider is emitted separately
                 // after this hook; it has no graph edges, native components, or subpackage ownership to plan.
                 const subpackages = placement.getSubpackages()
+
+                // Emit after minification so native loaders always receive quoted literal paths, without a repair pass.
+                this.emitFile(
+                    createTransportOutput({
+                        bundle,
+                        classifyModule: placement.classifyChunk,
+                        getPackageLocation: placement.getPackageLocation
+                    })
+                )
 
                 const outputFiles = await createOutputFiles({
                     bundle,

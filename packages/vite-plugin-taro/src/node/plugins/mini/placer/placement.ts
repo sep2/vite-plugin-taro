@@ -23,7 +23,6 @@ export type Placement = Readonly<{
     getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation
     /** Resolves a rendered chunk or its exact entry module ID to its planned physical path. */
     getPhysicalChunkId(chunk: Rolldown.RenderedChunk | string): string
-    getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async'
     finalize(bundle: Rolldown.OutputBundle): readonly GeneratedSubpackage[]
 }>
 
@@ -137,11 +136,6 @@ export function createPlacement({
             }
             const location = getPackageLocation(resolved)
             return location.kind === 'main' ? resolved.fileName : `${location.root}/${resolved.fileName}`
-        },
-
-        /** Selects the native loading API directly from typed package ownership. */
-        getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async' {
-            return getPackageLocation(chunk).kind === 'subpackage' ? 'async' : 'sync'
         },
 
         /** Assigns each final chunk's Rolldown-owned physical filename and declares typed owners that survived output. */

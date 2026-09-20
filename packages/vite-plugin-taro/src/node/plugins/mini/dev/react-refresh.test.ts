@@ -126,7 +126,7 @@ export function evaluateBoundary() {
         assert.ok(chunk?.type === 'chunk')
         assert.match(chunk.code, /can't detect preamble/)
         // Isolate the shared protocol state from Node and from the other target's runtime.
-        const provider = result.output.find((chunk) => chunk.fileName === 'common/vpt-global.js')
+        const provider = result.output.find((chunk) => chunk.fileName === 'common/vpt/global.js')
         assert.ok(provider?.type === 'chunk')
         const context = {
             exports: {},
@@ -135,7 +135,7 @@ export function evaluateBoundary() {
             clearTimeout,
             console,
             require(request: string) {
-                assert.equal(request, './common/vpt-global.js')
+                assert.equal(request, './common/vpt/global.js')
                 return globalExports
             }
         }

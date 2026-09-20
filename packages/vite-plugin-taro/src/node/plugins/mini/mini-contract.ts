@@ -11,7 +11,6 @@ export type TaroContract = {
 /** Physical runtime modules selected by one Mini Program target. */
 export type RuntimeModulesContract = {
     bootstrap: string
-    transport: string
     appShell: string
     appCapsule: string
     componentShell: string

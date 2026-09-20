@@ -1,4 +1,5 @@
-import { normalizePath } from 'vite'
+import path from 'node:path'
+import { normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId, resolveAppComponentPath, resolvePageComponentPath } from '../../../utils/modules.ts'
 import { createAppConfig } from '../../../utils/project-config.ts'
 import { appComponentId } from '../../client/constant.ts'
@@ -7,6 +8,8 @@ import {
     appShellFileName,
     componentShellFileName,
     customWrapperShellFileName,
+    miniTransportFileName,
+    miniTransportId,
     pageCapsuleId,
     pageComponentId,
     taroTargetRuntimeId,
@@ -60,7 +63,16 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'runtime
     return {
         ...entryGraph,
 
-        resolveId(id: string, importer: string | undefined, projectRoot: string): string | undefined {
+        resolveId(
+            id: string,
+            importer: string | undefined,
+            projectRoot: string
+        ): string | Rolldown.PartialResolvedId | undefined {
+            if (id === miniTransportId) {
+                // Bootstrap lives in common/; generated infrastructure has its own namespace outside the bundled graph.
+                return { id: `./${path.posix.relative('common', miniTransportFileName)}`, external: true }
+            }
+
             // Unknown IDs fall through so Vite and other plugins retain normal resolution.
             return privateIdResolvers.get(id)?.(importer, projectRoot)
         },
@@ -100,7 +112,6 @@ function createEntryGraph(pages: readonly MiniPage[], modules: RuntimeModulesCon
         applicationEntryIds: [modules.appCapsule, ...pageEntries.map((entry) => entry.capsuleId)],
         input: Object.fromEntries([
             ['bootstrap', modules.bootstrap],
-            ['transport', modules.transport],
             [appShellFileName, modules.appShell],
             ['app-capsule', modules.appCapsule],
             [componentShellFileName, modules.componentShell],

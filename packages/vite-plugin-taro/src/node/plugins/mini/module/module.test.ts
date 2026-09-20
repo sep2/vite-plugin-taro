@@ -17,7 +17,6 @@ import {
 
 const modules: RuntimeModulesContract = {
     bootstrap: '/runtime/bootstrap',
-    transport: '/runtime/transport',
     appShell: '/runtime/app-shell',
     appCapsule: '/runtime/app-capsule',
     componentShell: '/runtime/component-shell',
@@ -44,18 +43,12 @@ test('identifies shell and capsule entry roles independently from output executi
     assert.throws(() => classifyModule(chunk(modules.appShell, modules.appCapsule)), /mixes shell and capsule entries/)
 })
 
-test('classifies native, capsule, amphibious, and transport execution in one pass', () => {
+test('classifies native, capsule and amphibious execution in one pass', () => {
     assert.deepEqual(classifyModule(chunk('/application')), {
         entryRole: undefined,
-        executionKind: 'capsule',
-        isTransport: false
+        executionKind: 'capsule'
     })
     assert.equal(classifyModule(chunk(modules.appShell)).executionKind, 'native')
-    assert.deepEqual(classifyModule(chunk(modules.transport)), {
-        entryRole: undefined,
-        executionKind: 'native',
-        isTransport: true
-    })
     assert.equal(classifyModule(chunk(modules.appCapsule)).executionKind, 'capsule')
     assert.equal(classifyModule(chunk(modules.bootstrap)).executionKind, 'amphibious')
     assert.equal(classifyModule(chunk(vptGlobalBindingId)).executionKind, 'amphibious')
@@ -72,8 +65,7 @@ test('framework vendor remains a capsule regardless of its output name', () => {
     ]) {
         assert.deepEqual(classifyModule({ ...chunk(moduleId), name: 'renamed-framework' }), {
             entryRole: undefined,
-            executionKind: 'capsule',
-            isTransport: false
+            executionKind: 'capsule'
         })
     }
     assert.equal(classifyModule({ ...chunk('/repo/src/vendor.ts'), name: 'vendor' }).executionKind, 'capsule')

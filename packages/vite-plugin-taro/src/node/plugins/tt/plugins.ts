@@ -24,7 +24,6 @@ export function createTtMiniContract(options: VptOptions): MiniContract {
         runtime: {
             modules: {
                 bootstrap: resolveRuntimeFile('mini/amphibious/bootstrap'),
-                transport: resolveRuntimeFile('mini/amphibious/transport'),
                 appShell: resolveRuntimeFile('mini/native/app'),
                 appCapsule: resolveRuntimeFile('mini/capsule/app'),
                 componentShell: resolveRuntimeFile('mini/native/component'),

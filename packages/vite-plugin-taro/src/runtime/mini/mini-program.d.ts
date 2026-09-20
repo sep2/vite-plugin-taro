@@ -3,6 +3,11 @@ declare module '\0vpt:global-binding' {
     export const vptGlobal: typeof globalThis
 }
 
+/** Native routing table generated from finalized chunk paths rather than bundled as a source module. */
+declare module '\0vpt:mini-transport' {
+    export const transport: (moduleId: string) => System.Registration | PromiseLike<System.Registration>
+}
+
 /** SystemJS loader installed on the language global before any native shell imports a capsule. */
 declare var System: System.Loader
 

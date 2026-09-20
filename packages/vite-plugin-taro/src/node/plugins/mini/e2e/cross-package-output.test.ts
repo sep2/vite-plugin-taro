@@ -5,12 +5,12 @@ import { build, type OutputChunk, type Plugin } from 'rolldown'
 import { normalizePath } from 'vite'
 import { System as createdSystem } from '../../../../runtime/mini/systemjs/system-core.js'
 import type { RuntimeModulesContract } from '../mini-contract.ts'
-import { createMiniModuleClassifier } from '../module/module.ts'
+import { createMiniModuleClassifier, miniTransportFileName, miniTransportId } from '../module/module.ts'
+import { createTransportOutput } from '../output/create-transport-output.ts'
 import { createPlacement, type Placement } from '../placer/placement.ts'
 import { createPlacementRolldownOptions } from '../placer/placer.ts'
 import { renderCapsule } from '../render/capsule.ts'
 import { renderNative } from '../render/native.ts'
-import { materializeTransport } from '../render/transport.ts'
 
 const system: System.Loader = createdSystem
 
@@ -42,7 +42,6 @@ const system: System.Loader = createdSystem
 const planningBudgetBytes = 1_900_000
 const runtimeModules = {
     bootstrap: '/runtime/bootstrap',
-    transport: '/runtime/transport',
     appShell: '/runtime/app-shell',
     appCapsule: '/runtime/app-capsule',
     componentShell: '/runtime/component-shell',
@@ -54,11 +53,11 @@ const runtimeModules = {
     interpreterHmrRuntime: '/runtime/interpreter-hmr'
 } satisfies RuntimeModulesContract
 const classifyModule = createMiniModuleClassifier(runtimeModules)
-const transportPath = runtimeModules.transport
 const placementRolldownOptions = createPlacementRolldownOptions(classifyModule)
 
 const applicationId = '/cross-package/application.js'
-const mainDependencyId = '/cross-package/main-dependency.js'
+// A shared application transport.js must coexist with the generated native transport without a naming exception.
+const mainDependencyId = '/cross-package/transport.js'
 const subpackageAId = '/cross-package/subpackage-a.js'
 const subpackageAStaticId = '/cross-package/subpackage-a-static.js'
 const subpackageBId = '/cross-package/subpackage-b.js'
@@ -70,17 +69,16 @@ const deepStaticId = '/cross-package/deep-static.js'
 const largeLazyModuleIds: ReadonlySet<string> = new Set([subpackageAId, subpackageBId, nestedDynamicId, deepDynamicId])
 
 const modules: Readonly<Record<string, string>> = {
-    // The package's built runtime is intentionally virtualized so this source-level test does not require a prebuilt dist.
-    [transportPath]: `
-        export const transport = __VPT_TRANSPORT__
-    `,
+    // Bootstrap resolves the generated table through the same external native edge as production.
     [runtimeModules.bootstrap]: `
+        import { transport } from ${JSON.stringify(miniTransportId)}
         export const System = fixtureSystem
+        System.instantiate = transport
         export const loadSubpackage = () => import('${subpackageAId}')
         export const loadById = (id) => import(/* @vite-ignore */ id)
     `,
     [applicationId]: `
-        import { mainName } from './main-dependency.js'
+        import { mainName } from './transport.js'
         export const readMain = () => mainName
         export const loadSubpackage = () => import('./subpackage-a.js')
     `,
@@ -88,7 +86,7 @@ const modules: Readonly<Record<string, string>> = {
         export const mainName = 'main'
     `,
     [subpackageAId]: `
-        import { mainName } from './main-dependency.js'
+        import { mainName } from './transport.js'
         import { readCycleName, readPeerName } from './subpackage-a-static.js'
         export const name = 'a'
         export const readMainDependency = () => mainName
@@ -107,7 +105,7 @@ const modules: Readonly<Record<string, string>> = {
         export const readImporter = () => importerName
     `,
     [nestedDynamicId]: `
-        import { mainName } from './main-dependency.js'
+        import { mainName } from './transport.js'
         import { loadDeepDynamic, readNestedStatic } from './nested-static.js'
         export const readMainDependency = () => mainName
         export { loadDeepDynamic, readNestedStatic }
@@ -122,14 +120,16 @@ const modules: Readonly<Record<string, string>> = {
         export { readDeepStatic }
     `,
     [deepStaticId]: `
-        import { mainName } from './main-dependency.js'
+        import { mainName } from './transport.js'
         import { name as cycleName } from './subpackage-a.js'
         export const readDeepStatic = () => mainName + ':' + cycleName
     `
 }
 
+type NativeFile = Pick<OutputChunk, 'fileName' | 'code'>
+
 type CrossPackageOutput = {
-    readonly chunks: readonly OutputChunk[]
+    readonly files: readonly NativeFile[]
     readonly application: OutputChunk
     readonly nativeEntry: OutputChunk
     readonly mainDependency: OutputChunk
@@ -137,7 +137,7 @@ type CrossPackageOutput = {
     readonly subpackageB: OutputChunk
     readonly nestedDynamic: OutputChunk
     readonly deepDynamic: OutputChunk
-    readonly transport: OutputChunk
+    readonly transport: NativeFile
 }
 
 type NativeLoad = {
@@ -159,6 +159,9 @@ function createVirtualModulesPlugin(): Plugin {
     return {
         name: 'test:cross-package-modules',
         resolveId(source, importer) {
+            if (source === miniTransportId) {
+                return { id: './vpt/transport.js', external: true }
+            }
             if (source in modules) {
                 return source
             }
@@ -176,6 +179,7 @@ function createVirtualModulesPlugin(): Plugin {
 
 /** Runs the same placement and final rendering stages used by the production wx plugin. */
 function createMiniOutputPlugin(): Plugin {
+    // A fresh plan is shared by render hooks for one output generation, then discarded on the next renderStart.
     let placement: Placement | undefined
 
     return {
@@ -195,7 +199,7 @@ function createMiniOutputPlugin(): Plugin {
                 return renderCapsule(code, chunk, sourcemap)
             }
 
-            const native = renderNative({
+            return renderNative({
                 code,
                 chunk,
                 chunks: meta.chunks,
@@ -204,22 +208,13 @@ function createMiniOutputPlugin(): Plugin {
                 classifyModule: classifyModule,
                 sourcemap
             })
-            if (!classification.isTransport) {
-                return native
-            }
-            return materializeTransport({
-                code: native.code,
-                transportChunk: chunk,
-                chunks: meta.chunks,
-                classifyModule: classifyModule,
-                getLoadMode: placement.getLoadMode,
-                getPhysicalChunkId: placement.getPhysicalChunkId,
-                sourcemap
-            })
         },
         generateBundle(_outputOptions, bundle) {
             assert.ok(placement)
             placement.finalize(bundle)
+            this.emitFile(
+                createTransportOutput({ bundle, classifyModule, getPackageLocation: placement.getPackageLocation })
+            )
         }
     }
 }
@@ -230,7 +225,8 @@ async function buildCrossPackageOutput(): Promise<CrossPackageOutput> {
         input: {
             application: applicationId,
             native: runtimeModules.bootstrap,
-            transport: transportPath
+            // Keep this shared source in its own file to exercise a real common/transport.js beside common/vpt/transport.js.
+            transport: mainDependencyId
         },
         plugins: [createVirtualModulesPlugin(), createMiniOutputPlugin()],
         preserveEntrySignatures: placementRolldownOptions.preserveEntrySignatures,
@@ -238,14 +234,18 @@ async function buildCrossPackageOutput(): Promise<CrossPackageOutput> {
             ...placementRolldownOptions.output,
             format: 'es',
             sourcemap: false,
+            minify: true,
             strictExecutionOrder: true
         },
         write: false
     })
     const chunks = result.output.filter((output): output is OutputChunk => output.type === 'chunk')
+    const asset = result.output.find((output) => output.fileName === miniTransportFileName)
+    assert.ok(asset?.type === 'asset' && typeof asset.source === 'string')
+    const transport = { fileName: asset.fileName, code: asset.source }
 
     return {
-        chunks,
+        files: [...chunks, transport],
         application: findEntryChunk(chunks, 'application'),
         nativeEntry: findEntryChunk(chunks, 'native'),
         mainDependency: findChunk(chunks, mainDependencyId),
@@ -253,7 +253,7 @@ async function buildCrossPackageOutput(): Promise<CrossPackageOutput> {
         subpackageB: findChunk(chunks, subpackageBId),
         nestedDynamic: findChunk(chunks, nestedDynamicId),
         deepDynamic: findChunk(chunks, deepDynamicId),
-        transport: findChunk(chunks, transportPath)
+        transport
     }
 }
 
@@ -275,8 +275,8 @@ function findChunk(chunks: readonly OutputChunk[], moduleId: string): OutputChun
 }
 
 /** Evaluates generated CommonJS files with WeChat-shaped sync and async native require functions. */
-function createNativeEvaluator(chunks: readonly OutputChunk[]): NativeEvaluator {
-    const chunksByFileName = new Map(chunks.map((chunk) => [chunk.fileName, chunk]))
+function createNativeEvaluator(files: readonly NativeFile[]): NativeEvaluator {
+    const chunksByFileName = new Map(files.map((file) => [file.fileName, file]))
     // Mutable cache reproduces CommonJS' single module identity across repeated native requires.
     const cache = new Map<string, { exports: unknown }>()
     // Mutable trace records the physical API selected for every generated file load.
@@ -344,8 +344,10 @@ test('executes a complex nested static and dynamic graph across production wx su
     )
     assert.doesNotMatch(output.application.fileName, /^sub\//)
     assert.doesNotMatch(output.mainDependency.fileName, /^sub\//)
+    assert.ok(output.files.some((file) => file.fileName === 'common/transport.js'))
+    assert.equal(output.transport.fileName, 'common/vpt/transport.js')
 
-    const native = createNativeEvaluator(output.chunks)
+    const native = createNativeEvaluator(output.files)
     const transportExports = native.evaluate(output.transport.fileName)
     requireTransportExports(transportExports)
 

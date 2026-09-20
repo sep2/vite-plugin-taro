@@ -12,7 +12,6 @@ import { createMiniPlacementPlugin, createPlacementRolldownOptions } from './pla
 const planningBudgetBytes = 1_900_000
 const runtimeModules = {
     bootstrap: '/runtime/bootstrap',
-    transport: '/runtime/transport',
     appShell: '/runtime/app-shell',
     appCapsule: '/runtime/app-capsule',
     componentShell: '/runtime/component-shell',
@@ -23,12 +22,7 @@ const runtimeModules = {
     devtoolsHmrRuntime: '/runtime/devtools-hmr',
     interpreterHmrRuntime: '/runtime/interpreter-hmr'
 } satisfies RuntimeModulesContract
-const {
-    appCapsule: appCapsulePath,
-    appShell: appShellPath,
-    bootstrap: bootstrapPath,
-    transport: transportPath
-} = runtimeModules
+const { appCapsule: appCapsulePath, appShell: appShellPath, bootstrap: bootstrapPath } = runtimeModules
 const placementRolldownOptions = createPlacementRolldownOptions(createMiniModuleClassifier(runtimeModules))
 const fixtureRoot = '/placer-fixture'
 
@@ -165,7 +159,7 @@ test('rejects placement services and chunk delivery outside their lifecycle phas
     assert.ok(renderStartHook)
     const renderStart = typeof renderStartHook === 'function' ? renderStartHook : renderStartHook.handler
     Reflect.apply(renderStart, {}, [])
-    assert.throws(() => plugin.getLoadMode(chunk), /placement is unavailable/)
+    assert.throws(() => plugin.getPackageLocation(chunk), /placement is unavailable/)
 })
 
 test('automatically bundles application modules and non-framework dependencies together', async () => {
@@ -190,6 +184,23 @@ test('automatically bundles application modules and non-framework dependencies t
     assert.equal(findChunk(output.chunks, moduleId('source-groups.js')), first)
     assert.ok(output.chunks.every((chunk) => chunk.name !== 'vendor'))
 })
+
+for (const name of ['transport', 'global']) {
+    test(`keeps application ${name} chunks outside the generated infrastructure namespace without renaming them`, async () => {
+        const sharedId = moduleId(`${name}.js`)
+        const output = await buildFixture({
+            input: { first: moduleId('first.js'), second: moduleId('second.js') },
+            modules: {
+                [moduleId('first.js')]: `export { value } from './${name}.js'`,
+                [moduleId('second.js')]: `export { value } from './${name}.js'`,
+                [sharedId]: `export const value = Math.random()`
+            }
+        })
+        const shared = findChunk(output.chunks, sharedId)
+        assert.equal(shared.fileName, `common/${name}.js`)
+        assert.equal(output.placement.getPackageLocation(shared).kind, 'main')
+    })
+}
 
 test('keeps core-js separate from recursive framework dependencies and application modules', async () => {
     const applicationId = moduleId('application.js')
@@ -233,7 +244,7 @@ test('keeps core-js separate from recursive framework dependencies and applicati
     assert.ok(polyfills.moduleIds.includes(polyfillHelperId))
     assert.ok(!polyfills.moduleIds.includes(taroId))
     assert.ok(!polyfills.moduleIds.includes(reactId))
-    assert.equal(output.placement.getLoadMode(polyfills), 'sync')
+    assert.equal(output.placement.getPackageLocation(polyfills).kind, 'main')
     assert.equal(vendor.fileName, 'common/vendor.js')
     assert.ok(!vendor.moduleIds.includes(polyfillId))
     assert.ok(vendor.moduleIds.includes(taroId))
@@ -242,7 +253,7 @@ test('keeps core-js separate from recursive framework dependencies and applicati
     assert.ok(!vendor.moduleIds.includes(applicationDependencyId))
     assert.ok(application.moduleIds.includes(applicationId))
     assert.ok(application.moduleIds.includes(applicationDependencyId))
-    assert.equal(output.placement.getLoadMode(vendor), 'sync')
+    assert.equal(output.placement.getPackageLocation(vendor).kind, 'main')
     assert.deepEqual(output.subpackages, [])
 })
 
@@ -279,7 +290,7 @@ test('emits an eager application closure entirely in the synchronous main packag
     assert.equal(application.fileName, 'common/application.js')
     assert.ok(application.moduleIds.includes(eagerId))
     assert.deepEqual(output.subpackages, [])
-    assert.ok(output.chunks.every((chunk) => output.placement.getLoadMode(chunk) === 'sync'))
+    assert.ok(output.chunks.every((chunk) => output.placement.getPackageLocation(chunk).kind === 'main'))
 })
 
 test('preserves Rolldown naming for one lazy static closure', async () => {
@@ -305,8 +316,8 @@ test('preserves Rolldown naming for one lazy static closure', async () => {
     assert.equal(feature.moduleIds[0], dependencyId)
     assert.ok(feature.moduleIds.includes(featureId))
     assert.equal(feature.fileName, `${root}/common/feature-panel.js`)
-    assert.equal(output.placement.getLoadMode(application), 'sync')
-    assert.equal(output.placement.getLoadMode(feature), 'async')
+    assert.equal(output.placement.getPackageLocation(application).kind, 'main')
+    assert.equal(output.placement.getPackageLocation(feature).kind, 'subpackage')
     assert.deepEqual(output.subpackages, [{ root: root }])
 })
 
@@ -335,8 +346,8 @@ test('keeps same-named chunks from different source folders as distinct owners',
 
     assert.notEqual(account.preliminaryFileName, report.preliminaryFileName)
     assert.notEqual(account.fileName, report.fileName)
-    assert.equal(output.placement.getLoadMode(account), 'async')
-    assert.equal(output.placement.getLoadMode(report), 'async')
+    assert.equal(output.placement.getPackageLocation(account).kind, 'subpackage')
+    assert.equal(output.placement.getPackageLocation(report).kind, 'subpackage')
     assert.equal(output.subpackages.length, 2)
 })
 
@@ -365,8 +376,8 @@ test('keeps an eagerly shared dependency in main when a subpackage also imports 
 
     assert.doesNotMatch(shared.fileName, /^sub\//)
     assert.match(feature.fileName, /^sub\/p_[a-f0-9]{8}\/common\/lazy-feature\.js$/)
-    assert.equal(output.placement.getLoadMode(shared), 'sync')
-    assert.equal(output.placement.getLoadMode(feature), 'async')
+    assert.equal(output.placement.getPackageLocation(shared).kind, 'main')
+    assert.equal(output.placement.getPackageLocation(feature).kind, 'subpackage')
     assert.equal(output.subpackages.length, 1)
 })
 
@@ -402,7 +413,7 @@ test('emits independently named chunks when the package budget splits lazy roots
         output.subpackages.map((subpackage) => subpackage.root),
         [accountRoot, reportRoot].sort()
     )
-    assert.ok([account, report].every((chunk) => output.placement.getLoadMode(chunk) === 'async'))
+    assert.ok([account, report].every((chunk) => output.placement.getPackageLocation(chunk).kind === 'subpackage'))
 })
 
 test('preserves native shell paths with adjacent capsules and hash-free shared runtime entries', async () => {
@@ -410,26 +421,22 @@ test('preserves native shell paths with adjacent capsules and hash-free shared r
         input: {
             'app.js': appShellPath,
             'app-capsule': appCapsulePath,
-            bootstrap: bootstrapPath,
-            transport: transportPath
+            bootstrap: bootstrapPath
         },
         modules: {
             [appShellPath]: `export const shell = 'app'`,
             [appCapsulePath]: `export default { name: 'app' }`,
-            [bootstrapPath]: `export const bootstrap = true`,
-            [transportPath]: `export const transport = true`
+            [bootstrapPath]: `export const bootstrap = true`
         }
     })
 
     const shell = findChunk(output.chunks, appShellPath)
     const capsule = findChunk(output.chunks, appCapsulePath)
     const bootstrap = findChunk(output.chunks, bootstrapPath)
-    const transport = findChunk(output.chunks, transportPath)
 
     assert.equal(shell.fileName, 'app.js')
     assert.equal(capsule.fileName, 'app-capsule.js')
     assert.equal(bootstrap.fileName, 'common/bootstrap.js')
-    assert.equal(transport.fileName, 'common/transport.js')
     assert.deepEqual(output.subpackages, [])
-    assert.ok(output.chunks.every((chunk) => output.placement.getLoadMode(chunk) === 'sync'))
+    assert.ok(output.chunks.every((chunk) => output.placement.getPackageLocation(chunk).kind === 'main'))
 })

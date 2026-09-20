@@ -30,7 +30,6 @@ const pageCapsuleFileName = 'pages/home/index-capsule.js'
 
 const runtimeModules = {
     bootstrap: resolveRuntimeFile('mini/amphibious/bootstrap'),
-    transport: resolveRuntimeFile('mini/amphibious/transport'),
     appShell: resolveRuntimeFile('mini/native/app'),
     appCapsule: resolveRuntimeFile('mini/capsule/app'),
     componentShell: resolveRuntimeFile('mini/native/component'),
@@ -698,6 +697,23 @@ test('rebuild mode replaces complete output without creating patch transport art
     assert.equal(await readExistingFile(fixture.patchesPath), undefined)
 })
 
+test('regenerates native transport routes when a complete rebuild adds or removes lazy chunks', async (context) => {
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createRebuildOptions(), 'disk')
+    context.after(fixture.close)
+    const transportPath = path.join(fixture.outDir, 'common/vpt/transport.js')
+    assert.doesNotMatch(await readFile(transportPath, 'utf8'), /require\.async/)
+
+    await writeFile(path.join(path.dirname(fixture.pagePath), 'lazy-feature.ts'), 'console.log("lazy feature loaded")')
+    await publishSourceGeneration(fixture.pagePath, `${renderPage('added lazy route')}\nvoid import('./lazy-feature')`)
+    const added = await waitForFile(transportPath, (code) => code.includes('lazy-feature.js'), maximumWaitAttempts)
+    assert.match(added, /require\.async\("\.\.\/\.\.\/sub\/p_[a-f0-9]{8}\/common\/lazy-feature\.js"\)/)
+    assert.doesNotMatch(added, /registerModule|case ["']common\/vpt\/transport\.js/)
+
+    await publishSourceGeneration(fixture.pagePath, renderPage('removed lazy route'))
+    const removed = await waitForFile(transportPath, (code) => !code.includes('lazy-feature.js'), maximumWaitAttempts)
+    assert.doesNotMatch(removed, /require\.async/)
+})
+
 test('prints physical project paths without compromising later patch publication', async (context) => {
     // This mutable list captures the physical DevTools project banner.
     const infos: string[] = []
@@ -756,7 +772,8 @@ test('preserves live files and directory identities across patches and recovery 
     await writeFile(obsoleteFile, 'live session file')
     const initialFiles = (await readdir(fixture.outDir, { recursive: true })).sort()
     assert.ok(initialFiles.includes(path.join('common', 'bootstrap.js')), JSON.stringify(initialFiles))
-    assert.ok(initialFiles.includes(path.join('common', 'transport.js')), JSON.stringify(initialFiles))
+    assert.ok(initialFiles.includes(path.join('common', 'vpt', 'transport.js')), JSON.stringify(initialFiles))
+    assert.ok(initialFiles.includes(path.join('common', 'vpt', 'global.js')), JSON.stringify(initialFiles))
 
     await publishSourceGeneration(fixture.pagePath, renderPage('changed before complete build'))
     await waitForFile(

@@ -28,7 +28,6 @@ export type MiniPlacementPlugin = Plugin &
         classifyChunk(chunk: Rolldown.PreRenderedChunk | Rolldown.RenderedChunk): MiniChunkClassification
         getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation
         getPhysicalChunkId(chunk: Rolldown.RenderedChunk | string): string
-        getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async'
         getSubpackages(): readonly GeneratedSubpackage[]
     }>
 
@@ -95,7 +94,7 @@ export function createPlacementRolldownOptions(classifyChunk: MiniModuleClassifi
  * 1. Its config hook installs package-neutral Rolldown names and entry-signature semantics.
  * 2. `renderStart` atomically starts a generation in `awaiting-chunks`; no stale placement remains reachable.
  * 3. Its first pre-order `renderChunk` creates one immutable LTHP placement from the complete tree-shaken graph.
- * 4. `vpt:mini` asks this plugin only for package ownership, physical relocation, and native loading mode.
+ * 4. `vpt:mini` asks this plugin only for package ownership and physical relocation.
  * 5. Its pre-order `generateBundle` assigns each OutputChunk its package-qualified filename and publishes app.json declarations.
  *
  * The discriminated state is the only generation-local mutation: `idle → awaiting-chunks → planned → finalized`. Each hook
@@ -173,10 +172,6 @@ export function createMiniPlacementPlugin(modules: RuntimeModulesContract): Mini
 
         getPhysicalChunkId(chunk: Rolldown.RenderedChunk | string): string {
             return requirePlacement().getPhysicalChunkId(chunk)
-        },
-
-        getLoadMode(chunk: Rolldown.RenderedChunk): 'sync' | 'async' {
-            return requirePlacement().getLoadMode(chunk)
         },
 
         getSubpackages(): readonly GeneratedSubpackage[] {

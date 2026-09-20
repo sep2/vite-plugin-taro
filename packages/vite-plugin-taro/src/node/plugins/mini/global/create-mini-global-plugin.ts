@@ -9,7 +9,7 @@ import { rolldownRuntimeId, vptGlobalBindingId } from '../module/module.ts'
 import type { MiniPlacementPlugin } from '../placer/placer.ts'
 
 const vptGlobalSrcFile = resolveRuntimeFile('global/vpt-global')
-const vptGlobalDistFile = 'common/vpt-global.js'
+const vptGlobalDistFile = 'common/vpt/global.js'
 
 /** Shares one standalone native provider between the application's virtual binding and the wrapped HMR runtime. */
 export function createMiniGlobalPlugin(placement: Pick<MiniPlacementPlugin, 'getPhysicalChunkId'>): Plugin[] {

@@ -16,6 +16,10 @@ export const vptGlobalBindingId = '\0vpt:global-binding'
 /** Generates the selected core-js imports as one independently executable output entry. */
 export const miniPolyfillsId = '\0vpt:mini-polyfills'
 
+/** External bootstrap dependency emitted only after the bundled graph is finalized. */
+export const miniTransportId = '\0vpt:mini-transport'
+export const miniTransportFileName = 'common/vpt/transport.js'
+
 /** Resolves the shared Taro facade's target initialization side effect. */
 export const taroTargetRuntimeId = '\0vpt:taro-target-runtime'
 
@@ -49,13 +53,12 @@ export type MiniExecutionKind = 'native' | 'capsule' | 'amphibious'
 export type MiniChunkClassification = Readonly<{
     entryRole: MiniEntryRole | undefined
     executionKind: MiniExecutionKind
-    isTransport: boolean
 }>
 
 /** Classifies chunks by explicit runtime roles. */
 export type MiniModuleClassifier = (chunk: MiniChunk) => MiniChunkClassification
 
-type MiniRuntimeModuleKind = MiniEntryRole | 'amphibious' | 'transport'
+type MiniRuntimeModuleKind = MiniEntryRole | 'amphibious'
 
 const frameworkPackageRoots = [
     // The exported Mini entry is <runtime package>/dist/runtime/index.js, regardless of where the package is installed or linked.
@@ -101,8 +104,7 @@ export function createMiniModuleClassifier(modules: RuntimeModulesContract): Min
         [modules.bootstrap, 'amphibious'],
         [vptGlobalBindingId, 'amphibious'],
         [miniPolyfillsId, 'amphibious'],
-        [rolldownRuntimeId, 'amphibious'],
-        [modules.transport, 'transport']
+        [rolldownRuntimeId, 'amphibious']
     ])
 
     return (chunk) => {
@@ -110,7 +112,6 @@ export function createMiniModuleClassifier(modules: RuntimeModulesContract): Min
         let ownsShell = false
         let ownsCapsule = false
         let isAmphibious = false
-        let isTransport = false
 
         for (const moduleId of chunk.moduleIds) {
             const normalizedId = normalizeModuleId(moduleId)
@@ -127,9 +128,6 @@ export function createMiniModuleClassifier(modules: RuntimeModulesContract): Min
                 case 'amphibious':
                     isAmphibious = true
                     break
-                case 'transport':
-                    isTransport = true
-                    break
             }
         }
 
@@ -140,8 +138,7 @@ export function createMiniModuleClassifier(modules: RuntimeModulesContract): Min
         const entryRole = ownsShell ? 'shell' : ownsCapsule ? 'capsule' : undefined
         return {
             entryRole: entryRole,
-            executionKind: isAmphibious ? 'amphibious' : entryRole === 'shell' || isTransport ? 'native' : 'capsule',
-            isTransport: isTransport
+            executionKind: isAmphibious ? 'amphibious' : entryRole === 'shell' ? 'native' : 'capsule'
         }
     }
 }

@@ -92,7 +92,7 @@ async function bundleFixture(sources: ReadonlyMap<string, string>, input: string
     const chunks = result.output.filter((chunk) => chunk.type === 'chunk')
     const entry = chunks.find((chunk) => chunk.facadeModuleId === input[0])
     assert.ok(entry)
-    const runtime = chunks.find((chunk) => chunk.fileName === 'common/vpt-global.js')
+    const runtime = chunks.find((chunk) => chunk.fileName === 'common/vpt/global.js')
     assert.ok(runtime?.facadeModuleId)
     assert.deepEqual(runtime.moduleIds, [], 'Discovery must not enter the application graph')
     assert.deepEqual(runtime.imports, [])

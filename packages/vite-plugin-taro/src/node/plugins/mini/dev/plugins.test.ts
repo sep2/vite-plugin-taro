@@ -7,7 +7,6 @@ import { createMiniDevelopmentPlugin, isMiniClientEnvironment, removeDevelopment
 
 const runtimeModules = {
     bootstrap: '/runtime/bootstrap.ts',
-    transport: '/runtime/transport.ts',
     appShell: '/runtime/app-shell.ts',
     appCapsule: '/runtime/app-capsule.ts',
     componentShell: '/runtime/component-shell.ts',
