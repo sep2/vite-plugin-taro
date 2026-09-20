@@ -2,6 +2,7 @@ import type { Plugin, PluginOption } from 'vite'
 import { esTarget } from '../../utils/constant.ts'
 import { createExactModuleIdFilter } from '../../utils/modules.ts'
 import { packageRequire } from '../../utils/packages.ts'
+import type { AstTransformResult } from '../../utils/transform.ts'
 import { createMiniDevelopmentPlugin } from './dev/plugins.ts'
 import { createMiniGlobalPlugin } from './global/create-mini-global-plugin.ts'
 import type { MiniContract } from './mini-contract.ts'
@@ -116,7 +117,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
 
         renderChunk: {
             order: 'post',
-            handler(code, chunk, outputOptions, meta) {
+            handler(code, chunk, outputOptions, meta): AstTransformResult {
                 // The placement plugin runs first and has already created immutable placement from this complete chunk graph.
 
                 const kind = placement.classifyChunk(chunk)
@@ -139,9 +140,6 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                             classifyModule: placement.classifyChunk,
                             sourcemap
                         })
-                    }
-                    default: {
-                        throw new Error(`Unknown module kind ${kind}`)
                     }
                 }
             }
