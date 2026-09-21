@@ -4,7 +4,10 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import type { InlineConfig, Plugin } from 'vite'
-import { build, resolveConfig } from 'vite'
+import { build, createServer, resolveConfig } from 'vite'
+import type { VptJsonObject, VptOptions } from '../../../../options.ts'
+import { packageRequire } from '../../../utils/packages.ts'
+import vpt from '../../../vpt.ts'
 import { createMiniWatchPlugin } from './create-mini-watch-plugin.ts'
 
 const markerPattern = /^\/\/ [\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}\n$/
@@ -16,7 +19,7 @@ test('enables the filesystem policy only for physical watch builds, including pr
         root,
         configFile: false,
         mode: 'production',
-        plugins: [createMiniWatchPlugin()]
+        plugins: [createMiniWatchPlugin('wx')]
     } satisfies InlineConfig
     const watched = await resolveConfig({ ...options, build: { watch: {}, emptyOutDir: true } }, 'build')
     assert.equal(watched.build.emptyOutDir, false)
@@ -34,6 +37,225 @@ test('enables the filesystem policy only for physical watch builds, including pr
     }
 })
 
+for (const target of ['wx', 'zfb', 'tt', 'h5'] as const) {
+    for (const hotReload of [true, false, undefined]) {
+        test(`${target}: watch handles hotReload=${hotReload} without changing unrelated configuration`, async (context) => {
+            const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-mini-watch-project-'))
+            context.after(() => fs.rm(root, { recursive: true, force: true }))
+            const input = path.join(root, 'app.js')
+            await fs.writeFile(input, 'console.log("fixture");\n')
+            // Include every platform's spelling so the assertions also catch writes to foreign fields and files.
+            const setting = hotReload === undefined ? undefined : { compileHotReLoad: hotReload, autoCompile: true }
+            const developOptions = hotReload === undefined ? undefined : { hotReload, skipTranspile: true }
+            const preferences = {
+                setting: Object.freeze(setting),
+                developOptions: Object.freeze(developOptions),
+                compileHotReload: hotReload
+            }
+            const projectConfig = Object.freeze({ appid: 'fixture', ...preferences })
+            const privateConfig = Object.freeze({ projectname: 'private', ...preferences })
+            const projectFile = target === 'zfb' ? 'mini.project.json' : 'project.config.json'
+            const privateFile = target === 'zfb' ? '.mini-ide/project-ide.json' : 'project.private.config.json'
+            const sourceFiles = {
+                [projectFile]: JSON.stringify(projectConfig),
+                [privateFile]: JSON.stringify(privateConfig),
+                'app.json': '{"pages":[]}'
+            }
+            const expectedProject = {
+                wx: { ...projectConfig, setting: { ...setting, compileHotReLoad: false } },
+                zfb: { ...projectConfig, developOptions: { ...developOptions, hotReload: false } },
+                tt: { ...projectConfig, compileHotReload: false, setting: { ...setting, compileHotReLoad: false } },
+                h5: projectConfig
+            }[target]
+            const expectedPrivate =
+                target === 'wx' || target === 'tt'
+                    ? { ...privateConfig, setting: { ...setting, compileHotReLoad: false } }
+                    : privateConfig
+            const expectedFiles: Readonly<Record<string, VptJsonObject>> = {
+                [projectFile]: expectedProject,
+                [privateFile]: expectedPrivate,
+                'app.json': { pages: [] }
+            }
+            const completed = Promise.withResolvers<void>()
+            const config = {
+                root,
+                configFile: false,
+                logLevel: 'silent',
+                plugins: [
+                    {
+                        name: 'test:project-skeleton',
+                        generateBundle: {
+                            // The real skeleton uses a post hook too; the watch policy must run after its emission.
+                            order: 'post',
+                            handler() {
+                                for (const [fileName, source] of Object.entries(sourceFiles)) {
+                                    this.emitFile({ type: 'asset', fileName, source })
+                                }
+                            }
+                        }
+                    },
+                    createMiniWatchPlugin(target),
+                    {
+                        name: 'test:watch-completed',
+                        enforce: 'post',
+                        closeBundle: {
+                            order: 'post',
+                            sequential: true,
+                            handler(error) {
+                                if (!error) {
+                                    completed.resolve()
+                                }
+                            }
+                        }
+                    }
+                ],
+                build: { watch: {}, rolldownOptions: { input } }
+            } satisfies InlineConfig
+            const watcher = await build(config)
+            assert.ok(!Array.isArray(watcher) && 'on' in watcher)
+            context.after(() => watcher.close())
+            watcher.on('event', (event) => {
+                if (event.code === 'ERROR') {
+                    completed.reject(event.error)
+                }
+            })
+            await completed.promise
+            for (const [fileName, expected] of Object.entries(expectedFiles)) {
+                assert.deepEqual(
+                    JSON.parse(await fs.readFile(path.join(root, 'dist', fileName), 'utf8')),
+                    JSON.parse(JSON.stringify(expected))
+                )
+            }
+            assert.equal(JSON.stringify(projectConfig), sourceFiles[projectFile])
+            assert.equal(JSON.stringify(privateConfig), sourceFiles[privateFile])
+            await watcher.close()
+            await build({ ...config, build: { ...config.build, watch: null } })
+            for (const [fileName, source] of Object.entries(sourceFiles)) {
+                assert.equal(await fs.readFile(path.join(root, 'dist', fileName), 'utf8'), source)
+            }
+        })
+    }
+}
+
+for (const target of ['wx', 'zfb', 'tt'] as const) {
+    test(`${target}: public plugin disables hot reload on every watch build and restores configured settings in dev`, {
+        timeout: 30_000
+    }, async (context) => {
+        const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
+        const root = await fs.mkdtemp(path.join(packageRoot, '.vpt-watch-test-'))
+        context.after(() => fs.rm(root, { recursive: true, force: true }))
+        const input = path.join(root, 'app.tsx')
+        await fs.writeFile(input, 'export default function App() { return null }\n')
+        const originalFiles = createProjectConfigFixture(target, true)
+        const options: VptOptions = {
+            target,
+            app: input,
+            pages: [],
+            appJson: {},
+            projectConfigJson: originalFiles[target === 'zfb' ? 'mini.project.json' : 'project.config.json'],
+            projectPrivateConfigJson:
+                originalFiles[target === 'zfb' ? '.mini-ide/project-ide.json' : 'project.private.config.json'],
+            hmr: { mode: target === 'wx' ? 'devtools' : 'interpreter' }
+        }
+        // Advance the completion promise only after observing each fully written generation.
+        let completed = Promise.withResolvers<void>()
+        const config = {
+            root,
+            configFile: false,
+            logLevel: 'silent',
+            plugins: [
+                vpt(options),
+                {
+                    name: 'test:watch-completed',
+                    enforce: 'post',
+                    closeBundle: {
+                        order: 'post',
+                        sequential: true,
+                        handler(error) {
+                            if (!error) {
+                                completed.resolve()
+                            }
+                        }
+                    }
+                }
+            ],
+            build: { watch: {} }
+        } satisfies InlineConfig
+        const watcher = await build(config)
+        assert.ok(!Array.isArray(watcher) && 'on' in watcher)
+        context.after(() => watcher.close())
+        watcher.on('event', (event) => {
+            if (event.code === 'ERROR') {
+                completed.reject(event.error)
+            }
+        })
+        const expectedFiles = createProjectConfigFixture(target, false)
+        for (const generation of [0, 1]) {
+            if (generation === 1) {
+                completed = Promise.withResolvers<void>()
+                await fs.writeFile(input, 'export default function App() { return "updated" }\n')
+            }
+            await completed.promise
+            for (const [fileName, expected] of Object.entries(expectedFiles)) {
+                assert.deepEqual(JSON.parse(await fs.readFile(path.join(root, 'dist', fileName), 'utf8')), expected)
+            }
+        }
+        await watcher.close()
+        const server = await createServer({
+            root,
+            configFile: false,
+            logLevel: 'silent',
+            plugins: vpt(options),
+            server: { port: 0, watch: null, ws: false }
+        })
+        context.after(() => server.close())
+        await server.listen()
+        for (const [fileName, expected] of Object.entries(originalFiles)) {
+            assert.deepEqual(JSON.parse(await fs.readFile(path.join(root, 'dist', fileName), 'utf8')), expected)
+        }
+    })
+}
+
+/** Native schemas stay separate so the public integration test catches field spelling and file ownership mistakes. */
+function createProjectConfigFixture(
+    target: 'wx' | 'zfb' | 'tt',
+    hotReload: boolean
+): Readonly<Record<string, VptJsonObject>> {
+    switch (target) {
+        case 'wx':
+            return {
+                'project.config.json': Object.freeze({
+                    appid: 'fixture',
+                    setting: Object.freeze({ compileHotReLoad: hotReload, urlCheck: false })
+                }),
+                'project.private.config.json': Object.freeze({
+                    setting: Object.freeze({ compileHotReLoad: hotReload, skylineRenderEnable: false })
+                })
+            }
+        case 'zfb':
+            return {
+                'mini.project.json': Object.freeze({
+                    appid: 'fixture',
+                    format: 2,
+                    compileOptions: { globalObjectMode: 'enable', transpile: {} },
+                    developOptions: Object.freeze({ hotReload, skipTranspile: true, sourcemap: false })
+                }),
+                '.mini-ide/project-ide.json': Object.freeze({ ignoreHttpDomainCheck: true })
+            }
+        case 'tt':
+            return {
+                'project.config.json': Object.freeze({
+                    appid: 'fixture',
+                    compileHotReload: hotReload,
+                    setting: Object.freeze({ compileHotReLoad: hotReload, autoCompile: true, urlCheck: false })
+                }),
+                'project.private.config.json': Object.freeze({
+                    setting: Object.freeze({ compileHotReLoad: hotReload, autoCompile: true, urlCheck: false })
+                })
+            }
+    }
+}
+
 test('closing a failed watcher never publishes a successful completion marker', async (context) => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-mini-watch-error-'))
     context.after(() => fs.rm(root, { recursive: true, force: true }))
@@ -42,7 +264,7 @@ test('closing a failed watcher never publishes a successful completion marker', 
         root,
         configFile: false,
         logLevel: 'silent',
-        plugins: [createMiniWatchPlugin()],
+        plugins: [createMiniWatchPlugin('wx')],
         build: { watch: {}, rolldownOptions: { input: path.join(root, 'missing.js') } }
     })
     assert.ok(!Array.isArray(watcher) && 'on' in watcher)
@@ -54,7 +276,7 @@ test('closing a failed watcher never publishes a successful completion marker', 
     })
     await failed.promise
     await watcher.close()
-    const { closeBundle } = createMiniWatchPlugin()
+    const { closeBundle } = createMiniWatchPlugin('wx')
     assert.ok(closeBundle && typeof closeBundle === 'object')
     assert.equal(Reflect.apply(closeBundle.handler, null, [new Error('failed close')]), undefined)
     await assert.rejects(fs.access(path.join(root, 'dist/hmr/watch.js')), { code: 'ENOENT' })
@@ -132,7 +354,7 @@ test('watch cleans only at startup, preserves live output and signals only after
         root,
         configFile: false,
         logLevel: 'silent',
-        plugins: [createMiniWatchPlugin(), fixture],
+        plugins: [createMiniWatchPlugin('wx'), fixture],
         build: {
             outDir,
             watch: {},

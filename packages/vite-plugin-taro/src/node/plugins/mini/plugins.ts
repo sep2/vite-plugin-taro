@@ -37,7 +37,7 @@ export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] 
         createMiniPolyfillPlugin(contract),
         createMiniGlobalPlugin(placement),
         createMiniDevelopmentPlugin(contract, styles),
-        createMiniWatchPlugin()
+        createMiniWatchPlugin(contract.options.target)
     ]
 }
 

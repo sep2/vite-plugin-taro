@@ -165,9 +165,17 @@ projectConfigJson: {
 
 微信写入 `project.config.json`，支付宝写入 `mini.project.json`，抖音写入 `project.config.json`。
 
+小程序监听构建（`build:... --watch`）会自动关闭生成配置中的开发者工具热重载：
+
+| 目标 | 监听构建中强制设为 `false` 的字段 |
+| --- | --- |
+| 微信 | `setting.compileHotReLoad` |
+| 支付宝 | `developOptions.hotReload` |
+| 抖音 | 顶层 `compileHotReload` 和 `setting.compileHotReLoad` |
+
 ## `projectPrivateConfigJson`
 
-可选。提供时原样写入对应平台的私有配置文件，不与 `projectConfigJson` 合并：
+可选。提供时写入对应平台的私有配置文件，不与 `projectConfigJson` 合并。微信和抖音监听构建会强制设置私有配置中的 `setting.compileHotReLoad: false`，避免覆盖共享配置的关闭设置；其余字段及支付宝私有配置原样输出：
 
 ```ts
 projectPrivateConfigJson: {

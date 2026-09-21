@@ -107,9 +107,7 @@ yarn build:tt --watch
 
 区别在于：`build:... --watch` 打包的是生产版本，而对应 `dev:...` 下的 `hmr.mode: 'rebuild'` 打包的是开发版本。
 
-:::note
-使用 `build:wx --watch` 时，必须设置 `projectConfigJson.setting.compileHotReLoad: false`，否则微信开发者工具可能刷新异常；切回 `dev:wx` 时恢复为 `true`。
-:::
+微信、支付宝和抖音监听构建会自动关闭生成项目配置中的开发者工具热重载，避免它干扰完整重建；微信和抖音的私有热重载设置也会被覆盖。抖音的自动编译设置保持原值。切回 `dev:...` 后使用 `vite.config.ts` 中原有的配置，无需手动切换。具体字段见[项目配置](/guides/configuration/#projectconfigjson)。
 
 ## 保留的状态
 

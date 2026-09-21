@@ -82,7 +82,10 @@ export interface VptOptions {
     appJson: VptAppConfig
 
     /**
-     * Native development-tool project configuration written without merging.
+     * Native development-tool project configuration. Mini Program watch builds disable native hot reload in output:
+     * WX forces `setting.compileHotReLoad: false`; ZFB forces `developOptions.hotReload: false`; TT forces top-level
+     * `compileHotReload: false` and `setting.compileHotReLoad: false`, preserving `setting.autoCompile`.
+     * Other builds write it without merging.
      *
      * WX emits `project.config.json`; ZFB emits `mini.project.json`; TT emits `project.config.json`; H5 ignores it. Supply the schema
      * expected by the selected target rather than sharing one project's platform-specific values across invocations. ZFB must
@@ -92,7 +95,8 @@ export interface VptOptions {
     projectConfigJson: VptJsonObject
 
     /**
-     * Local development-tool preferences written without merging.
+     * Local development-tool preferences. WX and TT watch builds force `setting.compileHotReLoad: false` in emitted
+     * preferences; ZFB preferences and other builds are written without merging.
      *
      * WX emits `project.private.config.json`; ZFB emits `.mini-ide/project-ide.json`; TT emits `project.private.config.json`;
      * H5 ignores it. TT private configuration requires TikTok DevTools 4.0.7+ and supports only its documented fields.
