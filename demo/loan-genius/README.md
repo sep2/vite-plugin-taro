@@ -2,198 +2,58 @@
 
 简体中文 | [English](README.en.md)
 
-Loan Genius 是 `vite-plugin-taro` 的示例应用。它是一个基于 React 19 + Taro 的房贷计算器，使用本仓库推荐的最新标准前端技术栈构建：Vite 8、React 19 和 Tailwind CSS v4。
+基于 Vite 8、React 19、Taro 和 Tailwind CSS v4 的房贷计算器示例，一套源码支持微信、支付宝、抖音小程序和 Web。
 
-该应用改造自 [`wuba/Taro-Mortgage-Calculator`](https://github.com/wuba/Taro-Mortgage-Calculator)，用于演示 `vpt` 的用法。
+此项目改造自 [wuba/Taro-Mortgage-Calculator](https://github.com/wuba/Taro-Mortgage-Calculator)。
 
-- 源码：[`demo/loan-genius`](https://github.com/sep2/vite-plugin-taro/tree/main/demo/loan-genius)
-- 官网：<https://vpt.js.org>
+[VPT 文档](https://vpt.js.org) · [AI 开发指南](https://vpt.js.org/guides/ai/)
 
-## 环境要求
+## 快速开始
 
-| 工具 | 版本 / 用途 |
-| --- | --- |
-| Node.js | `>=22` |
-| pnpm | `11.x` |
-| 微信开发者工具 | 打开 `dist/wx` 和运行 WX HMR 测试时需要。 |
-| 支付宝小程序开发者工具 | 打开 `dist/zfb` 时需要。 |
-| 抖音开发者工具 | 打开 `dist/tt` 时需要。 |
-| `wechatide` | 仅自动化 WX HMR 测试需要。 |
+需要 Node.js 26+、pnpm 11，以及目标平台的小程序开发者工具。
 
-## 从全新克隆运行
-
-请在仓库根目录运行以下命令：
+首先初始化仓库，以下命令均在**仓库根目录**运行：
 
 ```sh
+git clone https://github.com/sep2/vite-plugin-taro.git
 pnpm install
 pnpm prepare:taro
 pnpm build:plugin
 ```
 
-## 微信小程序
+（可选）在 `demo/loan-genius/.env.local` 中填写对应平台的 App ID：
 
-构建一次微信小程序：
-
-```sh
-pnpm build:loan-genius:wx
+```dotenv
+VITE_VPT_WECHAT_APP_ID=your_wechat_app_id
+VITE_VPT_ALIPAY_APP_ID=your_alipay_app_id
+VITE_VPT_TIKTOK_APP_ID=your_tiktok_app_id
 ```
 
-或启动热更新开发模式：
+## 开发与构建
 
-```sh
-pnpm dev:loan-genius:wx
-```
+按目标选择命令，脚本会自动设置 `VITE_VPT_TARGET`：
 
-微信小程序产物会写入：
+| 目标 | 开发模式 | 生产构建 | 构建目录 |
+| --- | --- | --- | --- |
+| 微信 | `pnpm dev:loan-genius:wx` | `pnpm build:loan-genius:wx` | `demo/loan-genius/dist/wx` |
+| 支付宝 | `pnpm dev:loan-genius:zfb` | `pnpm build:loan-genius:zfb` | `demo/loan-genius/dist/zfb` |
+| 抖音 | `pnpm dev:loan-genius:tt` | `pnpm build:loan-genius:tt` | `demo/loan-genius/dist/tt` |
+| Web | `pnpm dev:loan-genius:h5` | `pnpm build:loan-genius:h5` | `demo/loan-genius/dist/h5` |
 
-```text
-demo/loan-genius/dist/wx
-```
+- 小程序：等待初始构建完成，在对应开发者工具中导入构建目录，不要导入源码目录。
+- Web：访问终端显示的地址；构建后用 `pnpm preview:loan-genius:h5` 预览。
+- 开发时保持命令运行。各平台工具版本与热更新配置见[开发热更新指南](https://vpt.js.org/guides/hot-module-replacement/)。
 
-请在微信开发者工具中打开 `demo/loan-genius/dist/wx`，不要打开源码包目录。
+## 修改应用
 
-### WX HMR 回归测试
+- `vite.config.ts`：目标、页面、应用与开发者工具配置。
+- `src/app.tsx` / `src/app.css`：应用入口、全局样式和 Tailwind CSS。
+- `src/pages/calculator/`：计算器、月供明细和历史记录页面。
+- `src/components/` / `src/utils/`：共享组件和工具函数。
 
-构建当前插件后，在仓库根目录运行包含 27 个有状态流程的开发者工具测试：
+## 测试
 
-```sh
-pnpm build:plugin
-wechatide auth -c Pi
-pnpm test:loan-genius:hmr
-```
-
-测试会将 Loan Genius 复制到系统临时目录下的 `vite-plugin-taro-loan-genius-hmr-v1`，注入稳定的自动化 ID，并覆盖 polyfill 访问、组件修改、多文件更新、突发更新、已打开浮层、隐藏页面、页面导航、语法错误恢复和正常重新挂载。测试还会在适用的更新和还原后拒绝 WX 不安全的生成类名，使已知样式回归继续以失败形式暴露。测试不会修改包内源码，并会在清理阶段停止 Vite 服务和关闭开发者工具项目窗口。
-
-示例通过 `polyfills: ['web.url']` 为小程序启用 URL API，并使用 Vite 的 `define: { URL: 'globalThis.URL' }`，让所有目标中直接引用的 `URL` 都使用原生或 polyfill 提供的全局实现。polyfill 流程会验证启动时的 `globalThis.URL`，通过 HMR 切换到 `URL`，再还原代码，并检查计算器状态始终保留。
-
-测试通过原子替换发布每个源文件，避免 Vite 读到写入期间被截断的内容。无需开发者工具即可运行发布器回归测试：`pnpm --filter loan-genius test`。
-
-如果已授权的 `wechatide` 客户端名称不是 `Pi`，请设置 `VPT_LOAN_HMR_DEVTOOLS_CLIENT`。
-
-## 支付宝小程序
-
-在 `demo/loan-genius/.env.local` 设置 `VITE_VPT_ALIPAY_APP_ID`，然后在仓库根目录运行：
-
-```sh
-pnpm build:loan-genius:zfb
-pnpm dev:loan-genius:zfb
-```
-
-用支付宝小程序开发者工具导入 `demo/loan-genius/dist/zfb`。
-
-## 抖音小程序（TT）
-
-`tt` 指抖音（Douyin）小程序，不代表已验证海外 TikTok 小程序兼容性。在 `demo/loan-genius/.env.local` 设置沿用的变量 `VITE_VPT_TIKTOK_APP_ID` 为你的抖音小程序 App ID，然后在仓库根目录运行：
-
-```sh
-pnpm build:loan-genius:tt
-# 或保持开发构建运行：
-pnpm dev:loan-genius:tt
-```
-
-用抖音开发者工具导入 `demo/loan-genius/dist/tt`，不要导入源码目录。TT 使用自定义导航栏和 `interpreter` 热更新，不包含微信的 Skyline 配置。异步通用分包需要基础库 2.86.1+；原生样式热重载需要开发者工具 4.1.4+、基础库 2.98.0.0+，并同时开启顶层 `compileHotReload: true` 和 `setting.autoCompile: true`。
-
-TT 构建产物有测试覆盖，但渲染和 HMR 状态保留仍需在抖音开发者工具中验证。自动化 IDE HMR 测试仍仅覆盖 WX。
-
-## H5
-
-启动 H5 开发服务器：
-
-```sh
-pnpm dev:loan-genius:h5
-```
-
-构建并预览 H5 应用：
-
-```sh
-pnpm build:loan-genius:h5
-pnpm preview:loan-genius:h5
-```
-
-H5 产物会写入：
-
-```text
-demo/loan-genius/dist/h5
-```
-
-## 本示例演示的内容
-
-- 使用同一套 React 19 + Taro 源码同时支持 `wx`、`zfb`、`tt` 和 `h5`。
-- 通过 `VITE_VPT_TARGET` 进行 `vite-plugin-taro` 目标选择。
-- 在 `vite.config.ts` 中声明应用和页面元数据。
-- 微信、支付宝、抖音小程序构建产物，以及 H5 开发服务器和 H5 构建产物。
-- 从 `src/app.css` 引入 Tailwind CSS v4。
-- 应用侧通过 `virtual:taro/api` 和 `virtual:taro/components` 导入能力。
-- 生成 WX 的 WXML/WXS/WXSS、ZFB 的 AXML/SJS/ACSS、TT 的 TTML/SJS/TTSS，以及各目标的原生项目配置和 CommonJS chunk。
-
-应用代码不要直接导入或安装 `@tarojs/*` 包。请改用插件提供的虚拟模块：
-
-```tsx
-import Taro from 'virtual:taro/api'
-import { Text, View } from 'virtual:taro/components'
-```
-
-## 环境变量
-
-| 变量 | 是否必需 | 说明 |
-| --- | --- | --- |
-| `VITE_VPT_TARGET` | 是 | 由根目录脚本设置为 `wx`、`zfb`、`tt` 或 `h5`。 |
-| `VITE_VPT_WECHAT_APP_ID` | 否 | 微信小程序 app id。默认值为 `touristappid`。 |
-| `VITE_VPT_ALIPAY_APP_ID` | 否 | 写入 `mini.project.json` 的支付宝小程序 App ID。 |
-| `VITE_VPT_TIKTOK_APP_ID` | TT 开发者工具需要 | 写入 `dist/tt/project.config.json` 的抖音小程序 App ID。 |
-
-如需在本地测试微信小程序，请将 app id 写入 `demo/loan-genius/.env.local`：
-
-```env
-VITE_VPT_WECHAT_APP_ID=your_app_id
-```
-
-## 项目结构
-
-```text
-demo/loan-genius/
-├── index.html
-├── vite.config.ts
-└── src/
-    ├── app.tsx
-    ├── app.css
-    ├── components/
-    ├── pages/
-    │   └── calculator/
-    └── utils/
-```
-
-重要文件：
-
-| 文件 | 用途 |
-| --- | --- |
-| `vite.config.ts` | 选择目标，配置别名、输出目录、页面、应用配置和微信项目元数据。 |
-| `src/app.tsx` | 传给 `vite-plugin-taro` 的 React 根应用组件。 |
-| `src/app.css` | 全局 Tailwind CSS v4 引入和应用样式。 |
-| `src/pages/calculator/index.tsx` | 首页和默认路由。 |
-| `src/pages/calculator/monthly-payments/index.tsx` | 月供明细页面。 |
-| `src/pages/calculator/history/index.tsx` | 计算历史页面。 |
-
-## 添加页面
-
-1. 在 `src/pages` 下创建页面组件，例如 `src/pages/about/index.tsx`。
-2. 在 `vite.config.ts` 的 `pages` 中添加路由：
-
-```ts
-{
-    path: 'pages/about/index',
-    config: {
-        navigationBarTitleText: 'About'
-    }
-}
-```
-
-3. 通过插件虚拟模块导入 Taro API 和组件：
-
-```tsx
-import Taro from 'virtual:taro/api'
-import { Text, View } from 'virtual:taro/components'
-```
+类型检查、自动化测试、WX HMR 回归与平台验证范围见 [TESTING.md](TESTING.md)。
 
 ## 许可证
 
