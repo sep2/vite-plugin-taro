@@ -1,30 +1,30 @@
 # Loan Genius
 
-[简体中文](README.zh.md) | English
+简体中文 | [English](README.en.md)
 
-Loan Genius is the sample app for `vite-plugin-taro`. It is a React 19 + Taro loan calculator built with the same latest standard frontend stack promoted by this repository: Vite 8, React 19, and Tailwind CSS v4.
+Loan Genius 是 `vite-plugin-taro` 的示例应用。它是一个基于 React 19 + Taro 的贷款计算器，使用本仓库推荐的最新标准前端技术栈构建：Vite 8、React 19 和 Tailwind CSS v4。
 
-> **AI-assisted development is recommended:** Follow the [VPT AI development guide](https://vpt.js.org/guides/ai/) and let a coding assistant create, develop, test, and validate your app.
+> **推荐使用 AI 开发：** 阅读 [VPT AI 开发指南](https://vpt.js.org/guides/ai/)，让编程助手创建项目并完成开发、测试和验证。
 
-The app is forked from [`wuba/Taro-Mortgage-Calculator`](https://github.com/wuba/Taro-Mortgage-Calculator) and adapted to demonstrate `vite-plugin-taro`.
+该应用改造自 [`wuba/Taro-Mortgage-Calculator`](https://github.com/wuba/Taro-Mortgage-Calculator)，用于演示 `vite-plugin-taro` 的用法。
 
-- Source: [`demo/loan-genius`](https://github.com/sep2/vite-plugin-taro/tree/main/demo/loan-genius)
-- Official Website: <https://vpt.js.org>
+- 源码：[`demo/loan-genius`](https://github.com/sep2/vite-plugin-taro/tree/main/demo/loan-genius)
+- 官网：<https://vpt.js.org>
 
-## Requirements
+## 环境要求
 
-| Tool | Version / use |
+| 工具 | 版本 / 用途 |
 | --- | --- |
 | Node.js | `>=22` |
 | pnpm | `11.x` |
-| WeChat DevTools | Needed for opening `dist/wx` and running WX HMR tests. |
-| Alipay Mini Program Studio | Needed for opening `dist/zfb`. |
-| Douyin DevTools | Needed for opening `dist/tt`. |
-| `wechatide` | Needed only for the automated WX HMR suite. |
+| 微信开发者工具 | 打开 `dist/wx` 和运行 WX HMR 测试时需要。 |
+| 支付宝小程序开发者工具 | 打开 `dist/zfb` 时需要。 |
+| 抖音开发者工具 | 打开 `dist/tt` 时需要。 |
+| `wechatide` | 仅自动化 WX HMR 测试需要。 |
 
-## Run from a fresh clone
+## 从全新克隆运行
 
-Run these commands from the repository root:
+请在仓库根目录运行以下命令：
 
 ```sh
 pnpm install
@@ -32,33 +32,33 @@ pnpm prepare:taro
 pnpm build:plugin
 ```
 
-`pnpm prepare:taro` is required in a fresh clone because the patched Taro workspace package outputs are generated files and are not committed.
+全新克隆后必须运行 `pnpm prepare:taro`，因为打过补丁的 Taro workspace 包产物是生成文件，不会提交到仓库。
 
-## WeChat Mini Program
+## 微信小程序
 
-Build the WeChat Mini Program once:
+构建一次微信小程序：
 
 ```sh
 pnpm build:loan-genius:wx
 ```
 
-Or start development with hot reload:
+或启动热更新开发模式：
 
 ```sh
 pnpm dev:loan-genius:wx
 ```
 
-WeChat output is written to:
+微信小程序产物会写入：
 
 ```text
 demo/loan-genius/dist/wx
 ```
 
-Open `demo/loan-genius/dist/wx` in WeChat DevTools. Do not open the source package directory.
+请在微信开发者工具中打开 `demo/loan-genius/dist/wx`，不要打开源码包目录。
 
-### WX HMR regression suite
+### WX HMR 回归测试
 
-After building the current plugin, run the stateful 27-flow DevTools suite from the repository root:
+构建当前插件后，在仓库根目录运行包含 27 个有状态流程的开发者工具测试：
 
 ```sh
 pnpm build:plugin
@@ -66,93 +66,93 @@ wechatide auth -c Pi
 pnpm test:loan-genius:hmr
 ```
 
-The suite copies Loan Genius into `vite-plugin-taro-loan-genius-hmr-v1` under the system temporary directory, instruments stable automation IDs, and exercises polyfill access, component edits, multi-file updates, bursts, open overlays, hidden pages, navigation, syntax-error recovery, and normal remounting. It also rejects WX-unsafe generated class names after applicable updates and restorations, so known style regressions remain visible as failures. It never edits the package source fixture and stops its Vite server and DevTools project window during cleanup.
+测试会将 Loan Genius 复制到系统临时目录下的 `vite-plugin-taro-loan-genius-hmr-v1`，注入稳定的自动化 ID，并覆盖 polyfill 访问、组件修改、多文件更新、突发更新、已打开浮层、隐藏页面、页面导航、语法错误恢复和正常重新挂载。测试还会在适用的更新和还原后拒绝 WX 不安全的生成类名，使已知样式回归继续以失败形式暴露。测试不会修改包内源码，并会在清理阶段停止 Vite 服务和关闭开发者工具项目窗口。
 
-The sample enables `polyfills: ['web.url']` for mini programs. Its Vite `define: { URL: 'globalThis.URL' }` makes bare `URL` references use the native or polyfilled global on every target. The polyfill flow checks `globalThis.URL` at startup, switches to bare `URL` through HMR, then restores the original code while checking that calculator state is retained.
+示例通过 `polyfills: ['web.url']` 为小程序启用 URL API，并使用 Vite 的 `define: { URL: 'globalThis.URL' }`，让所有目标中直接引用的 `URL` 都使用原生或 polyfill 提供的全局实现。polyfill 流程会验证启动时的 `globalThis.URL`，通过 HMR 切换到 `URL`，再还原代码，并检查计算器状态始终保留。
 
-Fixture edits atomically replace each source file so Vite never observes a truncated generation. Run the publisher regression tests without DevTools using `pnpm --filter loan-genius test`.
+测试通过原子替换发布每个源文件，避免 Vite 读到写入期间被截断的内容。无需开发者工具即可运行发布器回归测试：`pnpm --filter loan-genius test`。
 
-Set `VPT_LOAN_HMR_DEVTOOLS_CLIENT` when the authorized `wechatide` client is not named `Pi`.
+如果已授权的 `wechatide` 客户端名称不是 `Pi`，请设置 `VPT_LOAN_HMR_DEVTOOLS_CLIENT`。
 
-## Alipay Mini Program
+## 支付宝小程序
 
-Set `VITE_VPT_ALIPAY_APP_ID` in `demo/loan-genius/.env.local`, then run from the repository root:
+在 `demo/loan-genius/.env.local` 设置 `VITE_VPT_ALIPAY_APP_ID`，然后在仓库根目录运行：
 
 ```sh
 pnpm build:loan-genius:zfb
 pnpm dev:loan-genius:zfb
 ```
 
-Open `demo/loan-genius/dist/zfb` in Alipay Mini Program Studio.
+用支付宝小程序开发者工具导入 `demo/loan-genius/dist/zfb`。
 
-## Douyin (抖音) Mini Program (TT)
+## 抖音小程序（TT）
 
-The `tt` target is for Douyin, not a claim of verified overseas TikTok compatibility. Set the existing `VITE_VPT_TIKTOK_APP_ID` variable in `demo/loan-genius/.env.local` to your Douyin Mini Program App ID. From the repository root:
+`tt` 指抖音（Douyin）小程序，不代表已验证海外 TikTok 小程序兼容性。在 `demo/loan-genius/.env.local` 设置沿用的变量 `VITE_VPT_TIKTOK_APP_ID` 为你的抖音小程序 App ID，然后在仓库根目录运行：
 
 ```sh
 pnpm build:loan-genius:tt
-# Or keep the development build running:
+# 或保持开发构建运行：
 pnpm dev:loan-genius:tt
 ```
 
-Open `demo/loan-genius/dist/tt` in Douyin DevTools, not the source directory. TT uses native custom navigation and `interpreter` HMR, without WeChat's Skyline settings. Async common packages require base library 2.86.1+; native style hot reload requires DevTools 4.1.4+, base library 2.98.0.0+, top-level `compileHotReload: true`, and `setting.autoCompile: true`.
+用抖音开发者工具导入 `demo/loan-genius/dist/tt`，不要导入源码目录。TT 使用自定义导航栏和 `interpreter` 热更新，不包含微信的 Skyline 配置。异步通用分包需要基础库 2.86.1+；原生样式热重载需要开发者工具 4.1.4+、基础库 2.98.0.0+，并同时开启顶层 `compileHotReload: true` 和 `setting.autoCompile: true`。
 
-TT build output is tested, but rendering and HMR state retention still need validation in Douyin DevTools. The automated IDE HMR suite remains WX-only.
+TT 构建产物有测试覆盖，但渲染和 HMR 状态保留仍需在抖音开发者工具中验证。自动化 IDE HMR 测试仍仅覆盖 WX。
 
 ## H5
 
-Start the H5 dev server:
+启动 H5 开发服务器：
 
 ```sh
 pnpm dev:loan-genius:h5
 ```
 
-Build and preview the H5 app:
+构建并预览 H5 应用：
 
 ```sh
 pnpm build:loan-genius:h5
 pnpm preview:loan-genius:h5
 ```
 
-H5 output is written to:
+H5 产物会写入：
 
 ```text
 demo/loan-genius/dist/h5
 ```
 
-## What this sample demonstrates
+## 本示例演示的内容
 
-- One React 19 + Taro source tree for `wx`, `zfb`, `tt`, and `h5`.
-- `vite-plugin-taro` target selection with `VITE_VPT_TARGET`.
-- App and page metadata declared in `vite.config.ts`.
-- WeChat, Alipay, and Douyin Mini Program output, plus the H5 dev server and production build.
-- Tailwind CSS v4 imported from `src/app.css`.
-- App-facing imports from `virtual:taro/api` and `virtual:taro/components`.
-- WX WXML/WXS/WXSS, ZFB AXML/SJS/ACSS, and TT TTML/SJS/TTSS skeletons with target-native project files and CommonJS entries.
+- 使用同一套 React 19 + Taro 源码同时支持 `wx`、`zfb`、`tt` 和 `h5`。
+- 通过 `VITE_VPT_TARGET` 进行 `vite-plugin-taro` 目标选择。
+- 在 `vite.config.ts` 中声明应用和页面元数据。
+- 微信、支付宝、抖音小程序构建产物，以及 H5 开发服务器和 H5 构建产物。
+- 从 `src/app.css` 引入 Tailwind CSS v4。
+- 应用侧通过 `virtual:taro/api` 和 `virtual:taro/components` 导入能力。
+- 生成 WX 的 WXML/WXS/WXSS、ZFB 的 AXML/SJS/ACSS、TT 的 TTML/SJS/TTSS，以及各目标的原生项目配置和 CommonJS chunk。
 
-Application code must not import or install `@tarojs/*` packages directly. Use the plugin virtual modules instead:
+应用代码不要直接导入或安装 `@tarojs/*` 包。请改用插件提供的虚拟模块：
 
 ```tsx
 import Taro from 'virtual:taro/api'
 import { Text, View } from 'virtual:taro/components'
 ```
 
-## Environment variables
+## 环境变量
 
-| Variable | Required | Description |
+| 变量 | 是否必需 | 说明 |
 | --- | --- | --- |
-| `VITE_VPT_TARGET` | Yes | Set by the root scripts to `wx`, `zfb`, `tt`, or `h5`. |
-| `VITE_VPT_WECHAT_APP_ID` | No | WeChat Mini Program app id. Defaults to `touristappid`. |
-| `VITE_VPT_ALIPAY_APP_ID` | No | Alipay Mini Program app id written to `mini.project.json`. |
-| `VITE_VPT_TIKTOK_APP_ID` | For TT DevTools | Douyin Mini Program App ID written to `dist/tt/project.config.json`; the variable name is unchanged. |
+| `VITE_VPT_TARGET` | 是 | 由根目录脚本设置为 `wx`、`zfb`、`tt` 或 `h5`。 |
+| `VITE_VPT_WECHAT_APP_ID` | 否 | 微信小程序 app id。默认值为 `touristappid`。 |
+| `VITE_VPT_ALIPAY_APP_ID` | 否 | 写入 `mini.project.json` 的支付宝小程序 App ID。 |
+| `VITE_VPT_TIKTOK_APP_ID` | TT 开发者工具需要 | 写入 `dist/tt/project.config.json` 的抖音小程序 App ID。 |
 
-For local WeChat testing, put your app id in `demo/loan-genius/.env.local`:
+如需在本地测试微信小程序，请将 app id 写入 `demo/loan-genius/.env.local`：
 
 ```env
 VITE_VPT_WECHAT_APP_ID=your_app_id
 ```
 
-## Project structure
+## 项目结构
 
 ```text
 demo/loan-genius/
@@ -167,21 +167,21 @@ demo/loan-genius/
     └── utils/
 ```
 
-Important files:
+重要文件：
 
-| File | Purpose |
+| 文件 | 用途 |
 | --- | --- |
-| `vite.config.ts` | Selects the target and configures aliases, output, pages, app config, and native project metadata. |
-| `src/app.tsx` | Root React app component passed to `vite-plugin-taro`. |
-| `src/app.css` | Global Tailwind CSS v4 imports and app styles. |
-| `src/pages/calculator/index.tsx` | First page and default route. |
-| `src/pages/calculator/monthly-payments/index.tsx` | Monthly payment detail page. |
-| `src/pages/calculator/history/index.tsx` | Calculator history page. |
+| `vite.config.ts` | 选择目标，配置别名、输出目录、页面、应用配置和微信项目元数据。 |
+| `src/app.tsx` | 传给 `vite-plugin-taro` 的 React 根应用组件。 |
+| `src/app.css` | 全局 Tailwind CSS v4 引入和应用样式。 |
+| `src/pages/calculator/index.tsx` | 首页和默认路由。 |
+| `src/pages/calculator/monthly-payments/index.tsx` | 月供明细页面。 |
+| `src/pages/calculator/history/index.tsx` | 计算历史页面。 |
 
-## Adding a page
+## 添加页面
 
-1. Create a page component under `src/pages`, for example `src/pages/about/index.tsx`.
-2. Add the route to `pages` in `vite.config.ts`:
+1. 在 `src/pages` 下创建页面组件，例如 `src/pages/about/index.tsx`。
+2. 在 `vite.config.ts` 的 `pages` 中添加路由：
 
 ```ts
 {
@@ -192,13 +192,13 @@ Important files:
 }
 ```
 
-3. Import Taro APIs and components through the plugin virtual modules:
+3. 通过插件虚拟模块导入 Taro API 和组件：
 
 ```tsx
 import Taro from 'virtual:taro/api'
 import { Text, View } from 'virtual:taro/components'
 ```
 
-## License
+## 许可证
 
 MIT
