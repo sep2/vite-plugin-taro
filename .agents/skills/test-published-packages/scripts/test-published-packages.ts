@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { installNativeCounterProbe } from './install-native-counter-probe.ts'
 
 interface CommandResult {
     status: number | null
@@ -50,7 +51,7 @@ const projectPaths: ProjectPaths = {
     root: temporaryRoot,
     output: resolve(temporaryRoot, 'dist/wx'),
     source: resolve(temporaryRoot, 'src/pages/home/index.tsx'),
-    counterSource: resolve(temporaryRoot, 'src/components/counter/counter.tsx'),
+    counterSource: resolve(temporaryRoot, 'src/components/counter/native-counter.tsx'),
     backup: resolve(temporaryRoot, '.hmr-test-index.tsx.backup'),
     viteLog: resolve(temporaryDirectory, 'vpt-published-packages-test-vite.log')
 }
@@ -315,14 +316,7 @@ function configureDisposableProject(): void {
     )
 
     const counterSource = readFileSync(projectPaths.counterSource, 'utf8')
-    const counterPropsOpening = 'export interface CounterProps {\n'
-    if (counterSource.split(counterPropsOpening).length !== 2) {
-        throw new Error('Expected one CounterProps interface in the generated counter')
-    }
-    writeFileSync(
-        projectPaths.counterSource,
-        counterSource.replace(counterPropsOpening, `${counterPropsOpening}    id: string\n`)
-    )
+    writeFileSync(projectPaths.counterSource, installNativeCounterProbe(counterSource))
 }
 
 function validateProjectConfig(): void {
