@@ -147,7 +147,7 @@ import { Slot, Text } from 'virtual:taro/components'
 
 ## 全自动分包
 
-vpt 只输出实际使用的原生组件，并将其资源纳入主包和分包的位置规划。
+vpt 会将原声组件纳入主包和分包的全自动位置规划。
 
 `defineNativeComponent()` 会被编译器消除，不会生成可供 `React.lazy()` 加载的运行时组件；其中的 `import()` 只用于定位原生入口，也不会创建分包。按需加载时，在同一文件中默认导出一个普通 React 组件：
 
