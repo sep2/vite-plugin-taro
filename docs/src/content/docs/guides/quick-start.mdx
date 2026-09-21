@@ -4,7 +4,6 @@ description: 从创建项目到运行微信、支付宝、抖音小程序与 Web
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components'
-import HmrVideoFrame from '../../../components/hmr-video-frame.astro'
 
 本指南使用 `create-vite-taro` 创建一个同时支持微信、支付宝、抖音小程序和 Web 的应用。默认模板已经配置好 Vite 8、React 19、Taro 4、TypeScript 和 Tailwind CSS v4。
 
@@ -59,100 +58,49 @@ VITE_VPT_TIKTOK_APP_ID=testAppId
 
 `.env.local` 已被 Git 忽略，不会提交到仓库。
 
-## 3. 运行微信小程序
+## 3. 运行开发模式
 
-启动 Vite 微信开发模式：
+按目标选择一个命令，启动 Vite 开发模式：
 
 <Tabs syncKey="package-manager">
     <TabItem label="pnpm">
 
 ```sh
-pnpm dev:wx
+pnpm dev:wx         # 微信小程序
+pnpm dev:zfb        # 支付宝小程序
+pnpm dev:tt         # 抖音小程序
+pnpm dev:h5         # Web 应用
 ```
 
     </TabItem>
     <TabItem label="npm">
 
 ```sh
-npm run dev:wx
+npm run dev:wx      # 微信小程序
+npm run dev:zfb     # 支付宝小程序
+npm run dev:tt      # 抖音小程序
+npm run dev:h5      # Web 应用
 ```
 
     </TabItem>
     <TabItem label="yarn">
 
 ```sh
-yarn dev:wx
+yarn dev:wx         # 微信小程序
+yarn dev:zfb        # 支付宝小程序
+yarn dev:tt         # 抖音小程序
+yarn dev:h5         # Web 应用
 ```
 
     </TabItem>
 </Tabs>
 
-等待终端显示 Vite 已准备完成，然后在微信开发者工具中导入：
+- **小程序：** 等待 Vite 完成初始构建，然后在对应平台的开发者工具中导入生成目录：微信 `dist/wx`、支付宝 `dist/zfb`、抖音 `dist/tt`。不要打开项目源码根目录。
+- **Web：** 在浏览器中访问终端显示的地址。
 
-```text
-dist/wx
-```
+如需同时开发多个目标，请在不同终端中分别运行对应命令。
 
-请打开生成的 `dist/wx`，不要打开项目源码根目录。模板已经启用 `compileHotReLoad`，修改 React 组件时会热更新并保留：
-
-- App 与 `globalData`
-- 当前原生页面
-- React 组件状态
-- 原生输入状态
-
-<HmrVideoFrame variant="embedded" />
-
-## 4. 运行支付宝小程序
-
-启动支付宝开发模式：
-
-```sh
-npm run dev:zfb
-```
-
-等待 Vite 完成初始构建，然后在支付宝小程序开发者工具中导入 `dist/zfb`。
-
-## 5. 运行抖音小程序
-
-启动抖音开发模式：
-
-```sh
-npm run dev:tt
-```
-
-等待 Vite 完成初始构建，然后在抖音小程序开发者工具中导入 `dist/tt`。
-
-## 6. 运行 Web 应用
-
-在另一个终端中启动 H5 开发服务器：
-
-<Tabs syncKey="package-manager">
-    <TabItem label="pnpm">
-
-```sh
-pnpm dev:h5
-```
-
-    </TabItem>
-    <TabItem label="npm">
-
-```sh
-npm run dev:h5
-```
-
-    </TabItem>
-    <TabItem label="yarn">
-
-```sh
-yarn dev:h5
-```
-
-    </TabItem>
-</Tabs>
-
-浏览器访问终端显示的地址。Vite 默认从 [http://localhost:5173](http://localhost:5173) 开始选择端口；如果该端口已被微信开发服务占用，会自动使用下一个可用端口。`dev:wx` 和 `dev:h5` 可以同时运行。
-
-## 7. 编辑第一个页面
+## 4. 编辑第一个页面
 
 模板的默认首页组件位于 `src/pages/home/index.tsx`。可以直接使用 `div`、`span`、`button` 等 HTML 标签编写 React 组件；vpt 在小程序端将支持的标签映射为原生组件：
 
@@ -188,7 +136,7 @@ HTML 标签可以与 `ScrollView` 等 Taro 组件混用。
 不要安装或直接导入 `@tarojs/*` 包。
 :::
 
-## 8. 构建与检查
+## 5. 构建与检查
 
 <Tabs syncKey="package-manager">
     <TabItem label="pnpm">
@@ -238,7 +186,7 @@ yarn typecheck       # 使用 tsc 检查类型
 | 抖音小程序（`tt`） | `dev:tt` | `build:tt` | `dist/tt` |
 | Web（`h5`） | `dev:h5` | `build:h5` | `dist/h5` |
 
-## 9. 了解项目结构
+## 6. 了解项目结构
 
 项目的核心文件如下：
 
