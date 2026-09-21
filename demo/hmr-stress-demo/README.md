@@ -1,6 +1,6 @@
 # Mini Program HMR stress demo
 
-A repository-only WeChat and Alipay Mini Program fixture for exercising HMR with a large retained React/Taro tree. Douyin (抖音 / TT) is supported by VPT but is not configured in this fixture.
+A repository-only WeChat and Alipay Mini Program fixture for exercising HMR with a large retained React/Taro tree. TikTok (抖音 / TT) is supported by VPT but is not configured in this fixture.
 
 > **AI-assisted development is recommended:** Follow the [VPT AI development guide](https://vpt.js.org/guides/ai/) and let a coding assistant create, develop, test, and validate your app.
 
@@ -80,7 +80,7 @@ VITE_VPT_WECHAT_APP_ID=<appid> pnpm dev:hmr-stress-demo:wx
 VITE_VPT_ALIPAY_APP_ID=<appid> pnpm dev:hmr-stress-demo:zfb
 ```
 
-Open `demo/hmr-stress-demo/dist/wx` in WeChat DevTools or `demo/hmr-stress-demo/dist/zfb` in Alipay Mini Program Studio. ZFB uses interpreter HMR. For Douyin development, use `pnpm dev:loan-genius:tt` and open `demo/loan-genius/dist/tt` in Douyin DevTools; this stress fixture has no TT target. Do not run burst publishers against either repository-backed server; use the automated WeChat commands above so source generations remain confined to the disposable fixture.
+Open `demo/hmr-stress-demo/dist/wx` in WeChat DevTools or `demo/hmr-stress-demo/dist/zfb` in Alipay Mini Program Studio. ZFB uses interpreter HMR. For TikTok development, use `pnpm dev:loan-genius:tt` and open `demo/loan-genius/dist/tt` in TikTok DevTools; this stress fixture has no TT target. Do not run burst publishers against either repository-backed server; use the automated WeChat commands above so source generations remain confined to the disposable fixture.
 
 Build-only validation is available for both targets:
 

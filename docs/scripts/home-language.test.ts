@@ -15,7 +15,7 @@ test('every homepage translation switches in both directions without ambiguity',
     }
 })
 
-test('homepage platform lists include Douyin in both languages', () => {
+test('homepage platform lists include TikTok in both languages', () => {
     const platformLists = Object.entries(homeTranslations).filter(
         ([chinese, english]) =>
             (chinese.includes('微信') && chinese.includes('支付宝')) ||
@@ -25,7 +25,7 @@ test('homepage platform lists include Douyin in both languages', () => {
 
     for (const [chinese, english] of platformLists) {
         assert.ok(chinese.includes('抖音'), chinese)
-        assert.ok(english.includes('Douyin'), english)
+        assert.ok(english.includes('TikTok'), english)
     }
 })
 

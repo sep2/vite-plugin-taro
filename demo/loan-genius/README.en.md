@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | English
 
-A mortgage calculator example built with VPT. One codebase supports WeChat, Alipay, and Douyin Mini Programs, as well as the Web.
+A mortgage calculator example built with VPT. One codebase supports WeChat, Alipay, and TikTok Mini Programs, as well as the Web.
 
 This project was migrated from [wuba/Taro-Mortgage-Calculator](https://github.com/wuba/Taro-Mortgage-Calculator).
 
@@ -39,7 +39,7 @@ Choose a target below. Each script sets `VITE_VPT_TARGET` automatically:
 | --- | --- | --- | --- |
 | WeChat | `pnpm dev:loan-genius:wx` | `pnpm build:loan-genius:wx` | `demo/loan-genius/dist/wx` |
 | Alipay | `pnpm dev:loan-genius:zfb` | `pnpm build:loan-genius:zfb` | `demo/loan-genius/dist/zfb` |
-| Douyin | `pnpm dev:loan-genius:tt` | `pnpm build:loan-genius:tt` | `demo/loan-genius/dist/tt` |
+| TikTok | `pnpm dev:loan-genius:tt` | `pnpm build:loan-genius:tt` | `demo/loan-genius/dist/tt` |
 | Web | `pnpm dev:loan-genius:h5` | `pnpm build:loan-genius:h5` | `demo/loan-genius/dist/h5` |
 
 - Mini Programs: wait for the initial build, then import the output directory into the matching DevTools—not the source directory.
