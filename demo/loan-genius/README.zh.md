@@ -87,7 +87,7 @@ pnpm dev:loan-genius:zfb
 
 ## 抖音小程序（TT）
 
-在 `demo/loan-genius/.env.local` 设置 `VITE_VPT_TIKTOK_APP_ID` 为你的抖音小程序 App ID，然后在仓库根目录运行：
+`tt` 指抖音（Douyin）小程序，不代表已验证海外 TikTok 小程序兼容性。在 `demo/loan-genius/.env.local` 设置沿用的变量 `VITE_VPT_TIKTOK_APP_ID` 为你的抖音小程序 App ID，然后在仓库根目录运行：
 
 ```sh
 pnpm build:loan-genius:tt
@@ -95,7 +95,7 @@ pnpm build:loan-genius:tt
 pnpm dev:loan-genius:tt
 ```
 
-用抖音开发者工具导入 `demo/loan-genius/dist/tt`，不要导入源码目录。TT 使用自定义导航栏和 `interpreter` 热更新，不包含微信的 Skyline 配置。异步通用分包需要基础库 2.86.1+；原生样式热重载需要开发者工具 4.1.4+、基础库 2.98.0.0+。
+用抖音开发者工具导入 `demo/loan-genius/dist/tt`，不要导入源码目录。TT 使用自定义导航栏和 `interpreter` 热更新，不包含微信的 Skyline 配置。异步通用分包需要基础库 2.86.1+；原生样式热重载需要开发者工具 4.1.4+、基础库 2.98.0.0+，并同时开启顶层 `compileHotReload: true` 和 `setting.autoCompile: true`。
 
 TT 构建产物有测试覆盖，但渲染和 HMR 状态保留仍需在抖音开发者工具中验证。自动化 IDE HMR 测试仍仅覆盖 WX。
 

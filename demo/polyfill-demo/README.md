@@ -1,6 +1,6 @@
 # Polyfill demo
 
-WX / ZFB runtime fixture for VPT's opt-in `polyfills` option. The page runs 12 checks at module startup, shows individual PASS/FAIL results and offers a **Run again** button.
+WX / ZFB runtime fixture for VPT's opt-in `polyfills` option; Douyin (抖音 / TT) is not configured in this fixture. The page runs 12 checks at module startup, shows individual PASS/FAIL results and offers a **Run again** button.
 
 Checks cover URL, URLSearchParams, Array.at/findLast/toSorted/toReversed, Object.fromEntries, String.replaceAll, Promise.allSettled/any, structuredClone and queueMicrotask. `src/polyfill-cases.ts` supplies both the checks and the core-js module list consumed by `vite.config.ts`; there are no direct core-js imports in application code.
 
@@ -18,7 +18,7 @@ pnpm dev:polyfill-demo:wx
 # Or: pnpm dev:polyfill-demo:zfb
 ```
 
-Import `demo/polyfill-demo/dist/wx` into WeChat DevTools or `demo/polyfill-demo/dist/zfb` into Alipay DevTools. Expect **12/12 passed**, including after clicking **Run again**. Check both development and production builds, and real devices when validating older engines.
+Import `demo/polyfill-demo/dist/wx` into WeChat DevTools or `demo/polyfill-demo/dist/zfb` into Alipay DevTools. Expect **12/12 passed**, including after clicking **Run again**. Check both development and production builds, and real devices when validating older engines. These checks do not establish Douyin compatibility; this fixture has no `dist/tt` output.
 
 Optional `.env.local` settings: `VITE_VPT_WECHAT_APP_ID` (defaults to `touristappid`) and `VITE_VPT_ALIPAY_APP_ID`.
 

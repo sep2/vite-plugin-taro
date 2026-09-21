@@ -1,18 +1,18 @@
 ---
 title: 快速开始
-description: 从创建项目到运行微信小程序、支付宝小程序与 Web 应用。
+description: 从创建项目到运行微信、支付宝、抖音小程序与 Web 应用。
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components'
 import HmrVideoFrame from '../../../components/hmr-video-frame.astro'
 
-本指南使用 `create-vite-taro` 创建一个同时支持微信小程序、支付宝小程序和 Web 的应用。默认模板已经配置好 Vite 8、React 19、Taro 4、TypeScript 和 Tailwind CSS v4。
+本指南使用 `create-vite-taro` 创建一个同时支持微信、支付宝、抖音小程序和 Web 的应用。默认模板已经配置好 Vite 8、React 19、Taro 4、TypeScript 和 Tailwind CSS v4。
 
 ## 准备工作
 
 - Node.js 24 或更高版本。
 - pnpm、npm 或 yarn。推荐使用 pnpm。
-- 安装[微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)和/或支付宝小程序开发者工具最新版。
+- 安装[微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)和/或支付宝/抖音小程序开发者工具最新版。
 - 对应平台的小程序 App ID。没有微信 App ID 时也可以先使用测试号体验部分功能。
 
 ## 1. 创建项目
@@ -54,6 +54,7 @@ yarn install
 ```dotenv
 VITE_VPT_WECHAT_APP_ID=wx1234567890abcdef
 VITE_VPT_ALIPAY_APP_ID=2021000000000000
+VITE_VPT_TIKTOK_APP_ID=testAppId
 ```
 
 `.env.local` 已被 Git 忽略，不会提交到仓库。
@@ -111,7 +112,7 @@ npm run dev:zfb
 
 等待 Vite 完成初始构建，然后在支付宝小程序开发者工具中导入 `dist/zfb`。
 
-### 抖音小程序（TT）
+## 5. 运行抖音小程序
 
 启动抖音开发模式：
 
@@ -121,7 +122,7 @@ npm run dev:tt
 
 等待 Vite 完成初始构建，然后在抖音小程序开发者工具中导入 `dist/tt`。
 
-## 5. 运行 Web 应用
+## 6. 运行 Web 应用
 
 在另一个终端中启动 H5 开发服务器：
 
@@ -151,7 +152,7 @@ yarn dev:h5
 
 浏览器访问终端显示的地址。Vite 默认从 [http://localhost:5173](http://localhost:5173) 开始选择端口；如果该端口已被微信开发服务占用，会自动使用下一个可用端口。`dev:wx` 和 `dev:h5` 可以同时运行。
 
-## 6. 编辑第一个页面
+## 7. 编辑第一个页面
 
 模板的默认首页组件位于 `src/pages/home/index.tsx`。可以直接使用 `div`、`span`、`button` 等 HTML 标签编写 React 组件；vpt 在小程序端将支持的标签映射为原生组件：
 
@@ -187,7 +188,7 @@ HTML 标签可以与 `ScrollView` 等 Taro 组件混用。
 不要安装或直接导入 `@tarojs/*` 包。
 :::
 
-## 7. 构建与检查
+## 8. 构建与检查
 
 <Tabs syncKey="package-manager">
     <TabItem label="pnpm">
@@ -195,6 +196,7 @@ HTML 标签可以与 `ScrollView` 等 Taro 组件混用。
 ```sh
 pnpm build:wx        # 构建微信小程序到 dist/wx
 pnpm build:zfb       # 构建支付宝小程序到 dist/zfb
+pnpm build:tt        # 构建抖音小程序到 dist/tt
 pnpm build:h5        # 构建 Web 应用到 dist/h5
 pnpm preview:h5      # 预览 Web 生产构建
 pnpm typecheck       # 使用 tsc 检查类型
@@ -206,6 +208,7 @@ pnpm typecheck       # 使用 tsc 检查类型
 ```sh
 npm run build:wx     # 构建微信小程序到 dist/wx
 npm run build:zfb    # 构建支付宝小程序到 dist/zfb
+npm run build:tt     # 构建抖音小程序到 dist/tt
 npm run build:h5     # 构建 Web 应用到 dist/h5
 npm run preview:h5   # 预览 Web 生产构建
 npm run typecheck    # 使用 tsc 检查类型
@@ -217,6 +220,7 @@ npm run typecheck    # 使用 tsc 检查类型
 ```sh
 yarn build:wx        # 构建微信小程序到 dist/wx
 yarn build:zfb       # 构建支付宝小程序到 dist/zfb
+yarn build:tt        # 构建抖音小程序到 dist/tt
 yarn build:h5        # 构建 Web 应用到 dist/h5
 yarn preview:h5      # 预览 Web 生产构建
 yarn typecheck       # 使用 tsc 检查类型
@@ -231,9 +235,10 @@ yarn typecheck       # 使用 tsc 检查类型
 | --- | --- | --- | --- |
 | 微信小程序（`wx`） | `dev:wx` | `build:wx` | `dist/wx` |
 | 支付宝小程序（`zfb`） | `dev:zfb` | `build:zfb` | `dist/zfb` |
+| 抖音小程序（`tt`） | `dev:tt` | `build:tt` | `dist/tt` |
 | Web（`h5`） | `dev:h5` | `build:h5` | `dist/h5` |
 
-## 8. 了解项目结构
+## 9. 了解项目结构
 
 项目的核心文件如下：
 
@@ -261,7 +266,7 @@ my-app/
 
 ### 小程序开发者工具无法打开项目
 
-确认导入的是 `dist/wx` 或 `dist/zfb`，并检查 `.env.local` 中对应的 App ID 是否属于当前开发者账号。
+确认导入的是当前目标的 `dist/wx`、`dist/zfb` 或 `dist/tt`，并检查 `.env.local` 中对应的 App ID 是否属于当前开发者账号。
 
 ### Tailwind 工具类没有生效
 

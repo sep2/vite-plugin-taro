@@ -1,6 +1,6 @@
 # native-comp-demo
 
-Development fixture for integrating WeChat and Alipay native custom components with vpt's Taro React renderer.
+Development fixture for integrating WeChat and Alipay native custom components with vpt's Taro React renderer. VPT also supports Douyin (抖音 / TT), but this fixture does not configure that target.
 
 > **AI-assisted development is recommended:** Follow the [VPT AI development guide](https://vpt.js.org/guides/ai/) and let a coding assistant create, develop, test, and validate your app.
 
@@ -11,7 +11,7 @@ pnpm --filter native-comp-demo dev-wx
 pnpm --filter native-comp-demo dev-zfb
 ```
 
-Open `demo/native-comp-demo/dist/wx` in WeChat DevTools or `demo/native-comp-demo/dist/zfb` in Alipay Mini Program Studio.
+Open `demo/native-comp-demo/dist/wx` in WeChat DevTools or `demo/native-comp-demo/dist/zfb` in Alipay Mini Program Studio. For Douyin setup, see the [Quick Start guide](https://vpt.js.org/guides/quick-start/); this fixture has no `dist/tt` output.
 Set `VITE_VPT_WECHAT_APP_ID` or `VITE_VPT_ALIPAY_APP_ID` in `.env.local` for the selected target.
 
 The target-native component sources live under `src/native/wx/native-counter` and `src/native/zfb/native-counter`. Conditional

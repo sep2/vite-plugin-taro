@@ -1,5 +1,6 @@
----title: 小程序原生组件
-description: 在 React 中类型安全地使用微信或支付宝原生组件，并让原生资源参与全自动分包。
+---
+title: 小程序原生组件
+description: 在 React 中类型安全地使用微信、支付宝或抖音原生组件，并让原生资源参与全自动分包。
 ---
 
 使用 `defineNativeComponent()` 为当前目标的原生组件声明一个 React 接口。vpt 会自动复制原生文件、注册组件并规划分包。
@@ -70,6 +71,8 @@ src/native-counter/
     ├── child.json
     └── child.wxml
 ```
+
+上面是微信组件目录。支付宝使用 `.axml` / `.acss`，抖音使用 `.ttml` / `.ttss`；对应脚本模块分别使用 `.wxs`、`.sjs`、`.sjs`。vpt 不会在平台间转换原生文件，请为当前目标提供对应实现。
 
 vpt 会递归复制目录中的文件并保留相对路径。组件脚本、图片、字体、子组件和 CommonJS 模块都可以放在里面。
 
@@ -214,7 +217,7 @@ export default function Page() {
 
 完整规划规则参见[全自动分包](/guides/automatic-subpackages/)。
 
-## 同时构建微信、支付宝 与 Web
+## 同时构建微信、支付宝、抖音与 Web
 
 Web 代码不能导入使用 `virtual:taro/native` 的接口文件。不同平台的原生目录也不能混用。共享组件可以通过条件编译选择实现：
 
@@ -225,6 +228,10 @@ import { WxNativeCounter } from './wx-native-counter.tsx'
 
 // #ifdef zfb
 import { ZfbNativeCounter } from './zfb-native-counter.tsx'
+// #endif
+
+// #ifdef tt
+import { TtNativeCounter } from './tt-native-counter.tsx'
 // #endif
 
 // #ifdef h5
@@ -238,6 +245,10 @@ export default function Counter(props: { count: number }) {
 
     // #ifdef zfb
     return <ZfbNativeCounter count={props.count} />
+    // #endif
+
+    // #ifdef tt
+    return <TtNativeCounter count={props.count} />
     // #endif
 
     // #ifdef h5
@@ -285,7 +296,7 @@ React 和原生组件不共享 CommonJS 模块实例。使用属性和事件通�
 
 ### 属性或事件没有传递
 
-确认微信组件的 `properties` / `triggerEvent()` 或支付宝组件的 `props` / `on*` 回调名称与 TypeScript 字段一致。
+确认微信、抖音组件的 `properties` / `triggerEvent()` 或支付宝组件的 `props` / `on*` 回调名称与 TypeScript 字段一致。
 
 ### 原生组件内部找不到文件
 
@@ -293,5 +304,5 @@ React 和原生组件不共享 CommonJS 模块实例。使用属性和事件通�
 
 ## 示例
 
-- [`native-comp-demo`](https://github.com/sep2/vite-plugin-taro/tree/main/demo/native-comp-demo)：微信与支付宝原生组件的属性、事件和命名 slot。
+- [`native-comp-demo`](https://github.com/sep2/vite-plugin-taro/tree/main/demo/native-comp-demo)：微信、支付宝、抖音原生组件的属性、事件和命名 slot。
 - [`towxml-stream-demo`](https://github.com/sep2/vite-plugin-taro/tree/main/demo/towxml-stream-demo)：微信 Towxml、增量 adapter 和自动分包。

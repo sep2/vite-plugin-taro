@@ -1,6 +1,6 @@
 # Mini Program HMR stress demo
 
-A repository-only WeChat and Alipay Mini Program fixture for exercising HMR with a large retained React/Taro tree.
+A repository-only WeChat and Alipay Mini Program fixture for exercising HMR with a large retained React/Taro tree. Douyin (抖音 / TT) is supported by VPT but is not configured in this fixture.
 
 > **AI-assisted development is recommended:** Follow the [VPT AI development guide](https://vpt.js.org/guides/ai/) and let a coding assistant create, develop, test, and validate your app.
 
@@ -12,7 +12,7 @@ Each page renders:
 - 96 additional stateful grid cells;
 - controlled input, counter, selection, density, and mount-token state.
 
-The singleton App projects the Page outlet through a 16-level host chain beside a second 16-level decorative branch, and it consumes the same edited marker as both Pages. Every marker generation also reverses the two keyed App branches, forcing structural App HMR while retaining the Page subtree. The mirror route mounts a second Page copy while the primary Page remains in the back stack. Together they stress App-view slot routing, App and Page React Refresh, cumulative patch delivery, native Page replacement on WX, in-place interpreter updates on ZFB, large `data` snapshot restoration, hidden-page recovery, runtime-requested rebuilds, and invalid-source recovery.
+The singleton App projects the Page outlet through a 16-level host chain beside a second 16-level decorative branch, and it consumes the same edited marker as both Pages. Every marker generation also reverses the two keyed App branches, forcing structural App HMR while retaining the Page subtree. The mirror route mounts a second Page copy while the primary Page remains in the back stack. Together they stress App-view slot routing, App and Page React Refresh, cumulative patch delivery, native Page replacement on WX, in-place interpreter updates on ZFB, large `data` snapshot restoration, hidden-page recovery, runtime-requested rebuilds, and invalid-source recovery. These flows do not exercise TT.
 
 ## Automated WeChat DevTools suite
 
@@ -80,7 +80,7 @@ VITE_VPT_WECHAT_APP_ID=<appid> pnpm dev:hmr-stress-demo:wx
 VITE_VPT_ALIPAY_APP_ID=<appid> pnpm dev:hmr-stress-demo:zfb
 ```
 
-Open `demo/hmr-stress-demo/dist/wx` in WeChat DevTools or `demo/hmr-stress-demo/dist/zfb` in Alipay Mini Program Studio. ZFB uses the interpreter HMR mode required by the Alipay development tool. Do not run burst publishers against either repository-backed server; use the automated WeChat commands above so source generations remain confined to the disposable fixture.
+Open `demo/hmr-stress-demo/dist/wx` in WeChat DevTools or `demo/hmr-stress-demo/dist/zfb` in Alipay Mini Program Studio. ZFB uses interpreter HMR. For Douyin development, use `pnpm dev:loan-genius:tt` and open `demo/loan-genius/dist/tt` in Douyin DevTools; this stress fixture has no TT target. Do not run burst publishers against either repository-backed server; use the automated WeChat commands above so source generations remain confined to the disposable fixture.
 
 Build-only validation is available for both targets:
 

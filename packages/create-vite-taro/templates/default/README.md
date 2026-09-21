@@ -57,7 +57,7 @@ npm install
 
 3. 用支付宝小程序开发者工具导入 `dist/zfb`，不要导入项目根目录。
 
-### 抖音小程序（TT）
+### 抖音小程序
 
 1. 在 `.env.local` 中填写抖音 App ID：
 
@@ -71,7 +71,7 @@ npm install
     npm run dev:tt
     ```
 
-3. 用抖音小程序开发者工具导入 `dist/tt`，不要导入项目根目录。
+3. 用抖音开发者工具导入 `dist/tt`，不要导入项目根目录。
 
 ### Web
 

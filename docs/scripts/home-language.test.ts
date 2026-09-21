@@ -15,6 +15,20 @@ test('every homepage translation switches in both directions without ambiguity',
     }
 })
 
+test('homepage platform lists include Douyin in both languages', () => {
+    const platformLists = Object.entries(homeTranslations).filter(
+        ([chinese, english]) =>
+            (chinese.includes('微信') && chinese.includes('支付宝')) ||
+            (english.includes('WeChat') && english.includes('Alipay'))
+    )
+    assert.ok(platformLists.length > 0)
+
+    for (const [chinese, english] of platformLists) {
+        assert.ok(chinese.includes('抖音'), chinese)
+        assert.ok(english.includes('Douyin'), english)
+    }
+})
+
 test('translations preserve surrounding whitespace and normalize wrapped copy', () => {
     assert.equal(translateHomeText('\n  快速开始  \n', 'en'), '\n  Get started  \n')
     assert.equal(translateHomeText('\n  Get started  \n', 'zh-CN'), '\n  快速开始  \n')

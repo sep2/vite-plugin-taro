@@ -148,7 +148,7 @@ appJson: {
 
 ## `projectConfigJson`
 
-配置微信开发者工具项目：
+使用当前目标的原生字段配置开发者工具项目。以下为微信示例：
 
 ```ts
 projectConfigJson: {
@@ -278,9 +278,9 @@ H5 需要项目根目录下的 `index.html`，其中包含挂载节点：
 
 ### 小程序中的浏览器式全局变量
 
-WX 和 ZFB 中可以直接使用以下名称，无需额外安装依赖或手动导入：
+小程序共用 Taro 浏览器兼容绑定，可以直接使用以下名称，无需额外安装依赖或手动导入：
 
-- `window`、`document`、`navigator`；
+- `document`、`navigator`；
 - `requestAnimationFrame`、`cancelAnimationFrame`；
 - `Element`、`SVGElement`、`MutationObserver`；
 - `history`、`location`。

@@ -27,7 +27,7 @@ VPT 可同时使用 Tailwind CSS v4、CSS Modules 和普通 CSS。样式也支�
 
 - 三个 `@import` 分别引入主题、基础规则和工具类。
 - `@source "./"` 扫描 `src` 中使用的 Tailwind 类名。
-- vpt 为微信、支付宝和 Web 分别生成可用的目标样式。
+- vpt 为微信、支付宝、抖音和 Web 分别生成可用的目标样式。
 
 在 JSX 中直接使用 `className`：
 
@@ -185,7 +185,7 @@ PostCSS 配置使用 Vite 的 `css.postcss` 或项目根目录中的 PostCSS 配
 
 ## 样式热更新
 
-运行 `npm run dev:wx` 或 `npm run dev:zfb` 时，以下修改会触发样式热更新：
+运行 `npm run dev:...` 时，以下修改会触发样式热更新：
 
 - 修改已导入的 CSS、CSS Modules 或预处理器文件。
 - 在 JSX 中新增、替换或删除 Tailwind 类名。
@@ -217,12 +217,14 @@ Web 目标沿用 Vite 的 CSS 行为。小程序目标会收集应用和所有�
 dist/wx/assets/global.wxss
 // zfb
 dist/zfb/assets/global.acss
+// tt
+dist/tt/assets/global.ttss
 ```
 
 这包含普通导入、CSS Modules、Tailwind 生成结果和动态导入分支中的样式。因此，小程序目标不会等到动态组件加载时再加载它的 CSS。
 
 :::note
-原生组件自带的 `.wxss` 或 `.acss` 会继续跟随原生组件输出，不会合并到 React 应用的全局样式中。
+原生组件自带的 `.wxss`、`.acss` 或 `.ttss` 会继续跟随原生组件输出，不会合并到 React 应用的全局样式中。
 :::
 
 ## 常见问题
@@ -245,8 +247,4 @@ dist/zfb/assets/global.acss
 
 ### 小程序与 Web 显示不同
 
-检查所用属性和选择器是否受当前 WXSS 或 ACSS 方言支持，并确认尺寸换算、默认元素样式和 Tailwind Preflight。不要依赖开发者工具的 PostCSS；样式转换由 vpt 完成。
-
-### 修改样式后没有更新
-
-确认运行的是 `dev:wx` 或 `dev:zfb`，开发者工具打开的是对应的 `dist/wx` 或 `dist/zfb`，并检查终端是否有 CSS 语法或 Tailwind 生成错误。修复后再次保存会继续热更新。
+检查所用属性和选择器是否受当前 WXSS、ACSS 或 TTSS 方言支持，并确认尺寸换算、默认元素样式和 Tailwind Preflight。不要依赖开发者工具的 PostCSS；样式转换由 vpt 完成。
