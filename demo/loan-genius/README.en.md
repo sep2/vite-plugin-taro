@@ -14,10 +14,11 @@ This project was migrated from [wuba/Taro-Mortgage-Calculator](https://github.co
 
 Requires Node.js 26+, pnpm 11, and the Mini Program DevTools for your target platform.
 
-First, initialize the repository. Run the following commands from the **repository root**:
+First, initialize the repository:
 
 ```sh
 git clone https://github.com/sep2/vite-plugin-taro.git
+cd vite-plugin-taro
 pnpm install
 pnpm prepare:taro
 pnpm build:plugin

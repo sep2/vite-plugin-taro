@@ -180,7 +180,7 @@
         "@tarojs/runtime": "4.2.1",
         "@tarojs/taro": "4.2.1",
         "@tarojs/taro-h5": "4.2.1",
-        "@types/node": "^26.5.1",
+        "@types/node": "^26.6.2",
         "@types/react": "^19.3.0",
         "typescript": "^7.0.2"
     },

@@ -176,8 +176,8 @@ test('public packages preserve their published entrypoints and scaffold dependen
                 assert.equal(project.private, true)
                 assert.equal(project.version, '0.0.0')
                 assert.equal(project.devDependencies['vite-plugin-taro'], `^${version}`)
-                assert.equal(project.devDependencies.vite, '8.3.0')
-                assert.equal(project.devDependencies.rolldown, '1.2.8')
+                assert.equal(project.devDependencies.vite, pluginPackage.peerDependencies.vite)
+                assert.equal(project.devDependencies.rolldown, pluginPackage.dependencies.rolldown)
                 assert.ok(output.includes(`  ${packageManager ?? 'npm'} install\n`))
                 const run = packageManager === 'pnpm' || packageManager === 'yarn' ? '' : 'run '
                 assert.ok(output.includes(`  ${packageManager ?? 'npm'} ${run}dev:tt\n`))

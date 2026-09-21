@@ -14,10 +14,11 @@
 
 需要 Node.js 26+、pnpm 11，以及目标平台的小程序开发者工具。
 
-首先初始化仓库，以下命令均在**仓库根目录**运行：
+首先初始化仓库：
 
 ```sh
 git clone https://github.com/sep2/vite-plugin-taro.git
+cd vite-plugin-taro
 pnpm install
 pnpm prepare:taro
 pnpm build:plugin
