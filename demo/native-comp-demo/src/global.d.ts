@@ -1,3 +1,3 @@
 interface ImportMetaEnv {
-    readonly VITE_VPT_TARGET: 'wx' | 'zfb'
+    readonly VITE_VPT_TARGET: 'wx' | 'zfb' | 'tt'
 }

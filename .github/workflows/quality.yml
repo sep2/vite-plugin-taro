@@ -39,6 +39,9 @@ jobs:
       - name: Enforce 100% coverage
         run: pnpm test:coverage --test-reporter=../../scripts/ci-test-reporter.ts
 
+      - name: Test native component Douyin demo
+        run: pnpm --filter native-comp-demo test
+
       - name: Build sample WeChat Mini Program
         run: pnpm build:loan-genius:wx
 
@@ -89,6 +92,9 @@ jobs:
 
       - name: Test
         run: pnpm --filter vite-plugin-taro exec node --test --test-reporter=../../scripts/ci-test-reporter.ts --test-concurrency=1
+
+      - name: Test native component Douyin demo
+        run: pnpm --filter native-comp-demo test
 
       - name: Build sample WeChat Mini Program
         run: pnpm build:loan-genius:wx
