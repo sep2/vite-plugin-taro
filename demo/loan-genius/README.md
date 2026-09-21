@@ -2,11 +2,9 @@
 
 简体中文 | [English](README.en.md)
 
-Loan Genius 是 `vite-plugin-taro` 的示例应用。它是一个基于 React 19 + Taro 的贷款计算器，使用本仓库推荐的最新标准前端技术栈构建：Vite 8、React 19 和 Tailwind CSS v4。
+Loan Genius 是 `vite-plugin-taro` 的示例应用。它是一个基于 React 19 + Taro 的房贷计算器，使用本仓库推荐的最新标准前端技术栈构建：Vite 8、React 19 和 Tailwind CSS v4。
 
-> **推荐使用 AI 开发：** 阅读 [VPT AI 开发指南](https://vpt.js.org/guides/ai/)，让编程助手创建项目并完成开发、测试和验证。
-
-该应用改造自 [`wuba/Taro-Mortgage-Calculator`](https://github.com/wuba/Taro-Mortgage-Calculator)，用于演示 `vite-plugin-taro` 的用法。
+该应用改造自 [`wuba/Taro-Mortgage-Calculator`](https://github.com/wuba/Taro-Mortgage-Calculator)，用于演示 `vpt` 的用法。
 
 - 源码：[`demo/loan-genius`](https://github.com/sep2/vite-plugin-taro/tree/main/demo/loan-genius)
 - 官网：<https://vpt.js.org>
@@ -31,8 +29,6 @@ pnpm install
 pnpm prepare:taro
 pnpm build:plugin
 ```
-
-全新克隆后必须运行 `pnpm prepare:taro`，因为打过补丁的 Taro workspace 包产物是生成文件，不会提交到仓库。
 
 ## 微信小程序
 
