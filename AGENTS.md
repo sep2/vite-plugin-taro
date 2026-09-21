@@ -40,7 +40,7 @@ Under `demo/`:
 
 - `loan-genius`: sample app for `wx`, `zfb`, `tt`, and `h5`.
 - `native-comp-demo`: native custom-component fixture for `wx`, `zfb`, and `tt`.
-- `polyfill-demo`: opt-in core-js runtime checks for `wx` and `zfb`.
+- `polyfill-demo`: opt-in core-js runtime checks for `wx`, `zfb`, and `tt`.
 - `hmr-stress-demo`: deep React tree HMR fixture for `wx` and `zfb`; automated IDE harness is WX-only.
 - `towxml-stream-demo`: native Towxml streaming fixture for `wx` only.
 

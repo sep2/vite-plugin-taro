@@ -7,10 +7,12 @@
     "scripts": {
         "build-wx": "cross-env NODE_ENV=production VITE_VPT_TARGET=wx vite build",
         "build-zfb": "cross-env NODE_ENV=production VITE_VPT_TARGET=zfb vite build",
+        "build-tt": "cross-env NODE_ENV=production VITE_VPT_TARGET=tt vite build",
         "dev-wx": "cross-env NODE_ENV=development VITE_VPT_TARGET=wx vite",
         "dev-zfb": "cross-env NODE_ENV=development VITE_VPT_TARGET=zfb vite",
-        "typecheck": "tsc --project tsconfig.json",
-        "test": "node --test src/*.test.ts"
+        "dev-tt": "cross-env NODE_ENV=development VITE_VPT_TARGET=tt vite",
+        "typecheck": "tsc --project tsconfig.json && tsc --project tsconfig.node.json",
+        "test": "node --test src/*.test.ts scripts/*.test.ts"
     },
     "dependencies": {
         "react": "^19.3.0",

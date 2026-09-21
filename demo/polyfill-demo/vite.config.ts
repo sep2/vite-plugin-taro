@@ -13,6 +13,7 @@ export default defineConfig(({ mode }) => {
     const target = getTarget(env)
     const wechatAppId = env.VITE_VPT_WECHAT_APP_ID || 'touristappid'
     const alipayAppId = env.VITE_VPT_ALIPAY_APP_ID
+    const ttAppId = env.VITE_VPT_TIKTOK_APP_ID
 
     return {
         build: {
@@ -30,11 +31,11 @@ export default defineConfig(({ mode }) => {
                     }
                 ],
                 appJson: createAppJson(target),
-                projectConfigJson: createProjectConfigJson({ target, wechatAppId, alipayAppId }),
+                projectConfigJson: createProjectConfigJson({ target, wechatAppId, alipayAppId, ttAppId }),
                 projectPrivateConfigJson: createProjectPrivateConfigJson(target),
                 sitemapJson: { rules: [{ action: 'allow', page: '*' }] },
                 hmr: {
-                    mode: target === 'zfb' ? 'interpreter' : 'devtools'
+                    mode: target === 'wx' ? 'devtools' : 'interpreter'
                 }
             })
         ]
@@ -43,7 +44,8 @@ export default defineConfig(({ mode }) => {
 
 function createPageJson(target: MiniTarget, title: string): VptJsonObject {
     switch (target) {
-        case 'wx': {
+        case 'wx':
+        case 'tt': {
             return {
                 navigationBarTitleText: title
             }
@@ -76,17 +78,26 @@ function createAppJson(target: MiniTarget): VptJsonObject {
                 }
             }
         }
+        case 'tt': {
+            return {
+                window: {
+                    navigationBarTitleText: appTitle
+                }
+            }
+        }
     }
 }
 
 function createProjectConfigJson({
     target,
     wechatAppId,
-    alipayAppId
+    alipayAppId,
+    ttAppId
 }: {
     target: MiniTarget
     wechatAppId: string
     alipayAppId: string | undefined
+    ttAppId: string | undefined
 }): VptJsonObject {
     switch (target) {
         case 'wx': {
@@ -139,12 +150,28 @@ function createProjectConfigJson({
                 }
             }
         }
+        case 'tt': {
+            return {
+                appid: ttAppId,
+                projectname: 'polyfill demo',
+                miniprogramRoot: './',
+                compileHotReload: true,
+                setting: {
+                    urlCheck: false,
+                    es6: false,
+                    postcss: false,
+                    minified: false,
+                    autoCompile: true
+                }
+            }
+        }
     }
 }
 
 function createProjectPrivateConfigJson(target: MiniTarget): VptJsonObject {
     switch (target) {
-        case 'wx': {
+        case 'wx':
+        case 'tt': {
             return {
                 setting: {
                     urlCheck: false
@@ -165,11 +192,11 @@ function getTarget(env: Record<string, string>): MiniTarget {
     const targetEnvName = 'VITE_VPT_TARGET'
     const target = env[targetEnvName]
 
-    if (target === 'wx' || target === 'zfb') {
+    if (target === 'wx' || target === 'zfb' || target === 'tt') {
         return target
     }
 
-    throw new Error(`${targetEnvName} must be "wx" or "zfb".`)
+    throw new Error(`${targetEnvName} must be "wx", "zfb", or "tt".`)
 }
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url))
