@@ -16,7 +16,7 @@ export default function ApiCard() {
             </div>
             <button
                 type="button"
-                className="relative z-10 mt-6 flex items-center justify-center self-start rounded-full bg-action px-6 py-3 text-sm font-bold text-action-foreground after:border-0 sm:mt-0"
+                className="relative z-10 mt-6 flex items-center justify-center self-start rounded-full border-none bg-action px-6 py-3 text-sm font-bold text-action-foreground after:content-none sm:mt-0"
                 onClick={() => Taro.showToast({ title: 'Hello from VPT!' })}
             >
                 Try a Taro toast →

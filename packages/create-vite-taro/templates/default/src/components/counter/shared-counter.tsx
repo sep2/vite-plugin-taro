@@ -9,7 +9,7 @@ export function SharedCounter({ count, onDecrement, onIncrement }: CounterProps)
                 <View className="flex h-full w-14 shrink-0">
                     <Button
                         aria-label="Decrease counter"
-                        className="m-0 flex h-full w-full items-center justify-center rounded-l-full rounded-r-none bg-white p-0 text-lg font-bold leading-none text-foreground after:border-0"
+                        className="m-0 flex h-full w-full items-center justify-center rounded-l-full rounded-r-none border-none bg-white p-0 text-lg font-bold leading-none text-foreground after:content-none"
                         onClick={onDecrement}
                     >
                         <Text>−</Text>
@@ -21,7 +21,7 @@ export function SharedCounter({ count, onDecrement, onIncrement }: CounterProps)
                 <View className="flex h-full w-14 shrink-0">
                     <Button
                         aria-label="Increase counter"
-                        className="m-0 flex h-full w-full items-center justify-center rounded-l-none rounded-r-full bg-primary-control p-0 text-lg font-bold leading-none text-white after:border-0"
+                        className="m-0 flex h-full w-full items-center justify-center rounded-l-none rounded-r-full border-none bg-primary-control p-0 text-lg font-bold leading-none text-white after:content-none"
                         onClick={onIncrement}
                     >
                         <Text>+</Text>

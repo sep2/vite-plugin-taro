@@ -38,11 +38,6 @@
     box-sizing: border-box;
 }
 
-.__workaround_weapp_tailwind,
-button::after {
-    border: none;
-}
-
 page,
 body {
     margin: 0;

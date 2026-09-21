@@ -737,7 +737,7 @@ export default function LoanGenius() {
                 boxShadow="0px 2px 8px 0px rgba(211,215,218,1)"
             >
                 <Button
-                    className="flex p-2 m-4 flex-1 items-center justify-center leading-normal rounded-xs bg-[rgba(35,201,147,1)] text-center"
+                    className="flex p-2 m-4 flex-1 items-center justify-center leading-normal rounded-md border-none after:content-none bg-[rgba(35,201,147,1)] text-center"
                     onClick={submit}
                 >
                     <Text className="font-pingfang-regular text-lg font-normal text-white">开始计算</Text>

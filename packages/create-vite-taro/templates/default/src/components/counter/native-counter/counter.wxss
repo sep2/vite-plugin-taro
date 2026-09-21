@@ -39,6 +39,7 @@
     justify-content: center;
     margin: 0;
     padding: 0;
+    border: none;
     border-radius: 0;
     background: var(--color-white);
     color: var(--color-foreground);
@@ -48,7 +49,7 @@
 }
 
 .native-counter__button::after {
-    border: 0;
+    content: none;
 }
 
 .native-counter__button--decrement {
