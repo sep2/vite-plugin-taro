@@ -2,9 +2,11 @@
 
 [简体中文](README.md) | English
 
-A mortgage calculator example built with Vite 8, React 19, Taro, and Tailwind CSS v4. One codebase supports WeChat, Alipay, and Douyin Mini Programs, as well as the Web.
+A mortgage calculator example built with VPT. One codebase supports WeChat, Alipay, and Douyin Mini Programs, as well as the Web.
 
-This project is adapted from [wuba/Taro-Mortgage-Calculator](https://github.com/wuba/Taro-Mortgage-Calculator).
+This project was migrated from [wuba/Taro-Mortgage-Calculator](https://github.com/wuba/Taro-Mortgage-Calculator).
+
+![Loan Genius screenshot](./screenshots/demo.webp)
 
 [VPT documentation](https://vpt.js.org) · [AI development guide](https://vpt.js.org/guides/ai/)
 

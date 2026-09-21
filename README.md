@@ -21,17 +21,16 @@
 npm create vite-taro@latest my-app
 ```
 
+或者（推荐使用 pnpm）
+
+```sh
+pnpm --config.minimum-release-age=0 create vite-taro@latest my-app
+```
+
 接下来阅读[快速开始](https://vpt.js.org/guides/quick-start/)。
 
 
-## 赞助
-
-VPT 由 [weapp.dev](https://weapp.dev) 赞助，感谢赞助者对开源开发的支持。
-
-weapp.dev 致力于为小程序与 Web 构建开放、可组合的现代工具链。
-
-
-### 已支持微信开发者工具的 React 热更新
+### 已支持小程序开发者工具的热更新
 
 <video src="https://github.com/user-attachments/assets/c8289e1e-d8ad-429f-a0d9-a40656b4962a" controls autoplay muted loop playsinline width="100%"></video>
 
@@ -41,6 +40,19 @@ weapp.dev 致力于为小程序与 Web 构建开放、可组合的现代工具�
 - **Tailwind CSS v4 开箱即用** 直接书写工具类，微信与 Web 样式自动适配。
 - **基于 Taro，超越 Taro** 使用 Taro 组件和 API，摆脱旧式 webpack 链路。
 - **Skyline 就绪** 支持全局或按页面启用微信 Skyline 渲染模式。
+
+## Demo
+
+查看 [Loan Genius Demo](https://github.com/sep2/vite-plugin-taro/tree/main/demo/loan-genius)。
+
+<img src="https://raw.githubusercontent.com/sep2/vite-plugin-taro/main/demo/loan-genius/screenshots/demo.webp" alt="Loan Genius screenshot" width="320" />
+
+## 赞助
+
+VPT 由 [weapp.dev](https://weapp.dev) 赞助，感谢赞助者对开源开发的支持。
+
+weapp.dev 致力于为小程序与 Web 构建开放、可组合的现代工具链。
+
 
 ## 文档
 

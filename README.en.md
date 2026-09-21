@@ -9,7 +9,7 @@
 
 [简体中文](README.md) | English
 
-Build WeChat, Alipay, TikTok Mini Programs, and Web apps with Vite 8, React 19, Taro 4, and Tailwind CSS v4.
+Build WeChat, Alipay, and Douyin Mini Programs, as well as Web apps, with Vite 8, React 19, Taro 4, and Tailwind CSS v4.
 
 Website: <https://vpt.js.org>
 
@@ -21,7 +21,30 @@ Website: <https://vpt.js.org>
 npm create vite-taro@latest my-app
 ```
 
+Or use pnpm (recommended):
+
+```sh
+pnpm --config.minimum-release-age=0 create vite-taro@latest my-app
+```
+
 Continue with the [Quick Start guide](https://vpt.js.org/guides/quick-start/).
+
+### Hot Reload in Mini Program DevTools
+
+<video src="https://github.com/user-attachments/assets/c8289e1e-d8ad-429f-a0d9-a40656b4962a" controls autoplay muted loop playsinline width="100%"></video>
+
+- **Vite 8 + React 19** Build one codebase for WeChat, Alipay, and Douyin Mini Programs, as well as Web.
+- **Hot reload** Preserve App data, the active page, React component state, and input state while editing.
+- **Automatic subpackages** Use standard static and dynamic imports while vpt plans WeChat Mini Program subpackages automatically.
+- **Tailwind CSS v4 ready** Write utility classes directly; styles adapt automatically for WeChat and Web.
+- **Built on Taro, beyond Taro** Use Taro components and APIs without the old webpack pipeline.
+- **Skyline ready** Use WeChat Skyline rendering globally or per page.
+
+## Demo
+
+See the [Loan Genius Demo](https://github.com/sep2/vite-plugin-taro/blob/main/demo/loan-genius/README.en.md).
+
+<img src="https://raw.githubusercontent.com/sep2/vite-plugin-taro/main/demo/loan-genius/screenshots/demo.webp" alt="Loan Genius screenshot" width="320" />
 
 ## Sponsor
 
@@ -29,24 +52,13 @@ VPT is sponsored by [weapp.dev](https://weapp.dev). Thank you to our sponsor for
 
 weapp.dev builds an open, composable modern toolchain for Mini Program and Web development.
 
-### React Hot Reload in WeChat DevTools
-
-<video src="https://github.com/user-attachments/assets/c8289e1e-d8ad-429f-a0d9-a40656b4962a" controls autoplay muted loop playsinline width="100%"></video>
-
-- **Vite 8 + React 19** Build one codebase for WeChat, Alipay, TikTok Mini Programs, and Web.
-- **Hot reload** Preserve App data, the active page, React component state, and input state while editing.
-- **Automatic subpackages** Use standard static and dynamic imports while vpt plans Mini Program packages automatically.
-- **Tailwind CSS v4 ready** Write utility classes directly; styles adapt automatically for every target.
-- **Built on Taro, beyond Taro** Use Taro components and APIs without the old webpack pipeline.
-- **Skyline ready** Use WeChat Skyline rendering globally or per page.
-
 ## Documentation
 
 - [Quick Start](https://vpt.js.org/guides/quick-start/)
 - [AI-assisted development](https://vpt.js.org/guides/ai/)
 - [Styles](https://vpt.js.org/guides/styles/)
 - [Automatic subpackages](https://vpt.js.org/guides/automatic-subpackages/)
-- [Native WeChat components](https://vpt.js.org/guides/native-components/)
+- [Native components](https://vpt.js.org/guides/native-components/)
 - [Hot module replacement](https://vpt.js.org/guides/hot-module-replacement/)
 - [Configuration options](https://vpt.js.org/guides/configuration/)
 - [Conditional compilation](https://vpt.js.org/guides/conditional-directives/)

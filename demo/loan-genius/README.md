@@ -2,9 +2,11 @@
 
 简体中文 | [English](README.en.md)
 
-基于 Vite 8、React 19、Taro 和 Tailwind CSS v4 的房贷计算器示例，一套源码支持微信、支付宝、抖音小程序和 Web。
+基于 VPT 的房贷计算器示例，一套源码支持微信、支付宝、抖音小程序和 Web。
 
-此项目改造自 [wuba/Taro-Mortgage-Calculator](https://github.com/wuba/Taro-Mortgage-Calculator)。
+此项目迁移自 [wuba/Taro-Mortgage-Calculator](https://github.com/wuba/Taro-Mortgage-Calculator)。
+
+![Loan Genius screenshot](./screenshots/demo.webp)
 
 [VPT 文档](https://vpt.js.org) · [AI 开发指南](https://vpt.js.org/guides/ai/)
 
