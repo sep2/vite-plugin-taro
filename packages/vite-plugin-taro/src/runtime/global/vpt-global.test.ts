@@ -186,6 +186,32 @@ test('the temporary getter retains its self fallback when called without a recei
     `).runInContext(context)
 })
 
+test('strict execution retains a fallback when inherited lookup returns undefined without throwing', () => {
+    const context = createHeap(`
+        delete this.globalThis;
+        this.self = undefined;
+        const defineProperty = Object.defineProperty;
+        Object.defineProperty = (object, key, descriptor) => {
+            if (key === '__vpt_global__') {
+                const getter = descriptor.get;
+                descriptor.get = () => Reflect.apply(getter, undefined, []);
+            }
+            return defineProperty(object, key, descriptor);
+        };
+    `)
+    // Record diagnostics only in this deliberately strict heap; native output is tested separately in non-strict mode.
+    const errors: unknown[][] = []
+    context.console = { error: (...args: unknown[]) => errors.push(args) }
+    runtimeScript.runInContext(context)
+    new Script(`
+        assert.equal(vptGlobal, Object[Symbol.for('vpt.fake.global')]);
+        assert.notEqual(vptGlobal, this);
+        assert.equal(vptGlobal.globalThis, vptGlobal);
+        assert.equal(Object.hasOwn(Object.prototype, '__vpt_global__'), false);
+    `).runInContext(context)
+    assert.deepEqual(errors, [['Unable to resolve globalThis, might in strict mode']])
+})
+
 test('returns a native proxy without inspecting it or touching an existing recovery key', () => {
     const context = createHeap(`
         const native = Proxy.revocable({}, {});

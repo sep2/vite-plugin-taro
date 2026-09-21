@@ -318,7 +318,7 @@ for (const minify of [false, true]) {
             assert.equal(provider.fileName, 'common/vpt/global.js')
             assert.deepEqual(provider.imports, [])
             assert.deepEqual(provider.moduleIds, [])
-            assert.match(provider.code, /^["']use strict["']/)
+            assert.doesNotMatch(provider.code, /^["']use strict["']/)
             assert.doesNotMatch(provider.code, /require\(|__rolldown_runtime__|__VPT_GLOBAL__/)
             assert.doesNotMatch(binding.code, /__VPT_GLOBAL__|vpt\.fake\.global/)
             assert.match(binding.code, /\.\.\/common\/vpt\/global\.js/)
@@ -335,17 +335,17 @@ for (const minify of [false, true]) {
             runInContext(`(function(exports, require) {\n${binding.code}\n})(exports, require)`, context)
             assert.equal(runInContext('exports.vptGlobal === globalThis', context), true)
 
-            // The standalone export wrapper must preserve discovery's string-key fallback before any polyfills exist.
-            // Diagnostics belong only to this restricted heap and distinguish failure recovery from native probing.
+            // The existing this probe can recover the real host without Symbol or mutating a frozen prototype.
             const diagnostics: unknown[][] = []
-            const restricted = createContext({ console: { error: (...args: unknown[]) => diagnostics.push(args) } })
+            const restricted = createContext({
+                exports: {},
+                console: { error: (...args: unknown[]) => diagnostics.push(args) }
+            })
             runInContext('delete this.globalThis; delete this.Symbol; Object.freeze(Object.prototype);', restricted)
-            runInContext(`(function(exports) {\n${provider.code}\n})({})`, restricted)
-            assert.equal(diagnostics.length, 1)
-            assert.equal(
-                runInContext('Object["vpt.fake.global"].globalThis === Object["vpt.fake.global"]', restricted),
-                true
-            )
+            runInContext(`(function(exports) {\n${provider.code}\n})(exports)`, restricted)
+            assert.equal(diagnostics.length, 0)
+            assert.equal(runInContext('exports.vptGlobal === this', restricted), true)
+            assert.equal(runInContext('Object["vpt.fake.global"]', restricted), undefined)
             assert.equal(runInContext('typeof globalThis', restricted), 'undefined')
 
             const map = result.output.find((output) => output.fileName === 'common/vpt/global.js.map')

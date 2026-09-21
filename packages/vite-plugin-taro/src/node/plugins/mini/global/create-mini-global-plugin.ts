@@ -121,11 +121,12 @@ const bundleGlobal = memoize(
         build({
             input: vptGlobalSrcFile,
             transform: { target: esTarget },
-            // Preserve ESM receiver and cleanup semantics even when the host's CommonJS wrapper is not strict.
             output: {
                 ...output,
                 format: 'cjs',
-                strict: true,
+                // iOS may invoke the inherited global-name getter with an undefined receiver. Only this standalone
+                // provider allows non-strict receiver conversion; application chunks retain their own strictness.
+                strict: false,
                 // Discovery supports a missing Symbol constructor; export metadata must not access it first.
                 generatedCode: { symbols: false },
                 entryFileNames: vptGlobalDistFile

@@ -181,7 +181,7 @@ test('real HMR factories reuse the registered binding without rediscovering the 
             assert.equal(exports.root, runInContext('this', heap.context))
             assert.equal(exports.value, 2)
         }
-        assert.equal(runInContext('discoveries', heap.context), index === 0 ? 0 : 1)
+        assert.equal(runInContext('discoveries', heap.context), 0)
         assert.equal(runInContext('typeof globalThis', heap.context), index === 0 ? 'object' : 'undefined')
     }
 })

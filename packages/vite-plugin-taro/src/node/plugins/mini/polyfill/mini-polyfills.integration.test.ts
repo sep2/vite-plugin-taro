@@ -486,7 +486,7 @@ for (const target of miniTargets) {
                         assert.ok(heap.reports.some((report) => JSON.parse(report).data.kind === 'applied'))
                     }
                     assert.equal(heap.read('typeof globalThis'), globalType, 'startup must not install a host alias')
-                    assert.equal(heap.read('globalDiscoveries'), globalType === 'object' ? 0 : 1)
+                    assert.equal(heap.read('globalDiscoveries'), 0)
                 })
             }
         })
@@ -548,7 +548,7 @@ for (const target of miniTargets) {
             assert.equal(native.read('queueMicrotask'), nativeQueue)
 
             for (const setup of ['delete this.globalThis;', 'let globalThis;']) {
-                await t.test(`failed discovery: ${setup}`, async () => {
+                await t.test(`recovers the host with a frozen prototype: ${setup}`, async () => {
                     const restricted = createAppHeap(chunks, true, target)
                     restricted.read(`
                         ${setup}
@@ -558,12 +558,10 @@ for (const target of miniTargets) {
                     `)
                     const provider = restricted.evaluate('common/vpt/global.js')
                     assert.ok(provider && typeof provider === 'object')
-                    restricted.read('const sharedGlobal = Object[Symbol.for("vpt.fake.global")];')
+                    restricted.read('const sharedGlobal = this;')
                     assert.strictEqual(Reflect.get(provider, 'vptGlobal'), restricted.read('sharedGlobal'))
-                    assert.notStrictEqual(restricted.read('sharedGlobal'), restricted.read('this'))
+                    assert.equal(restricted.read('Object[Symbol.for("vpt.fake.global")]'), undefined)
                     restricted.evaluate('common/bootstrap.js')
-                    // Sval publishes its imported runtime on the host's global alias; generated app code must not need it.
-                    restricted.read('this.__rolldown_runtime__ = undefined;')
                     restricted.evaluate('app.js')
                     restricted.evaluate('pages/home/index.js')
                     restricted.evaluate('comp.js')
@@ -571,8 +569,14 @@ for (const target of miniTargets) {
                     assert.deepEqual(restricted.registrations, ['App', 'Page', 'Component', 'Component'])
                     assert.equal(restricted.read('sharedGlobal.polyfillProbe.href'), 'https://example.com/dir/child')
                     assert.equal(restricted.read('typeof globalThis'), 'undefined')
-                    assert.equal(restricted.read('typeof __rolldown_runtime__'), 'undefined')
-                    assert.equal(restricted.read('typeof queueMicrotask'), 'undefined')
+                    assert.equal(
+                        restricted.read('typeof __rolldown_runtime__'),
+                        mode === 'production' ? 'undefined' : 'object'
+                    )
+                    assert.equal(
+                        restricted.read('typeof queueMicrotask'),
+                        mode === 'production' ? 'undefined' : 'function'
+                    )
                     if (mode !== 'production') {
                         assert.equal(restricted.read('typeof sharedGlobal.__rolldown_runtime__'), 'object')
                         restricted.read(`
@@ -584,8 +588,8 @@ for (const target of miniTargets) {
                         await Promise.resolve()
                         assert.deepEqual(restricted.json('microtaskOrder'), ['sync', 'after-schedule', 'queued'])
                     }
-                    assert.equal(restricted.read('globalDiscoveries'), 1)
-                    assert.equal(restricted.read('diagnostics.length'), 1)
+                    assert.equal(restricted.read('globalDiscoveries'), 0)
+                    assert.equal(restricted.read('diagnostics.length'), 0)
                 })
             }
         })
@@ -609,7 +613,7 @@ for (const target of miniTargets) {
 }
 
 for (const target of miniTargets) {
-    test(`${target}: a real React Refresh patch uses the shared global after failed discovery`, async () => {
+    test(`${target}: a real React Refresh patch uses the recovered host even with a frozen prototype`, async () => {
         await compileFixture(target, 'devtools', [], async (chunks, root) => {
             const patchesPath = path.join(root, 'dist/hmr/patches.js')
             await waitForPatchSource(patchesPath, 'module.exports')
@@ -624,7 +628,7 @@ for (const target of miniTargets) {
                 }
                 const provider = heap.evaluate('common/vpt/global.js')
                 assert.ok(provider && typeof provider === 'object')
-                heap.read(`const sharedGlobal = ${restricted ? 'Object[Symbol.for("vpt.fake.global")]' : 'this'};`)
+                heap.read('const sharedGlobal = this;')
                 assert.strictEqual(Reflect.get(provider, 'vptGlobal'), heap.read('sharedGlobal'))
                 heap.evaluate('app.js')
                 heap.evaluate('pages/home/index.js')

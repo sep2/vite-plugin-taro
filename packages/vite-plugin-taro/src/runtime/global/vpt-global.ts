@@ -38,6 +38,11 @@ function getGlobalThis(this: GlobalThisType | void): GlobalThisType {
         })
 
         resolved = __vpt_global__
+
+        if (!resolved) {
+            console.error('Unable to resolve globalThis, might in strict mode')
+            resolved = getOrCreateFakeGlobal()
+        }
     } catch (cause) {
         console.error('Unable to resolve globalThis', cause)
         resolved = getOrCreateFakeGlobal()
