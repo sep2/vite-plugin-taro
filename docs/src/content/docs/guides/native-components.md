@@ -3,7 +3,7 @@ title: 小程序原生组件
 description: 在 React 中类型安全地使用微信、支付宝或抖音原生组件，并让原生资源参与全自动分包。
 ---
 
-使用 `defineNativeComponent()` 为当前目标的原生组件声明一个 React 接口。vpt 会自动复制原生文件、注册组件并规划分包。
+使用 `defineNativeComponent()` 为原生组件声明一个 React 接口。vpt 会自动复制原生文件、注册组件并规划分包。
 
 ## 在 React 中使用
 
