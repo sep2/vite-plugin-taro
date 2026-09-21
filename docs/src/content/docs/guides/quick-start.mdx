@@ -60,7 +60,7 @@ VITE_VPT_TIKTOK_APP_ID=testAppId
 
 ## 3. 运行开发模式
 
-按目标选择一个命令，启动 Vite 开发模式：
+按目标选择一个命令，启动 Vite 开发模式[热更新](/guides/hot-module-replacement/)：
 
 <Tabs syncKey="package-manager">
     <TabItem label="pnpm">
@@ -100,6 +100,48 @@ yarn dev:h5         # Web 应用
 
 如需同时开发多个目标，请在不同终端中分别运行对应命令。
 
+### 自动重新构建（`--watch`）
+
+如果不需要热更新，例如让 AI 批量修改代码，可以使用：
+
+<Tabs syncKey="package-manager">
+    <TabItem label="pnpm">
+
+```sh
+pnpm build:wx --watch        # 微信小程序
+pnpm build:zfb --watch       # 支付宝小程序
+pnpm build:tt --watch        # 抖音小程序
+```
+
+    </TabItem>
+    <TabItem label="npm">
+
+```sh
+npm run build:wx -- --watch  # 微信小程序
+npm run build:zfb -- --watch # 支付宝小程序
+npm run build:tt -- --watch  # 抖音小程序
+```
+
+    </TabItem>
+    <TabItem label="yarn">
+
+```sh
+yarn build:wx --watch        # 微信小程序
+yarn build:zfb --watch       # 支付宝小程序
+yarn build:tt --watch        # 抖音小程序
+```
+
+    </TabItem>
+</Tabs>
+
+这些命令运行 `vite build --watch`，在源码变化后重新生成对应 `dist/...` 下的**生产构建**。
+
+不要与 `dev:...` 同时运行，以免同时写入输出目录。
+
+:::note
+微信使用 `build:wx --watch` 时，请在 `vite.config.ts` 中设置 `projectConfigJson.setting.compileHotReLoad: false`；切回 `dev:wx` 时恢复为 `true`。更多更新模式见[开发热更新](/guides/hot-module-replacement/)。
+:::
+
 ## 4. 编辑第一个页面
 
 模板的默认首页组件位于 `src/pages/home/index.tsx`。可以直接使用 `div`、`span`、`button` 等 HTML 标签编写 React 组件；vpt 在小程序端将支持的标签映射为原生组件：
@@ -132,8 +174,8 @@ HTML 标签可以与 `ScrollView` 等 Taro 组件混用。
 | `virtual:taro/api` | `Taro.navigateTo`、`Taro.getWindowInfo`、`Taro.useLaunch` 等 API 和 hooks。 |
 | `virtual:taro/native` | 为当前小程序目标声明带类型的原生组件属性和事件。 |
 
-:::caution
-不要安装或直接导入 `@tarojs/*` 包。
+:::note
+不必安装或导入 `@tarojs/*` 包。
 :::
 
 ## 5. 构建与检查
@@ -208,7 +250,7 @@ my-app/
 - `vite.config.ts` 标准 vite 项目的配置文件。
 - `src/app.tsx` 是应用入口。
 - `src/app.css` 包含全局样式和 Tailwind CSS v4 配置。
-- `src/pages/home/index.tsx` 是模板的默认首页组件。
+- `src/pages/home/index.tsx` 是默认首页组件。
 
 ## 常见问题
 
