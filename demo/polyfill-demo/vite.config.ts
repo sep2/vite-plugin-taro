@@ -15,8 +15,6 @@ export default defineConfig(({ mode }) => {
     const alipayAppId = env.VITE_VPT_ALIPAY_APP_ID
 
     return {
-        // WeChat shadows bare URL; resolve it from the global patched by core-js.
-        define: { URL: 'globalThis.URL' },
         build: {
             outDir: fromRoot('dist', target)
         },

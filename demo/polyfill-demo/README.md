@@ -4,7 +4,7 @@ WX / ZFB runtime fixture for VPT's opt-in `polyfills` option; TikTok (抖音 / T
 
 Checks cover URL, URLSearchParams, Array.at/findLast/toSorted/toReversed, Object.fromEntries, String.replaceAll, Promise.allSettled/any, structuredClone and queueMicrotask. `src/polyfill-cases.ts` supplies both the checks and the core-js module list consumed by `vite.config.ts`; there are no direct core-js imports in application code.
 
-WeChat shadows the bare `URL` identifier. The Vite top-level `define: { URL: 'globalThis.URL' }` redirects it to the global installed by core-js, as documented in the configuration guide.
+The checks use bare `URL` and `URLSearchParams` without Vite `define` mappings. The selected polyfills install missing APIs on the shared global object before application code runs; see the [configuration guide](https://vpt.js.org/guides/configuration/#polyfills).
 
 ## Run
 

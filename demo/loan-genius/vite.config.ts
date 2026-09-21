@@ -12,8 +12,6 @@ export default defineConfig(({ mode }) => {
 
     return {
         base: target === 'h5' ? './' : undefined,
-        // Use the native or polyfilled global URL for bare URL references on every target.
-        define: { URL: 'globalThis.URL' },
         resolve: {
             alias: [
                 { find: '@components', replacement: fromRoot('src/components') },

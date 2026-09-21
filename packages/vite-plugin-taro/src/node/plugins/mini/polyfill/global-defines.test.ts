@@ -40,7 +40,7 @@ test('global defines bypass host shadowing without rewriting text or local bindi
     assert.ok(chunk?.type === 'chunk')
     assert.ok(chunk.code.includes(comment), 'global names inside comments must remain unchanged')
 
-    // Only this isolated heap receives a self alias. Add the host's shadowing parameters after transformation, as WX does.
+    // Only this isolated heap receives a self alias. A synthetic host wrapper tests shadowing, not platform behavior.
     runInNewContext(
         `
             globalThis.self = globalThis;

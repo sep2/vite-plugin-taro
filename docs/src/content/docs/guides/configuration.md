@@ -217,19 +217,8 @@ polyfills: ['web.url', 'es.array.at', '...']
 需要 `URL` 和 `URLSearchParams` 时，选择 `web.url` 即可。如果还需要 `URL.parse`，使用
 `polyfills: ['web.url', 'web.url.parse']`。
 
-全局 API 安装在 `globalThis` 上。在微信中，可以直接使用 `new globalThis.URL(...)`。
-由于微信默认并不支持全局对象的写法 `new URL(...)`，请在 **Vite 顶层配置**（不是 `vpt()` 选项）中添加：
-
-```ts
-define: { URL: 'globalThis.URL' }
-```
-
-这样就可以直接使用 `new URL(...)`。
-
-`polyfills` 负责为小程序提供 API，`define` 让小程序里支持直接使用全局的 `URL` 名称。
-它不会修改字符串、注释或局部变量中的 `URL`。
-
-同理，选择 `web.self` 后，如果微信代码需要直接引用 `self`，可添加 `self: 'globalThis.self'`。
+全局 API 安装在 `globalThis` 上。所有小程序目标都支持直接使用 `new URL(...)`、`new URLSearchParams(...)`，
+也可以通过 `globalThis.URL`、`globalThis.URLSearchParams` 访问，无需额外配置。
 
 
 ## `hmr`
@@ -283,6 +272,12 @@ H5 需要项目根目录下的 `index.html`，其中包含挂载节点：
 ```
 
 不需要 `src/main.tsx`，也不需要在 HTML 中添加入口脚本。vpt 会生成并注入入口。小程序构建都不使用 `index.html`。
+
+### 小程序中的 `globalThis`
+
+微信（`wx`）、支付宝（`zfb`）和抖音（`tt`）均支持直接使用 `globalThis`。vpt 自动提供统一的全局对象绑定，无需手动导入、配置 `define` 或添加 `globalThis` polyfill。
+
+安装在全局对象上的 API 也可通过裸标识符访问，同名局部变量遵循正常的 JavaScript 作用域规则。
 
 ### 小程序中的浏览器式全局变量
 
