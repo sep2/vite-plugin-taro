@@ -21,7 +21,8 @@ export function createMiniPolyfillPlugin(contract: Pick<MiniContract, 'options'>
             return {
                 build: {
                     rolldownOptions: {
-                        input: { polyfills: miniPolyfillsId },
+                        // Bootstrap already imports the virtual module. Keep its manual chunk boundary: an extra entry root
+                        // allows Rolldown to fold its shared runtime (including development HMR) into polyfills.js.
                         transform: { inject: miniBrowserBindings }
                     }
                 }

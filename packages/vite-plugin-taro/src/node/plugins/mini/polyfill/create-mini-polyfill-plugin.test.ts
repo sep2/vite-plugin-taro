@@ -41,7 +41,7 @@ for (const polyfills of [
         const config = await resolvePolyfillConfig('wx', polyfills, 'build')
         const input = config.build.rolldownOptions.input
         assert.ok(input && typeof input === 'object' && !Array.isArray(input))
-        assert.equal(input.polyfills, miniPolyfillsId)
+        assert.equal(input.polyfills, undefined)
         assert.equal(input['vpt-global'], undefined)
         const inject = config.build.rolldownOptions.transform?.inject
         assert.deepEqual(inject, { ...miniBrowserBindings, globalThis: [vptGlobalBindingId, 'vptGlobal'] })

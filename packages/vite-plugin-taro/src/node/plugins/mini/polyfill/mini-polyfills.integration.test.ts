@@ -12,14 +12,16 @@ import type { VptOptions } from '../../../../options.ts'
 import { interpreterServerEvent } from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
+import { miniPolyfillsId, rolldownRuntimeId, vptGlobalBindingId } from '../module/module.ts'
 
-type MiniTarget = 'wx' | 'zfb'
+type MiniTarget = 'wx' | 'zfb' | 'tt'
 type Mode = 'production' | 'devtools' | 'interpreter' | 'rebuild'
 type NativeFile = Pick<OutputChunk, 'fileName' | 'code'>
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 const coreJsRoot = `${normalizePath(path.dirname(packageRequire.resolve('core-js/package.json')))}/`
 const optionalPolyfills = ['web.url', 'es.array.at']
+const miniTargets = ['wx', 'zfb', 'tt'] as const
 
 /** Captures public build/server output; only patch probes materialize an editable page for the real watcher. */
 async function compileFixture(
@@ -106,10 +108,23 @@ async function compileFixture(
                     hasPolyfills ? ['common/polyfills.js'] : [],
                     'core-js modules must stay in one dedicated polyfills file'
                 )
-                const polyfillEntry = chunks.find((chunk) => chunk.fileName === 'common/polyfills.js')
-                assert.ok(polyfillEntry?.isEntry)
+                const polyfillChunk = chunks.find((chunk) => chunk.fileName === 'common/polyfills.js')
+                assert.ok(polyfillChunk)
+                assert.equal(polyfillChunk.isEntry, false, 'bootstrap owns polyfill loading, not a second entry root')
+                for (const moduleId of polyfillChunk.moduleIds) {
+                    assert.ok(
+                        moduleId === miniPolyfillsId ||
+                            moduleId === vptGlobalBindingId ||
+                            normalizePath(moduleId).startsWith(coreJsRoot),
+                        `Unrelated module in common/polyfills.js: ${moduleId}`
+                    )
+                }
+                const runtimeChunk = chunks.find((chunk) => chunk.moduleIds.includes(rolldownRuntimeId))
+                assert.ok(runtimeChunk)
+                assert.equal(runtimeChunk.fileName, 'common/rolldown-runtime.js')
+                assert.deepEqual(runtimeChunk.moduleIds, [rolldownRuntimeId])
                 assert.ok(
-                    !polyfillEntry.imports.includes('common/vendor.js'),
+                    !polyfillChunk.imports.includes('common/vendor.js'),
                     'pre-bootstrap polyfills must not depend on the framework capsule'
                 )
                 // Compiler-owned JavaScript assets execute through native require just like rendered chunks.
@@ -209,7 +224,7 @@ async function compileFixture(
                 .filter((entry) => entry.isFile())
                 .map((entry) => normalizePath(path.relative(root, path.join(entry.parentPath, entry.name))))
                 .sort()
-            const extension = target === 'wx' ? 'wxss' : 'acss'
+            const extension = { wx: 'wxss', zfb: 'acss', tt: 'ttss' }[target]
             assert.deepEqual(
                 files,
                 [
@@ -269,6 +284,7 @@ function createAppHeap(chunks: readonly NativeFile[], nativeURLs: boolean, targe
             clearTimeout,
             wx: host,
             my: host,
+            tt: host,
             App() {
                 registrations.push('App')
             },
@@ -334,7 +350,7 @@ function createAppHeap(chunks: readonly NativeFile[], nativeURLs: boolean, targe
                 event: interpreterServerEvent,
                 data: { buildId: 'test', patches: [{ seq: 1, changedIds: ['probe'], code }] }
             })
-            onMessage(target === 'wx' ? { data } : { message: data })
+            onMessage(target === 'zfb' ? { message: data } : { data })
         },
         reports,
         registrations
@@ -386,7 +402,7 @@ function assertPolyfilledApp(heap: ReturnType<typeof createAppHeap>, structuredC
     assert.equal(heap.read('this["__core-js_shared__"].versions.length'), 1)
 }
 
-for (const target of ['wx', 'zfb'] as const) {
+for (const target of miniTargets) {
     test(`${target}: selected production APIs install before dependencies without replacing native URL constructors`, async () => {
         const chunks = await compileFixture(target, 'production', [...optionalPolyfills, 'es.array.at'])
         assertPolyfilledBootstrap(chunks, target, 'undefined')
@@ -477,7 +493,7 @@ for (const target of ['wx', 'zfb'] as const) {
     }
 }
 
-for (const target of ['wx', 'zfb'] as const) {
+for (const target of miniTargets) {
     for (const mode of ['production', 'devtools', 'interpreter', 'rebuild'] as const) {
         test(`${target} ${mode}: the empty selection keeps core-js out while development retains its microtask fallback`, async (t) => {
             const chunks = await compileFixture(target, mode, [])
@@ -592,7 +608,7 @@ for (const target of ['wx', 'zfb'] as const) {
     })
 }
 
-for (const target of ['wx', 'zfb'] as const) {
+for (const target of miniTargets) {
     test(`${target}: a real React Refresh patch uses the shared global after failed discovery`, async () => {
         await compileFixture(target, 'devtools', [], async (chunks, root) => {
             const patchesPath = path.join(root, 'dist/hmr/patches.js')

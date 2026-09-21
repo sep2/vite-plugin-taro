@@ -13,7 +13,7 @@ export const rolldownRuntimeId = '\0rolldown/runtime.js'
 /** Identifies the virtual binding shared by native files, SystemJS capsules and HMR factories. */
 export const vptGlobalBindingId = '\0vpt:global-binding'
 
-/** Generates the selected core-js imports as one independently executable output entry. */
+/** Generates the selected core-js imports loaded by bootstrap from the native polyfill chunk. */
 export const miniPolyfillsId = '\0vpt:mini-polyfills'
 
 /** External bootstrap dependency emitted only after the bundled graph is finalized. */

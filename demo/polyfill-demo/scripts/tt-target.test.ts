@@ -58,7 +58,7 @@ test('builds the TT polyfill demo with native configuration and every selected p
         }
 
         const polyfills = output.find((entry) => entry.fileName === 'common/polyfills.js')
-        assert.ok(polyfills?.type === 'chunk' && polyfills.isEntry)
+        assert.ok(polyfills?.type === 'chunk')
         const moduleIds = polyfills.moduleIds.map(normalizePath)
         for (const { module } of polyfillCases) {
             assert.ok(

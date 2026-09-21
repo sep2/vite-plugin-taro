@@ -64,7 +64,7 @@ test('classifies standalone and grouped infrastructure as amphibious', () => {
     for (const moduleId of [modules.bootstrap, vptGlobalBindingId, miniPolyfillsId, rolldownRuntimeId]) {
         assert.equal(classifyModule(chunk('/dependency', moduleId)), 'amphibious')
     }
-    // Bundled development groups these infrastructure modules together, separately from lifecycle capsules.
+    // Classification depends on module identities, not whether Rolldown keeps infrastructure in separate chunks.
     assert.equal(classifyModule(chunk(rolldownRuntimeId, vptGlobalBindingId, miniPolyfillsId)), 'amphibious')
     assert.equal(classifyModule(chunk(miniPolyfillsId, vptGlobalBindingId, rolldownRuntimeId)), 'amphibious')
 })
@@ -83,6 +83,7 @@ test('framework vendor remains a normal capsule regardless of its output name', 
 test('polyfill execution follows the virtual entry while package paths only control grouping', () => {
     assert.equal(isMiniPolyfillModule(miniPolyfillsId), true)
     assert.equal(isMiniPolyfillModule(vptGlobalBindingId), true)
+    assert.equal(isMiniPolyfillModule(rolldownRuntimeId), false)
     assert.equal(classifyModule({ ...chunk(miniPolyfillsId), name: 'renamed-polyfills' }), 'amphibious')
     for (const moduleId of [
         packageRequire.resolve('core-js/modules/web.url.js'),
