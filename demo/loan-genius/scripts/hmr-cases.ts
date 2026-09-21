@@ -63,18 +63,18 @@ async function runPolyfillFlow(context: HmrContext): Promise<void> {
     const original = await context.fixture.read(file)
     const selector = '#loan-polyfill-probe'
     const href = 'https://example.com/loan/child'
-    await waitForElementText(context, selector, `globalThis.URL:${href}`)
-    console.log('[loan-hmr] polyfill: globalThis.URL works at startup')
+    await waitForElementText(context, selector, `URL:${href}`)
+    console.log('[loan-hmr] polyfill: bare URL works at startup')
     try {
-        // Distinct labels prove the bare-identifier update actually rendered, rather than observing the previous generation.
-        const updated = replaceOnce(replaceOnce(original, 'globalThis.URL:', 'URL:'), 'new globalThis.URL(', 'new URL(')
+        // A changed constructor argument proves the updated bare call ran, rather than observing the previous generation.
+        const updated = replaceOnce(original, "new URL('child',", "new URL('updated-child',")
         await context.fixture.write(file, updated)
-        await waitForElementText(context, selector, `URL:${href}`)
+        await waitForElementText(context, selector, 'URL:https://example.com/loan/updated-child')
         await assertCalculatorState(context)
     } finally {
         await context.fixture.write(file, original)
     }
-    await waitForElementText(context, selector, `globalThis.URL:${href}`)
+    await waitForElementText(context, selector, `URL:${href}`)
     await assertCalculatorState(context)
     console.log('[loan-hmr] polyfill-global-bindings passed')
 }

@@ -153,7 +153,7 @@ async function instrumentSources(fixture: LoanHmrFixture): Promise<void> {
             ],
             [
                 '            <NavigationBar backgroundColor={backgroundColor} color={navigationBarColor}>',
-                '            <Text id="loan-direct-page-probe">direct-page-baseline</Text>\n            <Text id="loan-polyfill-probe">globalThis.URL:{new globalThis.URL(\'child\', \'https://example.com/loan/\').href}</Text>\n            <Text id="loan-hmr-marker">{hmrMarker}</Text>\n            <NavigationBar backgroundColor={backgroundColor} color={navigationBarColor}>'
+                '            <Text id="loan-direct-page-probe">direct-page-baseline</Text>\n            <Text id="loan-polyfill-probe">URL:{new URL(\'child\', \'https://example.com/loan/\').href}</Text>\n            <Text id="loan-hmr-marker">{hmrMarker}</Text>\n            <NavigationBar backgroundColor={backgroundColor} color={navigationBarColor}>'
             ],
             [
                 '                <Button\n                    className="flex p-2',

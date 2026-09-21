@@ -4,7 +4,7 @@ WX / ZFB / TikTok (抖音 / TT) runtime fixture for VPT's opt-in `polyfills` opt
 
 Checks cover URL, URLSearchParams, Array.at/findLast/toSorted/toReversed, Object.fromEntries, String.replaceAll, Promise.allSettled/any, structuredClone and queueMicrotask. `src/polyfill-cases.ts` supplies both the checks and the core-js module list consumed by `vite.config.ts`; there are no direct core-js imports in application code.
 
-The checks use bare `URL` and `URLSearchParams` without Vite `define` mappings. The selected polyfills install missing APIs on the shared global object before application code runs; see the [configuration guide](https://vpt.js.org/guides/configuration/#polyfills).
+All checks use bare API bindings, including `URL`, `URLSearchParams`, `structuredClone`, and `queueMicrotask`, without `globalThis` property access or Vite `define` mappings. The selected polyfills install missing APIs on the shared global object before application code runs; see the [configuration guide](https://vpt.js.org/guides/configuration/#polyfills).
 
 ## Run
 
@@ -39,4 +39,4 @@ pnpm typecheck:polyfill-demo
 pnpm test:polyfill-demo
 ```
 
-The Node tests validate the check logic against Node's native APIs and verify the TT build's configuration, native assets, and selected polyfill modules. They do not establish polyfill installation or HMR behavior in TikTok DevTools or on devices. The mini-program page validates actual runtime behavior; native implementations may satisfy checks on newer engines. This fixture does not delete or replace host globals to force fallback paths. VPT's isolated-realm integration tests cover missing-native scenarios separately. Configured core-js modules are emitted in `common/polyfills.js` before application code.
+The Node tests validate the check logic against Node's native APIs, verify that WX/ZFB/TT production builds preserve bare API calls, and check the TT build's configuration, native assets, and selected polyfill modules. They do not establish polyfill installation or HMR behavior in TikTok DevTools or on devices. The mini-program page validates actual runtime behavior; native implementations may satisfy checks on newer engines. This fixture does not delete or replace host globals to force fallback paths. VPT's isolated-realm integration tests cover missing-native scenarios separately. Configured core-js modules are emitted in `common/polyfills.js` before application code.
