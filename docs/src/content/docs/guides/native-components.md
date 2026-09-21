@@ -238,24 +238,27 @@ import { TtNativeCounter } from './tt-native-counter.tsx'
 import { WebCounter } from './web-counter.tsx'
 // #endif
 
-export default function Counter(props: { count: number }) {
+// Conditional compilation leaves exactly one target component in this tuple.
+export const [Counter] = [
     // #ifdef wx
-    return <WxNativeCounter count={props.count} />
+    WxNativeCounter,
     // #endif
 
     // #ifdef zfb
-    return <ZfbNativeCounter count={props.count} />
+    ZfbNativeCounter,
     // #endif
 
     // #ifdef tt
-    return <TtNativeCounter count={props.count} />
+    TtNativeCounter,
     // #endif
 
     // #ifdef h5
-    return <WebCounter count={props.count} />
+    WebCounter
     // #endif
-}
+]
 ```
+
+条件编译后，数组中只保留当前目标的实现。导出的 `Counter` 可直接用于 JSX，无需额外的 React 包装组件。
 
 条件语法详见[条件编译](/guides/conditional-directives/)。
 

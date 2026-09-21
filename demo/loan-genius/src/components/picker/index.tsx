@@ -42,9 +42,7 @@ function getRangeItem(
     return getRangeItems(range, mode, column)[index]
 }
 
-let TaroPickerSelector: ComponentType<PropsWithChildren<TaroPickerSelectorProps>>
-
-/*  #ifdef  h5  */
+// #ifdef h5
 const TaroPickerSelectorH5: ComponentType<PropsWithChildren<TaroPickerSelectorProps>> = (props) => {
     const {
         range = [],
@@ -109,11 +107,10 @@ const TaroPickerSelectorH5: ComponentType<PropsWithChildren<TaroPickerSelectorPr
     )
 }
 
-TaroPickerSelector = TaroPickerSelectorH5
-/*  #endif  */
+// #endif
 
-/*  #ifndef  h5  */
-const TaroPickerSelectorWx: ComponentType<PropsWithChildren<TaroPickerSelectorProps>> = (props) => {
+// #ifndef h5
+const TaroPickerSelectorMini: ComponentType<PropsWithChildren<TaroPickerSelectorProps>> = (props) => {
     const {
         range = [],
         value = [],
@@ -246,7 +243,17 @@ const TaroPickerSelectorWx: ComponentType<PropsWithChildren<TaroPickerSelectorPr
     )
 }
 
-TaroPickerSelector = TaroPickerSelectorWx
-/*  #endif  */
+// #endif
+
+// Conditional compilation leaves exactly one target component in this tuple.
+const [TaroPickerSelector] = [
+    // #ifdef h5
+    TaroPickerSelectorH5,
+    // #endif
+
+    // #ifndef h5
+    TaroPickerSelectorMini
+    // #endif
+]
 
 export default TaroPickerSelector

@@ -12,12 +12,13 @@ export interface CounterProps {
     onIncrement: () => void
 }
 
-export function Counter(props: CounterProps) {
+// Conditional compilation leaves exactly one target component in this tuple.
+export const [Counter] = [
     // #ifdef wx
-    return <NativeCounter {...props} />
+    NativeCounter,
     // #endif
 
     // #ifndef wx
-    return <SharedCounter {...props} />
+    SharedCounter
     // #endif
-}
+]
