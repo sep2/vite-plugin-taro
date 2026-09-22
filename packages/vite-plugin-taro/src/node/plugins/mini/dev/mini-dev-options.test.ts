@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import test, { type TestContext } from 'node:test'
 import { runInNewContext } from 'node:vm'
-import type { OutputOptions, PreRenderedChunk, RenderedChunk } from 'rolldown'
+import { build, type OutputOptions, type PreRenderedChunk, type RenderedChunk } from 'rolldown'
 import { DevRuntime } from 'rolldown/experimental/runtime'
 import { type BuildOptions, createLogger, createServer } from 'vite'
 import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
@@ -119,7 +119,8 @@ test('adapts physical wx development output without changing configured filename
     const configuredOutput: OutputOptions = {
         assetFileNames: 'static/[name]-[hash:8][extname]',
         chunkFileNames: configuredChunkFileNames,
-        entryFileNames: '[name]-[hash]'
+        entryFileNames: '[name]-[hash]',
+        keepNames: false
     }
     const server = await createOptionsServer(context, { rolldownOptions: { output: configuredOutput } })
 
@@ -163,11 +164,13 @@ test('adapts physical wx development output without changing configured filename
     assert.equal(output.entryFileNames, configuredOutput.entryFileNames)
     assert.equal(output.format, 'es')
     assert.equal(output.minify, true)
+    assert.equal(output.keepNames, true)
     assert.equal(output.sourcemap, false)
     assert.deepEqual(configuredOutput, {
         assetFileNames: 'static/[name]-[hash:8][extname]',
         chunkFileNames: configuredChunkFileNames,
-        entryFileNames: '[name]-[hash]'
+        entryFileNames: '[name]-[hash]',
+        keepNames: false
     })
     assert.equal(viteTransformOptions.sourcemap, false)
 
@@ -191,6 +194,79 @@ test('adapts physical wx development output without changing configured filename
         "__rolldown_runtime__.applyPatches(require('../../hmr/patches.js'));\n"
     )
     assert.equal(await banner(createRenderedChunk('assets/vendor.js', 'assets/vendor.js')), '')
+})
+
+test('minified development keeps HOC component names compatible with React Refresh', async (context) => {
+    const server = await createOptionsServer(context, {})
+    const bundledDev: BundledDev = {
+        async getRolldownOptions() {
+            return { output: {} }
+        },
+        async listen() {},
+        async triggerBundleRegenerationIfStale() {
+            return true
+        }
+    }
+    installMiniDevOptions({ bundledDev, server, contract: options, hmrMode })
+    const output = requireSingleOutput(await bundledDev.getRolldownOptions())
+    assert.equal(output.minify, true)
+    const refreshRuntimePath = path.join(
+        path.dirname(packageRequire.resolve('@vitejs/plugin-react')),
+        'refresh-runtime.js'
+    )
+    const entry = '\0test:refresh-hoc'
+    const result = await build({
+        input: entry,
+        plugins: [
+            {
+                name: 'test:refresh-hoc',
+                resolveId(id) {
+                    if (id === entry) {
+                        return entry
+                    }
+                },
+                load(id) {
+                    if (id === entry) {
+                        return `
+import { registerExportsForReactRefresh, validateRefreshBoundaryAndEnqueueUpdate } from ${JSON.stringify(refreshRuntimePath)}
+class LayoutHoc {
+    HOC(Page) {
+        function TopViewPage(props) { return Page(props) }
+        return TopViewPage
+    }
+}
+const layoutHoc = new LayoutHoc()
+const previous = { default: layoutHoc.HOC(() => 'before') }
+const next = { default: layoutHoc.HOC(() => 'after') }
+registerExportsForReactRefresh('page', previous)
+registerExportsForReactRefresh('page', next)
+export const invalidationReason = validateRefreshBoundaryAndEnqueueUpdate('page', previous, next)
+export const className = layoutHoc.constructor.name
+export const previousName = previous.default.name
+export const nextName = next.default.name
+export const previousValue = previous.default({})
+export const nextValue = next.default({})
+`
+                    }
+                }
+            }
+        ],
+        output: { ...output, format: 'cjs', exports: 'named' },
+        write: false
+    })
+    const chunk = result.output[0]
+    assert.ok(chunk?.type === 'chunk')
+    // Bundle execution populates this isolated namespace; a mocked timer observes accepted Refresh without scheduling work.
+    const exports: Record<string, unknown> = {}
+    const scheduleRefresh = context.mock.fn()
+    runInNewContext(chunk.code, { exports, window: {}, setTimeout: scheduleRefresh, clearTimeout() {} })
+    assert.equal(exports.invalidationReason, undefined)
+    assert.equal(scheduleRefresh.mock.callCount(), 1)
+    assert.equal(exports.className, 'LayoutHoc')
+    assert.equal(exports.previousName, 'TopViewPage')
+    assert.equal(exports.nextName, 'TopViewPage')
+    assert.equal(exports.previousValue, 'before')
+    assert.equal(exports.nextValue, 'after')
 })
 
 for (const [target, createContract] of [
@@ -228,7 +304,10 @@ for (const [target, createContract] of [
             })
             const adapted = await bundledDev.getRolldownOptions()
             const devMode = adapted.experimental?.devMode
+            const output = requireSingleOutput(adapted)
 
+            assert.equal(output.minify, true)
+            assert.equal(output.keepNames, true)
             assert.ok(devMode && typeof devMode === 'object')
             assertRuntimeWrapper(devMode.implement)
         })

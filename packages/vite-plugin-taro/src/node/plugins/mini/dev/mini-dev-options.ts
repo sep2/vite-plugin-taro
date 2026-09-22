@@ -76,6 +76,8 @@ export function installMiniDevOptions({
             // Bundled development emits complete physical output repeatedly. Minifying bounds disk transfer and native-tool
             // compile work; source-level HMR diagnostics still come from Vite/Rolldown before this final output pass.
             minify: true,
+            // Fast Refresh recognizes HOC-returned components by their function names; minification must not erase that boundary.
+            keepNames: true,
             // Native tools execute physical project files and HMR applies module factories rather than browser source maps. Disabling
             // maps avoids extra output files and prevents Vite's Oxc sourcemap transform from touching generated host code.
             sourcemap: false
