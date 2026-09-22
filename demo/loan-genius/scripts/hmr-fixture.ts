@@ -142,14 +142,22 @@ async function instrumentSources(fixture: LoanHmrFixture): Promise<void> {
     ]
     await Promise.all(markerFiles.map((file) => fixture.publishMarker(file, 'baseline')))
     await Promise.all([
+        replaceFixtureSource(fixture, 'src/components/layout-hoc.tsx', [
+            ["import { View } from 'virtual:taro/components'", "import { Text, View } from 'virtual:taro/components'"],
+            ["import type { ComponentType } from 'react'", "import { type ComponentType, useState } from 'react'"],
+            [
+                '        return function TopViewPage() {',
+                '        return function TopViewPage() {\n            // A mount-only token detects wrapper remounts independently of Page state.\n            const [mountToken] = useState(() => String(Math.random()))'
+            ],
+            [
+                '                    <Page />',
+                '                    <Text id="loan-layout-probe">layout-baseline</Text>\n                    <Text id="loan-layout-mount">mount:{mountToken}</Text>\n                    <Page />'
+            ]
+        ]),
         replaceFixtureSource(fixture, 'src/pages/calculator/index.tsx', [
             [
                 "import { equalInterestCalc } from './helper'",
                 "import { hmrMarker } from './hmr-marker'\nimport { equalInterestCalc } from './helper'"
-            ],
-            [
-                '<View className="relative flex flex-col flex-1 bg-white h-screen w-full overflow-hidden">',
-                '<View id="loan-calculator-page" className="relative flex flex-col flex-1 bg-white h-screen w-full overflow-hidden">'
             ],
             [
                 '            <NavigationBar backgroundColor={backgroundColor} color={navigationBarColor}>',
@@ -188,6 +196,10 @@ async function instrumentSources(fixture: LoanHmrFixture): Promise<void> {
         ]),
         replaceFixtureSource(fixture, 'src/pages/calculator/compute-header/index.tsx', [
             ['<View>\n            <LinearGradient', '<View id="loan-result-header">\n            <LinearGradient'],
+            [
+                '<Text className="text-sm font-normal text-white">查看历史</Text>',
+                '<Text id="loan-history-label" className="text-sm font-normal text-white">查看历史</Text>'
+            ],
             [
                 '<View className="flex flex-row items-center" onClick={goHistory}>',
                 '<View id="loan-open-history" className="flex flex-row items-center" onClick={goHistory}>'

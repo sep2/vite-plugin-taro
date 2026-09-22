@@ -23,6 +23,14 @@ type PreparedEdit = Readonly<{
     original: string
 }>
 
+type HocEdit = Readonly<{
+    after: string
+    before: string
+    file: string
+    name: string
+    selector: string
+}>
+
 const calculatorMarker = 'src/pages/calculator/hmr-marker.ts'
 const monthlyMarker = 'src/pages/calculator/monthly-payments/hmr-marker.ts'
 const historyMarker = 'src/pages/calculator/history/hmr-marker.ts'
@@ -49,7 +57,7 @@ export async function runLoanHmrCases(context: HmrContext): Promise<void> {
     await waitForElement(context, '#loan-result-header')
 
     await runPolyfillFlow(context)
-    await runIsolatedPageFlow(context)
+    await runHocFlows(context)
     await runCalculatorFlows(context)
     await runOverlayFlows(context)
     await runNavigationFlows(context)
@@ -79,19 +87,63 @@ async function runPolyfillFlow(context: HmrContext): Promise<void> {
     console.log('[loan-hmr] polyfill-global-bindings passed')
 }
 
-async function runIsolatedPageFlow(context: HmrContext): Promise<void> {
-    const file = 'src/pages/calculator/index.tsx'
-    const original = await context.fixture.read(file)
-    try {
-        await context.fixture.write(file, replaceOnce(original, 'direct-page-baseline', 'direct-page-updated'))
-        await waitForElementText(context, '#loan-direct-page-probe', 'direct-page-updated')
-        await assertCalculatorState(context)
-    } finally {
-        await context.fixture.write(file, original)
+async function runHocFlows(context: HmrContext): Promise<void> {
+    const edits: readonly HocEdit[] = [
+        {
+            name: 'hoc-wrapped-page',
+            file: 'src/pages/calculator/index.tsx',
+            selector: '#loan-direct-page-probe',
+            before: 'direct-page-baseline',
+            after: 'direct-page-updated'
+        },
+        layoutHocEdit('hoc-shared-layout'),
+        {
+            name: 'hoc-memo-child',
+            file: 'src/pages/calculator/compute-header/index.tsx',
+            selector: '#loan-history-label',
+            before: '查看历史',
+            after: '查看历史·HOC'
+        }
+    ]
+    for (const edit of edits) {
+        await runHocEdit(context, edit, () => assertCalculatorState(context))
     }
-    await waitForElementText(context, '#loan-direct-page-probe', 'direct-page-baseline')
-    await assertCalculatorState(context)
-    console.log('[loan-hmr] 00-isolated-page-self-update passed')
+}
+
+function layoutHocEdit(name: string): HocEdit {
+    return {
+        name: name,
+        file: 'src/components/layout-hoc.tsx',
+        selector: '#loan-layout-probe',
+        before: 'layout-baseline',
+        after: 'layout-updated'
+    }
+}
+
+async function runHocEdit(context: HmrContext, edit: HocEdit, assertState: () => Promise<void>): Promise<void> {
+    const original = await context.fixture.read(edit.file)
+    const mountToken = await context.devTools.readElement('#loan-layout-mount', 'text')
+    const buildInfo = await context.fixture.read('dist/wx/hmr/info.js')
+    assert.match(mountToken, /^mount:\d/)
+    const assertRetained = async (): Promise<void> => {
+        await assertState()
+        assert.equal(await context.devTools.readElement('#loan-layout-mount', 'text'), mountToken)
+        assert.equal(await context.fixture.read('dist/wx/hmr/info.js'), buildInfo, 'HOC edits must not rebuild the app')
+        await assertWxSafeClasses(context, edit.name)
+    }
+
+    await waitForElementText(context, edit.selector, edit.before)
+    try {
+        await context.fixture.write(edit.file, replaceOnce(original, edit.before, edit.after))
+        // No companion marker update: the edited HOC boundary must refresh by itself, not via another Page invalidation.
+        await waitForElementText(context, edit.selector, edit.after)
+        await assertRetained()
+    } finally {
+        await context.fixture.write(edit.file, original)
+    }
+    await waitForElementText(context, edit.selector, edit.before)
+    await assertRetained()
+    console.log(`[loan-hmr] ${edit.name} passed`)
 }
 
 async function runCalculatorFlows(context: HmrContext): Promise<void> {
@@ -155,8 +207,8 @@ async function runCalculatorFlows(context: HmrContext): Promise<void> {
         textFlow(
             '12-page-layout',
             'src/pages/calculator/index.tsx',
-            'id="loan-calculator-page" className="relative',
-            'id="loan-calculator-page" className="flow-12 relative'
+            "className: 'relative flex flex-col",
+            "className: 'flow-12 relative flex flex-col"
         ),
         {
             name: '13-multi-file-parent-child',
@@ -294,11 +346,20 @@ async function runOverlayFlows(context: HmrContext): Promise<void> {
 }
 
 async function runNavigationFlows(context: HmrContext): Promise<void> {
+    const calculatorMountToken = await context.devTools.readElement('#loan-layout-mount', 'text')
     await context.devTools.tapElement('#loan-open-monthly')
     await waitForRoute(context, monthlyRoute)
     await waitForMarker(context, monthlyMarker, 'baseline')
     await context.devTools.tapElement('#loan-payment-equalPrincipal')
     assert.match(await context.devTools.readElement('#loan-payment-equalPrincipal', 'outerWxml'), checkedPaymentIcon)
+
+    await runHocEdit(context, layoutHocEdit('hoc-shared-layout-with-hidden-page'), async () => {
+        await assertRoute(context, monthlyRoute)
+        assert.match(
+            await context.devTools.readElement('#loan-payment-equalPrincipal', 'outerWxml'),
+            checkedPaymentIcon
+        )
+    })
 
     await runFlow(
         context,
@@ -348,6 +409,8 @@ async function runNavigationFlows(context: HmrContext): Promise<void> {
     await context.devTools.navigate('navigateBack', undefined)
     await waitForRoute(context, calculatorRoute)
     await assertCalculatorState(context)
+    assert.equal(await context.devTools.readElement('#loan-layout-mount', 'text'), calculatorMountToken)
+    await waitForElementText(context, '#loan-layout-probe', 'layout-baseline')
 
     await context.devTools.tapElement('#loan-open-history')
     await waitForRoute(context, historyRoute)
@@ -406,12 +469,14 @@ async function runRecoveryFlow(context: HmrContext): Promise<void> {
 }
 
 async function runNormalRemountFlow(context: HmrContext): Promise<void> {
+    const mountToken = await context.devTools.readElement('#loan-layout-mount', 'text')
     await context.devTools.navigate('redirectTo', `/${historyRoute}`)
     await waitForRoute(context, historyRoute)
     await context.devTools.navigate('redirectTo', `/${calculatorRoute}`)
     await waitForRoute(context, calculatorRoute)
     await waitForElement(context, primaryInput)
     assert.equal(await context.devTools.readElement(primaryInput, 'value'), '0')
+    assert.notEqual(await context.devTools.readElement('#loan-layout-mount', 'text'), mountToken)
     console.log('[loan-hmr] normal-unmount-remount passed')
 }
 

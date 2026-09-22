@@ -6,11 +6,12 @@
  */
 
 import { ScrollView } from 'virtual:taro/components'
-import { NavigationBar, SafeAreaView } from '@components'
+import { NavigationBar } from '@components'
+import layoutHoc from '@components/layout-hoc'
 import { getStorageData } from '@utils'
 import { useEffect, useState } from 'react'
 
-export default function LoanGeniusHistory() {
+function LoanGeniusHistory() {
     const [historyList, setHistoryList] = useState<any[]>([])
 
     useEffect(() => {
@@ -31,7 +32,7 @@ export default function LoanGeniusHistory() {
     }, [])
 
     return (
-        <SafeAreaView className="flex size-full flex-1 flex-col bg-white">
+        <>
             <NavigationBar>
                 <span>计算历史</span>
             </NavigationBar>
@@ -71,6 +72,11 @@ export default function LoanGeniusHistory() {
                     )
                 })}
             </ScrollView>
-        </SafeAreaView>
+        </>
     )
 }
+
+export default layoutHoc.HOC(LoanGeniusHistory, {
+    className: 'flex size-full flex-1 flex-col bg-white',
+    safeArea: true
+})

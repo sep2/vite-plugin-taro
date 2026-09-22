@@ -7,13 +7,14 @@
 
 import Taro from 'virtual:taro/api'
 import { Image, ScrollView, Text, View } from 'virtual:taro/components'
-import { NavigationBar, SafeAreaView } from '@components'
+import { NavigationBar } from '@components'
+import layoutHoc from '@components/layout-hoc'
 import { getGlobalData, getStorageData } from '@utils'
 import clsx from 'clsx'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CHECK_RIDIO, CHECK_RIDIO_Y, MONTY_DATA, MONTY_TITLE } from '../constants'
 
-export default function LoanGeniusMonthlyPayments() {
+function LoanGeniusMonthlyPayments() {
     const pageRef = useRef(1)
     const totalRef = useRef(0)
     const [state, setState] = useState<any>({
@@ -91,7 +92,7 @@ export default function LoanGeniusMonthlyPayments() {
     const { checked, interestList, principalList, loanAmount, tip } = state
 
     return (
-        <SafeAreaView className="box-border flex h-screen w-full flex-1 flex-col overflow-hidden bg-white">
+        <>
             <NavigationBar>
                 <Text>对比月供</Text>
             </NavigationBar>
@@ -200,6 +201,11 @@ export default function LoanGeniusMonthlyPayments() {
                     </View>
                 </View>
             </ScrollView>
-        </SafeAreaView>
+        </>
     )
 }
+
+export default layoutHoc.HOC(LoanGeniusMonthlyPayments, {
+    className: 'box-border flex h-screen w-full flex-1 flex-col overflow-hidden bg-white',
+    safeArea: true
+})

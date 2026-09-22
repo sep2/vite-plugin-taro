@@ -8,6 +8,7 @@
 import Taro from 'virtual:taro/api'
 import { Button, Input, ScrollView, Text, View } from 'virtual:taro/components'
 import { BoxShadow, NavigationBar } from '@components'
+import layoutHoc from '@components/layout-hoc'
 import { formatFloat, getStorageData, isAndroid, setGlobalData } from '@utils'
 import { useCallback, useRef, useState } from 'react'
 import LoanGeniusHeader from './compute-header'
@@ -79,7 +80,7 @@ function createInitialState() {
     }
 }
 
-export default function LoanGenius() {
+function LoanGenius() {
     const [state, setReactState] = useState<any>(createInitialState)
     const stateRef = useRef(state)
     const loadingRef = useRef(false)
@@ -629,7 +630,7 @@ export default function LoanGenius() {
     const navigationBarColor = backgroundColor === '#fff' ? '#0B0F12' : '#fff'
 
     return (
-        <View className="relative flex flex-col flex-1 bg-white h-screen w-full overflow-hidden">
+        <>
             <NavigationBar backgroundColor={backgroundColor} color={navigationBarColor}>
                 <Text>房贷计算器</Text>
             </NavigationBar>
@@ -743,6 +744,11 @@ export default function LoanGenius() {
                     <Text className="font-pingfang-regular text-lg font-normal text-white">开始计算</Text>
                 </Button>
             </BoxShadow>
-        </View>
+        </>
     )
 }
+
+export default layoutHoc.HOC(LoanGenius, {
+    className: 'relative flex flex-col flex-1 bg-white h-screen w-full overflow-hidden',
+    safeArea: false
+})
