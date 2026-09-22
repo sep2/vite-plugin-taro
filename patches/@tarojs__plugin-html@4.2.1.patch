@@ -1,3 +1,4 @@
+diff --git a/dist/runtime.js b/dist/runtime.js
 --- a/dist/runtime.js
 +++ b/dist/runtime.js
 @@ -18,8 +18,10 @@
