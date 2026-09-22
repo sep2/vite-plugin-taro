@@ -123,18 +123,23 @@ test('emits compact deterministic routes with final physical paths and resolved 
     assert.throws(() => load(lazy.fileName), { message: `Unknown module: ${lazy.fileName}` })
 })
 
-test('bridges amphibious namespaces lazily to avoid requiring bootstrap during initialization', () => {
-    const bootstrap = createChunk('common/bootstrap.js', 'amphibious')
-    const runtime = createChunk('common/rolldown-runtime.js', 'amphibious')
-    const output = emit({ [bootstrap.fileName]: bootstrap, [runtime.fileName]: runtime })
-    // Traces distinguish selecting a registration from executing its namespace bridge.
+test('shares a lazy amphibious helper without loading namespaces during initialization', () => {
+    const chunks = ['bootstrap', 'polyfills', 'rolldown-runtime'].map((name) =>
+        createChunk(`common/${name}.js`, 'amphibious')
+    )
+    const output = emit(Object.fromEntries(chunks.map((chunk) => [chunk.fileName, chunk])))
+    assert.equal([...output.source.matchAll(/execute:function/g)].length, 1)
+    const namespaces = new Map(
+        chunks.map((chunk) => [`../${chunk.fileName.slice('common/'.length)}`, { fileName: chunk.fileName }])
+    )
+    // Traces distinguish selecting a registration from executing its namespace loader.
     const required: string[] = []
-    const namespace = { value: 42 }
     const load = evaluate(output.source, (id) => {
         required.push(id)
-        return namespace
+        assert.ok(namespaces.has(id))
+        return namespaces.get(id)
     })
-    for (const chunk of [bootstrap, runtime]) {
+    const declarations = chunks.map((chunk) => {
         const registration = load(chunk.fileName)
         assert.ok(Array.isArray(registration))
         assert.deepEqual(registration[0], [])
@@ -143,9 +148,15 @@ test('bridges amphibious namespaces lazily to avoid requiring bootstrap during i
         const declaration = registration[1]((value: unknown) => published.push(value))
         assert.deepEqual(required, [])
         assert.deepEqual(published, [])
+        return { chunk, declaration, published }
+    })
+    // Executing in reverse proves each registration retains its own loader and export callback.
+    for (const { chunk, declaration, published } of declarations.toReversed()) {
         declaration.execute()
-        assert.deepEqual(required.splice(0), [`../${chunk.fileName.slice('common/'.length)}`])
-        assert.equal(published[0], namespace)
+        const requirePath = `../${chunk.fileName.slice('common/'.length)}`
+        assert.deepEqual(required.splice(0), [requirePath])
+        assert.equal(published.length, 1)
+        assert.equal(published[0], namespaces.get(requirePath))
     }
 })
 

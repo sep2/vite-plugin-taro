@@ -705,12 +705,21 @@ test('regenerates native transport routes when a complete rebuild adds or remove
 
     await writeFile(path.join(path.dirname(fixture.pagePath), 'lazy-feature.ts'), 'console.log("lazy feature loaded")')
     await publishSourceGeneration(fixture.pagePath, `${renderPage('added lazy route')}\nvoid import('./lazy-feature')`)
-    const added = await waitForFile(transportPath, (code) => code.includes('lazy-feature.js'), maximumWaitAttempts)
+    // Disk reads can observe a partial asset write; inspect routes only after the transport's closing delimiter.
+    const added = await waitForFile(
+        transportPath,
+        (code) => code.endsWith('};') && code.includes('lazy-feature.js'),
+        maximumWaitAttempts
+    )
     assert.match(added, /require\.async\("\.\.\/\.\.\/sub\/p_[a-f0-9]{8}\/common\/lazy-feature\.js"\)/)
     assert.doesNotMatch(added, /registerModule|case ["']common\/vpt\/transport\.js/)
 
     await publishSourceGeneration(fixture.pagePath, renderPage('removed lazy route'))
-    const removed = await waitForFile(transportPath, (code) => !code.includes('lazy-feature.js'), maximumWaitAttempts)
+    const removed = await waitForFile(
+        transportPath,
+        (code) => code.endsWith('};') && !code.includes('lazy-feature.js'),
+        maximumWaitAttempts
+    )
     assert.doesNotMatch(removed, /require\.async/)
 })
 

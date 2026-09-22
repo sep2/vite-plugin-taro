@@ -31,14 +31,16 @@ export function createTransportOutput({
     getPackageLocation(chunk: Rolldown.OutputChunk): PackageLocation
 }) {
     // Fixed syntax and JSON-encoded paths produce CommonJS shaped like:
+    // function amphibious(load) {
+    //     return [[], function(exportBinding) {
+    //         return { execute() { exportBinding(load()) } }
+    //     }]
+    // }
     // exports.transport = function(moduleId) {
     //     switch (moduleId) {
     //         case 'app-capsule.js': return require('../../app-capsule.js')
     //         case 'common/page.js': return require.async('../../sub/p_account/common/page.js')
-    //         case 'common/bootstrap.js':
-    //             return [[], function(exportBinding) {
-    //                 return { execute() { exportBinding(require('../bootstrap.js')) } }
-    //             }]
+    //         case 'common/bootstrap.js': return amphibious(function() { return require('../bootstrap.js') })
     //         default: throw new Error('Unknown module: ' + moduleId)
     //     }
     // }
@@ -71,7 +73,7 @@ export function createTransportOutput({
         const load = `${asynchronous ? 'require.async' : 'require'}(${requirePath})`
         // Amphibious namespaces must be required lazily during registration execution, never while bootstrap imports transport.
         // Capsules already export registrations; bridging only native namespaces avoids eager bootstrap recursion.
-        const registration = kind === 'amphibious' ? `[[],function(e){return{execute:function(){e(${load})}}}]` : load
+        const registration = kind === 'amphibious' ? `amphibious(function(){return ${load}})` : load
         cases.push(`case ${JSON.stringify(logicalId)}:return ${registration};`)
     }
 
@@ -84,6 +86,6 @@ export function createTransportOutput({
     return {
         type: 'asset',
         fileName: miniTransportFileName,
-        source: `"use strict";exports.transport=function(m){switch(m){${cases.join('')}default:throw new Error('Unknown module: '+m)}};`
+        source: `"use strict";function amphibious(r){return[[],function(e){return{execute:function(){e(r())}}}]}exports.transport=function(m){switch(m){${cases.join('')}default:throw new Error('Unknown module: '+m)}};`
     } satisfies Rolldown.EmittedAsset
 }
