@@ -12,7 +12,7 @@ This project was migrated from [wuba/Taro-Mortgage-Calculator](https://github.co
 
 ## Quick start
 
-Requires Node.js 26+, pnpm 11, and the Mini Program DevTools for your target platform.
+Requires Node.js 26+, pnpm 12, and the Mini Program DevTools for your target platform.
 
 First, initialize the repository:
 

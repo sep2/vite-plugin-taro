@@ -1,7 +1,7 @@
 ---
 name: cut-new-release
 description: Prepare and commit a VPT release using Changesets. Use when asked to cut a new release, prepare a patch release, or bump the release version. Audit net changes from the published baseline and write Chinese release notes with verified migration instructions. Stop after the local release commit; never push unless the user explicitly requests it.
-compatibility: Requires Node.js 26+, pnpm 11, and Git. GitHub CLI is needed only for explicitly requested remote release verification or editing published release notes.
+compatibility: Requires Node.js 26+, pnpm 12, and Git. GitHub CLI is needed only for explicitly requested remote release verification or editing published release notes.
 ---
 
 # Cut New Release

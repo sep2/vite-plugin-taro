@@ -7,7 +7,7 @@ description: VPT monorepo 的安装、构建、验证与发布流程。
 
 ## 环境准备
 
-仓库要求 Node.js 26+ 和 pnpm 11：
+仓库要求 Node.js 26+ 和 pnpm 12：
 
 ```sh
 git clone https://github.com/sep2/vite-plugin-taro.git

@@ -28,7 +28,7 @@
 
 ## Workspace
 
-pnpm v11 monorepo integrating Vite 8, React 19, and Taro for WeChat (`wx`), Alipay (`zfb`), TikTok (`tt`), and H5 (`h5`). Node.js v26+ runs TypeScript natively.
+pnpm v12 monorepo integrating Vite 8, React 19, and Taro for WeChat (`wx`), Alipay (`zfb`), TikTok (`tt`), and H5 (`h5`). Node.js v26+ runs TypeScript natively.
 
 Under `packages/`:
 

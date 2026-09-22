@@ -175,7 +175,17 @@ async function createRegistry(t: TestContext, versions: Readonly<Record<string, 
             JSON.stringify({
                 name,
                 'dist-tags': { latest: '0.7.0' },
-                versions: Object.fromEntries(versions[name].map((version) => [version, { name, version }]))
+                // pnpm 12 requires dist.tarball to recognize a published version; planning never downloads it.
+                versions: Object.fromEntries(
+                    versions[name].map((version) => [
+                        version,
+                        {
+                            name,
+                            version,
+                            dist: { tarball: `http://${request.headers.host}/${name}/-/${name}-${version}.tgz` }
+                        }
+                    ])
+                )
             })
         )
     })
@@ -193,7 +203,7 @@ async function createRegistry(t: TestContext, versions: Readonly<Record<string, 
 
 async function publishPlan(root: string, registry: string): Promise<PublishPlan> {
     const output = path.join(root, 'publish-plan.json')
-    // pnpm 11 reads registry settings from workspace YAML, not npm_config_* environment variables.
+    // pnpm reads registry settings from workspace YAML, not npm_config_* environment variables.
     appendFileSync(path.join(root, 'pnpm-workspace.yaml'), `registry: ${registry}\nfetchRetries: 0\n`)
     await execFileAsync(process.execPath, [cliPath, 'publish-plan', '--output', output], { cwd: root })
     return JSON.parse(readFileSync(output, 'utf8'))
