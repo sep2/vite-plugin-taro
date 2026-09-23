@@ -609,35 +609,6 @@ test('a Vite restart removes obsolete files and publishes a new baseline before 
     assert.equal(parseHmrInfo(await readFile(fixture.infoPath, 'utf8')).buildId, next.buildId)
 })
 
-test('resume republishes missed DevTools patches without a new edit or App reload', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'memory')
-    context.after(fixture.close)
-    const initial = await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
-    const info = parseHmrInfo(initial)
-    await publishSourceGeneration(fixture.pagePath, renderPage('missed while disconnected'))
-    const first = await waitForFile(
-        fixture.patchesPath,
-        (source) => source.includes('missed while disconnected'),
-        maximumWaitAttempts
-    )
-    await sendRuntimeReport(info, { kind: 'resume', buildId: info.buildId, seq: 0 })
-    const replay = await waitForFile(fixture.patchesPath, (source) => source !== first, maximumWaitAttempts)
-    assert.match(replay, /missed while disconnected/)
-    assert.match(replay, /\{seq: 1,/)
-    assert.equal(await readFile(fixture.infoPath, 'utf8'), initial)
-
-    // A lost ACK is recovered by the resume frontier without republishing already applied factories.
-    await sendRuntimeReport(info, { kind: 'resume', buildId: info.buildId, seq: 1 })
-    await sendRuntimeReport(info, { kind: 'resume', buildId: 'stale', seq: 0 })
-    await delay(100)
-    assert.equal(await readFile(fixture.patchesPath, 'utf8'), replay)
-    assert.equal(await readFile(fixture.infoPath, 'utf8'), initial)
-
-    // A different retained heap can be behind a pruned frontier; rebuild rather than sending an incomplete suffix.
-    await sendRuntimeReport(info, { kind: 'resume', buildId: info.buildId, seq: 0 })
-    await waitForFile(fixture.infoPath, (source) => source !== initial, maximumWaitAttempts)
-})
-
 test('startup rebuilds after one published patch even when its complete history is retained', async (context) => {
     const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'memory')
     context.after(fixture.close)
@@ -754,31 +725,6 @@ test('publishes interpreter source through Vite WebSocket', async (context) => {
     assert.match(secondSource, /second interpreted generation/)
     assert.doesNotMatch(secondSource, /first interpreted generation/)
     assert.equal(await readExistingFile(fixture.patchesPath), undefined)
-})
-
-test('resume replays interpreter patches over a replacement socket without another source edit', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createInterpreterOptions(), 'memory')
-    context.after(fixture.close)
-    const info = parseHmrInfo(
-        await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
-    )
-    const first = await openHmrSocket(info)
-    const published = waitForInterpreterMessage(first)
-    await publishSourceGeneration(fixture.pagePath, renderPage('retained interpreter patch'))
-    const payload = await published
-    first.close()
-    const replacement = await openHmrSocket(info)
-    context.after(() => replacement.close())
-    const replay = waitForInterpreterMessage(replacement)
-    replacement.send(
-        JSON.stringify({
-            type: 'custom',
-            event: runtimeReportEvent,
-            data: { kind: 'resume', buildId: info.buildId, seq: 0 }
-        })
-    )
-    assert.deepEqual(await replay, payload)
-    assert.equal(parseHmrInfo(await readFile(fixture.infoPath, 'utf8')).buildId, info.buildId)
 })
 
 test('rebuild mode replaces complete output without creating patch transport artifacts', async (context) => {

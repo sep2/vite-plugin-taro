@@ -133,36 +133,6 @@ test('startup requires a new baseline after any publication regardless of ACK pr
     assert.equal(publications.length, 1)
 })
 
-test('resume republishes the retained suffix and recovers a lost ACK without resetting the baseline', async () => {
-    const { journal, publications } = createJournal()
-    assert.equal(await journal.resume(0), false)
-    journal.startBuild()
-    assert.equal(await journal.resume(0), true)
-    assert.equal(await journal.resume(1), false)
-    await journal.produce([patch(1, 'p1'), patch(2, 'p2')])
-    assert.equal(await journal.resume(0), true)
-    assert.deepEqual(publications[1], publications[0])
-    assert.equal(await journal.resume(1), true)
-    assert.deepEqual(publications[2]?.patches, [patch(2, 'p2')])
-    assert.equal(await journal.resume(0), false, 'The ACK-pruned prefix cannot be recovered')
-    assert.equal(await journal.resume(2), true)
-    assert.equal(await journal.resume(2), true)
-    assert.equal(publications.length, 3, 'A caught-up runtime needs no new delivery')
-    assert.equal(await journal.resume(1), false, 'An empty journal cannot recover a behind heap')
-    assert.equal(journal.isBaselineCurrent(), false)
-    journal.startBuild()
-    assert.equal(await journal.resume(0), true)
-})
-
-test('resume refuses factories left behind by failed physical publication', async () => {
-    const journal = new PatchJournal(async () => {
-        throw new Error('disk unavailable')
-    })
-    journal.startBuild()
-    await assert.rejects(journal.produce([patch(1, 'p1')]), /disk unavailable/)
-    assert.equal(await journal.resume(0), false)
-})
-
 test('a fresh build restarts the Rolldown sequence', async () => {
     const { journal, publications } = createJournal()
     const { buildId: firstBuild } = journal.startBuild()

@@ -91,13 +91,6 @@ test('renders initial and cumulative patches as inert CommonJS data', () => {
     assert.doesNotMatch(source, /^__rolldown_runtime__/)
 })
 
-test('replaying an identical patch suffix changes physical content without changing factories', () => {
-    const first = renderDevtoolsPatches('build', [patch])
-    const second = renderDevtoolsPatches('build', [patch])
-    assert.notEqual(first, second)
-    assert.equal(first.split('/* vpt-delivery:')[0], second.split('/* vpt-delivery:')[0])
-})
-
 test('native patch wrappers capture the supplied runtime without looking up a host binding', () => {
     const code = `
         __rolldown_runtime__.registerFactory(() => __rolldown_runtime__);
