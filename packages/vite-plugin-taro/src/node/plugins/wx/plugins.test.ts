@@ -31,7 +31,11 @@ test('creates the WX Mini Program contract without translating public options', 
         appFileName: 'app.wxss',
         globalFileName: 'assets/global.wxss'
     })
-    assert.deepEqual(Object.keys(contract.output), ['generateProjectSkeleton'])
+    assert.deepEqual(contract.output, {
+        projectConfigFilename: 'project.config.json',
+        projectPrivateConfigFilename: 'project.private.config.json',
+        generateProjectSkeleton: contract.output.generateProjectSkeleton
+    })
     assert.equal(typeof contract.output.generateProjectSkeleton, 'function')
     const plugins = createWxMiniPlugins(options)
     assert.equal(plugins.length, 8)

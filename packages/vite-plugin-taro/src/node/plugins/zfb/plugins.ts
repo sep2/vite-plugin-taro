@@ -15,6 +15,8 @@ export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
     const componentsReactPath = packageRequire.resolve(
         'vite-plugin-taro-runtime/plugin-platform-alipay/components-react'
     )
+    const projectConfigFilename = 'mini.project.json'
+    const projectPrivateConfigFilename = '.mini-ide/project-ide.json'
 
     return {
         options: vptOptions,
@@ -42,11 +44,15 @@ export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
             globalFileName: 'assets/global.acss'
         },
         output: {
+            projectConfigFilename,
+            projectPrivateConfigFilename,
             generateProjectSkeleton(input) {
                 return createZfbSkeleton({
                     ...input,
                     options: vptOptions,
-                    componentsModulePath: componentsReactPath
+                    componentsModulePath: componentsReactPath,
+                    projectConfigFilename,
+                    projectPrivateConfigFilename
                 })
             }
         }

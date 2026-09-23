@@ -57,6 +57,10 @@ test('creates the ZFB Mini Program contract without translating user configurati
         appFileName: 'app.acss',
         globalFileName: 'assets/global.acss'
     })
-    assert.deepEqual(Object.keys(contract.output), ['generateProjectSkeleton'])
+    assert.deepEqual(contract.output, {
+        projectConfigFilename: 'mini.project.json',
+        projectPrivateConfigFilename: '.mini-ide/project-ide.json',
+        generateProjectSkeleton: contract.output.generateProjectSkeleton
+    })
     assert.equal(typeof contract.output.generateProjectSkeleton, 'function')
 })

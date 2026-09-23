@@ -15,6 +15,8 @@ export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
     const componentsReactPath = packageRequire.resolve(
         'vite-plugin-taro-runtime/plugin-platform-weapp/components-react'
     )
+    const projectConfigFilename = 'project.config.json'
+    const projectPrivateConfigFilename = 'project.private.config.json'
 
     return {
         options: vptOptions,
@@ -42,11 +44,15 @@ export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
             globalFileName: 'assets/global.wxss'
         },
         output: {
+            projectConfigFilename,
+            projectPrivateConfigFilename,
             generateProjectSkeleton(input) {
                 return createWxSkeleton({
                     ...input,
                     options: vptOptions,
-                    componentsModulePath: componentsReactPath
+                    componentsModulePath: componentsReactPath,
+                    projectConfigFilename,
+                    projectPrivateConfigFilename
                 })
             }
         }

@@ -9,6 +9,8 @@ const contract = {
         globalFileName: 'assets/global.native.css'
     },
     output: {
+        projectConfigFilename: 'project.fixture.json',
+        projectPrivateConfigFilename: 'project.private.fixture.json',
         generateProjectSkeleton() {
             return []
         }

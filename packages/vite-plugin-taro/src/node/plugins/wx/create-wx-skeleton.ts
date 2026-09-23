@@ -19,6 +19,8 @@ type WxSkeletonInput = MiniProjectSkeletonInput &
     Readonly<{
         options: VptOptions
         componentsModulePath: string
+        projectConfigFilename: string
+        projectPrivateConfigFilename: string
     }>
 
 /**
@@ -75,7 +77,9 @@ export function createWxSkeleton({
     nativeComponents,
     isProduction,
     options,
-    componentsModulePath
+    componentsModulePath,
+    projectConfigFilename,
+    projectPrivateConfigFilename
 }: WxSkeletonInput): Rolldown.EmittedAsset[] {
     const template = createWxTemplate()
 
@@ -119,9 +123,9 @@ export function createWxSkeleton({
             ),
             createTextAsset(`${page.path}.wxss`, '')
         ]),
-        jsonAsset('project.config.json', options.projectConfigJson),
+        jsonAsset(projectConfigFilename, options.projectConfigJson),
         ...(options.projectPrivateConfigJson
-            ? [jsonAsset('project.private.config.json', options.projectPrivateConfigJson)]
+            ? [jsonAsset(projectPrivateConfigFilename, options.projectPrivateConfigJson)]
             : []),
         ...(options.sitemapJson ? [jsonAsset('sitemap.json', options.sitemapJson)] : [])
     ]

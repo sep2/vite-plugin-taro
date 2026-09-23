@@ -24,6 +24,8 @@ type ZfbSkeletonInput = MiniProjectSkeletonInput &
     Readonly<{
         options: VptOptions
         componentsModulePath: string
+        projectConfigFilename: string
+        projectPrivateConfigFilename: string
     }>
 
 /**
@@ -80,7 +82,9 @@ export function createZfbSkeleton({
     nativeComponents,
     isProduction,
     options,
-    componentsModulePath
+    componentsModulePath,
+    projectConfigFilename,
+    projectPrivateConfigFilename
 }: ZfbSkeletonInput): Rolldown.EmittedAsset[] {
     const template = createZfbTemplate()
     const componentConfig = collectTemplateComponentConfig(bundle, componentsModulePath, nativeComponents)
@@ -123,9 +127,9 @@ export function createZfbSkeleton({
                 createTextAsset(`${page.path}.acss`, '')
             ]
         }),
-        jsonAsset('mini.project.json', options.projectConfigJson),
+        jsonAsset(projectConfigFilename, options.projectConfigJson),
         ...(options.projectPrivateConfigJson
-            ? [jsonAsset('.mini-ide/project-ide.json', options.projectPrivateConfigJson)]
+            ? [jsonAsset(projectPrivateConfigFilename, options.projectPrivateConfigJson)]
             : []),
         createTextAsset('.browserslistrc', 'defaults and fully supports es6-module')
     ]

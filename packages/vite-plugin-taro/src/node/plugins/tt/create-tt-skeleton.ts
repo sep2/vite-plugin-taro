@@ -24,6 +24,8 @@ type TtSkeletonInput = MiniProjectSkeletonInput &
     Readonly<{
         options: VptOptions
         componentsModulePath: string
+        projectConfigFilename: string
+        projectPrivateConfigFilename: string
     }>
 
 /**
@@ -37,7 +39,9 @@ export function createTtSkeleton({
     nativeComponents,
     isProduction,
     options,
-    componentsModulePath
+    componentsModulePath,
+    projectConfigFilename,
+    projectPrivateConfigFilename
 }: TtSkeletonInput): Rolldown.EmittedAsset[] {
     const template = createTtTemplate()
     const nativeComponentConfig = createNativeComponentConfig(nativeComponents)
@@ -85,9 +89,9 @@ export function createTtSkeleton({
             createTextAsset(`${page.path}.ttss`, '')
         ]),
         // project.tt.json is Taro's source config filename; TikTok DevTools consumes project.config.json in the output.
-        jsonAsset('project.config.json', options.projectConfigJson),
+        jsonAsset(projectConfigFilename, options.projectConfigJson),
         ...(options.projectPrivateConfigJson
-            ? [jsonAsset('project.private.config.json', options.projectPrivateConfigJson)]
+            ? [jsonAsset(projectPrivateConfigFilename, options.projectPrivateConfigJson)]
             : [])
     ]
 }

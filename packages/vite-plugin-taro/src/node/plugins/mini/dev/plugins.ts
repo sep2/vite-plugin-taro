@@ -24,10 +24,7 @@ export function isMiniClientEnvironment(environment: Readonly<{ name: string }>)
  * The shared style pipeline already owns the resolver's ordered App/Page cascade policy, so the host does not reconstruct it
  * from unrelated Rolldown shell and bootstrap entries.
  */
-export function createMiniDevelopmentPlugin(
-    contract: Pick<MiniContract, 'options' | 'runtime' | 'styles'>,
-    styles: MiniStylePlugin
-): PluginOption[] {
+export function createMiniDevelopmentPlugin(contract: MiniContract, styles: MiniStylePlugin): PluginOption[] {
     // Resolve once so plugins, journal effects, entry banners, and runtime bundling cannot disagree about the active mechanism.
     const hmrMode = createMiniHmrMode(contract.options.hmr, contract.runtime.modules)
 
@@ -84,8 +81,8 @@ export function createMiniDevelopmentPlugin(
                     // replacement build by three seconds and then verifies two state-retaining rendered updates.
                     // Later recovery builds do not clean because cached unchanged companions may not be emitted again.
                     cleanOutputFiles(path.resolve(server.config.root, server.config.build.outDir), [
-                        'project.config.json',
-                        'project.private.config.json'
+                        contract.output.projectConfigFilename,
+                        contract.output.projectPrivateConfigFilename
                     ])
 
                     host = await createMiniDevHost({

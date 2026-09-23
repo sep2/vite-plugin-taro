@@ -22,6 +22,8 @@ test('binds TT runtime and style paths without translating native configuration'
     assert.match(contract.runtime.modules.devtoolsHmrRuntime, /tt[/\\]dev[/\\]devtools-runtime\.(?:js|ts)$/)
     assert.match(contract.runtime.modules.interpreterHmrRuntime, /tt[/\\]dev[/\\]interpreter-runtime\.(?:js|ts)$/)
     assert.deepEqual(contract.styles, { appFileName: 'app.ttss', globalFileName: 'assets/global.ttss' })
+    assert.equal(contract.output.projectConfigFilename, 'project.config.json')
+    assert.equal(contract.output.projectPrivateConfigFilename, 'project.private.config.json')
     assert.equal(createTtMiniPlugins(options).length, 8)
 })
 

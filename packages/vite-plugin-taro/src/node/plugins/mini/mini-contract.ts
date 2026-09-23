@@ -53,8 +53,10 @@ export type MiniProjectSkeletonInput = Readonly<{
     isProduction: boolean
 }>
 
-/** One target-owned native project-skeleton generator. */
+/** Target-owned native project filenames and project-skeleton generator. */
 export type OutputContract = {
+    projectConfigFilename: string
+    projectPrivateConfigFilename: string
     generateProjectSkeleton(input: MiniProjectSkeletonInput): Rolldown.EmittedAsset[]
 }
 

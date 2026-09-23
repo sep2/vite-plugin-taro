@@ -32,8 +32,15 @@ const contract = {
     styles: {
         appFileName: 'app.native.css',
         globalFileName: 'assets/global.native.css'
+    },
+    output: {
+        projectConfigFilename: 'project.fixture.json',
+        projectPrivateConfigFilename: 'project.private.fixture.json',
+        generateProjectSkeleton() {
+            return []
+        }
     }
-} satisfies Pick<MiniContract, 'options' | 'runtime' | 'styles'>
+} satisfies Pick<MiniContract, 'options' | 'output' | 'runtime' | 'styles'>
 
 test('assigns physical Mini Program host ownership only to the client environment', () => {
     assert.equal(isMiniClientEnvironment({ name: 'client' }), true)
@@ -60,7 +67,7 @@ test('composes rebuild mode without patch transforms', async () => {
             ...contract.options,
             hmr: { mode: 'rebuild' }
         }
-    } satisfies Pick<MiniContract, 'options' | 'runtime' | 'styles'>
+    } satisfies Pick<MiniContract, 'options' | 'output' | 'runtime' | 'styles'>
     const config = await resolveConfig(
         {
             configFile: false,
