@@ -35,6 +35,7 @@ pnpm stress:hmr-stress-demo:burst         # 30 edits at 8 ms
 pnpm test:hmr-stress-demo:rebuild         # mixed ACK/rebuild report storms
 pnpm test:hmr-stress-demo:recovery        # syntax failures and passive HMR recovery
 pnpm test:hmr-stress-demo:restart         # real Vite process restart, then rendered HMR updates
+pnpm test:hmr-stress-demo:watch-restart   # replace vite build --watch, then render two later edits
 ```
 
 No stress edit touches `demo/hmr-stress-demo/src`. The portable harness deliberately avoids RAM-disk provisioning: it confines writes to one fixed temporary project and bounds the strict burst to 30 source generations, plus two restoration writes. Syntax recovery uses one invalid generation plus restoration, and post-recovery health uses five edits. This retains the failure-producing profiles without thousands of filesystem writes or platform-specific mount setup.
@@ -61,6 +62,8 @@ The complete suite checks:
 10. two successive source edits after restart appear in the simulator while retaining input state, build identity, and the App stylesheet marker.
 
 The harness observes the real App's startup report for the current build before publishing edits; a rendered Page can appear before its HMR socket opens. The restart case first proves HMR works before restarting. It then distinguishes a successful App reload from working post-restart HMR: changing a patch file or opening a new socket alone cannot satisfy its rendered-marker assertions. Both Vite process logs are retained in the fixture's `vite.log`.
+
+The standalone build-watch restart case uses the same fixed project and ownership boundary but launches the production `vite build --watch` path. It proves one rendered edit, replaces the watcher process without reopening or manually compiling DevTools, and then requires two more rendered edits. Every watched build is delayed by three seconds; this path performs full reloads and does not assert state retention.
 
 Useful environment overrides:
 

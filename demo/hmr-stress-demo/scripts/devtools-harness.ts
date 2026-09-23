@@ -27,6 +27,7 @@ type ElementReadAction = 'text' | 'value'
 type ToolParameters = Readonly<Record<string, string>>
 type TestCase = (harness: DevToolsHarness) => Promise<void>
 type ServerProcess = ChildProcessByStdio<null, Readable, Readable>
+type StartServer = (root: string) => Promise<ServerProcess>
 type CommandResult = Readonly<{ exitCode: number | null; stdout: string; stderr: string }>
 
 /** Only observation polling may retry the temporary detach/missing-node responses of a simulator reload. */
@@ -65,8 +66,17 @@ const testDeadline = Date.now() + testBudgetMilliseconds
 // directories or per-run clients would force a new authorization prompt and make standalone cases slower and interactive.
 const devToolsClient = process.env.VPT_HMR_DEVTOOLS_CLIENT ?? 'Pi'
 
-/** Runs cases against one fixed temporary project, cleaning it completely before every invocation. */
-export async function withDevToolsHarness(testName: string, testCase: TestCase): Promise<void> {
+/** Runs development-server cases against one fixed temporary project. */
+export function withDevToolsHarness(testName: string, testCase: TestCase): Promise<void> {
+    return withServerHarness(testName, testCase, startDevelopmentServer)
+}
+
+/** Runs production build-watch cases through the same project, process, and DevTools ownership boundary. */
+export function withBuildWatchHarness(testName: string, testCase: TestCase): Promise<void> {
+    return withServerHarness(testName, testCase, startBuildWatcher)
+}
+
+async function withServerHarness(testName: string, testCase: TestCase, startServer: StartServer): Promise<void> {
     // One fixed lock prevents concurrent standalone cases from deleting or mutating the same disposable project.
     const lockPath = path.join(tmpdir(), 'vite-plugin-taro-hmr-stress.lock')
     const lock = await acquireHarnessLock(lockPath)
@@ -105,7 +115,7 @@ export async function withDevToolsHarness(testName: string, testCase: TestCase):
     process.once('SIGINT', interrupt)
     process.once('SIGTERM', interrupt)
     try {
-        await runLockedHarness(resolveTestRoot(), testName, testCase)
+        await runLockedHarness(resolveTestRoot(), testName, testCase, startServer)
     } finally {
         try {
             await cleanup()
@@ -153,7 +163,12 @@ function hasErrorCode(error: unknown, code: string): boolean {
     return error instanceof Error && 'code' in error && error.code === code
 }
 
-async function runLockedHarness(root: string, testName: string, testCase: TestCase): Promise<void> {
+async function runLockedHarness(
+    root: string,
+    testName: string,
+    testCase: TestCase,
+    startServer: StartServer
+): Promise<void> {
     await buildPlugin()
     await prepareFixture(root)
     await writeFile(path.join(root, 'vite.log'), '')
@@ -309,7 +324,7 @@ async function prepareFixture(root: string): Promise<void> {
     }
 }
 
-async function startServer(root: string): Promise<ServerProcess> {
+async function startDevelopmentServer(root: string): Promise<ServerProcess> {
     const viteExecutable = path.join(root, 'node_modules/vite/bin/vite.js')
     const appId = process.env.VITE_VPT_WECHAT_APP_ID ?? (await readFixtureAppId()) ?? 'touristappid'
     const serverLogPath = path.join(root, 'vite.log')
@@ -342,6 +357,57 @@ async function startServer(root: string): Promise<ServerProcess> {
     } catch (error) {
         await stopServer(server)
         await logClosed
+        throw error
+    }
+}
+
+async function startBuildWatcher(root: string): Promise<ServerProcess> {
+    const viteExecutable = path.join(root, 'node_modules/vite/bin/vite.js')
+    const appId = process.env.VITE_VPT_WECHAT_APP_ID ?? (await readFixtureAppId()) ?? 'touristappid'
+    const serverLogPath = path.join(root, 'vite.log')
+    const watchMarkerPath = path.join(root, 'dist/wx/hmr/watch.js')
+    const previousMarker = await readExistingFile(watchMarkerPath)
+    const log = createWriteStream(serverLogPath, { flags: 'a' })
+    const server = processes.start(process.execPath, [viteExecutable, 'build', '--watch'], {
+        cwd: root,
+        env: {
+            ...process.env,
+            NODE_ENV: 'production',
+            VITE_VPT_TARGET: 'wx',
+            VITE_VPT_WECHAT_APP_ID: appId
+        }
+    })
+    server.stdout.pipe(log, { end: false })
+    server.stderr.pipe(log, { end: false })
+    const logClosed = finished(log).catch((error: unknown) => error)
+    logCompletions.push(logClosed)
+    server.once('close', () => log.end())
+    server.once('error', () => log.end())
+    try {
+        // The random completion marker is written after every complete watch output and cannot match the prior process.
+        await waitFor(
+            async () => {
+                const marker = await readExistingFile(watchMarkerPath)
+                return marker !== undefined && marker !== previousMarker
+            },
+            30_000,
+            20
+        )
+        return server
+    } catch (error) {
+        await stopServer(server)
+        await logClosed
+        throw error
+    }
+}
+
+async function readExistingFile(fileName: string): Promise<string | undefined> {
+    try {
+        return await readFile(fileName, 'utf8')
+    } catch (error) {
+        if (hasErrorCode(error, 'ENOENT')) {
+            return undefined
+        }
         throw error
     }
 }

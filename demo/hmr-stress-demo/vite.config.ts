@@ -40,6 +40,13 @@ export default defineConfig(({ mode }) => {
             }),
             {
                 name: 'hmr-stress:runtime-readiness',
+                async buildStart() {
+                    // The restart regression widens startup cleanup into an observable three-second interval.
+                    const delayMilliseconds = Number(process.env.VPT_HMR_RESTART_BUILD_DELAY_MS ?? 0)
+                    if (delayMilliseconds > 0) {
+                        await new Promise<void>((resolve) => setTimeout(resolve, delayMilliseconds))
+                    }
+                },
                 configureServer(server) {
                     // A rendered Page can precede socket OPEN. Tests must observe the real App's startup before editing.
                     server.ws.on('vpt:mini-hmr:report', (report: { kind: string; buildId: string }) => {
