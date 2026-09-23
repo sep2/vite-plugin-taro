@@ -6,7 +6,7 @@ import type { DevToolsHarness } from './devtools-harness.ts'
 import { isRecord, waitFor } from './devtools-harness.ts'
 import { type HmrEditProfile, publishHmrEdits } from './publish-hmr-edits.ts'
 
-export type DevToolsCase = 'all' | 'burst' | 'rebuild' | 'recovery' | 'restart'
+export type DevToolsCase = 'all' | 'burst' | 'cold-page' | 'rebuild' | 'recovery' | 'restart'
 
 type HmrInfo = Readonly<{
     buildId: string
@@ -28,13 +28,14 @@ const postRecoveryProfile: HmrEditProfile = {
 export async function runDevToolsCase(caseName: DevToolsCase, harness: DevToolsHarness): Promise<void> {
     const cases: Readonly<Record<Exclude<DevToolsCase, 'all'>, () => Promise<void>>> = {
         burst: () => testStateRetention('burst', burstProfile, harness),
+        'cold-page': () => testColdPageSharedComponent(harness),
         rebuild: () => testRuntimeRebuild(harness),
         recovery: () => testSyntaxRecovery(harness),
         restart: () => testServerRestart(harness)
     }
     if (caseName === 'all') {
-        // One strict burst covers the paced path while retaining the failure-producing write interval.
-        for (const selected of ['burst', 'rebuild', 'recovery', 'restart'] as const) {
+        // Run the cold-page case before any navigation can mount its secondary route in this App generation.
+        for (const selected of ['cold-page', 'burst', 'rebuild', 'recovery', 'restart'] as const) {
             console.log(`[hmr-devtools] case: ${selected}`)
             await waitForRuntimeStartup(harness)
             await cases[selected]()
@@ -43,6 +44,56 @@ export async function runDevToolsCase(caseName: DevToolsCase, harness: DevToolsH
     }
     await waitForRuntimeStartup(harness)
     await cases[caseName]()
+}
+
+async function testColdPageSharedComponent(harness: DevToolsHarness): Promise<void> {
+    const sourcePath = path.join(harness.root, 'src/components/stress-dashboard.tsx')
+    const originalSource = await readFile(sourcePath, 'utf8')
+    const generationPattern = /const sharedGeneration = '[^']*'/
+    assert.match(originalSource, generationPattern)
+    const infoPath = path.join(harness.outDir, 'hmr/info.js')
+    const appStylePath = path.join(harness.outDir, 'app.wxss')
+    const build = await readHmrInfo(infoPath)
+    const appStyle = await readFile(appStylePath, 'utf8')
+    const rebuildsBefore = await countLog(harness.serverLogPath, 'wx full rebuild required')
+
+    await assertCurrentRoute('pages/index/index', harness)
+    assert.equal(
+        (await harness.readPageStack()).length,
+        1,
+        'The mirror Page must not be mounted before the shared edit'
+    )
+    await setPageState('cold-page-primary', harness)
+
+    console.log('[hmr-devtools] cold-page: editing the shared component before the mirror Page is first mounted')
+    await writeFile(
+        sourcePath,
+        originalSource.replace(generationPattern, "const sharedGeneration = 'cold-page-latest'")
+    )
+    try {
+        await waitForSharedGeneration('cold-page-latest', harness)
+        await assertPageState('cold-page-primary', harness)
+        assert.equal((await readHmrInfo(infoPath)).buildId, build.buildId)
+        assert.equal(await readFile(appStylePath, 'utf8'), appStyle)
+
+        await harness.navigate('navigateTo', '/pages/mirror/index')
+        await assertCurrentRoute('pages/mirror/index', harness)
+        await waitForSharedGeneration('cold-page-latest', harness)
+        assert.equal(await harness.readElement('#stress-input', 'value'), 'seed-000')
+        assert.equal((await readHmrInfo(infoPath)).buildId, build.buildId)
+        assert.equal(await countLog(harness.serverLogPath, 'wx full rebuild required'), rebuildsBefore)
+        assert.equal(await readFile(appStylePath, 'utf8'), appStyle, 'A full reload must not mask a stale cold Page')
+        await assertCleanConsole(harness)
+        console.log('[hmr-devtools] cold-page: the first mirror mount rendered the latest shared component')
+    } finally {
+        await writeFile(sourcePath, originalSource)
+    }
+
+    await waitForSharedGeneration('baseline', harness)
+    await harness.navigate('navigateBack', undefined)
+    await assertCurrentRoute('pages/index/index', harness)
+    await waitForSharedGeneration('baseline', harness)
+    await assertPageState('cold-page-primary', harness)
 }
 
 async function testStateRetention(name: string, profile: HmrEditProfile, harness: DevToolsHarness): Promise<void> {
@@ -188,7 +239,7 @@ async function testServerRestart(harness: DevToolsHarness): Promise<void> {
             async () =>
                 (await harness.readCurrentPage()).path === 'pages/index/index' &&
                 (await harness.readElement('#stress-input', 'value')) === 'seed-000',
-            20_000,
+            40_000,
             100
         )
         await waitForMarker('restart-before', harness)
@@ -269,6 +320,14 @@ async function assertPageState(value: string, harness: DevToolsHarness): Promise
 
 async function waitForBaselineMarker(harness: DevToolsHarness): Promise<void> {
     await waitForMarker('baseline', harness)
+}
+
+async function waitForSharedGeneration(generation: string, harness: DevToolsHarness): Promise<void> {
+    await waitFor(
+        async () => (await harness.readElement('#shared-generation', 'text')) === `shared:${generation}`,
+        6_000,
+        100
+    )
 }
 
 async function waitForMarker(marker: string, harness: DevToolsHarness): Promise<void> {

@@ -14,6 +14,8 @@ type StressDashboardProps = Readonly<{
     title: string
 }>
 
+const sharedGeneration = 'baseline'
+
 export default function StressDashboard({ navigation, title }: StressDashboardProps) {
     const tree = useMemo(() => createStressTree(5, 3), [])
     // User-editable state proves that the root Fiber was retained across Page replacement.
@@ -33,6 +35,7 @@ export default function StressDashboard({ navigation, title }: StressDashboardPr
                 <View>
                     <Text className="stress-title">{title}</Text>
                     <Text id="hmr-status" className="stress-subtitle">{`marker:${hmrMarker}`}</Text>
+                    <Text id="shared-generation" className="stress-subtitle">{`shared:${sharedGeneration}`}</Text>
                     <Text className="stress-subtitle">364 recursive nodes · 243 stateful leaves · 96 grid cells</Text>
                 </View>
                 {navigation}

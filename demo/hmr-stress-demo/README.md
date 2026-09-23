@@ -26,12 +26,13 @@ pnpm test:hmr-stress-demo:interpreter
 pnpm setup:hmr-stress-demo:devtools
 ```
 
-Setup and the restart case may each use up to 60 seconds; the aggregate suite has a 90-second deadline. The two-project port-swap case has a 120-second deadline. Other standalone cases have a 30-second deadline. Each invocation attaches to the newly built output itself; a prior setup invocation is not required. The complete suite runs the strict burst, rebuild storm, syntax recovery, and server restart cases. Runtime assertions replace fixed settle sleeps, including observing the restoration marker before publishing and awaiting the baseline. Plugin rebuilding is opt-in.
+Setup and the restart case may each use up to 60 seconds; the aggregate suite and two-project port-swap case each have a 120-second deadline. Other standalone cases have a 30-second deadline. Each invocation attaches to the newly built output itself; a prior setup invocation is not required. The complete suite runs the never-mounted shared-component case, strict burst, rebuild storm, syntax recovery, and server restart cases. Runtime assertions replace fixed settle sleeps, including observing the restoration marker before publishing and awaiting the baseline. Plugin rebuilding is opt-in.
 
 Individual cases can be run independently:
 
 ```bash
 pnpm stress:hmr-stress-demo:burst         # 30 edits at 8 ms
+pnpm test:hmr-stress-demo:cold-page       # edit shared code before the secondary Page is first mounted
 pnpm test:hmr-stress-demo:rebuild         # mixed ACK/rebuild report storms
 pnpm test:hmr-stress-demo:recovery        # syntax failures and passive HMR recovery
 pnpm test:hmr-stress-demo:restart         # real Vite process restart, then rendered HMR updates
@@ -51,17 +52,18 @@ node --test demo/hmr-stress-demo/scripts/create-process-scope.test.ts
 
 The complete suite checks:
 
-1. burst patch publication through both the deep App view and Pages, with primary and hidden mirror state retention;
-2. unique Page-slot routing while keyed deep App branches repeatedly reorder, marker restoration, and valid two-Page navigation stacks;
-3. duplicate and out-of-order ACK conflation under rebuild-report storms;
-4. build identity rotation and non-empty `assets/global.wxss` after every complete rebuild;
-5. invalid syntax does not start a complete build or alter the live Page runtime state;
-6. valid source after failure resumes HMR without rotating the build identity;
-7. HMR remains healthy and preserves state after syntax recovery;
-8. the App console remains free of patch, Refresh, reconciliation, and `setData` failures;
-9. restarting the actual Vite process, without reopening or manually compiling DevTools, removes obsolete output and loads a new baseline;
-10. two successive source edits after restart appear in the simulator while retaining input state, build identity, and the App stylesheet marker;
-11. two simultaneously open projects survive reverse-order Vite restarts that exchange their ports, then independently render later HMR edits without cross-project identity or state corruption.
+1. a shared component edited while only the primary Page is mounted renders its latest generation when the mirror Page is first opened;
+2. burst patch publication through both the deep App view and Pages, with primary and hidden mirror state retention;
+3. unique Page-slot routing while keyed deep App branches repeatedly reorder, marker restoration, and valid two-Page navigation stacks;
+4. duplicate and out-of-order ACK conflation under rebuild-report storms;
+5. build identity rotation and non-empty `assets/global.wxss` after every complete rebuild;
+6. invalid syntax does not start a complete build or alter the live Page runtime state;
+7. valid source after failure resumes HMR without rotating the build identity;
+8. HMR remains healthy and preserves state after syntax recovery;
+9. the App console remains free of patch, Refresh, reconciliation, and `setData` failures;
+10. restarting the actual Vite process, without reopening or manually compiling DevTools, removes obsolete output and loads a new baseline;
+11. two successive source edits after restart appear in the simulator while retaining input state, build identity, and the App stylesheet marker;
+12. two simultaneously open projects survive reverse-order Vite restarts that exchange their ports, then independently render later HMR edits without cross-project identity or state corruption.
 
 The harness observes the real App's startup report for the current build before publishing edits; a rendered Page can appear before its HMR socket opens. The restart case first proves HMR works before restarting, then delays each full compilation by three seconds so cleanup behavior is visible to the open project. It distinguishes a successful App reload from working post-restart HMR: changing a patch file or opening a new socket alone cannot satisfy its rendered-marker assertions. Both Vite process logs are retained in the fixture's `vite.log`.
 

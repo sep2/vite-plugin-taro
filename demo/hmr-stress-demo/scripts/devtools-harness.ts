@@ -69,7 +69,7 @@ const testBudgetMilliseconds =
     requestedCase === 'port-swap'
         ? 120_000
         : requestedCase === 'all'
-          ? 90_000
+          ? 120_000
           : process.env.VPT_HMR_SETUP === '1' || requestedCase === 'restart'
             ? 60_000
             : 30_000
