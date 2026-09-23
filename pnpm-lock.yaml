@@ -580,9 +580,9 @@ importers:
       picocolors:
         specifier: ^1.1.1
         version: 1.1.1
-      postcss-pxtrans:
-        specifier: 1.0.4
-        version: 1.0.4(postcss@8.5.28)
+      postcss-rule-unit-converter:
+        specifier: 0.2.3
+        version: 0.2.3(postcss@8.5.28)
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2

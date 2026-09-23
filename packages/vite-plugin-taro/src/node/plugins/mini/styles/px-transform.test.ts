@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
 import { compile } from '@tailwindcss/node'
-import pxTransform from 'postcss-pxtrans'
+import unitConverter, { presets } from 'postcss-rule-unit-converter'
 import { build } from 'vite'
 import { createMiniTransformer } from './create-mini-transformer.ts'
 import { minifyMiniStylesheet } from './minify-mini-stylesheet.ts'
@@ -20,13 +20,16 @@ test('converts Mini CSS px with the fixed 750 design width but leaves capitalize
 })
 
 for (const target of ['wx', 'h5'] as const) {
-    test(`documented postcss-pxtrans configuration converts ${target} CSS before output`, async () => {
+    test(`documented postcss-rule-unit-converter configuration converts ${target} CSS before output`, async () => {
         const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'vpt-px-transform-')))
         const entry = path.join(root, 'app.js')
 
         try {
             await writeFile(entry, "import './app.css'\n")
-            await writeFile(path.join(root, 'app.css'), '.sizes { width: 100px; border-bottom-width: 1Px; }')
+            await writeFile(
+                path.join(root, 'app.css'),
+                '.sizes { width: 100px; height: 100rpx; padding: 1rem; border-bottom-width: 1Px; }'
+            )
 
             const result = await build({
                 root,
@@ -35,11 +38,15 @@ for (const target of ['wx', 'h5'] as const) {
                 css: {
                     postcss: {
                         plugins: [
-                            pxTransform(
-                                target === 'h5'
-                                    ? { platform: 'h5', designWidth: 375, targetUnit: 'vw' }
-                                    : { platform: 'weapp', designWidth: 375, deviceRatio: { 375: 2 } }
-                            )
+                            unitConverter({
+                                rules:
+                                    target === 'h5'
+                                        ? [
+                                              presets.pxToVw({ viewportWidth: 375 }),
+                                              presets.rpxToVw({ viewportWidth: 375, ratio: 1 })
+                                          ]
+                                        : [presets.pxToRpx({ ratio: 2 })]
+                            })
                         ]
                     }
                 },
@@ -70,8 +77,8 @@ for (const target of ['wx', 'h5'] as const) {
             assert.match(
                 String(stylesheet.source),
                 target === 'wx'
-                    ? /\.sizes \{ width: 200rpx; border-bottom-width: 1Px; \}/
-                    : /\.sizes \{ width: 26\.66667vw; border-bottom-width: 1Px; \}/
+                    ? /\.sizes \{ width: 200rpx; height: 100rpx; padding: 32rpx; border-bottom-width: 1Px; \}/
+                    : /\.sizes \{ width: 26\.66667vw; height: 26\.66667vw; padding: 1rem; border-bottom-width: 1Px; \}/
             )
         } finally {
             await rm(root, { recursive: true, force: true })

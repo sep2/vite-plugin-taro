@@ -114,7 +114,7 @@
         "c8": "^12.0.0",
         "oxc-walker": "1.1.1",
         "picocolors": "^1.1.1",
-        "postcss-pxtrans": "1.0.4",
+        "postcss-rule-unit-converter": "0.2.3",
         "rxjs": "^7.8.2",
         "typescript": "^7.0.2",
         "vite": "8.3.0"

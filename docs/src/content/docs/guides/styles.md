@@ -259,19 +259,26 @@ Web 默认保留 CSS 中的 `px`，不会自动将其转换为 `rem`。若要在
 1. 安装转换插件：
 
    ```sh
-   pnpm add -D postcss-pxtrans
+   pnpm add -D postcss-rule-unit-converter
    ```
 
 2. 在 `vite.config.ts` 现有的 `defineConfig` 回调中，取得 `target` 后加入 `css` 字段，保留其他配置：
 
    ```ts
-   import pxTransform from 'postcss-pxtrans'
+   import unitConverter, { presets } from 'postcss-rule-unit-converter'
 
    const css = {
        postcss: {
-           plugins: target === 'h5'
-               ? [pxTransform({ platform: 'h5', designWidth: 375, targetUnit: 'vw' })]
-               : [pxTransform({ platform: 'weapp', designWidth: 375, deviceRatio: { 375: 2 } })]
+           plugins: [
+               unitConverter({
+                   rules: target === 'h5'
+                       ? [
+                             presets.pxToVw({ viewportWidth: 375 }),
+                             presets.rpxToVw({ viewportWidth: 375, ratio: 1 })
+                         ]
+                       : [presets.pxToRpx({ ratio: 2 })]
+               })
+           ]
        }
    }
    // 将 css 加入原有的 return 对象。
@@ -289,7 +296,7 @@ Web 默认保留 CSS 中的 `px`，不会自动将其转换为 `rem`。若要在
    })
    ```
 
-这里使用模板自带的 `VITE_VPT_TARGET`；其他项目请换成自己的目标标识。`100px` 在小程序中成为 `200rpx`，在 Web 中成为 `26.66667vw`；`Taro.pxTransform(100)` 也会返回对应单位。两者在 375px 宽的屏幕上均相当于 100px。
+H5 中已有的 `rpx` 按相同设计稿比例换算为 `vw`。`100px` 在小程序中成为 `200rpx`，在 Web 中成为 `26.66667vw`；`Taro.pxTransform(100)` 也会返回对应单位。两者在 375px 宽的屏幕上均相当于 100px。
 
 ## 常见问题
 
