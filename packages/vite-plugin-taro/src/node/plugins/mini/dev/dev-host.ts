@@ -222,7 +222,7 @@ export async function createMiniDevHost({
         // The complete-output hook kept the previous physical App-style wrapper in place. Replace it only now, after the selected
         // mode is reset and matching identity is durable. Native development tools treat the App stylesheet as a root, so this
         // write intentionally causes the one full refresh allowed at a complete-build boundary; the refreshed App reads the new
-        // info above. Incremental updates must never write this file because an App refresh could destroy the heap while its
+        // info above. Incremental updates must never write this file because an App refresh could replace the runtime while its
         // JavaScript patch is being acknowledged. They publish only the imported global stylesheet instead.
         await writeFile(contract.styles.appFileName, renderDevelopmentAppStyle(contract.styles.globalFileName, buildId))
     }

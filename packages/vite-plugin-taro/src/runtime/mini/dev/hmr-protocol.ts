@@ -1,9 +1,9 @@
-/** Host-to-App terminal control over the App heap's authenticated Vite socket. */
+/** Host-to-App terminal control over the authenticated Vite socket owned by the running App. */
 export const runtimeControlEvent = 'vpt:mini-hmr:control'
 /** App-to-host application frontier and rebuild reports over the same socket. */
 export const runtimeReportEvent = 'vpt:mini-hmr:report'
 
-/** Build identity and authenticated socket endpoint fixed for one App heap. */
+/** Build identity and authenticated socket endpoint fixed for the lifetime of one running App. */
 export type HmrInfo = Readonly<{
     buildId: string
     endpoint: string

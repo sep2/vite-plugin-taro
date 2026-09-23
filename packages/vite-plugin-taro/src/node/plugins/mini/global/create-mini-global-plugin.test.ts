@@ -107,7 +107,7 @@ for (const command of ['serve', 'build'] as const) {
                 __rolldown_runtime__: { marker: 'ambient' },
                 queueMicrotask: (callback: () => void) => callback()
             }
-            // Count native provider lookups in this heap; calls after chunk initialization must use the retained singleton.
+            // Count native provider lookups in this VM context; calls after chunk initialization must use the retained singleton.
             let providerLoads = 0
             const context = createContext({
                 ...ambient,

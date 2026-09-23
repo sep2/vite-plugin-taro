@@ -104,7 +104,7 @@ test('TT navigation and Android detection use only TT-supported native APIs', as
         ['devtools', 'Android 15', true],
         ['ios', 'iOS 18', false]
     ] as const) {
-        // Each native heap owns its module exports and call journal; repeat renders must reuse cached layout metrics.
+        // Each native runtime instance owns its module exports and call journal; repeat renders must reuse cached layout metrics.
         const module: { exports: Record<string, unknown> } = { exports: {} }
         const calls: string[] = []
         const api = {

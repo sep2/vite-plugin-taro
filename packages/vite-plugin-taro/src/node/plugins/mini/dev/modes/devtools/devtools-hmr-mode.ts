@@ -68,7 +68,7 @@ export function renderDevtoolsPatches(buildId: string, patches: readonly PatchUp
 /**
  * Prepends physical CommonJS edges after Rolldown graph analysis.
  *
- * App initialization reads the build identity once into its persistent heap. Every Page reads the stable patch path immediately
+ * App initialization reads the build identity once and retains it while the App keeps running. Every Page reads the stable patch path immediately
  * before its capsule, so DevTools classifies a replacement as Page JavaScript hot reload instead of an App restart. Injecting
  * these requires as source imports would incorrectly pull host-only files into Rolldown's application chunk graph.
  */

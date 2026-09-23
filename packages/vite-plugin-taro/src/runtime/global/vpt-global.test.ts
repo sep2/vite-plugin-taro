@@ -16,15 +16,15 @@ const runtimeScript = new Script(
     { filename }
 )
 
-function createHeap(setup: string) {
+function createRuntimeContext(setup: string) {
     const context = createContext(constants.DONT_CONTEXTIFY, { codeGeneration: { strings: false, wasm: false } })
     context.assert = assert
     new Script(setup).runInContext(context)
     return context
 }
 
-function assertDiscoveryFallback(context: ReturnType<typeof createHeap>, cacheKey: string | symbol): unknown {
-    // Capture diagnostics only in this isolated heap, without changing the test runner's console.
+function assertDiscoveryFallback(context: ReturnType<typeof createRuntimeContext>, cacheKey: string | symbol): unknown {
+    // Capture diagnostics only in this isolated VM context, without changing the test runner's console.
     const errors: unknown[][] = []
     context.console = { error: (...args: unknown[]) => errors.push(args) }
     context.cacheKey = cacheKey
@@ -75,7 +75,7 @@ test('exports only one shared native object across repeated ESM imports', async 
 })
 
 test('prefers native globalThis without probing fallbacks or modifying a frozen prototype', () => {
-    const context = createHeap(`
+    const context = createRuntimeContext(`
         Object.defineProperty(this, 'globalThis', { value: this, writable: false, configurable: false });
         for (const name of ['self', 'window']) {
             Object.defineProperty(this, name, { get() { throw new Error('Unexpected ' + name + ' probe'); } });
@@ -88,7 +88,7 @@ test('prefers native globalThis without probing fallbacks or modifying a frozen 
 
 for (const state of ['absent', 'shadowed'] as const) {
     test(`recovers the real host with ${state} globalThis without eval or installing an alias`, () => {
-        const context = createHeap(`
+        const context = createRuntimeContext(`
             this.host = this;
             ${state === 'absent' ? 'delete this.globalThis;' : "this.globalThis = { marker: 'existing' }; let globalThis;"}
             const descriptor = Object.getOwnPropertyDescriptor(this, 'globalThis');
@@ -124,7 +124,7 @@ for (const state of ['absent', 'shadowed'] as const) {
 }
 
 test('uses self before window or prototype recovery when native globalThis is null', () => {
-    const context = createHeap(`
+    const context = createRuntimeContext(`
         this.globalThis = null;
         this.self = this;
         Object.defineProperty(this, 'window', { get() { throw new Error('Unexpected window probe'); } });
@@ -135,7 +135,7 @@ test('uses self before window or prototype recovery when native globalThis is nu
 })
 
 test('uses window before prototype recovery when native globalThis is absent and self is null', () => {
-    const context = createHeap(
+    const context = createRuntimeContext(
         'delete this.globalThis; this.self = null; this.window = this; Object.freeze(Object.prototype);'
     )
     runtimeScript.runInContext(context)
@@ -143,7 +143,7 @@ test('uses window before prototype recovery when native globalThis is absent and
 })
 
 test('returns an explicit object receiver when native names are unavailable', () => {
-    const context = createHeap('')
+    const context = createRuntimeContext('')
     runtimeScript.runInContext(context)
     new Script(`
         delete this.globalThis;
@@ -157,7 +157,7 @@ test('returns an explicit object receiver when native names are unavailable', ()
 
 for (const receiver of ['undefined', 'null', '42']) {
     test(`uses prototype recovery when the receiver is ${receiver}`, () => {
-        const context = createHeap('delete this.globalThis; this.self = false; this.window = null;')
+        const context = createRuntimeContext('delete this.globalThis; this.self = false; this.window = null;')
         runtimeScript.runInContext(context)
         new Script(`
             assert.equal(getGlobalThis.call(${receiver}), this);
@@ -167,7 +167,7 @@ for (const receiver of ['undefined', 'null', '42']) {
 }
 
 test('the temporary getter retains its self fallback when called without a receiver', () => {
-    const context = createHeap(`
+    const context = createRuntimeContext(`
         delete this.globalThis;
         const defineProperty = Object.defineProperty;
         // Capture the actual getter locally while still performing its ordinary installation and cleanup.
@@ -187,7 +187,7 @@ test('the temporary getter retains its self fallback when called without a recei
 })
 
 test('strict execution retains a fallback when inherited lookup returns undefined without throwing', () => {
-    const context = createHeap(`
+    const context = createRuntimeContext(`
         delete this.globalThis;
         this.self = undefined;
         const defineProperty = Object.defineProperty;
@@ -199,7 +199,7 @@ test('strict execution retains a fallback when inherited lookup returns undefine
             return defineProperty(object, key, descriptor);
         };
     `)
-    // Record diagnostics only in this deliberately strict heap; native output is tested separately in non-strict mode.
+    // Record diagnostics only in this deliberately strict VM context; native output is tested separately in non-strict mode.
     const errors: unknown[][] = []
     context.console = { error: (...args: unknown[]) => errors.push(args) }
     runtimeScript.runInContext(context)
@@ -213,7 +213,7 @@ test('strict execution retains a fallback when inherited lookup returns undefine
 })
 
 test('returns a native proxy without inspecting it or touching an existing recovery key', () => {
-    const context = createHeap(`
+    const context = createRuntimeContext(`
         const native = Proxy.revocable({}, {});
         native.revoke();
         this.globalThis = native.proxy;
@@ -232,7 +232,7 @@ test('returns a native proxy without inspecting it or touching an existing recov
 
 for (const name of ['self', 'window']) {
     test(`returns a null-prototype ${name} object as-is rather than recovering the host`, () => {
-        const context = createHeap(`
+        const context = createRuntimeContext(`
             this.globalThis = false;
             this.self = null;
             this.window = null;
@@ -246,7 +246,7 @@ for (const name of ['self', 'window']) {
 }
 
 test('recovers the host receiver through multiple prototype levels without changing its prototype', () => {
-    const context = createHeap(`
+    const context = createRuntimeContext(`
         delete this.globalThis;
         const prototype = Object.create(Object.getPrototypeOf(this));
         Object.setPrototypeOf(this, prototype);
@@ -263,7 +263,7 @@ test('recovers the host receiver through multiple prototype levels without chang
 
 for (const name of ['globalThis', 'self', 'window']) {
     test(`propagates an error from the ${name} probe without starting prototype recovery`, () => {
-        const context = createHeap(`
+        const context = createRuntimeContext(`
             delete this.globalThis;
             this.self = null;
             this.window = null;
@@ -280,7 +280,7 @@ for (const name of ['globalThis', 'self', 'window']) {
 }
 
 test('logs an arbitrary lookup cause and removes only the temporary getter', () => {
-    const context = createHeap(`
+    const context = createRuntimeContext(`
         delete this.globalThis;
         this.failure = { reason: 'host lookup failed' };
         Object.defineProperty(this, '__vpt_global__', { get() { throw failure; }, configurable: true });
@@ -294,7 +294,7 @@ test('logs an arbitrary lookup cause and removes only the temporary getter', () 
 
 for (const restriction of ['preventExtensions', 'seal', 'freeze']) {
     test(`returns a shared fallback when Object.${restriction} blocks discovery`, () => {
-        const context = createHeap(`delete this.globalThis; Object.${restriction}(Object.prototype);`)
+        const context = createRuntimeContext(`delete this.globalThis; Object.${restriction}(Object.prototype);`)
         const cause = assertDiscoveryFallback(context, Symbol.for('vpt.fake.global'))
         assert.ok(isNativeError(cause))
         assert.equal(cause.name, 'TypeError')
@@ -302,7 +302,7 @@ for (const restriction of ['preventExtensions', 'seal', 'freeze']) {
 }
 
 test('returns a shared fallback and cleans up when the host does not inherit Object.prototype', () => {
-    const context = createHeap('delete this.globalThis; Object.setPrototypeOf(this, null);')
+    const context = createRuntimeContext('delete this.globalThis; Object.setPrototypeOf(this, null);')
     const cause = assertDiscoveryFallback(context, Symbol.for('vpt.fake.global'))
     assert.ok(isNativeError(cause))
     assert.equal(cause.name, 'ReferenceError')
@@ -310,7 +310,7 @@ test('returns a shared fallback and cleans up when the host does not inherit Obj
 
 for (const setup of ['delete this.Symbol;', 'this.Symbol = undefined;', 'Symbol.for = undefined;']) {
     test(`shares the fallback through a string key when ${setup}`, () => {
-        const context = createHeap(`delete this.globalThis; Object.freeze(Object.prototype); ${setup}`)
+        const context = createRuntimeContext(`delete this.globalThis; Object.freeze(Object.prototype); ${setup}`)
         const cause = assertDiscoveryFallback(context, 'vpt.fake.global')
         assert.ok(isNativeError(cause))
         assert.equal(cause.name, 'TypeError')
@@ -318,8 +318,10 @@ for (const setup of ['delete this.Symbol;', 'this.Symbol = undefined;', 'Symbol.
 }
 
 test('propagates cache installation failure when the Object constructor is not extensible', () => {
-    const context = createHeap('delete this.globalThis; Object.freeze(Object.prototype); Object.freeze(Object);')
-    // Suppress only this heap's expected discovery diagnostic; the cache failure itself must remain observable.
+    const context = createRuntimeContext(
+        'delete this.globalThis; Object.freeze(Object.prototype); Object.freeze(Object);'
+    )
+    // Suppress only this VM context's expected discovery diagnostic; the cache failure itself must remain observable.
     context.console = { error() {} }
     assert.throws(
         () => runtimeScript.runInContext(context),
@@ -336,7 +338,7 @@ test('propagates cache installation failure when the Object constructor is not e
 })
 
 test('cleans up the temporary getter even when fallback logging throws', () => {
-    const context = createHeap(`
+    const context = createRuntimeContext(`
         delete this.globalThis;
         const lookupFailure = { reason: 'host lookup failed' };
         this.loggingFailure = new Error('logging failed');
@@ -363,7 +365,7 @@ test('cleans up the temporary getter even when fallback logging throws', () => {
 
 for (const outcome of ['return', 'throw'] as const) {
     test(`preserves a native cleanup error when host lookup attempts to ${outcome}`, () => {
-        const context = createHeap(`
+        const context = createRuntimeContext(`
             delete this.globalThis;
             Object.defineProperty(this, '__vpt_global__', {
                 get() {
@@ -391,7 +393,7 @@ for (const state of ['native', 'recovered'] as const) {
     const setup = `"use strict"; this.host = this; ${state === 'recovered' ? 'delete this.globalThis;' : ''}`
 
     test(`${state}: observes live native replacements, future APIs, falsy values and deletion`, () => {
-        const context = createHeap(`
+        const context = createRuntimeContext(`
             ${setup}
             const nativeMath = Math;
             this.vendorBridge = { value: 1, read() { return this.value; } };
@@ -435,7 +437,7 @@ for (const state of ['native', 'recovered'] as const) {
     })
 
     test(`${state}: keeps accessor reads lazy and preserves update and short-circuit order`, () => {
-        const context = createHeap(`
+        const context = createRuntimeContext(`
             ${setup}
             // This realm-local journal and backing value expose duplicate probes, coercions and setter calls.
             const events = [];
@@ -478,7 +480,7 @@ for (const state of ['native', 'recovered'] as const) {
     })
 
     test(`${state}: does not probe unrelated accessors or wrap their thrown values`, () => {
-        const context = createHeap(`
+        const context = createRuntimeContext(`
             ${setup}
             const readFailure = new RangeError('read failed');
             const writeFailure = { reason: 'write failed' };
@@ -497,7 +499,7 @@ for (const state of ['native', 'recovered'] as const) {
     })
 
     test(`${state}: preserves symbols, descriptors, readonly properties and present undefined`, () => {
-        const context = createHeap(`
+        const context = createRuntimeContext(`
             ${setup}
             const symbol = Symbol('host API');
             const descriptor = { value: { marker: true }, writable: true, configurable: true, enumerable: false };
@@ -538,7 +540,7 @@ for (const state of ['native', 'recovered'] as const) {
     })
 
     test(`${state}: preserves function identity, call receivers, tags and constructors`, () => {
-        const context = createHeap(`
+        const context = createRuntimeContext(`
             ${setup}
             this.read = function(...values) { return [this, values]; };
             this.tag = function(strings, ...values) { return [this, [...strings], values]; };
@@ -578,7 +580,7 @@ for (const state of ['native', 'recovered'] as const) {
     })
 
     test(`${state}: shares object-backed globals without capturing lexical bindings or installing globalThis`, () => {
-        const context = createHeap(`
+        const context = createRuntimeContext(`
             ${setup}
             var objectValue = 1;
             let lexicalValue = 2;
@@ -617,7 +619,7 @@ for (const state of ['native', 'recovered'] as const) {
     })
 
     test(`${state}: honors descriptor changes and deletion during assignment RHS evaluation`, () => {
-        const context = createHeap(`${setup} this.slot = 1;`)
+        const context = createRuntimeContext(`${setup} this.slot = 1;`)
         runtimeScript.runInContext(context)
         new Script(`
             "use strict";
@@ -642,7 +644,7 @@ for (const state of ['native', 'recovered'] as const) {
     })
 
     test(`${state}: preserves destructuring order, rest targets, loop writes and iterator cleanup`, () => {
-        const context = createHeap(setup)
+        const context = createRuntimeContext(setup)
         runtimeScript.runInContext(context)
         new Script(`
             "use strict";
@@ -681,7 +683,7 @@ for (const state of ['native', 'recovered'] as const) {
     })
 
     test(`${state}: retains assignment references across await and yield`, async () => {
-        const context = createHeap(`${setup} this.slot = 1;`)
+        const context = createRuntimeContext(`${setup} this.slot = 1;`)
         runtimeScript.runInContext(context)
         await new Script(`
             "use strict";
@@ -708,7 +710,7 @@ for (const state of ['native', 'recovered'] as const) {
     })
 
     test(`${state}: keeps inherited APIs and special property names without reflection helpers on access`, () => {
-        const context = createHeap(`
+        const context = createRuntimeContext(`
             ${setup}
             const prototype = Object.create(Object.getPrototypeOf(host), {
                 inheritedApi: { value() { return this; } }
@@ -745,7 +747,7 @@ for (const state of ['native', 'recovered'] as const) {
 }
 
 test('does not overwrite a read-only undefined globalThis property during recovery', () => {
-    const context = createHeap(`
+    const context = createRuntimeContext(`
         Object.defineProperty(this, 'globalThis', { value: undefined, writable: false, configurable: false });
     `)
     runtimeScript.runInContext(context)

@@ -198,7 +198,7 @@ test('reports patch failure before closing the socket and stops subsequent insta
                 seq: 1,
                 changedIds: [],
                 factory() {
-                    assert.fail('Failed heaps must not install further patches')
+                    assert.fail('Failed runtime instances must not install further patches')
                 }
             }
         ]
@@ -378,7 +378,7 @@ test('passes the receiving runtime to patch factories and their retained module 
     assert.deepEqual(runtime.initModule('page'), { value: 'new' })
 })
 
-test('keeps the first App-heap identity when initialize is replayed', async (context) => {
+test('keeps the first App runtime identity when initialize is replayed', async (context) => {
     context.mock.method(console, 'warn', () => {})
     const { messages, runtime } = await createTestHarness()
     runtime.initialize({ buildId: 'replacement', endpoint: 'ws://replacement/hmr' })
@@ -391,7 +391,7 @@ test('keeps the first App-heap identity when initialize is replayed', async (con
                 seq: 1,
                 changedIds: ['page'],
                 factory(): void {
-                    assert.fail('A replacement session must not execute in the existing App heap')
+                    assert.fail('A replacement session must not execute in the existing App runtime instance')
                 }
             }
         ]

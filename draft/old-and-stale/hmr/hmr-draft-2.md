@@ -58,7 +58,7 @@ The prototype separated transport into:
 
 The HTTP response never carried executable patch source.
 
-### 1.2 Page-scoped file changes can retain the App heap
+### 1.2 Page-scoped file changes can retain the App runtime instance
 
 The bare probes in `../hmr-probe-result.md` established, with `compileHotReLoad: true`, that automatically rewriting
 an active `page.js` preserved the existing App identity and `globalData`. The same probe did **not** establish React,
@@ -849,7 +849,7 @@ Rejected because it relied on generated-code shapes and could silently remove th
 
 ### 9.7 Ordinary full builds for source edits
 
-Rejected because they rewrite App-level files, cause DevTools reloads, and destroy the retained heap.
+Rejected because they rewrite App-level files, cause DevTools reloads, and destroy the retained runtime instance.
 
 ### 9.8 Output snapshots and full rematerialization after every callback
 
@@ -897,7 +897,7 @@ observation before the next layer is added.
 - Register one executed module with Rolldown.
 - Obtain one patch.
 - Write only `/update.js`.
-- Confirm the existing App heap remains.
+- Confirm the existing App runtime instance remains.
 - Confirm stale initializers do not overwrite the patched module.
 
 ### Phase D: establish reliable versioning

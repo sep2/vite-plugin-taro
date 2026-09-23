@@ -351,7 +351,7 @@ test('executes a complex nested static and dynamic graph across production wx su
     const transportExports = native.evaluate(output.transport.fileName)
     requireTransportExports(transportExports)
 
-    // The production bootstrap installs this mutable transport hook once for the application heap.
+    // The production bootstrap installs this mutable transport hook once for the application runtime instance.
     system.instantiate = transportExports.transport
 
     const nativeEntry = native.evaluate(output.nativeEntry.fileName)

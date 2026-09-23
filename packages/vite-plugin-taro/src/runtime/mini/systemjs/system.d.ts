@@ -46,7 +46,7 @@ declare global {
             /**
              * Uses the same registry and evaluator but requires every unresolved registration and execute function in the
              * static closure to complete synchronously. An asynchronous phase throws without rollback and must be treated
-             * as a fatal placement invariant violation for the current runtime heap.
+             * as a fatal placement invariant violation for the current runtime instance.
              */
             importSync(id: string): Module
             instantiate(id: string): Registration | PromiseLike<Registration>

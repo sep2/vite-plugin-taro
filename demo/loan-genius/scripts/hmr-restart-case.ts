@@ -67,7 +67,7 @@ export async function runLoanHmrRestartCase(context: LoanRestartContext): Promis
         const restarted = await waitForNewBuild(infoPath, before.buildId)
         await assert.rejects(stat(obsoletePath), { code: 'ENOENT' })
         await waitForRuntimeStartup(fixture, infoPath)
-        // A development restart intentionally replaces the App heap. The same open DevTools window must load the new baseline.
+        // A development restart intentionally reloads the App. The same open DevTools window must load the new baseline.
         await waitForCalculator(devTools, '0')
         await waitForMarker(devTools, 'restart-before')
         const appStyle = await readFile(appStylePath, 'utf8')

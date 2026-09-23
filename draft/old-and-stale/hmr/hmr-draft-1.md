@@ -7,7 +7,7 @@ Web HMR assumes that the running application can receive new JavaScript and exec
 - executable code must be compiled by WeChat DevTools from a project file;
 - code received through `wx.request` cannot be evaluated with `eval`, `Function`, or an equivalent mechanism;
 - DevTools chooses how much of the Mini Program to reload from the file that changed;
-- if DevTools reloads the App, the old JavaScript heap, Taro root, and React Fiber tree are gone.
+- if DevTools reloads the App, the old JavaScript runtime instance, Taro root, and React Fiber tree are gone.
 
 React Refresh can preserve state only while the existing Fiber tree remains alive. The central problem is how to deliver and execute new module code **without causing DevTools to rerun the App**.
 
@@ -224,7 +224,7 @@ cannot use the `page.wxss` boundary for general source CSS because its styles ar
 ownership and route splitting exist, CSS edits still require a complete build. State-preserving WXSS hot reload is the
 next planned extension and will be supported soon.
 
-A build that rewrites `app.wxss` reloads the App in the tested DevTools environment, so the old heap, HMR runtime, Taro
+A build that rewrites `app.wxss` reloads the App in the tested DevTools environment, so the old runtime instance, HMR runtime, Taro
 root, and Fiber tree are gone. No later HMR logic can recover them.
 
 ## Why this design is necessary

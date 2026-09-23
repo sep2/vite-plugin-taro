@@ -25,7 +25,7 @@ function moduleSource(value: number): string {
 }
 
 /** Execute the complete emitted graph without manually registering the global facade or installing a globalThis alias. */
-function createHeap(chunks: readonly OutputChunk[], setup: string) {
+function createRuntimeContext(chunks: readonly OutputChunk[], setup: string) {
     const context = createContext(constants.DONT_CONTEXTIFY, { codeGeneration: { strings: false, wasm: false } })
     const runtime = new RegistrationRuntime('global-test')
     context.__createRuntime = (global: unknown) => {
@@ -148,13 +148,13 @@ test('real HMR factories reuse the registered binding without rediscovering the 
     await engine.registerClient('global-test')
     const main = chunks.find((chunk) => normalizePath(chunk.facadeModuleId ?? '') === normalizePath(entry))
     assert.ok(main)
-    const heaps = ['', 'delete this.globalThis;', 'let globalThis;'].map((setup) => {
-        const heap = createHeap(chunks, setup)
-        const exports = heap.load(main.fileName)
+    const runtimeContexts = ['', 'delete this.globalThis;', 'let globalThis;'].map((setup) => {
+        const fixture = createRuntimeContext(chunks, setup)
+        const exports = fixture.load(main.fileName)
         assert.ok(exports && typeof exports === 'object')
-        assert.equal(Reflect.get(exports, 'root'), runInContext('this', heap.context))
+        assert.equal(Reflect.get(exports, 'root'), runInContext('this', fixture.context))
         assert.equal(Reflect.get(exports, 'value'), 1)
-        return heap
+        return fixture
     })
 
     // Atomic replacement exposes one complete source generation to the actual native watcher.
@@ -172,16 +172,16 @@ test('real HMR factories reuse the registered binding without rediscovering the 
     const patch = patches[0]
     assert.match(patch.code, /vpt:global-binding/)
     assert.doesNotMatch(patch.code, /__VPT_GLOBAL__|vpt\.fake\.global|require\(/)
-    for (const [index, heap] of heaps.entries()) {
-        runInContext(patch.code, heap.context)
+    for (const [index, fixture] of runtimeContexts.entries()) {
+        runInContext(patch.code, fixture.context)
         for (const id of patch.changedIds) {
-            heap.runtime.removeModuleCache(id)
-            heap.runtime.initModule(id)
-            const exports = heap.runtime.loadExports(id)
-            assert.equal(exports.root, runInContext('this', heap.context))
+            fixture.runtime.removeModuleCache(id)
+            fixture.runtime.initModule(id)
+            const exports = fixture.runtime.loadExports(id)
+            assert.equal(exports.root, runInContext('this', fixture.context))
             assert.equal(exports.value, 2)
         }
-        assert.equal(runInContext('discoveries', heap.context), 0)
-        assert.equal(runInContext('typeof globalThis', heap.context), index === 0 ? 'object' : 'undefined')
+        assert.equal(runInContext('discoveries', fixture.context), 0)
+        assert.equal(runInContext('typeof globalThis', fixture.context), index === 0 ? 'object' : 'undefined')
     }
 })

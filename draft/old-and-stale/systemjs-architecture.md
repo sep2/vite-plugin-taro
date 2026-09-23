@@ -154,7 +154,7 @@ Code received through `wx.request` cannot be executed through `eval`, `Function`
 code path. HTTP carries control metadata only.
 
 Executable hot definitions are written to the fixed `hmr/update.js` project file. DevTools compiles that file and
-reruns the page-side boundary while retaining the App heap.
+reruns the page-side boundary while retaining the App runtime instance.
 
 ### Package limits apply to physical output
 
@@ -1045,9 +1045,9 @@ The existing DevTools boundary remains part of the design.
 Every generated page entry directly and literally requires the same pre-existing `hmr/update.js` file from the
 initial checkpoint. During a JavaScript update, the server writes only this file.
 
-In the tested active-page file-save case, DevTools recompiles and reruns page-side code while retaining the App heap.
+In the tested active-page file-save case, DevTools recompiles and reruns page-side code while retaining the App runtime instance.
 That probe did not establish inactive-page behavior, Page-instance identity for arbitrary JavaScript changes, or the
-final React/Taro composition. The System transaction probe applied pre-embedded updates in the same WeChat heap; it did
+final React/Taro composition. The System transaction probe applied pre-embedded updates in the same WeChat runtime context; it did
 not deliver those definitions through the fixed file. `update.js` is designed to call the existing `app-runtime.js` with
 the missing ordered definition range before ordinary page setup continues. The composition of those two proven pieces
 remains an integration test.

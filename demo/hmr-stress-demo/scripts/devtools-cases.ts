@@ -107,7 +107,7 @@ async function testSyntaxRecovery(harness: DevToolsHarness): Promise<void> {
             5_000,
             20
         )
-        // Invalid editor contents carry no patch and must leave both the build identity and live Page heap untouched.
+        // Invalid editor contents carry no patch and must leave both the build identity and live Page runtime state untouched.
         assert.equal((await readHmrInfo(infoPath)).buildId, before.buildId)
         await assertPageState('syntax-retained', harness)
     } finally {

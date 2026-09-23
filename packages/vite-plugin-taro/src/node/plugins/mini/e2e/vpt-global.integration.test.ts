@@ -103,11 +103,11 @@ async function bundleFixture(sources: ReadonlyMap<string, string>, input: string
 }
 
 /** Execute emitted CommonJS, including split chunks, in a strict host realm with eval and Function disabled. */
-function createBundleHeap(chunks: readonly OutputChunk[], setup: string) {
+function createBundleRuntime(chunks: readonly OutputChunk[], setup: string) {
     const context = createContext(constants.DONT_CONTEXTIFY, { codeGeneration: { strings: false, wasm: false } })
     context.assert = assert
     const files = new Map(chunks.map((chunk) => [chunk.fileName, chunk]))
-    // CommonJS owns this per-heap module cache; registering before evaluation also models cycles accurately.
+    // CommonJS owns this per-context module cache; registering before evaluation also models cycles accurately.
     const modules = new Map<string, { exports: unknown }>()
 
     function run(code: string): unknown {
@@ -199,9 +199,9 @@ for (const minify of [false, true]) {
                 absent: 'delete this.globalThis;',
                 shadowed: 'let globalThis;'
             }[state]
-            const heap = createBundleHeap(chunks, setup)
-            heap.context.fixture = heap.load(entry.fileName)
-            heap.run(`
+            const execution = createBundleRuntime(chunks, setup)
+            execution.context.fixture = execution.load(entry.fileName)
+            execution.run(`
                 assert.equal(fixture.root, host);
                 assert.equal(fixture.peerRoot, host);
                 assert.equal(fixture.shorthand.globalThis, host);
@@ -244,9 +244,9 @@ for (const minify of [false, true]) {
         assert.ok(vendor)
         assert.ok(vendor.moduleIds.includes(localId), 'The recursive group must actually include its dependency')
         assert.notEqual(vendor.fileName, runtime.fileName)
-        const heap = createBundleHeap(chunks, 'delete this.globalThis;')
-        heap.context.fixture = heap.load(entry.fileName)
-        heap.run(`
+        const execution = createBundleRuntime(chunks, 'delete this.globalThis;')
+        execution.context.fixture = execution.load(entry.fileName)
+        execution.run(`
             assert.equal(fixture.root, host);
             assert.deepEqual(fixture.local, { marker: 'vendor local' });
             assert.equal(discoveries, 1);
@@ -257,9 +257,9 @@ for (const minify of [false, true]) {
         const sources = new Map([[entryId, 'export const kind = typeof globalThis;']])
         const { chunks, imports, entry } = await bundleFixture(sources, [entryId], minify)
         assert.deepEqual(imports.get(entryId), [bindingId])
-        const heap = createBundleHeap(chunks, 'delete this.globalThis;')
-        heap.context.fixture = heap.load(entry.fileName)
-        heap.run(`
+        const execution = createBundleRuntime(chunks, 'delete this.globalThis;')
+        execution.context.fixture = execution.load(entry.fileName)
+        execution.run(`
             assert.equal(fixture.kind, 'object');
             assert.equal(typeof globalThis, 'undefined');
             assert.equal(discoveries, 1);
@@ -278,9 +278,9 @@ for (const minify of [false, true]) {
             ])
             const { chunks, imports, entry } = await bundleFixture(sources, [entryId], minify)
             assert.deepEqual(imports.get(commonJsId), [bindingId])
-            const heap = createBundleHeap(chunks, 'delete this.globalThis;')
-            heap.context.fixture = heap.load(entry.fileName)
-            heap.run(`
+            const execution = createBundleRuntime(chunks, 'delete this.globalThis;')
+            execution.context.fixture = execution.load(entry.fileName)
+            execution.run(`
                 assert.equal(fixture.dependency.root, host);
                 assert.equal(fixture.root, host);
                 assert.equal(fixture.dependency.matchesMath, true);
@@ -303,10 +303,10 @@ for (const minify of [false, true]) {
         const entry = chunks.find((chunk) => chunk.facadeModuleId === entryId)
         const peer = chunks.find((chunk) => chunk.facadeModuleId === peerId)
         assert.ok(entry && peer)
-        const heap = createBundleHeap(chunks, 'delete this.globalThis;')
-        heap.context.first = heap.load(entry.fileName)
-        heap.context.second = heap.load(peer.fileName)
-        await heap.run(`
+        const execution = createBundleRuntime(chunks, 'delete this.globalThis;')
+        execution.context.first = execution.load(entry.fileName)
+        execution.context.second = execution.load(peer.fileName)
+        await execution.run(`
             (async () => {
                 assert.equal(first.root, host);
                 assert.equal(second.root, host);
@@ -345,20 +345,20 @@ for (const { name, setup } of [
         ]
         const hostSetup = `
             delete this.globalThis;
-            // This heap-local journal captures failed discovery independently of fallback cache reuse.
+            // This context-local journal captures failed discovery independently of fallback cache reuse.
             this.diagnostics = [];
             this.console = { error: (...args) => diagnostics.push(args) };
             ${setup}
         `
-        const heap = createBundleHeap(chunks, hostSetup)
-        heap.context.first = heap.load(`first/${first.entry.fileName}`)
-        heap.run(`
+        const execution = createBundleRuntime(chunks, hostSetup)
+        execution.context.first = execution.load(`first/${first.entry.fileName}`)
+        execution.run(`
             first.root.fixtureValue = 42;
             // A cached fallback remains readable even if the constructor is locked after its creation.
             Object.freeze(Object);
         `)
-        heap.context.second = heap.load(`second/${second.entry.fileName}`)
-        heap.run(`
+        execution.context.second = execution.load(`second/${second.entry.fileName}`)
+        execution.run(`
             assert.equal(first.root, second.root);
             assert.notEqual(first.root, host);
             assert.equal(second.root.fixtureValue, 42);
@@ -381,10 +381,14 @@ for (const { name, setup } of [
             assert.equal(typeof fixtureValue, 'undefined');
         `)
 
-        const otherHeap = createBundleHeap(chunks, hostSetup)
-        otherHeap.context.first = otherHeap.load(`first/${first.entry.fileName}`)
-        assert.notStrictEqual(otherHeap.run('first.root'), heap.run('first.root'), 'Caches must remain realm-local')
-        assert.equal(otherHeap.run('first.root.fixtureValue'), undefined)
+        const otherExecution = createBundleRuntime(chunks, hostSetup)
+        otherExecution.context.first = otherExecution.load(`first/${first.entry.fileName}`)
+        assert.notStrictEqual(
+            otherExecution.run('first.root'),
+            execution.run('first.root'),
+            'Caches must remain realm-local'
+        )
+        assert.equal(otherExecution.run('first.root.fixtureValue'), undefined)
     })
 }
 
@@ -412,9 +416,9 @@ test('local globalThis bindings, property names, text and comments never trigger
     assert.deepEqual(imports.get(entryId), [peerId])
     assert.deepEqual(entry.imports, [])
     assert.ok(entry.code.includes(comment))
-    const heap = createBundleHeap(chunks, 'delete this.globalThis;')
-    heap.context.fixture = heap.load(entry.fileName)
-    heap.run(`
+    const execution = createBundleRuntime(chunks, 'delete this.globalThis;')
+    execution.context.fixture = execution.load(entry.fileName)
+    execution.run(`
         assert.equal(fixture.imported, 'imported local');
         assert.equal(fixture.text, 'globalThis __VPT_GLOBAL__');
         assert.deepEqual(fixture.property, { globalThis: 'property' });
@@ -444,9 +448,9 @@ test('other free globals remain native and do not load the runtime', async () =>
     const { chunks, imports, entry } = await bundleFixture(sources, [entryId], false)
     assert.deepEqual(imports.get(entryId), [])
     assert.deepEqual(entry.imports, [])
-    const heap = createBundleHeap(chunks, 'delete this.globalThis;')
-    heap.context.fixture = heap.load(entry.fileName)
-    heap.run(`
+    const execution = createBundleRuntime(chunks, 'delete this.globalThis;')
+    execution.context.fixture = execution.load(entry.fileName)
+    execution.run(`
         assert.deepEqual(fixture.bindings, [Math, Promise, fetch, tt]);
         assert.deepEqual(fixture.callFetch(3), [undefined, 3]);
         assert.equal(fixture.windowKind, 'undefined');
@@ -461,15 +465,15 @@ test('the isolated runtime entry initializes without application execution or a 
     const sources = new Map([[entryId, 'globalThis.events.push("application"); export const root = globalThis;']])
     const { chunks, runtime, entry } = await bundleFixture(sources, [entryId], false)
     assert.deepEqual(runtime.imports, [])
-    const heap = createBundleHeap(chunks, 'Object.freeze(Object.prototype);')
-    heap.context.runtime = heap.load(runtime.fileName)
-    heap.run(`
+    const execution = createBundleRuntime(chunks, 'Object.freeze(Object.prototype);')
+    execution.context.runtime = execution.load(runtime.fileName)
+    execution.run(`
         assert.equal(runtime.vptGlobal, host);
         assert.deepEqual(events, []);
         assert.equal(discoveries, 0);
     `)
-    heap.context.fixture = heap.load(entry.fileName)
-    heap.run(`
+    execution.context.fixture = execution.load(entry.fileName)
+    execution.run(`
         assert.equal(fixture.root, runtime.vptGlobal);
         assert.deepEqual(events, ['application']);
         assert.equal(discoveries, 0);

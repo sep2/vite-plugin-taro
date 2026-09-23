@@ -261,7 +261,7 @@ async function compileFixture(
 }
 
 /** Evaluates emitted native files in a separate AppService-like realm with no browser DOM or dynamic code generation. */
-function createAppHeap(chunks: readonly NativeFile[], nativeURLs: boolean, target: MiniTarget) {
+function createAppRuntime(chunks: readonly NativeFile[], nativeURLs: boolean, target: MiniTarget) {
     // Add the host-published HMR files, which deliberately live outside Rolldown's chunk graph, to this fixture's source table.
     const sources = new Map(chunks.map((chunk) => [chunk.fileName, chunk.code]))
     sources.set('hmr/info.js', 'module.exports = { buildId: "test", endpoint: "ws://localhost/test" };')
@@ -311,7 +311,7 @@ function createAppHeap(chunks: readonly NativeFile[], nativeURLs: boolean, targe
         },
         { codeGeneration: { strings: false, wasm: false } }
     )
-    // Only this isolated realm loses the optional prototype method; Node and other App heaps retain their native built-ins.
+    // Only this isolated realm loses the optional prototype method; Node and other App runtime instances retain their native built-ins.
     runInContext(
         `
         globalThis.global = globalThis;
@@ -375,22 +375,25 @@ function assertPolyfilledBootstrap(
     target: MiniTarget,
     structuredClone: 'function' | 'undefined'
 ): void {
-    const heap = createAppHeap(chunks, false, target)
-    heap.evaluate('common/polyfills.js')
-    assert.equal(heap.read('typeof System'), 'undefined')
-    assert.equal(heap.read('typeof URL'), 'function')
-    assert.equal(heap.read('typeof URLSearchParams'), 'function')
-    assert.equal(heap.read('[1, 2].at(-1)'), 2)
-    assert.equal(heap.read('typeof structuredClone'), structuredClone)
-    assert.equal(heap.read('typeof globalThis.polyfillProbe'), 'undefined')
-    const installedURL = heap.read('URL')
-    heap.evaluate('common/bootstrap.js')
-    assert.equal(heap.read('URL'), installedURL)
+    const runtime = createAppRuntime(chunks, false, target)
+    runtime.evaluate('common/polyfills.js')
+    assert.equal(runtime.read('typeof System'), 'undefined')
+    assert.equal(runtime.read('typeof URL'), 'function')
+    assert.equal(runtime.read('typeof URLSearchParams'), 'function')
+    assert.equal(runtime.read('[1, 2].at(-1)'), 2)
+    assert.equal(runtime.read('typeof structuredClone'), structuredClone)
+    assert.equal(runtime.read('typeof globalThis.polyfillProbe'), 'undefined')
+    const installedURL = runtime.read('URL')
+    runtime.evaluate('common/bootstrap.js')
+    assert.equal(runtime.read('URL'), installedURL)
 }
 
-function assertPolyfilledApp(heap: ReturnType<typeof createAppHeap>, structuredClone: 'function' | 'undefined'): void {
-    heap.evaluate('app.js')
-    assert.deepEqual(heap.json('polyfillProbe'), {
+function assertPolyfilledApp(
+    runtime: ReturnType<typeof createAppRuntime>,
+    structuredClone: 'function' | 'undefined'
+): void {
+    runtime.evaluate('app.js')
+    assert.deepEqual(runtime.json('polyfillProbe'), {
         href: 'https://example.com/dir/child',
         params: 'a=1&b=2&a=3',
         entries: [
@@ -405,29 +408,29 @@ function assertPolyfilledApp(heap: ReturnType<typeof createAppHeap>, structuredC
         local: 'local',
         structuredClone
     })
-    const installedURL = heap.read('URL')
-    heap.evaluate('pages/home/index.js')
-    heap.evaluate('comp.js')
-    heap.evaluate('custom-wrapper.js')
-    assert.deepEqual(heap.registrations, ['App', 'Page', 'Component', 'Component'])
-    assert.equal(heap.read('URL'), installedURL)
-    assert.equal(heap.read('this["__core-js_shared__"].versions.length'), 1)
+    const installedURL = runtime.read('URL')
+    runtime.evaluate('pages/home/index.js')
+    runtime.evaluate('comp.js')
+    runtime.evaluate('custom-wrapper.js')
+    assert.deepEqual(runtime.registrations, ['App', 'Page', 'Component', 'Component'])
+    assert.equal(runtime.read('URL'), installedURL)
+    assert.equal(runtime.read('this["__core-js_shared__"].versions.length'), 1)
 }
 
 for (const target of miniTargets) {
     test(`${target}: selected production APIs install before dependencies without replacing native URL constructors`, async () => {
         const chunks = await compileFixture(target, 'production', [...optionalPolyfills, 'es.array.at'])
         assertPolyfilledBootstrap(chunks, target, 'undefined')
-        const missing = createAppHeap(chunks, false, target)
+        const missing = createAppRuntime(chunks, false, target)
         assertPolyfilledApp(missing, 'undefined')
-        const native = createAppHeap(chunks, true, target)
+        const native = createAppRuntime(chunks, true, target)
         assertPolyfilledApp(native, 'undefined')
         assert.equal(native.read('URL'), URL)
         assert.equal(native.read('URLSearchParams'), URLSearchParams)
 
         // Enter through the real App/Page/Component shells, without a host globalThis alias or a manual System import.
         for (const setup of ['delete this.globalThis;', 'let globalThis;']) {
-            const recovered = createAppHeap(chunks, false, target)
+            const recovered = createAppRuntime(chunks, false, target)
             recovered.read(setup)
             assertPolyfilledApp(recovered, 'undefined')
             assert.equal(recovered.read('typeof globalThis'), 'undefined')
@@ -442,7 +445,7 @@ for (const target of miniTargets) {
                 'web.queue-microtask'
             ])
             assertPolyfilledBootstrap(chunks, target, 'function')
-            // Reuse the emitted graph, but give every host configuration its own heap and CommonJS cache.
+            // Reuse the emitted graph, but give every host configuration its own VM context and CommonJS cache.
             // Each case requires successful startup; asserting the current exception would hide the missing runtime binding.
             for (const { name, setup, globalType } of [
                 { name: 'native globalThis', setup: '', globalType: 'object' },
@@ -450,16 +453,16 @@ for (const target of miniTargets) {
                 { name: 'shadowed globalThis', setup: 'let globalThis;', globalType: 'undefined' }
             ]) {
                 await t.test(name, () => {
-                    const heap = createAppHeap(chunks, false, target)
-                    heap.read(setup)
-                    assert.equal(heap.read('typeof globalThis'), globalType)
-                    const provider = heap.evaluate('common/vpt/global.js')
+                    const runtime = createAppRuntime(chunks, false, target)
+                    runtime.read(setup)
+                    assert.equal(runtime.read('typeof globalThis'), globalType)
+                    const provider = runtime.evaluate('common/vpt/global.js')
                     assert.ok(provider && typeof provider === 'object')
-                    assert.strictEqual(Reflect.get(provider, 'vptGlobal'), heap.read('this'))
-                    assert.equal(heap.read('typeof __rolldown_runtime__'), 'undefined')
-                    assert.deepEqual(heap.registrations, [])
-                    // Record the install target inside this heap, then restore Reflect before exercising any HMR patches.
-                    heap.read(`
+                    assert.strictEqual(Reflect.get(provider, 'vptGlobal'), runtime.read('this'))
+                    assert.equal(runtime.read('typeof __rolldown_runtime__'), 'undefined')
+                    assert.deepEqual(runtime.registrations, [])
+                    // Record the install target inside this VM context, then restore Reflect before exercising any HMR patches.
+                    runtime.read(`
                         let runtimeGlobal;
                         const nativeReflectSet = Reflect.set;
                         Reflect.set = (target, key, ...args) => {
@@ -469,20 +472,20 @@ for (const target of miniTargets) {
                             return nativeReflectSet(target, key, ...args);
                         };
                     `)
-                    assertPolyfilledApp(heap, 'function')
-                    heap.read('Reflect.set = nativeReflectSet;')
-                    const globalEntry = heap.evaluate('common/vpt/global.js')
+                    assertPolyfilledApp(runtime, 'function')
+                    runtime.read('Reflect.set = nativeReflectSet;')
+                    const globalEntry = runtime.evaluate('common/vpt/global.js')
                     assert.ok(globalEntry && typeof globalEntry === 'object')
-                    assert.strictEqual(Reflect.get(globalEntry, 'vptGlobal'), heap.read('runtimeGlobal'))
-                    assert.strictEqual(heap.read('runtimeGlobal'), heap.read('this'))
-                    assert.equal(heap.read('typeof queueMicrotask'), 'function')
+                    assert.strictEqual(Reflect.get(globalEntry, 'vptGlobal'), runtime.read('runtimeGlobal'))
+                    assert.strictEqual(runtime.read('runtimeGlobal'), runtime.read('this'))
+                    assert.equal(runtime.read('typeof queueMicrotask'), 'function')
                     if (mode === 'interpreter') {
-                        heap.read(`
+                        runtime.read(`
                             __rolldown_runtime__.registerGraph({ ids: ['probe'], localCount: 1, edges: [[]], dynamicEdges: [[]] });
                             __rolldown_runtime__.registerModule('probe', { exports: {} });
                             __rolldown_runtime__.createModuleHotContext('probe').accept();
                         `)
-                        heap.sendPatch(`
+                        runtime.sendPatch(`
                             __rolldown_runtime__.registerFactory('probe', 'esm', function(moduleId) {
                                 __rolldown_runtime__.registerModule(moduleId, { exports: {
                                     href: new URL('child', 'https://example.com/dir/page').href,
@@ -491,14 +494,14 @@ for (const target of miniTargets) {
                                 __rolldown_runtime__.createModuleHotContext(moduleId).accept();
                             });
                         `)
-                        assert.deepEqual(heap.json('__rolldown_runtime__.loadExports("probe")'), {
+                        assert.deepEqual(runtime.json('__rolldown_runtime__.loadExports("probe")'), {
                             href: 'https://example.com/dir/child',
                             clone: { value: 2 }
                         })
-                        assert.ok(heap.reports.some((report) => JSON.parse(report).data.kind === 'applied'))
+                        assert.ok(runtime.reports.some((report) => JSON.parse(report).data.kind === 'applied'))
                     }
-                    assert.equal(heap.read('typeof globalThis'), globalType, 'startup must not install a host alias')
-                    assert.equal(heap.read('globalDiscoveries'), 0)
+                    assert.equal(runtime.read('typeof globalThis'), globalType, 'startup must not install a host alias')
+                    assert.equal(runtime.read('globalDiscoveries'), 0)
                 })
             }
         })
@@ -509,29 +512,29 @@ for (const target of miniTargets) {
     for (const mode of ['production', 'devtools', 'interpreter', 'rebuild'] as const) {
         test(`${target} ${mode}: the empty selection keeps core-js out while development retains its microtask fallback`, async (t) => {
             const chunks = await compileFixture(target, mode, [])
-            const missing = createAppHeap(chunks, false, target)
+            const missing = createAppRuntime(chunks, false, target)
             assert.throws(() => missing.evaluate('app.js'), { name: 'ReferenceError', message: 'URL is not defined' })
             assert.equal(missing.read('typeof URLSearchParams'), 'undefined')
 
-            const heap = createAppHeap(chunks, true, target)
-            heap.evaluate('common/bootstrap.js')
-            assert.equal(heap.read('typeof globalThis.polyfillProbe'), 'undefined')
-            assert.equal(heap.read('typeof queueMicrotask'), mode === 'production' ? 'undefined' : 'function')
-            assert.equal(heap.read('typeof globalThis["__core-js_shared__"]'), 'undefined')
+            const runtime = createAppRuntime(chunks, true, target)
+            runtime.evaluate('common/bootstrap.js')
+            assert.equal(runtime.read('typeof globalThis.polyfillProbe'), 'undefined')
+            assert.equal(runtime.read('typeof queueMicrotask'), mode === 'production' ? 'undefined' : 'function')
+            assert.equal(runtime.read('typeof globalThis["__core-js_shared__"]'), 'undefined')
             if (mode !== 'production') {
-                await assertMicrotaskQueue(heap)
+                await assertMicrotaskQueue(runtime)
             }
 
-            heap.evaluate('app.js')
+            runtime.evaluate('app.js')
             assert.equal(
-                Array.isArray(heap.evaluate('common/vendor.js')),
+                Array.isArray(runtime.evaluate('common/vendor.js')),
                 true,
                 'vendor must export a capsule registration'
             )
-            assert.equal(heap.read('URL'), URL)
-            assert.equal(heap.read('URLSearchParams'), URLSearchParams)
-            assert.equal(heap.read('typeof Array.prototype.at'), 'undefined')
-            assert.deepEqual(heap.json('polyfillProbe'), {
+            assert.equal(runtime.read('URL'), URL)
+            assert.equal(runtime.read('URLSearchParams'), URLSearchParams)
+            assert.equal(runtime.read('typeof Array.prototype.at'), 'undefined')
+            assert.deepEqual(runtime.json('polyfillProbe'), {
                 href: 'https://example.com/dir/child',
                 params: 'a=1&b=2&a=3',
                 entries: [
@@ -546,13 +549,13 @@ for (const target of miniTargets) {
                 local: 'local',
                 structuredClone: 'undefined'
             })
-            // Fixed clocks in this isolated heap distinguish the development rewrite from production's original call.
+            // Fixed clocks in this isolated VM context distinguish the development rewrite from production's original call.
             assert.equal(
-                heap.read('globalThis.performance = { now: () => 123 }; Date.now = () => 456; readPerformanceNow()'),
+                runtime.read('globalThis.performance = { now: () => 123 }; Date.now = () => 456; readPerformanceNow()'),
                 mode === 'production' ? 123 : 456
             )
 
-            const native = createAppHeap(chunks, true, target)
+            const native = createAppRuntime(chunks, true, target)
             const nativeQueue = native.read(
                 'globalThis.queueMicrotask = (callback) => { void Promise.resolve().then(callback) }'
             )
@@ -561,7 +564,7 @@ for (const target of miniTargets) {
 
             for (const setup of ['delete this.globalThis;', 'let globalThis;']) {
                 await t.test(`recovers the host with a frozen prototype: ${setup}`, async () => {
-                    const restricted = createAppHeap(chunks, true, target)
+                    const restricted = createAppRuntime(chunks, true, target)
                     restricted.read(`
                         ${setup}
                         Object.preventExtensions(Object.prototype);
@@ -609,18 +612,18 @@ for (const target of miniTargets) {
 
     test(`${target}: production can opt into queueMicrotask without other APIs`, async () => {
         const chunks = await compileFixture(target, 'production', ['web.queue-microtask'])
-        const heap = createAppHeap(chunks, true, target)
-        heap.evaluate('common/bootstrap.js')
-        await assertMicrotaskQueue(heap)
-        assert.throws(() => heap.read('queueMicrotask()'), { name: 'TypeError' })
-        assert.throws(() => heap.read('queueMicrotask(null)'), { name: 'TypeError' })
-        const installedQueue = heap.read('queueMicrotask')
-        heap.evaluate('app.js')
-        heap.evaluate('pages/home/index.js')
-        heap.evaluate('comp.js')
-        assert.equal(heap.read('queueMicrotask'), installedQueue)
-        assert.equal(heap.read('globalThis["__core-js_shared__"].versions.length'), 1)
-        assert.equal(heap.read('typeof Array.prototype.at'), 'undefined')
+        const runtime = createAppRuntime(chunks, true, target)
+        runtime.evaluate('common/bootstrap.js')
+        await assertMicrotaskQueue(runtime)
+        assert.throws(() => runtime.read('queueMicrotask()'), { name: 'TypeError' })
+        assert.throws(() => runtime.read('queueMicrotask(null)'), { name: 'TypeError' })
+        const installedQueue = runtime.read('queueMicrotask')
+        runtime.evaluate('app.js')
+        runtime.evaluate('pages/home/index.js')
+        runtime.evaluate('comp.js')
+        assert.equal(runtime.read('queueMicrotask'), installedQueue)
+        assert.equal(runtime.read('globalThis["__core-js_shared__"].versions.length'), 1)
+        assert.equal(runtime.read('typeof Array.prototype.at'), 'undefined')
     })
 }
 
@@ -629,22 +632,22 @@ for (const target of miniTargets) {
         await compileFixture(target, 'devtools', [], async (chunks, root, replaceWatchedFile) => {
             const patchesPath = path.join(root, 'dist/hmr/patches.js')
             await waitForPatchSource(patchesPath, 'module.exports')
-            const heaps = [false, true].map((restricted) => {
-                const heap = createAppHeap(chunks, true, target)
+            const runtimes = [false, true].map((restricted) => {
+                const runtime = createAppRuntime(chunks, true, target)
                 if (restricted) {
-                    heap.read(`
+                    runtime.read(`
                         delete this.globalThis;
                         Object.preventExtensions(Object.prototype);
                         this.console = { ...console, error() {} };
                     `)
                 }
-                const provider = heap.evaluate('common/vpt/global.js')
+                const provider = runtime.evaluate('common/vpt/global.js')
                 assert.ok(provider && typeof provider === 'object')
-                heap.read('const sharedGlobal = this;')
-                assert.strictEqual(Reflect.get(provider, 'vptGlobal'), heap.read('sharedGlobal'))
-                heap.evaluate('app.js')
-                heap.evaluate('pages/home/index.js')
-                return heap
+                runtime.read('const sharedGlobal = this;')
+                assert.strictEqual(Reflect.get(provider, 'vptGlobal'), runtime.read('sharedGlobal'))
+                runtime.evaluate('app.js')
+                runtime.evaluate('pages/home/index.js')
+                return runtime
             })
             const pagePath = normalizePath(path.join(root, 'src/pages/home/index.tsx'))
             for (const seq of [1, 2]) {
@@ -658,9 +661,9 @@ for (const target of miniTargets) {
                 const source = await waitForPatchSource(patchesPath, marker)
                 assert.match(source, /validateRefreshBoundaryAndEnqueueUpdate/)
                 assert.doesNotMatch(source, /vpt\.fake\.global|__VPT_GLOBAL__/)
-                for (const heap of heaps) {
+                for (const runtime of runtimes) {
                     // Keep the real factory and changed IDs; only the fixture socket uses a deterministic build ID.
-                    const rendered = heap.read(`(() => {
+                    const rendered = runtime.read(`(() => {
                         const module = { exports: {} };
                         ${source}
                         const runtime = sharedGlobal.__rolldown_runtime__;
@@ -668,7 +671,7 @@ for (const target of miniTargets) {
                         const patches = module.exports.patches;
                         return runtime.loadExports(patches[patches.length - 1].changedIds[0]).default();
                     })()`)
-                    const reports = heap.reports.map((report) => JSON.parse(report).data)
+                    const reports = runtime.reports.map((report) => JSON.parse(report).data)
                     assert.ok(
                         reports.some((report) => report.kind === 'applied' && report.seq === seq),
                         JSON.stringify(reports)
@@ -700,25 +703,25 @@ async function waitForPatchSource(fileName: string, marker: string): Promise<str
     }
 }
 
-async function assertMicrotaskQueue(heap: ReturnType<typeof createAppHeap>): Promise<void> {
-    assert.equal(heap.read('typeof queueMicrotask'), 'function')
-    // This heap-local journal records callback order without changing the test runner's globals.
-    heap.read(`
+async function assertMicrotaskQueue(runtime: ReturnType<typeof createAppRuntime>): Promise<void> {
+    assert.equal(runtime.read('typeof queueMicrotask'), 'function')
+    // This context-local journal records callback order without changing the test runner's globals.
+    runtime.read(`
         globalThis.microtaskOrder = ['sync'];
         queueMicrotask(() => microtaskOrder.push('first'));
         queueMicrotask(() => microtaskOrder.push('second'));
         microtaskOrder.push('after-schedule');
     `)
-    assert.deepEqual(heap.json('microtaskOrder'), ['sync', 'after-schedule'])
+    assert.deepEqual(runtime.json('microtaskOrder'), ['sync', 'after-schedule'])
     await Promise.resolve()
-    assert.deepEqual(heap.json('microtaskOrder'), ['sync', 'after-schedule', 'first', 'second'])
+    assert.deepEqual(runtime.json('microtaskOrder'), ['sync', 'after-schedule', 'first', 'second'])
 }
 
 test('a prototype-only selection does not install unselected URL APIs', async () => {
     const chunks = await compileFixture('wx', 'production', ['es.array.at'])
-    const heap = createAppHeap(chunks, false, 'wx')
-    assert.throws(() => heap.evaluate('app.js'), { name: 'ReferenceError', message: 'URL is not defined' })
-    assert.equal(heap.read('[1, 2].at(-1)'), 2)
-    assert.equal(heap.read('typeof globalThis.URL'), 'undefined')
-    assert.equal(heap.read('typeof globalThis.URLSearchParams'), 'undefined')
+    const runtime = createAppRuntime(chunks, false, 'wx')
+    assert.throws(() => runtime.evaluate('app.js'), { name: 'ReferenceError', message: 'URL is not defined' })
+    assert.equal(runtime.read('[1, 2].at(-1)'), 2)
+    assert.equal(runtime.read('typeof globalThis.URL'), 'undefined')
+    assert.equal(runtime.read('typeof globalThis.URLSearchParams'), 'undefined')
 })

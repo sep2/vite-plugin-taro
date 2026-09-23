@@ -44,7 +44,7 @@ systemJSPrototype.import = function (id, parentId, meta) {
  *
  * Mini Program placement guarantees that every registration in a synchronous graph uses the main-package transport. Encountering
  * a thenable therefore indicates a fatal placement invariant violation. No rollback is attempted: rows already published
- * to the shared registry remain there and the current runtime heap must not be reused.
+ * to the shared registry remain there and the current runtime instance must not be reused.
  */
 systemJSPrototype.importSync = function (id) {
     var loader = this

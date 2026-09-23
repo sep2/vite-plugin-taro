@@ -538,7 +538,7 @@ test('coalesces one full-file save into one wx patch', async (context) => {
     assert.doesNotMatch(stablePatches, /window\.\$RefreshReg\$/)
 })
 
-test('publishes and acknowledges cumulative wx patches without rotating the App heap', async (context) => {
+test('publishes and acknowledges cumulative wx patches without replacing the App runtime', async (context) => {
     const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'memory')
     context.after(fixture.close)
 
@@ -662,7 +662,7 @@ test('Compile after two acknowledged edits rebuilds the baseline and resumes HMR
         await delay(50)
     }
 
-    // Compile creates a new App heap from the unchanged baseline, not the previously acknowledged runtime.
+    // Compile creates a new App runtime instance from the unchanged baseline, not the previously acknowledged runtime.
     await sendRuntimeReport(info, { buildId: info.buildId, kind: 'startup' })
     const freshInfo = parseHmrInfo(
         await waitForFile(fixture.infoPath, (source) => source !== initialSource, maximumWaitAttempts)

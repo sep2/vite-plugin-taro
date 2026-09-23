@@ -1006,7 +1006,7 @@ Initial release.
 - place and adapt the global wxss in production builds (72c7b55)
 - emit wx assets as files instead of base64 (4b226b6)
 - runtime-requested rebuilds for unrecoverable applies (74270b5)
-- full rebuild on fresh app heap (1f09d62)
+- full rebuild in a fresh app runtime instance (1f09d62)
 - lower the dev runtime chunk for device engines (b2db69c)
 - preserve page state across hot reloads (2e7c614)
 - mirror rolldown web runtime hot context propagation (739ac9f)

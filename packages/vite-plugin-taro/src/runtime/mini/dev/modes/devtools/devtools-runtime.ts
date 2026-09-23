@@ -1,6 +1,6 @@
 /*
  * DevTools adapter injected into the App-global Rolldown runtime chunk. Every Page evaluates the inert `hmr/patches.js` payload
- * before its route capsule, while this singleton survives Page JavaScript hot reload in the App heap. That lifetime difference is
+ * before its route capsule, while this singleton survives Page JavaScript hot reload as the App keeps running. That lifetime difference is
  * what allows module and React state to survive repeated native Page registration.
  */
 

@@ -59,7 +59,7 @@ export default defineConfig(({ mode }) => {
                     }
                 },
                 configureServer(server) {
-                    // Rendered baseline files can precede socket OPEN. The restart test waits for this exact App heap before
+                    // Rendered baseline files can precede socket OPEN. The restart test waits for this exact App startup before
                     // editing again, so a stale Page cannot make post-restart HMR appear successful.
                     server.ws.on('vpt:mini-hmr:report', (report: { kind: string; buildId: string }) => {
                         if (report.kind === 'startup') {

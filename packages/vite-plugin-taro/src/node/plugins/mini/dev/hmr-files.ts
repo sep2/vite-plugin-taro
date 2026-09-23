@@ -7,7 +7,7 @@ export const hmrInfoFileName = 'hmr/info.js'
 
 /**
  * Renders immutable CommonJS metadata because App startup must initialize the runtime synchronously before any entry capsule.
- * Freezing also prevents application code from accidentally changing the build identity or socket endpoint for the App heap.
+ * Freezing also prevents application code from accidentally changing the running App's build identity or socket endpoint.
  */
 export function renderHmrInfo(info: HmrInfo): string {
     return `module.exports = Object.freeze(${JSON.stringify(info)});\n`
@@ -18,7 +18,7 @@ export function renderHmrInfo(info: HmrInfo): string {
  *
  * Imported global CSS can change while the entry remains byte-identical. DevTools may then reuse an older persistent compile
  * cache after it restarts. Tying this inert comment to the build identity invalidates that cache once per complete build,
- * while incremental style updates continue changing only the imported file and therefore preserve the App heap.
+ * while incremental style updates continue changing only the imported file and therefore keep the App running.
  */
 export function renderDevelopmentAppStyle(globalStyleFileName: string, buildId: string): string {
     return `@import "./${globalStyleFileName}";\n/* vpt-build:${buildId} */\n`

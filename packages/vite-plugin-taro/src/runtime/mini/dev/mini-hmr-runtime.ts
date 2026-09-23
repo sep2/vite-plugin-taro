@@ -20,14 +20,14 @@ import { polyfillQueueMicrotask } from './polyfill/polyfill-queue-microtask.ts'
 /** Lexical base class injected into the runtime chunk by Rolldown; typed via the contract. */
 declare const DevRuntime: new (clientId: string) => RolldownDevRuntime
 
-/** App-heap HMR identity; only the committed application frontier mutates. */
+/** HMR identity for one running App; only the committed application frontier mutates. */
 type HmrSession = {
     /** Rejects delayed patch delivery and identifies reports after a newer full build exists. */
     readonly buildId: string
     /**
      * Highest contiguous application sequence whose installation, graph propagation, and accept callbacks all succeeded.
      * Host-filtered native asset updates consume no sequence. Replayed mode deliveries read this watermark; it advances only
-     * after an atomic batch succeeds and resets only with a new App heap.
+     * after an atomic batch succeeds and resets only when DevTools reloads the App.
      */
     appliedSeq: number
 }
@@ -126,7 +126,7 @@ export type ConnectMiniSocket = (endpoint: string) => MiniSocketTask
 /** Shared Mini Program host mechanics extending the Rolldown contract instead of reimplementing it. */
 export class MiniHmrRuntime extends DevRuntime {
     /**
-     * One session for this App heap. Undefined only before the mode-selected entry initializes the runtime; its identity then
+     * One session for the running App. Undefined only before the mode-selected entry initializes the runtime; its identity then
      * stays fixed while appliedSeq records the committed frontier.
      */
     private session: HmrSession | undefined
@@ -142,7 +142,7 @@ export class MiniHmrRuntime extends DevRuntime {
      */
     private readonly moduleHotContexts = new Map<string, MiniHotContext>()
 
-    /** Immutable platform socket constructor retained for the App heap's first initialization. */
+    /** Immutable platform socket constructor retained until the running App initializes. */
     private readonly connectSocket: ConnectMiniSocket
 
     constructor(connectSocket: ConnectMiniSocket) {
@@ -252,7 +252,7 @@ export class MiniHmrRuntime extends DevRuntime {
     }
 
     /**
-     * Initializes exactly once per App heap. Repeated entry evaluation must not replace the identity or reset `appliedSeq`, because
+     * Initializes exactly once each time DevTools loads the App. Repeated entry evaluation must not replace the identity or reset `appliedSeq`, because
      * either change could acknowledge factories against another host client or replay already committed application generations.
      */
     initialize(info: HmrInfo): void {
@@ -320,14 +320,14 @@ export class MiniHmrRuntime extends DevRuntime {
         }
 
         if (!this.socket) {
-            // Before OPEN the new heap uses only the disk baseline. Startup requests a rebuild if patches were published;
+            // Before OPEN the newly loaded App uses only the disk baseline. Startup requests a rebuild if patches were published;
             // do not replay their factories early or queue them for later. Closed connections likewise cannot acknowledge updates.
             return
         }
 
         if (session.appliedSeq === 0 && payload.patches.length > 0 && payload.patches[0].seq > 1) {
             // Compile starts from the original bundle, but the physical file can be an ACK-pruned suffix. Do not install it or
-            // classify an expected new-heap synchronization as patch corruption. OPEN reports startup automatically; if already
+            // classify expected startup synchronization as patch corruption. OPEN reports startup automatically; if already
             // connected, ask the host to rebuild the baseline now.
             this.sendReport({ kind: 'startup' })
             return

@@ -111,7 +111,7 @@ test('native patch wrappers capture the supplied runtime without looking up a ho
     assert.ok(payload && typeof payload === 'object' && 'patches' in payload && Array.isArray(payload.patches))
     const factory: unknown = payload.patches[0].factory
     assert.ok(typeof factory === 'function')
-    // The same inert payload may be installed by separate heaps; closures must retain each call's own parameter.
+    // The same inert payload may be installed by separate runtime instances; closures must retain each call's own parameter.
     const closures: Array<() => unknown> = []
     const runtimes = [0, 1].map(() => ({
         registerFactory(closure: () => unknown) {

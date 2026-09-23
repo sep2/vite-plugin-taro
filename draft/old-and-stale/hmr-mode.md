@@ -2,7 +2,7 @@
 
 ## Status
 
-Phase 2 implemented: `devtools` and `interpreter` are selectable implementations over the same journal, host ordering, module runtime, styles, React Refresh, reports, and rebuild recovery. Both modes use one authenticated Vite WebSocket per App heap for reports and control; interpreter delivery adds source events to that same socket. There is no HTTP report protocol, polling timer, or second socket server.
+Phase 2 implemented: `devtools` and `interpreter` are selectable implementations over the same journal, host ordering, module runtime, styles, React Refresh, reports, and rebuild recovery. Both modes use one authenticated Vite WebSocket per App runtime instance for reports and control; interpreter delivery adds source events to that same socket. There is no HTTP report protocol, polling timer, or second socket server.
 
 ## Objective
 
@@ -16,13 +16,13 @@ The refactor must:
 - isolate physical patch files, Page reload activation, and Page lifecycle handoff inside `devtools`;
 - install native DevTools factories or Sval-interpreted registration programs through one runtime seam;
 - avoid mode branches in the per-update hot path;
-- keep interpreter source delivery event-driven and bounded to one socket per App heap.
+- keep interpreter source delivery event-driven and bounded to one socket per App runtime instance.
 
 ## Decisions
 
 ### One mode per development server
 
-A WX development server and its App heap use exactly one HMR mode. Modes are alternatives, not concurrent executors.
+A WX development server and its App runtime instance use exactly one HMR mode. Modes are alternatives, not concurrent executors.
 
 The mode is resolved before Vite creates the development host. The same immutable mode descriptor is then passed to plugin creation, Rolldown option installation, and host creation.
 
@@ -89,7 +89,7 @@ The shared WX HMR runtime owns:
 - accepted-module re-execution;
 - build identity and the applied sequence frontier;
 - contiguous batch validation;
-- the App heap's sole Vite-protocol SocketTask;
+- the App runtime instance's sole Vite-protocol SocketTask;
 - application and rebuild report events;
 - build-replacement and host-shutdown control events.
 
@@ -498,7 +498,7 @@ Mutable state remains localized and justified:
 - runtime session frontier: records successfully applied sequences;
 - hot-context map: retains accepting boundaries across cache eviction;
 - Page handoff state: spans one DevTools native re-registration lifecycle;
-- shared runtime socket reference: retains the App heap's sole connection.
+- shared runtime socket reference: retains the App runtime instance's sole connection.
 
 The mode descriptor and all publication values are immutable.
 

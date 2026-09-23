@@ -55,7 +55,7 @@ The complete suite checks:
 2. unique Page-slot routing while keyed deep App branches repeatedly reorder, marker restoration, and valid two-Page navigation stacks;
 3. duplicate and out-of-order ACK conflation under rebuild-report storms;
 4. build identity rotation and non-empty `assets/global.wxss` after every complete rebuild;
-5. invalid syntax does not start a complete build or alter the live Page heap;
+5. invalid syntax does not start a complete build or alter the live Page runtime state;
 6. valid source after failure resumes HMR without rotating the build identity;
 7. HMR remains healthy and preserves state after syntax recovery;
 8. the App console remains free of patch, Refresh, reconciliation, and `setData` failures;

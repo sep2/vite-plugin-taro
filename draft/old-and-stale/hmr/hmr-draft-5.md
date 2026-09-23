@@ -49,7 +49,7 @@ Implement physical WX HMR where:
    HTTP is metadata-only. Patch JavaScript remains physical.
 
 4. **Page re-execution must not recreate the HMR runtime.**
-   The runtime belongs to the App/global heap.
+   The runtime belongs to the App/global runtime context.
 
 5. **SystemJS does not provide browser-style lexical globals.**
    Setting `global.window = global` does not make free `window` or DevTools-hook identifiers work reliably. Exact AST rewrites to `global.*` are required.
@@ -366,7 +366,7 @@ The implementation follows the exact capabilities exposed by the pinned toolchai
    chunks, or send executable JavaScript over HTTP. The HTTP response only says that the physical publication completed.
 6. WeChat sees a changed JavaScript dependency of every Page and re-executes live Page entries. Each entry synchronously
    requires the shared patch file, which only calls `storePatches(metadata, programs)`; no patch executes in `require()`.
-7. `initializePage(fileName, Page)` is idempotent in the App heap. Initial evaluation registers the native shell; physical
+7. `initializePage(fileName, Page)` is idempotent in the App runtime instance. Initial evaluation registers the native shell; physical
    re-execution does not call `Page()` again and therefore does not remount Taro before Refresh.
 8. DevTools' synthetic replacement lifecycle is intercepted while the publication is pending. `onUnload` captures the
    old `$taroPath`, params, config, and receiver; replacement `onLoad`/`onShow` receive that identity. Ordinary navigation
@@ -384,7 +384,7 @@ The implementation follows the exact capabilities exposed by the pinned toolchai
 - Any invalid range, missing boundary, Refresh exception, Taro rebinding error, HTTP-reported runtime failure, patch write
   failure, or patch-history limit requests a full build.
 - A successful full build changes `buildId`, resets history/version to zero, and changes enough physical output for
-  DevTools to restart the App heap. That restart is the reset protocol; no second runtime state machine exists.
+  DevTools to restart the App runtime instance. That restart is the reset protocol; no second runtime state machine exists.
 - Delayed Rolldown callbacks carry their old client/build ID and cannot enter the current Build. Late module reports are
   also ignored by the output edge once their build is no longer materialized.
 - Rebuild requests are exhausted until one composite `full-build-finished` fact arrives. This coalesces failure bursts
@@ -397,7 +397,7 @@ The implementation follows the exact capabilities exposed by the pinned toolchai
 | Browser/Vite HMR | Physical WX HMR |
 | --- | --- |
 | WebSocket tells a browser to import an HMR URL. | HTTP carries only reports; executable code must appear in a watched physical file. |
-| The page/global runtime survives a module import naturally. | Page code is re-executed, so the runtime must belong to the longer-lived App heap. |
+| The page/global runtime survives a module import naturally. | Page code is re-executed, so the runtime must belong to the longer-lived App runtime instance. |
 | `window`, `globalThis`, script globals, and a DOM are available. | The WeChat runtime has `global` but no browser lexical globals; exact generated identifiers must be rewritten. |
 | A JS import applies the update directly. | `patches.js` loading must be passive until DevTools finishes the current Page evaluation. |
 | Browser page lifecycle is not replayed for HMR. | DevTools synthesizes native Page replacement lifecycle that would make Taro unmount React. |
@@ -405,7 +405,7 @@ The implementation follows the exact capabilities exposed by the pinned toolchai
 | Output files are usually served from memory. | File path, write shape, close timing, and which files changed determine DevTools' reload classification. |
 | One update message normally means one patch import. | A runtime can be several versions behind, and each logical HostPatch needs a microtask/Refresh checkpoint. |
 | The server can discover its endpoint after listening. | `info.js` must exist before App execution, so strict configured port metadata is materialized before listen resolves. |
-| Full reload is `location.reload()`. | Full recovery is a complete physical build that causes DevTools to destroy and recreate the App heap. |
+| Full reload is `location.reload()`. | Full recovery is a complete physical build that causes DevTools to destroy and recreate the App runtime instance. |
 
 ### Validation record
 
@@ -481,7 +481,7 @@ do not repeat impl detail. record the reason that it makes to hmr works.
 ## Why the non-web machinery is necessary
 
 - WeChat chooses reload scope from the physical file graph, not from Vite's HMR message. A single shared Page dependency
-  is the only reliable trigger that leaves the App heap alive while re-evaluating every live Page.
+  is the only reliable trigger that leaves the App runtime instance alive while re-evaluating every live Page.
 - A direct completed write is semantically different from replacing a file by rename in DevTools' watcher. The former was
   classified as Page code reload; the latter caused an App-level restart in experiments.
 - HTTP publication success is not execution acknowledgement. It only means the watched file is closed; the next runtime

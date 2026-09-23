@@ -58,7 +58,7 @@ happens to pass through is not a support contract.
 7. Development HMR follows Vite's acceptance-boundary model while retaining Vite's stable module IDs.
 8. Fresh namespaces are delivered to qualified HMR accept callbacks; existing ESM importers are not automatically reconnected.
 9. Circular or otherwise unsafe updates stop plugin HMR and request a DevTools-owned hard refresh rather than
-   attempting to repair or approximate replacement inside the retained heap.
+   attempting to repair or approximate replacement inside the retained runtime instance.
 10. Production output is optimized for delivery; development output is optimized for module identity and HMR.
 
 ## Platform constraints
@@ -890,7 +890,7 @@ optimizer before their output is converted into System registrations.
 
 Optimized output uses the stable module IDs supplied by Vite for the current materialized development build; the plugin does not derive a
 second identity from optimizer cache paths. Optimized dependencies are foundational HMR modules: they are reused by application updates
-and are never replaced inside the retained runtime heap. An optimizer rerun, dependency installation, lockfile change, optimizer
+and are never replaced inside the retained runtime instance. An optimizer rerun, dependency installation, lockfile change, optimizer
 configuration change, or changed optimized output creates a new development build ID, rematerializes the native project, and triggers a
 hard refresh.
 
@@ -1358,7 +1358,7 @@ Ordinary module loading always uses full SystemJS cycle semantics, including cyc
 
 HMR deliberately follows Vite's stricter rule. If an accepting boundary is inside a circular import chain, the server stops plugin HMR
 before deleting any live System module and requests a DevTools hard refresh. The initial implementation does not
-attempt to reconstruct cycle execution order inside a retained application heap.
+attempt to reconstruct cycle execution order inside a retained application runtime instance.
 
 ### Future: importer-aware live-binding reconnection
 
@@ -1418,7 +1418,7 @@ interface ExecutableDelivery {
 
 Properties:
 
-- `sessionId` binds the executable delivery to exactly one active runtime heap; a new session never consumes an old session's delivery;
+- `sessionId` binds the executable delivery to exactly one active runtime instance; a new session never consumes an old session's delivery;
 - `version` is a monotonically increasing delivery sequence, not a module identity.
 - `nonce` ensures DevTools observes a physical file change when a delivery must be republished.
 - executing the same delivery twice is harmless;
@@ -1452,12 +1452,12 @@ The server retains:
 
 The protocol supports one active WeChat runtime at a time. A session ID does not represent concurrent-client support.
 
-A new session means WeChat DevTools or the App restarted and arrived with a fresh heap. The new session replaces the old active session,
+A new session means WeChat DevTools or the App restarted and created a fresh runtime instance. The new session replaces the old active session,
 and all old HMR deliveries, acknowledgements, pending instantiations, callbacks, and `hot.data` are discarded. Deliveries are never
 replayed into a new runtime.
 
 If the physical project is already
-a current materialization, the server accepts the session and the new heap itself is the completed hard refresh. If source has advanced
+a current materialization, the server accepts the session and the new runtime instance itself is the completed hard refresh. If source has advanced
 through session-local HMR since that materialization, the server leaves the barrier pending, emits a new complete materialization and
 build ID, and DevTools performs one full compilation and restart before development continues.
 
@@ -1480,7 +1480,7 @@ hard-refreshes into the new materialization.
 #### Bounded delivery state
 
 Exceeding the bound performs a hard refresh and starts a new build and runtime session;
-it never replays an accumulated history into another heap.
+it never replays an accumulated history into another runtime instance.
 
 ## DevTools-owned hard refresh
 
@@ -1502,17 +1502,17 @@ HMR. The plugin stops HMR and publishes a complete materialization intended for 
 - active-session delivery state is exhausted.
 
 For a server-detected boundary, the registry has not been mutated. For a runtime failure after mutation, the runtime
-reports the failed phase without acknowledging the delivery. These facts terminate plugin HMR for that heap but
+reports the failed phase without acknowledging the delivery. These facts terminate plugin HMR for that runtime instance but
 create no ordered teardown or runtime-state protocol.
 
 The server transactionally builds a complete current Mini Program materialization under a new build ID. A failed build
 publishes nothing and leaves the last runnable generated project unchanged. A successful build publishes the complete
 project, including the new build ID in watched amphibious bootstrap code. Publication does not sequence active-session
-disposal, DevTools compilation, or process restart. The server makes no state guarantee about the old heap after
+disposal, DevTools compilation, or process restart. The server makes no state guarantee about the old runtime instance after
 requesting the refresh.
 
 WeChat DevTools alone decides when to compile and reload the App. Once the reload occurs, the App starts with a
-fresh heap and session; the normal new-session handshake supersedes all old deliveries, acknowledgements, pending
+fresh runtime instance and session; the normal new-session handshake supersedes all old deliveries, acknowledgements, pending
 instantiations, callbacks, and `hot.data`. Hard-refresh completion is observed only when that fresh session reports
 the published build ID.
 
@@ -1582,7 +1582,7 @@ The implementation enforces these invariants with build-time assertions and runt
 28. Each facade's callback names and conditional presence are exactly the native surface resolved by the bundled Taro
     integration; the plugin neither adds nor removes callbacks, and active forwarding returns Taro's result unchanged.
 29. The development protocol has one active runtime session; replacing it discards all HMR delivery state and never replays updates into
-    the new heap.
+    the new runtime instance.
 30. The dedicated `wx` Vite environment is the only application transform, module, and HMR graph.
 31. Vite's browser client and `ModuleRunner` never evaluate wx application modules.
 32. The Taro template builder, component aliases, hydration schema, root updater, event bridge, and React renderer come from one bundled
@@ -1752,7 +1752,7 @@ The implementation enforces these invariants with build-time assertions and runt
 - `weapp-tailwindcss` rewrites JavaScript classes and WXSS selectors consistently;
 - dynamically imported source contributes eager production CSS;
 - every production style is flattened into `app.wxss`;
-- CSS-only development updates preserve the React heap;
+- CSS-only development updates preserve the React runtime state;
 - TSX candidate changes write WXSS before publishing JavaScript HMR;
 - per-page full-CSS duplication works as the development fallback.
 
@@ -1769,7 +1769,7 @@ The implementation enforces these invariants with build-time assertions and runt
 - bounded active-session delivery state triggers a hard refresh;
 - a successful hard-refresh materialization is published atomically with its new build ID;
 - publication imposes no ordering or state transition on the current runtime;
-- DevTools reload starts a fresh heap and session without restoring any previous runtime state;
+- DevTools reload starts a fresh runtime instance and session without restoring any previous runtime state;
 - hard-refresh completion is observed only when the fresh session reports the published build ID;
 - a failed hard-refresh materialization leaves the last runnable generated project unchanged and makes no runtime-state
   guarantee.
@@ -1784,7 +1784,7 @@ These behaviors remain executable integration probes rather than assumptions:
 
 - literal asynchronous loading in every main/subpackage direction;
 - cross-subpackage SystemJS cycles;
-- direct `page.js` to `update.js` dependency preserving the App heap;
+- direct `page.js` to `update.js` dependency preserving the App runtime instance;
 - page entry rerun and route-registration guarding;
 - pending `System.import()` surviving an on-demand delivery rerun;
 - `System.delete()` replacement with the reconnect closure deliberately discarded;

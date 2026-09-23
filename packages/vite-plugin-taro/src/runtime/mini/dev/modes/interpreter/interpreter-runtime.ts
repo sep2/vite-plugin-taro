@@ -10,7 +10,7 @@ import { type InterpreterPatch, type InterpreterServerMessage, interpreterServer
 
 /** Interprets cumulative patch source received by the shared App-level HMR socket. */
 class InterpreterHmrRuntime extends MiniHmrRuntime {
-    /** One installer and Sval scope retain interpreted factory closures for this App heap. */
+    /** One installer and Sval scope retain interpreted factory closures for the lifetime of the running App. */
     private readonly installPatch: (patch: InterpreterPatch) => void
 
     constructor(connectSocket: ConnectMiniSocket) {

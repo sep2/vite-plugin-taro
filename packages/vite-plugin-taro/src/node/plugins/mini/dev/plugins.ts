@@ -149,7 +149,7 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
  * but removes the prior physical App stylesheet; recovery builds do not clean. The host publishes the stylesheet once afterward.
  * Patch modes first reset delivery and publish matching `hmr/info.js`; rebuild mode has no patch state and writes a fresh marker
  * directly. Incremental HMR never enters this complete-output hook and changes only the imported global stylesheet; rewriting
- * the App root would reload the heap while a JavaScript patch is awaiting acknowledgement. The serve-only plugin leaves
+ * the App root would reload the runtime while a JavaScript patch is awaiting acknowledgement. The serve-only plugin leaves
  * production output unchanged.
  */
 export function removeDevelopmentAppStyle(bundle: Record<string, unknown>, appStyleFileName: string): void {

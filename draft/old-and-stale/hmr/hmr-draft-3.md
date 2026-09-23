@@ -19,7 +19,7 @@ independent of this plan.
 2. Keep the current native, capsule, and amphibious output kinds.
 3. Let Vite bundled development generate both the initial bundle and source-module HMR patches.
 4. Preserve the current SystemJS transport and generated-subpackage architecture for the initial development bundle.
-5. Preserve the App heap, Taro root, React Fiber tree, and component state for accepted React updates.
+5. Preserve the App runtime instance, Taro root, React Fiber tree, and component state for accepted React updates.
 6. Use a complete DevTools-owned reload whenever a change cannot be represented safely.
 7. Run one Vite server and one Rolldown DevEngine. Do not start a nested Vite build or a second watcher.
 8. Transport executable JavaScript only through physical Mini Program files. HTTP carries metadata only.
@@ -75,7 +75,7 @@ record stays evaluated and cached.
 6. Every executable delivery is a literal physical `/update.js` file.
 7. A delivery is successful only after factory installation, module re-execution, accept callbacks, React Refresh, and
    acknowledgement all complete.
-8. A failed or partially applied delivery terminates HMR for that runtime heap and requests a hard reload.
+8. A failed or partially applied delivery terminates HMR for that runtime instance and requests a hard reload.
 9. Only modules reported as executed by the active runtime are eligible for source-module HMR.
 10. A change to an unloaded module causes a complete rematerialization in the first implementation. This prevents a
     stale physical capsule from later overwriting a newer dormant factory.
@@ -392,7 +392,7 @@ The publisher allows exactly one in-flight delivery:
 6. ignore duplicate execution of an already acknowledged version;
 7. request a full rematerialization if the queue or retained bytes exceed a fixed bound.
 
-A new runtime session never replays patches produced for an old heap. If the physical snapshot is behind current source
+A new runtime session never replays patches produced for an old runtime instance. If the physical snapshot is behind current source
 when a new session registers, create a complete output and start a new build ID.
 
 ## Runtime patch application
@@ -404,7 +404,7 @@ The runtime serializes delivery application and follows these phases.
 - compare build ID and session ID;
 - reject stale, skipped, or out-of-order versions;
 - validate boundary and changed-module metadata;
-- reject a delivery after the heap has entered failed state.
+- reject a delivery after the runtime has entered failed state.
 
 ### 2. Prepare
 
@@ -529,7 +529,7 @@ A full rematerialization:
 6. lets DevTools compile and restart the App;
 7. accepts the first runtime session reporting the new build ID.
 
-There is no `wx.reLaunch()` state-restoration protocol and no replay of old hot data into the new heap.
+There is no `wx.reLaunch()` state-restoration protocol and no replay of old hot data into the new runtime instance.
 
 ## Server protocol
 
@@ -578,7 +578,7 @@ Before production implementation, create focused probes that verify the pinned V
 3. a rendered capsule can contain DevRuntime source-module registrations and still export its normal namespace;
 4. HMR patch output contains graph/factory registrations and exposes stable boundaries;
 5. patch output bypasses normal `renderChunk`;
-6. changing `update.js` causes DevTools to execute it while retaining the App heap;
+6. changing `update.js` causes DevTools to execute it while retaining the App runtime instance;
 7. loaded-module reports correspond to actual DevRuntime `registerModule()` calls;
 8. CSS output ordering is observable and deterministic enough to gate patch publication.
 
@@ -611,7 +611,7 @@ At the end of this phase, source edits may perform complete rematerializations o
 - delay Refresh until delivery completion;
 - add idempotent Page registration and bounded lifecycle suppression;
 - retain/reconnect the Taro root;
-- verify component state and App heap preservation.
+- verify component state and App runtime preservation.
 
 ### Phase 4: CSS and Tailwind updates
 
@@ -663,15 +663,15 @@ At the end of this phase, source edits may perform complete rematerializations o
 
 ### DevTools probes
 
-- App heap identity survives a valid update;
+- App runtime identity survives a valid update;
 - React Fiber identity and local component state survive a valid Refresh boundary;
 - changing a Page component does not run genuine Page load/unload behavior twice;
 - changing an unloaded Page performs a complete rematerialization before later navigation;
 - dynamic imports still load through the current SystemJS transport;
 - generated-subpackage dynamic imports still use `require.async()`;
-- CSS-only edits update visible styles without replacing the App heap;
+- CSS-only edits update visible styles without replacing the App runtime instance;
 - TSX class changes update WXSS before refreshed rendering;
-- patch failure converges to a fresh App heap through DevTools reload.
+- patch failure converges to a fresh App runtime instance through DevTools reload.
 
 ## Known risks
 
