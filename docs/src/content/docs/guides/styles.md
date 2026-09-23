@@ -231,13 +231,13 @@ dist/tt/assets/global.ttss
 
 ### CSS 中的尺寸
 
-微信、支付宝和抖音小程序的应用 CSS 默认以 750px 设计稿为基准转换：`100px` 输出为 `100rpx`，`1rem` 输出为 `32rpx`。已经写成 `rpx` 的值保持不变；原生组件自带的样式不参与转换。
+小程序（微信、支付宝、抖音）默认按 750px 设计稿转换应用 CSS：`100px → 100rpx`、`1rem → 32rpx`。已有的 `rpx` 保持不变；原生组件的样式不参与转换。
 
-不希望某个值随屏幕宽度缩放时，把单位写成 `Px` 或 `PX`。例如 `border-bottom: 1Px solid` 在小程序中仍是 `1px`。Tailwind v4 的任意边框宽度需要标明类型：使用 `border-b-[length:1Px]` 保留 `1px`，使用 `border-b-[length:1px]` 则会转换为 `1rpx`。
+需要固定的 CSS 像素时，用大写单位 `Px`，如 `border-bottom: 1Px solid`。Tailwind v4 中对应写法是 `border-b-[length:1Px]`；使用小写 `px` 则会被转换。
 
 ### 动态行内样式
 
-JSX 中的 `style` 值不会经过 CSS 转换。小程序需要按设计稿尺寸自适应时，使用 `Taro.pxTransform()`：
+行内样式不经过 CSS 转换。小程序中可以使用 `Taro.pxTransform()`，默认 `100 → '100rpx'`：
 
 ```tsx
 import Taro from 'virtual:taro/api'
@@ -248,49 +248,48 @@ export function SizedView({ width }: { width: number }) {
 }
 ```
 
-默认设计宽度为 750px，`Taro.pxTransform(100)` 返回 `'100rpx'`。如果组件也用于 Web，请先阅读下面的 [Web 目标](#web-目标)；不能直接依赖 Web 端的默认行为。
+### Web 目标
+
+Web 默认保留 CSS 中的 `px`，不会自动将其转换为 `rem`。若要在 Web 中使用 `Taro.pxTransform()`，须先初始化，并让 CSS 与动态样式使用相同单位。下面用 `vw` 演示，无需额外配置根字号。
 
 ### 使用其他设计稿宽度
 
-例如使用 375px 设计稿时，需要**分别**配置静态 CSS 和运行时尺寸。VPT 没有可以同时配置两者的 `designWidth` 选项。
+以 375px 设计稿为例，为小程序和 Web 配置同一套自适应尺寸：
 
-1. 安装 PostCSS 插件：
+1. 安装转换插件：
 
    ```sh
    pnpm add -D postcss-pxtrans
    ```
 
-2. 在 `vite.config.ts` 的 `defineConfig` 回调中取得现有的 `target` 后，添加 `css` 配置，并保留原有的 `build`、`plugins` 等字段：
+2. 在 `vite.config.ts` 现有的 `defineConfig` 回调中，取得 `target` 后加入 `css` 字段，保留其他配置：
 
    ```ts
    import pxTransform from 'postcss-pxtrans'
 
    const css = {
        postcss: {
-           plugins: target === 'h5' ? [] : [
-               pxTransform({ platform: 'weapp', designWidth: 375, deviceRatio: { 375: 2 } })
-           ]
+           plugins: target === 'h5'
+               ? [pxTransform({ platform: 'h5', designWidth: 375, targetUnit: 'vw' })]
+               : [pxTransform({ platform: 'weapp', designWidth: 375, deviceRatio: { 375: 2 } })]
        }
    }
-   // 将 css 加入现有的 return 对象；如已有 PostCSS 插件，保留在 plugins 中。
+   // 将 css 加入原有的 return 对象。
    ```
 
-   此时小程序 CSS 的 `100px` 输出为 `200rpx`；VPT 不会再次转换已有的 `rpx`。
-
-3. 如果使用 `Taro.pxTransform()` 处理动态值，还要在**第一次调用前**初始化小程序运行时：
+3. 在首次调用 `Taro.pxTransform()` 前，用相同的设计宽度初始化运行时：
 
    ```ts
    import Taro from 'virtual:taro/api'
 
-   Taro.initPxTransform({ designWidth: 375, deviceRatio: { 375: 2 } })
-   Taro.pxTransform(100) // '200rpx'
+   Taro.initPxTransform({
+       designWidth: 375,
+       deviceRatio: { 375: 2 },
+       targetUnit: import.meta.env.VITE_VPT_TARGET === 'h5' ? 'vw' : 'rpx'
+   })
    ```
 
-   把初始化放在使用动态尺寸的模块顶层代码执行之前。`initPxTransform()` 不会修改静态 CSS 的转换规则。
-
-### Web 目标
-
-Web 的 CSS 沿用 Vite 行为：`100px` 仍是 `100px`，不会自动转为 `rem`。Web 端使用 `Taro.pxTransform()` 前必须显式调用 `Taro.initPxTransform()`；VPT 不会自动设置与 `rem` 配套的响应式根字号。如果需要小程序与 Web 使用同一套自适应尺寸，应单独配置 Web 的 CSS 转换和对应的运行时单位；上面的 `rpx` PostCSS 配置仅用于小程序。
+这里使用模板自带的 `VITE_VPT_TARGET`；其他项目请换成自己的目标标识。`100px` 在小程序中成为 `200rpx`，在 Web 中成为 `26.66667vw`；`Taro.pxTransform(100)` 也会返回对应单位。两者在 375px 宽的屏幕上均相当于 100px。
 
 ## 常见问题
 
