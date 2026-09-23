@@ -1,5 +1,7 @@
+import { existsSync } from 'node:fs'
+import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { type PluginOption, transformWithOxc } from 'vite'
+import { normalizePath, type PluginOption, transformWithOxc } from 'vite'
 import { cleanOutputFiles } from '../../../utils/clean-output-files.ts'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
@@ -96,11 +98,13 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
 
             generateBundle: {
                 order: 'post',
-                handler(_, bundle) {
+                async handler(_, bundle) {
                     // The shared output plugin emits the production App wrapper during every complete build: startup and each
                     // recovery build, not just once when this plugin instance is created. Development transfers that file
                     // to the host so its only physical write happens after the complete output and matching mode state are durable.
                     removeDevelopmentAppStyle(bundle, contract.styles.appFileName)
+
+                    await emitMiniPublicAssets(this)
                 }
             },
 
@@ -154,6 +158,29 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
  */
 export function removeDevelopmentAppStyle(bundle: Record<string, unknown>, appStyleFileName: string): void {
     delete bundle[appStyleFileName]
+}
+
+/** The Mini DevEngine writes Rolldown output directly, bypassing Vite's normal build-time publicDir copy. */
+async function emitMiniPublicAssets(context: {
+    environment: { config: { publicDir: string; build: { copyPublicDir: boolean } } }
+    emitFile: (asset: { type: 'asset'; fileName: string; source: Uint8Array }) => string
+}): Promise<void> {
+    const { publicDir, build } = context.environment.config
+    if (!build.copyPublicDir || !publicDir || !existsSync(publicDir)) {
+        return
+    }
+
+    for (const entry of await readdir(publicDir, { recursive: true, withFileTypes: true })) {
+        if (!entry.isFile()) {
+            continue
+        }
+        const file = path.join(entry.parentPath, entry.name)
+        context.emitFile({
+            type: 'asset',
+            fileName: normalizePath(path.relative(publicDir, file)),
+            source: await readFile(file)
+        })
+    }
 }
 
 /*

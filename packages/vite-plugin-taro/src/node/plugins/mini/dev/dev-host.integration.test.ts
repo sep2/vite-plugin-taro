@@ -110,7 +110,8 @@ async function startDevFixture(
     logger: Logger,
     host: string,
     options: VptOptions,
-    bundleOutput: 'memory' | 'capsule' | 'disk'
+    bundleOutput: 'memory' | 'capsule' | 'disk',
+    publicAsset?: { fileName: string; source: string }
 ): Promise<DevFixture> {
     const persistedBundleFiles = bundleOutput === 'capsule' ? [pageCapsuleFileName] : []
     const root = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-dev-test-'))
@@ -140,6 +141,11 @@ async function startDevFixture(
     )
     await writeFile(path.join(path.dirname(pagePath), 'suffix.ts'), 'export const suffix = "";\n')
     await writeFile(pagePath, renderPage('initial page marker'))
+    if (publicAsset) {
+        const assetPath = path.join(root, 'public', publicAsset.fileName)
+        await mkdir(path.dirname(assetPath), { recursive: true })
+        await writeFile(assetPath, publicAsset.source)
+    }
 
     // Each complete build replaces this fixture-local snapshot; HMR assertions do not need physical runtime bundles.
     let javaScriptOutput: readonly string[] = []
@@ -587,6 +593,19 @@ test('publishes and acknowledges cumulative wx patches without replacing the App
     assert.doesNotMatch(secondPatches, /first hot generation/)
     assert.equal(await readFile(fixture.infoPath, 'utf8'), initialInfoSource)
     assert.equal(await readFile(fixture.appStylePath, 'utf8'), initialAppStyle)
+})
+
+test('the Mini DevEngine emits public assets with their stable paths on startup and restart', async (context) => {
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'disk', {
+        fileName: 'icons/home.png',
+        source: 'tab icon'
+    })
+    context.after(fixture.close)
+    const icon = path.join(fixture.outDir, 'icons/home.png')
+    assert.equal(await readFile(icon, 'utf8'), 'tab icon')
+
+    await fixture.restart()
+    assert.equal(await readFile(icon, 'utf8'), 'tab icon')
 })
 
 test('a Vite restart removes obsolete files and publishes a new baseline before subsequent patches', async (context) => {
