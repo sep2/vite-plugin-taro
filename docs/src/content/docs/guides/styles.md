@@ -250,7 +250,7 @@ export function SizedView({ width }: { width: number }) {
 
 ### Web 目标
 
-Web 默认保留 CSS 中的 `px`，不会自动将其转换为 `rem`。若要在 Web 中使用 `Taro.pxTransform()`，须先初始化，并让 CSS 与动态样式使用相同单位。下面用 `vw` 演示，无需额外配置根字号。
+Web 默认保留 CSS 中的 `px`，不会自动将其转换为 `rem`。若要在 Web 中使用 `Taro.pxTransform()`，须先初始化，并让 CSS 与动态样式使用相同单位。`rem` 的实际尺寸取决于根字号；这里推荐使用直接按视口宽度计算的 `vw`。
 
 ### 使用其他设计稿宽度
 
