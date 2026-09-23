@@ -26,7 +26,7 @@ pnpm test:hmr-stress-demo:interpreter
 pnpm setup:hmr-stress-demo:devtools
 ```
 
-Setup and the aggregate suite may each use up to 60 seconds. Every standalone case has a hard 30-second deadline. Each invocation attaches to the newly built output itself; a prior setup invocation is not required. The complete suite runs the strict burst, rebuild storm, and syntax recovery cases. Runtime assertions replace fixed settle sleeps, including observing the restoration marker before publishing and awaiting the baseline. Plugin rebuilding is opt-in.
+Setup and the restart case may each use up to 60 seconds; the aggregate suite has a 90-second deadline. Other standalone cases have a 30-second deadline. Each invocation attaches to the newly built output itself; a prior setup invocation is not required. The complete suite runs the strict burst, rebuild storm, syntax recovery, and server restart cases. Runtime assertions replace fixed settle sleeps, including observing the restoration marker before publishing and awaiting the baseline. Plugin rebuilding is opt-in.
 
 Individual cases can be run independently:
 
@@ -34,6 +34,7 @@ Individual cases can be run independently:
 pnpm stress:hmr-stress-demo:burst         # 30 edits at 8 ms
 pnpm test:hmr-stress-demo:rebuild         # mixed ACK/rebuild report storms
 pnpm test:hmr-stress-demo:recovery        # syntax failures and passive HMR recovery
+pnpm test:hmr-stress-demo:restart         # real Vite process restart, then rendered HMR updates
 ```
 
 No stress edit touches `demo/hmr-stress-demo/src`. The portable harness deliberately avoids RAM-disk provisioning: it confines writes to one fixed temporary project and bounds the strict burst to 30 source generations, plus two restoration writes. Syntax recovery uses one invalid generation plus restoration, and post-recovery health uses five edits. This retains the failure-producing profiles without thousands of filesystem writes or platform-specific mount setup.
@@ -55,7 +56,11 @@ The complete suite checks:
 5. invalid syntax does not start a complete build or alter the live Page heap;
 6. valid source after failure resumes HMR without rotating the build identity;
 7. HMR remains healthy and preserves state after syntax recovery;
-8. the App console remains free of patch, Refresh, reconciliation, and `setData` failures.
+8. the App console remains free of patch, Refresh, reconciliation, and `setData` failures;
+9. restarting the actual Vite process, without reopening or manually compiling DevTools, removes obsolete output and loads a new baseline;
+10. two successive source edits after restart appear in the simulator while retaining input state, build identity, and the App stylesheet marker.
+
+The harness observes the real App's startup report for the current build before publishing edits; a rendered Page can appear before its HMR socket opens. The restart case first proves HMR works before restarting. It then distinguishes a successful App reload from working post-restart HMR: changing a patch file or opening a new socket alone cannot satisfy its rendered-marker assertions. Both Vite process logs are retained in the fixture's `vite.log`.
 
 Useful environment overrides:
 

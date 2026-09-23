@@ -82,7 +82,7 @@ async function createConnectingTestHarness(): Promise<TestHarness> {
             }
         },
         close(options) {
-            assert.ok(opened)
+            // Failed or connecting SocketTasks also need explicit release; only send requires OPEN.
             closed.push(options)
             opened = false
             // Do not emit onClose: the runtime must stop immediately, not wait for the native callback.
@@ -209,7 +209,8 @@ test('reports patch failure before closing the socket and stops subsequent insta
 })
 
 for (const event of ['closeSocket', 'failSocket'] as const) {
-    test(`does not send reports after native ${event}`, async () => {
+    test(`does not send reports after native ${event}`, async (context) => {
+        context.mock.timers.enable({ apis: ['setTimeout'] })
         const harness = await createTestHarness()
         harness[event]()
         harness.runtime.applyPatches({ buildId: 'build', patches: [{ seq: 1, changedIds: [], factory() {} }] })

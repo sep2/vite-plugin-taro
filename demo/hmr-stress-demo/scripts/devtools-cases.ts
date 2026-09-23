@@ -5,7 +5,7 @@ import type { DevToolsHarness } from './devtools-harness.ts'
 import { isRecord, waitFor } from './devtools-harness.ts'
 import { type HmrEditProfile, publishHmrEdits } from './publish-hmr-edits.ts'
 
-export type DevToolsCase = 'all' | 'burst' | 'rebuild' | 'recovery'
+export type DevToolsCase = 'all' | 'burst' | 'rebuild' | 'recovery' | 'restart'
 
 type HmrInfo = Readonly<{
     buildId: string
@@ -28,16 +28,19 @@ export async function runDevToolsCase(caseName: DevToolsCase, harness: DevToolsH
     const cases: Readonly<Record<Exclude<DevToolsCase, 'all'>, () => Promise<void>>> = {
         burst: () => testStateRetention('burst', burstProfile, harness),
         rebuild: () => testRuntimeRebuild(harness),
-        recovery: () => testSyntaxRecovery(harness)
+        recovery: () => testSyntaxRecovery(harness),
+        restart: () => testServerRestart(harness)
     }
     if (caseName === 'all') {
         // One strict burst covers the paced path while retaining the failure-producing write interval.
-        for (const selected of ['burst', 'rebuild', 'recovery'] as const) {
+        for (const selected of ['burst', 'rebuild', 'recovery', 'restart'] as const) {
             console.log(`[hmr-devtools] case: ${selected}`)
+            await waitForRuntimeStartup(harness)
             await cases[selected]()
         }
         return
     }
+    await waitForRuntimeStartup(harness)
     await cases[caseName]()
 }
 
@@ -78,6 +81,7 @@ async function testRuntimeRebuild(harness: DevToolsHarness): Promise<void> {
         await sendReportStorm(before, round, reportsPerRound)
         await waitFor(async () => (await readHmrInfo(infoPath)).buildId !== before.buildId, 6_000, 20)
         await assertWxss(harness.outDir)
+        await waitForRuntimeStartup(harness)
         // Metadata is written before DevTools reloads. Baseline text alone can still belong to the old Page.
         await waitFor(async () => (await harness.readElement('#stress-input', 'value')) === 'seed-000', 12_000, 100)
     }
@@ -118,6 +122,74 @@ async function testSyntaxRecovery(harness: DevToolsHarness): Promise<void> {
     await assertWxss(harness.outDir)
     assert.equal(await countLog(harness.serverLogPath, 'wx dev build failed'), buildFailuresBefore)
     await assertCleanConsole(harness)
+}
+
+async function testServerRestart(harness: DevToolsHarness): Promise<void> {
+    const originalSource = await readFile(harness.markerPath, 'utf8')
+    const markerPattern = /export const hmrMarker = '[^']*'/
+    assert.match(originalSource, markerPattern)
+    const infoPath = path.join(harness.outDir, 'hmr/info.js')
+    const appStylePath = path.join(harness.outDir, 'app.wxss')
+    const obsoletePath = path.join(harness.outDir, 'obsolete-restart-output.txt')
+    const publishMarker = async (marker: string) => {
+        console.log(`[hmr-devtools] restart: waiting for rendered marker:${marker}`)
+        await writeFile(
+            harness.markerPath,
+            originalSource.replace(markerPattern, `export const hmrMarker = '${marker}'`)
+        )
+        await waitForMarker(marker, harness)
+        console.log(`[hmr-devtools] restart: rendered marker:${marker}`)
+    }
+
+    try {
+        // Establish working native patch delivery before testing a restart of the same open project.
+        await setPageState('restart-before', harness)
+        await publishMarker('restart-before')
+        await assertPageState('restart-before', harness)
+        const before = await readHmrInfo(infoPath)
+        await writeFile(obsoletePath, 'obsolete output from the previous server')
+
+        console.log('[hmr-devtools] restart: replacing Vite process without reopening or compiling DevTools')
+        await harness.restartServer()
+        await waitFor(async () => (await readHmrInfo(infoPath)).buildId !== before.buildId, 6_000, 20)
+        await assert.rejects(stat(obsoletePath), { code: 'ENOENT' })
+        // Do not query the destroyed automator context or edit before the replacement App opens its socket.
+        const restarted = await waitForRuntimeStartup(harness)
+        // Refresh the automator's page context after the App reload before querying an element from the new Page.
+        await waitFor(
+            async () =>
+                (await harness.readCurrentPage()).path === 'pages/index/index' &&
+                (await harness.readElement('#stress-input', 'value')) === 'seed-000',
+            20_000,
+            100
+        )
+        await waitForMarker('restart-before', harness)
+        const appStyle = await readFile(appStylePath, 'utf8')
+        assert.ok(appStyle.includes(restarted.buildId))
+        console.log('[hmr-devtools] restart: new baseline loaded; obsolete output removed')
+
+        await setPageState('restart-retained', harness)
+        for (const marker of ['restart-after-1', 'restart-after-2']) {
+            await publishMarker(marker)
+            await assertPageState('restart-retained', harness)
+            assert.equal((await readHmrInfo(infoPath)).buildId, restarted.buildId)
+            assert.equal(await readFile(appStylePath, 'utf8'), appStyle, 'A full reload must not mask broken HMR')
+        }
+        await assertCleanConsole(harness)
+    } finally {
+        await writeFile(harness.markerPath, originalSource)
+    }
+}
+
+async function waitForRuntimeStartup(harness: DevToolsHarness): Promise<HmrInfo> {
+    const info = await readHmrInfo(path.join(harness.outDir, 'hmr/info.js'))
+    await waitFor(
+        async () =>
+            (await readFile(harness.serverLogPath, 'utf8')).includes(`[hmr-stress] runtime ready ${info.buildId}`),
+        12_000,
+        100
+    )
+    return info
 }
 
 async function sendReportStorm(info: HmrInfo, round: number, reportCount: number): Promise<void> {

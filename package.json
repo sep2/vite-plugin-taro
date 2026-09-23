@@ -38,6 +38,7 @@
         "test:hmr-stress-demo:interpreter": "pnpm --filter hmr-stress-demo test-interpreter",
         "test:hmr-stress-demo:rebuild": "pnpm --filter hmr-stress-demo test-devtools:rebuild",
         "test:hmr-stress-demo:recovery": "pnpm --filter hmr-stress-demo test-devtools:recovery",
+        "test:hmr-stress-demo:restart": "pnpm --filter hmr-stress-demo test-devtools:restart",
         "build:towxml-stream-demo:wx": "pnpm --filter towxml-stream-demo build-wx",
         "dev:towxml-stream-demo:wx": "pnpm --filter towxml-stream-demo dev-wx",
         "build:loan-genius:wx": "pnpm --filter loan-genius build-wx",

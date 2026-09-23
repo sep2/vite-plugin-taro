@@ -37,7 +37,18 @@ export default defineConfig(({ mode }) => {
                 projectConfigJson: createProjectConfigJson({ target, wechatAppId, alipayAppId }),
                 projectPrivateConfigJson: createProjectPrivateConfigJson(target),
                 sitemapJson: { rules: [{ action: 'allow', page: '*' }] }
-            })
+            }),
+            {
+                name: 'hmr-stress:runtime-readiness',
+                configureServer(server) {
+                    // A rendered Page can precede socket OPEN. Tests must observe the real App's startup before editing.
+                    server.ws.on('vpt:mini-hmr:report', (report: { kind: string; buildId: string }) => {
+                        if (report.kind === 'startup') {
+                            server.config.logger.info(`[hmr-stress] runtime ready ${report.buildId}`)
+                        }
+                    })
+                }
+            }
         ]
     }
 })

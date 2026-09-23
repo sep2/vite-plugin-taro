@@ -17,6 +17,7 @@
         "test-devtools:burst": "node scripts/run-devtools-tests.ts burst",
         "test-devtools:rebuild": "node scripts/run-devtools-tests.ts rebuild",
         "test-devtools:recovery": "node scripts/run-devtools-tests.ts recovery",
+        "test-devtools:restart": "node scripts/run-devtools-tests.ts restart",
         "typecheck": "tsc --project tsconfig.json"
     },
     "dependencies": {

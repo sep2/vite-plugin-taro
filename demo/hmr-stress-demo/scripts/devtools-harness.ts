@@ -1,5 +1,5 @@
 import type { ChildProcessByStdio } from 'node:child_process'
-import { createWriteStream, existsSync } from 'node:fs'
+import { createWriteStream, existsSync, realpathSync } from 'node:fs'
 import { cp, type FileHandle, mkdir, open, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -18,6 +18,7 @@ export type DevToolsHarness = Readonly<{
     readCurrentPage: () => Promise<Readonly<{ path: string }>>
     readElement: (selector: string, action: ElementReadAction) => Promise<string>
     readPageStack: () => Promise<readonly unknown[]>
+    restartServer: () => Promise<void>
     root: string
     serverLogPath: string
 }>
@@ -26,6 +27,7 @@ type ElementReadAction = 'text' | 'value'
 type ToolParameters = Readonly<Record<string, string>>
 type TestCase = (harness: DevToolsHarness) => Promise<void>
 type ServerProcess = ChildProcessByStdio<null, Readable, Readable>
+type CommandResult = Readonly<{ exitCode: number | null; stdout: string; stderr: string }>
 
 /** Only observation polling may retry the temporary detach/missing-node responses of a simulator reload. */
 export class DevToolsToolError extends Error {
@@ -51,7 +53,14 @@ const fixtureRoot = path.dirname(scriptsRoot)
 const repositoryRoot = path.resolve(fixtureRoot, '../..')
 const commandTimeoutMilliseconds = 12_000
 const requestedCase = process.argv[2] ?? 'all'
-const testDeadline = Date.now() + (process.env.VPT_HMR_SETUP === '1' || requestedCase === 'all' ? 60_000 : 30_000)
+// Restart includes a second process startup and native App reload; the aggregate suite includes that extra case.
+const testBudgetMilliseconds =
+    requestedCase === 'all'
+        ? 90_000
+        : process.env.VPT_HMR_SETUP === '1' || requestedCase === 'restart'
+          ? 60_000
+          : 30_000
+const testDeadline = Date.now() + testBudgetMilliseconds
 // Keep both this client name and the temporary project path fixed. WeChat DevTools persists trust by identity/path; random temp
 // directories or per-run clients would force a new authorization prompt and make standalone cases slower and interactive.
 const devToolsClient = process.env.VPT_HMR_DEVTOOLS_CLIENT ?? 'Pi'
@@ -145,38 +154,40 @@ function hasErrorCode(error: unknown, code: string): boolean {
 }
 
 async function runLockedHarness(root: string, testName: string, testCase: TestCase): Promise<void> {
-    // Assigned after startup so finalization owns only a successfully started server.
-    let server: ServerProcess | undefined
-    try {
-        await buildPlugin()
-        await prepareFixture(root)
+    await buildPlugin()
+    await prepareFixture(root)
+    await writeFile(path.join(root, 'vite.log'), '')
+    // Own the current process across restarts. Failed starts clean up their own child before rejecting.
+    let server = await startServer(root)
+    const restartServer = async () => {
+        await stopServer(server)
         server = await startServer(root)
+    }
+    try {
         const outDir = path.join(root, 'dist/wx')
         await validateProjectConfig(path.join(outDir, 'project.config.json'))
         devToolsUsed = true
         await openProject(outDir)
 
         console.log(`[hmr-devtools] running ${testName} in ${root}`)
-        try {
-            await testCase(createHarness(root, outDir))
-        } catch (error) {
-            console.error(
-                `[hmr-devtools] Vite log before cleanup:\n${await readFile(path.join(root, 'vite.log'), 'utf8')}`
-            )
-            throw error
-        }
+        await testCase(createHarness(root, outDir, restartServer))
         console.log(`[hmr-devtools] ${testName} passed`)
+    } catch (error) {
+        // Report setup failures too, before a separate cleanup failure can obscure the original cause.
+        console.error(`[hmr-devtools] ${testName} failed`, error)
+        console.error(`[hmr-devtools] Vite log before cleanup:\n${await readFile(path.join(root, 'vite.log'), 'utf8')}`)
+        throw error
     } finally {
         // Stop Vite before outer cleanup closes this project window and releases the fixture lock.
-        if (server) {
-            await stopServer(server)
-        }
+        await stopServer(server)
     }
 }
 
 async function openProject(outDir: string): Promise<void> {
     // Rebuilding the fixture invalidates an earlier automator attachment, even when its window is still open.
+    console.log(`[hmr-devtools] opening ${outDir}`)
     await runToolWithTimeout('open_project_window', outDir, {}, 30_000)
+    console.log('[hmr-devtools] waiting for automator attachment')
     await waitFor(
         async () => {
             const result = await runTool('automation_runtime_info', outDir, { action: 'currentPage' })
@@ -187,7 +198,7 @@ async function openProject(outDir: string): Promise<void> {
     )
 }
 
-function createHarness(root: string, outDir: string): DevToolsHarness {
+function createHarness(root: string, outDir: string, restartServer: () => Promise<void>): DevToolsHarness {
     return {
         inputElement: async (selector, value) => {
             const result = await runTool('automation_element_action', outDir, {
@@ -250,6 +261,7 @@ function createHarness(root: string, outDir: string): DevToolsHarness {
             }
             return result.pageStack
         },
+        restartServer: restartServer,
         root: root,
         serverLogPath: path.join(root, 'vite.log')
     }
@@ -258,20 +270,22 @@ function createHarness(root: string, outDir: string): DevToolsHarness {
 function resolveTestRoot(): string {
     // The fixed path preserves DevTools trust. Source-pressure profiles are intentionally bounded, so portability and a quick
     // one-command run are more valuable than provisioning a platform-specific RAM disk for a few dozen temporary writes.
-    return path.join(tmpdir(), 'vite-plugin-taro-hmr-stress-v1')
+    // Match Vite's canonical cwd, including macOS's /var -> /private/var alias, when addressing the native runtime.
+    return path.join(realpathSync(tmpdir()), 'vite-plugin-taro-hmr-stress-v1')
 }
 
 async function buildPlugin(): Promise<void> {
     if (process.env.VPT_HMR_BUILD_PLUGIN !== '1') {
         return
     }
-    await runCommand(
+    const result = await runCommand(
         'pnpm',
         ['build:plugin'],
         repositoryRoot,
         process.env,
         remainingTimeout(commandTimeoutMilliseconds)
     )
+    assertSuccessfulCommand('pnpm', result)
 }
 
 async function prepareFixture(root: string): Promise<void> {
@@ -299,8 +313,8 @@ async function startServer(root: string): Promise<ServerProcess> {
     const viteExecutable = path.join(root, 'node_modules/vite/bin/vite.js')
     const appId = process.env.VITE_VPT_WECHAT_APP_ID ?? (await readFixtureAppId()) ?? 'touristappid'
     const serverLogPath = path.join(root, 'vite.log')
-    await writeFile(serverLogPath, '')
-    const log = createWriteStream(serverLogPath)
+    const logOffset = (await readFile(serverLogPath, 'utf8')).length
+    const log = createWriteStream(serverLogPath, { flags: 'a' })
     const server = processes.start(process.execPath, [viteExecutable], {
         cwd: root,
         env: {
@@ -318,7 +332,12 @@ async function startServer(root: string): Promise<ServerProcess> {
     server.once('close', () => log.end())
     server.once('error', () => log.end())
     try {
-        await waitFor(async () => (await readFile(serverLogPath, 'utf8')).includes('Mini Program project'), 20_000, 100)
+        // Preserve both process logs without accepting the previous process's readiness banner.
+        await waitFor(
+            async () => (await readFile(serverLogPath, 'utf8')).slice(logOffset).includes('Mini Program project'),
+            20_000,
+            100
+        )
         return server
     } catch (error) {
         await stopServer(server)
@@ -354,14 +373,9 @@ async function closeProject(outDir: string): Promise<void> {
         process.env,
         commandTimeoutMilliseconds
     )
-    const response = parseToolResponse(output)
-    if (
-        response.ok !== true ||
-        !isRecord(response.result) ||
-        response.result.success !== true ||
-        response.result.canceled === true
-    ) {
-        throw new Error(`wechatide close_project_window failed: ${output}`)
+    const result = decodeDevToolsResponse('close_project_window', output)
+    if (!isRecord(result) || result.success !== true || result.canceled === true) {
+        throw new Error(`wechatide close_project_window failed: ${output.stdout}`)
     }
 }
 
@@ -383,23 +397,33 @@ async function runToolWithTimeout(
         process.env,
         remainingTimeout(timeoutMilliseconds)
     )
-    const response = parseToolResponse(output)
+    return decodeDevToolsResponse(tool, output)
+}
+
+/** The CLI exits with 1 for structured business errors too; decode them before classifying a shell failure. */
+export function decodeDevToolsResponse(tool: string, command: CommandResult): unknown {
+    const jsonStart = command.stdout.indexOf('{')
+    if (jsonStart < 0) {
+        assertSuccessfulCommand('wechatide', command)
+        throw new Error(`wechatide returned no JSON: ${command.stdout}`)
+    }
+    const response: unknown = JSON.parse(command.stdout.slice(jsonStart))
+    if (!isRecord(response)) {
+        throw new Error(`wechatide returned invalid JSON: ${command.stdout}`)
+    }
     if (response.ok !== true) {
         throw new DevToolsToolError(tool, response)
     }
+    assertSuccessfulCommand('wechatide', command)
     return response.result
 }
 
-function parseToolResponse(output: string): Record<string, unknown> {
-    const jsonStart = output.indexOf('{')
-    if (jsonStart < 0) {
-        throw new Error(`wechatide returned no JSON: ${output}`)
+function assertSuccessfulCommand(command: string, result: CommandResult): void {
+    if (result.exitCode !== 0) {
+        throw new Error(
+            `${command} exited with ${result.exitCode}:\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+        )
     }
-    const response: unknown = JSON.parse(output.slice(jsonStart))
-    if (!isRecord(response)) {
-        throw new Error(`wechatide returned invalid JSON: ${output}`)
-    }
-    return response
 }
 
 async function runCommand(
@@ -408,7 +432,7 @@ async function runCommand(
     cwd: string,
     environment: NodeJS.ProcessEnv,
     timeoutMilliseconds: number
-): Promise<string> {
+): Promise<CommandResult> {
     // pnpm and wechatide are command shims on Windows; Vite itself runs directly under Node.
     const executable = process.platform === 'win32' ? 'cmd.exe' : command
     const args = process.platform === 'win32' ? ['/d', '/s', '/c', command, ...arguments_] : arguments_
@@ -428,7 +452,7 @@ async function runCommand(
         child.once('error', reject)
         child.once('close', resolve)
         timeout = setTimeout(() => {
-            reject(new Error(`${command} timed out`))
+            reject(new Error(`${command} ${arguments_.join(' ')} timed out`))
         }, timeoutMilliseconds)
     })
     const exitCode = await (async () => {
@@ -439,10 +463,7 @@ async function runCommand(
             await processes.stop(child)
         }
     })()
-    if (exitCode !== 0) {
-        throw new Error(`${command} exited with ${exitCode}:\nstdout:\n${stdout}\nstderr:\n${stderr}`)
-    }
-    return stdout
+    return { exitCode: exitCode, stdout: stdout, stderr: stderr }
 }
 
 async function stopServer(server: ServerProcess): Promise<void> {

@@ -12,5 +12,5 @@ if (requestedCase === 'setup') {
 }
 
 function isDevToolsCase(value: string): value is DevToolsCase {
-    return ['all', 'burst', 'rebuild', 'recovery'].includes(value)
+    return ['all', 'burst', 'rebuild', 'recovery', 'restart'].includes(value)
 }

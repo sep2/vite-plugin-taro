@@ -43,6 +43,7 @@ const runtimeModules = {
 
 type DevFixture = Readonly<{
     close: () => Promise<void>
+    restart: () => Promise<void>
     outDir: string
     infoPath: string
     appStylePath: string
@@ -138,57 +139,68 @@ async function startDevFixture(
 
     // Each complete build replaces this fixture-local snapshot; HMR assertions do not need physical runtime bundles.
     let javaScriptOutput: readonly string[] = []
-    const server = await createServer({
-        root,
-        configFile: false,
-        customLogger: logger,
-        plugins: [
-            vpt(options),
-            {
-                name: 'test:capsule-layout',
-                generateBundle: {
-                    order: 'post',
-                    handler(_output, bundle) {
-                        const app = bundle['app-capsule.js']
-                        const page = bundle[pageCapsuleFileName]
-                        assert.ok(app?.type === 'chunk' && page?.type === 'chunk')
-                        assert.ok(app.moduleIds.includes(normalizePath(path.join(root, 'src/app.tsx'))))
-                        assert.ok(app.moduleIds.includes(runtimeModules.appCapsule))
-                        assert.ok(page.moduleIds.includes(normalizePath(pagePath)))
-                        assert.ok(page.moduleIds.includes(`${runtimeModules.pageCapsule}?route=pages%2Fhome%2Findex`))
-                        assert.ok(bundle['app.js'])
-                        assert.ok(bundle['pages/home/index.js'])
-                        javaScriptOutput = Object.values(bundle).flatMap((item) =>
-                            item.type === 'chunk' ? [item.code] : []
-                        )
-                        if (bundleOutput !== 'disk') {
-                            // Only the directory-preservation case needs a complete physical project. Capsule cases keep
-                            // their real write/read assertions without also rewriting unrelated vendor and template files.
-                            for (const fileName of Object.keys(bundle)) {
-                                if (!persistedBundleFiles.includes(fileName)) {
-                                    delete bundle[fileName]
+    const createFixtureServer = () =>
+        createServer({
+            root,
+            configFile: false,
+            customLogger: logger,
+            plugins: [
+                vpt(options),
+                {
+                    name: 'test:capsule-layout',
+                    generateBundle: {
+                        order: 'post',
+                        handler(_output, bundle) {
+                            const app = bundle['app-capsule.js']
+                            const page = bundle[pageCapsuleFileName]
+                            assert.ok(app?.type === 'chunk' && page?.type === 'chunk')
+                            assert.ok(app.moduleIds.includes(normalizePath(path.join(root, 'src/app.tsx'))))
+                            assert.ok(app.moduleIds.includes(runtimeModules.appCapsule))
+                            assert.ok(page.moduleIds.includes(normalizePath(pagePath)))
+                            assert.ok(
+                                page.moduleIds.includes(`${runtimeModules.pageCapsule}?route=pages%2Fhome%2Findex`)
+                            )
+                            assert.ok(bundle['app.js'])
+                            assert.ok(bundle['pages/home/index.js'])
+                            javaScriptOutput = Object.values(bundle).flatMap((item) =>
+                                item.type === 'chunk' ? [item.code] : []
+                            )
+                            if (bundleOutput !== 'disk') {
+                                // Only the directory-preservation case needs a complete physical project. Capsule cases keep
+                                // their real write/read assertions without also rewriting unrelated vendor and template files.
+                                for (const fileName of Object.keys(bundle)) {
+                                    if (!persistedBundleFiles.includes(fileName)) {
+                                        delete bundle[fileName]
+                                    }
                                 }
                             }
                         }
                     }
                 }
+            ],
+            build: {
+                outDir
+            },
+            server: {
+                host,
+                port: 0,
+                strictPort: true
             }
-        ],
-        build: {
-            outDir
-        },
-        server: {
-            host,
-            port: 0,
-            strictPort: true
-        }
-    })
+        })
 
+    // Restarts replace the server with fresh plugin instances, just like restarting the Vite process from its config file.
+    let server = await createFixtureServer()
     try {
-        await assert.rejects(readFile(oldAppStyle), { code: 'ENOENT' })
+        assert.equal(
+            await readFile(oldAppStyle, 'utf8'),
+            'previous App stylesheet',
+            'Creating the server must not clean the previous output'
+        )
         await server.listen()
         assert.equal((await stat(oldDirectory)).ino, directoryInode, 'Startup must preserve watched directories')
-        await assert.rejects(readFile(oldFile), { code: 'ENOENT' })
+        assert.equal(await readExistingFile(oldFile), undefined, 'The first output must remove obsolete files')
+        // listen() binds before its metadata transaction finishes; the App marker is the completed baseline boundary.
+        await waitForFile(oldAppStyle, (source) => source.includes('vpt-build:'), maximumWaitAttempts)
     } catch (error) {
         await server.close()
         await rm(root, { force: true, recursive: true })
@@ -196,9 +208,18 @@ async function startDevFixture(
     }
 
     return {
-        server,
+        get server() {
+            return server
+        },
         outDir,
-        bundledDev: requireBundledDev(server.environments.client.bundledDev),
+        get bundledDev() {
+            return requireBundledDev(server.environments.client.bundledDev)
+        },
+        restart: async () => {
+            await server.close()
+            server = await createFixtureServer()
+            await server.listen()
+        },
         pagePath,
         appStylePath: path.join(outDir, 'app.wxss'),
         infoPath: path.join(outDir, hmrInfoFileName),
@@ -422,6 +443,9 @@ test('rejects startup with the original complete-output failure', async () => {
     await writeFile(path.join(root, 'src/app.tsx'), 'export default function App() { return null }\n')
     await writeFile(path.join(path.dirname(pagePath), 'suffix.ts'), 'export const suffix = "";\n')
     await writeFile(pagePath, renderPage('initial output failure'))
+    const oldOutput = path.join(root, 'dist/old.js')
+    await mkdir(path.dirname(oldOutput), { recursive: true })
+    await writeFile(oldOutput, 'previous successful output')
     const failure = new Error('expected complete-output failure')
     const failOutput: Plugin = {
         name: 'test:fail-complete-output',
@@ -447,6 +471,7 @@ test('rejects startup with the original complete-output failure', async () => {
     try {
         await assert.rejects(() => server.listen(), /expected complete-output failure/)
         assert.match(errors.join('\n'), /wx dev build failed/)
+        assert.equal(await readFile(oldOutput, 'utf8'), 'previous successful output')
     } finally {
         await server.close()
         await rm(root, { force: true, recursive: true })
@@ -548,6 +573,55 @@ test('publishes and acknowledges cumulative wx patches without rotating the App 
     assert.doesNotMatch(secondPatches, /first hot generation/)
     assert.equal(await readFile(fixture.infoPath, 'utf8'), initialInfoSource)
     assert.equal(await readFile(fixture.appStylePath, 'utf8'), initialAppStyle)
+})
+
+test('a Vite restart removes obsolete files and publishes a new baseline before subsequent patches', async (context) => {
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'disk')
+    context.after(fixture.close)
+    const initial = await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
+    const sentinel = path.join(fixture.outDir, 'obsolete/nested/old.js')
+    await writeFile(sentinel, 'obsolete file from the previous session')
+    await fixture.restart()
+    const next = parseHmrInfo(await waitForFile(fixture.infoPath, (source) => source !== initial, maximumWaitAttempts))
+    assert.equal(await readExistingFile(sentinel), undefined)
+    await waitForFile(fixture.appStylePath, (source) => source.includes(next.buildId), maximumWaitAttempts)
+    await publishSourceGeneration(fixture.pagePath, renderPage('edit after server restart'))
+    const patches = await waitForFile(
+        fixture.patchesPath,
+        (source) => source.includes('edit after server restart'),
+        maximumWaitAttempts
+    )
+    assert.match(patches, /\{seq: 1,/)
+    assert.equal(parseHmrInfo(await readFile(fixture.infoPath, 'utf8')).buildId, next.buildId)
+})
+
+test('resume republishes missed DevTools patches without a new edit or App reload', async (context) => {
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'memory')
+    context.after(fixture.close)
+    const initial = await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
+    const info = parseHmrInfo(initial)
+    await publishSourceGeneration(fixture.pagePath, renderPage('missed while disconnected'))
+    const first = await waitForFile(
+        fixture.patchesPath,
+        (source) => source.includes('missed while disconnected'),
+        maximumWaitAttempts
+    )
+    await sendRuntimeReport(info, { kind: 'resume', buildId: info.buildId, seq: 0 })
+    const replay = await waitForFile(fixture.patchesPath, (source) => source !== first, maximumWaitAttempts)
+    assert.match(replay, /missed while disconnected/)
+    assert.match(replay, /\{seq: 1,/)
+    assert.equal(await readFile(fixture.infoPath, 'utf8'), initial)
+
+    // A lost ACK is recovered by the resume frontier without republishing already applied factories.
+    await sendRuntimeReport(info, { kind: 'resume', buildId: info.buildId, seq: 1 })
+    await sendRuntimeReport(info, { kind: 'resume', buildId: 'stale', seq: 0 })
+    await delay(100)
+    assert.equal(await readFile(fixture.patchesPath, 'utf8'), replay)
+    assert.equal(await readFile(fixture.infoPath, 'utf8'), initial)
+
+    // A different retained heap can be behind a pruned frontier; rebuild rather than sending an incomplete suffix.
+    await sendRuntimeReport(info, { kind: 'resume', buildId: info.buildId, seq: 0 })
+    await waitForFile(fixture.infoPath, (source) => source !== initial, maximumWaitAttempts)
 })
 
 test('startup rebuilds after one published patch even when its complete history is retained', async (context) => {
@@ -668,6 +742,31 @@ test('publishes interpreter source through Vite WebSocket', async (context) => {
     assert.equal(await readExistingFile(fixture.patchesPath), undefined)
 })
 
+test('resume replays interpreter patches over a replacement socket without another source edit', async (context) => {
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createInterpreterOptions(), 'memory')
+    context.after(fixture.close)
+    const info = parseHmrInfo(
+        await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
+    )
+    const first = await openHmrSocket(info)
+    const published = waitForInterpreterMessage(first)
+    await publishSourceGeneration(fixture.pagePath, renderPage('retained interpreter patch'))
+    const payload = await published
+    first.close()
+    const replacement = await openHmrSocket(info)
+    context.after(() => replacement.close())
+    const replay = waitForInterpreterMessage(replacement)
+    replacement.send(
+        JSON.stringify({
+            type: 'custom',
+            event: runtimeReportEvent,
+            data: { kind: 'resume', buildId: info.buildId, seq: 0 }
+        })
+    )
+    assert.deepEqual(await replay, payload)
+    assert.equal(parseHmrInfo(await readFile(fixture.infoPath, 'utf8')).buildId, info.buildId)
+})
+
 test('rebuild mode replaces complete output without creating patch transport artifacts', async (context) => {
     const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createRebuildOptions(), 'capsule')
     context.after(fixture.close)
@@ -702,6 +801,7 @@ test('regenerates native transport routes when a complete rebuild adds or remove
     context.after(fixture.close)
     const transportPath = path.join(fixture.outDir, 'common/vpt/transport.js')
     assert.doesNotMatch(await readFile(transportPath, 'utf8'), /require\.async/)
+    const initialAppStyle = await readFile(fixture.appStylePath, 'utf8')
 
     await writeFile(path.join(path.dirname(fixture.pagePath), 'lazy-feature.ts'), 'console.log("lazy feature loaded")')
     await publishSourceGeneration(fixture.pagePath, `${renderPage('added lazy route')}\nvoid import('./lazy-feature')`)
@@ -713,6 +813,8 @@ test('regenerates native transport routes when a complete rebuild adds or remove
     )
     assert.match(added, /require\.async\("\.\.\/\.\.\/sub\/p_[a-f0-9]{8}\/common\/lazy-feature\.js"\)/)
     assert.doesNotMatch(added, /registerModule|case ["']common\/vpt\/transport\.js/)
+    // The transport is an intermediate output, not a completed build. Wait for the host's final marker before the next edit.
+    await waitForFile(fixture.appStylePath, (source) => source !== initialAppStyle, maximumWaitAttempts)
 
     await publishSourceGeneration(fixture.pagePath, renderPage('removed lazy route'))
     const removed = await waitForFile(
@@ -929,7 +1031,8 @@ test('resumes wx patch publication after a transient syntax error', async (conte
         (source) => source.includes('buildId'),
         maximumWaitAttempts
     )
-    await writeFile(
+    // Test two complete editor generations; truncate/write event coalescing has its own regression above.
+    await publishSourceGeneration(
         fixture.pagePath,
         `
             import { View } from '@tarojs/components'
@@ -943,7 +1046,7 @@ test('resumes wx patch publication after a transient syntax error', async (conte
         maximumWaitAttempts
     )
 
-    await writeFile(fixture.pagePath, renderPage('recovered hot generation'))
+    await publishSourceGeneration(fixture.pagePath, renderPage('recovered hot generation'))
     const recoveredPatches = await waitForFile(
         fixture.patchesPath,
         (source) => source.includes('recovered hot generation'),

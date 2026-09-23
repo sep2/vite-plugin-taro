@@ -1,6 +1,47 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { DevToolsToolError, waitFor } from './devtools-harness.ts'
+import { DevToolsToolError, decodeDevToolsResponse, waitFor } from './devtools-harness.ts'
+
+test('decodes a reload observation error even when the CLI exits with status 1', () => {
+    assert.throws(
+        () =>
+            decodeDevToolsResponse('automation_element_action', {
+                exitCode: 1,
+                stdout: JSON.stringify({ ok: false, message: 'timeout waiting for automator response' }),
+                stderr: '[wechatide] skill-call'
+            }),
+        (error: unknown) => error instanceof DevToolsToolError && error.retryableObservation
+    )
+    assert.throws(
+        () =>
+            decodeDevToolsResponse('automation_element_action', {
+                exitCode: 1,
+                stdout: JSON.stringify({ ok: false, message: 'User denied' }),
+                stderr: ''
+            }),
+        (error: unknown) => error instanceof DevToolsToolError && !error.retryableObservation
+    )
+})
+
+test('accepts successful CLI responses and preserves command failures', () => {
+    assert.equal(
+        decodeDevToolsResponse('automation_element_action', {
+            exitCode: 0,
+            stdout: JSON.stringify({ ok: true, result: 'marker:updated' }),
+            stderr: ''
+        }),
+        'marker:updated'
+    )
+    assert.throws(
+        () =>
+            decodeDevToolsResponse('automation_element_action', {
+                exitCode: 1,
+                stdout: '',
+                stderr: 'command failed before returning a tool response'
+            }),
+        /command failed before returning a tool response/
+    )
+})
 
 test('observation polling spans a simulator reload without accepting a stale result', async () => {
     const observations = [
