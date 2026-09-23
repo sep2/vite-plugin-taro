@@ -27,8 +27,13 @@ async function bundleOptimizedNavigator(root: string): Promise<string> {
     await writeFile(
         entry,
         `
-            export { default as applicationApi, showToast as applicationToast, useLaunch as applicationLaunch }
-                from ${JSON.stringify(resolveRuntimeFile('h5/taro-api'))}
+            export {
+                default as applicationApi,
+                showToast as applicationToast,
+                useLaunch as applicationLaunch,
+                pxTransform as applicationPxTransform,
+                initPxTransform as applicationInitPxTransform
+            } from ${JSON.stringify(resolveRuntimeFile('h5/taro-api'))}
             export { default as consumerApi } from '@tarojs/taro'
             export { default as backendApi, canIUse } from 'vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis'
             export { default as upstreamBackendApi } from '@tarojs/plugin-platform-h5/dist/runtime/apis'
@@ -106,6 +111,15 @@ function assertOptimizedNavigation(code: string): void {
             assert.equal(harness.backendApi, harness.upstreamBackendApi)
             assert.equal(harness.applicationApi.showToast, harness.applicationToast)
             assert.equal(harness.applicationApi.useLaunch, harness.applicationLaunch)
+            assert.equal(harness.applicationApi.pxTransform, harness.applicationPxTransform)
+            assert.equal(harness.applicationApi.initPxTransform, harness.applicationInitPxTransform)
+            assert.equal(harness.applicationPxTransform, harness.backendApi.pxTransform)
+            assert.equal(harness.applicationInitPxTransform, harness.backendApi.initPxTransform)
+            // H5 does not initialize sizing automatically; an explicit policy makes dynamic inline values usable.
+            harness.applicationApi.initPxTransform({ designWidth: 750, deviceRatio: { 750: 1 } })
+            assert.equal(harness.applicationApi.pxTransform(100), '2.5rem')
+            harness.applicationInitPxTransform({ designWidth: 375, deviceRatio: { 375: 2 }, targetUnit: 'vw' })
+            assert.equal(harness.applicationPxTransform(100), '26.66667vw')
             assert.equal(harness.applicationApi.canIUse, harness.canIUse)
             assert.equal(harness.applicationApi.navigateTo, harness.backendApi.navigateTo)
             assert.equal(harness.applicationApi.options, harness.backendApi.options)

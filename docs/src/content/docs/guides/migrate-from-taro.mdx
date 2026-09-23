@@ -288,7 +288,7 @@ vpt全自动分包处理的是通过动态 `import()` 加载的 **JavaScript 模
 | Taro `plugins` | 不会运行；确认用途后改写为 Vite 插件或业务代码。 |
 | `compiler`、`framework` | 删除；vpt 已确定使用 Vite 与 React。 |
 
-`designWidth`、`deviceRatio` 和 Taro `pxtransform` 配置没有可直接复制的选项。vpt 会为微信样式转换 `px` 和 `rem`，迁移后应逐页检查尺寸，不要假设旧的自定义换算比例仍然生效。
+`designWidth`、`deviceRatio` 和 Taro `pxtransform` 构建配置没有可直接复制到 `vpt()` 的选项。微信、支付宝和抖音的应用 CSS 默认按 750px 设计稿转换 `px` / `rem`；运行时 `Taro.pxTransform()` 在小程序也可用，但单独调用 `Taro.initPxTransform()` 不会更改静态 CSS。需要其他设计宽度时，按[样式指南的尺寸配置](/guides/styles/#使用其他设计稿宽度)分别设置 Vite PostCSS 和运行时，再逐页检查尺寸。H5 不会自动将 CSS 的 `px` 转成 `rem`，也不会自动初始化 `pxTransform`。
 
 ### 环境变量
 

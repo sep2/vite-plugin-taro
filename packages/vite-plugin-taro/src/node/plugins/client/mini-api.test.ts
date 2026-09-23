@@ -54,6 +54,37 @@ async function bundleMiniApi(source: string, target: 'wx' | 'zfb' | 'tt'): Promi
 }
 
 for (const target of ['wx', 'zfb', 'tt'] as const) {
+    test(`converts dynamic inline sizes through the real ${target} Taro facade`, async () => {
+        const code = await bundleMiniApi(
+            `
+            import Taro, { initPxTransform, pxTransform } from 'virtual:taro/api'
+            import Upstream from '@tarojs/taro'
+            import backend from 'vite-plugin-taro-runtime/taro'
+            export function probe() {
+                assert.equal(Taro, Upstream)
+                assert.equal(Taro, backend)
+                assert.equal(Taro.pxTransform, pxTransform)
+                assert.equal(Taro.initPxTransform, initPxTransform)
+                assert.equal(Taro.pxTransform(100), '100rpx')
+                Taro.initPxTransform({ designWidth: 375, deviceRatio: { 375: 2 } })
+                assert.equal(Taro.pxTransform(100), '200rpx')
+                assert.equal(pxTransform(12.5), '24rpx')
+            }
+        `,
+            target
+        )
+        runInNewContext(`globalThis.global = globalThis;\n${code}\nfixture.probe()`, {
+            assert,
+            console,
+            wx: {},
+            my: {},
+            tt: {},
+            navigator: {},
+            getApp: () => ({}),
+            getCurrentPages: () => []
+        })
+    })
+
     test(`retains the shared ${target} API object and native setup when importing a hook`, async () => {
         const code = await bundleMiniApi(
             `

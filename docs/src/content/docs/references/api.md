@@ -195,17 +195,19 @@ tableOfContents:
 
 ### Taro.pxTransform(size)
 
-尺寸转换
+将代码中的动态设计稿尺寸转换为带单位的字符串，适合行内样式。小程序默认 750px 设计宽度，`pxTransform(100)` 返回 `100rpx`；初始化为 375px、`deviceRatio: { 375: 2 }` 后返回 `200rpx`。输入会先截为整数。
 
-**支持：** 微信、Web
+**支持：** 微信、支付宝、抖音、Web（Web 需先初始化，且不会自动转换 CSS）
+
+静态 CSS 的换算需要另行配置，见[尺寸单位与动态样式](/guides/styles/#尺寸单位与动态样式)。
 
 [查看 Taro 文档](https://docs.taro.zone/docs/apis/taro.extend/pxTransform)
 
 ### Taro.initPxTransform(config)
 
-尺寸转换初始化
+设置运行时 `pxTransform()` 的 `designWidth`、`deviceRatio` 等参数；**不会**更改静态 CSS 的转换规则。VPT 不会自动初始化 H5 的尺寸转换，也不提供与 H5 `rem` 配套的响应式根字号。
 
-**支持：** 微信、Web
+**支持：** 微信、支付宝、抖音、Web
 
 [查看 Taro 文档](https://docs.taro.zone/docs/apis/taro.extend/initPxTransform)
 
