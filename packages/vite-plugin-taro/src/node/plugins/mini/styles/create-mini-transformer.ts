@@ -41,8 +41,10 @@ const miniStyleHandlerOptions = {
     cssRemoveActivePseudoClass: true,
     cssRemoveHoverPseudoClass: true,
     majorVersion: 4,
-    px2rpx: true,
-    rem2rpx: true
+    cssOptions: {
+        px2rpx: true,
+        rem2rpx: true
+    }
 } satisfies Partial<IStyleHandlerOptions>
 
 type JavaScriptTransformInput = Readonly<{
