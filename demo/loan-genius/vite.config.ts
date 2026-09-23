@@ -47,7 +47,27 @@ export default defineConfig(({ mode }) => {
                 hmr: {
                     mode: target === 'wx' ? 'devtools' : 'interpreter'
                 }
-            })
+            }),
+            {
+                name: 'loan-genius:hmr-test-readiness',
+                async buildStart() {
+                    // Restart regressions widen cleanup into an observable interval. Keeping this opt-in leaves normal builds
+                    // unchanged while proving that an already-open DevTools project survives replacement-process startup.
+                    const delayMilliseconds = Number(process.env.VPT_HMR_RESTART_BUILD_DELAY_MS ?? 0)
+                    if (delayMilliseconds > 0) {
+                        await new Promise<void>((resolve) => setTimeout(resolve, delayMilliseconds))
+                    }
+                },
+                configureServer(server) {
+                    // Rendered baseline files can precede socket OPEN. The restart test waits for this exact App heap before
+                    // editing again, so a stale Page cannot make post-restart HMR appear successful.
+                    server.ws.on('vpt:mini-hmr:report', (report: { kind: string; buildId: string }) => {
+                        if (report.kind === 'startup') {
+                            server.config.logger.info(`[loan-hmr] runtime ready ${report.buildId}`)
+                        }
+                    })
+                }
+            }
         ]
     }
 })

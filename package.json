@@ -51,6 +51,8 @@
         "dev:loan-genius:tt": "pnpm --filter loan-genius dev-tt",
         "dev:loan-genius:h5": "pnpm --filter loan-genius dev-h5",
         "test:loan-genius:hmr": "pnpm --filter loan-genius test-hmr-wx",
+        "test:loan-genius:hmr:restart": "pnpm --filter loan-genius test-hmr-wx:restart",
+        "test:loan-genius:watch-restart": "pnpm --filter loan-genius test-build-watch-wx:restart",
         "preview:loan-genius:h5": "pnpm --filter loan-genius preview-h5",
         "dev:docs": "pnpm --filter docs dev",
         "typecheck": "pnpm typecheck:scripts && pnpm --recursive --if-present typecheck",

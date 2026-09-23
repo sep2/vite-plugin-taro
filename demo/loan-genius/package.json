@@ -15,7 +15,9 @@
         "dev-tt": "cross-env NODE_ENV=development VITE_VPT_TARGET=tt vite",
         "dev-h5": "cross-env NODE_ENV=development VITE_VPT_TARGET=h5 vite",
         "test": "node --test scripts/*.test.ts",
-        "test-hmr-wx": "node scripts/run-hmr-tests.ts",
+        "test-hmr-wx": "node scripts/run-hmr-tests.ts all",
+        "test-hmr-wx:restart": "cross-env VPT_HMR_RESTART_BUILD_DELAY_MS=3000 node scripts/run-hmr-tests.ts restart",
+        "test-build-watch-wx:restart": "cross-env VPT_HMR_RESTART_BUILD_DELAY_MS=3000 node scripts/run-build-watch-restart-test.ts",
         "typecheck": "tsc --project tsconfig.json && tsc --project tsconfig.scripts.json"
     },
     "dependencies": {

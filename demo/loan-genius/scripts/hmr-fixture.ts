@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { cp, type FileHandle, mkdir, open, readFile, rm, symlink, unlink } from 'node:fs/promises'
+import { cp, type FileHandle, mkdir, open, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -23,6 +23,7 @@ export type LoanHmrServer = Readonly<{
 
 type SourceReplacement = readonly [oldText: string, newText: string]
 type FixtureTest = (fixture: LoanHmrFixture) => Promise<void>
+export type LoanHmrFixtureProfile = 'restart' | 'state-retention'
 
 const scriptsRoot = path.dirname(fileURLToPath(import.meta.url))
 const packageRoot = path.dirname(scriptsRoot)
@@ -31,10 +32,10 @@ const fixtureRoot = path.join(tmpdir(), 'vite-plugin-taro-loan-genius-hmr-v1')
 const fixtureLockPath = path.join(tmpdir(), 'vite-plugin-taro-loan-genius-hmr.lock')
 
 /** Runs one suite against the fixed trusted DevTools project without allowing concurrent source mutation. */
-export async function withLoanHmrFixture(test: FixtureTest): Promise<void> {
+export async function withLoanHmrFixture(profile: LoanHmrFixtureProfile, test: FixtureTest): Promise<void> {
     const lock = await acquireFixtureLock()
     try {
-        const fixture = await prepareFixture()
+        const fixture = await prepareFixture(profile)
         await test(fixture)
     } finally {
         await lock.close()
@@ -78,7 +79,7 @@ function hasErrorCode(error: unknown, code: string): boolean {
     return error instanceof Error && 'code' in error && error.code === code
 }
 
-async function prepareFixture(): Promise<LoanHmrFixture> {
+async function prepareFixture(profile: LoanHmrFixtureProfile): Promise<LoanHmrFixture> {
     await mkdir(fixtureRoot, { recursive: true })
     await Promise.all(
         ['src', 'public', 'node_modules'].map((entry) =>
@@ -98,6 +99,8 @@ async function prepareFixture(): Promise<LoanHmrFixture> {
     if (existsSync(path.join(packageRoot, '.env.local'))) {
         await cp(path.join(packageRoot, '.env.local'), path.join(fixtureRoot, '.env.local'))
     }
+    // Each suite gets one readable journal. Replacement servers append so restart readiness cannot match an old process.
+    await writeFile(path.join(fixtureRoot, 'vite.log'), '')
     await symlink(
         path.join(packageRoot, 'node_modules'),
         path.join(fixtureRoot, 'node_modules'),
@@ -106,7 +109,9 @@ async function prepareFixture(): Promise<LoanHmrFixture> {
 
     const fixture = createFixture()
     await configureAutomatableRenderer(fixture)
-    await instrumentSources(fixture)
+    // The broad state-retention suite owns the independent bare-URL polyfill assertion. Restart-only suites keep the same
+    // application and automation selectors but isolate process recovery from that unrelated runtime feature.
+    await instrumentSources(fixture, profile === 'state-retention')
     return fixture
 }
 
@@ -134,12 +139,15 @@ async function configureAutomatableRenderer(fixture: LoanHmrFixture): Promise<vo
     ])
 }
 
-async function instrumentSources(fixture: LoanHmrFixture): Promise<void> {
+async function instrumentSources(fixture: LoanHmrFixture, includePolyfillProbe: boolean): Promise<void> {
     const markerFiles = [
         'src/pages/calculator/hmr-marker.ts',
         'src/pages/calculator/monthly-payments/hmr-marker.ts',
         'src/pages/calculator/history/hmr-marker.ts'
     ]
+    const polyfillProbe = includePolyfillProbe
+        ? "            <Text id=\"loan-polyfill-probe\">URL:{new URL('child', 'https://example.com/loan/').href}</Text>\n"
+        : ''
     await Promise.all(markerFiles.map((file) => fixture.publishMarker(file, 'baseline')))
     await Promise.all([
         replaceFixtureSource(fixture, 'src/components/layout-hoc.tsx', [
@@ -161,7 +169,7 @@ async function instrumentSources(fixture: LoanHmrFixture): Promise<void> {
             ],
             [
                 '            <NavigationBar backgroundColor={backgroundColor} color={navigationBarColor}>',
-                '            <Text id="loan-direct-page-probe">direct-page-baseline</Text>\n            <Text id="loan-polyfill-probe">URL:{new URL(\'child\', \'https://example.com/loan/\').href}</Text>\n            <Text id="loan-hmr-marker">{hmrMarker}</Text>\n            <NavigationBar backgroundColor={backgroundColor} color={navigationBarColor}>'
+                `            <Text id="loan-direct-page-probe">direct-page-baseline</Text>\n${polyfillProbe}            <Text id="loan-hmr-marker">{hmrMarker}</Text>\n            <NavigationBar backgroundColor={backgroundColor} color={navigationBarColor}>`
             ],
             [
                 '                <Button\n                    className="flex p-2',
@@ -277,18 +285,54 @@ export function replaceOnce(source: string, oldText: string, newText: string): s
 
 export async function startLoanHmrServer(fixture: LoanHmrFixture): Promise<LoanHmrServer> {
     const logPath = path.join(fixture.root, 'vite.log')
-    const logFile = await open(logPath, 'w')
-    const server = spawn(process.execPath, [path.join(fixture.root, 'node_modules/vite/bin/vite.js')], {
+    const logOffset = (await readFile(logPath, 'utf8')).length
+    return startLoanProcess(fixture, [], async () => {
+        const currentLog = await readFile(logPath, 'utf8')
+        return currentLog.slice(logOffset).includes('Mini Program project')
+    })
+}
+
+export async function startLoanBuildWatcher(fixture: LoanHmrFixture): Promise<LoanHmrServer> {
+    const markerPath = path.join(fixture.outDir, 'hmr/watch.js')
+    const previousMarker = await readExistingFile(markerPath)
+    return startLoanProcess(fixture, ['build', '--watch'], async () => {
+        const marker = await readExistingFile(markerPath)
+        return marker !== undefined && marker !== previousMarker
+    })
+}
+
+async function startLoanProcess(
+    fixture: LoanHmrFixture,
+    arguments_: readonly string[],
+    ready: () => Promise<boolean>
+): Promise<LoanHmrServer> {
+    const logFile = await open(path.join(fixture.root, 'vite.log'), 'a')
+    const server = spawn(process.execPath, [path.join(fixture.root, 'node_modules/vite/bin/vite.js'), ...arguments_], {
         cwd: fixture.root,
-        env: { ...process.env, NODE_ENV: 'development', VITE_VPT_TARGET: 'wx' },
+        env: {
+            ...process.env,
+            NODE_ENV: arguments_.includes('build') ? 'production' : 'development',
+            VITE_VPT_TARGET: 'wx'
+        },
         stdio: ['ignore', logFile.fd, logFile.fd]
     })
     const handle = { logFile: logFile, process: server }
     try {
-        await waitFor(async () => (await readFile(logPath, 'utf8')).includes('Mini Program project'), 20_000)
+        await waitFor(ready, arguments_.includes('build') ? 30_000 : 20_000)
         return handle
     } catch (error) {
         await stopLoanHmrServer(handle)
+        throw error
+    }
+}
+
+async function readExistingFile(file: string): Promise<string | undefined> {
+    try {
+        return await readFile(file, 'utf8')
+    } catch (error) {
+        if (hasErrorCode(error, 'ENOENT')) {
+            return undefined
+        }
         throw error
     }
 }

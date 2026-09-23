@@ -18,6 +18,19 @@ type ElementInteractionAction = 'input' | 'tap'
 type ElementReadAction = 'outerWxml' | 'text' | 'value' | 'wxml'
 type ToolParameters = Readonly<Record<string, string>>
 
+/** Only simulator observations may retry the temporary detach and missing-node states of a native App reload. */
+export class LoanDevToolsToolError extends Error {
+    readonly retryableObservation: boolean
+
+    constructor(tool: string, response: Record<string, unknown>) {
+        super(`wechatide ${tool} failed: ${JSON.stringify(response)}`)
+        this.retryableObservation =
+            response.message === 'timeout waiting for automator response' ||
+            response.message === 'no such element' ||
+            response.message === 'page node not found'
+    }
+}
+
 const execFileAsync = promisify(execFile)
 const commandTimeoutMilliseconds = 12_000
 const devToolsExecutable = process.platform === 'win32' ? 'cmd.exe' : 'wechatide'
@@ -52,12 +65,14 @@ export function createLoanHmrDevTools(fixture: LoanHmrFixture): LoanHmrDevTools 
         },
         openProject: async () => {
             await runToolWithTimeout(fixture, 'open_project_window', {}, 30_000)
-            try {
-                await runTool('automation_runtime_info', { action: 'currentPage' })
-            } catch {
-                // A clean project can finish compilation just after the automator's first response deadline.
-                await runTool('automation_runtime_info', { action: 'currentPage' })
-            }
+            await waitFor(
+                async () => {
+                    const result = await runTool('automation_runtime_info', { action: 'currentPage' })
+                    return isRecord(result) && isRecord(result.currentPage)
+                },
+                20_000,
+                100
+            )
         },
         readConsoleErrors: async () => {
             const result = await runTool('get_simulator_console', {
@@ -100,19 +115,49 @@ async function runToolWithTimeout(
     timeoutMilliseconds: number
 ): Promise<unknown> {
     const parameterArguments = Object.entries(parameters).flatMap(([name, value]) => [`--${name}`, value])
-    const { stdout } = await execFileAsync(
-        devToolsExecutable,
-        [...devToolsArguments, '-c', devToolsClient, '-t', tool, '--project', fixture.outDir, ...parameterArguments],
-        {
-            cwd: fixture.repositoryRoot,
-            env: process.env,
-            timeout: timeoutMilliseconds,
-            maxBuffer: 10 * 1024 * 1024
+    try {
+        const { stdout } = await execFileAsync(
+            devToolsExecutable,
+            [
+                ...devToolsArguments,
+                '-c',
+                devToolsClient,
+                '-t',
+                tool,
+                '--project',
+                fixture.outDir,
+                ...parameterArguments
+            ],
+            {
+                cwd: fixture.repositoryRoot,
+                env: process.env,
+                timeout: timeoutMilliseconds,
+                maxBuffer: 10 * 1024 * 1024
+            }
+        )
+        return decodeDevToolsResponse(tool, stdout)
+    } catch (error) {
+        const stdout = readCommandStdout(error)
+        if (stdout?.includes('{')) {
+            // wechatide exits with status 1 for structured simulator reload responses. Decode those before preserving genuine
+            // shell, timeout, and authorization failures from execFile.
+            decodeDevToolsResponse(tool, stdout)
         }
-    )
-    const response = parseToolResponse(stdout)
+        throw error
+    }
+}
+
+function readCommandStdout(error: unknown): string | undefined {
+    if (error instanceof Error && 'stdout' in error && typeof error.stdout === 'string') {
+        return error.stdout
+    }
+    return undefined
+}
+
+export function decodeDevToolsResponse(tool: string, output: string): unknown {
+    const response = parseToolResponse(output)
     if (response.ok !== true) {
-        throw new Error(`wechatide ${tool} failed: ${stdout}`)
+        throw new LoanDevToolsToolError(tool, response)
     }
     return response.result
 }
@@ -140,7 +185,21 @@ export async function waitFor(
     intervalMilliseconds: number
 ): Promise<void> {
     const startedAt = Date.now()
-    while (!(await predicate())) {
+    const observe = async (): Promise<boolean> => {
+        try {
+            return await predicate()
+        } catch (error) {
+            if (
+                !(error instanceof LoanDevToolsToolError) ||
+                !error.retryableObservation ||
+                Date.now() - startedAt > timeoutMilliseconds
+            ) {
+                throw error
+            }
+            return false
+        }
+    }
+    while (!(await observe())) {
         if (Date.now() - startedAt > timeoutMilliseconds) {
             throw new Error(`Timed out after ${timeoutMilliseconds}ms`)
         }
