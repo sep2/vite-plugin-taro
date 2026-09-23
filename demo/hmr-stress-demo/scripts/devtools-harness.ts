@@ -1,6 +1,7 @@
 import type { ChildProcessByStdio } from 'node:child_process'
 import { createWriteStream, existsSync, realpathSync } from 'node:fs'
 import { cp, type FileHandle, mkdir, open, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises'
+import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { Readable } from 'node:stream'
@@ -9,7 +10,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { createProcessScope } from './create-process-scope.ts'
 
-export type DevToolsHarness = Readonly<{
+export type DevToolsProjectHarness = Readonly<{
     inputElement: (selector: string, value: string) => Promise<void>
     markerPath: string
     navigate: (action: string, url: string | undefined) => Promise<void>
@@ -18,9 +19,18 @@ export type DevToolsHarness = Readonly<{
     readCurrentPage: () => Promise<Readonly<{ path: string }>>
     readElement: (selector: string, action: ElementReadAction) => Promise<string>
     readPageStack: () => Promise<readonly unknown[]>
-    restartServer: () => Promise<void>
     root: string
     serverLogPath: string
+}>
+
+export type DevToolsHarness = DevToolsProjectHarness &
+    Readonly<{
+        restartServer: () => Promise<void>
+    }>
+
+export type PortSwapHarness = Readonly<{
+    projects: Readonly<Record<'a' | 'b', DevToolsProjectHarness>>
+    restartInReverseOrder: () => Promise<void>
 }>
 
 type ElementReadAction = 'text' | 'value'
@@ -46,8 +56,8 @@ export class DevToolsToolError extends Error {
 const processes = createProcessScope()
 // Each server registers its log completion so finalization also drains file handles.
 const logCompletions: Promise<unknown>[] = []
-// Close only this fixture's window after this invocation has attempted to attach to its runtime.
-let devToolsUsed = false
+// Cleanup owns only project windows this invocation attempted to open; unrelated DevTools windows remain untouched.
+const openedProjectPaths = new Set<string>()
 
 const scriptsRoot = path.dirname(fileURLToPath(import.meta.url))
 const fixtureRoot = path.dirname(scriptsRoot)
@@ -56,11 +66,13 @@ const commandTimeoutMilliseconds = 12_000
 const requestedCase = process.argv[2] ?? 'all'
 // Restart includes a second process startup and native App reload; the aggregate suite includes that extra case.
 const testBudgetMilliseconds =
-    requestedCase === 'all'
-        ? 90_000
-        : process.env.VPT_HMR_SETUP === '1' || requestedCase === 'restart'
-          ? 60_000
-          : 30_000
+    requestedCase === 'port-swap'
+        ? 120_000
+        : requestedCase === 'all'
+          ? 90_000
+          : process.env.VPT_HMR_SETUP === '1' || requestedCase === 'restart'
+            ? 60_000
+            : 30_000
 const testDeadline = Date.now() + testBudgetMilliseconds
 // Keep both this client name and the temporary project path fixed. WeChat DevTools persists trust by identity/path; random temp
 // directories or per-run clients would force a new authorization prompt and make standalone cases slower and interactive.
@@ -68,7 +80,7 @@ const devToolsClient = process.env.VPT_HMR_DEVTOOLS_CLIENT ?? 'Pi'
 
 /** Runs development-server cases against one fixed temporary project. */
 export function withDevToolsHarness(testName: string, testCase: TestCase): Promise<void> {
-    return withServerHarness(testName, testCase, startDevelopmentServer)
+    return withServerHarness(testName, testCase, (root) => startDevelopmentServer(root, undefined))
 }
 
 /** Runs production build-watch cases through the same project, process, and DevTools ownership boundary. */
@@ -76,29 +88,49 @@ export function withBuildWatchHarness(testName: string, testCase: TestCase): Pro
     return withServerHarness(testName, testCase, startBuildWatcher)
 }
 
+/** Runs two development projects whose Vite ports are deliberately exchanged while both DevTools windows stay open. */
+export function withPortSwapHarness(testCase: (harness: PortSwapHarness) => Promise<void>): Promise<void> {
+    return withHarnessLifecycle(true, () => runPortSwapHarness(testCase))
+}
+
 async function withServerHarness(testName: string, testCase: TestCase, startServer: StartServer): Promise<void> {
-    // One fixed lock prevents concurrent standalone cases from deleting or mutating the same disposable project.
+    return withHarnessLifecycle(testName !== 'setup', () =>
+        runLockedHarness(resolveTestRoot(), testName, testCase, startServer)
+    )
+}
+
+async function withHarnessLifecycle(closeProjects: boolean, run: () => Promise<void>): Promise<void> {
+    // One fixed lock prevents standalone and two-project cases from mutating trusted fixtures concurrently.
     const lockPath = path.join(tmpdir(), 'vite-plugin-taro-hmr-stress.lock')
     const lock = await acquireHarnessLock(lockPath)
     // Memoize cleanup because a signal can arrive while normal finalization is already running.
     let cleanupPromise: Promise<void> | undefined
     const cleanup = (): Promise<void> => {
         cleanupPromise ??= (async () => {
-            try {
-                try {
-                    if (testName !== 'setup' && devToolsUsed) {
-                        await closeProject(path.join(resolveTestRoot(), 'dist/wx'))
+            const errors: unknown[] = []
+            if (closeProjects) {
+                for (const project of [...openedProjectPaths].reverse()) {
+                    try {
+                        await closeProject(project)
+                    } catch (error) {
+                        errors.push(error)
                     }
-                } finally {
-                    await processes.close()
                 }
-                const errors = (await Promise.all(logCompletions)).filter((error) => error !== undefined)
-                if (errors.length > 0) {
-                    throw new AggregateError(errors, 'Failed to close Vite logs')
-                }
-            } finally {
+            }
+            try {
+                await processes.close()
+            } catch (error) {
+                errors.push(error)
+            }
+            errors.push(...(await Promise.all(logCompletions)).filter((error) => error !== undefined))
+            try {
                 await lock.close()
                 await unlink(lockPath)
+            } catch (error) {
+                errors.push(error)
+            }
+            if (errors.length > 0) {
+                throw new AggregateError(errors, 'Failed to clean up HMR DevTools harness')
             }
         })()
         return cleanupPromise
@@ -115,7 +147,7 @@ async function withServerHarness(testName: string, testCase: TestCase, startServ
     process.once('SIGINT', interrupt)
     process.once('SIGTERM', interrupt)
     try {
-        await runLockedHarness(resolveTestRoot(), testName, testCase, startServer)
+        await run()
     } finally {
         try {
             await cleanup()
@@ -181,7 +213,6 @@ async function runLockedHarness(
     try {
         const outDir = path.join(root, 'dist/wx')
         await validateProjectConfig(path.join(outDir, 'project.config.json'))
-        devToolsUsed = true
         await openProject(outDir)
 
         console.log(`[hmr-devtools] running ${testName} in ${root}`)
@@ -198,7 +229,125 @@ async function runLockedHarness(
     }
 }
 
+async function runPortSwapHarness(testCase: (harness: PortSwapHarness) => Promise<void>): Promise<void> {
+    await buildPlugin()
+    const roots = resolvePortSwapRoots()
+    await Promise.all([prepareFixture(roots.a), prepareFixture(roots.b)])
+    await Promise.all([writeFile(path.join(roots.a, 'vite.log'), ''), writeFile(path.join(roots.b, 'vite.log'), '')])
+    const basePort = await findAvailablePortPair(readPortSwapBase())
+    // These handles advance to the replacement processes so finalization always stops the currently active pair.
+    let serverA: ServerProcess | undefined
+    let serverB: ServerProcess | undefined
+    try {
+        serverA = await startDevelopmentServer(roots.a, basePort)
+        serverB = await startDevelopmentServer(roots.b, basePort)
+        const outDirs = { a: path.join(roots.a, 'dist/wx'), b: path.join(roots.b, 'dist/wx') }
+        await Promise.all(
+            Object.values(outDirs).map((outDir) => validateProjectConfig(path.join(outDir, 'project.config.json')))
+        )
+        await openProject(outDirs.a)
+        await openProject(outDirs.b)
+
+        const restartInReverseOrder = async (): Promise<void> => {
+            const firstPort = await readHmrPort(outDirs.a)
+            await stopServers([serverA, serverB])
+            // B claims A's former port first; A then follows Vite's normal non-strict increment to B's former port.
+            serverB = await startDevelopmentServer(roots.b, firstPort)
+            serverA = await startDevelopmentServer(roots.a, firstPort)
+        }
+        console.log(`[hmr-port-swap] running in ${path.dirname(roots.a)}`)
+        await testCase({
+            projects: {
+                a: createProjectHarness(roots.a, outDirs.a),
+                b: createProjectHarness(roots.b, outDirs.b)
+            },
+            restartInReverseOrder: restartInReverseOrder
+        })
+        console.log('[hmr-port-swap] passed')
+    } catch (error) {
+        console.error('[hmr-port-swap] failed', error)
+        for (const root of [roots.a, roots.b]) {
+            console.error(
+                `[hmr-port-swap] ${path.basename(root)} Vite log:\n${await readFile(path.join(root, 'vite.log'), 'utf8')}`
+            )
+        }
+        throw error
+    } finally {
+        await stopServers([serverA, serverB])
+    }
+}
+
+async function stopServers(servers: readonly (ServerProcess | undefined)[]): Promise<void> {
+    const results = await Promise.allSettled(
+        servers.map((server) => (server === undefined ? Promise.resolve() : stopServer(server)))
+    )
+    const errors = results.flatMap((result) => (result.status === 'rejected' ? [result.reason] : []))
+    if (errors.length > 0) {
+        throw new AggregateError(errors, 'Failed to stop Vite port-swap servers')
+    }
+}
+
+async function readHmrPort(outDir: string): Promise<number> {
+    const source = await readFile(path.join(outDir, 'hmr/info.js'), 'utf8')
+    const serialized = source.match(/Object\.freeze\((.*)\);/)?.[1]
+    const value: unknown = serialized ? JSON.parse(serialized) : undefined
+    if (!isRecord(value) || typeof value.endpoint !== 'string') {
+        throw new Error(`Invalid HMR info: ${source}`)
+    }
+    const port = Number(new URL(value.endpoint).port)
+    if (!Number.isSafeInteger(port) || port <= 0) {
+        throw new Error(`Invalid HMR endpoint port: ${value.endpoint}`)
+    }
+    return port
+}
+
+function readPortSwapBase(): number {
+    const port = Number(process.env.VPT_HMR_PORT_SWAP_BASE ?? 53_200)
+    if (!Number.isSafeInteger(port) || port < 1_024 || port >= 65_535) {
+        throw new Error('VPT_HMR_PORT_SWAP_BASE must leave two valid non-privileged ports')
+    }
+    return port
+}
+
+async function findAvailablePortPair(start: number): Promise<number> {
+    for (let offset = 0; offset < 100; offset += 2) {
+        const candidate = start + offset
+        if (candidate >= 65_535) {
+            break
+        }
+        const available = await Promise.all([canListen(candidate), canListen(candidate + 1)])
+        if (available.every(Boolean)) {
+            return candidate
+        }
+    }
+    throw new Error(`No adjacent ports are available from ${start}`)
+}
+
+async function canListen(port: number): Promise<boolean> {
+    const server = createServer()
+    return new Promise<boolean>((resolve, reject) => {
+        server.once('error', (error) => {
+            if ('code' in error && error.code === 'EADDRINUSE') {
+                resolve(false)
+                return
+            }
+            reject(error)
+        })
+        server.listen(port, () => {
+            server.close((error) => {
+                if (error) {
+                    reject(error)
+                    return
+                }
+                resolve(true)
+            })
+        })
+    })
+}
+
 async function openProject(outDir: string): Promise<void> {
+    // Register before opening so cleanup can close a partially initialized window without touching unrelated projects.
+    openedProjectPaths.add(outDir)
     // Rebuilding the fixture invalidates an earlier automator attachment, even when its window is still open.
     console.log(`[hmr-devtools] opening ${outDir}`)
     await runToolWithTimeout('open_project_window', outDir, {}, 30_000)
@@ -214,6 +363,10 @@ async function openProject(outDir: string): Promise<void> {
 }
 
 function createHarness(root: string, outDir: string, restartServer: () => Promise<void>): DevToolsHarness {
+    return { ...createProjectHarness(root, outDir), restartServer: restartServer }
+}
+
+function createProjectHarness(root: string, outDir: string): DevToolsProjectHarness {
     return {
         inputElement: async (selector, value) => {
             const result = await runTool('automation_element_action', outDir, {
@@ -276,7 +429,6 @@ function createHarness(root: string, outDir: string, restartServer: () => Promis
             }
             return result.pageStack
         },
-        restartServer: restartServer,
         root: root,
         serverLogPath: path.join(root, 'vite.log')
     }
@@ -287,6 +439,11 @@ function resolveTestRoot(): string {
     // one-command run are more valuable than provisioning a platform-specific RAM disk for a few dozen temporary writes.
     // Match Vite's canonical cwd, including macOS's /var -> /private/var alias, when addressing the native runtime.
     return path.join(realpathSync(tmpdir()), 'vite-plugin-taro-hmr-stress-v1')
+}
+
+function resolvePortSwapRoots(): Readonly<Record<'a' | 'b', string>> {
+    const root = path.join(realpathSync(tmpdir()), 'vite-plugin-taro-hmr-port-swap-v1')
+    return { a: path.join(root, 'a'), b: path.join(root, 'b') }
 }
 
 async function buildPlugin(): Promise<void> {
@@ -324,13 +481,14 @@ async function prepareFixture(root: string): Promise<void> {
     }
 }
 
-async function startDevelopmentServer(root: string): Promise<ServerProcess> {
+async function startDevelopmentServer(root: string, port: number | undefined): Promise<ServerProcess> {
     const viteExecutable = path.join(root, 'node_modules/vite/bin/vite.js')
     const appId = process.env.VITE_VPT_WECHAT_APP_ID ?? (await readFixtureAppId()) ?? 'touristappid'
     const serverLogPath = path.join(root, 'vite.log')
     const logOffset = (await readFile(serverLogPath, 'utf8')).length
     const log = createWriteStream(serverLogPath, { flags: 'a' })
-    const server = processes.start(process.execPath, [viteExecutable], {
+    const portArguments = port === undefined ? [] : ['--port', String(port)]
+    const server = processes.start(process.execPath, [viteExecutable, ...portArguments], {
         cwd: root,
         env: {
             ...process.env,

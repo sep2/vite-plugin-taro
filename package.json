@@ -39,6 +39,7 @@
         "test:hmr-stress-demo:rebuild": "pnpm --filter hmr-stress-demo test-devtools:rebuild",
         "test:hmr-stress-demo:recovery": "pnpm --filter hmr-stress-demo test-devtools:recovery",
         "test:hmr-stress-demo:restart": "pnpm --filter hmr-stress-demo test-devtools:restart",
+        "test:hmr-stress-demo:port-swap": "pnpm --filter hmr-stress-demo test-devtools:port-swap",
         "test:hmr-stress-demo:watch-restart": "pnpm --filter hmr-stress-demo test-build-watch:restart",
         "build:towxml-stream-demo:wx": "pnpm --filter towxml-stream-demo build-wx",
         "dev:towxml-stream-demo:wx": "pnpm --filter towxml-stream-demo dev-wx",

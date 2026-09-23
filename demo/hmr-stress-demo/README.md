@@ -26,7 +26,7 @@ pnpm test:hmr-stress-demo:interpreter
 pnpm setup:hmr-stress-demo:devtools
 ```
 
-Setup and the restart case may each use up to 60 seconds; the aggregate suite has a 90-second deadline. Other standalone cases have a 30-second deadline. Each invocation attaches to the newly built output itself; a prior setup invocation is not required. The complete suite runs the strict burst, rebuild storm, syntax recovery, and server restart cases. Runtime assertions replace fixed settle sleeps, including observing the restoration marker before publishing and awaiting the baseline. Plugin rebuilding is opt-in.
+Setup and the restart case may each use up to 60 seconds; the aggregate suite has a 90-second deadline. The two-project port-swap case has a 120-second deadline. Other standalone cases have a 30-second deadline. Each invocation attaches to the newly built output itself; a prior setup invocation is not required. The complete suite runs the strict burst, rebuild storm, syntax recovery, and server restart cases. Runtime assertions replace fixed settle sleeps, including observing the restoration marker before publishing and awaiting the baseline. Plugin rebuilding is opt-in.
 
 Individual cases can be run independently:
 
@@ -35,6 +35,7 @@ pnpm stress:hmr-stress-demo:burst         # 30 edits at 8 ms
 pnpm test:hmr-stress-demo:rebuild         # mixed ACK/rebuild report storms
 pnpm test:hmr-stress-demo:recovery        # syntax failures and passive HMR recovery
 pnpm test:hmr-stress-demo:restart         # real Vite process restart, then rendered HMR updates
+pnpm test:hmr-stress-demo:port-swap       # reverse two projects' Vite ports, then verify independent HMR
 pnpm test:hmr-stress-demo:watch-restart   # replace vite build --watch, then render two later edits
 ```
 
@@ -59,9 +60,12 @@ The complete suite checks:
 7. HMR remains healthy and preserves state after syntax recovery;
 8. the App console remains free of patch, Refresh, reconciliation, and `setData` failures;
 9. restarting the actual Vite process, without reopening or manually compiling DevTools, removes obsolete output and loads a new baseline;
-10. two successive source edits after restart appear in the simulator while retaining input state, build identity, and the App stylesheet marker.
+10. two successive source edits after restart appear in the simulator while retaining input state, build identity, and the App stylesheet marker;
+11. two simultaneously open projects survive reverse-order Vite restarts that exchange their ports, then independently render later HMR edits without cross-project identity or state corruption.
 
 The harness observes the real App's startup report for the current build before publishing edits; a rendered Page can appear before its HMR socket opens. The restart case first proves HMR works before restarting, then delays each full compilation by three seconds so cleanup behavior is visible to the open project. It distinguishes a successful App reload from working post-restart HMR: changing a patch file or opening a new socket alone cannot satisfy its rendered-marker assertions. Both Vite process logs are retained in the fixture's `vite.log`.
+
+The standalone port-swap case uses two fixed trusted projects under `<os.tmpdir()>/vite-plugin-taro-hmr-port-swap-v1`. It starts A before B on adjacent ports, stops both servers, then starts B before A from A's former port. Both DevTools windows remain open throughout; the case requires each replacement App to acquire its own new build identity and exchanged endpoint before a later source edit can update only that project's rendered marker while retaining input state.
 
 The standalone build-watch restart case uses the same fixed project and ownership boundary but launches the production `vite build --watch` path. It proves one rendered edit, replaces the watcher process without reopening or manually compiling DevTools, and then requires two more rendered edits. Every watched build is delayed by three seconds; this path performs full reloads and does not assert state retention.
 
@@ -76,6 +80,7 @@ VPT_HMR_STRESS_UPDATES           burst update count
 VPT_HMR_STRESS_INTERVAL_MS       burst interval
 VPT_HMR_REBUILD_ROUNDS           rebuild storm rounds; default 1
 VPT_HMR_REPORTS_PER_ROUND        reports per rebuild round; default 100
+VPT_HMR_PORT_SWAP_BASE           first preferred port for the two-project case; default 53200
 ```
 
 ## Manual development
