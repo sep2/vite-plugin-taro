@@ -36,14 +36,14 @@ const miniStyleHandlerOptions = {
     autoprefixer: false,
     cssPresetEnv: { autoprefixer: false },
     cssCalc: false,
-    cssChildCombinatorReplaceValue: ['view', 'text'],
     cssPreflight,
     cssRemoveActivePseudoClass: true,
     cssRemoveHoverPseudoClass: true,
     majorVersion: 4,
     cssOptions: {
         px2rpx: true,
-        rem2rpx: true
+        rem2rpx: true,
+        cssChildCombinatorReplaceValue: ['view', 'text']
     }
 } satisfies Partial<IStyleHandlerOptions>
 
