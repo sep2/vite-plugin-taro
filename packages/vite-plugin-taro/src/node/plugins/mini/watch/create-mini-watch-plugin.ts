@@ -59,7 +59,7 @@ export function createMiniWatchPlugin(target: VptTarget): Plugin {
         },
         configResolved({ root, build }) {
             // A new watch session starts clean. Later builds overwrite files in place; obsolete files remain until restart.
-            cleanOutputFiles(path.resolve(root, build.outDir))
+            cleanOutputFiles(path.resolve(root, build.outDir), [])
         },
         buildStart() {
             closed = false

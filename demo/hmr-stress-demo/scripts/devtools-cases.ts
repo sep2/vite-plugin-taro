@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { DevToolsHarness } from './devtools-harness.ts'
@@ -131,6 +132,9 @@ async function testServerRestart(harness: DevToolsHarness): Promise<void> {
     const infoPath = path.join(harness.outDir, 'hmr/info.js')
     const appStylePath = path.join(harness.outDir, 'app.wxss')
     const obsoletePath = path.join(harness.outDir, 'obsolete-restart-output.txt')
+    const projectConfigPaths = ['project.config.json', 'project.private.config.json'].map((fileName) =>
+        path.join(harness.outDir, fileName)
+    )
     const publishMarker = async (marker: string) => {
         console.log(`[hmr-devtools] restart: waiting for rendered marker:${marker}`)
         await writeFile(
@@ -150,8 +154,32 @@ async function testServerRestart(harness: DevToolsHarness): Promise<void> {
         await writeFile(obsoletePath, 'obsolete output from the previous server')
 
         console.log('[hmr-devtools] restart: replacing Vite process without reopening or compiling DevTools')
-        await harness.restartServer()
-        await waitFor(async () => (await readHmrInfo(infoPath)).buildId !== before.buildId, 6_000, 20)
+        // This mutable observation spans the delayed replacement build; a final existence check could miss deletion/recreation.
+        let projectConfigMissing = false
+        const configMonitor = setInterval(() => {
+            projectConfigMissing ||= projectConfigPaths.some((fileName) => !existsSync(fileName))
+        }, 1)
+        try {
+            await harness.restartServer()
+        } finally {
+            clearInterval(configMonitor)
+        }
+        assert.equal(projectConfigMissing, false, 'Restart cleanup must retain both DevTools project config files')
+        // Cleanup intentionally removes HMR metadata until the replacement output is ready.
+        await waitFor(
+            async () => {
+                try {
+                    return (await readHmrInfo(infoPath)).buildId !== before.buildId
+                } catch (error) {
+                    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+                        return false
+                    }
+                    throw error
+                }
+            },
+            6_000,
+            20
+        )
         await assert.rejects(stat(obsoletePath), { code: 'ENOENT' })
         // Do not query the destroyed automator context or edit before the replacement App opens its socket.
         const restarted = await waitForRuntimeStartup(harness)

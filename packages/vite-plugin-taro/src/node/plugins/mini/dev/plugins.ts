@@ -52,12 +52,9 @@ export function createMiniDevelopmentPlugin(
                     // React's development-only Suspense diagnostics call this browser API without guards.
                     define: { 'performance.now': 'Date.now' },
                     build: {
-                        // Development output is the live project opened by the native tool, not a disposable build artifact.
-                        // Deleting and recreating its directory tree during a dev-server restart detaches the native watcher;
-                        // recreating identical paths does not reliably reattach it. Every development mode depends on that
-                        // watcher for complete builds and styles, while DevTools mode also uses it for JavaScript patches.
-                        // Startup cleans files below without removing directories. Live rebuilds retain cached assets.
-                        // Production builds retain normal output cleanup.
+                        // The development cleaner owns startup cleanup so it can retain watched directories and the two
+                        // DevTools project-config files. Recovery builds must also retain cached, unchanged output.
+                        // Production builds retain normal Vite output cleanup.
                         emptyOutDir: false,
                         // Disable maps in resolved environment config as well as final output so Oxc and Babel skip producing
                         // intermediate maps that Rolldown would discard.
@@ -80,9 +77,16 @@ export function createMiniDevelopmentPlugin(
                 // asks bundledDev to create its hard-coded skip-write DevEngine.
                 order: 'post',
                 async handler(server) {
-                    // Clean once before creating the engine. Its live full builds reuse cached asset emissions, so cleaning
-                    // again would delete unchanged native companions. Startup removes every file, including App styles.
-                    cleanOutputFiles(path.resolve(server.config.root, server.config.build.outDir))
+                    // Clean once per server before creating its engine, but never remove DevTools' project identity and
+                    // private compile settings. Deleting these two files during a restart let the replacement App launch
+                    // and report startup, yet later patch writes no longer updated its rendered Page. Preserving only these
+                    // files fixes that failure while still removing obsolete output; the restart regression delays the
+                    // replacement build by three seconds and then verifies two state-retaining rendered updates.
+                    // Later recovery builds do not clean because cached unchanged companions may not be emitted again.
+                    cleanOutputFiles(path.resolve(server.config.root, server.config.build.outDir), [
+                        'project.config.json',
+                        'project.private.config.json'
+                    ])
 
                     host = await createMiniDevHost({
                         server: server,
@@ -144,8 +148,8 @@ export function createMiniDevelopmentPlugin(
  *    rebuild-mode transaction has completed;
  * 3. let the host replace the wrapper again with the new marker, causing a second App reload.
  *
- * Deleting the in-memory bundle entry avoids both premature writes. Startup cleanup removes all physical files; live recovery
- * builds do not clean, so their prior App stylesheet remains available. The host publishes the stylesheet once afterward.
+ * Deleting the in-memory bundle entry avoids both premature writes. Startup cleanup retains DevTools project configuration
+ * but removes the prior physical App stylesheet; recovery builds do not clean. The host publishes the stylesheet once afterward.
  * Patch modes first reset delivery and publish matching `hmr/info.js`; rebuild mode has no patch state and writes a fresh marker
  * directly. Incremental HMR never enters this complete-output hook and changes only the imported global stylesheet; rewriting
  * the App root would reload the heap while a JavaScript patch is awaiting acknowledgement. The serve-only plugin leaves

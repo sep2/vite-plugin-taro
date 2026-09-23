@@ -9,14 +9,15 @@ function createEntry(parentPath: string, name: string, directory: boolean): fs.D
     return Object.assign(new fs.Dirent(), { parentPath, name, isDirectory: () => directory })
 }
 
-test('creates the output directory and unlinks only files while retaining directory entries', (context) => {
+test('creates output and unlinks files except caller-owned paths while retaining directories', (context) => {
     const directory = path.resolve('/fixture/dist')
     const obsolete = createEntry(directory, 'obsolete', true)
     const nested = createEntry(path.join(directory, 'obsolete'), 'nested', true)
     const oldFile = createEntry(path.join(directory, 'obsolete/nested'), 'old.js', false)
     const appStyle = createEntry(directory, 'app.wxss', false)
+    const projectConfig = createEntry(directory, 'project.config.json', false)
     const link = createEntry(directory, 'linked-component', false)
-    const generations = [[], [obsolete, nested, oldFile, appStyle, link], [obsolete, nested]]
+    const generations = [[], [obsolete, nested, oldFile, appStyle, projectConfig, link], [obsolete, nested]]
     // This cursor supplies the empty, populated and already-clean directory snapshots to three synchronous calls.
     let generation = 0
     const mkdir = context.mock.method(fs, 'mkdirSync', () => undefined)
@@ -25,10 +26,10 @@ test('creates the output directory and unlinks only files while retaining direct
     // Refresh the utility's named builtin imports, then restore them before returning control to the test runner.
     syncBuiltinESMExports()
     try {
-        cleanOutputFiles(directory)
+        cleanOutputFiles(directory, ['project.config.json'])
         assert.equal(unlink.mock.callCount(), 0)
-        cleanOutputFiles(directory)
-        cleanOutputFiles(directory)
+        cleanOutputFiles(directory, ['project.config.json'])
+        cleanOutputFiles(directory, ['project.config.json'])
     } finally {
         context.mock.restoreAll()
         syncBuiltinESMExports()

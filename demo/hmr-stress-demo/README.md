@@ -61,7 +61,7 @@ The complete suite checks:
 9. restarting the actual Vite process, without reopening or manually compiling DevTools, removes obsolete output and loads a new baseline;
 10. two successive source edits after restart appear in the simulator while retaining input state, build identity, and the App stylesheet marker.
 
-The harness observes the real App's startup report for the current build before publishing edits; a rendered Page can appear before its HMR socket opens. The restart case first proves HMR works before restarting. It then distinguishes a successful App reload from working post-restart HMR: changing a patch file or opening a new socket alone cannot satisfy its rendered-marker assertions. Both Vite process logs are retained in the fixture's `vite.log`.
+The harness observes the real App's startup report for the current build before publishing edits; a rendered Page can appear before its HMR socket opens. The restart case first proves HMR works before restarting, then delays each full compilation by three seconds so cleanup behavior is visible to the open project. It distinguishes a successful App reload from working post-restart HMR: changing a patch file or opening a new socket alone cannot satisfy its rendered-marker assertions. Both Vite process logs are retained in the fixture's `vite.log`.
 
 The standalone build-watch restart case uses the same fixed project and ownership boundary but launches the production `vite build --watch` path. It proves one rendered edit, replaces the watcher process without reopening or manually compiling DevTools, and then requires two more rendered edits. Every watched build is delayed by three seconds; this path performs full reloads and does not assert state retention.
 

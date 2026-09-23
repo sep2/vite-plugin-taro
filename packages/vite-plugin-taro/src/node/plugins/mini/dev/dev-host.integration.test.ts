@@ -122,6 +122,10 @@ async function startDevFixture(
     await writeFile(oldFile, 'previous dev session')
     const oldAppStyle = path.join(outDir, 'app.wxss')
     await writeFile(oldAppStyle, 'previous App stylesheet')
+    const projectConfigPath = path.join(outDir, 'project.config.json')
+    const projectPrivateConfigPath = path.join(outDir, 'project.private.config.json')
+    await writeFile(projectConfigPath, 'previous project config')
+    await writeFile(projectPrivateConfigPath, 'previous private config')
     const pagePath = path.join(root, 'src/pages/home/index.tsx')
     await mkdir(path.dirname(pagePath), { recursive: true })
     await writeFile(
@@ -192,13 +196,15 @@ async function startDevFixture(
     let server = await createFixtureServer()
     try {
         assert.equal(
-            await readFile(oldAppStyle, 'utf8'),
-            'previous App stylesheet',
-            'Creating the server must not clean the previous output'
+            await readExistingFile(oldAppStyle),
+            undefined,
+            'Server configuration must remove replaceable output'
         )
-        await server.listen()
+        assert.equal(await readExistingFile(oldFile), undefined, 'Server configuration must remove obsolete output')
+        assert.equal(await readFile(projectConfigPath, 'utf8'), 'previous project config')
+        assert.equal(await readFile(projectPrivateConfigPath, 'utf8'), 'previous private config')
         assert.equal((await stat(oldDirectory)).ino, directoryInode, 'Startup must preserve watched directories')
-        assert.equal(await readExistingFile(oldFile), undefined, 'The first output must remove obsolete files')
+        await server.listen()
         // listen() binds before its metadata transaction finishes; the App marker is the completed baseline boundary.
         await waitForFile(oldAppStyle, (source) => source.includes('vpt-build:'), maximumWaitAttempts)
     } catch (error) {
@@ -233,6 +239,8 @@ async function startDevFixture(
                     const allowedFiles = new Set([
                         'app.wxss',
                         'assets/global.wxss',
+                        'project.config.json',
+                        'project.private.config.json',
                         hmrInfoFileName,
                         devtoolsPatchesFileName,
                         ...persistedBundleFiles
@@ -444,8 +452,12 @@ test('rejects startup with the original complete-output failure', async () => {
     await writeFile(path.join(path.dirname(pagePath), 'suffix.ts'), 'export const suffix = "";\n')
     await writeFile(pagePath, renderPage('initial output failure'))
     const oldOutput = path.join(root, 'dist/old.js')
+    const projectConfig = path.join(root, 'dist/project.config.json')
+    const projectPrivateConfig = path.join(root, 'dist/project.private.config.json')
     await mkdir(path.dirname(oldOutput), { recursive: true })
     await writeFile(oldOutput, 'previous successful output')
+    await writeFile(projectConfig, 'previous project config')
+    await writeFile(projectPrivateConfig, 'previous private config')
     const failure = new Error('expected complete-output failure')
     const failOutput: Plugin = {
         name: 'test:fail-complete-output',
@@ -471,7 +483,9 @@ test('rejects startup with the original complete-output failure', async () => {
     try {
         await assert.rejects(() => server.listen(), /expected complete-output failure/)
         assert.match(errors.join('\n'), /wx dev build failed/)
-        assert.equal(await readFile(oldOutput, 'utf8'), 'previous successful output')
+        assert.equal(await readExistingFile(oldOutput), undefined)
+        assert.equal(await readFile(projectConfig, 'utf8'), 'previous project config')
+        assert.equal(await readFile(projectPrivateConfig, 'utf8'), 'previous private config')
     } finally {
         await server.close()
         await rm(root, { force: true, recursive: true })
