@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { VptOptions } from '../../../options.ts'
+import { createZfbSkeleton } from './create-zfb-skeleton.ts'
 import { createZfbMiniContract, createZfbMiniPlugins } from './plugins.ts'
 
 test('creates the ZFB Mini Program contract without translating user configuration', () => {
@@ -57,10 +58,7 @@ test('creates the ZFB Mini Program contract without translating user configurati
         appFileName: 'app.acss',
         globalFileName: 'assets/global.acss'
     })
-    assert.deepEqual(contract.output, {
-        projectConfigFilename: 'mini.project.json',
-        projectPrivateConfigFilename: '.mini-ide/project-ide.json',
-        generateProjectSkeleton: contract.output.generateProjectSkeleton
-    })
-    assert.equal(typeof contract.output.generateProjectSkeleton, 'function')
+    assert.equal(contract.output.projectConfigFilename, 'mini.project.json')
+    assert.equal(contract.output.projectPrivateConfigFilename, '.mini-ide/project-ide.json')
+    assert.equal(contract.output.generateProjectSkeleton, createZfbSkeleton)
 })

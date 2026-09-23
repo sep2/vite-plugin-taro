@@ -12,17 +12,13 @@ export function createWxMiniPlugins(vptOptions: VptOptions): PluginOption[] {
 
 /** Binds the shared Mini Program core to WeChat runtime and output conventions. */
 export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
-    const componentsReactPath = packageRequire.resolve(
-        'vite-plugin-taro-runtime/plugin-platform-weapp/components-react'
-    )
-    const projectConfigFilename = 'project.config.json'
-    const projectPrivateConfigFilename = 'project.private.config.json'
-
     return {
         options: vptOptions,
         taro: {
             env: 'weapp',
-            componentsReactPath: componentsReactPath,
+            componentsReactPath: packageRequire.resolve(
+                'vite-plugin-taro-runtime/plugin-platform-weapp/components-react'
+            ),
             targetRuntimePath: packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-weapp/runtime')
         },
         runtime: {
@@ -44,17 +40,9 @@ export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
             globalFileName: 'assets/global.wxss'
         },
         output: {
-            projectConfigFilename,
-            projectPrivateConfigFilename,
-            generateProjectSkeleton(input) {
-                return createWxSkeleton({
-                    ...input,
-                    options: vptOptions,
-                    componentsModulePath: componentsReactPath,
-                    projectConfigFilename,
-                    projectPrivateConfigFilename
-                })
-            }
+            projectConfigFilename: 'project.config.json',
+            projectPrivateConfigFilename: 'project.private.config.json',
+            generateProjectSkeleton: createWxSkeleton
         }
     }
 }

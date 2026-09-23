@@ -1,7 +1,6 @@
 import type { Rolldown } from 'vite'
-import type { VptOptions } from '../../../options.ts'
 import { getPageConfig } from '../../utils/project-config.ts'
-import type { MiniJsonObject, MiniProjectSkeletonInput } from '../mini/mini-contract.ts'
+import type { MiniContract, MiniJsonObject, MiniProjectSkeletonInput } from '../mini/mini-contract.ts'
 import {
     buildRecursiveBaseTemplate,
     buildRecursiveComponentTemplate,
@@ -20,29 +19,16 @@ import {
 } from '../mini/skeleton/skeleton-utils.ts'
 import { createTtTemplate } from './create-tt-template.ts'
 
-type TtSkeletonInput = MiniProjectSkeletonInput &
-    Readonly<{
-        options: VptOptions
-        componentsModulePath: string
-        projectConfigFilename: string
-        projectPrivateConfigFilename: string
-    }>
-
 /**
  * TT supports recursive named templates. Like Alipay, its App host carries the independent Page root as p through each
  * template scope and CustomWrapper boundary. The TT runtime declares p as a native property on both generated components.
  * This preserves the App → Page React tree without copying Page nodes into the shared App projection or adding layout nodes.
  */
-export function createTtSkeleton({
-    bundle,
-    subpackages,
-    nativeComponents,
-    isProduction,
-    options,
-    componentsModulePath,
-    projectConfigFilename,
-    projectPrivateConfigFilename
-}: TtSkeletonInput): Rolldown.EmittedAsset[] {
+export function createTtSkeleton(
+    { bundle, subpackages, nativeComponents, isProduction }: MiniProjectSkeletonInput,
+    contract: MiniContract
+): Rolldown.EmittedAsset[] {
+    const { options, output, taro } = contract
     const template = createTtTemplate()
     const nativeComponentConfig = createNativeComponentConfig(nativeComponents)
     const recursiveComponentJson = createRecursiveComponentJson(nativeComponentConfig)
@@ -60,7 +46,9 @@ export function createTtSkeleton({
         createTextAsset(
             'base.ttml',
             buildRecursiveBaseTemplate(
-                template.buildTemplate(collectTemplateComponentConfig(bundle, componentsModulePath, nativeComponents)),
+                template.buildTemplate(
+                    collectTemplateComponentConfig(bundle, taro.componentsReactPath, nativeComponents)
+                ),
                 'tt'
             )
         ),
@@ -89,9 +77,9 @@ export function createTtSkeleton({
             createTextAsset(`${page.path}.ttss`, '')
         ]),
         // project.tt.json is Taro's source config filename; TikTok DevTools consumes project.config.json in the output.
-        jsonAsset(projectConfigFilename, options.projectConfigJson),
+        jsonAsset(output.projectConfigFilename, options.projectConfigJson),
         ...(options.projectPrivateConfigJson
-            ? [jsonAsset(projectPrivateConfigFilename, options.projectPrivateConfigJson)]
+            ? [jsonAsset(output.projectPrivateConfigFilename, options.projectPrivateConfigJson)]
             : [])
     ]
 }

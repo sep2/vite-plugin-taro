@@ -26,6 +26,11 @@ const contract = {
         appJson: {},
         projectConfigJson: {}
     },
+    taro: {
+        env: 'fixture',
+        componentsReactPath: '/runtime/components-react.ts',
+        targetRuntimePath: '/runtime/target.ts'
+    },
     runtime: {
         modules: runtimeModules
     },
@@ -40,7 +45,7 @@ const contract = {
             return []
         }
     }
-} satisfies Pick<MiniContract, 'options' | 'output' | 'runtime' | 'styles'>
+} satisfies MiniContract
 
 test('assigns physical Mini Program host ownership only to the client environment', () => {
     assert.equal(isMiniClientEnvironment({ name: 'client' }), true)
@@ -67,7 +72,7 @@ test('composes rebuild mode without patch transforms', async () => {
             ...contract.options,
             hmr: { mode: 'rebuild' }
         }
-    } satisfies Pick<MiniContract, 'options' | 'output' | 'runtime' | 'styles'>
+    } satisfies MiniContract
     const config = await resolveConfig(
         {
             configFile: false,

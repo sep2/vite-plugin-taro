@@ -1,7 +1,6 @@
 import type { Rolldown } from 'vite'
-import type { VptOptions } from '../../../options.ts'
 import { getPageConfig } from '../../utils/project-config.ts'
-import type { MiniJsonObject, MiniProjectSkeletonInput } from '../mini/mini-contract.ts'
+import type { MiniContract, MiniJsonObject, MiniProjectSkeletonInput } from '../mini/mini-contract.ts'
 import {
     buildRecursiveBaseTemplate,
     buildRecursiveComponentTemplate,
@@ -19,14 +18,6 @@ import {
     toRootRelativePath
 } from '../mini/skeleton/skeleton-utils.ts'
 import { createZfbTemplate } from './create-zfb-template.ts'
-
-type ZfbSkeletonInput = MiniProjectSkeletonInput &
-    Readonly<{
-        options: VptOptions
-        componentsModulePath: string
-        projectConfigFilename: string
-        projectPrivateConfigFilename: string
-    }>
 
 /**
  * Generates the Alipay templates that project one React ownership tree through two independent native Page data roots.
@@ -76,18 +67,13 @@ type ZfbSkeletonInput = MiniProjectSkeletonInput &
  * declaration, but accepts an empty array and still packages the files beneath that root. Keeping `pages: []` preserves the real
  * model: no synthetic Page, native lifecycle, route, or template exists merely to make code eligible for asynchronous loading.
  */
-export function createZfbSkeleton({
-    bundle,
-    subpackages,
-    nativeComponents,
-    isProduction,
-    options,
-    componentsModulePath,
-    projectConfigFilename,
-    projectPrivateConfigFilename
-}: ZfbSkeletonInput): Rolldown.EmittedAsset[] {
+export function createZfbSkeleton(
+    { bundle, subpackages, nativeComponents, isProduction }: MiniProjectSkeletonInput,
+    contract: MiniContract
+): Rolldown.EmittedAsset[] {
+    const { options, output, taro } = contract
     const template = createZfbTemplate()
-    const componentConfig = collectTemplateComponentConfig(bundle, componentsModulePath, nativeComponents)
+    const componentConfig = collectTemplateComponentConfig(bundle, taro.componentsReactPath, nativeComponents)
     const nativeComponentConfig = createNativeComponentConfig(nativeComponents)
     const recursiveComponentJson = createRecursiveComponentJson(nativeComponentConfig)
     const baseTemplateSource = buildZfbBaseTemplate(template.buildTemplate(componentConfig))
@@ -127,9 +113,9 @@ export function createZfbSkeleton({
                 createTextAsset(`${page.path}.acss`, '')
             ]
         }),
-        jsonAsset(projectConfigFilename, options.projectConfigJson),
+        jsonAsset(output.projectConfigFilename, options.projectConfigJson),
         ...(options.projectPrivateConfigJson
-            ? [jsonAsset(projectPrivateConfigFilename, options.projectPrivateConfigJson)]
+            ? [jsonAsset(output.projectPrivateConfigFilename, options.projectPrivateConfigJson)]
             : []),
         createTextAsset('.browserslistrc', 'defaults and fully supports es6-module')
     ]

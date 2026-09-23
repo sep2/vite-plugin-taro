@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { VptOptions } from '../../../options.ts'
+import { createTtSkeleton } from './create-tt-skeleton.ts'
 import { createTtMiniContract, createTtMiniPlugins } from './plugins.ts'
 
 const options: VptOptions = {
@@ -24,19 +25,25 @@ test('binds TT runtime and style paths without translating native configuration'
     assert.deepEqual(contract.styles, { appFileName: 'app.ttss', globalFileName: 'assets/global.ttss' })
     assert.equal(contract.output.projectConfigFilename, 'project.config.json')
     assert.equal(contract.output.projectPrivateConfigFilename, 'project.private.config.json')
+    assert.equal(contract.output.generateProjectSkeleton, createTtSkeleton)
     assert.equal(createTtMiniPlugins(options).length, 8)
 })
 
 for (const isProduction of [false, true]) {
     test(`generates TT templates, native registrations and common packages (production=${isProduction})`, () => {
-        const output = createTtMiniContract(options).output.generateProjectSkeleton({
-            bundle: {},
-            subpackages: [{ root: 'sub/p_example' }],
-            nativeComponents: [
-                { name: 'native-card', componentPath: '/sub/p_example/card/index', fields: ['@select'] }
-            ],
-            isProduction
-        })
+        const contract = createTtMiniContract(options)
+        const { projectConfigFilename, projectPrivateConfigFilename } = contract.output
+        const output = contract.output.generateProjectSkeleton(
+            {
+                bundle: {},
+                subpackages: [{ root: 'sub/p_example' }],
+                nativeComponents: [
+                    { name: 'native-card', componentPath: '/sub/p_example/card/index', fields: ['@select'] }
+                ],
+                isProduction
+            },
+            contract
+        )
         const assets = new Map(output.map((asset) => [asset.fileName, String(asset.source)]))
         const asset = (name: string): string => {
             const source = assets.get(name)
@@ -59,8 +66,8 @@ for (const isProduction of [false, true]) {
                 'pages/other/index.json',
                 'pages/other/index.ttml',
                 'pages/other/index.ttss',
-                'project.config.json',
-                'project.private.config.json'
+                projectConfigFilename,
+                projectPrivateConfigFilename
             ]
         )
         assert.deepEqual(JSON.parse(asset('app.json')), {
@@ -69,9 +76,9 @@ for (const isProduction of [false, true]) {
             subPackages: [{ root: 'sub/p_example', pages: [], common: true }]
         })
         assert.equal(asset('app.json').includes('\n'), !isProduction)
-        assert.deepEqual(JSON.parse(asset('project.config.json')), options.projectConfigJson)
-        assert.deepEqual(JSON.parse(asset('project.private.config.json')), options.projectPrivateConfigJson)
-        assert.equal(asset('project.private.config.json').includes('\n'), !isProduction)
+        assert.deepEqual(JSON.parse(asset(projectConfigFilename)), options.projectConfigJson)
+        assert.deepEqual(JSON.parse(asset(projectPrivateConfigFilename)), options.projectPrivateConfigJson)
+        assert.equal(asset(projectPrivateConfigFilename).includes('\n'), !isProduction)
         const base = asset('base.ttml')
         assert.match(base, /tt:for="{{i.cn}}"/)
         assert.match(base, /tt:key="sid"/)
@@ -104,15 +111,19 @@ for (const [description, projectPrivateConfigJson, expected] of [
     ['empty', {}, ['{}']]
 ] as const) {
     test(`preserves ${description} TT private configuration without adding defaults`, () => {
-        const output = createTtMiniContract({ ...options, projectPrivateConfigJson }).output.generateProjectSkeleton({
-            bundle: {},
-            subpackages: [],
-            nativeComponents: [],
-            isProduction: true
-        })
+        const contract = createTtMiniContract({ ...options, projectPrivateConfigJson })
+        const output = contract.output.generateProjectSkeleton(
+            {
+                bundle: {},
+                subpackages: [],
+                nativeComponents: [],
+                isProduction: true
+            },
+            contract
+        )
         assert.deepEqual(
             output
-                .filter((asset) => asset.fileName === 'project.private.config.json')
+                .filter((asset) => asset.fileName === contract.output.projectPrivateConfigFilename)
                 .map((asset) => String(asset.source)),
             expected
         )

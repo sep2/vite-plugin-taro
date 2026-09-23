@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { VptOptions } from '../../../options.ts'
+import { createWxSkeleton } from './create-wx-skeleton.ts'
 import { createWxMiniContract, createWxMiniPlugins } from './plugins.ts'
 
 test('creates the WX Mini Program contract without translating public options', () => {
@@ -31,12 +32,9 @@ test('creates the WX Mini Program contract without translating public options', 
         appFileName: 'app.wxss',
         globalFileName: 'assets/global.wxss'
     })
-    assert.deepEqual(contract.output, {
-        projectConfigFilename: 'project.config.json',
-        projectPrivateConfigFilename: 'project.private.config.json',
-        generateProjectSkeleton: contract.output.generateProjectSkeleton
-    })
-    assert.equal(typeof contract.output.generateProjectSkeleton, 'function')
+    assert.equal(contract.output.projectConfigFilename, 'project.config.json')
+    assert.equal(contract.output.projectPrivateConfigFilename, 'project.private.config.json')
+    assert.equal(contract.output.generateProjectSkeleton, createWxSkeleton)
     const plugins = createWxMiniPlugins(options)
     assert.equal(plugins.length, 8)
     for (const name of ['vpt:mini-native-component', 'vpt:mini-global', 'vpt:mini-global-dev', 'vpt:mini-watch']) {

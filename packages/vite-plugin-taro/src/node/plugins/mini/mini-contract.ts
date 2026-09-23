@@ -57,7 +57,7 @@ export type MiniProjectSkeletonInput = Readonly<{
 export type OutputContract = {
     projectConfigFilename: string
     projectPrivateConfigFilename: string
-    generateProjectSkeleton(input: MiniProjectSkeletonInput): Rolldown.EmittedAsset[]
+    generateProjectSkeleton(input: MiniProjectSkeletonInput, contract: MiniContract): Rolldown.EmittedAsset[]
 }
 
 /** Complete input consumed by the shared Mini Program pipeline. */

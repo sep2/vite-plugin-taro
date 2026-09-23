@@ -1,7 +1,6 @@
 import type { Rolldown } from 'vite'
-import type { VptOptions } from '../../../options.ts'
 import { getPageConfig } from '../../utils/project-config.ts'
-import type { MiniJsonObject, MiniProjectSkeletonInput } from '../mini/mini-contract.ts'
+import type { MiniContract, MiniJsonObject, MiniProjectSkeletonInput } from '../mini/mini-contract.ts'
 import {
     collectTemplateComponentConfig,
     createJsonAsset,
@@ -14,14 +13,6 @@ import {
     toRootRelativePath
 } from '../mini/skeleton/skeleton-utils.ts'
 import { createWxTemplate } from './create-wx-template.ts'
-
-type WxSkeletonInput = MiniProjectSkeletonInput &
-    Readonly<{
-        options: VptOptions
-        componentsModulePath: string
-        projectConfigFilename: string
-        projectPrivateConfigFilename: string
-    }>
 
 /**
  * Generates the WX templates that project one React ownership tree through two native Page data roots.
@@ -71,16 +62,11 @@ type WxSkeletonInput = MiniProjectSkeletonInput &
  * Page root mutates the in-memory outlet but does not serialize that root into App data. A newly pushed native Page receives the
  * current complete App snapshot with its initial Page batch; retained and hidden Pages need no navigation synchronization.
  */
-export function createWxSkeleton({
-    bundle,
-    subpackages,
-    nativeComponents,
-    isProduction,
-    options,
-    componentsModulePath,
-    projectConfigFilename,
-    projectPrivateConfigFilename
-}: WxSkeletonInput): Rolldown.EmittedAsset[] {
+export function createWxSkeleton(
+    { bundle, subpackages, nativeComponents, isProduction }: MiniProjectSkeletonInput,
+    contract: MiniContract
+): Rolldown.EmittedAsset[] {
+    const { options, output, taro } = contract
     const template = createWxTemplate()
 
     const nativeComponentConfig = createNativeComponentConfig(nativeComponents)
@@ -99,7 +85,9 @@ export function createWxSkeleton({
         createTextAsset(
             'base.wxml',
             buildWxBaseTemplate(
-                template.buildTemplate(collectTemplateComponentConfig(bundle, componentsModulePath, nativeComponents))
+                template.buildTemplate(
+                    collectTemplateComponentConfig(bundle, taro.componentsReactPath, nativeComponents)
+                )
             )
         ),
 
@@ -123,9 +111,9 @@ export function createWxSkeleton({
             ),
             createTextAsset(`${page.path}.wxss`, '')
         ]),
-        jsonAsset(projectConfigFilename, options.projectConfigJson),
+        jsonAsset(output.projectConfigFilename, options.projectConfigJson),
         ...(options.projectPrivateConfigJson
-            ? [jsonAsset(projectPrivateConfigFilename, options.projectPrivateConfigJson)]
+            ? [jsonAsset(output.projectPrivateConfigFilename, options.projectPrivateConfigJson)]
             : []),
         ...(options.sitemapJson ? [jsonAsset('sitemap.json', options.sitemapJson)] : [])
     ]

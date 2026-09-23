@@ -43,23 +43,27 @@ const contract = createWxMiniContract({
 })
 
 test('creates native rendering and configuration assets', () => {
-    const output = contract.output.generateProjectSkeleton({
-        bundle: {} as Rolldown.OutputBundle,
-        subpackages: [{ root: 'sub/p_example' }],
-        isProduction: false,
-        nativeComponents: [
-            {
-                name: 'native-counter',
-                componentPath: '/components/native-counter/index',
-                fields: ['count', 'extraData', 'label', 'onIncrement']
-            },
-            {
-                name: 'native-card',
-                componentPath: '/sub/p_card/components/native-card/index',
-                fields: []
-            }
-        ]
-    })
+    const { projectConfigFilename, projectPrivateConfigFilename } = contract.output
+    const output = contract.output.generateProjectSkeleton(
+        {
+            bundle: {} as Rolldown.OutputBundle,
+            subpackages: [{ root: 'sub/p_example' }],
+            isProduction: false,
+            nativeComponents: [
+                {
+                    name: 'native-counter',
+                    componentPath: '/components/native-counter/index',
+                    fields: ['count', 'extraData', 'label', 'onIncrement']
+                },
+                {
+                    name: 'native-card',
+                    componentPath: '/sub/p_card/components/native-card/index',
+                    fields: []
+                }
+            ]
+        },
+        contract
+    )
     const assets = new Map(output.map((asset) => [asset.fileName, String(asset.source)]))
     const nativeUsingComponents = {
         'native-counter': '/components/native-counter/index',
@@ -85,8 +89,8 @@ test('creates native rendering and configuration assets', () => {
             'pages/account/index.json',
             'pages/account/index.wxml',
             'pages/account/index.wxss',
-            'project.config.json',
-            'project.private.config.json',
+            projectConfigFilename,
+            projectPrivateConfigFilename,
             'sitemap.json'
         ]
     )
@@ -120,9 +124,9 @@ test('creates native rendering and configuration assets', () => {
         },
         componentPlaceholder: nativeComponentPlaceholder
     })
-    assert.deepEqual(JSON.parse(assets.get('project.config.json') ?? ''), contract.options.projectConfigJson)
+    assert.deepEqual(JSON.parse(assets.get(projectConfigFilename) ?? ''), contract.options.projectConfigJson)
     assert.deepEqual(
-        JSON.parse(assets.get('project.private.config.json') ?? ''),
+        JSON.parse(assets.get(projectPrivateConfigFilename) ?? ''),
         contract.options.projectPrivateConfigJson
     )
     assert.deepEqual(JSON.parse(assets.get('sitemap.json') ?? ''), contract.options.sitemapJson)

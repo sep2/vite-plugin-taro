@@ -1,21 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { MiniContract } from '../mini-contract.ts'
+import { createWxMiniContract } from '../../wx/plugins.ts'
 import { createOutputFiles } from './files.ts'
 
-const contract = {
-    styles: {
-        appFileName: 'app.native.css',
-        globalFileName: 'assets/global.native.css'
-    },
-    output: {
-        projectConfigFilename: 'project.fixture.json',
-        projectPrivateConfigFilename: 'project.private.fixture.json',
-        generateProjectSkeleton() {
-            return []
-        }
-    }
-} satisfies Pick<MiniContract, 'output' | 'styles'>
+const contract = createWxMiniContract({
+    target: 'wx',
+    app: 'src/app.tsx',
+    pages: [],
+    appJson: {},
+    projectConfigJson: {}
+})
 
 test('creates the stable app stylesheet wrapper', async () => {
     const outputFiles = await createOutputFiles({
@@ -28,11 +22,11 @@ test('creates the stable app stylesheet wrapper', async () => {
     })
 
     assert.deepEqual(
-        outputFiles.find((file) => file.type === 'asset' && file.fileName === 'app.native.css'),
+        outputFiles.find((file) => file.type === 'asset' && file.fileName === contract.styles.appFileName),
         {
             type: 'asset',
-            fileName: 'app.native.css',
-            source: '@import "./assets/global.native.css";\n'
+            fileName: contract.styles.appFileName,
+            source: `@import "./${contract.styles.globalFileName}";\n`
         }
     )
 })

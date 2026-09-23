@@ -12,15 +12,11 @@ export function createTtMiniPlugins(options: VptOptions): PluginOption[] {
 
 /** Binds TT's runtime, native templates, styles, and socket transport to the shared compiler. */
 export function createTtMiniContract(options: VptOptions): MiniContract {
-    const componentsReactPath = packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-tt/components-react')
-    const projectConfigFilename = 'project.config.json'
-    const projectPrivateConfigFilename = 'project.private.config.json'
-
     return {
         options,
         taro: {
             env: 'tt',
-            componentsReactPath,
+            componentsReactPath: packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-tt/components-react'),
             targetRuntimePath: resolveRuntimeFile('tt/taro-runtime')
         },
         runtime: {
@@ -42,17 +38,9 @@ export function createTtMiniContract(options: VptOptions): MiniContract {
             globalFileName: 'assets/global.ttss'
         },
         output: {
-            projectConfigFilename,
-            projectPrivateConfigFilename,
-            generateProjectSkeleton(input) {
-                return createTtSkeleton({
-                    ...input,
-                    options,
-                    componentsModulePath: componentsReactPath,
-                    projectConfigFilename,
-                    projectPrivateConfigFilename
-                })
-            }
+            projectConfigFilename: 'project.config.json',
+            projectPrivateConfigFilename: 'project.private.config.json',
+            generateProjectSkeleton: createTtSkeleton
         }
     }
 }

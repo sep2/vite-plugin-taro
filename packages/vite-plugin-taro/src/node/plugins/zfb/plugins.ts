@@ -12,17 +12,13 @@ export function createZfbMiniPlugins(vptOptions: VptOptions): PluginOption[] {
 
 /** Binds the shared Mini Program core to Alipay runtime and output conventions. */
 export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
-    const componentsReactPath = packageRequire.resolve(
-        'vite-plugin-taro-runtime/plugin-platform-alipay/components-react'
-    )
-    const projectConfigFilename = 'mini.project.json'
-    const projectPrivateConfigFilename = '.mini-ide/project-ide.json'
-
     return {
         options: vptOptions,
         taro: {
             env: 'alipay',
-            componentsReactPath: componentsReactPath,
+            componentsReactPath: packageRequire.resolve(
+                'vite-plugin-taro-runtime/plugin-platform-alipay/components-react'
+            ),
             targetRuntimePath: packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-alipay/runtime')
         },
         runtime: {
@@ -44,17 +40,9 @@ export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
             globalFileName: 'assets/global.acss'
         },
         output: {
-            projectConfigFilename,
-            projectPrivateConfigFilename,
-            generateProjectSkeleton(input) {
-                return createZfbSkeleton({
-                    ...input,
-                    options: vptOptions,
-                    componentsModulePath: componentsReactPath,
-                    projectConfigFilename,
-                    projectPrivateConfigFilename
-                })
-            }
+            projectConfigFilename: 'mini.project.json',
+            projectPrivateConfigFilename: '.mini-ide/project-ide.json',
+            generateProjectSkeleton: createZfbSkeleton
         }
     }
 }

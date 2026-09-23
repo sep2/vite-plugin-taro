@@ -13,7 +13,7 @@ export async function createOutputFiles({
     getPackageLocation
 }: {
     bundle: Rolldown.OutputBundle
-    contract: Pick<MiniContract, 'output' | 'styles'>
+    contract: MiniContract
     subpackages: readonly GeneratedSubpackage[]
     isProduction: boolean
     getModuleInfo: (moduleId: string) => { meta: Rolldown.CustomPluginOptions } | null
@@ -27,12 +27,15 @@ export async function createOutputFiles({
             fileName: contract.styles.appFileName,
             source: `@import "./${contract.styles.globalFileName}";\n`
         },
-        ...contract.output.generateProjectSkeleton({
-            bundle: bundle,
-            subpackages: subpackages,
-            nativeComponents: nativeOutput.registrations,
-            isProduction: isProduction
-        }),
+        ...contract.output.generateProjectSkeleton(
+            {
+                bundle: bundle,
+                subpackages: subpackages,
+                nativeComponents: nativeOutput.registrations,
+                isProduction: isProduction
+            },
+            contract
+        ),
         ...nativeOutput.files
     ]
 }

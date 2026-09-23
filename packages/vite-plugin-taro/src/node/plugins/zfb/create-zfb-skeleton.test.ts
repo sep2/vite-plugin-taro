@@ -38,18 +38,22 @@ test('rejects a Taro base template that lost its recursive child contract', () =
 })
 
 test('assembles contract-selected Alipay templates without WX dialect output', () => {
-    const output = contract.output.generateProjectSkeleton({
-        bundle: {},
-        subpackages: [{ root: 'sub/p_example' }],
-        nativeComponents: [
-            {
-                name: 'native-counter',
-                componentPath: '/components/native-counter/index',
-                fields: ['count', 'onIncrement']
-            }
-        ],
-        isProduction: false
-    })
+    const { projectConfigFilename, projectPrivateConfigFilename } = contract.output
+    const output = contract.output.generateProjectSkeleton(
+        {
+            bundle: {},
+            subpackages: [{ root: 'sub/p_example' }],
+            nativeComponents: [
+                {
+                    name: 'native-counter',
+                    componentPath: '/components/native-counter/index',
+                    fields: ['count', 'onIncrement']
+                }
+            ],
+            isProduction: false
+        },
+        contract
+    )
     const assets = new Map(output.map((asset) => [asset.fileName, String(asset.source)]))
 
     assert.deepEqual(
@@ -68,8 +72,8 @@ test('assembles contract-selected Alipay templates without WX dialect output', (
             'pages/meta/index.json',
             'pages/meta/index.axml',
             'pages/meta/index.acss',
-            'mini.project.json',
-            '.mini-ide/project-ide.json',
+            projectConfigFilename,
+            projectPrivateConfigFilename,
             '.browserslistrc'
         ]
     )
@@ -83,14 +87,14 @@ test('assembles contract-selected Alipay templates without WX dialect output', (
             }
         ]
     })
-    assert.deepEqual(JSON.parse(assets.get('mini.project.json') ?? ''), {
+    assert.deepEqual(JSON.parse(assets.get(projectConfigFilename) ?? ''), {
         format: 2,
         compileOptions: {
             globalObjectMode: 'enable',
             transpile: {}
         }
     })
-    assert.deepEqual(JSON.parse(assets.get('.mini-ide/project-ide.json') ?? ''), {
+    assert.deepEqual(JSON.parse(assets.get(projectPrivateConfigFilename) ?? ''), {
         ignoreHttpDomainCheck: true
     })
     assert.equal(assets.get('.browserslistrc'), 'defaults and fully supports es6-module')
