@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
 import { compile } from '@tailwindcss/node'
+import pxTransform from 'postcss-pxtrans'
 import { build } from 'vite'
 import { createMiniTransformer } from './create-mini-transformer.ts'
 import { minifyMiniStylesheet } from './minify-mini-stylesheet.ts'
@@ -18,56 +19,65 @@ test('converts Mini CSS px with the fixed 750 design width but leaves capitalize
     assert.match(minified, /\.sizes\{width:100rpx;padding:32rpx;border-bottom-width:1px\}/)
 })
 
-test('Vite PostCSS can override the fixed Mini px ratio before native conversion', async () => {
-    const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'vpt-mini-px-transform-')))
-    const entry = path.join(root, 'app.js')
+for (const target of ['wx', 'h5'] as const) {
+    test(`documented postcss-pxtrans configuration converts ${target} CSS before output`, async () => {
+        const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'vpt-px-transform-')))
+        const entry = path.join(root, 'app.js')
 
-    try {
-        await writeFile(entry, "import './app.css'\n")
-        await writeFile(path.join(root, 'app.css'), '.sizes { width: 100px; border-bottom-width: 1Px; }')
+        try {
+            await writeFile(entry, "import './app.css'\n")
+            await writeFile(path.join(root, 'app.css'), '.sizes { width: 100px; border-bottom-width: 1Px; }')
 
-        const result = await build({
-            root,
-            configFile: false,
-            logLevel: 'silent',
-            css: {
-                postcss: {
-                    plugins: [
-                        {
-                            postcssPlugin: 'test:design-width-375',
-                            Declaration(declaration) {
-                                if (declaration.value === '100px') {
-                                    declaration.value = '200rpx'
-                                }
-                            }
-                        }
-                    ]
+            const result = await build({
+                root,
+                configFile: false,
+                logLevel: 'silent',
+                css: {
+                    postcss: {
+                        plugins: [
+                            pxTransform(
+                                target === 'h5'
+                                    ? { platform: 'h5', designWidth: 375, targetUnit: 'vw' }
+                                    : { platform: 'weapp', designWidth: 375, deviceRatio: { 375: 2 } }
+                            )
+                        ]
+                    }
+                },
+                plugins:
+                    target === 'wx'
+                        ? [
+                              createMiniStylePlugin(
+                                  { styles: { appFileName: 'app.wxss', globalFileName: 'assets/global.wxss' } },
+                                  [entry]
+                              )
+                          ]
+                        : [],
+                build: {
+                    write: false,
+                    cssCodeSplit: false,
+                    cssMinify: false,
+                    rolldownOptions: { input: entry }
                 }
-            },
-            plugins: [
-                createMiniStylePlugin(
-                    {
-                        styles: { appFileName: 'app.wxss', globalFileName: 'assets/global.wxss' }
-                    },
-                    [entry]
-                )
-            ],
-            build: {
-                write: false,
-                cssCodeSplit: false,
-                cssMinify: false,
-                rolldownOptions: { input: entry }
-            }
-        })
+            })
 
-        assert.ok(!Array.isArray(result) && 'output' in result)
-        const stylesheet = result.output.find((asset) => asset.fileName === 'assets/global.wxss')
-        assert.equal(stylesheet?.type, 'asset')
-        assert.match(String(stylesheet.source), /\.sizes \{ width: 200rpx; border-bottom-width: 1Px; \}/)
-    } finally {
-        await rm(root, { recursive: true, force: true })
-    }
-})
+            assert.ok(!Array.isArray(result) && 'output' in result)
+            const stylesheet = result.output.find(
+                (asset) =>
+                    asset.type === 'asset' &&
+                    (target === 'wx' ? asset.fileName === 'assets/global.wxss' : asset.fileName.endsWith('.css'))
+            )
+            assert.ok(stylesheet?.type === 'asset')
+            assert.match(
+                String(stylesheet.source),
+                target === 'wx'
+                    ? /\.sizes \{ width: 200rpx; border-bottom-width: 1Px; \}/
+                    : /\.sizes \{ width: 26\.66667vw; border-bottom-width: 1Px; \}/
+            )
+        } finally {
+            await rm(root, { recursive: true, force: true })
+        }
+    })
+}
 
 test('Tailwind v4 requires a length hint for an unscaled arbitrary border width', async () => {
     const compiler = await compile('@tailwind utilities;', { base: process.cwd(), onDependency() {} })
