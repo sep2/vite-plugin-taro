@@ -64,13 +64,13 @@ const fixtureRoot = path.dirname(scriptsRoot)
 const repositoryRoot = path.resolve(fixtureRoot, '../..')
 const commandTimeoutMilliseconds = 12_000
 const requestedCase = process.argv[2] ?? 'all'
-// Cold-page runs two isolated App generations; restart includes a second process startup and native App reload.
+// The inactive-page case verifies two unopened Pages in one App generation; restart includes a second process startup.
 const testBudgetMilliseconds =
     requestedCase === 'port-swap'
         ? 120_000
         : requestedCase === 'all'
           ? 150_000
-          : requestedCase === 'cold-page'
+          : requestedCase === 'inactive-page'
             ? 90_000
             : process.env.VPT_HMR_SETUP === '1' || requestedCase === 'restart'
               ? 60_000

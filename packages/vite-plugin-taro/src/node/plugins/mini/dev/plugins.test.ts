@@ -63,6 +63,7 @@ test('preserves physical outputs and composes the selected mode across developme
 
     assert.equal(config.build.emptyOutDir, false)
     assert.ok(config.plugins.some((plugin) => plugin.name === 'vpt:mini-page-shell-hmr'))
+    assert.ok(config.plugins.some((plugin) => plugin.name === 'vpt:mini-page-component-hmr'))
 })
 
 test('composes rebuild mode without patch transforms', async () => {
@@ -85,6 +86,19 @@ test('composes rebuild mode without patch transforms', async () => {
     )
 
     assert.ok(!config.plugins.some((plugin) => plugin.name === 'vpt:mini-page-shell-hmr'))
+    assert.ok(config.plugins.some((plugin) => plugin.name === 'vpt:mini-page-component-hmr'))
+})
+
+test('does not inject Page HMR into a build run in development mode', async () => {
+    const config = await resolveConfig(
+        {
+            configFile: false,
+            mode: 'development',
+            plugins: createMiniDevelopmentPlugin(contract, createMiniStylePlugin(contract, [import.meta.filename]))
+        },
+        'build'
+    )
+    assert.ok(!config.plugins.some((plugin) => plugin.name === 'vpt:mini-page-component-hmr'))
 })
 
 test('transfers the App style entry from complete output to the development host', () => {

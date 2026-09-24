@@ -15,7 +15,7 @@
         "test-devtools": "node scripts/run-devtools-tests.ts all",
         "test-interpreter": "cross-env VPT_HMR_MODE=interpreter node scripts/run-devtools-tests.ts all",
         "test-devtools:burst": "node scripts/run-devtools-tests.ts burst",
-        "test-devtools:cold-page": "node scripts/run-devtools-tests.ts cold-page",
+        "test-devtools:inactive-page": "node scripts/run-devtools-tests.ts inactive-page",
         "test-devtools:rebuild": "node scripts/run-devtools-tests.ts rebuild",
         "test-devtools:recovery": "node scripts/run-devtools-tests.ts recovery",
         "test-devtools:restart": "cross-env VPT_HMR_RESTART_BUILD_DELAY_MS=3000 node scripts/run-devtools-tests.ts restart",

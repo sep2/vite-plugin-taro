@@ -3,6 +3,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build, type OutputChunk, type Plugin } from 'rolldown'
+import { injectDevPageComponent } from '../../node/plugins/mini/dev/inject-dev-page-component.ts'
 
 type Call = Readonly<{
     name: string
@@ -35,12 +36,15 @@ function rejectRegistration(name: string): Registration {
 async function bundleRuntimeEntry({
     entry,
     mocks,
-    defines
+    defines,
+    servePagePath
 }: {
     entry: string
     mocks: Readonly<Record<string, string>>
     defines: Readonly<Record<string, string>>
+    servePagePath?: string
 }): Promise<string> {
+    const input = path.join(runtimeRoot, entry)
     const mockEntries = Object.entries(mocks).map(([request, source], index) => ({
         request,
         source,
@@ -55,10 +59,15 @@ async function bundleRuntimeEntry({
         },
         load(id) {
             return mockSourceById.get(id)
+        },
+        transform(code, id) {
+            if (id === input && servePagePath) {
+                return injectDevPageComponent(code, servePagePath)
+            }
         }
     }
     const result = await build({
-        input: path.join(runtimeRoot, entry),
+        input,
         plugins: [mockPlugin],
         transform: {
             define: { ...defines }
@@ -66,7 +75,7 @@ async function bundleRuntimeEntry({
         output: {
             exports: 'named',
             format: 'cjs',
-            sourcemap: 'inline'
+            sourcemap: false
         },
         write: false
     })
@@ -320,8 +329,9 @@ test('creates the Mini Program Page capsule with the transparent App collection 
             '../../mini/capsule/taro-runtime.ts': `
                 export const createPageConfig = globalThis.harness.createPageConfig
             `,
-            react: 'export default globalThis.harness.React',
+            react: 'export const createElement = () => undefined; export default globalThis.harness.React',
             '\0vpt:app-component': 'export default globalThis.harness.AppComponent',
+            '\0vpt:global-binding': 'export const vptGlobal = globalThis',
             '\0vpt:page-component': 'export default globalThis.harness.PageComponent'
         },
         defines: {
@@ -333,6 +343,7 @@ test('creates the Mini Program Page capsule with the transparent App collection 
 
     const exports = executeRuntimeEntry(code, createExecutionContext(harness))
 
+    assert.strictEqual(exports.default, pageConfig)
     assert.deepEqual(
         calls.map(({ name }) => name),
         ['createReactApp', 'createPageConfig']
@@ -343,7 +354,48 @@ test('creates the Mini Program Page capsule with the transparent App collection 
         { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } },
         pageConfigInput
     ])
-    assert.strictEqual(exports.default, pageConfig)
+})
+
+test('mounts the current Page export instead of the cold native capsule baseline in development', async () => {
+    const calls: Call[] = []
+    function BaselinePage() {
+        return null
+    }
+    function LatestPage() {
+        return null
+    }
+    const config = {}
+    const harness = {
+        PageComponent: BaselinePage,
+        createPageConfig: recordCall(calls, 'createPageConfig', config),
+        runtime: {
+            resolvePageComponent: (id: string, baseline: unknown) => {
+                assert.equal(id, 'src/pages/home/index.tsx')
+                assert.strictEqual(baseline, BaselinePage)
+                return LatestPage
+            }
+        }
+    }
+    const code = await bundleRuntimeEntry({
+        entry: 'mini/capsule/page.ts',
+        mocks: {
+            './app.ts': '',
+            './taro-runtime.ts': 'export const createPageConfig = globalThis.harness.createPageConfig',
+            '\0vpt:global-binding': 'export const vptGlobal = globalThis',
+            '\0vpt:page-component': 'export default globalThis.harness.PageComponent'
+        },
+        defines: {
+            __VPT_PAGE_PATH__: "'pages/home/index'",
+            __VPT_PAGE_CONFIG__: '{}'
+        },
+        servePagePath: 'pages/home/index'
+    })
+    const context = createExecutionContext(harness)
+    context.globalThis.__rolldown_runtime__ = harness.runtime
+    const exports = executeRuntimeEntry(code, context)
+    assert.strictEqual(exports.default, config)
+    assert.strictEqual(calls[0]?.args[0], LatestPage)
+    assert.equal(calls.length, 1)
 })
 
 test('preserves WX capsule runtime initialization order and export identities', async () => {

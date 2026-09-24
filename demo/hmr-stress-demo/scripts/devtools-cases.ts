@@ -6,7 +6,7 @@ import type { DevToolsHarness } from './devtools-harness.ts'
 import { isRecord, waitFor } from './devtools-harness.ts'
 import { type HmrEditProfile, publishHmrEdits } from './publish-hmr-edits.ts'
 
-export type DevToolsCase = 'all' | 'burst' | 'cold-page' | 'rebuild' | 'recovery' | 'restart'
+export type DevToolsCase = 'all' | 'burst' | 'inactive-page' | 'rebuild' | 'recovery' | 'restart'
 
 type HmrInfo = Readonly<{
     buildId: string
@@ -28,14 +28,14 @@ const postRecoveryProfile: HmrEditProfile = {
 export async function runDevToolsCase(caseName: DevToolsCase, harness: DevToolsHarness): Promise<void> {
     const cases: Readonly<Record<Exclude<DevToolsCase, 'all'>, () => Promise<void>>> = {
         burst: () => testStateRetention('burst', burstProfile, harness),
-        'cold-page': () => testColdPageEdits(harness),
+        'inactive-page': () => testInactivePage(harness),
         rebuild: () => testRuntimeRebuild(harness),
         recovery: () => testSyntaxRecovery(harness),
         restart: () => testServerRestart(harness)
     }
     if (caseName === 'all') {
-        // Run the cold-page case before any navigation can mount its secondary route in this App generation.
-        for (const selected of ['cold-page', 'burst', 'rebuild', 'recovery', 'restart'] as const) {
+        // Run the inactive-page case before any navigation can mount either secondary route in this App generation.
+        for (const selected of ['inactive-page', 'burst', 'rebuild', 'recovery', 'restart'] as const) {
             console.log(`[hmr-devtools] case: ${selected}`)
             await waitForRuntimeStartup(harness)
             await cases[selected]()
@@ -46,41 +46,16 @@ export async function runDevToolsCase(caseName: DevToolsCase, harness: DevToolsH
     await cases[caseName]()
 }
 
-async function testColdPageEdits(harness: DevToolsHarness): Promise<void> {
-    await testColdPageSharedComponent(harness)
-
-    // A new build gives the mirror-only case an unmounted Page and a fresh patch frontier, independent of the shared edit.
-    const previousBuild = await readHmrInfo(path.join(harness.outDir, 'hmr/info.js'))
-    console.log('[hmr-devtools] cold-page: restarting for an independent mirror-only edit')
-    await harness.restartServer()
-    // Restart cleanup removes metadata until the replacement build publishes its own identity.
-    await waitFor(
-        async () => {
-            try {
-                return (await readHmrInfo(path.join(harness.outDir, 'hmr/info.js'))).buildId !== previousBuild.buildId
-            } catch (error) {
-                if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-                    return false
-                }
-                throw error
-            }
-        },
-        6_000,
-        20
-    )
-    await waitForRuntimeStartup(harness)
-    await waitFor(
-        async () =>
-            (await harness.readCurrentPage()).path === 'pages/index/index' &&
-            (await harness.readPageStack()).length === 1 &&
-            (await harness.readElement('#stress-input', 'value')) === 'seed-000',
-        40_000,
-        100
-    )
-    await testColdPageOnlyEdit(harness)
+async function testInactivePage(harness: DevToolsHarness): Promise<void> {
+    const infoPath = path.join(harness.outDir, 'hmr/info.js')
+    const { buildId } = await readHmrInfo(infoPath)
+    await testInactivePageOnly(harness)
+    assert.equal((await readHmrInfo(infoPath)).buildId, buildId)
+    await testInactiveSharedComponent(harness)
+    assert.equal((await readHmrInfo(infoPath)).buildId, buildId)
 }
 
-async function testColdPageSharedComponent(harness: DevToolsHarness): Promise<void> {
+async function testInactiveSharedComponent(harness: DevToolsHarness): Promise<void> {
     const sourcePath = path.join(harness.root, 'src/components/stress-dashboard.tsx')
     const originalSource = await readFile(sourcePath, 'utf8')
     const generationPattern = /const sharedGeneration = '[^']*'/
@@ -92,33 +67,29 @@ async function testColdPageSharedComponent(harness: DevToolsHarness): Promise<vo
     const rebuildsBefore = await countLog(harness.serverLogPath, 'wx full rebuild required')
 
     await assertCurrentRoute('pages/index/index', harness)
-    assert.equal(
-        (await harness.readPageStack()).length,
-        1,
-        'The mirror Page must not be mounted before the shared edit'
-    )
-    await setPageState('cold-page-primary', harness)
+    assert.equal((await harness.readPageStack()).length, 1, 'Page C must not be mounted before the shared edit')
+    await setPageState('inactive-page-shared-primary', harness)
 
-    console.log('[hmr-devtools] cold-page: editing the shared component before the mirror Page is first mounted')
+    console.log('[hmr-devtools] inactive-page: editing the shared component before Page C is mounted')
     await writeFile(
         sourcePath,
-        originalSource.replace(generationPattern, "const sharedGeneration = 'cold-page-latest'")
+        originalSource.replace(generationPattern, "const sharedGeneration = 'inactive-page-latest'")
     )
     try {
-        await waitForSharedGeneration('cold-page-latest', harness)
-        await assertPageState('cold-page-primary', harness)
+        await waitForSharedGeneration('inactive-page-latest', harness)
+        await assertPageState('inactive-page-shared-primary', harness)
         assert.equal((await readHmrInfo(infoPath)).buildId, build.buildId)
         assert.equal(await readFile(appStylePath, 'utf8'), appStyle)
 
-        await harness.navigate('navigateTo', '/pages/mirror/index')
-        await assertCurrentRoute('pages/mirror/index', harness)
-        await waitForSharedGeneration('cold-page-latest', harness)
+        await harness.navigate('navigateTo', '/pages/shared/index')
+        await assertCurrentRoute('pages/shared/index', harness)
+        await waitForSharedGeneration('inactive-page-latest', harness)
         assert.equal(await harness.readElement('#stress-input', 'value'), 'seed-000')
         assert.equal((await readHmrInfo(infoPath)).buildId, build.buildId)
         assert.equal(await countLog(harness.serverLogPath, 'wx full rebuild required'), rebuildsBefore)
-        assert.equal(await readFile(appStylePath, 'utf8'), appStyle, 'A full reload must not mask a stale cold Page')
+        assert.equal(await readFile(appStylePath, 'utf8'), appStyle, 'A full reload must not mask an inactive Page')
         await assertCleanConsole(harness)
-        console.log('[hmr-devtools] cold-page: the first mirror mount rendered the latest shared component')
+        console.log('[hmr-devtools] inactive-page: Page C first rendered the updated shared component')
     } finally {
         await writeFile(sourcePath, originalSource)
     }
@@ -126,56 +97,55 @@ async function testColdPageSharedComponent(harness: DevToolsHarness): Promise<vo
     await waitForSharedGeneration('baseline', harness)
     await harness.navigate('navigateBack', undefined)
     await assertCurrentRoute('pages/index/index', harness)
-    await waitForSharedGeneration('baseline', harness)
-    await assertPageState('cold-page-primary', harness)
+    await assertPageState('inactive-page-shared-primary', harness)
 }
 
-async function testColdPageOnlyEdit(harness: DevToolsHarness): Promise<void> {
+async function testInactivePageOnly(harness: DevToolsHarness): Promise<void> {
     const sourcePath = path.join(harness.root, 'src/pages/mirror/index.tsx')
     const originalSource = await readFile(sourcePath, 'utf8')
     const previousTitle = 'Mirror tree'
-    const updatedTitle = 'Mirror tree after cold edit'
-    assert.ok(originalSource.includes(`title="${previousTitle}"`))
+    const updatedTitle = 'Mirror tree after inactive edit'
+    assert.ok(originalSource.includes(previousTitle))
     const infoPath = path.join(harness.outDir, 'hmr/info.js')
     const appStylePath = path.join(harness.outDir, 'app.wxss')
     const build = await readHmrInfo(infoPath)
     const appStyle = await readFile(appStylePath, 'utf8')
     const rebuildsBefore = await countLog(harness.serverLogPath, 'wx full rebuild required')
+    const appliedBefore = await countLog(harness.serverLogPath, '[hmr-stress] patch applied')
 
     await assertCurrentRoute('pages/index/index', harness)
-    assert.equal((await harness.readPageStack()).length, 1, 'The mirror Page must not be mounted before its edit')
-    await setPageState('cold-page-only-primary', harness)
-    console.log('[hmr-devtools] cold-page: editing only the never-mounted mirror Page')
-    await writeFile(sourcePath, originalSource.replace(`title="${previousTitle}"`, `title="${updatedTitle}"`))
+    assert.equal((await harness.readPageStack()).length, 1, 'Page B must not be mounted before its edit')
+    await setPageState('inactive-page-only-primary', harness)
+    console.log('[hmr-devtools] inactive-page: editing only the never-mounted Page B')
+    await writeFile(sourcePath, originalSource.replace(previousTitle, updatedTitle))
     try {
-        await waitFor(
-            async () => (await readFile(path.join(harness.outDir, 'hmr/patches.js'), 'utf8')).includes(updatedTitle),
-            6_000,
-            100
-        )
-        await assertPageState('cold-page-only-primary', harness)
+        if (process.env.VPT_HMR_MODE === 'interpreter') {
+            await waitFor(
+                async () => (await countLog(harness.serverLogPath, '[hmr-stress] patch applied')) > appliedBefore,
+                6_000,
+                100
+            )
+        } else {
+            await waitFor(
+                async () =>
+                    (await readFile(path.join(harness.outDir, 'hmr/patches.js'), 'utf8')).includes(updatedTitle),
+                6_000,
+                100
+            )
+        }
+        await assertPageState('inactive-page-only-primary', harness)
         assert.equal((await harness.readPageStack()).length, 1)
         assert.equal((await readHmrInfo(infoPath)).buildId, build.buildId)
         assert.equal(await readFile(appStylePath, 'utf8'), appStyle)
 
         await harness.navigate('navigateTo', '/pages/mirror/index')
         await assertCurrentRoute('pages/mirror/index', harness)
+        await waitFor(async () => (await harness.readElement('.stress-title', 'text')) === updatedTitle, 6_000, 100)
         assert.equal((await readHmrInfo(infoPath)).buildId, build.buildId)
-        assert.equal(await readFile(appStylePath, 'utf8'), appStyle, 'A full reload must not mask a stale cold Page')
         assert.equal(await countLog(harness.serverLogPath, 'wx full rebuild required'), rebuildsBefore)
-        console.log(
-            `[hmr-devtools] cold-page: first mirror title: ${await harness.readElement('.stress-title', 'text')}`
-        )
-        try {
-            await waitFor(async () => (await harness.readElement('.stress-title', 'text')) === updatedTitle, 6_000, 100)
-        } catch (error) {
-            console.error(
-                `[hmr-devtools] cold-page: title after timeout: ${await harness.readElement('.stress-title', 'text')}`
-            )
-            throw error
-        }
+        assert.equal(await readFile(appStylePath, 'utf8'), appStyle, 'A full reload must not mask an inactive Page')
         await assertCleanConsole(harness)
-        console.log('[hmr-devtools] cold-page: the first mirror mount rendered its edited source')
+        console.log('[hmr-devtools] inactive-page: Page B first rendered its edited source')
     } finally {
         await writeFile(sourcePath, originalSource)
     }
@@ -183,7 +153,7 @@ async function testColdPageOnlyEdit(harness: DevToolsHarness): Promise<void> {
     await waitFor(async () => (await harness.readElement('.stress-title', 'text')) === previousTitle, 6_000, 100)
     await harness.navigate('navigateBack', undefined)
     await assertCurrentRoute('pages/index/index', harness)
-    await assertPageState('cold-page-only-primary', harness)
+    await assertPageState('inactive-page-only-primary', harness)
 }
 
 async function testStateRetention(name: string, profile: HmrEditProfile, harness: DevToolsHarness): Promise<void> {

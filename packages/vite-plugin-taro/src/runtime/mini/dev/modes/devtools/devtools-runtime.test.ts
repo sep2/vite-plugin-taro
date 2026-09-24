@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import type { ElementType } from 'react'
 import { DevRuntime } from 'rolldown/experimental/runtime'
 import { runtimeReportEvent } from '../../hmr-protocol.ts'
 import type { MiniSocketTask } from '../../mini-hmr-runtime.ts'
@@ -27,6 +28,7 @@ type TestRuntime = DevRuntime &
         moduleHotContexts: ReadonlyMap<string, TestHotContext>
         initialize: (info: { buildId: string; endpoint: string }) => void
         applyPatches: (payload: { buildId: string; patches: TestPatch[] } | undefined) => void
+        resolvePageComponent: (moduleId: string, baseline: ElementType) => ElementType
         sendReport: (data: Record<string, unknown>) => void
         stopSocket: (reason: string) => void
     }>
@@ -301,6 +303,108 @@ function assertNoRebuild(reports: readonly unknown[]): void {
 function assertApplied(reports: readonly unknown[], seq: number): void {
     assert.match(JSON.stringify(reports), new RegExp(`"kind":"applied","seq":${seq}`))
 }
+
+test('resolves the baseline component of a cold Page without a patch factory', async () => {
+    const { runtime } = await createTestHarness()
+    function Baseline() {
+        return null
+    }
+    assert.strictEqual(runtime.resolvePageComponent('cold-page', Baseline), Baseline)
+    assert.equal(runtime.isExecuted('cold-page'), false)
+})
+
+test('replaces a late-loaded baseline Page cache with its previously acknowledged patch factory', async () => {
+    const { runtime, reports } = await createTestHarness()
+    function Baseline() {
+        return null
+    }
+    function Latest() {
+        return null
+    }
+    // This test-local counter proves that repeated renders reuse the same patched module instance.
+    let executions = 0
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            createPatch({
+                runtime,
+                seq: 1,
+                moduleId: 'cold-page',
+                moduleExports: { default: Latest },
+                deferAccept: false,
+                onExecute: () => {
+                    executions++
+                }
+            })
+        ]
+    })
+    assertApplied(reports, 1)
+    assert.equal(runtime.isExecuted('cold-page'), false)
+
+    // A physical Page capsule evaluates after ACK and caches its original component, shadowing the newer factory.
+    runtime.registerModule('cold-page', { exports: { default: Baseline } })
+    assert.strictEqual(runtime.loadExports('cold-page').default, Baseline)
+    assert.strictEqual(runtime.resolvePageComponent('cold-page', Baseline), Latest)
+    assert.strictEqual(runtime.resolvePageComponent('cold-page', Baseline), Latest)
+    assert.equal(executions, 1)
+    assertNoRebuild(reports)
+})
+
+test('loads an installed Page factory when no baseline capsule has executed', async () => {
+    const { runtime, reports } = await createTestHarness()
+    function Baseline() {
+        return null
+    }
+    function Latest() {
+        return null
+    }
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            createPatch({
+                runtime,
+                seq: 1,
+                moduleId: 'cold-page',
+                moduleExports: { default: Latest },
+                deferAccept: false
+            })
+        ]
+    })
+    assertApplied(reports, 1)
+    assert.equal(runtime.isExecuted('cold-page'), false)
+    assert.strictEqual(runtime.resolvePageComponent('cold-page', Baseline), Latest)
+})
+
+test('keeps an already-executed Page factory and React boundary when resolving its component', async () => {
+    const { runtime, reports } = await createTestHarness()
+    function Baseline() {
+        return null
+    }
+    function Latest() {
+        return null
+    }
+    registerInitialModule({ runtime, moduleId: 'page', moduleExports: { default: Baseline } })
+    // This test-local counter proves that resolving an already-applied boundary never re-executes it.
+    let executions = 0
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            createPatch({
+                runtime,
+                seq: 1,
+                moduleId: 'page',
+                moduleExports: { default: Latest },
+                deferAccept: false,
+                onExecute: () => {
+                    executions++
+                }
+            })
+        ]
+    })
+    assertApplied(reports, 1)
+    assert.strictEqual(runtime.resolvePageComponent('page', Baseline), Latest)
+    assert.equal(executions, 1)
+})
 
 test('initialization does not report an application frontier before patches run', async () => {
     const { reports } = await createTestHarness()

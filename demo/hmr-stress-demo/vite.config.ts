@@ -7,6 +7,7 @@ type MiniTarget = Exclude<VptTarget, 'h5'>
 
 const appTitle = 'HMR stress lab'
 const mirrorTitle = 'HMR mirror stack'
+const sharedTitle = 'HMR shared stack'
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), 'VITE_VPT_')
@@ -31,6 +32,10 @@ export default defineConfig(({ mode }) => {
                     {
                         path: 'pages/mirror/index',
                         config: createPageJson(target, mirrorTitle)
+                    },
+                    {
+                        path: 'pages/shared/index',
+                        config: createPageJson(target, sharedTitle)
                     }
                 ],
                 appJson: createAppJson(target),
@@ -52,6 +57,8 @@ export default defineConfig(({ mode }) => {
                     server.ws.on('vpt:mini-hmr:report', (report: { kind: string; buildId: string }) => {
                         if (report.kind === 'startup') {
                             server.config.logger.info(`[hmr-stress] runtime ready ${report.buildId}`)
+                        } else if (report.kind === 'applied') {
+                            server.config.logger.info('[hmr-stress] patch applied')
                         }
                     })
                 }

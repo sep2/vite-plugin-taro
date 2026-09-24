@@ -103,14 +103,18 @@ for (const [target, createContract] of [
             appJson: { fixture: 'app-config' },
             projectConfigJson: {}
         })
-        const config = await resolveConfig({ configFile: false, plugins: createMiniTargetPlugins(contract) }, 'build')
+        const config = await resolveConfig(
+            { configFile: false, mode: 'development', plugins: createMiniTargetPlugins(contract) },
+            'build'
+        )
         const plugin = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
         assert.ok(plugin?.transform && typeof plugin.transform === 'object')
         assert.equal(plugin.transform.order, 'pre')
         const appId = normalizePath(contract.runtime.modules.appCapsule)
         const pageId = normalizePath(contract.runtime.modules.pageCapsule)
         const appSource = 'export const config = __VPT_APP_CONFIG__'
-        const pageSource = 'export const route = __VPT_PAGE_PATH__; export const config = __VPT_PAGE_CONFIG__'
+        const pageSource =
+            'const PageComponent = () => null; export const route = __VPT_PAGE_PATH__; export const config = __VPT_PAGE_CONFIG__; export const component = PageComponent'
         const eligibleSources = [
             { id: appId, code: appSource, marker: 'app-config' },
             { id: `${appId}?v=1`, code: appSource, marker: 'app-config' },
@@ -142,6 +146,7 @@ for (const [target, createContract] of [
         )
         const result = await build({
             configFile: false,
+            mode: 'development',
             logLevel: 'silent',
             plugins: [
                 {
@@ -171,6 +176,9 @@ for (const [target, createContract] of [
             if (marker !== undefined) {
                 assert.ok(chunk.code.includes(marker), chunk.facadeModuleId)
                 assert.doesNotMatch(chunk.code, /__VPT_(?:APP_CONFIG|PAGE_PATH|PAGE_CONFIG)__/)
+                if (chunk.facadeModuleId.startsWith(pageId)) {
+                    assert.doesNotMatch(chunk.code, /resolvePageComponent/)
+                }
             }
         }
     })

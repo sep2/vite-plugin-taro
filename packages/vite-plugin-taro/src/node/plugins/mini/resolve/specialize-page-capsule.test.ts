@@ -50,13 +50,15 @@ test('preserves Page paths and configuration containing quotes and other reserve
         config: { title: '__VPT_PAGE_PATH__\n', absent: undefined }
     }
     const result = specializePageCapsule({
-        code: 'const args = [__VPT_PAGE_PATH__, __VPT_PAGE_CONFIG__]',
+        code: 'const PageComponent = () => null; const args = [__VPT_PAGE_PATH__, __VPT_PAGE_CONFIG__, PageComponent]',
         id: '/runtime/page.ts',
         page,
         sourcemap: false
     })
     const args: unknown = Function(`${result.code}; return args`)()
-    assert.deepEqual(args, [page.path, { title: page.config.title }])
+    assert.ok(Array.isArray(args))
+    assert.deepEqual(args.slice(0, 2), [page.path, { title: page.config.title }])
+    assert.equal(typeof args[2], 'function')
     assert.equal(result.map, null)
 })
 
