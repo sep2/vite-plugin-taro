@@ -5,7 +5,15 @@ import { mkdtemp, open, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
-import { stopLoanHmrServer } from './hmr-fixture.ts'
+import { stopLoanHmrServer, withLoanHmrFixture } from './hmr-fixture.ts'
+
+test('state-retention probe reads the opt-in URL from the host global', async () => {
+    await withLoanHmrFixture('state-retention', async (fixture) => {
+        const source = await fixture.read('src/pages/calculator/index.tsx')
+        assert.match(source, /id="loan-polyfill-probe">URL:\{new globalThis\.URL\('child'/)
+        assert.doesNotMatch(source, /id="loan-polyfill-probe">URL:\{new URL\(/)
+    })
+})
 
 test('server cleanup awaits exit and closes the log handle', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'loan-server-cleanup-'))

@@ -109,8 +109,8 @@ async function prepareFixture(profile: LoanHmrFixtureProfile): Promise<LoanHmrFi
 
     const fixture = createFixture()
     await configureAutomatableRenderer(fixture)
-    // The broad state-retention suite owns the independent bare-URL polyfill assertion. Restart-only suites keep the same
-    // application and automation selectors but isolate process recovery from that unrelated runtime feature.
+    // The broad state-retention suite checks the polyfilled host URL. Restart-only suites keep the same application
+    // and automation selectors but isolate process recovery from that unrelated runtime feature.
     await instrumentSources(fixture, profile === 'state-retention')
     return fixture
 }
@@ -146,7 +146,7 @@ async function instrumentSources(fixture: LoanHmrFixture, includePolyfillProbe: 
         'src/pages/calculator/history/hmr-marker.ts'
     ]
     const polyfillProbe = includePolyfillProbe
-        ? "            <Text id=\"loan-polyfill-probe\">URL:{new URL('child', 'https://example.com/loan/').href}</Text>\n"
+        ? "            <Text id=\"loan-polyfill-probe\">URL:{new globalThis.URL('child', 'https://example.com/loan/').href}</Text>\n"
         : ''
     await Promise.all(markerFiles.map((file) => fixture.publishMarker(file, 'baseline')))
     await Promise.all([
