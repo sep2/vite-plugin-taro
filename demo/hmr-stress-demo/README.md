@@ -12,7 +12,7 @@ Each page renders:
 - 96 additional stateful grid cells;
 - controlled input, counter, selection, density, and mount-token state.
 
-The singleton App projects the Page outlet through a 16-level host chain beside a second 16-level decorative branch, and it consumes the same edited marker as both Pages. Every marker generation also reverses the two keyed App branches, forcing structural App HMR while retaining the Page subtree. The mirror route mounts a second Page copy while the primary Page remains in the back stack. Together they stress App-view slot routing, App and Page React Refresh, cumulative patch delivery, native Page replacement on WX, in-place interpreter updates on ZFB, large `data` snapshot restoration, hidden-page recovery, runtime-requested rebuilds, and invalid-source recovery. These flows do not exercise TT.
+The singleton App projects the Page outlet through a 16-level host chain beside a second 16-level decorative branch, and it consumes the same edited marker as all three Pages. Every marker generation also reverses the two keyed App branches, forcing structural App HMR while retaining the Page subtree. The mirror and shared routes mount separate Page copies while the primary Page remains in the back stack. B and C stay unopened until their respective inactive-page checks. Together they stress App-view slot routing, App and Page React Refresh, cumulative patch delivery, native Page replacement on WX, in-place interpreter updates on ZFB, large `data` snapshot restoration, hidden-page recovery, runtime-requested rebuilds, and invalid-source recovery. These flows do not exercise TT.
 
 ## Automated WeChat DevTools suite
 
@@ -26,15 +26,15 @@ pnpm test:hmr-stress-demo:interpreter
 pnpm setup:hmr-stress-demo:devtools
 ```
 
-Setup and the restart case may each use up to 60 seconds; `cold-page` has a 90-second deadline, the aggregate suite 150 seconds, and two-project port-swap 120 seconds. Other standalone cases have a 30-second deadline. Each invocation attaches to the newly built output itself; a prior setup invocation is not required. The complete suite runs both cold-page checks, strict burst, rebuild storm, syntax recovery, and server restart cases. Runtime assertions replace fixed settle sleeps, including observing the restoration marker before publishing and awaiting the baseline. Plugin rebuilding is opt-in.
+Setup and the restart case may each use up to 60 seconds; `inactive-page` has a 90-second deadline, the aggregate suite 150 seconds, and two-project port-swap 120 seconds. Other standalone cases have a 30-second deadline. Each invocation attaches to the newly built output itself; a prior setup invocation is not required. The complete suite runs both inactive-page checks, strict burst, rebuild storm, syntax recovery, and server restart cases. Runtime assertions replace fixed settle sleeps, including observing the restoration marker before publishing and awaiting the baseline. Plugin rebuilding is opt-in.
 
-The `cold-page` command first edits a shared component before the mirror Page is mounted, then restarts the disposable Vite project to give the mirror-only edit an independent, never-mounted App generation. The second check currently fails: the patch contains the edited mirror title, but the first mirror mount shows the old title. Because `all` includes this check, it also fails until the bug is fixed.
+The `inactive-page` command keeps Page A mounted. It edits only unopened Page B and first opens B, restores that edit, then edits the shared dashboard and first opens still-unopened Page C. Both first mounts must render the latest source without restarting Vite, rotating the build ID, or resetting A's input state.
 
 Individual cases can be run independently:
 
 ```bash
 pnpm stress:hmr-stress-demo:burst         # 30 edits at 8 ms
-pnpm test:hmr-stress-demo:cold-page       # shared edit, then isolated mirror-only edit (currently fails)
+pnpm test:hmr-stress-demo:inactive-page   # Page B-only edit, then shared edit before first opening C
 pnpm test:hmr-stress-demo:rebuild         # mixed ACK/rebuild report storms
 pnpm test:hmr-stress-demo:recovery        # syntax failures and passive HMR recovery
 pnpm test:hmr-stress-demo:restart         # real Vite process restart, then rendered HMR updates
@@ -54,7 +54,7 @@ node --test demo/hmr-stress-demo/scripts/create-process-scope.test.ts
 
 The complete suite checks:
 
-1. a shared component edited while only the primary Page is mounted renders its latest generation when the mirror Page is first opened; after a fresh App build, an edit belonging only to the unmounted mirror Page must also render on its first mount (currently fails);
+1. an edit belonging only to unopened Page B renders on B's first mount; after returning to A, a shared component edit renders on still-unopened Page C's first mount in the same App generation;
 2. burst patch publication through both the deep App view and Pages, with primary and hidden mirror state retention;
 3. unique Page-slot routing while keyed deep App branches repeatedly reorder, marker restoration, and valid two-Page navigation stacks;
 4. duplicate and out-of-order ACK conflation under rebuild-report storms;

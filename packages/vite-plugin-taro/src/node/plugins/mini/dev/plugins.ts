@@ -7,11 +7,12 @@ import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
 import { createExactModuleIdFilter } from '../../../utils/modules.ts'
 import type { MiniContract } from '../mini-contract.ts'
-import { rolldownRuntimeId } from '../module/module.ts'
+import { pageComponentId, rolldownRuntimeId } from '../module/module.ts'
 import type { MiniStylePlugin } from '../styles/plugins.ts'
 import { createMiniDevHost, type MiniDevHost } from './dev-host.ts'
 import { createMiniHmrMode } from './hmr-mode.ts'
 import { hmrEndpointPath } from './hmr-protocol.ts'
+import { injectDevPageComponent } from './inject-dev-page-component.ts'
 import { createMiniReactRefreshTransforms } from './react-refresh.ts'
 
 /** Selects the sole Vite environment that owns the physical Mini Program development project. */
@@ -110,6 +111,30 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
 
             closeBundle() {
                 return host?.close()
+            }
+        },
+        // Only serve rewrites the Page capsule: production must pass PageComponent directly to createPageConfig(),
+        // while a late-opened dev Page must select its installed HMR factory before Taro captures the original export.
+        {
+            name: 'vpt:mini-page-capsule-hmr',
+            apply: 'serve',
+            transform: {
+                order: 'pre',
+                filter: { id: createExactModuleIdFilter(contract.runtime.modules.pageCapsule) },
+                async handler(capsuleCode, capsuleId) {
+                    // The capsule ID carries the route, so Vite resolves its actual Page import here. Reconstructing a path
+                    // from the route would drift from the resolver if the source layout or extension changes.
+                    const component = await this.resolve(pageComponentId, capsuleId)
+                    if (!component) {
+                        throw new Error(`Failed to resolve Page component imported by ${capsuleId}`)
+                    }
+
+                    // Vite returns an absolute source ID; Rolldown's installed factories use root-relative, POSIX IDs.
+                    // Passing the absolute path (or Windows separators) makes hasFactory miss and first mount stays stale.
+                    const componentId = normalizePath(path.relative(this.environment.config.root, component.id))
+
+                    return injectDevPageComponent({ capsuleCode, componentId, capsuleId })
+                }
             }
         },
         {

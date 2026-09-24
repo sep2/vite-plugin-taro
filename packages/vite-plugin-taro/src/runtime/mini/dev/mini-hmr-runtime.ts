@@ -7,6 +7,7 @@
  * and ACK form one application transaction; it has no file-delivery or interpreter policy of its own.
  */
 
+import type { ElementType } from 'react'
 import type { DevRuntime as RolldownDevRuntime } from 'rolldown/experimental/runtime-types'
 import {
     type HmrInfo,
@@ -166,6 +167,21 @@ export class MiniHmrRuntime extends DevRuntime {
         // A new execution supersedes the old boundary before it decides whether to accept.
         this.moduleHotContexts.delete(moduleId)
         return new MiniHotContext(moduleId, this.moduleHotContexts)
+    }
+
+    /** Resolves a cold Page against patches installed before its physical capsule first executed. */
+    resolvePageComponent(moduleId: string, baseline: ElementType): ElementType {
+        if (!this.hasFactory(moduleId)) {
+            return baseline
+        }
+
+        // An unopened native Page evaluates its original capsule after the patch has already been ACKed. That capsule
+        // registers baseline exports in Rolldown's cache, shadowing the installed patch factory. Only evict that exact
+        // baseline reference: an already-refreshed Page's current exports must not be re-executed on every render.
+        if (this.isExecuted(moduleId) && this.loadExports(moduleId).default === baseline) {
+            this.removeModuleCache(moduleId)
+        }
+        return this.initModule(moduleId).default
     }
 
     /** Computes accepting boundaries and every executed module that must be re-armed. */

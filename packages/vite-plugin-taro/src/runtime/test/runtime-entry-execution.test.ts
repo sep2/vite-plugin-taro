@@ -37,12 +37,12 @@ async function bundleRuntimeEntry({
     entry,
     mocks,
     defines,
-    servePagePath
+    servePageModuleId
 }: {
     entry: string
     mocks: Readonly<Record<string, string>>
     defines: Readonly<Record<string, string>>
-    servePagePath?: string
+    servePageModuleId?: string
 }): Promise<string> {
     const input = path.join(runtimeRoot, entry)
     const mockEntries = Object.entries(mocks).map(([request, source], index) => ({
@@ -61,8 +61,8 @@ async function bundleRuntimeEntry({
             return mockSourceById.get(id)
         },
         transform(code, id) {
-            if (id === input && servePagePath) {
-                return injectDevPageComponent(code, servePagePath)
+            if (id === input && servePageModuleId) {
+                return injectDevPageComponent({ capsuleCode: code, componentId: servePageModuleId, capsuleId: id })
             }
         }
     }
@@ -101,6 +101,8 @@ function executeRuntimeEntry(code: string, context: ExecutionContext): Record<st
         'App',
         'Page',
         'Component',
+        // Mini serve chunks receive this lexical binding from vpt:mini-global-dev at renderChunk.
+        '__rolldown_runtime__',
         code
     )(
         commonJsModule,
@@ -110,7 +112,8 @@ function executeRuntimeEntry(code: string, context: ExecutionContext): Record<st
         context.global,
         context.App,
         context.Page,
-        context.Component
+        context.Component,
+        context.globalThis.__rolldown_runtime__
     )
 
     return commonJsModule.exports
@@ -388,7 +391,7 @@ test('mounts the current Page export instead of the cold native capsule baseline
             __VPT_PAGE_PATH__: "'pages/home/index'",
             __VPT_PAGE_CONFIG__: '{}'
         },
-        servePagePath: 'pages/home/index'
+        servePageModuleId: 'src/pages/home/index.tsx'
     })
     const context = createExecutionContext(harness)
     context.globalThis.__rolldown_runtime__ = harness.runtime

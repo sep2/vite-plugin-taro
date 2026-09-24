@@ -170,6 +170,7 @@ async function startDevFixture(
                             assert.ok(
                                 page.moduleIds.includes(`${runtimeModules.pageCapsule}?route=pages%2Fhome%2Findex`)
                             )
+                            assert.match(page.code, /resolvePageComponent\([`"']src\/pages\/home\/index\.tsx[`"']/)
                             assert.ok(bundle['app.js'])
                             assert.ok(bundle['pages/home/index.js'])
                             javaScriptOutput = Object.values(bundle).flatMap((item) =>
