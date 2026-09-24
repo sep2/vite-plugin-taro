@@ -72,10 +72,10 @@ async function runPolyfillFlow(context: HmrContext): Promise<void> {
     const selector = '#loan-polyfill-probe'
     const href = 'https://example.com/loan/child'
     await waitForElementText(context, selector, `URL:${href}`)
-    console.log('[loan-hmr] polyfill: bare URL works at startup')
+    console.log('[loan-hmr] polyfill: globalThis.URL works at startup')
     try {
-        // A changed constructor argument proves the updated bare call ran, rather than observing the previous generation.
-        const updated = replaceOnce(original, "new URL('child',", "new URL('updated-child',")
+        // A changed constructor argument proves the updated host-global call ran, rather than the previous generation.
+        const updated = replaceOnce(original, "new globalThis.URL('child',", "new globalThis.URL('updated-child',")
         await context.fixture.write(file, updated)
         await waitForElementText(context, selector, 'URL:https://example.com/loan/updated-child')
         await assertCalculatorState(context)
