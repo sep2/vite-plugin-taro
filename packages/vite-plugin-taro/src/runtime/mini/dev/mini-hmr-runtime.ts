@@ -135,6 +135,9 @@ export class MiniHmrRuntime extends DevRuntime {
     // Set only by native OPEN and cleared on close/error: this reference is the authority for whether reports can be sent.
     private socket: MiniSocketTask | undefined
 
+    // One socket belongs to this App runtime. Its first failure or deliberate stop silences subsequent error/close warnings.
+    private disconnectWarningHandled = false
+
     /**
      * Sparse current-generation accepting boundaries keyed by module id. Entries alone must
      * outlive Rolldown module-cache eviction so old callbacks can receive fresh exports.
@@ -284,11 +287,18 @@ export class MiniHmrRuntime extends DevRuntime {
         this.session = { buildId: info.buildId, appliedSeq: 0 }
 
         const socket = this.connectSocket(info.endpoint)
-        const clearSocket = () => {
+        const handleDisconnect = () => {
             this.socket = undefined
+            if (this.disconnectWarningHandled) {
+                return
+            }
+            this.disconnectWarningHandled = true
+            console.warn(
+                '[vpt] HMR disconnected. Ensure the Vite dev server is running, then reload the Mini Program in DevTools.'
+            )
         }
-        socket.onClose(clearSocket)
-        socket.onError(clearSocket)
+        socket.onClose(handleDisconnect)
+        socket.onError(handleDisconnect)
         socket.onOpen(() => {
             this.socket = socket
             this.sendReport({ kind: 'startup' })
@@ -320,6 +330,8 @@ export class MiniHmrRuntime extends DevRuntime {
             throw new Error('Mini Program HMR socket is not initialized')
         }
         const socket = this.socket
+        // Mark intentional shutdown before invoking the native API, which may immediately emit close or error.
+        this.disconnectWarningHandled = true
         this.socket = undefined
         socket?.close({ code: 1000, reason: reason })
     }

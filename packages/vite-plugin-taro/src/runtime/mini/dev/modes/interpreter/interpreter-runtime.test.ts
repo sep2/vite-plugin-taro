@@ -39,8 +39,9 @@ type TestHarness = Readonly<{
 let runtimeId = 0
 
 function createSocket(connectOptions: ConnectOptions, reports: unknown[]): CapturedSocket {
-    // This mutable listener cell models the callback registered for native SocketTask messages.
+    // These mutable listeners model native SocketTask messages and immediate close notifications from the platform API.
     let messageListener = (_result: Readonly<{ data: string | ArrayBuffer }>) => {}
+    let closeListener = () => {}
     const closed: Array<Readonly<{ code: number; reason: string }>> = []
 
     return {
@@ -54,11 +55,14 @@ function createSocket(connectOptions: ConnectOptions, reports: unknown[]): Captu
         },
         close(options) {
             closed.push(options)
+            closeListener()
         },
         onOpen(listener) {
             listener()
         },
-        onClose() {},
+        onClose(listener) {
+            closeListener = listener
+        },
         onError() {},
         onMessage(listener) {
             messageListener = listener
@@ -254,7 +258,7 @@ test('ignores unrelated events and stops stale-build source without interpreting
 })
 
 test('stops the socket after interpreter failure and requests a complete build', async (context) => {
-    context.mock.method(console, 'warn', () => {})
+    const warn = context.mock.method(console, 'warn', () => {})
     const { reports, runtime, sockets } = await createTestHarness()
     registerInitialBoundary(runtime, () => {})
 
@@ -275,9 +279,12 @@ test('stops the socket after interpreter failure and requests a complete build',
     assert.deepEqual(reports, [{ buildId: 'build', kind: 'rebuild', reason: 'broken program' }])
     assert.deepEqual(runtime.loadExports('page'), { value: 'old' })
     assert.deepEqual(socket.closed, [{ code: 1000, reason: 'patch application stopped' }])
+    assert.equal(warn.mock.callCount(), 1)
+    assert.match(String(warn.mock.calls[0]?.arguments[0]), /patch batch failed/)
 })
 
-test('retains one socket and closes it when the host rotates builds', async () => {
+test('retains one socket and quietly closes it when the host rotates builds', async (context) => {
+    const warn = context.mock.method(console, 'warn', () => {})
     const { sockets } = await createTestHarness()
     const socket = sockets[0]
     assert.ok(socket)
@@ -285,4 +292,5 @@ test('retains one socket and closes it when the host rotates builds', async () =
     socket.emitControl({ kind: 'close', reason: 'build replaced' })
     assert.deepEqual(socket.closed, [{ code: 1000, reason: 'build replaced' }])
     assert.equal(sockets.length, 1)
+    assert.equal(warn.mock.callCount(), 0)
 })

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { ElementType } from 'react'
 import { DevRuntime } from 'rolldown/experimental/runtime'
-import { runtimeReportEvent } from '../../hmr-protocol.ts'
+import { runtimeControlEvent, runtimeReportEvent } from '../../hmr-protocol.ts'
 import type { MiniSocketTask } from '../../mini-hmr-runtime.ts'
 
 type TestHotContext = Readonly<{
@@ -179,8 +179,8 @@ test('startup announces the build without executing or queuing pre-OPEN Page pat
 })
 
 test('reports patch failure before closing the socket and stops subsequent installation', async (context) => {
-    context.mock.method(console, 'warn', () => {})
-    const { runtime, reports, closed } = await createTestHarness()
+    const warn = context.mock.method(console, 'warn', () => {})
+    const { runtime, reports, closed, closeSocket, failSocket } = await createTestHarness()
     runtime.applyPatches({
         buildId: 'build',
         patches: [
@@ -208,16 +208,68 @@ test('reports patch failure before closing the socket and stops subsequent insta
     runtime.applyPatches(laterPayload)
     assert.deepEqual(reports, [{ buildId: 'build', kind: 'rebuild', reason: 'broken factory' }])
     assert.deepEqual(closed, [{ code: 1000, reason: 'patch application stopped' }])
+    assert.equal(warn.mock.callCount(), 1)
+    assert.match(String(warn.mock.calls[0]?.arguments[0]), /patch batch failed/)
+
+    // Native lifecycle notifications must not add a disconnect warning after the patch failure was already reported.
+    failSocket()
+    closeSocket()
+    assert.equal(warn.mock.callCount(), 1)
 })
 
-for (const event of ['closeSocket', 'failSocket'] as const) {
-    test(`does not send reports after native ${event}`, async () => {
-        const harness = await createTestHarness()
-        harness[event]()
-        harness.runtime.applyPatches({ buildId: 'build', patches: [{ seq: 1, changedIds: [], factory() {} }] })
-        assert.deepEqual(harness.reports, [])
-    })
+for (const state of ['connecting', 'open'] as const) {
+    for (const event of ['closeSocket', 'failSocket'] as const) {
+        test(`warns once and stops reports after native ${event} while ${state}`, async (context) => {
+            const warn = context.mock.method(console, 'warn', () => {})
+            const harness = state === 'connecting' ? await createConnectingTestHarness() : await createTestHarness()
+            assert.equal(warn.mock.callCount(), 0)
+
+            harness[event]()
+            assert.equal(warn.mock.callCount(), 1)
+            assert.deepEqual(warn.mock.calls[0]?.arguments, [
+                '[vpt] HMR disconnected. Ensure the Vite dev server is running, then reload the Mini Program in DevTools.'
+            ])
+
+            // Platforms may emit both error and close for one failed connection; neither order should repeat the warning.
+            harness.failSocket()
+            harness.closeSocket()
+            harness.runtime.applyPatches({
+                buildId: 'build',
+                patches: [
+                    {
+                        seq: 1,
+                        changedIds: [],
+                        factory() {
+                            assert.fail('A disconnected runtime must not install patches')
+                        }
+                    }
+                ]
+            })
+            assert.equal(warn.mock.callCount(), 1)
+            assert.deepEqual(harness.reports, [])
+            assert.deepEqual(harness.closed, [])
+        })
+    }
 }
+
+test('host-requested shutdown stays quiet through delayed native error and close notifications', async (context) => {
+    const warn = context.mock.method(console, 'warn', () => {})
+    const { runtime, emitSocketMessage, closeSocket, failSocket, closed, reports } = await createTestHarness()
+    emitSocketMessage(
+        JSON.stringify({
+            type: 'custom',
+            event: runtimeControlEvent,
+            data: { kind: 'close', reason: 'build replaced' }
+        })
+    )
+    failSocket()
+    closeSocket()
+    runtime.stopSocket('build replaced')
+
+    assert.equal(warn.mock.callCount(), 0)
+    assert.deepEqual(closed, [{ code: 1000, reason: 'build replaced' }])
+    assert.deepEqual(reports, [])
+})
 
 async function importTestRuntime(): Promise<TestRuntime> {
     runtimeId++
