@@ -68,6 +68,99 @@ test('coalesces a quiet HMR window without losing callback order', () => {
     stream.complete()
 })
 
+test('empty and Noop-only callbacks neither schedule nor publish work', () => {
+    const { failures, publications, scheduler, stream } = createProbe()
+    stream.next({ updates: [], changedFiles: ['/src/empty.ts'] })
+    stream.next({
+        updates: [
+            { clientId: 'client', update: { type: 'Noop' } },
+            { clientId: 'other-client', update: { type: 'Noop' } }
+        ],
+        changedFiles: ['/src/noop.ts']
+    })
+
+    scheduler.flush()
+    stream.complete()
+
+    assert.equal(scheduler.frame, 0)
+    assert.deepEqual(publications, [])
+    assert.deepEqual(failures, [])
+})
+
+test('publishes every patch at the last meaningful deadline despite repeated Noop callbacks', () => {
+    const { failures, publications, scheduler, stream } = createProbe()
+    const first = result(1, ['/src/a.ts'])
+    const second = result(2, ['/src/b.ts'])
+    stream.next(first)
+    scheduler.schedule(() => stream.next(second), 8)
+    for (const frame of [16, 24, 32, 48, 64]) {
+        scheduler.schedule(
+            () =>
+                stream.next({
+                    updates: [{ clientId: 'client', update: { type: 'Noop' } }],
+                    changedFiles: ['/src/noop.ts']
+                }),
+            frame
+        )
+    }
+
+    // Advance the virtual clock around the last real callback's deadline, then drain later no-ops separately.
+    scheduler.maxFrames = 8 + settleMilliseconds - 1
+    scheduler.flush()
+    assert.deepEqual(publications, [])
+    scheduler.maxFrames++
+    scheduler.flush()
+    assert.equal(scheduler.frame, 8 + settleMilliseconds)
+    assert.deepEqual(publications, [
+        { updates: [...first.updates, ...second.updates], changedFiles: ['/src/a.ts', '/src/b.ts'] }
+    ])
+
+    scheduler.maxFrames = Infinity
+    scheduler.flush()
+    stream.complete()
+    assert.equal(publications.length, 1)
+    assert.deepEqual(failures, [])
+})
+
+test('preserves mixed callbacks containing patches, Noops, and full reloads unchanged', () => {
+    const { publications, scheduler, stream } = createProbe()
+    const mixed: HmrUpdates = {
+        updates: [
+            { clientId: 'client', update: { type: 'Noop' } },
+            { clientId: 'client', update: patch(1) }
+        ],
+        changedFiles: ['/src/a.ts']
+    }
+    const reload: HmrUpdates = {
+        updates: [{ clientId: 'client', update: { type: 'FullReload' } }],
+        changedFiles: ['/src/app.config.ts']
+    }
+    stream.next(mixed)
+    scheduler.flush()
+    stream.next(reload)
+    scheduler.flush()
+    stream.complete()
+
+    assert.deepEqual(publications, [mixed, reload])
+})
+
+test('Noop callbacks do not postpone a pending diagnostic', () => {
+    const { failures, publications, scheduler, stream } = createProbe()
+    const failure = new Error('broken update')
+    stream.next(failure)
+    scheduler.schedule(
+        () => stream.next({ updates: [{ clientId: 'client', update: { type: 'Noop' } }], changedFiles: [] }),
+        8
+    )
+
+    // Stop exactly at the error's original deadline to prove no-ops leave diagnostic admission unchanged.
+    scheduler.maxFrames = settleMilliseconds
+    scheduler.flush()
+    assert.deepEqual(failures, [failure])
+    assert.deepEqual(publications, [])
+    stream.complete()
+})
+
 test('keeps edits outside the quiet window as separate publications', () => {
     // Advancing beyond the exact settle duration proves ordinary paced saves preserve separate interactive transactions.
     const { publications, scheduler, stream } = createProbe()

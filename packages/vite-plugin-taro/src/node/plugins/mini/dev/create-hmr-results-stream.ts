@@ -8,10 +8,13 @@ type HmrUpdates = Exclude<HmrUpdatesResult, Error>
  * Adapts Rolldown's non-awaited HMR callback into lossless quiet-window publications.
  *
  * Debouncing the result stream itself would retain only the final callback and lose incremental patch factories that later
- * patches provably do not reproduce. Instead, the debounced view is only a closing notifier for `buffer`: every callback is
- * retained in arrival order, and one configured quiet period emits the complete window to the host's existing serialized
+ * patches provably do not reproduce. Instead, the debounced view is only a closing notifier for `buffer`: admitted callbacks
+ * are retained in arrival order, and one configured quiet period emits the complete window to the host's existing serialized
  * writer. This first stream migration deliberately does not own physical state; `publish` and `reportError` remain synchronous
  * admission callbacks so the dev host can enqueue both through its single writer.
+ *
+ * Empty and Noop-only callbacks are excluded from both the buffer and its closing notifier, so they cannot delay meaningful
+ * work or enqueue empty publications. Mixed callbacks remain intact; the host still owns per-update selection.
  *
  * DevEngine failures are values, not Observable errors. They represent transient editor generations and carry no executable
  * patch, so the stream reports the final error but otherwise removes them. Successful callbacks on either side remain ordered
@@ -28,17 +31,21 @@ export function createHmrResultsStream(
     reportError: (error: Error) => void
 ): Subject<HmrUpdatesResult> {
     /*
-     * This hot Subject is the sole mutable boundary between Rolldown's non-awaited callback and RxJS. Each next preserves one
-     * compiler generation by reference and in arrival order. buffer owns the temporary lossless window; debounceTime observes the
-     * same Subject only to decide when that window closes. Replacing this with a debounced scalar would discard patch factories,
+     * This hot Subject is the sole mutable boundary between Rolldown's non-awaited callback and RxJS. Admitted generations are
+     * preserved by reference and in arrival order. buffer owns the temporary lossless window; debounceTime observes the same
+     * filtered stream to decide when that window closes. Replacing this with a debounced scalar would discard patch factories,
      * while letting callback Promises mutate host state directly would overlap publications. Completion flushes the final window
      * before shutdown, after which the Subject is never reused.
      */
     const results = new Subject<HmrUpdatesResult>()
 
-    results
+    const meaningfulResults = results.pipe(
+        filter((result) => result instanceof Error || result.updates.some(({ update }) => update.type !== 'Noop'))
+    )
+
+    meaningfulResults
         .pipe(
-            buffer(results.pipe(debounceTime(settleMilliseconds, scheduler))),
+            buffer(meaningfulResults.pipe(debounceTime(settleMilliseconds, scheduler))),
             filter((window) => window.length > 0)
         )
         .subscribe((window) => {
@@ -67,5 +74,6 @@ export function createHmrResultsStream(
                 })
             }
         })
+
     return results
 }
