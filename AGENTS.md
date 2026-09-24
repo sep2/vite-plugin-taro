@@ -39,6 +39,7 @@ Under `packages/`:
 Under `demo/`:
 
 - `loan-genius`: sample app for `wx`, `zfb`, `tt`, and `h5`.
+- `react-tabs-demo`: real tab routes with a shared React bottom bar for `wx`, `zfb`, `tt`, and `h5`.
 - `native-comp-demo`: native custom-component fixture for `wx`, `zfb`, and `tt`.
 - `polyfill-demo`: opt-in core-js runtime checks for `wx`, `zfb`, and `tt`.
 - `hmr-stress-demo`: deep React tree HMR fixture for `wx` and `zfb`; automated IDE harness is WX-only.
@@ -54,7 +55,7 @@ See root `package.json` for all scripts.
 - Build or develop an app: `pnpm build:<app>:<target>` / `pnpm dev:<app>:<target>`; supported targets are listed above. Dev commands enable hot reload.
 - Typecheck: `pnpm typecheck:plugin` or `pnpm typecheck:<app>`.
 - HMR stress edits: `pnpm stress:hmr-stress-demo` (paced) or `pnpm stress:hmr-stress-demo:burst` (rapid).
-- H5 preview: `pnpm preview:loan-genius:h5`.
+- H5 preview: `pnpm preview:loan-genius:h5` or `pnpm preview:react-tabs-demo:h5`.
 - Biome: `pnpm lint` (check) / `pnpm format` (safe fixes).
 - Release notes: `pnpm changeset`; preview with `pnpm changeset status`.
 - Prepare release files: `pnpm release` (Changesets versioning, lockfile refresh, formatting only). Review, commit, and push `main` to publish in CI; never publish locally or create release tags manually.

@@ -27,6 +27,7 @@ pnpm build:plugin
 | `packages/create-vite-taro` | 项目生成器及默认模板 |
 | `packages/taro-runtime` | 从固定版本 Taro 开发依赖构建的统一运行时、React 与平台适配包 |
 | `demo/loan-genius` | 微信、支付宝、抖音与 Web 综合示例 |
+| `demo/react-tabs-demo` | 微信、支付宝、抖音与 Web 的真实 tab 页面与共享 React 底栏示例 |
 | `demo/native-comp-demo` | 微信、支付宝与抖音原生组件示例 |
 | `demo/hmr-stress-demo` | 微信与支付宝深层 React 树及页面栈 HMR 压力测试项目；暂不包含抖音目标 |
 | `demo/towxml-stream-demo` | 微信 Towxml 原生组件与流式渲染示例 |
@@ -52,6 +53,12 @@ pnpm build:loan-genius:wx
 pnpm build:loan-genius:zfb
 pnpm build:loan-genius:tt
 pnpm build:loan-genius:h5
+
+pnpm typecheck:react-tabs-demo
+pnpm build:react-tabs-demo:wx
+pnpm build:react-tabs-demo:zfb
+pnpm build:react-tabs-demo:tt
+pnpm build:react-tabs-demo:h5
 
 pnpm typecheck:native-comp-demo
 pnpm build:native-comp-demo:wx
@@ -84,6 +91,10 @@ pnpm dev:loan-genius:wx
 pnpm dev:loan-genius:zfb
 pnpm dev:loan-genius:tt
 pnpm dev:loan-genius:h5
+pnpm dev:react-tabs-demo:wx
+pnpm dev:react-tabs-demo:zfb
+pnpm dev:react-tabs-demo:tt
+pnpm dev:react-tabs-demo:h5
 pnpm dev:native-comp-demo:wx
 pnpm dev:native-comp-demo:zfb
 pnpm dev:native-comp-demo:tt

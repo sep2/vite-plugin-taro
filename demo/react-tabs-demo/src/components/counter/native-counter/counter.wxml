@@ -1,0 +1,24 @@
+<view class="native-counter">
+    <text class="native-counter__title">SHARED COUNTER</text>
+    <view class="native-counter__control">
+        <button
+            aria-label="Decrease counter"
+            class="native-counter__button native-counter__button--decrement"
+            hover-class="native-counter__button--pressed"
+            bindtap="decrement"
+        >
+            <text>−</text>
+        </button>
+        <view class="native-counter__value">
+            <text>{{ count }}</text>
+        </view>
+        <button
+            aria-label="Increase counter"
+            class="native-counter__button native-counter__button--increment"
+            hover-class="native-counter__button--pressed"
+            bindtap="increment"
+        >
+            <text>+</text>
+        </button>
+    </view>
+</view>

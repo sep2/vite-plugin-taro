@@ -1,0 +1,26 @@
+import Taro from 'virtual:taro/api'
+import { BotanicalSprig } from '../../../components/botanical-sprig/botanical-sprig.tsx'
+
+export default function ApiCard() {
+    return (
+        <div className="relative mt-8 flex flex-col overflow-hidden rounded-3xl bg-primary p-7 text-white sm:flex-row sm:items-center sm:justify-between sm:p-9">
+            <BotanicalSprig placement="cta" />
+            <div className="relative z-10 flex max-w-lg flex-col">
+                <span className="text-xs font-bold tracking-widest text-on-primary-accent">TARO API READY</span>
+                <span className="brand-serif mt-2 block text-3xl font-semibold text-white">
+                    Make this starter yours.
+                </span>
+                <span className="mt-3 block text-sm leading-6 text-on-primary-muted">
+                    Add pages, connect your data and ship the same experience to WeChat and H5.
+                </span>
+            </div>
+            <button
+                type="button"
+                className="relative z-10 mt-6 flex items-center justify-center self-start rounded-full border-none bg-action px-6 py-3 text-sm font-bold text-action-foreground after:content-none sm:mt-0"
+                onClick={() => Taro.showToast({ title: 'Hello from VPT!' })}
+            >
+                Try a Taro toast →
+            </button>
+        </div>
+    )
+}
