@@ -219,7 +219,12 @@ export class MiniHmrRuntime extends DevRuntime {
             return undefined
         }
 
-        const importers = this.getImporters(moduleId).filter((importer) => this.isExecuted(importer))
+        // A Page wrapper can import itself in Rolldown's graph. That edge makes no progress toward an accepting boundary;
+        // excluding it preserves real multi-module cycle detection below without rejecting an otherwise valid Page update.
+        const importers = this.getImporters(moduleId).filter(
+            (importer) => importer !== moduleId && this.isExecuted(importer)
+        )
+
         if (importers.length === 0) {
             return `no HMR boundary found for module ${moduleId}`
         }

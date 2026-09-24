@@ -1221,6 +1221,49 @@ test('requests a rebuild before eviction when any propagated module lacks a fres
     assert.doesNotMatch(JSON.stringify(newReports), /"kind":"applied"/)
 })
 
+test('ignores a Page self-import while propagating to its accepting boundary', async () => {
+    const { reports, runtime } = await createTestHarness()
+    const graph = {
+        ids: ['dependency', 'page'],
+        localCount: 2,
+        edges: [[], [0, 1]],
+        dynamicEdges: [[], []]
+    }
+    runtime.registerGraph(graph)
+    runtime.registerModule('dependency', { exports: { value: 'old' } })
+    runtime.registerModule('page', { exports: { value: 'page:old' } })
+    let acceptedExports: unknown
+    runtime.createModuleHotContext('page').accept((fresh: unknown) => {
+        acceptedExports = fresh
+    })
+    const reportCount = reports.length
+
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            {
+                seq: 1,
+                changedIds: ['dependency'],
+                factory(): void {
+                    runtime.registerGraph(graph)
+                    runtime.registerFactory('dependency', 'esm', (id) => {
+                        runtime.registerModule(id, { exports: { value: 'new' } })
+                    })
+                    runtime.registerFactory('page', 'esm', (id) => {
+                        const dependency = runtime.initModule('dependency')
+                        runtime.registerModule(id, { exports: { value: `page:${readValue(dependency)}` } })
+                        runtime.createModuleHotContext(id).accept()
+                    })
+                }
+            }
+        ]
+    })
+
+    assert.deepEqual(acceptedExports, { value: 'page:new' })
+    assertApplied(getNewReports(reports, reportCount), 1)
+    assertNoRebuild(getNewReports(reports, reportCount))
+})
+
 test('requests a rebuild for circular propagation without an accepting boundary', async (context) => {
     context.mock.method(console, 'warn', () => {})
     const { reports, runtime } = await createTestHarness()
