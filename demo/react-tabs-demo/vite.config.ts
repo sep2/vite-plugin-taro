@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
 
     return {
         // Native slot filenames are platform-defined; copy only the active target's empty stub.
-        publicDir: target === 'wx' || target === 'zfb' ? fromRoot('native-tab-bar-stubs', target) : false,
+        publicDir: target === 'wx' || target === 'zfb' ? fromRoot(`${target}-public`) : false,
         build: {
             outDir: fromRoot('dist', target)
         },

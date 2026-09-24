@@ -1,7 +1,7 @@
 import { ScrollView, Text, View } from 'virtual:taro/components'
 import { lazy, Suspense, useState } from 'react'
+import { useTabPage } from '../../components/app-tab-bar/tab-page.ts'
 import { BotanicalSprig } from '../../components/botanical-sprig/botanical-sprig.tsx'
-import { useTabPage } from '../../components/bottom-tabs/tab-page.ts'
 import { Counter } from '../../components/counter/counter.tsx'
 import { NavigationBar } from '../../components/navigation-bar/navigation-bar.tsx'
 import { tabPages } from '../../tab-pages.ts'

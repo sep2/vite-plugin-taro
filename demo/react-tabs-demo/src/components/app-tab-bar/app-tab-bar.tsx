@@ -9,7 +9,7 @@ function currentPagePath(): string | undefined {
     return Taro.getCurrentPages?.().at(-1)?.route?.replace(/^\//, '')
 }
 
-export default function BottomTabs() {
+export default function AppTabBar() {
     // The App bar stays mounted across tab routes; page onShow catches route changes after navigation.
     const [activePath, setActivePath] = useState(() => currentPagePath() ?? tabPages[0].path)
 

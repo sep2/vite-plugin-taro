@@ -1,5 +1,5 @@
 import { ScrollView, Text, View } from 'virtual:taro/components'
-import { useTabPage } from '../../components/bottom-tabs/tab-page.ts'
+import { useTabPage } from '../../components/app-tab-bar/tab-page.ts'
 import { NavigationBar } from '../../components/navigation-bar/navigation-bar.tsx'
 import { tabPages } from '../../tab-pages.ts'
 
