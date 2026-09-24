@@ -44,10 +44,10 @@ type HostAction =
     | Readonly<{ kind: 'listening' }>
 
 /**
- * One frame-sized trailing edge folds an editor burst into one style/delivery transaction. The upstream result stream retains
- * every Rolldown payload in order, so settling reduces redundant physical writes without dropping factories or sequence numbers.
+ * One frame-sized window folds an editor burst into one style/delivery transaction without waiting for edits to stop.
+ * The result stream retains every Rolldown payload in order, so batching never drops factories or sequence numbers.
  */
-const hmrSettleMilliseconds = 16
+const hmrBatchMilliseconds = 16
 
 /**
  * Creates the Mini Program dev host: the adapter that owns the physical Rolldown DevEngine and selected update mode effects.
@@ -91,7 +91,7 @@ export async function createMiniDevHost({
     const engine: DevEngine = await createEngine()
 
     const hmrResults = createHmrResultsStream(
-        hmrSettleMilliseconds,
+        hmrBatchMilliseconds,
         asyncScheduler,
         (result) => {
             // One reduced window becomes one host transaction: style preparation, one cumulative mode publication, then ordered

@@ -1,17 +1,16 @@
 import type { DevOptions } from 'rolldown/experimental'
-import { buffer, debounceTime, filter, type SchedulerLike, Subject } from 'rxjs'
+import { auditTime, buffer, filter, type SchedulerLike, Subject } from 'rxjs'
 
 type HmrUpdatesResult = Parameters<NonNullable<DevOptions['onHmrUpdates']>>[0]
 type HmrUpdates = Exclude<HmrUpdatesResult, Error>
 
 /**
- * Adapts Rolldown's non-awaited HMR callback into lossless quiet-window publications.
+ * Adapts Rolldown's non-awaited HMR callback into lossless fixed-duration batch publications.
  *
- * Debouncing the result stream itself would retain only the final callback and lose incremental patch factories that later
- * patches provably do not reproduce. Instead, the debounced view is only a closing notifier for `buffer`: admitted callbacks
- * are retained in arrival order, and one configured quiet period emits the complete window to the host's existing serialized
- * writer. This first stream migration deliberately does not own physical state; `publish` and `reportError` remain synchronous
- * admission callbacks so the dev host can enqueue both through its single writer.
+ * Applying auditTime to the result stream itself would retain only the final callback and lose incremental patch factories
+ * that later patches do not reproduce. Instead, it only closes `buffer`: the first meaningful callback starts one timed window,
+ * and later callbacks join without postponing its deadline. No timer runs while idle. `publish` and `reportError` remain
+ * synchronous admission callbacks so the dev host can enqueue both through its existing serialized writer.
  *
  * Empty and Noop-only callbacks are excluded from both the buffer and its closing notifier, so they cannot delay meaningful
  * work or enqueue empty publications. Mixed callbacks remain intact; the host still owns per-update selection.
@@ -22,18 +21,18 @@ type HmrUpdates = Exclude<HmrUpdatesResult, Error>
  * Completing the returned Subject flushes its current buffer synchronously, allowing host shutdown to await the resulting
  * serialized task rather than silently dropping an admitted patch.
  *
- * Complexity is O(updates + changed files) per emitted window, with one retained reference per callback until the quiet edge.
+ * Complexity is O(updates + changed files) per emitted window, with one retained reference per callback until its closing edge.
  */
 export function createHmrResultsStream(
-    settleMilliseconds: number,
+    batchMilliseconds: number,
     scheduler: SchedulerLike,
     publish: (result: HmrUpdates) => void,
     reportError: (error: Error) => void
 ): Subject<HmrUpdatesResult> {
     /*
      * This hot Subject is the sole mutable boundary between Rolldown's non-awaited callback and RxJS. Admitted generations are
-     * preserved by reference and in arrival order. buffer owns the temporary lossless window; debounceTime observes the same
-     * filtered stream to decide when that window closes. Replacing this with a debounced scalar would discard patch factories,
+     * preserved by reference and in arrival order. buffer owns the temporary lossless window; auditTime observes the same
+     * filtered stream only to close it on time. Applying auditTime without buffering would discard patch factories,
      * while letting callback Promises mutate host state directly would overlap publications. Completion flushes the final window
      * before shutdown, after which the Subject is never reused.
      */
@@ -45,13 +44,13 @@ export function createHmrResultsStream(
 
     meaningfulResults
         .pipe(
-            buffer(meaningfulResults.pipe(debounceTime(settleMilliseconds, scheduler))),
+            buffer(meaningfulResults.pipe(auditTime(batchMilliseconds, scheduler))),
             filter((window) => window.length > 0)
         )
         .subscribe((window) => {
             /*
              * An Error is one source generation that produced no executable delta; it does not invalidate successful Rolldown
-             * callbacks already admitted on either side of it. Dropping the whole quiet window would therefore discard real
+             * callbacks already admitted on either side of it. Dropping the whole window would therefore discard real
              * patch factories, while starting a complete build would compile the same known-invalid editor contents. Keep the
              * old runtime running, report only the latest diagnostic from a repeated parser burst, and continue below with the
              * successful callback values exactly as if the temporary invalid save had never produced an HMR payload.

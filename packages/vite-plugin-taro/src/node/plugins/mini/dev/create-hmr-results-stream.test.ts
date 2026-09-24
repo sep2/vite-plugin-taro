@@ -8,7 +8,7 @@ import type { PatchUpdate } from './hmr-protocol.ts'
 type HmrUpdatesResult = Parameters<NonNullable<DevOptions['onHmrUpdates']>>[0]
 type HmrUpdates = Exclude<HmrUpdatesResult, Error>
 
-const settleMilliseconds = 32
+const batchMilliseconds = 16
 
 function patch(seq: number): PatchUpdate {
     return {
@@ -30,29 +30,32 @@ function result(seq: number, changedFiles: string[]): HmrUpdates {
 function createProbe(): Readonly<{
     failures: Error[]
     publications: HmrUpdates[]
+    publicationFrames: number[]
     scheduler: VirtualTimeScheduler
     stream: ReturnType<typeof createHmrResultsStream>
 }> {
     // These mutable journals expose stream effects after deterministic virtual-time scheduling.
     const publications: HmrUpdates[] = []
+    const publicationFrames: number[] = []
     const failures: Error[] = []
     const scheduler = new VirtualTimeScheduler()
     const stream = createHmrResultsStream(
-        settleMilliseconds,
+        batchMilliseconds,
         scheduler,
         (update) => {
             publications.push(update)
+            publicationFrames.push(scheduler.frame)
         },
         (error) => {
             failures.push(error)
         }
     )
-    return { failures: failures, publications: publications, scheduler: scheduler, stream: stream }
+    return { failures, publications, publicationFrames, scheduler, stream }
 }
 
-test('coalesces a quiet HMR window without losing callback order', () => {
-    // Eight virtual milliseconds stays within the 32 ms trailing edge; callback arrays are concatenated without interpretation.
-    const { failures, publications, scheduler, stream } = createProbe()
+test('coalesces a 16 ms HMR window without losing callback order', () => {
+    // The second callback joins the first window without postponing its original deadline.
+    const { failures, publications, publicationFrames, scheduler, stream } = createProbe()
     stream.next(result(1, ['/src/a.ts']))
     scheduler.schedule(() => stream.next(result(2, ['/src/a.ts', '/src/b.ts'])), 8)
 
@@ -63,6 +66,8 @@ test('coalesces a quiet HMR window without losing callback order', () => {
         [1, 2]
     )
     assert.deepEqual(publications[0]?.changedFiles, ['/src/a.ts', '/src/a.ts', '/src/b.ts'])
+    assert.deepEqual(publicationFrames, [batchMilliseconds])
+    assert.equal(scheduler.frame, batchMilliseconds)
     assert.equal(publications.length, 1)
     assert.deepEqual(failures, [])
     stream.complete()
@@ -87,13 +92,13 @@ test('empty and Noop-only callbacks neither schedule nor publish work', () => {
     assert.deepEqual(failures, [])
 })
 
-test('publishes every patch at the last meaningful deadline despite repeated Noop callbacks', () => {
+test('publishes every patch at the first meaningful deadline despite repeated Noop callbacks', () => {
     const { failures, publications, scheduler, stream } = createProbe()
     const first = result(1, ['/src/a.ts'])
     const second = result(2, ['/src/b.ts'])
     stream.next(first)
     scheduler.schedule(() => stream.next(second), 8)
-    for (const frame of [16, 24, 32, 48, 64]) {
+    for (const frame of [4, 12, 20, 28, 36]) {
         scheduler.schedule(
             () =>
                 stream.next({
@@ -104,13 +109,13 @@ test('publishes every patch at the last meaningful deadline despite repeated Noo
         )
     }
 
-    // Advance the virtual clock around the last real callback's deadline, then drain later no-ops separately.
-    scheduler.maxFrames = 8 + settleMilliseconds - 1
+    // Advance the virtual clock around the first real callback's deadline, then drain later no-ops separately.
+    scheduler.maxFrames = batchMilliseconds - 1
     scheduler.flush()
     assert.deepEqual(publications, [])
     scheduler.maxFrames++
     scheduler.flush()
-    assert.equal(scheduler.frame, 8 + settleMilliseconds)
+    assert.equal(scheduler.frame, batchMilliseconds)
     assert.deepEqual(publications, [
         { updates: [...first.updates, ...second.updates], changedFiles: ['/src/a.ts', '/src/b.ts'] }
     ])
@@ -154,18 +159,18 @@ test('Noop callbacks do not postpone a pending diagnostic', () => {
     )
 
     // Stop exactly at the error's original deadline to prove no-ops leave diagnostic admission unchanged.
-    scheduler.maxFrames = settleMilliseconds
+    scheduler.maxFrames = batchMilliseconds
     scheduler.flush()
     assert.deepEqual(failures, [failure])
     assert.deepEqual(publications, [])
     stream.complete()
 })
 
-test('keeps edits outside the quiet window as separate publications', () => {
-    // Advancing beyond the exact settle duration proves ordinary paced saves preserve separate interactive transactions.
-    const { publications, scheduler, stream } = createProbe()
+test('starts a fresh 16 ms window after an idle gap', () => {
+    // The next callback starts its own deadline rather than inheriting an idle periodic timer.
+    const { publications, publicationFrames, scheduler, stream } = createProbe()
     scheduler.schedule(() => stream.next(result(1, ['/src/a.ts'])), 0)
-    scheduler.schedule(() => stream.next(result(2, ['/src/b.ts'])), settleMilliseconds + 8)
+    scheduler.schedule(() => stream.next(result(2, ['/src/b.ts'])), batchMilliseconds + 8)
 
     scheduler.flush()
 
@@ -175,7 +180,78 @@ test('keeps edits outside the quiet window as separate publications', () => {
         ),
         [[1], [2]]
     )
+    assert.deepEqual(publicationFrames, [batchMilliseconds, 2 * batchMilliseconds + 8])
+    assert.equal(scheduler.frame, 2 * batchMilliseconds + 8)
     stream.complete()
+})
+
+test('flushes sustained traffic in 16 ms windows without losing or reordering patches', () => {
+    const { failures, publications, publicationFrames, scheduler, stream } = createProbe()
+    const updates = Array.from({ length: 18 }, (_, index) => result(index + 1, [`/src/module-${index}.ts`]))
+    updates.forEach((update, index) => {
+        scheduler.schedule(() => stream.next(update), index * 10)
+    })
+
+    scheduler.flush()
+    stream.complete()
+
+    // Each pair arrives 10 ms apart; later callbacks cannot move the deadline set by the first callback of each pair.
+    assert.deepEqual(
+        publicationFrames,
+        Array.from({ length: 9 }, (_, index) => index * 20 + batchMilliseconds)
+    )
+    assert.deepEqual(
+        publications.map(({ updates }) => updates.length),
+        Array.from({ length: 9 }, () => 2)
+    )
+    assert.deepEqual(
+        publications.flatMap(({ updates }) => updates),
+        updates.flatMap(({ updates }) => updates)
+    )
+    assert.deepEqual(
+        publications.flatMap(({ changedFiles }) => changedFiles),
+        updates.flatMap(({ changedFiles }) => changedFiles)
+    )
+    assert.equal(scheduler.frame, 160 + batchMilliseconds)
+    assert.deepEqual(failures, [])
+})
+
+test('reports the latest error at 16 ms during a continuous parser burst', () => {
+    const { failures, publications, scheduler, stream } = createProbe()
+    const errors = Array.from({ length: 7 }, (_, index) => new Error(`invalid generation ${index}`))
+    errors.forEach((error, index) => {
+        scheduler.schedule(() => stream.next(error), index * 2)
+    })
+
+    // Inspect both sides of the deadline, then drain the scheduler to prove no timer remains while idle.
+    scheduler.maxFrames = batchMilliseconds - 1
+    scheduler.flush()
+    assert.deepEqual(failures, [])
+    scheduler.maxFrames = batchMilliseconds
+    scheduler.flush()
+    assert.deepEqual(failures, [errors.at(-1)])
+    assert.deepEqual(publications, [])
+    scheduler.maxFrames = Infinity
+    scheduler.flush()
+    assert.equal(scheduler.frame, batchMilliseconds)
+    stream.complete()
+})
+
+test('flushes a pending window immediately on shutdown after an earlier timed publication', () => {
+    const { publications, publicationFrames, scheduler, stream } = createProbe()
+    for (const [index, frame] of [0, 4, 8, 12, 20].entries()) {
+        scheduler.schedule(() => stream.next(result(index + 1, [])), frame)
+    }
+    scheduler.schedule(() => stream.complete(), 24)
+
+    scheduler.flush()
+
+    assert.deepEqual(publicationFrames, [batchMilliseconds, 24])
+    assert.deepEqual(
+        publications.map(({ updates }) => updates.map(({ update }) => update.type === 'Patch' && update.seq)),
+        [[1, 2, 3, 4], [5]]
+    )
+    assert.equal(scheduler.frame, 24)
 })
 
 test('ignores an error-only editor generation and accepts the next healthy update', () => {
