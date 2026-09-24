@@ -16,7 +16,7 @@ import { hmrInfoFileName, renderDevelopmentAppStyle, renderHmrInfo, writeDevelop
 import type { MiniHmrAction, MiniHmrMode } from './hmr-mode.ts'
 import { type HmrInfo, hmrEndpointPath, type PatchUpdate } from './hmr-protocol.ts'
 import { createHostActions } from './host-actions.ts'
-import { type BundledDev, installMiniDevOptions, requireSingleOutput } from './mini-dev-options.ts'
+import { type BundledDev, createMiniDevOptionsPlugin, requireSingleOutput } from './mini-dev-options.ts'
 import { PatchJournal } from './patch-journal.ts'
 
 declare module 'vite' {
@@ -86,8 +86,6 @@ export async function createMiniDevHost({
         hostActions.next({ kind: 'report', report: report })
     })
 
-    // Option installation configures only Rolldown. Build lifecycle results enter through the engine's output action below.
-    installMiniDevOptions({ bundledDev: bundledDev, server: server, contract: contract, hmrMode: hmrMode })
     const engine: DevEngine = await createEngine()
 
     const hmrResults = createHmrResultsStream(
@@ -289,27 +287,36 @@ export async function createMiniDevHost({
         const rolldownOptions = await bundledDev.getRolldownOptions()
         const output = requireSingleOutput(rolldownOptions)
 
-        return dev(rolldownOptions, output, {
-            // Rebuild mode omits patch results because Rolldown writes complete output itself after every update.
-            onHmrUpdates:
-                hmrMode.rebuildStrategy === 'on-failure'
-                    ? (result: HmrUpdatesResult) => {
-                          hmrResults.next(result)
-                      }
-                    : undefined,
-            // Initial and later complete builds share one admission path; startup merely observes the first OutputAction.
-            onOutput: (result: DevOutputResult) => {
-                hostActions.next({ kind: 'output', result: result })
+        // Append a public options hook without changing Vite's factory or retained plugin list. Keep the same output object:
+        // the hook configures Rolldown only; build lifecycle results enter through the engine's output action below.
+        return dev(
+            {
+                ...rolldownOptions,
+                plugins: [rolldownOptions.plugins, createMiniDevOptionsPlugin({ server, contract, hmrMode })]
             },
-            rebuildStrategy: hmrMode.rebuildStrategy === 'always' ? 'always' : 'never',
-            watch: {
-                // Normalize platform filesystem notifications before compilation. In particular, a single Windows full-file
-                // save can emit separate truncate and write events. Rolldown's debounce folds those physical events into one
-                // logical source generation; the RxJS result stream still preserves every callback emitted after compilation.
-                skipWrite: false,
-                useDebounce: true
+            output,
+            {
+                // Rebuild mode omits patch results because Rolldown writes complete output itself after every update.
+                onHmrUpdates:
+                    hmrMode.rebuildStrategy === 'on-failure'
+                        ? (result: HmrUpdatesResult) => {
+                              hmrResults.next(result)
+                          }
+                        : undefined,
+                // Initial and later complete builds share one admission path; startup merely observes the first OutputAction.
+                onOutput: (result: DevOutputResult) => {
+                    hostActions.next({ kind: 'output', result: result })
+                },
+                rebuildStrategy: hmrMode.rebuildStrategy === 'always' ? 'always' : 'never',
+                watch: {
+                    // Normalize platform filesystem notifications before compilation. In particular, a single Windows full-file
+                    // save can emit separate truncate and write events. Rolldown's debounce folds those physical events into one
+                    // logical source generation; the RxJS result stream still preserves every callback emitted after compilation.
+                    skipWrite: false,
+                    useDebounce: true
+                }
             }
-        })
+        )
     }
 
     /** Centralizes the one diagnostic and DevEngine command used by every rebuild authority. */

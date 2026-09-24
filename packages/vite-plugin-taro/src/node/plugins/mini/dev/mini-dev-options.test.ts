@@ -8,6 +8,7 @@ import {
     type Plugin,
     type PreRenderedChunk,
     type RenderedChunk,
+    type RolldownOptions,
     type RolldownOutput
 } from 'rolldown'
 import { dev } from 'rolldown/experimental'
@@ -16,7 +17,7 @@ import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
 import { createZfbMiniContract } from '../../zfb/plugins.ts'
 import type { MiniContract, RuntimeModulesContract } from '../mini-contract.ts'
-import { type BundledDev, installMiniDevOptions, requireSingleOutput } from './mini-dev-options.ts'
+import { createMiniDevOptionsPlugin, requireSingleOutput } from './mini-dev-options.ts'
 import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
 import { createInterpreterHmrMode } from './modes/interpreter/interpreter-hmr-mode.ts'
 
@@ -140,30 +141,20 @@ test('adapts physical wx development output without changing configured filename
         name: 'builtin:vite-transform',
         _options: { transformOptions: viteTransformOptions }
     }
-    const bundledDev: BundledDev = {
-        async getRolldownOptions() {
-            return {
-                output: generatedOutput,
-                plugins: [[{ name: 'fixture:existing-plugin' }], viteTransformPlugin],
-                experimental: {
-                    devMode: {
-                        host: '127.0.0.1',
-                        port: 4321,
-                        implement: 'previous runtime',
-                        lazy: true,
-                        skipCommonRuntimeInjection: false
-                    }
-                }
+    const plugin = createMiniDevOptionsPlugin({ server, contract: options, hmrMode })
+    const adaptedOptions = await plugin.options({
+        output: generatedOutput,
+        plugins: [[{ name: 'fixture:existing-plugin' }], viteTransformPlugin],
+        experimental: {
+            devMode: {
+                host: '127.0.0.1',
+                port: 4321,
+                implement: 'previous runtime',
+                lazy: true,
+                skipCommonRuntimeInjection: false
             }
-        },
-        async listen() {},
-        async triggerBundleRegenerationIfStale() {
-            return true
         }
-    }
-
-    installMiniDevOptions({ bundledDev: bundledDev, server: server, contract: options, hmrMode: hmrMode })
-    const adaptedOptions = await bundledDev.getRolldownOptions()
+    })
     const output = requireSingleOutput(adaptedOptions)
     const devMode = adaptedOptions.experimental?.devMode
 
@@ -233,25 +224,35 @@ test('executes generated development code with a bundled runtime and no ambient 
             return sources.get(id)
         }
     }
-    const bundledDev: BundledDev = {
-        async getRolldownOptions() {
-            return { input: entryId, plugins: [sourcePlugin] }
-        },
-        async listen() {},
-        async triggerBundleRegenerationIfStale() {
-            return true
-        }
+    // The hook must adapt the same output object already passed to DevEngine, before native options are normalized.
+    const output: OutputOptions = {}
+    const rolldownOptions: RolldownOptions = {
+        input: entryId,
+        output,
+        plugins: [
+            sourcePlugin,
+            createMiniDevOptionsPlugin({ server, contract: options, hmrMode }),
+            {
+                name: 'test:runtime-output',
+                options(input) {
+                    assert.equal(output.format, 'es')
+                    assert.equal(output.minify, true)
+                    assert.equal(output.keepNames, true)
+                    assert.equal(output.sourcemap, false)
+                    // Stand in for Mini's late CommonJS conversion so the generated runtime can execute in an isolated VM.
+                    output.format = 'cjs'
+                    // Exercise the adapted runtime/output with virtual sources only. The native reporter writes directly to stdout,
+                    // which can corrupt node:test's serialized worker protocol; presentation is not part of runtime execution.
+                    return { ...input, plugins: [sourcePlugin] }
+                }
+            }
+        ]
     }
-    installMiniDevOptions({ bundledDev, server, contract: options, hmrMode })
-    const adapted = await bundledDev.getRolldownOptions()
     const outputReady = Promise.withResolvers<Error | RolldownOutput>()
-    const engine = await dev(
-        // Exercise the adapted runtime/output with virtual sources only. The native reporter writes directly to stdout,
-        // which can corrupt node:test's serialized worker protocol; presentation is not part of runtime execution.
-        { ...adapted, plugins: [sourcePlugin] },
-        { ...requireSingleOutput(adapted), format: 'cjs' },
-        { watch: { enabled: false, skipWrite: true }, onOutput: outputReady.resolve }
-    )
+    const engine = await dev(rolldownOptions, output, {
+        watch: { enabled: false, skipWrite: true },
+        onOutput: outputReady.resolve
+    })
     context.after(() => engine.close())
     await engine.run()
     await engine.ensureCurrentBuildFinish()
@@ -277,17 +278,8 @@ test('executes generated development code with a bundled runtime and no ambient 
 
 test('minified development keeps HOC component names compatible with React Refresh', async (context) => {
     const server = await createOptionsServer(context, {})
-    const bundledDev: BundledDev = {
-        async getRolldownOptions() {
-            return { output: {} }
-        },
-        async listen() {},
-        async triggerBundleRegenerationIfStale() {
-            return true
-        }
-    }
-    installMiniDevOptions({ bundledDev, server, contract: options, hmrMode })
-    const output = requireSingleOutput(await bundledDev.getRolldownOptions())
+    const plugin = createMiniDevOptionsPlugin({ server, contract: options, hmrMode })
+    const output = requireSingleOutput(await plugin.options({ output: {} }))
     assert.equal(output.minify, true)
     const refreshRuntimePath = path.join(
         path.dirname(packageRequire.resolve('@vitejs/plugin-react')),
@@ -365,23 +357,12 @@ for (const [target, createContract] of [
                 projectConfigJson: {}
             })
             const server = await createOptionsServer(context, {})
-            const bundledDev: BundledDev = {
-                async getRolldownOptions() {
-                    return {}
-                },
-                async listen() {},
-                async triggerBundleRegenerationIfStale() {
-                    return true
-                }
-            }
-
-            installMiniDevOptions({
-                bundledDev: bundledDev,
-                server: server,
-                contract: contract,
+            const plugin = createMiniDevOptionsPlugin({
+                server,
+                contract,
                 hmrMode: createMode(contract.runtime.modules)
             })
-            const adapted = await bundledDev.getRolldownOptions()
+            const adapted = await plugin.options({})
             const devMode = adapted.experimental?.devMode
             const output = requireSingleOutput(adapted)
 
@@ -412,21 +393,11 @@ test('leaves naming unspecified when Vite has no configured output', async (cont
         }
     })
     const server = await createOptionsServer(context, {})
-    const bundledDev: BundledDev = {
-        async getRolldownOptions() {
-            return {
-                plugins: [false],
-                experimental: { devMode: true }
-            }
-        },
-        async listen() {},
-        async triggerBundleRegenerationIfStale() {
-            return true
-        }
-    }
-
-    installMiniDevOptions({ bundledDev: bundledDev, server: server, contract: options, hmrMode: hmrMode })
-    const adapted = await bundledDev.getRolldownOptions()
+    const plugin = createMiniDevOptionsPlugin({ server, contract: options, hmrMode })
+    const adapted = await plugin.options({
+        plugins: [false],
+        experimental: { devMode: true }
+    })
     const output = requireSingleOutput(adapted)
 
     assert.equal(output.assetFileNames, undefined)
@@ -448,43 +419,13 @@ test('rejects missing and multiple generated outputs before creating a developme
 test('rejects output arrays from both Vite configuration and generated Rolldown options', async (context) => {
     const server = await createOptionsServer(context, { rolldownOptions: { output: [{}, {}] } })
 
-    const configuredArrayBundledDev: BundledDev = {
-        async getRolldownOptions() {
-            return { output: {} }
-        },
-        async listen() {},
-        async triggerBundleRegenerationIfStale() {
-            return true
-        }
-    }
-    installMiniDevOptions({
-        bundledDev: configuredArrayBundledDev,
-        server: server,
-        contract: options,
-        hmrMode: hmrMode
-    })
+    const plugin = createMiniDevOptionsPlugin({ server, contract: options, hmrMode })
     await assert.rejects(
-        () => configuredArrayBundledDev.getRolldownOptions(),
+        () => plugin.options({ output: {} }),
         /Mini Program development supports one configured Rolldown output/
     )
-
-    const generatedArrayBundledDev: BundledDev = {
-        async getRolldownOptions() {
-            return { output: [{}, {}] }
-        },
-        async listen() {},
-        async triggerBundleRegenerationIfStale() {
-            return true
-        }
-    }
-    installMiniDevOptions({
-        bundledDev: generatedArrayBundledDev,
-        server: server,
-        contract: options,
-        hmrMode: hmrMode
-    })
     await assert.rejects(
-        () => generatedArrayBundledDev.getRolldownOptions(),
+        () => plugin.options({ output: [{}, {}] }),
         /Mini Program development requires one configured Rolldown output/
     )
 })

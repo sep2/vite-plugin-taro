@@ -160,6 +160,18 @@ async function startDevFixture(
                 vpt(options),
                 {
                     name: 'test:capsule-layout',
+                    configureServer(server) {
+                        // Capture before Mini's post-ordered host installation, then check again after every configure hook.
+                        const bundledDev = requireBundledDev(server.environments.client.bundledDev)
+                        const original = bundledDev.getRolldownOptions
+                        return () => {
+                            assert.equal(
+                                bundledDev.getRolldownOptions,
+                                original,
+                                'Vite must retain its options factory'
+                            )
+                        }
+                    },
                     generateBundle: {
                         order: 'post',
                         handler(_output, bundle) {
