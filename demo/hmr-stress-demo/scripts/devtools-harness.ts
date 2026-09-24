@@ -64,15 +64,17 @@ const fixtureRoot = path.dirname(scriptsRoot)
 const repositoryRoot = path.resolve(fixtureRoot, '../..')
 const commandTimeoutMilliseconds = 12_000
 const requestedCase = process.argv[2] ?? 'all'
-// Restart includes a second process startup and native App reload; the aggregate suite includes that extra case.
+// Cold-page runs two isolated App generations; restart includes a second process startup and native App reload.
 const testBudgetMilliseconds =
     requestedCase === 'port-swap'
         ? 120_000
         : requestedCase === 'all'
-          ? 120_000
-          : process.env.VPT_HMR_SETUP === '1' || requestedCase === 'restart'
-            ? 60_000
-            : 30_000
+          ? 150_000
+          : requestedCase === 'cold-page'
+            ? 90_000
+            : process.env.VPT_HMR_SETUP === '1' || requestedCase === 'restart'
+              ? 60_000
+              : 30_000
 const testDeadline = Date.now() + testBudgetMilliseconds
 // Keep both this client name and the temporary project path fixed. WeChat DevTools persists trust by identity/path; random temp
 // directories or per-run clients would force a new authorization prompt and make standalone cases slower and interactive.

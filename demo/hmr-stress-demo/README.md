@@ -26,13 +26,15 @@ pnpm test:hmr-stress-demo:interpreter
 pnpm setup:hmr-stress-demo:devtools
 ```
 
-Setup and the restart case may each use up to 60 seconds; the aggregate suite and two-project port-swap case each have a 120-second deadline. Other standalone cases have a 30-second deadline. Each invocation attaches to the newly built output itself; a prior setup invocation is not required. The complete suite runs the never-mounted shared-component case, strict burst, rebuild storm, syntax recovery, and server restart cases. Runtime assertions replace fixed settle sleeps, including observing the restoration marker before publishing and awaiting the baseline. Plugin rebuilding is opt-in.
+Setup and the restart case may each use up to 60 seconds; `cold-page` has a 90-second deadline, the aggregate suite 150 seconds, and two-project port-swap 120 seconds. Other standalone cases have a 30-second deadline. Each invocation attaches to the newly built output itself; a prior setup invocation is not required. The complete suite runs both cold-page checks, strict burst, rebuild storm, syntax recovery, and server restart cases. Runtime assertions replace fixed settle sleeps, including observing the restoration marker before publishing and awaiting the baseline. Plugin rebuilding is opt-in.
+
+The `cold-page` command first edits a shared component before the mirror Page is mounted, then restarts the disposable Vite project to give the mirror-only edit an independent, never-mounted App generation. The second check currently fails: the patch contains the edited mirror title, but the first mirror mount shows the old title. Because `all` includes this check, it also fails until the bug is fixed.
 
 Individual cases can be run independently:
 
 ```bash
 pnpm stress:hmr-stress-demo:burst         # 30 edits at 8 ms
-pnpm test:hmr-stress-demo:cold-page       # edit shared code before the secondary Page is first mounted
+pnpm test:hmr-stress-demo:cold-page       # shared edit, then isolated mirror-only edit (currently fails)
 pnpm test:hmr-stress-demo:rebuild         # mixed ACK/rebuild report storms
 pnpm test:hmr-stress-demo:recovery        # syntax failures and passive HMR recovery
 pnpm test:hmr-stress-demo:restart         # real Vite process restart, then rendered HMR updates
@@ -52,7 +54,7 @@ node --test demo/hmr-stress-demo/scripts/create-process-scope.test.ts
 
 The complete suite checks:
 
-1. a shared component edited while only the primary Page is mounted renders its latest generation when the mirror Page is first opened;
+1. a shared component edited while only the primary Page is mounted renders its latest generation when the mirror Page is first opened; after a fresh App build, an edit belonging only to the unmounted mirror Page must also render on its first mount (currently fails);
 2. burst patch publication through both the deep App view and Pages, with primary and hidden mirror state retention;
 3. unique Page-slot routing while keyed deep App branches repeatedly reorder, marker restoration, and valid two-Page navigation stacks;
 4. duplicate and out-of-order ACK conflation under rebuild-report storms;
