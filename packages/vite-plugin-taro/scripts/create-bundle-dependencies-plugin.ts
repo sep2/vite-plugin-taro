@@ -19,6 +19,15 @@ export function createBundleDependenciesPlugin(packageRoot: string): Plugin {
 
     return {
         name: 'vpt:bundle-dependencies',
+        options(options) {
+            return {
+                ...options,
+                // The dependency eagerly creates an unused default handler with Autoprefixer enabled. Its factory owns only
+                // local caches and plugins, so discard unused calls while retaining VPT's configured, consumed handler.
+                // This plugin owns compiler-build specialization; application builds never receive this purity declaration.
+                treeshake: { manualPureFunctions: ['createStyleHandler'] }
+            }
+        },
         resolveId(id) {
             if (id === 'rxjs') {
                 return rxjsEntry

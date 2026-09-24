@@ -795,8 +795,12 @@ test('regenerates native transport routes when a complete rebuild adds or remove
     )
     assert.match(added, /require\.async\("\.\.\/\.\.\/sub\/p_[a-f0-9]{8}\/common\/lazy-feature\.js"\)/)
     assert.doesNotMatch(added, /registerModule|case ["']common\/vpt\/transport\.js/)
-    // The transport is an intermediate output, not a completed build. Wait for the host's final marker before the next edit.
+    // The transport is intermediate output. Await both host publication and engine completion: onOutput admits the host's
+    // asynchronous writes before the native build has finished. This test changes routes between builds, not during a build.
     await waitForFile(fixture.appStylePath, (source) => source !== initialAppStyle, maximumWaitAttempts)
+    const engine = fixture.bundledDev._devEngine
+    assert.ok(engine)
+    await engine.ensureCurrentBuildFinish()
 
     await publishSourceGeneration(fixture.pagePath, renderPage('removed lazy route'))
     const removed = await waitForFile(

@@ -6,6 +6,7 @@ import type { ViteDevServer } from 'vite'
 import { memoize } from '../../../utils/memoize.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import type { MiniHmrMode } from './hmr-mode.ts'
+import { replaceViteTransformPlugin } from './replace-vite-transform-plugin.ts'
 
 export type BundledDev = {
     _devEngine?: DevEngine
@@ -101,8 +102,10 @@ export function installMiniDevOptions({
          * an ordered composite rather than pushing into Vite's potentially shared nested array; the reporter observes final output
          * without mutating Vite's retained input list.
          */
-        rolldownOptions.plugins = [rolldownOptions.plugins, createViteReporter(server)]
-        disableViteOxcSourcemap(rolldownOptions.plugins)
+        rolldownOptions.plugins = [
+            await replaceViteTransformPlugin(rolldownOptions.plugins, server.environments.client.config),
+            createViteReporter(server)
+        ]
 
         return rolldownOptions
     }
@@ -125,29 +128,6 @@ function ensureSingleOutput(rolldownOptions: RolldownOptions): OutputOptions {
     // Rolldown needs the created object attached to input options by identity; returning a detached fallback would be ignored.
     rolldownOptions.output ??= {}
     return rolldownOptions.output
-}
-
-type ViteTransformPlugin = {
-    _options?: { transformOptions?: { sourcemap?: boolean } }
-    name?: string
-}
-
-function disableViteOxcSourcemap(pluginOption: unknown): void {
-    if (Array.isArray(pluginOption)) {
-        pluginOption.forEach(disableViteOxcSourcemap)
-        return
-    }
-    if (!pluginOption || typeof pluginOption !== 'object') return
-
-    const plugin = pluginOption as ViteTransformPlugin
-    if (plugin.name === 'builtin:vite-transform' && plugin._options?.transformOptions) {
-        /*
-         * Vite's private builtin retains this mutable transform options object and does not expose a public replacement hook.
-         * Updating its one sourcemap flag prevents Oxc from allocating maps that final native output always discards; cloning the
-         * descriptor would not update the builtin closure that reads the original object during transforms.
-         */
-        plugin._options.transformOptions.sourcemap = false
-    }
 }
 
 function createViteReporter(server: ViteDevServer) {

@@ -68,6 +68,18 @@ test('maps HTML selectors without another reset or changing native view selector
     assert.doesNotMatch(css, /\.h5-view/)
 })
 
+test('retains native prefix exceptions without adding browser prefixes', async () => {
+    const css = await createMiniTransformer().transformStylesheet(`
+        .clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2 }
+        .unprefixed { user-select: none; appearance: none }
+    `)
+    assert.match(css, /display:\s*-webkit-box/)
+    assert.match(css, /-webkit-box-orient:\s*vertical/)
+    assert.match(css, /-webkit-line-clamp:\s*2/)
+    assert.match(css, /\.unprefixed\s*\{\s*user-select:\s*none;\s*appearance:\s*none\s*\}/)
+    assert.doesNotMatch(css, /-(?:webkit|moz|ms)-(?:appearance|user-select)/)
+})
+
 test('rewrites only generated Tailwind classes in strings and template elements', () => {
     const transformer = createMiniTransformer()
     const code = [

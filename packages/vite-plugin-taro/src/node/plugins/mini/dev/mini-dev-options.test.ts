@@ -2,7 +2,14 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import test, { type TestContext } from 'node:test'
 import { runInNewContext } from 'node:vm'
-import { build, type OutputOptions, type PreRenderedChunk, type RenderedChunk, type RolldownOutput } from 'rolldown'
+import {
+    build,
+    type OutputOptions,
+    type Plugin,
+    type PreRenderedChunk,
+    type RenderedChunk,
+    type RolldownOutput
+} from 'rolldown'
 import { dev } from 'rolldown/experimental'
 import { type BuildOptions, createLogger, createServer } from 'vite'
 import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
@@ -179,7 +186,7 @@ test('adapts physical wx development output without changing configured filename
         entryFileNames: '[name]-[hash]',
         keepNames: false
     })
-    assert.equal(viteTransformOptions.sourcemap, false)
+    assert.equal(viteTransformOptions.sourcemap, true, 'Replacing the native transform must not mutate Vite ownership')
 
     assert.ok(devMode && typeof devMode === 'object')
     assert.equal(devMode.host, '127.0.0.1')
@@ -215,24 +222,20 @@ test('executes generated development code with a bundled runtime and no ambient 
         ],
         [commonJsId, 'module.exports = 42;']
     ])
+    const sourcePlugin: Plugin = {
+        name: 'test:runtime-entry',
+        resolveId(id) {
+            if (sources.has(id)) {
+                return id
+            }
+        },
+        load(id) {
+            return sources.get(id)
+        }
+    }
     const bundledDev: BundledDev = {
         async getRolldownOptions() {
-            return {
-                input: entryId,
-                plugins: [
-                    {
-                        name: 'test:runtime-entry',
-                        resolveId(id) {
-                            if (sources.has(id)) {
-                                return id
-                            }
-                        },
-                        load(id) {
-                            return sources.get(id)
-                        }
-                    }
-                ]
-            }
+            return { input: entryId, plugins: [sourcePlugin] }
         },
         async listen() {},
         async triggerBundleRegenerationIfStale() {
@@ -243,7 +246,9 @@ test('executes generated development code with a bundled runtime and no ambient 
     const adapted = await bundledDev.getRolldownOptions()
     const outputReady = Promise.withResolvers<Error | RolldownOutput>()
     const engine = await dev(
-        adapted,
+        // Exercise the adapted runtime/output with virtual sources only. The native reporter writes directly to stdout,
+        // which can corrupt node:test's serialized worker protocol; presentation is not part of runtime execution.
+        { ...adapted, plugins: [sourcePlugin] },
         { ...requireSingleOutput(adapted), format: 'cjs' },
         { watch: { enabled: false, skipWrite: true }, onOutput: outputReady.resolve }
     )
