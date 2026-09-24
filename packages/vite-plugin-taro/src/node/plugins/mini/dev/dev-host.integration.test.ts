@@ -23,7 +23,9 @@ import type { BundledDev } from './mini-dev-options.ts'
 import { createDevtoolsHmrMode, devtoolsPatchesFileName } from './modes/devtools/devtools-hmr-mode.ts'
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
-const maximumWaitAttempts = 400
+// Instrumented DevEngine rebuilds can exceed the previous 10-second polling limit under the full coverage suite.
+// Observations still require the actual published file, rather than sleeping for a fixed settle period.
+const maximumWaitAttempts = 1_200
 const stableReadCount = 10
 const waitIntervalMilliseconds = 25
 const pageCapsuleFileName = 'pages/home/index-capsule.js'

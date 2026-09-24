@@ -689,7 +689,8 @@ for (const target of miniTargets) {
 
 /** The dev host publishes metadata asynchronously, after bundle capture, and replaces patch files atomically. */
 async function waitForPatchSource(fileName: string, marker: string): Promise<string> {
-    const deadline = Date.now() + 10_000
+    // C8 instrumentation stretches consecutive DevEngine patch builds; still fail if the requested marker never publishes.
+    const deadline = Date.now() + 30_000
     while (true) {
         assert.ok(Date.now() < deadline, `Timed out waiting for patch source containing ${marker}`)
         const source = await readFile(fileName, 'utf8').catch((error: unknown) => {

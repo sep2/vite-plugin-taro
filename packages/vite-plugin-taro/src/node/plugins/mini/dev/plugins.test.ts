@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { resolveConfig } from 'vite'
 import type { MiniContract, RuntimeModulesContract } from '../mini-contract.ts'
+import { pageComponentId } from '../module/module.ts'
 import { createMiniStylePlugin } from '../styles/plugins.ts'
 import { createMiniDevelopmentPlugin, isMiniClientEnvironment, removeDevelopmentAppStyle } from './plugins.ts'
 
@@ -99,6 +100,36 @@ test('does not inject Page HMR into a build run in development mode', async () =
         'build'
     )
     assert.ok(!config.plugins.some((plugin) => plugin.name === 'vpt:mini-page-capsule-hmr'))
+})
+
+test('reports a Page capsule whose component cannot be resolved', async () => {
+    const config = await resolveConfig(
+        {
+            configFile: false,
+            plugins: createMiniDevelopmentPlugin(contract, createMiniStylePlugin(contract, [import.meta.filename]))
+        },
+        'serve'
+    )
+    const plugin = config.plugins.find((candidate) => candidate.name === 'vpt:mini-page-capsule-hmr')
+    assert.ok(plugin)
+    const transform = plugin.transform
+    assert.ok(transform && typeof transform === 'object')
+
+    const capsuleId = '/runtime/page-capsule.ts?route=pages%2Fhome%2Findex'
+    await assert.rejects(
+        Reflect.apply(
+            transform.handler,
+            {
+                resolve: async (id: string, importer: string) => {
+                    assert.equal(id, pageComponentId)
+                    assert.equal(importer, capsuleId)
+                    return null
+                }
+            },
+            ['createPageConfig(PageComponent)', capsuleId]
+        ),
+        /Failed to resolve Page component imported by/
+    )
 })
 
 test('transfers the App style entry from complete output to the development host', () => {
