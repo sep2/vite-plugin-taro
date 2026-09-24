@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { ElementType } from 'react'
-import { DevRuntime } from 'rolldown/experimental/runtime'
+import type { DevRuntime } from 'rolldown/experimental/runtime'
 import { runtimeControlEvent, runtimeReportEvent } from '../../hmr-protocol.ts'
 import type { MiniSocketTask } from '../../mini-hmr-runtime.ts'
 
@@ -94,7 +94,6 @@ async function createConnectingTestHarness(): Promise<TestHarness> {
         }
     }
     Object.assign(globalThis, {
-        DevRuntime,
         wx: {
             connectSocket(): MiniSocketTask {
                 return socket
@@ -593,7 +592,6 @@ test('fails invariant-only hot operations with local diagnostics', async () => {
 
 test('rejects reports before initialization', async () => {
     Object.assign(globalThis, {
-        DevRuntime,
         wx: {
             connectSocket(): never {
                 assert.fail('An uninitialized runtime must not open a socket')

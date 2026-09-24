@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { RUNTIME_MODULE_ID } from 'rolldown'
 import { normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { packageRequire } from '../../../utils/packages.ts'
@@ -8,7 +9,7 @@ import type { RuntimeModulesContract } from '../mini-contract.ts'
 export const miniRuntimeId = packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini')
 
 /** Identifies Rolldown's generated helper module independently of its unstable output filename. */
-export const rolldownRuntimeId = '\0rolldown/runtime.js'
+export const rolldownRuntimeId = RUNTIME_MODULE_ID
 
 /** Identifies the virtual binding shared by native files, SystemJS capsules and HMR factories. */
 export const vptGlobalBindingId = '\0vpt:global-binding'

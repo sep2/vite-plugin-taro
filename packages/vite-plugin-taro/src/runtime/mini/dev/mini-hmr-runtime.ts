@@ -1,6 +1,6 @@
 /*
  * Shared Mini Program HMR runtime, bundled into the mode-selected entry and injected into Rolldown's generated runtime chunk.
- * Rolldown provides the lexical `DevRuntime` base class; this file extends that registry instead of duplicating module loading.
+ * The exported Rolldown `DevRuntime` is bundled with this adapter instead of relying on an implicitly injected base class.
  *
  * Concrete modes decide how executable registrations arrive—native project JavaScript or interpreted source—and provide only a
  * synchronous installer. This class owns the invariant that installation, graph propagation, cache eviction, boundary execution,
@@ -8,7 +8,7 @@
  */
 
 import type { ElementType } from 'react'
-import type { DevRuntime as RolldownDevRuntime } from 'rolldown/experimental/runtime-types'
+import { DevRuntime } from 'rolldown/experimental/runtime'
 import {
     type HmrInfo,
     type RuntimeControlMessage,
@@ -17,9 +17,6 @@ import {
     runtimeReportEvent
 } from './hmr-protocol.ts'
 import { polyfillQueueMicrotask } from './polyfill/polyfill-queue-microtask.ts'
-
-/** Lexical base class injected into the runtime chunk by Rolldown; typed via the contract. */
-declare const DevRuntime: new (clientId: string) => RolldownDevRuntime
 
 /** HMR identity for one running App; only the committed application frontier mutates. */
 type HmrSession = {

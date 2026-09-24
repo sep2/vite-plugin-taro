@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { DevRuntime } from 'rolldown/experimental/runtime'
+import type { DevRuntime } from 'rolldown/experimental/runtime'
 
 type TestPage = {
     data: Record<string, unknown>
@@ -41,7 +41,6 @@ async function createTestHarness(): Promise<TestHarness> {
     customWrapperCache.clear()
     Reflect.set(globalThis, customWrapperCacheKey, customWrapperCache)
     Object.assign(globalThis, {
-        DevRuntime,
         wx: {
             request(options: { success: () => void }): void {
                 options.success()

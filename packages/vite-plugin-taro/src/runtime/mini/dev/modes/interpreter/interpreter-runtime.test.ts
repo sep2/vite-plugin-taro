@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { DevRuntime } from 'rolldown/experimental/runtime'
+import type { DevRuntime } from 'rolldown/experimental/runtime'
 import { type RuntimeControlMessage, runtimeControlEvent, runtimeReportEvent } from '../../hmr-protocol.ts'
 import type { MiniSocketTask } from '../../mini-hmr-runtime.ts'
 import { type InterpreterServerMessage, interpreterServerEvent } from './interpreter-protocol.ts'
@@ -88,7 +88,6 @@ async function createTestHarness(): Promise<TestHarness> {
     const reports: unknown[] = []
     const sockets: CapturedSocket[] = []
     Object.assign(globalThis, {
-        DevRuntime,
         wx: {
             connectSocket(options: ConnectOptions): CapturedSocket {
                 const socket = createSocket(options, reports)

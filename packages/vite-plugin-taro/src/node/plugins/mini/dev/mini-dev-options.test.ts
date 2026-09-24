@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import test, { type TestContext } from 'node:test'
 import { runInNewContext } from 'node:vm'
-import { build, type OutputOptions, type PreRenderedChunk, type RenderedChunk } from 'rolldown'
-import { DevRuntime } from 'rolldown/experimental/runtime'
+import { build, type OutputOptions, type PreRenderedChunk, type RenderedChunk, type RolldownOutput } from 'rolldown'
+import { dev } from 'rolldown/experimental'
 import { type BuildOptions, createLogger, createServer } from 'vite'
 import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
@@ -96,9 +96,9 @@ function assertRuntimeWrapper(source: unknown): void {
     assert.match(source, /Reflect\.set\(globalThis,\s*['"`]__rolldown_runtime__['"`]/)
     assert.doesNotMatch(source, /Reflect\.(?:get|set)\((?:wx|my),/)
 
-    // Runtime installation may mutate only the supplied provider, never the VM's ambient global object.
+    // Installation may mutate only the supplied provider. No ambient DevRuntime is supplied: the bundle must own its base.
     const shared: Record<string, unknown> = {}
-    const context = { DevRuntime, __VPT_GLOBAL__: shared }
+    const context = { __VPT_GLOBAL__: shared }
     Object.defineProperty(context, 'globalThis', {
         get() {
             assert.fail('The HMR wrapper must not read ambient globalThis')
@@ -109,7 +109,10 @@ function assertRuntimeWrapper(source: unknown): void {
         contextCodeGeneration: { strings: false, wasm: false }
     })
     assert.strictEqual(runtime, shared.__rolldown_runtime__)
-    assert.ok(shared.__rolldown_runtime__ instanceof DevRuntime)
+    assert.ok(runtime !== null && typeof runtime === 'object')
+    for (const method of ['registerGraph', 'registerFactory', 'initModule', 'loadExports', 'removeModuleCache']) {
+        assert.equal(typeof Reflect.get(runtime, method), 'function')
+    }
     assert.equal(typeof shared.queueMicrotask, 'function')
     assert.equal(Reflect.has(context, '__rolldown_runtime__'), false)
 }
@@ -137,7 +140,11 @@ test('adapts physical wx development output without changing configured filename
                 plugins: [[{ name: 'fixture:existing-plugin' }], viteTransformPlugin],
                 experimental: {
                     devMode: {
-                        retainedFixtureOption: 'retained'
+                        host: '127.0.0.1',
+                        port: 4321,
+                        implement: 'previous runtime',
+                        lazy: true,
+                        skipCommonRuntimeInjection: false
                     }
                 }
             }
@@ -175,9 +182,10 @@ test('adapts physical wx development output without changing configured filename
     assert.equal(viteTransformOptions.sourcemap, false)
 
     assert.ok(devMode && typeof devMode === 'object')
-    assert.equal(devMode.retainedFixtureOption, 'retained')
+    assert.equal(devMode.host, '127.0.0.1')
+    assert.equal(devMode.port, 4321)
     assert.equal(devMode.lazy, false)
-    assert.equal(devMode.skipCommonRuntimeInjection, false)
+    assert.equal(devMode.skipCommonRuntimeInjection, true)
     assertRuntimeWrapper(devMode.implement)
 
     const banner = output.banner
@@ -194,6 +202,72 @@ test('adapts physical wx development output without changing configured filename
         "__rolldown_runtime__.applyPatches(require('../../hmr/patches.js'));\n"
     )
     assert.equal(await banner(createRenderedChunk('assets/vendor.js', 'assets/vendor.js')), '')
+})
+
+test('executes generated development code with a bundled runtime and no ambient base class', async (context) => {
+    const server = await createOptionsServer(context, {})
+    const entryId = '\0test:runtime-entry'
+    const commonJsId = '\0test:runtime-commonjs'
+    const sources = new Map([
+        [
+            entryId,
+            `import value from ${JSON.stringify(commonJsId)}; export const answer = value; import.meta.hot.accept();`
+        ],
+        [commonJsId, 'module.exports = 42;']
+    ])
+    const bundledDev: BundledDev = {
+        async getRolldownOptions() {
+            return {
+                input: entryId,
+                plugins: [
+                    {
+                        name: 'test:runtime-entry',
+                        resolveId(id) {
+                            if (sources.has(id)) {
+                                return id
+                            }
+                        },
+                        load(id) {
+                            return sources.get(id)
+                        }
+                    }
+                ]
+            }
+        },
+        async listen() {},
+        async triggerBundleRegenerationIfStale() {
+            return true
+        }
+    }
+    installMiniDevOptions({ bundledDev, server, contract: options, hmrMode })
+    const adapted = await bundledDev.getRolldownOptions()
+    const outputReady = Promise.withResolvers<Error | RolldownOutput>()
+    const engine = await dev(
+        adapted,
+        { ...requireSingleOutput(adapted), format: 'cjs' },
+        { watch: { enabled: false, skipWrite: true }, onOutput: outputReady.resolve }
+    )
+    context.after(() => engine.close())
+    await engine.run()
+    await engine.ensureCurrentBuildFinish()
+    const result = await outputReady.promise
+    if (result instanceof Error) {
+        throw result
+    }
+    const chunk = result.output[0]
+    assert.ok(chunk?.type === 'chunk')
+
+    // VM execution owns these two isolated namespaces. The local cell matches Mini's late runtime binding without injecting a base class.
+    const exports: Record<string, unknown> = {}
+    const shared: Record<string, unknown> = {}
+    runInNewContext(
+        `let __rolldown_runtime__;\n${chunk.code}`,
+        { exports, __VPT_GLOBAL__: shared },
+        {
+            contextCodeGeneration: { strings: false, wasm: false }
+        }
+    )
+    assert.equal(exports.answer, 42)
 })
 
 test('minified development keeps HOC component names compatible with React Refresh', async (context) => {
@@ -357,7 +431,7 @@ test('leaves naming unspecified when Vite has no configured output', async (cont
         implement:
             typeof adapted.experimental?.devMode === 'object' ? adapted.experimental.devMode.implement : undefined,
         lazy: false,
-        skipCommonRuntimeInjection: false
+        skipCommonRuntimeInjection: true
     })
 })
 

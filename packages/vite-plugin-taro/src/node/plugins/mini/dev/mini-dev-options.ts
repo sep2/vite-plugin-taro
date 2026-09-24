@@ -1,5 +1,5 @@
 import path from 'node:path'
-import type { InputOptions, OutputOptions } from 'rolldown'
+import type { OutputOptions, RolldownOptions } from 'rolldown'
 import { build } from 'rolldown'
 import { type DevEngine, viteReporterPlugin } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
@@ -7,17 +7,9 @@ import { memoize } from '../../../utils/memoize.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import type { MiniHmrMode } from './hmr-mode.ts'
 
-type BundledDevRolldownOptions = InputOptions & {
-    experimental?: {
-        [key: string]: unknown
-        devMode?: boolean | Record<string, unknown>
-    }
-    output?: OutputOptions | OutputOptions[]
-}
-
 export type BundledDev = {
     _devEngine?: DevEngine
-    getRolldownOptions(): Promise<BundledDevRolldownOptions>
+    getRolldownOptions(): Promise<RolldownOptions>
     listen(): Promise<void>
     triggerBundleRegenerationIfStale(): Promise<boolean>
 }
@@ -90,7 +82,7 @@ export function installMiniDevOptions({
         rolldownOptions.experimental ??= {}
         const existingDevMode = rolldownOptions.experimental.devMode
         rolldownOptions.experimental.devMode = {
-            // Retain unknown user/forward-compatible devMode fields while the three explicit Mini invariants below win.
+            // Retain configured devMode fields while the three explicit Mini invariants below win.
             ...(typeof existingDevMode === 'object' ? existingDevMode : {}),
             // Bundle the selected adapter and pass the shared provider into its lexical globalThis wrapper at startup.
             // This needs neither the application's virtual binding nor its HMR registry. Patch adapters initialize delivery
@@ -99,9 +91,9 @@ export function installMiniDevOptions({
             // Produce a complete output graph on the initial build. Lazy per-request compilation cannot establish the closed
             // App/Page graph, native companions, style sidecars, and build identity required before any patch is admitted.
             lazy: false,
-            // Keep Rolldown's common runtime injection because generated application factories call its module registry and
-            // HMR primitives. Skipping it would leave the custom implementation without the runtime surface it extends.
-            skipCommonRuntimeInjection: false
+            // The adapter imports and bundles Rolldown's exported DevRuntime, including its module registry and helpers.
+            // Disable the deprecated automatic injection so there is only one base runtime implementation.
+            skipCommonRuntimeInjection: true
         }
 
         /*
@@ -117,7 +109,7 @@ export function installMiniDevOptions({
 }
 
 /** Returns the configured output after rejecting states unsupported by the physical Mini Program engine. */
-export function requireSingleOutput(rolldownOptions: BundledDevRolldownOptions): OutputOptions {
+export function requireSingleOutput(rolldownOptions: RolldownOptions): OutputOptions {
     if (!rolldownOptions.output || Array.isArray(rolldownOptions.output)) {
         throw new Error('Mini Program development requires exactly one Rolldown output.')
     }
@@ -126,7 +118,7 @@ export function requireSingleOutput(rolldownOptions: BundledDevRolldownOptions):
 }
 
 /** Creates the one missing output object while rejecting a configured output array. */
-function ensureSingleOutput(rolldownOptions: BundledDevRolldownOptions): OutputOptions {
+function ensureSingleOutput(rolldownOptions: RolldownOptions): OutputOptions {
     if (Array.isArray(rolldownOptions.output)) {
         throw new Error('Mini Program development requires one configured Rolldown output.')
     }
