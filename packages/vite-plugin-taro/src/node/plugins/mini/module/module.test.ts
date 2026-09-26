@@ -18,7 +18,7 @@ import {
     miniPageCapsuleId,
     miniPageShellId,
     miniPolyfillsId,
-    miniRuntimeId,
+    miniTaroRuntimeId,
     rolldownRuntimeId,
     vptGlobalBindingId
 } from './module.ts'
@@ -65,7 +65,7 @@ test('classifies standalone and grouped infrastructure as amphibious', () => {
 })
 
 test('framework vendor remains a normal capsule regardless of its output name', () => {
-    for (const moduleId of [miniRuntimeId, packageRequire.resolve('react'), packageRequire.resolve('react-dom')]) {
+    for (const moduleId of [miniTaroRuntimeId, packageRequire.resolve('react'), packageRequire.resolve('react-dom')]) {
         assert.equal(classifyModule({ ...chunk(moduleId), name: 'renamed-framework' }), 'normal-capsule')
     }
     assert.equal(classifyModule({ ...chunk('/repo/src/vendor.ts'), name: 'vendor' }), 'normal-capsule')
@@ -142,7 +142,7 @@ for (const layout of ['installed', 'linked'] as const) {
             assert.equal(fixtureModule.isMiniFrameworkVendorModule(`${packageRoot}-other/index.js`), false)
             assert.equal(fixtureModule.isMiniPolyfillModule(`${packageRoot}-other/index.js`), false)
         }
-        assert.equal(fixtureModule.miniRuntimeId, path.join(runtimeRoot, 'dist/runtime/index.js'))
+        assert.equal(fixtureModule.miniTaroRuntimeId, path.join(runtimeRoot, 'dist/runtime/index.js'))
         assert.equal(fixtureModule.isMiniFrameworkVendorModule(path.join(root, 'src/react.ts')), false)
     })
 }

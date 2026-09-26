@@ -6,7 +6,7 @@ import type { AstTransformResult } from '../../utils/transform.ts'
 import { createMiniDevelopmentPlugin } from './dev/plugins.ts'
 import { createMiniGlobalPlugin } from './global/create-mini-global-plugin.ts'
 import type { MiniContract } from './mini-contract.ts'
-import { classifyMiniModule, miniAppCapsuleId, miniPageCapsuleId, miniRuntimeId } from './module/module.ts'
+import { classifyMiniModule, miniAppCapsuleId, miniPageCapsuleId, miniTaroRuntimeId } from './module/module.ts'
 import { createMiniNativeComponentPlugin } from './native/create-mini-native-component-plugin.ts'
 import { createTransportOutput } from './output/create-transport-output.ts'
 import { createOutputFiles } from './output/files.ts'
@@ -62,7 +62,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                         },
                         {
                             find: /^@tarojs\/runtime$/,
-                            replacement: miniRuntimeId
+                            replacement: miniTaroRuntimeId
                         },
                         {
                             find: /^@tarojs\/api$/,

@@ -3,14 +3,14 @@ import { test } from 'node:test'
 import { runInNewContext } from 'node:vm'
 import { build } from 'rolldown'
 import { resolveTaroRuntime } from '../../utils/packages.ts'
-import { miniRuntimeId } from '../mini/module/module.ts'
+import { miniTaroRuntimeId } from '../mini/module/module.ts'
 import { createClientTaroPlugin } from './client-taro.ts'
 
 /** Bundles the real Mini facade, shared CommonJS backend, platform adapter, and React hooks. */
 async function bundleMiniApi(source: string, target: 'wx' | 'zfb' | 'tt'): Promise<string> {
     const platform = { wx: 'weapp', zfb: 'alipay', tt: 'tt' }[target]
     const aliases: ReadonlyMap<string, string> = new Map([
-        ['@tarojs/runtime', miniRuntimeId],
+        ['@tarojs/runtime', miniTaroRuntimeId],
         ['@tarojs/api', resolveTaroRuntime('api')]
     ])
     const result = await build({

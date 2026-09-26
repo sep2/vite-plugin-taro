@@ -29,7 +29,7 @@ export const miniPageShellId = resolveVptRuntime('mini/native/page')
 export const miniPageCapsuleId = resolveVptRuntime('mini/capsule/page')
 
 // Resolve from the plugin: pnpm consumers do not expose this transitive dependency to injected app imports.
-export const miniRuntimeId = resolveTaroRuntime('runtime/mini')
+export const miniTaroRuntimeId = resolveTaroRuntime('runtime/mini')
 
 /** Identifies Rolldown's generated helper module independently of its unstable output filename. */
 export const rolldownRuntimeId = RUNTIME_MODULE_ID
@@ -73,7 +73,7 @@ export type MiniChunkKind = 'native' | 'entry-capsule' | 'normal-capsule' | 'amp
 
 const frameworkPackageRoots = [
     // The exported Mini entry is <runtime package>/dist/runtime/index.js, regardless of where the package is installed or linked.
-    path.resolve(path.dirname(miniRuntimeId), '../..'),
+    path.resolve(path.dirname(miniTaroRuntimeId), '../..'),
     ...['react', 'react-dom'].map((name) => path.dirname(packageRequire.resolve(`${name}/package.json`)))
 ].map((root) => `${normalizePath(root)}/`)
 
