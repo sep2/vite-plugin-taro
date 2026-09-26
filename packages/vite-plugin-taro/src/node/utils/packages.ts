@@ -4,11 +4,14 @@ import { fileURLToPath } from 'node:url'
 import { normalizePath } from 'vite'
 
 export const packageRequire = createRequire(import.meta.url)
+
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
+
 const runtimeLocations = {
     '.ts': { root: 'src/runtime', extension: '.ts' },
     '.js': { root: 'dist/runtime', extension: '.js' }
 } as const
+
 const runtimeLocation = runtimeLocations[path.extname(fileURLToPath(import.meta.url)) as keyof typeof runtimeLocations]
 
 /** Resolves a file shipped by this package as a portable Vite module ID. */
