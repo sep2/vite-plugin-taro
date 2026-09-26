@@ -5,6 +5,7 @@ import type { Plugin } from 'vite'
 import type { VptJsonObject, VptTarget } from '../../../../options.ts'
 import { cleanOutputFiles } from '../../../utils/clean-output-files.ts'
 import { isMiniClientEnvironment } from '../dev/plugins.ts'
+import type { MiniContract } from '../mini-contract.ts'
 import { recursiveMerge } from '../skeleton/recursive-merge.ts'
 import { createJsonAsset } from '../skeleton/skeleton-utils.ts'
 
@@ -33,7 +34,10 @@ const projectConfigOverrides: Readonly<Record<VptTarget, Readonly<Record<string,
 }
 
 /** Preserves watched directories and forces full reloads for Mini Program watch output without changing serve HMR. */
-export function createMiniWatchPlugin(target: VptTarget): Plugin {
+export function createMiniWatchPlugin(contract: {
+    options: Pick<MiniContract['options'], 'target'>
+    output: Pick<MiniContract['output'], 'projectConfigFilename' | 'projectPrivateConfigFilename'>
+}): Plugin {
     // Rolldown also closes an unsuccessful result when its watcher shuts down, without passing an error.
     // Track that lifecycle boundary so shutdown cannot publish a false completion marker.
     let closed = false
@@ -58,8 +62,12 @@ export function createMiniWatchPlugin(target: VptTarget): Plugin {
             return { build: { emptyOutDir: false } }
         },
         configResolved({ root, build }) {
-            // A new watch session starts clean. Later builds overwrite files in place; obsolete files remain until restart.
-            cleanOutputFiles(path.resolve(root, build.outDir), [])
+            // Retain DevTools project identity and local preferences while removing obsolete output. Later builds overwrite
+            // files in place; obsolete files generated during this session remain until restart.
+            cleanOutputFiles(path.resolve(root, build.outDir), [
+                contract.output.projectConfigFilename,
+                contract.output.projectPrivateConfigFilename
+            ])
         },
         buildStart() {
             closed = false
@@ -72,7 +80,7 @@ export function createMiniWatchPlugin(target: VptTarget): Plugin {
             handler(_, bundle) {
                 // Run after skeleton emission and change only output, so serve and one-shot builds retain user settings.
                 // Override supported private preferences too, since they take precedence over shared settings in DevTools.
-                for (const [fileName, overrides] of Object.entries(projectConfigOverrides[target])) {
+                for (const [fileName, overrides] of Object.entries(projectConfigOverrides[contract.options.target])) {
                     const asset = bundle[fileName]
 
                     if (asset?.type === 'asset') {

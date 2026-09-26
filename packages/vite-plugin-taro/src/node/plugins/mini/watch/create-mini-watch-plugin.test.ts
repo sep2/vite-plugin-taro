@@ -11,6 +11,13 @@ import vpt from '../../../vpt.ts'
 import { createMiniWatchPlugin } from './create-mini-watch-plugin.ts'
 
 const markerPattern = /^\/\/ [\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}\n$/
+const wxWatchContract = {
+    options: { target: 'wx' },
+    output: {
+        projectConfigFilename: 'project.config.json',
+        projectPrivateConfigFilename: 'project.private.config.json'
+    }
+} as const
 
 test('enables the filesystem policy only for physical watch builds, including production mode', async (context) => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-mini-watch-config-'))
@@ -19,7 +26,7 @@ test('enables the filesystem policy only for physical watch builds, including pr
         root,
         configFile: false,
         mode: 'production',
-        plugins: [createMiniWatchPlugin('wx')]
+        plugins: [createMiniWatchPlugin(wxWatchContract)]
     } satisfies InlineConfig
     const watched = await resolveConfig({ ...options, build: { watch: {}, emptyOutDir: true } }, 'build')
     assert.equal(watched.build.emptyOutDir, false)
@@ -56,6 +63,11 @@ for (const target of ['wx', 'zfb', 'tt', 'h5'] as const) {
             const privateConfig = Object.freeze({ projectname: 'private', ...preferences })
             const projectFile = target === 'zfb' ? 'mini.project.json' : 'project.config.json'
             const privateFile = target === 'zfb' ? '.mini-ide/project-ide.json' : 'project.private.config.json'
+            const outDir = path.join(root, 'dist')
+            await fs.mkdir(path.dirname(path.join(outDir, privateFile)), { recursive: true })
+            await fs.writeFile(path.join(outDir, projectFile), 'previous project config')
+            await fs.writeFile(path.join(outDir, privateFile), 'previous private config')
+            await fs.writeFile(path.join(outDir, 'obsolete.js'), 'obsolete output')
             const sourceFiles = {
                 [projectFile]: JSON.stringify(projectConfig),
                 [privateFile]: JSON.stringify(privateConfig),
@@ -87,14 +99,31 @@ for (const target of ['wx', 'zfb', 'tt', 'h5'] as const) {
                         generateBundle: {
                             // The real skeleton uses a post hook too; the watch policy must run after its emission.
                             order: 'post',
-                            handler() {
+                            async handler() {
+                                if (this.environment.config.build.watch) {
+                                    // The previous project files stay present until this generation replaces them on disk.
+                                    assert.equal(
+                                        await fs.readFile(path.join(outDir, projectFile), 'utf8'),
+                                        'previous project config'
+                                    )
+                                    assert.equal(
+                                        await fs.readFile(path.join(outDir, privateFile), 'utf8'),
+                                        'previous private config'
+                                    )
+                                    await assert.rejects(fs.access(path.join(outDir, 'obsolete.js')), {
+                                        code: 'ENOENT'
+                                    })
+                                }
                                 for (const [fileName, source] of Object.entries(sourceFiles)) {
                                     this.emitFile({ type: 'asset', fileName, source })
                                 }
                             }
                         }
                     },
-                    createMiniWatchPlugin(target),
+                    createMiniWatchPlugin({
+                        options: { target },
+                        output: { projectConfigFilename: projectFile, projectPrivateConfigFilename: privateFile }
+                    }),
                     {
                         name: 'test:watch-completed',
                         enforce: 'post',
@@ -264,7 +293,7 @@ test('closing a failed watcher never publishes a successful completion marker', 
         root,
         configFile: false,
         logLevel: 'silent',
-        plugins: [createMiniWatchPlugin('wx')],
+        plugins: [createMiniWatchPlugin(wxWatchContract)],
         build: { watch: {}, rolldownOptions: { input: path.join(root, 'missing.js') } }
     })
     assert.ok(!Array.isArray(watcher) && 'on' in watcher)
@@ -276,7 +305,7 @@ test('closing a failed watcher never publishes a successful completion marker', 
     })
     await failed.promise
     await watcher.close()
-    const { closeBundle } = createMiniWatchPlugin('wx')
+    const { closeBundle } = createMiniWatchPlugin(wxWatchContract)
     assert.ok(closeBundle && typeof closeBundle === 'object')
     assert.equal(Reflect.apply(closeBundle.handler, null, [new Error('failed close')]), undefined)
     await assert.rejects(fs.access(path.join(root, 'dist/hmr/watch.js')), { code: 'ENOENT' })
@@ -354,7 +383,7 @@ test('watch cleans only at startup, preserves live output and signals only after
         root,
         configFile: false,
         logLevel: 'silent',
-        plugins: [createMiniWatchPlugin('wx'), fixture],
+        plugins: [createMiniWatchPlugin(wxWatchContract), fixture],
         build: {
             outDir,
             watch: {},
