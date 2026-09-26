@@ -4,11 +4,11 @@ import { createRequire } from 'node:module'
 import { test } from 'node:test'
 import { build } from 'rolldown'
 import { normalizePath } from 'vite'
-import { packageRequire } from '../../utils/packages.ts'
+import { resolveTaroRuntime } from '../../utils/packages.ts'
 import { wrapPluginTransform } from '../../utils/vite.ts'
 import { adaptStencilClient, createStencilClientAdapter } from './create-stencil-client-adapter.ts'
 
-const runtimeRequire = createRequire(packageRequire.resolve('vite-plugin-taro-runtime/components'))
+const runtimeRequire = createRequire(resolveTaroRuntime('components'))
 const stencilClientPath = runtimeRequire.resolve('@stencil/core/internal/client')
 
 test('native filtering dispatches only exact and query-suffixed Stencil client IDs', async () => {

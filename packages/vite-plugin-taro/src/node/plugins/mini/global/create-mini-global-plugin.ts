@@ -4,20 +4,25 @@ import { type Plugin, transformWithOxc } from 'vite'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
 import { createExactModuleIdFilter } from '../../../utils/modules.ts'
-import { resolveRuntimeFile } from '../../../utils/packages.ts'
+import { resolveVptRuntime } from '../../../utils/packages.ts'
 import { rolldownRuntimeId, vptGlobalBindingId } from '../module/module.ts'
 import type { MiniPlacementPlugin } from '../placer/placer.ts'
 
-const vptGlobalSrcFile = resolveRuntimeFile('global/vpt-global')
-const vptGlobalDistFile = 'common/vpt/global.js'
+const vptGlobalSrcFile = resolveVptRuntime('global/vpt-global')
+const vptGlobalOutputPath = 'common/vpt/global.js'
 
 /** Shares one standalone native provider between the application's virtual binding and the wrapped HMR runtime. */
 export function createMiniGlobalPlugin(placement: Pick<MiniPlacementPlugin, 'getPhysicalChunkId'>): Plugin[] {
     function getGlobalReference(chunk: RenderedChunk): string {
         // Insert the physical edge only after linking. A source-level require would pull discovery back into HMR.
         // Placement has already assigned the caller's path; the provider always lives in the main package.
-        const relative = path.posix.relative(path.posix.dirname(placement.getPhysicalChunkId(chunk)), vptGlobalDistFile)
+        const relative = path.posix.relative(
+            path.posix.dirname(placement.getPhysicalChunkId(chunk)),
+            vptGlobalOutputPath
+        )
+
         const reference = relative.startsWith('.') ? relative : `./${relative}`
+
         return `require(${JSON.stringify(reference)}).vptGlobal`
     }
 
@@ -129,7 +134,7 @@ const bundleGlobal = memoize(
                 strict: false,
                 // Discovery supports a missing Symbol constructor; export metadata must not access it first.
                 generatedCode: { symbols: false },
-                entryFileNames: vptGlobalDistFile
+                entryFileNames: vptGlobalOutputPath
             },
             write: false
         }),

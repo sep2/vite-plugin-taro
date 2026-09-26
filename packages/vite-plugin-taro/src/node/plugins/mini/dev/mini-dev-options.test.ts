@@ -13,7 +13,7 @@ import {
 } from 'rolldown'
 import { dev } from 'rolldown/experimental'
 import { type BuildOptions, createLogger, createServer } from 'vite'
-import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
+import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
 import { createZfbMiniContract } from '../../zfb/plugins.ts'
 import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
@@ -24,8 +24,8 @@ import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 
 const runtimeModules = {
-    devtoolsHmrRuntime: resolveRuntimeFile('wx/dev/devtools-runtime'),
-    interpreterHmrRuntime: resolveRuntimeFile('wx/dev/interpreter-runtime')
+    devtoolsHmrRuntime: resolveVptRuntime('wx/dev/devtools-runtime'),
+    interpreterHmrRuntime: resolveVptRuntime('wx/dev/interpreter-runtime')
 } satisfies RuntimeContract
 
 const options = {

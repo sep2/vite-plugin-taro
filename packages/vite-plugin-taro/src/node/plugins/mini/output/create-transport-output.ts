@@ -1,7 +1,7 @@
 import path from 'node:path'
 import type { Rolldown } from 'vite'
 import { toLogicalChunkId } from '../module/chunk-path.ts'
-import { classifyMiniModule, miniTransportFileName } from '../module/module.ts'
+import { classifyMiniModule, miniTransportOutputPath } from '../module/module.ts'
 import type { PackageLocation } from '../placer/placement.ts'
 
 /**
@@ -44,7 +44,8 @@ export function createTransportOutput({
     // }
     // One local journal accumulates only capsule and amphibious routes in deterministic bundle-key order.
     const cases: string[] = []
-    const directory = path.posix.dirname(miniTransportFileName)
+    const directory = path.posix.dirname(miniTransportOutputPath)
+
     for (const key of Object.keys(bundle).sort()) {
         const chunk = bundle[key]
         if (chunk.type !== 'chunk') {
@@ -83,7 +84,7 @@ export function createTransportOutput({
     // The default branch rejects IDs absent from the closed output graph rather than attempting an undeclared native load.
     return {
         type: 'asset',
-        fileName: miniTransportFileName,
+        fileName: miniTransportOutputPath,
         source: `"use strict";function amphibious(r){return[[],function(e){return{execute:function(){e(r())}}}]}exports.transport=function(m){switch(m){${cases.join('')}default:throw new Error('Unknown module: '+m)}};`
     } satisfies Rolldown.EmittedAsset
 }

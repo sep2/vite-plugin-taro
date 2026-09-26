@@ -3,7 +3,7 @@ import type { HtmlTagDescriptor, Plugin, PluginOption } from 'vite'
 import type { VptOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
 import { createExactModuleIdFilter, toViteFileImportPath } from '../../utils/modules.ts'
-import { packageRequire } from '../../utils/packages.ts'
+import { resolveTaroRuntime } from '../../utils/packages.ts'
 import { tailwindcssBasedir } from '../tailwind/tailwind-css.ts'
 import { h5AppPath } from './constant.ts'
 import { createStencilClientAdapter } from './create-stencil-client-adapter.ts'
@@ -41,62 +41,54 @@ function createH5Plugin(options: VptOptions): Plugin {
                             // Pin canonical and upstream requests to compiler-owned files, even when the consumer cannot
                             // resolve the runtime package directly. Both spellings must share one optimized module.
                             find: /^(?:@tarojs\/plugin-platform-h5\/dist|vite-plugin-taro-runtime\/plugin-platform-h5)\/runtime\/apis$/,
-                            replacement: packageRequire.resolve(
-                                'vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis'
-                            )
+                            replacement: resolveTaroRuntime('plugin-platform-h5/runtime/apis')
                         },
                         {
                             find: /^(?:@tarojs\/plugin-platform-h5\/dist|vite-plugin-taro-runtime\/plugin-platform-h5)\/definition\.json$/,
-                            replacement: packageRequire.resolve(
-                                'vite-plugin-taro-runtime/plugin-platform-h5/definition.json'
-                            )
+                            replacement: resolveTaroRuntime('plugin-platform-h5/definition.json')
                         },
                         {
                             find: /^(?:@tarojs\/plugin-framework-react\/dist|vite-plugin-taro-runtime\/plugin-framework-react)\/runtime$/,
-                            replacement: packageRequire.resolve(
-                                'vite-plugin-taro-runtime/plugin-framework-react/runtime'
-                            )
+                            replacement: resolveTaroRuntime('plugin-framework-react/runtime')
                         },
                         {
                             find: /^(?:@tarojs\/runtime|vite-plugin-taro-runtime\/runtime\/h5)$/,
-                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/runtime/h5')
+                            replacement: resolveTaroRuntime('runtime/h5')
                         },
                         {
                             find: /^(?:@tarojs|vite-plugin-taro-runtime)\/api$/,
-                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/api')
+                            replacement: resolveTaroRuntime('api')
                         },
                         {
                             find: /^(?:@tarojs|vite-plugin-taro-runtime)\/taro-h5\/dist\/api\/taro$/,
-                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/taro-h5/dist/api/taro')
+                            replacement: resolveTaroRuntime('taro-h5/dist/api/taro')
                         },
                         {
                             find: /^(?:@tarojs|vite-plugin-taro-runtime)\/taro-h5\/dist\/api\/index$/,
-                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/taro-h5/dist/api/index')
+                            replacement: resolveTaroRuntime('taro-h5/dist/api/index')
                         },
                         {
                             find: /^(?:@tarojs|vite-plugin-taro-runtime)\/components\/global\.css$/,
-                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/components/global.css')
+                            replacement: resolveTaroRuntime('components/global.css')
                         },
                         {
                             find: /^(?:@tarojs|vite-plugin-taro-runtime)\/components\/dist\/taro-components\/taro-components\.css$/,
-                            replacement: packageRequire.resolve(
-                                'vite-plugin-taro-runtime/components/dist/taro-components/taro-components.css'
-                            )
+                            replacement: resolveTaroRuntime('components/dist/taro-components/taro-components.css')
                         },
                         {
                             // The hidden App bootstrap and copied H5 APIs must share this stateful router instance.
                             find: /^(?:@tarojs|vite-plugin-taro-runtime)\/router$/,
-                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/router')
+                            replacement: resolveTaroRuntime('router')
                         },
                         {
                             find: /^(?:@tarojs|vite-plugin-taro-runtime)\/components$/,
-                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/components')
+                            replacement: resolveTaroRuntime('components')
                         },
                         {
                             // The React entry self-imports this Stencil index by package name. Pinning both entries to the
                             // runtime package prevents Vite from transforming a second component graph.
                             find: /^(?:@tarojs|vite-plugin-taro-runtime)\/components\/dist\/components$/,
-                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/components/dist/components')
+                            replacement: resolveTaroRuntime('components/dist/components')
                         }
                     ]
                 },
@@ -182,7 +174,7 @@ function createH5TaroOptimizerResolver(): Plugin {
 /** Resolves only the Taro request that must remain within optimized component chunks. */
 export function resolveH5OptimizerTaro(id: string): string | undefined {
     if (id === '@tarojs/taro') {
-        return packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis')
+        return resolveTaroRuntime('plugin-platform-h5/runtime/apis')
     }
 }
 

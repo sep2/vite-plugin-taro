@@ -2,15 +2,15 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { runInNewContext } from 'node:vm'
 import { build } from 'rolldown'
-import { packageRequire } from '../../utils/packages.ts'
+import { resolveTaroRuntime } from '../../utils/packages.ts'
 import { createClientTaroPlugin } from './client-taro.ts'
 
 /** Bundles the real Mini facade, shared CommonJS backend, platform adapter, and React hooks. */
 async function bundleMiniApi(source: string, target: 'wx' | 'zfb' | 'tt'): Promise<string> {
     const platform = { wx: 'weapp', zfb: 'alipay', tt: 'tt' }[target]
     const aliases: ReadonlyMap<string, string> = new Map([
-        ['@tarojs/runtime', packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini')],
-        ['@tarojs/api', packageRequire.resolve('vite-plugin-taro-runtime/api')]
+        ['@tarojs/runtime', resolveTaroRuntime('runtime/mini')],
+        ['@tarojs/api', resolveTaroRuntime('api')]
     ])
     const result = await build({
         input: '\0entry',
@@ -18,7 +18,13 @@ async function bundleMiniApi(source: string, target: 'wx' | 'zfb' | 'tt'): Promi
             createClientTaroPlugin(target),
             {
                 name: 'test:mini-runtime',
-                resolveId: (id) => (id === '\0entry' ? id : aliases.get(id)),
+                resolveId: (id) =>
+                    id === '\0entry'
+                        ? id
+                        : (aliases.get(id) ??
+                          (id.startsWith('vite-plugin-taro-runtime/')
+                              ? resolveTaroRuntime(id.slice('vite-plugin-taro-runtime/'.length))
+                              : undefined)),
                 load: (id) =>
                     id === '\0entry'
                         ? `

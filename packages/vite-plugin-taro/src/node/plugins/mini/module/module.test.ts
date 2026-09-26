@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
-import { packageRequire } from '../../../utils/packages.ts'
+import { packageRequire, resolveTaroRuntime } from '../../../utils/packages.ts'
 import {
     classifyMiniModule,
     isMiniPolyfillModule,
@@ -65,7 +65,7 @@ test('classifies standalone and grouped infrastructure as amphibious', () => {
 
 test('framework vendor remains a normal capsule regardless of its output name', () => {
     for (const moduleId of [
-        packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini'),
+        resolveTaroRuntime('runtime/mini'),
         packageRequire.resolve('react'),
         packageRequire.resolve('react-dom')
     ]) {

@@ -5,21 +5,24 @@ import { normalizePath } from 'vite'
 
 export const packageRequire = createRequire(import.meta.url)
 
+/** Resolves a public export of the bundled Taro runtime package. */
+export function resolveTaroRuntime(subpath: string): string {
+    return packageRequire.resolve(`vite-plugin-taro-runtime/${subpath}`)
+}
+
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 
-const runtimeLocations = {
+const vptRuntimeLocations = {
     '.ts': { root: 'src/runtime', extension: '.ts' },
     '.js': { root: 'dist/runtime', extension: '.js' }
 } as const
 
-const runtimeLocation = runtimeLocations[path.extname(fileURLToPath(import.meta.url)) as keyof typeof runtimeLocations]
-
-/** Resolves a file shipped by this package as a portable Vite module ID. */
-export function resolvePackageFile(...segments: string[]): string {
-    return normalizePath(path.join(packageRoot, ...segments))
-}
+const vptRuntimeLocation =
+    vptRuntimeLocations[path.extname(fileURLToPath(import.meta.url)) as keyof typeof vptRuntimeLocations]
 
 /** Resolves an unbundled browser runtime module from source in the workspace and from dist after publication. */
-export function resolveRuntimeFile(modulePath: string): string {
-    return resolvePackageFile(runtimeLocation.root, `${modulePath}${runtimeLocation.extension}`)
+export function resolveVptRuntime(modulePath: string): string {
+    return normalizePath(
+        path.join(packageRoot, vptRuntimeLocation.root, `${modulePath}${vptRuntimeLocation.extension}`)
+    )
 }

@@ -6,11 +6,11 @@ import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { h5AppPath } from '../plugins/h5/constant.ts'
+import { resolveTaroRuntime } from '../utils/packages.ts'
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const distRoot = path.join(packageRoot, 'dist')
-const packageRequire = createRequire(import.meta.url)
-const runtimePackageEntry = packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini')
+const runtimePackageEntry = resolveTaroRuntime('runtime/mini')
 const runtimePackageDistRoot = path.resolve(path.dirname(runtimePackageEntry), '..')
 const runtimePackageRoot = path.resolve(runtimePackageDistRoot, '..')
 const runtimePackageRequire = createRequire(runtimePackageEntry)
@@ -328,14 +328,8 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
 
     const runtimeOutputRoot = path.join(runtimePackageDistRoot, 'runtime')
     await assertRuntimeDistCopied(path.join(resolveAdapterDependencyRoot('@tarojs/runtime'), 'dist'), runtimeOutputRoot)
-    assert.equal(
-        packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini'),
-        path.join(runtimeOutputRoot, 'index.js')
-    )
-    assert.equal(
-        packageRequire.resolve('vite-plugin-taro-runtime/runtime/h5'),
-        path.join(runtimeOutputRoot, 'runtime.esm.js')
-    )
+    assert.equal(resolveTaroRuntime('runtime/mini'), path.join(runtimeOutputRoot, 'index.js'))
+    assert.equal(resolveTaroRuntime('runtime/h5'), path.join(runtimeOutputRoot, 'runtime.esm.js'))
     const copiedRuntimeExports = [
         ['api', 'api/dist/index.js'],
         ['taro', 'taro/index.js'],
@@ -346,10 +340,7 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         ['taro-h5/dist/api/index', 'taro-h5/dist/api/index.js']
     ] as const
     copiedRuntimeExports.forEach(([request, output]) => {
-        assert.equal(
-            packageRequire.resolve(`vite-plugin-taro-runtime/${request}`),
-            path.join(runtimePackageDistRoot, output)
-        )
+        assert.equal(resolveTaroRuntime(request), path.join(runtimePackageDistRoot, output))
     })
 
     await assertDirectoryCopied(

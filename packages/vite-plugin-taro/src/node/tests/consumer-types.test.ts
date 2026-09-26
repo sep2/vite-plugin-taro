@@ -9,10 +9,10 @@ import test from 'node:test'
 import { createVirtualFileSystem } from 'typescript/unstable/fs'
 import { API } from 'typescript/unstable/sync'
 import { normalizePath } from 'vite'
-import { packageRequire } from '../utils/packages.ts'
+import { packageRequire, resolveTaroRuntime } from '../utils/packages.ts'
 
 const pluginRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
-const runtimeRoot = path.resolve(path.dirname(packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini')), '../..')
+const runtimeRoot = path.resolve(path.dirname(resolveTaroRuntime('runtime/mini')), '../..')
 
 /** Reads declarations into an isolated package tree without copying hundreds of files or following workspace symlinks. */
 async function readDeclarations(sourceRoot: string, destinationRoot: string): Promise<Record<string, string>> {

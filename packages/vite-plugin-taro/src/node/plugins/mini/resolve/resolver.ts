@@ -16,8 +16,8 @@ import {
     miniCustomWrapperShellId,
     miniPageCapsuleId,
     miniPageShellId,
-    miniTransportFileName,
     miniTransportId,
+    miniTransportOutputPath,
     pageCapsuleId,
     pageComponentId,
     taroTargetRuntimeId,
@@ -78,7 +78,7 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'taro'>)
         ): string | Rolldown.PartialResolvedId | undefined {
             if (id === miniTransportId) {
                 // Bootstrap lives in common/; generated infrastructure has its own namespace outside the bundled graph.
-                return { id: `./${path.posix.relative('common', miniTransportFileName)}`, external: true }
+                return { id: `./${path.posix.relative('common', miniTransportOutputPath)}`, external: true }
             }
 
             // Unknown IDs fall through so Vite and other plugins retain normal resolution.

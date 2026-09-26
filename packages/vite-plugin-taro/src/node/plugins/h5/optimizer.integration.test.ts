@@ -6,11 +6,11 @@ import test from 'node:test'
 import { runInNewContext } from 'node:vm'
 import { build } from 'rolldown'
 import { optimizeDeps, resolveConfig } from 'vite'
-import { packageRequire, resolveRuntimeFile } from '../../utils/packages.ts'
+import { packageRequire, resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import { createH5TargetPlugins } from './plugins.ts'
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
-const runtimeRequire = createRequire(packageRequire.resolve('vite-plugin-taro-runtime/components'))
+const runtimeRequire = createRequire(resolveTaroRuntime('components'))
 
 type TestWindow = Pick<Window, 'document' | 'navigator' | 'location' | 'customElements'> & {
     HTMLElement: typeof HTMLElement
@@ -33,7 +33,7 @@ async function bundleOptimizedNavigator(root: string): Promise<string> {
                 useLaunch as applicationLaunch,
                 pxTransform as applicationPxTransform,
                 initPxTransform as applicationInitPxTransform
-            } from ${JSON.stringify(resolveRuntimeFile('h5/taro-api'))}
+            } from ${JSON.stringify(resolveVptRuntime('h5/taro-api'))}
             export { default as consumerApi } from '@tarojs/taro'
             export { default as backendApi, canIUse } from 'vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis'
             export { default as upstreamBackendApi } from '@tarojs/plugin-platform-h5/dist/runtime/apis'

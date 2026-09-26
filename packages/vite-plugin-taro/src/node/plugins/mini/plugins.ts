@@ -1,7 +1,7 @@
 import type { Plugin, PluginOption } from 'vite'
 import { esTarget } from '../../utils/constant.ts'
 import { createExactModuleIdFilter } from '../../utils/modules.ts'
-import { packageRequire } from '../../utils/packages.ts'
+import { packageRequire, resolveTaroRuntime } from '../../utils/packages.ts'
 import type { AstTransformResult } from '../../utils/transform.ts'
 import { createMiniDevelopmentPlugin } from './dev/plugins.ts'
 import { createMiniGlobalPlugin } from './global/create-mini-global-plugin.ts'
@@ -58,9 +58,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                     alias: [
                         {
                             find: /^@tarojs\/plugin-framework-react\/dist\/runtime$/,
-                            replacement: packageRequire.resolve(
-                                'vite-plugin-taro-runtime/plugin-framework-react/runtime'
-                            )
+                            replacement: resolveTaroRuntime('plugin-framework-react/runtime')
                         },
                         {
                             find: /^@tarojs\/runtime$/,
@@ -68,7 +66,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                         },
                         {
                             find: /^@tarojs\/api$/,
-                            replacement: packageRequire.resolve('vite-plugin-taro-runtime/api')
+                            replacement: resolveTaroRuntime('api')
                         },
                         {
                             // The typed shared facade and upstream imports select the same Mini component table.

@@ -6,11 +6,11 @@ import { pathToFileURL } from 'node:url'
 import { build, type OutputChunk } from 'rolldown'
 import { parseSync } from 'rolldown/utils'
 import type { VptTarget } from '../../../options.ts'
-import { packageRequire, resolveRuntimeFile } from '../../utils/packages.ts'
+import { packageRequire, resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import { createClientTaroPlugin } from './client-taro.ts'
 
 const frameworkId = 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
-const frameworkApisPath = resolveRuntimeFile('client/taro/framework-apis')
+const frameworkApisPath = resolveVptRuntime('client/taro/framework-apis')
 const frameworkNames = exportedNames(await readFile(frameworkApisPath, 'utf8'))
 const frameworkSource = frameworkNames.map((name) => `export function ${name}() { return '${name}-marker' }`).join('\n')
 const backendId = 'vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis'
@@ -116,7 +116,7 @@ test('tree-shakes H5 platform exports while preserving upstream hook registratio
                         return id
                     }
                     if (id === '@tarojs/runtime') {
-                        return packageRequire.resolve('vite-plugin-taro-runtime/runtime/h5')
+                        return resolveTaroRuntime('runtime/h5')
                     }
                 },
                 load(id) {
@@ -231,10 +231,10 @@ test('executes the physical H5 ESM facades with shared platform and framework ex
     })
     try {
         const facade: Readonly<Record<string, unknown>> = await import(
-            pathToFileURL(resolveRuntimeFile('h5/taro-api')).href
+            pathToFileURL(resolveVptRuntime('h5/taro-api')).href
         )
         const namespace: Readonly<Record<string, unknown>> = await import(
-            pathToFileURL(resolveRuntimeFile('h5/taro-api-exports')).href
+            pathToFileURL(resolveVptRuntime('h5/taro-api-exports')).href
         )
         const backend: Readonly<Record<string, unknown>> = await import(backendId)
         const framework: Readonly<Record<string, unknown>> = await import(frameworkId)

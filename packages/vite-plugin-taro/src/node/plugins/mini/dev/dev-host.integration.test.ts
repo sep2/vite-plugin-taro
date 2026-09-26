@@ -12,7 +12,7 @@ import {
     type InterpreterServerMessage,
     interpreterServerEvent
 } from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
-import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
+import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
 import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
 import { miniAppCapsuleId, miniPageCapsuleId } from '../module/module.ts'
@@ -32,8 +32,8 @@ const waitIntervalMilliseconds = 25
 const pageCapsuleFileName = 'pages/home/index-capsule.js'
 
 const runtimeModules = {
-    devtoolsHmrRuntime: resolveRuntimeFile('wx/dev/devtools-runtime'),
-    interpreterHmrRuntime: resolveRuntimeFile('wx/dev/interpreter-runtime')
+    devtoolsHmrRuntime: resolveVptRuntime('wx/dev/devtools-runtime'),
+    interpreterHmrRuntime: resolveVptRuntime('wx/dev/interpreter-runtime')
 } satisfies RuntimeContract
 
 type DevFixture = Readonly<{

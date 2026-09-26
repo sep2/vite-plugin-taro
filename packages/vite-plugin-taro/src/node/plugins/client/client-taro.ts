@@ -1,6 +1,6 @@
 import type { Plugin } from 'vite'
 import type { VptTarget } from '../../../options.ts'
-import { resolveRuntimeFile } from '../../utils/packages.ts'
+import { resolveVptRuntime } from '../../utils/packages.ts'
 import { clientTaroNativeId } from './constant.ts'
 
 /** Public application facade: H5's static ESM namespace or Mini's shared Taro object. */
@@ -13,12 +13,13 @@ export const clientTaroApiId = 'virtual:taro/api'
  * of the components → APIs → components cycle. The public namespace shares those same API functions and state objects.
  */
 export function createClientTaroPlugin(target: VptTarget): Plugin {
-    const apiPath = resolveRuntimeFile(target === 'h5' ? 'h5/taro-api' : 'client/taro/api')
+    const apiPath = resolveVptRuntime(target === 'h5' ? 'h5/taro-api' : 'client/taro/api')
+
     const modules: ReadonlyMap<string, string> = new Map([
         [clientTaroApiId, apiPath],
         ['@tarojs/taro', apiPath],
-        ['virtual:taro/components', resolveRuntimeFile('client/taro/component')],
-        [clientTaroNativeId, resolveRuntimeFile('client/taro/native')]
+        ['virtual:taro/components', resolveVptRuntime('client/taro/component')],
+        [clientTaroNativeId, resolveVptRuntime('client/taro/native')]
     ])
 
     return {

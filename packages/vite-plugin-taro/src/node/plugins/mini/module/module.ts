@@ -2,34 +2,34 @@ import path from 'node:path'
 import { RUNTIME_MODULE_ID } from 'rolldown'
 import { normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
-import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
+import { packageRequire, resolveTaroRuntime, resolveVptRuntime } from '../../../utils/packages.ts'
 
 /** Installs SystemJS, transport, and polyfills before native entries load capsules. */
-export const miniBootstrapId = resolveRuntimeFile('mini/amphibious/bootstrap')
+export const miniBootstrapId = resolveVptRuntime('mini/amphibious/bootstrap')
 
 /** Registers the native App using its generated configuration capsule. */
-export const miniAppShellId = resolveRuntimeFile('mini/native/app')
+export const miniAppShellId = resolveVptRuntime('mini/native/app')
 
 /** Builds the App configuration and activates its React runtime. */
-export const miniAppCapsuleId = resolveRuntimeFile('mini/capsule/app')
+export const miniAppCapsuleId = resolveVptRuntime('mini/capsule/app')
 
 /** Registers the recursive native Component from its capsule configuration. */
-export const miniComponentShellId = resolveRuntimeFile('mini/native/component')
+export const miniComponentShellId = resolveVptRuntime('mini/native/component')
 
 /** Supplies the recursive Component and CustomWrapper configurations. */
-export const miniComponentCapsuleId = resolveRuntimeFile('mini/capsule/component')
+export const miniComponentCapsuleId = resolveVptRuntime('mini/capsule/component')
 
 /** Registers the native CustomWrapper from the shared component capsule. */
-export const miniCustomWrapperShellId = resolveRuntimeFile('mini/native/custom-wrapper')
+export const miniCustomWrapperShellId = resolveVptRuntime('mini/native/custom-wrapper')
 
 /** Registers each route's native Page using its route-qualified capsule. */
-export const miniPageShellId = resolveRuntimeFile('mini/native/page')
+export const miniPageShellId = resolveVptRuntime('mini/native/page')
 
 /** Specializes each route's Page configuration and component import. */
-export const miniPageCapsuleId = resolveRuntimeFile('mini/capsule/page')
+export const miniPageCapsuleId = resolveVptRuntime('mini/capsule/page')
 
 // Resolve from the plugin: pnpm consumers do not expose this transitive dependency to injected app imports.
-export const miniRuntimeId = packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini')
+export const miniRuntimeId = resolveTaroRuntime('runtime/mini')
 
 /** Identifies Rolldown's generated helper module independently of its unstable output filename. */
 export const rolldownRuntimeId = RUNTIME_MODULE_ID

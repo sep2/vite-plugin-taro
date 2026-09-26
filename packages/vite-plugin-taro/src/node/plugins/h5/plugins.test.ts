@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { build, normalizePath, resolveConfig } from 'vite'
 import type { VptOptions } from '../../../options.ts'
-import { packageRequire } from '../../utils/packages.ts'
+import { packageRequire, resolveTaroRuntime } from '../../utils/packages.ts'
 import { wrapPluginTransform } from '../../utils/vite.ts'
 import { h5AppPath } from './constant.ts'
 import { createH5TargetPlugins, resolveH5OptimizerTaro } from './plugins.ts'
@@ -151,9 +151,6 @@ export const routes = __VPT_H5_ROUTES__
 })
 
 test('shares the H5 backend with optimized dependencies without importing the application facade', () => {
-    assert.equal(
-        resolveH5OptimizerTaro('@tarojs/taro'),
-        packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-h5/runtime/apis')
-    )
+    assert.equal(resolveH5OptimizerTaro('@tarojs/taro'), resolveTaroRuntime('plugin-platform-h5/runtime/apis'))
     assert.equal(resolveH5OptimizerTaro('virtual:taro/api'), undefined)
 })

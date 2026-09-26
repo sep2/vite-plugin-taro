@@ -8,7 +8,7 @@ import {
     miniAppCapsuleId,
     miniAppShellId,
     miniBootstrapId,
-    miniTransportFileName
+    miniTransportOutputPath
 } from '../module/module.ts'
 import type { PackageLocation } from '../placer/placement.ts'
 import { createTransportOutput } from './create-transport-output.ts'
@@ -83,10 +83,10 @@ test('emits compact deterministic routes with final physical paths and resolved 
     const result = emit(bundle)
     assert.deepEqual(result, emit(Object.fromEntries(Object.entries(bundle).reverse())))
     assert.equal(result.type, 'asset')
-    assert.equal(result.fileName, miniTransportFileName)
+    assert.equal(result.fileName, miniTransportOutputPath)
     assert.doesNotMatch(result.source, /\n|!~\{/)
 
-    const parsed = parseSync(miniTransportFileName, result.source)
+    const parsed = parseSync(miniTransportOutputPath, result.source)
     assert.deepEqual(parsed.errors, [])
     // These local journals inspect grammar and native-loader arguments without changing generated output.
     const ids: string[] = []
@@ -221,7 +221,7 @@ for (const name of [
         const chunk = createChunk(`sub/p_test/${logicalId}`, 'normal-capsule')
         const output = emit({ [chunk.fileName]: chunk })
         const requirePath = `../../${chunk.fileName}`
-        assert.deepEqual(parseSync(miniTransportFileName, output.source).errors, [])
+        assert.deepEqual(parseSync(miniTransportOutputPath, output.source).errors, [])
         assert.ok(output.source.includes(`require.async(${JSON.stringify(requirePath)})`))
 
         const namespace = {}
@@ -242,7 +242,7 @@ test('JSON-encodes special characters without changing module IDs or literal req
     const name = 'quoted-"\'`\\\n抖音.js'
     const chunk = createChunk(`common/vpt/${name}`, 'normal-capsule')
     const output = emit({ [chunk.fileName]: chunk })
-    assert.deepEqual(parseSync(miniTransportFileName, output.source).errors, [])
+    assert.deepEqual(parseSync(miniTransportOutputPath, output.source).errors, [])
     const load = evaluate(output.source, (id) => id)
     assert.equal(load(chunk.fileName), `./${name}`)
     assert.ok(output.source.includes(`require(${JSON.stringify(`./${name}`)})`))

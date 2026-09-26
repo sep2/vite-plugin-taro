@@ -4,7 +4,7 @@ import test from 'node:test'
 import { createContext, runInContext } from 'node:vm'
 import { build, type OutputChunk } from 'rolldown'
 import { dev } from 'rolldown/experimental'
-import { resolveRuntimeFile } from '../../../utils/packages.ts'
+import { resolveVptRuntime } from '../../../utils/packages.ts'
 import { rolldownRuntimeId, vptGlobalBindingId } from '../module/module.ts'
 import { createMiniGlobalPlugin } from './create-mini-global-plugin.ts'
 
@@ -27,7 +27,7 @@ test('virtual hooks match only the private binding and leave the real provider u
         assert.equal(filter.id.test(vptGlobalBindingId), true)
         assert.equal(filter.id.test(`${vptGlobalBindingId}?import`), true)
         assert.equal(filter.id.test(`${vptGlobalBindingId}-other`), false)
-        assert.equal(filter.id.test(resolveRuntimeFile('global/vpt-global')), false)
+        assert.equal(filter.id.test(resolveVptRuntime('global/vpt-global')), false)
     }
 })
 

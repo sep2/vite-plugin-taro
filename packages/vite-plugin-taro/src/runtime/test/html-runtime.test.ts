@@ -9,7 +9,7 @@ import { runInNewContext } from 'node:vm'
 import { build } from 'rolldown'
 import { resolveConfig } from 'vite'
 import vpt from '../../index.ts'
-import { packageRequire } from '../../node/utils/packages.ts'
+import { resolveTaroRuntime } from '../../node/utils/packages.ts'
 
 for (const target of ['wx', 'zfb'] as const) {
     test(`${target}: upstream HTML hooks and enabled DOM APIs share injected globals`, async () => {
@@ -28,7 +28,7 @@ for (const target of ['wx', 'zfb'] as const) {
         )
         const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), 'html-runtime-fixture.js')
         const platform = target === 'wx' ? 'weapp' : 'alipay'
-        const targetRuntime = packageRequire.resolve(`vite-plugin-taro-runtime/plugin-platform-${platform}/runtime`)
+        const targetRuntime = resolveTaroRuntime(`plugin-platform-${platform}/runtime`)
         const result = await build({
             input: entry,
             plugins: [
@@ -39,7 +39,7 @@ for (const target of ['wx', 'zfb'] as const) {
                             return entry
                         }
                         if (id === '@tarojs/runtime') {
-                            return packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini')
+                            return resolveTaroRuntime('runtime/mini')
                         }
                     },
                     load(id) {

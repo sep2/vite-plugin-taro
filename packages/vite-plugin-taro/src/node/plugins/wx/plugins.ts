@@ -1,6 +1,6 @@
 import type { PluginOption } from 'vite'
 import type { VptOptions } from '../../../options.ts'
-import { packageRequire, resolveRuntimeFile } from '../../utils/packages.ts'
+import { resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
 import { createWxSkeleton } from './create-wx-skeleton.ts'
@@ -16,14 +16,12 @@ export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
         options: vptOptions,
         taro: {
             env: 'weapp',
-            componentsReactPath: packageRequire.resolve(
-                'vite-plugin-taro-runtime/plugin-platform-weapp/components-react'
-            ),
-            targetRuntimePath: packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-weapp/runtime')
+            componentsReactPath: resolveTaroRuntime('plugin-platform-weapp/components-react'),
+            targetRuntimePath: resolveTaroRuntime('plugin-platform-weapp/runtime')
         },
         runtime: {
-            devtoolsHmrRuntime: resolveRuntimeFile('wx/dev/devtools-runtime'),
-            interpreterHmrRuntime: resolveRuntimeFile('wx/dev/interpreter-runtime')
+            devtoolsHmrRuntime: resolveVptRuntime('wx/dev/devtools-runtime'),
+            interpreterHmrRuntime: resolveVptRuntime('wx/dev/interpreter-runtime')
         },
         styles: {
             appFileName: 'app.wxss',

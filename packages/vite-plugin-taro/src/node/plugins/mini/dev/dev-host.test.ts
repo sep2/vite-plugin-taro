@@ -7,7 +7,7 @@ import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { DevOptions } from 'rolldown/experimental'
 import { createLogger, createServer } from 'vite'
-import { resolveRuntimeFile } from '../../../utils/packages.ts'
+import { resolveVptRuntime } from '../../../utils/packages.ts'
 import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
 import type { MiniStylePlugin } from '../styles/plugins.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
@@ -26,8 +26,8 @@ type SyntheticDev = (_input: unknown, _output: unknown, devOptions: DevOptions) 
 const devHostHarnessKey = '__vptDevHostTestHarness__'
 
 const runtimeModules = {
-    devtoolsHmrRuntime: resolveRuntimeFile('wx/dev/devtools-runtime'),
-    interpreterHmrRuntime: resolveRuntimeFile('wx/dev/interpreter-runtime')
+    devtoolsHmrRuntime: resolveVptRuntime('wx/dev/devtools-runtime'),
+    interpreterHmrRuntime: resolveVptRuntime('wx/dev/interpreter-runtime')
 } satisfies RuntimeContract
 
 const contract = {

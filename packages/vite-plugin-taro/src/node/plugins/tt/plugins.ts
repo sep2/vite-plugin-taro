@@ -1,6 +1,6 @@
 import type { PluginOption } from 'vite'
 import type { VptOptions } from '../../../options.ts'
-import { packageRequire, resolveRuntimeFile } from '../../utils/packages.ts'
+import { resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
 import { createTtSkeleton } from './create-tt-skeleton.ts'
@@ -16,12 +16,12 @@ export function createTtMiniContract(options: VptOptions): MiniContract {
         options,
         taro: {
             env: 'tt',
-            componentsReactPath: packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-tt/components-react'),
-            targetRuntimePath: resolveRuntimeFile('tt/taro-runtime')
+            componentsReactPath: resolveTaroRuntime('plugin-platform-tt/components-react'),
+            targetRuntimePath: resolveVptRuntime('tt/taro-runtime')
         },
         runtime: {
-            devtoolsHmrRuntime: resolveRuntimeFile('tt/dev/devtools-runtime'),
-            interpreterHmrRuntime: resolveRuntimeFile('tt/dev/interpreter-runtime')
+            devtoolsHmrRuntime: resolveVptRuntime('tt/dev/devtools-runtime'),
+            interpreterHmrRuntime: resolveVptRuntime('tt/dev/interpreter-runtime')
         },
         styles: {
             appFileName: 'app.ttss',

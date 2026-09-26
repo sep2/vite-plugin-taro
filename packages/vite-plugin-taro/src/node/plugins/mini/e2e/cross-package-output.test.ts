@@ -4,7 +4,7 @@ import test from 'node:test'
 import { build, type OutputChunk, type Plugin } from 'rolldown'
 import { normalizePath } from 'vite'
 import { System as createdSystem } from '../../../../runtime/mini/systemjs/system-core.js'
-import { classifyMiniModule, miniBootstrapId, miniTransportFileName, miniTransportId } from '../module/module.ts'
+import { classifyMiniModule, miniBootstrapId, miniTransportId, miniTransportOutputPath } from '../module/module.ts'
 import { createTransportOutput } from '../output/create-transport-output.ts'
 import { createPlacement, type Placement } from '../placer/placement.ts'
 import { createPlacementRolldownOptions } from '../placer/placer.ts'
@@ -223,7 +223,7 @@ async function buildCrossPackageOutput(): Promise<CrossPackageOutput> {
         write: false
     })
     const chunks = result.output.filter((output): output is OutputChunk => output.type === 'chunk')
-    const asset = result.output.find((output) => output.fileName === miniTransportFileName)
+    const asset = result.output.find((output) => output.fileName === miniTransportOutputPath)
     assert.ok(asset?.type === 'asset' && typeof asset.source === 'string')
     const transport = { fileName: asset.fileName, code: asset.source }
 

@@ -4,9 +4,9 @@ import { createRequire } from 'node:module'
 import test from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { RecursiveTemplate, UnRecursiveTemplate } from '@tarojs/shared/dist/template.js'
+import { resolveTaroRuntime } from '../../../utils/packages.ts'
 
-const packageRequire = createRequire(import.meta.url)
-const runtimePackageRequire = createRequire(packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini'))
+const runtimePackageRequire = createRequire(resolveTaroRuntime('runtime/mini'))
 
 type Platform = 'wx' | 'zfb' | 'tt'
 type Implementation = 'local' | 'upstream'

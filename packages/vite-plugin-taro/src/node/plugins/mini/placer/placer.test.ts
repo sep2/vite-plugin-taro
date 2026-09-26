@@ -3,7 +3,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { build, type InputOption, type OutputBundle, type OutputChunk, type OutputOptions, type Plugin } from 'rolldown'
 import { normalizePath } from 'vite'
-import { packageRequire } from '../../../utils/packages.ts'
+import { packageRequire, resolveTaroRuntime } from '../../../utils/packages.ts'
 import { isMiniFrameworkVendorModule, miniAppCapsuleId, miniAppShellId, miniBootstrapId } from '../module/module.ts'
 import { createPlacement, type GeneratedSubpackage, type Placement } from './placement.ts'
 import { createMiniPlacementPlugin, createPlacementRolldownOptions } from './placer.ts'
@@ -190,7 +190,7 @@ for (const name of ['transport', 'global']) {
 test('keeps core-js separate from recursive framework dependencies and application modules', async () => {
     const applicationId = moduleId('application.js')
     const reactId = normalizePath(packageRequire.resolve('react'))
-    const taroId = normalizePath(packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini'))
+    const taroId = normalizePath(resolveTaroRuntime('runtime/mini'))
     const polyfillId = normalizePath(packageRequire.resolve('core-js/modules/web.url.js'))
     const polyfillHelperId = normalizePath(packageRequire.resolve('core-js/internals/global-this.js'))
     const frameworkDependencyId = moduleId('framework-dependency.js')
