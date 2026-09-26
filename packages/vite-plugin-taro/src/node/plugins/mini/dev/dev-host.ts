@@ -320,10 +320,8 @@ export async function createMiniDevHost({
     }
 
     /** Centralizes the one diagnostic and DevEngine command used by every rebuild authority. */
-    function requestFullBuild(reason: string | undefined): void {
-        server.config.logger.info(
-            `[vpt] ${contract.options.target} full rebuild required${reason ? `: ${reason}` : ''}`
-        )
+    function requestFullBuild(reason: string): void {
+        server.config.logger.info(`[vpt] ${contract.options.target} full rebuild required: ${reason}`)
         engine.triggerFullBuild()
     }
 
@@ -344,7 +342,7 @@ export async function createMiniDevHost({
                 continue
             }
 
-            requestFullBuild(update.reason)
+            requestFullBuild(update.reason || `Rolldown ${update.type} update`)
             return
         }
 

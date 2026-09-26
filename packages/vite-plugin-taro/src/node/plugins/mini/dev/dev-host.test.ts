@@ -271,7 +271,7 @@ test('reduces synthetic engine update variants and unknown host failures without
         })
         await updateFailureLogged.promise
 
-        // A current non-patch update dominates the batch and requests a complete build without a reason suffix.
+        // A current non-patch update dominates the batch; even without a Rolldown reason, its type is logged.
         httpServer.address = () => ({ address: '::1', family: 'IPv6', port: 43124 })
         const originalHttps = server.config.server.https
         Reflect.set(server.config.server, 'https', true)
@@ -285,7 +285,7 @@ test('reduces synthetic engine update variants and unknown host failures without
             ]
         })
         const nextInfo = await waitForFileChange(path.join(outDir, hmrInfoFileName), stringAddressInfo)
-        assert.match(infos.join('\n'), /wx full rebuild required(?:\n|$)/)
+        assert.match(infos.join('\n'), /wx full rebuild required: Rolldown FullReload update/)
         const nextBuildId = /"buildId":"([^"]+)"/.exec(nextInfo)?.[1]
         assert.ok(nextBuildId)
         assert.notEqual(nextBuildId, activeBuildId)
