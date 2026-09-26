@@ -4,8 +4,7 @@ import test from 'node:test'
 import { build, type OutputChunk, type Plugin } from 'rolldown'
 import { normalizePath } from 'vite'
 import { System as createdSystem } from '../../../../runtime/mini/systemjs/system-core.js'
-import type { RuntimeModulesContract } from '../mini-contract.ts'
-import { createMiniModuleClassifier, miniTransportFileName, miniTransportId } from '../module/module.ts'
+import { classifyMiniModule, miniBootstrapId, miniTransportFileName, miniTransportId } from '../module/module.ts'
 import { createTransportOutput } from '../output/create-transport-output.ts'
 import { createPlacement, type Placement } from '../placer/placement.ts'
 import { createPlacementRolldownOptions } from '../placer/placer.ts'
@@ -40,20 +39,8 @@ const system: System.Loader = createdSystem
  * static closure being collapsed into one package.
  */
 const planningBudgetBytes = 1_900_000
-const runtimeModules = {
-    bootstrap: '/runtime/bootstrap',
-    appShell: '/runtime/app-shell',
-    appCapsule: '/runtime/app-capsule',
-    componentShell: '/runtime/component-shell',
-    componentCapsule: '/runtime/component-capsule',
-    customWrapperShell: '/runtime/custom-wrapper-shell',
-    pageShell: '/runtime/page-shell',
-    pageCapsule: '/runtime/page-capsule',
-    devtoolsHmrRuntime: '/runtime/devtools-hmr',
-    interpreterHmrRuntime: '/runtime/interpreter-hmr'
-} satisfies RuntimeModulesContract
-const classifyModule = createMiniModuleClassifier(runtimeModules)
-const placementRolldownOptions = createPlacementRolldownOptions(classifyModule)
+const classifyModule = classifyMiniModule
+const placementRolldownOptions = createPlacementRolldownOptions()
 
 const applicationId = '/cross-package/application.js'
 // A shared application transport.js must coexist with the generated native transport without a naming exception.
@@ -70,7 +57,7 @@ const largeLazyModuleIds: ReadonlySet<string> = new Set([subpackageAId, subpacka
 
 const modules: Readonly<Record<string, string>> = {
     // Bootstrap resolves the generated table through the same external native edge as production.
-    [runtimeModules.bootstrap]: `
+    [miniBootstrapId]: `
         import { transport } from ${JSON.stringify(miniTransportId)}
         export const System = fixtureSystem
         System.instantiate = transport
@@ -203,18 +190,14 @@ function createMiniOutputPlugin(): Plugin {
                 code,
                 chunk,
                 chunks: meta.chunks,
-                bootstrapModuleId: runtimeModules.bootstrap,
                 getPhysicalChunkId: placement.getPhysicalChunkId,
-                classifyModule: classifyModule,
                 sourcemap
             })
         },
         generateBundle(_outputOptions, bundle) {
             assert.ok(placement)
             placement.finalize(bundle)
-            this.emitFile(
-                createTransportOutput({ bundle, classifyModule, getPackageLocation: placement.getPackageLocation })
-            )
+            this.emitFile(createTransportOutput({ bundle, getPackageLocation: placement.getPackageLocation }))
         }
     }
 }
@@ -224,7 +207,7 @@ async function buildCrossPackageOutput(): Promise<CrossPackageOutput> {
     const result = await build({
         input: {
             application: applicationId,
-            native: runtimeModules.bootstrap,
+            native: miniBootstrapId,
             // Keep this shared source in its own file to exercise a real common/transport.js beside common/vpt/transport.js.
             transport: mainDependencyId
         },

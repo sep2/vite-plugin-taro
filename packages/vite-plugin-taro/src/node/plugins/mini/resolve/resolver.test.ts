@@ -3,8 +3,16 @@ import path from 'node:path'
 import test from 'node:test'
 import { normalizePath } from 'vite'
 import { appComponentId } from '../../client/constant.ts'
-import type { MiniContract, RuntimeModulesContract } from '../mini-contract.ts'
+import type { MiniContract } from '../mini-contract.ts'
 import {
+    miniAppCapsuleId,
+    miniAppShellId,
+    miniBootstrapId,
+    miniComponentCapsuleId,
+    miniComponentShellId,
+    miniCustomWrapperShellId,
+    miniPageCapsuleId,
+    miniPageShellId,
     miniTransportId,
     pageCapsuleId,
     pageComponentId,
@@ -14,17 +22,15 @@ import {
 import { createResolver } from './resolver.ts'
 
 const modules = {
-    bootstrap: '/runtime/bootstrap.ts',
-    appShell: '/runtime/app-shell.ts',
-    appCapsule: '/runtime/app-capsule.ts',
-    componentShell: '/runtime/component-shell.ts',
-    componentCapsule: '/runtime/component-capsule.ts',
-    customWrapperShell: '/runtime/custom-wrapper-shell.ts',
-    pageShell: '/runtime/page-shell.ts',
-    pageCapsule: '/runtime/page-capsule.ts',
-    devtoolsHmrRuntime: '/runtime/devtools-hmr.ts',
-    interpreterHmrRuntime: '/runtime/interpreter-hmr.ts'
-} satisfies RuntimeModulesContract
+    bootstrap: miniBootstrapId,
+    appShell: miniAppShellId,
+    appCapsule: miniAppCapsuleId,
+    componentShell: miniComponentShellId,
+    componentCapsule: miniComponentCapsuleId,
+    customWrapperShell: miniCustomWrapperShellId,
+    pageShell: miniPageShellId,
+    pageCapsule: miniPageCapsuleId
+}
 
 const contract = {
     options: {
@@ -50,11 +56,8 @@ const contract = {
         env: 'synthetic',
         componentsReactPath: '/runtime/components-react.ts',
         targetRuntimePath: '/runtime/target.ts'
-    },
-    runtime: {
-        modules: modules
     }
-} satisfies Pick<MiniContract, 'options' | 'runtime' | 'taro'>
+} satisfies Pick<MiniContract, 'options' | 'taro'>
 
 test('resolves fixed and route-specific private IDs', () => {
     const resolver = createResolver(contract)

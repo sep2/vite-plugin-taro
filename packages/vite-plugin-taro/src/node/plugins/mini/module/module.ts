@@ -2,8 +2,31 @@ import path from 'node:path'
 import { RUNTIME_MODULE_ID } from 'rolldown'
 import { normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
-import { packageRequire } from '../../../utils/packages.ts'
-import type { RuntimeModulesContract } from '../mini-contract.ts'
+import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
+
+/** Installs SystemJS, transport, and polyfills before native entries load capsules. */
+export const miniBootstrapId = resolveRuntimeFile('mini/amphibious/bootstrap')
+
+/** Registers the native App using its generated configuration capsule. */
+export const miniAppShellId = resolveRuntimeFile('mini/native/app')
+
+/** Builds the App configuration and activates its React runtime. */
+export const miniAppCapsuleId = resolveRuntimeFile('mini/capsule/app')
+
+/** Registers the recursive native Component from its capsule configuration. */
+export const miniComponentShellId = resolveRuntimeFile('mini/native/component')
+
+/** Supplies the recursive Component and CustomWrapper configurations. */
+export const miniComponentCapsuleId = resolveRuntimeFile('mini/capsule/component')
+
+/** Registers the native CustomWrapper from the shared component capsule. */
+export const miniCustomWrapperShellId = resolveRuntimeFile('mini/native/custom-wrapper')
+
+/** Registers each route's native Page using its route-qualified capsule. */
+export const miniPageShellId = resolveRuntimeFile('mini/native/page')
+
+/** Specializes each route's Page configuration and component import. */
+export const miniPageCapsuleId = resolveRuntimeFile('mini/capsule/page')
 
 // Resolve from the plugin: pnpm consumers do not expose this transitive dependency to injected app imports.
 export const miniRuntimeId = packageRequire.resolve('vite-plugin-taro-runtime/runtime/mini')
@@ -47,9 +70,6 @@ export type MiniChunk = Rolldown.PreRenderedChunk | Rolldown.RenderedChunk
 /** Distinguishes native shells, lifecycle entry capsules, ordinary capsules, and shared native/SystemJS infrastructure. */
 export type MiniChunkKind = 'native' | 'entry-capsule' | 'normal-capsule' | 'amphibious'
 
-/** Classifies chunks by their compiler-owned modules; ordinary application chunks are normal capsules. */
-export type MiniModuleClassifier = (chunk: MiniChunk) => MiniChunkKind
-
 const frameworkPackageRoots = [
     // The exported Mini entry is <runtime package>/dist/runtime/index.js, regardless of where the package is installed or linked.
     path.resolve(path.dirname(miniRuntimeId), '../..'),
@@ -77,33 +97,28 @@ export function isMiniFrameworkVendorModule(moduleId: string): boolean {
     return frameworkPackageRoots.some((root) => normalizedId.startsWith(root))
 }
 
-/**
- * The Mini graph separates lifecycle entries from bootstrap/polyfill/runtime infrastructure. A compiler-owned module
- * identifies its chunk's kind; chunks containing only application or framework modules are normal capsules.
- * One scan stops at the first known identity: O(M) worst-case time and O(1) extra space, without per-chunk collections.
- */
-export function createMiniModuleClassifier(modules: RuntimeModulesContract): MiniModuleClassifier {
-    const moduleKindById: ReadonlyMap<string, MiniChunkKind> = new Map([
-        [modules.appShell, 'native'],
-        [modules.componentShell, 'native'],
-        [modules.customWrapperShell, 'native'],
-        [modules.pageShell, 'native'],
-        [modules.appCapsule, 'entry-capsule'],
-        [modules.componentCapsule, 'entry-capsule'],
-        [modules.pageCapsule, 'entry-capsule'],
-        [modules.bootstrap, 'amphibious'],
-        [vptGlobalBindingId, 'amphibious'],
-        [miniPolyfillsId, 'amphibious'],
-        [rolldownRuntimeId, 'amphibious']
-    ])
+/** Fixed Mini graph identities are indexed once; classification scans module IDs until the first match. */
+const moduleKindById: ReadonlyMap<string, MiniChunkKind> = new Map([
+    [miniAppShellId, 'native'],
+    [miniComponentShellId, 'native'],
+    [miniCustomWrapperShellId, 'native'],
+    [miniPageShellId, 'native'],
+    [miniAppCapsuleId, 'entry-capsule'],
+    [miniComponentCapsuleId, 'entry-capsule'],
+    [miniPageCapsuleId, 'entry-capsule'],
+    [miniBootstrapId, 'amphibious'],
+    [vptGlobalBindingId, 'amphibious'],
+    [miniPolyfillsId, 'amphibious'],
+    [rolldownRuntimeId, 'amphibious']
+])
 
-    return (chunk) => {
-        for (const moduleId of chunk.moduleIds) {
-            const kind = moduleKindById.get(normalizeModuleId(moduleId))
-            if (kind !== undefined) {
-                return kind
-            }
+/** Classifies each chunk by its compiler-owned modules; ordinary application chunks are normal capsules. O(M) time. */
+export function classifyMiniModule(chunk: MiniChunk): MiniChunkKind {
+    for (const moduleId of chunk.moduleIds) {
+        const kind = moduleKindById.get(normalizeModuleId(moduleId))
+        if (kind !== undefined) {
+            return kind
         }
-        return 'normal-capsule'
     }
+    return 'normal-capsule'
 }

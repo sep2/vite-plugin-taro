@@ -39,7 +39,7 @@ import { parseSync } from 'rolldown/utils'
 import type { Rolldown } from 'vite'
 import type { AstTransformResult } from '../../../utils/transform.ts'
 import { resolveLogicalChunkReference, resolvePhysicalChunkReference } from '../module/chunk-path.ts'
-import type { MiniModuleClassifier } from '../module/module.ts'
+import { classifyMiniModule, miniBootstrapId } from '../module/module.ts'
 
 type ImportBinding = Readonly<{
     imported: string | null
@@ -96,17 +96,13 @@ export function renderNative({
     code,
     chunk,
     chunks,
-    bootstrapModuleId,
     getPhysicalChunkId,
-    classifyModule,
     sourcemap
 }: {
     code: string
     chunk: Rolldown.RenderedChunk
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
-    bootstrapModuleId: string
     getPhysicalChunkId: (chunk: Rolldown.RenderedChunk | string) => string
-    classifyModule: MiniModuleClassifier
     sourcemap: boolean
 }): AstTransformResult {
     const parsed = parseSync(chunk.fileName, code)
@@ -116,14 +112,7 @@ export function renderNative({
     }
 
     // Resolve scopes, helper names, and capsule identities before creating the local source editor.
-    const model = analyzeNativeModule(
-        parsed.program,
-        chunk,
-        chunks,
-        bootstrapModuleId,
-        getPhysicalChunkId,
-        classifyModule
-    )
+    const model = analyzeNativeModule(parsed.program, chunk, chunks, getPhysicalChunkId)
     const editor = new RolldownMagicString(code, { filename: chunk.fileName })
 
     // Expression edits split untouched source ranges first. Declaration replacement runs afterwards because MagicString must
@@ -161,9 +150,7 @@ function analyzeNativeModule(
     program: Program,
     chunk: Rolldown.RenderedChunk,
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>,
-    bootstrapModuleId: string,
-    getPhysicalChunkId: (chunk: Rolldown.RenderedChunk | string) => string,
-    classifyModule: MiniModuleClassifier
+    getPhysicalChunkId: (chunk: Rolldown.RenderedChunk | string) => string
 ): NativeModuleModel {
     // Analysis-local collections accumulate the complete module model before any source edits.
     const identifierNames = new Set<string>()
@@ -237,7 +224,7 @@ function analyzeNativeModule(
         switch (node.type) {
             case 'ImportDeclaration': {
                 requirePlainImport(node, chunk.fileName)
-                const capsule = getImportedCapsule(chunk.fileName, node.source.value, chunks, classifyModule)
+                const capsule = getImportedCapsule(chunk.fileName, node.source.value, chunks)
                 if (capsule) {
                     const [specifier] = node.specifiers
                     if (node.specifiers.length !== 1 || !specifier || specifier.type === 'ImportNamespaceSpecifier') {
@@ -278,7 +265,7 @@ function analyzeNativeModule(
         // Placement owns physical paths; capsule identities below stay package-neutral. Resolve only loader users.
         const relative = path.posix.relative(
             path.posix.dirname(getPhysicalChunkId(chunk)),
-            getPhysicalChunkId(bootstrapModuleId)
+            getPhysicalChunkId(miniBootstrapId)
         )
         const reference = relative.startsWith('../') ? relative : `./${relative}`
         const local = takeGeneratedName('__nativeSystem', identifierNames)
@@ -624,12 +611,11 @@ function memberExpression(object: string, property: string): string {
 function getImportedCapsule(
     fileName: string,
     reference: string,
-    chunks: Readonly<Record<string, Rolldown.RenderedChunk>>,
-    classifyModule: MiniModuleClassifier
+    chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
 ): Rolldown.RenderedChunk | undefined {
     if (!reference.startsWith('./') && !reference.startsWith('../')) return undefined
     const imported = chunks[resolvePhysicalChunkReference(fileName, reference)]
-    return imported && classifyModule(imported) === 'entry-capsule' ? imported : undefined
+    return imported && classifyMiniModule(imported) === 'entry-capsule' ? imported : undefined
 }
 
 /** Renders all native dependencies through the same import lowering, including the generated System import. */

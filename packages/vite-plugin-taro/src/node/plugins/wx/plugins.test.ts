@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { VptOptions } from '../../../options.ts'
+import { miniBootstrapId } from '../mini/module/module.ts'
 import { createWxSkeleton } from './create-wx-skeleton.ts'
 import { createWxMiniContract, createWxMiniPlugins } from './plugins.ts'
 
@@ -22,12 +23,10 @@ test('creates the WX Mini Program contract without translating public options', 
         /taro-runtime[/\\]dist[/\\]plugin-platform-weapp[/\\]components-react\.js$/
     )
     assert.match(contract.taro.targetRuntimePath, /taro-runtime[/\\]dist[/\\]plugin-platform-weapp[/\\]runtime\.js$/)
-    assert.match(contract.runtime.modules.bootstrap, /runtime[/\\]mini[/\\]amphibious[/\\]bootstrap\.(?:js|ts)$/)
-    assert.match(contract.runtime.modules.devtoolsHmrRuntime, /runtime[/\\]wx[/\\]dev[/\\]devtools-runtime\.(?:js|ts)$/)
-    assert.match(
-        contract.runtime.modules.interpreterHmrRuntime,
-        /runtime[/\\]wx[/\\]dev[/\\]interpreter-runtime\.(?:js|ts)$/
-    )
+    assert.match(miniBootstrapId, /runtime[/\\]mini[/\\]amphibious[/\\]bootstrap\.(?:js|ts)$/)
+    assert.deepEqual(Object.keys(contract.runtime).sort(), ['devtoolsHmrRuntime', 'interpreterHmrRuntime'])
+    assert.match(contract.runtime.devtoolsHmrRuntime, /runtime[/\\]wx[/\\]dev[/\\]devtools-runtime\.(?:js|ts)$/)
+    assert.match(contract.runtime.interpreterHmrRuntime, /runtime[/\\]wx[/\\]dev[/\\]interpreter-runtime\.(?:js|ts)$/)
     assert.deepEqual(contract.styles, {
         appFileName: 'app.wxss',
         globalFileName: 'assets/global.wxss'

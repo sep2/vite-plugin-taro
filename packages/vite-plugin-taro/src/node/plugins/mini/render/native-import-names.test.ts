@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
+import { miniAppCapsuleId } from '../module/module.ts'
 import { renderNative } from './native.ts'
 
 const chunk: Rolldown.RenderedChunk = {
@@ -22,9 +23,7 @@ function compile(code: string, sourcemap: boolean) {
         code,
         chunk,
         chunks: {},
-        bootstrapModuleId: '/bootstrap.js',
         getPhysicalChunkId: () => assert.fail('These external imports need no loader dependency'),
-        classifyModule: () => assert.fail('These external imports need no chunk classification'),
         sourcemap
     })
 }
@@ -159,17 +158,12 @@ test('preserves namespace numbering and loading order across side-effect and cap
         'const values = [config, laterConfig, first, second]',
         'export { values }'
     ].join('\n')
-    const capsule: Rolldown.RenderedChunk = { ...chunk, fileName: 'capsule.js', moduleIds: ['/capsule.js'] }
+    const capsule: Rolldown.RenderedChunk = { ...chunk, fileName: 'capsule.js', moduleIds: [miniAppCapsuleId] }
     const output = renderNative({
         code,
         chunk,
         chunks: { 'capsule.js': capsule },
-        bootstrapModuleId: '/bootstrap.js',
         getPhysicalChunkId: (chunk) => (typeof chunk === 'string' ? 'bootstrap.js' : chunk.fileName),
-        classifyModule(imported) {
-            assert.equal(imported, capsule)
-            return 'entry-capsule'
-        },
         sourcemap: false
     })
     // Side-effect imports still reserve their original slots; capsule imports never allocate a native namespace.

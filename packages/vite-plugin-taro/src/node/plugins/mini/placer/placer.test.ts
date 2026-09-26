@@ -4,26 +4,12 @@ import test from 'node:test'
 import { build, type InputOption, type OutputBundle, type OutputChunk, type OutputOptions, type Plugin } from 'rolldown'
 import { normalizePath } from 'vite'
 import { packageRequire } from '../../../utils/packages.ts'
-import type { RuntimeModulesContract } from '../mini-contract.ts'
-import { createMiniModuleClassifier, isMiniFrameworkVendorModule } from '../module/module.ts'
+import { isMiniFrameworkVendorModule, miniAppCapsuleId, miniAppShellId, miniBootstrapId } from '../module/module.ts'
 import { createPlacement, type GeneratedSubpackage, type Placement } from './placement.ts'
 import { createMiniPlacementPlugin, createPlacementRolldownOptions } from './placer.ts'
 
 const planningBudgetBytes = 1_900_000
-const runtimeModules = {
-    bootstrap: '/runtime/bootstrap',
-    appShell: '/runtime/app-shell',
-    appCapsule: '/runtime/app-capsule',
-    componentShell: '/runtime/component-shell',
-    componentCapsule: '/runtime/component-capsule',
-    customWrapperShell: '/runtime/custom-wrapper-shell',
-    pageShell: '/runtime/page-shell',
-    pageCapsule: '/runtime/page-capsule',
-    devtoolsHmrRuntime: '/runtime/devtools-hmr',
-    interpreterHmrRuntime: '/runtime/interpreter-hmr'
-} satisfies RuntimeModulesContract
-const { appCapsule: appCapsulePath, appShell: appShellPath, bootstrap: bootstrapPath } = runtimeModules
-const placementRolldownOptions = createPlacementRolldownOptions(createMiniModuleClassifier(runtimeModules))
+const placementRolldownOptions = createPlacementRolldownOptions()
 const fixtureRoot = '/placer-fixture'
 
 type BuildFixture = {
@@ -116,7 +102,7 @@ function moduleId(fileName: string): string {
 }
 
 test('leaves application grouping and asset naming to Vite and Rolldown', () => {
-    const { config } = createMiniPlacementPlugin(runtimeModules)
+    const { config } = createMiniPlacementPlugin()
     assert.ok(typeof config === 'function')
     const resolved: ReturnType<typeof config> = Reflect.apply(config, null, [{}])
     assert.ok(resolved && 'build' in resolved)
@@ -139,9 +125,8 @@ test('rejects placement services and chunk delivery outside their lifecycle phas
     })
     const chunk = output.chunks[0]
     assert.ok(chunk)
-    const plugin = createMiniPlacementPlugin(runtimeModules)
+    const plugin = createMiniPlacementPlugin()
 
-    assert.doesNotThrow(() => plugin.classifyChunk(chunk))
     assert.throws(() => plugin.getPackageLocation(chunk), /placement is unavailable/)
     assert.throws(() => plugin.getPhysicalChunkId(chunk), /placement is unavailable/)
     assert.throws(() => plugin.getPhysicalChunkId(moduleId('lifecycle.js')), /placement is unavailable/)
@@ -419,20 +404,20 @@ test('emits independently named chunks when the package budget splits lazy roots
 test('preserves native shell paths with adjacent capsules and hash-free shared runtime entries', async () => {
     const output = await buildFixture({
         input: {
-            'app.js': appShellPath,
-            'app-capsule': appCapsulePath,
-            bootstrap: bootstrapPath
+            'app.js': miniAppShellId,
+            'app-capsule': miniAppCapsuleId,
+            bootstrap: miniBootstrapId
         },
         modules: {
-            [appShellPath]: `export const shell = 'app'`,
-            [appCapsulePath]: `export default { name: 'app' }`,
-            [bootstrapPath]: `export const bootstrap = true`
+            [miniAppShellId]: `export const shell = 'app'`,
+            [miniAppCapsuleId]: `export default { name: 'app' }`,
+            [miniBootstrapId]: `export const bootstrap = true`
         }
     })
 
-    const shell = findChunk(output.chunks, appShellPath)
-    const capsule = findChunk(output.chunks, appCapsulePath)
-    const bootstrap = findChunk(output.chunks, bootstrapPath)
+    const shell = findChunk(output.chunks, miniAppShellId)
+    const capsule = findChunk(output.chunks, miniAppCapsuleId)
+    const bootstrap = findChunk(output.chunks, miniBootstrapId)
 
     assert.equal(shell.fileName, 'app.js')
     assert.equal(capsule.fileName, 'app-capsule.js')

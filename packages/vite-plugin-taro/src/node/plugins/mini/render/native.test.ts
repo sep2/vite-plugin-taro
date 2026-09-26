@@ -3,36 +3,16 @@ import test from 'node:test'
 import { walk } from 'oxc-walker'
 import { parseSync } from 'rolldown/utils'
 import type { Rolldown } from 'vite'
-import type { RuntimeModulesContract } from '../mini-contract.ts'
-import { createMiniModuleClassifier } from '../module/module.ts'
+import { miniAppCapsuleId, miniBootstrapId } from '../module/module.ts'
 import { renderNative as renderNativeWithRuntime } from './native.ts'
 
-const runtimeModules = {
-    bootstrap: '/runtime/bootstrap',
-    appShell: '/runtime/app-shell',
-    appCapsule: '/runtime/app-capsule',
-    componentShell: '/runtime/component-shell',
-    componentCapsule: '/runtime/component-capsule',
-    customWrapperShell: '/runtime/custom-wrapper-shell',
-    pageShell: '/runtime/page-shell',
-    pageCapsule: '/runtime/page-capsule',
-    devtoolsHmrRuntime: '/runtime/devtools-hmr',
-    interpreterHmrRuntime: '/runtime/interpreter-hmr'
-} satisfies RuntimeModulesContract
-const { appCapsule: appCapsulePath, bootstrap: bootstrapPath } = runtimeModules
-const classifyModule = createMiniModuleClassifier(runtimeModules)
+const appCapsulePath = miniAppCapsuleId
+const bootstrapPath = miniBootstrapId
 
-function renderNative(
-    input: Omit<
-        Parameters<typeof renderNativeWithRuntime>[0],
-        'classifyModule' | 'bootstrapModuleId' | 'getPhysicalChunkId'
-    >
-) {
+function renderNative(input: Omit<Parameters<typeof renderNativeWithRuntime>[0], 'getPhysicalChunkId'>) {
     return renderNativeWithRuntime({
         ...input,
-        bootstrapModuleId: bootstrapPath,
-        getPhysicalChunkId: (chunk) => (typeof chunk === 'string' ? 'assets/bootstrap-a.js' : chunk.fileName),
-        classifyModule: classifyModule
+        getPhysicalChunkId: (chunk) => (typeof chunk === 'string' ? 'assets/bootstrap-a.js' : chunk.fileName)
     })
 }
 
@@ -303,12 +283,10 @@ test('resolves loader imports from placed paths without changing logical dynamic
         code: 'export const load = () => import("./feature.js")',
         chunk: nativeChunk,
         chunks: {},
-        bootstrapModuleId: bootstrapPath,
         getPhysicalChunkId(input) {
             lookups.push(input)
             return typeof input === 'string' ? 'runtime/loader.js' : 'sub/p_fixture/common/worker.js'
         },
-        classifyModule,
         sourcemap: false
     })
     assert.deepEqual(lookups, [nativeChunk, bootstrapPath])
@@ -346,9 +324,7 @@ test('keeps loader access hygienic across a static bootstrap cycle', async () =>
         `,
         chunk: chunk({ fileName: filename, moduleIds: [bootstrapPath], isEntry: true }),
         chunks: {},
-        bootstrapModuleId: bootstrapPath,
         getPhysicalChunkId: () => filename,
-        classifyModule,
         sourcemap: false
     })
     // CommonJS caches the export cell before evaluation. Capture that namespace, not its still-uninitialized System value.

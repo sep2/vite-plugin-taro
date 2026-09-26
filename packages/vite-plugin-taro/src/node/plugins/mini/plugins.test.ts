@@ -7,6 +7,13 @@ import { clientTaroNativeId } from '../client/constant.ts'
 import { createTtMiniContract } from '../tt/plugins.ts'
 import { createWxMiniContract } from '../wx/plugins.ts'
 import { createZfbMiniContract } from '../zfb/plugins.ts'
+import {
+    miniAppCapsuleId,
+    miniAppShellId,
+    miniBootstrapId,
+    miniPageCapsuleId,
+    miniPageShellId
+} from './module/module.ts'
 import { createMiniTargetPlugins } from './plugins.ts'
 
 test('native rendering resolves bootstrap from each output generation rather than an ambient global', async () => {
@@ -22,7 +29,9 @@ test('native rendering resolves bootstrap from each output generation rather tha
     const placement = config.plugins.find((candidate) => candidate.name === 'vpt:mini-placer')
     assert.ok(plugin?.renderChunk)
     assert.ok(placement?.renderStart && placement.renderChunk)
-    const { appShell, appCapsule, bootstrap } = contract.runtime.modules
+    const appShell = miniAppShellId
+    const appCapsule = miniAppCapsuleId
+    const bootstrap = miniBootstrapId
     const sources: ReadonlyMap<string, string> = new Map([
         [appShell, `import config from ${JSON.stringify(appCapsule)}; App(config)`],
         [appCapsule, 'export default { value: 42 }'],
@@ -110,8 +119,8 @@ for (const [target, createContract] of [
         const plugin = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
         assert.ok(plugin?.transform && typeof plugin.transform === 'object')
         assert.equal(plugin.transform.order, 'pre')
-        const appId = normalizePath(contract.runtime.modules.appCapsule)
-        const pageId = normalizePath(contract.runtime.modules.pageCapsule)
+        const appId = normalizePath(miniAppCapsuleId)
+        const pageId = normalizePath(miniPageCapsuleId)
         const appSource = 'export const config = __VPT_APP_CONFIG__'
         const pageSource =
             'const PageComponent = () => null; export const route = __VPT_PAGE_PATH__; export const config = __VPT_PAGE_CONFIG__; export const component = PageComponent'
@@ -130,8 +139,8 @@ for (const [target, createContract] of [
             [`${pageId}/nested.ts`, pageSource],
             [`/fixture${appId}`, appSource],
             [`/fixture/other.ts?original=${pageId}`, pageSource],
-            [normalizePath(contract.runtime.modules.appShell), appSource],
-            [normalizePath(contract.runtime.modules.pageShell), pageSource],
+            [normalizePath(miniAppShellId), appSource],
+            [normalizePath(miniPageShellId), pageSource],
             ['/fixture/interface.ts', `export const marker = ${JSON.stringify(clientTaroNativeId)}`]
         ])
         // Count actual JS dispatches while preserving the original native filter, ordering, and Vite context.

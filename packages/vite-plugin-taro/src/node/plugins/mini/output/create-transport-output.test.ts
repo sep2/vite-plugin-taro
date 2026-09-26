@@ -3,16 +3,15 @@ import test from 'node:test'
 import { walk } from 'oxc-walker'
 import { parseSync } from 'rolldown/utils'
 import type { Rolldown } from 'vite'
-import { type MiniChunkKind, type MiniModuleClassifier, miniTransportFileName } from '../module/module.ts'
+import {
+    type MiniChunkKind,
+    miniAppCapsuleId,
+    miniAppShellId,
+    miniBootstrapId,
+    miniTransportFileName
+} from '../module/module.ts'
 import type { PackageLocation } from '../placer/placement.ts'
 import { createTransportOutput } from './create-transport-output.ts'
-
-// Fixture identities carry explicit classifications; the cross-package execution test uses the production classifier.
-const classifyModule: MiniModuleClassifier = ({ moduleIds }) => {
-    const kind = moduleIds[0]
-    assert.ok(kind === 'native' || kind === 'entry-capsule' || kind === 'normal-capsule' || kind === 'amphibious')
-    return kind
-}
 
 function createChunk(fileName: string, kind: MiniChunkKind): Rolldown.OutputChunk {
     return {
@@ -25,7 +24,14 @@ function createChunk(fileName: string, kind: MiniChunkKind): Rolldown.OutputChun
         isEntry: false,
         isDynamicEntry: false,
         facadeModuleId: null,
-        moduleIds: [kind],
+        moduleIds: [
+            {
+                native: miniAppShellId,
+                'entry-capsule': miniAppCapsuleId,
+                'normal-capsule': '/fixture/application.js',
+                amphibious: miniBootstrapId
+            }[kind]
+        ],
         modules: {},
         exports: [],
         imports: [],
@@ -40,7 +46,7 @@ function getPackageLocation(chunk: Rolldown.OutputChunk): PackageLocation {
 }
 
 function emit(bundle: Rolldown.OutputBundle) {
-    return createTransportOutput({ bundle, classifyModule, getPackageLocation })
+    return createTransportOutput({ bundle, getPackageLocation })
 }
 
 /** Evaluates the emitted CommonJS directly, without another code generator changing its literal paths. */
@@ -257,7 +263,6 @@ test('emits an empty table without loading native shells', () => {
     const shell = createChunk('app.js', 'native')
     const output = createTransportOutput({
         bundle: { [shell.fileName]: shell },
-        classifyModule,
         getPackageLocation: () => assert.fail('Native shells have no transport route')
     })
     const load = evaluate(output.source, () => assert.fail('An empty table must never load a module'))

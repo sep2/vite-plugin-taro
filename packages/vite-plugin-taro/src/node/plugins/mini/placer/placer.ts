@@ -1,12 +1,5 @@
 import type { Plugin, Rolldown } from 'vite'
-import type { RuntimeModulesContract } from '../mini-contract.ts'
-import {
-    createMiniModuleClassifier,
-    isMiniFrameworkVendorModule,
-    isMiniPolyfillModule,
-    type MiniChunkKind,
-    type MiniModuleClassifier
-} from '../module/module.ts'
+import { classifyMiniModule, isMiniFrameworkVendorModule, isMiniPolyfillModule } from '../module/module.ts'
 import { getNativeComponentAssetBytes } from '../native/native-component-assets.ts'
 import { createPlacement, type GeneratedSubpackage, type PackageLocation, type Placement } from './placement.ts'
 
@@ -25,7 +18,6 @@ type PlacementState =
 /** Placement services consumed by the later Mini Program rendering and output hooks. */
 export type MiniPlacementPlugin = Plugin &
     Readonly<{
-        classifyChunk(chunk: Rolldown.PreRenderedChunk | Rolldown.RenderedChunk): MiniChunkKind
         getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation
         getPhysicalChunkId(chunk: Rolldown.RenderedChunk | string): string
         getSubpackages(): readonly GeneratedSubpackage[]
@@ -35,7 +27,7 @@ export type MiniPlacementPlugin = Plugin &
  * Rolldown options owned by Mini Program placement. Every field enforces a distinct output invariant. The plugin returns this object
  * from its config hook, while direct Rolldown integration tests reuse the same value to exercise the identical lifecycle.
  */
-export function createPlacementRolldownOptions(classifyChunk: MiniModuleClassifier) {
+export function createPlacementRolldownOptions() {
     return {
         /**
          * Rolldown owns shared chunk names and collision handling. LTHP adds physical package prefixes
@@ -67,7 +59,7 @@ export function createPlacementRolldownOptions(classifyChunk: MiniModuleClassifi
             },
             /** Native shells retain their public routes; capsules live beside them and shared runtime entries live in common/. */
             entryFileNames(chunk: Rolldown.PreRenderedChunk): string {
-                switch (classifyChunk(chunk)) {
+                switch (classifyMiniModule(chunk)) {
                     case 'native':
                         return '[name]'
                     case 'entry-capsule':
@@ -104,9 +96,7 @@ export function createPlacementRolldownOptions(classifyChunk: MiniModuleClassifi
  * performs one whole-state transition, so stale graph state, duplicate planning, and partially reset generations are
  * unrepresentable.
  */
-export function createMiniPlacementPlugin(modules: RuntimeModulesContract): MiniPlacementPlugin {
-    const classifyChunk = createMiniModuleClassifier(modules)
-
+export function createMiniPlacementPlugin(): MiniPlacementPlugin {
     // This one mutable cell is the output-generation state machine described above; hooks replace it atomically by phase.
     let state: PlacementState = { phase: 'idle' }
 
@@ -123,7 +113,7 @@ export function createMiniPlacementPlugin(modules: RuntimeModulesContract): Mini
         config() {
             return {
                 build: {
-                    rolldownOptions: createPlacementRolldownOptions(classifyChunk)
+                    rolldownOptions: createPlacementRolldownOptions()
                 }
             }
         },
@@ -163,10 +153,6 @@ export function createMiniPlacementPlugin(modules: RuntimeModulesContract): Mini
                     subpackages: placement.finalize(bundle)
                 }
             }
-        },
-
-        classifyChunk(chunk: Rolldown.PreRenderedChunk | Rolldown.RenderedChunk): MiniChunkKind {
-            return classifyChunk(chunk)
         },
 
         getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation {

@@ -8,7 +8,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import type { DevOptions } from 'rolldown/experimental'
 import { createLogger, createServer } from 'vite'
 import { resolveRuntimeFile } from '../../../utils/packages.ts'
-import type { MiniContract, RuntimeModulesContract } from '../mini-contract.ts'
+import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
 import type { MiniStylePlugin } from '../styles/plugins.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
 import { hmrEndpointPath } from './hmr-protocol.ts'
@@ -26,17 +26,9 @@ type SyntheticDev = (_input: unknown, _output: unknown, devOptions: DevOptions) 
 const devHostHarnessKey = '__vptDevHostTestHarness__'
 
 const runtimeModules = {
-    bootstrap: resolveRuntimeFile('mini/amphibious/bootstrap'),
-    appShell: resolveRuntimeFile('mini/native/app'),
-    appCapsule: resolveRuntimeFile('mini/capsule/app'),
-    componentShell: resolveRuntimeFile('mini/native/component'),
-    componentCapsule: resolveRuntimeFile('mini/capsule/component'),
-    customWrapperShell: resolveRuntimeFile('mini/native/custom-wrapper'),
-    pageShell: resolveRuntimeFile('mini/native/page'),
-    pageCapsule: resolveRuntimeFile('mini/capsule/page'),
     devtoolsHmrRuntime: resolveRuntimeFile('wx/dev/devtools-runtime'),
     interpreterHmrRuntime: resolveRuntimeFile('wx/dev/interpreter-runtime')
-} satisfies RuntimeModulesContract
+} satisfies RuntimeContract
 
 const contract = {
     options: {
@@ -208,7 +200,7 @@ test('reduces synthetic engine update variants and unknown host failures without
             server: server,
             contract: contract,
             styles: styles,
-            hmrMode: createDevtoolsHmrMode(runtimeModules)
+            hmrMode: createDevtoolsHmrMode(runtimeModules.devtoolsHmrRuntime)
         })
         const bundledDev = requireBundledDev(server.environments.client.bundledDev)
 

@@ -24,9 +24,7 @@ function compile(code: string, sourcemap: boolean) {
         code,
         chunk,
         chunks: {},
-        bootstrapModuleId: '/bootstrap.js',
         getPhysicalChunkId: () => assert.fail('These traversal fixtures need no loader dependency'),
-        classifyModule: () => assert.fail('These fixtures have no imported chunks to classify'),
         sourcemap
     })
 }

@@ -1,22 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { interpreterServerEvent } from '../../../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
-import type { RuntimeModulesContract } from '../../../mini-contract.ts'
 import type { PatchPublication, PatchUpdate } from '../../hmr-protocol.ts'
 import { createInterpreterHmrMode } from './interpreter-hmr-mode.ts'
 
-const modules: RuntimeModulesContract = {
-    bootstrap: '/runtime/bootstrap',
-    appShell: '/runtime/app-shell',
-    appCapsule: '/runtime/app-capsule',
-    componentShell: '/runtime/component-shell',
-    componentCapsule: '/runtime/component-capsule',
-    customWrapperShell: '/runtime/custom-wrapper-shell',
-    pageShell: '/runtime/native/page.ts',
-    pageCapsule: '/runtime/page-capsule',
-    devtoolsHmrRuntime: '/runtime/devtools-runtime.ts',
-    interpreterHmrRuntime: '/runtime/interpreter-runtime.ts'
-}
+const runtimeFile = '/runtime/interpreter-runtime.ts'
 
 const patch: PatchUpdate = {
     type: 'Patch',
@@ -27,7 +15,7 @@ const patch: PatchUpdate = {
 }
 
 test('initializes only the App entry and installs no Page transform', () => {
-    const mode = createInterpreterHmrMode(modules)
+    const mode = createInterpreterHmrMode(runtimeFile)
     const banner = mode.createEntryBanner(new Set(['pages/home/index.js']))
 
     assert.equal(
@@ -36,11 +24,11 @@ test('initializes only the App entry and installs no Page transform', () => {
     )
     assert.equal(banner({ name: 'pages/home/index.js', fileName: 'pages/home/index.js' }), '')
     assert.deepEqual(mode.plugins, [])
-    assert.equal(mode.runtimeFile, modules.interpreterHmrRuntime)
+    assert.equal(mode.runtimeFile, runtimeFile)
 })
 
 test('describes publication events without owning their transport', () => {
-    const mode = createInterpreterHmrMode(modules)
+    const mode = createInterpreterHmrMode(runtimeFile)
     const publication: PatchPublication = { buildId: 'build', patches: [patch] }
     const publish = mode.publish
 

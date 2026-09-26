@@ -14,7 +14,8 @@ import {
 } from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
 import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
-import type { MiniContract, RuntimeModulesContract } from '../mini-contract.ts'
+import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
+import { miniAppCapsuleId, miniPageCapsuleId } from '../module/module.ts'
 import { createMiniStylePlugin } from '../styles/plugins.ts'
 import { createMiniDevHost } from './dev-host.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
@@ -31,17 +32,9 @@ const waitIntervalMilliseconds = 25
 const pageCapsuleFileName = 'pages/home/index-capsule.js'
 
 const runtimeModules = {
-    bootstrap: resolveRuntimeFile('mini/amphibious/bootstrap'),
-    appShell: resolveRuntimeFile('mini/native/app'),
-    appCapsule: resolveRuntimeFile('mini/capsule/app'),
-    componentShell: resolveRuntimeFile('mini/native/component'),
-    componentCapsule: resolveRuntimeFile('mini/capsule/component'),
-    customWrapperShell: resolveRuntimeFile('mini/native/custom-wrapper'),
-    pageShell: resolveRuntimeFile('mini/native/page'),
-    pageCapsule: resolveRuntimeFile('mini/capsule/page'),
     devtoolsHmrRuntime: resolveRuntimeFile('wx/dev/devtools-runtime'),
     interpreterHmrRuntime: resolveRuntimeFile('wx/dev/interpreter-runtime')
-} satisfies RuntimeModulesContract
+} satisfies RuntimeContract
 
 type DevFixture = Readonly<{
     close: () => Promise<void>
@@ -179,11 +172,9 @@ async function startDevFixture(
                             const page = bundle[pageCapsuleFileName]
                             assert.ok(app?.type === 'chunk' && page?.type === 'chunk')
                             assert.ok(app.moduleIds.includes(normalizePath(path.join(root, 'src/app.tsx'))))
-                            assert.ok(app.moduleIds.includes(runtimeModules.appCapsule))
+                            assert.ok(app.moduleIds.includes(miniAppCapsuleId))
                             assert.ok(page.moduleIds.includes(normalizePath(pagePath)))
-                            assert.ok(
-                                page.moduleIds.includes(`${runtimeModules.pageCapsule}?route=pages%2Fhome%2Findex`)
-                            )
+                            assert.ok(page.moduleIds.includes(`${miniPageCapsuleId}?route=pages%2Fhome%2Findex`))
                             assert.match(page.code, /resolvePageComponent\([`"']src\/pages\/home\/index\.tsx[`"']/)
                             assert.ok(bundle['app.js'])
                             assert.ok(bundle['pages/home/index.js'])
@@ -459,7 +450,7 @@ test('rejects a server without Vite bundled development ownership', async (conte
                 server: server,
                 contract: contract,
                 styles: createMiniStylePlugin(contract, [import.meta.filename]),
-                hmrMode: createDevtoolsHmrMode(runtimeModules)
+                hmrMode: createDevtoolsHmrMode(runtimeModules.devtoolsHmrRuntime)
             }),
         /Vite did not create the Mini Program bundled-development environment/
     )

@@ -22,18 +22,8 @@ export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
             targetRuntimePath: packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-weapp/runtime')
         },
         runtime: {
-            modules: {
-                bootstrap: resolveRuntimeFile('mini/amphibious/bootstrap'),
-                appShell: resolveRuntimeFile('mini/native/app'),
-                appCapsule: resolveRuntimeFile('mini/capsule/app'),
-                componentShell: resolveRuntimeFile('mini/native/component'),
-                componentCapsule: resolveRuntimeFile('mini/capsule/component'),
-                customWrapperShell: resolveRuntimeFile('mini/native/custom-wrapper'),
-                pageShell: resolveRuntimeFile('mini/native/page'),
-                pageCapsule: resolveRuntimeFile('mini/capsule/page'),
-                devtoolsHmrRuntime: resolveRuntimeFile('wx/dev/devtools-runtime'),
-                interpreterHmrRuntime: resolveRuntimeFile('wx/dev/interpreter-runtime')
-            }
+            devtoolsHmrRuntime: resolveRuntimeFile('wx/dev/devtools-runtime'),
+            interpreterHmrRuntime: resolveRuntimeFile('wx/dev/interpreter-runtime')
         },
         styles: {
             appFileName: 'app.wxss',

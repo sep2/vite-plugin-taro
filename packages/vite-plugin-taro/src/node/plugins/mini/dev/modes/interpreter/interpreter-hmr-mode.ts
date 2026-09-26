@@ -1,15 +1,14 @@
 import { interpreterServerEvent } from '../../../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
-import type { RuntimeModulesContract } from '../../../mini-contract.ts'
 import { appShellFileName } from '../../../module/module.ts'
 import { hmrInfoFileName } from '../../hmr-files.ts'
 import type { MiniHmrMode } from '../../hmr-mode.ts'
 import type { PatchPublication } from '../../hmr-protocol.ts'
 
 /** Creates the pure interpreter adapter whose events are dispatched by the shared development host. */
-export function createInterpreterHmrMode(modules: RuntimeModulesContract): MiniHmrMode {
+export function createInterpreterHmrMode(runtimeFile: string): MiniHmrMode {
     return {
         rebuildStrategy: 'on-failure',
-        runtimeFile: modules.interpreterHmrRuntime,
+        runtimeFile,
         plugins: [],
         createEntryBanner: createInterpreterEntryBanner,
         publish: (publication: PatchPublication) => ({

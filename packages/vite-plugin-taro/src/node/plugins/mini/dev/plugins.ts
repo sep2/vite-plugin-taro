@@ -7,7 +7,7 @@ import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
 import { createExactModuleIdFilter } from '../../../utils/modules.ts'
 import type { MiniContract } from '../mini-contract.ts'
-import { pageComponentId, rolldownRuntimeId } from '../module/module.ts'
+import { miniPageCapsuleId, pageComponentId, rolldownRuntimeId } from '../module/module.ts'
 import type { MiniStylePlugin } from '../styles/plugins.ts'
 import { createMiniDevHost, type MiniDevHost } from './dev-host.ts'
 import { createMiniHmrMode } from './hmr-mode.ts'
@@ -29,7 +29,7 @@ export function isMiniClientEnvironment(environment: Readonly<{ name: string }>)
  */
 export function createMiniDevelopmentPlugin(contract: MiniContract, styles: MiniStylePlugin): PluginOption[] {
     // Resolve once so plugins, journal effects, entry banners, and runtime bundling cannot disagree about the active mechanism.
-    const hmrMode = createMiniHmrMode(contract.options.hmr, contract.runtime.modules)
+    const hmrMode = createMiniHmrMode(contract.options.hmr, contract.runtime)
 
     /*
      * Vite creates this plugin descriptor before a server or DevEngine exists, then invokes configureServer and closeBundle on
@@ -120,7 +120,7 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
             apply: 'serve',
             transform: {
                 order: 'pre',
-                filter: { id: createExactModuleIdFilter(contract.runtime.modules.pageCapsule) },
+                filter: { id: createExactModuleIdFilter(miniPageCapsuleId) },
                 async handler(capsuleCode, capsuleId) {
                     // The capsule ID carries the route, so Vite resolves its actual Page import here. Reconstructing a path
                     // from the route would drift from the resolver if the source layout or extension changes.

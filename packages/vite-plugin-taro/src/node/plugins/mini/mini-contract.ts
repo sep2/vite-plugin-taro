@@ -8,23 +8,10 @@ export type TaroContract = {
     targetRuntimePath: string
 }
 
-/** Physical runtime modules selected by one Mini Program target. */
-export type RuntimeModulesContract = {
-    bootstrap: string
-    appShell: string
-    appCapsule: string
-    componentShell: string
-    componentCapsule: string
-    customWrapperShell: string
-    pageShell: string
-    pageCapsule: string
+/** Target-specific development runtimes; shared Mini entry IDs live beside their source modules. */
+export type RuntimeContract = {
     devtoolsHmrRuntime: string
     interpreterHmrRuntime: string
-}
-
-/** Physical runtime selection for one Mini Program target. */
-export type RuntimeContract = {
-    modules: RuntimeModulesContract
 }
 
 /** Style output names selected by one Mini Program target. */

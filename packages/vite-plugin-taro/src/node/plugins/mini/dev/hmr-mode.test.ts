@@ -1,26 +1,18 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { RuntimeModulesContract } from '../mini-contract.ts'
+import type { RuntimeContract } from '../mini-contract.ts'
 import { createMiniHmrMode } from './hmr-mode.ts'
 
-const modules: RuntimeModulesContract = {
-    bootstrap: '/runtime/bootstrap',
-    appShell: '/runtime/app-shell',
-    appCapsule: '/runtime/app-capsule',
-    componentShell: '/runtime/component-shell',
-    componentCapsule: '/runtime/component-capsule',
-    customWrapperShell: '/runtime/custom-wrapper-shell',
-    pageShell: '/runtime/native/page.ts',
-    pageCapsule: '/runtime/page-capsule',
+const runtime: RuntimeContract = {
     devtoolsHmrRuntime: '/runtime/devtools-runtime.ts',
     interpreterHmrRuntime: '/runtime/interpreter-runtime.ts'
 }
 
 test('defaults to DevTools and resolves every public update mode', () => {
-    const defaultMode = createMiniHmrMode(undefined, modules)
-    const devtoolsMode = createMiniHmrMode({ mode: 'devtools' }, modules)
-    const interpreterMode = createMiniHmrMode({ mode: 'interpreter' }, modules)
-    const rebuildMode = createMiniHmrMode({ mode: 'rebuild' }, modules)
+    const defaultMode = createMiniHmrMode(undefined, runtime)
+    const devtoolsMode = createMiniHmrMode({ mode: 'devtools' }, runtime)
+    const interpreterMode = createMiniHmrMode({ mode: 'interpreter' }, runtime)
+    const rebuildMode = createMiniHmrMode({ mode: 'rebuild' }, runtime)
 
     assert.equal(defaultMode.rebuildStrategy, 'on-failure')
     assert.equal(devtoolsMode.rebuildStrategy, 'on-failure')

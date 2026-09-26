@@ -3,11 +3,19 @@ import { normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId, resolveAppComponentPath, resolvePageComponentPath } from '../../../utils/modules.ts'
 import { createAppConfig } from '../../../utils/project-config.ts'
 import { appComponentId } from '../../client/constant.ts'
-import type { MiniContract, MiniPage, RuntimeModulesContract } from '../mini-contract.ts'
+import type { MiniContract, MiniPage } from '../mini-contract.ts'
 import {
     appShellFileName,
     componentShellFileName,
     customWrapperShellFileName,
+    miniAppCapsuleId,
+    miniAppShellId,
+    miniBootstrapId,
+    miniComponentCapsuleId,
+    miniComponentShellId,
+    miniCustomWrapperShellId,
+    miniPageCapsuleId,
+    miniPageShellId,
     miniTransportFileName,
     miniTransportId,
     pageCapsuleId,
@@ -22,19 +30,19 @@ import { specializePageCapsule } from './specialize-page-capsule.ts'
 type PrivateIdResolver = (importer: string | undefined, projectRoot: string) => string
 
 /** Creates the resolver and source specializer for one Mini Program module graph. */
-export function createResolver(contract: Pick<MiniContract, 'options' | 'runtime' | 'taro'>) {
-    const normalizedAppCapsulePath = normalizePath(contract.runtime.modules.appCapsule)
-    const normalizedPageCapsulePath = normalizePath(contract.runtime.modules.pageCapsule)
+export function createResolver(contract: Pick<MiniContract, 'options' | 'taro'>) {
+    const normalizedAppCapsulePath = normalizePath(miniAppCapsuleId)
+    const normalizedPageCapsulePath = normalizePath(miniPageCapsuleId)
 
     // Construct output input and application traversal roots together once so style order cannot drift from route order.
-    const entryGraph = createEntryGraph(contract.options.pages, contract.runtime.modules)
+    const entryGraph = createEntryGraph(contract.options.pages)
 
     // Provide constant-time route validation and access to each configured Page JSON object.
     const pageByPath = new Map(contract.options.pages.map((page) => [page.path, page]))
 
     const privateIdResolvers = new Map<string, PrivateIdResolver>([
         // Share bootstrap's preload identity through native require and its amphibious SystemJS registration.
-        [vitePreloadId, () => contract.runtime.modules.bootstrap],
+        [vitePreloadId, () => miniBootstrapId],
         [taroTargetRuntimeId, () => contract.taro.targetRuntimePath],
         // Keep the configured App component behind one stable private import in the App capsule.
         [
@@ -55,7 +63,7 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'runtime
                 // Query-qualify the capsule source so every Page retains a distinct graph identity.
                 const page = requireConfiguredPage({ moduleId: importer, pageByPath })
 
-                return createRouteModuleId({ moduleId: contract.runtime.modules.pageCapsule, pagePath: page.path })
+                return createRouteModuleId({ moduleId: miniPageCapsuleId, pagePath: page.path })
             }
         ]
     ])
@@ -97,26 +105,26 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'runtime
 }
 
 /** Declares output entries and the ordered application subset that can own user styles. */
-function createEntryGraph(pages: readonly MiniPage[], modules: RuntimeModulesContract) {
+function createEntryGraph(pages: readonly MiniPage[]) {
     const pageEntries = pages.map((page) => {
         return {
-            capsuleId: createRouteModuleId({ moduleId: modules.pageCapsule, pagePath: page.path }),
+            capsuleId: createRouteModuleId({ moduleId: miniPageCapsuleId, pagePath: page.path }),
             capsuleName: `${page.path}-capsule`,
-            shellId: createRouteModuleId({ moduleId: modules.pageShell, pagePath: page.path }),
+            shellId: createRouteModuleId({ moduleId: miniPageShellId, pagePath: page.path }),
             shellName: `${page.path}.js`
         }
     })
 
     return {
         // The App owns the first global cascade layer; configured Pages follow in their declared route order.
-        applicationEntryIds: [modules.appCapsule, ...pageEntries.map((entry) => entry.capsuleId)],
+        applicationEntryIds: [miniAppCapsuleId, ...pageEntries.map((entry) => entry.capsuleId)],
         input: Object.fromEntries([
-            ['bootstrap', modules.bootstrap],
-            [appShellFileName, modules.appShell],
-            ['app-capsule', modules.appCapsule],
-            [componentShellFileName, modules.componentShell],
-            ['component-capsule', modules.componentCapsule],
-            [customWrapperShellFileName, modules.customWrapperShell],
+            ['bootstrap', miniBootstrapId],
+            [appShellFileName, miniAppShellId],
+            ['app-capsule', miniAppCapsuleId],
+            [componentShellFileName, miniComponentShellId],
+            ['component-capsule', miniComponentCapsuleId],
+            [customWrapperShellFileName, miniCustomWrapperShellId],
             ...pageEntries.flatMap((entry) => {
                 return [
                     [entry.shellName, entry.shellId],

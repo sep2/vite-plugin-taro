@@ -6,7 +6,7 @@ import type { AstTransformResult } from '../../utils/transform.ts'
 import { createMiniDevelopmentPlugin } from './dev/plugins.ts'
 import { createMiniGlobalPlugin } from './global/create-mini-global-plugin.ts'
 import type { MiniContract } from './mini-contract.ts'
-import { miniRuntimeId } from './module/module.ts'
+import { classifyMiniModule, miniAppCapsuleId, miniPageCapsuleId, miniRuntimeId } from './module/module.ts'
 import { createMiniNativeComponentPlugin } from './native/create-mini-native-component-plugin.ts'
 import { createTransportOutput } from './output/create-transport-output.ts'
 import { createOutputFiles } from './output/files.ts'
@@ -26,7 +26,7 @@ export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] 
 
     // Reuse the resolver instance's ordered application subset. Rolldown's complete input also contains bootstrap,
     // shell, and component entries; entry membership alone cannot recover which roots define the App/Page CSS cascade.
-    const placement = createMiniPlacementPlugin(contract.runtime.modules)
+    const placement = createMiniPlacementPlugin()
     const styles = createMiniStylePlugin(contract, resolver.applicationEntryIds)
 
     return [
@@ -106,9 +106,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
         transform: {
             order: 'pre',
             filter: {
-                id: [contract.runtime.modules.appCapsule, contract.runtime.modules.pageCapsule].map(
-                    createExactModuleIdFilter
-                )
+                id: [miniAppCapsuleId, miniPageCapsuleId].map(createExactModuleIdFilter)
             },
             handler(code, id) {
                 return resolver.specialize(code, id, Boolean(this.environment.config.build.sourcemap))
@@ -120,7 +118,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
             handler(code, chunk, outputOptions, meta): AstTransformResult {
                 // The placement plugin runs first and has already created immutable placement from this complete chunk graph.
 
-                const kind = placement.classifyChunk(chunk)
+                const kind = classifyMiniModule(chunk)
                 const sourcemap = Boolean(outputOptions.sourcemap)
 
                 switch (kind) {
@@ -135,9 +133,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                             code,
                             chunk,
                             chunks: meta.chunks,
-                            bootstrapModuleId: contract.runtime.modules.bootstrap,
                             getPhysicalChunkId: placement.getPhysicalChunkId,
-                            classifyModule: placement.classifyChunk,
                             sourcemap
                         })
                     }
@@ -159,13 +155,7 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                 const subpackages = placement.getSubpackages()
 
                 // Emit after minification so native loaders always receive quoted literal paths, without a repair pass.
-                this.emitFile(
-                    createTransportOutput({
-                        bundle,
-                        classifyModule: placement.classifyChunk,
-                        getPackageLocation: placement.getPackageLocation
-                    })
-                )
+                this.emitFile(createTransportOutput({ bundle, getPackageLocation: placement.getPackageLocation }))
 
                 const outputFiles = await createOutputFiles({
                     bundle,

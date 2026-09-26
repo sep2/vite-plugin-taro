@@ -16,25 +16,17 @@ import { type BuildOptions, createLogger, createServer } from 'vite'
 import { packageRequire, resolveRuntimeFile } from '../../../utils/packages.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
 import { createZfbMiniContract } from '../../zfb/plugins.ts'
-import type { MiniContract, RuntimeModulesContract } from '../mini-contract.ts'
+import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
+import { createMiniHmrMode } from './hmr-mode.ts'
 import { createMiniDevOptionsPlugin, requireSingleOutput } from './mini-dev-options.ts'
 import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
-import { createInterpreterHmrMode } from './modes/interpreter/interpreter-hmr-mode.ts'
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 
 const runtimeModules = {
-    bootstrap: resolveRuntimeFile('mini/amphibious/bootstrap'),
-    appShell: resolveRuntimeFile('mini/native/app'),
-    appCapsule: resolveRuntimeFile('mini/capsule/app'),
-    componentShell: resolveRuntimeFile('mini/native/component'),
-    componentCapsule: resolveRuntimeFile('mini/capsule/component'),
-    customWrapperShell: resolveRuntimeFile('mini/native/custom-wrapper'),
-    pageShell: resolveRuntimeFile('mini/native/page'),
-    pageCapsule: resolveRuntimeFile('mini/capsule/page'),
     devtoolsHmrRuntime: resolveRuntimeFile('wx/dev/devtools-runtime'),
     interpreterHmrRuntime: resolveRuntimeFile('wx/dev/interpreter-runtime')
-} satisfies RuntimeModulesContract
+} satisfies RuntimeContract
 
 const options = {
     options: {
@@ -50,7 +42,7 @@ const options = {
         projectConfigJson: {}
     }
 } satisfies Pick<MiniContract, 'options'>
-const hmrMode = createDevtoolsHmrMode(runtimeModules)
+const hmrMode = createDevtoolsHmrMode(runtimeModules.devtoolsHmrRuntime)
 
 /** These tests inspect options only: never watch workspace files or populate its shared dependency cache. */
 async function createOptionsServer(context: TestContext, build: BuildOptions) {
@@ -344,10 +336,7 @@ for (const [target, createContract] of [
     ['zfb', createZfbMiniContract],
     ['tt', createTtMiniContract]
 ] as const) {
-    for (const [mode, createMode] of [
-        ['devtools', createDevtoolsHmrMode],
-        ['interpreter', createInterpreterHmrMode]
-    ] as const) {
+    for (const mode of ['devtools', 'interpreter'] as const) {
         test(`passes the shared global to ${target} ${mode} HMR without virtual imports`, async (context) => {
             const contract = createContract({
                 target,
@@ -360,7 +349,7 @@ for (const [target, createContract] of [
             const plugin = createMiniDevOptionsPlugin({
                 server,
                 contract,
-                hmrMode: createMode(contract.runtime.modules)
+                hmrMode: createMiniHmrMode({ mode }, contract.runtime)
             })
             const adapted = await plugin.options({})
             const devMode = adapted.experimental?.devMode

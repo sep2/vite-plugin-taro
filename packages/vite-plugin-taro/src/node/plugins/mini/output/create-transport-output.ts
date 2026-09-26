@@ -1,7 +1,7 @@
 import path from 'node:path'
 import type { Rolldown } from 'vite'
 import { toLogicalChunkId } from '../module/chunk-path.ts'
-import { type MiniModuleClassifier, miniTransportFileName } from '../module/module.ts'
+import { classifyMiniModule, miniTransportFileName } from '../module/module.ts'
 import type { PackageLocation } from '../placer/placement.ts'
 
 /**
@@ -23,11 +23,9 @@ import type { PackageLocation } from '../placer/placement.ts'
  */
 export function createTransportOutput({
     bundle,
-    classifyModule,
     getPackageLocation
 }: {
     bundle: Rolldown.OutputBundle
-    classifyModule: MiniModuleClassifier
     getPackageLocation(chunk: Rolldown.OutputChunk): PackageLocation
 }) {
     // Fixed syntax and JSON-encoded paths produce CommonJS shaped like:
@@ -52,7 +50,7 @@ export function createTransportOutput({
         if (chunk.type !== 'chunk') {
             continue
         }
-        const kind = classifyModule(chunk)
+        const kind = classifyMiniModule(chunk)
         if (kind === 'native') {
             continue
         }

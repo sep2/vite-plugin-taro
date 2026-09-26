@@ -6,29 +6,23 @@ import path from 'node:path'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
 import { packageRequire } from '../../../utils/packages.ts'
-import type { RuntimeModulesContract } from '../mini-contract.ts'
 import {
-    createMiniModuleClassifier,
+    classifyMiniModule,
     isMiniPolyfillModule,
+    miniAppCapsuleId,
+    miniAppShellId,
+    miniBootstrapId,
+    miniComponentCapsuleId,
+    miniComponentShellId,
+    miniCustomWrapperShellId,
+    miniPageCapsuleId,
+    miniPageShellId,
     miniPolyfillsId,
     rolldownRuntimeId,
     vptGlobalBindingId
 } from './module.ts'
 
-const modules: RuntimeModulesContract = {
-    bootstrap: '/runtime/bootstrap',
-    appShell: '/runtime/app-shell',
-    appCapsule: '/runtime/app-capsule',
-    componentShell: '/runtime/component-shell',
-    componentCapsule: '/runtime/component-capsule',
-    customWrapperShell: '/runtime/custom-wrapper-shell',
-    pageShell: '/runtime/page-shell',
-    pageCapsule: '/runtime/page-capsule',
-    devtoolsHmrRuntime: '/runtime/devtools-hmr',
-    interpreterHmrRuntime: '/runtime/interpreter-hmr'
-}
-
-const classifyModule = createMiniModuleClassifier(modules)
+const classifyModule = classifyMiniModule
 
 function chunk(...moduleIds: string[]): Rolldown.PreRenderedChunk {
     return {
@@ -42,17 +36,17 @@ function chunk(...moduleIds: string[]): Rolldown.PreRenderedChunk {
 }
 
 test('classifies native lifecycle shells and entry capsules by module identity', () => {
-    for (const moduleId of [modules.appShell, modules.pageShell, modules.componentShell, modules.customWrapperShell]) {
+    for (const moduleId of [miniAppShellId, miniPageShellId, miniComponentShellId, miniCustomWrapperShellId]) {
         assert.equal(classifyModule(chunk('/dependency', moduleId)), 'native')
     }
-    for (const moduleId of [modules.appCapsule, modules.pageCapsule, modules.componentCapsule]) {
+    for (const moduleId of [miniAppCapsuleId, miniPageCapsuleId, miniComponentCapsuleId]) {
         assert.equal(classifyModule(chunk('/dependency', moduleId)), 'entry-capsule')
     }
 })
 
 test('recognizes route-qualified lifecycle entries', () => {
-    assert.equal(classifyModule(chunk(`${modules.pageShell}?route=pages%2Fhome`)), 'native')
-    assert.equal(classifyModule(chunk(`${modules.pageCapsule}?route=pages%2Fhome`)), 'entry-capsule')
+    assert.equal(classifyModule(chunk(`${miniPageShellId}?route=pages%2Fhome`)), 'native')
+    assert.equal(classifyModule(chunk(`${miniPageCapsuleId}?route=pages%2Fhome`)), 'entry-capsule')
 })
 
 test('classifies application-only and empty chunks as normal capsules', () => {
@@ -61,7 +55,7 @@ test('classifies application-only and empty chunks as normal capsules', () => {
 })
 
 test('classifies standalone and grouped infrastructure as amphibious', () => {
-    for (const moduleId of [modules.bootstrap, vptGlobalBindingId, miniPolyfillsId, rolldownRuntimeId]) {
+    for (const moduleId of [miniBootstrapId, vptGlobalBindingId, miniPolyfillsId, rolldownRuntimeId]) {
         assert.equal(classifyModule(chunk('/dependency', moduleId)), 'amphibious')
     }
     // Classification depends on module identities, not whether Rolldown keeps infrastructure in separate chunks.
@@ -142,7 +136,7 @@ for (const layout of ['installed', 'linked'] as const) {
         const fixtureModule: typeof import('./module.ts') = await import(
             new URL(`./module.ts?layout=${layout}`, import.meta.url).href
         )
-        const classifyFixture = fixtureModule.createMiniModuleClassifier(modules)
+        const classifyFixture = fixtureModule.classifyMiniModule
         for (const [name, packageRoot] of Object.entries(packageRoots)) {
             const moduleId = path.join(packageRoot, 'index.js')
             assert.equal(fixtureModule.isMiniFrameworkVendorModule(moduleId), name !== 'core-js')

@@ -20,18 +20,8 @@ export function createTtMiniContract(options: VptOptions): MiniContract {
             targetRuntimePath: resolveRuntimeFile('tt/taro-runtime')
         },
         runtime: {
-            modules: {
-                bootstrap: resolveRuntimeFile('mini/amphibious/bootstrap'),
-                appShell: resolveRuntimeFile('mini/native/app'),
-                appCapsule: resolveRuntimeFile('mini/capsule/app'),
-                componentShell: resolveRuntimeFile('mini/native/component'),
-                componentCapsule: resolveRuntimeFile('mini/capsule/component'),
-                customWrapperShell: resolveRuntimeFile('mini/native/custom-wrapper'),
-                pageShell: resolveRuntimeFile('mini/native/page'),
-                pageCapsule: resolveRuntimeFile('mini/capsule/page'),
-                devtoolsHmrRuntime: resolveRuntimeFile('tt/dev/devtools-runtime'),
-                interpreterHmrRuntime: resolveRuntimeFile('tt/dev/interpreter-runtime')
-            }
+            devtoolsHmrRuntime: resolveRuntimeFile('tt/dev/devtools-runtime'),
+            interpreterHmrRuntime: resolveRuntimeFile('tt/dev/interpreter-runtime')
         },
         styles: {
             appFileName: 'app.ttss',

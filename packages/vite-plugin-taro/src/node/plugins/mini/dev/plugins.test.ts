@@ -1,23 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { resolveConfig } from 'vite'
-import type { MiniContract, RuntimeModulesContract } from '../mini-contract.ts'
+import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
 import { pageComponentId } from '../module/module.ts'
 import { createMiniStylePlugin } from '../styles/plugins.ts'
 import { createMiniDevelopmentPlugin, isMiniClientEnvironment, removeDevelopmentAppStyle } from './plugins.ts'
 
 const runtimeModules = {
-    bootstrap: '/runtime/bootstrap.ts',
-    appShell: '/runtime/app-shell.ts',
-    appCapsule: '/runtime/app-capsule.ts',
-    componentShell: '/runtime/component-shell.ts',
-    componentCapsule: '/runtime/component-capsule.ts',
-    customWrapperShell: '/runtime/custom-wrapper-shell.ts',
-    pageShell: '/runtime/page-shell.ts',
-    pageCapsule: '/runtime/page-capsule.ts',
     devtoolsHmrRuntime: '/runtime/devtools-hmr.ts',
     interpreterHmrRuntime: '/runtime/interpreter-hmr.ts'
-} satisfies RuntimeModulesContract
+} satisfies RuntimeContract
 
 const contract = {
     options: {
@@ -32,9 +24,7 @@ const contract = {
         componentsReactPath: '/runtime/components-react.ts',
         targetRuntimePath: '/runtime/target.ts'
     },
-    runtime: {
-        modules: runtimeModules
-    },
+    runtime: runtimeModules,
     styles: {
         appFileName: 'app.native.css',
         globalFileName: 'assets/global.native.css'

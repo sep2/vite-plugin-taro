@@ -22,18 +22,8 @@ export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
             targetRuntimePath: packageRequire.resolve('vite-plugin-taro-runtime/plugin-platform-alipay/runtime')
         },
         runtime: {
-            modules: {
-                bootstrap: resolveRuntimeFile('mini/amphibious/bootstrap'),
-                appShell: resolveRuntimeFile('mini/native/app'),
-                appCapsule: resolveRuntimeFile('mini/capsule/app'),
-                componentShell: resolveRuntimeFile('mini/native/component'),
-                componentCapsule: resolveRuntimeFile('mini/capsule/component'),
-                customWrapperShell: resolveRuntimeFile('mini/native/custom-wrapper'),
-                pageShell: resolveRuntimeFile('mini/native/page'),
-                pageCapsule: resolveRuntimeFile('mini/capsule/page'),
-                devtoolsHmrRuntime: resolveRuntimeFile('zfb/dev/devtools-runtime'),
-                interpreterHmrRuntime: resolveRuntimeFile('zfb/dev/interpreter-runtime')
-            }
+            devtoolsHmrRuntime: resolveRuntimeFile('zfb/dev/devtools-runtime'),
+            interpreterHmrRuntime: resolveRuntimeFile('zfb/dev/interpreter-runtime')
         },
         styles: {
             appFileName: 'app.acss',

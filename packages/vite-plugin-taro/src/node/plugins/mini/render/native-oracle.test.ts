@@ -3,24 +3,8 @@ import test from 'node:test'
 import { type PluginTarget, transformSync } from '@babel/core'
 import transformModulesCommonjs from '@babel/plugin-transform-modules-commonjs'
 import type { Rolldown } from 'vite'
-import type { RuntimeModulesContract } from '../mini-contract.ts'
-import { createMiniModuleClassifier } from '../module/module.ts'
+import { miniBootstrapId } from '../module/module.ts'
 import { renderNative } from './native.ts'
-
-const runtimeModules = {
-    bootstrap: '/runtime/bootstrap',
-    appShell: '/runtime/app-shell',
-    appCapsule: '/runtime/app-capsule',
-    componentShell: '/runtime/component-shell',
-    componentCapsule: '/runtime/component-capsule',
-    customWrapperShell: '/runtime/custom-wrapper-shell',
-    pageShell: '/runtime/page-shell',
-    pageCapsule: '/runtime/page-capsule',
-    devtoolsHmrRuntime: '/runtime/devtools-hmr',
-    interpreterHmrRuntime: '/runtime/interpreter-hmr'
-} satisfies RuntimeModulesContract
-
-const classifyModule = createMiniModuleClassifier(runtimeModules)
 
 type ModuleNamespace = Record<string, unknown>
 type CommonJsInstance = Readonly<{
@@ -168,14 +152,12 @@ test('matches Babel for side-effect import order and local declaration exports',
 })
 
 function compile(code: string) {
-    const chunk = { fileName: 'assets/native.js', moduleIds: [runtimeModules.bootstrap] } as Rolldown.RenderedChunk
+    const chunk = { fileName: 'assets/native.js', moduleIds: [miniBootstrapId] } as Rolldown.RenderedChunk
     return renderNative({
         code,
         chunk,
         chunks: {},
-        bootstrapModuleId: runtimeModules.bootstrap,
         getPhysicalChunkId: () => assert.fail('These oracle fixtures need no loader dependency'),
-        classifyModule: classifyModule,
         sourcemap: false
     })
 }
