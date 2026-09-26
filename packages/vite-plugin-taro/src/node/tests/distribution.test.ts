@@ -4,7 +4,8 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { resolveConfig } from 'vite'
 import { h5AppPath } from '../plugins/h5/constant.ts'
 import { resolveTaroRuntime } from '../utils/packages.ts'
 
@@ -187,7 +188,6 @@ test('publishes a compiler that depends on the unified Taro runtime package', as
     assert.match(compiler, /vite-plugin-taro-runtime\/plugin-platform-weapp\/runtime-utils/)
     assert.match(compiler, /vite-plugin-taro-runtime\/plugin-platform-alipay\/runtime-utils/)
     assert.match(compiler, /vite-plugin-taro-runtime\/plugin-platform-tt\/runtime-utils/)
-    assert.match(compiler, /vite-plugin-taro-runtime\/plugin-platform-h5\/definition\.json/)
     assert.match(compiler, /@tailwindcss\/vite/)
     assert.ok(Buffer.byteLength(compiler) < compilerSizeLimit)
     assert.match(componentFacade, /from 'vite-plugin-taro-runtime\/components'/)
@@ -201,6 +201,22 @@ test('publishes a compiler that depends on the unified Taro runtime package', as
         compilerModules.some((file) => file.endsWith('.js')),
         false
     )
+})
+
+test('published compiler resolves the H5 definition from the bundled runtime', async () => {
+    const { default: vpt } = await import(pathToFileURL(path.join(distRoot, 'index.js')).href)
+    const config = await resolveConfig(
+        {
+            configFile: false,
+            plugins: vpt({ target: 'h5', app: 'src/app.tsx', pages: [], appJson: {}, projectConfigJson: {} })
+        },
+        'serve'
+    )
+    const alias = config.resolve.alias.find(
+        (entry) => entry.find instanceof RegExp && entry.find.test('@tarojs/plugin-platform-h5/dist/definition.json')
+    )
+    assert.ok(alias)
+    assert.equal(alias.replacement, resolveTaroRuntime('plugin-platform-h5/definition.json'))
 })
 
 test('emits first-party runtime modules using canonical package imports', async () => {
