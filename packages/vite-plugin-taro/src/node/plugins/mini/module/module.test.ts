@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
-import { packageRequire, resolveTaroRuntime } from '../../../utils/packages.ts'
+import { packageRequire } from '../../../utils/packages.ts'
 import {
     classifyMiniModule,
     isMiniPolyfillModule,
@@ -18,6 +18,7 @@ import {
     miniPageCapsuleId,
     miniPageShellId,
     miniPolyfillsId,
+    miniRuntimeId,
     rolldownRuntimeId,
     vptGlobalBindingId
 } from './module.ts'
@@ -64,11 +65,7 @@ test('classifies standalone and grouped infrastructure as amphibious', () => {
 })
 
 test('framework vendor remains a normal capsule regardless of its output name', () => {
-    for (const moduleId of [
-        resolveTaroRuntime('runtime/mini'),
-        packageRequire.resolve('react'),
-        packageRequire.resolve('react-dom')
-    ]) {
+    for (const moduleId of [miniRuntimeId, packageRequire.resolve('react'), packageRequire.resolve('react-dom')]) {
         assert.equal(classifyModule({ ...chunk(moduleId), name: 'renamed-framework' }), 'normal-capsule')
     }
     assert.equal(classifyModule({ ...chunk('/repo/src/vendor.ts'), name: 'vendor' }), 'normal-capsule')

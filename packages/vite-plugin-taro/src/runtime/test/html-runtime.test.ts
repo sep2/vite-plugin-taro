@@ -9,6 +9,7 @@ import { runInNewContext } from 'node:vm'
 import { build } from 'rolldown'
 import { resolveConfig } from 'vite'
 import vpt from '../../index.ts'
+import { miniRuntimeId } from '../../node/plugins/mini/module/module.ts'
 import { resolveTaroRuntime } from '../../node/utils/packages.ts'
 
 for (const target of ['wx', 'zfb'] as const) {
@@ -39,7 +40,7 @@ for (const target of ['wx', 'zfb'] as const) {
                             return entry
                         }
                         if (id === '@tarojs/runtime') {
-                            return resolveTaroRuntime('runtime/mini')
+                            return miniRuntimeId
                         }
                     },
                     load(id) {

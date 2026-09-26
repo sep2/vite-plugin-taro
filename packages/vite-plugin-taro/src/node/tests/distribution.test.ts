@@ -328,7 +328,7 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
 
     const runtimeOutputRoot = path.join(runtimePackageDistRoot, 'runtime')
     await assertRuntimeDistCopied(path.join(resolveAdapterDependencyRoot('@tarojs/runtime'), 'dist'), runtimeOutputRoot)
-    assert.equal(resolveTaroRuntime('runtime/mini'), path.join(runtimeOutputRoot, 'index.js'))
+    assert.equal(runtimePackageEntry, path.join(runtimeOutputRoot, 'index.js'))
     assert.equal(resolveTaroRuntime('runtime/h5'), path.join(runtimeOutputRoot, 'runtime.esm.js'))
     const copiedRuntimeExports = [
         ['api', 'api/dist/index.js'],
