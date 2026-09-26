@@ -35,7 +35,8 @@ const contract = {
         generateProjectSkeleton() {
             return []
         }
-    }
+    },
+    watch: { override: {} }
 } satisfies MiniContract
 
 test('assigns physical Mini Program host ownership only to the client environment', () => {

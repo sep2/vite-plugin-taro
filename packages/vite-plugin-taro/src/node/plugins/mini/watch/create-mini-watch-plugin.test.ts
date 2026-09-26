@@ -8,6 +8,9 @@ import { build, createServer, resolveConfig } from 'vite'
 import type { VptJsonObject, VptOptions } from '../../../../options.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
+import { createTtMiniContract } from '../../tt/plugins.ts'
+import { createWxMiniContract } from '../../wx/plugins.ts'
+import { createZfbMiniContract } from '../../zfb/plugins.ts'
 import { createMiniWatchPlugin } from './create-mini-watch-plugin.ts'
 
 const markerPattern = /^\/\/ [\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}\n$/
@@ -16,7 +19,14 @@ const wxWatchContract = {
     output: {
         projectConfigFilename: 'project.config.json',
         projectPrivateConfigFilename: 'project.private.config.json'
-    }
+    },
+    watch: { override: {} }
+} as const
+
+const miniContracts = {
+    wx: createWxMiniContract,
+    zfb: createZfbMiniContract,
+    tt: createTtMiniContract
 } as const
 
 test('enables the filesystem policy only for physical watch builds, including production mode', async (context) => {
@@ -121,8 +131,17 @@ for (const target of ['wx', 'zfb', 'tt', 'h5'] as const) {
                         }
                     },
                     createMiniWatchPlugin({
-                        options: { target },
-                        output: { projectConfigFilename: projectFile, projectPrivateConfigFilename: privateFile }
+                        output: { projectConfigFilename: projectFile, projectPrivateConfigFilename: privateFile },
+                        watch:
+                            target === 'h5'
+                                ? { override: {} }
+                                : miniContracts[target]({
+                                      target,
+                                      app: 'app.js',
+                                      pages: [],
+                                      appJson: {},
+                                      projectConfigJson: {}
+                                  }).watch
                     }),
                     {
                         name: 'test:watch-completed',

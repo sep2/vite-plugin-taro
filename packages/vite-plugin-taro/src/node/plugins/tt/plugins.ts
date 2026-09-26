@@ -31,6 +31,16 @@ export function createTtMiniContract(options: VptOptions): MiniContract {
             projectConfigFilename: 'project.config.json',
             projectPrivateConfigFilename: 'project.private.config.json',
             generateProjectSkeleton: createTtSkeleton
+        },
+        watch: {
+            override: {
+                // Top-level compileHotReload and shared/private compileHotReLoad use distinct spellings.
+                // Leave autoCompile untouched so watch output still triggers automatic full recompilation.
+                // https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/dev-tools/developer-instrument/compilation/hot-reload
+                // https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/dev-tools/developer-instrument/development-assistance/private-config
+                'project.config.json': { compileHotReload: false, setting: { compileHotReLoad: false } },
+                'project.private.config.json': { setting: { compileHotReLoad: false } }
+            }
         }
     }
 }

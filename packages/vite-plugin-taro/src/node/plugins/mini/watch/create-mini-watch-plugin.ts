@@ -2,41 +2,17 @@ import { randomUUID } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Plugin } from 'vite'
-import type { VptJsonObject, VptTarget } from '../../../../options.ts'
+import type { VptJsonObject } from '../../../../options.ts'
 import { cleanOutputFiles } from '../../../utils/clean-output-files.ts'
 import { isMiniClientEnvironment } from '../dev/plugins.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import { recursiveMerge } from '../skeleton/recursive-merge.ts'
 import { createJsonAsset } from '../skeleton/skeleton-utils.ts'
 
-// Keep native field names and file ownership explicit. Alipay's IDE preferences do not own developOptions.
-const projectConfigOverrides: Readonly<Record<VptTarget, Readonly<Record<string, VptJsonObject>>>> = {
-    wx: {
-        // Project settings and private-config precedence:
-        // https://developers.weixin.qq.com/miniprogram/dev/devtools/projectconfig.html
-        'project.config.json': { setting: { compileHotReLoad: false } },
-        'project.private.config.json': { setting: { compileHotReLoad: false } }
-    },
-    zfb: {
-        // Format 2 migrates enableHMR to developOptions.hotReload:
-        // https://opendoc.alipay.com/mini/09j22u
-        'mini.project.json': { developOptions: { hotReload: false } }
-    },
-    tt: {
-        // TT documents the top-level toggle as compileHotReload, but shared/private setting uses compileHotReLoad.
-        // https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/dev-tools/developer-instrument/compilation/hot-reload
-        // https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/dev-tools/developer-instrument/development-assistance/private-config
-        // Leave autoCompile untouched: watch output still needs automatic full recompilation.
-        'project.config.json': { compileHotReload: false, setting: { compileHotReLoad: false } },
-        'project.private.config.json': { setting: { compileHotReLoad: false } }
-    },
-    h5: {}
-}
-
 /** Preserves watched directories and forces full reloads for Mini Program watch output without changing serve HMR. */
 export function createMiniWatchPlugin(contract: {
-    options: Pick<MiniContract['options'], 'target'>
     output: Pick<MiniContract['output'], 'projectConfigFilename' | 'projectPrivateConfigFilename'>
+    watch: MiniContract['watch']
 }): Plugin {
     // Rolldown also closes an unsuccessful result when its watcher shuts down, without passing an error.
     // Track that lifecycle boundary so shutdown cannot publish a false completion marker.
@@ -80,7 +56,7 @@ export function createMiniWatchPlugin(contract: {
             handler(_, bundle) {
                 // Run after skeleton emission and change only output, so serve and one-shot builds retain user settings.
                 // Override supported private preferences too, since they take precedence over shared settings in DevTools.
-                for (const [fileName, overrides] of Object.entries(projectConfigOverrides[contract.options.target])) {
+                for (const [fileName, overrides] of Object.entries(contract.watch.override)) {
                     const asset = bundle[fileName]
 
                     if (asset?.type === 'asset') {

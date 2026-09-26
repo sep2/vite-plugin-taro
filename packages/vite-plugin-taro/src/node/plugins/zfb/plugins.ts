@@ -31,6 +31,13 @@ export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
             projectConfigFilename: 'mini.project.json',
             projectPrivateConfigFilename: '.mini-ide/project-ide.json',
             generateProjectSkeleton: createZfbSkeleton
+        },
+        watch: {
+            override: {
+                // Format 2 migrates enableHMR to developOptions.hotReload; IDE preferences do not own this field.
+                // https://opendoc.alipay.com/mini/09j22u
+                'mini.project.json': { developOptions: { hotReload: false } }
+            }
         }
     }
 }

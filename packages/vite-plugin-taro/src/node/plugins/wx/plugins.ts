@@ -31,6 +31,14 @@ export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
             projectConfigFilename: 'project.config.json',
             projectPrivateConfigFilename: 'project.private.config.json',
             generateProjectSkeleton: createWxSkeleton
+        },
+        watch: {
+            override: {
+                // Private settings take precedence over the shared project config in WeChat DevTools.
+                // https://developers.weixin.qq.com/miniprogram/dev/devtools/projectconfig.html
+                'project.config.json': { setting: { compileHotReLoad: false } },
+                'project.private.config.json': { setting: { compileHotReLoad: false } }
+            }
         }
     }
 }

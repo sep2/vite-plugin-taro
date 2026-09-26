@@ -47,6 +47,11 @@ export type OutputContract = {
     generateProjectSkeleton(input: MiniProjectSkeletonInput, contract: MiniContract): Rolldown.EmittedAsset[]
 }
 
+/** Native project config fields overridden only in physical build-watch output. */
+export type WatchContract = {
+    override: Readonly<Record<string, VptJsonObject>>
+}
+
 /** Complete input consumed by the shared Mini Program pipeline. */
 export type MiniContract = {
     options: VptOptions
@@ -54,6 +59,7 @@ export type MiniContract = {
     runtime: RuntimeContract
     styles: StyleContract
     output: OutputContract
+    watch: WatchContract
 }
 
 /** Application JSON represented by the current Mini Program contract. */
