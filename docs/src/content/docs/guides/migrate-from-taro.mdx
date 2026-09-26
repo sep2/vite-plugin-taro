@@ -5,38 +5,21 @@ description: 将现有 Taro React 项目迁移到 VPT。
 
 import { Tabs, TabItem } from '@astrojs/starlight/components'
 
-本指南适用于使用 Taro 3 或 Taro 4 的 React 项目。迁移后继续使用 Taro 组件、API、生命周期和页面路径，但构建入口、配置位置与导入路径会改变。vpt 使用 Taro 4 运行时，来自 Taro 3 的项目还需要处理已经废弃或改变的 Taro API。
+本指南适用于使用 Taro 3 或 Taro 4 的 React 项目。
 
-:::note[适用范围]
-vpt 当前构建 **React 19 + 微信小程序 + Web**。Vue、Preact、Solid、React Native 以及其他小程序目标不能直接迁移。本指南对照了 [Taro 4.2.1 官方项目模板](https://github.com/NervJS/taro/tree/v4.2.1/packages/taro-cli/templates/default)及 vpt 的实际构建实现。
-:::
+## 推荐使用 AI 迁移
 
-## 推荐使用 AI 完成迁移
-
-迁移涉及配置拆分、导入替换、React 19 兼容性和构建插件清理，推荐让 AI 编程助手直接读取新旧两个项目并执行迁移。AI 可以根据实际源码逐文件修改，比照着通用步骤手动批量替换更可靠。
-
-可以把本指南链接和下面的任务说明交给 AI：
+把下面这段话交给 AI 即可：
 
 ```text
-请将旁边的 Taro React 项目迁移到这个 create-vite-taro 项目。
-
-开始修改前：
-1. 请先完整阅读 vpt 的文档。
-2. 阅读旧项目的 package.json、config、app.config、所有页面配置和构建插件。
-3. 阅读新项目的 vite.config.ts、package.json 和现有页面约定。
-4. 列出不能直接迁移的能力和需要我确认的行为变化。
-
-迁移时：
-1. 保留新项目的 Vite 构建结构，逐项迁移业务源码和配置。
-2. 将项目源码中的 Taro 导入改为 virtual:taro/api 和 virtual:taro/components。
-3. 不要批量修改第三方依赖或生成文件。
-4. 每完成一个阶段就运行 typecheck、微信构建和 Web 构建。
-5. 对照旧项目逐页检查路由、样式、资源、生命周期和 Taro API。
+请阅读 https://vpt.js.org/llms.txt
+对比最新的 create-vite-taro 模板以及相关 demo，
+创建一个新项目，把当前项目迁移到最新稳定版 VPT，并完成所有验证测试。
+不要修改当前项目。
 ```
 
-让 AI 分阶段提交修改，并要求它解释删除的每一项 Taro 配置。涉及原生页面分包、自定义原生组件、Taro 插件或 webpack 定制时，应先确认替代方案，不要让 AI 静默删除。
 
-## 迁移思路
+## 手动迁移思路
 
 建议先创建一个新的 vpt 项目，再逐步复制业务源码，而不是直接修改原项目的构建配置。这样可以保留一份可运行的 Taro 项目，用于逐页比较结果。
 
