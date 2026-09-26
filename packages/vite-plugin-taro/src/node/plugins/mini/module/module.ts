@@ -42,7 +42,8 @@ export const miniPolyfillsId = '\0vpt:mini-polyfills'
 
 /** External bootstrap dependency emitted only after the bundled graph is finalized. */
 export const miniTransportId = '\0vpt:mini-transport'
-export const miniTransportFileName = 'common/vpt/transport.js'
+
+export const miniTransportOutputPath = 'common/vpt/transport.js'
 
 /** Resolves the shared Taro facade's target initialization side effect. */
 export const taroTargetRuntimeId = '\0vpt:taro-target-runtime'
