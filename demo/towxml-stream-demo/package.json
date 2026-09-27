@@ -5,8 +5,8 @@
     "author": "sep2",
     "type": "module",
     "scripts": {
-        "build-wx": "cross-env NODE_ENV=production vite build",
-        "dev-wx": "cross-env NODE_ENV=development vite",
+        "build-wx": "vite build",
+        "dev-wx": "vite",
         "typecheck": "tsc --project tsconfig.json"
     },
     "dependencies": {
@@ -16,7 +16,6 @@
     },
     "devDependencies": {
         "@types/react": "^19.3.0",
-        "cross-env": "^10.1.0",
         "typescript": "^7.0.2",
         "vite": "8.3.0"
     }

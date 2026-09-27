@@ -494,7 +494,6 @@ async function startDevelopmentServer(root: string, port: number | undefined): P
         cwd: root,
         env: {
             ...process.env,
-            NODE_ENV: 'development',
             VITE_VPT_TARGET: 'wx',
             VITE_VPT_WECHAT_APP_ID: appId
         }
@@ -532,7 +531,6 @@ async function startBuildWatcher(root: string): Promise<ServerProcess> {
         cwd: root,
         env: {
             ...process.env,
-            NODE_ENV: 'production',
             VITE_VPT_TARGET: 'wx',
             VITE_VPT_WECHAT_APP_ID: appId
         }

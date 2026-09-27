@@ -311,7 +311,6 @@ async function startLoanProcess(
         cwd: fixture.root,
         env: {
             ...process.env,
-            NODE_ENV: arguments_.includes('build') ? 'production' : 'development',
             VITE_VPT_TARGET: 'wx'
         },
         stdio: ['ignore', logFile.fd, logFile.fd]

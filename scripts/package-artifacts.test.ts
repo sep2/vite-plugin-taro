@@ -152,8 +152,8 @@ test('public packages preserve their published entrypoints and scaffold dependen
         const project = JSON.parse(readFileSync(path.join(projectPath, 'package.json'), 'utf8'))
         assert.equal(project.name, 'complete-app')
         assert.equal(project.devDependencies['vite-plugin-taro'], `^${creatorPackage.version}`)
-        assert.equal(project.scripts['dev:tt'], 'cross-env NODE_ENV=development VITE_VPT_TARGET=tt vite')
-        assert.equal(project.scripts['build:tt'], 'cross-env NODE_ENV=production VITE_VPT_TARGET=tt vite build')
+        assert.equal(project.scripts['dev:tt'], 'cross-env VITE_VPT_TARGET=tt vite')
+        assert.equal(project.scripts['build:tt'], 'cross-env VITE_VPT_TARGET=tt vite build')
     })
 
     const manifestGenerator = createManifestGenerator(root, generatorRoot)
