@@ -34,7 +34,7 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'taro'>)
     const normalizedAppCapsulePath = normalizePath(miniAppCapsuleId)
     const normalizedPageCapsulePath = normalizePath(miniPageCapsuleId)
 
-    // Construct output input and application traversal roots together once so style order cannot drift from route order.
+    // Construct App/Page metadata and output inputs together so traversal roots and native paths share one definition.
     const entryGraph = createEntryGraph(contract.options.pages)
 
     // Provide constant-time route validation and access to each configured Page JSON object.
@@ -104,8 +104,15 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'taro'>)
     }
 }
 
-/** Declares output entries and the ordered application subset that can own user styles. */
+/** Declares native output inputs and exposes their App and ordered Page entries. */
 function createEntryGraph(pages: readonly MiniPage[]) {
+    const appEntries = {
+        capsuleId: miniAppCapsuleId,
+        capsuleName: 'app-capsule',
+        shellId: miniAppShellId,
+        shellName: appShellFileName
+    }
+
     const pageEntries = pages.map((page) => {
         return {
             capsuleId: createRouteModuleId({ moduleId: miniPageCapsuleId, pagePath: page.path }),
@@ -116,12 +123,15 @@ function createEntryGraph(pages: readonly MiniPage[]) {
     })
 
     return {
-        // The App owns the first global cascade layer; configured Pages follow in their declared route order.
-        applicationEntryIds: [miniAppCapsuleId, ...pageEntries.map((entry) => entry.capsuleId)],
+        // Reuse the same App/Page records for graph roots and native output paths instead of a separate ownership list.
+        entries: {
+            appEntries,
+            pageEntries
+        },
         input: Object.fromEntries([
             ['bootstrap', miniBootstrapId],
-            [appShellFileName, miniAppShellId],
-            ['app-capsule', miniAppCapsuleId],
+            [appEntries.shellName, appEntries.shellId],
+            [appEntries.capsuleName, appEntries.capsuleId],
             [componentShellFileName, miniComponentShellId],
             ['component-capsule', miniComponentCapsuleId],
             [customWrapperShellFileName, miniCustomWrapperShellId],

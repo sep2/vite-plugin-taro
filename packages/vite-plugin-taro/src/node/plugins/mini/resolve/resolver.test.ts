@@ -63,10 +63,22 @@ test('resolves fixed and route-specific private IDs', () => {
     const resolver = createResolver(contract)
     const projectRoot = path.resolve('/project')
 
-    assert.deepEqual(resolver.applicationEntryIds, [
-        modules.appCapsule,
-        `${modules.pageCapsule}?route=pages%2Fhome%2Findex`
-    ])
+    assert.deepEqual(resolver.entries, {
+        appEntries: {
+            capsuleId: modules.appCapsule,
+            capsuleName: 'app-capsule',
+            shellId: modules.appShell,
+            shellName: 'app.js'
+        },
+        pageEntries: [
+            {
+                capsuleId: `${modules.pageCapsule}?route=pages%2Fhome%2Findex`,
+                capsuleName: 'pages/home/index-capsule',
+                shellId: `${modules.pageShell}?route=pages%2Fhome%2Findex`,
+                shellName: 'pages/home/index.js'
+            }
+        ]
+    })
     assert.deepEqual(resolver.input, {
         'app.js': modules.appShell,
         'comp.js': modules.componentShell,
@@ -94,6 +106,58 @@ test('resolves fixed and route-specific private IDs', () => {
         resolver.resolveId(pageComponentId, pageCapsule, projectRoot),
         normalizePath(path.resolve(projectRoot, 'src/pages/home/index.tsx'))
     )
+})
+
+test('preserves configured Page order and reuses App/Page entries in the native input map', () => {
+    const resolver = createResolver({
+        ...contract,
+        options: {
+            ...contract.options,
+            pages: [{ path: 'pages/z-last/index' }, { path: 'features/account/pages/a-first/index' }]
+        }
+    })
+
+    const { appEntries, pageEntries } = resolver.entries
+    assert.deepEqual(pageEntries, [
+        {
+            capsuleId: `${modules.pageCapsule}?route=pages%2Fz-last%2Findex`,
+            capsuleName: 'pages/z-last/index-capsule',
+            shellId: `${modules.pageShell}?route=pages%2Fz-last%2Findex`,
+            shellName: 'pages/z-last/index.js'
+        },
+        {
+            capsuleId: `${modules.pageCapsule}?route=features%2Faccount%2Fpages%2Fa-first%2Findex`,
+            capsuleName: 'features/account/pages/a-first/index-capsule',
+            shellId: `${modules.pageShell}?route=features%2Faccount%2Fpages%2Fa-first%2Findex`,
+            shellName: 'features/account/pages/a-first/index.js'
+        }
+    ])
+    for (const entry of [appEntries, ...pageEntries]) {
+        assert.equal(resolver.input[entry.capsuleName], entry.capsuleId)
+        assert.equal(resolver.input[entry.shellName], entry.shellId)
+    }
+})
+
+test('retains App entries with no Page entries when no routes are configured', () => {
+    const resolver = createResolver({ ...contract, options: { ...contract.options, pages: [] } })
+
+    assert.deepEqual(resolver.entries, {
+        appEntries: {
+            capsuleId: modules.appCapsule,
+            capsuleName: 'app-capsule',
+            shellId: modules.appShell,
+            shellName: 'app.js'
+        },
+        pageEntries: []
+    })
+    assert.deepEqual(resolver.input, {
+        bootstrap: modules.bootstrap,
+        'app.js': modules.appShell,
+        'app-capsule': modules.appCapsule,
+        'comp.js': modules.componentShell,
+        'component-capsule': modules.componentCapsule,
+        'custom-wrapper.js': modules.customWrapperShell
+    })
 })
 
 test('rejects Page-private imports without one configured route origin', () => {

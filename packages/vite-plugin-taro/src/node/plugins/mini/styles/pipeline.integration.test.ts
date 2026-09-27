@@ -5,6 +5,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { type DevEngine, dev } from 'rolldown/experimental'
 import { createServer, normalizePath } from 'vite'
+import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
 import { writeDevelopmentFile } from '../dev/hmr-files.ts'
 import type { BundledDev } from '../dev/mini-dev-options.ts'
 import type { MiniContract } from '../mini-contract.ts'
@@ -46,7 +47,7 @@ test('minifies development CSS and live rpx updates without identical rewrites',
     let publicationWork = Promise.resolve()
     // DevEngine callbacks run only after assignment and advance the same published frontier as the production host.
     let engine: DevEngine
-    const styles = createMiniStylePlugin(contract, [appId])
+    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(appId, []))
     // This one-shot mutable fault proves a failed atomic writer does not advance the plugin's published stylesheet frontier.
     let writeFailure: Error | undefined
     const writeStyle = async (wxss: string): Promise<void> => {
@@ -253,7 +254,7 @@ test('respects cssMinify:false while rendering Tailwind CSS and matching patch f
     let hmrWork = Promise.resolve()
     // DevEngine callbacks run only after assignment and commit every finalized payload before the next source edit.
     let engine: DevEngine
-    const styles = createMiniStylePlugin(contract, [appId])
+    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(appId, []))
     const writeStyle = async (wxss: string): Promise<void> => {
         await writeDevelopmentFile(outDir, globalWxssFileName, wxss)
         publishedStyles.push(wxss)

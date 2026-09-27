@@ -7,6 +7,7 @@ import { normalizeModuleId } from '../../../utils/modules.ts'
 import { wrapPluginTransform } from '../../../utils/vite.ts'
 import { tailwindcssBasedir } from '../../tailwind/tailwind-css.ts'
 import type { MiniContract } from '../mini-contract.ts'
+import type { createResolver } from '../resolve/resolver.ts'
 import { createMiniTransformer } from './create-mini-transformer.ts'
 import { minifyMiniStylesheet } from './minify-mini-stylesheet.ts'
 
@@ -112,7 +113,8 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  *
  * ### 3. Live-graph projection
  *
- * Output finalization starts from resolved App/Page entry IDs and traverses Rolldown's current static and dynamic import edges
+ * The resolver supplies App/Page entry records; only their capsules become CSS roots, ordered App-first then by configured Page.
+ * Output finalization starts from those resolved IDs and traverses Rolldown's current static and dynamic import edges
  * in dependency-first post-order. Transaction-local visited sets terminate cycles and deduplicate shared modules and physical
  * stylesheets. A retained stylesheet contributes only when its module is still reachable, so removing an import prunes its CSS
  * and Tailwind candidates without a separate prune protocol or persistent topology cache. Candidate sets are unioned only from
@@ -175,13 +177,13 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  */
 export function createMiniStylePlugin(
     contract: Pick<MiniContract, 'styles'>,
-    applicationEntryIds: readonly string[]
+    entries: ReturnType<typeof createResolver>['entries']
 ): MiniStylePlugin {
     // Late config captures the requested switch before disabling Vite's intermediate pass; configResolved supplies the
     // resolved JS-minification default. The same policy stays fixed throughout builds and HMR.
     let cssMinify: BuildOptions['cssMinify']
-    // This mutable root list is replaced in buildStart with Vite/Rolldown's exact cross-platform graph identities.
-    let entryIds = applicationEntryIds
+    // buildStart replaces this mutable root list with exact capsule identities without changing the supplied entry metadata.
+    let entryIds: readonly string[]
     // configResolved initializes this service once the output policy is known; all builds and HMR reuse its bounded cache.
     let finalizeOutput: ReturnType<typeof createFinalizeOutput>
 
@@ -243,9 +245,11 @@ export function createMiniStylePlugin(
         },
         /** Resolves exact graph roots and captures the graph reader used by host calls outside plugin hooks. */
         async buildStart() {
-            // Resolve through Rolldown instead of reconstructing real paths, whose drive casing and separators vary on Windows.
+            // Resolve through Rolldown rather than reconstructing real paths, whose drive casing and separators vary on Windows.
             const resolvedEntryIds = await Promise.all(
-                applicationEntryIds.map(async (entryId) => (await this.resolve(entryId))!.id)
+                [entries.appEntries, ...entries.pageEntries].map(
+                    async (entry) => (await this.resolve(entry.capsuleId))!.id
+                )
             )
 
             // Commit the complete root set together so finalization never observes a partially resolved application graph.

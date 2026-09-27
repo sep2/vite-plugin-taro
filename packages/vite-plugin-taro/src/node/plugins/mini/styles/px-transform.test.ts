@@ -6,6 +6,7 @@ import { test } from 'node:test'
 import { compile } from '@tailwindcss/node'
 import unitConverter, { presets } from 'postcss-rule-unit-converter'
 import { build } from 'vite'
+import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
 import { createMiniTransformer } from './create-mini-transformer.ts'
 import { minifyMiniStylesheet } from './minify-mini-stylesheet.ts'
 import { createMiniStylePlugin } from './plugins.ts'
@@ -55,7 +56,7 @@ for (const target of ['wx', 'h5'] as const) {
                         ? [
                               createMiniStylePlugin(
                                   { styles: { appFileName: 'app.wxss', globalFileName: 'assets/global.wxss' } },
-                                  [entry]
+                                  createMiniStyleEntries(entry, [])
                               )
                           ]
                         : [],

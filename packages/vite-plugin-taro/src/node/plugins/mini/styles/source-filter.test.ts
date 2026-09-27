@@ -3,6 +3,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { build } from 'rolldown'
 import { isCSSRequest, normalizePath, type Plugin } from 'vite'
+import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
 import { wrapPluginTransform } from '../../../utils/vite.ts'
 import { createMiniStylePlugin } from './plugins.ts'
 
@@ -36,7 +37,7 @@ test('native stylesheet dispatch matches Vite for extensions, virtual styles, an
         '/fixture/app.css#fragment'
     ]
     const sourceIds = new Set(ids)
-    const styles = createMiniStylePlugin(contract, [])
+    const styles = createMiniStylePlugin(contract, createMiniStyleEntries('/fixture/app.js', []))
     assert.ok(styles.transform && typeof styles.transform === 'object')
     assert.equal(styles.transform.order, 'pre')
     // Record real JS dispatches without emulating Rolldown's filter evaluation.
@@ -77,7 +78,7 @@ test('ordinary CSS clears retained Tailwind candidates while raw requests leave 
     const root = normalizePath(fileURLToPath(new URL('.', import.meta.url)))
     const entryId = `${root}source-filter-entry.js`
     const styleId = `${root}source-filter-fixture.css`
-    const styles = createMiniStylePlugin(contract, [entryId])
+    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(entryId, []))
     // Model Vite's successful post-CSS boundary without materializing source files or browser output.
     const cssPost: Plugin = { name: 'vite:css-post', transform: (code) => ({ code, map: null }) }
     const configResolved = styles.configResolved

@@ -101,6 +101,41 @@ for (const [target, createContract] of [
     ['zfb', createZfbMiniContract],
     ['tt', createTtMiniContract]
 ] as const) {
+    test(`${target}: styles traverse the App followed by configured Page capsules`, async () => {
+        for (const pages of [[], [{ path: 'pages/home/index' }, { path: 'pages/detail/index' }]]) {
+            const contract = createContract({
+                target,
+                app: 'src/app.tsx',
+                pages,
+                appJson: {},
+                projectConfigJson: {}
+            })
+            const config = await resolveConfig(
+                { configFile: false, plugins: createMiniTargetPlugins(contract) },
+                'build'
+            )
+            assert.equal(config.build.cssCodeSplit, false)
+            const styles = config.plugins.find((plugin) => plugin.name === 'vpt:mini-styles')
+            assert.ok(typeof styles?.buildStart === 'function')
+            // Record resolution requests to verify the global cascade keeps App-first route order without native shells.
+            const entryIds: string[] = []
+            await Reflect.apply(
+                styles.buildStart,
+                {
+                    async resolve(id: string) {
+                        entryIds.push(id)
+                        return { id: normalizePath(id) }
+                    }
+                },
+                []
+            )
+            assert.deepEqual(entryIds, [
+                miniAppCapsuleId,
+                ...pages.map((page) => `${miniPageCapsuleId}?route=${encodeURIComponent(page.path)}`)
+            ])
+        }
+    })
+
     test(`${target}: native filters specialize only App and route-qualified Page capsules`, async () => {
         const contract = createContract({
             target,

@@ -3,6 +3,7 @@ import { registerHooks } from 'node:module'
 import test, { type TestContext } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { type BuildOptions, normalizePath, type Plugin } from 'vite'
+import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
 import type { createMiniTransformer } from './create-mini-transformer.ts'
 
 const contract = { styles: { appFileName: 'app.wxss', globalFileName: 'assets/global.wxss' } }
@@ -44,7 +45,7 @@ async function importObservedPlugin() {
 async function createStyleFixture(
     testContext: TestContext,
     cssMinify: BuildOptions['cssMinify'],
-    entries: readonly string[]
+    entries: Parameters<typeof createMiniStylePlugin>[1]
 ) {
     const plugin = createMiniStylePlugin(contract, entries)
     const cssPost: Plugin = { name: 'vite:css-post', transform: (code) => ({ code, map: null }) }
@@ -115,8 +116,37 @@ function tailwind(candidates: readonly string[]): string {
     return `@import "tailwindcss" source(none);\n@source inline(${JSON.stringify(candidates.join(' '))});`
 }
 
+test('resolves App/Page capsules in cascade order without mutating their entry metadata', async (context) => {
+    const entries = createMiniStyleEntries('/app.js', ['/z-page.js', '/a-page.js'])
+    const originalEntries = structuredClone(entries)
+    const fixture = await createStyleFixture(context, false, entries)
+    const resolve = context.mock.method(fixture.context, 'resolve', async (id: string) => ({ id: `resolved:${id}` }))
+    const sources = [
+        ['/app.js', '.app { color: red; }'],
+        ['/z-page.js', '.first-page { color: blue; }'],
+        ['/a-page.js', '.second-page { color: green; }']
+    ] as const
+    fixture.graph.clear()
+    for (const [id, css] of sources) {
+        const styleId = `${id}.css`
+        fixture.graph.set(`resolved:${id}`, { importedIds: [styleId], dynamicallyImportedIds: [] })
+        fixture.graph.set(styleId, { importedIds: [], dynamicallyImportedIds: [] })
+        await fixture.capture(styleId, css)
+    }
+    assert.ok(typeof fixture.plugin.buildStart === 'function')
+    await Reflect.apply(fixture.plugin.buildStart, fixture.context, [])
+    await fixture.update('export {}')
+
+    assert.deepEqual(
+        resolve.mock.calls.map((call) => call.arguments[0]),
+        sources.map(([id]) => id)
+    )
+    assert.equal(fixture.css.mock.calls[0]!.arguments[0], sources.map(([, css]) => css).join('\n'))
+    assert.deepEqual(entries, originalEntries)
+})
+
 test('reuses unchanged CSS and candidate tables while rewriting each current patch', async (context) => {
-    const fixture = await createStyleFixture(context, false, ['/app.js'])
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', []))
     await fixture.transform('/app.css', tailwind(['py-5.5']))
     const first = await fixture.update("const first = 'py-5.5'")
     const unchanged = await fixture.update("const next = 'py-5.5'")
@@ -159,7 +189,7 @@ test('reuses unchanged CSS and candidate tables while rewriting each current pat
 })
 
 test('retains only the latest conversion and keeps each plugin minification policy independent', async (context) => {
-    const fixture = await createStyleFixture(context, false, ['/app.js'])
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', []))
     const firstCss = '.first { padding: 1px; }'
     const secondCss = '.second { padding: 2px; }'
     for (const source of [firstCss, firstCss, secondCss, firstCss]) {
@@ -172,7 +202,7 @@ test('retains only the latest conversion and keeps each plugin minification poli
     )
     assert.match(fixture.published.at(-1)!, /\.first \{ padding: 1rpx; \}/)
 
-    const minified = await createStyleFixture(context, true, ['/app.js'])
+    const minified = await createStyleFixture(context, true, createMiniStyleEntries('/app.js', []))
     await minified.capture('/app.css', firstCss)
     await minified.update('export {}')
     await minified.update('export {}')
@@ -182,7 +212,11 @@ test('retains only the latest conversion and keeps each plugin minification poli
 })
 
 test('reprojects cyclic multi-entry graphs, deduplicates styles, and prunes removed imports and candidates', async (context) => {
-    const fixture = await createStyleFixture(context, false, ['/app.js', '/page.js', '/missing.js'])
+    const fixture = await createStyleFixture(
+        context,
+        false,
+        createMiniStyleEntries('/app.js', ['/page.js', '/missing.js'])
+    )
     fixture.graph.clear()
     fixture.graph.set('/app.js', { importedIds: ['/a.css?one'], dynamicallyImportedIds: ['/lazy.js'] })
     fixture.graph.set('/lazy.js', { importedIds: ['/b.css'], dynamicallyImportedIds: ['/app.js'] })
@@ -235,7 +269,7 @@ test('reprojects cyclic multi-entry graphs, deduplicates styles, and prunes remo
 
 for (const failureStage of ['conversion', 'minification', 'JavaScript'] as const) {
     test(`failed ${failureStage} stays retryable without replacing the last successful snapshot`, async (context) => {
-        const fixture = await createStyleFixture(context, true, ['/app.js'])
+        const fixture = await createStyleFixture(context, true, createMiniStyleEntries('/app.js', []))
         const previousCss = '.previous { color: red; }'
         const nextCss = '.next { color: blue; }'
         const code = "const classes = 'py-5.5 mr-4.5'"
@@ -282,7 +316,7 @@ for (const failureStage of ['conversion', 'minification', 'JavaScript'] as const
 }
 
 test('retries a failed stylesheet publication without repeating successful conversion', async (context) => {
-    const fixture = await createStyleFixture(context, false, ['/app.js'])
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', []))
     await fixture.transform('/app.css', tailwind(['py-5.5']))
     const artifact = { code: "const name = 'py-5.5'", filename: 'app.js', seq: 1 }
     await assert.rejects(

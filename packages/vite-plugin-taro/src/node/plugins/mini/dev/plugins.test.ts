@@ -3,6 +3,7 @@ import test from 'node:test'
 import { resolveConfig } from 'vite'
 import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
 import { pageComponentId } from '../module/module.ts'
+import { createResolver } from '../resolve/resolver.ts'
 import { createMiniStylePlugin } from '../styles/plugins.ts'
 import { createMiniDevelopmentPlugin, isMiniClientEnvironment, removeDevelopmentAppStyle } from './plugins.ts'
 
@@ -38,6 +39,7 @@ const contract = {
     },
     watch: { override: {} }
 } satisfies MiniContract
+const { entries } = createResolver(contract)
 
 test('assigns physical Mini Program host ownership only to the client environment', () => {
     assert.equal(isMiniClientEnvironment({ name: 'client' }), true)
@@ -48,7 +50,7 @@ test('preserves physical outputs and composes the selected mode across developme
     const config = await resolveConfig(
         {
             configFile: false,
-            plugins: createMiniDevelopmentPlugin(contract, createMiniStylePlugin(contract, [import.meta.filename]))
+            plugins: createMiniDevelopmentPlugin(contract, createMiniStylePlugin(contract, entries))
         },
         'serve'
     )
@@ -69,10 +71,7 @@ test('composes rebuild mode without patch transforms', async () => {
     const config = await resolveConfig(
         {
             configFile: false,
-            plugins: createMiniDevelopmentPlugin(
-                rebuildContract,
-                createMiniStylePlugin(rebuildContract, [import.meta.filename])
-            )
+            plugins: createMiniDevelopmentPlugin(rebuildContract, createMiniStylePlugin(rebuildContract, entries))
         },
         'serve'
     )
@@ -86,7 +85,7 @@ test('does not inject Page HMR into a build run in development mode', async () =
         {
             configFile: false,
             mode: 'development',
-            plugins: createMiniDevelopmentPlugin(contract, createMiniStylePlugin(contract, [import.meta.filename]))
+            plugins: createMiniDevelopmentPlugin(contract, createMiniStylePlugin(contract, entries))
         },
         'build'
     )
@@ -97,7 +96,7 @@ test('reports a Page capsule whose component cannot be resolved', async () => {
     const config = await resolveConfig(
         {
             configFile: false,
-            plugins: createMiniDevelopmentPlugin(contract, createMiniStylePlugin(contract, [import.meta.filename]))
+            plugins: createMiniDevelopmentPlugin(contract, createMiniStylePlugin(contract, entries))
         },
         'serve'
     )

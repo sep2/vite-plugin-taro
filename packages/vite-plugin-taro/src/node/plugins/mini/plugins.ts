@@ -24,10 +24,9 @@ type MiniResolver = ReturnType<typeof createResolver>
 export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] {
     const resolver = createResolver(contract)
 
-    // Reuse the resolver instance's ordered application subset. Rolldown's complete input also contains bootstrap,
-    // shell, and component entries; entry membership alone cannot recover which roots define the App/Page CSS cascade.
     const placement = createMiniPlacementPlugin()
-    const styles = createMiniStylePlugin(contract, resolver.applicationEntryIds)
+
+    const styles = createMiniStylePlugin(contract, resolver.entries)
 
     return [
         placement,

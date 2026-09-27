@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { type BuildOptions, build, normalizePath, type Plugin } from 'vite'
+import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import { createMiniTransformer } from './create-mini-transformer.ts'
 import { createMiniStylePlugin } from './plugins.ts'
@@ -38,7 +39,7 @@ function createSourceFixture(files: Readonly<Record<string, string>>, entryName:
 }
 
 test('handles physical and ignored query fragments before watcher cleanup', async () => {
-    const styles = createMiniStylePlugin(contract, ['/src/app.js'])
+    const styles = createMiniStylePlugin(contract, createMiniStyleEntries('/src/app.js', []))
     const transformHook = styles.transform
     assert.ok(transformHook)
     const transform = typeof transformHook === 'function' ? transformHook : transformHook.handler
@@ -64,7 +65,7 @@ test('invalidates Tailwind compiler dependencies through the HMR hook', async ()
         const themeId = path.join(root, 'theme.css')
         const source = ['@import "tailwindcss";', '@import "./theme.css";', '@source inline("bg-brand");'].join('\n')
         await writeFile(themeId, '@theme { --color-brand: #123456; }')
-        const styles = createMiniStylePlugin(contract, [path.join(root, 'app.ts')])
+        const styles = createMiniStylePlugin(contract, createMiniStyleEntries(path.join(root, 'app.ts'), []))
         const transformHook = styles.transform
         const hotUpdateHook = styles.hotUpdate
         assert.ok(transformHook)
@@ -130,7 +131,7 @@ test('minifies the complete compiler stylesheet before later WX output hooks', a
         },
         'src/app.ts'
     )
-    const styles = createMiniStylePlugin(contract, [applicationEntry])
+    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(applicationEntry, []))
     const verifyAssetOwnership: Plugin = {
         name: 'test:verify-wx-style-ownership',
         generateBundle: {
@@ -216,9 +217,10 @@ for (const extension of ['wxss', 'acss']) {
             const nativeFileName = `components/counter/index.${extension}`
             const nativeStyle = '.native-counter { padding: 1px; }\n'
 
-            const styles = createMiniStylePlugin({ styles: { appFileName: `app.${extension}`, globalFileName } }, [
-                appPath
-            ])
+            const styles = createMiniStylePlugin(
+                { styles: { appFileName: `app.${extension}`, globalFileName } },
+                createMiniStyleEntries(appPath, [])
+            )
             const result = await build({
                 root,
                 configFile: false,
@@ -285,7 +287,7 @@ test('captures CSS minification configured by a later ordinary plugin', async ()
         logLevel: 'silent',
         plugins: [
             plugin,
-            createMiniStylePlugin(contract, [appPath]),
+            createMiniStylePlugin(contract, createMiniStyleEntries(appPath, [])),
             {
                 name: 'test:configure-css-minify',
                 config() {
@@ -305,7 +307,7 @@ test('captures CSS minification configured by a later ordinary plugin', async ()
 test('emits the HTML base once even when the application has no styles', async () => {
     const { root, entry: appPath, plugin } = createSourceFixture({ 'app.ts': 'export {}\n' }, 'app.ts')
 
-    const styles = createMiniStylePlugin(contract, [appPath])
+    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(appPath, []))
     const result = await build({
         root,
         configFile: false,

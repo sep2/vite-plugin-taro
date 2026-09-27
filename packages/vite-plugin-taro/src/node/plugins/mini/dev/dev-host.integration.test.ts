@@ -12,6 +12,7 @@ import {
     type InterpreterServerMessage,
     interpreterServerEvent
 } from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
+import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
 import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
@@ -449,7 +450,7 @@ test('rejects a server without Vite bundled development ownership', async (conte
             createMiniDevHost({
                 server: server,
                 contract: contract,
-                styles: createMiniStylePlugin(contract, [import.meta.filename]),
+                styles: createMiniStylePlugin(contract, createMiniStyleEntries(import.meta.filename, [])),
                 hmrMode: createDevtoolsHmrMode(runtimeModules.devtoolsHmrRuntime)
             }),
         /Vite did not create the Mini Program bundled-development environment/
