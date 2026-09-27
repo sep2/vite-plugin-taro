@@ -13,6 +13,7 @@ import {
     interpreterServerEvent
 } from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
 import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
+import { createNativeDevRuntime } from '../../../tests/create-native-dev-runtime.ts'
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
 import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
@@ -107,7 +108,8 @@ async function startDevFixture(
     host: string,
     options: VptOptions,
     bundleOutput: 'memory' | 'capsule' | 'disk',
-    publicAsset?: { fileName: string; source: string }
+    publicAsset?: { fileName: string; source: string },
+    initialSources?: Readonly<Record<string, string>>
 ): Promise<DevFixture> {
     const persistedBundleFiles = bundleOutput === 'capsule' ? [pageCapsuleFileName] : []
     const root = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-dev-test-'))
@@ -137,6 +139,11 @@ async function startDevFixture(
     )
     await writeFile(path.join(path.dirname(pagePath), 'suffix.ts'), 'export const suffix = "";\n')
     await writeFile(pagePath, renderPage('initial page marker'))
+    for (const [fileName, source] of Object.entries(initialSources ?? {})) {
+        const filePath = path.join(root, fileName)
+        await mkdir(path.dirname(filePath), { recursive: true })
+        await writeFile(filePath, source)
+    }
     if (publicAsset) {
         const assetPath = path.join(root, 'public', publicAsset.fileName)
         await mkdir(path.dirname(assetPath), { recursive: true })
@@ -553,6 +560,126 @@ test('publishes Page styles before patches and clears removed imports without re
     assert.equal((await stat(globalPath)).ino, globalInode)
     assert.equal(await readFile(fixture.infoPath, 'utf8'), infoSource)
     assert.equal(await readFile(fixture.appStylePath, 'utf8'), appStyle)
+})
+
+test('first native lazy import uses edits acknowledged before its physical chunk loaded', async (context) => {
+    const lazyModuleId = 'src/pages/home/lazy-feature.ts'
+    const renderLazy = (marker: string) => `
+        export default function LazyFeature() { return ${JSON.stringify(marker)} }
+        if (import.meta.hot) { import.meta.hot.accept() }
+    `
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'disk', undefined, {
+        'src/pages/home/index.tsx': `${renderPage('lazy import fixture')}\nexport const loadLazyEntry = () => import('./lazy-entry')`,
+        'src/pages/home/lazy-entry.ts': `export const loadLazy = () => import('./lazy-feature')`,
+        [lazyModuleId]: renderLazy('initial lazy generation')
+    })
+    context.after(fixture.close)
+    const infoSource = await readFile(fixture.infoPath, 'utf8')
+    const info = parseHmrInfo(infoSource)
+    const appStyle = await readFile(fixture.appStylePath, 'utf8')
+    const runtime = createNativeDevRuntime(fixture.outDir, info)
+    // Load only the dynamic-import caller so the assertion exercises generated import() code, not a hand-written resolver.
+    const entry: unknown = await runtime.run(`System.import('common/lazy-entry.js')`)
+    assert.ok(entry && typeof entry === 'object' && 'loadLazy' in entry && typeof entry.loadLazy === 'function')
+    const lazyPath = path.join(path.dirname(fixture.pagePath), 'lazy-feature.ts')
+    assert.equal(runtime.run(`globalThis.__rolldown_runtime__.isExecuted(${JSON.stringify(lazyModuleId)})`), false)
+
+    // Both edits are installed and acknowledged while the lazy chunk is still cold; replaying only the first is also stale.
+    for (const marker of ['intermediate lazy generation', 'latest lazy generation']) {
+        await publishSourceGeneration(lazyPath, renderLazy(marker))
+        const patches = await waitForFile(fixture.patchesPath, (source) => source.includes(marker), maximumWaitAttempts)
+        const seq = [...patches.matchAll(/\{seq: (\d+)/g)].map((match) => Number(match[1])).at(-1)
+        assert.ok(seq)
+        const previousReportCount = runtime.reports.length
+        runtime.applyPatches(patches)
+        assert.equal(runtime.reports.length, previousReportCount + 1)
+        assert.deepEqual(runtime.reports.at(-1), { buildId: info.buildId, kind: 'applied', seq })
+        assert.equal(runtime.run(`globalThis.__rolldown_runtime__.isExecuted(${JSON.stringify(lazyModuleId)})`), false)
+        await sendRuntimeReport(info, { buildId: info.buildId, kind: 'applied', seq })
+        // Allow the host's receipt-conflation window to prune this generation before the next edit.
+        await delay(50)
+    }
+
+    // The emitted caller goes through native require.async and SystemJS before returning its lazy module namespace.
+    const namespace: unknown = await entry.loadLazy()
+    assert.ok(
+        namespace && typeof namespace === 'object' && 'default' in namespace && typeof namespace.default === 'function'
+    )
+    assert.equal(
+        namespace.default(),
+        'latest lazy generation',
+        'First lazy import must not resurrect the original disk exports'
+    )
+    assert.strictEqual(await entry.loadLazy(), namespace, 'Repeated imports must reuse the current lazy namespace')
+    assert.doesNotMatch(JSON.stringify(runtime.reports), /"kind":"rebuild"/)
+    assert.equal(await readFile(fixture.infoPath, 'utf8'), infoSource)
+    assert.equal(await readFile(fixture.appStylePath, 'utf8'), appStyle)
+})
+
+test('keeps patch sequences contiguous after repairing a Page CSS publication failure', async (context) => {
+    // Capture the failed host transaction so repair begins only after the real CSS finalizer has rejected the invalid source.
+    const errors: string[] = []
+    const logger = createLogger('silent')
+    logger.error = (message) => {
+        errors.push(message)
+    }
+    const fixture = await startDevFixture(logger, '127.0.0.1', createOptions(), 'memory', undefined, {
+        'src/pages/home/index.tsx': `import './index.css'\n${renderPage('styled baseline')}`,
+        'src/pages/home/index.css': '.page-local { padding: 4px; }'
+    })
+    context.after(fixture.close)
+    const infoSource = await readFile(fixture.infoPath, 'utf8')
+    const appStyle = await readFile(fixture.appStylePath, 'utf8')
+    const stylePath = path.join(path.dirname(fixture.pagePath), 'index.css')
+    const outputPath = path.join(fixture.outDir, 'pages/home/index.wxss')
+
+    await publishSourceGeneration(stylePath, '.page-local { padding: 8px; }')
+    const firstPatches = await waitForFile(
+        fixture.patchesPath,
+        (source) => source.includes('{seq:'),
+        maximumWaitAttempts
+    )
+    const lastGoodCss = await readFile(outputPath, 'utf8')
+    assert.match(lastGoodCss, /padding:\s*8rpx/)
+    assert.deepEqual(
+        [...firstPatches.matchAll(/\{seq: (\d+)/g)].map((match) => Number(match[1])),
+        [1]
+    )
+
+    await publishSourceGeneration(stylePath, '.page-local { padding: 12px;')
+    await waitForCondition(
+        () => errors.some((message) => message.includes('[vpt] wx HMR publish failed')),
+        maximumWaitAttempts
+    )
+    assert.equal(
+        await readFile(outputPath, 'utf8'),
+        lastGoodCss,
+        'Invalid CSS must leave last-good native styles intact'
+    )
+    assert.equal(
+        await readFile(fixture.patchesPath, 'utf8'),
+        firstPatches,
+        'Failed finalization must not publish JavaScript'
+    )
+    assert.equal(await readFile(fixture.infoPath, 'utf8'), infoSource)
+    assert.equal(await readFile(fixture.appStylePath, 'utf8'), appStyle)
+
+    await publishSourceGeneration(stylePath, '.page-local { padding: 16px; }')
+    const recoveredPatches = await waitForFile(
+        fixture.patchesPath,
+        (source) => source !== firstPatches,
+        maximumWaitAttempts
+    )
+    assert.match(await readFile(outputPath, 'utf8'), /padding:\s*16rpx/)
+    assert.equal(await readFile(fixture.infoPath, 'utf8'), infoSource, 'Repair must not rotate the App build identity')
+    assert.equal(await readFile(fixture.appStylePath, 'utf8'), appStyle, 'Repair must not force an App reload')
+    const sequences = [...recoveredPatches.matchAll(/\{seq: (\d+)/g)].map((match) => Number(match[1]))
+    assert.ok(sequences.length > 1)
+    assert.deepEqual(
+        sequences,
+        Array.from({ length: sequences.length }, (_, index) => index + 1),
+        'Repaired CSS must not skip the failed publication sequence and force the running client to rebuild'
+    )
 })
 
 test('coalesces one full-file save into one wx patch', async (context) => {
