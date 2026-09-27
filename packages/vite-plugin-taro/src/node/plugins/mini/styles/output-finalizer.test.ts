@@ -5,28 +5,41 @@ import { fileURLToPath } from 'node:url'
 import { type BuildOptions, normalizePath, type Plugin } from 'vite'
 import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
 import type { createMiniTransformer } from './create-mini-transformer.ts'
+import { miniHtmlBase } from './mini-html-base.ts'
+import type { projectMiniStyles } from './project-mini-styles.ts'
 
 const contract = { styles: { appFileName: 'app.wxss', globalFileName: 'assets/global.wxss' } }
 const root = normalizePath(fileURLToPath(new URL('.', import.meta.url)))
-const { createMiniStylePlugin, transformers } = await importObservedPlugin()
+const { createMiniStylePlugin, transformers, projections } = await importObservedPlugin()
 
-/** Observe real transformer instances at their module boundary, without adding a production injection API. */
+/** Observe real projections and transformers at their module boundaries, without a production injection API. */
 async function importObservedPlugin() {
     const pluginUrl = new URL('./plugins.ts', import.meta.url).href
     const transformerUrl = new URL('./create-mini-transformer.ts', import.meta.url).href
-    // This test-only journal exposes created instances so node:test can observe calls and inject one-shot failures.
+    const projectorUrl = new URL('./project-mini-styles.ts', import.meta.url).href
+    // These test-only journals expose ownership snapshots and transformer instances for assertions and one-shot failures.
     const observerUrl = `data:text/javascript,${encodeURIComponent(`
         import { createMiniTransformer as create } from ${JSON.stringify(transformerUrl)}
+        import { projectMiniStyles as project } from ${JSON.stringify(projectorUrl)}
         export const transformers = []
+        export const projections = []
         export function createMiniTransformer() {
             const transformer = create()
             transformers.push(transformer)
             return transformer
         }
+        export function projectMiniStyles(entries, styles, context) {
+            const projection = project(entries, styles, context)
+            projections.push({ entries, projection })
+            return projection
+        }
     `)}`
     const hooks = registerHooks({
         resolve(specifier, context, nextResolve) {
-            if (specifier === './create-mini-transformer.ts' && context.parentURL === pluginUrl) {
+            if (
+                context.parentURL === pluginUrl &&
+                (specifier === './create-mini-transformer.ts' || specifier === './project-mini-styles.ts')
+            ) {
                 return { url: observerUrl, shortCircuit: true }
             }
             return nextResolve(specifier, context)
@@ -34,8 +47,18 @@ async function importObservedPlugin() {
     })
     try {
         const plugin: typeof import('./plugins.ts') = await import(pluginUrl)
-        const observer: { transformers: ReturnType<typeof createMiniTransformer>[] } = await import(observerUrl)
-        return { createMiniStylePlugin: plugin.createMiniStylePlugin, transformers: observer.transformers }
+        const observer: {
+            transformers: ReturnType<typeof createMiniTransformer>[]
+            projections: {
+                entries: Parameters<typeof projectMiniStyles>[0]
+                projection: ReturnType<typeof projectMiniStyles>
+            }[]
+        } = await import(observerUrl)
+        return {
+            createMiniStylePlugin: plugin.createMiniStylePlugin,
+            transformers: observer.transformers,
+            projections: observer.projections
+        }
     } finally {
         hooks.deregister()
     }
@@ -83,9 +106,9 @@ async function createStyleFixture(
     }
     await Reflect.apply(buildStart, context, [])
     // Capture publication in memory; these tests never create source fixtures, output files, or watchers.
-    const published: string[] = []
-    const publish = async (stylesheet: string) => {
-        published.push(stylesheet)
+    const published: { fileName: string; source: string }[] = []
+    const publish = async (fileName: string, source: string) => {
+        published.push({ fileName, source })
     }
     return {
         plugin,
@@ -141,8 +164,179 @@ test('resolves App/Page capsules in cascade order without mutating their entry m
         resolve.mock.calls.map((call) => call.arguments[0]),
         sources.map(([id]) => id)
     )
-    assert.equal(fixture.css.mock.calls[0]!.arguments[0], sources.map(([, css]) => css).join('\n'))
+    assert.deepEqual(
+        fixture.css.mock.calls.map((call) => call.arguments[0]),
+        sources.map(([, css]) => css)
+    )
+    assert.deepEqual(
+        fixture.published.map((file) => file.fileName),
+        ['assets/global.wxss', 'pages/page-0/index.wxss', 'pages/page-1/index.wxss']
+    )
+    const observed = projections.at(-1)!
+    assert.deepEqual(observed.entries, {
+        appEntries: { ...entries.appEntries, capsuleId: 'resolved:/app.js' },
+        pageEntries: entries.pageEntries.map((entry) => ({ ...entry, capsuleId: `resolved:${entry.capsuleId}` }))
+    })
+    assert.equal(observed.projection.appEntries.css, sources[0][1])
+    assert.deepEqual(
+        observed.projection.pageEntries.map((entry) => entry.css),
+        sources.slice(1).map(([, css]) => css)
+    )
     assert.deepEqual(entries, originalEntries)
+})
+
+test('keeps the previous resolved ownership snapshot when a Page resolution fails', async (context) => {
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']))
+    fixture.graph.set('/page.js', { importedIds: ['/app.css'], dynamicallyImportedIds: [] })
+    await fixture.capture('/app.css', '.app { color: red; }')
+    await fixture.update('export {}')
+    const previousEntries = projections.at(-1)!.entries
+    context.mock.method(fixture.context, 'resolve', async (id: string) => {
+        if (id === '/page.js') {
+            throw new Error('Page resolution failed')
+        }
+        return { id: `new:${id}` }
+    })
+    assert.ok(typeof fixture.plugin.buildStart === 'function')
+    await assert.rejects(Reflect.apply(fixture.plugin.buildStart, fixture.context, []), /Page resolution failed/)
+    await fixture.update('export {}')
+
+    assert.strictEqual(projections.at(-1)!.entries, previousEntries)
+    assert.equal(fixture.css.mock.callCount(), 2)
+    assert.equal(fixture.published.length, 2)
+})
+
+test('moves styles from App to Page during HMR without changing JavaScript candidate identities', async (context) => {
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']))
+    fixture.graph.set('/page.js', { importedIds: ['/app.css'], dynamicallyImportedIds: [] })
+    await fixture.transform('/app.css', tailwind(['py-5.5']))
+    const code = "const name = 'py-5.5'"
+    const initial = await fixture.update(code)
+    const before = projections.at(-1)!.projection
+    assert.deepEqual(before.appEntries.classSet, new Set(['py-5.5']))
+    assert.equal(before.pageEntries[0]!.css, '')
+
+    fixture.graph.set('/app.js', { importedIds: [], dynamicallyImportedIds: [] })
+    const updated = await fixture.update(code)
+    const after = projections.at(-1)!.projection
+    assert.equal(after.appEntries.css, '')
+    assert.deepEqual(after.appEntries.classSet, new Set())
+    assert.equal(after.pageEntries[0]!.css, before.appEntries.css)
+    assert.deepEqual(after.pageEntries[0]!.classSet, before.appEntries.classSet)
+    assert.deepEqual(updated, initial)
+    assert.equal(fixture.css.mock.callCount(), 4)
+    assert.equal(fixture.published.length, 4)
+    assert.equal(fixture.published[2]!.fileName, 'assets/global.wxss')
+    assert.equal(fixture.published[2]!.source, `${miniHtmlBase}\n`)
+    assert.equal(fixture.published[3]!.fileName, 'pages/page-0/index.wxss')
+    assert.match(fixture.published[3]!.source, /\.py-5_d5/)
+    assert.doesNotMatch(fixture.published[3]!.source, /\.h5-span/)
+    assert.strictEqual(
+        fixture.javaScript.mock.calls[0]!.arguments[0].classSet,
+        fixture.javaScript.mock.calls[1]!.arguments[0].classSet
+    )
+})
+
+test('emits HTML display defaults only in App CSS and leaves empty Page styles empty', async (context) => {
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']))
+    await fixture.update('export {}')
+    assert.deepEqual(fixture.published, [
+        { fileName: 'assets/global.wxss', source: `${miniHtmlBase}\n` },
+        { fileName: 'pages/page-0/index.wxss', source: '' }
+    ])
+    const css = fixture.published[0]!.source
+    assert.match(css, /\.h5-span,\s*\.h5-a\s*\{\s*display:\s*inline/)
+    assert.match(css, /\.h5-button,\s*\.h5-input,\s*\.h5-textarea,\s*\.h5-progress\s*\{\s*display:\s*inline-block/)
+    assert.match(css, /\.h5-template,\s*\.h5-datalist\s*\{\s*display:\s*none/)
+    assert.deepEqual(
+        Array.from(css.matchAll(/([\w-]+)\s*:/g), (match) => match[1]),
+        ['display', 'display', 'display']
+    )
+    assert.doesNotMatch(css, /@layer|!important|\.h5-(?:li|meter|br|ins|select|table|tr|td|h[1-6])\b/)
+    await fixture.update('export {}')
+    assert.equal(fixture.published.length, 2)
+})
+
+test('caches each Page independently, rewrites the shared candidate union, and clears removed styles', async (context) => {
+    const fixture = await createStyleFixture(
+        context,
+        true,
+        createMiniStyleEntries('/app.js', ['/first.js', '/second.js'])
+    )
+    fixture.graph.set('/first.js', { importedIds: ['/first.css'], dynamicallyImportedIds: [] })
+    fixture.graph.set('/second.js', { importedIds: ['/second.css'], dynamicallyImportedIds: [] })
+    fixture.graph.set('/first.css', { importedIds: [], dynamicallyImportedIds: [] })
+    fixture.graph.set('/second.css', { importedIds: [], dynamicallyImportedIds: [] })
+    await fixture.capture('/app.css', '.app { color: red; }')
+    await fixture.transform('/first.css', tailwind(['py-5.5']))
+    await fixture.transform('/second.css', tailwind(['mr-4.5']))
+    const code = "const classes = 'py-5.5 mr-4.5'"
+    const initial = await fixture.update(code)
+    assert.equal(initial[0]!.code, "const classes = 'py-5_d5 mr-4_d5'")
+    assert.doesNotMatch(fixture.published[0]!.source, /py-5|mr-4/)
+    assert.match(fixture.published[1]!.source, /\.py-5_d5\{/)
+    assert.doesNotMatch(fixture.published[1]!.source, /mr-4|\.h5-span/)
+    assert.match(fixture.published[2]!.source, /\.mr-4_d5\{/)
+    assert.doesNotMatch(fixture.published[2]!.source, /py-5|\.h5-span/)
+
+    await fixture.capture('/app.css', '.app { color: blue; }')
+    await fixture.update(code)
+    assert.equal(fixture.css.mock.callCount(), 4)
+    assert.equal(fixture.published.at(-1)!.fileName, 'assets/global.wxss')
+    fixture.graph.set('/first.js', { importedIds: [], dynamicallyImportedIds: [] })
+    const removed = await fixture.update(code)
+    assert.equal(removed[0]!.code, "const classes = 'py-5.5 mr-4_d5'")
+    assert.deepEqual(fixture.published.at(-1), { fileName: 'pages/page-0/index.wxss', source: '' })
+    assert.equal(fixture.published.length, 5)
+    assert.equal(fixture.css.mock.callCount(), 5)
+    await fixture.update(code)
+    assert.equal(fixture.published.length, 5)
+})
+
+test('retries a failed Page write without rewriting durable App CSS or delivering partial JavaScript', async (context) => {
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']))
+    fixture.graph.set('/page.js', { importedIds: ['/page.css'], dynamicallyImportedIds: [] })
+    fixture.graph.set('/page.css', { importedIds: [], dynamicallyImportedIds: [] })
+    await fixture.capture('/app.css', '.app { color: red; }')
+    await fixture.transform('/page.css', tailwind(['py-5.5']))
+    const artifact = { code: "const name = 'py-5.5'", filename: 'page.js', seq: 7 }
+    await assert.rejects(
+        fixture.plugin.finalizeUpdate([artifact], async (fileName, source) => {
+            if (fileName === 'pages/page-0/index.wxss') {
+                throw new Error('Page write failed')
+            }
+            await fixture.publish(fileName, source)
+        }),
+        /Page write failed/
+    )
+    assert.equal(fixture.published.length, 1)
+    assert.equal(fixture.published[0]!.fileName, 'assets/global.wxss')
+    assert.equal(artifact.code, "const name = 'py-5.5'")
+
+    const retried = await fixture.plugin.finalizeUpdate([artifact], fixture.publish)
+    assert.deepEqual(retried, [{ ...artifact, code: "const name = 'py-5_d5'" }])
+    assert.equal(fixture.published.length, 2)
+    assert.equal(fixture.published[1]!.fileName, 'pages/page-0/index.wxss')
+    assert.equal(fixture.css.mock.callCount(), 2)
+})
+
+test('a later Page conversion failure exposes no files from the newer transaction', async (context) => {
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']))
+    fixture.graph.set('/page.js', { importedIds: ['/page.css'], dynamicallyImportedIds: [] })
+    fixture.graph.set('/page.css', { importedIds: [], dynamicallyImportedIds: [] })
+    await fixture.capture('/app.css', '.app { color: red; }')
+    await fixture.capture('/page.css', '.page { color: red; }')
+    await fixture.update('export {}')
+    await fixture.capture('/app.css', '.app { color: blue; }')
+    await fixture.capture('/page.css', '.page {')
+    await assert.rejects(fixture.update('export {}'), /Unclosed block/)
+    assert.equal(fixture.published.length, 2)
+    await fixture.capture('/page.css', '.page { color: blue; }')
+    await fixture.update('export {}')
+    assert.equal(fixture.published.length, 4)
+    assert.match(fixture.published[2]!.source, /color: blue/)
+    assert.match(fixture.published[3]!.source, /color: blue/)
+    assert.equal(fixture.css.mock.callCount(), 6)
 })
 
 test('reuses unchanged CSS and candidate tables while rewriting each current patch', async (context) => {
@@ -152,7 +346,7 @@ test('reuses unchanged CSS and candidate tables while rewriting each current pat
     const unchanged = await fixture.update("const next = 'py-5.5'")
     assert.deepEqual(first, [{ code: "const first = 'py-5_d5'", filename: 'app.js', seq: 1 }])
     assert.deepEqual(unchanged, [{ code: "const next = 'py-5_d5'", filename: 'app.js', seq: 1 }])
-    assert.match(fixture.published[0]!, /\.py-5_d5/)
+    assert.match(fixture.published[0]!.source, /\.py-5_d5/)
     assert.equal(fixture.published.length, 1)
     assert.equal(fixture.css.mock.callCount(), 1)
     assert.strictEqual(
@@ -200,15 +394,15 @@ test('retains only the latest conversion and keeps each plugin minification poli
         fixture.css.mock.calls.map((call) => call.arguments[0]),
         [firstCss, secondCss, firstCss]
     )
-    assert.match(fixture.published.at(-1)!, /\.first \{ padding: 1rpx; \}/)
+    assert.match(fixture.published.at(-1)!.source, /\.first \{ padding: 1rpx; \}/)
 
     const minified = await createStyleFixture(context, true, createMiniStyleEntries('/app.js', []))
     await minified.capture('/app.css', firstCss)
     await minified.update('export {}')
     await minified.update('export {}')
     assert.equal(minified.css.mock.callCount(), 1)
-    assert.match(minified.published[0]!, /\.first\{padding:1rpx\}/)
-    assert.notEqual(minified.published[0], fixture.published.at(-1))
+    assert.match(minified.published[0]!.source, /\.first\{padding:1rpx\}/)
+    assert.notEqual(minified.published[0]!.source, fixture.published.at(-1)!.source)
 })
 
 test('reprojects cyclic multi-entry graphs, deduplicates styles, and prunes removed imports and candidates', async (context) => {
@@ -236,12 +430,12 @@ test('reprojects cyclic multi-entry graphs, deduplicates styles, and prunes remo
     assert.equal(first[0]!.code, "const classes = 'py-5_d5 mr-4_d5 px-1.5'")
     assert.deepEqual(
         fixture.css.mock.calls.map((call) => call.arguments[0]),
-        [`${a}\n${b}`]
+        [`${a}\n${b}`, '', '']
     )
 
     fixture.graph.set('/app.js', { importedIds: ['/b.css'], dynamicallyImportedIds: ['/a.css?one', '/lazy.js'] })
     await fixture.update(code)
-    assert.equal(fixture.css.mock.calls[1]!.arguments[0], `${b}\n${a}`)
+    assert.equal(fixture.css.mock.calls[3]!.arguments[0], `${b}\n${a}`)
     assert.strictEqual(
         fixture.javaScript.mock.calls[0]!.arguments[0].classSet,
         fixture.javaScript.mock.calls[1]!.arguments[0].classSet
@@ -250,17 +444,17 @@ test('reprojects cyclic multi-entry graphs, deduplicates styles, and prunes remo
     fixture.graph.set('/app.js', { importedIds: [], dynamicallyImportedIds: ['/a.css?one'] })
     const pruned = await fixture.update(code)
     assert.equal(pruned[0]!.code, "const classes = 'py-5_d5 mr-4.5 px-1.5'")
-    assert.equal(fixture.css.mock.calls[2]!.arguments[0], a)
+    assert.equal(fixture.css.mock.calls[4]!.arguments[0], a)
 
     fixture.graph.delete('/a.css?one')
     fixture.graph.delete('/a.css?two')
     const missing = await fixture.update(code)
     assert.equal(missing[0]!.code, code)
-    assert.equal(fixture.css.mock.calls[3]!.arguments[0], '')
-    assert.doesNotMatch(fixture.published.at(-1)!, /\.[ab] \{/)
+    assert.equal(fixture.css.mock.calls[5]!.arguments[0], '')
+    assert.doesNotMatch(fixture.published.at(-1)!.source, /\.[ab] \{/)
     fixture.graph.clear()
     await fixture.update(code)
-    assert.equal(fixture.css.mock.callCount(), 4)
+    assert.equal(fixture.css.mock.callCount(), 6)
     assert.strictEqual(
         fixture.javaScript.mock.calls[3]!.arguments[0].classSet,
         fixture.javaScript.mock.calls[4]!.arguments[0].classSet

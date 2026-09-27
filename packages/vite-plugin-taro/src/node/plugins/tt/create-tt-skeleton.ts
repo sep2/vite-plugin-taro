@@ -73,8 +73,7 @@ export function createTtSkeleton(
                     '<comp i="{{app}}" p="{{page}}" />',
                     'TT Page template entry'
                 )
-            ),
-            createTextAsset(`${page.path}.ttss`, '')
+            )
         ]),
         // project.tt.json is Taro's source config filename; TikTok DevTools consumes project.config.json in the output.
         jsonAsset(output.projectConfigFilename, options.projectConfigJson),

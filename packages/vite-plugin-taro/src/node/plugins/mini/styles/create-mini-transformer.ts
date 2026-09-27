@@ -5,7 +5,6 @@ import { createStyleHandler, type IStyleHandlerOptions, postcssHtmlTransform } f
 import { type WalkerEnter, walk } from 'oxc-walker'
 import { RolldownMagicString } from 'rolldown'
 import { parseSync } from 'rolldown/utils'
-import { miniHtmlBase } from './mini-html-base.ts'
 
 const cssPreflight = {
     border: '0 solid',
@@ -80,10 +79,8 @@ export function createMiniTransformer(): MiniTransformer {
     return {
         transformJavaScript,
         async transformStylesheet(css) {
-            // Each call receives the complete global projection, so the base is emitted once in builds and HMR.
-            // Flatten only application CSS, preserving its layer policy. Native-ready defaults precede the result
-            // so later mapped HTML selectors and utility classes can override them at equal specificity.
-            return `${miniHtmlBase}\n${(await styleHandler(css)).css}`
+            // Convert one App/Page projection without adding global defaults to Page-local styles.
+            return (await styleHandler(css)).css
         }
     }
 }

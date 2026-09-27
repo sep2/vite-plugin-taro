@@ -25,17 +25,21 @@ function assertGlobalStylesheet(css: string, applicationCss: string): void {
     assert.ok(css.endsWith(applicationCss))
 }
 
-test('minifies development CSS and live rpx updates without identical rewrites', async () => {
+test('minifies App/Page CSS, clears removed Page styles, and suppresses identical rewrites', async () => {
     const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-style-plugin-')))
     const appId = normalizePath(path.join(root, 'app.js'))
     const cssId = normalizePath(path.join(root, 'app.css'))
     const extraCssId = normalizePath(path.join(root, 'extra.css'))
+    const pageId = normalizePath(path.join(root, 'page.js'))
+    const pageCssId = normalizePath(path.join(root, 'page.css'))
     const outDir = path.join(root, 'dist')
     const initialSource = "import './app.css'\nexport const value = 'initial'\n"
     await Promise.all([
         writeFile(appId, initialSource),
         writeFile(cssId, '.app { color: red; }\n'),
-        writeFile(extraCssId, '.extra { color: gold; padding: 12.5rpx; }\n')
+        writeFile(extraCssId, '.extra { color: gold; padding: 12.5rpx; }\n'),
+        writeFile(pageId, "import './page.css'\nexport const value = 'page'\n"),
+        writeFile(pageCssId, '.page { padding: 1px; }\n')
     ])
 
     // These mutable journals retain DevEngine's non-awaited lifecycle results for test synchronization.
@@ -47,16 +51,16 @@ test('minifies development CSS and live rpx updates without identical rewrites',
     let publicationWork = Promise.resolve()
     // DevEngine callbacks run only after assignment and advance the same published frontier as the production host.
     let engine: DevEngine
-    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(appId, []))
+    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(appId, [pageId]))
     // This one-shot mutable fault proves a failed atomic writer does not advance the plugin's published stylesheet frontier.
     let writeFailure: Error | undefined
-    const writeStyle = async (wxss: string): Promise<void> => {
+    const writeStyle = async (fileName: string, wxss: string): Promise<void> => {
         if (writeFailure) {
             const error = writeFailure
             writeFailure = undefined
             throw error
         }
-        await writeDevelopmentFile(outDir, globalWxssFileName, wxss)
+        await writeDevelopmentFile(outDir, fileName, wxss)
         publishedStyles.push(wxss)
     }
     const publish = (result: unknown, results: unknown[], deliveredFileNames: readonly string[]): void => {
@@ -109,7 +113,7 @@ test('minifies development CSS and live rpx updates without identical rewrites',
             outDir: outDir,
             // The same minification policy applies to initial development output, full rebuilds, and HMR publications.
             cssMinify: true,
-            rolldownOptions: { input: appId }
+            rolldownOptions: { input: { app: appId, page: pageId } }
         }
     })
     const bundledDev = requireBundledDev(server.environments.client.bundledDev)
@@ -152,6 +156,8 @@ test('minifies development CSS and live rpx updates without identical rewrites',
         await waitForEventCount(outputResults, 1)
         const globalWxssPath = path.join(outDir, globalWxssFileName)
         assertGlobalStylesheet(await readFile(globalWxssPath, 'utf8'), '.app{color:#123456}')
+        const pageWxssPath = path.join(outDir, 'pages/page-0/index.wxss')
+        assert.equal(await readFile(pageWxssPath, 'utf8'), '.page{padding:1rpx}')
         await engine.registerClient('style-plugin-test')
 
         const colorResultCount = hmrResults.length
@@ -210,9 +216,32 @@ test('minifies development CSS and live rpx updates without identical rewrites',
         await waitForEventCount(hmrResults, formattingResultCount + 1)
         assert.equal((await stat(globalWxssPath)).ino, unchangedInode)
 
+        const pageResultCount = hmrResults.length
+        const pageStyleCount = publishedStyles.length
+        await writeFile(pageCssId, '.page { padding: 2px; }\n')
+        await waitForPublishedStyle(publishedStyles, pageStyleCount, (css) => css === '.page{padding:2rpx}', hmrResults)
+        await waitForEventCount(hmrResults, pageResultCount + 1)
+        assert.equal(await readFile(pageWxssPath, 'utf8'), '.page{padding:2rpx}')
+        assert.equal((await stat(globalWxssPath)).ino, unchangedInode, 'Page CSS must not rewrite App CSS')
+
+        const pageRemovalResultCount = hmrResults.length
+        const pageRemovalStyleCount = publishedStyles.length
+        await writeFile(pageId, "export const value = 'removed'\n")
+        await waitForPublishedStyle(publishedStyles, pageRemovalStyleCount, (css) => css === '', hmrResults)
+        await waitForEventCount(hmrResults, pageRemovalResultCount + 1)
+        assert.equal(await readFile(pageWxssPath, 'utf8'), '')
+        assert.equal((await stat(globalWxssPath)).ino, unchangedInode)
+
+        const emptyPageInode = (await stat(pageWxssPath)).ino
+        const emptyPageResultCount = hmrResults.length
+        await writeFile(pageId, "export const value = 'still-empty'\n")
+        await waitForEventCount(hmrResults, emptyPageResultCount + 1)
+        assert.equal((await stat(pageWxssPath)).ino, emptyPageInode)
+
         engine.triggerFullBuild()
         await waitForEventCount(outputResults, 2)
         assertGlobalStylesheet(await readFile(globalWxssPath, 'utf8'), '.app{color:#654321}')
+        assert.equal(await readFile(pageWxssPath, 'utf8'), '')
 
         const durableWxss = await readFile(globalWxssPath, 'utf8')
         const failedResultCount = hmrResults.length
@@ -255,8 +284,8 @@ test('respects cssMinify:false while rendering Tailwind CSS and matching patch f
     // DevEngine callbacks run only after assignment and commit every finalized payload before the next source edit.
     let engine: DevEngine
     const styles = createMiniStylePlugin(contract, createMiniStyleEntries(appId, []))
-    const writeStyle = async (wxss: string): Promise<void> => {
-        await writeDevelopmentFile(outDir, globalWxssFileName, wxss)
+    const writeStyle = async (fileName: string, wxss: string): Promise<void> => {
+        await writeDevelopmentFile(outDir, fileName, wxss)
         publishedStyles.push(wxss)
     }
     const server = await createServer({

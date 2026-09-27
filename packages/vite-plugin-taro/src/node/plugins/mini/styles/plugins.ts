@@ -9,7 +9,9 @@ import { tailwindcssBasedir } from '../../tailwind/tailwind-css.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import type { createResolver } from '../resolve/resolver.ts'
 import { createMiniTransformer } from './create-mini-transformer.ts'
+import { miniHtmlBase } from './mini-html-base.ts'
 import { minifyMiniStylesheet } from './minify-mini-stylesheet.ts'
+import { projectMiniStyles } from './project-mini-styles.ts'
 
 /** Persistent Tailwind state owned by one physical CSS root across incremental Rolldown transforms. */
 type TailwindRoot = Readonly<{
@@ -44,10 +46,10 @@ type JavaScriptArtifact = Readonly<{
 /** Vite plugin with the host operation that finalizes one coherent native-style/JavaScript transaction. */
 export type MiniStylePlugin = Plugin &
     Readonly<{
-        /** Neutralizes browser CSS payloads and atomically publishes the matching global native stylesheet. */
+        /** Neutralizes browser CSS payloads and publishes every matching native stylesheet before JavaScript delivery. */
         finalizeUpdate: <Artifact extends JavaScriptArtifact>(
             artifacts: readonly Artifact[],
-            writeStylesheet: (stylesheet: string) => Promise<void>
+            writeStylesheet: (fileName: string, source: string) => Promise<void>
         ) => Promise<readonly Artifact[]>
     }>
 
@@ -57,7 +59,7 @@ const tailwindRootImportPattern = /(@(?:import|reference)\s+(?:url\(\s*)?)(['"])
 const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.css'))
 
 /**
- * Creates the single owner of global native-style compilation, graph projection, class rewriting, and publication.
+ * Creates the single owner of App/Page native-style compilation, graph projection, class rewriting, and publication.
  *
  * ## Architectural invariant
  *
@@ -79,12 +81,11 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  *    `vite:css-post` hook only after the original hook succeeds; it never rereads source files or repeats CSS preprocessing.
  * 4. The fixed Mini transformer owns selector conversion and Oxc-based JavaScript class-string conversion. One retained
  *    transformer and one projected candidate set drive both operations without loading a framework project context.
- * 5. VPT owns physical global native CSS and patch publication. Vite's browser CSS asset is only an intermediate carrier and is
- *    removed before VPT emits the contract-selected global stylesheet.
+ * 5. VPT owns physical App/Page CSS and patch publication. Vite's browser CSS asset is only an intermediate carrier and is
+ *    removed before VPT emits the App stylesheet and each native Page companion.
  *
- * Native Page and component styles are outside this global pipeline. The target skeleton is generated after this style plugin
- * and emits those opaque companions later. Mini output also enforces `cssCodeSplit: false`, so Vite contributes at
- * most one browser compiler stylesheet for this plugin to replace.
+ * Opaque native-component styles stay outside this pipeline and are emitted by later native output hooks. Mini output keeps
+ * `cssCodeSplit: false` for Vite's intermediate browser carrier; native splitting follows App/Page graph ownership instead.
  *
  * ## Compilation phases
  *
@@ -113,33 +114,36 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  *
  * ### 3. Live-graph projection
  *
- * The resolver supplies App/Page entry records; only their capsules become CSS roots, ordered App-first then by configured Page.
- * Output finalization starts from those resolved IDs and traverses Rolldown's current static and dynamic import edges
- * in dependency-first post-order. Transaction-local visited sets terminate cycles and deduplicate shared modules and physical
- * stylesheets. A retained stylesheet contributes only when its module is still reachable, so removing an import prunes its CSS
- * and Tailwind candidates without a separate prune protocol or persistent topology cache. Candidate sets are unioned only from
- * the Tailwind roots whose captured CSS survives that exact traversal, preserving the CSS/class identity invariant.
+ * The resolver supplies App/Page entry records; capsule resolution preserves those records and their native output paths.
+ * Each capsule traverses Rolldown's current static and dynamic import edges in dependency-first post-order. Root-local visited
+ * sets terminate cycles and deduplicate physical styles without suppressing another Page's independent cascade. App-reachable
+ * styles belong to the App and are excluded from every Page projection; styles shared only by Pages remain in each consumer.
+ * A retained stylesheet contributes only while reachable, so import removals prune CSS and candidates without a topology cache.
+ * Candidate sets contain only the Tailwind roots whose captured CSS survives each entry's projection.
+ *
+ * App CSS is emitted at the contract's global filename; Page CSS is emitted beside each native Page shell. Only the App file
+ * receives HTML display defaults. JavaScript rewriting uses the union of all surviving App/Page Tailwind candidates.
  *
  * ### 4. Shared native-style finalization
  *
- * `finalizeOutput()` converts the concatenated reachable CSS to native CSS, optionally minifies that complete global file
- * (including HTML defaults), then transforms each JavaScript artifact with the same projected class set. Both builds and HMR
- * follow `build.cssMinify`, defaulting to `build.minify`, using Lightning CSS. Vite's intermediate CSS minification
+ * `finalizeOutput()` converts and optionally minifies each entry's CSS, then transforms every JavaScript artifact using
+ * the shared candidate union. Builds and HMR follow `build.cssMinify`, defaulting to `build.minify`, using Lightning CSS.
+ * Vite's intermediate CSS minification
  * remains disabled so only final native bytes are optimized. The function returns data without bundle mutation or filesystem
  * publication. Any conversion or minification failure rejects before callers expose partial output. JavaScript conversion is
  * skipped when the projection contains no Tailwind candidates, preserving ordinary bundle bytes.
  *
- * `createFinalizeOutput()` captures the resolved output policy once and retains only the latest successful CSS conversion and
- * candidate identity. Every transaction supplies a fresh live-graph projection, but byte-identical CSS skips both PostCSS and
- * Lightning CSS. Equal candidate contents reuse the same set and replacement table even when the projection allocated a new
- * set. Changed candidates never reuse stale replacements; conversion failures do not advance the snapshot.
+ * `createFinalizeOutput()` captures the resolved output policy once and retains only the latest successful conversion per file
+ * and candidate identity. Every transaction supplies a fresh live-graph projection, but byte-identical CSS skips PostCSS and
+ * Lightning CSS independently for each file. Equal candidate contents reuse the same set and replacement table even when
+ * the projection allocated a new set. Changed candidates never reuse stale replacements; failures do not advance the snapshot.
  *
  * ### 5a. Complete-build commit
  *
  * The post-order `generateBundle` hook gathers all JavaScript chunks, finalizes them as one operation, and only then mutates the
  * bundle. It assigns converted code, clears invalid source maps, removes Vite's intermediate browser stylesheet, and always
- * emits the contract-selected global file, including the HTML compatibility base even when the application has no styles.
- * Native output hooks run afterward and emit Page/component companion files independently.
+ * emits the App stylesheet with HTML defaults and every Page stylesheet, including empty Pages. Native output hooks run
+ * afterward without Page-style placeholders; opaque native-component styles remain independently owned.
  *
  * ### 5b. Development commit
  *
@@ -148,25 +152,27 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * all conversion succeeds, the host's atomic writer publishes changed native CSS before `finalizeUpdate()` returns converted
  * patch factories. Their captured Vite CSS literals are emptied first; factories, exports, changed IDs, and sequences remain
  * intact. The patch publisher therefore cannot expose newer JavaScript class identities before matching selectors exist.
- * `publishedStylesheet` advances only after a successful write and suppresses byte-identical native-tool reload events.
+ * Each file's publication frontier advances only after its atomic write succeeds. A failed later write blocks JavaScript
+ * delivery; retry skips files already made durable. Empty Page CSS overwrites stale styles after import removal.
  *
  * ## Retained state and lifecycle
  *
  * Each plugin instance owns the following bounded state and transformation services:
  *
- * - `cssMinify`: requested global-style minification captured before disabling Vite's intermediate pass, then resolved once;
- * - `entryIds`: graph-exact App/Page entry identities resolved at the start of each build;
+ * - `cssMinify`: requested native-style minification captured before disabling Vite's intermediate pass, then resolved once;
+ * - `resolvedEntries`: App/Page metadata with graph-exact capsule identities resolved at the start of each build;
  * - `graphContext`: the active Rolldown graph reader needed by host calls made outside plugin hooks;
  * - `styleByModuleId`: the latest successful Vite CSS plus optional Tailwind state at one normalized module identity;
- * - `publishedStylesheet`: the last durably published development stylesheet used for unchanged-write suppression;
- * - `finalizeOutput`: resolved output options, the fixed Mini transformer, and the latest successful CSS/candidate snapshot.
+ * - `publishedStylesheets`: the last durably published bytes per development stylesheet for unchanged-write suppression;
+ * - `finalizeOutput`: resolved output options, the fixed transformer, and the latest successful per-file CSS/candidate snapshot.
  *
- * The state owners remain scoped to one plugin instance; `entryIds` is atomically replaced after each complete resolution.
+ * The state owners remain scoped to one plugin instance; `resolvedEntries` is atomically replaced after each complete resolution.
  * A development watcher retains them across updates; build and watcher shutdown clear the complete style store.
  *
  * ## Cost model
  *
- * Projection is `O(V + E + B + C)` for reachable modules, import edges, concatenated CSS bytes, and candidate insertions.
+ * Projection is `O(sum(Vᵢ + Eᵢ + Bᵢ + Cᵢ))` across App/Page roots for reachable modules, import edges, projected CSS bytes,
+ * and candidate insertions. Shared subgraphs are revisited per root; candidate unioning needs no extra graph traversal.
  * Building one exact candidate precheck costs `O(C)` candidate bytes and testing a chunk costs `O(J)` source bytes. Matching
  * chunks then parse and walk in `O(J)`; replacing `Kᵢ` candidate tokens in literal `i` costs `O(LᵢKᵢ)` while preserving
  * untouched bytes through Rolldown's native editor. Comparing candidate sets costs `O(C)` without sorting. Retained memory
@@ -182,8 +188,8 @@ export function createMiniStylePlugin(
     // Late config captures the requested switch before disabling Vite's intermediate pass; configResolved supplies the
     // resolved JS-minification default. The same policy stays fixed throughout builds and HMR.
     let cssMinify: BuildOptions['cssMinify']
-    // buildStart replaces this mutable root list with exact capsule identities without changing the supplied entry metadata.
-    let entryIds: readonly string[]
+    // buildStart atomically replaces these entry records with resolved capsules while preserving native output metadata.
+    let resolvedEntries: typeof entries
     // configResolved initializes this service once the output policy is known; all builds and HMR reuse its bounded cache.
     let finalizeOutput: ReturnType<typeof createFinalizeOutput>
 
@@ -191,8 +197,8 @@ export function createMiniStylePlugin(
     let graphContext: PluginContext
     // This mutable map is the only retained style store: Vite and Tailwind update separate fields at one module identity.
     const styleByModuleId = new Map<string, StyleModule>()
-    // This mutable frontier advances only after the host durably writes native CSS, suppressing byte-identical filesystem events.
-    let publishedStylesheet: string | undefined
+    // Each mutable per-file frontier advances after a durable write, allowing partial publication failures to retry safely.
+    const publishedStylesheets = new Map<string, string>()
 
     /** Invalidates every Tailwind root fed by one changed compiler dependency. */
     const invalidateTailwindDependencies = (dependencyId: string): void => {
@@ -210,7 +216,7 @@ export function createMiniStylePlugin(
     return {
         name: 'vpt:mini-styles',
         config: {
-            // Observe user and ordinary plugin configuration before reserving minification for the native global output.
+            // Observe user and ordinary plugin configuration before reserving minification for native output.
             order: 'post',
             handler(config) {
                 cssMinify = config.build?.cssMinify
@@ -220,7 +226,7 @@ export function createMiniStylePlugin(
         /** Resolves the output policy and installs the private Vite integration that observes fully processed module CSS. */
         configResolved(config) {
             cssMinify ??= Boolean(config.build.minify)
-            finalizeOutput = createFinalizeOutput({ filename: contract.styles.globalFileName, minify: cssMinify })
+            finalizeOutput = createFinalizeOutput(contract.styles, cssMinify)
 
             // `vite:css-post` is the boundary after all public CSS processing and before browser-module serialization.
             const cssPostPlugin = config.plugins.find((plugin) => plugin.name === 'vite:css-post')!
@@ -246,14 +252,17 @@ export function createMiniStylePlugin(
         /** Resolves exact graph roots and captures the graph reader used by host calls outside plugin hooks. */
         async buildStart() {
             // Resolve through Rolldown rather than reconstructing real paths, whose drive casing and separators vary on Windows.
-            const resolvedEntryIds = await Promise.all(
-                [entries.appEntries, ...entries.pageEntries].map(
-                    async (entry) => (await this.resolve(entry.capsuleId))!.id
-                )
-            )
+            const resolveEntry = async (entry: typeof entries.appEntries) => ({
+                ...entry,
+                capsuleId: (await this.resolve(entry.capsuleId))!.id
+            })
+            const [appEntries, pageEntries] = await Promise.all([
+                resolveEntry(entries.appEntries),
+                Promise.all(entries.pageEntries.map(resolveEntry))
+            ])
 
-            // Commit the complete root set together so finalization never observes a partially resolved application graph.
-            entryIds = resolvedEntryIds
+            // Commit App and Pages together so finalization never observes a partially resolved ownership snapshot.
+            resolvedEntries = { appEntries, pageEntries }
             graphContext = this
         },
         transform: {
@@ -318,7 +327,7 @@ export function createMiniStylePlugin(
 
                 // Step 2: finish all fallible CSS and JavaScript conversion before mutating any bundle output.
                 const finalized = await finalizeOutput(
-                    projectStyles(entryIds, styleByModuleId, this),
+                    projectMiniStyles(resolvedEntries, styleByModuleId, this),
                     chunks.map((chunk) => ({ code: chunk.code, filename: chunk.fileName }))
                 )
 
@@ -328,15 +337,17 @@ export function createMiniStylePlugin(
                     chunk.map = null
                 })
 
-                // Step 4: remove Vite's browser CSS carrier; VPT owns the sole physical global native stylesheet.
+                // Step 4: remove Vite's browser CSS carrier; VPT owns the physical App/Page stylesheets.
                 Object.entries(bundle).forEach(([fileName, output]) => {
                     if (isStyleAsset(output)) {
                         delete bundle[fileName]
                     }
                 })
 
-                // Step 5: always emit the imported global file, including the HTML base for applications without styles.
-                this.emitFile({ type: 'asset', fileName: contract.styles.globalFileName, source: finalized.stylesheet })
+                // Step 5: emit the App base and all Page companions, even when a Page has no local CSS.
+                for (const stylesheet of finalized.stylesheets) {
+                    this.emitFile({ type: 'asset', ...stylesheet })
+                }
             }
         },
         /** Releases build-only state after the final bundle has consumed it. */
@@ -348,11 +359,12 @@ export function createMiniStylePlugin(
         /** Releases all long-lived development state when the owning watcher terminates. */
         closeWatcher() {
             styleByModuleId.clear()
+            publishedStylesheets.clear()
         },
         /** Finalizes one development result and publishes matching native CSS before exposing converted patch factories. */
         finalizeUpdate: async <Artifact extends JavaScriptArtifact>(
             artifacts: readonly Artifact[],
-            writeStylesheet: (stylesheet: string) => Promise<void>
+            writeStylesheet: (fileName: string, source: string) => Promise<void>
         ): Promise<readonly Artifact[]> => {
             // CSS is already captured for physical publication, so its browser payload need not enter JavaScript conversion.
             const javaScript = artifacts.map((artifact) => ({
@@ -361,66 +373,77 @@ export function createMiniStylePlugin(
             }))
 
             // Step 1: complete every fallible conversion against one snapshot of the current module graph.
-            const output = await finalizeOutput(projectStyles(entryIds, styleByModuleId, graphContext), javaScript)
+            const output = await finalizeOutput(
+                projectMiniStyles(resolvedEntries, styleByModuleId, graphContext),
+                javaScript
+            )
 
-            // Step 2: publish native CSS first so the tool cannot observe JavaScript with newer class identities.
-            if (output.stylesheet !== publishedStylesheet) {
-                await writeStylesheet(output.stylesheet)
-                // Advance the frontier only after the atomic writer succeeds; failed writes remain retryable.
-                publishedStylesheet = output.stylesheet
+            // Step 2: publish every changed file before JavaScript; keep successful writes durable across a later failure.
+            for (const { fileName, source } of output.stylesheets) {
+                if (publishedStylesheets.get(fileName) !== source) {
+                    await writeStylesheet(fileName, source)
+                    publishedStylesheets.set(fileName, source)
+                }
             }
 
-            // Step 3: preserve patch metadata and replace only code after the matching stylesheet is durable.
+            // Step 3: preserve patch metadata and replace only code after all matching stylesheets are durable.
             return artifacts.map((artifact, index) => ({ ...artifact, code: output.javaScript[index]! }))
         }
     }
 }
 
-/** Creates one cached native-output converter for a fixed filename and minification policy. */
-function createFinalizeOutput(stylesheetOptions: Parameters<typeof minifyMiniStylesheet>[1]) {
-    // The fixed transformer retains only deterministic class-escape and PostCSS pipeline caches for this finalizer.
+/** Caches one successful conversion per native output file and one shared JavaScript candidate identity. */
+function createFinalizeOutput(styles: MiniContract['styles'], minify: BuildOptions['cssMinify']) {
     const miniTransformer = createMiniTransformer()
-    // Retain only the latest successful CSS conversion and candidate identity, not historical outputs or graph topology.
+    const extension = path.posix.extname(styles.appFileName)
+    // Replace this bounded snapshot only after every CSS and JavaScript conversion succeeds; failures remain retryable.
     let previousOutput:
         | Readonly<{
-              css: string
+              stylesheets: ReadonlyMap<string, Readonly<{ css: string; source: string }>>
               classSet: ReadonlySet<string>
-              stylesheet: string
           }>
         | undefined
 
     return async function finalizeOutput(
-        projection: ReturnType<typeof projectStyles>,
+        projection: ReturnType<typeof projectMiniStyles>,
         javaScript: readonly JavaScriptArtifact[]
     ) {
-        // Step 1: reuse candidate identities only when this transaction's live projection has equal contents.
         const classSet =
             previousOutput && equalCandidates(previousOutput.classSet, projection.classSet)
                 ? previousOutput.classSet
                 : projection.classSet
+        const inputs = [
+            { fileName: styles.globalFileName, css: projection.appEntries.css, app: true },
+            ...projection.pageEntries.map((entry) => ({
+                fileName: entry.shellName.replace(/\.js$/, extension),
+                css: entry.css,
+                app: false
+            }))
+        ]
+        // These local accumulators stage the complete transaction before exposing any converted files or updating caches.
+        const nextStylesheets = new Map<string, Readonly<{ css: string; source: string }>>()
+        const stylesheets: { fileName: string; source: string }[] = []
+        for (const { fileName, css, app } of inputs) {
+            const cached = previousOutput?.stylesheets.get(fileName)
+            const converted =
+                cached?.css === css
+                    ? cached
+                    : {
+                          css,
+                          source: await minifyMiniStylesheet(
+                              `${app ? `${miniHtmlBase}\n` : ''}${await miniTransformer.transformStylesheet(css)}`,
+                              { filename: fileName, minify }
+                          )
+                      }
+            nextStylesheets.set(fileName, converted)
+            stylesheets.push({ fileName, source: converted.source })
+        }
 
-        // Step 2: reuse identical CSS or convert before minifying, including native units, selectors, and HTML defaults.
-        const stylesheet =
-            previousOutput?.css === projection.css
-                ? previousOutput.stylesheet
-                : await minifyMiniStylesheet(
-                      await miniTransformer.transformStylesheet(projection.css),
-                      stylesheetOptions
-                  )
-
-        // Step 3: transform artifacts independently with the exact candidate set projected from that stylesheet.
         const transformedJavaScript = javaScript.map((artifact) =>
-            miniTransformer.transformJavaScript({
-                classSet,
-                code: artifact.code,
-                filename: artifact.filename
-            })
+            miniTransformer.transformJavaScript({ classSet, code: artifact.code, filename: artifact.filename })
         )
-
-        // Advance only after all conversions succeed; failed CSS/JS transactions leave the reusable snapshot intact.
-        previousOutput = { css: projection.css, classSet, stylesheet }
-        // Returning data keeps physical bundle mutation and development filesystem publication at their respective owners.
-        return { javaScript: transformedJavaScript, stylesheet }
+        previousOutput = { stylesheets: nextStylesheets, classSet }
+        return { javaScript: transformedJavaScript, stylesheets }
     }
 }
 
@@ -435,60 +458,6 @@ function equalCandidates(left: ReadonlySet<string>, right: ReadonlySet<string>):
         }
     }
     return true
-}
-
-/** Selects styles reachable from the configured entries in deterministic dependency-first cascade order. */
-function projectStyles(
-    entryIds: readonly string[],
-    styleByModuleId: ReadonlyMap<string, StyleModule>,
-    context: PluginContext
-) {
-    // This mutable transaction-local set terminates cycles and prevents repeated traversal through shared JavaScript modules.
-    const visitedModuleIds = new Set<string>()
-    // This mutable transaction-local set emits a physical stylesheet once even when multiple graph paths import it.
-    const visitedStyleIds = new Set<string>()
-    // This mutable transaction-local list records dependency-first CSS order for the final concatenated stylesheet.
-    const css: string[] = []
-    // This mutable transaction-local set unions candidates from exactly the Tailwind roots contributing reachable CSS.
-    const classSet = new Set<string>()
-
-    /** Performs a post-order graph visit so dependencies precede the modules that import them in the CSS cascade. */
-    const visit = (moduleId: string): void => {
-        // Step 1: claim the module before recursion to terminate cycles and shared dependency paths.
-        if (visitedModuleIds.has(moduleId)) {
-            return
-        }
-        visitedModuleIds.add(moduleId)
-
-        // Step 2: ignore IDs absent from the current graph; retained CSS alone never makes a removed module reachable.
-        const moduleInfo = context.getModuleInfo(moduleId)
-        if (!moduleInfo) {
-            return
-        }
-
-        // Step 3: visit static and dynamic dependencies before considering this module's own stylesheet contribution.
-        moduleInfo.importedIds.forEach(visit)
-        moduleInfo.dynamicallyImportedIds.forEach(visit)
-
-        // Step 4: join graph identity to captured style identity and append each reachable physical stylesheet once.
-        const styleId = normalizeModuleId(moduleId)
-        const style = styleByModuleId.get(styleId)
-        if (style?.css === undefined || visitedStyleIds.has(styleId)) {
-            return
-        }
-        visitedStyleIds.add(styleId)
-        css.push(style.css)
-
-        // Step 5: union candidates only from roots whose CSS survived this same reachability projection.
-        style.tailwind?.classSet.forEach((className) => {
-            classSet.add(className)
-        })
-    }
-
-    // Each App/Page entry is a root; shared visited sets deduplicate styles across the complete application projection.
-    entryIds.forEach(visit)
-
-    return { classSet: classSet, css: css.join('\n') }
 }
 
 /** Compiles one Tailwind root and returns replacement state without mutating the retained module store. */

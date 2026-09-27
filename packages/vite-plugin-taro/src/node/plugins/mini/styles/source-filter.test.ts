@@ -108,7 +108,8 @@ test('ordinary CSS clears retained Tailwind candidates while raw requests leave 
     const artifact = { code: "export const className = 'py-5.5'", filename: 'factory.js', seq: 1 }
     // Publication is captured in memory; no stylesheet writer or watcher is started by this test.
     const published: string[] = []
-    const publish = async (css: string) => {
+    const publish = async (fileName: string, css: string) => {
+        assert.equal(fileName, contract.styles.globalFileName)
         published.push(css)
     }
     const initial = await styles.finalizeUpdate([artifact], publish)

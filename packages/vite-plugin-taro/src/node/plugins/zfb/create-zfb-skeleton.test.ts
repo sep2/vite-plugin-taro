@@ -68,10 +68,8 @@ test('assembles contract-selected Alipay templates without WX dialect output', (
             'custom-wrapper.json',
             'pages/home/index.json',
             'pages/home/index.axml',
-            'pages/home/index.acss',
             'pages/meta/index.json',
             'pages/meta/index.axml',
-            'pages/meta/index.acss',
             projectConfigFilename,
             projectPrivateConfigFilename,
             '.browserslistrc'
@@ -142,11 +140,11 @@ test('assembles contract-selected Alipay templates without WX dialect output', (
     assert.doesNotMatch(homeTemplate, /<import|<import-sjs|<template/)
     assert.match(homeTemplate, /<comp i="{{app}}" p="{{page}}" \/>/)
     assert.doesNotMatch(homeTemplate, /root:root|wx:/)
-    assert.equal(assets.get('pages/home/index.acss'), '')
+    assert.ok(!assets.has('pages/home/index.acss'), 'Page styles belong to the style pipeline')
 
     const metaTemplate = assets.get('pages/meta/index.axml') ?? ''
     assert.doesNotMatch(metaTemplate, /<import src=|<template/)
     assert.match(metaTemplate, /<page-meta/)
     assert.match(metaTemplate, /<comp i="{{app}}" p="{{page}}" \/>/)
-    assert.equal(assets.get('pages/meta/index.acss'), '')
+    assert.ok(!assets.has('pages/meta/index.acss'))
 })

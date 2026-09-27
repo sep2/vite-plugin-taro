@@ -1,6 +1,6 @@
 import type { BuildOptions } from 'vite'
 
-/** Minifies only the completed global native stylesheet, without another browser compatibility or preprocessing pass. */
+/** Minifies one completed native stylesheet, without another browser compatibility or preprocessing pass. */
 export async function minifyMiniStylesheet(
     css: string,
     options: Readonly<{ filename: string; minify: BuildOptions['cssMinify'] }>

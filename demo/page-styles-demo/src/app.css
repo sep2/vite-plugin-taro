@@ -1,0 +1,35 @@
+/* biome-ignore lint/correctness/noUnknownTypeSelector: Native mini-program page root. */
+page {
+    background: #f3f4f6;
+    color: #374151;
+    font-family: sans-serif;
+}
+
+.app-shell {
+    padding: 24px;
+}
+
+.app-banner {
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 2px solid #15803d;
+    background: #dcfce7;
+    color: #166534;
+}
+
+.section {
+    margin-top: 20px;
+}
+
+.demo-button {
+    margin-top: 12px;
+    font-size: 28px;
+}
+
+.leak-probe {
+    margin-top: 20px;
+    padding: 16px;
+    border: 2px dashed #6b7280;
+    background: #e5e7eb;
+    color: #374151;
+}

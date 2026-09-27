@@ -185,7 +185,73 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
                     .join('\n')
                 assert.match(css, /\.h5-div\.card\{color:red\}/)
                 assert.match(css, /\.h5-span,\.h5-a\{display:inline\}/)
+                const extension = { wx: 'wxss', zfb: 'acss', tt: 'ttss' }[target]
+                const appCss = String(requireAsset(output, `assets/global.${extension}`).source)
+                const pageCss = String(requireAsset(output, `pages/home/index.${extension}`).source)
+                assert.doesNotMatch(appCss, /\.card/)
+                assert.match(pageCss, /\.h5-div\.card\{color:red\}/)
+                assert.doesNotMatch(pageCss, /\.h5-span,\.h5-a/)
                 assert.ok(collectModuleIds(output).some((id) => id.endsWith('/plugin-html/runtime.js')))
+            }
+        )
+    })
+}
+
+for (const target of ['wx', 'zfb', 'tt'] as const) {
+    test(`splits ${target} App, Page, shared CSS Modules and lazy styles without skeleton placeholders`, async () => {
+        await inspectFixtureBuild(
+            {
+                options: {
+                    ...createOptions(target),
+                    pages: [
+                        { path: 'pages/home/index' },
+                        { path: 'pages/account/index' },
+                        { path: 'pages/empty/index' }
+                    ]
+                },
+                build: { cssMinify: true },
+                files: {
+                    'src/app.tsx': `import './app.css';\n${appSource}`,
+                    'src/app.css': '.app { padding: 3px; }',
+                    'src/shared.tsx': `import styles from './shared.module.css'; export function Shared() { return <div className={styles.shared} /> }`,
+                    'src/shared.module.css': '.shared { margin: 9px; }',
+                    'src/pages/home/index.tsx': `import './index.css'; import { Shared } from '../../shared'; void import('./lazy'); export default function Home() { return <div className="home"><Shared /></div> }`,
+                    'src/pages/home/index.css': '.home { color: red; }',
+                    'src/pages/home/lazy.ts': `import './lazy.css'; console.log('lazy')`,
+                    'src/pages/home/lazy.css': '.lazy { padding: 6px; }',
+                    'src/pages/account/index.tsx': `import './index.css'; import { Shared } from '../../shared'; export default function Account() { return <div className="account"><Shared /></div> }`,
+                    'src/pages/account/index.css': '.account { color: blue; }',
+                    'src/pages/empty/index.tsx': 'export default function Empty() { return null }'
+                }
+            },
+            (output) => {
+                const extension = { wx: 'wxss', zfb: 'acss', tt: 'ttss' }[target]
+                const appCss = String(requireAsset(output, `assets/global.${extension}`).source)
+                const homeCss = String(requireAsset(output, `pages/home/index.${extension}`).source)
+                const accountCss = String(requireAsset(output, `pages/account/index.${extension}`).source)
+                assert.equal(
+                    String(requireAsset(output, `app.${extension}`).source),
+                    `@import "./assets/global.${extension}";\n`
+                )
+                assert.match(appCss, /\.app\{padding:3rpx\}/)
+                assert.match(appCss, /\.h5-span,\.h5-a\{display:inline\}/)
+                assert.doesNotMatch(appCss, /\.home|\.account|\.lazy|margin:9rpx/)
+                assert.match(homeCss, /\.home\{color:red\}/)
+                assert.match(homeCss, /\.lazy\{padding:6rpx\}/)
+                assert.doesNotMatch(homeCss, /\.app\b|\.account\b|\.h5-span/)
+                assert.match(accountCss, /\.account\{color:#00f\}/)
+                assert.doesNotMatch(accountCss, /\.app\b|\.home\b|\.lazy\b|\.h5-span/)
+                const moduleClassName = /\.([\w-]+)\{margin:9rpx\}/.exec(homeCss)?.[1]
+                assert.ok(moduleClassName)
+                assert.ok(accountCss.includes(moduleClassName))
+                assert.ok(output.some((chunk) => chunk.type === 'chunk' && chunk.code.includes(moduleClassName)))
+                assert.equal(String(requireAsset(output, `pages/empty/index.${extension}`).source), '')
+                for (const route of ['home', 'account', 'empty']) {
+                    assert.equal(
+                        output.filter((asset) => asset.fileName === `pages/${route}/index.${extension}`).length,
+                        1
+                    )
+                }
             }
         )
     })
@@ -358,7 +424,8 @@ test('builds TT runtime, common packages, native components and target-specific 
             assert.match(String(requireAsset(output, 'base.ttml').source), /<aweme-data\s/)
             assert.match(String(requireAsset(output, 'base.ttml').source), /p="{{p}}"/)
             assert.match(String(requireAsset(output, 'pages/home/index.ttml').source), /<comp i="{{app}}" p="{{page}}"/)
-            assert.match(String(requireAsset(output, 'assets/global.ttss').source), /color:red/)
+            assert.doesNotMatch(String(requireAsset(output, 'assets/global.ttss').source), /color:red/)
+            assert.match(String(requireAsset(output, 'pages/home/index.ttss').source), /color:red/)
             assert.deepEqual(parseJsonAsset(output, 'project.config.json'), { appid: 'fixture-app' })
             assert.deepEqual(parseJsonAsset(output, 'project.private.config.json'), { setting: { urlCheck: false } })
             assert.equal(String(requireAsset(output, 'components/card/index.ttml').source), '<view>{{count}}</view>')

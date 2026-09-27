@@ -139,7 +139,7 @@ Socket 打开前跳过 Page 补丁执行，不暂存补丁或 ACK；由启动报
 
 ```text
 保存源码 ─┬─ rebuild: Rolldown 完整输出 → App 样式构建标记 → App 重启
-          └─ 补丁 → global.wxss → 累计补丁日志
+          └─ 补丁 → 各入口 WXSS → 累计补丁日志
                                   ├─ devtools: patches.js → Page 重载 → 原生工厂
                                   └─ interpreter: Vite WebSocket → Sval 安装源码
                                                      ↓
@@ -350,16 +350,16 @@ WXSS 内容不通过 JavaScript 模块的更新边界交付。完整构建和增
 1. Tailwind 扫描器把已有候选文件和编译依赖登记到 Rolldown；相关文件变化时，Rolldown 重新转换对应 Tailwind 入口；
 2. 入口复用自己的增量生成器，得到新的浏览器 CSS 和同一代原始类名集合；编译依赖变化时才重建生成器；
 3. Vite 继续执行 PostCSS、CSS Modules 和预处理器转换，vpt 在内置 `vite:css-post` 序列化浏览器 HMR 模块前记录最终模块 CSS；
-4. 使用 Rolldown 当前模块图，按 App 和配置页面的顺序选择仍然可达的最终 CSS；
-5. 合并为一份确定的全局级联，再对完整内容执行一次微信 WXSS 转换；
-6. 用步骤 2 的类名集合转换同一事务中的最终 JavaScript；
-7. 内容确实变化时才替换 `assets/global.wxss`。
+4. 使用 Rolldown 当前模块图，分别选择 App 和每个页面仍然可达的 CSS；页面排除 App 已拥有的样式，页面间共享的样式保留在每个使用者中；
+5. 分别转换、压缩 App 与页面 WXSS，仅在 App 样式中加入 HTML 显示默认值；
+6. 用所有存活入口的 Tailwind 类名并集转换同一事务中的最终 JavaScript；
+7. 逐个原子替换内容发生变化的 `assets/global.wxss` 和页面 WXSS，全部成功后再发布 JavaScript 补丁。
 
 Tailwind 生成器只负责编译入口，不拥有补丁发布。它在入口存活期间保留增量扫描缓存；候选文件变化由 Rolldown 触发入口转换，新增和删除类名都会更新同一个权威集合。vpt 不在发布事务中重新扫描项目，不重复执行 Vite CSS 预处理，不绕过 Vite 读取物理样式文件，也不从 WXSS 反向解析类名。
 
-增量更新不会改写根目录的 `app.wxss`。它始终导入 `assets/global.wxss`，所以只替换后者即可让样式生效，同时保留 App 运行环境。vpt 先写入匹配类名集合的 WXSS，再发布已经用该集合转换过的 JavaScript 补丁。发布前仅把补丁中的 Vite 浏览器 CSS 字符串置空；模块工厂、CSS Modules 导出、`changedIds` 和补丁序号保持不变。若最终字节没有变化，vpt 不写文件，也不会制造多余的开发者工具事件。
+增量更新不会改写根目录的 `app.wxss`。它始终导入 `assets/global.wxss`；App 样式更新只替换后者，页面样式更新则写入对应的页面 WXSS。vpt 先写入所有匹配类名集合的 WXSS，再发布已经用该集合转换过的 JavaScript 补丁。发布前仅把补丁中的 Vite 浏览器 CSS 字符串置空；模块工厂、CSS Modules 导出、`changedIds` 和补丁序号保持不变。每个文件分别比较最终字节，未变化的文件不会重写；删除页面样式导入会写入空内容，清除旧规则。若后续文件写入失败，JavaScript 不会交付；重试跳过已成功写入的文件。
 
-完整构建在最终输出阶段执行同一种图投影，用其中的类名集合处理 JavaScript，并用投影得到的 WXSS 替换 Vite 编译器样式。原生 Page 和组件 WXSS 随后单独输出，始终保持不透明。
+完整构建在最终输出阶段执行同一种图投影，用类名并集处理 JavaScript，并输出 App 和页面 WXSS。平台骨架不再生成空的页面样式占位文件；原生自定义组件的样式随后独立输出，始终保持不透明。
 
 ## 什么时候执行完整构建
 
@@ -375,7 +375,7 @@ Tailwind 生成器只负责编译入口，不拥有补丁发布。它在入口�
 
 补丁模式的完整构建完成后，主机按以下顺序建立新基线：
 
-1. 协调本次完整输出的全局 WXSS；
+1. 协调本次完整输出的 App 与页面 WXSS；
 2. 生成新的 `buildId`，停止使用旧 Rolldown 客户端身份；
 3. 通知旧 App 关闭 WebSocket，再旋转补丁日志身份并清空待确认补丁；`devtools` 同时清空补丁文件；
 4. 写入带有新身份和认证 WebSocket 地址的 `hmr/info.js`；
@@ -415,7 +415,7 @@ type RebuildReport = {
 
 ```text
 收齐且保留全部 Rolldown 增量
-   → 发布新的 global.wxss（如果变化）
+   → 发布内容有变化的 App / 页面 WXSS
    → 通过所选模式发布累计补丁
    → 按序确认补丁已交付给 Rolldown
    → 等待 App 报告实际应用序号
@@ -425,7 +425,7 @@ type RebuildReport = {
 
 ```text
 写入完整输出
-   → 协调最终 global.wxss
+   → 协调最终 App / 页面 WXSS
    → 通知旧 App 关闭 WebSocket
    → 创建新 buildId
    → 重置所选交付
@@ -437,7 +437,7 @@ type RebuildReport = {
 
 ```text
 写入完整输出
-   → 协调最终 global.wxss
+   → 协调最终 App / 页面 WXSS
    → 最后更新 app.wxss 的唯一构建标记，让 DevTools 重启 App
 ```
 

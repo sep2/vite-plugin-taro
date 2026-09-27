@@ -1,0 +1,18 @@
+.page-heading {
+    color: blue;
+    font-size: 36px;
+    font-weight: bold;
+}
+
+.collision-card {
+    margin-top: 20px;
+    padding: 20px;
+    border-left: 8px solid blue;
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.blue-only {
+    background: blue;
+    color: white;
+}

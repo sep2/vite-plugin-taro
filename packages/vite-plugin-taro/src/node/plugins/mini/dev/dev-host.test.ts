@@ -174,7 +174,8 @@ test('reduces synthetic engine update variants and unknown host failures without
                 styleFailure = undefined
                 throw failure
             }
-            await writeWxss('.synthetic {}\n')
+            await writeWxss(contract.styles.globalFileName, '.synthetic {}\n')
+            await writeWxss('pages/home/index.wxss', '.synthetic-page {}\n')
             return artifacts
         }
     }

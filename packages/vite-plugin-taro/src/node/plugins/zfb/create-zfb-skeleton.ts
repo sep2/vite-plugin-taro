@@ -109,8 +109,7 @@ export function createZfbSkeleton(
                         source: pageTemplateSource,
                         baseTemplatePath: baseTemplatePath
                     })
-                ),
-                createTextAsset(`${page.path}.acss`, '')
+                )
             ]
         }),
         jsonAsset(output.projectConfigFilename, options.projectConfigJson),

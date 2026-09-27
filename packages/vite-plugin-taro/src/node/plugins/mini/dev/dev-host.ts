@@ -161,11 +161,6 @@ export async function createMiniDevHost({
         }
     }
 
-    /** Atomically materializes the style plugin's prepared global artifact. */
-    async function writeGlobalStyle(source: string): Promise<void> {
-        await writeFile(contract.styles.globalFileName, source)
-    }
-
     /** Materializes one completed build and rotates patch-session state only when the selected mode has one. */
     async function publishBuildBoundary(): Promise<void> {
         if (hmrMode.rebuildStrategy === 'always') {
@@ -221,7 +216,7 @@ export async function createMiniDevHost({
         // mode is reset and matching identity is durable. Native development tools treat the App stylesheet as a root, so this
         // write intentionally causes the one full refresh allowed at a complete-build boundary; the refreshed App reads the new
         // info above. Incremental updates must never write this file because an App refresh could replace the runtime while its
-        // JavaScript patch is being acknowledged. They publish only the imported global stylesheet instead.
+        // JavaScript patch is being acknowledged. They publish only the imported App CSS and Page stylesheets instead.
         await writeFile(contract.styles.appFileName, renderDevelopmentAppStyle(contract.styles.globalFileName, buildId))
     }
 
@@ -248,7 +243,7 @@ export async function createMiniDevHost({
 
     /** Publishes graph-complete styles before rotating the App-visible build identity. */
     async function publishCompleteStyles(): Promise<void> {
-        await styles.finalizeUpdate([], writeGlobalStyle)
+        await styles.finalizeUpdate([], writeFile)
         await publishBuildBoundary()
     }
 
@@ -349,17 +344,17 @@ export async function createMiniDevHost({
         await publishPatchBatch(patches)
     }
 
-    /** Publishes one coherent native stylesheet, selected-mode delivery, and Rolldown-frontier transaction. */
+    /** Publishes one coherent App/Page style, selected-mode delivery, and Rolldown-frontier transaction. */
     async function publishPatchBatch(patches: readonly PatchUpdate[]): Promise<void> {
         if (patches.length === 0) {
             return
         }
 
         // `onHmrUpdates` runs after every affected transform has updated captured CSS and the live import graph. The style
-        // boundary finalizes every factory before atomically publishing its matching native stylesheet.
-        const finalizedPatches = await styles.finalizeUpdate(patches, writeGlobalStyle)
+        // boundary finalizes every factory before atomically writing each matching App/Page stylesheet.
+        const finalizedPatches = await styles.finalizeUpdate(patches, writeFile)
 
-        // Publish the global native stylesheet before JavaScript delivery so the mode observes one coherent HMR transaction.
+        // Publish all native stylesheets before JavaScript delivery so the mode observes one coherent HMR transaction.
         // Delivery must become durable before Rolldown advances: later patches may be generated relative to this batch even if
         // the runtime has not applied it. PatchJournal retains the unapplied range, so every later publication still bridges the
         // runtime's older application frontier.

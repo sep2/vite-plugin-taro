@@ -63,10 +63,8 @@ for (const isProduction of [false, true]) {
                 'custom-wrapper.json',
                 'pages/home/index.json',
                 'pages/home/index.ttml',
-                'pages/home/index.ttss',
                 'pages/other/index.json',
                 'pages/other/index.ttml',
-                'pages/other/index.ttss',
                 projectConfigFilename,
                 projectPrivateConfigFilename
             ]
@@ -96,7 +94,7 @@ for (const isProduction of [false, true]) {
         for (const page of options.pages) {
             assert.match(asset(`${page.path}.ttml`), /<comp i="{{app}}" p="{{page}}" \/>/)
             assert.match(asset(`${page.path}.ttml`), /\.\.\/\.\.\/base.ttml/)
-            assert.equal(asset(`${page.path}.ttss`), '')
+            assert.ok(!assets.has(`${page.path}.ttss`), 'Page styles belong to the style pipeline')
             const config = JSON.parse(asset(`${page.path}.json`))
             assert.equal(config.usingComponents['native-card'], '/sub/p_example/card/index')
             assert.equal(config.componentPlaceholder['native-card'], 'view')

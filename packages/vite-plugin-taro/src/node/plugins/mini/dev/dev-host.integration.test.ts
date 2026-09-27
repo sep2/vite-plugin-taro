@@ -252,6 +252,7 @@ async function startDevFixture(
                     const allowedFiles = new Set([
                         'app.wxss',
                         'assets/global.wxss',
+                        ...options.pages.map((page) => `${page.path}.wxss`),
                         'project.config.json',
                         'project.private.config.json',
                         hmrInfoFileName,
@@ -525,6 +526,33 @@ test('patches a bundled utility without rewriting its Page capsule or rotating t
     assert.equal(await readFile(fixture.infoPath, 'utf8'), infoSource)
     assert.equal(await readFile(fixture.appStylePath, 'utf8'), appStyle)
     assert.equal(await readFile(capsulePath, 'utf8'), originalCapsule)
+})
+
+test('publishes Page styles before patches and clears removed imports without rewriting App styles', async (context) => {
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'memory')
+    context.after(fixture.close)
+    const infoSource = await readFile(fixture.infoPath, 'utf8')
+    const appStyle = await readFile(fixture.appStylePath, 'utf8')
+    const globalPath = path.join(fixture.outDir, 'assets/global.wxss')
+    const globalInode = (await stat(globalPath)).ino
+    const stylePath = path.join(path.dirname(fixture.pagePath), 'index.css')
+    const outputPath = path.join(fixture.outDir, 'pages/home/index.wxss')
+    assert.equal(await readFile(outputPath, 'utf8'), '')
+
+    await writeFile(stylePath, '.page-local { padding: 4px; }')
+    await publishSourceGeneration(fixture.pagePath, `import './index.css';\n${renderPage('page CSS added')}`)
+    await waitForFile(fixture.patchesPath, (source) => source.includes('page CSS added'), maximumWaitAttempts)
+    const pageCss = await readFile(outputPath, 'utf8')
+    assert.match(pageCss, /\.page-local\s*\{\s*padding:\s*4rpx/)
+    assert.doesNotMatch(pageCss, /\.h5-span/)
+    assert.equal((await stat(globalPath)).ino, globalInode)
+
+    await publishSourceGeneration(fixture.pagePath, renderPage('page CSS removed'))
+    await waitForFile(fixture.patchesPath, (source) => source.includes('page CSS removed'), maximumWaitAttempts)
+    assert.equal(await readFile(outputPath, 'utf8'), '')
+    assert.equal((await stat(globalPath)).ino, globalInode)
+    assert.equal(await readFile(fixture.infoPath, 'utf8'), infoSource)
+    assert.equal(await readFile(fixture.appStylePath, 'utf8'), appStyle)
 })
 
 test('coalesces one full-file save into one wx patch', async (context) => {

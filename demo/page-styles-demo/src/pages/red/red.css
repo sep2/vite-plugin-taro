@@ -1,0 +1,18 @@
+.page-heading {
+    color: red;
+    font-size: 36px;
+    font-weight: bold;
+}
+
+.collision-card {
+    margin-top: 20px;
+    padding: 20px;
+    border-left: 8px solid red;
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.red-only {
+    background: red;
+    color: white;
+}

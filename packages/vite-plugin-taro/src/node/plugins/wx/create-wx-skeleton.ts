@@ -108,8 +108,7 @@ export function createWxSkeleton(
                         path: page.path
                     })
                 )
-            ),
-            createTextAsset(`${page.path}.wxss`, '')
+            )
         ]),
         jsonAsset(output.projectConfigFilename, options.projectConfigJson),
         ...(options.projectPrivateConfigJson

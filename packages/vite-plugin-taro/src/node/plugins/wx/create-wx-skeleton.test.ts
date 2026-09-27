@@ -85,10 +85,8 @@ test('creates native rendering and configuration assets', () => {
             'custom-wrapper.json',
             'pages/home/index.json',
             'pages/home/index.wxml',
-            'pages/home/index.wxss',
             'pages/account/index.json',
             'pages/account/index.wxml',
-            'pages/account/index.wxss',
             projectConfigFilename,
             projectPrivateConfigFilename,
             'sitemap.json'
@@ -169,7 +167,7 @@ test('creates native rendering and configuration assets', () => {
     assert.match(homeTemplate, /\.\.\/\.\.\/base\.wxml/)
     assert.match(homeTemplate, /<comp i="{{app}}">\s*<template is="taro_tmpl" data="{{root:page}}" \/>\s*<\/comp>/)
     assert.doesNotMatch(homeTemplate, /root:root/)
-    assert.equal(assets.get('pages/home/index.wxss'), '')
+    assert.ok(!assets.has('pages/home/index.wxss'), 'Page styles belong to the style pipeline')
     assert.match(assets.get('pages/account/index.wxml') ?? '', /\.\.\/\.\.\/base\.wxml/)
-    assert.equal(assets.get('pages/account/index.wxss'), '')
+    assert.ok(!assets.has('pages/account/index.wxss'))
 })

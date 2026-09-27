@@ -1,0 +1,28 @@
+{
+    "name": "page-styles-demo",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build-wx": "cross-env VITE_VPT_TARGET=wx vite build",
+        "build-zfb": "cross-env VITE_VPT_TARGET=zfb vite build",
+        "build-tt": "cross-env VITE_VPT_TARGET=tt vite build",
+        "dev-wx": "cross-env VITE_VPT_TARGET=wx vite",
+        "dev-zfb": "cross-env VITE_VPT_TARGET=zfb vite",
+        "dev-tt": "cross-env VITE_VPT_TARGET=tt vite",
+        "typecheck": "tsc --project tsconfig.json && tsc --project tsconfig.node.json",
+        "test": "node --test scripts/*.test.ts"
+    },
+    "dependencies": {
+        "react": "^19.3.0",
+        "react-dom": "^19.3.0",
+        "vite-plugin-taro": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/node": "^26.6.2",
+        "@types/react": "^19.3.0",
+        "cross-env": "^10.1.0",
+        "typescript": "^7.0.2",
+        "vite": "8.3.0"
+    }
+}

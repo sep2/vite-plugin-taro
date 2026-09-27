@@ -43,6 +43,7 @@ Under `demo/`:
 - `react-tabs-demo`: real tab routes with a shared React bottom bar for `wx`, `zfb`, `tt`, and `h5`.
 - `native-comp-demo`: native custom-component fixture for `wx`, `zfb`, and `tt`.
 - `polyfill-demo`: opt-in core-js runtime checks for `wx`, `zfb`, and `tt`.
+- `page-styles-demo`: App/Page CSS isolation, shared/lazy styles, and native HMR checks for `wx`, `zfb`, and `tt`.
 - `hmr-stress-demo`: deep React tree HMR fixture for `wx` and `zfb`; automated IDE harness is WX-only.
 - `towxml-stream-demo`: native Towxml streaming fixture for `wx` only.
 
