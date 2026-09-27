@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { registerHooks } from 'node:module'
 import test, { type TestContext } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { type BuildOptions, normalizePath, type Plugin } from 'vite'
+import { type BuildOptions, createLogger, normalizePath, type Plugin } from 'vite'
 import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
 import type { createMiniTransformer } from './create-mini-transformer.ts'
 import { miniHtmlBase } from './mini-html-base.ts'
@@ -80,7 +80,13 @@ async function createStyleFixture(
     assert.ok(typeof configResolved === 'function' && typeof buildStart === 'function')
     assert.ok(transform && typeof transform === 'object')
     await Reflect.apply(config.handler, {}, [{ build: { cssMinify } }])
-    await Reflect.apply(configResolved, {}, [{ build: { minify: false }, plugins: [cssPost] }])
+    // Retain diagnostics so tests can distinguish tolerated native CSS errors from rejected transactions.
+    const errors: string[] = []
+    const logger = createLogger('silent')
+    logger.error = (message) => {
+        errors.push(message)
+    }
+    await Reflect.apply(configResolved, {}, [{ build: { minify: false }, plugins: [cssPost], logger }])
     const transformer = transformers.at(-1)!
     const css = testContext.mock.method(transformer, 'transformStylesheet')
     const javaScript = testContext.mock.method(transformer, 'transformJavaScript')
@@ -102,7 +108,8 @@ async function createStyleFixture(
             assert.equal(this, context, 'Graph reads must retain their plugin context')
             return graph.get(id)
         },
-        addWatchFile() {}
+        addWatchFile() {},
+        emitFile: testContext.mock.fn()
     }
     await Reflect.apply(buildStart, context, [])
     // Capture publication in memory; these tests never create source fixtures, output files, or watchers.
@@ -116,6 +123,7 @@ async function createStyleFixture(
         graph,
         css,
         javaScript,
+        errors,
         published,
         publish,
         update: (code: string) => plugin.finalizeUpdate([{ code, filename: 'app.js', seq: 1 }], publish),
@@ -320,7 +328,7 @@ test('retries a failed Page write without rewriting durable App CSS or deliverin
     assert.equal(fixture.css.mock.callCount(), 2)
 })
 
-test('a later Page conversion failure exposes no files from the newer transaction', async (context) => {
+test('a Page conversion failure keeps its last valid CSS while publishing healthy App CSS and JavaScript', async (context) => {
     const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']))
     fixture.graph.set('/page.js', { importedIds: ['/page.css'], dynamicallyImportedIds: [] })
     fixture.graph.set('/page.css', { importedIds: [], dynamicallyImportedIds: [] })
@@ -329,14 +337,19 @@ test('a later Page conversion failure exposes no files from the newer transactio
     await fixture.update('export {}')
     await fixture.capture('/app.css', '.app { color: blue; }')
     await fixture.capture('/page.css', '.page {')
-    await assert.rejects(fixture.update('export {}'), /Unclosed block/)
-    assert.equal(fixture.published.length, 2)
+    const updated = await fixture.update('export const generation = 2')
+    assert.deepEqual(updated, [{ code: 'export const generation = 2', filename: 'app.js', seq: 1 }])
+    assert.equal(fixture.published.length, 3)
+    assert.equal(fixture.published[2]!.fileName, 'assets/global.wxss')
+    assert.match(fixture.published[2]!.source, /color: blue/)
+    assert.equal(fixture.errors.length, 1)
+    assert.match(fixture.errors[0]!, /pages\/page-0\/index\.wxss[\s\S]*Unclosed block/)
     await fixture.capture('/page.css', '.page { color: blue; }')
     await fixture.update('export {}')
     assert.equal(fixture.published.length, 4)
-    assert.match(fixture.published[2]!.source, /color: blue/)
+    assert.equal(fixture.published[3]!.fileName, 'pages/page-0/index.wxss')
     assert.match(fixture.published[3]!.source, /color: blue/)
-    assert.equal(fixture.css.mock.callCount(), 6)
+    assert.equal(fixture.css.mock.callCount(), 5)
 })
 
 test('reuses unchanged CSS and candidate tables while rewriting each current patch', async (context) => {
@@ -461,8 +474,109 @@ test('reprojects cyclic multi-entry graphs, deduplicates styles, and prunes remo
     )
 })
 
+for (const failureStage of ['conversion', 'minification'] as const) {
+    test(`HMR logs CSS ${failureStage} failure and retains valid styles without rejecting JavaScript`, async (context) => {
+        const fixture = await createStyleFixture(context, true, createMiniStyleEntries('/app.js', []))
+        const code = "const classes = 'py-5.5 mr-4.5'"
+        await fixture.transform('/app.css', tailwind(['py-5.5']))
+        await fixture.update(code)
+        await fixture.transform('/app.css', tailwind(['mr-4.5']))
+        if (failureStage === 'conversion') {
+            await fixture.capture('/app.css', '.broken {')
+        } else {
+            await fixture.capture('/app.css', '.next { color: blue; }')
+            // Return invalid native output twice to exercise repeated Lightning CSS failures, not PostCSS failures.
+            const invalidNativeCss = async () => '.broken { color: red; } }'
+            fixture.css.mock.mockImplementationOnce(invalidNativeCss, 1)
+            fixture.css.mock.mockImplementationOnce(invalidNativeCss, 2)
+        }
+        for (const generation of [1, 2]) {
+            const updated = await fixture.update(code)
+            assert.equal(updated[0]!.code, "const classes = 'py-5.5 mr-4_d5'")
+            assert.equal(fixture.published.length, 1, 'Failed CSS must never replace the last valid stylesheet')
+            assert.equal(fixture.css.mock.callCount(), generation + 1, 'Failed CSS must be retried, not cached')
+            assert.equal(fixture.errors.length, generation)
+            assert.match(fixture.errors.at(-1)!, /Native CSS update failed.*assets\/global\.wxss/)
+        }
+        await fixture.transform('/app.css', tailwind(['mr-4.5']))
+        const repaired = await fixture.update(code)
+        assert.equal(repaired[0]!.code, "const classes = 'py-5.5 mr-4_d5'")
+        assert.equal(fixture.published.length, 2)
+        assert.match(fixture.published[1]!.source, /\.mr-4_d5/)
+        assert.equal(fixture.css.mock.callCount(), 4)
+        assert.strictEqual(
+            fixture.javaScript.mock.calls[1]!.arguments[0].classSet,
+            fixture.javaScript.mock.calls[3]!.arguments[0].classSet
+        )
+        await fixture.update(code)
+        assert.equal(fixture.css.mock.callCount(), 4)
+        assert.equal(fixture.published.length, 2)
+    })
+}
+
+test('HMR retains the last valid stylesheet when Lightning CSS rejects a native media query', async (context) => {
+    const fixture = await createStyleFixture(context, true, createMiniStyleEntries('/app.js', []))
+    await fixture.capture('/app.css', '.units { padding: 4px; }')
+    await fixture.update('export {}')
+    await fixture.capture('/app.css', '@media (min-width: 375rpx) { .units { padding: 16px; } }')
+    const updated = await fixture.update('export {}')
+    assert.equal(updated[0]!.code, 'export {}')
+    assert.equal(fixture.published.length, 1)
+    assert.match(fixture.published[0]!.source, /padding:4rpx/)
+    assert.doesNotMatch(fixture.published[0]!.source, /@media|16rpx/)
+    assert.match(fixture.errors[0]!, /assets\/global\.wxss[\s\S]*Invalid media query/)
+})
+
+test('HMR skips an invalid stylesheet without a previous conversion and recovers after import removal', async (context) => {
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']))
+    fixture.graph.set('/page.js', { importedIds: ['/page.css'], dynamicallyImportedIds: [] })
+    fixture.graph.set('/page.css', { importedIds: [], dynamicallyImportedIds: [] })
+    await fixture.capture('/page.css', '.broken {')
+    const updated = await fixture.update('export {}')
+    assert.equal(updated[0]!.code, 'export {}')
+    assert.equal(fixture.published.length, 1)
+    assert.equal(fixture.published[0]!.fileName, 'assets/global.wxss')
+    assert.match(fixture.errors[0]!, /pages\/page-0\/index\.wxss[\s\S]*Unclosed block/)
+    fixture.graph.set('/page.js', { importedIds: [], dynamicallyImportedIds: [] })
+    await fixture.update('export {}')
+    assert.deepEqual(fixture.published[1], { fileName: 'pages/page-0/index.wxss', source: '' })
+    assert.equal(fixture.errors.length, 1)
+})
+
+test('reverting failed CSS to the previous source reuses the last valid conversion without rewriting it', async (context) => {
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', []))
+    const previousCss = '.app { padding: 4px; }'
+    await fixture.capture('/app.css', previousCss)
+    await fixture.update('export {}')
+    await fixture.capture('/app.css', '.app { padding: 8px;')
+    await fixture.update('export {}')
+    assert.equal(fixture.published.length, 1)
+    await fixture.capture('/app.css', previousCss)
+    await fixture.update('export {}')
+    assert.equal(fixture.published.length, 1)
+    assert.match(fixture.published[0]!.source, /padding: 4rpx/)
+    assert.equal(fixture.css.mock.callCount(), 2)
+})
+
+test('a complete build rejects invalid CSS that HMR logged and kept out of publication', async (context) => {
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', []))
+    await fixture.capture('/app.css', '.app { padding: 4px; }')
+    await fixture.update('export {}')
+    await fixture.capture('/app.css', '.app {')
+    await fixture.update('export {}')
+    assert.equal(fixture.errors.length, 1)
+    assert.equal(fixture.published.length, 1)
+
+    const generate = fixture.plugin.generateBundle
+    assert.ok(generate && typeof generate === 'object')
+    await assert.rejects(Reflect.apply(generate.handler, fixture.context, [{}, {}]), /Unclosed block/)
+    assert.equal(fixture.errors.length, 1, 'Build errors must not enter the HMR-only error logger')
+    assert.equal(fixture.context.emitFile.mock.callCount(), 0)
+    assert.equal(fixture.published.length, 1)
+})
+
 for (const failureStage of ['conversion', 'minification', 'JavaScript'] as const) {
-    test(`failed ${failureStage} stays retryable without replacing the last successful snapshot`, async (context) => {
+    test(`failed ${failureStage === 'JavaScript' ? 'HMR JavaScript' : `build CSS ${failureStage}`} stays strict and retryable`, async (context) => {
         const fixture = await createStyleFixture(context, true, createMiniStyleEntries('/app.js', []))
         const previousCss = '.previous { color: red; }'
         const nextCss = '.next { color: blue; }'
@@ -479,7 +593,18 @@ for (const failureStage of ['conversion', 'minification', 'JavaScript'] as const
         } else if (failureStage === 'minification') {
             fixture.css.mock.mockImplementationOnce(async () => '.broken { color: red; } }')
         }
-        await assert.rejects(fixture.update(failureStage === 'JavaScript' ? "const = 'mr-4.5'" : code), Error)
+        if (failureStage === 'JavaScript') {
+            await assert.rejects(fixture.update("const = 'mr-4.5'"), Error)
+        } else {
+            const generate = fixture.plugin.generateBundle
+            assert.ok(generate && typeof generate === 'object')
+            const bundle = { 'app.js': { type: 'chunk', fileName: 'app.js', code, map: null } }
+            const originalBundle = structuredClone(bundle)
+            await assert.rejects(Reflect.apply(generate.handler, fixture.context, [{}, bundle]), Error)
+            assert.deepEqual(bundle, originalBundle)
+            assert.equal(fixture.context.emitFile.mock.callCount(), 0)
+        }
+        assert.equal(fixture.errors.length, 0, 'Strict failures must reject rather than log and continue')
         assert.equal(fixture.published.length, 1, 'Failed conversion must not publish newer CSS')
         assert.equal(fixture.javaScript.mock.callCount(), failureStage === 'JavaScript' ? 2 : 1)
 

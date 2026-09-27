@@ -2,7 +2,7 @@ import path from 'node:path'
 import { Scanner } from '@tailwindcss/oxide'
 import { createTailwindV4Engine, resolveTailwindV4Source, type TailwindV4Engine } from '@tailwindcss-mangle/engine/v4'
 import type { PluginContext } from 'rolldown'
-import { type BuildOptions, isCSSRequest, normalizePath, type Plugin, type Rolldown } from 'vite'
+import { type BuildOptions, isCSSRequest, type Logger, normalizePath, type Plugin, type Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { wrapPluginTransform } from '../../../utils/vite.ts'
 import { tailwindcssBasedir } from '../../tailwind/tailwind-css.ts'
@@ -43,10 +43,16 @@ type JavaScriptArtifact = Readonly<{
     filename: string
 }>
 
-/** Vite plugin with the host operation that finalizes one coherent native-style/JavaScript transaction. */
+/** One graph-projected stylesheet with its native filename and App-only defaults policy. */
+type StylesheetInput = Readonly<{ fileName: string; css: string; app: boolean }>
+
+/** A successful native conversion keyed by its exact projected source. */
+type ConvertedStylesheet = Readonly<{ css: string; source: string }>
+
+/** Vite plugin that finalizes native CSS and JavaScript without discarding HMR patches on CSS errors. */
 export type MiniStylePlugin = Plugin &
     Readonly<{
-        /** Neutralizes browser CSS payloads and publishes every matching native stylesheet before JavaScript delivery. */
+        /** Publishes valid native CSS before JavaScript; CSS failures only log errors and retain the last valid styles. */
         finalizeUpdate: <Artifact extends JavaScriptArtifact>(
             artifacts: readonly Artifact[],
             writeStylesheet: (fileName: string, source: string) => Promise<void>
@@ -63,11 +69,11 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  *
  * ## Architectural invariant
  *
- * One Mini Program transaction must expose JavaScript and native CSS produced from one class-identity snapshot. Tailwind utility
- * names can be escaped—for example, `py-5.5` becomes `py-5_d5`—so publishing either side independently can leave running code
- * referring to selectors that do not yet exist. This plugin therefore treats reachable CSS, Tailwind candidates, converted
- * native CSS, and converted JavaScript as one output. Complete builds and HMR updates both call `finalizeOutput()`; they differ only
- * in how the returned bytes are materialized.
+ * Successful Mini Program updates expose JavaScript and native CSS produced from one class-identity snapshot. Tailwind utility
+ * names can be escaped—for example, `py-5.5` becomes `py-5_d5`—so both sides share the current candidate union. Complete builds
+ * reject any conversion failure. HMR instead logs native CSS errors and retains the last valid stylesheet for each failed file.
+ * Failed CSS is never published. Valid JavaScript still arrives with its assigned patch sequence; dropping that sequence would
+ * force the running client to rebuild and lose state. Separate build/update finalizers share conversion and caching.
  *
  * ## Ownership boundaries
  *
@@ -108,8 +114,8 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  *
  * `configResolved` wraps the concrete `vite:css-post` transform while preserving its hook metadata, filter, ordering, and
  * plugin context. The original Vite hook executes first, which preserves CSS Module exports and Vite's internal extraction
- * state. Only a successful transform updates `styleByModuleId`; syntax errors therefore leave the last successful CSS available
- * to the currently running application. Query modes such as `?raw`, `?url`, and `?inline` are excluded because they represent
+ * state. Only a successful transform updates `styleByModuleId`; Vite processing errors leave the last successful CSS available.
+ * Native conversion may still reject CSS accepted by this hook. Query modes such as `?raw`, `?url`, and `?inline` represent
  * values rather than graph-owned stylesheets.
  *
  * ### 3. Live-graph projection
@@ -126,17 +132,20 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  *
  * ### 4. Shared native-style finalization
  *
- * `finalizeOutput()` converts and optionally minifies each entry's CSS, then transforms every JavaScript artifact using
+ * Both output finalizers convert and optionally minify each entry's CSS, then transform every JavaScript artifact using
  * the shared candidate union. Builds and HMR follow `build.cssMinify`, defaulting to `build.minify`, using Lightning CSS.
  * Vite's intermediate CSS minification
  * remains disabled so only final native bytes are optimized. The function returns data without bundle mutation or filesystem
- * publication. Any conversion or minification failure rejects before callers expose partial output. JavaScript conversion is
- * skipped when the projection contains no Tailwind candidates, preserving ordinary bundle bytes.
+ * publication. Complete builds reject conversion or minification failures. HMR logs CSS errors and reuses the affected file's
+ * last valid output, if any; neither invalid CSS nor partially processed CSS is published. JavaScript conversion stays strict
+ * and uses current candidates, even with stale CSS. It is skipped when the projection contains no Tailwind candidates,
+ * preserving ordinary bundle bytes.
  *
- * `createFinalizeOutput()` captures the resolved output policy once and retains only the latest successful conversion per file
- * and candidate identity. Every transaction supplies a fresh live-graph projection, but byte-identical CSS skips PostCSS and
+ * `createFinalizeOutput()` composes a strict build converter and an HMR-only recovery wrapper. Both retain the same latest
+ * successful conversion per file and candidate identity. Every transaction supplies a fresh live-graph projection, but byte-identical CSS skips PostCSS and
  * Lightning CSS independently for each file. Equal candidate contents reuse the same set and replacement table even when
- * the projection allocated a new set. Changed candidates never reuse stale replacements; failures do not advance the snapshot.
+ * the projection allocated a new set. Changed candidates never reuse stale replacements. Invalid CSS is never cached; rejected
+ * transactions do not advance the snapshot.
  *
  * ### 5a. Complete-build commit
  *
@@ -148,10 +157,10 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * ### 5b. Development commit
  *
  * The development host calls `finalizeUpdate()` after Rolldown produces patch factories or a complete-output notification.
- * Finalization uses the `PluginContext` captured by `buildStart`, so it observes the same current graph as the compiler. After
- * all conversion succeeds, the host's atomic writer publishes changed native CSS before `finalizeUpdate()` returns converted
- * patch factories. Their captured Vite CSS literals are emptied first; factories, exports, changed IDs, and sequences remain
- * intact. The patch publisher therefore cannot expose newer JavaScript class identities before matching selectors exist.
+ * Finalization uses the `PluginContext` captured by `buildStart`, so it observes the same current graph as the compiler. The host's
+ * atomic writer publishes valid native CSS before `finalizeUpdate()` returns converted patch factories. CSS conversion errors
+ * retain only the affected file's last valid styles; they do not block valid patches or healthy stylesheets. Captured Vite CSS
+ * literals are emptied first; factories, exports, changed IDs, and sequences remain intact.
  * Each file's publication frontier advances only after its atomic write succeeds. A failed later write blocks JavaScript
  * delivery; retry skips files already made durable. Empty Page CSS overwrites stale styles after import removal.
  *
@@ -178,7 +187,7 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * untouched bytes through Rolldown's native editor. Comparing candidate sets costs `O(C)` without sorting. Retained memory
  * is `O(B + C + D + F)` for latest CSS, candidate sets, compiler dependencies, and watched file identities; no second application
  * graph is retained. The Tailwind generator stays alive across candidate edits to avoid repeating source normalization and
- * compiler initialization. Native CSS conversion/minification runs only when projected CSS changes;
+ * compiler initialization. Successful native CSS conversions are reused while projected CSS is unchanged; failures retry;
  * no extra source reads or graph traversals are needed.
  */
 export function createMiniStylePlugin(
@@ -226,7 +235,7 @@ export function createMiniStylePlugin(
         /** Resolves the output policy and installs the private Vite integration that observes fully processed module CSS. */
         configResolved(config) {
             cssMinify ??= Boolean(config.build.minify)
-            finalizeOutput = createFinalizeOutput(contract.styles, cssMinify)
+            finalizeOutput = createFinalizeOutput(contract.styles, cssMinify, config.logger)
 
             // `vite:css-post` is the boundary after all public CSS processing and before browser-module serialization.
             const cssPostPlugin = config.plugins.find((plugin) => plugin.name === 'vite:css-post')!
@@ -326,7 +335,7 @@ export function createMiniStylePlugin(
                 const chunks = outputs.filter((output): output is Rolldown.OutputChunk => output.type === 'chunk')
 
                 // Step 2: finish all fallible CSS and JavaScript conversion before mutating any bundle output.
-                const finalized = await finalizeOutput(
+                const finalized = await finalizeOutput.build(
                     projectMiniStyles(resolvedEntries, styleByModuleId, this),
                     chunks.map((chunk) => ({ code: chunk.code, filename: chunk.fileName }))
                 )
@@ -361,7 +370,7 @@ export function createMiniStylePlugin(
             styleByModuleId.clear()
             publishedStylesheets.clear()
         },
-        /** Finalizes one development result and publishes matching native CSS before exposing converted patch factories. */
+        /** Publishes valid native CSS before patch factories; native CSS errors log and retain the last valid styles. */
         finalizeUpdate: async <Artifact extends JavaScriptArtifact>(
             artifacts: readonly Artifact[],
             writeStylesheet: (fileName: string, source: string) => Promise<void>
@@ -372,8 +381,8 @@ export function createMiniStylePlugin(
                 filename: artifact.filename
             }))
 
-            // Step 1: complete every fallible conversion against one snapshot of the current module graph.
-            const output = await finalizeOutput(
+            // Step 1: convert the current graph, retaining valid styles on CSS errors rather than dropping patch sequences.
+            const output = await finalizeOutput.update(
                 projectMiniStyles(resolvedEntries, styleByModuleId, graphContext),
                 javaScript
             )
@@ -386,64 +395,88 @@ export function createMiniStylePlugin(
                 }
             }
 
-            // Step 3: preserve patch metadata and replace only code after all matching stylesheets are durable.
+            // Step 3: preserve patch metadata and replace only code after every stylesheet write succeeds.
             return artifacts.map((artifact, index) => ({ ...artifact, code: output.javaScript[index]! }))
         }
     }
 }
 
 /** Caches one successful conversion per native output file and one shared JavaScript candidate identity. */
-function createFinalizeOutput(styles: MiniContract['styles'], minify: BuildOptions['cssMinify']) {
+function createFinalizeOutput(styles: MiniContract['styles'], minify: BuildOptions['cssMinify'], logger: Logger) {
     const miniTransformer = createMiniTransformer()
     const extension = path.posix.extname(styles.appFileName)
-    // Replace this bounded snapshot only after every CSS and JavaScript conversion succeeds; failures remain retryable.
+    // Commit after JS conversion succeeds; tolerated HMR CSS failures retain the affected file's last valid conversion.
     let previousOutput:
         | Readonly<{
-              stylesheets: ReadonlyMap<string, Readonly<{ css: string; source: string }>>
+              stylesheets: ReadonlyMap<string, ConvertedStylesheet>
               classSet: ReadonlySet<string>
           }>
         | undefined
 
-    return async function finalizeOutput(
-        projection: ReturnType<typeof projectMiniStyles>,
-        javaScript: readonly JavaScriptArtifact[]
-    ) {
-        const classSet =
-            previousOutput && equalCandidates(previousOutput.classSet, projection.classSet)
-                ? previousOutput.classSet
-                : projection.classSet
-        const inputs = [
-            { fileName: styles.globalFileName, css: projection.appEntries.css, app: true },
-            ...projection.pageEntries.map((entry) => ({
-                fileName: entry.shellName.replace(/\.js$/, extension),
-                css: entry.css,
-                app: false
-            }))
-        ]
-        // These local accumulators stage the complete transaction before exposing any converted files or updating caches.
-        const nextStylesheets = new Map<string, Readonly<{ css: string; source: string }>>()
-        const stylesheets: { fileName: string; source: string }[] = []
-        for (const { fileName, css, app } of inputs) {
-            const cached = previousOutput?.stylesheets.get(fileName)
-            const converted =
-                cached?.css === css
-                    ? cached
-                    : {
-                          css,
-                          source: await minifyMiniStylesheet(
-                              `${app ? `${miniHtmlBase}\n` : ''}${await miniTransformer.transformStylesheet(css)}`,
-                              { filename: fileName, minify }
-                          )
-                      }
-            nextStylesheets.set(fileName, converted)
-            stylesheets.push({ fileName, source: converted.source })
+    /** Complete builds use this strict converter directly; CSS failures reject before output is published. */
+    async function convertStylesheet({ fileName, css, app }: StylesheetInput): Promise<ConvertedStylesheet> {
+        return {
+            css,
+            source: await minifyMiniStylesheet(
+                `${app ? `${miniHtmlBase}\n` : ''}${await miniTransformer.transformStylesheet(css)}`,
+                { filename: fileName, minify }
+            )
         }
+    }
 
-        const transformedJavaScript = javaScript.map((artifact) =>
-            miniTransformer.transformJavaScript({ classSet, code: artifact.code, filename: artifact.filename })
-        )
-        previousOutput = { stylesheets: nextStylesheets, classSet }
-        return { javaScript: transformedJavaScript, stylesheets }
+    /** Only HMR catches CSS errors and falls back to the previous valid conversion. */
+    async function convertUpdatedStylesheet(input: StylesheetInput, previous: ConvertedStylesheet | undefined) {
+        try {
+            return await convertStylesheet(input)
+        } catch (error) {
+            logger.error(
+                `[vpt] Native CSS update failed (${input.fileName}); keeping last valid styles.\n${String(error)}`
+            )
+            return previous
+        }
+    }
+
+    /** Share graph projection, caching, and strict JavaScript conversion without a build/HMR mode flag. */
+    function createFinalizer(convert: typeof convertUpdatedStylesheet) {
+        return async function finalizeOutput(
+            projection: ReturnType<typeof projectMiniStyles>,
+            javaScript: readonly JavaScriptArtifact[]
+        ) {
+            const classSet =
+                previousOutput && equalCandidates(previousOutput.classSet, projection.classSet)
+                    ? previousOutput.classSet
+                    : projection.classSet
+            const inputs = [
+                { fileName: styles.globalFileName, css: projection.appEntries.css, app: true },
+                ...projection.pageEntries.map((entry) => ({
+                    fileName: entry.shellName.replace(/\.js$/, extension),
+                    css: entry.css,
+                    app: false
+                }))
+            ]
+            // Stage the complete transaction before exposing any converted files or updating the shared snapshot.
+            const nextStylesheets = new Map<string, ConvertedStylesheet>()
+            const stylesheets: { fileName: string; source: string }[] = []
+            for (const input of inputs) {
+                const cached = previousOutput?.stylesheets.get(input.fileName)
+                const converted = cached?.css === input.css ? cached : await convert(input, cached)
+                if (converted) {
+                    nextStylesheets.set(input.fileName, converted)
+                    stylesheets.push({ fileName: input.fileName, source: converted.source })
+                }
+            }
+
+            const transformedJavaScript = javaScript.map((artifact) =>
+                miniTransformer.transformJavaScript({ classSet, code: artifact.code, filename: artifact.filename })
+            )
+            previousOutput = { stylesheets: nextStylesheets, classSet }
+            return { javaScript: transformedJavaScript, stylesheets }
+        }
+    }
+
+    return {
+        build: createFinalizer(convertStylesheet),
+        update: createFinalizer(convertUpdatedStylesheet)
     }
 }
 

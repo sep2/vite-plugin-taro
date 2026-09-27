@@ -344,17 +344,17 @@ export async function createMiniDevHost({
         await publishPatchBatch(patches)
     }
 
-    /** Publishes one coherent App/Page style, selected-mode delivery, and Rolldown-frontier transaction. */
+    /** Publishes App/Page styles and patches, then advances Rolldown's delivery frontier. */
     async function publishPatchBatch(patches: readonly PatchUpdate[]): Promise<void> {
         if (patches.length === 0) {
             return
         }
 
         // `onHmrUpdates` runs after every affected transform has updated captured CSS and the live import graph. The style
-        // boundary finalizes every factory before atomically writing each matching App/Page stylesheet.
+        // boundary retains last valid CSS on conversion errors without dropping valid JavaScript patch sequences.
         const finalizedPatches = await styles.finalizeUpdate(patches, writeFile)
 
-        // Publish all native stylesheets before JavaScript delivery so the mode observes one coherent HMR transaction.
+        // Successfully converted stylesheets are durable before JavaScript delivery; failed CSS is never published.
         // Delivery must become durable before Rolldown advances: later patches may be generated relative to this batch even if
         // the runtime has not applied it. PatchJournal retains the unapplied range, so every later publication still bridges the
         // runtime's older application frontier.

@@ -616,8 +616,8 @@ test('first native lazy import uses edits acknowledged before its physical chunk
     assert.equal(await readFile(fixture.appStylePath, 'utf8'), appStyle)
 })
 
-test('keeps patch sequences contiguous after repairing a Page CSS publication failure', async (context) => {
-    // Capture the failed host transaction so repair begins only after the real CSS finalizer has rejected the invalid source.
+test('keeps last valid Page CSS and publishes contiguous JavaScript patches through native conversion repair', async (context) => {
+    // Record diagnostics to verify native CSS errors are reported without rejecting the host publication.
     const errors: string[] = []
     const logger = createLogger('silent')
     logger.error = (message) => {
@@ -639,47 +639,65 @@ test('keeps patch sequences contiguous after repairing a Page CSS publication fa
         (source) => source.includes('{seq:'),
         maximumWaitAttempts
     )
-    const lastGoodCss = await readFile(outputPath, 'utf8')
-    assert.match(lastGoodCss, /padding:\s*8rpx/)
+    const lastValidCss = await readFile(outputPath, 'utf8')
+    assert.match(lastValidCss, /padding:\s*8rpx/)
     assert.deepEqual(
         [...firstPatches.matchAll(/\{seq: (\d+)/g)].map((match) => Number(match[1])),
         [1]
     )
 
-    await publishSourceGeneration(stylePath, '.page-local { padding: 12px;')
-    await waitForCondition(
-        () => errors.some((message) => message.includes('[vpt] wx HMR publish failed')),
+    const invalidCss = '.page-local { padding: 12px;'
+    await publishSourceGeneration(stylePath, invalidCss)
+    const invalidCssPatches = await waitForFile(
+        fixture.patchesPath,
+        (source) => source !== firstPatches,
         maximumWaitAttempts
+    )
+    assert.ok(
+        errors.some((message) =>
+            /Native CSS update failed.*pages\/home\/index\.wxss[\s\S]*Unclosed block/.test(message)
+        )
     )
     assert.equal(
         await readFile(outputPath, 'utf8'),
-        lastGoodCss,
-        'Invalid CSS must leave last-good native styles intact'
+        lastValidCss,
+        'Failed conversion must retain the last valid stylesheet without publishing failed CSS'
     )
-    assert.equal(
-        await readFile(fixture.patchesPath, 'utf8'),
-        firstPatches,
-        'Failed finalization must not publish JavaScript'
+    assert.deepEqual(
+        [...invalidCssPatches.matchAll(/\{seq: (\d+)/g)].map((match) => Number(match[1])),
+        [1, 2],
+        'A native CSS error must not discard the valid JavaScript patch'
     )
     assert.equal(await readFile(fixture.infoPath, 'utf8'), infoSource)
     assert.equal(await readFile(fixture.appStylePath, 'utf8'), appStyle)
 
+    await publishSourceGeneration(
+        fixture.pagePath,
+        `import './index.css'\n${renderPage('updated while CSS is invalid')}`
+    )
+    const javaScriptPatches = await waitForFile(
+        fixture.patchesPath,
+        (source) => source.includes('updated while CSS is invalid'),
+        maximumWaitAttempts
+    )
+    assert.equal(await readFile(outputPath, 'utf8'), lastValidCss)
+    assert.deepEqual(
+        [...javaScriptPatches.matchAll(/\{seq: (\d+)/g)].map((match) => Number(match[1])),
+        [1, 2, 3]
+    )
+
     await publishSourceGeneration(stylePath, '.page-local { padding: 16px; }')
     const recoveredPatches = await waitForFile(
         fixture.patchesPath,
-        (source) => source !== firstPatches,
+        (source) => source !== javaScriptPatches,
         maximumWaitAttempts
     )
     assert.match(await readFile(outputPath, 'utf8'), /padding:\s*16rpx/)
     assert.equal(await readFile(fixture.infoPath, 'utf8'), infoSource, 'Repair must not rotate the App build identity')
     assert.equal(await readFile(fixture.appStylePath, 'utf8'), appStyle, 'Repair must not force an App reload')
     const sequences = [...recoveredPatches.matchAll(/\{seq: (\d+)/g)].map((match) => Number(match[1]))
-    assert.ok(sequences.length > 1)
-    assert.deepEqual(
-        sequences,
-        Array.from({ length: sequences.length }, (_, index) => index + 1),
-        'Repaired CSS must not skip the failed publication sequence and force the running client to rebuild'
-    )
+    assert.deepEqual(sequences, [1, 2, 3, 4], 'Repair must preserve the patch sequence without forcing a rebuild')
+    assert.ok(errors.every((message) => !message.includes('HMR publish failed')))
 })
 
 test('coalesces one full-file save into one wx patch', async (context) => {
