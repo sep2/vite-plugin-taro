@@ -77,6 +77,8 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                 },
 
                 build: {
+                    // Native Mini Program files are not served with HTTP gzip; reporting compressed sizes wastes build time.
+                    reportCompressedSize: false,
                     modulePreload: false,
                     // Mini Program styles are intentionally global. This guarantees one compiler stylesheet for the CSS
                     // finalizer; enabling splitting would require Page ownership and must not be silently flattened.

@@ -116,6 +116,7 @@ for (const [target, createContract] of [
             { configFile: false, mode: 'development', plugins: createMiniTargetPlugins(contract) },
             'build'
         )
+        assert.equal(config.build.reportCompressedSize, false)
         const plugin = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
         assert.ok(plugin?.transform && typeof plugin.transform === 'object')
         assert.equal(plugin.transform.order, 'pre')
