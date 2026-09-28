@@ -13,7 +13,7 @@ import {
     interpreterServerEvent
 } from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
 import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
-// import { createNativeDevRuntime } from '../../../tests/create-native-dev-runtime.ts'
+import { createNativeDevRuntime } from '../../../tests/create-native-dev-runtime.ts'
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
 import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
@@ -636,6 +636,87 @@ test('first native lazy import uses edits acknowledged before its physical chunk
 })
 
 */
+
+test('applies native HMR once to an executed lazy module and reports a failed patch', async (context) => {
+    const lazyModuleId = 'src/pages/home/lazy-feature.ts'
+    const renderLazy = (marker: string) => `
+        globalThis.__lazyExecutions += 1
+        export default function LazyFeature() { return ${JSON.stringify(marker)} }
+        if (import.meta.hot) {
+            import.meta.hot.accept((next) => { globalThis.__lazyAccepted.push(next.default()) })
+        }
+    `
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'disk', undefined, {
+        'src/pages/home/index.tsx': `${renderPage('warm lazy fixture')}\nexport const loadLazyEntry = () => import('./lazy-entry')`,
+        'src/pages/home/lazy-entry.ts': `export const loadLazy = () => import('./lazy-feature')`,
+        [lazyModuleId]: renderLazy('initial warm generation')
+    })
+    context.after(fixture.close)
+    const infoSource = await readFile(fixture.infoPath, 'utf8')
+    const info = parseHmrInfo(infoSource)
+    const appStyle = await readFile(fixture.appStylePath, 'utf8')
+    const runtime = createNativeDevRuntime(fixture.outDir, info)
+    const lazyPath = path.join(path.dirname(fixture.pagePath), 'lazy-feature.ts')
+    const compilerOptions = await fixture.bundledDev.getRolldownOptions()
+    // Compiler identities are relative to its cwd, which differs from this disposable fixture's Vite root.
+    const runtimeModuleId = normalizePath(path.relative(compilerOptions.cwd ?? process.cwd(), lazyPath))
+    // These VM-local journals distinguish module execution from accept callbacks and detect duplicate patch application.
+    runtime.run('globalThis.__lazyExecutions = 0; globalThis.__lazyAccepted = []')
+    const entry: unknown = await runtime.run(`System.import('common/lazy-entry.js')`)
+    assert.ok(entry && typeof entry === 'object' && 'loadLazy' in entry && typeof entry.loadLazy === 'function')
+    const namespace: unknown = await entry.loadLazy()
+    assert.ok(
+        namespace && typeof namespace === 'object' && 'default' in namespace && typeof namespace.default === 'function'
+    )
+    assert.equal(namespace.default(), 'initial warm generation')
+    assert.strictEqual(await entry.loadLazy(), namespace, 'Repeated initial imports must reuse the native namespace')
+    assert.equal(runtime.run('globalThis.__lazyExecutions'), 1)
+    assert.equal(runtime.run(`globalThis.__rolldown_runtime__.isExecuted(${JSON.stringify(runtimeModuleId)})`), true)
+
+    const markers = ['first warm update', 'second warm update']
+    for (const [index, marker] of markers.entries()) {
+        const seq = index + 1
+        await publishSourceGeneration(lazyPath, renderLazy(marker))
+        const patches = await waitForFile(fixture.patchesPath, (source) => source.includes(marker), maximumWaitAttempts)
+        runtime.applyPatches(patches)
+        assert.deepEqual(runtime.reports.at(-1), { buildId: info.buildId, kind: 'applied', seq })
+        assert.equal(
+            runtime.run(`globalThis.__rolldown_runtime__.loadExports(${JSON.stringify(runtimeModuleId)}).default()`),
+            marker
+        )
+        assert.equal(runtime.run('globalThis.__lazyExecutions'), seq + 1)
+        assert.equal(runtime.run('JSON.stringify(globalThis.__lazyAccepted)'), JSON.stringify(markers.slice(0, seq)))
+
+        runtime.applyPatches(patches)
+        // Another Page may replay the delivery and repeat its ACK, but must not execute the module or accept callback again.
+        assert.deepEqual(runtime.reports.at(-1), { buildId: info.buildId, kind: 'applied', seq })
+        assert.equal(runtime.run('globalThis.__lazyExecutions'), seq + 1)
+        assert.equal(runtime.run('JSON.stringify(globalThis.__lazyAccepted)'), JSON.stringify(markers.slice(0, seq)))
+        await sendRuntimeReport(info, { buildId: info.buildId, kind: 'applied', seq })
+        await delay(50)
+    }
+    assert.doesNotMatch(JSON.stringify(runtime.reports), /"kind":"rebuild"/)
+
+    // A failing native installer must report recovery and close its socket instead of acknowledging a partial patch.
+    const warning = context.mock.method(console, 'warn', () => {})
+    runtime.applyPatches(`module.exports = {
+        buildId: ${JSON.stringify(info.buildId)},
+        patches: [{ seq: 3, changedIds: [], factory() { throw new Error('fixture patch failed') } }]
+    }`)
+    assert.deepEqual(runtime.reports.at(-1), {
+        buildId: info.buildId,
+        kind: 'rebuild',
+        reason: 'fixture patch failed'
+    })
+    assert.equal(warning.mock.callCount(), 1)
+    assert.match(String(warning.mock.calls[0]!.arguments[1]), /fixture patch failed/)
+    const reportCount = runtime.reports.length
+    runtime.applyPatches(`module.exports = { buildId: ${JSON.stringify(info.buildId)}, patches: [] }`)
+    assert.equal(runtime.reports.length, reportCount, 'Failed installation must leave the socket closed')
+    assert.equal(runtime.run('globalThis.__lazyExecutions'), 3)
+    assert.equal(await readFile(fixture.infoPath, 'utf8'), infoSource)
+    assert.equal(await readFile(fixture.appStylePath, 'utf8'), appStyle)
+})
 
 test('keeps last valid Page CSS and publishes contiguous JavaScript patches through native conversion repair', async (context) => {
     // Record diagnostics to verify native CSS errors are reported without rejecting the host publication.
