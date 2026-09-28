@@ -90,8 +90,9 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * 5. VPT owns physical App/Page CSS and patch publication. Vite's browser CSS asset is only an intermediate carrier and is
  *    removed before VPT emits the App stylesheet and each native Page companion.
  *
- * Opaque native-component styles stay outside this pipeline and are emitted by later native output hooks. Mini output keeps
- * `cssCodeSplit: false` for Vite's intermediate browser carrier; native splitting follows App/Page graph ownership instead.
+ * Opaque native-component styles stay outside this pipeline and are emitted by later native output hooks. The requested
+ * `build.cssCodeSplit` controls native projection. Vite's intermediate browser carrier remains unsplit after that request
+ * is captured, preventing browser CSS-loading code from leaking into native output.
  *
  * ## Compilation phases
  *
@@ -124,8 +125,9 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * Each capsule traverses Rolldown's current static and dynamic import edges in dependency-first post-order. Root-local visited
  * sets terminate cycles and deduplicate physical styles without suppressing another Page's independent cascade. App-reachable
  * styles belong to the App and are excluded from every Page projection; styles shared only by Pages remain in each consumer.
- * A retained stylesheet contributes only while reachable, so import removals prune CSS and candidates without a topology cache.
- * Candidate sets contain only the Tailwind roots whose captured CSS survives each entry's projection.
+ * With splitting disabled, one traversal visits App then configured Pages and collects all reachable CSS into the App file,
+ * deduplicating shared styles and leaving Page companions empty. A retained stylesheet contributes only while reachable,
+ * so import removals prune CSS and candidates without a topology cache. Candidate sets contain only surviving Tailwind roots.
  *
  * App CSS is emitted at the contract's global filename; Page CSS is emitted beside each native Page shell. Only the App file
  * receives HTML display defaults. JavaScript rewriting uses the union of all surviving App/Page Tailwind candidates.
@@ -168,6 +170,7 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  *
  * Each plugin instance owns the following bounded state and transformation services:
  *
+ * - `cssCodeSplit`: requested native-style ownership policy captured before disabling Vite's browser-only splitting;
  * - `cssMinify`: requested native-style minification captured before disabling Vite's intermediate pass, then resolved once;
  * - `resolvedEntries`: App/Page metadata with graph-exact capsule identities resolved at the start of each build;
  * - `graphContext`: the active Rolldown graph reader needed by host calls made outside plugin hooks;
@@ -180,8 +183,9 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  *
  * ## Cost model
  *
- * Projection is `O(sum(Vᵢ + Eᵢ + Bᵢ + Cᵢ))` across App/Page roots for reachable modules, import edges, projected CSS bytes,
- * and candidate insertions. Shared subgraphs are revisited per root; candidate unioning needs no extra graph traversal.
+ * Split projection is `O(sum(Vᵢ + Eᵢ + Bᵢ + Cᵢ))` across App/Page roots for reachable modules, import edges, projected CSS
+ * bytes, and candidate insertions. Combined projection is `O(V + E + B + C + P)` with one traversal and P Page companions.
+ * Candidate unioning needs no extra graph traversal.
  * Building one exact candidate precheck costs `O(C)` candidate bytes and testing a chunk costs `O(J)` source bytes. Matching
  * chunks then parse and walk in `O(J)`; replacing `Kᵢ` candidate tokens in literal `i` costs `O(LᵢKᵢ)` while preserving
  * untouched bytes through Rolldown's native editor. Comparing candidate sets costs `O(C)` without sorting. Retained memory
@@ -197,6 +201,8 @@ export function createMiniStylePlugin(
     // Late config captures the requested switch before disabling Vite's intermediate pass; configResolved supplies the
     // resolved JS-minification default. The same policy stays fixed throughout builds and HMR.
     let cssMinify: BuildOptions['cssMinify']
+    // Late config captures native splitting once before reserving Vite's CSS output for an unsplit intermediate carrier.
+    let cssCodeSplit: boolean
     // buildStart atomically replaces these entry records with resolved capsules while preserving native output metadata.
     let resolvedEntries: typeof entries
     // configResolved initializes this service once the output policy is known; all builds and HMR reuse its bounded cache.
@@ -225,11 +231,14 @@ export function createMiniStylePlugin(
     return {
         name: 'vpt:mini-styles',
         config: {
-            // Observe user and ordinary plugin configuration before reserving minification for native output.
+            // Observe user and ordinary plugin configuration before reserving CSS output policy for native styles.
             order: 'post',
             handler(config) {
                 cssMinify = config.build?.cssMinify
-                return { build: { cssMinify: false } }
+                // Mini Programs default to split styles independently of Vite's intermediate browser carrier.
+                cssCodeSplit = config.build?.cssCodeSplit ?? true
+
+                return { build: { cssMinify: false, cssCodeSplit: false } }
             }
         },
         /** Resolves the output policy and installs the private Vite integration that observes fully processed module CSS. */
@@ -336,7 +345,7 @@ export function createMiniStylePlugin(
 
                 // Step 2: finish all fallible CSS and JavaScript conversion before mutating any bundle output.
                 const finalized = await finalizeOutput.build(
-                    projectMiniStyles(resolvedEntries, styleByModuleId, this),
+                    projectMiniStyles(resolvedEntries, styleByModuleId, this, cssCodeSplit),
                     chunks.map((chunk) => ({ code: chunk.code, filename: chunk.fileName }))
                 )
 
@@ -383,7 +392,7 @@ export function createMiniStylePlugin(
 
             // Step 1: convert the current graph, retaining valid styles on CSS errors rather than dropping patch sequences.
             const output = await finalizeOutput.update(
-                projectMiniStyles(resolvedEntries, styleByModuleId, graphContext),
+                projectMiniStyles(resolvedEntries, styleByModuleId, graphContext, cssCodeSplit),
                 javaScript
             )
 

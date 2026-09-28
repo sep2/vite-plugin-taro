@@ -350,14 +350,14 @@ WXSS 内容不通过 JavaScript 模块的更新边界交付。完整构建和增
 1. Tailwind 扫描器把已有候选文件和编译依赖登记到 Rolldown；相关文件变化时，Rolldown 重新转换对应 Tailwind 入口；
 2. 入口复用自己的增量生成器，得到新的浏览器 CSS 和同一代原始类名集合；编译依赖变化时才重建生成器；
 3. Vite 继续执行 PostCSS、CSS Modules 和预处理器转换，vpt 在内置 `vite:css-post` 序列化浏览器 HMR 模块前记录最终模块 CSS；
-4. 使用 Rolldown 当前模块图，分别选择 App 和每个页面仍然可达的 CSS；页面排除 App 已拥有的样式，页面间共享的样式保留在每个使用者中；
+4. 按 `build.cssCodeSplit` 投影 Rolldown 当前模块图：开启时分别选择 App 和每个页面仍然可达的 CSS，页面排除 App 已拥有的样式；关闭时按 App、配置页面顺序合并所有可达样式并去重，页面样式保持为空；
 5. 分别转换、压缩 App 与页面 WXSS，仅在 App 样式中加入 HTML 显示默认值；
 6. 用所有存活入口的 Tailwind 类名并集转换同一事务中的最终 JavaScript；
 7. 逐个原子替换转换成功且内容发生变化的 `assets/global.wxss` 和页面 WXSS，写入全部成功后再发布 JavaScript 补丁。
 
 Tailwind 生成器只负责编译入口，不拥有补丁发布。它在入口存活期间保留增量扫描缓存；候选文件变化由 Rolldown 触发入口转换，新增和删除类名都会更新同一个权威集合。vpt 不在发布事务中重新扫描项目，不重复执行 Vite CSS 预处理，不绕过 Vite 读取物理样式文件，也不从 WXSS 反向解析类名。
 
-增量更新不会改写根目录的 `app.wxss`。它始终导入 `assets/global.wxss`；App 样式更新只替换后者，页面样式更新则写入对应的页面 WXSS。vpt 先写入转换成功的 WXSS，再发布已经用当前类名集合转换过的 JavaScript 补丁。发布前仅把补丁中的 Vite 浏览器 CSS 字符串置空；模块工厂、CSS Modules 导出、`changedIds` 和补丁序号保持不变。每个文件分别比较最终字节，未变化的文件不会重写；删除页面样式导入会写入空内容，清除旧规则。若后续文件写入失败，JavaScript 不会交付；重试跳过已成功写入的文件。
+增量更新不会改写根目录的 `app.wxss`。它始终导入 `assets/global.wxss`；开启 `build.cssCodeSplit` 时，App 样式更新只替换后者，页面样式更新则写入对应的页面 WXSS；关闭时，所有应用样式更新都写入全局文件。vpt 先写入转换成功的 WXSS，再发布已经用当前类名集合转换过的 JavaScript 补丁。发布前仅把补丁中的 Vite 浏览器 CSS 字符串置空；模块工厂、CSS Modules 导出、`changedIds` 和补丁序号保持不变。每个文件分别比较最终字节，未变化的文件不会重写；删除页面样式导入会写入空内容，清除旧规则。若后续文件写入失败，JavaScript 不会交付；重试跳过已成功写入的文件。
 
 HMR 的原生 CSS 转换或压缩失败时，vpt 只报告输出文件名和错误，不抛出该 CSS 错误，也不发布失败或部分处理的 CSS；对应文件继续使用上次成功的样式，有效 JavaScript 和其他正常样式继续交付。若尚无成功结果，则跳过该文件。失败的源 CSS 不会被缓存为成功结果，下次更新仍会重试；修复后恢复正常转换和发布。JavaScript 仍使用当前 Tailwind 类名集合，因此修复前可能暂时出现样式缺失或不匹配，但不会因丢弃已分配序号的补丁而触发序号缺口和状态重置。此策略不吞掉 Vite / Tailwind 编译错误、JavaScript 转换错误或文件写入错误。
 

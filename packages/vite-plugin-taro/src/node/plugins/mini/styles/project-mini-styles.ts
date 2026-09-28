@@ -24,22 +24,31 @@ type ProjectedStyle = Readonly<{
 }>
 
 /**
- * Projects App-owned CSS and each Page's remaining CSS in dependency-first order. Shared Page styles remain in every
- * consuming Page rather than becoming global. One union of all surviving candidates gives every JavaScript artifact
- * the same class identities as the separately emitted stylesheets, without a second graph traversal.
+ * Projects native CSS according to build.cssCodeSplit. Split output preserves each Page's dependency-first cascade;
+ * combined output traverses App then configured Pages once, deduplicating shared CSS in the global stylesheet.
+ * Page companions stay empty in combined output. Both policies share one union of surviving Tailwind candidates.
  *
- * Each root has its own visited set: cycles terminate without one Page suppressing another Page's styles or cascade order.
- * Work is O(sum(Vᵢ + Eᵢ + Bᵢ + Cᵢ)) over each root's reachable modules, edges, projected CSS bytes and candidates; shared
- * subgraphs are revisited per root. All projection state is transaction-local, so graph removals need no retained cache.
+ * Split work is O(sum(Vᵢ + Eᵢ + Bᵢ + Cᵢ)) across roots. Combined work is O(V + E + B + C + P), where P is the Page count.
+ * All visited/style collections are transaction-local, so cycles terminate and graph removals need no retained cache.
  */
 export function projectMiniStyles(
     entries: MiniEntries,
     styleByModuleId: ReadonlyMap<string, StyleSource>,
-    context: ModuleGraph
+    context: ModuleGraph,
+    cssCodeSplit: boolean
 ) {
-    const appEntries = projectEntry(entries.appEntries, new Set<string>(), styleByModuleId, context)
+    const appRoots = cssCodeSplit
+        ? [entries.appEntries.capsuleId]
+        : [entries.appEntries.capsuleId, ...entries.pageEntries.map((entry) => entry.capsuleId)]
+    const appEntries = {
+        ...entries.appEntries,
+        ...projectStyles(appRoots, new Set<string>(), styleByModuleId, context)
+    }
     const appStyleIds = new Set(appEntries.styles.keys())
-    const pageEntries = entries.pageEntries.map((entry) => projectEntry(entry, appStyleIds, styleByModuleId, context))
+    const pageEntries = entries.pageEntries.map((entry) => ({
+        ...entry,
+        ...projectStyles(cssCodeSplit ? [entry.capsuleId] : [], appStyleIds, styleByModuleId, context)
+    }))
 
     // This transaction-local union keeps shared JavaScript consistent with every App/Page stylesheet.
     const classSet = new Set(appEntries.classSet)
@@ -52,16 +61,16 @@ export function projectMiniStyles(
     return { appEntries, pageEntries, classSet }
 }
 
-/** Traverses one capsule without pruning dependency edges of an excluded App-owned stylesheet. */
-function projectEntry(
-    entry: MiniEntries['appEntries'],
+/** Traverses an ordered set of capsules without pruning dependency edges of excluded App-owned stylesheets. */
+function projectStyles(
+    roots: readonly string[],
     appStyleIds: ReadonlySet<string>,
     styleByModuleId: ReadonlyMap<string, StyleSource>,
     context: ModuleGraph
 ) {
-    // This root-local set terminates cycles and deduplicates exact module identities, including route/query variants.
+    // This projection-local set terminates cycles and deduplicates exact module identities, including route/query variants.
     const visitedModuleIds = new Set<string>()
-    // This root-local map deduplicates physical styles and retains their dependency-first cascade order.
+    // This projection-local map deduplicates physical styles and retains their dependency-first cascade order.
     const styles = new Map<string, ProjectedStyle>()
 
     const visit = (moduleId: string): void => {
@@ -85,8 +94,8 @@ function projectEntry(
         styles.set(styleId, { css: style.css, classSet: style.tailwind?.classSet })
     }
 
-    visit(entry.capsuleId)
-    return { ...entry, ...summarizeStyles(styles) }
+    roots.forEach(visit)
+    return summarizeStyles(styles)
 }
 
 /** Joins an ordered physical-style selection with precisely its surviving Tailwind candidates. */

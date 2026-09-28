@@ -189,73 +189,87 @@ test('minifies the complete compiler stylesheet before later WX output hooks', a
 })
 
 for (const extension of ['wxss', 'acss', 'ttss']) {
-    test(`emits App and Page ${extension} separately with each Page's own shared-style cascade`, async () => {
-        const css = [
-            '.app { color: purple; }',
-            '.shared { color: blue; }',
-            '.first { color: red; }',
-            '.second { color: green; }'
-        ]
-        const {
-            root,
-            entry: appId,
-            plugin
-        } = createSourceFixture(
-            {
-                'app.ts': "import './app.css'; console.log('app')",
-                'app.css': css[0]!,
-                'shared.css': css[1]!,
-                'pages/first.ts': "import '../shared.css'; import './first.css'; console.log('first')",
-                'pages/first.css': css[2]!,
-                'pages/second.ts': "import './second.css'; import '../shared.css'; console.log('second')",
-                'pages/second.css': css[3]!
-            },
-            'app.ts'
-        )
-        const firstId = path.join(root, 'pages/first.ts')
-        const secondId = path.join(root, 'pages/second.ts')
-        const globalFileName = `assets/global.${extension}`
-        const result = await build({
-            root,
-            configFile: false,
-            logLevel: 'silent',
-            plugins: [
-                plugin,
-                createMiniStylePlugin(
-                    { styles: { appFileName: `app.${extension}`, globalFileName } },
-                    createMiniStyleEntries(appId, [firstId, secondId])
+    for (const cssCodeSplit of [undefined, true, false]) {
+        test(`emits ${extension} with cssCodeSplit=${cssCodeSplit ?? 'default'}`, async () => {
+            const css = [
+                '.app { color: purple; }',
+                '.shared { color: blue; }',
+                '.first { color: red; }',
+                '.second { color: green; }'
+            ]
+            const {
+                root,
+                entry: appId,
+                plugin
+            } = createSourceFixture(
+                {
+                    'app.ts': "import './app.css'; console.log('app')",
+                    'app.css': css[0]!,
+                    'shared.css': css[1]!,
+                    'pages/first.ts': "import '../shared.css'; import './first.css'; console.log('first')",
+                    'pages/first.css': css[2]!,
+                    'pages/second.ts': "import './second.css'; import '../shared.css'; console.log('second')",
+                    'pages/second.css': css[3]!
+                },
+                'app.ts'
+            )
+            const firstId = path.join(root, 'pages/first.ts')
+            const secondId = path.join(root, 'pages/second.ts')
+            const globalFileName = `assets/global.${extension}`
+            const result = await build({
+                root,
+                configFile: false,
+                logLevel: 'silent',
+                plugins: [
+                    plugin,
+                    createMiniStylePlugin(
+                        { styles: { appFileName: `app.${extension}`, globalFileName } },
+                        createMiniStyleEntries(appId, [firstId, secondId])
+                    )
+                ],
+                build: {
+                    write: false,
+                    minify: false,
+                    cssCodeSplit,
+                    rolldownOptions: { input: { app: appId, first: firstId, second: secondId } }
+                }
+            })
+            assert.ok(!Array.isArray(result) && 'output' in result)
+            const styles = result.output.filter((asset) => asset.type === 'asset')
+            assert.deepEqual(styles.map((asset) => asset.fileName).sort(), [
+                globalFileName,
+                `pages/page-0/index.${extension}`,
+                `pages/page-1/index.${extension}`
+            ])
+            const byName = new Map(styles.map((asset) => [asset.fileName, String(asset.source)]))
+            const transformer = createMiniTransformer()
+            if (cssCodeSplit === false) {
+                assert.equal(
+                    byName.get(globalFileName),
+                    `${miniHtmlBase}\n${await transformer.transformStylesheet(css.join('\n'))}`
                 )
-            ],
-            build: {
-                write: false,
-                minify: false,
-                cssCodeSplit: false,
-                rolldownOptions: { input: { app: appId, first: firstId, second: secondId } }
+                assert.equal(byName.get(`pages/page-0/index.${extension}`), '')
+                assert.equal(byName.get(`pages/page-1/index.${extension}`), '')
+            } else {
+                assert.equal(
+                    byName.get(globalFileName),
+                    `${miniHtmlBase}\n${await transformer.transformStylesheet(css[0]!)}`
+                )
+                assert.equal(
+                    byName.get(`pages/page-0/index.${extension}`),
+                    await transformer.transformStylesheet(`${css[1]}\n${css[2]}`)
+                )
+                assert.equal(
+                    byName.get(`pages/page-1/index.${extension}`),
+                    await transformer.transformStylesheet(`${css[3]}\n${css[1]}`)
+                )
+                assert.doesNotMatch(byName.get(globalFileName)!, /\.(?:shared|first|second)\b/)
+                assert.doesNotMatch(byName.get(`pages/page-0/index.${extension}`)!, /\.h5-span|\.app\b|\.second\b/)
+                assert.doesNotMatch(byName.get(`pages/page-1/index.${extension}`)!, /\.h5-span|\.app\b|\.first\b/)
             }
+            await assert.rejects(access(root), { code: 'ENOENT' })
         })
-        assert.ok(!Array.isArray(result) && 'output' in result)
-        const styles = result.output.filter((asset) => asset.type === 'asset')
-        assert.deepEqual(styles.map((asset) => asset.fileName).sort(), [
-            globalFileName,
-            `pages/page-0/index.${extension}`,
-            `pages/page-1/index.${extension}`
-        ])
-        const byName = new Map(styles.map((asset) => [asset.fileName, String(asset.source)]))
-        const transformer = createMiniTransformer()
-        assert.equal(byName.get(globalFileName), `${miniHtmlBase}\n${await transformer.transformStylesheet(css[0]!)}`)
-        assert.equal(
-            byName.get(`pages/page-0/index.${extension}`),
-            await transformer.transformStylesheet(`${css[1]}\n${css[2]}`)
-        )
-        assert.equal(
-            byName.get(`pages/page-1/index.${extension}`),
-            await transformer.transformStylesheet(`${css[3]}\n${css[1]}`)
-        )
-        assert.doesNotMatch(byName.get(globalFileName)!, /\.(?:shared|first|second)\b/)
-        assert.doesNotMatch(byName.get(`pages/page-0/index.${extension}`)!, /\.h5-span|\.app\b|\.second\b/)
-        assert.doesNotMatch(byName.get(`pages/page-1/index.${extension}`)!, /\.h5-span|\.app\b|\.first\b/)
-        await assert.rejects(access(root), { code: 'ENOENT' })
-    })
+    }
 }
 
 const minificationCases = [
@@ -350,28 +364,49 @@ for (const extension of ['wxss', 'acss']) {
     }
 }
 
-test('captures CSS minification configured by a later ordinary plugin', async () => {
-    const { root, entry: appPath, plugin } = createSourceFixture({ 'app.ts': 'export {}\n' }, 'app.ts')
+test('captures CSS minification and splitting configured by a later ordinary plugin', async () => {
+    const {
+        root,
+        entry: appPath,
+        plugin
+    } = createSourceFixture(
+        {
+            'app.ts': 'export {}\n',
+            'page.ts': "import './page.css'; console.log('page')",
+            'page.css': '.page { padding: 4px; }'
+        },
+        'app.ts'
+    )
+    const pagePath = path.join(root, 'page.ts')
     const result = await build({
         root,
         configFile: false,
         logLevel: 'silent',
         plugins: [
             plugin,
-            createMiniStylePlugin(contract, createMiniStyleEntries(appPath, [])),
+            createMiniStylePlugin(contract, createMiniStyleEntries(appPath, [pagePath])),
             {
-                name: 'test:configure-css-minify',
+                name: 'test:configure-css-output',
                 config() {
-                    return { build: { cssMinify: true } }
+                    return { build: { cssMinify: true, cssCodeSplit: false } }
                 }
             }
         ],
-        build: { minify: false, write: false, rolldownOptions: { input: appPath } }
+        build: {
+            minify: false,
+            cssCodeSplit: true,
+            write: false,
+            rolldownOptions: { input: { app: appPath, page: pagePath } }
+        }
     })
     assert.ok(!Array.isArray(result) && 'output' in result)
     const globalStyle = result.output.find((asset) => asset.fileName === contract.styles.globalFileName)
+    const pageStyle = result.output.find((asset) => asset.fileName === 'pages/page-0/index.wxss')
     assert.equal(globalStyle?.type, 'asset')
+    assert.equal(pageStyle?.type, 'asset')
     assert.match(String(globalStyle.source), /\.h5-span,\.h5-a\{display:inline\}/)
+    assert.match(String(globalStyle.source), /\.page\{padding:4rpx\}/)
+    assert.equal(String(pageStyle.source), '')
     await assert.rejects(access(root), { code: 'ENOENT' })
 })
 

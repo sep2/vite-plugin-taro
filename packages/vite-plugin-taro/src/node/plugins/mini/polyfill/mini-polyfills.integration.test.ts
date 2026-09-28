@@ -244,6 +244,7 @@ async function compileFixture(
                     `dist/assets/global.${extension}`,
                     ...(mode === 'rebuild' ? [] : ['dist/hmr/info.js']),
                     ...(mode === 'devtools' ? ['dist/hmr/patches.js'] : []),
+                    `dist/pages/home/index.${extension}`,
                     ...(onDevReady ? ['src/pages/home/index.tsx'] : [])
                 ],
                 'Only the editable fixture page and host-owned style/HMR metadata may reach disk'

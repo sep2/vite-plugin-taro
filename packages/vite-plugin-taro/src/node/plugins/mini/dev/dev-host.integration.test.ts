@@ -109,7 +109,8 @@ async function startDevFixture(
     options: VptOptions,
     bundleOutput: 'memory' | 'capsule' | 'disk',
     publicAsset?: { fileName: string; source: string },
-    initialSources?: Readonly<Record<string, string>>
+    initialSources?: Readonly<Record<string, string>>,
+    cssCodeSplit?: boolean
 ): Promise<DevFixture> {
     const persistedBundleFiles = bundleOutput === 'capsule' ? [pageCapsuleFileName] : []
     const root = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-dev-test-'))
@@ -203,7 +204,8 @@ async function startDevFixture(
                 }
             ],
             build: {
-                outDir
+                outDir,
+                cssCodeSplit
             },
             server: {
                 host,
@@ -535,32 +537,46 @@ test('patches a bundled utility without rewriting its Page capsule or rotating t
     assert.equal(await readFile(capsulePath, 'utf8'), originalCapsule)
 })
 
-test('publishes Page styles before patches and clears removed imports without rewriting App styles', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'memory')
-    context.after(fixture.close)
-    const infoSource = await readFile(fixture.infoPath, 'utf8')
-    const appStyle = await readFile(fixture.appStylePath, 'utf8')
-    const globalPath = path.join(fixture.outDir, 'assets/global.wxss')
-    const globalInode = (await stat(globalPath)).ino
-    const stylePath = path.join(path.dirname(fixture.pagePath), 'index.css')
-    const outputPath = path.join(fixture.outDir, 'pages/home/index.wxss')
-    assert.equal(await readFile(outputPath, 'utf8'), '')
+for (const cssCodeSplit of [true, false]) {
+    test(`publishes styles before patches and clears removed imports with cssCodeSplit=${cssCodeSplit}`, async (context) => {
+        const fixture = await startDevFixture(
+            createLogger('silent'),
+            '127.0.0.1',
+            createOptions(),
+            'memory',
+            undefined,
+            undefined,
+            cssCodeSplit
+        )
+        context.after(fixture.close)
+        const infoSource = await readFile(fixture.infoPath, 'utf8')
+        const appStyle = await readFile(fixture.appStylePath, 'utf8')
+        const globalPath = path.join(fixture.outDir, 'assets/global.wxss')
+        const initialGlobalCss = await readFile(globalPath, 'utf8')
+        const stylePath = path.join(path.dirname(fixture.pagePath), 'index.css')
+        const pagePath = path.join(fixture.outDir, 'pages/home/index.wxss')
+        const outputPath = cssCodeSplit ? pagePath : globalPath
+        const unchangedPath = cssCodeSplit ? globalPath : pagePath
+        const unchangedInode = (await stat(unchangedPath)).ino
+        assert.equal(await readFile(pagePath, 'utf8'), '')
 
-    await writeFile(stylePath, '.page-local { padding: 4px; }')
-    await publishSourceGeneration(fixture.pagePath, `import './index.css';\n${renderPage('page CSS added')}`)
-    await waitForFile(fixture.patchesPath, (source) => source.includes('page CSS added'), maximumWaitAttempts)
-    const pageCss = await readFile(outputPath, 'utf8')
-    assert.match(pageCss, /\.page-local\s*\{\s*padding:\s*4rpx/)
-    assert.doesNotMatch(pageCss, /\.h5-span/)
-    assert.equal((await stat(globalPath)).ino, globalInode)
+        await writeFile(stylePath, '.page-local { padding: 4px; }')
+        await publishSourceGeneration(fixture.pagePath, `import './index.css';\n${renderPage('page CSS added')}`)
+        await waitForFile(fixture.patchesPath, (source) => source.includes('page CSS added'), maximumWaitAttempts)
+        const css = await readFile(outputPath, 'utf8')
+        assert.match(css, /\.page-local\s*\{\s*padding:\s*4rpx/)
+        assert.equal(css.includes('.h5-span'), !cssCodeSplit)
+        assert.equal((await stat(unchangedPath)).ino, unchangedInode)
 
-    await publishSourceGeneration(fixture.pagePath, renderPage('page CSS removed'))
-    await waitForFile(fixture.patchesPath, (source) => source.includes('page CSS removed'), maximumWaitAttempts)
-    assert.equal(await readFile(outputPath, 'utf8'), '')
-    assert.equal((await stat(globalPath)).ino, globalInode)
-    assert.equal(await readFile(fixture.infoPath, 'utf8'), infoSource)
-    assert.equal(await readFile(fixture.appStylePath, 'utf8'), appStyle)
-})
+        await publishSourceGeneration(fixture.pagePath, renderPage('page CSS removed'))
+        await waitForFile(fixture.patchesPath, (source) => source.includes('page CSS removed'), maximumWaitAttempts)
+        assert.equal(await readFile(pagePath, 'utf8'), '')
+        assert.equal(await readFile(globalPath, 'utf8'), initialGlobalCss)
+        assert.equal((await stat(unchangedPath)).ino, unchangedInode)
+        assert.equal(await readFile(fixture.infoPath, 'utf8'), infoSource)
+        assert.equal(await readFile(fixture.appStylePath, 'utf8'), appStyle)
+    })
+}
 
 // TODO: Re-enable once cold imports select the latest acknowledged factory instead of the disk baseline.
 // https://github.com/sep2/vite-plugin-taro/issues/32

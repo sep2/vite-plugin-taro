@@ -79,9 +79,6 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                     // Native Mini Program files are not served with HTTP gzip; reporting compressed sizes wastes build time.
                     reportCompressedSize: false,
                     modulePreload: false,
-                    // VPT projects native styles by App/Page ownership; Vite's browser CSS is only an intermediate carrier.
-                    cssCodeSplit: false,
-
                     // No base64 assets: Taro warns on image srcs above ~2KB, and inlined
                     // images bloat the JS bundle toward the mini program package limit.
                     assetsInlineLimit: 0,

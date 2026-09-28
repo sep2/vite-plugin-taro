@@ -28,8 +28,8 @@ async function importObservedPlugin() {
             transformers.push(transformer)
             return transformer
         }
-        export function projectMiniStyles(entries, styles, context) {
-            const projection = project(entries, styles, context)
+        export function projectMiniStyles(entries, styles, context, cssCodeSplit) {
+            const projection = project(entries, styles, context, cssCodeSplit)
             projections.push({ entries, projection })
             return projection
         }
@@ -68,7 +68,8 @@ async function importObservedPlugin() {
 async function createStyleFixture(
     testContext: TestContext,
     cssMinify: BuildOptions['cssMinify'],
-    entries: Parameters<typeof createMiniStylePlugin>[1]
+    entries: Parameters<typeof createMiniStylePlugin>[1],
+    build?: Pick<BuildOptions, 'cssCodeSplit'>
 ) {
     const plugin = createMiniStylePlugin(contract, entries)
     const cssPost: Plugin = { name: 'vite:css-post', transform: (code) => ({ code, map: null }) }
@@ -79,7 +80,7 @@ async function createStyleFixture(
     assert.ok(config && typeof config === 'object')
     assert.ok(typeof configResolved === 'function' && typeof buildStart === 'function')
     assert.ok(transform && typeof transform === 'object')
-    await Reflect.apply(config.handler, {}, [{ build: { cssMinify } }])
+    await Reflect.apply(config.handler, {}, [{ build: { cssMinify, ...build } }])
     // Retain diagnostics so tests can distinguish tolerated native CSS errors from rejected transactions.
     const errors: string[] = []
     const logger = createLogger('silent')
@@ -300,6 +301,53 @@ test('caches each Page independently, rewrites the shared candidate union, and c
     await fixture.update(code)
     assert.equal(fixture.published.length, 5)
 })
+
+test('cssCodeSplit:false publishes Page Tailwind updates globally and prunes removed imports without rewriting Page companions', async (context) => {
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']), {
+        cssCodeSplit: false
+    })
+    fixture.graph.set('/page.js', { importedIds: ['/page.css'], dynamicallyImportedIds: [] })
+    await fixture.capture('/app.css', '.app { color: red; }')
+    await fixture.transform('/page.css', tailwind(['py-5.5']))
+    fixture.graph.set('/page.css', { importedIds: [], dynamicallyImportedIds: [] })
+    const code = "const classes = 'py-5.5 mr-4.5'"
+    const initial = await fixture.update(code)
+    assert.equal(initial[0]!.code, "const classes = 'py-5_d5 mr-4.5'")
+    assert.match(fixture.published[0]!.source, /\.app/)
+    assert.match(fixture.published[0]!.source, /\.py-5_d5/)
+    assert.deepEqual(fixture.published[1], { fileName: 'pages/page-0/index.wxss', source: '' })
+
+    await fixture.transform('/page.css', tailwind(['mr-4.5']))
+    const updated = await fixture.update(code)
+    assert.equal(updated[0]!.code, "const classes = 'py-5.5 mr-4_d5'")
+    assert.equal(fixture.published[2]!.fileName, 'assets/global.wxss')
+    assert.match(fixture.published[2]!.source, /\.mr-4_d5/)
+    assert.doesNotMatch(fixture.published[2]!.source, /\.py-5_d5/)
+
+    fixture.graph.set('/page.js', { importedIds: [], dynamicallyImportedIds: [] })
+    assert.equal((await fixture.update(code))[0]!.code, code)
+    assert.equal(fixture.published.length, 4)
+    assert.deepEqual(fixture.published[3], {
+        fileName: 'assets/global.wxss',
+        source: `${miniHtmlBase}\n.app { color: red; }`
+    })
+    await fixture.update(code)
+    assert.equal(fixture.published.length, 4, 'Identical global CSS and empty Page companions must not be rewritten')
+})
+
+for (const cssCodeSplit of [undefined, true, false]) {
+    test(`defaults to split native styles and respects cssCodeSplit=${cssCodeSplit ?? 'default'}`, async (context) => {
+        const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']), {
+            cssCodeSplit
+        })
+        fixture.graph.set('/page.js', { importedIds: ['/page.css'], dynamicallyImportedIds: [] })
+        fixture.graph.set('/page.css', { importedIds: [], dynamicallyImportedIds: [] })
+        await fixture.capture('/page.css', '.page { color: red; }')
+        await fixture.update('export {}')
+        assert.equal(fixture.published[0]!.source.includes('.page'), cssCodeSplit === false)
+        assert.equal(fixture.published[1]!.source.includes('.page'), cssCodeSplit !== false)
+    })
+}
 
 test('retries a failed Page write without rewriting durable App CSS or delivering partial JavaScript', async (context) => {
     const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']))

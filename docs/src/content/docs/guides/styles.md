@@ -210,28 +210,31 @@ export default App
 
 ### 小程序与 Web 的区别
 
-Web 目标沿用 Vite 的 CSS 行为。小程序目标按 App 和页面的导入关系自动拆分样式，无需设置 `build.cssCodeSplit`：
+Web 目标沿用 Vite 的 CSS 行为。小程序通过 `build.cssCodeSplit` 控制样式范围，开发和生产构建使用同一设置：
 
-```text
-// wx
-dist/wx/app.wxss                  // 导入 assets/global.wxss
-dist/wx/assets/global.wxss        // App 样式与 HTML 显示默认值
-dist/wx/pages/home/index.wxss     // home 页面样式
-// zfb、tt 使用相同目录结构，扩展名分别为 .acss、.ttss
+| 设置 | 效果 |
+| --- | --- |
+| `true`（默认） | App 导入的样式全局生效；页面及其组件导入的其他样式仅在使用它们的页面生效。 |
+| `false` | 应用导入的所有样式全局生效，普通选择器可能影响其他页面。 |
+
+需要全局共享的样式，建议从 `src/app.tsx` 导入。也可以在 `vite.config.ts` 中关闭拆分：
+
+```ts
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+    build: {
+        cssCodeSplit: false
+    }
+})
 ```
 
-- App 及其依赖导入的样式属于全局样式；页面不会重复输出这些样式。
-- 页面及其组件导入的其余样式输出到对应页面。仅由多个页面共用的组件样式会分别输出到每个使用它的页面，不会自动提升为全局样式。
-- 普通 CSS、CSS Modules、预处理器和 Tailwind 都遵循这个归属规则。从 App 导入的 Tailwind 入口仍然生成全局工具类，不会按页面的 JSX 用量拆分工具类。
-- 动态导入分支的样式也随所属 App 或页面提前输出，不等待动态组件加载。
-- 删除某页最后一个样式导入后，该页样式文件会被清空；热更新只写入转换成功且内容发生变化的文件，并在这些样式写入后交付 JavaScript 补丁。
+两种设置都支持普通 CSS、CSS Modules、预处理器和 Tailwind；CSS Modules 的类名隔离不变。从 App 导入的 Tailwind 工具类始终全局可用。
 
-如果原来依赖某个页面导入的 CSS 为其他页面提供样式，请把该样式改为从 App 导入，或让每个使用它的页面明确导入。
-
-仓库中的 [`page-styles-demo`](https://github.com/sep2/vite-plugin-taro/tree/main/demo/page-styles-demo) 提供同名选择器冲突、共享组件、CSS Modules、动态导入和空样式页面的完整示例，并附带三个小程序目标的构建测试及原生开发者工具热更新检查清单。
+完整示例见 [`page-styles-demo`](https://github.com/sep2/vite-plugin-taro/tree/main/demo/page-styles-demo)。
 
 :::note
-原生组件自带的 `.wxss`、`.acss` 或 `.ttss` 会继续跟随原生组件输出，不参与 React 应用的 App / 页面样式拆分。
+原生组件自带的样式不受此设置影响。
 :::
 
 ## 尺寸单位与动态样式
