@@ -99,7 +99,8 @@ async function startDevFixture(
     bundleOutput: 'memory' | 'capsule' | 'disk',
     publicAsset?: { fileName: string; source: string },
     initialSources?: Readonly<Record<string, string>>,
-    cssCodeSplit?: boolean
+    cssCodeSplit?: boolean,
+    watchPageFromCapsule?: boolean
 ): Promise<DevFixture> {
     const persistedBundleFiles = bundleOutput === 'capsule' ? [pageCapsuleFileName] : []
     const root = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-dev-test-'))
@@ -156,6 +157,17 @@ async function startDevFixture(
             customLogger: logger,
             plugins: [
                 vpt(options),
+                {
+                    name: 'test:page-capsule-dependency',
+                    transform: {
+                        order: 'post',
+                        handler(_code, id) {
+                            if (watchPageFromCapsule && id.startsWith(`${miniPageCapsuleId}?`)) {
+                                this.addWatchFile(pagePath)
+                            }
+                        }
+                    }
+                },
                 {
                     name: 'test:capsule-layout',
                     configureServer(server) {
@@ -1277,14 +1289,24 @@ test('reports a failed physical patch transaction through the serialized host bo
     await mkdir(hmrDirectory, { recursive: true })
 })
 
-test('resumes wx patch publication after a transient syntax error', async (context) => {
-    // This request-local trace proves the invalid generation reached the host before recovery is attempted.
+test('recovers a republished Page capsule without invalidating the native shell', async (context) => {
+    // Rolldown includes watched transform dependencies in the changed set and retries them after a failed scan.
+    // Register the Page source as a capsule dependency to make the observed recovery path deterministic.
     const errors: string[] = []
     const logger = createLogger('silent')
     logger.error = (message) => {
         errors.push(message)
     }
-    const fixture = await startDevFixture(logger, '127.0.0.1', createOptions(), 'memory')
+    const fixture = await startDevFixture(
+        logger,
+        '127.0.0.1',
+        createOptions(),
+        'memory',
+        undefined,
+        undefined,
+        undefined,
+        true
+    )
     context.after(fixture.close)
 
     const initialInfoSource = await waitForFile(
@@ -1292,7 +1314,16 @@ test('resumes wx patch publication after a transient syntax error', async (conte
         (source) => source.includes('buildId'),
         maximumWaitAttempts
     )
-    // Test two complete editor generations; truncate/write event coalescing has its own regression above.
+    // With the same watched dependency, a healthy edit leaves the capsule's output unchanged; Rolldown suppresses it.
+    await publishSourceGeneration(fixture.pagePath, renderPage('healthy edit'))
+    const healthyPatches = await waitForFile(
+        fixture.patchesPath,
+        (source) => source.includes('healthy edit'),
+        maximumWaitAttempts
+    )
+    assert.doesNotMatch(healthyPatches, /changedIds: \[[^\]]*"src\/runtime\/mini\/capsule\/page\.ts\?route=/)
+
+    // A failed partial scan retains the old graph and queues the affected modules for retry.
     await publishSourceGeneration(
         fixture.pagePath,
         `
@@ -1314,6 +1345,15 @@ test('resumes wx patch publication after a transient syntax error', async (conte
         maximumWaitAttempts
     )
 
-    assert.match(recoveredPatches, /recovered hot generation/)
+    const recoveredPatch = recoveredPatches.match(/\{seq: 2, changedIds: [\s\S]*$/)?.[0]
+    assert.ok(recoveredPatch, 'Recovery must publish the second patch')
+    assert.match(recoveredPatch, /recovered hot generation/)
+    assert.match(
+        recoveredPatch,
+        /changedIds: \[[^\]]*"src\/runtime\/mini\/capsule\/page\.ts\?route=pages%2Fhome%2Findex"/
+    )
+    assert.match(recoveredPatch, /registerFactory\("src\/runtime\/mini\/capsule\/page\.ts\?route=pages%2Fhome%2Findex"/)
+    assert.match(recoveredPatch, /hot_page\.accept\(\)/)
+    assert.doesNotMatch(recoveredPatch, /registerFactory\("[^"]*src\/runtime\/mini\/native\/page\.ts/)
     assert.equal(await readFile(fixture.infoPath, 'utf8'), initialInfoSource)
 })

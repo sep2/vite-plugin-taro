@@ -56,14 +56,10 @@ export async function runLoanHmrCases(context: HmrContext): Promise<void> {
     assert.equal(await context.devTools.readConsoleErrors(), '')
 }
 
-/** Repeats recovery in one App session to catch intermittent Page capsule invalidation without unrelated edit flows. */
+/** Verifies the real DevTools recovery path once; the Rolldown capsule path has a deterministic host regression. */
 export async function runLoanHmrRecoveryCase(context: HmrContext): Promise<void> {
     await prepareCalculator(context)
-    const iterations = 12
-    for (const index of Array.from({ length: iterations }, (_, index) => index)) {
-        console.log(`[loan-hmr] recovery iteration ${index + 1}/${iterations}`)
-        await runRecoveryFlow(context)
-    }
+    await runRecoveryFlow(context)
     assert.equal(await context.devTools.readConsoleErrors(), '')
 }
 
