@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -14,6 +13,7 @@ import {
 } from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
 import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
 import { createNativeDevRuntime } from '../../../tests/create-native-dev-runtime.ts'
+import { publishSourceGeneration } from '../../../tests/publish-source-generation.ts'
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
 import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
@@ -90,17 +90,6 @@ function renderPage(marker: string): string {
             return <View>{${JSON.stringify(marker)} + suffix}</View>
         }
     `
-}
-
-/** Publishes one complete editor generation without exposing writeFile's intermediate truncation state to the watcher. */
-async function publishSourceGeneration(filePath: string, source: string): Promise<void> {
-    const temporaryPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.${randomUUID()}.txt`)
-    try {
-        await writeFile(temporaryPath, source)
-        await rename(temporaryPath, filePath)
-    } finally {
-        await rm(temporaryPath, { force: true })
-    }
 }
 
 async function startDevFixture(

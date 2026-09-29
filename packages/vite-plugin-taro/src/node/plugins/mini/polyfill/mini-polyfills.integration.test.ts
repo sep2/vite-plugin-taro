@@ -10,6 +10,7 @@ import { parseSync } from 'rolldown/utils'
 import { build, createServer, normalizePath, type Plugin } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { interpreterServerEvent } from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
+import { publishSourceGeneration } from '../../../tests/publish-source-generation.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
 import { miniPolyfillsId, rolldownRuntimeId, vptGlobalBindingId } from '../module/module.ts'
@@ -28,11 +29,7 @@ async function compileFixture(
     target: MiniTarget,
     mode: Mode,
     polyfills: readonly string[],
-    onDevReady?: (
-        chunks: readonly NativeFile[],
-        root: string,
-        replaceWatchedFile: (fileName: string, source: string) => Promise<void>
-    ) => Promise<void>
+    onDevReady?: (chunks: readonly NativeFile[], root: string) => Promise<void>
 ): Promise<readonly NativeFile[]> {
     const root = await mkdtemp(path.join(packageRoot, '.vpt-polyfills-test-'))
     const pagePath = normalizePath(path.join(root, 'src/pages/home/index.tsx'))
@@ -219,15 +216,7 @@ async function compileFixture(
             const server = await createServer(config)
             try {
                 await server.listen()
-                const replaceWatchedFile = async (fileName: string, source: string): Promise<void> => {
-                    // Manual publication isolates the HMR assertion from Chokidar's platform-specific rename event sequences.
-                    // The write completes before one deterministic change event lets every Vite watcher read the final source.
-                    const normalizedFileName = normalizePath(fileName)
-                    server.watcher.unwatch(normalizedFileName)
-                    await writeFile(normalizedFileName, source)
-                    server.watcher.emit('change', normalizedFileName)
-                }
-                await onDevReady?.(await output.promise, root, replaceWatchedFile)
+                await onDevReady?.(await output.promise, root)
             } finally {
                 await server.close()
             }
@@ -631,7 +620,7 @@ for (const target of miniTargets) {
 
 for (const target of miniTargets) {
     test(`${target}: a real React Refresh patch uses the recovered host even with a frozen prototype`, async () => {
-        await compileFixture(target, 'devtools', [], async (chunks, root, replaceWatchedFile) => {
+        await compileFixture(target, 'devtools', [], async (chunks, root) => {
             const patchesPath = path.join(root, 'dist/hmr/patches.js')
             await waitForPatchSource(patchesPath, 'module.exports')
             const runtimes = [false, true].map((restricted) => {
@@ -656,7 +645,7 @@ for (const target of miniTargets) {
                 // Both cold and patched Refresh boundaries must arm their next accept callback in a microtask.
                 await Promise.resolve()
                 const marker = `refreshed page ${seq}`
-                await replaceWatchedFile(
+                await publishSourceGeneration(
                     pagePath,
                     `export default function Home() { return ${JSON.stringify(marker)} }`
                 )
