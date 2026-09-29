@@ -292,7 +292,8 @@ function createAppRuntime(chunks: readonly NativeFile[], nativeURLs: boolean, ta
     const host = { connectSocket: () => socket }
     const context = createContext(
         {
-            console,
+            // Taro's development renderer advertises DevTools on every isolated startup; only diagnostics matter here.
+            console: { ...console, info() {} },
             setTimeout,
             clearTimeout,
             wx: host,

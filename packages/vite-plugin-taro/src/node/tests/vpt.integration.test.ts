@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import type { OutputAsset, OutputChunk } from 'rolldown'
-import { type BuildOptions, createLogger, normalizePath, build as viteBuild } from 'vite'
+import { type BuildOptions, normalizePath, build as viteBuild } from 'vite'
 import vpt, { type VptOptions, type VptTarget } from '../../index.ts'
 import { packageRequire } from '../utils/packages.ts'
 
@@ -43,7 +43,7 @@ async function inspectFixtureBuild<Result>(
         const result = await viteBuild({
             root,
             configFile: false,
-            customLogger: createLogger('silent'),
+            logLevel: 'silent',
             plugins: vpt(fixture.options),
             build: {
                 minify: false,
