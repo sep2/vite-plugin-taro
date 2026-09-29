@@ -1,3 +1,6 @@
+# Keep text files LF on every platform so Git checkouts match .editorconfig and Biome.
+* text=auto eol=lf
+
 # Patch files must keep LF line endings. CRLF checkout makes git apply
 # treat blank context lines inside hunks as corrupt patches on Windows.
 patches/*.patch text eol=lf
