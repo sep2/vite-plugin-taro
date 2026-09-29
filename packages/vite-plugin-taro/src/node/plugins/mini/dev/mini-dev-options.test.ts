@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import test, { type TestContext } from 'node:test'
 import { runInNewContext } from 'node:vm'
@@ -12,7 +13,7 @@ import {
     type RolldownOutput
 } from 'rolldown'
 import { dev } from 'rolldown/experimental'
-import { type BuildOptions, createLogger, createServer } from 'vite'
+import { type BuildOptions, createServer } from 'vite'
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
 import { createZfbMiniContract } from '../../zfb/plugins.ts'
@@ -49,7 +50,7 @@ async function createOptionsServer(context: TestContext, build: BuildOptions) {
     const server = await createServer({
         root: packageRoot,
         configFile: false,
-        customLogger: createLogger('silent'),
+        logLevel: 'silent',
         optimizeDeps: { noDiscovery: true, include: [] },
         server: { watch: null },
         build
@@ -57,6 +58,94 @@ async function createOptionsServer(context: TestContext, build: BuildOptions) {
     context.after(() => server.close())
     assert.equal(server.environments.client.depsOptimizer, undefined)
     return server
+}
+
+for (const logLevel of [undefined, 'info', 'warn', 'error', 'silent'] as const) {
+    test(`native build reporting respects ${logLevel ?? 'default'} logging`, () => {
+        // Native progress writes bypass JS stdout mocks. Capture a separate process without node:test's worker protocol.
+        const result = spawnSync(
+            process.execPath,
+            [
+                '--input-type=module',
+                '--eval',
+                `
+                    import { mkdtemp, rm } from 'node:fs/promises'
+                    import { tmpdir } from 'node:os'
+                    import path from 'node:path'
+                    import { build } from 'rolldown'
+                    import { createServer } from 'vite'
+                    import { createMiniDevOptionsPlugin, requireSingleOutput } from ${JSON.stringify(new URL('./mini-dev-options.ts', import.meta.url).href)}
+                    import { createDevtoolsHmrMode } from ${JSON.stringify(new URL('./modes/devtools/devtools-hmr-mode.ts', import.meta.url).href)}
+
+                    const outDir = await mkdtemp(path.join(tmpdir(), 'vpt-reporter-'))
+                    const server = await createServer({
+                        configFile: false,
+                        logLevel: ${JSON.stringify(logLevel)},
+                        optimizeDeps: { noDiscovery: true, include: [] },
+                        server: { watch: null }
+                    })
+                    try {
+                        const plugin = createMiniDevOptionsPlugin({
+                            server,
+                            contract: ${JSON.stringify(options)},
+                            hmrMode: createDevtoolsHmrMode(${JSON.stringify(runtimeModules.devtoolsHmrRuntime)})
+                        })
+                        const adapted = await plugin.options({
+                            output: {},
+                            plugins: [{
+                                name: 'test:reporter-source',
+                                resolveId() { return 'virtual:reporter-fixture' },
+                                load() { return 'export const answer = 42' }
+                            }]
+                        })
+                        await build({
+                            ...adapted,
+                            input: { 'reporter-fixture': 'virtual:reporter-fixture' },
+                            // This build exercises the real native reporter, not application HMR runtime execution.
+                            experimental: {},
+                            output: { ...requireSingleOutput(adapted), dir: outDir }
+                        })
+                        server.config.logger.warn('reporter warning marker')
+                        server.config.logger.error('reporter error marker')
+                    } finally {
+                        await server.close()
+                        await rm(outDir, { recursive: true, force: true })
+                    }
+                `
+            ],
+            {
+                cwd: packageRoot,
+                encoding: 'utf8',
+                env: { ...process.env, CI: 'true', NODE_TEST_CONTEXT: undefined },
+                timeout: 15_000
+            }
+        )
+        const output = result.stdout + result.stderr
+        assert.ifError(result.error)
+        assert.equal(result.signal, null)
+        assert.equal(result.status, 0, output)
+        if (logLevel === undefined || logLevel === 'info') {
+            assert.match(output, /transforming\.\.\./)
+            assert.match(output, /\d+ modules transformed/)
+            assert.match(output, /rendering chunks\.\.\./)
+            assert.match(output, /reporter-fixture\.js/, 'The native reporter must forward its output summary to Vite')
+        } else {
+            assert.doesNotMatch(
+                output,
+                /transforming\.\.\.|modules? transformed|rendering chunks\.\.\.|reporter-fixture\.js/
+            )
+        }
+        if (logLevel === 'silent' || logLevel === 'error') {
+            assert.doesNotMatch(output, /reporter warning marker/)
+        } else {
+            assert.match(output, /reporter warning marker/)
+        }
+        if (logLevel === 'silent') {
+            assert.equal(output, '')
+        } else {
+            assert.match(output, /reporter error marker/)
+        }
+    })
 }
 
 function createPreRenderedChunk(name: string): PreRenderedChunk {
@@ -226,16 +315,13 @@ test('executes generated development code with a bundled runtime and no ambient 
             createMiniDevOptionsPlugin({ server, contract: options, hmrMode }),
             {
                 name: 'test:runtime-output',
-                options(input) {
+                options() {
                     assert.equal(output.format, 'es')
                     assert.equal(output.minify, true)
                     assert.equal(output.keepNames, true)
                     assert.equal(output.sourcemap, false)
                     // Stand in for Mini's late CommonJS conversion so the generated runtime can execute in an isolated VM.
                     output.format = 'cjs'
-                    // Exercise the adapted runtime/output with virtual sources only. The native reporter writes directly to stdout,
-                    // which can corrupt node:test's serialized worker protocol; presentation is not part of runtime execution.
-                    return { ...input, plugins: [sourcePlugin] }
                 }
             }
         ]

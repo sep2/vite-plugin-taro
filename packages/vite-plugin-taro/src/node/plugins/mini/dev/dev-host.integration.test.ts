@@ -152,6 +152,7 @@ async function startDevFixture(
         createServer({
             root,
             configFile: false,
+            logLevel: 'silent',
             customLogger: logger,
             plugins: [
                 vpt(options),
@@ -442,7 +443,7 @@ test('rejects a server without Vite bundled development ownership', async (conte
     } satisfies Pick<MiniContract, 'options' | 'styles'>
     const server = await createServer({
         configFile: false,
-        customLogger: createLogger('silent'),
+        logLevel: 'silent',
         // Ownership validation needs no watcher or dependency cache in the real workspace.
         optimizeDeps: { noDiscovery: true, include: [] },
         server: { watch: null }
@@ -491,6 +492,7 @@ test('rejects startup without removing the last complete output on failure', asy
     const server = await createServer({
         root,
         configFile: false,
+        logLevel: 'silent',
         customLogger: logger,
         plugins: [failOutput, vpt(createOptions())],
         build: { outDir: path.join(root, 'dist') },

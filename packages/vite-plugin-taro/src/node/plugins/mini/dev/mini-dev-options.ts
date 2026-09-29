@@ -127,13 +127,15 @@ function ensureSingleOutput(rolldownOptions: RolldownOptions): OutputOptions {
 }
 
 function createViteReporter(server: ViteDevServer) {
-    const { build, logger, root } = server.config
+    const { build, logger, logLevel, root } = server.config
+
     return viteReporterPlugin({
         assetsDir: path.join(build.assetsDir, '/'),
         chunkLimit: 2000,
         isLib: Boolean(build.lib),
         isTty: Boolean(process.stdout.isTTY && !process.env.CI),
-        logInfo: (message) => logger.info(message),
+        // The callback's presence enables native progress output; a silent logger alone cannot suppress it.
+        logInfo: (logLevel ?? 'info') === 'info' ? (message) => logger.info(message) : undefined,
         reportCompressedSize: false,
         root,
         warnLargeChunks: false
