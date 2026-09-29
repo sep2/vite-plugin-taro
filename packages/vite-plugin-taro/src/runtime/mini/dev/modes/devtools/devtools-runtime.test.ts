@@ -329,7 +329,7 @@ function createPatch({
         factory(): void {
             onRegister?.()
             runtime.registerGraph({ ids: [moduleId], localCount: 1, edges: [[]], dynamicEdges: [[]] })
-            runtime.registerFactory(moduleId, 'esm', (id) => {
+            runtime.registerFactory(moduleId, (id) => {
                 onExecute?.()
                 runtime.registerModule(id, { exports: moduleExports })
                 const hotContext = runtime.createModuleHotContext(id)
@@ -519,7 +519,7 @@ test('passes the receiving runtime to patch factories and their retained module 
                 changedIds: ['page'],
                 factory(receivingRuntime) {
                     assert.strictEqual(receivingRuntime, runtime)
-                    receivingRuntime.registerFactory('page', 'esm', (moduleId) => {
+                    receivingRuntime.registerFactory('page', (moduleId) => {
                         receivingRuntime.registerModule(moduleId, { exports: { value: 'new' } })
                         receivingRuntime.createModuleHotContext(moduleId).accept()
                     })
@@ -1134,10 +1134,10 @@ test('bubbles a dependency update to the nearest accepting importer', async () =
                         edges: [[1], []],
                         dynamicEdges: [[], []]
                     })
-                    runtime.registerFactory('dependency', 'esm', (id) => {
+                    runtime.registerFactory('dependency', (id) => {
                         runtime.registerModule(id, { exports: { value: 'new dependency' } })
                     })
-                    runtime.registerFactory('page', 'esm', (id) => {
+                    runtime.registerFactory('page', (id) => {
                         const dependencyExports: unknown = runtime.initModule('dependency')
                         assert.ok(
                             dependencyExports &&
@@ -1194,21 +1194,21 @@ test('applies a converging dependency graph once at its shared accepting boundar
                 changedIds: ['dependency'],
                 factory(): void {
                     runtime.registerGraph(graph)
-                    runtime.registerFactory('dependency', 'esm', (id) => {
+                    runtime.registerFactory('dependency', (id) => {
                         countExecution(id)
                         runtime.registerModule(id, { exports: { value: 'new' } })
                     })
-                    runtime.registerFactory('left', 'esm', (id) => {
+                    runtime.registerFactory('left', (id) => {
                         countExecution(id)
                         const dependency = runtime.initModule('dependency')
                         runtime.registerModule(id, { exports: { value: `left:${readValue(dependency)}` } })
                     })
-                    runtime.registerFactory('right', 'esm', (id) => {
+                    runtime.registerFactory('right', (id) => {
                         countExecution(id)
                         const dependency = runtime.initModule('dependency')
                         runtime.registerModule(id, { exports: { value: `right:${readValue(dependency)}` } })
                     })
-                    runtime.registerFactory('boundary', 'esm', (id) => {
+                    runtime.registerFactory('boundary', (id) => {
                         countExecution(id)
                         const left = runtime.initModule('left')
                         const right = runtime.initModule('right')
@@ -1256,7 +1256,7 @@ test('requests a rebuild before eviction when any propagated module lacks a fres
                 changedIds: ['dependency'],
                 factory(): void {
                     runtime.registerGraph(graph)
-                    runtime.registerFactory('dependency', 'esm', (id) => {
+                    runtime.registerFactory('dependency', (id) => {
                         runtime.registerModule(id, { exports: { value: 'new dependency' } })
                     })
                 }
@@ -1296,10 +1296,10 @@ test('ignores a Page self-import while propagating to its accepting boundary', a
                 changedIds: ['dependency'],
                 factory(): void {
                     runtime.registerGraph(graph)
-                    runtime.registerFactory('dependency', 'esm', (id) => {
+                    runtime.registerFactory('dependency', (id) => {
                         runtime.registerModule(id, { exports: { value: 'new' } })
                     })
-                    runtime.registerFactory('page', 'esm', (id) => {
+                    runtime.registerFactory('page', (id) => {
                         const dependency = runtime.initModule('dependency')
                         runtime.registerModule(id, { exports: { value: `page:${readValue(dependency)}` } })
                         runtime.createModuleHotContext(id).accept()
@@ -1336,10 +1336,10 @@ test('requests a rebuild for circular propagation without an accepting boundary'
                 changedIds: ['a'],
                 factory(): void {
                     runtime.registerGraph(graph)
-                    runtime.registerFactory('a', 'esm', (id) => {
+                    runtime.registerFactory('a', (id) => {
                         runtime.registerModule(id, { exports: { value: 'new a' } })
                     })
-                    runtime.registerFactory('b', 'esm', (id) => {
+                    runtime.registerFactory('b', (id) => {
                         runtime.registerModule(id, { exports: { value: 'new b' } })
                     })
                 }

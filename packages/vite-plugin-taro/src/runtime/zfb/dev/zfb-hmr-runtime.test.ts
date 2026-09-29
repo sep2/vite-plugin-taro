@@ -96,7 +96,7 @@ test('adapts the Alipay socket while installing both patch modes on the shared r
                             type: 'Patch',
                             seq: 1,
                             changedIds: ['new-module'],
-                            code: "queueMicrotask(() => {}); __rolldown_runtime__.registerFactory('new-module', 'esm', () => {})"
+                            code: "queueMicrotask(() => {}); __rolldown_runtime__.registerFactory('new-module', () => {})"
                         }
                     ]
                 }

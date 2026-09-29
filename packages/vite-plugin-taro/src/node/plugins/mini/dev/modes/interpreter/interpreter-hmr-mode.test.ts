@@ -8,7 +8,7 @@ const runtimeFile = '/runtime/interpreter-runtime.ts'
 
 const patch: PatchUpdate = {
     type: 'Patch',
-    code: '__rolldown_runtime__.registerFactory("feature", "esm", factory)',
+    code: '__rolldown_runtime__.registerFactory("feature", factory)',
     filename: 'feature.js',
     changedIds: ['feature'],
     seq: 1

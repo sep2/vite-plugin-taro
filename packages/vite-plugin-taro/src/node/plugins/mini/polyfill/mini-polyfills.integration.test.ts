@@ -488,7 +488,7 @@ for (const target of miniTargets) {
                             __rolldown_runtime__.createModuleHotContext('probe').accept();
                         `)
                         runtime.sendPatch(`
-                            __rolldown_runtime__.registerFactory('probe', 'esm', function(moduleId) {
+                            __rolldown_runtime__.registerFactory('probe', function(moduleId) {
                                 __rolldown_runtime__.registerModule(moduleId, { exports: {
                                     href: new URL('child', 'https://example.com/dir/page').href,
                                     clone: structuredClone({ value: [1, 2].at(-1) })

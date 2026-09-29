@@ -171,13 +171,18 @@ test('public packages preserve their published entrypoints and scaffold dependen
                     listFiles(projectPath),
                     packageManager === 'pnpm' ? ['package.json', 'pnpm-workspace.yaml'] : ['package.json']
                 )
-                const project: { private: boolean; version: string; devDependencies: Record<string, string> } =
-                    JSON.parse(readFileSync(path.join(projectPath, 'package.json'), 'utf8'))
+                const project: {
+                    private: boolean
+                    version: string
+                    devDependencies: Record<string, string>
+                    overrides: Record<string, string>
+                } = JSON.parse(readFileSync(path.join(projectPath, 'package.json'), 'utf8'))
                 assert.equal(project.private, true)
                 assert.equal(project.version, '0.0.0')
                 assert.equal(project.devDependencies['vite-plugin-taro'], `^${version}`)
                 assert.equal(project.devDependencies.vite, pluginPackage.peerDependencies.vite)
                 assert.equal(project.devDependencies.rolldown, pluginPackage.dependencies.rolldown)
+                assert.equal(project.overrides.rolldown, '$rolldown')
                 assert.ok(output.includes(`  ${packageManager ?? 'npm'} install\n`))
                 const run = packageManager === 'pnpm' || packageManager === 'yarn' ? '' : 'run '
                 assert.ok(output.includes(`  ${packageManager ?? 'npm'} ${run}dev:tt\n`))

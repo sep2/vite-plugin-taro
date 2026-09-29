@@ -119,7 +119,7 @@ function registerInitialBoundary(runtime: TestRuntime, callback: (moduleExports:
 
 const interpretedCode = `
 __rolldown_runtime__.registerGraph({ ids: ['page'], localCount: 1, edges: [[]], dynamicEdges: [[]] });
-__rolldown_runtime__.registerFactory('page', 'esm', function (moduleId) {
+__rolldown_runtime__.registerFactory('page', function (moduleId) {
     __rolldown_runtime__.registerModule(moduleId, { exports: { value: 'interpreted' } });
     __rolldown_runtime__.createModuleHotContext(moduleId).accept();
 });
@@ -172,7 +172,7 @@ test('reads live app globals while retaining patch-local bindings outside the ho
                 changedIds: ['page'],
                 code: `
                 var __vpt_patch_local__ = __vpt_late_api__();
-                __rolldown_runtime__.registerFactory('page', 'esm', function(moduleId) {
+                __rolldown_runtime__.registerFactory('page', function(moduleId) {
                     __rolldown_runtime__.registerModule(moduleId, { exports: {
                         value: __vpt_patch_local__,
                         host: globalThis,
@@ -214,7 +214,7 @@ for (const ambient of ['undefined', 'another runtime'] as const) {
                         seq: 1,
                         changedIds: ['page'],
                         code: `
-                        __rolldown_runtime__.registerFactory('page', 'esm', function(moduleId) {
+                        __rolldown_runtime__.registerFactory('page', function(moduleId) {
                             __rolldown_runtime__.registerModule(moduleId, { exports: {
                                 readRuntime: () => __rolldown_runtime__
                             } });
