@@ -641,6 +641,8 @@ for (const target of miniTargets) {
                 return runtime
             })
             const pagePath = normalizePath(path.join(root, 'src/pages/home/index.tsx'))
+            // Rolldown's default cwd is the test process cwd; the emitted Page module ID is relative to it.
+            const pageModuleId = normalizePath(path.relative(process.cwd(), pagePath))
             for (const seq of [1, 2]) {
                 // Both cold and patched Refresh boundaries must arm their next accept callback in a microtask.
                 await Promise.resolve()
@@ -653,18 +655,24 @@ for (const target of miniTargets) {
                 assert.match(source, /validateRefreshBoundaryAndEnqueueUpdate/)
                 assert.doesNotMatch(source, /vpt\.fake\.global|__VPT_GLOBAL__/)
                 for (const runtime of runtimes) {
-                    // Keep the real factory and changed IDs; only the fixture socket uses a deterministic build ID.
-                    const rendered = runtime.read(`(() => {
+                    // Keep real factories and IDs; append the observed empty-update shape after the final edit.
+                    // That transport patch must not determine which module's exports the test reads.
+                    const result: unknown = runtime.read(`(() => {
                         const module = { exports: {} };
                         ${source}
+                        const patches = module.exports.patches;
+                        if (${seq === 2}) {
+                            patches.push({ seq: patches[patches.length - 1].seq + 1, changedIds: [], factory() {} });
+                        }
                         const runtime = sharedGlobal.__rolldown_runtime__;
                         runtime.applyPatches({ ...module.exports, buildId: 'test' });
-                        const patches = module.exports.patches;
-                        return runtime.loadExports(patches[patches.length - 1].changedIds[0]).default();
+                        return [runtime.loadExports(${JSON.stringify(pageModuleId)}).default(), patches[patches.length - 1].seq];
                     })()`)
+                    assert.ok(Array.isArray(result) && typeof result[0] === 'string' && typeof result[1] === 'number')
+                    const [rendered, appliedSeq] = result
                     const reports = runtime.reports.map((report) => JSON.parse(report).data)
                     assert.ok(
-                        reports.some((report) => report.kind === 'applied' && report.seq === seq),
+                        reports.some((report) => report.kind === 'applied' && report.seq === appliedSeq),
                         JSON.stringify(reports)
                     )
                     assert.equal(
