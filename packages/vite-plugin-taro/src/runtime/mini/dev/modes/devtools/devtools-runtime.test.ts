@@ -1314,6 +1314,50 @@ test('ignores a Page self-import while propagating to its accepting boundary', a
     assertNoRebuild(getNewReports(reports, reportCount))
 })
 
+test('accepts a recovered Page capsule without bubbling into its passive native shell', async () => {
+    const { reports, runtime } = await createTestHarness()
+    const graph = {
+        ids: ['component', 'capsule', 'native-shell'],
+        localCount: 3,
+        edges: [[], [0], [1]],
+        dynamicEdges: [[], [], []]
+    }
+    runtime.registerGraph(graph)
+    runtime.registerModule('component', { exports: { value: 'old' } })
+    runtime.registerModule('capsule', { exports: { value: 'capsule:old' } })
+    runtime.registerModule('native-shell', { exports: { value: 'shell:old' } })
+    runtime.createModuleHotContext('component').accept()
+    runtime.createModuleHotContext('capsule').accept()
+    const reportCount = reports.length
+
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            {
+                seq: 1,
+                changedIds: ['capsule', 'component'],
+                factory(): void {
+                    runtime.registerGraph(graph)
+                    runtime.registerFactory('component', (id) => {
+                        runtime.registerModule(id, { exports: { value: 'recovered' } })
+                        runtime.createModuleHotContext(id).accept()
+                    })
+                    runtime.registerFactory('capsule', (id) => {
+                        const component = runtime.initModule('component')
+                        runtime.registerModule(id, { exports: { value: `capsule:${readValue(component)}` } })
+                        runtime.createModuleHotContext(id).accept()
+                    })
+                }
+            }
+        ]
+    })
+
+    assert.deepEqual(runtime.loadExports('capsule'), { value: 'capsule:recovered' })
+    assert.deepEqual(runtime.loadExports('native-shell'), { value: 'shell:old' })
+    assertApplied(getNewReports(reports, reportCount), 1)
+    assertNoRebuild(getNewReports(reports, reportCount))
+})
+
 test('requests a rebuild for circular propagation without an accepting boundary', async (context) => {
     context.mock.method(console, 'warn', () => {})
     const { reports, runtime } = await createTestHarness()

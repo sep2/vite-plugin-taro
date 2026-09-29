@@ -22,6 +22,9 @@ export function injectDevPageComponent({
         filename: capsuleId,
         sourcemap: false,
         createVisitor(editor) {
+            // A recovered Page transform can republish the generated capsule as a changed root. Its static Page config is
+            // unchanged; accept that update here instead of bubbling into the passive native Page shell and reloading the App.
+            editor.appendRight(capsuleCode.length, '\nimport.meta.hot.accept()\n')
             return (node) => {
                 if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier') {
                     return

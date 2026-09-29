@@ -70,7 +70,11 @@ async function bundleRuntimeEntry({
         input,
         plugins: [mockPlugin],
         transform: {
-            define: { ...defines }
+            // The standalone CJS build has no DevRuntime; only a serve capsule receives import.meta.hot.
+            define: {
+                ...defines,
+                ...(servePageModuleId ? { 'import.meta.hot': 'globalThis.harness.hot' } : {})
+            }
         },
         output: {
             exports: 'named',
@@ -371,6 +375,7 @@ test('mounts the current Page export instead of the cold native capsule baseline
     const harness = {
         PageComponent: BaselinePage,
         createPageConfig: recordCall(calls, 'createPageConfig', config),
+        hot: { accept: recordCall(calls, 'accept', undefined) },
         runtime: {
             resolvePageComponent: (id: string, baseline: unknown) => {
                 assert.equal(id, 'src/pages/home/index.tsx')
@@ -398,7 +403,10 @@ test('mounts the current Page export instead of the cold native capsule baseline
     const exports = executeRuntimeEntry(code, context)
     assert.strictEqual(exports.default, config)
     assert.strictEqual(calls[0]?.args[0], LatestPage)
-    assert.equal(calls.length, 1)
+    assert.deepEqual(
+        calls.map(({ name }) => name),
+        ['createPageConfig', 'accept']
+    )
 })
 
 test('preserves WX capsule runtime initialization order and export identities', async () => {

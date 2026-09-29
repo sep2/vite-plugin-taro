@@ -13,7 +13,7 @@ test('resolves a patched Page only in the transformed serve capsule', () => {
         /__rolldown_runtime__\.resolvePageComponent\("src\/pages\/mirror\/index\.tsx", PageComponent\)/
     )
     assert.doesNotMatch(result.code, /vptGlobal|Reflect\.get|import\.meta\.env/)
-    assert.ok(result.code.endsWith('"pages/mirror/index")'))
+    assert.match(result.code, /"pages\/mirror\/index"\)\nimport\.meta\.hot\.accept\(\)\n$/)
     assert.equal(result.map, null)
 })
 
@@ -32,6 +32,7 @@ test('selects the Page component by syntax rather than whitespace or text in com
     assert.match(result.code, /PageComponent\) \/\* after the component \*\//)
     assert.match(result.code, /\/\/ createPageConfig\(PageComponent, 'not a call'\)/)
     assert.equal(result.code.split('resolvePageComponent(').length - 1, 1)
+    assert.equal(result.code.split('import.meta.hot.accept()').length - 1, 1)
 })
 
 test('rejects a changed Page capsule contract', () => {

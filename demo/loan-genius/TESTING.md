@@ -40,11 +40,12 @@ pnpm build:loan-genius:h5
 pnpm build:plugin
 wechatide auth -c Pi
 pnpm test:loan-genius:hmr
+pnpm test:loan-genius:hmr:recovery
 pnpm test:loan-genius:hmr:restart
 pnpm test:loan-genius:watch-restart
 ```
 
-首次授权时按开发者工具提示确认。测试默认使用 `Pi` 客户端；如果已授权的名称不同，请在运行测试前设置环境变量 `VPT_LOAN_HMR_DEVTOOLS_CLIENT`。两个 `restart` 命令都会把替换进程的首次构建延迟三秒，以覆盖旧产物仍在磁盘上的启动窗口。
+首次授权时按开发者工具提示确认。测试默认使用 `Pi` 客户端；如果已授权的名称不同，请在运行测试前设置环境变量 `VPT_LOAN_HMR_DEVTOOLS_CLIENT`。`hmr:recovery` 在同一个 App 会话中连续执行 12 次语法错误修复，快速捕获偶发的 Page capsule 重编译，无需先跑完整 HMR 流程。两个 `restart` 命令都会把替换进程的首次构建延迟三秒，以覆盖旧产物仍在磁盘上的启动窗口。
 
 ### 覆盖范围
 
