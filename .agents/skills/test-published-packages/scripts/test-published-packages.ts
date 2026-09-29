@@ -60,7 +60,7 @@ const originalText = 'Build naturally. Ship everywhere.'
 const updatedText = 'Published HMR keeps React state.'
 const probeId = 'published-hmr-probe'
 const nativeCounterId = 'published-native-counter'
-const pollIntervalMs = 3_000
+const pollIntervalMs = 500
 const transitionDeadlineMs = 120_000
 const commandTimeoutMs = 29_000
 const devServerReadyMarker = 'Mini Program project'
@@ -569,7 +569,6 @@ function collectHmrDiagnostics(rootHashes: Map<string, string>): void {
 }
 
 async function waitForProbeText(expectedText: string): Promise<void> {
-    await sleep(5_000)
     await pollUntil(`visible text "${expectedText}"`, transitionDeadlineMs, pollIntervalMs, readProbeText, (text) =>
         text.includes(expectedText)
     )
