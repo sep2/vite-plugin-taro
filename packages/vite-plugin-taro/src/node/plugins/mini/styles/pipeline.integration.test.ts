@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -264,13 +264,17 @@ test('minifies App/Page CSS, clears removed Page styles, and suppresses identica
 
 test('respects cssMinify:false while rendering Tailwind CSS and matching patch factories', async () => {
     const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-tailwind-style-hmr-')))
-    const appId = normalizePath(path.join(root, 'app.js'))
+    const sourceDir = path.join(root, 'src')
+    const appId = normalizePath(path.join(sourceDir, 'app.js'))
     const cssId = normalizePath(path.join(root, 'app.css'))
     const themeId = normalizePath(path.join(root, 'theme.css'))
     const outDir = path.join(root, 'dist')
+    // @source "./" also scans dist, including the WXSS and its atomic .txt sibling; this triggered Windows rename EPERM.
+    // Scan application sources only, as in the demos where src and dist are separate.
+    await mkdir(sourceDir)
     await Promise.all([
         writeFile(appId, renderTailwindApplication('mt-2 bg-brand')),
-        writeFile(cssId, '@import "tailwindcss";\n@import "./theme.css";\n@source "./";\n'),
+        writeFile(cssId, '@import "tailwindcss";\n@import "./theme.css";\n@source "./src";\n'),
         writeFile(themeId, '@theme { --color-brand: red; }\n')
     ])
 
@@ -423,7 +427,7 @@ test('respects cssMinify:false while rendering Tailwind CSS and matching patch f
 })
 
 function renderTailwindApplication(classes: string): string {
-    return `import './app.css'\nexport const props = { className: '${classes}' }\n`
+    return `import '../app.css'\nexport const props = { className: '${classes}' }\n`
 }
 
 function requireFinalizedHmr(value: unknown): Readonly<{ codes: readonly string[] }> {
