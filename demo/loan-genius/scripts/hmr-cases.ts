@@ -44,6 +44,30 @@ const checkedPaymentIcon = /src="\/assets\/comm_form_icon_gouxuan-[\w-]+\.png"/
 
 /** Exercises stateful Page replacement across component, overlay, navigation, burst and recovery boundaries. */
 export async function runLoanHmrCases(context: HmrContext): Promise<void> {
+    await prepareCalculator(context)
+
+    await runPolyfillFlow(context)
+    await runHocFlows(context)
+    await runCalculatorFlows(context)
+    await runOverlayFlows(context)
+    await runNavigationFlows(context)
+    await runRecoveryFlow(context)
+    await runNormalRemountFlow(context)
+    assert.equal(await context.devTools.readConsoleErrors(), '')
+}
+
+/** Repeats recovery in one App session to catch intermittent Page capsule invalidation without unrelated edit flows. */
+export async function runLoanHmrRecoveryCase(context: HmrContext): Promise<void> {
+    await prepareCalculator(context)
+    const iterations = 12
+    for (const index of Array.from({ length: iterations }, (_, index) => index)) {
+        console.log(`[loan-hmr] recovery iteration ${index + 1}/${iterations}`)
+        await runRecoveryFlow(context)
+    }
+    assert.equal(await context.devTools.readConsoleErrors(), '')
+}
+
+async function prepareCalculator(context: HmrContext): Promise<void> {
     await context.devTools.navigate('reLaunch', `/${calculatorRoute}`)
     await waitForMarker(context, calculatorMarker, 'baseline')
     await waitForElement(context, primaryInput)
@@ -55,15 +79,6 @@ export async function runLoanHmrCases(context: HmrContext): Promise<void> {
     )
     await context.devTools.tapElement('#loan-submit')
     await waitForElement(context, '#loan-result-header')
-
-    await runPolyfillFlow(context)
-    await runHocFlows(context)
-    await runCalculatorFlows(context)
-    await runOverlayFlows(context)
-    await runNavigationFlows(context)
-    await runRecoveryFlow(context)
-    await runNormalRemountFlow(context)
-    assert.equal(await context.devTools.readConsoleErrors(), '')
 }
 
 async function runPolyfillFlow(context: HmrContext): Promise<void> {
@@ -452,6 +467,7 @@ async function runRecoveryFlow(context: HmrContext): Promise<void> {
     const original = await context.fixture.read(file)
     const failureCount = async () => (await context.fixture.read('vite.log')).split('wx HMR update failed').length - 1
     const failuresBefore = await failureCount()
+    const buildInfo = await context.fixture.read('dist/wx/hmr/info.js')
     try {
         await context.fixture.write(file, 'export default function Broken(\n')
         await waitFor(async () => (await failureCount()) > failuresBefore, 5_000, 20)
@@ -465,6 +481,7 @@ async function runRecoveryFlow(context: HmrContext): Promise<void> {
     await assertCalculatorState(context)
     await context.fixture.publishMarker(calculatorMarker, 'baseline')
     await waitForMarker(context, calculatorMarker, 'baseline')
+    assert.equal(await context.fixture.read('dist/wx/hmr/info.js'), buildInfo, 'Recovery must not rebuild the App')
     console.log('[loan-hmr] 25-syntax-error-recovery passed')
 }
 
