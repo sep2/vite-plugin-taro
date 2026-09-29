@@ -38,7 +38,12 @@ await withLoanHmrFixture(requestedCase === 'restart' ? 'restart' : 'state-retent
             console.error(
                 `[loan-hmr] Vite log before cleanup:\n${await readFile(path.join(fixture.root, 'vite.log'), 'utf8')}`
             )
-            console.error(`[loan-hmr] DevTools console before cleanup:\n${await devTools.readConsoleErrors()}`)
+            try {
+                console.error(`[loan-hmr] DevTools console before cleanup:\n${await devTools.readConsoleErrors()}`)
+            } catch (consoleError) {
+                // A broken or rate-limited console endpoint must not hide the original failing assertion.
+                console.error('[loan-hmr] Unable to read DevTools console before cleanup:', consoleError)
+            }
             throw error
         } finally {
             await devTools.closeProject()

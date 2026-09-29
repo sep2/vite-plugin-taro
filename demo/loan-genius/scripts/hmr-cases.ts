@@ -509,7 +509,10 @@ async function runFlow(
         ])
         await waitForMarker(context, markerFile, `flow-${flow.name}`)
         await assertState()
-        await assertWxSafeClasses(context, `${flow.name} application`)
+        // The caller already asserted the active route; only calculator flows contain this WX class probe.
+        if (markerFile === calculatorMarker) {
+            await assertCalculatorWxSafeClasses(context, `${flow.name} application`)
+        }
     } finally {
         await Promise.all([
             ...preparedEdits.map(({ edit, original }) => context.fixture.write(edit.file, original)),
@@ -518,7 +521,9 @@ async function runFlow(
     }
     await waitForMarker(context, markerFile, 'baseline')
     await assertState()
-    await assertWxSafeClasses(context, `${flow.name} restoration`)
+    if (markerFile === calculatorMarker) {
+        await assertCalculatorWxSafeClasses(context, `${flow.name} restoration`)
+    }
     console.log(`[loan-hmr] ${flow.name} passed`)
 }
 
@@ -528,6 +533,10 @@ async function assertWxSafeClasses(context: HmrContext, generation: string): Pro
         return
     }
 
+    await assertCalculatorWxSafeClasses(context, generation)
+}
+
+async function assertCalculatorWxSafeClasses(context: HmrContext, generation: string): Promise<void> {
     const wxml = await context.devTools.readElement('#loan-field-commerceLoanYear', 'outerWxml')
     assert.match(wxml, /py-5_d5/, `WX-unsafe class after ${generation}`)
 }

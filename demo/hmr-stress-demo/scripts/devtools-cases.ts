@@ -21,7 +21,7 @@ const burstProfile: HmrEditProfile = {
 }
 const postRecoveryProfile: HmrEditProfile = {
     intervalMilliseconds: 40,
-    updateCount: 5
+    updateCount: 1
 }
 
 /** Runs a named case; `all` reuses one compiled disposable project to keep the complete suite quick. */
@@ -225,8 +225,7 @@ async function testSyntaxRecovery(harness: DevToolsHarness): Promise<void> {
         await writeFile(harness.markerPath, originalSource)
     }
 
-    // The corrected save resumes ordinary HMR. Five real marker generations prove the stream remains live without rotating the
-    // complete-build identity or resetting Page state.
+    // One rendered update after the corrected save proves recovery; the separate burst case exercises repeated delivery.
     await publishHmrEdits(harness.markerPath, postRecoveryProfile, (marker) => waitForMarker(marker, harness))
     assert.equal((await readHmrInfo(infoPath)).buildId, before.buildId)
     await assertAppProjectionBaseline(harness)
