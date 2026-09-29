@@ -3,7 +3,7 @@ import path from 'node:path'
 
 /**
  * WeChat DevTools can retain stale file contents when output directories are deleted and recreated.
- * Preserve every directory so its watcher stays attached, retain caller-owned project files, and unlink the rest.
+ * Preserve every directory so its watcher stays attached, retain the caller's current files, and unlink the rest.
  */
 export function cleanOutputFiles(directory: string, preservedRelativePaths: readonly string[]): void {
     mkdirSync(directory, { recursive: true })

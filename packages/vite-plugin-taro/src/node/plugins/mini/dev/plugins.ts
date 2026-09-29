@@ -10,6 +10,7 @@ import type { MiniContract } from '../mini-contract.ts'
 import { miniPageCapsuleId, pageComponentId, rolldownRuntimeId } from '../module/module.ts'
 import type { MiniStylePlugin } from '../styles/plugins.ts'
 import { createMiniDevHost, type MiniDevHost } from './dev-host.ts'
+import { hmrInfoFileName } from './hmr-files.ts'
 import { createMiniHmrMode } from './hmr-mode.ts'
 import { hmrEndpointPath } from './hmr-protocol.ts'
 import { injectDevPageComponent } from './inject-dev-page-component.ts'
@@ -30,6 +31,16 @@ export function isMiniClientEnvironment(environment: Readonly<{ name: string }>)
 export function createMiniDevelopmentPlugin(contract: MiniContract, styles: MiniStylePlugin): PluginOption[] {
     // Resolve once so plugins, journal effects, entry banners, and runtime bundling cannot disagree about the active mechanism.
     const hmrMode = createMiniHmrMode(contract.options.hmr, contract.runtime)
+    const reset = hmrMode.reset?.()
+    const hostFiles = [
+        contract.output.projectConfigFilename,
+        contract.output.projectPrivateConfigFilename,
+        contract.styles.appFileName,
+        contract.styles.globalFileName,
+        ...contract.options.pages.map((page) => `${page.path}${path.extname(contract.styles.appFileName)}`),
+        ...(hmrMode.rebuildStrategy === 'on-failure' ? [hmrInfoFileName] : []),
+        ...(reset?.kind === 'write' ? [reset.fileName] : [])
+    ]
 
     /*
      * Vite creates this plugin descriptor before a server or DevEngine exists, then invokes configureServer and closeBundle on
@@ -39,6 +50,8 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
      * in closeBundle would lose every live action, patch, style, and client frontier owned by the running instance.
      */
     let host: MiniDevHost | null = null
+    // One complete output establishes the current file set; later recovery builds must retain cached unchanged files.
+    let initialOutputPending = true
     return [
         {
             name: 'vpt:mini-dev',
@@ -52,8 +65,8 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
                     // React's development-only Suspense diagnostics call this browser API without guards.
                     define: { 'performance.now': 'Date.now' },
                     build: {
-                        // The development cleaner owns startup cleanup so it can retain watched directories and the two
-                        // DevTools project-config files. Recovery builds must also retain cached, unchanged output.
+                        // Development removes obsolete files after its first complete output, retaining live files while
+                        // DevTools reattaches on restart. Recovery builds must also retain cached, unchanged output.
                         // Production builds retain normal Vite output cleanup.
                         emptyOutDir: false,
                         // Disable maps in resolved environment config as well as final output so Oxc and Babel skip producing
@@ -77,17 +90,7 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
                 // asks bundledDev to create its hard-coded skip-write DevEngine.
                 order: 'post',
                 async handler(server) {
-                    // Clean once per server before creating its engine, but never remove DevTools' project identity and
-                    // private compile settings. Deleting these two files during a restart let the replacement App launch
-                    // and report startup, yet later patch writes no longer updated its rendered Page. Preserving only these
-                    // files fixes that failure while still removing obsolete output; the restart regression delays the
-                    // replacement build by three seconds and then verifies two state-retaining rendered updates.
-                    // Later recovery builds do not clean because cached unchanged companions may not be emitted again.
-                    cleanOutputFiles(path.resolve(server.config.root, server.config.build.outDir), [
-                        contract.output.projectConfigFilename,
-                        contract.output.projectPrivateConfigFilename
-                    ])
-
+                    // Keep the last complete output intact while DevTools watches it; early unlink/recreate loses Page HMR.
                     host = await createMiniDevHost({
                         server: server,
                         contract: contract,
@@ -106,6 +109,18 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
                     removeDevelopmentAppStyle(bundle, contract.styles.appFileName)
 
                     await emitMiniPublicAssets(this)
+                }
+            },
+
+            writeBundle: {
+                order: 'post',
+                handler(_, bundle) {
+                    if (!initialOutputPending) {
+                        return
+                    }
+                    const { root, build } = this.environment.config
+                    cleanOutputFiles(path.resolve(root, build.outDir), [...Object.keys(bundle), ...hostFiles])
+                    initialOutputPending = false
                 }
             },
 

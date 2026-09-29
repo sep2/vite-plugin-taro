@@ -121,7 +121,13 @@ async function startDevFixture(
     const oldFile = path.join(oldDirectory, 'old.js')
     await writeFile(oldFile, 'previous dev session')
     const oldAppStyle = path.join(outDir, 'app.wxss')
+    const oldPageShell = path.join(outDir, 'pages/home/index.js')
+    const oldPatchFile = path.join(outDir, devtoolsPatchesFileName)
+    await mkdir(path.dirname(oldPageShell), { recursive: true })
+    await mkdir(path.dirname(oldPatchFile), { recursive: true })
     await writeFile(oldAppStyle, 'previous App stylesheet')
+    await writeFile(oldPageShell, 'previous Page shell')
+    await writeFile(oldPatchFile, 'previous patch dependency')
     const projectConfigPath = path.join(outDir, 'project.config.json')
     const projectPrivateConfigPath = path.join(outDir, 'project.private.config.json')
     await writeFile(projectConfigPath, 'previous project config')
@@ -217,18 +223,17 @@ async function startDevFixture(
     // Restarts replace the server with fresh plugin instances, just like restarting the Vite process from its config file.
     let server = await createFixtureServer()
     try {
-        assert.equal(
-            await readExistingFile(oldAppStyle),
-            undefined,
-            'Server configuration must remove replaceable output'
-        )
-        assert.equal(await readExistingFile(oldFile), undefined, 'Server configuration must remove obsolete output')
+        assert.equal(await readFile(oldAppStyle, 'utf8'), 'previous App stylesheet')
+        assert.equal(await readFile(oldPageShell, 'utf8'), 'previous Page shell')
+        assert.equal(await readFile(oldPatchFile, 'utf8'), 'previous patch dependency')
+        assert.equal(await readFile(oldFile, 'utf8'), 'previous dev session')
         assert.equal(await readFile(projectConfigPath, 'utf8'), 'previous project config')
         assert.equal(await readFile(projectPrivateConfigPath, 'utf8'), 'previous private config')
         assert.equal((await stat(oldDirectory)).ino, directoryInode, 'Startup must preserve watched directories')
         await server.listen()
         // listen() binds before its metadata transaction finishes; the App marker is the completed baseline boundary.
         await waitForFile(oldAppStyle, (source) => source.includes('vpt-build:'), maximumWaitAttempts)
+        assert.equal(await readExistingFile(oldFile), undefined, 'Initial output must remove obsolete files')
     } catch (error) {
         await server.close()
         await rm(root, { force: true, recursive: true })
@@ -467,7 +472,7 @@ test('rejects a server without Vite bundled development ownership', async (conte
     )
 })
 
-test('rejects startup with the original complete-output failure', async () => {
+test('rejects startup without removing the last complete output on failure', async () => {
     const root = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-output-failure-test-'))
     const pagePath = path.join(root, 'src/pages/home/index.tsx')
     await mkdir(path.dirname(pagePath), { recursive: true })
@@ -506,7 +511,7 @@ test('rejects startup with the original complete-output failure', async () => {
     try {
         await assert.rejects(() => server.listen(), /expected complete-output failure/)
         assert.match(errors.join('\n'), /wx dev build failed/)
-        assert.equal(await readExistingFile(oldOutput), undefined)
+        assert.equal(await readFile(oldOutput, 'utf8'), 'previous successful output')
         assert.equal(await readFile(projectConfig, 'utf8'), 'previous project config')
         assert.equal(await readFile(projectPrivateConfig, 'utf8'), 'previous private config')
     } finally {
