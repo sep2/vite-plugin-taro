@@ -32,6 +32,7 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
     // Resolve once so plugins, journal effects, entry banners, and runtime bundling cannot disagree about the active mechanism.
     const hmrMode = createMiniHmrMode(contract.options.hmr, contract.runtime)
     const reset = hmrMode.reset?.()
+    // These files are owned by DevTools or the host, not necessarily emitted in Rolldown's bundle.
     const hostFiles = [
         contract.output.projectConfigFilename,
         contract.output.projectPrivateConfigFilename,
@@ -50,7 +51,7 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
      * in closeBundle would lose every live action, patch, style, and client frontier owned by the running instance.
      */
     let host: MiniDevHost | null = null
-    // One complete output establishes the current file set; later recovery builds must retain cached unchanged files.
+    // Clean once per server: recovery builds may reuse unchanged files without re-emitting them.
     let initialOutputPending = true
     return [
         {
@@ -65,9 +66,8 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
                     // React's development-only Suspense diagnostics call this browser API without guards.
                     define: { 'performance.now': 'Date.now' },
                     build: {
-                        // Development removes obsolete files after its first complete output, retaining live files while
-                        // DevTools reattaches on restart. Recovery builds must also retain cached, unchanged output.
-                        // Production builds retain normal Vite output cleanup.
+                        // Vite's default cleanup removes watched directories, which can detach DevTools' native watcher.
+                        // Serve mode retains those directories; production and build.watch have separate output policies.
                         emptyOutDir: false,
                         // Disable maps in resolved environment config as well as final output so Oxc and Babel skip producing
                         // intermediate maps that Rolldown would discard.
@@ -90,7 +90,8 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
                 // asks bundledDev to create its hard-coded skip-write DevEngine.
                 order: 'post',
                 async handler(server) {
-                    // Keep the last complete output intact while DevTools watches it; early unlink/recreate loses Page HMR.
+                    // The former startup cleanup removed live Page files before the replacement build. On fast restarts,
+                    // DevTools could reload the App yet stop observing subsequent Page patches; do not unlink here.
                     host = await createMiniDevHost({
                         server: server,
                         contract: contract,
@@ -118,6 +119,8 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
                     if (!initialOutputPending) {
                         return
                     }
+                    // Remove obsolete files only after the new output has been written, retaining project settings and
+                    // host-published files. Until then (or if startup fails), the previous output remains available.
                     const { root, build } = this.environment.config
                     cleanOutputFiles(path.resolve(root, build.outDir), [...Object.keys(bundle), ...hostFiles])
                     initialOutputPending = false
