@@ -4,9 +4,9 @@ Historical releases through 0.7.1-beta.1 are preserved here from the former Git-
 
 New release notes are maintained by Changesets in each published package:
 
-- [vite-plugin-taro](packages/vite-plugin-taro/CHANGELOG.md)
-- [vite-plugin-taro-runtime](packages/taro-runtime/CHANGELOG.md)
-- [create-vite-taro](packages/create-vite-taro/CHANGELOG.md)
+- [vite-plugin-taro](../../packages/vite-plugin-taro/CHANGELOG.md)
+- [vite-plugin-taro-runtime](../../packages/taro-runtime/CHANGELOG.md)
+- [create-vite-taro](../../packages/create-vite-taro/CHANGELOG.md)
 
 ## [0.7.1-beta.1] - 2026-09-06
 
@@ -1068,7 +1068,7 @@ Initial release.
 - implement WX HMR topology with immutable state transitions and refined patch handling (6680b22)
 - add React Refresh and React Reconciler runtime resolution for WX development transforms (6285767)
 - enhance React Refresh logic to integrate WX App runtime and DevTools hooks (283819e)
-- add `react-reconciler@0.33.0` dependency and update `pnpm-lock.yaml` (510efe0)
+- add `react-reconciler@0.33.0` dependency and update `../../pnpm-lock.yaml` (510efe0)
 - refactor (c11338b)
 - extend WX HMR topology types and streams with `requestId` and `clientId` for enhanced request tracking and filtering (843c77e)
 - update WX HMR topology types and streams to consolidate lifecycle management and improve modularity (471b652)
@@ -1212,7 +1212,7 @@ Initial release.
 - add biome ignore directive to preserve side effect order in WX runtime imports (f1bea2c)
 - reorder imports in H5 app runtime for clarity and maintainability (81c6622)
 - replace virtual H5 app module with specialized physical entry, update resolvers, transforms, and tests for improved maintainability and modularity (6c82864)
-- add `@types/react-dom` as a devDependency and update `pnpm-lock.yaml` accordingly (4874f69)
+- add `@types/react-dom` as a devDependency and update `../../pnpm-lock.yaml` accordingly (4874f69)
 - add `createAppConfig` utility to generate shared app configuration with authoritative page order (3adc028)
 - introduce `conditional-directives` plugin for target-specific code transforms, add H5 support plugins, and enhance modularity with extracted utilities and runtime adjustments (2c5a1bc)
 - update `transformPageModule` to use destructured parameters, adjust test cases for improved readability and maintainability (46e2bf5)

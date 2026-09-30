@@ -108,7 +108,6 @@ pnpm dev:towxml-stream-demo:wx
 ## 生成文件
 
 - 不要手动编辑 `packages/vite-plugin-taro/dist`；运行 `pnpm build:plugin` 重新生成。
-- 根目录 `CHANGELOG.md` 保留迁移前的发布历史；后续日志由 Changesets 生成到三个发布包各自的 `CHANGELOG.md`。
 - 根目录的 `README.md` 与 `README.en.md` 是插件 README 的来源；`pnpm build:plugin` 会同步到 `packages/vite-plugin-taro`。
 
 ## 发布
@@ -126,8 +125,6 @@ pnpm release
 `pnpm changeset` 记录面向用户的改动说明与 patch / minor / major 级别，可以随功能提交一起提交。`pnpm changeset status` 预览累计版本计划。`pnpm release` 是一个不接受 bump 参数的准备命令：执行 `changeset version`、更新 `pnpm-lock.yaml`，并格式化 `.changeset`。它不会提交、创建 tag、推送或发布。
 
 `.changeset/config.json` 将 `vite-plugin-taro`、`vite-plugin-taro-runtime` 和 `create-vite-taro` 放在同一个 `fixed` 组中，始终一起更新版本。根工作区、文档和示例应用均为私有包，不参与版本发布。生成器创建项目时从自身版本推导插件依赖，不再单独同步模板中的版本号。
-
-检查生成的 `.changeset` 变更、包内 `package.json` / `CHANGELOG.md` 和 `pnpm-lock.yaml`，提交这些文件，然后推送：
 
 ```sh
 git push origin main
