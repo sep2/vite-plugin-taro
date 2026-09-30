@@ -3,17 +3,16 @@ import type { PluginOption } from 'vite'
 import type { VptOptions } from '../options.ts'
 import { createClientTaroPlugin } from './plugins/client/client-taro.ts'
 import { createConditionalDirectivePlugin } from './plugins/conditional/conditional-directives.ts'
+import { createDepsPlugin } from './plugins/deps/create-deps-plugin.ts'
 import { createH5TargetPlugins } from './plugins/h5/plugins.ts'
 import { createTtMiniPlugins } from './plugins/tt/plugins.ts'
 import { createWxMiniPlugins } from './plugins/wx/plugins.ts'
 import { createZfbMiniPlugins } from './plugins/zfb/plugins.ts'
-import { assertRuntimeVersions } from './utils/assert-runtime-versions.ts'
 
 /** Creates the Vite plugins for one Taro target. */
 export default function vpt(options: VptOptions): PluginOption[] {
-    assertRuntimeVersions()
-
     return [
+        createDepsPlugin(),
         createConditionalDirectivePlugin(options.target),
         createClientTaroPlugin(options.target),
         ...react(),
