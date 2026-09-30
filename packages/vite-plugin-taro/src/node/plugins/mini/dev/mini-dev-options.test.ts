@@ -18,6 +18,7 @@ import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
 import { createZfbMiniContract } from '../../zfb/plugins.ts'
 import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
+import { renderNative } from '../render/native.ts'
 import { createMiniHmrMode } from './hmr-mode.ts'
 import { createMiniDevOptionsPlugin, requireSingleOutput } from './mini-dev-options.ts'
 import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
@@ -320,8 +321,22 @@ test('executes generated development code with a bundled runtime and no ambient 
                     assert.equal(output.minify, true)
                     assert.equal(output.keepNames, true)
                     assert.equal(output.sourcemap, false)
-                    // Stand in for Mini's late CommonJS conversion so the generated runtime can execute in an isolated VM.
-                    output.format = 'cjs'
+                },
+                // Keep Rolldown's dev graph in ESM and use Mini's actual late CommonJS conversion for VM execution.
+                renderChunk: {
+                    order: 'post',
+                    handler(code, chunk, _output, meta) {
+                        return renderNative({
+                            code,
+                            chunk,
+                            chunks: meta.chunks,
+                            getPhysicalChunkId(chunk) {
+                                assert.ok(typeof chunk !== 'string')
+                                return chunk.fileName
+                            },
+                            sourcemap: false
+                        })
+                    }
                 }
             }
         ]

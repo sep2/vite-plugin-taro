@@ -11,6 +11,7 @@ import { DevRuntime } from 'rolldown/experimental/runtime'
 import { normalizePath } from 'vite'
 import type { PatchUpdate } from '../dev/hmr-protocol.ts'
 import { vptGlobalBindingId } from '../module/module.ts'
+import { renderNative } from '../render/native.ts'
 import { createMiniGlobalPlugin } from './create-mini-global-plugin.ts'
 
 /** Factory registration is real; this fixture exercises imports and globals rather than React Refresh callbacks. */
@@ -107,6 +108,22 @@ test('real HMR factories reuse the registered binding without rediscovering the 
                 { name: globalDevPlugin.name, renderChunk: globalDevPlugin.renderChunk },
                 {
                     name: 'test:capture-global-output',
+                    // Match Mini's native execution boundary without requesting unsupported CommonJS dev output.
+                    renderChunk: {
+                        order: 'post',
+                        handler(code, chunk, _output, meta) {
+                            return renderNative({
+                                code,
+                                chunk,
+                                chunks: meta.chunks,
+                                getPhysicalChunkId(chunk) {
+                                    assert.ok(typeof chunk !== 'string')
+                                    return chunk.fileName
+                                },
+                                sourcemap: false
+                            })
+                        }
+                    },
                     generateBundle: {
                         order: 'post',
                         handler(_options, bundle) {
@@ -119,7 +136,7 @@ test('real HMR factories reuse the registered binding without rediscovering the 
             ]
         },
         {
-            format: 'cjs',
+            format: 'es',
             entryFileNames: 'nested/[name]-[hash].js',
             chunkFileNames: 'nested/shared/[name]-[hash].js',
             minify: true

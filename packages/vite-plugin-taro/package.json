@@ -87,7 +87,7 @@
         "core-js": "^3.50.0",
         "lightningcss": "1.33.0",
         "react-reconciler": "0.34.0",
-        "rolldown": "1.2.11",
+        "rolldown": "1.2.12",
         "sval": "0.6.12",
         "tailwindcss": "^4.3.3",
         "vite-plugin-taro-runtime": "workspace:*"

@@ -7,7 +7,7 @@ overrides:
   react: '^19.3.0'
   react-dom: '^19.3.0'
   # Vite, VPT, and generated apps must share one Rolldown DevRuntime ABI.
-  rolldown: 1.2.11
+  rolldown: 1.2.12
   vite: 8.3.1
   # Taro 4.2.1 references Rollup only from declarations; VPT's runtime and build pipeline use Rolldown.
   '@tarojs/runner-utils@4.2.1>rollup': '-'
@@ -32,3 +32,21 @@ patchedDependencies:
   '@tarojs/react@4.2.1': patches/@tarojs__react@4.2.1-react19.patch
   '@tarojs/runtime@4.2.1': patches/@tarojs__runtime@4.2.1.patch
   canvas-confetti@1.9.4: patches/canvas-confetti@1.9.4.patch
+
+minimumReleaseAgeExclude:
+  - '@rolldown/binding-android-arm-eabi@1.2.12'
+  - '@rolldown/binding-android-arm64@1.2.12'
+  - '@rolldown/binding-darwin-arm64@1.2.12'
+  - '@rolldown/binding-darwin-x64@1.2.12'
+  - '@rolldown/binding-freebsd-x64@1.2.12'
+  - '@rolldown/binding-linux-arm-gnueabihf@1.2.12'
+  - '@rolldown/binding-linux-arm64-gnu@1.2.12'
+  - '@rolldown/binding-linux-arm64-musl@1.2.12'
+  - '@rolldown/binding-linux-ppc64-gnu@1.2.12'
+  - '@rolldown/binding-linux-s390x-gnu@1.2.12'
+  - '@rolldown/binding-linux-x64-gnu@1.2.12'
+  - '@rolldown/binding-linux-x64-musl@1.2.12'
+  - '@rolldown/binding-openharmony-arm64@1.2.12'
+  - '@rolldown/binding-win32-arm64-msvc@1.2.12'
+  - '@rolldown/binding-win32-x64-msvc@1.2.12'
+  - rolldown@1.2.12
