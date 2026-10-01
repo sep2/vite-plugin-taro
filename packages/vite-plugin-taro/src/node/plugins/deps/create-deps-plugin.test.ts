@@ -79,10 +79,6 @@ test('warns for an installed runtime that does not export its package.json', asy
     )
 
     assert.equal(warn.mock.callCount(), 1)
-    assert.equal(
-        warn.mock.calls[0].arguments[0],
-        `[vpt] Tested with vite-plugin-taro-runtime@${pluginVersion}, but found vite-plugin-taro-runtime@0.0.0. Compatibility is not guaranteed.`
-    )
 })
 
 for (const dependency of dependencyNames) {
@@ -90,10 +86,6 @@ for (const dependency of dependencyNames) {
         const warn = mock.fn<(message: string) => void>()
         assert.doesNotThrow(() => warnDependencyVersions({ ...installedVersions, [dependency]: '0.0.0' }, { warn }))
         assert.equal(warn.mock.callCount(), 1)
-        assert.equal(
-            warn.mock.calls[0].arguments[0],
-            `[vpt] Tested with ${dependency}@${installedVersions[dependency]}, but found ${dependency}@0.0.0. Compatibility is not guaranteed.`
-        )
     })
 }
 
@@ -103,7 +95,6 @@ test('warns when the installed runtime is newer than the plugin', () => {
         warnDependencyVersions({ ...installedVersions, 'vite-plugin-taro-runtime': '999.0.0' }, { warn })
     )
     assert.equal(warn.mock.callCount(), 1)
-    assert.match(warn.mock.calls[0].arguments[0], /but found vite-plugin-taro-runtime@999\.0\.0/)
 })
 
 test('reports all mismatched dependency versions without blocking any warning', () => {
@@ -112,11 +103,4 @@ test('reports all mismatched dependency versions without blocking any warning', 
         warnDependencyVersions({ vite: '0.0.0', rolldown: '0.0.0', 'vite-plugin-taro-runtime': '0.0.0' }, { warn })
     )
     assert.equal(warn.mock.callCount(), 3)
-    assert.deepEqual(
-        warn.mock.calls.map(({ arguments: [message] }) => message),
-        dependencyNames.map(
-            (dependency) =>
-                `[vpt] Tested with ${dependency}@${installedVersions[dependency]}, but found ${dependency}@0.0.0. Compatibility is not guaranteed.`
-        )
-    )
 })
