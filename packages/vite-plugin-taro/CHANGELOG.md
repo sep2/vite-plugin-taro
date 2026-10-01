@@ -1,5 +1,21 @@
 # vite-plugin-taro
 
+## 0.7.11
+
+### 变更
+
+- 04ef9b37、6294bab7：Vite、Rolldown 或 `vite-plugin-taro-runtime` 版本不匹配时改为输出兼容性警告，不再抛错阻止构建或开发服务器启动；运行时版本按 VPT 自身的发布版本检查。
+
+### 修复
+
+- a1ddbbd8：Rolldown 升级为 `1.2.12`，避免 macOS 文件监听器在监听路径未变化时被无谓重启并漏掉保存事件，改善小程序开发与监听构建的更新可靠性。
+
+### 升级说明
+
+从 `0.7.10` 升级到 `0.7.11`：运行 `pnpm add -D --save-exact vite-plugin-taro@0.7.11 vite@8.3.1 rolldown@1.2.12`。
+
+**固定了 Rolldown 版本覆盖的项目**：pnpm 项目将 `pnpm-workspace.yaml` 中的 `overrides.rolldown` 更新为 `1.2.12`；npm / Bun 项目将 `package.json` 中的 `overrides.rolldown` 更新为 `1.2.12`；Yarn 项目将 `resolutions.rolldown` 更新为 `1.2.12`，使 Vite 与 VPT 使用同一版本。已使用 `$rolldown` 引用直接依赖的覆盖项无需改动。
+
 ## 0.7.10
 
 ### 变更
