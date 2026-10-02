@@ -1450,8 +1450,12 @@ Confirm 类型
 
 共享元素
 
-共享元素是一种动画形式，类似于 [`flutter Hero`](https://flutterchina.club/animations/hero-animations/) 动画，表现为元素像是在页面间穿越一样。该组件需与 [`PageContainer`](https://docs.taro.zone/docs/components/viewContainer/page-container) 组件结合使用。
-使用时需在当前页放置 `ShareElement` 组件，同时在 `PageContainer` 容器中放置对应的 `ShareElement` 组件，对应关系通过属性值 key 映射。当设置 `PageContainer` `显示时，transform` 属性为 `true` 的共享元素会产生动画。当前页面容器退出时，会产生返回动画。
+共享元素是一种动画形式，类似于 [`flutter Hero`](https://flutterchina.club/animations/hero-animations/) 动画，表现为元素像是在页面间穿越一样。不同渲染引擎的使用方式不同：
+
+- **Skyline**：在两个 Skyline 页面中放置具有相同 `mapkey` 的 `ShareElement`，通过 `Taro.navigateTo` 和 `Taro.navigateBack` 触发页面间的共享元素动画，**无需 `PageContainer`**。
+- **WebView**：在当前页和 [`PageContainer`](https://docs.taro.zone/docs/components/viewContainer/page-container) 容器中放置对应的 `ShareElement`。容器显示时，`transform` 为 `true` 的共享元素产生进入动画；容器退出时产生返回动画。
+
+React 的 `key` 用于列表元素标识，不会作为普通属性传递。请使用 `mapkey`，vpt 会将其映射为微信原生 `share-element` 的 `key`；该值须在同一页面内唯一。
 
 | 参数 | 说明 | 默认值 | 微信 | Web |
 | --- | --- | :---: | :---: | :---: |
