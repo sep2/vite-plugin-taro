@@ -1,5 +1,5 @@
 diff --git a/dist/runtime.js b/dist/runtime.js
-index 1e3d43280a9738dda659344b6ec4192bcc466d40..b442381ee46d4f99b31e6940697d2050316e07ab 100644
+index 94d631f6a7e8dfc78ae4f7a51fe3ab343186938e..27e1c01008742cdffb35c93ee362c1e1914227a4 100644
 --- a/dist/runtime.js
 +++ b/dist/runtime.js
 @@ -1,6 +1,16 @@
@@ -20,10 +20,11 @@ index 1e3d43280a9738dda659344b6ec4192bcc466d40..b442381ee46d4f99b31e6940697d2050
  const reactMeta = {
      PageContext: EMPTY_OBJ,
      R: EMPTY_OBJ,
-@@ -258,6 +268,29 @@ function connectReactPage(R, id) {
+@@ -257,6 +267,29 @@ function connectReactPage(R, id) {
+         };
      };
  }
- /**
++/**
 + * One App reconciliation produces one granular app.* batch, while WX stores an App mirror inside every mounted native
 + * Page. Resolve the native stack only when that batch flushes instead of maintaining a second Page registry or active-Page
 + * tracker. WeChat orders getCurrentPages() from the oldest hidden Page to the current visible Page, so forEach dispatches
@@ -46,11 +47,10 @@ index 1e3d43280a9738dda659344b6ec4192bcc466d40..b442381ee46d4f99b31e6940697d2050
 +        }
 +    });
 +}
-+/**
+ /**
   * 桥接小程序 App 构造器和 React 渲染流程
   * @param App 用户编写的入口组件
-  * @param react 框架
-@@ -296,11 +329,23 @@ function createReactApp(App, react, dom, config) {
+@@ -295,13 +328,30 @@ function createReactApp(App, react, dom, config) {
          let container = document.getElementById(appId);
          if (container == null) {
              const appContainer = document.getElementById(CONTAINER);
@@ -64,21 +64,16 @@ index 1e3d43280a9738dda659344b6ec4192bcc466d40..b442381ee46d4f99b31e6940697d2050
              container.id = appId;
              appContainer === null || appContainer === void 0 ? void 0 : appContainer.appendChild(container);
          }
-         /*
++        /*
 +         * renderReactRoot runs only for the Mini Program branch. The patched WX document makes this App container a
 +         * TaroRootElement, so it serves simultaneously as React's existing host container and Taro's App scheduler; its
 +         * structural _path is app and its _root is itself. Assign only the native sink that fans Taro's normal granular
 +         * batches across Page surfaces. No detached scheduler node, second React root, or host-property override participates.
 +         */
 +        container.ctx = { setData: broadcastAppUpdate };
-+        /*
-          * Upstream enables createRoot only for a React 18 version string, which skips the entire App render on React 19.
-          * Detect the renderer capability instead: React 18/19 take the modern path and older renderers retain the fallback.
-          */
-@@ -312,6 +357,11 @@ function createReactApp(App, react, dom, config) {
-             // eslint-disable-next-line react/no-deprecated
-             (_b = ReactDOM$1.render) === null || _b === void 0 ? void 0 : _b.call(ReactDOM$1, h$1(AppWrapper), container);
-         }
+         // VPT requires React 19: both the Mini renderer and react-dom/client provide concurrent roots.
+         const root = ReactDOM$1.createRoot(container);
+         root.render(h$1(AppWrapper));
 +        /*
 +         * Return the exact host passed to ReactDOM. AppWrapper.mount closes over this immutable value when a Page is added,
 +         * guaranteeing that its initial snapshot comes from the same singleton App tree without a host registry or lookup.
@@ -87,7 +82,7 @@ index 1e3d43280a9738dda659344b6ec4192bcc466d40..b442381ee46d4f99b31e6940697d2050
      }
      class AppWrapper extends react.Component {
          constructor(props) {
-@@ -329,6 +379,19 @@ function createReactApp(App, react, dom, config) {
+@@ -319,6 +369,19 @@ function createReactApp(App, react, dom, config) {
              this.pages.push(page);
              this.forceUpdate((...args) => {
                  perf.stop(PAGE_INIT);
@@ -107,7 +102,7 @@ index 1e3d43280a9738dda659344b6ec4192bcc466d40..b442381ee46d4f99b31e6940697d2050
                  return cb(...args);
              });
          }
-@@ -348,12 +411,23 @@ function createReactApp(App, react, dom, config) {
+@@ -338,12 +401,23 @@ function createReactApp(App, react, dom, config) {
              if (isReactComponent) {
                  props = { ref: appInstanceRef };
              }

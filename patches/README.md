@@ -7,17 +7,19 @@ pnpm applies one combined patch to each package version. We maintain **8 feature
 | Package | Ordered feature patches | Purpose |
 | --- | --- | --- |
 | `@tarojs/plugin-html@4.2.1` | `01-html-display-defaults` | Populate upstream HTML inline/block element sets without the Taro compiler rewriting installed files. |
-| `@tarojs/plugin-framework-react@4.2.1` | `01-react19-root-api` | Select `createRoot` by renderer capability instead of a React 18 version-string check. |
+| `@tarojs/plugin-framework-react@4.2.1` | `01-react19-root-api` | Use React 19 concurrent roots for App and standalone native-component entries; make standalone native-component setup explicitly synchronous with `flushSync`. |
 | | `02-mini-app-page-rendering` | Keep one React App tree, broadcast App data to native Pages, project Page children through an outlet, and seed App/Page data in the same initial native batch. |
 | | `03-h5-router-container` | Give H5 Page children a dedicated `taro_router` container so routing CSS does not target unrelated App siblings. |
-| `@tarojs/react@4.2.1` | `01-react19-reconciler` | Adapt event priorities, host configuration, commit updates, root error callbacks, and reconciler helpers to React 19. |
+| `@tarojs/react@4.2.1` | `01-react19-reconciler` | Target the pinned React 19 reconciler contract directly: concurrent roots, commit updates, scoped event priorities, error callbacks and distinct synchronous callback/work flushing. Remove legacy render APIs and align declarations. |
 | | `02-app-page-outlet-projection` | Mark the outlet's ancestor branch after each React commit so recursive native components forward the Page slot exactly once. |
 | `@tarojs/runtime@4.2.1` | `01-mini-app-page-rendering` | Make the App host a scheduler, separate `app.*` and `page.*` updates, and keep Page roots out of App serialization. These changes form one coordinated feature, not independent per-file patches. |
 | `canvas-confetti@1.9.4` | `01-canvas-confetti-enhancements` | Keep all existing confetti enhancements together: rotation/tilt controls, frame-clock repeat emission, cached path drawing, and DOMMatrix input normalization. Source, browser and module builds stay aligned. |
 
-React 19 support spans the renderer and framework packages. Mini App/Page rendering spans the runtime, renderer and framework packages; their corresponding patches must stay coordinated. The series are maintenance boundaries, **not independently selectable runtime features**.
+React 19 support spans the renderer and framework packages. The renderer targets `react-reconciler@0.34.0` and React 19.3, without legacy roots, React 18 host signatures or API probing. `render` and `findDOMNode` are no longer exported; callers use `createRoot` and refs. The internal `unmountComponentAtNode` host-lookup helper remains, but only tears down concurrent roots. Public `flushSync` runs callbacks through `flushSyncFromReconciler`; controlled-input restoration calls `flushSyncWork` before restoring native values. Neither operation waits for native `setData` completion.
 
-This split preserves the previous patched package bytes. It does not implement synchronous first-frame rendering: the existing initial App/Page data batch still uses Taro's asynchronous scheduler.
+Mini App/Page rendering spans the runtime, renderer and framework packages; their corresponding patches must stay coordinated. The series are maintenance boundaries, **not independently selectable runtime features**.
+
+The original feature split preserved the previous patched package bytes; the React-19-only adaptation now simplifies that renderer contract. Normal VPT App/Page initialization remains asynchronous, including its initial native data batch. Only upstream Taro's standalone/mixed-mode component bootstrap now explicitly flushes its initial React commit: the pinned reconciler already ignored its old legacy-root request, so that path previously had no synchronous-commit guarantee. VPT's generated App/Page entries do not call that standalone bootstrap.
 
 ## Compose and install
 

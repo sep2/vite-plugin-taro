@@ -1,17 +1,43 @@
 diff --git a/dist/runtime.js b/dist/runtime.js
-index d428a646592651e95355ce0114811295004a9cde..1e3d43280a9738dda659344b6ec4192bcc466d40 100644
+index d428a646592651e95355ce0114811295004a9cde..94d631f6a7e8dfc78ae4f7a51fe3ab343186938e 100644
 --- a/dist/runtime.js
 +++ b/dist/runtime.js
-@@ -300,7 +300,11 @@ function createReactApp(App, react, dom, config) {
+@@ -291,7 +291,6 @@ function createReactApp(App, react, dom, config) {
+         // appWrapper ? cb() : appWrapperPromise.then(() => cb())
+     }
+     function renderReactRoot() {
+-        var _a, _b;
+         const appId = (config === null || config === void 0 ? void 0 : config.appId) || 'app';
+         let container = document.getElementById(appId);
+         if (container == null) {
+@@ -300,14 +299,9 @@ function createReactApp(App, react, dom, config) {
              container.id = appId;
              appContainer === null || appContainer === void 0 ? void 0 : appContainer.appendChild(container);
          }
 -        if ((react.version || '').startsWith('18')) {
-+        /*
-+         * Upstream enables createRoot only for a React 18 version string, which skips the entire App render on React 19.
-+         * Detect the renderer capability instead: React 18/19 take the modern path and older renderers retain the fallback.
-+         */
-+        if (typeof ReactDOM$1.createRoot === 'function') {
-             const root = ReactDOM$1.createRoot(container);
-             (_a = root.render) === null || _a === void 0 ? void 0 : _a.call(root, h$1(AppWrapper));
-         }
+-            const root = ReactDOM$1.createRoot(container);
+-            (_a = root.render) === null || _a === void 0 ? void 0 : _a.call(root, h$1(AppWrapper));
+-        }
+-        else {
+-            // eslint-disable-next-line react/no-deprecated
+-            (_b = ReactDOM$1.render) === null || _b === void 0 ? void 0 : _b.call(ReactDOM$1, h$1(AppWrapper), container);
+-        }
++        // VPT requires React 19: both the Mini renderer and react-dom/client provide concurrent roots.
++        const root = ReactDOM$1.createRoot(container);
++        root.render(h$1(AppWrapper));
+     }
+     class AppWrapper extends react.Component {
+         constructor(props) {
+@@ -591,8 +585,10 @@ function initNativeComponentEntry(params) {
+         (_a = app === null || app === void 0 ? void 0 : app.parentNode) === null || _a === void 0 ? void 0 : _a.appendChild(nativeApp);
+         app = nativeApp;
+     }
+-    // eslint-disable-next-line react/no-deprecated
+-    ReactDOM.render(h(Entry, {}), app);
++    // Native created/attached callbacks require Entry.componentDidMount to install the App before setup returns.
++    ReactDOM.flushSync(() => {
++        ReactDOM.createRoot(app).render(h(Entry, {}));
++    });
+ }
+ function createNativePageConfig(Component, pageName, data, react, reactDOM, pageConfig) {
+     reactMeta.R = react;

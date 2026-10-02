@@ -171,9 +171,9 @@ overrides:
   '@tarojs/plugin-platform-h5@4.2.1>babel-plugin-transform-taroapi': '-'
 
 patchedDependencies:
-  '@tarojs/plugin-framework-react@4.2.1': bee126dd99cc13ef598c6e19119aa21388b3e0d81d96450a8f9fa98ec6f31145
+  '@tarojs/plugin-framework-react@4.2.1': a0e57fda5ad12bc7771f8428b1435f8eb2587be6efc73215495e5573f204a489
   '@tarojs/plugin-html@4.2.1': 8f23b4dc7380fb234619721f6460781344add219e2bcca7a143b76946b9312e6
-  '@tarojs/react@4.2.1': 9fec274af4b294f6b595ae1c908b54e8162c6b1c7a37cb1bad3d4f6a3cf169e9
+  '@tarojs/react@4.2.1': 7d482282bd4992adb71997f6d4fb6cbf12c82ed433c0834cb44432262c74d380
   '@tarojs/runtime@4.2.1': 5034551a8c30ecf530525ee59b89e48d5f772cd84a56622034ddc96801048d12
   canvas-confetti@1.9.4: 3f4a594e24a7e49abb6d1e667918977b4679fe1b93dc4e9efe04f87e9539ea36
 
@@ -506,7 +506,7 @@ importers:
         version: 4.2.1(@tarojs/helper@4.2.1(supports-color@7.2.0))(@types/react@19.3.0)(postcss@8.5.28)
       '@tarojs/plugin-framework-react':
         specifier: 4.2.1
-        version: 4.2.1(patch_hash=bee126dd99cc13ef598c6e19119aa21388b3e0d81d96450a8f9fa98ec6f31145)(@tarojs/helper@4.2.1(supports-color@7.2.0))(@tarojs/runtime@4.2.1(patch_hash=5034551a8c30ecf530525ee59b89e48d5f772cd84a56622034ddc96801048d12))(@tarojs/shared@4.2.1)(react@19.3.0)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0))
+        version: 4.2.1(patch_hash=a0e57fda5ad12bc7771f8428b1435f8eb2587be6efc73215495e5573f204a489)(@tarojs/helper@4.2.1(supports-color@7.2.0))(@tarojs/runtime@4.2.1(patch_hash=5034551a8c30ecf530525ee59b89e48d5f772cd84a56622034ddc96801048d12))(@tarojs/shared@4.2.1)(react@19.3.0)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0))
       '@tarojs/plugin-html':
         specifier: 4.2.1
         version: 4.2.1(patch_hash=8f23b4dc7380fb234619721f6460781344add219e2bcca7a143b76946b9312e6)(@tarojs/helper@4.2.1(supports-color@7.2.0))(@tarojs/runtime@4.2.1(patch_hash=5034551a8c30ecf530525ee59b89e48d5f772cd84a56622034ddc96801048d12))(@tarojs/shared@4.2.1)
@@ -524,7 +524,7 @@ importers:
         version: 4.2.1(@tarojs/service@4.2.1(supports-color@7.2.0))(@tarojs/shared@4.2.1)
       '@tarojs/react':
         specifier: 4.2.1
-        version: 4.2.1(patch_hash=9fec274af4b294f6b595ae1c908b54e8162c6b1c7a37cb1bad3d4f6a3cf169e9)(react@19.3.0)
+        version: 4.2.1(patch_hash=7d482282bd4992adb71997f6d4fb6cbf12c82ed433c0834cb44432262c74d380)(react@19.3.0)
       '@tarojs/router':
         specifier: 4.2.1
         version: 4.2.1(@tarojs/runtime@4.2.1(patch_hash=5034551a8c30ecf530525ee59b89e48d5f772cd84a56622034ddc96801048d12))(@tarojs/shared@4.2.1)(@tarojs/taro@4.2.1(@tarojs/components@4.2.1(@tarojs/helper@4.2.1(supports-color@7.2.0))(@types/react@19.3.0)(postcss@8.5.28))(@tarojs/helper@4.2.1(supports-color@7.2.0))(@tarojs/shared@4.2.1)(@types/react@19.3.0)(postcss@8.5.28))
@@ -7138,7 +7138,7 @@ snapshots:
       - '@swc/helpers'
       - supports-color
 
-  '@tarojs/plugin-framework-react@4.2.1(patch_hash=bee126dd99cc13ef598c6e19119aa21388b3e0d81d96450a8f9fa98ec6f31145)(@tarojs/helper@4.2.1(supports-color@7.2.0))(@tarojs/runtime@4.2.1(patch_hash=5034551a8c30ecf530525ee59b89e48d5f772cd84a56622034ddc96801048d12))(@tarojs/shared@4.2.1)(react@19.3.0)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0))':
+  '@tarojs/plugin-framework-react@4.2.1(patch_hash=a0e57fda5ad12bc7771f8428b1435f8eb2587be6efc73215495e5573f204a489)(@tarojs/helper@4.2.1(supports-color@7.2.0))(@tarojs/runtime@4.2.1(patch_hash=5034551a8c30ecf530525ee59b89e48d5f772cd84a56622034ddc96801048d12))(@tarojs/shared@4.2.1)(react@19.3.0)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0))':
     dependencies:
       '@tarojs/helper': 4.2.1(supports-color@7.2.0)
       '@tarojs/runtime': 4.2.1(patch_hash=5034551a8c30ecf530525ee59b89e48d5f772cd84a56622034ddc96801048d12)
@@ -7201,7 +7201,7 @@ snapshots:
       '@tarojs/service': 4.2.1(supports-color@7.2.0)
       '@tarojs/shared': 4.2.1
 
-  '@tarojs/react@4.2.1(patch_hash=9fec274af4b294f6b595ae1c908b54e8162c6b1c7a37cb1bad3d4f6a3cf169e9)(react@19.3.0)':
+  '@tarojs/react@4.2.1(patch_hash=7d482282bd4992adb71997f6d4fb6cbf12c82ed433c0834cb44432262c74d380)(react@19.3.0)':
     dependencies:
       '@tarojs/runtime': 4.2.1(patch_hash=5034551a8c30ecf530525ee59b89e48d5f772cd84a56622034ddc96801048d12)
       '@tarojs/shared': 4.2.1

@@ -1,5 +1,5 @@
 diff --git a/dist/runtime.js b/dist/runtime.js
-index d428a646592651e95355ce0114811295004a9cde..621b837e89b2b1e53a8ee4a96b478be5bbdac209 100644
+index d428a646592651e95355ce0114811295004a9cde..2dd626030caa263b53d631a79630b6597968ca94 100644
 --- a/dist/runtime.js
 +++ b/dist/runtime.js
 @@ -1,6 +1,16 @@
@@ -66,7 +66,12 @@ index d428a646592651e95355ce0114811295004a9cde..621b837e89b2b1e53a8ee4a96b478be5
      const appInstanceRef = react.createRef();
      const isReactComponent = isClassComponent(react, App);
      let appWrapper;
-@@ -296,11 +327,27 @@ function createReactApp(App, react, dom, config) {
+@@ -291,23 +322,34 @@ function createReactApp(App, react, dom, config) {
+         // appWrapper ? cb() : appWrapperPromise.then(() => cb())
+     }
+     function renderReactRoot() {
+-        var _a, _b;
+         const appId = (config === null || config === void 0 ? void 0 : config.appId) || 'app';
          let container = document.getElementById(appId);
          if (container == null) {
              const appContainer = document.getElementById(CONTAINER);
@@ -81,6 +86,13 @@ index d428a646592651e95355ce0114811295004a9cde..621b837e89b2b1e53a8ee4a96b478be5
              appContainer === null || appContainer === void 0 ? void 0 : appContainer.appendChild(container);
          }
 -        if ((react.version || '').startsWith('18')) {
+-            const root = ReactDOM$1.createRoot(container);
+-            (_a = root.render) === null || _a === void 0 ? void 0 : _a.call(root, h$1(AppWrapper));
+-        }
+-        else {
+-            // eslint-disable-next-line react/no-deprecated
+-            (_b = ReactDOM$1.render) === null || _b === void 0 ? void 0 : _b.call(ReactDOM$1, h$1(AppWrapper), container);
+-        }
 +        /*
 +         * renderReactRoot runs only for the Mini Program branch. The patched WX document makes this App container a
 +         * TaroRootElement, so it serves simultaneously as React's existing host container and Taro's App scheduler; its
@@ -88,18 +100,9 @@ index d428a646592651e95355ce0114811295004a9cde..621b837e89b2b1e53a8ee4a96b478be5
 +         * batches across Page surfaces. No detached scheduler node, second React root, or host-property override participates.
 +         */
 +        container.ctx = { setData: broadcastAppUpdate };
-+        /*
-+         * Upstream enables createRoot only for a React 18 version string, which skips the entire App render on React 19.
-+         * Detect the renderer capability instead: React 18/19 take the modern path and older renderers retain the fallback.
-+         */
-+        if (typeof ReactDOM$1.createRoot === 'function') {
-             const root = ReactDOM$1.createRoot(container);
-             (_a = root.render) === null || _a === void 0 ? void 0 : _a.call(root, h$1(AppWrapper));
-         }
-@@ -308,6 +355,11 @@ function createReactApp(App, react, dom, config) {
-             // eslint-disable-next-line react/no-deprecated
-             (_b = ReactDOM$1.render) === null || _b === void 0 ? void 0 : _b.call(ReactDOM$1, h$1(AppWrapper), container);
-         }
++        // VPT requires React 19: both the Mini renderer and react-dom/client provide concurrent roots.
++        const root = ReactDOM$1.createRoot(container);
++        root.render(h$1(AppWrapper));
 +        /*
 +         * Return the exact host passed to ReactDOM. AppWrapper.mount closes over this immutable value when a Page is added,
 +         * guaranteeing that its initial snapshot comes from the same singleton App tree without a host registry or lookup.
@@ -108,7 +111,7 @@ index d428a646592651e95355ce0114811295004a9cde..621b837e89b2b1e53a8ee4a96b478be5
      }
      class AppWrapper extends react.Component {
          constructor(props) {
-@@ -325,6 +377,19 @@ function createReactApp(App, react, dom, config) {
+@@ -325,6 +367,19 @@ function createReactApp(App, react, dom, config) {
              this.pages.push(page);
              this.forceUpdate((...args) => {
                  perf.stop(PAGE_INIT);
@@ -128,7 +131,7 @@ index d428a646592651e95355ce0114811295004a9cde..621b837e89b2b1e53a8ee4a96b478be5
                  return cb(...args);
              });
          }
-@@ -344,12 +409,25 @@ function createReactApp(App, react, dom, config) {
+@@ -344,12 +399,25 @@ function createReactApp(App, react, dom, config) {
              if (isReactComponent) {
                  props = { ref: appInstanceRef };
              }
@@ -158,3 +161,16 @@ index d428a646592651e95355ce0114811295004a9cde..621b837e89b2b1e53a8ee4a96b478be5
      const [ONLAUNCH, ONSHOW, ONHIDE] = hooks.call('getMiniLifecycleImpl').app;
      const appObj = Object.create({
          render(cb) {
+@@ -591,8 +659,10 @@ function initNativeComponentEntry(params) {
+         (_a = app === null || app === void 0 ? void 0 : app.parentNode) === null || _a === void 0 ? void 0 : _a.appendChild(nativeApp);
+         app = nativeApp;
+     }
+-    // eslint-disable-next-line react/no-deprecated
+-    ReactDOM.render(h(Entry, {}), app);
++    // Native created/attached callbacks require Entry.componentDidMount to install the App before setup returns.
++    ReactDOM.flushSync(() => {
++        ReactDOM.createRoot(app).render(h(Entry, {}));
++    });
+ }
+ function createNativePageConfig(Component, pageName, data, react, reactDOM, pageConfig) {
+     reactMeta.R = react;
