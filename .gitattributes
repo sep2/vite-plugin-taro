@@ -3,4 +3,5 @@
 
 # Patch files must keep LF line endings. CRLF checkout makes git apply
 # treat blank context lines inside hunks as corrupt patches on Windows.
-patches/*.patch text eol=lf
+# A single space is a required empty context line, not trailing source whitespace.
+*.patch text eol=lf -whitespace

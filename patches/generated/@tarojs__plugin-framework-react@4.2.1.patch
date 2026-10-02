@@ -1,12 +1,12 @@
 diff --git a/dist/runtime.js b/dist/runtime.js
-index d428a64..621b837 100644
+index d428a646592651e95355ce0114811295004a9cde..621b837e89b2b1e53a8ee4a96b478be5bbdac209 100644
 --- a/dist/runtime.js
 +++ b/dist/runtime.js
 @@ -1,6 +1,16 @@
  import { EMPTY_OBJ, isArray, isFunction, hooks, ensure, isUndefined } from '@tarojs/shared';
 -import { Current, getPageInstance, injectPageInstance, incrementId, document, perf, PAGE_INIT, CONTAINER, window, CONTEXT_ACTIONS, safeExecute, ON_HIDE, eventCenter, getOnHideEventKey, ON_SHOW, requestAnimationFrame, getOnShowEventKey, ON_READY, getOnReadyEventKey, removePageInstance, getPath, eventHandler, addLeadingSlash } from '@tarojs/runtime';
 +import { Current, getPageInstance, injectPageInstance, incrementId, document, perf, PAGE_INIT, CONTAINER, window, CONTEXT_ACTIONS, safeExecute, ON_HIDE, eventCenter, getOnHideEventKey, ON_SHOW, requestAnimationFrame, getOnShowEventKey, ON_READY, getOnReadyEventKey, removePageInstance, getPath, eventHandler, addLeadingSlash, hydrate } from '@tarojs/runtime';
-
+ 
 +/**
 + * WX App-wrap flow:
 + *
@@ -21,18 +21,17 @@ index d428a64..621b837 100644
      PageContext: EMPTY_OBJ,
      R: EMPTY_OBJ,
 @@ -152,7 +162,6 @@ var taroHooks = /*#__PURE__*/Object.freeze({
-
+ 
  let h$1;
  let ReactDOM$1;
 -let Fragment;
  const pageKeyId = incrementId();
  function setReconciler(ReactDOM) {
      hooks.tap('getLifecycle', function (instance, lifecycle) {
-@@ -257,6 +266,29 @@ function connectReactPage(R, id) {
-         };
+@@ -258,6 +267,29 @@ function connectReactPage(R, id) {
      };
  }
-+/**
+ /**
 + * One App reconciliation produces one granular app.* batch, while WX stores an App mirror inside every mounted native
 + * Page. Resolve the native stack only when that batch flushes instead of maintaining a second Page registry or active-Page
 + * tracker. WeChat orders getCurrentPages() from the oldest hidden Page to the current visible Page, so forEach dispatches
@@ -55,9 +54,10 @@ index d428a64..621b837 100644
 +        }
 +    });
 +}
- /**
++/**
   * 桥接小程序 App 构造器和 React 渲染流程
   * @param App 用户编写的入口组件
+  * @param react 框架
 @@ -272,7 +304,6 @@ function createReactApp(App, react, dom, config) {
      reactMeta.R = react;
      h$1 = react.createElement;

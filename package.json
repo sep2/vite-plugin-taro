@@ -12,6 +12,8 @@
     },
     "homepage": "https://vpt.js.org",
     "scripts": {
+        "patches:build": "node scripts/patches.ts build",
+        "patches:check": "node scripts/patches.ts check",
         "prepare:taro": "pnpm --filter vite-plugin-taro-runtime build",
         "build:plugin": "pnpm --filter vite-plugin-taro build",
         "build:native-comp-demo:wx": "pnpm --filter native-comp-demo build-wx",

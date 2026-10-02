@@ -27,6 +27,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify generated dependency patches
+        run: pnpm patches:check
+
       - name: Prepare Taro packages
         run: pnpm prepare:taro
 
@@ -77,6 +80,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Verify generated dependency patches
+        run: pnpm patches:check
 
       - name: Prepare Taro packages
         run: pnpm prepare:taro

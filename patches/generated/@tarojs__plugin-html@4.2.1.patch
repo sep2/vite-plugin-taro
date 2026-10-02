@@ -1,7 +1,8 @@
 diff --git a/dist/runtime.js b/dist/runtime.js
+index c48861da1c8d577ef52af8f4454bbfeaf6324ceb..80218d7cad4c0a83137c6b0c340c1429aa8a9df1 100644
 --- a/dist/runtime.js
 +++ b/dist/runtime.js
-@@ -18,8 +18,10 @@
+@@ -18,8 +18,10 @@ function genAttrMapFnFromDir(dir) {
      };
      return fn;
  }

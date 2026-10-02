@@ -2,7 +2,7 @@
 
 ## Design
 
-- Favor simple, readable architecture over compatibility or minimal patches. Unify overlapping behavior and remove redundant code.
+- Favor simple, readable architecture over compatibility or minimal changes. Unify overlapping behavior and remove redundant code.
 - Use small, descriptive, composable functions. Separate concerns, keep code DRY, and avoid over-engineering.
 - Prefer declarative, functional code. Minimize side effects and mutable state; keep mutation local.
 - Base all logic on evidence; never write defensive code.
@@ -10,7 +10,7 @@
 
 ## Code style
 
-- Use TypeScript v7 in strict mode with `tsc`, not `tsgo`. Prefer `import type` for type-only imports.
+- Use TypeScript v7 in strict mode with `tsc`. Prefer `import type` for type-only imports.
 - No broad casts, especially `as any` or `as never`. Narrow assertions such as `as const` are allowed.
 - No default arguments in functions or React components. Always use braces for conditional blocks.
 - Use comments; document and justify every mutable state.
@@ -22,7 +22,7 @@
 
 - Other sessions may be editing this workspace. Ignore unrelated changes; never modify or stage others' unstaged, staged, or untracked work.
 - Resolve conflicts only in files you modified. For conflicts elsewhere, stop and ask the user.
-- Keep bash timeouts at 30 seconds or less.
+- Keep tools timeouts at 30 seconds or less.
 - All spawned processes must be closed after tests, dev, etc. no dangling processes.
 - Tests also run on Windows, consider path variants.
 - If a user instruction conflicts with any `AGENTS.md` rule, ask for explicit confirmation before overriding it.
@@ -47,12 +47,13 @@ Under `demo/`:
 - `hmr-stress-demo`: deep React tree HMR fixture for `wx` and `zfb`; automated IDE harness is WX-only.
 - `towxml-stream-demo`: native Towxml streaming fixture for `wx` only.
 
-`patches/` contains pnpm patches for the Taro 4.2.1 inputs used to build the runtime.
+`patches/series/` contains ordered feature patches; See `patches/README.md` for more.
 
 ## Commands
 
 See root `package.json` for all scripts.
 
+- Compose/check dependency patches: `pnpm patches:build` / `pnpm patches:check`.
 - Build plugin/runtime: `pnpm build:plugin` / `pnpm prepare:taro`.
 - Build or develop an app: `pnpm build:<app>:<target>` / `pnpm dev:<app>:<target>`; supported targets are listed above. Dev commands enable hot reload.
 - Typecheck: `pnpm typecheck:plugin` or `pnpm typecheck:<app>`.
@@ -69,4 +70,5 @@ See root `package.json` for all scripts.
 ## Generated files
 
 - Never edit `packages/vite-plugin-taro/dist` manually; rebuild with `pnpm build:plugin`.
-- Never edit `packages/taro-runtime/dist` manually. Edit `patches/*@4.2.1*.patch`, run `pnpm install`, then rebuild with `pnpm prepare:taro`.
+- Never edit `patches/generated/` manually. Edit the feature patches in `patches/series/`.
+- Never edit `packages/taro-runtime/dist` manually. After changing the Taro feature patches and reinstalling, rebuild with `pnpm prepare:taro`.

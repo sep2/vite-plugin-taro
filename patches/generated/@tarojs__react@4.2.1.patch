@@ -1,5 +1,5 @@
 diff --git a/dist/react.esm.js b/dist/react.esm.js
-index ad8a51f..ec334da 100644
+index ad8a51f02788c6e0354579956625da33a00e14a2..ec334daba4c51814d93415088bd8834e72f9e410 100644
 --- a/dist/react.esm.js
 +++ b/dist/react.esm.js
 @@ -1,7 +1,12 @@
@@ -13,7 +13,7 @@ index ad8a51f..ec334da 100644
 +    DiscreteEventPriority,
 +    NoEventPriority
 +} from 'react-reconciler/constants';
-
+ 
  const supportedInputTypes = {
      color: true,
 @@ -20,12 +25,6 @@ const supportedInputTypes = {
@@ -31,7 +31,7 @@ index ad8a51f..ec334da 100644
          case 'cancel':
 @@ -600,7 +599,149 @@ function styleObjectToCss(style) {
  }
-
+ 
  /* eslint-disable @typescript-eslint/indent */
 +let taroCurrentUpdatePriority = NoEventPriority;
 +const taroNotPendingTransition = null;

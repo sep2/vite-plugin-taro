@@ -1,0 +1,17 @@
+diff --git a/dist/runtime.js b/dist/runtime.js
+index d428a646592651e95355ce0114811295004a9cde..1e3d43280a9738dda659344b6ec4192bcc466d40 100644
+--- a/dist/runtime.js
++++ b/dist/runtime.js
+@@ -300,7 +300,11 @@ function createReactApp(App, react, dom, config) {
+             container.id = appId;
+             appContainer === null || appContainer === void 0 ? void 0 : appContainer.appendChild(container);
+         }
+-        if ((react.version || '').startsWith('18')) {
++        /*
++         * Upstream enables createRoot only for a React 18 version string, which skips the entire App render on React 19.
++         * Detect the renderer capability instead: React 18/19 take the modern path and older renderers retain the fallback.
++         */
++        if (typeof ReactDOM$1.createRoot === 'function') {
+             const root = ReactDOM$1.createRoot(container);
+             (_a = root.render) === null || _a === void 0 ? void 0 : _a.call(root, h$1(AppWrapper));
+         }

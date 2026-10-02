@@ -1,0 +1,36 @@
+diff --git a/dist/runtime.js b/dist/runtime.js
+index b442381ee46d4f99b31e6940697d2050316e07ab..621b837e89b2b1e53a8ee4a96b478be5bbdac209 100644
+--- a/dist/runtime.js
++++ b/dist/runtime.js
+@@ -162,7 +162,6 @@ var taroHooks = /*#__PURE__*/Object.freeze({
+ 
+ let h$1;
+ let ReactDOM$1;
+-let Fragment;
+ const pageKeyId = incrementId();
+ function setReconciler(ReactDOM) {
+     hooks.tap('getLifecycle', function (instance, lifecycle) {
+@@ -305,7 +304,6 @@ function createReactApp(App, react, dom, config) {
+     reactMeta.R = react;
+     h$1 = react.createElement;
+     ReactDOM$1 = dom;
+-    Fragment = react.Fragment;
+     const appInstanceRef = react.createRef();
+     const isReactComponent = isClassComponent(react, App);
+     let appWrapper;
+@@ -414,11 +412,13 @@ function createReactApp(App, react, dom, config) {
+             const pageElements = elements.slice();
+             /*
+              * Keep Page elements as ordinary App children so Context, effects, refs, state, and HMR retain one React tree.
+-             * WX uses a private host at the exact {children} position. The runtime patch makes that host opaque to App
++             * Web gives the Page stack its own taro_router host: upstream routing CSS addresses direct Page children and uses
++             * their sibling order to hide retained Pages, so unrelated App siblings must not participate in that ordering.
++             * WX instead uses a private host at the exact {children} position. The runtime patch makes that host opaque to App
+              * serialization, while generated Page WXML consumes its slot from the separate Page data root.
+              */
+             const children = process.env.TARO_PLATFORM === 'web'
+-                ? h$1(Fragment !== null && Fragment !== void 0 ? Fragment : 'div', null, pageElements)
++                ? h$1('div', { className: 'taro_router' }, pageElements)
+                 : h$1('vpt_page_outlet', null, pageElements);
+             return h$1(App, props, children);
+         }

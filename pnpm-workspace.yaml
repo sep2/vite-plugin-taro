@@ -27,11 +27,11 @@ allowBuilds:
   esbuild: true
 
 patchedDependencies:
-  '@tarojs/plugin-html@4.2.1': patches/@tarojs__plugin-html@4.2.1.patch
-  '@tarojs/plugin-framework-react@4.2.1': patches/@tarojs__plugin-framework-react@4.2.1-react19.patch
-  '@tarojs/react@4.2.1': patches/@tarojs__react@4.2.1-react19.patch
-  '@tarojs/runtime@4.2.1': patches/@tarojs__runtime@4.2.1.patch
-  canvas-confetti@1.9.4: patches/canvas-confetti@1.9.4.patch
+  '@tarojs/plugin-html@4.2.1': patches/generated/@tarojs__plugin-html@4.2.1.patch
+  '@tarojs/plugin-framework-react@4.2.1': patches/generated/@tarojs__plugin-framework-react@4.2.1.patch
+  '@tarojs/react@4.2.1': patches/generated/@tarojs__react@4.2.1.patch
+  '@tarojs/runtime@4.2.1': patches/generated/@tarojs__runtime@4.2.1.patch
+  canvas-confetti@1.9.4: patches/generated/canvas-confetti@1.9.4.patch
 
 minimumReleaseAgeExclude:
   - '@rolldown/binding-android-arm-eabi@1.2.12'
