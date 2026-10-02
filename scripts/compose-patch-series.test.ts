@@ -44,7 +44,8 @@ test('composes overlapping feature patches into one upstream-relative patch', (t
     writeFileSync(path.join(pristine, 'value.txt'), 'one\n')
     const output = path.join(directory, 'combined.patch')
     writeFileSync(output, combined)
-    git(pristine, ['apply', output])
+    // Verify the generated patch bytes without the Windows host's automatic CRLF conversion.
+    git(pristine, ['-c', 'core.autocrlf=false', 'apply', output])
     assert.equal(readFileSync(path.join(pristine, 'value.txt'), 'utf8'), 'three\n')
 
     // Recomposition from another extraction is byte-stable; no timestamps or temporary paths enter the patch.
