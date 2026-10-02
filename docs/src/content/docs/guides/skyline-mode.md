@@ -21,7 +21,8 @@ vpt({
         rendererOptions: {
             skyline: {
                 defaultDisplayBlock: true,
-                defaultContentBox: true
+                defaultContentBox: true,
+                disableABTest: true
             }
         },
         window: {
@@ -45,6 +46,7 @@ vpt({
 | `lazyCodeLoading: 'requiredComponents'` | 按需注入页面所需组件。 |
 | `defaultDisplayBlock` | 将 Skyline 节点的默认布局从 `flex` 调整为 `block`。 |
 | `defaultContentBox` | 将默认盒模型从 `border-box` 调整为 `content-box`，更接近 Web。 |
+| `disableABTest: true` | 跳过 We 分析 AB 实验，让符合条件的真机直接使用 Skyline。 |
 | `navigationStyle: 'custom'` | 由应用绘制导航栏，而不是使用微信默认导航栏。 |
 | `skylineRenderEnable` | 控制微信开发者工具是否开启 Skyline 渲染调试。 |
 
@@ -83,7 +85,8 @@ appJson: {
     rendererOptions: {
         skyline: {
             defaultDisplayBlock: true,
-            defaultContentBox: true
+            defaultContentBox: true,
+            disableABTest: true
         }
     }
 }
@@ -113,7 +116,8 @@ appJson: {
     rendererOptions: {
         skyline: {
             defaultDisplayBlock: true,
-            defaultContentBox: true
+            defaultContentBox: true,
+            disableABTest: true
         }
     }
 }
@@ -146,6 +150,8 @@ Skyline 尽量保持小程序上层语法不变，但不是浏览器 CSS 的完�
 
 ## 发布与灰度
 
-配置 `renderer: 'skyline'` 不代表所有正式用户会立即使用 Skyline。微信支持通过 We 分析 AB 实验逐步放量，也允许开发版和体验版通过 “Switch Render” 在 `Auto`、`WebView` 与 `Skyline` 之间切换。
+微信默认要求 Skyline 经过 We 分析 AB 实验；仅配置 `renderer: 'skyline'` 而未配置实验时，真机仍可能使用 WebView。模板与 Skyline 示例现在默认设置 `disableABTest: true`，符合条件的真机无需配置实验即可使用 Skyline。已有项目需要手动补充上述 `rendererOptions.skyline` 配置；升级 vpt 不会改写应用配置。
 
-发布前应先用小范围用户验证稳定性、性能和 WebView 回退效果，再逐步扩大 Skyline 流量。具体流程请参考[微信 Skyline 迁移指南](https://developers.weixin.qq.com/miniprogram/dev/framework/runtime/skyline/migration/)。
+开发者工具的 `skylineRenderEnable` 只影响模拟器，不会控制手机。在真机的 **… → 开发调试 → Switch Render** 中选择 **Auto** 来验证应用配置，或选择 **Skyline** 强制调试。手动选择的 **WebView** 会持续生效，直到再次切换。以原生 `Page.renderer` 的实际值为准；不支持 Skyline 的客户端仍可能回退。
+
+发布前仍需验证真机稳定性、性能和 WebView 回退效果。如需通过 We 分析逐步放量，将 `disableABTest` 改为 `false` 并配置 AB 实验。具体流程请参考[微信 Skyline 发布配置](https://developers.weixin.qq.com/miniprogram/dev/framework/runtime/skyline/migration/release.html)。

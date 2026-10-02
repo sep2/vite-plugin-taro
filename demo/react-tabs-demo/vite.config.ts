@@ -91,7 +91,8 @@ function createAppJson(target: VptTarget): VptJsonObject {
                 rendererOptions: {
                     skyline: {
                         defaultDisplayBlock: true,
-                        defaultContentBox: true
+                        defaultContentBox: true,
+                        disableABTest: true
                     }
                 },
                 window: {

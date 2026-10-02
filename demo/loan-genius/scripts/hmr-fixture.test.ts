@@ -12,6 +12,8 @@ test('state-retention probe reads the opt-in URL from the host global', async ()
         const source = await fixture.read('src/pages/calculator/index.tsx')
         assert.match(source, /id="loan-polyfill-probe">URL:\{new globalThis\.URL\('child'/)
         assert.doesNotMatch(source, /id="loan-polyfill-probe">URL:\{new URL\(/)
+        const config = await fixture.read('vite.config.ts')
+        assert.doesNotMatch(config, /renderer: 'skyline'|rendererOptions|disableABTest/)
     })
 })
 

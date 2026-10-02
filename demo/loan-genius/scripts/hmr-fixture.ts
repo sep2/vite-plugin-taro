@@ -133,7 +133,7 @@ async function configureAutomatableRenderer(fixture: LoanHmrFixture): Promise<vo
     await replaceFixtureSource(fixture, 'vite.config.ts', [
         ["                renderer: 'skyline',\n", ''],
         [
-            '                rendererOptions: {\n                    skyline: {\n                        defaultDisplayBlock: true,\n                        defaultContentBox: true\n                    }\n                },\n',
+            '                rendererOptions: {\n                    skyline: {\n                        defaultDisplayBlock: true,\n                        defaultContentBox: true,\n                        disableABTest: true\n                    }\n                },\n',
             ''
         ]
     ])
