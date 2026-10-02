@@ -16,6 +16,8 @@ import {
     miniComponentShellId,
     miniCustomWrapperShellId,
     miniPageCapsuleId,
+    miniPageComponentConstructorRuntimeId,
+    miniPageConstructorRuntimeId,
     miniPageShellId,
     miniPolyfillsId,
     miniTaroRuntimeId,
@@ -48,6 +50,13 @@ test('classifies native lifecycle shells and entry capsules by module identity',
 test('recognizes route-qualified lifecycle entries', () => {
     assert.equal(classifyModule(chunk(`${miniPageShellId}?route=pages%2Fhome`)), 'native')
     assert.equal(classifyModule(chunk(`${miniPageCapsuleId}?route=pages%2Fhome`)), 'entry-capsule')
+})
+
+test('constructor modules bundled into bootstrap preserve its amphibious identity', () => {
+    for (const constructorId of [miniPageConstructorRuntimeId, miniPageComponentConstructorRuntimeId]) {
+        assert.equal(classifyModule(chunk(constructorId, miniBootstrapId)), 'amphibious')
+        assert.equal(classifyModule(chunk(miniBootstrapId, constructorId)), 'amphibious')
+    }
 })
 
 test('classifies application-only and empty chunks as normal capsules', () => {

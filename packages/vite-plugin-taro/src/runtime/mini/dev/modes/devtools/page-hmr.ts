@@ -42,7 +42,7 @@ export function injectPageHmr(config: HmrPageConfig): HmrPageConfig {
         }
 
         /*
-         * Arm the lifecycle wrappers on this exact static config before it is passed back to `Page(config)`. DevTools then
+         * Arm the lifecycle wrappers on this exact static config before native registration adapts it to Page or Component. DevTools then
          * triggers an unload/load/show sequence for that native re-registration: unload and load observe `true` and return before
          * entering Taro, preserving the mounted React tree and its original Page connection; show consumes the one-shot gate by
          * restoring `false`. Ordinary navigation never enters this branch, and every Page config owns an independent state, so
@@ -50,7 +50,7 @@ export function injectPageHmr(config: HmrPageConfig): HmrPageConfig {
          */
         existingState.isReregistering = true
         /*
-         * `Page(config)` reads `config.data` as the initial native view-model for this registration. The Page owns current app
+         * Native registration reads `config.data` as the initial view-model for this registration. The Page owns current app
          * and ordinary Page fields, while each mounted CustomWrapper owns the current snapshot below its native boundary. Join
          * those already-serialized snapshots before registration so the native host never publishes the stale initial placeholder tree.
          * This lifecycle handoff performs no setData call and runs before React Refresh can publish another logical tree.
@@ -77,7 +77,8 @@ export function injectPageHmr(config: HmrPageConfig): HmrPageConfig {
         mountedPage: undefined
     }
 
-    config[pageHmrStateKey] = state
+    // Handoff state belongs to the static config, not the native methods copied by the Component constructor adapter.
+    Object.defineProperty(config, pageHmrStateKey, { value: state })
 
     config.onUnload = function (this: NativePage, ...args: unknown[]) {
         if (state.isReregistering) {

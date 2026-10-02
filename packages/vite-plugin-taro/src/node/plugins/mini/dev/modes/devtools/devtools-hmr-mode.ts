@@ -84,7 +84,7 @@ function createDevtoolsEntryBanner(pageFiles: ReadonlySet<string>) {
     }
 }
 
-/** Transforms only the native Page shell. */
+/** Transforms only the shared native Page shell, independently of its selected constructor. */
 function createDevtoolsPagePlugin(): Plugin {
     return {
         name: 'vpt:mini-page-shell-hmr',
@@ -100,10 +100,8 @@ function createDevtoolsPagePlugin(): Plugin {
 }
 
 /**
- * Injects Page handoff at the exact native registration edge rather than wrapping arbitrary user `Page` calls.
- *
- * The native shell has one stable `Page(pageConfig)` contract. Failing when that contract changes is intentional: silently
- * skipping this transform would let DevTools unload the live Taro Page and destroy React state while appearing to support HMR.
+ * Hands off the static Taro config before the selected constructor adapts or registers it.
+ * The shared shell owns this one registration call; no platform choice or import-source parsing belongs in HMR.
  */
 export function injectPageShellHmr(code: string): { code: string; map: null } {
     const registration = 'Page(pageConfig)'

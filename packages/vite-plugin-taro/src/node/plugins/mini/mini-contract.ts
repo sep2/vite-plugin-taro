@@ -8,8 +8,9 @@ export type TaroContract = {
     targetRuntimePath: string
 }
 
-/** Target-specific development runtimes; shared Mini entry IDs live beside their source modules. */
+/** Native page constructor and development runtimes selected once by the target. */
 export type RuntimeContract = {
+    pageConstructor: string
     devtoolsHmrRuntime: string
     interpreterHmrRuntime: string
 }

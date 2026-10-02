@@ -47,7 +47,12 @@ test('creates the ZFB Mini Program contract without translating user configurati
     assert.match(contract.taro.targetRuntimePath, /taro-runtime[/\\]dist[/\\]plugin-platform-alipay[/\\]runtime\.js$/)
     assert.match(miniBootstrapId, /runtime[/\\]mini[/\\]amphibious[/\\]bootstrap\.(?:js|ts)$/)
     assert.match(miniPageCapsuleId, /runtime[/\\]mini[/\\]capsule[/\\]page\.(?:js|ts)$/)
-    assert.deepEqual(Object.keys(contract.runtime).sort(), ['devtoolsHmrRuntime', 'interpreterHmrRuntime'])
+    assert.deepEqual(Object.keys(contract.runtime).sort(), [
+        'devtoolsHmrRuntime',
+        'interpreterHmrRuntime',
+        'pageConstructor'
+    ])
+    assert.match(contract.runtime.pageConstructor, /runtime[/\\]mini[/\\]native[/\\]min-page-constructor\.(?:js|ts)$/)
     assert.match(contract.runtime.devtoolsHmrRuntime, /runtime[/\\]zfb[/\\]dev[/\\]devtools-runtime\.(?:js|ts)$/)
     assert.match(contract.runtime.interpreterHmrRuntime, /runtime[/\\]zfb[/\\]dev[/\\]interpreter-runtime\.(?:js|ts)$/)
     assert.deepEqual(contract.styles, {

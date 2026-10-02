@@ -34,6 +34,7 @@ const waitIntervalMilliseconds = 25
 const pageCapsuleFileName = 'pages/home/index-capsule.js'
 
 const runtimeModules = {
+    pageConstructor: resolveVptRuntime('mini/native/mini-page-component-constructor'),
     devtoolsHmrRuntime: resolveVptRuntime('wx/dev/devtools-runtime'),
     interpreterHmrRuntime: resolveVptRuntime('wx/dev/interpreter-runtime')
 } satisfies RuntimeContract

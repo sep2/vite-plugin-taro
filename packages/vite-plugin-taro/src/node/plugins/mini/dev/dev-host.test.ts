@@ -26,6 +26,7 @@ type SyntheticDev = (_input: unknown, _output: unknown, devOptions: DevOptions) 
 const devHostHarnessKey = '__vptDevHostTestHarness__'
 
 const runtimeModules = {
+    pageConstructor: resolveVptRuntime('mini/native/mini-page-component-constructor'),
     devtoolsHmrRuntime: resolveVptRuntime('wx/dev/devtools-runtime'),
     interpreterHmrRuntime: resolveVptRuntime('wx/dev/interpreter-runtime')
 } satisfies RuntimeContract

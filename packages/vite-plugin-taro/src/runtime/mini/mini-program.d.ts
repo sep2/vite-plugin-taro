@@ -3,6 +3,18 @@ declare module '\0vpt:global-binding' {
     export const vptGlobal: typeof globalThis
 }
 
+/** Route-specific Taro registration config shared by the native constructor adapters. */
+declare module '\0vpt:page-capsule' {
+    const config: import('vite-plugin-taro-runtime/runtime/mini').PageInstance
+    export default config
+}
+
+/** The target resolver selects exactly one native constructor implementation. */
+declare module 'vpt:mini-page-constructor' {
+    const Page: typeof import('./native/min-page-constructor.ts').default
+    export default Page
+}
+
 /** Native routing table generated from finalized chunk paths rather than bundled as a source module. */
 declare module '\0vpt:mini-transport' {
     export const transport: (moduleId: string) => System.Registration | PromiseLike<System.Registration>

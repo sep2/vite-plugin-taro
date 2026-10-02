@@ -12,6 +12,9 @@ import {
     miniComponentShellId,
     miniCustomWrapperShellId,
     miniPageCapsuleId,
+    miniPageComponentConstructorRuntimeId,
+    miniPageConstructorId,
+    miniPageConstructorRuntimeId,
     miniPageShellId,
     miniTransportId,
     pageCapsuleId,
@@ -56,8 +59,13 @@ const contract = {
         env: 'synthetic',
         componentsReactPath: '/runtime/components-react.ts',
         targetRuntimePath: '/runtime/target.ts'
+    },
+    runtime: {
+        pageConstructor: miniPageConstructorRuntimeId,
+        devtoolsHmrRuntime: '/runtime/devtools.ts',
+        interpreterHmrRuntime: '/runtime/interpreter.ts'
     }
-} satisfies Pick<MiniContract, 'options' | 'taro'>
+} satisfies Pick<MiniContract, 'options' | 'taro' | 'runtime'>
 
 test('resolves fixed and route-specific private IDs', () => {
     const resolver = createResolver(contract)
@@ -106,6 +114,17 @@ test('resolves fixed and route-specific private IDs', () => {
         resolver.resolveId(pageComponentId, pageCapsule, projectRoot),
         normalizePath(path.resolve(projectRoot, 'src/pages/home/index.tsx'))
     )
+})
+
+test('selects the constructor through the private import without changing the shared shell or capsule', () => {
+    for (const pageConstructor of [miniPageConstructorRuntimeId, miniPageComponentConstructorRuntimeId]) {
+        const resolver = createResolver({ ...contract, runtime: { ...contract.runtime, pageConstructor } })
+        const shellId = `${miniPageShellId}?route=pages%2Fhome%2Findex`
+        assert.equal(resolver.resolveId(miniPageConstructorId, shellId, path.resolve('/project')), pageConstructor)
+        assert.equal(resolver.entries.pageEntries[0]?.shellId, shellId)
+        assert.equal(resolver.input['pages/home/index.js'], shellId)
+        assert.equal(resolver.entries.pageEntries[0]?.capsuleId, `${miniPageCapsuleId}?route=pages%2Fhome%2Findex`)
+    }
 })
 
 test('preserves configured Page order and reuses App/Page entries in the native input map', () => {

@@ -25,6 +25,15 @@ export const miniCustomWrapperShellId = resolveVptRuntime('mini/native/custom-wr
 /** Registers each route's native Page using its route-qualified capsule. */
 export const miniPageShellId = resolveVptRuntime('mini/native/page')
 
+/** Selects the native page constructor through the target contract. */
+export const miniPageConstructorId = 'vpt:mini-page-constructor'
+
+/** Passes Taro's flat config directly to native Page. */
+export const miniPageConstructorRuntimeId = resolveVptRuntime('mini/native/min-page-constructor')
+
+/** Adapts Taro's flat config to native Component. */
+export const miniPageComponentConstructorRuntimeId = resolveVptRuntime('mini/native/mini-page-component-constructor')
+
 /** Specializes each route's Page configuration and component import. */
 export const miniPageCapsuleId = resolveVptRuntime('mini/capsule/page')
 

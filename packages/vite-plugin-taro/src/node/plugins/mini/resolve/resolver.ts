@@ -15,6 +15,7 @@ import {
     miniComponentShellId,
     miniCustomWrapperShellId,
     miniPageCapsuleId,
+    miniPageConstructorId,
     miniPageShellId,
     miniTransportId,
     miniTransportOutputPath,
@@ -30,7 +31,7 @@ import { specializePageCapsule } from './specialize-page-capsule.ts'
 type PrivateIdResolver = (importer: string | undefined, projectRoot: string) => string
 
 /** Creates the resolver and source specializer for one Mini Program module graph. */
-export function createResolver(contract: Pick<MiniContract, 'options' | 'taro'>) {
+export function createResolver(contract: Pick<MiniContract, 'options' | 'taro' | 'runtime'>) {
     const normalizedAppCapsulePath = normalizePath(miniAppCapsuleId)
     const normalizedPageCapsulePath = normalizePath(miniPageCapsuleId)
 
@@ -44,6 +45,7 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'taro'>)
         // Share bootstrap's preload identity through native require and its amphibious SystemJS registration.
         [vitePreloadId, () => miniBootstrapId],
         [taroTargetRuntimeId, () => contract.taro.targetRuntimePath],
+        [miniPageConstructorId, () => contract.runtime.pageConstructor],
         // Keep the configured App component behind one stable private import in the App capsule.
         [
             appComponentId,

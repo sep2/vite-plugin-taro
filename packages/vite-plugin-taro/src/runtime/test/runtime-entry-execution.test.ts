@@ -3,7 +3,10 @@ import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build, type OutputChunk, type Plugin } from 'rolldown'
+import type { PageInstance } from 'vite-plugin-taro-runtime/runtime/mini'
 import { injectDevPageComponent } from '../../node/plugins/mini/dev/inject-dev-page-component.ts'
+import { injectPageShellHmr } from '../../node/plugins/mini/dev/modes/devtools/devtools-hmr-mode.ts'
+import { injectPageHmr } from '../mini/dev/modes/devtools/page-hmr.ts'
 
 type Call = Readonly<{
     name: string
@@ -37,12 +40,14 @@ async function bundleRuntimeEntry({
     entry,
     mocks,
     defines,
-    servePageModuleId
+    servePageModuleId,
+    nativePageHmr
 }: {
     entry: string
     mocks: Readonly<Record<string, string>>
     defines: Readonly<Record<string, string>>
     servePageModuleId?: string
+    nativePageHmr?: boolean
 }): Promise<string> {
     const input = path.join(runtimeRoot, entry)
     const mockEntries = Object.entries(mocks).map(([request, source], index) => ({
@@ -61,6 +66,9 @@ async function bundleRuntimeEntry({
             return mockSourceById.get(id)
         },
         transform(code, id) {
+            if (id === input && nativePageHmr) {
+                return injectPageShellHmr(code)
+            }
             if (id === input && servePageModuleId) {
                 return injectDevPageComponent({ capsuleCode: code, componentId: servePageModuleId, capsuleId: id })
             }
@@ -460,11 +468,10 @@ test('preserves WX capsule runtime initialization order and export identities', 
     assert.strictEqual(exports.createRecursiveComponentConfig, createRecursiveComponentConfig)
 })
 
-test('registers every native WX shell after its amphibious bootstrap', async () => {
+test('registers native App and component shells after their amphibious bootstrap', async () => {
     const appConfig = { kind: 'app-config' }
     const componentConfig = { kind: 'component-config' }
     const customWrapperConfig = { kind: 'custom-wrapper-config' }
-    const pageConfig = { kind: 'page-config' }
     const entries = [
         {
             entry: 'mini/native/app.ts',
@@ -495,16 +502,6 @@ test('registers every native WX shell after its amphibious bootstrap', async () 
             },
             registration: 'Component',
             config: customWrapperConfig
-        },
-        {
-            entry: 'mini/native/page.ts',
-            mocks: {
-                '../amphibious/bootstrap.ts':
-                    "globalThis.harness.events.push({ name: 'bootstrap', config: undefined })",
-                '\0vpt:page-capsule': 'export default globalThis.harness.config'
-            },
-            registration: 'Page',
-            config: pageConfig
         }
     ] as const
 
@@ -531,6 +528,156 @@ test('registers every native WX shell after its amphibious bootstrap', async () 
     }
 })
 
+test('the shared page shell preserves onLoad timing and full queries with either resolved constructor', async () => {
+    for (const [constructorEntry, registration] of [
+        ['mini/native/mini-page-component-constructor.ts', 'Component'],
+        ['mini/native/min-page-constructor.ts', 'Page']
+    ] as const) {
+        // Each constructor records bootstrap, native registration and deferred lifecycle calls independently.
+        const calls: Call[] = []
+        const page = { data: { count: 0 } }
+        const query = { id: '42', undeclared: 'full-query', scene: 'a=b' }
+        const share = { title: 'Shared page', path: '/pages/home/index?id=42' }
+        const config = {
+            data: page.data,
+            options: { multipleSlots: true },
+            ...(registration === 'Page' ? { events: { onBack: () => true } } : {}),
+            onLoad(this: unknown, options: unknown) {
+                assert.strictEqual(this, page)
+                assert.strictEqual(options, query)
+                calls.push({ name: 'onLoad', args: [options] })
+            },
+            onShareAppMessage: () => share,
+            eh: recordCall(calls, 'event', undefined)
+        } satisfies PageInstance
+        const code = await bundleRuntimeEntry({
+            entry: 'mini/native/page.ts',
+            mocks: {
+                '../amphibious/bootstrap.ts':
+                    "globalThis.harness.bootstrap(); export { default as Page } from 'vpt:mini-page-constructor'",
+                '\0vpt:page-capsule': 'export default globalThis.harness.config',
+                'vpt:mini-page-constructor': `export { default } from ${JSON.stringify(path.join(runtimeRoot, constructorEntry))}`
+            },
+            defines: {}
+        })
+        const harness = {
+            get config() {
+                assert.deepEqual(
+                    calls.map(({ name }) => name),
+                    ['bootstrap']
+                )
+                return config
+            },
+            bootstrap: recordCall(calls, 'bootstrap', undefined)
+        }
+        const context = {
+            ...createExecutionContext(harness),
+            Page: recordCall(calls, 'Page', undefined),
+            Component: recordCall(calls, 'Component', undefined)
+        }
+        executeRuntimeEntry(code, context)
+        assert.deepEqual(
+            calls.map(({ name }) => name),
+            ['bootstrap', registration]
+        )
+        assert.doesNotMatch(code, /process\.env|registerPage/)
+        const registered = calls[1]?.args[0]
+        assert.ok(registered && typeof registered === 'object')
+        if (registration === 'Page') {
+            assert.strictEqual(registered, config)
+            assert.doesNotMatch(code, /\bComponent\(/)
+        } else {
+            const { data, options, onLoad, onShareAppMessage, eh } = config
+            assert.deepEqual(registered, { data, options, methods: { onLoad, onShareAppMessage, eh } })
+            assert.strictEqual(Reflect.get(registered, 'data'), data)
+            assert.strictEqual(Reflect.get(registered, 'options'), options)
+            assert.doesNotMatch(code, /\bPage\(/)
+        }
+        const methods = registration === 'Page' ? registered : Reflect.get(registered, 'methods')
+        assert.strictEqual(methods.onLoad, config.onLoad)
+        methods.onLoad.call(page, query)
+        assert.strictEqual(methods.onShareAppMessage(), share)
+        methods.eh('tap')
+        assert.deepEqual(calls.slice(2), [
+            { name: 'onLoad', args: [query] },
+            { name: 'event', args: ['tap'] }
+        ])
+    }
+})
+
+test('hands off HMR data and lifecycles before adapting the WX Component page', async (t) => {
+    const cacheKey = Symbol.for('customWrapperCache')
+    const previousCache = Object.getOwnPropertyDescriptor(globalThis, cacheKey)
+    // The real HMR adapter consumes the App-owned cache; isolate this test's empty cache and restore it afterwards.
+    Reflect.set(globalThis, cacheKey, new Map())
+    t.after(() => {
+        if (previousCache) {
+            Object.defineProperty(globalThis, cacheKey, previousCache)
+        } else {
+            Reflect.deleteProperty(globalThis, cacheKey)
+        }
+    })
+    // Native registrations and business lifecycles are journaled separately to detect accidental remounts.
+    const registrations: object[] = []
+    const calls: Call[] = []
+    const config = {
+        data: { count: 0 },
+        onLoad: recordCall(calls, 'load', undefined),
+        onShow: recordCall(calls, 'show', undefined),
+        onUnload: recordCall(calls, 'unload', undefined)
+    }
+    const code = await bundleRuntimeEntry({
+        entry: 'mini/native/page.ts',
+        mocks: {
+            '../amphibious/bootstrap.ts': "export { default as Page } from 'vpt:mini-page-constructor'",
+            '\0vpt:page-capsule': 'export default globalThis.harness.config',
+            'vpt:mini-page-constructor': `export { default } from ${JSON.stringify(path.join(runtimeRoot, 'mini/native/mini-page-component-constructor.ts'))}`
+        },
+        defines: {},
+        nativePageHmr: true
+    })
+    const context = {
+        ...createExecutionContext({ config }),
+        globalThis: { harness: { config }, __rolldown_runtime__: { injectPageHmr } },
+        Component(value: unknown) {
+            assert.ok(value && typeof value === 'object')
+            registrations.push(value)
+        }
+    }
+    const page = { data: { count: 7 } }
+    const firstQuery = { id: 'initial' }
+    executeRuntimeEntry(code, context)
+    const first = registrations[0]
+    assert.ok(first)
+    const firstMethods = Reflect.get(first, 'methods')
+    assert.deepEqual(Object.getOwnPropertySymbols(firstMethods), [], 'HMR state is not part of the native methods')
+    firstMethods.onLoad.call(page, firstQuery)
+    firstMethods.onShow.call(page)
+
+    executeRuntimeEntry(code, context)
+    const second = registrations[1]
+    assert.ok(second)
+    assert.strictEqual(Reflect.get(second, 'data'), page.data)
+    const secondMethods = Reflect.get(second, 'methods')
+    assert.strictEqual(secondMethods.onLoad, firstMethods.onLoad)
+    firstMethods.onUnload.call(page)
+    secondMethods.onLoad.call(page, { id: 'synthetic' })
+    secondMethods.onShow.call(page)
+    assert.deepEqual(calls, [
+        { name: 'load', args: [firstQuery] },
+        { name: 'show', args: [] }
+    ])
+
+    secondMethods.onUnload.call(page)
+    secondMethods.onLoad.call(page, { id: 'real-navigation' })
+    secondMethods.onShow.call(page)
+    assert.deepEqual(calls.slice(2), [
+        { name: 'unload', args: [] },
+        { name: 'load', args: [{ id: 'real-navigation' }] },
+        { name: 'show', args: [] }
+    ])
+})
+
 test('loads polyfills before SystemJS, installs amphibious transport and preserves preload semantics', async () => {
     // These mutable observations verify polyfill/SystemJS startup order and one synchronous preload invocation.
     const events: string[] = []
@@ -538,9 +685,11 @@ test('loads polyfills before SystemJS, installs amphibious transport and preserv
     const loader: { instantiate?: unknown } = {}
     const languageGlobal: Record<string, unknown> = {}
     const transport = (moduleId: string) => ({ moduleId })
+    const pageConstructor = rejectRegistration('Page during bootstrap')
     const harness = {
         events,
         transport,
+        pageConstructor,
         createSystem() {
             events.push('create-system')
             return loader
@@ -554,7 +703,8 @@ test('loads polyfills before SystemJS, installs amphibious transport and preserv
             '\0vpt:global-binding': 'export const vptGlobal = globalThis',
             '\0vpt:mini-polyfills': "globalThis.harness.events.push('polyfills')",
             '../systemjs/system-core.js': 'export const System = globalThis.harness.createSystem()',
-            '\0vpt:mini-transport': 'export const transport = globalThis.harness.transport'
+            '\0vpt:mini-transport': 'export const transport = globalThis.harness.transport',
+            'vpt:mini-page-constructor': 'export default globalThis.harness.pageConstructor'
         },
         defines: {}
     })
@@ -577,6 +727,7 @@ test('loads polyfills before SystemJS, installs amphibious transport and preserv
 
     assert.deepEqual(events, ['polyfills', 'create-system'])
     assert.strictEqual(exports.System, loader)
+    assert.strictEqual(exports.Page, pageConstructor)
     assert.strictEqual(languageGlobal.System, loader)
     assert.strictEqual(loader.instantiate, transport)
     assert.equal(loaded, 'loaded')

@@ -20,7 +20,15 @@ test('binds TT runtime and style paths without translating native configuration'
     assert.equal(contract.taro.env, 'tt')
     assert.match(contract.taro.componentsReactPath, /plugin-platform-tt[/\\]components-react\.js$/)
     assert.match(contract.taro.targetRuntimePath, /runtime[/\\]tt[/\\]taro-runtime\.(?:js|ts)$/)
-    assert.deepEqual(Object.keys(contract.runtime).sort(), ['devtoolsHmrRuntime', 'interpreterHmrRuntime'])
+    assert.deepEqual(Object.keys(contract.runtime).sort(), [
+        'devtoolsHmrRuntime',
+        'interpreterHmrRuntime',
+        'pageConstructor'
+    ])
+    assert.match(
+        contract.runtime.pageConstructor,
+        /runtime[/\\]mini[/\\]native[/\\]mini-page-component-constructor\.(?:js|ts)$/
+    )
     assert.match(contract.runtime.devtoolsHmrRuntime, /tt[/\\]dev[/\\]devtools-runtime\.(?:js|ts)$/)
     assert.match(contract.runtime.interpreterHmrRuntime, /tt[/\\]dev[/\\]interpreter-runtime\.(?:js|ts)$/)
     assert.deepEqual(contract.styles, { appFileName: 'app.ttss', globalFileName: 'assets/global.ttss' })

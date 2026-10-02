@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
+import { createContext, runInContext } from 'node:vm'
 import type { OutputAsset, OutputChunk } from 'rolldown'
 import { type BuildOptions, normalizePath, build as viteBuild } from 'vite'
 import vpt, { type VptOptions, type VptTarget } from '../../index.ts'
@@ -137,6 +138,74 @@ function assertNativeShells(output: BuildOutput): void {
     }
 }
 
+/** Executes the emitted bootstrap and Page shell, proving the selected constructor is bundled inside bootstrap. */
+function assertPageRegistration(output: BuildOutput, target: VptTarget, route: string): void {
+    const config = { data: { page: { cn: [] } }, onLoad: () => undefined, eh: () => undefined }
+    // The isolated native host records exactly one registration; its capsule retains the Taro config identity.
+    const registrations: Array<{ constructor: string; config: object }> = []
+    const host = {
+        Page(config: object) {
+            registrations.push({ constructor: 'Page', config })
+        },
+        Component(config: object) {
+            registrations.push({ constructor: 'Component', config })
+        }
+    }
+    const bootstrapChunk = requireChunk(output, 'common/bootstrap.js')
+    const constructorName = target === 'zfb' ? 'min-page-constructor' : 'mini-page-component-constructor'
+    assert.ok(
+        Object.keys(bootstrapChunk.modules).some((id) =>
+            new RegExp(`/native/${constructorName}\\.(?:js|ts)$`).test(normalizePath(id))
+        ),
+        'The constructor implementation must be inside bootstrap'
+    )
+    assert.ok(
+        !output.some(
+            (file) => file.fileName.includes('page-constructor') || file.fileName.includes('page-component-constructor')
+        )
+    )
+
+    const context = createContext(host)
+    // Bootstrap and its native dependencies share one host global and one CommonJS module cache.
+    const cache = new Map<string, { exports: unknown }>()
+    function load(fileName: string): unknown {
+        const existing = cache.get(fileName)
+        if (existing) {
+            return existing.exports
+        }
+        const file = output.find((candidate) => candidate.fileName === fileName)
+        assert.ok(file, `Missing native dependency: ${fileName}`)
+        const code = file.type === 'chunk' ? file.code : String(file.source)
+        const module: { exports: unknown } = { exports: {} }
+        cache.set(fileName, module)
+        const evaluate: unknown = runInContext(`(function(require, module, exports) {\n${code}\n})`, context)
+        assert.ok(typeof evaluate === 'function')
+        evaluate(
+            (id: string) => load(path.posix.normalize(path.posix.join(path.posix.dirname(fileName), id))),
+            module,
+            module.exports
+        )
+        return module.exports
+    }
+    const bootstrap = load('common/bootstrap.js')
+    assert.ok(bootstrap && typeof bootstrap === 'object')
+    // Only the application capsule is mocked: constructor selection, bundling, bootstrap and registration execute for real.
+    Reflect.get(bootstrap, 'System').importSync = (id: string) => {
+        assert.equal(id, `${route}-capsule.js`)
+        return { default: config }
+    }
+    load(`${route}.js`)
+    assert.equal(registrations.length, 1)
+    const registration = registrations[0]
+    assert.ok(registration)
+    assert.equal(registration.constructor, target === 'zfb' ? 'Page' : 'Component')
+    assert.strictEqual(Reflect.get(registration.config, 'data'), config.data)
+    const methods = target === 'zfb' ? registration.config : Reflect.get(registration.config, 'methods')
+    assert.strictEqual(methods.onLoad, config.onLoad)
+    assert.strictEqual(methods.eh, config.eh)
+    assert.ok(parseJsonAsset(output, `${route}.json`).usingComponents)
+}
+
 function parseJsonAsset(output: BuildOutput, fileName: string): Record<string, unknown> {
     return JSON.parse(String(requireAsset(output, fileName).source)) as Record<string, unknown>
 }
@@ -170,6 +239,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
                 }
             },
             (output) => {
+                assertPageRegistration(output, target, 'pages/home/index')
                 const template = String(
                     requireAsset(output, { wx: 'base.wxml', zfb: 'base.axml', tt: 'base.ttml' }[target]).source
                 )
@@ -260,6 +330,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
                     assert.ok(output.some((chunk) => chunk.type === 'chunk' && chunk.code.includes(moduleClassName)))
                     assert.equal(String(requireAsset(output, `pages/empty/index.${extension}`).source), '')
                     for (const route of ['home', 'account', 'empty']) {
+                        assertPageRegistration(output, target, `pages/${route}/index`)
                         assert.equal(
                             output.filter((asset) => asset.fileName === `pages/${route}/index.${extension}`).length,
                             1
