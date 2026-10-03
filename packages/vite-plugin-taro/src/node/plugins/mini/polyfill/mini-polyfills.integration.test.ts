@@ -404,7 +404,7 @@ function assertPolyfilledApp(
     runtime.evaluate('pages/home/index.js')
     runtime.evaluate('comp.js')
     runtime.evaluate('custom-wrapper.js')
-    assert.deepEqual(runtime.registrations, ['App', target === 'zfb' ? 'Page' : 'Component', 'Component', 'Component'])
+    assert.deepEqual(runtime.registrations, ['App', target === 'wx' ? 'Component' : 'Page', 'Component', 'Component'])
     assert.equal(runtime.read('URL'), installedURL)
     assert.equal(runtime.read('this["__core-js_shared__"].versions.length'), 1)
 }
@@ -575,7 +575,7 @@ for (const target of miniTargets) {
                     restricted.evaluate('custom-wrapper.js')
                     assert.deepEqual(restricted.registrations, [
                         'App',
-                        target === 'zfb' ? 'Page' : 'Component',
+                        target === 'wx' ? 'Component' : 'Page',
                         'Component',
                         'Component'
                     ])

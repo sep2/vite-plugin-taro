@@ -26,7 +26,7 @@ import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 
 const runtimeModules = {
-    pageConstructor: resolveVptRuntime('mini/native/mini-page-component-constructor'),
+    pageConstructor: resolveVptRuntime('wx/native/wx-page-constructor'),
     devtoolsHmrRuntime: resolveVptRuntime('wx/dev/devtools-runtime'),
     interpreterHmrRuntime: resolveVptRuntime('wx/dev/interpreter-runtime')
 } satisfies RuntimeContract

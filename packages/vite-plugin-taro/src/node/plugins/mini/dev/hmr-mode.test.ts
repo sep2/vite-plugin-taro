@@ -4,7 +4,7 @@ import type { RuntimeContract } from '../mini-contract.ts'
 import { createMiniHmrMode } from './hmr-mode.ts'
 
 const runtime: RuntimeContract = {
-    pageConstructor: '/runtime/mini-page-component-constructor.ts',
+    pageConstructor: '/runtime/wx-page-constructor.ts',
     devtoolsHmrRuntime: '/runtime/devtools-runtime.ts',
     interpreterHmrRuntime: '/runtime/interpreter-runtime.ts'
 }

@@ -25,10 +25,7 @@ test('binds TT runtime and style paths without translating native configuration'
         'interpreterHmrRuntime',
         'pageConstructor'
     ])
-    assert.match(
-        contract.runtime.pageConstructor,
-        /runtime[/\\]mini[/\\]native[/\\]mini-page-component-constructor\.(?:js|ts)$/
-    )
+    assert.match(contract.runtime.pageConstructor, /runtime[/\\]mini[/\\]native[/\\]min-page-constructor\.(?:js|ts)$/)
     assert.match(contract.runtime.devtoolsHmrRuntime, /tt[/\\]dev[/\\]devtools-runtime\.(?:js|ts)$/)
     assert.match(contract.runtime.interpreterHmrRuntime, /tt[/\\]dev[/\\]interpreter-runtime\.(?:js|ts)$/)
     assert.deepEqual(contract.styles, { appFileName: 'app.ttss', globalFileName: 'assets/global.ttss' })

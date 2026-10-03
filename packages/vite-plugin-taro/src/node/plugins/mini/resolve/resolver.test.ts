@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
 import { normalizePath } from 'vite'
+import { resolveVptRuntime } from '../../../utils/packages.ts'
 import { appComponentId } from '../../client/constant.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import {
@@ -12,7 +13,6 @@ import {
     miniComponentShellId,
     miniCustomWrapperShellId,
     miniPageCapsuleId,
-    miniPageComponentConstructorRuntimeId,
     miniPageConstructorId,
     miniPageConstructorRuntimeId,
     miniPageShellId,
@@ -117,7 +117,7 @@ test('resolves fixed and route-specific private IDs', () => {
 })
 
 test('selects the constructor through the private import without changing the shared shell or capsule', () => {
-    for (const pageConstructor of [miniPageConstructorRuntimeId, miniPageComponentConstructorRuntimeId]) {
+    for (const pageConstructor of [miniPageConstructorRuntimeId, resolveVptRuntime('wx/native/wx-page-constructor')]) {
         const resolver = createResolver({ ...contract, runtime: { ...contract.runtime, pageConstructor } })
         const shellId = `${miniPageShellId}?route=pages%2Fhome%2Findex`
         assert.equal(resolver.resolveId(miniPageConstructorId, shellId, path.resolve('/project')), pageConstructor)

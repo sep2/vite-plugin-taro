@@ -152,7 +152,7 @@ function assertPageRegistration(output: BuildOutput, target: VptTarget, route: s
         }
     }
     const bootstrapChunk = requireChunk(output, 'common/bootstrap.js')
-    const constructorName = target === 'zfb' ? 'min-page-constructor' : 'mini-page-component-constructor'
+    const constructorName = target === 'wx' ? 'wx-page-constructor' : 'min-page-constructor'
     assert.ok(
         Object.keys(bootstrapChunk.modules).some((id) =>
             new RegExp(`/native/${constructorName}\\.(?:js|ts)$`).test(normalizePath(id))
@@ -198,9 +198,9 @@ function assertPageRegistration(output: BuildOutput, target: VptTarget, route: s
     assert.equal(registrations.length, 1)
     const registration = registrations[0]
     assert.ok(registration)
-    assert.equal(registration.constructor, target === 'zfb' ? 'Page' : 'Component')
+    assert.equal(registration.constructor, target === 'wx' ? 'Component' : 'Page')
     assert.strictEqual(Reflect.get(registration.config, 'data'), config.data)
-    const methods = target === 'zfb' ? registration.config : Reflect.get(registration.config, 'methods')
+    const methods = target === 'wx' ? Reflect.get(registration.config, 'methods') : registration.config
     assert.strictEqual(methods.onLoad, config.onLoad)
     assert.strictEqual(methods.eh, config.eh)
     assert.ok(parseJsonAsset(output, `${route}.json`).usingComponents)

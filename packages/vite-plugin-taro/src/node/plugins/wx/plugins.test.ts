@@ -29,10 +29,7 @@ test('creates the WX Mini Program contract without translating public options', 
         'interpreterHmrRuntime',
         'pageConstructor'
     ])
-    assert.match(
-        contract.runtime.pageConstructor,
-        /runtime[/\\]mini[/\\]native[/\\]mini-page-component-constructor\.(?:js|ts)$/
-    )
+    assert.match(contract.runtime.pageConstructor, /runtime[/\\]wx[/\\]native[/\\]wx-page-constructor\.(?:js|ts)$/)
     assert.match(contract.runtime.devtoolsHmrRuntime, /runtime[/\\]wx[/\\]dev[/\\]devtools-runtime\.(?:js|ts)$/)
     assert.match(contract.runtime.interpreterHmrRuntime, /runtime[/\\]wx[/\\]dev[/\\]interpreter-runtime\.(?:js|ts)$/)
     assert.deepEqual(contract.styles, {

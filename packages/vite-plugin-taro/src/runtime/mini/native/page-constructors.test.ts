@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { PageInstance } from 'vite-plugin-taro-runtime/runtime/mini'
-import miniPageComponentConstructor from './mini-page-component-constructor.ts'
+import wxPageConstructor from '../../wx/native/wx-page-constructor.ts'
 
-test('the Alipay page constructor is the native Page function and forwards the config unchanged', async (t) => {
+test('the Alipay/TT page constructor is the native Page function and forwards the config unchanged', async (t) => {
     const page = t.mock.fn<(config: object) => void>()
     // Install the native global before importing its alias; remove the stub when the test finishes.
     Reflect.set(globalThis, 'Page', page)
@@ -24,7 +24,7 @@ test('the Alipay page constructor is the native Page function and forwards the c
     assert.equal(config.onLoad.mock.callCount(), 0)
 })
 
-test('the WX/TT page constructor separates data and options from methods without mutating the config', (t) => {
+test('the WX page constructor separates data and options from methods without mutating the config', (t) => {
     const component = t.mock.fn<(config: object) => void>()
     // Model the native registration boundary without booting Taro or leaking a global into another test.
     Reflect.set(globalThis, 'Component', component)
@@ -40,7 +40,7 @@ test('the WX/TT page constructor separates data and options from methods without
     }
     const config = Object.freeze({ data, options, ...methods } satisfies PageInstance)
 
-    miniPageComponentConstructor(config)
+    wxPageConstructor(config)
 
     assert.equal(component.mock.callCount(), 1)
     const registered = component.mock.calls[0]?.arguments[0]

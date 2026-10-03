@@ -530,7 +530,7 @@ test('registers native App and component shells after their amphibious bootstrap
 
 test('the shared page shell preserves onLoad timing and full queries with either resolved constructor', async () => {
     for (const [constructorEntry, registration] of [
-        ['mini/native/mini-page-component-constructor.ts', 'Component'],
+        ['wx/native/wx-page-constructor.ts', 'Component'],
         ['mini/native/min-page-constructor.ts', 'Page']
     ] as const) {
         // Each constructor records bootstrap, native registration and deferred lifecycle calls independently.
@@ -631,7 +631,7 @@ test('hands off HMR data and lifecycles before adapting the WX Component page', 
         mocks: {
             '../amphibious/bootstrap.ts': "export { default as Page } from 'vpt:mini-page-constructor'",
             '\0vpt:page-capsule': 'export default globalThis.harness.config',
-            'vpt:mini-page-constructor': `export { default } from ${JSON.stringify(path.join(runtimeRoot, 'mini/native/mini-page-component-constructor.ts'))}`
+            'vpt:mini-page-constructor': `export { default } from ${JSON.stringify(path.join(runtimeRoot, 'wx/native/wx-page-constructor.ts'))}`
         },
         defines: {},
         nativePageHmr: true

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
-import { packageRequire } from '../../../utils/packages.ts'
+import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import {
     classifyMiniModule,
     isMiniPolyfillModule,
@@ -16,7 +16,6 @@ import {
     miniComponentShellId,
     miniCustomWrapperShellId,
     miniPageCapsuleId,
-    miniPageComponentConstructorRuntimeId,
     miniPageConstructorRuntimeId,
     miniPageShellId,
     miniPolyfillsId,
@@ -53,7 +52,7 @@ test('recognizes route-qualified lifecycle entries', () => {
 })
 
 test('constructor modules bundled into bootstrap preserve its amphibious identity', () => {
-    for (const constructorId of [miniPageConstructorRuntimeId, miniPageComponentConstructorRuntimeId]) {
+    for (const constructorId of [miniPageConstructorRuntimeId, resolveVptRuntime('wx/native/wx-page-constructor')]) {
         assert.equal(classifyModule(chunk(constructorId, miniBootstrapId)), 'amphibious')
         assert.equal(classifyModule(chunk(miniBootstrapId, constructorId)), 'amphibious')
     }

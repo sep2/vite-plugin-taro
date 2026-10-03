@@ -31,9 +31,6 @@ export const miniPageConstructorId = 'vpt:mini-page-constructor'
 /** Passes Taro's flat config directly to native Page. */
 export const miniPageConstructorRuntimeId = resolveVptRuntime('mini/native/min-page-constructor')
 
-/** Adapts Taro's flat config to native Component. */
-export const miniPageComponentConstructorRuntimeId = resolveVptRuntime('mini/native/mini-page-component-constructor')
-
 /** Specializes each route's Page configuration and component import. */
 export const miniPageCapsuleId = resolveVptRuntime('mini/capsule/page')
 
