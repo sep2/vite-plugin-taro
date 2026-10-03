@@ -68,7 +68,6 @@ function createAppJson(target: VptTarget): VptJsonObject {
                 lazyCodeLoading: 'requiredComponents',
                 renderer: 'skyline',
                 componentFramework: 'glass-easel',
-                glassEaselWebview: true,
                 rendererOptions: {
                     skyline: {
                         defaultDisplayBlock: true,
@@ -77,6 +76,7 @@ function createAppJson(target: VptTarget): VptJsonObject {
                     }
                 },
                 window: {
+                    glassEaselWebview: true,
                     navigationStyle: 'custom',
                     navigationBarTextStyle: 'black'
                 }

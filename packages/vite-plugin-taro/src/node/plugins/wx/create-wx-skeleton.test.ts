@@ -42,6 +42,24 @@ const contract = createWxMiniContract({
     }
 })
 
+test('preserves application glass-easel settings without injecting Page overrides', () => {
+    const configured = createWxMiniContract({
+        ...contract.options,
+        pages: [{ path: 'pages/inherited' }, { path: 'pages/disabled', config: { glassEaselWebview: false } }],
+        appJson: { componentFramework: 'glass-easel', window: { glassEaselWebview: true } }
+    })
+    const output = configured.output.generateProjectSkeleton(
+        { bundle: {}, subpackages: [], nativeComponents: [], isProduction: true },
+        configured
+    )
+    const assets = new Map(output.map((asset) => [asset.fileName, String(asset.source)]))
+    const app = JSON.parse(assets.get('app.json') ?? '')
+    assert.equal(app.window.glassEaselWebview, true)
+    assert.equal(app.glassEaselWebview, undefined)
+    assert.equal(JSON.parse(assets.get('pages/inherited.json') ?? '').glassEaselWebview, undefined)
+    assert.equal(JSON.parse(assets.get('pages/disabled.json') ?? '').glassEaselWebview, false)
+})
+
 test('creates native rendering and configuration assets', () => {
     const { projectConfigFilename, projectPrivateConfigFilename } = contract.output
     const output = contract.output.generateProjectSkeleton(

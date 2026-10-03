@@ -26,6 +26,7 @@ vpt({
             }
         },
         window: {
+            glassEaselWebview: true,
             navigationStyle: 'custom'
         }
     },
@@ -39,16 +40,17 @@ vpt({
 })
 ```
 
-| 配置 | 作用 |
-| --- | --- |
-| `renderer: 'skyline'` | 为页面选择 Skyline 渲染引擎。 |
-| `componentFramework: 'glass-easel'` | 使用支持 Skyline 的组件框架。 |
-| `lazyCodeLoading: 'requiredComponents'` | 按需注入页面所需组件。 |
-| `defaultDisplayBlock` | 将 Skyline 节点的默认布局从 `flex` 调整为 `block`。 |
+| 配置 | 作用                                                           |
+| --- |----------------------------------------------------------------|
+| `renderer: 'skyline'` | 为页面选择 Skyline 渲染引擎。                                  |
+| `componentFramework: 'glass-easel'` | 使用支持 Skyline 的组件框架。                                  |
+| `window.glassEaselWebview: true` | 使用 WebView 及 Skyline 回退使用 glass-easel 运行时。          |
+| `lazyCodeLoading: 'requiredComponents'` | 按需注入页面所需组件。                                         |
+| `defaultDisplayBlock` | 将 Skyline 节点的默认布局从 `flex` 调整为 `block`。            |
 | `defaultContentBox` | 将默认盒模型从 `border-box` 调整为 `content-box`，更接近 Web。 |
-| `disableABTest: true` | 跳过 We 分析 AB 实验，让符合条件的真机直接使用 Skyline。 |
-| `navigationStyle: 'custom'` | 由应用绘制导航栏，而不是使用微信默认导航栏。 |
-| `skylineRenderEnable` | 控制微信开发者工具是否开启 Skyline 渲染调试。 |
+| `disableABTest: true` | 跳过 We 分析 AB 实验，让符合条件的真机直接使用 Skyline。       |
+| `navigationStyle: 'custom'` | 由应用绘制导航栏，而不是使用微信默认导航栏。                   |
+| `skylineRenderEnable` | 控制微信开发者工具是否开启 Skyline 渲染调试。                  |
 
 ## 开发模式与 Skyline 调试
 
@@ -66,7 +68,7 @@ projectConfigJson: {
 }
 ```
 
-重新打开微信项目后，在开发者工具的“详情 → 本地设置”中确认已开启 Skyline 渲染调试，并把调试基础库设为 **3.1.0 或更高版本**。模拟器左上角应显示当前 renderer 为 `skyline`。
+重新打开微信项目后，在开发者工具的“详情 → 本地设置”中确认已开启 Skyline 渲染调试，并把调试基础库设为 **3.8.12 或更高版本**。模拟器左上角应显示当前 renderer 为 `skyline`。
 
 :::caution[微信开发者工具限制]
 微信开发者工具的 Skyline 渲染调试目前不支持热更新。这是微信开发者工具自身的限制，不是 vpt 的限制；vpt 不会因为应用配置了 Skyline 而关闭热更新。模板默认关闭 `skylineRenderEnable`，是为了在日常开发中继续使用热更新，需要检查 Skyline 兼容性时再按需开启。
@@ -76,12 +78,13 @@ projectConfigJson: {
 
 ### 全局开启
 
-把 `renderer` 和 `componentFramework` 放在 `appJson` 中，所有页面都会请求 Skyline。默认模板使用这种方式：
+把 `renderer` 和 `componentFramework` 放在 `appJson` 中，所有页面都会请求 Skyline。全局 `glassEaselWebview` 必须放在 `appJson.window` 中，而不是 `appJson` 顶层；页面级设置则直接写在 `page.config` 中。默认模板使用这种方式：
 
 ```ts
 appJson: {
     renderer: 'skyline',
     componentFramework: 'glass-easel',
+    window: { glassEaselWebview: true },
     rendererOptions: {
         skyline: {
             defaultDisplayBlock: true,
@@ -103,6 +106,7 @@ pages: [
         config: {
             renderer: 'skyline',
             componentFramework: 'glass-easel',
+            glassEaselWebview: true,
             navigationStyle: 'custom'
         }
     },
@@ -141,7 +145,7 @@ Skyline 尽量保持小程序上层语法不变，但不是浏览器 CSS 的完�
 
 1. 将 `skylineRenderEnable` 改为 `true`。
 2. 运行微信开发模式并在开发者工具中打开 `dist/wx`。
-3. 确认调试基础库不低于 3.1.0，模拟器显示 `skyline`。
+3. 确认调试基础库不低于 3.8.12，模拟器显示 `skyline`。
 4. 逐页检查布局、滚动、手势、弹层和自定义导航栏。
 5. 使用预览或体验版在 Android 与 iOS 真机上测试。
 6. 检查 WebView 回退时页面仍可正常使用。

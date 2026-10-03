@@ -100,6 +100,7 @@ function createAppJson(target: VptTarget): VptJsonObject {
                     }
                 },
                 window: {
+                    glassEaselWebview: true,
                     navigationStyle: 'custom'
                 }
             }

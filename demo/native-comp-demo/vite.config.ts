@@ -68,6 +68,7 @@ function createAppJson(target: MiniTarget): VptJsonObject {
                 lazyCodeLoading: 'requiredComponents',
                 componentFramework: 'glass-easel',
                 window: {
+                    glassEaselWebview: true,
                     navigationBarTitleText: appTitle
                 }
             }
