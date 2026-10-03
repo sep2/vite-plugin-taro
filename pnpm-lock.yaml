@@ -365,6 +365,31 @@ importers:
         specifier: 8.3.1
         version: 8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0)
 
+  demo/skyline-share-element-demo:
+    dependencies:
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
+      vite-plugin-taro:
+        specifier: workspace:*
+        version: link:../../packages/vite-plugin-taro
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.3
+        version: 26.6.3
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: 8.3.1
+        version: 8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0)
+
   demo/towxml-stream-demo:
     dependencies:
       react:

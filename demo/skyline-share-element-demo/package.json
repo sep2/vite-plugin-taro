@@ -1,0 +1,22 @@
+{
+    "name": "skyline-share-element-demo",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build-wx": "vite build",
+        "dev-wx": "vite",
+        "typecheck": "tsc --project tsconfig.json && tsc --project tsconfig.node.json"
+    },
+    "dependencies": {
+        "react": "^19.3.0",
+        "react-dom": "^19.3.0",
+        "vite-plugin-taro": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/node": "^26.6.3",
+        "@types/react": "^19.3.0",
+        "typescript": "^7.0.2",
+        "vite": "8.3.1"
+    }
+}

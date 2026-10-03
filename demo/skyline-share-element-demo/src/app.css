@@ -1,0 +1,126 @@
+/* biome-ignore lint/correctness/noUnknownTypeSelector: native WeChat page root */
+page {
+    background: #f7f5ef;
+    color: #252638;
+}
+
+.app {
+    min-height: 100vh;
+    background: #f7f5ef;
+}
+
+.page {
+    padding: 192rpx 48rpx 64rpx;
+}
+
+/* Fixed positioning keeps the diagnostic update from moving either transition endpoint after its first frame. */
+.renderer-badge {
+    position: fixed;
+    top: 120rpx;
+    left: 48rpx;
+    padding: 8rpx 16rpx;
+    border-radius: 12rpx;
+    background: #fff1d6;
+    color: #996515;
+    font-size: 20rpx;
+}
+
+.renderer-badge-skyline {
+    background: #e1f5e9;
+    color: #216d42;
+}
+
+.eyebrow {
+    display: block;
+    color: #797989;
+    font-size: 22rpx;
+    letter-spacing: 4rpx;
+}
+
+.heading {
+    display: block;
+    margin-top: 24rpx;
+    font-size: 72rpx;
+    font-weight: 700;
+}
+
+.description {
+    display: block;
+    margin-top: 28rpx;
+    font-size: 32rpx;
+    line-height: 1.6;
+    color: #737383;
+}
+
+.cards {
+    margin-top: 60rpx;
+}
+
+.card {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 32rpx;
+    margin-bottom: 28rpx;
+    border-radius: 44rpx;
+    background: #ffffff;
+}
+
+.small-tile {
+    display: block;
+    width: 136rpx;
+    height: 136rpx;
+    flex-shrink: 0;
+}
+
+.large-tile {
+    display: block;
+    width: 560rpx;
+    height: 560rpx;
+    margin: 68rpx auto;
+}
+
+.tile-content {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    border-radius: 44rpx;
+    align-items: center;
+    justify-content: center;
+}
+
+.tile-symbol {
+    color: #ffffff;
+    font-size: 80rpx;
+    font-weight: 700;
+}
+
+.card-label {
+    margin-left: 36rpx;
+}
+
+.card-title {
+    display: block;
+    font-size: 42rpx;
+    font-weight: 600;
+}
+
+.card-hint {
+    display: block;
+    margin-top: 12rpx;
+    color: #8a8997;
+    font-size: 22rpx;
+}
+
+.footnote {
+    display: block;
+    margin-top: 52rpx;
+    color: #92909b;
+    font-size: 24rpx;
+    line-height: 1.6;
+}
+
+.back {
+    font-size: 30rpx;
+    color: #6b6680;
+}
