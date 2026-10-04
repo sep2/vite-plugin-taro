@@ -97,7 +97,7 @@ appJson: {
 
 ### 按页面开启
 
-如果正在逐步迁移，可以只为部分页面配置 Skyline。保留 `appJson.rendererOptions`，并把渲染设置放进目标页面：
+可以只为部分页面配置 Skyline，但所有微信页面仍需使用 glass-easel。保留全局组件框架和 WebView 配置，并把 Skyline 渲染设置放进目标页面：
 
 ```ts
 pages: [
@@ -117,6 +117,8 @@ pages: [
 ],
 appJson: {
     lazyCodeLoading: 'requiredComponents',
+    componentFramework: 'glass-easel',
+    window: { glassEaselWebview: true },
     rendererOptions: {
         skyline: {
             defaultDisplayBlock: true,
