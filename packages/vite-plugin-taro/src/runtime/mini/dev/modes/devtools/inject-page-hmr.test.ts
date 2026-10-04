@@ -7,6 +7,7 @@ type TestPage = {
 }
 
 type PageConfigInput = {
+    __vpt_meta: { skipPrerender: boolean }
     data: Record<string, unknown>
     onUnload?: (this: TestPage, ...args: unknown[]) => void
     onLoad?: (this: TestPage, ...args: unknown[]) => void
@@ -59,10 +60,11 @@ async function createTestHarness(): Promise<TestHarness> {
             return { data: {} }
         },
         createBareConfig() {
-            return runtime.injectPageHmr({ data: { root: { cn: [] } } })
+            return runtime.injectPageHmr({ __vpt_meta: { skipPrerender: false }, data: { root: { cn: [] } } })
         },
         createConfig(originals) {
             const config = {
+                __vpt_meta: { skipPrerender: false },
                 data: { root: { cn: [] } },
                 onUnload: originals?.onUnload ?? (() => {}),
                 onLoad: originals?.onLoad ?? (() => {}),
@@ -111,6 +113,8 @@ test('scopes re-registration lifecycles to their static Page configuration', asy
     primaryConfig.onLoad.call(primary)
     mirrorConfig.onLoad.call(mirror)
     harness.reregisterPage(mirrorConfig)
+    assert.equal(primaryConfig.__vpt_meta.skipPrerender, false)
+    assert.equal(mirrorConfig.__vpt_meta.skipPrerender, true)
     primaryConfig.onUnload.call(primary)
     mirrorConfig.onUnload.call(mirror)
 
@@ -136,6 +140,7 @@ test('does not arm re-registration before mount or after an ordinary unload', as
 
     harness.reregisterPage(config)
     assert.strictEqual(config.data, initialData)
+    assert.equal(config.__vpt_meta.skipPrerender, false)
 
     const firstPage = harness.createPage()
     config.onLoad.call(firstPage, 'first-load')
@@ -145,6 +150,7 @@ test('does not arm re-registration before mount or after an ordinary unload', as
     firstPage.data = { stale: true }
     harness.reregisterPage(config)
     assert.strictEqual(config.data, initialData)
+    assert.equal(config.__vpt_meta.skipPrerender, false)
 
     const nextPage = harness.createPage()
     config.onLoad.call(nextPage, 'next-load')
@@ -157,6 +163,41 @@ test('does not arm re-registration before mount or after an ordinary unload', as
         { kind: 'load', page: nextPage, args: ['next-load'] },
         { kind: 'show', page: nextPage, args: ['next-show'] }
     ])
+})
+
+test('keeps prerender control separate from the re-registration lifecycle gate', async () => {
+    const harness = await createTestHarness()
+    const page = harness.createPage()
+    // This mutable trace verifies lifecycle forwarding independently of the native prerender flag.
+    const calls: string[] = []
+    const config = harness.createConfig({
+        onLoad() {
+            calls.push('load')
+        },
+        onShow() {
+            calls.push('show')
+        },
+        onUnload() {
+            calls.push('unload')
+        }
+    })
+
+    // Skipping prerender must not suppress ordinary lifecycles.
+    config.__vpt_meta.skipPrerender = true
+    config.onLoad.call(page)
+    config.onShow.call(page)
+    assert.deepEqual(calls, ['load', 'show'])
+
+    harness.reregisterPage(config)
+    // Changing native prerender control must not disarm the private re-registration gate.
+    config.__vpt_meta.skipPrerender = false
+    config.onUnload.call(page)
+    config.onLoad.call(page)
+    config.onShow.call(page)
+    assert.deepEqual(calls, ['load', 'show'])
+
+    config.onUnload.call(page)
+    assert.deepEqual(calls, ['load', 'show', 'unload'])
 })
 
 test('requires the App-global CustomWrapper cache before mounted re-registration', async () => {
@@ -246,6 +287,7 @@ test('retains native data and suppresses re-registration business lifecycles', a
     lifecycleCalls.length = 0
 
     harness.reregisterPage(config)
+    assert.equal(config.__vpt_meta.skipPrerender, true)
     config.onUnload.call(page)
 
     assert.strictEqual(config.data, page.data)
@@ -253,6 +295,7 @@ test('retains native data and suppresses re-registration business lifecycles', a
     config.onLoad.call(transientPage)
     config.onShow.call(transientPage)
 
+    assert.equal(config.__vpt_meta.skipPrerender, false)
     assert.deepEqual(lifecycleCalls, [])
     assert.deepEqual(transientPage.data, { root: { cn: ['preserved'] } })
     assert.strictEqual(config.data, transientPage.data)

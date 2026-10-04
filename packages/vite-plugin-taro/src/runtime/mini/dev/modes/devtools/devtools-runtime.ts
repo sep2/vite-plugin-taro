@@ -5,7 +5,7 @@
  */
 
 import { type ConnectMiniSocket, MiniHmrRuntime, type RuntimePatch } from '../../mini-hmr-runtime.ts'
-import { injectPageHmr as injectDevtoolsPageHmr } from './page-hmr.ts'
+import { injectPageHmr as injectDevtoolsPageHmr } from './inject-page-hmr.ts'
 
 /**
  * One physical DevTools patch. DevTools compiles `factory` as native project JavaScript; invoking it registers updated Rolldown

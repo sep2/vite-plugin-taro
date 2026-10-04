@@ -14,6 +14,7 @@ type PageHmrState = {
 }
 
 type HmrPageConfig = {
+    __vpt_meta: { skipPrerender: boolean }
     data: Record<string, unknown>
     onUnload?: unknown
     onLoad?: unknown
@@ -23,11 +24,14 @@ type HmrPageConfig = {
 
 /** Calls a native lifecycle with the same Page bound to `this` and the same arguments. */
 function forward(handler: unknown, page: unknown, args: unknown[]): void {
-    if (typeof handler === 'function') handler.apply(page, args)
+    if (typeof handler === 'function') {
+        handler.apply(page, args)
+    }
 }
 
 /** Tracks the mounted native Page and prepares its static config for DevTools re-registration. */
 export function injectPageHmr(config: HmrPageConfig): HmrPageConfig {
+    const metadata = config.__vpt_meta
     const existingState = config[pageHmrStateKey]
 
     if (existingState) {
@@ -49,6 +53,7 @@ export function injectPageHmr(config: HmrPageConfig): HmrPageConfig {
          * no route map, global phase, or Page identity comparison participates in the decision.
          */
         existingState.isReregistering = true
+        metadata.skipPrerender = true
         /*
          * Native registration reads `config.data` as the initial view-model for this registration. The Page owns current app
          * and ordinary Page fields, while each mounted CustomWrapper owns the current snapshot below its native boundary. Join
@@ -69,7 +74,8 @@ export function injectPageHmr(config: HmrPageConfig): HmrPageConfig {
     /*
      * This mutable config-local state spans ordinary Page mount/unmount and one DevTools re-registration lifecycle. Lifecycle
      * wrappers close over this exact object, while a later `injectPageHmr(config)` retrieves it through the symbol and avoids
-     * wrapping twice. Config-local ownership avoids route maps, runtime-global phase flags, and state shared by independent Page
+     * wrapping twice. The separate metadata flag controls only native prerendering, not lifecycle forwarding.
+     * Config-local ownership avoids route maps, runtime-global phase flags, and state shared by independent Page
      * registrations; the state becomes unreachable together with its static config.
      */
     const state: PageHmrState = {
@@ -100,9 +106,10 @@ export function injectPageHmr(config: HmrPageConfig): HmrPageConfig {
 
     config.onShow = function (this: NativePage, ...args: unknown[]) {
         if (state.isReregistering) {
-            // DevTools' synthetic unload/load/show cycle ends here. Consume the gate exactly once so the next real navigation
-            // forwards ordinary Taro lifecycles instead of being mistaken for the same registration.
+            // DevTools' synthetic unload/load/show cycle ends here. Clear both flags so the next real navigation
+            // forwards ordinary Taro lifecycles and prerenders its own initial data.
             state.isReregistering = false
+            metadata.skipPrerender = false
             return
         }
 

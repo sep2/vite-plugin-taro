@@ -11,6 +11,7 @@ type TestHotContext = Readonly<{
         updateStyle: () => void
     }>
     accept: (callback?: (moduleExports: unknown) => void) => void
+    dispose: (callback: () => void) => void
     invalidate: (reason?: string) => never
     prune: (callback?: () => void) => void
     runAccept: (moduleExports: unknown) => void
@@ -580,6 +581,57 @@ test('retains hot contexts only after they become accepting boundaries', async (
 
     runtime.createModuleHotContext('passive')
     assert.equal(runtime.moduleHotContexts.has('passive'), false)
+})
+
+test('disposes passive module listeners once without turning them into accepting boundaries', async () => {
+    const { runtime } = await createTestHarness()
+    // This journal captures native cleanup independently from HMR acceptance.
+    const calls: string[] = []
+    const context = runtime.createModuleHotContext('query')
+    runtime.registerModule('query', { exports: {} })
+    context.dispose(() => {
+        assert.equal(runtime.isExecuted('query'), true, 'cleanup precedes cache eviction')
+        calls.push('first')
+    })
+    context.dispose(() => calls.push('second'))
+    assert.equal(runtime.moduleHotContexts.has('query'), false)
+    runtime.removeModuleCache('query')
+    runtime.removeModuleCache('query')
+    assert.deepEqual(calls, ['first', 'second'])
+
+    const next = runtime.createModuleHotContext('query')
+    next.dispose(() => calls.push('replacement'))
+    runtime.createModuleHotContext('query')
+    runtime.removeModuleCache('query')
+    assert.deepEqual(calls, ['first', 'second', 'replacement'])
+})
+
+test('runs disposal before replacement factories and old acceptance callbacks', async () => {
+    const { runtime } = await createTestHarness()
+    // This order distinguishes old-generation resource cleanup from fresh module execution.
+    const calls: string[] = []
+    runtime.registerGraph({ ids: ['page'], localCount: 1, edges: [[]], dynamicEdges: [[]] })
+    runtime.registerModule('page', { exports: {} })
+    const context = runtime.createModuleHotContext('page')
+    context.dispose(() => calls.push('dispose'))
+    context.accept(() => calls.push('accept'))
+    runtime.applyPatches({
+        buildId: 'build',
+        patches: [
+            {
+                seq: 1,
+                changedIds: ['page'],
+                factory(receivingRuntime) {
+                    receivingRuntime.registerFactory('page', () => {
+                        calls.push('factory')
+                        receivingRuntime.createModuleHotContext('page').accept()
+                        receivingRuntime.registerModule('page', { exports: {} })
+                    })
+                }
+            }
+        ]
+    })
+    assert.deepEqual(calls, ['dispose', 'factory', 'accept'])
 })
 
 test('fails invariant-only hot operations with local diagnostics', async () => {
