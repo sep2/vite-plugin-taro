@@ -14,12 +14,14 @@ test('the Alipay/TT constructor is native Page and forwards the config without c
         events: { onBack: () => true },
         onLoad: t.mock.fn<() => void>()
     } satisfies PageInstance
-    const metadata = { component: () => null, route: 'pages/home', skipPrerender: false }
     const initialPage = { path: 'pages/home?instance=1', params: { id: 'prepared' } }
-    Object.defineProperties(config, {
-        __vpt_meta: { value: metadata },
-        $taroInitialPage: { value: initialPage, writable: true }
-    })
+    const metadata = {
+        component: () => null,
+        route: 'pages/home',
+        skipPrerender: false,
+        prerenderIdentity: initialPage
+    }
+    Object.defineProperty(config, '__vpt_meta', { value: metadata })
     Object.freeze(config)
 
     assert.strictEqual(miniPageConstructor, page)
@@ -28,8 +30,7 @@ test('the Alipay/TT constructor is native Page and forwards the config without c
     assert.equal(page.mock.callCount(), 1)
     assert.strictEqual(page.mock.calls[0]?.arguments[0], config)
     assert.equal(config.onLoad.mock.callCount(), 0)
-    assert.strictEqual(Reflect.get(config, '$taroInitialPage'), initialPage)
-    assert.equal(Object.hasOwn({ ...config }, '$taroInitialPage'), false)
+    assert.strictEqual(metadata.prerenderIdentity, initialPage)
     assert.equal(metadata.skipPrerender, false)
     assert.equal(Object.hasOwn({ ...config }, '__vpt_meta'), false)
 })

@@ -24,11 +24,8 @@ export function createPageConfig(
         }
     })
 
-    // Keep both slots out of native methods. Taro onLoad consumes the prepared identity without deleting the writable slot.
-    Object.defineProperties(config, {
-        __vpt_meta: { enumerable: false },
-        $taroInitialPage: { value: undefined, writable: true }
-    })
+    // Keep private inputs and the one-shot prerender identity out of native methods.
+    Object.defineProperty(config, '__vpt_meta', { enumerable: false })
 
     return config
 }

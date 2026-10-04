@@ -29,7 +29,14 @@ test('published renderer and declarations expose only the supported React 19 ren
         readFile(path.join(path.dirname(rendererPath), 'index.d.ts'), 'utf8'),
         readFile(path.join(path.dirname(rendererPath), 'render.d.ts'), 'utf8')
     ])
-    assert.doesNotMatch(renderer, /LegacyRoot|isReact19Signature|prepareUpdate\(|getCurrentEventPriority\(/)
+    assert.doesNotMatch(
+        renderer,
+        /LegacyRoot|isReact19Signature|prepareUpdate\(|getCurrentEventPriority\(|container\.onCommit/
+    )
+    assert.doesNotMatch(
+        framework,
+        /react\.Activity|container\.onCommit|page\.mode|RouterContext|preparationRouter|hasPage\(/
+    )
     assert.doesNotMatch(renderer, /TaroReconciler\.(?:flushSync\s*=|runWithPriority)|findDOMNode/)
     assert.match(renderer, /TaroReconciler\.flushSyncWork\(\)/)
     assert.match(renderer, /const flushSync = TaroReconciler\.flushSyncFromReconciler/)
@@ -59,20 +66,68 @@ async function runFixture(t: TestContext, target: 'wx' | 'zfb' | 'tt', mode: str
     )
     const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), 'react19-renderer-fixture.js')
     const platform = { wx: 'weapp', zfb: 'alipay', tt: 'tt' }[target]
+    const capsuleSource = await readFile(path.join(path.dirname(entry), '../mini/capsule/page.ts'), 'utf8')
+    const routes = new Map([
+        ['test:page-first-frame.ts', 'pages/first-frame'],
+        ['test:page-suspended.ts', 'pages/suspended'],
+        ['test:page-bare.ts', 'pages/bare']
+    ])
     const result = await build({
         input: entry,
         plugins: [
             {
                 name: 'test:react19-renderer',
-                resolveId(id) {
-                    if (id === entry) {
-                        return entry
+                resolveId(id, importer) {
+                    if (id === entry || routes.has(id) || id === 'test:empty') {
+                        return id
                     }
-                    if (id === '@tarojs/runtime') {
+                    if (id === '\0vpt:global-binding') {
+                        return 'test:global'
+                    }
+                    if (id === '@tarojs/runtime' || id === 'vite-plugin-taro-runtime/runtime/mini') {
                         return resolveTaroRuntime('runtime/mini')
+                    }
+                    const route = importer && routes.get(importer)
+                    if (route) {
+                        if (id === '\0vpt:page-component') {
+                            return `test:component:${route}`
+                        }
+                        if (id === './app.ts') {
+                            return 'test:empty'
+                        }
+                        if (id === './taro-runtime.ts') {
+                            return path.join(path.dirname(entry), '../mini/capsule/create-page-config.ts')
+                        }
+                    }
+                    if (id === 'test:prerender') {
+                        return path.join(path.dirname(entry), '../wx/native/prerender-to-data.ts')
+                    }
+                    if (id === './get-wx-page-query.ts') {
+                        return 'test:page-query'
                     }
                 },
                 async load(id) {
+                    const route = routes.get(id)
+                    if (route) {
+                        return capsuleSource
+                            .replaceAll('__VPT_PAGE_PATH__', JSON.stringify(route))
+                            .replaceAll('__VPT_PAGE_CONFIG__', '{}')
+                    }
+                    if (id === 'test:empty') {
+                        return ''
+                    }
+                    if (id === 'test:global') {
+                        return 'export const vptGlobal = global'
+                    }
+                    if (id === 'test:page-query') {
+                        return 'export const getWxPageQuery = () => globalThis.pageQuery'
+                    }
+                    if (id.startsWith('test:component:')) {
+                        // Keep each capsule's component identity stable while the fixture supplies its hook-rich body.
+                        return `export default function Page(props) {
+                            return globalThis.pageComponents[${JSON.stringify(id.slice('test:component:'.length))}](props)
+                        }`
+                    }
                     if (id === entry) {
                         return `import ${JSON.stringify(resolveTaroRuntime(`plugin-platform-${platform}/runtime`))}\n${fixture}`
                     }
@@ -104,6 +159,7 @@ async function runFixture(t: TestContext, target: 'wx' | 'zfb' | 'tt', mode: str
         require,
         global: {},
         console: { ...console, info() {} },
+        performance,
         getCurrentPages: () => [],
         setTimeout(callback: (...args: unknown[]) => void, delay: number | undefined, ...args: unknown[]) {
             const timer = setTimeout(() => {
@@ -127,10 +183,24 @@ import assert from 'node:assert/strict'
 import React from 'react'
 import { ConcurrentRoot, DiscreteEventPriority, ContinuousEventPriority, DefaultEventPriority, NoEventPriority } from 'react-reconciler/constants'
 import ReactDOM, { rendererHostConfig } from 'vite-plugin-taro-runtime/react'
-import { Current, document, eventHandler, hooks } from '@tarojs/runtime'
-import { createReactApp, createNativeComponentConfig, setReconciler } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
+import { Current, document, eventHandler, hooks, createPageConfig as createTaroPageConfig } from '@tarojs/runtime'
+import config from 'test:page-first-frame.ts'
+import suspendedConfig from 'test:page-suspended.ts'
+import bareConfig from 'test:page-bare.ts'
+import { prerenderToData as prerenderConfig } from 'test:prerender'
+// This fixture-local query models the native routing input for each independent data callback.
+function renderInitialData(config, query) {
+    globalThis.pageQuery = query
+    return prerenderConfig(config)
+}
+const prerenderToData = query => renderInitialData(config, query)
+const prerenderSuspended = query => renderInitialData(suspendedConfig, query)
+const prerenderBare = query => renderInitialData(bareConfig, query)
+import { createReactApp, createNativeComponentConfig, setReconciler, useLoad, useUnload, useRouter } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
 
 const h = React.createElement
+// VM-local component bodies are installed before invoking their actual route capsule's renderer.
+const pageComponents = globalThis.pageComponents = {}
 
 async function checkRootsAndCommits() {
     assert.equal('render' in ReactDOM, false)
@@ -296,6 +366,214 @@ function checkEventPrioritiesAndControlledInputs() {
     ReactDOM.flushSync(() => root.unmount())
 }
 
+function checkPageConfigData() {
+    // Page registration preserves the public data contract and does not mount React or require an initialized App.
+    const data = { page: { cn: [] } }
+    const baseConfig = createTaroPageConfig(() => assert.fail('registration must not render'), 'pages/config', data, {})
+    assert.strictEqual(baseConfig.data, data)
+    assert.equal(createTaroPageConfig.length, 4, 'the upstream factory signature stays unchanged')
+    assert.equal(Object.hasOwn(baseConfig, '__vpt_meta'), false)
+    assert.equal(Object.hasOwn(baseConfig, 'prerenderToData'), false)
+    assert.equal(Object.hasOwn(config, 'prerenderToData'), false)
+    assert.equal(Object.getOwnPropertyDescriptor(config, '__vpt_meta').enumerable, false)
+    assert.equal(Object.hasOwn({ ...config }, '__vpt_meta'), false)
+    assert.equal(config.__vpt_meta.prerenderIdentity, undefined)
+    assert.equal(typeof config.data, 'object')
+    assert.equal(typeof prerenderToData, 'function')
+}
+
+async function checkNativeInitialData() {
+    if (process.env.TARO_ENV !== 'weapp') {
+        return
+    }
+    // Exercise the native data-factory/onLoad order with real React, including a cold uncommitted App root.
+    const initialized = []
+    const effects = []
+    const loads = []
+    const unloads = []
+    const setters = new Map()
+    const routers = new Map()
+    const context = React.createContext('missing')
+    let setAppValue
+    function App({ children }) {
+        const [value, update] = React.useState('first-context')
+        setAppValue = update
+        return h(context.Provider, { value }, h('view', null, children))
+    }
+    function Page() {
+        const router = useRouter()
+        const dynamic = useRouter(true)
+        const value = React.useContext(context)
+        const id = router.params.id
+        routers.set(id, { router, dynamic })
+        const [count, update] = React.useState(() => { initialized.push(id); return 0 })
+        setters.set(id, update)
+        useLoad(params => {
+            assert.strictEqual(params, router.params)
+            loads.push(params)
+        })
+        useUnload(() => unloads.push(id))
+        React.useLayoutEffect(() => {
+            effects.push('layout:' + id)
+            return () => effects.push('cleanup:' + id)
+        }, [])
+        React.useEffect(() => {
+            effects.push('passive:' + id)
+            return () => effects.push('passive-cleanup:' + id)
+        }, [])
+        return h('view', { id: 'view-' + id, onClick: () => update(n => n + 1) }, value + ':' + id + ':' + count)
+    }
+    const seed = () => ({ app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } })
+    const native = (route, data) => ({ route, data, writes: [], setData(data, cb) { this.writes.push(data); cb?.() } })
+    const until = async predicate => {
+        const deadline = Date.now() + 3000
+        while (!predicate()) {
+            assert.ok(Date.now() < deadline, 'timed out waiting for the real renderer')
+            await new Promise(resolve => setTimeout(resolve, 5))
+        }
+    }
+    createReactApp(App, React, ReactDOM, {
+        appId: 'first-frame-app', componentFramework: 'glass-easel'
+    })
+    pageComponents['pages/first-frame'] = Page
+    assert.deepEqual(config.data, seed())
+
+    const metadata = config.__vpt_meta
+    const sourceData = prerenderToData({ id: 'source', full: 'a%3Db' })
+    const initialRouter = Current.router
+    const initialPage = metadata.prerenderIdentity
+    assert.equal(initialPage.path, initialRouter.$taroPath)
+    assert.strictEqual(initialPage.params, initialRouter.params)
+    assert.deepEqual(config.data, seed(), 'native initialization does not replace the public data object')
+    assert.ok(sourceData.app.cn.length > 0, 'cold data factory commits the existing App root synchronously')
+    assert.match(JSON.stringify(sourceData.page), /first-context:source:0/)
+    assert.deepEqual(initialized, ['source'])
+    assert.ok(effects.includes('layout:source'))
+    assert.deepEqual(loads, [], 'the factory must not synthesize native onLoad')
+    assert.equal(Current.page, null)
+    const sourceHost = document.getElementById('view-source')
+    assert.equal(sourceData.page.cn[0].sid, sourceHost.sid)
+    const source = native('pages/first-frame', sourceData)
+    config.onLoad.call(source, { id: 'source', full: 'a%3Db' })
+    assert.equal(metadata.prerenderIdentity, undefined, 'onLoad consumes the prepared identity immediately')
+    assert.strictEqual(config.__vpt_meta, metadata, 'onLoad preserves the remaining VPT metadata')
+    assert.equal(metadata.route, 'pages/first-frame')
+    assert.equal(metadata.skipPrerender, false)
+    assert.strictEqual(source.$taroParams, initialPage.params)
+    assert.strictEqual(source.$taroParams, initialRouter.params)
+    assert.equal(source.$taroPath, initialRouter.$taroPath)
+    config.onShow.call(source)
+    await until(() => source.writes.length > 0)
+    assert.strictEqual(document.getElementById('view-source'), sourceHost)
+    assert.equal(effects.filter(x => x === 'layout:source').length, 1)
+    assert.equal(loads[0].full, 'a%3Db')
+    assert.strictEqual(Current.page, source)
+
+    ReactDOM.flushSync(() => setAppValue('latest-context'))
+    const targetData = prerenderToData({ id: 'target' })
+    const targetIdentity = metadata.prerenderIdentity
+    assert.notEqual(targetIdentity.path, initialPage.path)
+    assert.equal(Object.getOwnPropertyDescriptor(config, '__vpt_meta').enumerable, false)
+    const targetHost = document.getElementById('view-target')
+    assert.equal(targetData.page.cn[0].sid, targetHost.sid)
+    assert.notEqual(targetHost.sid, sourceHost.sid)
+    assert.match(JSON.stringify(targetData.page), /latest-context:target:0/)
+    assert.doesNotMatch(JSON.stringify(targetData.app), /view-source|view-target/)
+    assert.deepEqual(initialized, ['source', 'target'], 'each data callback mounts exactly one new instance')
+    assert.deepEqual(loads.map(x => x.id), ['source'])
+    assert.strictEqual(Current.page, source, 'router initialization does not invent a native Page instance')
+
+    // Preserve both upstream useRouter modes: the default captures its mount route; dynamic reads Current.router.
+    ReactDOM.flushSync(() => setters.get('source')(3))
+    assert.equal(routers.get('source').router.params.id, 'source')
+    assert.strictEqual(routers.get('source').dynamic, Current.router)
+    assert.equal(routers.get('source').dynamic.params.id, 'target')
+
+    const target = native('pages/first-frame', targetData)
+    config.onLoad.call(target, { id: 'target' })
+    assert.equal(metadata.prerenderIdentity, undefined)
+    assert.equal(target.$taroPath, targetIdentity.path)
+    assert.strictEqual(target.$taroParams, targetIdentity.params)
+    config.onShow.call(target)
+    await until(() => target.writes.length > 0)
+    assert.strictEqual(document.getElementById('view-target'), targetHost)
+    assert.equal(target.writes[0]['page.cn'][0].sid, targetHost.sid)
+    assert.ok(Object.hasOwn(target.writes[0], 'app.cn'))
+    assert.equal(effects.filter(x => x === 'layout:target').length, 1)
+    assert.deepEqual(loads.map(x => x.id), ['source', 'target'])
+    const writeCount = target.writes.length
+    eventHandler({ type: 'tap', target: { id: targetHost.id }, detail: {} })
+    assert.equal(target.writes.length, writeCount, 'ordinary updates remain asynchronous')
+    await until(() => targetHost.textContent === 'latest-context:target:1' && target.writes.length > writeCount)
+    config.onHide.call(target)
+    config.onShow.call(source)
+    await until(() => Current.page === source)
+    assert.equal(effects.includes('cleanup:target'), false)
+    config.onUnload.call(target)
+    await until(() => effects.includes('passive-cleanup:target'))
+    assert.deepEqual(unloads, ['target'])
+    config.onUnload.call(source)
+    await until(() => effects.includes('passive-cleanup:source'))
+
+    // The consumed identity must not leak into a later native instance that enters onLoad without prerendering.
+    const unprepared = native('pages/first-frame', seed())
+    config.onLoad.call(unprepared, { id: 'unprepared' })
+    await until(() => unprepared.writes.length > 0)
+    assert.equal(unprepared.$taroParams.id, 'unprepared')
+    assert.notEqual(unprepared.$taroPath, target.$taroPath)
+    config.onUnload.call(unprepared)
+    await until(() => effects.includes('passive-cleanup:unprepared'))
+
+    // Callers that do not request initial data retain asynchronous onLoad, including empty initial replacements.
+    const emptyConfig = createTaroPageConfig(() => null, 'pages/empty', seed(), {})
+    assert.deepEqual(emptyConfig.data, seed(), 'ordinary pages retain their static data object')
+    const empty = native('pages/empty', seed())
+    empty.data.page.cn.push({ sid: 'stale-seed' })
+    emptyConfig.onLoad.call(empty, {})
+    assert.equal(Object.hasOwn(emptyConfig, '__vpt_meta'), false, 'ordinary configs gain no VPT metadata')
+    await until(() => empty.writes.length > 0)
+    assert.deepEqual(empty.writes[0]['page.cn'], [])
+    emptyConfig.onUnload.call(empty)
+
+    let resolveContent
+    const content = new Promise(resolve => { resolveContent = resolve })
+    function Content() {
+        return h('text', null, React.use(content))
+    }
+    function SuspendedPage() {
+        return h(React.Suspense, { fallback: h('text', null, 'loading') }, h(Content))
+    }
+    pageComponents['pages/suspended'] = SuspendedPage
+    const suspendedData = prerenderSuspended({})
+    assert.match(JSON.stringify(suspendedData.page), /loading/, 'the factory returns the committed fallback without waiting')
+    const suspended = native('pages/suspended', suspendedData)
+    suspendedConfig.onLoad.call(suspended, {})
+    await until(() => suspended.writes.length > 0)
+    resolveContent('resolved-content')
+    await until(() => document.getElementById(suspended.$taroPath).textContent === 'resolved-content')
+    suspendedConfig.onUnload.call(suspended)
+
+    // Without any Suspense boundary there is no committed Page yet; return the seed and let normal mounting finish.
+    let resolveBare
+    const bareContent = new Promise(resolve => { resolveBare = resolve })
+    function BarePage() {
+        return h('text', null, React.use(bareContent))
+    }
+    pageComponents['pages/bare'] = BarePage
+    const bareData = prerenderBare({})
+    assert.deepEqual(bareData, seed())
+    const bare = native('pages/bare', bareData)
+    bareConfig.onLoad.call(bare, {})
+    resolveBare('bare-content')
+    await until(() => bare.writes.length > 0)
+    assert.equal(document.getElementById(bare.$taroPath).textContent, 'bare-content')
+    bareConfig.onUnload.call(bare)
+    ReactDOM.flushSync(() => ReactDOM.unmountComponentAtNode(document.getElementById('first-frame-app')))
+    Current.app = null
+    Current.page = null
+    Current.router = null
+}
+
 function checkFrameworkRootEntryPoints() {
     // A renderer double records bootstrap ordering; it deliberately has no legacy render API.
     const calls = []
@@ -336,6 +614,8 @@ async function run() {
     await checkRootsAndCommits()
     checkRootOptionsAndErrors()
     checkEventPrioritiesAndControlledInputs()
+    checkPageConfigData()
+    await checkNativeInitialData()
     checkFrameworkRootEntryPoints()
 }
 run()
