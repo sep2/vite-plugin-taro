@@ -17,8 +17,7 @@ import { type BuildOptions, createServer } from 'vite'
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
 import { createZfbMiniContract } from '../../zfb/plugins.ts'
-import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
-import { miniPageShellId } from '../module/module.ts'
+import type { MiniContract } from '../mini-contract.ts'
 import { renderNative } from '../render/native.ts'
 import { createMiniHmrMode } from './hmr-mode.ts'
 import { createMiniDevOptionsPlugin, requireSingleOutput } from './mini-dev-options.ts'
@@ -26,12 +25,7 @@ import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 
-const runtimeModules = {
-    pageShell: miniPageShellId,
-    pageConstructor: resolveVptRuntime('wx/native/wx-page-constructor'),
-    devtoolsHmrRuntime: resolveVptRuntime('wx/dev/devtools-runtime'),
-    interpreterHmrRuntime: resolveVptRuntime('wx/dev/interpreter-runtime')
-} satisfies RuntimeContract
+const runtimeFile = resolveVptRuntime('wx/dev/devtools-runtime')
 
 const options = {
     options: {
@@ -47,7 +41,7 @@ const options = {
         projectConfigJson: {}
     }
 } satisfies Pick<MiniContract, 'options'>
-const hmrMode = createDevtoolsHmrMode(runtimeModules)
+const hmrMode = createDevtoolsHmrMode(runtimeFile)
 
 /** These tests inspect options only: never watch workspace files or populate its shared dependency cache. */
 async function createOptionsServer(context: TestContext, build: BuildOptions) {
@@ -92,7 +86,7 @@ for (const logLevel of [undefined, 'info', 'warn', 'error', 'silent'] as const) 
                         const plugin = createMiniDevOptionsPlugin({
                             server,
                             contract: ${JSON.stringify(options)},
-                            hmrMode: createDevtoolsHmrMode(${JSON.stringify(runtimeModules)})
+                            hmrMode: createDevtoolsHmrMode(${JSON.stringify(runtimeFile)})
                         })
                         const adapted = await plugin.options({
                             output: {},

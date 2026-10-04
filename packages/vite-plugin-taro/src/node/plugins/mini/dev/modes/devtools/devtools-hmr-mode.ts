@@ -1,8 +1,7 @@
 import path from 'node:path'
 import type { Plugin } from 'vite'
 import { createExactModuleIdFilter } from '../../../../../utils/modules.ts'
-import type { RuntimeContract } from '../../../mini-contract.ts'
-import { appShellFileName } from '../../../module/module.ts'
+import { appShellFileName, miniPageShellId } from '../../../module/module.ts'
 import { hmrInfoFileName } from '../../hmr-files.ts'
 import type { MiniHmrMode } from '../../hmr-mode.ts'
 import type { PatchUpdate } from '../../hmr-protocol.ts'
@@ -16,11 +15,11 @@ export const devtoolsPatchesFileName = 'hmr/patches.js'
  * DevTools observes a changed Page dependency, re-executes the Page shell, and that shell synchronously gives the cumulative
  * native factory payload to the persistent App runtime. Mixing any one of these pieces with another mode would break that chain.
  */
-export function createDevtoolsHmrMode(contract: RuntimeContract): MiniHmrMode {
+export function createDevtoolsHmrMode(runtimeFile: string): MiniHmrMode {
     return {
         rebuildStrategy: 'on-failure',
-        runtimeFile: contract.devtoolsHmrRuntime,
-        plugins: [createDevtoolsPagePlugin(contract.pageShell)],
+        runtimeFile,
+        plugins: [createDevtoolsPagePlugin()],
         createEntryBanner: createDevtoolsEntryBanner,
         // Every Page requires this path from its first complete build. Exporting undefined keeps that dependency valid while
         // making initial Page evaluation a no-op in the runtime adapter until a real cumulative patch suffix exists.
@@ -85,17 +84,15 @@ function createDevtoolsEntryBanner(pageFiles: ReadonlySet<string>) {
     }
 }
 
-/** Transforms the contract's Page shell, including its route-qualified entries. */
-function createDevtoolsPagePlugin(pageShell: string): Plugin {
+/** Transforms the shared Page shell, including its route-qualified entries. */
+function createDevtoolsPagePlugin(): Plugin {
     return {
         name: 'vpt:mini-page-shell-hmr',
         apply: 'serve',
         transform: {
             order: 'post',
-            filter: { id: createExactModuleIdFilter(pageShell) },
-            handler(code) {
-                return injectPageShellHmr(code)
-            }
+            filter: { id: createExactModuleIdFilter(miniPageShellId) },
+            handler: injectPageShellHmr
         }
     }
 }

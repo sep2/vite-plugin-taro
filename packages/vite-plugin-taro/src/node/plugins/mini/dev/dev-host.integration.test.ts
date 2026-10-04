@@ -16,8 +16,8 @@ import { createNativeDevRuntime } from '../../../tests/create-native-dev-runtime
 import { publishSourceGeneration } from '../../../tests/publish-source-generation.ts'
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
-import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
-import { miniAppCapsuleId, miniPageCapsuleId, miniPageShellId } from '../module/module.ts'
+import type { MiniContract } from '../mini-contract.ts'
+import { miniAppCapsuleId, miniPageCapsuleId } from '../module/module.ts'
 import { createMiniStylePlugin } from '../styles/plugins.ts'
 import { createMiniDevHost } from './dev-host.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
@@ -33,12 +33,7 @@ const stableReadCount = 10
 const waitIntervalMilliseconds = 25
 const pageCapsuleFileName = 'pages/home/index-capsule.js'
 
-const runtimeModules = {
-    pageShell: miniPageShellId,
-    pageConstructor: resolveVptRuntime('wx/native/wx-page-constructor'),
-    devtoolsHmrRuntime: resolveVptRuntime('wx/dev/devtools-runtime'),
-    interpreterHmrRuntime: resolveVptRuntime('wx/dev/interpreter-runtime')
-} satisfies RuntimeContract
+const runtimeFile = resolveVptRuntime('wx/dev/devtools-runtime')
 
 type DevFixture = Readonly<{
     close: () => Promise<void>
@@ -470,7 +465,7 @@ test('rejects a server without Vite bundled development ownership', async (conte
                 server: server,
                 contract: contract,
                 styles: createMiniStylePlugin(contract, createMiniStyleEntries(import.meta.filename, [])),
-                hmrMode: createDevtoolsHmrMode(runtimeModules)
+                hmrMode: createDevtoolsHmrMode(runtimeFile)
             }),
         /Vite did not create the Mini Program bundled-development environment/
     )

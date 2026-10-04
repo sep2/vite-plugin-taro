@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { runInNewContext } from 'node:vm'
-import type { RuntimeContract } from '../../../mini-contract.ts'
 import { miniPageShellId } from '../../../module/module.ts'
 import type { PatchUpdate } from '../../hmr-protocol.ts'
 import {
@@ -12,12 +11,7 @@ import {
     renderInitialDevtoolsPatches
 } from './devtools-hmr-mode.ts'
 
-const contract: RuntimeContract = {
-    pageShell: miniPageShellId,
-    pageConstructor: '/runtime/page-constructor.ts',
-    devtoolsHmrRuntime: '/runtime/devtools-runtime.ts',
-    interpreterHmrRuntime: '/runtime/interpreter-runtime.ts'
-}
+const runtimeFile = '/runtime/devtools-runtime.ts'
 
 const patch: PatchUpdate = {
     type: 'Patch',
@@ -28,7 +22,7 @@ const patch: PatchUpdate = {
 }
 
 test('creates exact App and Page entry banners', () => {
-    const mode = createDevtoolsHmrMode(contract)
+    const mode = createDevtoolsHmrMode(runtimeFile)
     const banner = mode.createEntryBanner(new Set(['pages/home/index.js']))
 
     assert.equal(
@@ -40,12 +34,12 @@ test('creates exact App and Page entry banners', () => {
         "__rolldown_runtime__.applyPatches(require('../../hmr/patches.js'));\n"
     )
     assert.equal(banner({ name: 'assets/vendor.js', fileName: 'assets/vendor.js' }), '')
-    assert.equal(mode.runtimeFile, contract.devtoolsHmrRuntime)
+    assert.equal(mode.runtimeFile, runtimeFile)
 })
 
 test('creates fresh Page plugins with exact shell identity filtering', async () => {
-    const first = createDevtoolsHmrMode(contract).plugins[0]
-    const second = createDevtoolsHmrMode(contract).plugins[0]
+    const first = createDevtoolsHmrMode(runtimeFile).plugins[0]
+    const second = createDevtoolsHmrMode(runtimeFile).plugins[0]
     assert.ok(first)
     assert.ok(second)
     assert.notStrictEqual(first, second)
@@ -66,16 +60,18 @@ test('creates fresh Page plugins with exact shell identity filtering', async () 
     assert.match(String(transformed.code), /injectPageHmr/)
 })
 
-test('filters the Page shell selected by the runtime contract', () => {
-    const pageShell = '/runtime/selected-page.ts'
-    const mode = createDevtoolsHmrMode({ ...contract, pageShell })
+test('filters only the shared shell, not the runtime or constructor', () => {
+    const pageConstructor = '/runtime/page-constructor.ts'
+    const mode = createDevtoolsHmrMode(runtimeFile)
     const transform = mode.plugins[0]?.transform
     assert.ok(transform && typeof transform === 'object')
     const filter = transform.filter?.id
     assert.ok(filter instanceof RegExp)
-    assert.equal(filter.test(pageShell), true)
-    assert.equal(filter.test(`${pageShell}?route=pages%2Fhome`), true)
-    assert.equal(filter.test(miniPageShellId), false)
+    assert.equal(filter.test(miniPageShellId), true)
+    assert.equal(filter.test(`${miniPageShellId}?route=pages%2Fhome`), true)
+    assert.equal(filter.test(pageConstructor), false)
+    assert.equal(filter.test(`${pageConstructor}?other`), false)
+    assert.equal(filter.test(runtimeFile), false)
 })
 
 test('injects Page HMR immediately before native registration', () => {
@@ -138,7 +134,7 @@ test('rejects an empty cumulative patch range', () => {
 })
 
 test('describes reset and publication writes through the exact DevTools patch path', () => {
-    const mode = createDevtoolsHmrMode(contract)
+    const mode = createDevtoolsHmrMode(runtimeFile)
     const resetMode = mode.reset
     const publishMode = mode.publish
     assert.ok(resetMode)

@@ -40,7 +40,7 @@ export function createMiniHmrMode(options: MiniHmrOptions, runtime: RuntimeContr
     const mode = options?.mode ?? 'devtools'
     switch (mode) {
         case 'devtools':
-            return createDevtoolsHmrMode(runtime)
+            return createDevtoolsHmrMode(runtime.devtoolsHmrRuntime)
         case 'interpreter':
             return createInterpreterHmrMode(runtime.interpreterHmrRuntime)
         case 'rebuild':

@@ -2,13 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { resolveConfig } from 'vite'
 import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
-import { miniPageShellId, pageComponentId } from '../module/module.ts'
+import { pageComponentId } from '../module/module.ts'
 import { createResolver } from '../resolve/resolver.ts'
 import { createMiniStylePlugin } from '../styles/plugins.ts'
 import { createMiniDevelopmentPlugin, isMiniClientEnvironment, removeDevelopmentAppStyle } from './plugins.ts'
 
 const runtimeModules = {
-    pageShell: miniPageShellId,
     pageConstructor: '/runtime/wx-page-constructor.ts',
     devtoolsHmrRuntime: '/runtime/devtools-hmr.ts',
     interpreterHmrRuntime: '/runtime/interpreter-hmr.ts'
