@@ -16,7 +16,6 @@ import {
     miniCustomWrapperShellId,
     miniPageCapsuleId,
     miniPageConstructorId,
-    miniPageShellId,
     miniTransportId,
     miniTransportOutputPath,
     pageCapsuleId,
@@ -36,7 +35,7 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'taro' |
     const normalizedPageCapsulePath = normalizePath(miniPageCapsuleId)
 
     // Construct App/Page metadata and output inputs together so traversal roots and native paths share one definition.
-    const entryGraph = createEntryGraph(contract.options.pages)
+    const entryGraph = createEntryGraph(contract.options.pages, contract.runtime.pageShell)
 
     // Provide constant-time route validation and access to each configured Page JSON object.
     const pageByPath = new Map(contract.options.pages.map((page) => [page.path, page]))
@@ -107,7 +106,7 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'taro' |
 }
 
 /** Declares native output inputs and exposes their App and ordered Page entries. */
-function createEntryGraph(pages: readonly MiniPage[]) {
+function createEntryGraph(pages: readonly MiniPage[], pageShell: string) {
     const appEntries = {
         capsuleId: miniAppCapsuleId,
         capsuleName: 'app-capsule',
@@ -119,7 +118,7 @@ function createEntryGraph(pages: readonly MiniPage[]) {
         return {
             capsuleId: createRouteModuleId({ moduleId: miniPageCapsuleId, pagePath: page.path }),
             capsuleName: `${page.path}-capsule`,
-            shellId: createRouteModuleId({ moduleId: miniPageShellId, pagePath: page.path }),
+            shellId: createRouteModuleId({ moduleId: pageShell, pagePath: page.path }),
             shellName: `${page.path}.js`
         }
     })

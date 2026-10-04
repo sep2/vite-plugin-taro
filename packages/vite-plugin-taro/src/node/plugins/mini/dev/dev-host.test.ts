@@ -9,6 +9,7 @@ import type { DevOptions } from 'rolldown/experimental'
 import { createLogger, createServer } from 'vite'
 import { resolveVptRuntime } from '../../../utils/packages.ts'
 import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
+import { miniPageShellId } from '../module/module.ts'
 import type { MiniStylePlugin } from '../styles/plugins.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
 import { hmrEndpointPath } from './hmr-protocol.ts'
@@ -26,6 +27,7 @@ type SyntheticDev = (_input: unknown, _output: unknown, devOptions: DevOptions) 
 const devHostHarnessKey = '__vptDevHostTestHarness__'
 
 const runtimeModules = {
+    pageShell: miniPageShellId,
     pageConstructor: resolveVptRuntime('wx/native/wx-page-constructor'),
     devtoolsHmrRuntime: resolveVptRuntime('wx/dev/devtools-runtime'),
     interpreterHmrRuntime: resolveVptRuntime('wx/dev/interpreter-runtime')

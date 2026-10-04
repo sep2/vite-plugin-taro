@@ -2,7 +2,7 @@ import path from 'node:path'
 import type { Plugin } from 'vite'
 import { createExactModuleIdFilter } from '../../../../../utils/modules.ts'
 import type { RuntimeContract } from '../../../mini-contract.ts'
-import { appShellFileName, miniPageShellId } from '../../../module/module.ts'
+import { appShellFileName } from '../../../module/module.ts'
 import { hmrInfoFileName } from '../../hmr-files.ts'
 import type { MiniHmrMode } from '../../hmr-mode.ts'
 import type { PatchUpdate } from '../../hmr-protocol.ts'
@@ -20,7 +20,7 @@ export function createDevtoolsHmrMode(contract: RuntimeContract): MiniHmrMode {
     return {
         rebuildStrategy: 'on-failure',
         runtimeFile: contract.devtoolsHmrRuntime,
-        plugins: [createDevtoolsPagePlugin()],
+        plugins: [createDevtoolsPagePlugin(contract.pageShell)],
         createEntryBanner: createDevtoolsEntryBanner,
         // Every Page requires this path from its first complete build. Exporting undefined keeps that dependency valid while
         // making initial Page evaluation a no-op in the runtime adapter until a real cumulative patch suffix exists.
@@ -85,14 +85,14 @@ function createDevtoolsEntryBanner(pageFiles: ReadonlySet<string>) {
     }
 }
 
-/** Transforms only the shared native Page shell, independently of its selected constructor. */
-function createDevtoolsPagePlugin(): Plugin {
+/** Transforms the contract's Page shell, including its route-qualified entries. */
+function createDevtoolsPagePlugin(pageShell: string): Plugin {
     return {
         name: 'vpt:mini-page-shell-hmr',
         apply: 'serve',
         transform: {
             order: 'post',
-            filter: { id: createExactModuleIdFilter(miniPageShellId) },
+            filter: { id: createExactModuleIdFilter(pageShell) },
             handler(code) {
                 return injectPageShellHmr(code)
             }

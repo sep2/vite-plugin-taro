@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { RuntimeContract } from '../mini-contract.ts'
+import { miniPageShellId } from '../module/module.ts'
 import { createMiniHmrMode } from './hmr-mode.ts'
 
 const runtime: RuntimeContract = {
+    pageShell: miniPageShellId,
     pageConstructor: '/runtime/wx-page-constructor.ts',
     devtoolsHmrRuntime: '/runtime/devtools-runtime.ts',
     interpreterHmrRuntime: '/runtime/interpreter-runtime.ts'

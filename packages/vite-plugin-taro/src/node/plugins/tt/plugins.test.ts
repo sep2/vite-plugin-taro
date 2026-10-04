@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { VptOptions } from '../../../options.ts'
+import { miniPageShellId } from '../mini/module/module.ts'
 import { createTtSkeleton } from './create-tt-skeleton.ts'
 import { createTtMiniContract, createTtMiniPlugins } from './plugins.ts'
 
@@ -23,8 +24,10 @@ test('binds TT runtime and style paths without translating native configuration'
     assert.deepEqual(Object.keys(contract.runtime).sort(), [
         'devtoolsHmrRuntime',
         'interpreterHmrRuntime',
-        'pageConstructor'
+        'pageConstructor',
+        'pageShell'
     ])
+    assert.equal(contract.runtime.pageShell, miniPageShellId)
     assert.match(contract.runtime.pageConstructor, /runtime[/\\]mini[/\\]native[/\\]min-page-constructor\.(?:js|ts)$/)
     assert.match(contract.runtime.devtoolsHmrRuntime, /tt[/\\]dev[/\\]devtools-runtime\.(?:js|ts)$/)
     assert.match(contract.runtime.interpreterHmrRuntime, /tt[/\\]dev[/\\]interpreter-runtime\.(?:js|ts)$/)

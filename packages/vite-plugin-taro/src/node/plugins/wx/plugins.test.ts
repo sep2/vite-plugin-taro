@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { VptOptions } from '../../../options.ts'
-import { miniBootstrapId } from '../mini/module/module.ts'
+import { miniBootstrapId, miniPageShellId } from '../mini/module/module.ts'
 import { createWxSkeleton } from './create-wx-skeleton.ts'
 import { createWxMiniContract, createWxMiniPlugins } from './plugins.ts'
 
@@ -27,8 +27,10 @@ test('creates the WX Mini Program contract without translating public options', 
     assert.deepEqual(Object.keys(contract.runtime).sort(), [
         'devtoolsHmrRuntime',
         'interpreterHmrRuntime',
-        'pageConstructor'
+        'pageConstructor',
+        'pageShell'
     ])
+    assert.equal(contract.runtime.pageShell, miniPageShellId)
     assert.match(contract.runtime.pageConstructor, /runtime[/\\]wx[/\\]native[/\\]wx-page-constructor\.(?:js|ts)$/)
     assert.match(contract.runtime.devtoolsHmrRuntime, /runtime[/\\]wx[/\\]dev[/\\]devtools-runtime\.(?:js|ts)$/)
     assert.match(contract.runtime.interpreterHmrRuntime, /runtime[/\\]wx[/\\]dev[/\\]interpreter-runtime\.(?:js|ts)$/)

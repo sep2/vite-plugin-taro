@@ -13,6 +13,7 @@ import {
 } from './devtools-hmr-mode.ts'
 
 const contract: RuntimeContract = {
+    pageShell: miniPageShellId,
     pageConstructor: '/runtime/page-constructor.ts',
     devtoolsHmrRuntime: '/runtime/devtools-runtime.ts',
     interpreterHmrRuntime: '/runtime/interpreter-runtime.ts'
@@ -63,6 +64,18 @@ test('creates fresh Page plugins with exact shell identity filtering', async () 
     const transformed = await Reflect.apply(transformHook.handler, {}, ['Page(pageConfig)', miniPageShellId])
     assert.ok(transformed && typeof transformed === 'object' && 'code' in transformed)
     assert.match(String(transformed.code), /injectPageHmr/)
+})
+
+test('filters the Page shell selected by the runtime contract', () => {
+    const pageShell = '/runtime/selected-page.ts'
+    const mode = createDevtoolsHmrMode({ ...contract, pageShell })
+    const transform = mode.plugins[0]?.transform
+    assert.ok(transform && typeof transform === 'object')
+    const filter = transform.filter?.id
+    assert.ok(filter instanceof RegExp)
+    assert.equal(filter.test(pageShell), true)
+    assert.equal(filter.test(`${pageShell}?route=pages%2Fhome`), true)
+    assert.equal(filter.test(miniPageShellId), false)
 })
 
 test('injects Page HMR immediately before native registration', () => {

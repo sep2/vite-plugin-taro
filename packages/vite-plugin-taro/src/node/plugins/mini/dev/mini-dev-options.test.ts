@@ -18,6 +18,7 @@ import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
 import { createZfbMiniContract } from '../../zfb/plugins.ts'
 import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
+import { miniPageShellId } from '../module/module.ts'
 import { renderNative } from '../render/native.ts'
 import { createMiniHmrMode } from './hmr-mode.ts'
 import { createMiniDevOptionsPlugin, requireSingleOutput } from './mini-dev-options.ts'
@@ -26,6 +27,7 @@ import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 
 const runtimeModules = {
+    pageShell: miniPageShellId,
     pageConstructor: resolveVptRuntime('wx/native/wx-page-constructor'),
     devtoolsHmrRuntime: resolveVptRuntime('wx/dev/devtools-runtime'),
     interpreterHmrRuntime: resolveVptRuntime('wx/dev/interpreter-runtime')

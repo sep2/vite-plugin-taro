@@ -61,6 +61,7 @@ const contract = {
         targetRuntimePath: '/runtime/target.ts'
     },
     runtime: {
+        pageShell: miniPageShellId,
         pageConstructor: miniPageConstructorRuntimeId,
         devtoolsHmrRuntime: '/runtime/devtools.ts',
         interpreterHmrRuntime: '/runtime/interpreter.ts'
@@ -125,6 +126,16 @@ test('selects the constructor through the private import without changing the sh
         assert.equal(resolver.input['pages/home/index.js'], shellId)
         assert.equal(resolver.entries.pageEntries[0]?.capsuleId, `${miniPageCapsuleId}?route=pages%2Fhome%2Findex`)
     }
+})
+
+test('takes route-qualified Page entries from the runtime contract', () => {
+    const pageShell = '/runtime/selected-page.ts'
+    const resolver = createResolver({ ...contract, runtime: { ...contract.runtime, pageShell } })
+    const shellId = `${pageShell}?route=pages%2Fhome%2Findex`
+    const capsuleId = `${miniPageCapsuleId}?route=pages%2Fhome%2Findex`
+    assert.equal(resolver.entries.pageEntries[0]?.shellId, shellId)
+    assert.equal(resolver.input['pages/home/index.js'], shellId)
+    assert.equal(resolver.resolveId(pageCapsuleId, shellId, '/project'), capsuleId)
 })
 
 test('preserves configured Page order and reuses App/Page entries in the native input map', () => {
