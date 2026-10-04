@@ -1,0 +1,32 @@
+diff --git a/dist/dsl/common.js b/dist/dsl/common.js
+index aaf58e6320a8df8392064d5fbc1787b8c41ea009..091fd7b0b57a9a97fe2ff876361b9e9e2fed8381 100644
+--- a/dist/dsl/common.js
++++ b/dist/dsl/common.js
+@@ -95,8 +95,12 @@ function createPageConfig(component, pageName, data, pageConfig) {
+             Current.page = this;
+             this.config = pageConfig || {};
+             // this.$taroPath 是页面唯一标识
+-            const uniqueOptions = Object.assign({}, options, { $taroTimestamp: Date.now() });
+-            const $taroPath = this.$taroPath = getPath(id, uniqueOptions);
++            const prerenderIdentity = config.__vpt_meta?.prerenderIdentity;
++            if (prerenderIdentity) {
++                config.__vpt_meta.prerenderIdentity = undefined;
++            }
++            const uniqueOptions = prerenderIdentity?.params ?? Object.assign({}, options, { $taroTimestamp: Date.now() });
++            const $taroPath = this.$taroPath = prerenderIdentity?.path ?? getPath(id, uniqueOptions);
+             if (process.env.TARO_PLATFORM === 'web') {
+                 config.path = $taroPath;
+             }
+diff --git a/dist/dsl/instance.d.ts b/dist/dsl/instance.d.ts
+index ad2d594ce3cdbe1324d74bd3a0e82c050a174c40..c6a78fdbe43a620dfd64fb6e2c1d36fb35b13472 100644
+--- a/dist/dsl/instance.d.ts
++++ b/dist/dsl/instance.d.ts
+@@ -56,6 +56,8 @@ interface PageLifeCycle extends Show {
+     onUnload?(): void;
+ }
+ interface PageInstance extends PageLifeCycle {
++    /** @internal VPT metadata; native onLoad consumes the prepared identity once. */
++    __vpt_meta?: { prerenderIdentity?: { path: string; params: Record<string, unknown> } };
+     /** 页面的初始数据 */
+     data?: Record<string, unknown>;
+     /** 页面路径 */

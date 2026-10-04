@@ -24,7 +24,10 @@
     {
         "package": "@tarojs/runtime@4.2.1",
         "output": "patches/generated/@tarojs__runtime@4.2.1.patch",
-        "patches": ["patches/series/@tarojs__runtime@4.2.1/01-mini-app-page-rendering.patch"]
+        "patches": [
+            "patches/series/@tarojs__runtime@4.2.1/01-mini-app-page-rendering.patch",
+            "patches/series/@tarojs__runtime@4.2.1/02-page-prerender.patch"
+        ]
     },
     {
         "package": "canvas-confetti@1.9.4",
