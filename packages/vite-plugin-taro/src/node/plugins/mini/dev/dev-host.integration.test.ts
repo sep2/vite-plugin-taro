@@ -469,7 +469,7 @@ test('rejects a server without Vite bundled development ownership', async (conte
                 server: server,
                 contract: contract,
                 styles: createMiniStylePlugin(contract, createMiniStyleEntries(import.meta.filename, [])),
-                hmrMode: createDevtoolsHmrMode(runtimeModules.devtoolsHmrRuntime)
+                hmrMode: createDevtoolsHmrMode(runtimeModules)
             }),
         /Vite did not create the Mini Program bundled-development environment/
     )

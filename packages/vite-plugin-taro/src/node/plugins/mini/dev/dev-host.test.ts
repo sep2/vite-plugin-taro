@@ -202,7 +202,7 @@ test('reduces synthetic engine update variants and unknown host failures without
             server: server,
             contract: contract,
             styles: styles,
-            hmrMode: createDevtoolsHmrMode(runtimeModules.devtoolsHmrRuntime)
+            hmrMode: createDevtoolsHmrMode(runtimeModules)
         })
         const bundledDev = requireBundledDev(server.environments.client.bundledDev)
 

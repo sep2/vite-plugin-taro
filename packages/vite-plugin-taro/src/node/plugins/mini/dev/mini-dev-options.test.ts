@@ -45,7 +45,7 @@ const options = {
         projectConfigJson: {}
     }
 } satisfies Pick<MiniContract, 'options'>
-const hmrMode = createDevtoolsHmrMode(runtimeModules.devtoolsHmrRuntime)
+const hmrMode = createDevtoolsHmrMode(runtimeModules)
 
 /** These tests inspect options only: never watch workspace files or populate its shared dependency cache. */
 async function createOptionsServer(context: TestContext, build: BuildOptions) {
@@ -90,7 +90,7 @@ for (const logLevel of [undefined, 'info', 'warn', 'error', 'silent'] as const) 
                         const plugin = createMiniDevOptionsPlugin({
                             server,
                             contract: ${JSON.stringify(options)},
-                            hmrMode: createDevtoolsHmrMode(${JSON.stringify(runtimeModules.devtoolsHmrRuntime)})
+                            hmrMode: createDevtoolsHmrMode(${JSON.stringify(runtimeModules)})
                         })
                         const adapted = await plugin.options({
                             output: {},

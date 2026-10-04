@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { runInNewContext } from 'node:vm'
+import type { RuntimeContract } from '../../../mini-contract.ts'
 import { miniPageShellId } from '../../../module/module.ts'
 import type { PatchUpdate } from '../../hmr-protocol.ts'
 import {
@@ -11,7 +12,11 @@ import {
     renderInitialDevtoolsPatches
 } from './devtools-hmr-mode.ts'
 
-const runtimeFile = '/runtime/devtools-runtime.ts'
+const contract: RuntimeContract = {
+    pageConstructor: '/runtime/page-constructor.ts',
+    devtoolsHmrRuntime: '/runtime/devtools-runtime.ts',
+    interpreterHmrRuntime: '/runtime/interpreter-runtime.ts'
+}
 
 const patch: PatchUpdate = {
     type: 'Patch',
@@ -22,7 +27,7 @@ const patch: PatchUpdate = {
 }
 
 test('creates exact App and Page entry banners', () => {
-    const mode = createDevtoolsHmrMode(runtimeFile)
+    const mode = createDevtoolsHmrMode(contract)
     const banner = mode.createEntryBanner(new Set(['pages/home/index.js']))
 
     assert.equal(
@@ -34,12 +39,12 @@ test('creates exact App and Page entry banners', () => {
         "__rolldown_runtime__.applyPatches(require('../../hmr/patches.js'));\n"
     )
     assert.equal(banner({ name: 'assets/vendor.js', fileName: 'assets/vendor.js' }), '')
-    assert.equal(mode.runtimeFile, runtimeFile)
+    assert.equal(mode.runtimeFile, contract.devtoolsHmrRuntime)
 })
 
 test('creates fresh Page plugins with exact shell identity filtering', async () => {
-    const first = createDevtoolsHmrMode(runtimeFile).plugins[0]
-    const second = createDevtoolsHmrMode(runtimeFile).plugins[0]
+    const first = createDevtoolsHmrMode(contract).plugins[0]
+    const second = createDevtoolsHmrMode(contract).plugins[0]
     assert.ok(first)
     assert.ok(second)
     assert.notStrictEqual(first, second)
@@ -120,7 +125,7 @@ test('rejects an empty cumulative patch range', () => {
 })
 
 test('describes reset and publication writes through the exact DevTools patch path', () => {
-    const mode = createDevtoolsHmrMode(runtimeFile)
+    const mode = createDevtoolsHmrMode(contract)
     const resetMode = mode.reset
     const publishMode = mode.publish
     assert.ok(resetMode)
