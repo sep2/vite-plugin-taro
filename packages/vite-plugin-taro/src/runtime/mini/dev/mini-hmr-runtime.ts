@@ -72,10 +72,26 @@ class MiniHotContext {
     /** Stable module identity and shared sparse index used only when this context accepts. */
     private readonly moduleId: string
     private readonly acceptingContexts: Map<string, MiniHotContext>
+    private readonly disposeCallbacks: Map<string, Array<() => void>>
 
-    constructor(moduleId: string, acceptingContexts: Map<string, MiniHotContext>) {
+    constructor(
+        moduleId: string,
+        acceptingContexts: Map<string, MiniHotContext>,
+        disposeCallbacks: Map<string, Array<() => void>>
+    ) {
         this.moduleId = moduleId
         this.acceptingContexts = acceptingContexts
+        this.disposeCallbacks = disposeCallbacks
+    }
+
+    /** Cleanup registration is independent of accepting updates; passive dependencies ay own native listenemrs. */
+    dispose(callback: () => void): void {
+        const callbacks = this.disposeCallbacks.get(this.moduleId)
+        if (callbacks) {
+            callbacks.push(callback)
+        } else {
+            this.disposeCallbacks.set(this.moduleId, [callback])
+        }
     }
 
     accept(callback?: AcceptCallback): void {
@@ -143,6 +159,9 @@ export class MiniHmrRuntime extends DevRuntime {
      */
     private readonly moduleHotContexts = new Map<string, MiniHotContext>()
 
+    // Retain only modules that registered cleanup; eviction consumes their callbacks before replacement factories execute.
+    private readonly moduleDisposeCallbacks = new Map<string, Array<() => void>>()
+
     /** Immutable platform socket constructor retained until the running App initializes. */
     private readonly connectSocket: ConnectMiniSocket
 
@@ -165,8 +184,23 @@ export class MiniHmrRuntime extends DevRuntime {
      */
     override createModuleHotContext(moduleId: string): MiniHotContext {
         // A new execution supersedes the old boundary before it decides whether to accept.
+        this.disposeModule(moduleId)
         this.moduleHotContexts.delete(moduleId)
-        return new MiniHotContext(moduleId, this.moduleHotContexts)
+        return new MiniHotContext(moduleId, this.moduleHotContexts, this.moduleDisposeCallbacks)
+    }
+
+    /** Native listener cleanup runs before the old exports are evicted, including cold-capsule replacement. */
+    override removeModuleCache(moduleId: string): void {
+        this.disposeModule(moduleId)
+        super.removeModuleCache(moduleId)
+    }
+
+    private disposeModule(moduleId: string): void {
+        const callbacks = this.moduleDisposeCallbacks.get(moduleId)
+        this.moduleDisposeCallbacks.delete(moduleId)
+        for (const callback of callbacks ?? []) {
+            callback()
+        }
     }
 
     /** Resolves a cold Page against patches installed before its physical capsule first executed. */
