@@ -200,6 +200,7 @@ pages/home/index.js
 pages/home/index-capsule.js
 common/vendor.js
 common/bootstrap.js
+common/vpt.js
 assets/logo-<hash>.png
 sub/p_abcd1234/common/report.js
 ```
@@ -432,7 +433,8 @@ VPT 模块运行时与微信原生模块加载处于同一量级。
 | --- | --- | --- |
 | `shell` | 原生入口 | 微信直接执行的固定路径 CommonJS 文件 |
 | `capsule` | 模块注册信息 | `require()` 后只返回依赖和执行函数、由模块运行时处理的文件；App/Page/Component capsule 专门创建注册参数对象 |
-| `bootstrap` | 启动运行时 | 安装 SystemJS 并接入文件加载表的主包代码 |
+| `bootstrap` | 模块加载器 | 安装 SystemJS、polyfills 并接入文件加载表的主包代码 |
+| `vpt` | 原生入口桥接 | 导出已初始化的加载器与平台 Page 构造适配器 |
 | `transport` | 文件加载表 | 从模块 ID 选择物理路径和 `require` 方式的生成函数 |
 | `amphibious` | 双重入口运行时代码 | 同一份缓存导出需要同时提供给 CommonJS 和模块注册表的内部分类 |
 | `placement` | 位置规划 | 最终代码块到主包或某个分包的唯一映射 |
