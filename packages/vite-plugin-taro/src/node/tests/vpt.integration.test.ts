@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { createContext, runInContext } from 'node:vm'
 import type { OutputAsset, OutputChunk } from 'rolldown'
 import { type BuildOptions, normalizePath, build as viteBuild } from 'vite'
 import vpt, { type VptOptions, type VptTarget } from '../../index.ts'
-import { packageRequire, resolveVptRuntime } from '../utils/packages.ts'
+import { resolveVptRuntime } from '../utils/packages.ts'
+import { createTestProject } from './create-test-project.ts'
 
-const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 const appSource = `
     import type { PropsWithChildren } from 'react'
 
@@ -30,8 +30,7 @@ async function inspectFixtureBuild<Result>(
     fixture: BuildFixture,
     inspect: (output: BuildOutput) => Result | Promise<Result>
 ): Promise<Result> {
-    // React skips node_modules; fixtures must live outside it to exercise real application transforms.
-    const root = await mkdtemp(path.join(packageRoot, '.vpt-build-test-'))
+    const root = await createTestProject('build-')
     try {
         await Promise.all(
             Object.entries(fixture.files).map(async ([fileName, source]) => {

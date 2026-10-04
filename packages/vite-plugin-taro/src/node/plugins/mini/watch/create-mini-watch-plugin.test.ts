@@ -6,7 +6,7 @@ import test from 'node:test'
 import type { InlineConfig, Plugin } from 'vite'
 import { build, createServer, resolveConfig } from 'vite'
 import type { VptJsonObject, VptOptions } from '../../../../options.ts'
-import { packageRequire } from '../../../utils/packages.ts'
+import { createTestProject } from '../../../tests/create-test-project.ts'
 import vpt from '../../../vpt.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
 import { createWxMiniContract } from '../../wx/plugins.ts'
@@ -189,8 +189,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
     test(`${target}: public plugin disables hot reload on every watch build and restores configured settings in dev`, {
         timeout: 30_000
     }, async (context) => {
-        const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
-        const root = await fs.mkdtemp(path.join(packageRoot, '.vpt-watch-test-'))
+        const root = await createTestProject('watch-')
         context.after(() => fs.rm(root, { recursive: true, force: true }))
         const input = path.join(root, 'app.tsx')
         await fs.writeFile(input, 'export default function App() { return null }\n')

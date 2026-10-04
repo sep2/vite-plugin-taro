@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -10,6 +10,7 @@ import { parseSync } from 'rolldown/utils'
 import { build, createServer, normalizePath, type Plugin } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { interpreterServerEvent } from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
+import { createTestProject } from '../../../tests/create-test-project.ts'
 import { publishSourceGeneration } from '../../../tests/publish-source-generation.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
@@ -19,7 +20,6 @@ type MiniTarget = 'wx' | 'zfb' | 'tt'
 type Mode = 'production' | 'devtools' | 'interpreter' | 'rebuild'
 type NativeFile = Pick<OutputChunk, 'fileName' | 'code'>
 
-const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 const coreJsRoot = `${normalizePath(path.dirname(packageRequire.resolve('core-js/package.json')))}/`
 const optionalPolyfills = ['web.url', 'es.array.at']
 const miniTargets = ['wx', 'zfb', 'tt'] as const
@@ -31,7 +31,7 @@ async function compileFixture(
     polyfills: readonly string[],
     onDevReady?: (chunks: readonly NativeFile[], root: string) => Promise<void>
 ): Promise<readonly NativeFile[]> {
-    const root = await mkdtemp(path.join(packageRoot, '.vpt-polyfills-test-'))
+    const root = await createTestProject('polyfills-')
     const pagePath = normalizePath(path.join(root, 'src/pages/home/index.tsx'))
     const pageSource = 'export default function Home() { return null }'
     const sources: ReadonlyMap<string, string> = new Map([

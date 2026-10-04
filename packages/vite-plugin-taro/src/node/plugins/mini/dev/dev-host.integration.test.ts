@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -13,8 +13,9 @@ import {
 } from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
 import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
 import { createNativeDevRuntime } from '../../../tests/create-native-dev-runtime.ts'
+import { createTestProject } from '../../../tests/create-test-project.ts'
 import { publishSourceGeneration } from '../../../tests/publish-source-generation.ts'
-import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
+import { resolveVptRuntime } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import { miniAppCapsuleId, miniPageCapsuleId } from '../module/module.ts'
@@ -25,7 +26,6 @@ import type { HmrInfo, RuntimeReport } from './hmr-protocol.ts'
 import type { BundledDev } from './mini-dev-options.ts'
 import { createDevtoolsHmrMode, devtoolsPatchesFileName } from './modes/devtools/devtools-hmr-mode.ts'
 
-const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 // Instrumented DevEngine rebuilds can exceed the previous 10-second polling limit under the full coverage suite.
 // Observations still require the actual published file, rather than sleeping for a fixed settle period.
 const maximumWaitAttempts = 1_200
@@ -100,7 +100,7 @@ async function startDevFixture(
     watchPageFromCapsule?: boolean
 ): Promise<DevFixture> {
     const persistedBundleFiles = bundleOutput === 'capsule' ? [pageCapsuleFileName] : []
-    const root = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-dev-test-'))
+    const root = await createTestProject('dev-host-')
     const outDir = path.join(root, 'dist')
     const oldDirectory = path.join(outDir, 'obsolete/nested')
     await mkdir(oldDirectory, { recursive: true })
@@ -472,7 +472,7 @@ test('rejects a server without Vite bundled development ownership', async (conte
 })
 
 test('rejects startup without removing the last complete output on failure', async () => {
-    const root = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-output-failure-test-'))
+    const root = await createTestProject('output-failure-')
     const pagePath = path.join(root, 'src/pages/home/index.tsx')
     await mkdir(path.dirname(pagePath), { recursive: true })
     await writeFile(path.join(root, 'src/app.tsx'), 'export default function App() { return null }\n')

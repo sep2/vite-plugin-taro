@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
+import { readdir, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import test from 'node:test'
 import { runInNewContext } from 'node:vm'
 import { build } from 'rolldown'
 import { optimizeDeps, resolveConfig } from 'vite'
-import { packageRequire, resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
+import { createTestProject } from '../../tests/create-test-project.ts'
+import { resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import { createH5TargetPlugins } from './plugins.ts'
 
-const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 const runtimeRequire = createRequire(resolveTaroRuntime('components'))
 
 type TestWindow = Pick<Window, 'document' | 'navigator' | 'location' | 'customElements'> & {
@@ -171,7 +171,7 @@ function assertOptimizedNavigation(code: string): void {
 }
 
 test('canonical and upstream H5 imports share optimized runtime identities and complete APIs', async () => {
-    const root = await mkdtemp(path.join(packageRoot, 'node_modules/.vpt-h5-optimizer-'))
+    const root = await createTestProject('h5-optimizer-')
     try {
         const code = await bundleOptimizedNavigator(root)
         assert.doesNotMatch(code, /dingtalk-jsapi/)

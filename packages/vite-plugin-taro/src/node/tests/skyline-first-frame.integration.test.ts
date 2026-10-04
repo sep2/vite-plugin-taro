@@ -1,14 +1,12 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { isPromise } from 'node:util/types'
 import { createContext, runInContext } from 'node:vm'
 import { build } from 'vite'
 import vpt from '../../index.ts'
-import { packageRequire } from '../utils/packages.ts'
-
-const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
+import { createTestProject } from './create-test-project.ts'
 
 // Issue #35's attached vpt.zip reads the native route synchronously and conditionally renders the matching target.
 // https://github.com/sep2/vite-plugin-taro/issues/35
@@ -42,7 +40,7 @@ const files = {
 }
 
 test('Skyline #35: query-selected shared-element targets exist by the native first-frame deadline', async () => {
-    const root = await mkdtemp(path.join(packageRoot, '.vpt-first-frame-test-'))
+    const root = await createTestProject('first-frame-')
     try {
         await Promise.all(
             Object.entries(files).map(async ([name, source]) => {

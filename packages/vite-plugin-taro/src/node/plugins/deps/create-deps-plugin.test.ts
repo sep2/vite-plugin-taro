@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test, { mock } from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'rolldown'
 import { createLogger, resolveConfig, rolldownVersion, version as viteVersion } from 'vite'
+import { createTestProject } from '../../tests/create-test-project.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { createDepsPlugin, warnDependencyVersions } from './create-deps-plugin.ts'
 
@@ -32,8 +33,7 @@ for (const command of ['serve', 'build'] as const) {
 
 /** Exercise real package resolution without mutating either workspace manifest. */
 test('warns for an installed runtime that does not export its package.json', async (context) => {
-    const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
-    const root = await mkdtemp(path.join(packageRoot, '.vpt-deps-test-'))
+    const root = await createTestProject('deps-')
     context.after(() => rm(root, { recursive: true, force: true }))
     const pluginRoot = path.join(root, 'node_modules/vite-plugin-taro')
     const runtimeRoot = path.join(root, 'node_modules/vite-plugin-taro-runtime')
