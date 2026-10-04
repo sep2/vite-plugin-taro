@@ -1,0 +1,23 @@
+diff --git a/dist/runtime.js b/dist/runtime.js
+index 2dd626030caa263b53d631a79630b6597968ca94..92c4430c8cb0d5bbf7f05617af03f2b3549701d3 100644
+--- a/dist/runtime.js
++++ b/dist/runtime.js
+@@ -361,10 +361,14 @@ function createReactApp(App, react, dom, config) {
+             appWrapperResolver(this);
+         }
+         mount(pageComponent, id, cb) {
+-            const pageWrapper = connectReactPage(react, id)(pageComponent);
+-            const key = id + pageKeyId();
+-            const page = () => h$1(pageWrapper, { key, tid: id });
+-            this.pages.push(page);
++            // Prerender and onLoad share an identity, even when both mounts arrive before the queued Page renders.
++            if (!this.pages.some(page => page.tid === id) && !this.elements.some(element => element.props.tid === id)) {
++                const pageWrapper = connectReactPage(react, id)(pageComponent);
++                const key = id + pageKeyId();
++                const page = () => h$1(pageWrapper, { key, tid: id });
++                page.tid = id;
++                this.pages.push(page);
++            }
+             this.forceUpdate((...args) => {
+                 perf.stop(PAGE_INIT);
+                 if (process.env.TARO_PLATFORM !== 'web') {

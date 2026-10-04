@@ -171,7 +171,7 @@ overrides:
   '@tarojs/plugin-platform-h5@4.2.1>babel-plugin-transform-taroapi': '-'
 
 patchedDependencies:
-  '@tarojs/plugin-framework-react@4.2.1': a0e57fda5ad12bc7771f8428b1435f8eb2587be6efc73215495e5573f204a489
+  '@tarojs/plugin-framework-react@4.2.1': 9427a98763f01773eedf74b905ffd96462d30afe1b304da58780730de15e220f
   '@tarojs/plugin-html@4.2.1': 8f23b4dc7380fb234619721f6460781344add219e2bcca7a143b76946b9312e6
   '@tarojs/react@4.2.1': 7d482282bd4992adb71997f6d4fb6cbf12c82ed433c0834cb44432262c74d380
   '@tarojs/runtime@4.2.1': bf40af62ed4131af0d0c1c463a68cdbf5d25203fe25caaa8998d7dae1f7d5bf3
@@ -531,7 +531,7 @@ importers:
         version: 4.2.1(@tarojs/helper@4.2.1(supports-color@7.2.0))(@types/react@19.3.0)(postcss@8.5.28)
       '@tarojs/plugin-framework-react':
         specifier: 4.2.1
-        version: 4.2.1(patch_hash=a0e57fda5ad12bc7771f8428b1435f8eb2587be6efc73215495e5573f204a489)(@tarojs/helper@4.2.1(supports-color@7.2.0))(@tarojs/runtime@4.2.1(patch_hash=bf40af62ed4131af0d0c1c463a68cdbf5d25203fe25caaa8998d7dae1f7d5bf3))(@tarojs/shared@4.2.1)(react@19.3.0)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0))
+        version: 4.2.1(patch_hash=9427a98763f01773eedf74b905ffd96462d30afe1b304da58780730de15e220f)(@tarojs/helper@4.2.1(supports-color@7.2.0))(@tarojs/runtime@4.2.1(patch_hash=bf40af62ed4131af0d0c1c463a68cdbf5d25203fe25caaa8998d7dae1f7d5bf3))(@tarojs/shared@4.2.1)(react@19.3.0)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0))
       '@tarojs/plugin-html':
         specifier: 4.2.1
         version: 4.2.1(patch_hash=8f23b4dc7380fb234619721f6460781344add219e2bcca7a143b76946b9312e6)(@tarojs/helper@4.2.1(supports-color@7.2.0))(@tarojs/runtime@4.2.1(patch_hash=bf40af62ed4131af0d0c1c463a68cdbf5d25203fe25caaa8998d7dae1f7d5bf3))(@tarojs/shared@4.2.1)
@@ -7163,7 +7163,7 @@ snapshots:
       - '@swc/helpers'
       - supports-color
 
-  '@tarojs/plugin-framework-react@4.2.1(patch_hash=a0e57fda5ad12bc7771f8428b1435f8eb2587be6efc73215495e5573f204a489)(@tarojs/helper@4.2.1(supports-color@7.2.0))(@tarojs/runtime@4.2.1(patch_hash=bf40af62ed4131af0d0c1c463a68cdbf5d25203fe25caaa8998d7dae1f7d5bf3))(@tarojs/shared@4.2.1)(react@19.3.0)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0))':
+  '@tarojs/plugin-framework-react@4.2.1(patch_hash=9427a98763f01773eedf74b905ffd96462d30afe1b304da58780730de15e220f)(@tarojs/helper@4.2.1(supports-color@7.2.0))(@tarojs/runtime@4.2.1(patch_hash=bf40af62ed4131af0d0c1c463a68cdbf5d25203fe25caaa8998d7dae1f7d5bf3))(@tarojs/shared@4.2.1)(react@19.3.0)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.103.1)(yaml@2.9.0))':
     dependencies:
       '@tarojs/helper': 4.2.1(supports-color@7.2.0)
       '@tarojs/runtime': 4.2.1(patch_hash=bf40af62ed4131af0d0c1c463a68cdbf5d25203fe25caaa8998d7dae1f7d5bf3)

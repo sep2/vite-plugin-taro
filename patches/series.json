@@ -10,7 +10,8 @@
         "patches": [
             "patches/series/@tarojs__plugin-framework-react@4.2.1/01-react19-root-api.patch",
             "patches/series/@tarojs__plugin-framework-react@4.2.1/02-mini-app-page-rendering.patch",
-            "patches/series/@tarojs__plugin-framework-react@4.2.1/03-h5-router-container.patch"
+            "patches/series/@tarojs__plugin-framework-react@4.2.1/03-h5-router-container.patch",
+            "patches/series/@tarojs__plugin-framework-react@4.2.1/04-page-prerender.patch"
         ]
     },
     {
