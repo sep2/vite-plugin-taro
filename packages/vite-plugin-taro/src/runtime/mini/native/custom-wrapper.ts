@@ -1,5 +1,5 @@
-// biome-ignore assist/source/organizeImports: Bootstrap must initialize first.
-import '../amphibious/bootstrap.ts'
+// Initialize the VPT runtime before loading the native configuration capsule.
+import '../amphibious/vpt.ts'
 
 import { customWrapperConfig } from '../capsule/component.ts'
 

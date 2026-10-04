@@ -13,9 +13,6 @@ import { transport } from '\0vpt:mini-transport'
 // Install the minimal SystemJS loader and its synchronous-import extension before any native entry requests a capsule.
 import { System as createdSystem } from '../systemjs/system-core.js'
 
-// Bootstrap is the constructor's only importer, keeping the target adapter in this shared native chunk.
-export { default as Page } from 'vpt:mini-page-constructor'
-
 // install the System on globalThis
 globalThis.System = createdSystem
 
