@@ -386,7 +386,7 @@ async function checkNativeInitialData() {
     if (process.env.TARO_ENV !== 'weapp') {
         return
     }
-    // Exercise the native data-factory/onLoad order with real React, including a cold uncommitted App root.
+    // Exercise cold queued mounts and warm synchronous prerendering with real React and native onLoad.
     const initialized = []
     const effects = []
     const loads = []
@@ -445,14 +445,13 @@ async function checkNativeInitialData() {
     assert.equal(initialPage.path, initialRouter.$taroPath)
     assert.strictEqual(initialPage.params, initialRouter.params)
     assert.deepEqual(config.data, seed(), 'native initialization does not replace the public data object')
-    assert.ok(sourceData.app.cn.length > 0, 'cold data factory commits the existing App root synchronously')
-    assert.match(JSON.stringify(sourceData.page), /first-context:source:0/)
-    assert.deepEqual(initialized, ['source'])
-    assert.ok(effects.includes('layout:source'))
+    assert.strictEqual(sourceData, config.data, 'cold startup keeps the seed and mounts asynchronously')
+    assert.equal(setAppValue, undefined, 'prerender must not force App initialization')
+    assert.deepEqual(initialized, [])
+    assert.deepEqual(effects, [])
     assert.deepEqual(loads, [], 'the factory must not synthesize native onLoad')
     assert.equal(Current.page, null)
-    const sourceHost = document.getElementById('view-source')
-    assert.equal(sourceData.page.cn[0].sid, sourceHost.sid)
+    assert.equal(document.getElementById('view-source'), null)
     const source = native('pages/first-frame', sourceData)
     config.onLoad.call(source, { id: 'source', full: 'a%3Db' })
     assert.equal(metadata.prerenderIdentity, undefined, 'onLoad consumes the prepared identity immediately')
@@ -464,7 +463,9 @@ async function checkNativeInitialData() {
     assert.equal(source.$taroPath, initialRouter.$taroPath)
     config.onShow.call(source)
     await until(() => source.writes.length > 0)
-    assert.strictEqual(document.getElementById('view-source'), sourceHost)
+    const sourceHost = document.getElementById('view-source')
+    assert.match(sourceHost.textContent, /first-context:source:0/)
+    assert.deepEqual(initialized, ['source'], 'queued prerender and onLoad mount one Page instance')
     assert.equal(effects.filter(x => x === 'layout:source').length, 1)
     assert.equal(loads[0].full, 'a%3Db')
     assert.strictEqual(Current.page, source)
@@ -497,7 +498,7 @@ async function checkNativeInitialData() {
     config.onShow.call(target)
     await until(() => target.writes.length > 0)
     assert.strictEqual(document.getElementById('view-target'), targetHost)
-    assert.equal(target.writes[0]['page.cn'][0].sid, targetHost.sid)
+    assert.deepEqual(initialized, ['source', 'target'], 'onLoad reuses the already-rendered Page instance')
     assert.ok(Object.hasOwn(target.writes[0], 'app.cn'))
     assert.equal(effects.filter(x => x === 'layout:target').length, 1)
     assert.deepEqual(loads.map(x => x.id), ['source', 'target'])
@@ -524,15 +525,15 @@ async function checkNativeInitialData() {
     config.onUnload.call(unprepared)
     await until(() => effects.includes('passive-cleanup:unprepared'))
 
-    // Callers that do not request initial data retain asynchronous onLoad, including empty initial replacements.
+    // Empty pages retain their ordinary empty seed and asynchronous onLoad without an extra Page snapshot.
     const emptyConfig = createTaroPageConfig(() => null, 'pages/empty', seed(), {})
     assert.deepEqual(emptyConfig.data, seed(), 'ordinary pages retain their static data object')
     const empty = native('pages/empty', seed())
-    empty.data.page.cn.push({ sid: 'stale-seed' })
     emptyConfig.onLoad.call(empty, {})
     assert.equal(Object.hasOwn(emptyConfig, '__vpt_meta'), false, 'ordinary configs gain no VPT metadata')
     await until(() => empty.writes.length > 0)
-    assert.deepEqual(empty.writes[0]['page.cn'], [])
+    assert.deepEqual(empty.data.page.cn, [])
+    assert.equal(document.getElementById(empty.$taroPath).childNodes.length, 0)
     emptyConfig.onUnload.call(empty)
 
     let resolveContent
@@ -601,7 +602,9 @@ function checkFrameworkRootEntryPoints() {
         }
     }
     createReactApp(({ children }) => children, React, renderer, {})
-    assert.deepEqual(calls, ['createRoot', 'render'])
+    assert.equal(Current.app.mount.length, 3, 'mount retains its original signature')
+    ReactDOM.flushSync(() => Current.app.mount(() => null, 'pages/cold', () => assert.fail('cold App must not be flushed')))
+    assert.deepEqual(calls, ['createRoot', 'render'], 'prerender does not force or repeat App initialization')
     Current.app = null
     calls.length = 0
     const config = createNativeComponentConfig(() => null, React, renderer, {})

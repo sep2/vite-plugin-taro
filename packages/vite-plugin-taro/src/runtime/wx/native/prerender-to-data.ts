@@ -1,3 +1,4 @@
+import { flushSync } from 'vite-plugin-taro-runtime/react'
 import {
     addLeadingSlash,
     Current,
@@ -39,11 +40,13 @@ export function prerenderToData(config: ReturnType<typeof createPageConfig>): Re
         return config.data
     }
 
-    Current.app.mount(component, path, () => {}, true)
+    flushSync(() => {
+        Current.app!.mount!(component, path, () => {})
+    })
 
     const page = document.getElementById(path)
     const app = page?.parentNode?._root
-    // Suspense without a committed fallback leaves the ordinary seed until a later React commit.
+    // Cold App startup or Suspense without a committed fallback keeps the seed until a later React commit.
     if (!page || !app) {
         return config.data
     }

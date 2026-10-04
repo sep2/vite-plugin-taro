@@ -191,6 +191,9 @@ const scenario = `
 (async () => {
     load('app.js');
     const gallery = openPage('pages/gallery/index', {});
+    assert.deepEqual(gallery.atAttached, {
+        app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] }
+    }, 'cold startup keeps the seed instead of forcing App initialization');
     await drainTasks();
     assert.equal(findNode(gallery.instance.data.page, 'uid', 'source')?.[keyAttribute], 'aurora', 'source fixture renders');
     // Each native instance must publish its own query-selected target, not a registration-time or previous-visit seed.

@@ -431,6 +431,7 @@ test('prerender stores its identity inside the non-enumerable VPT metadata', asy
                 export { prerenderToData } from ${JSON.stringify(path.join(runtimeRoot, 'wx/native/prerender-to-data.ts'))}
             `,
             'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
+            'vite-plugin-taro-runtime/react': 'export const flushSync = globalThis.harness.flushSync',
             './get-wx-page-query.ts': 'export const getWxPageQuery = () => ({ id: "example" })'
         },
         defines: {}
@@ -447,11 +448,18 @@ test('prerender stores its identity inside the non-enumerable VPT metadata', asy
             },
             Current: {
                 app: {
-                    mount(value: unknown, path: string, callback: () => void, synchronous: boolean) {
-                        calls.push({ name: 'mount', args: [value, path, synchronous] })
+                    mount(...args: [unknown, string, () => void]) {
+                        assert.equal(args.length, 3, 'prerender uses the original mount signature')
+                        const [value, path, callback] = args
+                        calls.push({ name: 'mount', args: [value, path] })
                         callback()
                     }
                 }
+            },
+            flushSync(callback: () => void) {
+                calls.push({ name: 'flushSync', args: [] })
+                callback()
+                calls.push({ name: 'commit', args: [] })
             },
             document: { getElementById: recordCall(calls, 'lookup', host) },
             hydrate(value: { cn: object[] }) {
@@ -496,12 +504,14 @@ test('prerender stores its identity inside the non-enumerable VPT metadata', asy
         assert.equal(router.params.id, 'example')
         assert.equal(Object.hasOwn({ ...config }, '__vpt_meta'), false)
         assert.deepEqual(Object.getOwnPropertyNames(config), ['data', '__vpt_meta'])
-        assert.deepEqual(calls.slice(0, 2), [
-            { name: 'mount', args: [component, 'pages/example?instance=1', true] },
+        assert.deepEqual(calls.slice(0, 4), [
+            { name: 'flushSync', args: [] },
+            { name: 'mount', args: [component, 'pages/example?instance=1'] },
+            { name: 'commit', args: [] },
             { name: 'lookup', args: ['pages/example?instance=1'] }
         ])
         if (host === page) {
-            assert.deepEqual(calls.slice(2), [
+            assert.deepEqual(calls.slice(4), [
                 { name: 'hydrate', args: [app] },
                 { name: 'hydrate', args: [page] }
             ])
@@ -511,7 +521,7 @@ test('prerender stores its identity inside the non-enumerable VPT metadata', asy
             })
         } else {
             assert.strictEqual(result, seed, 'uncommitted hosts keep the seed for normal onLoad mounting')
-            assert.equal(calls.length, 2)
+            assert.equal(calls.length, 4)
         }
         assert.deepEqual(seed, { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } })
         prerenderToData(config)
