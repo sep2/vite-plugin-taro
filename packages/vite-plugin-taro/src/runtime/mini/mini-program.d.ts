@@ -3,15 +3,15 @@ declare module '\0vpt:global-binding' {
     export const vptGlobal: typeof globalThis
 }
 
-/** Route-specific Taro registration config shared by the native constructor adapters. */
+/** Ordinary route config consumed by the shared native Page shell. */
 declare module '\0vpt:page-capsule' {
-    const config: import('vite-plugin-taro-runtime/runtime/mini').PageInstance
+    const config: ReturnType<typeof import('./capsule/create-page-config.ts').createPageConfig>
     export default config
 }
 
-/** The target resolver selects exactly one native constructor implementation. */
+/** Platform constructor selected by the Mini runtime contract. */
 declare module 'vpt:mini-page-constructor' {
-    const Page: typeof import('./native/min-page-constructor.ts').default
+    const Page: typeof import('../mini/native/mini-page-constructor.ts').default
     export default Page
 }
 
