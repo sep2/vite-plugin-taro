@@ -125,7 +125,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
     test(`preserves real ${target} native promises, callbacks, state, and mutable backend identity`, async () => {
         const code = await bundleMiniApi(
             `
-            import Taro, { showToast, getStorageSync, useLaunch, options } from 'virtual:taro/api'
+            import Taro, { showToast, getStorageSync, useLaunch, options, navigateTo } from 'virtual:taro/api'
             import Upstream from '@tarojs/taro'
             import backend from 'vite-plugin-taro-runtime/taro'
             export async function probe() {
@@ -146,6 +146,15 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
                 assert.equal(getStorageSync('key'), 'stored')
                 const result = await showToast({ title: 'hello', icon: 'success', success: recordSuccess })
                 assert.equal(result.errMsg, 'showToast:ok')
+                assert.strictEqual(Taro.navigateTo, navigateTo)
+                const navigation = await navigateTo({
+                    url: '/pages/next?query=full',
+                    success: recordNavigationSuccess,
+                    complete: recordNavigationComplete
+                })
+                assert.equal(navigation.errMsg, 'navigateTo:ok')
+                Taro.navigateTo = () => Promise.resolve({ errMsg: 'replacement-navigation' })
+                assert.equal((await navigateTo({ url: '/ignored' })).errMsg, 'replacement-navigation')
                 assert.equal(Taro.getEnv(), ${JSON.stringify({ wx: 'WEAPP', zfb: 'ALIPAY', tt: 'TT' }[target])})
                 Taro.addInterceptor(chain => {
                     assert.equal(chain.requestParams.url, '/fixture')
@@ -191,6 +200,18 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
                 calls.push('toast')
                 options.success({ errMsg: 'showToast:ok' })
             },
+            navigateTo(options: {
+                url: string
+                success(result: { errMsg: string }): void
+                complete(result: { errMsg: string }): void
+            }) {
+                assert.equal(this, native)
+                assert.equal(options.url, '/pages/next?query=full')
+                calls.push('navigate')
+                const result = { errMsg: 'navigateTo:ok' }
+                options.success(result)
+                options.complete(result)
+            },
             getStorageSync(key: string | { key: string }) {
                 assert.equal(this, native)
                 assert.equal(typeof key === 'string' ? key : key.key, 'key')
@@ -207,8 +228,18 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
             navigator: {},
             getApp: () => ({}),
             getCurrentPages: () => [],
-            recordSuccess: () => calls.push('success')
+            recordSuccess: () => calls.push('success'),
+            recordNavigationSuccess: () => calls.push('navigation-success'),
+            recordNavigationComplete: () => calls.push('navigation-complete')
         })
-        assert.deepEqual(calls, ['toast', 'success', 'request', 'abort'])
+        assert.deepEqual(calls, [
+            'toast',
+            'success',
+            'navigate',
+            'navigation-success',
+            'navigation-complete',
+            'request',
+            'abort'
+        ])
     })
 }

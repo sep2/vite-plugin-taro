@@ -36,6 +36,23 @@ for (const sourcemap of [false, true]) {
     })
 }
 
+for (const filename of ['capsule/page.ts?route=pages%2Fhome', String.raw`C:\runtime\page.ts?route=pages%2Fhome`]) {
+    test(`Oxc parses query-qualified TypeScript without changing its source identity: ${filename}`, () => {
+        const code = 'import { type Page } from "runtime"; const page: Page | undefined = undefined'
+        const result = transformWithOxcWalker({
+            code,
+            filename,
+            sourcemap: true,
+            createVisitor() {
+                return () => {}
+            }
+        })
+        assert.equal(result.code, code)
+        assert.deepEqual(result.map?.sources, [filename])
+        assert.equal(result.map?.file, filename)
+    })
+}
+
 test('Oxc leaves source unchanged when the visitor makes no edits', () => {
     const code = 'const value = 1;\n'
     const result = transformWithOxcWalker({

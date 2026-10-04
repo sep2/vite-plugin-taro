@@ -16,8 +16,10 @@ import {
     miniCustomWrapperShellId,
     miniPageCapsuleId,
     miniPageConstructorId,
+    miniPageShellId,
     miniTransportId,
     miniTransportOutputPath,
+    miniVptId,
     pageCapsuleId,
     pageComponentId,
     taroTargetRuntimeId,
@@ -35,13 +37,13 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'taro' |
     const normalizedPageCapsulePath = normalizePath(miniPageCapsuleId)
 
     // Construct App/Page metadata and output inputs together so traversal roots and native paths share one definition.
-    const entryGraph = createEntryGraph(contract.options.pages, contract.runtime.pageShell)
+    const entryGraph = createEntryGraph(contract.options.pages)
 
     // Provide constant-time route validation and access to each configured Page JSON object.
     const pageByPath = new Map(contract.options.pages.map((page) => [page.path, page]))
 
     const privateIdResolvers = new Map<string, PrivateIdResolver>([
-        // Share bootstrap's preload identity through native require and its amphibious SystemJS registration.
+        // Preload needs only the initialized loader, never vpt's constructor dependencies.
         [vitePreloadId, () => miniBootstrapId],
         [taroTargetRuntimeId, () => contract.taro.targetRuntimePath],
         [miniPageConstructorId, () => contract.runtime.pageConstructor],
@@ -78,7 +80,7 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'taro' |
             projectRoot: string
         ): string | Rolldown.PartialResolvedId | undefined {
             if (id === miniTransportId) {
-                // Bootstrap lives in common/; generated infrastructure has its own namespace outside the bundled graph.
+                // The loader lives in common/; generated infrastructure has its own namespace outside the bundled graph.
                 return { id: `./${path.posix.relative('common', miniTransportOutputPath)}`, external: true }
             }
 
@@ -106,7 +108,7 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'taro' |
 }
 
 /** Declares native output inputs and exposes their App and ordered Page entries. */
-function createEntryGraph(pages: readonly MiniPage[], pageShell: string) {
+function createEntryGraph(pages: readonly MiniPage[]) {
     const appEntries = {
         capsuleId: miniAppCapsuleId,
         capsuleName: 'app-capsule',
@@ -118,7 +120,7 @@ function createEntryGraph(pages: readonly MiniPage[], pageShell: string) {
         return {
             capsuleId: createRouteModuleId({ moduleId: miniPageCapsuleId, pagePath: page.path }),
             capsuleName: `${page.path}-capsule`,
-            shellId: createRouteModuleId({ moduleId: pageShell, pagePath: page.path }),
+            shellId: createRouteModuleId({ moduleId: miniPageShellId, pagePath: page.path }),
             shellName: `${page.path}.js`
         }
     })
@@ -131,6 +133,7 @@ function createEntryGraph(pages: readonly MiniPage[], pageShell: string) {
         },
         input: Object.fromEntries([
             ['bootstrap', miniBootstrapId],
+            ['vpt', miniVptId],
             [appEntries.shellName, appEntries.shellId],
             [appEntries.capsuleName, appEntries.capsuleId],
             [componentShellFileName, miniComponentShellId],

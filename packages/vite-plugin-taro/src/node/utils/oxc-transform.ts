@@ -1,6 +1,7 @@
 import { type WalkerEnter, walk } from 'oxc-walker'
 import { RolldownMagicString } from 'rolldown'
 import { parseSync } from 'rolldown/utils'
+import { normalizeModuleId } from './modules.ts'
 import type { AstTransformResult } from './transform.ts'
 
 type OxcTransformOptions = {
@@ -31,7 +32,8 @@ export function transformWithOxcWalker({
     // source-map generation cross the JavaScript boundary for every recorded segment.
     const editor = new RolldownMagicString(code, { filename })
 
-    const result = parseSync(filename, code)
+    // Route queries are module identity, not a file extension; retain the full ID in maps and diagnostics only.
+    const result = parseSync(normalizeModuleId(filename), code)
 
     // Oxc can return a recoverable AST together with diagnostics. Walking that partial tree could
     // let a visitor edit malformed input and hide the original syntax failure, so diagnostics are

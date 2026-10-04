@@ -6,7 +6,7 @@ import { createContext, runInContext } from 'node:vm'
 import type { OutputAsset, OutputChunk } from 'rolldown'
 import { type BuildOptions, normalizePath, build as viteBuild } from 'vite'
 import vpt, { type VptOptions, type VptTarget } from '../../index.ts'
-import { packageRequire } from '../utils/packages.ts'
+import { packageRequire, resolveVptRuntime } from '../utils/packages.ts'
 
 const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 const appSource = `
@@ -123,7 +123,7 @@ function requireChunk(output: BuildOutput, fileName: string): OutputChunk {
     return chunk
 }
 
-/** Every native shell loads bootstrap once and uses that namespace rather than an ambient System binding. */
+/** Native shells share VPT and use bootstrap rather than an ambient System binding. */
 function assertNativeShells(output: BuildOutput): void {
     const transport = requireAsset(output, 'common/vpt/transport.js')
     requireChunk(output, 'common/vpt/global.js')
@@ -131,6 +131,7 @@ function assertNativeShells(output: BuildOutput): void {
     assert.match(requireChunk(output, 'common/bootstrap.js').code, /require\(["']\.\/vpt\/transport\.js["']\)/)
     for (const fileName of ['app.js', 'pages/home/index.js', 'comp.js', 'custom-wrapper.js']) {
         const { code } = requireChunk(output, fileName)
+        assert.equal([...code.matchAll(/\brequire\(["'](?:\.\.?\/)+common\/vpt\.js["']\)/g)].length, 1, fileName)
         assert.equal([...code.matchAll(/\brequire\(["'](?:\.\.?\/)+common\/bootstrap\.js["']\)/g)].length, 1, fileName)
         assert.match(code, /\.System\.importSync/)
         assert.doesNotMatch(code, /(?:globalThis|wx|my)\.System\.importSync/)
@@ -138,31 +139,55 @@ function assertNativeShells(output: BuildOutput): void {
     }
 }
 
-/** Executes the emitted bootstrap and Page shell, proving the selected constructor is bundled inside bootstrap. */
+/** Executes the shared shell and selected constructor, mocking only the route config. */
 function assertPageRegistration(output: BuildOutput, target: VptTarget, route: string): void {
+    const pageShell = resolveVptRuntime('mini/native/page')
+    assert.equal(
+        requireChunk(output, `${route}.js`).facadeModuleId,
+        `${pageShell}?route=${encodeURIComponent(route)}`,
+        'Every platform uses the same native Page shell'
+    )
     const config = { data: { page: { cn: [] } }, onLoad: () => undefined, eh: () => undefined }
     // The isolated native host records exactly one registration; its capsule retains the Taro config identity.
     const registrations: Array<{ constructor: string; config: object }> = []
     const host = {
+        global: {},
+        console: { ...console, info() {} },
+        setTimeout() {
+            assert.fail('Page registration must not schedule rendering')
+        },
+        clearTimeout() {},
+        wx: { onBeforePageLoad() {} },
         Page(config: object) {
             registrations.push({ constructor: 'Page', config })
         },
-        Component(config: object) {
-            registrations.push({ constructor: 'Component', config })
+        Component() {
+            // The chain records a definition; the per-instance callback is evaluated separately below.
+            const definition: { options?: object; data?: () => unknown; methods?: object } = {}
+            const builder = {
+                options(options: object) {
+                    definition.options = options
+                    return builder
+                },
+                data(factory: () => unknown) {
+                    definition.data = factory
+                    return builder
+                },
+                methods(methods: object) {
+                    definition.methods = methods
+                    return builder
+                },
+                register() {
+                    registrations.push({ constructor: 'Component', config: definition })
+                }
+            }
+            return builder
         }
     }
-    const bootstrapChunk = requireChunk(output, 'common/bootstrap.js')
-    const constructorName = target === 'wx' ? 'wx-page-constructor' : 'min-page-constructor'
-    assert.ok(
-        Object.keys(bootstrapChunk.modules).some((id) =>
-            new RegExp(`/native/${constructorName}\\.(?:js|ts)$`).test(normalizePath(id))
-        ),
-        'The constructor implementation must be inside bootstrap'
-    )
-    assert.ok(
-        !output.some(
-            (file) => file.fileName.includes('page-constructor') || file.fileName.includes('page-component-constructor')
-        )
+    assert.equal(
+        collectModuleIds(output).some((id) => /\/native\/get-wx-page-query\.(?:js|ts)$/.test(id)),
+        target === 'wx',
+        'Only the WX constructor imports native query capture'
     )
 
     const context = createContext(host)
@@ -187,22 +212,30 @@ function assertPageRegistration(output: BuildOutput, target: VptTarget, route: s
         )
         return module.exports
     }
-    const bootstrap = load('common/bootstrap.js')
-    assert.ok(bootstrap && typeof bootstrap === 'object')
-    // Only the application capsule is mocked: constructor selection, bundling, bootstrap and registration execute for real.
-    Reflect.get(bootstrap, 'System').importSync = (id: string) => {
-        assert.equal(id, `${route}-capsule.js`)
-        return { default: config }
+    const runtime = load('common/vpt.js')
+    assert.ok(runtime && typeof runtime === 'object')
+    assert.equal(typeof Reflect.get(runtime, 'Page'), 'function', 'VPT exports the selected constructor')
+    // Source selection, bundling, VPT and registration execute for real.
+    const system = Reflect.get(runtime, 'System')
+    const importSync = system.importSync.bind(system)
+    system.importSync = (id: string) => {
+        return id === `${route}-capsule.js` ? { default: config } : importSync(id)
     }
     load(`${route}.js`)
     assert.equal(registrations.length, 1)
     const registration = registrations[0]
     assert.ok(registration)
     assert.equal(registration.constructor, target === 'wx' ? 'Component' : 'Page')
-    assert.strictEqual(Reflect.get(registration.config, 'data'), config.data)
+    const data = Reflect.get(registration.config, 'data')
+    if (target === 'wx') {
+        assert.equal(typeof data, 'function', 'registration defers rendering to the per-instance data factory')
+    } else {
+        assert.strictEqual(data, config.data)
+    }
     const methods = target === 'wx' ? Reflect.get(registration.config, 'methods') : registration.config
     assert.strictEqual(methods.onLoad, config.onLoad)
     assert.strictEqual(methods.eh, config.eh)
+    assert.equal(Object.keys(methods).includes('prerenderToData'), false)
     assert.ok(parseJsonAsset(output, `${route}.json`).usingComponents)
 }
 
@@ -341,6 +374,23 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
         })
     }
 }
+
+test('minified WX VPT initializes bootstrap before importing constructor capsules', async () => {
+    await inspectFixtureBuild(
+        {
+            options: createOptions('wx'),
+            build: { minify: true },
+            files: {
+                'src/app.tsx': appSource,
+                'src/pages/home/index.tsx': 'export default function Home() { return null }'
+            }
+        },
+        (output) => {
+            assertNativeShells(output)
+            assertPageRegistration(output, 'wx', 'pages/home/index')
+        }
+    )
+})
 
 test('builds a routed H5 application through the public plugin entry', async () => {
     await inspectFixtureBuild(

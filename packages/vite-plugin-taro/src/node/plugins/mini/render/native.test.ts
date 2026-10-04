@@ -277,7 +277,7 @@ test('routes native dynamic imports through SystemJS without changing promises o
 
 test('resolves loader imports from placed paths without changing logical dynamic-import identities', async () => {
     const nativeChunk = chunk({ fileName: 'common/worker.js', moduleIds: ['/worker'], isEntry: false })
-    // Observe the exact inputs to placement: the importer chunk and bootstrap entry identity, not guessed filenames.
+    // Observe the exact inputs to placement: the importer chunk and loader entry identity, not guessed filenames.
     const lookups: (Rolldown.RenderedChunk | string)[] = []
     const result = renderNativeWithRuntime({
         code: 'export const load = () => import("./feature.js")',
@@ -412,6 +412,54 @@ test('renders declaration exports, quoted imports, and unrelated destructuring',
     assert.equal(Reflect.get(Counter, 'value'), 42)
 })
 
+test('preserves live capsule imports and unbound function calls after one activation', () => {
+    const result = renderNative({
+        code: `
+            import config, { prerenderToData as render } from './page-capsule.js'
+            Component({ methods: config, data: () => render({ id: 'first' }) })
+        `,
+        chunk: chunk({ fileName: 'page.js', moduleIds: ['/native-page'], isEntry: true }),
+        chunks: {
+            'page-capsule.js': chunk({ fileName: 'page-capsule.js', moduleIds: [appCapsulePath], isEntry: true })
+        },
+        sourcemap: false
+    })
+    const config = {}
+    const initialData = { page: 'initial' }
+    const capsule = {
+        default: config,
+        prerenderToData(this: unknown, query: unknown) {
+            assert.equal(this, undefined)
+            assert.deepEqual(query, { id: 'first' })
+            return initialData
+        }
+    }
+    // Observe one activation while later factory calls read live exports rather than captured values.
+    const imports: string[] = []
+    const registrations: { methods: object; data: () => unknown }[] = []
+    Function(
+        'require',
+        'Component',
+        result.code
+    )(
+        () => ({
+            System: {
+                importSync(id: string) {
+                    imports.push(id)
+                    return capsule
+                }
+            }
+        }),
+        (definition: { methods: object; data: () => unknown }) => registrations.push(definition)
+    )
+    assert.strictEqual(registrations[0]?.data(), initialData)
+    capsule.default = {}
+    capsule.prerenderToData = () => ({ page: 'later' })
+    assert.deepEqual(imports, ['page-capsule.js'])
+    assert.strictEqual(registrations[0]?.methods, config)
+    assert.deepEqual(registrations[0]?.data(), { page: 'later' })
+})
+
 test('rejects malformed native chunks before any source rewrite', () => {
     assert.throws(
         () =>
@@ -462,24 +510,37 @@ test('rejects unsupported final native chunk grammar before rewriting', () => {
     assert.throws(() => compile('export const { value, ...rest } = source'), /exported destructuring declaration/)
 })
 
-test('rejects a capsule namespace import from a native shell', () => {
-    const nativeChunk = chunk({ fileName: 'app.js', moduleIds: ['/native-app'], isEntry: true })
-    const chunks = {
-        'assets/module-b.js': chunk({
-            fileName: 'assets/module-b.js',
-            moduleIds: [appCapsulePath],
-            isEntry: true
+test('links entry and ordinary capsule namespaces instead of requiring their registration arrays', () => {
+    for (const moduleIds of [[appCapsulePath], ['/runtime/prerender-to-data.ts']]) {
+        const result = renderNative({
+            code: 'import * as capsule from "./assets/module-b.js"\nApp(capsule.default)',
+            chunk: chunk({ fileName: 'app.js', moduleIds: ['/native-app'], isEntry: true }),
+            chunks: {
+                'assets/module-b.js': chunk({ fileName: 'assets/module-b.js', moduleIds, isEntry: false })
+            },
+            sourcemap: false
         })
+        const config = {}
+        // This journal ensures the ordinary helper is linked through System exactly like an entry capsule.
+        const imports: string[] = []
+        Function(
+            'require',
+            'App',
+            result.code
+        )(
+            (id: string) => {
+                assert.equal(id, './assets/bootstrap-a.js')
+                return {
+                    System: {
+                        importSync(id: string) {
+                            imports.push(id)
+                            return { default: config }
+                        }
+                    }
+                }
+            },
+            (value: unknown) => assert.strictEqual(value, config)
+        )
+        assert.deepEqual(imports, ['assets/module-b.js'])
     }
-
-    assert.throws(
-        () =>
-            renderNative({
-                code: 'import * as capsule from "./assets/module-b.js"\nApp(capsule.default)',
-                chunk: nativeChunk,
-                chunks,
-                sourcemap: false
-            }),
-        /Expected one capsule value import/
-    )
 })

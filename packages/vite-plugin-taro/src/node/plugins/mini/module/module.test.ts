@@ -20,6 +20,7 @@ import {
     miniPageShellId,
     miniPolyfillsId,
     miniTaroRuntimeId,
+    miniVptId,
     rolldownRuntimeId,
     vptGlobalBindingId
 } from './module.ts'
@@ -51,10 +52,22 @@ test('recognizes route-qualified lifecycle entries', () => {
     assert.equal(classifyModule(chunk(`${miniPageCapsuleId}?route=pages%2Fhome`)), 'entry-capsule')
 })
 
-test('constructor modules bundled into bootstrap preserve its amphibious identity', () => {
+test('classifies import-only entry facades after their implementation moves into a shared chunk', () => {
+    for (const [facadeModuleId, kind] of [
+        [miniBootstrapId, 'amphibious'],
+        [miniVptId, 'amphibious'],
+        [`${miniPageShellId}?route=pages%2Fhome`, 'native'],
+        [`${miniPageCapsuleId}?route=pages%2Fhome`, 'entry-capsule'],
+        ['/application', 'normal-capsule']
+    ] as const) {
+        assert.equal(classifyModule({ ...chunk(), facadeModuleId }), kind)
+    }
+})
+
+test('constructor modules bundled into vpt preserve its amphibious identity', () => {
     for (const constructorId of [miniPageConstructorRuntimeId, resolveVptRuntime('wx/native/wx-page-constructor')]) {
-        assert.equal(classifyModule(chunk(constructorId, miniBootstrapId)), 'amphibious')
-        assert.equal(classifyModule(chunk(miniBootstrapId, constructorId)), 'amphibious')
+        assert.equal(classifyModule(chunk(constructorId, miniVptId)), 'amphibious')
+        assert.equal(classifyModule(chunk(miniVptId, constructorId)), 'amphibious')
     }
 })
 
@@ -64,7 +77,7 @@ test('classifies application-only and empty chunks as normal capsules', () => {
 })
 
 test('classifies standalone and grouped infrastructure as amphibious', () => {
-    for (const moduleId of [miniBootstrapId, vptGlobalBindingId, miniPolyfillsId, rolldownRuntimeId]) {
+    for (const moduleId of [miniVptId, miniBootstrapId, vptGlobalBindingId, miniPolyfillsId, rolldownRuntimeId]) {
         assert.equal(classifyModule(chunk('/dependency', moduleId)), 'amphibious')
     }
     // Classification depends on module identities, not whether Rolldown keeps infrastructure in separate chunks.

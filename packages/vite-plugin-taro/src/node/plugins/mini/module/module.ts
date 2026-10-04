@@ -4,7 +4,10 @@ import { normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { packageRequire, resolveTaroRuntime, resolveVptRuntime } from '../../../utils/packages.ts'
 
-/** Installs SystemJS, transport, and polyfills before native entries load capsules. */
+/** Supplies initialized loader exports and the target's Page constructor to native shells. */
+export const miniVptId = resolveVptRuntime('mini/amphibious/vpt')
+
+/** Installs SystemJS, transport, and polyfills without importing constructors or application capsules. */
 export const miniBootstrapId = resolveVptRuntime('mini/amphibious/bootstrap')
 
 /** Registers the native App using its generated configuration capsule. */
@@ -29,7 +32,7 @@ export const miniPageShellId = resolveVptRuntime('mini/native/page')
 export const miniPageConstructorId = 'vpt:mini-page-constructor'
 
 /** Passes Taro's flat config directly to native Page. */
-export const miniPageConstructorRuntimeId = resolveVptRuntime('mini/native/min-page-constructor')
+export const miniPageConstructorRuntimeId = resolveVptRuntime('mini/native/mini-page-constructor')
 
 /** Specializes each route's Page configuration and component import. */
 export const miniPageCapsuleId = resolveVptRuntime('mini/capsule/page')
@@ -43,10 +46,10 @@ export const rolldownRuntimeId = RUNTIME_MODULE_ID
 /** Identifies the virtual binding shared by native files, SystemJS capsules and HMR factories. */
 export const vptGlobalBindingId = '\0vpt:global-binding'
 
-/** Generates the selected core-js imports loaded by bootstrap from the native polyfill chunk. */
+/** Generates the selected core-js imports loaded before SystemJS from the native polyfill chunk. */
 export const miniPolyfillsId = '\0vpt:mini-polyfills'
 
-/** External bootstrap dependency emitted only after the bundled graph is finalized. */
+/** External loader dependency emitted only after the bundled graph is finalized. */
 export const miniTransportId = '\0vpt:mini-transport'
 
 export const miniTransportOutputPath = 'common/vpt/transport.js'
@@ -54,7 +57,7 @@ export const miniTransportOutputPath = 'common/vpt/transport.js'
 /** Resolves the shared Taro facade's target initialization side effect. */
 export const taroTargetRuntimeId = '\0vpt:taro-target-runtime'
 
-/** Redirects Vite's injected browser preload helper to the bootstrap identity loader. */
+/** Redirects Vite's injected browser preload helper to the SystemJS entry's identity loader. */
 export const vitePreloadId = '\0vite/preload-helper.js'
 
 /** Forces the native App shell entry to emit at the required root path. */
@@ -113,14 +116,21 @@ const moduleKindById: ReadonlyMap<string, MiniChunkKind> = new Map([
     [miniAppCapsuleId, 'entry-capsule'],
     [miniComponentCapsuleId, 'entry-capsule'],
     [miniPageCapsuleId, 'entry-capsule'],
+    [miniVptId, 'amphibious'],
     [miniBootstrapId, 'amphibious'],
     [vptGlobalBindingId, 'amphibious'],
     [miniPolyfillsId, 'amphibious'],
     [rolldownRuntimeId, 'amphibious']
 ])
 
-/** Classifies each chunk by its compiler-owned modules; ordinary application chunks are normal capsules. O(M) time. */
+/** Classifies compiler-owned entry facades and modules; ordinary application chunks are normal capsules. O(M) time. */
 export function classifyMiniModule(chunk: MiniChunk): MiniChunkKind {
+    // Rolldown may extract an entry's implementation into a shared chunk, leaving an import-only facade.
+    const entryKind = chunk.facadeModuleId && moduleKindById.get(normalizeModuleId(chunk.facadeModuleId))
+    if (entryKind) {
+        return entryKind
+    }
+
     for (const moduleId of chunk.moduleIds) {
         const kind = moduleKindById.get(normalizeModuleId(moduleId))
         if (kind !== undefined) {

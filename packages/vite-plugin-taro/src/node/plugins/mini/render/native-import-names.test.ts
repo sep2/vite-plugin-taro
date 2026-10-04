@@ -166,9 +166,9 @@ test('preserves namespace numbering and loading order across side-effect and cap
         getPhysicalChunkId: (chunk) => (typeof chunk === 'string' ? 'bootstrap.js' : chunk.fileName),
         sourcemap: false
     })
-    // Side-effect imports still reserve their original slots; capsule imports never allocate a native namespace.
-    assert.match(output.code, /var __nativeImport2=require\("first"\)/)
-    assert.match(output.code, /var __nativeImport4=require\("second"\)/)
+    // Every import reserves one namespace slot, including capsule namespaces that preserve live export reads.
+    assert.match(output.code, /var __nativeImport4=require\("first"\)/)
+    assert.match(output.code, /var __nativeImport6=require\("second"\)/)
     // These test-local cells observe the interleaved native and SystemJS dependency loading without filesystem output.
     const exports: Record<string, unknown> = {}
     const events: string[] = []

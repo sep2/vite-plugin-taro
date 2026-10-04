@@ -16,7 +16,7 @@ import {
 } from './module/module.ts'
 import { createMiniTargetPlugins } from './plugins.ts'
 
-test('native rendering resolves bootstrap from each output generation rather than an ambient global', async () => {
+test('native rendering resolves loader from each output generation rather than an ambient global', async () => {
     const contract = createWxMiniContract({
         target: 'wx',
         app: 'src/app.tsx',
@@ -31,11 +31,11 @@ test('native rendering resolves bootstrap from each output generation rather tha
     assert.ok(placement?.renderStart && placement.renderChunk)
     const appShell = miniAppShellId
     const appCapsule = miniAppCapsuleId
-    const bootstrap = miniBootstrapId
+    const loader = miniBootstrapId
     const sources: ReadonlyMap<string, string> = new Map([
         [appShell, `import config from ${JSON.stringify(appCapsule)}; App(config)`],
         [appCapsule, 'export default { value: 42 }'],
-        [bootstrap, 'export const System = fixtureSystem']
+        [loader, 'export const System = fixtureSystem']
     ])
     const plugins = [
         {
@@ -47,7 +47,7 @@ test('native rendering resolves bootstrap from each output generation rather tha
         { name: plugin.name, renderChunk: plugin.renderChunk }
     ]
     const bundle = await rolldown({
-        input: { app: appShell, capsule: appCapsule, loader: bootstrap },
+        input: { app: appShell, capsule: appCapsule, loader },
         plugins,
         preserveEntrySignatures: 'strict'
     })
@@ -57,7 +57,7 @@ test('native rendering resolves bootstrap from each output generation rather tha
             const app = result.output.find((chunk) => chunk.type === 'chunk' && chunk.facadeModuleId === appShell)
             assert.ok(app?.type === 'chunk')
             const value = {}
-            // These per-generation journals prove the physical bootstrap path and exactly one shell activation.
+            // These per-generation journals prove the physical loader path and exactly one shell activation.
             const required: string[] = []
             const registered: unknown[] = []
             Function(

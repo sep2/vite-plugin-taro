@@ -22,7 +22,7 @@ export function createNativeDevRuntime(outDir: string, info: HmrInfo) {
         close() {}
     }
     const context = createContext(
-        { console, queueMicrotask, wx: { connectSocket: () => socket } },
+        { console, queueMicrotask, wx: { connectSocket: () => socket, onBeforePageLoad() {} } },
         { codeGeneration: { strings: false, wasm: false } }
     )
     // Native require caches physical modules; SystemJS independently owns their registration namespaces.

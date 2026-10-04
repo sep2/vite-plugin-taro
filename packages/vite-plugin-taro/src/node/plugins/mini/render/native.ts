@@ -11,8 +11,8 @@
  * Rolldown still emits one ESM chunk graph before that runtime split is materialized. Mini Program hosts cannot execute final ESM
  * imports directly, so this renderer translates chunks classified as native or amphibious into CommonJS while preserving the
  * ESM behavior observable at their boundary. Ordinary native dependencies become `require` namespace cells; capsule imports
- * become synchronous lookups through bootstrap's exported `System`. Dynamic imports use that same loader, and exports are published
- * through the CommonJS `exports` object.
+ * become synchronous lookups through the initialized loader's exported `System`. Dynamic imports use that same loader,
+ * and exports are published through the CommonJS `exports` object.
  *
  * This is deliberately a final-chunk compiler, not a general source-module compiler. Rolldown has already lowered TypeScript,
  * bundled source modules, selected chunk boundaries, and normalized the remaining imports and exports. Restricting the input
@@ -53,7 +53,7 @@ type ImportInterop = 'none' | 'default' | 'namespace'
 
 type ImportModel = Readonly<{
     bindings: readonly ImportBinding[]
-    capsuleBinding: Readonly<{ imported: string; local: string; logicalId: string }> | null
+    capsuleBinding: Readonly<{ logicalId: string }> | null
     interop: ImportInterop
     namespace: string
     reference: string
@@ -78,8 +78,8 @@ type NativeModuleModel = Readonly<{
  *
  * 1. Static ESM imports are hoisted into source-order `require` calls. Named imports remain property reads from the required
  *    namespace so they observe current values. Default and namespace imports receive Babel-compatible CommonJS interop.
- * 2. An import whose target owns a capsule entry is not passed to native `require`. It becomes
- *    bootstrap's `System.importSync(logicalChunkId)`, synchronously linking the capsule before the native lifecycle call.
+ * 2. An import targeting any capsule is not passed to native `require`. It becomes
+ *    the loader's `System.importSync(logicalChunkId)`, synchronously linking the capsule before the native lifecycle call.
  * 3. Local exports are published at declaration and mutation points. Imported re-exports use getters, while assignments and
  *    updates notify every alias without changing expression completion values or accidentally matching shadowed bindings.
  * 4. ESM top-level `this` becomes `undefined`. Direct imported calls and tags are explicitly unbound so converting an import
@@ -226,25 +226,12 @@ function analyzeNativeModule(
                 requirePlainImport(node, chunk.fileName)
                 const capsule = getImportedCapsule(chunk.fileName, node.source.value, chunks)
                 if (capsule) {
-                    const [specifier] = node.specifiers
-                    if (node.specifiers.length !== 1 || !specifier || specifier.type === 'ImportNamespaceSpecifier') {
-                        throw new Error(
-                            `Expected one capsule value import from ${capsule.fileName} in ${chunk.fileName}`
-                        )
-                    }
                     imports.push({
-                        bindings: [],
+                        ...analyzeImport(node, undefined),
                         capsuleBinding: {
-                            imported:
-                                specifier.type === 'ImportDefaultSpecifier'
-                                    ? 'default'
-                                    : moduleExportName(specifier.imported),
-                            local: specifier.local.name,
                             logicalId: resolveLogicalChunkReference(chunk.fileName, node.source.value)
                         },
-                        interop: 'none',
-                        namespace: '',
-                        reference: node.source.value
+                        interop: 'none'
                     })
                     continue
                 }
@@ -615,7 +602,11 @@ function getImportedCapsule(
 ): Rolldown.RenderedChunk | undefined {
     if (!reference.startsWith('./') && !reference.startsWith('../')) return undefined
     const imported = chunks[resolvePhysicalChunkReference(fileName, reference)]
-    return imported && classifyMiniModule(imported) === 'entry-capsule' ? imported : undefined
+    if (!imported) {
+        return undefined
+    }
+    const kind = classifyMiniModule(imported)
+    return kind === 'entry-capsule' || kind === 'normal-capsule' ? imported : undefined
 }
 
 /** Renders all native dependencies through the same import lowering, including the generated System import. */
@@ -623,10 +614,9 @@ function renderImports(model: NativeModuleModel): string {
     return model.imports
         .map((importModel) => {
             if (importModel.capsuleBinding) {
-                const { imported, local, logicalId } = importModel.capsuleBinding
                 const system = importedExpression(model.imports[0]!.bindings[0]!)
-                const namespace = `${system}.importSync(${JSON.stringify(logicalId)})`
-                return `var ${local}=${memberExpression(namespace, imported)};`
+                const namespace = `${system}.importSync(${JSON.stringify(importModel.capsuleBinding.logicalId)})`
+                return `var ${importModel.namespace}=${namespace};`
             }
 
             const requireCall = `require(${JSON.stringify(importModel.reference)})`

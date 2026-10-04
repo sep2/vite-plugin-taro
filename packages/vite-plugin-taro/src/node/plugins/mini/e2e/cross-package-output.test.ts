@@ -4,7 +4,13 @@ import test from 'node:test'
 import { build, type OutputChunk, type Plugin } from 'rolldown'
 import { normalizePath } from 'vite'
 import { System as createdSystem } from '../../../../runtime/mini/systemjs/system-core.js'
-import { classifyMiniModule, miniBootstrapId, miniTransportId, miniTransportOutputPath } from '../module/module.ts'
+import {
+    classifyMiniModule,
+    miniBootstrapId,
+    miniTransportId,
+    miniTransportOutputPath,
+    miniVptId
+} from '../module/module.ts'
 import { createTransportOutput } from '../output/create-transport-output.ts'
 import { createPlacement, type Placement } from '../placer/placement.ts'
 import { createPlacementRolldownOptions } from '../placer/placer.ts'
@@ -56,11 +62,14 @@ const deepStaticId = '/cross-package/deep-static.js'
 const largeLazyModuleIds: ReadonlySet<string> = new Set([subpackageAId, subpackageBId, nestedDynamicId, deepDynamicId])
 
 const modules: Readonly<Record<string, string>> = {
-    // Bootstrap resolves the generated table through the same external native edge as production.
+    // The loader resolves the generated table before vpt or application capsules use it.
     [miniBootstrapId]: `
         import { transport } from ${JSON.stringify(miniTransportId)}
         export const System = fixtureSystem
         System.instantiate = transport
+    `,
+    [miniVptId]: `
+        export { System } from ${JSON.stringify(miniBootstrapId)}
         export const loadSubpackage = () => import('${subpackageAId}')
         export const loadById = (id) => import(/* @vite-ignore */ id)
     `,
@@ -207,7 +216,8 @@ async function buildCrossPackageOutput(): Promise<CrossPackageOutput> {
     const result = await build({
         input: {
             application: applicationId,
-            native: miniBootstrapId,
+            native: miniVptId,
+            bootstrap: miniBootstrapId,
             // Keep this shared source in its own file to exercise a real common/transport.js beside common/vpt/transport.js.
             transport: mainDependencyId
         },
