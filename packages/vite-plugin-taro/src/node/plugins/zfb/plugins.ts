@@ -2,7 +2,7 @@ import type { PluginOption } from 'vite'
 import type { VptOptions } from '../../../options.ts'
 import { resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
-import { miniPageConstructorRuntimeId, miniPageShellId } from '../mini/module/module.ts'
+import { miniPageConstructorRuntimeId } from '../mini/module/module.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
 import { createZfbSkeleton } from './create-zfb-skeleton.ts'
 
@@ -21,7 +21,6 @@ export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
             targetRuntimePath: resolveTaroRuntime('plugin-platform-alipay/runtime')
         },
         runtime: {
-            pageShell: miniPageShellId,
             pageConstructor: miniPageConstructorRuntimeId,
             devtoolsHmrRuntime: resolveVptRuntime('zfb/dev/devtools-runtime'),
             interpreterHmrRuntime: resolveVptRuntime('zfb/dev/interpreter-runtime')

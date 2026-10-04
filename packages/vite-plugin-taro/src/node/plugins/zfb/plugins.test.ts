@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { VptOptions } from '../../../options.ts'
-import { miniBootstrapId, miniPageCapsuleId, miniPageShellId } from '../mini/module/module.ts'
+import { miniBootstrapId, miniPageCapsuleId } from '../mini/module/module.ts'
 import { createZfbSkeleton } from './create-zfb-skeleton.ts'
 import { createZfbMiniContract, createZfbMiniPlugins } from './plugins.ts'
 
@@ -50,11 +50,9 @@ test('creates the ZFB Mini Program contract without translating user configurati
     assert.deepEqual(Object.keys(contract.runtime).sort(), [
         'devtoolsHmrRuntime',
         'interpreterHmrRuntime',
-        'pageConstructor',
-        'pageShell'
+        'pageConstructor'
     ])
-    assert.equal(contract.runtime.pageShell, miniPageShellId)
-    assert.match(contract.runtime.pageConstructor, /runtime[/\\]mini[/\\]native[/\\]min-page-constructor\.(?:js|ts)$/)
+    assert.match(contract.runtime.pageConstructor, /runtime[/\\]mini[/\\]native[/\\]mini-page-constructor\.(?:js|ts)$/)
     assert.match(contract.runtime.devtoolsHmrRuntime, /runtime[/\\]zfb[/\\]dev[/\\]devtools-runtime\.(?:js|ts)$/)
     assert.match(contract.runtime.interpreterHmrRuntime, /runtime[/\\]zfb[/\\]dev[/\\]interpreter-runtime\.(?:js|ts)$/)
     assert.deepEqual(contract.styles, {
