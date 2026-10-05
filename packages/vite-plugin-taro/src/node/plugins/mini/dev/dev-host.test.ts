@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { registerHooks } from 'node:module'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { DevOptions } from 'rolldown/experimental'
 import { createLogger, createServer } from 'vite'
+import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import { resolveVptRuntime } from '../../../utils/packages.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import type { MiniStylePlugin } from '../styles/plugins.ts'
@@ -143,7 +143,7 @@ test('reduces synthetic engine update variants and unknown host failures without
         }
     }
     const createMiniDevHost = await importDevHost(dev)
-    const root = await mkdtemp(path.join(tmpdir(), 'vpt-dev-host-unit-'))
+    const root = await mkdtemp(path.join(projectTempDir, 'vpt-dev-host-unit-'))
     const outDir = path.join(root, 'dist')
     const appPath = path.join(root, 'src/app.tsx')
     await mkdir(path.dirname(appPath), { recursive: true })

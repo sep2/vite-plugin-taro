@@ -97,7 +97,7 @@ jobs:
         run: node --test --test-reporter=./scripts/ci-test-reporter.ts scripts/*.test.ts
 
       - name: Test
-        # Match the plugin's two-worker test and coverage commands now that fixture output is outside Tailwind's source scan.
+        # Fixture output lives under the Git-ignored root tmp/ directory, outside Tailwind's source scan.
         run: pnpm --filter vite-plugin-taro exec node --test --test-reporter=../../scripts/ci-test-reporter.ts --test-concurrency=2
 
       - name: Test native component TikTok demo

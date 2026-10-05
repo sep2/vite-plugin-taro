@@ -1,13 +1,13 @@
 import type { ChildProcessByStdio } from 'node:child_process'
-import { createWriteStream, existsSync, realpathSync } from 'node:fs'
+import { createWriteStream, existsSync } from 'node:fs'
 import { cp, type FileHandle, mkdir, open, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { Readable } from 'node:stream'
 import { finished } from 'node:stream/promises'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { projectTempDir } from '../../../packages/vite-plugin-taro/src/node/tests/project-temp-dir.ts'
 import { createProcessScope } from './create-process-scope.ts'
 
 export type DevToolsProjectHarness = Readonly<{
@@ -104,7 +104,7 @@ async function withServerHarness(testName: string, testCase: TestCase, startServ
 
 async function withHarnessLifecycle(closeProjects: boolean, run: () => Promise<void>): Promise<void> {
     // One fixed lock prevents standalone and two-project cases from mutating trusted fixtures concurrently.
-    const lockPath = path.join(tmpdir(), 'vite-plugin-taro-hmr-stress.lock')
+    const lockPath = path.join(projectTempDir, 'vite-plugin-taro-hmr-stress.lock')
     const lock = await acquireHarnessLock(lockPath)
     // Memoize cleanup because a signal can arrive while normal finalization is already running.
     let cleanupPromise: Promise<void> | undefined
@@ -448,14 +448,12 @@ function createProjectHarness(root: string, outDir: string): DevToolsProjectHarn
 }
 
 function resolveTestRoot(): string {
-    // The fixed path preserves DevTools trust. Source-pressure profiles are intentionally bounded, so portability and a quick
-    // one-command run are more valuable than provisioning a platform-specific RAM disk for a few dozen temporary writes.
-    // Match Vite's canonical cwd, including macOS's /var -> /private/var alias, when addressing the native runtime.
-    return path.join(realpathSync(tmpdir()), 'vite-plugin-taro-hmr-stress-v1')
+    // The fixed canonical path preserves DevTools trust across runs.
+    return path.join(projectTempDir, 'vite-plugin-taro-hmr-stress-v1')
 }
 
 function resolvePortSwapRoots(): Readonly<Record<'a' | 'b', string>> {
-    const root = path.join(realpathSync(tmpdir()), 'vite-plugin-taro-hmr-port-swap-v1')
+    const root = path.join(projectTempDir, 'vite-plugin-taro-hmr-port-swap-v1')
     return { a: path.join(root, 'a'), b: path.join(root, 'b') }
 }
 
@@ -486,11 +484,7 @@ async function prepareFixture(root: string): Promise<void> {
     ])
     const nodeModules = path.join(root, 'node_modules')
     if (!existsSync(nodeModules)) {
-        await symlink(
-            path.join(fixtureRoot, 'node_modules'),
-            nodeModules,
-            process.platform === 'win32' ? 'junction' : 'dir'
-        )
+        await symlink(path.join(fixtureRoot, 'node_modules'), nodeModules, 'dir')
     }
 }
 

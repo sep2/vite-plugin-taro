@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, globSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test, { type TestContext } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { projectTempDir } from '../packages/vite-plugin-taro/src/node/tests/project-temp-dir.ts'
 import series from '../patches/series.json' with { type: 'json' }
 import { composePatchSeries } from './compose-patch-series.ts'
 
@@ -12,7 +12,7 @@ const root = fileURLToPath(new URL('../', import.meta.url))
 
 /** Every test owns its package and Git index, including paths with spaces as on Windows runners. */
 function fixture(t: TestContext): { directory: string; packageDirectory: string } {
-    const directory = mkdtempSync(path.join(tmpdir(), 'vpt patch series test '))
+    const directory = mkdtempSync(path.join(projectTempDir, 'vpt patch series test '))
     t.after(() => rmSync(directory, { recursive: true, force: true }))
     const packageDirectory = path.join(directory, 'package with spaces')
     mkdirSync(packageDirectory)
@@ -44,6 +44,8 @@ test('composes overlapping feature patches into one upstream-relative patch', (t
     writeFileSync(path.join(pristine, 'value.txt'), 'one\n')
     const output = path.join(directory, 'combined.patch')
     writeFileSync(output, combined)
+    // Keep Git inside this fixture rather than discovering the enclosing repository.
+    git(pristine, ['init', '--quiet'])
     // Verify the generated patch bytes without the Windows host's automatic CRLF conversion.
     git(pristine, ['-c', 'core.autocrlf=false', 'apply', output])
     assert.equal(readFileSync(path.join(pristine, 'value.txt'), 'utf8'), 'three\n')

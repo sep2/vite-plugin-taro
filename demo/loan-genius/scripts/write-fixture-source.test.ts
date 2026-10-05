@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
+import { projectTempDir } from '../../../packages/vite-plugin-taro/src/node/tests/project-temp-dir.ts'
 import { writeFixtureSource } from './write-fixture-source.ts'
 
 test('concurrent readers only observe complete source generations during a burst', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'loan-fixture-write-'))
+    const root = await mkdtemp(path.join(projectTempDir, 'loan-fixture-write-'))
     const file = path.join(root, 'page.tsx')
     const generations = Array.from(
         { length: 100 },
@@ -46,7 +46,7 @@ test('concurrent readers only observe complete source generations during a burst
 })
 
 test('intentional syntax errors are published unchanged for recovery cases', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'loan-fixture-syntax-'))
+    const root = await mkdtemp(path.join(projectTempDir, 'loan-fixture-syntax-'))
     try {
         const file = path.join(root, 'page.tsx')
         const invalidSource = 'export default function Broken(\n'
@@ -58,7 +58,7 @@ test('intentional syntax errors are published unchanged for recovery cases', asy
 })
 
 test('failed publication removes its temporary file', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'loan-fixture-failure-'))
+    const root = await mkdtemp(path.join(projectTempDir, 'loan-fixture-failure-'))
     try {
         const destination = path.join(root, 'directory')
         await mkdir(destination)

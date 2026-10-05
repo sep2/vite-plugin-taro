@@ -1,10 +1,10 @@
 import { type ChildProcess, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { cp, type FileHandle, mkdir, open, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { projectTempDir } from '../../../packages/vite-plugin-taro/src/node/tests/project-temp-dir.ts'
 import { writeFixtureSource } from './write-fixture-source.ts'
 
 export type LoanHmrFixture = Readonly<{
@@ -28,8 +28,8 @@ export type LoanHmrFixtureProfile = 'restart' | 'state-retention'
 const scriptsRoot = path.dirname(fileURLToPath(import.meta.url))
 const packageRoot = path.dirname(scriptsRoot)
 const repositoryRoot = path.resolve(packageRoot, '../..')
-const fixtureRoot = path.join(tmpdir(), 'vite-plugin-taro-loan-genius-hmr-v1')
-const fixtureLockPath = path.join(tmpdir(), 'vite-plugin-taro-loan-genius-hmr.lock')
+const fixtureRoot = path.join(projectTempDir, 'vite-plugin-taro-loan-genius-hmr-v1')
+const fixtureLockPath = path.join(projectTempDir, 'vite-plugin-taro-loan-genius-hmr.lock')
 
 /** Runs one suite against the fixed trusted DevTools project without allowing concurrent source mutation. */
 export async function withLoanHmrFixture(profile: LoanHmrFixtureProfile, test: FixtureTest): Promise<void> {
@@ -101,11 +101,7 @@ async function prepareFixture(profile: LoanHmrFixtureProfile): Promise<LoanHmrFi
     }
     // Each suite gets one readable journal. Replacement servers append so restart readiness cannot match an old process.
     await writeFile(path.join(fixtureRoot, 'vite.log'), '')
-    await symlink(
-        path.join(packageRoot, 'node_modules'),
-        path.join(fixtureRoot, 'node_modules'),
-        process.platform === 'win32' ? 'junction' : 'dir'
-    )
+    await symlink(path.join(packageRoot, 'node_modules'), path.join(fixtureRoot, 'node_modules'), 'dir')
 
     const fixture = createFixture()
     await configureAutomatableRenderer(fixture)

@@ -72,7 +72,7 @@ pnpm test:loan-genius:watch-restart
 测试使用固定临时项目：
 
 ```text
-<os.tmpdir()>/vite-plugin-taro-loan-genius-hmr-v1
+<repo>/tmp/vite-plugin-taro-loan-genius-hmr-v1
 ```
 
 - 复制应用源码、配置和本地 App ID，注入稳定的自动化 ID；不修改仓库内的应用源码。

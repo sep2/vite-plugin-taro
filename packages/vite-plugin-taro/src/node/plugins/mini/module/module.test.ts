@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
+import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import {
     classifyMiniModule,
@@ -107,7 +107,7 @@ test('polyfill execution follows the virtual entry while package paths only cont
 
 for (const layout of ['installed', 'linked'] as const) {
     test(`framework and polyfill roots follow Node resolution in the ${layout} package layout`, async (context) => {
-        const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-framework-roots-')))
+        const root = await realpath(await mkdtemp(path.join(projectTempDir, 'vpt-framework-roots-')))
         context.after(() => rm(root, { recursive: true, force: true }))
         const runtimeRoot = path.join(
             root,

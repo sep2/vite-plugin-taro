@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
 import { compile } from '@tailwindcss/node'
 import unitConverter, { presets } from 'postcss-rule-unit-converter'
 import { build } from 'vite'
 import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
+import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import { createMiniTransformer } from './create-mini-transformer.ts'
 import { minifyMiniStylesheet } from './minify-mini-stylesheet.ts'
 import { createMiniStylePlugin } from './plugins.ts'
@@ -22,7 +22,7 @@ test('converts Mini CSS px with the fixed 750 design width but leaves capitalize
 
 for (const target of ['wx', 'h5'] as const) {
     test(`documented postcss-rule-unit-converter configuration converts ${target} CSS before output`, async () => {
-        const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'vpt-px-transform-')))
+        const root = await realpath(await mkdtemp(path.join(projectTempDir, 'vpt-px-transform-')))
         const entry = path.join(root, 'app.js')
 
         try {

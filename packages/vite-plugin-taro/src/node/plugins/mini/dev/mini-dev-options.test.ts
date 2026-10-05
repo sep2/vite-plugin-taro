@@ -68,14 +68,14 @@ for (const logLevel of [undefined, 'info', 'warn', 'error', 'silent'] as const) 
                 '--eval',
                 `
                     import { mkdtemp, rm } from 'node:fs/promises'
-                    import { tmpdir } from 'node:os'
+                    import { projectTempDir } from ${JSON.stringify(new URL('../../../tests/project-temp-dir.ts', import.meta.url).href)}
                     import path from 'node:path'
                     import { build } from 'rolldown'
                     import { createServer } from 'vite'
                     import { createMiniDevOptionsPlugin, requireSingleOutput } from ${JSON.stringify(new URL('./mini-dev-options.ts', import.meta.url).href)}
                     import { createDevtoolsHmrMode } from ${JSON.stringify(new URL('./modes/devtools/devtools-hmr-mode.ts', import.meta.url).href)}
 
-                    const outDir = await mkdtemp(path.join(tmpdir(), 'vpt-reporter-'))
+                    const outDir = await mkdtemp(path.join(projectTempDir, 'vpt-reporter-'))
                     const server = await createServer({
                         configFile: false,
                         logLevel: ${JSON.stringify(logLevel)},

@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { access, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { type BuildOptions, build, normalizePath, type Plugin } from 'vite'
 import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
+import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import { createMiniTransformer } from './create-mini-transformer.ts'
 import { miniHtmlBase } from './mini-html-base.ts'
@@ -20,7 +20,7 @@ const contract = {
 
 /** Serve ordinary absolute module IDs from memory so the real Vite/CSS transforms still run, without creating source files. */
 function createSourceFixture(files: Readonly<Record<string, string>>, entryName: string) {
-    const root = path.join(os.tmpdir(), `vpt-memory-styles-${randomUUID()}`)
+    const root = path.join(projectTempDir, `vpt-memory-styles-${randomUUID()}`)
     const sources: ReadonlyMap<string, string> = new Map(
         Object.entries(files).map(([file, source]) => [normalizePath(path.join(root, file)), source])
     )
@@ -59,7 +59,7 @@ test('handles physical and ignored query fragments before watcher cleanup', asyn
 })
 
 test('invalidates Tailwind compiler dependencies through the HMR hook', async () => {
-    const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'vpt-style-hot-update-')))
+    const root = await realpath(await mkdtemp(path.join(projectTempDir, 'vpt-style-hot-update-')))
 
     try {
         const styleId = path.join(root, 'app.css')

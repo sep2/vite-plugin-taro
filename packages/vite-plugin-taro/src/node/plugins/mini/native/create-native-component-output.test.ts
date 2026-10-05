@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
+import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import { compileNativeComponentInterface } from './compile-native-component-interface.ts'
 import { createNativeComponentOutput } from './create-native-component-output.ts'
 
 test('emits surviving native folders into their planned packages', async () => {
-    const projectFolder = await mkdtemp(path.join(tmpdir(), 'vpt-native-output-'))
+    const projectFolder = await mkdtemp(path.join(projectTempDir, 'vpt-native-output-'))
     try {
         const main = await createInterface(projectFolder, 'native-counter', 'counter')
         const subpackage = await createInterface(projectFolder, 'native-card', 'card')

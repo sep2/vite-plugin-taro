@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { resolveConfig } from 'vite'
 import { h5AppPath } from '../plugins/h5/constant.ts'
 import { resolveTaroRuntime } from '../utils/packages.ts'
+import { projectTempDir } from './project-temp-dir.ts'
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const distRoot = path.join(packageRoot, 'dist')
@@ -105,7 +105,7 @@ async function assertRuntimeDistCopied(sourceRoot: string, outputRoot: string): 
 }
 
 test('compares selected package files using filesystem-relative paths', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'vpt-distribution-paths-'))
+    const root = await mkdtemp(path.join(projectTempDir, 'vpt-distribution-paths-'))
     const sourceRoot = path.join(root, 'source')
     const outputRoot = path.join(root, 'output')
     const files = ['lib/react/index.js', 'dist/taro-components/taro-components.css', 'global.css']

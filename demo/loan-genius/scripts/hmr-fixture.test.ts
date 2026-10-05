@@ -2,9 +2,9 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { mkdtemp, open, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
+import { projectTempDir } from '../../../packages/vite-plugin-taro/src/node/tests/project-temp-dir.ts'
 import { stopLoanHmrServer, withLoanHmrFixture } from './hmr-fixture.ts'
 
 test('state-retention probe reads the opt-in URL from the host global', async () => {
@@ -18,7 +18,7 @@ test('state-retention probe reads the opt-in URL from the host global', async ()
 })
 
 test('server cleanup awaits exit and closes the log handle', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'loan-server-cleanup-'))
+    const root = await mkdtemp(path.join(projectTempDir, 'loan-server-cleanup-'))
     const logFile = await open(path.join(root, 'vite.log'), 'w')
     const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 10000)'], { stdio: 'ignore' })
     try {
@@ -36,7 +36,7 @@ test('server cleanup awaits exit and closes the log handle', async () => {
 test('forced shutdown reports failure but still closes the log handle', {
     skip: process.platform === 'win32'
 }, async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'loan-server-forced-'))
+    const root = await mkdtemp(path.join(projectTempDir, 'loan-server-forced-'))
     const logFile = await open(path.join(root, 'vite.log'), 'w')
     const child = spawn(
         process.execPath,

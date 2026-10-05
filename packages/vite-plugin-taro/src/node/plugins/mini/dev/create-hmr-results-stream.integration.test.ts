@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { mkdtemp, realpath, rename, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { type DevOptions, dev } from 'rolldown/experimental'
 import { asyncScheduler } from 'rxjs'
 import { createServer } from 'vite'
+import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
 import { createHostActions } from './host-actions.ts'
 import type { BundledDev } from './mini-dev-options.ts'
@@ -17,7 +17,7 @@ type DevOutputResult = Parameters<NonNullable<DevOptions['onOutput']>>[0]
 type OutputAction = Readonly<{ kind: 'output'; result: DevOutputResult }>
 
 test('adapts a real DevEngine callback into one publication', async () => {
-    const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-hmr-results-stream-')))
+    const root = await realpath(await mkdtemp(path.join(projectTempDir, 'vpt-hmr-results-stream-')))
     const appId = path.join(root, 'app.js')
     const dependencyId = path.join(root, 'dependency.js')
     await Promise.all([
@@ -84,7 +84,7 @@ test('adapts a real DevEngine callback into one publication', async () => {
 })
 
 test('keeps run fulfilled and reports an initial build failure through host actions', async () => {
-    const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-initial-output-error-')))
+    const root = await realpath(await mkdtemp(path.join(projectTempDir, 'vpt-initial-output-error-')))
     const appId = path.join(root, 'app.js')
     await writeFile(appId, 'export const value = 1\n')
 
@@ -142,7 +142,7 @@ test('keeps run fulfilled and reports an initial build failure through host acti
 })
 
 test('surfaces a real transform failure and accepts a later recovery generation', async () => {
-    const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-hmr-recovery-')))
+    const root = await realpath(await mkdtemp(path.join(projectTempDir, 'vpt-hmr-recovery-')))
     const appId = path.join(root, 'app.js')
     const dependencyId = path.join(root, 'dependency.js')
     await Promise.all([

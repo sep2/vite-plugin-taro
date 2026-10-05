@@ -10,13 +10,13 @@ import {
     rmSync,
     writeFileSync
 } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import creatorPackage from '../packages/create-vite-taro/package.json' with { type: 'json' }
 import runtimePackage from '../packages/taro-runtime/package.json' with { type: 'json' }
 import pluginPackage from '../packages/vite-plugin-taro/package.json' with { type: 'json' }
+import { projectTempDir } from '../packages/vite-plugin-taro/src/node/tests/project-temp-dir.ts'
 
 const repoRoot = fileURLToPath(new URL('../', import.meta.url))
 const publicPackages = [runtimePackage, pluginPackage, creatorPackage]
@@ -105,7 +105,7 @@ function runGenerator(generatorRoot: string, projectPath: string, packageManager
 
 test('public packages preserve their published entrypoints and scaffold dependencies', async (t) => {
     // Packed files and generated projects are disposable; source manifests stay unchanged.
-    const root = mkdtempSync(path.join(tmpdir(), 'vpt-package-artifacts-'))
+    const root = mkdtempSync(path.join(projectTempDir, 'vpt-package-artifacts-'))
     t.after(() => rmSync(root, { recursive: true, force: true }))
     packArtifacts(root)
 

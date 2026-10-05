@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
+import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import { renderDevelopmentAppStyle, renderHmrInfo, writeDevelopmentFile } from './hmr-files.ts'
 
 test('renders frozen CommonJS build metadata', () => {
@@ -24,7 +24,7 @@ test('revises the development App style entry for each complete build', () => {
 })
 
 test('atomically replaces a complete development file without leaving temporary files', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-hmr-file-'))
+    const root = await fs.mkdtemp(path.join(projectTempDir, 'vpt-hmr-file-'))
     const fileName = 'hmr/info.js'
     const filePath = path.join(root, fileName)
 

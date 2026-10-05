@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, realpath, rename, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -9,6 +8,7 @@ import type { OutputChunk } from 'rolldown'
 import { dev } from 'rolldown/experimental'
 import { DevRuntime } from 'rolldown/experimental/runtime'
 import { normalizePath } from 'vite'
+import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import type { PatchUpdate } from '../dev/hmr-protocol.ts'
 import { vptGlobalBindingId } from '../module/module.ts'
 import { renderNative } from '../render/native.ts'
@@ -71,7 +71,7 @@ function createRuntimeContext(chunks: readonly OutputChunk[], setup: string) {
 }
 
 test('real HMR factories reuse the registered binding without rediscovering the global', async (t) => {
-    const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-shared-global-')))
+    const root = await realpath(await mkdtemp(path.join(projectTempDir, 'vpt-shared-global-')))
     t.after(() => rm(root, { recursive: true, force: true }))
     const entry = path.join(root, 'entry.js')
     await writeFile(entry, moduleSource(1))

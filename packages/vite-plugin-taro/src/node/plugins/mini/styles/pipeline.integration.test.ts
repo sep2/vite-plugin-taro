@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { type DevEngine, dev } from 'rolldown/experimental'
 import { createServer, normalizePath } from 'vite'
 import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
+import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import { writeDevelopmentFile } from '../dev/hmr-files.ts'
 import type { BundledDev } from '../dev/mini-dev-options.ts'
 import type { MiniContract } from '../mini-contract.ts'
@@ -26,7 +26,7 @@ function assertGlobalStylesheet(css: string, applicationCss: string): void {
 }
 
 test('minifies App/Page CSS, clears removed Page styles, and suppresses identical rewrites', async () => {
-    const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-style-plugin-')))
+    const root = await realpath(await mkdtemp(path.join(projectTempDir, 'vpt-style-plugin-')))
     const appId = normalizePath(path.join(root, 'app.js'))
     const cssId = normalizePath(path.join(root, 'app.css'))
     const extraCssId = normalizePath(path.join(root, 'extra.css'))
@@ -263,7 +263,7 @@ test('minifies App/Page CSS, clears removed Page styles, and suppresses identica
 })
 
 test('respects cssMinify:false while rendering Tailwind CSS and matching patch factories', async () => {
-    const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-tailwind-style-hmr-')))
+    const root = await realpath(await mkdtemp(path.join(projectTempDir, 'vpt-tailwind-style-hmr-')))
     const sourceDir = path.join(root, 'src')
     const appId = normalizePath(path.join(sourceDir, 'app.js'))
     const cssId = normalizePath(path.join(root, 'app.css'))

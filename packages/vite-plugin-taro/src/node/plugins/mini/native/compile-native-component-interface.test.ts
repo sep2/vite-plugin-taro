@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { normalizePath } from 'vite'
+import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import { compileNativeComponentInterface } from './compile-native-component-interface.ts'
 import { nativeComponentMetaKey } from './native-component-assets.ts'
 
 test('compiles a co-located interface without treating it as an opaque native asset', async () => {
-    const projectDirectory = await mkdtemp(path.join(tmpdir(), 'vpt-native-interface-'))
+    const projectDirectory = await mkdtemp(path.join(projectTempDir, 'vpt-native-interface-'))
     try {
         const sourceDirectory = path.join(projectDirectory, 'native-counter')
         const sourcePath = path.join(sourceDirectory, 'component.data')

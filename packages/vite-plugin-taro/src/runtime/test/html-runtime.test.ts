@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -10,6 +9,7 @@ import { build } from 'rolldown'
 import { resolveConfig } from 'vite'
 import vpt from '../../index.ts'
 import { miniTaroRuntimeId } from '../../node/plugins/mini/module/module.ts'
+import { projectTempDir } from '../../node/tests/project-temp-dir.ts'
 import { resolveTaroRuntime } from '../../node/utils/packages.ts'
 
 for (const target of ['wx', 'zfb'] as const) {
@@ -75,7 +75,7 @@ for (const target of ['wx', 'zfb'] as const) {
 
 test('injected globals resolve outside the plugin dependency tree', async () => {
     // Keep the importer outside the workspace for the resolution regression, but supply its source in memory.
-    const entry = path.join(tmpdir(), `vpt-inject-${randomUUID()}`, 'entry.js')
+    const entry = path.join(projectTempDir, `vpt-inject-${randomUUID()}`, 'entry.js')
     const config = await resolveConfig(
         {
             configFile: false,

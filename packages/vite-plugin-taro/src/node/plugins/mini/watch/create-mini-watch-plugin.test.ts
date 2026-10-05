@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import type { InlineConfig, Plugin } from 'vite'
 import { build, createServer, resolveConfig } from 'vite'
 import type { VptJsonObject, VptOptions } from '../../../../options.ts'
 import { createTestProject } from '../../../tests/create-test-project.ts'
+import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import vpt from '../../../vpt.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
 import { createWxMiniContract } from '../../wx/plugins.ts'
@@ -30,7 +30,7 @@ const miniContracts = {
 } as const
 
 test('enables the filesystem policy only for physical watch builds, including production mode', async (context) => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-mini-watch-config-'))
+    const root = await fs.mkdtemp(path.join(projectTempDir, 'vpt-mini-watch-config-'))
     context.after(() => fs.rm(root, { recursive: true, force: true }))
     const options = {
         root,
@@ -57,7 +57,7 @@ test('enables the filesystem policy only for physical watch builds, including pr
 for (const target of ['wx', 'zfb', 'tt', 'h5'] as const) {
     for (const hotReload of [true, false, undefined]) {
         test(`${target}: watch handles hotReload=${hotReload} without changing unrelated configuration`, async (context) => {
-            const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-mini-watch-project-'))
+            const root = await fs.mkdtemp(path.join(projectTempDir, 'vpt-mini-watch-project-'))
             context.after(() => fs.rm(root, { recursive: true, force: true }))
             const input = path.join(root, 'app.js')
             await fs.writeFile(input, 'console.log("fixture");\n')
@@ -304,7 +304,7 @@ function createProjectConfigFixture(
 }
 
 test('closing a failed watcher never publishes a successful completion marker', async (context) => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-mini-watch-error-'))
+    const root = await fs.mkdtemp(path.join(projectTempDir, 'vpt-mini-watch-error-'))
     context.after(() => fs.rm(root, { recursive: true, force: true }))
     const failed = Promise.withResolvers<void>()
     const watcher = await build({
@@ -332,7 +332,7 @@ test('closing a failed watcher never publishes a successful completion marker', 
 test('watch cleans only at startup, preserves live output and signals only after successful writes', {
     timeout: 30_000
 }, async (context) => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'vpt-mini-watch-'))
+    const root = await fs.mkdtemp(path.join(projectTempDir, 'vpt-mini-watch-'))
     const outDir = path.join(root, 'dist')
     const appFile = path.join(outDir, 'app.js')
     const markerFile = path.join(outDir, 'hmr/watch.js')

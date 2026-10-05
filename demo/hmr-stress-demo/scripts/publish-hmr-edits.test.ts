@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
+import { projectTempDir } from '../../../packages/vite-plugin-taro/src/node/tests/project-temp-dir.ts'
 import { publishHmrEdits } from './publish-hmr-edits.ts'
 
 const baseline = "export const hmrMarker = 'baseline'\nexport const appOutletFirst = true\n"
 const profile = { intervalMilliseconds: 1, updateCount: 2 }
 
 test('publication awaits restoration and baseline application', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'hmr-publication-'))
+    const root = await mkdtemp(path.join(projectTempDir, 'hmr-publication-'))
     const file = path.join(root, 'marker.ts')
     // Record the runtime acknowledgements in order, alongside the generation on disk.
     const observed: string[] = []
@@ -27,7 +27,7 @@ test('publication awaits restoration and baseline application', async () => {
 })
 
 test('failed runtime acknowledgement still restores source and fails publication', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'hmr-publication-failure-'))
+    const root = await mkdtemp(path.join(projectTempDir, 'hmr-publication-failure-'))
     const file = path.join(root, 'marker.ts')
     const failure = new Error('Runtime did not apply the restoration')
     try {

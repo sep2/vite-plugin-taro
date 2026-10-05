@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { mkdtemp, realpath, rename, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -9,6 +8,7 @@ import { runInNewContext } from 'node:vm'
 import { dev } from 'rolldown/experimental'
 import { DevRuntime } from 'rolldown/experimental/runtime'
 import { createServer } from 'vite'
+import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import type { PatchUpdate } from './hmr-protocol.ts'
 import { type BundledDev, requireSingleOutput } from './mini-dev-options.ts'
 
@@ -68,7 +68,7 @@ function requireBundledDev(value: unknown): Pick<BundledDev, 'getRolldownOptions
 }
 
 async function createFixture() {
-    const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-rolldown-delivery-')))
+    const root = await realpath(await mkdtemp(path.join(projectTempDir, 'vpt-rolldown-delivery-')))
     const firstPath = path.join(root, 'first.js')
     const secondPath = path.join(root, 'second.js')
     const entryPath = path.join(root, 'entry.js')

@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test, { type TestContext } from 'node:test'
 import { build, type RolldownPluginOption } from 'rolldown'
 import { defineParallelPlugin, viteTransformPlugin } from 'rolldown/experimental'
+import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import { replaceViteTransformPlugin } from './replace-vite-transform-plugin.ts'
 
 type TransformConfig = Parameters<typeof replaceViteTransformPlugin>[1]
@@ -46,7 +46,7 @@ test('leaves a disabled Oxc pipeline unchanged', async () => {
 
 /** Owns only temporary physical transform inputs; Rolldown writes no output and starts no watcher. */
 async function createFixture(context: TestContext): Promise<string> {
-    const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vpt-oxc-options-')))
+    const root = await realpath(await mkdtemp(path.join(projectTempDir, 'vpt-oxc-options-')))
     context.after(() => rm(root, { recursive: true, force: true }))
     return root
 }

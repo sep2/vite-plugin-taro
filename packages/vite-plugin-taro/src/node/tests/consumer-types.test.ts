@@ -3,13 +3,13 @@ import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { createVirtualFileSystem } from 'typescript/unstable/fs'
 import { API } from 'typescript/unstable/sync'
 import { normalizePath } from 'vite'
 import { packageRequire, resolveTaroRuntime } from '../utils/packages.ts'
+import { projectTempDir } from './project-temp-dir.ts'
 
 const pluginRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
 const runtimeRoot = path.resolve(path.dirname(resolveTaroRuntime('runtime/mini')), '../..')
@@ -98,7 +98,7 @@ async function createConsumerFiles(root: string): Promise<Record<string, string>
 }
 
 test('preserves API and router types without upstream Taro packages or Vite aliases', async () => {
-    const root = normalizePath(path.join(tmpdir(), `vpt-consumer-types-${randomUUID()}`))
+    const root = normalizePath(path.join(projectTempDir, `vpt-consumer-types-${randomUUID()}`))
     const files = await createConsumerFiles(root)
     const virtualFs = createVirtualFileSystem(files)
     // TypeScript 7's API runs the bundled tsc binary with virtual FS callbacks, retaining the real checker without disk fixtures.

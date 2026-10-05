@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
+import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import {
     collectNativeComponentAssets,
     getNativeComponentAssetBytes,
@@ -32,7 +32,7 @@ test('reads empty and populated native component metadata', () => {
 })
 
 test('rejects a missing native component folder with its resolved path', async () => {
-    const sourceDirectory = await mkdtemp(path.join(tmpdir(), 'vpt-missing-native-assets-'))
+    const sourceDirectory = await mkdtemp(path.join(projectTempDir, 'vpt-missing-native-assets-'))
     const missingDirectory = path.join(sourceDirectory, 'missing')
     try {
         await assert.rejects(
@@ -53,7 +53,7 @@ test('rejects a missing native component folder with its resolved path', async (
 })
 
 test('rejects a missing native component entry with its resolved path', async () => {
-    const sourceDirectory = await mkdtemp(path.join(tmpdir(), 'vpt-missing-native-entry-'))
+    const sourceDirectory = await mkdtemp(path.join(projectTempDir, 'vpt-missing-native-entry-'))
     const missingEntry = path.join(sourceDirectory, 'counter.js')
     try {
         await assert.rejects(
@@ -74,7 +74,7 @@ test('rejects a missing native component entry with its resolved path', async ()
 })
 
 test('propagates filesystem errors other than missing paths', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'vpt-invalid-native-path-'))
+    const root = await mkdtemp(path.join(projectTempDir, 'vpt-invalid-native-path-'))
     try {
         await assert.rejects(
             () =>
@@ -107,7 +107,7 @@ test('propagates filesystem errors other than missing paths', async () => {
 })
 
 test('rejects a file as the component source and a directory as its JavaScript entry', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'vpt-invalid-native-assets-'))
+    const root = await mkdtemp(path.join(projectTempDir, 'vpt-invalid-native-assets-'))
     try {
         const sourceFile = path.join(root, 'source-file')
         await writeFile(sourceFile, 'not a directory')
@@ -145,7 +145,7 @@ test('rejects a file as the component source and a directory as its JavaScript e
 })
 
 test('collects an opaque native folder recursively while excluding its co-located interface', async () => {
-    const sourceDirectory = await mkdtemp(path.join(tmpdir(), 'vpt-native-assets-'))
+    const sourceDirectory = await mkdtemp(path.join(projectTempDir, 'vpt-native-assets-'))
     try {
         await mkdir(path.join(sourceDirectory, 'nested'))
         await writeFile(path.join(sourceDirectory, 'z.invalid-json'), '{')

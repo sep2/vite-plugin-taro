@@ -12,12 +12,12 @@ import {
     writeFileSync
 } from 'node:fs'
 import { createServer } from 'node:http'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test, { type TestContext } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import config from '../.changeset/config.json' with { type: 'json' }
+import { projectTempDir } from '../packages/vite-plugin-taro/src/node/tests/project-temp-dir.ts'
 
 interface PackageManifest {
     name: string
@@ -51,7 +51,7 @@ function changeset(root: string, args: string[]): string {
 
 /** Every versioning test mutates its own disposable Git workspace, never the real manifests or release state. */
 function createWorkspace(t: TestContext, version: string): string {
-    const root = mkdtempSync(path.join(tmpdir(), 'vpt-changesets-'))
+    const root = mkdtempSync(path.join(projectTempDir, 'vpt-changesets-'))
     t.after(() => rmSync(root, { recursive: true, force: true }))
     writeJson(path.join(root, 'package.json'), { name: 'release-fixture', private: true, type: 'module' })
     writeJson(path.join(root, '.changeset/config.json'), config)
