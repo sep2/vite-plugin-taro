@@ -11,7 +11,7 @@ import {
     incrementId,
     type MiniElementData
 } from 'vite-plugin-taro-runtime/runtime/mini'
-import { getPageQuery } from '../amphibious/vpt.ts'
+import { getPageQuery } from '../amphibious/bootstrap.ts'
 import type { createVptPageConfig, PageData } from './create-vpt-page-config.ts'
 
 // One counter distinguishes native instances even when their route, query and creation timestamp match.

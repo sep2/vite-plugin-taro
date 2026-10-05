@@ -18,7 +18,6 @@ import {
     miniPageShellId,
     miniTransportId,
     miniTransportOutputPath,
-    miniVptId,
     pageCapsuleId,
     pageComponentId,
     taroTargetRuntimeId,
@@ -131,7 +130,6 @@ function createEntryGraph(pages: readonly MiniPage[]) {
         },
         input: Object.fromEntries([
             ['bootstrap', miniBootstrapId],
-            ['vpt', miniVptId],
             [appEntries.shellName, appEntries.shellId],
             [appEntries.capsuleName, appEntries.capsuleId],
             [componentShellFileName, miniComponentShellId],

@@ -376,7 +376,7 @@ function assertPolyfilledBootstrap(
     assert.equal(runtime.read('typeof structuredClone'), structuredClone)
     assert.equal(runtime.read('typeof globalThis.polyfillProbe'), 'undefined')
     const installedURL = runtime.read('URL')
-    runtime.evaluate('common/vpt.js')
+    runtime.evaluate('common/bootstrap.js')
     assert.equal(runtime.read('URL'), installedURL)
 }
 
@@ -509,7 +509,7 @@ for (const target of miniTargets) {
             assert.equal(missing.read('typeof URLSearchParams'), 'undefined')
 
             const runtime = createAppRuntime(chunks, true, target)
-            runtime.evaluate('common/vpt.js')
+            runtime.evaluate('common/bootstrap.js')
             assert.equal(runtime.read('typeof globalThis.polyfillProbe'), 'undefined')
             assert.equal(runtime.read('typeof queueMicrotask'), mode === 'production' ? 'undefined' : 'function')
             assert.equal(runtime.read('typeof globalThis["__core-js_shared__"]'), 'undefined')
@@ -568,7 +568,7 @@ for (const target of miniTargets) {
                     restricted.read('const sharedGlobal = this;')
                     assert.strictEqual(Reflect.get(provider, 'vptGlobal'), restricted.read('sharedGlobal'))
                     assert.equal(restricted.read('Object[Symbol.for("vpt.fake.global")]'), undefined)
-                    restricted.evaluate('common/vpt.js')
+                    restricted.evaluate('common/bootstrap.js')
                     restricted.evaluate('app.js')
                     restricted.evaluate('pages/home/index.js')
                     restricted.evaluate('comp.js')
@@ -605,7 +605,7 @@ for (const target of miniTargets) {
     test(`${target}: production can opt into queueMicrotask without other APIs`, async () => {
         const chunks = await compileFixture(target, 'production', ['web.queue-microtask'])
         const runtime = createAppRuntime(chunks, true, target)
-        runtime.evaluate('common/vpt.js')
+        runtime.evaluate('common/bootstrap.js')
         await assertMicrotaskQueue(runtime)
         assert.throws(() => runtime.read('queueMicrotask()'), { name: 'TypeError' })
         assert.throws(() => runtime.read('queueMicrotask(null)'), { name: 'TypeError' })

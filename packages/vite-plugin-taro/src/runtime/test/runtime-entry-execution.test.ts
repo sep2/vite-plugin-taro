@@ -359,8 +359,8 @@ test('creates the Mini Program Page capsule after App initialization with one op
                 const harness = globalThis.harness
                 export const ReactDOM = harness.ReactDOM
                 export const createReactApp = harness.createReactApp
+                export const createVptPageConfig = harness.createVptPageConfig
             `,
-            './create-vpt-page-config.ts': 'export const createVptPageConfig = globalThis.harness.createVptPageConfig',
             'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
             './prerender-to-data.ts':
                 'export const prerenderToData = () => { throw new Error("Unexpected prerender") }',
@@ -413,7 +413,7 @@ test('prerender stores its identity inside the non-enumerable VPT metadata', asy
             `,
             'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
             'vite-plugin-taro-runtime/react': 'export const flushSync = globalThis.harness.flushSync',
-            '../amphibious/vpt.ts': 'export const getPageQuery = () => ({ id: "example" })'
+            '../amphibious/bootstrap.ts': 'export const getPageQuery = () => ({ id: "example" })'
         },
         defines: {}
     })
@@ -536,6 +536,7 @@ test('mounts the current Page export instead of the cold native capsule baseline
             './prerender-to-data.ts':
                 'export const prerenderToData = () => { throw new Error("Unexpected prerender") }',
             'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
+            './taro-runtime.ts': `export { createVptPageConfig } from ${JSON.stringify(path.join(runtimeRoot, 'mini/capsule/create-vpt-page-config.ts'))}`,
             '\0vpt:global-binding': 'export const vptGlobal = globalThis',
             '\0vpt:page-component': 'export default globalThis.harness.PageComponent'
         },
@@ -562,12 +563,14 @@ test('preserves WX capsule runtime initialization order and export identities', 
     // This mutable trace verifies the WeChat platform runtime executes before React and Taro runtime facades are exposed.
     const events: string[] = []
     const createReactApp = () => undefined
+    const createVptPageConfig = () => undefined
     const ReactDOM = {}
     const createRecursiveComponentConfig = () => undefined
     const customWrapperCache = new Map()
     const harness = {
         events,
         createReactApp,
+        createVptPageConfig,
         ReactDOM,
         createRecursiveComponentConfig,
         customWrapperCache
@@ -575,6 +578,7 @@ test('preserves WX capsule runtime initialization order and export identities', 
     const code = await bundleRuntimeEntry({
         entry: 'mini/capsule/taro-runtime.ts',
         mocks: {
+            './create-vpt-page-config.ts': 'export const createVptPageConfig = globalThis.harness.createVptPageConfig',
             '\0vpt:taro-target-runtime': "globalThis.harness.events.push('target-runtime')",
             'vite-plugin-taro-runtime/plugin-html/runtime': "globalThis.harness.events.push('html-runtime')",
             'vite-plugin-taro-runtime/plugin-framework-react/runtime': `
@@ -602,11 +606,11 @@ test('preserves WX capsule runtime initialization order and export identities', 
     assert.strictEqual(Reflect.get(context.globalThis, Symbol.for('customWrapperCache')), customWrapperCache)
     assert.strictEqual(exports.createReactApp, createReactApp)
     assert.strictEqual(exports.ReactDOM, ReactDOM)
-    assert.equal(Object.hasOwn(exports, 'createVptPageConfig'), false)
+    assert.strictEqual(exports.createVptPageConfig, createVptPageConfig)
     assert.strictEqual(exports.createRecursiveComponentConfig, createRecursiveComponentConfig)
 })
 
-test('registers native App and component shells after the VPT runtime', async () => {
+test('registers native App and component shells after bootstrap', async () => {
     const appConfig = { kind: 'app-config' }
     const componentConfig = { kind: 'component-config' }
     const customWrapperConfig = { kind: 'custom-wrapper-config' }
@@ -614,7 +618,8 @@ test('registers native App and component shells after the VPT runtime', async ()
         {
             entry: 'mini/native/app.ts',
             mocks: {
-                '../amphibious/vpt.ts': "globalThis.harness.events.push({ name: 'vpt', config: undefined })",
+                '../amphibious/bootstrap.ts':
+                    "globalThis.harness.events.push({ name: 'bootstrap', config: undefined })",
                 '../capsule/app.ts': 'export default globalThis.harness.config'
             },
             registration: 'App',
@@ -623,7 +628,8 @@ test('registers native App and component shells after the VPT runtime', async ()
         {
             entry: 'mini/native/component.ts',
             mocks: {
-                '../amphibious/vpt.ts': "globalThis.harness.events.push({ name: 'vpt', config: undefined })",
+                '../amphibious/bootstrap.ts':
+                    "globalThis.harness.events.push({ name: 'bootstrap', config: undefined })",
                 '../capsule/component.ts': 'export const componentConfig = globalThis.harness.config'
             },
             registration: 'Component',
@@ -632,7 +638,8 @@ test('registers native App and component shells after the VPT runtime', async ()
         {
             entry: 'mini/native/custom-wrapper.ts',
             mocks: {
-                '../amphibious/vpt.ts': "globalThis.harness.events.push({ name: 'vpt', config: undefined })",
+                '../amphibious/bootstrap.ts':
+                    "globalThis.harness.events.push({ name: 'bootstrap', config: undefined })",
                 '../capsule/component.ts': 'export const customWrapperConfig = globalThis.harness.config'
             },
             registration: 'Component',
@@ -657,7 +664,7 @@ test('registers native App and component shells after the VPT runtime', async ()
 
         assert.deepEqual(
             events.map(({ name }) => name),
-            ['vpt', entry.registration]
+            ['bootstrap', entry.registration]
         )
         assert.strictEqual(events[1]?.config, entry.config)
     }
@@ -695,6 +702,7 @@ test('createVptPageConfig selects native data form without copying the config', 
             entry: 'mini/capsule/page.ts',
             mocks: {
                 './app.ts': 'globalThis.harness.initialize()',
+                './taro-runtime.ts': `export { createVptPageConfig } from ${JSON.stringify(path.join(runtimeRoot, 'mini/capsule/create-vpt-page-config.ts'))}`,
                 'vite-plugin-taro-runtime/runtime/mini':
                     'export const createPageConfig = globalThis.harness.createPageConfig',
                 './prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData',
@@ -777,12 +785,13 @@ test('Page data factories receive native queries captured before capsule initial
     const code = await bundleRuntimeEntry({
         entry: 'mini/native/page.ts',
         mocks: {
-            '../amphibious/vpt.ts': `export { getPageQuery } from ${JSON.stringify(path.join(runtimeRoot, 'mini/amphibious/get-page-query.ts'))}`,
+            '../amphibious/bootstrap.ts': `export { getPageQuery } from ${JSON.stringify(path.join(runtimeRoot, 'mini/amphibious/get-page-query.ts'))}`,
             '\0vpt:page-capsule': `export { default } from ${JSON.stringify(path.join(runtimeRoot, 'mini/capsule/page.ts'))}`,
             './app.ts': 'globalThis.harness.assertListenerReady()',
+            './taro-runtime.ts': `export { createVptPageConfig } from ${JSON.stringify(path.join(runtimeRoot, 'mini/capsule/create-vpt-page-config.ts'))}`,
             'vite-plugin-taro-runtime/runtime/mini': 'export const createPageConfig = () => globalThis.harness.config',
             './prerender-to-data.ts': `
-                import { getPageQuery } from '../amphibious/vpt.ts'
+                import { getPageQuery } from '../amphibious/bootstrap.ts'
                 export const prerenderToData = config => globalThis.harness.prerenderToData(config, getPageQuery())
             `,
             '\0vpt:page-component': 'export default () => null'
@@ -908,6 +917,7 @@ for (const prerender of [false, true]) {
             entry: 'mini/capsule/page.ts',
             mocks: {
                 './app.ts': '',
+                './taro-runtime.ts': `export { createVptPageConfig } from ${JSON.stringify(path.join(runtimeRoot, 'mini/capsule/create-vpt-page-config.ts'))}`,
                 'vite-plugin-taro-runtime/runtime/mini':
                     'export const createPageConfig = globalThis.harness.createPageConfig',
                 './prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData',
@@ -929,7 +939,7 @@ for (const prerender of [false, true]) {
         const code = await bundleRuntimeEntry({
             entry: 'mini/native/page.ts',
             mocks: {
-                '../amphibious/vpt.ts': '',
+                '../amphibious/bootstrap.ts': '',
                 '\0vpt:page-capsule': 'export default globalThis.harness.config'
             },
             defines: {},
@@ -997,10 +1007,11 @@ for (const prerender of [false, true]) {
     })
 }
 
-test('loads polyfills before SystemJS, installs amphibious transport and preserves preload semantics', async () => {
-    // These mutable observations verify polyfill/SystemJS startup order and one synchronous preload invocation.
+test('bootstrap loads polyfills, SystemJS and query capture and preserves preload semantics', async () => {
+    // These mutable observations verify startup order, the shared native listener and one preload invocation.
     const events: string[] = []
     const preloadCalls: string[] = []
+    const listeners: ((event: { query: Record<string, unknown> }) => void)[] = []
     const loader: { instantiate?: unknown } = {}
     const languageGlobal: Record<string, unknown> = {}
     const transport = (moduleId: string) => ({ moduleId })
@@ -1026,7 +1037,13 @@ test('loads polyfills before SystemJS, installs amphibious transport and preserv
     })
     const context: ExecutionContext = {
         ...createExecutionContext(harness),
-        globalThis: languageGlobal
+        globalThis: languageGlobal,
+        wx: {
+            onBeforePageLoad(listener: (event: { query: Record<string, unknown> }) => void) {
+                events.push('query-capture')
+                listeners.push(listener)
+            }
+        }
     }
 
     const exports = executeRuntimeEntry(code, context)
@@ -1041,9 +1058,16 @@ test('loads polyfills before SystemJS, installs amphibious transport and preserv
         }
     ])
 
-    assert.deepEqual(events, ['polyfills', 'create-system'])
+    assert.deepEqual(events, ['polyfills', 'create-system', 'query-capture'])
     assert.strictEqual(exports.System, loader)
-    assert.equal(Object.hasOwn(exports, 'getPageQuery'), false)
+    const getPageQuery = exports.getPageQuery
+    assert.ok(typeof getPageQuery === 'function')
+    assert.equal(listeners.length, 1)
+    const listener = listeners[0]
+    assert.ok(listener)
+    const query = { id: 'native-query' }
+    listener({ query })
+    assert.strictEqual(getPageQuery(), query)
     assert.equal(Object.hasOwn(exports, 'Page'), false)
     assert.strictEqual(languageGlobal.System, loader)
     assert.strictEqual(loader.instantiate, transport)
@@ -1051,39 +1075,47 @@ test('loads polyfills before SystemJS, installs amphibious transport and preserv
     assert.deepEqual(preloadCalls, ['load'])
 })
 
-test('VPT initializes bootstrap before evaluating and exporting native query capture', async () => {
-    // Record loader readiness before the native module installs its shared listener.
+test('bootstrap initializes the loader and query capture before the native App capsule', async () => {
+    // Record readiness at the capsule boundary instead of relying on a separate runtime facade.
     const events: string[] = []
-    const loader = {}
-    const getPageQuery = () => assert.fail('Exporting query capture must not read Page data')
-    const preload = () => undefined
-    const harness = { events, loader, getPageQuery, preload }
+    const loader: { instantiate?: unknown } = {}
+    const languageGlobal: Record<string, unknown> = {}
+    const appConfig = { kind: 'app-config' }
+    const transport = () => undefined
+    const harness = {
+        events,
+        loader,
+        transport,
+        initializeApp() {
+            assert.deepEqual(events, ['polyfills', 'query-capture'])
+            assert.strictEqual(languageGlobal.System, loader)
+            assert.strictEqual(loader.instantiate, transport)
+            events.push('capsule')
+            return appConfig
+        }
+    }
+    languageGlobal.harness = harness
     const code = await bundleRuntimeEntry({
-        entry: 'mini/amphibious/vpt.ts',
+        entry: 'mini/native/app.ts',
         mocks: {
-            './bootstrap.ts': `
-                globalThis.System = globalThis.harness.loader
-                globalThis.harness.events.push('system')
-                export const System = globalThis.System
-                export const __vitePreload = globalThis.harness.preload
-            `,
-            './get-page-query.ts': `
-                if (globalThis.System !== globalThis.harness.loader) {
-                    throw new Error('Native query capture evaluated before the loader')
-                }
-                globalThis.harness.events.push('query-capture')
-                export const getPageQuery = globalThis.harness.getPageQuery
-            `
+            '\0vpt:global-binding': 'export const vptGlobal = globalThis',
+            '\0vpt:mini-polyfills': "globalThis.harness.events.push('polyfills')",
+            '../systemjs/system-core.js': 'export const System = globalThis.harness.loader',
+            '\0vpt:mini-transport': 'export const transport = globalThis.harness.transport',
+            '../capsule/app.ts': 'export default globalThis.harness.initializeApp()'
         },
         defines: {}
     })
-    const exports = executeRuntimeEntry(code, createExecutionContext(harness))
-    assert.deepEqual(events, ['system', 'query-capture'])
-    assert.strictEqual(exports.System, loader)
-    assert.strictEqual(exports.__vitePreload, preload)
-    assert.strictEqual(exports.getPageQuery, getPageQuery)
-    assert.equal(Object.hasOwn(exports, 'Page'), false)
-    assert.equal(Object.hasOwn(exports, 'prerenderToData'), false)
+    executeRuntimeEntry(code, {
+        ...createExecutionContext(harness),
+        globalThis: languageGlobal,
+        wx: { onBeforePageLoad: () => events.push('query-capture') },
+        App(config) {
+            assert.strictEqual(config, appConfig)
+            events.push('register')
+        }
+    })
+    assert.deepEqual(events, ['polyfills', 'query-capture', 'capsule', 'register'])
 })
 
 test('attaches Mini hooks to the original API object without invoking platform APIs', async () => {

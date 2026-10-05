@@ -95,14 +95,14 @@ async function runFixture(t: TestContext, target: 'wx' | 'zfb' | 'tt', mode: str
                         if (id === './app.ts') {
                             return 'test:empty'
                         }
-                        if (id === './create-vpt-page-config.ts') {
+                        if (id === './taro-runtime.ts') {
                             return path.join(path.dirname(entry), '../mini/capsule/create-vpt-page-config.ts')
                         }
                         if (id === './prerender-to-data.ts') {
                             return path.join(path.dirname(entry), '../mini/capsule/prerender-to-data.ts')
                         }
                     }
-                    if (id === '../amphibious/vpt.ts') {
+                    if (id === '../amphibious/bootstrap.ts') {
                         return 'test:page-query'
                     }
                 },

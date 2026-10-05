@@ -14,7 +14,6 @@ import {
     miniPageCapsuleId,
     miniPageShellId,
     miniTransportId,
-    miniVptId,
     pageCapsuleId,
     pageComponentId,
     taroTargetRuntimeId,
@@ -23,7 +22,6 @@ import {
 import { createResolver } from './resolver.ts'
 
 const modules = {
-    vpt: miniVptId,
     bootstrap: miniBootstrapId,
     appShell: miniAppShellId,
     appCapsule: miniAppCapsuleId,
@@ -85,7 +83,6 @@ test('resolves fixed and route-specific private IDs', () => {
         'app.js': modules.appShell,
         'comp.js': modules.componentShell,
         bootstrap: modules.bootstrap,
-        vpt: modules.vpt,
         'app-capsule': modules.appCapsule,
         'component-capsule': modules.componentCapsule,
         'custom-wrapper.js': modules.customWrapperShell,
@@ -155,7 +152,6 @@ test('retains App entries with no Page entries when no routes are configured', (
     })
     assert.deepEqual(resolver.input, {
         bootstrap: modules.bootstrap,
-        vpt: modules.vpt,
         'app.js': modules.appShell,
         'app-capsule': modules.appCapsule,
         'comp.js': modules.componentShell,

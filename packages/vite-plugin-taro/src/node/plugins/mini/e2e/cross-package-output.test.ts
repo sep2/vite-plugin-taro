@@ -6,10 +6,10 @@ import { normalizePath } from 'vite'
 import { System as createdSystem } from '../../../../runtime/mini/systemjs/system-core.js'
 import {
     classifyMiniModule,
+    miniAppShellId,
     miniBootstrapId,
     miniTransportId,
-    miniTransportOutputPath,
-    miniVptId
+    miniTransportOutputPath
 } from '../module/module.ts'
 import { createTransportOutput } from '../output/create-transport-output.ts'
 import { createPlacement, type Placement } from '../placer/placement.ts'
@@ -62,13 +62,13 @@ const deepStaticId = '/cross-package/deep-static.js'
 const largeLazyModuleIds: ReadonlySet<string> = new Set([subpackageAId, subpackageBId, nestedDynamicId, deepDynamicId])
 
 const modules: Readonly<Record<string, string>> = {
-    // The loader resolves the generated table before vpt or application capsules use it.
+    // The loader resolves the generated table before native shells or application capsules use it.
     [miniBootstrapId]: `
         import { transport } from ${JSON.stringify(miniTransportId)}
         export const System = fixtureSystem
         System.instantiate = transport
     `,
-    [miniVptId]: `
+    [miniAppShellId]: `
         export { System } from ${JSON.stringify(miniBootstrapId)}
         export const loadSubpackage = () => import('${subpackageAId}')
         export const loadById = (id) => import(/* @vite-ignore */ id)
@@ -216,7 +216,7 @@ async function buildCrossPackageOutput(): Promise<CrossPackageOutput> {
     const result = await build({
         input: {
             application: applicationId,
-            native: miniVptId,
+            native: miniAppShellId,
             bootstrap: miniBootstrapId,
             // Keep this shared source in its own file to exercise a real common/transport.js beside common/vpt/transport.js.
             transport: mainDependencyId
@@ -352,7 +352,7 @@ test('executes a complex nested static and dynamic graph across production wx su
         nativeEntry && typeof nativeEntry === 'object' && 'loadSubpackage' in nativeEntry && 'loadById' in nativeEntry
     )
     assert.ok(typeof nativeEntry.loadSubpackage === 'function' && typeof nativeEntry.loadById === 'function')
-    assert.equal(classifyModule(output.nativeEntry), 'amphibious')
+    assert.equal(classifyModule(output.nativeEntry), 'native')
 
     const application = system.importSync(output.application.fileName)
     const readMain = application.readMain

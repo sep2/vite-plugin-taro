@@ -122,15 +122,20 @@ function requireChunk(output: BuildOutput, fileName: string): OutputChunk {
     return chunk
 }
 
-/** Native shells share VPT and use bootstrap rather than an ambient System binding. */
+/** Native shells share one bootstrap entry rather than a separate facade or ambient System binding. */
 function assertNativeShells(output: BuildOutput): void {
+    assert.equal(
+        output.some((file) => file.fileName === 'common/vpt.js'),
+        false,
+        'no redundant runtime facade'
+    )
     const transport = requireAsset(output, 'common/vpt/transport.js')
     requireChunk(output, 'common/vpt/global.js')
     assert.doesNotMatch(String(transport.source), /registerModule|case ["']common\/vpt\//)
     assert.match(requireChunk(output, 'common/bootstrap.js').code, /require\(["']\.\/vpt\/transport\.js["']\)/)
     for (const fileName of ['app.js', 'pages/home/index.js', 'comp.js', 'custom-wrapper.js']) {
         const { code } = requireChunk(output, fileName)
-        assert.equal([...code.matchAll(/\brequire\(["'](?:\.\.?\/)+common\/vpt\.js["']\)/g)].length, 1, fileName)
+        assert.doesNotMatch(code, /common\/vpt\.js/)
         assert.equal([...code.matchAll(/\brequire\(["'](?:\.\.?\/)+common\/bootstrap\.js["']\)/g)].length, 1, fileName)
         assert.match(code, /\.System\.importSync/)
         assert.doesNotMatch(code, /(?:globalThis|wx|my)\.System\.importSync/)
@@ -198,12 +203,12 @@ function assertPageRegistration(output: BuildOutput, target: VptTarget, route: s
         )
         return module.exports
     }
-    const runtime = load('common/vpt.js')
+    const runtime = load('common/bootstrap.js')
     assert.ok(runtime && typeof runtime === 'object')
     assert.equal(typeof Reflect.get(runtime, 'getPageQuery'), 'function')
     assert.equal(Object.hasOwn(runtime, 'prerenderToData'), false, 'prerendering belongs to the capsule')
     assert.equal(Object.hasOwn(runtime, 'Page'), false, 'native Page needs no exported adapter')
-    // Source selection, bundling, VPT and registration execute for real.
+    // Source selection, bundling, bootstrap and registration execute for real.
     const system = Reflect.get(runtime, 'System')
     const importSync = system.importSync.bind(system)
     system.importSync = (id: string) => {
@@ -363,7 +368,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
     }
 }
 
-test('minified WX VPT initializes bootstrap and query capture before the Page capsule', async () => {
+test('minified WX bootstrap initializes the loader and query capture before the Page capsule', async () => {
     await inspectFixtureBuild(
         {
             options: createOptions('wx'),

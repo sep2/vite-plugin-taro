@@ -4,10 +4,7 @@ import { normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { packageRequire, resolveTaroRuntime, resolveVptRuntime } from '../../../utils/packages.ts'
 
-/** Supplies initialized loader exports and native query capture to shells and capsules. */
-export const miniVptId = resolveVptRuntime('mini/amphibious/vpt')
-
-/** Installs SystemJS, transport, and polyfills without importing native query capture or application capsules. */
+/** Initializes SystemJS, transport, polyfills and native query capture before application capsules. */
 export const miniBootstrapId = resolveVptRuntime('mini/amphibious/bootstrap')
 
 /** Registers the native App using its generated configuration capsule. */
@@ -110,7 +107,6 @@ const moduleKindById: ReadonlyMap<string, MiniChunkKind> = new Map([
     [miniAppCapsuleId, 'entry-capsule'],
     [miniComponentCapsuleId, 'entry-capsule'],
     [miniPageCapsuleId, 'entry-capsule'],
-    [miniVptId, 'amphibious'],
     [miniBootstrapId, 'amphibious'],
     [vptGlobalBindingId, 'amphibious'],
     [miniPolyfillsId, 'amphibious'],

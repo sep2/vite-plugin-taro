@@ -13,6 +13,9 @@ import { transport } from '\0vpt:mini-transport'
 // Install the minimal SystemJS loader and its synchronous-import extension before any native entry requests a capsule.
 import { System as createdSystem } from '../systemjs/system-core.js'
 
+// Install native query capture before App/Page capsules evaluate.
+export { getPageQuery } from './get-page-query.ts'
+
 // install the System on globalThis
 globalThis.System = createdSystem
 
