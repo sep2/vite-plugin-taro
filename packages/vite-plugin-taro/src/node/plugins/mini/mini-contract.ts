@@ -8,9 +8,8 @@ export type TaroContract = {
     targetRuntimePath: string
 }
 
-/** Native Page constructor and development runtimes selected once by the target. */
+/** Development runtimes selected once by the target. */
 export type RuntimeContract = {
-    pageConstructor: string
     devtoolsHmrRuntime: string
     interpreterHmrRuntime: string
 }

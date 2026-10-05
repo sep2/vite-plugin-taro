@@ -3,16 +3,10 @@ declare module '\0vpt:global-binding' {
     export const vptGlobal: typeof globalThis
 }
 
-/** Ordinary route config consumed by the shared native Page shell. */
+/** Final native route config, with an object or data factory selected by its capsule. */
 declare module '\0vpt:page-capsule' {
-    const config: ReturnType<typeof import('./capsule/create-page-config.ts').createPageConfig>
+    const config: typeof import('./capsule/page.ts').default
     export default config
-}
-
-/** Platform constructor selected by the Mini runtime contract. */
-declare module 'vpt:mini-page-constructor' {
-    const Page: typeof import('../mini/native/mini-page-constructor.ts').default
-    export default Page
 }
 
 /** Native routing table generated from finalized chunk paths rather than bundled as a source module. */

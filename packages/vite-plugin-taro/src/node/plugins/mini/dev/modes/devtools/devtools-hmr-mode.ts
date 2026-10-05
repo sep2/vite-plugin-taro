@@ -98,7 +98,7 @@ function createDevtoolsPagePlugin(): Plugin {
 }
 
 /**
- * Hands off the static Taro config before the selected constructor adapts or registers it.
+ * Prepares the capsule's final config immediately before the native shell registers it.
  * The shared shell owns this one registration call; no platform choice or import-source parsing belongs in HMR.
  */
 export function injectPageShellHmr(code: string): { code: string; map: null } {

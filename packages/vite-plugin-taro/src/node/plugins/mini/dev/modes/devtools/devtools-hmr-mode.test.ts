@@ -60,8 +60,8 @@ test('creates fresh Page plugins with exact shell identity filtering', async () 
     assert.match(String(transformed.code), /injectPageHmr/)
 })
 
-test('filters only the shared shell, not the runtime or constructor', () => {
-    const pageConstructor = '/runtime/page-constructor.ts'
+test('filters only the shared shell, not the runtime or prerender helper', () => {
+    const prerenderHelper = '/runtime/prerender-to-data.ts'
     const mode = createDevtoolsHmrMode(runtimeFile)
     const transform = mode.plugins[0]?.transform
     assert.ok(transform && typeof transform === 'object')
@@ -69,8 +69,8 @@ test('filters only the shared shell, not the runtime or constructor', () => {
     assert.ok(filter instanceof RegExp)
     assert.equal(filter.test(miniPageShellId), true)
     assert.equal(filter.test(`${miniPageShellId}?route=pages%2Fhome`), true)
-    assert.equal(filter.test(pageConstructor), false)
-    assert.equal(filter.test(`${pageConstructor}?other`), false)
+    assert.equal(filter.test(prerenderHelper), false)
+    assert.equal(filter.test(`${prerenderHelper}?other`), false)
     assert.equal(filter.test(runtimeFile), false)
 })
 
@@ -82,7 +82,7 @@ test('injects Page HMR immediately before native registration', () => {
 })
 
 test('rejects a native Page shell without the stable registration contract', () => {
-    assert.throws(() => injectPageShellHmr('Page(config)'), /must register pageConfig/)
+    assert.throws(() => injectPageShellHmr('export default pageConfig'), /must register pageConfig/)
 })
 
 test('renders initial and cumulative patches as inert CommonJS data', () => {

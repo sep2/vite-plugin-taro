@@ -4,10 +4,10 @@ import { normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { packageRequire, resolveTaroRuntime, resolveVptRuntime } from '../../../utils/packages.ts'
 
-/** Supplies initialized loader exports and the target's Page constructor to native shells. */
+/** Supplies initialized loader exports and native query capture to shells and capsules. */
 export const miniVptId = resolveVptRuntime('mini/amphibious/vpt')
 
-/** Installs SystemJS, transport, and polyfills without importing constructors or application capsules. */
+/** Installs SystemJS, transport, and polyfills without importing native query capture or application capsules. */
 export const miniBootstrapId = resolveVptRuntime('mini/amphibious/bootstrap')
 
 /** Registers the native App using its generated configuration capsule. */
@@ -27,12 +27,6 @@ export const miniCustomWrapperShellId = resolveVptRuntime('mini/native/custom-wr
 
 /** Registers each route's native Page using its route-qualified capsule. */
 export const miniPageShellId = resolveVptRuntime('mini/native/page')
-
-/** Selects the native page constructor through the target contract. */
-export const miniPageConstructorId = 'vpt:mini-page-constructor'
-
-/** Passes Taro's flat config directly to native Page. */
-export const miniPageConstructorRuntimeId = resolveVptRuntime('mini/native/mini-page-constructor')
 
 /** Specializes each route's Page configuration and component import. */
 export const miniPageCapsuleId = resolveVptRuntime('mini/capsule/page')

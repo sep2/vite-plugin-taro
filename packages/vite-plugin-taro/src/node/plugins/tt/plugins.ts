@@ -2,7 +2,6 @@ import type { PluginOption } from 'vite'
 import type { VptOptions } from '../../../options.ts'
 import { resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
-import { miniPageConstructorRuntimeId } from '../mini/module/module.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
 import { createTtSkeleton } from './create-tt-skeleton.ts'
 
@@ -21,7 +20,6 @@ export function createTtMiniContract(options: VptOptions): MiniContract {
             targetRuntimePath: resolveVptRuntime('tt/taro-runtime')
         },
         runtime: {
-            pageConstructor: miniPageConstructorRuntimeId,
             devtoolsHmrRuntime: resolveVptRuntime('tt/dev/devtools-runtime'),
             interpreterHmrRuntime: resolveVptRuntime('tt/dev/interpreter-runtime')
         },

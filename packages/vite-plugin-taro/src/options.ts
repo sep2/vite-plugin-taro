@@ -44,8 +44,8 @@ export type VptPageOption = {
     config?: VptPageConfig
 
     /**
-     * Opts this WX glass-easel page into synchronous prerendering through its native data factory.
-     * Disabled unless true; ignored on other targets. Rendering and effects may run before native onLoad.
+     * Registers a native Page data factory for synchronous prerendering; disabled unless true.
+     * Requires host data-factory support (WX glass-easel). Rendering and effects may run before native onLoad.
      */
     prerender?: boolean
 }

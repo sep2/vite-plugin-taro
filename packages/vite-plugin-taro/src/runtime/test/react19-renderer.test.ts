@@ -95,24 +95,24 @@ async function runFixture(t: TestContext, target: 'wx' | 'zfb' | 'tt', mode: str
                         if (id === './app.ts') {
                             return 'test:empty'
                         }
-                        if (id === './taro-runtime.ts') {
-                            return path.join(path.dirname(entry), '../mini/capsule/create-page-config.ts')
+                        if (id === './create-vpt-page-config.ts') {
+                            return path.join(path.dirname(entry), '../mini/capsule/create-vpt-page-config.ts')
+                        }
+                        if (id === './prerender-to-data.ts') {
+                            return path.join(path.dirname(entry), '../mini/capsule/prerender-to-data.ts')
                         }
                     }
-                    if (id === 'test:prerender') {
-                        return path.join(path.dirname(entry), '../wx/native/prerender-to-data.ts')
-                    }
-                    if (id === './get-wx-page-query.ts') {
+                    if (id === '../amphibious/vpt.ts') {
                         return 'test:page-query'
                     }
                 },
                 async load(id) {
                     const route = routes.get(id)
                     if (route) {
-                        return capsuleSource
-                            .replaceAll('__VPT_PAGE_PATH__', JSON.stringify(route))
-                            .replaceAll('__VPT_PAGE_CONFIG__', '{}')
-                            .replaceAll('__VPT_PAGE_PRERENDER__', 'true')
+                        return capsuleSource.replaceAll(
+                            '__VPT_PAGE_OPTIONS__',
+                            JSON.stringify({ path: route, prerender: true })
+                        )
                     }
                     if (id === 'test:empty') {
                         return ''
@@ -121,7 +121,7 @@ async function runFixture(t: TestContext, target: 'wx' | 'zfb' | 'tt', mode: str
                         return 'export const vptGlobal = global'
                     }
                     if (id === 'test:page-query') {
-                        return 'export const getWxPageQuery = () => globalThis.pageQuery'
+                        return 'export const getPageQuery = () => globalThis.pageQuery'
                     }
                     if (id.startsWith('test:component:')) {
                         // Keep each capsule's component identity stable while the fixture supplies its hook-rich body.
@@ -188,11 +188,10 @@ import { Current, document, eventHandler, hooks, createPageConfig as createTaroP
 import config from 'test:page-first-frame.ts'
 import suspendedConfig from 'test:page-suspended.ts'
 import bareConfig from 'test:page-bare.ts'
-import { prerenderToData as prerenderConfig } from 'test:prerender'
 // This fixture-local query models the native routing input for each independent data callback.
 function renderInitialData(config, query) {
     globalThis.pageQuery = query
-    return prerenderConfig(config)
+    return config.data()
 }
 const prerenderToData = query => renderInitialData(config, query)
 const prerenderSuspended = query => renderInitialData(suspendedConfig, query)
@@ -379,7 +378,7 @@ function checkPageConfigData() {
     assert.equal(Object.getOwnPropertyDescriptor(config, '__vpt_meta').enumerable, false)
     assert.equal(Object.hasOwn({ ...config }, '__vpt_meta'), false)
     assert.equal(config.__vpt_meta.prerenderIdentity, undefined)
-    assert.equal(typeof config.data, 'object')
+    assert.equal(typeof config.data, 'function')
     assert.equal(typeof prerenderToData, 'function')
 }
 
@@ -437,16 +436,20 @@ async function checkNativeInitialData() {
         appId: 'first-frame-app', componentFramework: 'glass-easel'
     })
     pageComponents['pages/first-frame'] = Page
-    assert.deepEqual(config.data, seed())
-
+    const dataFactory = config.data
     const metadata = config.__vpt_meta
+    // Read the retained seed without rendering, then restore ordinary per-instance prerendering.
+    metadata.skipPrerender = true
+    const initialData = dataFactory()
+    metadata.skipPrerender = false
+    assert.deepEqual(initialData, seed())
     const sourceData = prerenderToData({ id: 'source', full: 'a%3Db' })
     const initialRouter = Current.router
     const initialPage = metadata.prerenderIdentity
     assert.equal(initialPage.path, initialRouter.$taroPath)
     assert.strictEqual(initialPage.params, initialRouter.params)
-    assert.deepEqual(config.data, seed(), 'native initialization does not replace the public data object')
-    assert.strictEqual(sourceData, config.data, 'cold startup keeps the seed and mounts asynchronously')
+    assert.strictEqual(config.data, dataFactory, 'native initialization preserves the capsule data factory')
+    assert.strictEqual(sourceData, initialData, 'cold startup keeps the seed and mounts asynchronously')
     assert.equal(setAppValue, undefined, 'prerender must not force App initialization')
     assert.deepEqual(initialized, [])
     assert.deepEqual(effects, [])

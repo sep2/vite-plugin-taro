@@ -331,12 +331,11 @@ test('creates WX App and recursive component capsules only after App initializat
     assert.strictEqual(exports.customWrapperConfig, customWrapperConfig)
 })
 
-test('creates the Mini Program Page capsule with the transparent App collection seed', async () => {
-    // This mutable journal captures App-before-Page initialization and the exact recursive projection seed.
+test('creates the Mini Program Page capsule after App initialization with one options object', async () => {
+    // This mutable journal captures App-before-Page initialization and the two-argument factory contract.
     const calls: Call[] = []
     const appConfigInput = { pages: ['pages/home/index'] }
-    const pageConfigInput = { navigationBarTitleText: 'Home' }
-    const pagePath = 'pages/home/index'
+    const vptPageOptions = { path: 'pages/home/index', config: { navigationBarTitleText: 'Home' } }
     const appConfig = { kind: 'app-config' }
     const pageConfig = { kind: 'page-config' }
     const AppComponent = { kind: 'AppComponent' }
@@ -345,14 +344,13 @@ test('creates the Mini Program Page capsule with the transparent App collection 
     const ReactDOM = { kind: 'ReactDOM' }
     const harness = {
         appConfigInput,
-        pageConfigInput,
-        pagePath,
+        vptPageOptions,
         AppComponent,
         PageComponent,
         React,
         ReactDOM,
         createReactApp: recordCall(calls, 'createReactApp', appConfig),
-        createPageConfig: recordCall(calls, 'createPageConfig', pageConfig)
+        createVptPageConfig: recordCall(calls, 'createVptPageConfig', pageConfig)
     }
     const code = await bundleRuntimeEntry({
         entry: 'mini/capsule/page.ts',
@@ -361,9 +359,11 @@ test('creates the Mini Program Page capsule with the transparent App collection 
                 const harness = globalThis.harness
                 export const ReactDOM = harness.ReactDOM
                 export const createReactApp = harness.createReactApp
-                export const createPageConfig = harness.createPageConfig
             `,
+            './create-vpt-page-config.ts': 'export const createVptPageConfig = globalThis.harness.createVptPageConfig',
             'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
+            './prerender-to-data.ts':
+                'export const prerenderToData = () => { throw new Error("Unexpected prerender") }',
             react: 'export const createElement = () => undefined; export default globalThis.harness.React',
             '\0vpt:app-component': 'export default globalThis.harness.AppComponent',
             '\0vpt:global-binding': 'export const vptGlobal = globalThis',
@@ -371,9 +371,7 @@ test('creates the Mini Program Page capsule with the transparent App collection 
         },
         defines: {
             __VPT_APP_CONFIG__: 'globalThis.harness.appConfigInput',
-            __VPT_PAGE_CONFIG__: 'globalThis.harness.pageConfigInput',
-            __VPT_PAGE_PATH__: 'globalThis.harness.pagePath',
-            __VPT_PAGE_PRERENDER__: 'false'
+            __VPT_PAGE_OPTIONS__: 'globalThis.harness.vptPageOptions'
         }
     })
 
@@ -382,17 +380,11 @@ test('creates the Mini Program Page capsule with the transparent App collection 
     assert.strictEqual(exports.default, pageConfig)
     assert.deepEqual(
         calls.map(({ name }) => name),
-        ['createReactApp', 'createPageConfig']
+        ['createReactApp', 'createVptPageConfig']
     )
-    assert.equal(calls[1]?.args.length, 5)
-    assert.equal(calls[1]?.args[4], false)
     assert.deepEqual(Object.keys(exports), ['default'])
-    assert.deepEqual(calls[1]?.args.slice(0, 4), [
-        PageComponent,
-        pagePath,
-        { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } },
-        pageConfigInput
-    ])
+    assert.deepEqual(calls[1]?.args, [PageComponent, vptPageOptions])
+    assert.strictEqual(calls[1]?.args[1], vptPageOptions)
 })
 
 test('prerender stores its identity inside the non-enumerable VPT metadata', async () => {
@@ -405,12 +397,12 @@ test('prerender stores its identity inside the non-enumerable VPT metadata', asy
         entry: 'test/prerender-fixture.ts',
         mocks: {
             [path.join(runtimeRoot, 'test/prerender-fixture.ts')]: `
-                export { createPageConfig } from ${JSON.stringify(path.join(runtimeRoot, 'mini/capsule/create-page-config.ts'))}
-                export { prerenderToData } from ${JSON.stringify(path.join(runtimeRoot, 'wx/native/prerender-to-data.ts'))}
+                export { createVptPageConfig } from ${JSON.stringify(path.join(runtimeRoot, 'mini/capsule/create-vpt-page-config.ts'))}
+                export { prerenderToData } from ${JSON.stringify(path.join(runtimeRoot, 'mini/capsule/prerender-to-data.ts'))}
             `,
             'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
             'vite-plugin-taro-runtime/react': 'export const flushSync = globalThis.harness.flushSync',
-            './get-wx-page-query.ts': 'export const getWxPageQuery = () => ({ id: "example" })'
+            '../amphibious/vpt.ts': 'export const getPageQuery = () => ({ id: "example" })'
         },
         defines: {}
     })
@@ -445,22 +437,15 @@ test('prerender stores its identity inside the non-enumerable VPT metadata', asy
                 return { cn: value.cn }
             }
         }
-        const { createPageConfig, prerenderToData } = executeRuntimeEntry(code, createExecutionContext(harness))
-        assert.ok(typeof createPageConfig === 'function')
+        const { createVptPageConfig, prerenderToData } = executeRuntimeEntry(code, createExecutionContext(harness))
+        assert.ok(typeof createVptPageConfig === 'function')
         assert.ok(typeof prerenderToData === 'function')
-        const config = createPageConfig(
-            component,
-            'pages/example',
-            { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } },
-            {},
-            true
-        )
+        const config = createVptPageConfig(component, { path: 'pages/example' })
         assert.equal(Object.getOwnPropertyDescriptor(config, '__vpt_meta')?.enumerable, false)
         assert.equal(Object.hasOwn({ ...config }, '__vpt_meta'), false)
         assert.deepEqual(Object.keys(config), ['data'])
         assert.strictEqual(config.__vpt_meta.component, component)
         assert.equal(config.__vpt_meta.route, 'pages/example')
-        assert.equal(config.__vpt_meta.prerender, true)
         assert.equal(config.__vpt_meta.skipPrerender, false)
         assert.equal(config.__vpt_meta.prerenderIdentity, undefined)
         assert.deepEqual(Object.getOwnPropertyNames(config), ['data', '__vpt_meta'])
@@ -474,9 +459,17 @@ test('prerender stores its identity inside the non-enumerable VPT metadata', asy
         assert.equal(Object.hasOwn(config, 'prerenderToData'), false)
         assert.equal(calls[0]?.args.length, 4, 'no identity-reader argument is added to createPageConfig')
 
-        // Observe per-instance work only after config construction has completed.
+        // Skipped HMR registration must preserve the seed and leave routing and rendering untouched.
         calls.length = 0
-        const result = prerenderToData(config)
+        const previousRouter = Reflect.get(harness.Current, 'router')
+        config.__vpt_meta.skipPrerender = true
+        assert.strictEqual(prerenderToData(config, seed), seed)
+        assert.strictEqual(Reflect.get(harness.Current, 'router'), previousRouter)
+        assert.equal(config.__vpt_meta.prerenderIdentity, undefined)
+        assert.deepEqual(calls, [])
+        config.__vpt_meta.skipPrerender = false
+
+        const result = prerenderToData(config, seed)
         const router = Reflect.get(harness.Current, 'router')
         const initialPage = config.__vpt_meta.prerenderIdentity
         assert.deepEqual(initialPage, { path: 'pages/example?instance=1', params: router.params })
@@ -504,7 +497,7 @@ test('prerender stores its identity inside the non-enumerable VPT metadata', asy
             assert.equal(calls.length, 4)
         }
         assert.deepEqual(seed, { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } })
-        prerenderToData(config)
+        prerenderToData(config, seed)
         assert.equal(
             config.__vpt_meta.prerenderIdentity.path,
             'pages/example?instance=2',
@@ -540,15 +533,14 @@ test('mounts the current Page export instead of the cold native capsule baseline
         entry: 'mini/capsule/page.ts',
         mocks: {
             './app.ts': '',
+            './prerender-to-data.ts':
+                'export const prerenderToData = () => { throw new Error("Unexpected prerender") }',
             'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
-            './taro-runtime.ts': `export { createPageConfig } from ${JSON.stringify(path.join(runtimeRoot, 'mini/capsule/create-page-config.ts'))}`,
             '\0vpt:global-binding': 'export const vptGlobal = globalThis',
             '\0vpt:page-component': 'export default globalThis.harness.PageComponent'
         },
         defines: {
-            __VPT_PAGE_PATH__: "'pages/home/index'",
-            __VPT_PAGE_CONFIG__: '{}',
-            __VPT_PAGE_PRERENDER__: 'false'
+            __VPT_PAGE_OPTIONS__: JSON.stringify({ path: 'pages/home/index' })
         },
         servePageModuleId: 'src/pages/home/index.tsx'
     })
@@ -563,7 +555,6 @@ test('mounts the current Page export instead of the cold native capsule baseline
     )
     assert.ok(exports.default && typeof exports.default === 'object')
     assert.strictEqual(Reflect.get(exports.default, '__vpt_meta').component, LatestPage)
-    assert.equal(Reflect.get(exports.default, '__vpt_meta').prerender, false)
     assert.equal(Object.hasOwn(exports, 'prerenderToData'), false)
 })
 
@@ -572,14 +563,12 @@ test('preserves WX capsule runtime initialization order and export identities', 
     const events: string[] = []
     const createReactApp = () => undefined
     const ReactDOM = {}
-    const createPageConfig = () => undefined
     const createRecursiveComponentConfig = () => undefined
     const customWrapperCache = new Map()
     const harness = {
         events,
         createReactApp,
         ReactDOM,
-        createPageConfig,
         createRecursiveComponentConfig,
         customWrapperCache
     }
@@ -596,10 +585,8 @@ test('preserves WX capsule runtime initialization order and export identities', 
                 globalThis.harness.events.push('react-dom')
                 export default globalThis.harness.ReactDOM
             `,
-            './create-page-config.ts': 'export const createPageConfig = globalThis.harness.createPageConfig',
             'vite-plugin-taro-runtime/runtime/mini': `
                 globalThis.harness.events.push('taro-runtime')
-                export const createPageConfig = globalThis.harness.createPageConfig
                 export const createRecursiveComponentConfig = globalThis.harness.createRecursiveComponentConfig
                 export const customWrapperCache = globalThis.harness.customWrapperCache
             `
@@ -615,7 +602,7 @@ test('preserves WX capsule runtime initialization order and export identities', 
     assert.strictEqual(Reflect.get(context.globalThis, Symbol.for('customWrapperCache')), customWrapperCache)
     assert.strictEqual(exports.createReactApp, createReactApp)
     assert.strictEqual(exports.ReactDOM, ReactDOM)
-    assert.strictEqual(exports.createPageConfig, createPageConfig)
+    assert.equal(Object.hasOwn(exports, 'createVptPageConfig'), false)
     assert.strictEqual(exports.createRecursiveComponentConfig, createRecursiveComponentConfig)
 })
 
@@ -676,17 +663,12 @@ test('registers native App and component shells after the VPT runtime', async ()
     }
 })
 
-test('platform Page shells preserve onLoad timing and full queries', async () => {
-    for (const [pageConstructor, prerender, dataFactory] of [
-        ['wx/native/wx-page-constructor.ts', false, false],
-        ['wx/native/wx-page-constructor.ts', true, true],
-        ['mini/native/mini-page-constructor.ts', false, false],
-        ['mini/native/mini-page-constructor.ts', true, false]
-    ] as const) {
-        // Each shell records dependency initialization, native registration and deferred lifecycles independently.
+test('createVptPageConfig selects native data form without copying the config', async (t) => {
+    for (const prerender of [undefined, false, true]) {
+        // This journal distinguishes capsule construction from data creation and ordinary native lifecycles.
         const calls: Call[] = []
-        const initialization = 'constructor'
         const page = { data: { count: 0 } }
+        const renderedData = { count: 1 }
         const query = { id: '42', undeclared: 'full-query', scene: 'a=b' }
         const share = { title: 'Shared page', path: '/pages/home/index?id=42' }
         const config = {
@@ -701,57 +683,70 @@ test('platform Page shells preserve onLoad timing and full queries', async () =>
             onShareAppMessage: () => share,
             eh: recordCall(calls, 'event', undefined)
         } satisfies PageInstance
-        Object.defineProperty(config, '__vpt_meta', {
-            value: {
-                component: () => null,
-                route: 'pages/home/index',
-                prerender,
-                skipPrerender: false,
-                prerenderIdentity: { path: 'pages/home/index?instance=1', params: query }
+        const initialPage = { path: 'pages/home/index?instance=1', params: query }
+        const prerenderToData = t.mock.fn((value: unknown, data: unknown) => {
+            assert.strictEqual(value, config, 'prerender uses the original Taro config')
+            assert.strictEqual(data, calls[1]?.args[2], 'the factory passes the captured seed, not config.data')
+            return renderedData
+        })
+        const code = await bundleRuntimeEntry({
+            entry: 'mini/capsule/page.ts',
+            mocks: {
+                './app.ts': 'globalThis.harness.initialize()',
+                'vite-plugin-taro-runtime/runtime/mini':
+                    'export const createPageConfig = globalThis.harness.createPageConfig',
+                './prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData',
+                '\0vpt:page-component': 'export default () => null'
+            },
+            defines: {
+                __VPT_PAGE_OPTIONS__: JSON.stringify({ path: 'pages/home/index', config: {}, prerender })
             }
         })
-        Object.freeze(config)
-        const code = await bundleRuntimeEntry({
-            entry: 'mini/native/page.ts',
-            mocks: {
-                '../amphibious/vpt.ts': `
-                    export { default as Page } from ${JSON.stringify(path.join(runtimeRoot, pageConstructor))}
-                    globalThis.harness.initialize()
-                `,
-                './prerender-to-data.ts': 'export const prerenderToData = config => config.data',
-                '\0vpt:page-capsule': 'export default globalThis.harness.config'
-            },
-            defines: {}
-        })
         const harness = {
-            config,
-            initialize: recordCall(calls, initialization, undefined)
+            prerenderToData,
+            initialize: recordCall(calls, 'initialize', undefined),
+            createPageConfig: recordCall(calls, 'createPageConfig', config)
         }
-        const context = {
-            ...createExecutionContext(harness),
-            Page: recordCall(calls, 'Page', undefined)
-        }
-        executeRuntimeEntry(code, context)
+        const nativeConfig = executeRuntimeEntry(code, createExecutionContext(harness)).default
+        assert.ok(nativeConfig && typeof nativeConfig === 'object')
+        assert.strictEqual(nativeConfig, config, 'both data forms retain the original config identity')
+        const seed = calls[1]?.args[2]
+        assert.deepEqual(seed, { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } })
+        const metadata = Reflect.get(config, '__vpt_meta')
+        assert.equal(metadata.skipPrerender, false)
+        // Configuration and registration must not consume a pending native-instance identity.
+        metadata.prerenderIdentity = initialPage
+        Object.freeze(metadata)
+        Object.freeze(config)
         assert.deepEqual(
             calls.map(({ name }) => name),
-            [initialization, 'Page']
+            ['initialize', 'createPageConfig']
         )
-        assert.doesNotMatch(code, /process\.env|registerPage/)
-        const registered = calls[1]?.args[0]
-        assert.ok(registered && typeof registered === 'object')
-        if (dataFactory) {
-            const data = Reflect.get(registered, 'data')
-            assert.equal(typeof data, 'function')
-            assert.strictEqual(data(), config.data)
-            assert.deepEqual(registered, { ...config, data })
-            assert.equal(Object.hasOwn(registered, '__vpt_meta'), false)
+        assert.equal(calls[1]?.args.length, 4, 'the upstream Taro factory signature is unchanged')
+        assert.equal(prerenderToData.mock.callCount(), 0, 'capsule evaluation must not render')
+        assert.doesNotMatch(code, /process\.env|\bwx\b|registerPage/)
+        if (prerender) {
+            const data: unknown = Reflect.get(nativeConfig, 'data')
+            assert.ok(typeof data === 'function')
+            assert.strictEqual(data(), renderedData)
+            assert.equal(prerenderToData.mock.callCount(), 1)
+            assert.strictEqual(config.data, data, 'the original config owns the data factory')
         } else {
-            assert.strictEqual(registered, config)
+            assert.strictEqual(config.data, seed, 'ordinary pages keep their data object')
         }
-        assert.strictEqual(Reflect.get(registered, 'onLoad'), config.onLoad)
-        Reflect.get(registered, 'onLoad').call(page, query)
-        assert.strictEqual(Reflect.get(registered, 'onShareAppMessage')(), share)
-        Reflect.get(registered, 'eh')('tap')
+        assert.deepEqual(seed, { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } })
+        assert.strictEqual(
+            Reflect.get(nativeConfig, '__vpt_meta'),
+            metadata,
+            'onLoad and prerender share identity storage'
+        )
+        assert.equal(Object.getOwnPropertyDescriptor(nativeConfig, '__vpt_meta')?.enumerable, false)
+        assert.equal(Object.hasOwn({ ...nativeConfig }, '__vpt_meta'), false)
+        assert.strictEqual(metadata.prerenderIdentity, initialPage, 'configuration must not consume prepared identity')
+        assert.strictEqual(Reflect.get(nativeConfig, 'onLoad'), config.onLoad)
+        Reflect.get(nativeConfig, 'onLoad').call(page, query)
+        assert.strictEqual(Reflect.get(nativeConfig, 'onShareAppMessage')(), share)
+        Reflect.get(nativeConfig, 'eh')('tap')
         assert.deepEqual(calls.slice(2), [
             { name: 'onLoad', args: [query] },
             { name: 'event', args: ['tap'] }
@@ -759,7 +754,8 @@ test('platform Page shells preserve onLoad timing and full queries', async () =>
     }
 })
 
-test('Page data factories receive native queries without replacing navigation or dispatching lifecycles', async () => {
+test('Page data factories receive native queries captured before capsule initialization', async () => {
+    // Record listener installation, native registration and data creation without running business lifecycles.
     const calls: Call[] = []
     const factories: (() => unknown)[] = []
     const listeners: ((event: { query: Record<string, unknown> }) => void)[] = []
@@ -767,7 +763,6 @@ test('Page data factories receive native queries without replacing navigation or
         data: {},
         onLoad: recordCall(calls, 'load', undefined)
     } satisfies PageInstance
-    Object.defineProperty(config, '__vpt_meta', { value: { prerender: true, skipPrerender: false } })
     function prerenderToData(pageConfig: object, query: Record<string, unknown>) {
         assert.strictEqual(pageConfig, config)
         calls.push({ name: 'data', args: [query] })
@@ -776,17 +771,28 @@ test('Page data factories receive native queries without replacing navigation or
     const code = await bundleRuntimeEntry({
         entry: 'mini/native/page.ts',
         mocks: {
-            '../amphibious/vpt.ts': `export { default as Page } from ${JSON.stringify(path.join(runtimeRoot, 'wx/native/wx-page-constructor.ts'))}`,
+            '../amphibious/vpt.ts': `export { getPageQuery } from ${JSON.stringify(path.join(runtimeRoot, 'mini/amphibious/get-page-query.ts'))}`,
+            '\0vpt:page-capsule': `export { default } from ${JSON.stringify(path.join(runtimeRoot, 'mini/capsule/page.ts'))}`,
+            './app.ts': 'globalThis.harness.assertListenerReady()',
+            'vite-plugin-taro-runtime/runtime/mini': 'export const createPageConfig = () => globalThis.harness.config',
             './prerender-to-data.ts': `
-                import { getWxPageQuery } from ${JSON.stringify(path.join(runtimeRoot, 'wx/native/get-wx-page-query.ts'))}
-                export const prerenderToData = config => globalThis.harness.prerenderToData(config, getWxPageQuery())
+                import { getPageQuery } from '../amphibious/vpt.ts'
+                export const prerenderToData = config => globalThis.harness.prerenderToData(config, getPageQuery())
             `,
-            '\0vpt:page-capsule': 'export default globalThis.harness.config'
+            '\0vpt:page-component': 'export default () => null'
         },
-        defines: {}
+        defines: {
+            __VPT_PAGE_OPTIONS__: JSON.stringify({ path: 'pages/home/index', prerender: true })
+        }
     })
     executeRuntimeEntry(code, {
-        ...createExecutionContext({ config, prerenderToData }),
+        ...createExecutionContext({
+            config,
+            prerenderToData,
+            assertListenerReady() {
+                assert.equal(listeners.length, 1, 'native query capture must be installed before the capsule')
+            }
+        }),
         wx: {
             onBeforePageLoad(listener: (event: { query: Record<string, unknown> }) => void) {
                 listeners.push(listener)
@@ -796,13 +802,13 @@ test('Page data factories receive native queries without replacing navigation or
             assert.ok(definition && typeof definition === 'object')
             assert.deepEqual(Object.keys(definition), ['data', 'onLoad'])
             assert.strictEqual(Reflect.get(definition, 'onLoad'), config.onLoad)
+            assert.strictEqual(Reflect.get(definition, '__vpt_meta'), Reflect.get(config, '__vpt_meta'))
             factories.push(Reflect.get(definition, 'data'))
             calls.push({ name: 'register', args: [] })
         }
     })
     assert.deepEqual(calls, [{ name: 'register', args: [] }], 'registration must not render')
     assert.equal(factories.length, 1)
-    assert.equal(listeners.length, 1)
     const factory = factories[0]
     const beforePageLoad = listeners[0]
     assert.ok(factory)
@@ -821,6 +827,19 @@ test('Page data factories receive native queries without replacing navigation or
     )
 })
 
+test('native query capture does nothing when the host does not provide its API', async () => {
+    const code = await bundleRuntimeEntry({
+        entry: 'mini/amphibious/get-page-query.ts',
+        mocks: {},
+        defines: {}
+    })
+    for (const host of [{}, { wx: {} }]) {
+        const { getPageQuery } = executeRuntimeEntry(code, { ...createExecutionContext({}), ...host })
+        assert.ok(typeof getPageQuery === 'function')
+        assert.equal(getPageQuery(), undefined)
+    }
+})
+
 test('disposes only its own native query listener when the module is hot-replaced', async () => {
     type Listener = (event: { query: Record<string, unknown> }) => void
     const unrelatedListener: Listener = () => {}
@@ -828,7 +847,7 @@ test('disposes only its own native query listener when the module is hot-replace
     const listeners = new Set<Listener>([unrelatedListener])
     const disposals: (() => void)[] = []
     const code = await bundleRuntimeEntry({
-        entry: 'wx/native/get-wx-page-query.ts',
+        entry: 'mini/amphibious/get-page-query.ts',
         mocks: {},
         defines: { 'import.meta.hot': 'globalThis.harness.hot' }
     })
@@ -845,14 +864,14 @@ test('disposes only its own native query listener when the module is hot-replace
         }
     }
     for (const id of ['initial', 'replacement']) {
-        const { getWxPageQuery } = executeRuntimeEntry(code, context)
-        assert.ok(typeof getWxPageQuery === 'function')
+        const { getPageQuery } = executeRuntimeEntry(code, context)
+        assert.ok(typeof getPageQuery === 'function')
         assert.equal(listeners.size, 2, 'each generation installs exactly one listener')
         const query = { id }
         for (const listener of listeners) {
             listener({ query })
         }
-        assert.strictEqual(getWxPageQuery(), query)
+        assert.strictEqual(getPageQuery(), query)
         assert.equal(disposals.length, 1)
         const dispose = disposals.pop()
         assert.ok(dispose)
@@ -863,40 +882,56 @@ test('disposes only its own native query listener when the module is hot-replace
 
 for (const prerender of [false, true]) {
     test(`WX hot registration preserves the native Page with prerender=${prerender}`, async (t) => {
-        // Record registrations separately from real lifecycles: glass-easel hot registration does not create another instance.
+        // Glass-easel re-executes registration without re-evaluating the cached capsule or creating another instance.
         const registrations: object[] = []
         const calls: Call[] = []
-        const config = {
+        const originalConfig = {
             data: { count: 0 },
             onLoad: recordCall(calls, 'load', undefined),
             onShow: recordCall(calls, 'show', undefined),
             onUnload: recordCall(calls, 'unload', undefined)
         }
-        const metadata = Object.freeze({ prerender, skipPrerender: false })
-        Object.defineProperty(config, '__vpt_meta', { value: metadata })
-        const initialData = config.data
+        const createPageConfig = t.mock.fn((..._args: unknown[]) => originalConfig)
+        const prerenderToData = t.mock.fn((_config: unknown, data: unknown) => data)
+        const capsuleCode = await bundleRuntimeEntry({
+            entry: 'mini/capsule/page.ts',
+            mocks: {
+                './app.ts': '',
+                'vite-plugin-taro-runtime/runtime/mini':
+                    'export const createPageConfig = globalThis.harness.createPageConfig',
+                './prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData',
+                '\0vpt:page-component': 'export default () => null'
+            },
+            defines: {
+                __VPT_PAGE_OPTIONS__: JSON.stringify({ path: 'pages/home/index', config: {}, prerender })
+            }
+        })
+        const config = executeRuntimeEntry(
+            capsuleCode,
+            createExecutionContext({ createPageConfig, prerenderToData })
+        ).default
+        assert.strictEqual(config, originalConfig)
+        const initialData = createPageConfig.mock.calls[0]?.arguments[2]
+        assert.ok(initialData && typeof initialData === 'object')
+        const metadata = Object.freeze(Reflect.get(config, '__vpt_meta'))
+        const initialNativeData = Reflect.get(config, 'data')
         const code = await bundleRuntimeEntry({
             entry: 'mini/native/page.ts',
             mocks: {
-                '../amphibious/vpt.ts': `export { default as Page } from ${JSON.stringify(path.join(runtimeRoot, 'wx/native/wx-page-constructor.ts'))}`,
-                './prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData',
+                '../amphibious/vpt.ts': '',
                 '\0vpt:page-capsule': 'export default globalThis.harness.config'
             },
             defines: {},
             nativePageHmr: true
         })
-        const prerenderToData = t.mock.fn(() => initialData)
-        const harness = { config, prerenderToData }
+        const harness = { config }
         const runtime = createDevtoolsHmrRuntime(() => assert.fail('Page registration must not open an HMR socket'))
         const context = {
             ...createExecutionContext(harness),
             globalThis: { harness, __rolldown_runtime__: runtime },
             Page(value: unknown) {
-                assert.ok(value && typeof value === 'object')
-                if (!prerender) {
-                    assert.strictEqual(value, config)
-                }
-                registrations.push(value)
+                assert.strictEqual(value, config, 'the shell must register the exact exported capsule config')
+                registrations.push(config)
             }
         }
         const groupUpdates = () => assert.fail('Framework detection must not invoke the native method')
@@ -912,13 +947,9 @@ for (const prerender of [false, true]) {
 
         executeRuntimeEntry(code, context)
         const second = registrations[1]
-        assert.ok(second)
-        assert.strictEqual(
-            Reflect.get(second, 'onLoad'),
-            Reflect.get(first, 'onLoad'),
-            'lifecycle wrappers stay stable'
-        )
-        assert.strictEqual(config.data, initialData)
+        assert.strictEqual(second, first, 'hot registration reuses the capsule export')
+        assert.strictEqual(Reflect.get(config, 'data'), initialNativeData, 'HMR must preserve the data factory')
+        assert.strictEqual(originalConfig.data, initialNativeData)
         assert.deepEqual(page.data, { count: 7 })
         assert.equal(metadata.skipPrerender, false)
         assert.equal(
@@ -933,14 +964,20 @@ for (const prerender of [false, true]) {
 
         Reflect.get(first, 'onUnload').call(page)
         const nextPage = { data: { count: 0 }, groupUpdates }
-        assert.strictEqual(prerender ? Reflect.get(second, 'data')() : Reflect.get(second, 'data'), initialData)
+        const reopenedData: unknown = Reflect.get(config, 'data')
+        if (prerender) {
+            assert.ok(typeof reopenedData === 'function')
+            assert.strictEqual(reopenedData(), initialData)
+        } else {
+            assert.strictEqual(reopenedData, initialData)
+        }
         assert.equal(
             prerenderToData.mock.callCount(),
             prerender ? 2 : 0,
             'real navigation initializes its own instance'
         )
-        Reflect.get(second, 'onLoad').call(nextPage, { id: 'real-navigation' })
-        Reflect.get(second, 'onShow').call(nextPage)
+        Reflect.get(config, 'onLoad').call(nextPage, { id: 'real-navigation' })
+        Reflect.get(config, 'onShow').call(nextPage)
         assert.deepEqual(calls.slice(2), [
             { name: 'unload', args: [] },
             { name: 'load', args: [{ id: 'real-navigation' }] },
@@ -995,7 +1032,7 @@ test('loads polyfills before SystemJS, installs amphibious transport and preserv
 
     assert.deepEqual(events, ['polyfills', 'create-system'])
     assert.strictEqual(exports.System, loader)
-    assert.equal(Object.hasOwn(exports, 'getWxPageQuery'), false)
+    assert.equal(Object.hasOwn(exports, 'getPageQuery'), false)
     assert.equal(Object.hasOwn(exports, 'Page'), false)
     assert.strictEqual(languageGlobal.System, loader)
     assert.strictEqual(loader.instantiate, transport)
@@ -1003,13 +1040,13 @@ test('loads polyfills before SystemJS, installs amphibious transport and preserv
     assert.deepEqual(preloadCalls, ['load'])
 })
 
-test('VPT initializes bootstrap before evaluating and exporting the selected Page constructor', async () => {
-    // Constructor dependencies may synchronously import capsules, so record loader readiness at evaluation time.
+test('VPT initializes bootstrap before evaluating and exporting native query capture', async () => {
+    // Record loader readiness before the native module installs its shared listener.
     const events: string[] = []
     const loader = {}
-    const Page = () => assert.fail('Exporting the constructor must not register a Page')
+    const getPageQuery = () => assert.fail('Exporting query capture must not read Page data')
     const preload = () => undefined
-    const harness = { events, loader, Page, preload }
+    const harness = { events, loader, getPageQuery, preload }
     const code = await bundleRuntimeEntry({
         entry: 'mini/amphibious/vpt.ts',
         mocks: {
@@ -1019,21 +1056,23 @@ test('VPT initializes bootstrap before evaluating and exporting the selected Pag
                 export const System = globalThis.System
                 export const __vitePreload = globalThis.harness.preload
             `,
-            'vpt:mini-page-constructor': `
+            './get-page-query.ts': `
                 if (globalThis.System !== globalThis.harness.loader) {
-                    throw new Error('Constructor evaluated before the loader')
+                    throw new Error('Native query capture evaluated before the loader')
                 }
-                globalThis.harness.events.push('constructor')
-                export default globalThis.harness.Page
+                globalThis.harness.events.push('query-capture')
+                export const getPageQuery = globalThis.harness.getPageQuery
             `
         },
         defines: {}
     })
     const exports = executeRuntimeEntry(code, createExecutionContext(harness))
-    assert.deepEqual(events, ['system', 'constructor'])
+    assert.deepEqual(events, ['system', 'query-capture'])
     assert.strictEqual(exports.System, loader)
     assert.strictEqual(exports.__vitePreload, preload)
-    assert.strictEqual(exports.Page, Page)
+    assert.strictEqual(exports.getPageQuery, getPageQuery)
+    assert.equal(Object.hasOwn(exports, 'Page'), false)
+    assert.equal(Object.hasOwn(exports, 'prerenderToData'), false)
 })
 
 test('attaches Mini hooks to the original API object without invoking platform APIs', async () => {

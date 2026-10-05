@@ -1,10 +1,9 @@
 import type { Route, SpaRouterConfig } from 'vite-plugin-taro-runtime/router/types/router'
+import type { VptPageOption } from '../options.ts'
 
 declare global {
     const __VPT_H5_APP_CONFIG__: SpaRouterConfig
     const __VPT_H5_ROUTES__: Route[]
     const __VPT_APP_CONFIG__: Record<string, unknown>
-    const __VPT_PAGE_PATH__: string
-    const __VPT_PAGE_CONFIG__: Record<string, unknown>
-    const __VPT_PAGE_PRERENDER__: boolean
+    const __VPT_PAGE_OPTIONS__: VptPageOption
 }

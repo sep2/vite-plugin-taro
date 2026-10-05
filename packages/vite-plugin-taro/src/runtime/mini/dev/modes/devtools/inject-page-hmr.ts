@@ -16,7 +16,7 @@ type PageHmrState = {
 
 type HmrPageConfig = {
     __vpt_meta: { skipPrerender: boolean }
-    data: Record<string, unknown>
+    data: Record<string, unknown> | (() => Record<string, unknown>)
     onUnload?: unknown
     onLoad?: unknown
     onShow?: unknown

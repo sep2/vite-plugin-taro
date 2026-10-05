@@ -20,7 +20,6 @@ export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
             targetRuntimePath: resolveTaroRuntime('plugin-platform-weapp/runtime')
         },
         runtime: {
-            pageConstructor: resolveVptRuntime('wx/native/wx-page-constructor'),
             devtoolsHmrRuntime: resolveVptRuntime('wx/dev/devtools-runtime'),
             interpreterHmrRuntime: resolveVptRuntime('wx/dev/interpreter-runtime')
         },

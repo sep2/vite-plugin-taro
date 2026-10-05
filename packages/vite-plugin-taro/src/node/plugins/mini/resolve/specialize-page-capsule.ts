@@ -1,10 +1,7 @@
-import { getPageConfig } from '../../../utils/project-config.ts'
 import { type AstTransformResult, replaceTemplate } from '../../../utils/transform.ts'
 import type { MiniPage } from '../mini-contract.ts'
 
-const pagePathPlaceholder = '__VPT_PAGE_PATH__'
-const pageConfigPlaceholder = '__VPT_PAGE_CONFIG__'
-const pagePrerenderPlaceholder = '__VPT_PAGE_PRERENDER__'
+const pageOptionsPlaceholder = '__VPT_PAGE_OPTIONS__'
 
 /** Specializes the Page capsule for one configured route. */
 export function specializePageCapsule({
@@ -22,9 +19,11 @@ export function specializePageCapsule({
         code,
         id,
         {
-            [pagePathPlaceholder]: JSON.stringify(page.path),
-            [pageConfigPlaceholder]: JSON.stringify(getPageConfig(page)),
-            [pagePrerenderPlaceholder]: JSON.stringify(page.prerender === true)
+            [pageOptionsPlaceholder]: JSON.stringify({
+                path: page.path,
+                config: page.config,
+                prerender: page.prerender === true
+            })
         },
         sourcemap ?? false
     )

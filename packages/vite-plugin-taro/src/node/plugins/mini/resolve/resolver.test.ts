@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
 import { normalizePath } from 'vite'
-import { resolveVptRuntime } from '../../../utils/packages.ts'
 import { appComponentId } from '../../client/constant.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import {
@@ -13,8 +12,6 @@ import {
     miniComponentShellId,
     miniCustomWrapperShellId,
     miniPageCapsuleId,
-    miniPageConstructorId,
-    miniPageConstructorRuntimeId,
     miniPageShellId,
     miniTransportId,
     miniVptId,
@@ -61,13 +58,8 @@ const contract = {
         env: 'synthetic',
         componentsReactPath: '/runtime/components-react.ts',
         targetRuntimePath: '/runtime/target.ts'
-    },
-    runtime: {
-        pageConstructor: miniPageConstructorRuntimeId,
-        devtoolsHmrRuntime: '/runtime/devtools.ts',
-        interpreterHmrRuntime: '/runtime/interpreter.ts'
     }
-} satisfies Pick<MiniContract, 'options' | 'taro' | 'runtime'>
+} satisfies Pick<MiniContract, 'options' | 'taro'>
 
 test('resolves fixed and route-specific private IDs', () => {
     const resolver = createResolver(contract)
@@ -117,17 +109,6 @@ test('resolves fixed and route-specific private IDs', () => {
         resolver.resolveId(pageComponentId, pageCapsule, projectRoot),
         normalizePath(path.resolve(projectRoot, 'src/pages/home/index.tsx'))
     )
-})
-
-test('selects the constructor through the private import without changing the shared shell or capsule', () => {
-    for (const pageConstructor of [miniPageConstructorRuntimeId, resolveVptRuntime('wx/native/wx-page-constructor')]) {
-        const resolver = createResolver({ ...contract, runtime: { ...contract.runtime, pageConstructor } })
-        const shellId = `${miniPageShellId}?route=pages%2Fhome%2Findex`
-        assert.equal(resolver.resolveId(miniPageConstructorId, shellId, path.resolve('/project')), pageConstructor)
-        assert.equal(resolver.entries.pageEntries[0]?.shellId, shellId)
-        assert.equal(resolver.input['pages/home/index.js'], shellId)
-        assert.equal(resolver.entries.pageEntries[0]?.capsuleId, `${miniPageCapsuleId}?route=pages%2Fhome%2Findex`)
-    }
 })
 
 test('preserves configured Page order and reuses App/Page entries in the native input map', () => {

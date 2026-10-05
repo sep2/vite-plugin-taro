@@ -12,7 +12,6 @@ import 'vite-plugin-taro-runtime/plugin-html/runtime'
 export { createReactApp } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
 export { default as ReactDOM } from 'vite-plugin-taro-runtime/react'
 export { createRecursiveComponentConfig } from 'vite-plugin-taro-runtime/runtime/mini'
-export { createPageConfig } from './create-page-config.ts'
 
 import { customWrapperCache } from 'vite-plugin-taro-runtime/runtime/mini'
 

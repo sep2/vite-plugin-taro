@@ -113,7 +113,7 @@ path: 'pages/profile/index'
 
 ### `pages[].prerender`
 
-可选布尔值，默认关闭。省略或设为 `false` 时，微信页面直接使用普通原生 `Page` 构造器；只有显式设置为 `true` 才使用 glass-easel `Component` 的原生 data 工厂，尝试同步渲染并序列化 App/Page 首屏数据。其他目标忽略此选项。
+可选布尔值，默认关闭。省略或设为 `false` 时，直接注册原始 `Page` 配置；设为 `true` 时，尝试同步渲染并序列化 App/Page 首屏数据。
 
 ```ts
 pages: [

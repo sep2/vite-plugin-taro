@@ -11,17 +11,21 @@ import {
     incrementId,
     type MiniElementData
 } from 'vite-plugin-taro-runtime/runtime/mini'
-import type { createPageConfig } from '../../mini/capsule/create-page-config.ts'
-import { getWxPageQuery } from './get-wx-page-query.ts'
+import { getPageQuery } from '../amphibious/vpt.ts'
+import type { PageData, PrerenderPageConfig } from './create-vpt-page-config.ts'
 
 // One counter distinguishes native instances even when their route, query and creation timestamp match.
 const pageId = incrementId()
 
 /** Commits one Page into the existing App root and returns its initial native data without dispatching lifecycles. */
-export function prerenderToData(config: ReturnType<typeof createPageConfig>): Record<string, unknown> {
-    const { component, route } = config.__vpt_meta
+export function prerenderToData(config: PrerenderPageConfig, initialData: PageData): PageData {
+    const { component, route, skipPrerender } = config.__vpt_meta
 
-    const params = { ...getWxPageQuery(), $taroTimestamp: Date.now() }
+    if (skipPrerender) {
+        return initialData
+    }
+
+    const params = { ...getPageQuery(), $taroTimestamp: Date.now() }
     const path = getPath(route, { ...params, $vptPage: pageId() })
 
     // Retain this instance identity until native onLoad consumes it without remounting the Page.
@@ -37,7 +41,7 @@ export function prerenderToData(config: ReturnType<typeof createPageConfig>): Re
     }
 
     if (!Current.app?.mount) {
-        return config.data
+        return initialData
     }
 
     flushSync(() => {
@@ -48,7 +52,7 @@ export function prerenderToData(config: ReturnType<typeof createPageConfig>): Re
     const app = page?.parentNode?._root
     // Cold App startup or Suspense without a committed fallback keeps the seed until a later React commit.
     if (!page || !app) {
-        return config.data
+        return initialData
     }
 
     // Both hosts are elements; hydrate's shared return type also includes text nodes.
@@ -56,7 +60,7 @@ export function prerenderToData(config: ReturnType<typeof createPageConfig>): Re
     const pageData = hydrate(page) as MiniElementData
 
     return {
-        app: { ...config.data.app, cn: appData.cn },
-        page: { ...config.data.page, cn: pageData.cn }
+        app: { ...initialData.app, cn: appData.cn },
+        page: { ...initialData.page, cn: pageData.cn }
     }
 }

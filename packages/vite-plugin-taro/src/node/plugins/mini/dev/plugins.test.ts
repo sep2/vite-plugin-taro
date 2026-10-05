@@ -8,7 +8,6 @@ import { createMiniStylePlugin } from '../styles/plugins.ts'
 import { createMiniDevelopmentPlugin, isMiniClientEnvironment, removeDevelopmentAppStyle } from './plugins.ts'
 
 const runtimeModules = {
-    pageConstructor: '/runtime/wx-page-constructor.ts',
     devtoolsHmrRuntime: '/runtime/devtools-hmr.ts',
     interpreterHmrRuntime: '/runtime/interpreter-hmr.ts'
 } satisfies RuntimeContract
@@ -117,7 +116,7 @@ test('reports a Page capsule whose component cannot be resolved', async () => {
                     return null
                 }
             },
-            ['createPageConfig(PageComponent)', capsuleId]
+            ['createVptPageConfig(PageComponent)', capsuleId]
         ),
         /Failed to resolve Page component imported by/
     )

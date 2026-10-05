@@ -3,11 +3,11 @@ import test from 'node:test'
 import { specializePageCapsule } from './specialize-page-capsule.ts'
 
 const source = `import './app.js'
-import { createPageConfig } from './taro-runtime.js'
+import { createVptPageConfig } from './create-vpt-page-config.js'
 import PageComponent from '\0vpt:page-component'
-export default createPageConfig(PageComponent, __VPT_PAGE_PATH__, undefined, __VPT_PAGE_CONFIG__, __VPT_PAGE_PRERENDER__)`
+export default createVptPageConfig(PageComponent, __VPT_PAGE_OPTIONS__)`
 
-test('specializes the Page capsule for one route', () => {
+test('specializes the Page capsule with one options object', () => {
     const id = '/plugin/runtime/mini/capsule/page.js?route=pages%2Fhome%2Findex'
     const result = specializePageCapsule({
         code: source,
@@ -31,64 +31,59 @@ test('specializes the Page capsule for one route', () => {
     assert.ok(result.map.mappings)
 })
 
-test('specializes an omitted Page configuration as an empty object', () => {
+test('preserves omitted native config and defaults prerender to false', () => {
     const result = specializePageCapsule({
-        code: source,
+        code: 'const options = __VPT_PAGE_OPTIONS__',
         id: '/plugin/runtime/mini/capsule/page.js?route=pages%2Fplain%2Findex',
-        page: {
-            path: 'pages/plain/index'
-        }
+        page: { path: 'pages/plain/index' }
     })
 
-    assert.match(result.code, /["']pages\/plain\/index["'], undefined, \{\}, false\)/)
+    const options: unknown = Function(`${result.code}; return options`)()
+    assert.deepEqual(options, { path: 'pages/plain/index', prerender: false })
     assert.equal(result.map, null)
 })
 
 for (const prerender of [undefined, false, true]) {
     test(`specializes Page prerender=${prerender} independently of native config`, () => {
+        const page = {
+            path: 'pages/detail/index',
+            ...(prerender === undefined ? {} : { prerender }),
+            config: { title: 'Detail' }
+        }
         const result = specializePageCapsule({
-            code: 'const args = [__VPT_PAGE_PATH__, __VPT_PAGE_CONFIG__, __VPT_PAGE_PRERENDER__]',
+            code: 'const options = __VPT_PAGE_OPTIONS__',
             id: '/runtime/page.ts',
-            page: {
-                path: 'pages/detail/index',
-                ...(prerender === undefined ? {} : { prerender }),
-                config: { title: 'Detail' }
-            }
+            page
         })
-        const args: unknown = Function(`${result.code}; return args`)()
-        assert.deepEqual(args, ['pages/detail/index', { title: 'Detail' }, prerender === true])
+        const options: unknown = Function(`${result.code}; return options`)()
+        assert.deepEqual(options, { ...page, prerender: prerender === true })
     })
 }
 
-test('preserves Page paths and configuration containing quotes and other reserved slot names', () => {
+test('preserves quotes and the reserved slot name inside Page options', () => {
     const page = {
-        path: 'pages/"__VPT_PAGE_CONFIG__/index',
-        config: { title: '__VPT_PAGE_PATH__\n', absent: undefined }
+        path: 'pages/"__VPT_PAGE_OPTIONS__/index',
+        config: { title: '__VPT_PAGE_OPTIONS__\n', absent: undefined }
     }
     const result = specializePageCapsule({
-        code: 'const PageComponent = () => null; const args = [__VPT_PAGE_PATH__, __VPT_PAGE_CONFIG__, PageComponent, __VPT_PAGE_PRERENDER__]',
+        code: 'const options = __VPT_PAGE_OPTIONS__',
         id: '/runtime/page.ts',
         page,
         sourcemap: false
     })
-    const args: unknown = Function(`${result.code}; return args`)()
-    assert.ok(Array.isArray(args))
-    assert.deepEqual(args.slice(0, 2), [page.path, { title: page.config.title }])
-    assert.equal(typeof args[2], 'function')
+    const options: unknown = Function(`${result.code}; return options`)()
+    assert.deepEqual(options, { path: page.path, config: { title: page.config.title }, prerender: false })
     assert.equal(result.map, null)
 })
 
-test('rejects a Page capsule missing its specialization placeholders', () => {
+test('rejects a Page capsule missing its specialization placeholder', () => {
     assert.throws(
         () =>
             specializePageCapsule({
                 code: 'export default {}',
                 id: '/plugin/runtime/mini/capsule/page.js?route=pages%2Fhome%2Findex',
-                page: {
-                    path: 'pages/home/index',
-                    config: {}
-                }
+                page: { path: 'pages/home/index' }
             }),
-        /Expected one placeholder __VPT_PAGE_PATH__, found 0/
+        /Expected one placeholder __VPT_PAGE_OPTIONS__, found 0/
     )
 })

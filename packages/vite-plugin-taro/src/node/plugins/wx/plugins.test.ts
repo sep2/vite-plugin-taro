@@ -24,12 +24,7 @@ test('creates the WX Mini Program contract without translating public options', 
     )
     assert.match(contract.taro.targetRuntimePath, /taro-runtime[/\\]dist[/\\]plugin-platform-weapp[/\\]runtime\.js$/)
     assert.match(miniBootstrapId, /runtime[/\\]mini[/\\]amphibious[/\\]bootstrap\.(?:js|ts)$/)
-    assert.deepEqual(Object.keys(contract.runtime).sort(), [
-        'devtoolsHmrRuntime',
-        'interpreterHmrRuntime',
-        'pageConstructor'
-    ])
-    assert.match(contract.runtime.pageConstructor, /runtime[/\\]wx[/\\]native[/\\]wx-page-constructor\.(?:js|ts)$/)
+    assert.deepEqual(Object.keys(contract.runtime).sort(), ['devtoolsHmrRuntime', 'interpreterHmrRuntime'])
     assert.match(contract.runtime.devtoolsHmrRuntime, /runtime[/\\]wx[/\\]dev[/\\]devtools-runtime\.(?:js|ts)$/)
     assert.match(contract.runtime.interpreterHmrRuntime, /runtime[/\\]wx[/\\]dev[/\\]interpreter-runtime\.(?:js|ts)$/)
     assert.deepEqual(contract.styles, {

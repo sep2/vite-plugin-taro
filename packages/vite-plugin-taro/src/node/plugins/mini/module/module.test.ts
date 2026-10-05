@@ -16,7 +16,6 @@ import {
     miniComponentShellId,
     miniCustomWrapperShellId,
     miniPageCapsuleId,
-    miniPageConstructorRuntimeId,
     miniPageShellId,
     miniPolyfillsId,
     miniTaroRuntimeId,
@@ -64,11 +63,10 @@ test('classifies import-only entry facades after their implementation moves into
     }
 })
 
-test('constructor modules bundled into vpt preserve its amphibious identity', () => {
-    for (const constructorId of [miniPageConstructorRuntimeId, resolveVptRuntime('wx/native/wx-page-constructor')]) {
-        assert.equal(classifyModule(chunk(constructorId, miniVptId)), 'amphibious')
-        assert.equal(classifyModule(chunk(miniVptId, constructorId)), 'amphibious')
-    }
+test('native query capture bundled into vpt preserves its amphibious identity', () => {
+    const queryId = resolveVptRuntime('mini/amphibious/get-page-query')
+    assert.equal(classifyModule(chunk(queryId, miniVptId)), 'amphibious')
+    assert.equal(classifyModule(chunk(miniVptId, queryId)), 'amphibious')
 })
 
 test('classifies application-only and empty chunks as normal capsules', () => {

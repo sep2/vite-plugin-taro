@@ -44,14 +44,16 @@ for (const entry of ['pages/gallery/gallery.js', 'pages/detail/detail.js', 'comp
     const relative = path.posix.relative(path.posix.dirname(entry), modulePath)
     const specifier = relative.startsWith('.') ? relative : `./${relative}`
     const component = entry === 'comp.js'
-    // Shells pass the capsule's live export to VPT's Page constructor or native Component.
-    const registration = component ? /(Component)\((\w+\.componentConfig)\)/g : /(\(0,\w+\.Page\))\((\w+\.default)\)/g
+    // Shells register the capsule's final Page config or recursive Component config.
+    const registration = component ? /(Component)\((\w+\.componentConfig)\)/g : /(Page)\((\w+\.default)\)/g
     assert.equal([...source.matchAll(registration)].length, 1, entry)
     await writeFile(
         entryPath,
         source.replace(
             registration,
-            `$1(require('${specifier}').${component ? 'instrumentComponent' : 'instrumentPage'}($2))`
+            component
+                ? `$1(require('${specifier}').instrumentComponent($2))`
+                : `$1(require('${specifier}').instrumentPage($2))`
         )
     )
 }

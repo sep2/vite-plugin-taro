@@ -138,16 +138,22 @@ function assertNativeShells(output: BuildOutput): void {
     }
 }
 
-/** Executes the shared shell and selected constructor, mocking only the route config. */
-function assertPageRegistration(output: BuildOutput, target: VptTarget, route: string): void {
+/** Executes target-independent native registration, mocking only the route config. */
+function assertPageRegistration(output: BuildOutput, target: VptTarget, route: string, prerender: boolean): void {
     const pageShell = resolveVptRuntime('mini/native/page')
     assert.equal(
         requireChunk(output, `${route}.js`).facadeModuleId,
         `${pageShell}?route=${encodeURIComponent(route)}`,
         'Every platform uses the same native Page shell'
     )
-    const config = { data: { page: { cn: [] } }, onLoad: () => undefined, eh: () => undefined }
-    Object.defineProperty(config, '__vpt_meta', { value: { prerender: false, skipPrerender: false } })
+    const config = {
+        data: prerender
+            ? () => assert.fail('registration must not execute the capsule data factory')
+            : { page: { cn: [] } },
+        onLoad: () => undefined,
+        eh: () => undefined
+    }
+    Object.defineProperty(config, '__vpt_meta', { value: { skipPrerender: false } })
     // The isolated native host records exactly one registration; its capsule retains the Taro config identity.
     const registrations: Array<{ constructor: string; config: object }> = []
     const host = {
@@ -157,18 +163,18 @@ function assertPageRegistration(output: BuildOutput, target: VptTarget, route: s
             assert.fail('Page registration must not schedule rendering')
         },
         clearTimeout() {},
-        wx: { onBeforePageLoad() {} },
+        ...(target === 'wx' ? { wx: { onBeforePageLoad() {} } } : {}),
         Page(config: object) {
             registrations.push({ constructor: 'Page', config })
         },
         Component() {
-            assert.fail('Pages without prerender must use native Page, not Component')
+            assert.fail('Page shells must use native Page, not Component')
         }
     }
     assert.equal(
-        collectModuleIds(output).some((id) => /\/native\/get-wx-page-query\.(?:js|ts)$/.test(id)),
-        target === 'wx',
-        'Only the WX constructor imports native query capture'
+        collectModuleIds(output).some((id) => /\/amphibious\/get-page-query\.(?:js|ts)$/.test(id)),
+        true,
+        'Shared prerendering captures native queries only when the host provides the API'
     )
 
     const context = createContext(host)
@@ -195,7 +201,9 @@ function assertPageRegistration(output: BuildOutput, target: VptTarget, route: s
     }
     const runtime = load('common/vpt.js')
     assert.ok(runtime && typeof runtime === 'object')
-    assert.equal(typeof Reflect.get(runtime, 'Page'), 'function', 'VPT exports the selected constructor')
+    assert.equal(typeof Reflect.get(runtime, 'getPageQuery'), 'function')
+    assert.equal(Object.hasOwn(runtime, 'prerenderToData'), false, 'prerendering belongs to the capsule')
+    assert.equal(Object.hasOwn(runtime, 'Page'), false, 'native Page needs no exported adapter')
     // Source selection, bundling, VPT and registration execute for real.
     const system = Reflect.get(runtime, 'System')
     const importSync = system.importSync.bind(system)
@@ -207,11 +215,11 @@ function assertPageRegistration(output: BuildOutput, target: VptTarget, route: s
     const registration = registrations[0]
     assert.ok(registration)
     assert.equal(registration.constructor, 'Page')
-    assert.strictEqual(registration.config, config)
+    assert.strictEqual(registration.config, config, 'the shell registers the exact capsule export on every target')
     assert.strictEqual(Reflect.get(registration.config, 'data'), config.data)
     const methods = registration.config
-    assert.strictEqual(methods.onLoad, config.onLoad)
-    assert.strictEqual(methods.eh, config.eh)
+    assert.strictEqual(Reflect.get(methods, 'onLoad'), config.onLoad)
+    assert.strictEqual(Reflect.get(methods, 'eh'), config.eh)
     assert.equal(Object.keys(methods).includes('prerenderToData'), false)
     assert.ok(parseJsonAsset(output, `${route}.json`).usingComponents)
 }
@@ -249,7 +257,9 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
                 }
             },
             (output) => {
-                assertPageRegistration(output, target, 'pages/home/index')
+                for (const prerender of [false, true]) {
+                    assertPageRegistration(output, target, 'pages/home/index', prerender)
+                }
                 const template = String(
                     requireAsset(output, { wx: 'base.wxml', zfb: 'base.axml', tt: 'base.ttml' }[target]).source
                 )
@@ -340,7 +350,9 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
                     assert.ok(output.some((chunk) => chunk.type === 'chunk' && chunk.code.includes(moduleClassName)))
                     assert.equal(String(requireAsset(output, `pages/empty/index.${extension}`).source), '')
                     for (const route of ['home', 'account', 'empty']) {
-                        assertPageRegistration(output, target, `pages/${route}/index`)
+                        for (const prerender of [false, true]) {
+                            assertPageRegistration(output, target, `pages/${route}/index`, prerender)
+                        }
                         assert.equal(
                             output.filter((asset) => asset.fileName === `pages/${route}/index.${extension}`).length,
                             1
@@ -352,7 +364,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
     }
 }
 
-test('minified WX VPT initializes bootstrap before importing constructor capsules', async () => {
+test('minified WX VPT initializes bootstrap and query capture before the Page capsule', async () => {
     await inspectFixtureBuild(
         {
             options: createOptions('wx'),
@@ -364,7 +376,9 @@ test('minified WX VPT initializes bootstrap before importing constructor capsule
         },
         (output) => {
             assertNativeShells(output)
-            assertPageRegistration(output, 'wx', 'pages/home/index')
+            for (const prerender of [false, true]) {
+                assertPageRegistration(output, 'wx', 'pages/home/index', prerender)
+            }
         }
     )
 })

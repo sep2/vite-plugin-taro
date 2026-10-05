@@ -3,7 +3,7 @@ import type { AstTransformResult } from '../../../utils/transform.ts'
 
 /**
  * In serve, a native Page may load its original physical capsule after HMR has already installed a newer component factory.
- * Taro captures the component at createPageConfig() time; without this lookup, that Page first mounts with stale source even
+ * The VPT factory passes the component to Taro at createVptPageConfig() time; without this lookup, that Page first mounts with stale source even
  * though the patch was acknowledged. Replace only the component argument, leaving the production capsule untouched.
  */
 export function injectDevPageComponent({
@@ -31,7 +31,7 @@ export function injectDevPageComponent({
                 }
                 const component = node.arguments[0]
                 if (
-                    node.callee.name !== 'createPageConfig' ||
+                    node.callee.name !== 'createVptPageConfig' ||
                     component?.type !== 'Identifier' ||
                     component.name !== 'PageComponent'
                 ) {

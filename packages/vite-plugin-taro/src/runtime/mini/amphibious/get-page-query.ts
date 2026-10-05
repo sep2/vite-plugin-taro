@@ -10,7 +10,7 @@ declare const wx: {
 // WX Page shells share one listener and the latest query supplied by native routing.
 let pageQuery: Record<string, unknown>
 
-if ('onBeforePageLoad' in wx) {
+if (typeof wx !== 'undefined' && typeof wx.onBeforePageLoad === 'function') {
     const capturePageQuery: BeforePageLoadListener = ({ query }) => {
         pageQuery = query
     }
@@ -23,6 +23,6 @@ if ('onBeforePageLoad' in wx) {
 }
 
 /** Reads the complete native query for the Page instance currently being created. */
-export function getWxPageQuery(): Record<string, unknown> {
+export function getPageQuery(): Record<string, unknown> {
     return pageQuery
 }
