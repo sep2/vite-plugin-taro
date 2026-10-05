@@ -1,6 +1,26 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { decodeDevToolsResponse, LoanDevToolsToolError, waitFor } from './hmr-devtools.ts'
+import { decodeDevToolsResponse, filterConsoleErrors, LoanDevToolsToolError, waitFor } from './hmr-devtools.ts'
+
+test('retains runtime errors but ignores warnings and grep context separators', () => {
+    const error = '2:["[error]","runtime failed"]'
+    const contextError = '7-["[error]","context error"]'
+    assert.equal(
+        filterConsoleErrors(
+            [
+                '1:["[info]","not an error"]',
+                error,
+                '--',
+                '5-["[warn]","invalid configuration"]',
+                '6:["[log]","[error] is just text"]',
+                contextError
+            ].join('\n')
+        ),
+        `${error}\n${contextError}`
+    )
+    assert.equal(filterConsoleErrors('1:["[warn]","warning only"]\n--'), '')
+    assert.equal(filterConsoleErrors(''), '')
+})
 
 test('decodes transient reload observations without treating authorization failures as retryable', () => {
     assert.throws(

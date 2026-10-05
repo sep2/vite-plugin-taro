@@ -8,7 +8,6 @@ import { build } from 'vite'
 import vpt from '../../index.ts'
 import { createTestProject } from './create-test-project.ts'
 
-// Issue #35's attached vpt.zip reads the native route synchronously and conditionally renders the matching target.
 // https://github.com/sep2/vite-plugin-taro/issues/35
 // Skyline documents attached (inclusive) as the deadline for reliably publishing the first-frame target:
 // https://developers.weixin.qq.com/miniprogram/dev/framework/runtime/skyline/share-element.html

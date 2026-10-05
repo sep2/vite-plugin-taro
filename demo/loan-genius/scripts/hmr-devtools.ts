@@ -76,15 +76,13 @@ export function createLoanHmrDevTools(fixture: LoanHmrFixture): LoanHmrDevTools 
         },
         readConsoleErrors: async () => {
             const result = await runTool('get_simulator_console', {
-                command: "grep -i -E 'error|warn|exception'"
+                // Numbering keeps a single JSON log entry as text; filter by severity rather than message keywords.
+                command: 'grep -n .'
             })
             if (typeof result !== 'string') {
                 throw new Error('Expected DevTools console text')
             }
-            return result
-                .split('\n')
-                .filter((line) => line.length > 0 && isErrorConsoleEntry(line))
-                .join('\n')
+            return filterConsoleErrors(result)
         },
         readCurrentPage: async () => {
             const result = await runTool('automation_runtime_info', { action: 'currentPage' })
@@ -162,9 +160,12 @@ export function decodeDevToolsResponse(tool: string, output: string): unknown {
     return response.result
 }
 
-function isErrorConsoleEntry(line: string): boolean {
-    const entry: unknown = JSON.parse(line)
-    return Array.isArray(entry) && (entry[0] === '[error]' || entry[0] === '[warn]')
+/** Retains runtime errors without parsing grep separators or treating warnings as failures. */
+export function filterConsoleErrors(log: string): string {
+    return log
+        .split('\n')
+        .filter((line) => /^\d+[:-]\["\[error\]"/.test(line))
+        .join('\n')
 }
 
 function parseToolResponse(output: string): Record<string, unknown> {

@@ -33,6 +33,8 @@ export async function runDevToolsCase(caseName: DevToolsCase, harness: DevToolsH
         recovery: () => testSyntaxRecovery(harness),
         restart: () => testServerRestart(harness)
     }
+    await waitForRuntimeStartup(harness)
+    await assertPageInitialization(harness)
     if (caseName === 'all') {
         // Run the inactive-page case before any navigation can mount either secondary route in this App generation.
         for (const selected of ['inactive-page', 'burst', 'rebuild', 'recovery', 'restart'] as const) {
@@ -42,7 +44,6 @@ export async function runDevToolsCase(caseName: DevToolsCase, harness: DevToolsH
         }
         return
     }
-    await waitForRuntimeStartup(harness)
     await cases[caseName]()
 }
 
@@ -163,6 +164,7 @@ async function testStateRetention(name: string, profile: HmrEditProfile, harness
     await harness.navigate('navigateTo', '/pages/mirror/index')
     await assertCurrentRoute('pages/mirror/index', harness)
     await setPageState(mirrorValue, harness)
+    await assertPageInitialization(harness)
 
     await publishHmrEdits(harness.markerPath, profile, (marker) => waitForMarker(marker, harness))
     await assertAppProjectionBaseline(harness)
@@ -391,6 +393,18 @@ async function waitForSharedGeneration(generation: string, harness: DevToolsHarn
 
 async function waitForMarker(marker: string, harness: DevToolsHarness): Promise<void> {
     await waitFor(async () => (await harness.readElement('#hmr-status', 'text')) === `marker:${marker}`, 6_000, 100)
+}
+
+async function assertPageInitialization(harness: DevToolsHarness): Promise<void> {
+    await waitForBaselineMarker(harness)
+    // An app-level compiler flag or successful HMR alone does not prove native data factories execute.
+    assert.deepEqual(await harness.readPageInitialization(), {
+        renderer: 'webview',
+        glassEasel: true,
+        prerendered: process.env.VPT_HMR_PRERENDER === '1',
+        appNodeName: 'vpt_fragment'
+    })
+    await assertAppProjectionBaseline(harness)
 }
 
 async function assertAppProjectionBaseline(harness: DevToolsHarness): Promise<void> {

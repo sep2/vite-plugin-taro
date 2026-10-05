@@ -1,11 +1,11 @@
-import Taro, { useLoad } from 'virtual:taro/api'
+import Taro, { useReady } from 'virtual:taro/api'
 import { Text } from 'virtual:taro/components'
 import { useState } from 'react'
 
 export default function RendererBadge() {
-    // Read the actual native engine at onLoad; configuration alone cannot detect a WebView fallback on a phone.
+    // Read the actual native engine after initial rendering; configuration alone cannot detect a WebView fallback on a phone.
     const [renderer, setRenderer] = useState('checking')
-    useLoad(() => {
+    useReady(() => {
         // Taro's public PageInstance type omits this native WX field, so narrow it at the platform boundary.
         const page = Taro.getCurrentInstance().page
         const nativeRenderer: unknown = page && Reflect.get(page, 'renderer')

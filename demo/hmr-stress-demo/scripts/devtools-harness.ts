@@ -18,6 +18,7 @@ export type DevToolsProjectHarness = Readonly<{
     readConsoleErrors: () => Promise<string>
     readCurrentPage: () => Promise<Readonly<{ path: string }>>
     readElement: (selector: string, action: ElementReadAction) => Promise<string>
+    readPageInitialization: () => Promise<unknown>
     readPageStack: () => Promise<readonly unknown[]>
     root: string
     serverLogPath: string
@@ -415,6 +416,24 @@ function createProjectHarness(root: string, outDir: string): DevToolsProjectHarn
                 throw new Error(`Expected element result for ${selector}:${action}`)
             }
             return result
+        },
+        readPageInitialization: async () => {
+            const output = await runTool('automation_evaluate', outDir, {
+                'fn-source': `function () {
+                    const pages = getCurrentPages()
+                    const page = pages[pages.length - 1]
+                    return {
+                        renderer: page.renderer,
+                        glassEasel: typeof page.groupUpdates === 'function',
+                        prerendered: typeof page.$taroPath === 'string' && page.$taroPath.includes('$vptPage='),
+                        appNodeName: page.data.app?.nn
+                    }
+                }`
+            })
+            if (!isRecord(output) || !isRecord(output.result)) {
+                throw new Error('Expected native Page initialization response')
+            }
+            return output.result.result
         },
         readPageStack: async () => {
             const result = await runTool('automation_runtime_info', outDir, { action: 'pageStack' })
