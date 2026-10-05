@@ -111,14 +111,25 @@ path: 'pages/profile/index'
 
 `usingComponents` 由 vpt 自动管理，无需填写。接入方式参见[原生组件](/guides/native-components/)。
 
+微信目标请在每个页面的 `config` 中显式设置 `glassEaselWebview: true`，同时保留 `appJson` 顶层的 `componentFramework: 'glass-easel'` 和 `glassEaselWebview: true`。这既适用于 Skyline，也适用于普通 WebView 页面，与是否开启 `prerender` 无关。
+
 ### `pages[].prerender`
 
 可选布尔值，默认关闭。省略或设为 `false` 时，直接注册原始 `Page` 配置；设为 `true` 时，尝试同步渲染并序列化 App/Page 首屏数据。
 
+以下为微信页面示例，App 配置沿用上面的 glass-easel 设置：
+
 ```ts
 pages: [
-    { path: 'pages/gallery/index' },
-    { path: 'pages/detail/index', prerender: true }
+    {
+        path: 'pages/gallery/index',
+        config: { glassEaselWebview: true }
+    },
+    {
+        path: 'pages/detail/index',
+        prerender: true,
+        config: { glassEaselWebview: true }
+    }
 ]
 ```
 

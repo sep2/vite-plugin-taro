@@ -9,7 +9,7 @@ Skyline 是微信小程序的新一代渲染引擎。它减少了传统 WebView 
 
 ## 默认配置
 
-模板在 `vite.config.ts` 中包含：
+模板在 `vite.config.ts` 的微信（`wx`）配置中包含：
 
 ```ts
 vpt({
@@ -50,17 +50,22 @@ vpt({
 })
 ```
 
-| 配置 | 作用                                                           |
-| --- |----------------------------------------------------------------|
-| `renderer: 'skyline'` | 为页面选择 Skyline 渲染引擎。                                  |
-| `componentFramework: 'glass-easel'` | 使用支持 Skyline 的组件框架。                                  |
-| `glassEaselWebview: true` | 确保 WebView 及 Skyline 回退时使用 glass-easel 运行时。          |
-| `lazyCodeLoading: 'requiredComponents'` | 按需注入页面所需组件。                                         |
-| `defaultDisplayBlock` | 将 Skyline 节点的默认布局从 `flex` 调整为 `block`。            |
-| `defaultContentBox` | 将默认盒模型从 `border-box` 调整为 `content-box`，更接近 Web。 |
-| `disableABTest: true` | 跳过 We 分析 AB 实验，让符合条件的真机直接使用 Skyline。       |
-| `navigationStyle: 'custom'` | 由应用绘制导航栏，而不是使用微信默认导航栏。                   |
-| `skylineRenderEnable` | 控制微信开发者工具是否开启 Skyline 渲染调试。                  |
+| 配置                                     | 作用                                                                   |
+|------------------------------------------|------------------------------------------------------------------------|
+| `renderer: 'skyline'`                    | 为页面选择 Skyline 渲染引擎。                                          |
+| `componentFramework: 'glass-easel'`      | 使用支持 Skyline 的组件框架。                                          |
+| `glassEaselWebview: true`                | 启用 WebView 的 glass-easel 运行时，位置与 `componentFramework` 并列。 |
+| `pages[].config.glassEaselWebview: true` | 每个微信页面显式启用，避免开发者工具 WebView 模拟器未采用全局设置。    |
+| `lazyCodeLoading: 'requiredComponents'`  | 按需注入页面所需组件。                                                 |
+| `defaultDisplayBlock`                    | 将 Skyline 节点的默认布局从 `flex` 调整为 `block`。                    |
+| `defaultContentBox`                      | 将默认盒模型从 `border-box` 调整为 `content-box`，更接近 Web。         |
+| `disableABTest: true`                    | 跳过 We 分析 AB 实验，让符合条件的真机直接使用 Skyline。               |
+| `navigationStyle: 'custom'`              | 由应用绘制导航栏，而不是使用微信默认导航栏。                           |
+| `skylineRenderEnable`                    | 控制微信开发者工具是否开启 Skyline 渲染调试。                          |
+
+:::note[每个微信页面都显式设置]
+保留 App 顶层的 `glassEaselWebview: true`，同时为每个微信页面设置 `config.glassEaselWebview: true`，包括普通 WebView 页面、Skyline 页面和未开启 `prerender` 的页面。仓库在基础库 3.17.2 的开发者工具 WebView 模拟器中验证过：仅配置 App 顶层开关时未启用 glass-easel，显式配置页面开关后才生效。因此模板和示例同时保留两处设置。
+:::
 
 ## 开发模式与 Skyline 调试
 
@@ -88,9 +93,15 @@ projectConfigJson: {
 
 ### 全局开启
 
-把 `renderer` 和 `componentFramework` 放在 `appJson` 中，所有页面都会请求 Skyline。按照[微信 glass-easel 迁移文档](https://developers.weixin.qq.com/miniprogram/dev/framework/custom-component/glass-easel/migration.html)，全局 `glassEaselWebview` 放在 `appJson` 顶层，与 `componentFramework` 并列，而不是放进 `appJson.window`；页面级设置则直接写在 `page.config` 中。仅设置 `componentFramework` 会启用 glass-easel WXML 编译器，但不保证 WebView 使用 glass-easel 运行时；同时设置 `glassEaselWebview: true` 才能确保这一点。默认模板使用这种方式：
+把 `renderer` 和 `componentFramework` 放在 `appJson` 中，所有页面都会请求 Skyline。按照[微信 glass-easel 迁移文档](https://developers.weixin.qq.com/miniprogram/dev/framework/custom-component/glass-easel/migration.html)，`componentFramework` 选择 WXML 编译器，WebView 还需要 `glassEaselWebview: true` 来启用 glass-easel 运行时。全局开关放在 `appJson` 顶层。页面开关放在 `pages[].config` 顶层。
 
 ```ts
+pages: [
+    {
+        path: 'pages/home/index',
+        config: { glassEaselWebview: true }
+    }
+],
 appJson: {
     renderer: 'skyline',
     componentFramework: 'glass-easel',
@@ -107,7 +118,7 @@ appJson: {
 
 ### 按页面开启
 
-可以只为部分页面配置 Skyline，但所有微信页面仍需使用 glass-easel。保留全局组件框架和 WebView 配置，并把 Skyline 渲染设置放进目标页面：
+可以只为部分页面配置 Skyline，但所有微信页面仍需使用 glass-easel。保留全局组件框架和 WebView 开关，为每个页面显式设置 `config.glassEaselWebview: true`，仅把 `renderer: 'skyline'` 放进目标页面：
 
 ```ts
 pages: [
