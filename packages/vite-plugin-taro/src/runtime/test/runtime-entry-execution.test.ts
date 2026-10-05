@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { registerHooks } from 'node:module'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -25,6 +26,9 @@ type ExecutionContext = Readonly<{
 }>
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
+// Each generated bundle has different offsets; unique URLs prevent V8 from merging incompatible ranges.
+let runtimeEntryId = 0
 
 // Mock only the capsule's bridge; renderer tests exercise these calls against real React and Taro.
 const prerenderRuntimeMock = `
@@ -67,8 +71,9 @@ async function bundleRuntimeEntry({
     defines: Readonly<Record<string, string>>
     servePageModuleId?: string
     nativePageHmr?: boolean
-}): Promise<string> {
+}): Promise<{ code: string; execute: (...args: unknown[]) => void }> {
     const input = path.join(runtimeRoot, entry)
+    const outputFile = path.join(runtimeRoot, `test/runtime-entry-${runtimeEntryId++}.js`)
     const mockEntries = Object.entries(mocks).map(([request, source], index) => ({
         request,
         source,
@@ -82,7 +87,12 @@ async function bundleRuntimeEntry({
             return mockIdByRequest.get(id)
         },
         load(id) {
-            return mockSourceById.get(id)
+            const code = mockSourceById.get(id)
+            if (code === undefined) {
+                return
+            }
+            // Virtual mocks are test inputs, not original runtime sources.
+            return { code, map: { version: 3, sources: [], names: [], mappings: '' } }
         },
         transform(code, id) {
             if (id === input && nativePageHmr) {
@@ -104,9 +114,13 @@ async function bundleRuntimeEntry({
             }
         },
         output: {
+            file: outputFile,
             exports: 'named',
             format: 'cjs',
-            sourcemap: false
+            // A native module wrapper preserves the same lexical host bindings while making maps available to V8 coverage.
+            banner: 'export default function(module, exports, require, globalThis, global, App, Page, Component, wx, __rolldown_runtime__) {',
+            footer: '}',
+            sourcemap: 'inline'
         },
         write: false
     })
@@ -116,27 +130,31 @@ async function bundleRuntimeEntry({
     if (!chunk) {
         throw new Error(`Runtime entry did not emit JavaScript: ${entry}`)
     }
-    return `${chunk.code}\n//# sourceURL=${pathToFileURL(path.join(runtimeRoot, entry)).href}?runtime-entry-test`
+    const url = pathToFileURL(outputFile).href
+    const hooks = registerHooks({
+        resolve(specifier, context, nextResolve) {
+            return specifier === url ? { url, shortCircuit: true } : nextResolve(specifier, context)
+        },
+        load(id, context, nextLoad) {
+            return id === url ? { format: 'module', source: chunk.code, shortCircuit: true } : nextLoad(id, context)
+        }
+    })
+    try {
+        const { default: execute }: { default: (...args: unknown[]) => void } = await import(url)
+        return { code: chunk.code, execute }
+    } finally {
+        hooks.deregister()
+    }
 }
 
-function executeRuntimeEntry(code: string, context: ExecutionContext): Record<string, unknown> {
+function executeRuntimeEntry(
+    { execute }: Awaited<ReturnType<typeof bundleRuntimeEntry>>,
+    context: ExecutionContext
+): Record<string, unknown> {
     const commonJsModule: { exports: Record<string, unknown> } = { exports: {} }
     const rejectRequire = (id: string): never => assert.fail(`Unexpected external runtime import: ${id}`)
 
-    Function(
-        'module',
-        'exports',
-        'require',
-        'globalThis',
-        'global',
-        'App',
-        'Page',
-        'Component',
-        'wx',
-        // Mini serve chunks receive this lexical binding from vpt:mini-global-dev at renderChunk.
-        '__rolldown_runtime__',
-        code
-    )(
+    execute(
         commonJsModule,
         commonJsModule.exports,
         rejectRequire,
@@ -150,6 +168,40 @@ function executeRuntimeEntry(code: string, context: ExecutionContext): Record<st
     )
 
     return commonJsModule.exports
+}
+
+/** Import-only facades disappear during bundling; execute their original modules to verify re-exports and side effects. */
+async function importRuntimeFacade({
+    entry,
+    mocks,
+    harness
+}: {
+    entry: string
+    mocks: Readonly<Record<string, string>>
+    harness: unknown
+}): Promise<Record<string, unknown>> {
+    const id = runtimeEntryId++
+    const key = `vpt.runtime-facade-test:${id}`
+    const mockUrls = new Map(
+        Object.entries(mocks).map(([request, source]) => [
+            request,
+            `data:text/javascript,${encodeURIComponent(source.replaceAll('globalThis.harness', `globalThis[Symbol.for(${JSON.stringify(key)})]`))}`
+        ])
+    )
+    // Native module mocks share this test-local harness only for the duration of their import.
+    Reflect.set(globalThis, Symbol.for(key), harness)
+    const hooks = registerHooks({
+        resolve(specifier, context, nextResolve) {
+            const url = mockUrls.get(specifier)
+            return url ? { url, shortCircuit: true } : nextResolve(specifier, context)
+        }
+    })
+    try {
+        return await import(`${pathToFileURL(path.join(runtimeRoot, entry)).href}?facade-test=${id}`)
+    } finally {
+        hooks.deregister()
+        Reflect.deleteProperty(globalThis, Symbol.for(key))
+    }
 }
 
 function createExecutionContext(harness: unknown): ExecutionContext {
@@ -237,7 +289,7 @@ test('preserves H5 runtime facade side-effect order and export identities', asyn
         handleAppMount,
         window: browserWindow
     }
-    const code = await bundleRuntimeEntry({
+    const exports = await importRuntimeFacade({
         entry: 'h5/taro-runtime.ts',
         mocks: {
             'vite-plugin-taro-runtime/components/global.css': "globalThis.harness.events.push('global-css')",
@@ -258,10 +310,8 @@ test('preserves H5 runtime facade side-effect order and export identities', asyn
                 export const window = globalThis.harness.window
             `
         },
-        defines: {}
+        harness
     })
-
-    const exports = executeRuntimeEntry(code, createExecutionContext(harness))
 
     assert.deepEqual(events, ['global-css', 'component-css', 'framework', 'router', 'runtime'])
     assert.strictEqual(exports.createReactApp, createReactApp)
@@ -506,6 +556,35 @@ test('prerender stores its identity inside the non-enumerable VPT metadata', asy
     }
 })
 
+test('prerender preserves its seed and routing state until the App provides mount', async () => {
+    const code = await bundleRuntimeEntry({
+        entry: 'mini/capsule/prerender-to-data.ts',
+        mocks: {
+            'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
+            'vite-plugin-taro-runtime/react': 'export const flushSync = globalThis.harness.unexpected',
+            '../amphibious/bootstrap.ts': 'export const getPageQuery = globalThis.harness.unexpected'
+        },
+        defines: {}
+    })
+    for (const app of [undefined, null, {}]) {
+        const router = { path: '/existing' }
+        const config = { __vpt_meta: {} }
+        const seed = { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } }
+        const harness = {
+            Current: { app, router },
+            unexpected: () => assert.fail('An unavailable App must not capture query or render')
+        }
+        const { prerenderToData } = executeRuntimeEntry(code, createExecutionContext(harness))
+        assert.ok(typeof prerenderToData === 'function')
+        assert.strictEqual(
+            prerenderToData(config, () => null, 'pages/cold', seed),
+            seed
+        )
+        assert.strictEqual(harness.Current.router, router)
+        assert.deepEqual(config.__vpt_meta, {})
+    }
+})
+
 test('mounts the current Page export instead of the cold native capsule baseline in development', async () => {
     const calls: Call[] = []
     function BaselinePage() {
@@ -738,7 +817,8 @@ test('createVptPageConfig selects native data form without copying the config', 
         )
         assert.equal(calls[1]?.args.length, 4, 'the upstream Taro factory signature is unchanged')
         assert.equal(prerenderToData.mock.callCount(), 0, 'capsule evaluation must not render')
-        assert.doesNotMatch(code, /process\.env|\bwx\b|registerPage/)
+        // Inspect the bundle body, not the test wrapper's lexical host parameters.
+        assert.doesNotMatch(code.code.slice(code.code.indexOf('\n')), /process\.env|\bwx\b|registerPage/)
         if (prerender) {
             const data: unknown = Reflect.get(nativeConfig, 'data')
             assert.ok(typeof data === 'function')
@@ -1144,16 +1224,15 @@ test('attaches Mini hooks to the original API object without invoking platform A
         },
         defines: {}
     })
-    const componentCode = await bundleRuntimeEntry({
+    const componentExports = await importRuntimeFacade({
         entry: 'client/taro/component.ts',
         mocks: {
             'vite-plugin-taro-runtime/components': 'export const View = globalThis.harness.View'
         },
-        defines: {}
+        harness
     })
 
     const apiExports = executeRuntimeEntry(apiCode, createExecutionContext(harness))
-    const componentExports = executeRuntimeEntry(componentCode, createExecutionContext(harness))
 
     assert.deepEqual(events, ['backend', 'framework'])
     assert.strictEqual(apiExports.default, taro)
