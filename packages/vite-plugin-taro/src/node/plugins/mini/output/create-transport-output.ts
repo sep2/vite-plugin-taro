@@ -9,7 +9,7 @@ import type { PackageLocation } from '../placer/placement.ts'
  * identities: the package-neutral final filename is the SystemJS registration ID, while the package-qualified filename
  * supplies the literal native require path. Preliminary hash placeholders must not escape into this late-generated file.
  *
- * Transport itself executes only as native CommonJS in common/vpt/, separate from the bundled chunk namespace. Together
+ * Transport itself executes only as native CommonJS in common/vpt-transport.js, outside the bundled graph. Together
  * with bootstrap it publishes native namespaces to SystemJS without re-evaluating their module bodies.
  *
  * Do not generate this table in renderChunk: that hook runs before Rolldown's final minifier/code generator, which can rewrite
@@ -80,7 +80,7 @@ export function createTransportOutput({
     // A regular chunk belongs to the module/rendering pipeline. A prebuilt chunk bypasses it, but our Rolldown 1.2.8
     // bundled-dev test retained stale transport content at the same filename after lazy imports changed. Asset emission
     // updates changed source correctly; dev-host.integration.test.ts covers adding and removing lazy routes on rebuild.
-    // Unlike this graph-dependent table, common/vpt/global.js can remain prebuilt because application edits do not change it.
+    // Unlike this graph-dependent table, common/vpt-global.js can remain prebuilt because application edits do not change it.
     // The default branch rejects IDs absent from the closed output graph rather than attempting an undeclared native load.
     return {
         type: 'asset',

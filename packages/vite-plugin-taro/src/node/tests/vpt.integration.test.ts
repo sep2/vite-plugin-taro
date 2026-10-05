@@ -129,10 +129,10 @@ function assertNativeShells(output: BuildOutput): void {
         false,
         'no redundant runtime facade'
     )
-    const transport = requireAsset(output, 'common/vpt/transport.js')
-    requireChunk(output, 'common/vpt/global.js')
-    assert.doesNotMatch(String(transport.source), /registerModule|case ["']common\/vpt\//)
-    assert.match(requireChunk(output, 'common/bootstrap.js').code, /require\(["']\.\/vpt\/transport\.js["']\)/)
+    const transport = requireAsset(output, 'common/vpt-transport.js')
+    requireChunk(output, 'common/vpt-global.js')
+    assert.doesNotMatch(String(transport.source), /registerModule|case ["']common\/vpt-(?:global|transport)\.js/)
+    assert.match(requireChunk(output, 'common/bootstrap.js').code, /require\(["']\.\/vpt-transport\.js["']\)/)
     for (const fileName of ['app.js', 'pages/home/index.js', 'comp.js', 'custom-wrapper.js']) {
         const { code } = requireChunk(output, fileName)
         assert.doesNotMatch(code, /common\/vpt\.js/)
@@ -547,8 +547,8 @@ test('builds TT runtime, common packages, native components and target-specific 
                 { root: rootMatch[1], pages: [], common: true }
             ])
             assert.ok(
-                String(requireAsset(output, 'common/vpt/transport.js').source).includes(
-                    `require.async(${JSON.stringify(`../../${feature.fileName}`)})`
+                String(requireAsset(output, 'common/vpt-transport.js').source).includes(
+                    `require.async(${JSON.stringify(`../${feature.fileName}`)})`
                 )
             )
             assert.match(String(requireAsset(output, 'base.ttml').source), /<aweme-data\s/)
@@ -852,7 +852,7 @@ test('places a lazy wx feature in a declared code-only subpackage', async () => 
             assert.ok(rootMatch)
             const root = rootMatch[1]
             const appJson = parseJsonAsset(output, 'app.json')
-            const transport = requireAsset(output, 'common/vpt/transport.js')
+            const transport = requireAsset(output, 'common/vpt-transport.js')
 
             assert.deepEqual(appJson.subPackages, [
                 {
@@ -904,7 +904,7 @@ test('places a lazy zfb feature in a declared code-only package', async () => {
             assert.ok(rootMatch)
             const root = rootMatch[1]
             const appJson = parseJsonAsset(output, 'app.json')
-            const transport = requireAsset(output, 'common/vpt/transport.js')
+            const transport = requireAsset(output, 'common/vpt-transport.js')
 
             assert.deepEqual(appJson.subPackages, [
                 {

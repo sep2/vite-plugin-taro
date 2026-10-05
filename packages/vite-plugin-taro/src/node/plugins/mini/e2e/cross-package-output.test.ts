@@ -156,7 +156,7 @@ function createVirtualModulesPlugin(): Plugin {
         name: 'test:cross-package-modules',
         resolveId(source, importer) {
             if (source === miniTransportId) {
-                return { id: './vpt/transport.js', external: true }
+                return { id: './vpt-transport.js', external: true }
             }
             if (source in modules) {
                 return source
@@ -218,7 +218,7 @@ async function buildCrossPackageOutput(): Promise<CrossPackageOutput> {
             application: applicationId,
             native: miniAppShellId,
             bootstrap: miniBootstrapId,
-            // Keep this shared source in its own file to exercise a real common/transport.js beside common/vpt/transport.js.
+            // Keep this shared source in its own file to exercise a real common/transport.js beside common/vpt-transport.js.
             transport: mainDependencyId
         },
         plugins: [createVirtualModulesPlugin(), createMiniOutputPlugin()],
@@ -338,7 +338,7 @@ test('executes a complex nested static and dynamic graph across production wx su
     assert.doesNotMatch(output.application.fileName, /^sub\//)
     assert.doesNotMatch(output.mainDependency.fileName, /^sub\//)
     assert.ok(output.files.some((file) => file.fileName === 'common/transport.js'))
-    assert.equal(output.transport.fileName, 'common/vpt/transport.js')
+    assert.equal(output.transport.fileName, 'common/vpt-transport.js')
 
     const native = createNativeEvaluator(output.files)
     const transportExports = native.evaluate(output.transport.fileName)

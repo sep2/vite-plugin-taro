@@ -90,7 +90,7 @@ test('resolves fixed and route-specific private IDs', () => {
         'pages/home/index-capsule': `${modules.pageCapsule}?route=pages%2Fhome%2Findex`
     })
     assert.deepEqual(resolver.resolveId(miniTransportId, modules.bootstrap, projectRoot), {
-        id: './vpt/transport.js',
+        id: './vpt-transport.js',
         external: true
     })
     assert.equal(resolver.resolveId(vitePreloadId, undefined, projectRoot), modules.bootstrap)

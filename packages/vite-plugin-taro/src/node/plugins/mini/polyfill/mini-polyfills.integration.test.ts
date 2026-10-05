@@ -86,9 +86,9 @@ async function compileFixture(
             order: 'post',
             handler(_options, bundle) {
                 const chunks = Object.values(bundle).filter((item): item is OutputChunk => item.type === 'chunk')
-                const globalEntry = chunks.find((chunk) => chunk.fileName === 'common/vpt/global.js')
+                const globalEntry = chunks.find((chunk) => chunk.fileName === 'common/vpt-global.js')
                 assert.ok(globalEntry?.isEntry)
-                assert.equal(globalEntry.fileName, 'common/vpt/global.js')
+                assert.equal(globalEntry.fileName, 'common/vpt-global.js')
                 assert.deepEqual(
                     globalEntry.moduleIds,
                     [],
@@ -129,7 +129,7 @@ async function compileFixture(
                     'pre-bootstrap polyfills must not depend on the framework capsule'
                 )
                 // Compiler-owned JavaScript assets execute through native require just like rendered chunks.
-                const transport = bundle['common/vpt/transport.js']
+                const transport = bundle['common/vpt-transport.js']
                 assert.ok(transport?.type === 'asset' && typeof transport.source === 'string')
                 const files = [...chunks, { fileName: transport.fileName, code: transport.source }]
                 // Alipay rejects import() at compile time, even inside an unused React Refresh export that Node can parse.
@@ -194,7 +194,7 @@ async function compileFixture(
             const sourceMap: { mappings: string; sources: string[] } = JSON.parse(String(bootstrapMap.source))
             assert.ok(sourceMap.mappings.length > 0)
             assert.ok(sourceMap.sources.some((source) => source.endsWith('/mini/amphibious/bootstrap.ts')))
-            const globalMap = result.output.find((item) => item.fileName === 'common/vpt/global.js.map')
+            const globalMap = result.output.find((item) => item.fileName === 'common/vpt-global.js.map')
             assert.ok(globalMap?.type === 'asset')
             const globalSourceMap: { mappings: string; sources: string[] } = JSON.parse(String(globalMap.source))
             assert.ok(globalSourceMap.mappings.length > 0)
@@ -448,7 +448,7 @@ for (const target of miniTargets) {
                     const runtime = createAppRuntime(chunks, false, target)
                     runtime.read(setup)
                     assert.equal(runtime.read('typeof globalThis'), globalType)
-                    const provider = runtime.evaluate('common/vpt/global.js')
+                    const provider = runtime.evaluate('common/vpt-global.js')
                     assert.ok(provider && typeof provider === 'object')
                     assert.strictEqual(Reflect.get(provider, 'vptGlobal'), runtime.read('this'))
                     assert.equal(runtime.read('typeof __rolldown_runtime__'), 'undefined')
@@ -466,7 +466,7 @@ for (const target of miniTargets) {
                     `)
                     assertPolyfilledApp(runtime, 'function')
                     runtime.read('Reflect.set = nativeReflectSet;')
-                    const globalEntry = runtime.evaluate('common/vpt/global.js')
+                    const globalEntry = runtime.evaluate('common/vpt-global.js')
                     assert.ok(globalEntry && typeof globalEntry === 'object')
                     assert.strictEqual(Reflect.get(globalEntry, 'vptGlobal'), runtime.read('runtimeGlobal'))
                     assert.strictEqual(runtime.read('runtimeGlobal'), runtime.read('this'))
@@ -563,7 +563,7 @@ for (const target of miniTargets) {
                         this.diagnostics = [];
                         this.console = { ...console, error: (...args) => diagnostics.push(args) };
                     `)
-                    const provider = restricted.evaluate('common/vpt/global.js')
+                    const provider = restricted.evaluate('common/vpt-global.js')
                     assert.ok(provider && typeof provider === 'object')
                     restricted.read('const sharedGlobal = this;')
                     assert.strictEqual(Reflect.get(provider, 'vptGlobal'), restricted.read('sharedGlobal'))
@@ -633,7 +633,7 @@ for (const target of miniTargets) {
                         this.console = { ...console, error() {} };
                     `)
                 }
-                const provider = runtime.evaluate('common/vpt/global.js')
+                const provider = runtime.evaluate('common/vpt-global.js')
                 assert.ok(provider && typeof provider === 'object')
                 runtime.read('const sharedGlobal = this;')
                 assert.strictEqual(Reflect.get(provider, 'vptGlobal'), runtime.read('sharedGlobal'))

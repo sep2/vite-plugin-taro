@@ -1065,7 +1065,7 @@ test('rebuild mode replaces complete output without creating patch transport art
 test('regenerates native transport routes when a complete rebuild adds or removes lazy chunks', async (context) => {
     const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createRebuildOptions(), 'disk')
     context.after(fixture.close)
-    const transportPath = path.join(fixture.outDir, 'common/vpt/transport.js')
+    const transportPath = path.join(fixture.outDir, 'common/vpt-transport.js')
     assert.doesNotMatch(await readFile(transportPath, 'utf8'), /require\.async/)
     const initialAppStyle = await readFile(fixture.appStylePath, 'utf8')
 
@@ -1077,8 +1077,8 @@ test('regenerates native transport routes when a complete rebuild adds or remove
         (code) => code.endsWith('};') && code.includes('lazy-feature.js'),
         maximumWaitAttempts
     )
-    assert.match(added, /require\.async\("\.\.\/\.\.\/sub\/p_[a-f0-9]{8}\/common\/lazy-feature\.js"\)/)
-    assert.doesNotMatch(added, /registerModule|case ["']common\/vpt\/transport\.js/)
+    assert.match(added, /require\.async\("\.\.\/sub\/p_[a-f0-9]{8}\/common\/lazy-feature\.js"\)/)
+    assert.doesNotMatch(added, /registerModule|case ["']common\/vpt-transport\.js/)
     // The transport is intermediate output. Await both host publication and engine completion: onOutput admits the host's
     // asynchronous writes before the native build has finished. This test changes routes between builds, not during a build.
     await waitForFile(fixture.appStylePath, (source) => source !== initialAppStyle, maximumWaitAttempts)
@@ -1153,8 +1153,8 @@ test('preserves live files and directory identities across patches and recovery 
     await writeFile(obsoleteFile, 'live session file')
     const initialFiles = (await readdir(fixture.outDir, { recursive: true })).sort()
     assert.ok(initialFiles.includes(path.join('common', 'bootstrap.js')), JSON.stringify(initialFiles))
-    assert.ok(initialFiles.includes(path.join('common', 'vpt', 'transport.js')), JSON.stringify(initialFiles))
-    assert.ok(initialFiles.includes(path.join('common', 'vpt', 'global.js')), JSON.stringify(initialFiles))
+    assert.ok(initialFiles.includes(path.join('common', 'vpt-transport.js')), JSON.stringify(initialFiles))
+    assert.ok(initialFiles.includes(path.join('common', 'vpt-global.js')), JSON.stringify(initialFiles))
 
     await publishSourceGeneration(fixture.pagePath, renderPage('changed before complete build'))
     await waitForFile(

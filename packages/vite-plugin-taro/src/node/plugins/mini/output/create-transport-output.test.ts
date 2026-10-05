@@ -114,14 +114,10 @@ test('emits compact deterministic routes with final physical paths and resolved 
         }
     })
     assert.deepEqual(ids, ['common/bootstrap-resolved.js', 'common/eager-resolved.js', 'common/lazy-resolved.js'])
-    assert.deepEqual(paths, [
-        '../bootstrap-resolved.js',
-        '../eager-resolved.js',
-        '../../sub/p_test/common/lazy-resolved.js'
-    ])
+    assert.deepEqual(paths, ['./bootstrap-resolved.js', './eager-resolved.js', '../sub/p_test/common/lazy-resolved.js'])
     const namespace = {}
     const load = evaluate(result.source, (id) => {
-        assert.equal(id, '../eager-resolved.js')
+        assert.equal(id, './eager-resolved.js')
         return namespace
     })
     assert.equal(load(eager.fileName), namespace)
@@ -136,7 +132,7 @@ test('shares a lazy amphibious helper without loading namespaces during initiali
     const output = emit(Object.fromEntries(chunks.map((chunk) => [chunk.fileName, chunk])))
     assert.equal([...output.source.matchAll(/execute:function/g)].length, 1)
     const namespaces = new Map(
-        chunks.map((chunk) => [`../${chunk.fileName.slice('common/'.length)}`, { fileName: chunk.fileName }])
+        chunks.map((chunk) => [`./${chunk.fileName.slice('common/'.length)}`, { fileName: chunk.fileName }])
     )
     // Traces distinguish selecting a registration from executing its namespace loader.
     const required: string[] = []
@@ -159,7 +155,7 @@ test('shares a lazy amphibious helper without loading namespaces during initiali
     // Executing in reverse proves each registration retains its own loader and export callback.
     for (const { chunk, declaration, published } of declarations.toReversed()) {
         declaration.execute()
-        const requirePath = `../${chunk.fileName.slice('common/'.length)}`
+        const requirePath = `./${chunk.fileName.slice('common/'.length)}`
         assert.deepEqual(required.splice(0), [requirePath])
         assert.equal(published.length, 1)
         assert.equal(published[0], namespaces.get(requirePath))
@@ -175,7 +171,7 @@ test('preserves the native asynchronous promise until the subpackage finishes lo
         output.source,
         Object.assign(() => assert.fail('Lazy chunks must use require.async'), {
             async(id: string) {
-                assert.equal(id, '../../sub/p_test/common/lazy.js')
+                assert.equal(id, '../sub/p_test/common/lazy.js')
                 return pending.promise
             }
         })
@@ -203,8 +199,8 @@ test('normalizes logical route IDs and physical paths for main and subpackage ca
         Object.assign((id: string) => id, { async: (id: string) => Promise.resolve(id) })
     )
 
-    assert.equal(load('assets/page.js'), '../../assets/page.js')
-    assert.equal(await load('assets/lazy.js'), '../../sub/p_test/assets/lazy.js')
+    assert.equal(load('assets/page.js'), '../assets/page.js')
+    assert.equal(await load('assets/lazy.js'), '../sub/p_test/assets/lazy.js')
     for (const id of [main.fileName, 'assets/pages/../lazy.js', lazy.fileName]) {
         assert.throws(() => load(id), { message: `Unknown module: ${id}` })
     }
@@ -220,7 +216,7 @@ for (const name of [
         const logicalId = `common/${name}`
         const chunk = createChunk(`sub/p_test/${logicalId}`, 'normal-capsule')
         const output = emit({ [chunk.fileName]: chunk })
-        const requirePath = `../../${chunk.fileName}`
+        const requirePath = `../${chunk.fileName}`
         assert.deepEqual(parseSync(miniTransportOutputPath, output.source).errors, [])
         assert.ok(output.source.includes(`require.async(${JSON.stringify(requirePath)})`))
 
@@ -244,8 +240,8 @@ test('JSON-encodes special characters without changing module IDs or literal req
     const output = emit({ [chunk.fileName]: chunk })
     assert.deepEqual(parseSync(miniTransportOutputPath, output.source).errors, [])
     const load = evaluate(output.source, (id) => id)
-    assert.equal(load(chunk.fileName), `./${name}`)
-    assert.ok(output.source.includes(`require(${JSON.stringify(`./${name}`)})`))
+    assert.equal(load(chunk.fileName), `./vpt/${name}`)
+    assert.ok(output.source.includes(`require(${JSON.stringify(`./vpt/${name}`)})`))
 })
 
 test('regenerates a closed routing table from each final bundle without retaining removed routes', () => {
@@ -255,7 +251,7 @@ test('regenerates a closed routing table from each final bundle without retainin
     const second = emit({ [newChunk.fileName]: newChunk })
     assert.ok(first.source.includes('common/old.js'))
     assert.doesNotMatch(second.source, /old\.js/)
-    assert.ok(second.source.includes('require.async("../../sub/p_test/common/new.js")'))
+    assert.ok(second.source.includes('require.async("../sub/p_test/common/new.js")'))
     assert.deepEqual(first, emit({ [oldChunk.fileName]: oldChunk }))
 })
 
