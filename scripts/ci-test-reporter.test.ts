@@ -5,8 +5,8 @@ import path from 'node:path'
 import { Readable } from 'node:stream'
 import test, { type TestContext } from 'node:test'
 import type { TestEvent } from 'node:test/reporters'
-import { projectTempDir } from '../packages/vite-plugin-taro/src/node/tests/project-temp-dir.ts'
 import ciTestReporter from './ci-test-reporter.ts'
+import { projectTempDir } from './project-temp-dir.ts'
 
 // Node imports custom reporters as ESM; Windows drive-letter paths are not valid module URLs.
 const reporter = new URL('./ci-test-reporter.ts', import.meta.url).href
@@ -14,6 +14,7 @@ const reporter = new URL('./ci-test-reporter.ts', import.meta.url).href
 function runFixture(t: TestContext, source: string) {
     const root = mkdtempSync(path.join(projectTempDir, 'vpt-ci-reporter-'))
     t.after(() => rmSync(root, { recursive: true, force: true }))
+    assert.equal(path.dirname(root), path.resolve(import.meta.dirname, '../tmp'))
     const fixture = path.join(root, 'fixture.test.mjs')
     writeFileSync(fixture, source)
     const result = spawnSync(process.execPath, ['--test', `--test-reporter=${reporter}`, fixture], {

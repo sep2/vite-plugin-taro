@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { test } from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
-import { projectTempDir } from '../../../packages/vite-plugin-taro/src/node/tests/project-temp-dir.ts'
+import { projectTempDir } from './project-temp-dir.ts'
 import { writeFixtureSource } from './write-fixture-source.ts'
 
 test('concurrent readers only observe complete source generations during a burst', async () => {

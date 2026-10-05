@@ -16,7 +16,7 @@ The singleton App projects the Page outlet through a 16-level host chain beside 
 
 ## Automated WeChat DevTools suite
 
-The automated suite remains WeChat-specific because it uses the `wechatide` runtime. It creates a clean fixed fixture at `<repo>/tmp/vite-plugin-taro-hmr-stress-v1`, starts Vite, opens or reuses the same WeChat DevTools project, performs assertions, stops Vite, and closes only its own project window. Other DevTools projects remain open. Authorize the fixed CLI client once; subsequent runs reuse both that trust and the fixed project path without another authorization prompt:
+The automated suite remains WeChat-specific because it uses the `wechatide` runtime. It creates a clean fixed fixture at `<repo>/demo/hmr-stress-demo/tmp/vite-plugin-taro-hmr-stress-v1`, starts Vite, opens or reuses the same WeChat DevTools project, performs assertions, stops Vite, and closes only its own project window. Other DevTools projects remain open. Authorize the fixed CLI client once; subsequent runs reuse both that trust and the fixed project path without another authorization prompt:
 
 ```bash
 wechatide auth -c Pi
@@ -72,7 +72,7 @@ The complete suite checks:
 
 The harness observes the real App's startup report for the current build before publishing edits; a rendered Page can appear before its HMR socket opens. The aggregate suite exercises an immediate server restart; the standalone restart case first proves HMR works, then delays each full compilation by three seconds so cleanup behavior is visible to the open project. It distinguishes a successful App reload from working post-restart HMR: changing a patch file or opening a new socket alone cannot satisfy its rendered-marker assertions. Both Vite process logs are retained in the fixture's `vite.log`.
 
-The standalone port-swap case uses two fixed trusted projects under `<repo>/tmp/vite-plugin-taro-hmr-port-swap-v1`. It starts A before B on adjacent ports, stops both servers, then starts B before A from A's former port. Both DevTools windows remain open throughout; the case requires each replacement App to acquire its own new build identity and exchanged endpoint before a later source edit can update only that project's rendered marker while retaining input state.
+The standalone port-swap case uses two fixed trusted projects under `<repo>/demo/hmr-stress-demo/tmp/vite-plugin-taro-hmr-port-swap-v1`. It starts A before B on adjacent ports, stops both servers, then starts B before A from A's former port. Both DevTools windows remain open throughout; the case requires each replacement App to acquire its own new build identity and exchanged endpoint before a later source edit can update only that project's rendered marker while retaining input state.
 
 The standalone build-watch restart case uses the same fixed project and ownership boundary but launches the production `vite build --watch` path. It proves one rendered edit, replaces the watcher process without reopening or manually compiling DevTools, and then requires two more rendered edits. Every watched build is delayed by three seconds; this path performs full reloads and does not assert state retention.
 

@@ -1,7 +1,9 @@
 import { mkdirSync, realpathSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
+import path from 'node:path'
 
-const directory = fileURLToPath(new URL('../../../../../tmp/', import.meta.url))
+const packageRoot = path.dirname(createRequire(import.meta.url).resolve('vite-plugin-taro/package.json'))
+const directory = path.join(packageRoot, 'tmp')
 mkdirSync(directory, { recursive: true })
 
 /** Shared scratch root; each test owns and removes only its own files beneath it. */

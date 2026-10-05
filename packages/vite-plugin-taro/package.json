@@ -39,8 +39,8 @@
     ],
     "scripts": {
         "build": "node ../../scripts/sync-plugin-readme.ts && node ./scripts/build.ts",
-        "test": "node --test --test-concurrency=4 --test-reporter=dot",
-        "test:coverage": "c8 node --test --test-concurrency=4",
+        "test": "node --test --test-concurrency=4 --test-reporter=dot \"src/**/*.test.ts\" \"scripts/**/*.test.ts\"",
+        "test:coverage": "c8 node --test --test-concurrency=4 \"src/**/*.test.ts\" \"scripts/**/*.test.ts\"",
         "typecheck": "tsc --project tsconfig.json --noEmit"
     },
     "keywords": [

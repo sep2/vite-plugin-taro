@@ -8,15 +8,19 @@ import { packageRequire } from '../utils/packages.ts'
 import { createTestProject } from './create-test-project.ts'
 import { projectTempDir } from './project-temp-dir.ts'
 
-test('isolates consumer fixtures in repository tmp without losing workspace dependency resolution', async () => {
+test('isolates consumer fixtures in plugin tmp and inherits dependencies without extra links', async () => {
     const first = await createTestProject('project-')
     const second = await createTestProject('project-')
 
     const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/package.json'))
-    assert.equal(projectTempDir, await realpath(path.resolve(packageRoot, '../../tmp')))
+    assert.equal(projectTempDir, await realpath(path.join(packageRoot, 'tmp')))
     assert.notEqual(first, second)
     assert.equal(path.dirname(first), path.dirname(second))
     assert.equal(path.dirname(path.dirname(first)), projectTempDir)
+    assert.deepEqual(
+        (await readdir(path.dirname(first))).toSorted(),
+        [path.basename(first), path.basename(second)].toSorted()
+    )
     assert.deepEqual(await readdir(first), [])
     assert.deepEqual(await readdir(second), [])
 

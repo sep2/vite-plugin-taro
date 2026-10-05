@@ -4,9 +4,9 @@ import { cpSync, existsSync, globSync, mkdirSync, mkdtempSync, readFileSync, rmS
 import path from 'node:path'
 import test, { type TestContext } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { projectTempDir } from '../packages/vite-plugin-taro/src/node/tests/project-temp-dir.ts'
 import series from '../patches/series.json' with { type: 'json' }
 import { composePatchSeries } from './compose-patch-series.ts'
+import { projectTempDir } from './project-temp-dir.ts'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 

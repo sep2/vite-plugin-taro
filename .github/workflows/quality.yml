@@ -40,7 +40,7 @@ jobs:
         run: node --test --test-reporter=./scripts/ci-test-reporter.ts scripts/*.test.ts
 
       - name: Enforce 100% coverage
-        run: pnpm test:coverage --test-reporter=../../scripts/ci-test-reporter.ts
+        run: pnpm --filter vite-plugin-taro exec c8 node --test --test-reporter=../../scripts/ci-test-reporter.ts --test-concurrency=4 "src/**/*.test.ts" "scripts/**/*.test.ts"
 
       - name: Test native component TikTok demo
         run: pnpm --filter native-comp-demo test
@@ -97,8 +97,8 @@ jobs:
         run: node --test --test-reporter=./scripts/ci-test-reporter.ts scripts/*.test.ts
 
       - name: Test
-        # Fixture output lives under the Git-ignored root tmp/ directory, outside Tailwind's source scan.
-        run: pnpm --filter vite-plugin-taro exec node --test --test-reporter=../../scripts/ci-test-reporter.ts --test-concurrency=2
+        # Limit discovery to source tests; tmp/ contains generated fixtures.
+        run: pnpm --filter vite-plugin-taro exec node --test --test-reporter=../../scripts/ci-test-reporter.ts --test-concurrency=2 "src/**/*.test.ts" "scripts/**/*.test.ts"
 
       - name: Test native component TikTok demo
         run: pnpm --filter native-comp-demo test

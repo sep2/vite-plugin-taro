@@ -17,7 +17,7 @@ import test, { type TestContext } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import config from '../.changeset/config.json' with { type: 'json' }
-import { projectTempDir } from '../packages/vite-plugin-taro/src/node/tests/project-temp-dir.ts'
+import { projectTempDir } from './project-temp-dir.ts'
 
 interface PackageManifest {
     name: string

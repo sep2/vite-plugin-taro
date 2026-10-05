@@ -7,8 +7,8 @@ import type { Readable } from 'node:stream'
 import { finished } from 'node:stream/promises'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
-import { projectTempDir } from '../../../packages/vite-plugin-taro/src/node/tests/project-temp-dir.ts'
 import { createProcessScope } from './create-process-scope.ts'
+import { projectTempDir } from './project-temp-dir.ts'
 
 export type DevToolsProjectHarness = Readonly<{
     inputElement: (selector: string, value: string) => Promise<void>

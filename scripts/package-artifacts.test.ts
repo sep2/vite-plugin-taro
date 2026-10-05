@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url'
 import creatorPackage from '../packages/create-vite-taro/package.json' with { type: 'json' }
 import runtimePackage from '../packages/taro-runtime/package.json' with { type: 'json' }
 import pluginPackage from '../packages/vite-plugin-taro/package.json' with { type: 'json' }
-import { projectTempDir } from '../packages/vite-plugin-taro/src/node/tests/project-temp-dir.ts'
+import { projectTempDir } from './project-temp-dir.ts'
 
 const repoRoot = fileURLToPath(new URL('../', import.meta.url))
 const publicPackages = [runtimePackage, pluginPackage, creatorPackage]

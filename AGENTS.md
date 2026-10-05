@@ -25,7 +25,7 @@
 - Keep tools timeouts at 30 seconds or less.
 - All spawned processes must be closed after tests, dev, etc. no dangling processes.
 - Tests also run on Windows, consider path variants.
-- Put all generated test fixtures and scratch files under the repository-root `tmp/` directory (Git-ignored), not OS temp or scattered workspace folders. Use `projectTempDir` from `packages/vite-plugin-taro/src/node/tests/project-temp-dir.ts`; clean up only the files owned by each test. Agent test logs and diagnostics also belong under `tmp/`.
+- Put generated test fixtures, scratch files, agent test logs, and diagnostics under the owning project's Git-ignored `tmp/`: `packages/vite-plugin-taro/tmp/` for plugin tests, `demo/<name>/tmp/` for demo tests. Clean up only the files owned by each test.
 - If a user instruction conflicts with any `AGENTS.md` rule, ask for explicit confirmation before overriding it.
 
 ## Workspace

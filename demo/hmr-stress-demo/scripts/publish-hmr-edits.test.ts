@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { test } from 'node:test'
-import { projectTempDir } from '../../../packages/vite-plugin-taro/src/node/tests/project-temp-dir.ts'
+import { projectTempDir } from './project-temp-dir.ts'
 import { publishHmrEdits } from './publish-hmr-edits.ts'
 
 const baseline = "export const hmrMarker = 'baseline'\nexport const appOutletFirst = true\n"
@@ -14,6 +14,7 @@ test('publication awaits restoration and baseline application', async () => {
     // Record the runtime acknowledgements in order, alongside the generation on disk.
     const observed: string[] = []
     try {
+        assert.equal(path.dirname(root), path.resolve(import.meta.dirname, '../tmp'))
         await writeFile(file, baseline)
         await publishHmrEdits(file, profile, async (marker) => {
             assert.ok((await readFile(file, 'utf8')).includes(`hmrMarker = '${marker}'`))

@@ -4,7 +4,7 @@ import { cp, type FileHandle, mkdir, open, readFile, rm, symlink, unlink, writeF
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
-import { projectTempDir } from '../../../packages/vite-plugin-taro/src/node/tests/project-temp-dir.ts'
+import { projectTempDir } from './project-temp-dir.ts'
 import { writeFixtureSource } from './write-fixture-source.ts'
 
 export type LoanHmrFixture = Readonly<{
