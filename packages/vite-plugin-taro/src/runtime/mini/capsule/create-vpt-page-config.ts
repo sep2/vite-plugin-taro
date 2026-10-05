@@ -1,5 +1,4 @@
 import { createPageConfig as createTaroPageConfig, type MiniElementData } from 'vite-plugin-taro-runtime/runtime/mini'
-import type { VptPageOption } from '../../../options.ts'
 import { prerenderToData } from './prerender-to-data.ts'
 
 export type PageData = {
@@ -7,10 +6,12 @@ export type PageData = {
     page: { cn: MiniElementData['cn'] }
 }
 
+export type VptPageOptions = { path: string; config: Record<string, unknown>; prerender: boolean }
+
 /** Prepares the original Taro config for native registration, capturing the seed when prerendering. */
 export function createVptPageConfig(
     component: Parameters<typeof createTaroPageConfig>[0],
-    vptPageOptions: VptPageOption
+    vptPageOptions: { path: string; config: Record<string, unknown>; prerender: boolean }
 ) {
     const { path: routePath, config: pageConfig, prerender } = vptPageOptions
     /*

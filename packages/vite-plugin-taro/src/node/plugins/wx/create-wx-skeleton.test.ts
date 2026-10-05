@@ -42,11 +42,15 @@ const contract = createWxMiniContract({
     }
 })
 
-test('preserves application glass-easel settings without injecting Page overrides', () => {
+test('preserves top-level application glass-easel settings without injecting Page overrides', () => {
     const configured = createWxMiniContract({
         ...contract.options,
         pages: [{ path: 'pages/inherited' }, { path: 'pages/disabled', config: { glassEaselWebview: false } }],
-        appJson: { componentFramework: 'glass-easel', window: { glassEaselWebview: true } }
+        appJson: {
+            componentFramework: 'glass-easel',
+            glassEaselWebview: true,
+            window: { navigationBarTitleText: 'Example' }
+        }
     })
     const output = configured.output.generateProjectSkeleton(
         { bundle: {}, subpackages: [], nativeComponents: [], isProduction: true },
@@ -54,8 +58,9 @@ test('preserves application glass-easel settings without injecting Page override
     )
     const assets = new Map(output.map((asset) => [asset.fileName, String(asset.source)]))
     const app = JSON.parse(assets.get('app.json') ?? '')
-    assert.equal(app.window.glassEaselWebview, true)
-    assert.equal(app.glassEaselWebview, undefined)
+    assert.equal(app.componentFramework, 'glass-easel')
+    assert.equal(app.glassEaselWebview, true)
+    assert.deepEqual(app.window, { navigationBarTitleText: 'Example' })
     assert.equal(JSON.parse(assets.get('pages/inherited.json') ?? '').glassEaselWebview, undefined)
     assert.equal(JSON.parse(assets.get('pages/disabled.json') ?? '').glassEaselWebview, false)
 })

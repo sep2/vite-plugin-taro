@@ -14,10 +14,21 @@ Skyline 是微信小程序的新一代渲染引擎。它减少了传统 WebView 
 ```ts
 vpt({
     // ...
+    pages: [
+        {
+            path: 'pages/home/index',
+            config: {
+                glassEaselWebview: true,
+                navigationStyle: 'custom',
+                navigationBarTextStyle: 'black'
+            }
+        }
+    ],
     appJson: {
         lazyCodeLoading: 'requiredComponents',
         renderer: 'skyline',
         componentFramework: 'glass-easel',
+        glassEaselWebview: true,
         rendererOptions: {
             skyline: {
                 defaultDisplayBlock: true,
@@ -26,7 +37,6 @@ vpt({
             }
         },
         window: {
-            glassEaselWebview: true,
             navigationStyle: 'custom'
         }
     },
@@ -44,7 +54,7 @@ vpt({
 | --- |----------------------------------------------------------------|
 | `renderer: 'skyline'` | 为页面选择 Skyline 渲染引擎。                                  |
 | `componentFramework: 'glass-easel'` | 使用支持 Skyline 的组件框架。                                  |
-| `window.glassEaselWebview: true` | 使用 WebView 及 Skyline 回退使用 glass-easel 运行时。          |
+| `glassEaselWebview: true` | 确保 WebView 及 Skyline 回退时使用 glass-easel 运行时。          |
 | `lazyCodeLoading: 'requiredComponents'` | 按需注入页面所需组件。                                         |
 | `defaultDisplayBlock` | 将 Skyline 节点的默认布局从 `flex` 调整为 `block`。            |
 | `defaultContentBox` | 将默认盒模型从 `border-box` 调整为 `content-box`，更接近 Web。 |
@@ -78,13 +88,13 @@ projectConfigJson: {
 
 ### 全局开启
 
-把 `renderer` 和 `componentFramework` 放在 `appJson` 中，所有页面都会请求 Skyline。全局 `glassEaselWebview` 必须放在 `appJson.window` 中，而不是 `appJson` 顶层；页面级设置则直接写在 `page.config` 中。默认模板使用这种方式：
+把 `renderer` 和 `componentFramework` 放在 `appJson` 中，所有页面都会请求 Skyline。按照[微信 glass-easel 迁移文档](https://developers.weixin.qq.com/miniprogram/dev/framework/custom-component/glass-easel/migration.html)，全局 `glassEaselWebview` 放在 `appJson` 顶层，与 `componentFramework` 并列，而不是放进 `appJson.window`；页面级设置则直接写在 `page.config` 中。仅设置 `componentFramework` 会启用 glass-easel WXML 编译器，但不保证 WebView 使用 glass-easel 运行时；同时设置 `glassEaselWebview: true` 才能确保这一点。默认模板使用这种方式：
 
 ```ts
 appJson: {
     renderer: 'skyline',
     componentFramework: 'glass-easel',
-    window: { glassEaselWebview: true },
+    glassEaselWebview: true,
     rendererOptions: {
         skyline: {
             defaultDisplayBlock: true,
@@ -112,13 +122,13 @@ pages: [
     },
     {
         path: 'pages/settings/index',
-        config: {}
+        config: { glassEaselWebview: true }
     }
 ],
 appJson: {
     lazyCodeLoading: 'requiredComponents',
     componentFramework: 'glass-easel',
-    window: { glassEaselWebview: true },
+    glassEaselWebview: true,
     rendererOptions: {
         skyline: {
             defaultDisplayBlock: true,

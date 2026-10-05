@@ -97,9 +97,9 @@ function createAppJson(target: MiniTarget): VptJsonObject {
             return {
                 lazyCodeLoading: 'requiredComponents',
                 componentFramework: 'glass-easel',
+                glassEaselWebview: true,
                 renderer: 'webview',
                 window: {
-                    glassEaselWebview: true,
                     backgroundColor: '#e2e8f0',
                     navigationBarBackgroundColor: '#0f172a',
                     navigationBarTextStyle: 'white',

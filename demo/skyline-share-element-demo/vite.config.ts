@@ -18,6 +18,7 @@ export default defineConfig(({ mode }) => {
                 appJson: {
                     renderer: 'skyline',
                     componentFramework: 'glass-easel',
+                    glassEaselWebview: true,
                     lazyCodeLoading: 'requiredComponents',
                     rendererOptions: {
                         skyline: {
@@ -28,7 +29,6 @@ export default defineConfig(({ mode }) => {
                         }
                     },
                     window: {
-                        glassEaselWebview: true,
                         navigationStyle: 'custom',
                         navigationBarTextStyle: 'black'
                     }
