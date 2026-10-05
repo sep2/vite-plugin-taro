@@ -128,7 +128,7 @@ test('builds the real TT demo with native assets, named slots, events, and a laz
     assert.match(asset(output, 'base.ttml'), /<view slot="{{i.p0}}"/)
     assert.match(asset(output, 'app.ttss'), /assets\/global\.ttss/)
     assert.ok(asset(output, 'assets/global.ttss').length > 0)
-    assert.match(asset(output, 'common/vpt/transport.js'), /require\.async/)
+    assert.match(asset(output, 'common/vpt-transport.js'), /require\.async/)
 
     assert.equal(
         output.some(({ fileName }) => /\.(?:wxml|wxss|axml|acss)$/.test(fileName)),
