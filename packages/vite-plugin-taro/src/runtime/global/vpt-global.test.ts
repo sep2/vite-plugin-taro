@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
+import { readdirSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { stripTypeScriptTypes } from 'node:module'
+import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { isNativeError } from 'node:util/types'
@@ -759,4 +761,21 @@ test('does not overwrite a read-only undefined globalThis property during recove
         });
         assert.equal(Object.hasOwn(Object.prototype, '__vpt_global__'), false);
     `).runInContext(context)
+})
+
+test('runtime sources never import the standalone global provider directly', () => {
+    const runtimeRoot = fileURLToPath(new URL('../', import.meta.url))
+    const files = readdirSync(runtimeRoot, { recursive: true, withFileTypes: true }).filter(
+        (entry) => entry.isFile() && /\.[cm]?[jt]sx?$/.test(entry.name) && !entry.name.endsWith('.test.ts')
+    )
+
+    // Runtime sources must use globalThis; the compiler alone owns the standalone provider.
+    for (const entry of files) {
+        const filename = path.join(entry.parentPath, entry.name)
+        assert.doesNotMatch(
+            readFileSync(filename, 'utf8'),
+            /\b(?:from|import|require)\s*(?:\(\s*)?['"`][^'"`]*\bvpt-global\b/,
+            `${path.relative(runtimeRoot, filename)} must use globalThis instead of importing vpt-global directly`
+        )
+    }
 })

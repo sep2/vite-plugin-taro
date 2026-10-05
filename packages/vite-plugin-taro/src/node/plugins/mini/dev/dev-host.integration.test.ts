@@ -943,7 +943,7 @@ test('startup rebuilds after one published patch even when its complete history 
     assert.equal(parseHmrInfo(await readFile(fixture.infoPath, 'utf8')).buildId, freshInfo.buildId)
 })
 
-test('Compile after two acknowledged edits rebuilds the baseline and resumes HMR', async (context) => {
+test('Compile after acknowledged patch batches rebuilds the baseline and resumes HMR', async (context) => {
     const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'memory')
     context.after(fixture.close)
     const initialSource = await waitForFile(
@@ -953,18 +953,33 @@ test('Compile after two acknowledged edits rebuilds the baseline and resumes HMR
     )
     const info = parseHmrInfo(initialSource)
 
-    for (const seq of [1, 2]) {
-        await publishSourceGeneration(fixture.pagePath, renderPage(`compile regression edit ${seq}`))
-        const patches = await waitForFile(
+    // Track the runtime's applied frontier, not edit numbers: native watchers may produce multiple patches per save.
+    let appliedSeq = 0
+    for (const edits of [[1], [2, 3]]) {
+        // Deliberately retain multiple patches before the second ACK so this case does not depend on watcher timing.
+        for (const edit of edits) {
+            await publishSourceGeneration(fixture.pagePath, renderPage(`compile regression edit ${edit}`))
+            await waitForFile(
+                fixture.patchesPath,
+                (source) => source.includes(`compile regression edit ${edit}`),
+                maximumWaitAttempts
+            )
+        }
+        const patches = await waitForStableFile(
             fixture.patchesPath,
-            (source) => source.includes(`compile regression edit ${seq}`),
+            await readFile(fixture.patchesPath, 'utf8'),
+            stableReadCount,
             maximumWaitAttempts
         )
+        const sequences = [...patches.matchAll(/\{seq: (\d+)/g)].map((match) => Number(match[1]))
+        assert.ok(sequences.length >= edits.length)
         assert.deepEqual(
-            [...patches.matchAll(/\{seq: (\d+)/g)].map((match) => Number(match[1])),
-            [seq]
+            sequences,
+            Array.from({ length: sequences.length }, (_, index) => appliedSeq + index + 1),
+            'Publication must retain every unacknowledged patch and prune the previously acknowledged prefix'
         )
-        await sendRuntimeReport(info, { buildId: info.buildId, kind: 'applied', seq })
+        appliedSeq += sequences.length
+        await sendRuntimeReport(info, { buildId: info.buildId, kind: 'applied', seq: appliedSeq })
         await delay(50)
     }
 
@@ -974,7 +989,7 @@ test('Compile after two acknowledged edits rebuilds the baseline and resumes HMR
         await waitForFile(fixture.infoPath, (source) => source !== initialSource, maximumWaitAttempts)
     )
     await waitForFile(fixture.appStylePath, (source) => source.includes(freshInfo.buildId), maximumWaitAttempts)
-    await waitForJavaScriptOutput(fixture, 'compile regression edit 2', maximumWaitAttempts)
+    await waitForJavaScriptOutput(fixture, 'compile regression edit 3', maximumWaitAttempts)
     assert.doesNotMatch(await readFile(fixture.patchesPath, 'utf8'), /\{seq:/)
 
     await sendRuntimeReport(freshInfo, { buildId: freshInfo.buildId, kind: 'startup' })
