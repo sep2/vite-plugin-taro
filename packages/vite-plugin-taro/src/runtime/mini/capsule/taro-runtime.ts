@@ -12,8 +12,8 @@ import 'vite-plugin-taro-runtime/plugin-html/runtime'
 export { createReactApp } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
 export { default as ReactDOM } from 'vite-plugin-taro-runtime/react'
 export { createRecursiveComponentConfig } from 'vite-plugin-taro-runtime/runtime/mini'
-
 import { customWrapperCache } from 'vite-plugin-taro-runtime/runtime/mini'
+export { createVptPageConfig } from './create-vpt-page-config.ts'
 
 // Replaced by the compiler; Mini runtimes do not provide Node's process global or its ambient types.
 declare const process: { readonly env: { readonly NODE_ENV: string } }

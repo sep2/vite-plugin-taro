@@ -153,7 +153,6 @@ function assertPageRegistration(output: BuildOutput, target: VptTarget, route: s
         onLoad: () => undefined,
         eh: () => undefined
     }
-    Object.defineProperty(config, '__vpt_meta', { value: { skipPrerender: false } })
     // The isolated native host records exactly one registration; its capsule retains the Taro config identity.
     const registrations: Array<{ constructor: string; config: object }> = []
     const host = {

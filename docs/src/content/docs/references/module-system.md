@@ -200,7 +200,6 @@ pages/home/index.js
 pages/home/index-capsule.js
 common/vendor.js
 common/bootstrap.js
-common/vpt.js
 assets/logo-<hash>.png
 sub/p_abcd1234/common/report.js
 ```

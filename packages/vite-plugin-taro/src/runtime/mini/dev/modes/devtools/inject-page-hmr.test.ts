@@ -7,8 +7,7 @@ type TestPage = {
 }
 
 type PageConfigInput = {
-    __vpt_meta: { skipPrerender: boolean }
-    data: Record<string, unknown>
+    data: Record<string, unknown> | (() => Record<string, unknown>)
     onUnload?: (this: TestPage, ...args: unknown[]) => void
     onLoad?: (this: TestPage, ...args: unknown[]) => void
     onShow?: (this: TestPage, ...args: unknown[]) => void
@@ -54,12 +53,11 @@ async function createTestHarness(): Promise<TestHarness> {
             return { data: {} }
         },
         createBareConfig() {
-            return runtime.injectPageHmr({ __vpt_meta: { skipPrerender: false }, data: { root: { cn: [] } } })
+            return runtime.injectPageHmr({ data: { root: { cn: [] } } })
         },
         createConfig(originals) {
             const config = {
-                __vpt_meta: { skipPrerender: false },
-                data: { root: { cn: [] } },
+                data: originals?.data ?? { root: { cn: [] } },
                 onUnload: originals?.onUnload ?? (() => {}),
                 onLoad: originals?.onLoad ?? (() => {}),
                 onShow: originals?.onShow ?? (() => {})
@@ -107,8 +105,8 @@ test('scopes re-registration lifecycles to their static Page configuration', asy
     primaryConfig.onLoad.call(primary)
     mirrorConfig.onLoad.call(mirror)
     harness.reregisterPage(mirrorConfig)
-    assert.equal(primaryConfig.__vpt_meta.skipPrerender, false)
-    assert.equal(mirrorConfig.__vpt_meta.skipPrerender, true)
+    assert.equal(Object.hasOwn(primaryConfig, '__vpt_meta'), false)
+    assert.equal(Object.hasOwn(mirrorConfig, '__vpt_meta'), false)
     primaryConfig.onUnload.call(primary)
     mirrorConfig.onUnload.call(mirror)
 
@@ -134,7 +132,6 @@ test('does not arm re-registration before mount or after an ordinary unload', as
 
     harness.reregisterPage(config)
     assert.strictEqual(config.data, initialData)
-    assert.equal(config.__vpt_meta.skipPrerender, false)
 
     const firstPage = harness.createPage()
     config.onLoad.call(firstPage, 'first-load')
@@ -144,7 +141,6 @@ test('does not arm re-registration before mount or after an ordinary unload', as
     firstPage.data = { stale: true }
     harness.reregisterPage(config)
     assert.strictEqual(config.data, initialData)
-    assert.equal(config.__vpt_meta.skipPrerender, false)
 
     const nextPage = harness.createPage()
     config.onLoad.call(nextPage, 'next-load')
@@ -178,7 +174,6 @@ test('glass-easel registration preserves initial data and forwards real navigati
     const initialData = config.data
     const onLoad = config.onLoad
     Object.freeze(config)
-    Object.freeze(config.__vpt_meta)
     Object.freeze(initialData)
     const groupUpdates = () => assert.fail('Framework detection must not invoke the native method')
     const firstPage = { data: { count: 7 }, groupUpdates }
@@ -191,7 +186,6 @@ test('glass-easel registration preserves initial data and forwards real navigati
         harness.reregisterPage(config)
         assert.strictEqual(config.onLoad, onLoad, 'lifecycles must not be wrapped again')
         assert.strictEqual(config.data, initialData)
-        assert.equal(config.__vpt_meta.skipPrerender, false)
         assert.deepEqual(firstPage.data, { count: 7 })
     }
     config.onUnload.call(firstPage)
@@ -201,7 +195,6 @@ test('glass-easel registration preserves initial data and forwards real navigati
     config.onLoad.call(nextPage)
     config.onShow.call(nextPage)
     harness.reregisterPage(config)
-    assert.equal(config.__vpt_meta.skipPrerender, false)
     assert.deepEqual(calls, [
         { kind: 'load', page: firstPage },
         { kind: 'show', page: firstPage },
@@ -228,19 +221,18 @@ test('detects the framework per mounted Page rather than per target or App', asy
     harness.reregisterPage(legacyConfig)
 
     assert.strictEqual(glassConfig.data, initialData)
-    assert.equal(glassConfig.__vpt_meta.skipPrerender, false)
     assert.strictEqual(legacyConfig.data, legacyPage.data)
-    assert.equal(legacyConfig.__vpt_meta.skipPrerender, true)
     legacyConfig.onShow.call(legacyPage)
-    assert.equal(legacyConfig.__vpt_meta.skipPrerender, false)
 })
 
-test('keeps prerender control separate from the re-registration lifecycle gate', async () => {
+test('legacy re-registration replaces data factories with snapshots without prerendering', async (t) => {
     const harness = await createTestHarness()
     const page = harness.createPage()
-    // This mutable trace verifies lifecycle forwarding independently of the native prerender flag.
+    // This mutable trace distinguishes synthetic re-registration from ordinary navigation.
     const calls: string[] = []
+    const dataFactory = t.mock.fn(() => ({ count: 0 }))
     const config = harness.createConfig({
+        data: dataFactory,
         onLoad() {
             calls.push('load')
         },
@@ -252,15 +244,16 @@ test('keeps prerender control separate from the re-registration lifecycle gate',
         }
     })
 
-    // Skipping prerender must not suppress ordinary lifecycles.
-    config.__vpt_meta.skipPrerender = true
+    assert.strictEqual(config.data, dataFactory)
+    page.data = dataFactory()
     config.onLoad.call(page)
     config.onShow.call(page)
-    assert.deepEqual(calls, ['load', 'show'])
+    page.data.count = 7
 
     harness.reregisterPage(config)
-    // Changing native prerender control must not disarm the private re-registration gate.
-    config.__vpt_meta.skipPrerender = false
+    assert.strictEqual(config.data, page.data)
+    assert.equal(dataFactory.mock.callCount(), 1, 'hot registration uses the native snapshot instead of rendering')
+    assert.equal(Object.hasOwn(config, '__vpt_meta'), false, 'HMR needs no prerender metadata')
     config.onUnload.call(page)
     config.onLoad.call(page)
     config.onShow.call(page)
@@ -357,7 +350,6 @@ test('retains native data and suppresses re-registration business lifecycles', a
     lifecycleCalls.length = 0
 
     harness.reregisterPage(config)
-    assert.equal(config.__vpt_meta.skipPrerender, true)
     config.onUnload.call(page)
 
     assert.strictEqual(config.data, page.data)
@@ -365,7 +357,6 @@ test('retains native data and suppresses re-registration business lifecycles', a
     config.onLoad.call(transientPage)
     config.onShow.call(transientPage)
 
-    assert.equal(config.__vpt_meta.skipPrerender, false)
     assert.deepEqual(lifecycleCalls, [])
     assert.deepEqual(transientPage.data, { root: { cn: ['preserved'] } })
     assert.strictEqual(config.data, transientPage.data)

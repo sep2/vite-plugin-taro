@@ -387,6 +387,17 @@ test('creates the Mini Program Page capsule after App initialization with one op
     assert.strictEqual(calls[1]?.args[1], vptPageOptions)
 })
 
+test('Taro PageInstance accepts native data objects and factories without a VPT type override', () => {
+    const seed = { app: { cn: [] }, page: { cn: [] } }
+    // Native registration may replace only this field while retaining the original Page config.
+    const config: PageInstance = { data: seed }
+    assert.strictEqual(config.data, seed)
+    config.data = () => seed
+    assert.strictEqual(config.data(), seed)
+    config.data = undefined
+    assert.equal(config.data, undefined)
+})
+
 test('prerender stores its identity inside the non-enumerable VPT metadata', async () => {
     // The journal captures mount/lookup/serialization order without replacing any native lifecycle.
     const calls: Call[] = []
@@ -444,10 +455,7 @@ test('prerender stores its identity inside the non-enumerable VPT metadata', asy
         assert.equal(Object.getOwnPropertyDescriptor(config, '__vpt_meta')?.enumerable, false)
         assert.equal(Object.hasOwn({ ...config }, '__vpt_meta'), false)
         assert.deepEqual(Object.keys(config), ['data'])
-        assert.strictEqual(config.__vpt_meta.component, component)
-        assert.equal(config.__vpt_meta.route, 'pages/example')
-        assert.equal(config.__vpt_meta.skipPrerender, false)
-        assert.equal(config.__vpt_meta.prerenderIdentity, undefined)
+        assert.deepEqual(config.__vpt_meta, {})
         assert.deepEqual(Object.getOwnPropertyNames(config), ['data', '__vpt_meta'])
         assert.deepEqual(
             calls.map(({ name }) => name),
@@ -459,17 +467,9 @@ test('prerender stores its identity inside the non-enumerable VPT metadata', asy
         assert.equal(Object.hasOwn(config, 'prerenderToData'), false)
         assert.equal(calls[0]?.args.length, 4, 'no identity-reader argument is added to createPageConfig')
 
-        // Skipped HMR registration must preserve the seed and leave routing and rendering untouched.
+        // Observe per-instance work only after config construction has completed.
         calls.length = 0
-        const previousRouter = Reflect.get(harness.Current, 'router')
-        config.__vpt_meta.skipPrerender = true
-        assert.strictEqual(prerenderToData(config, seed), seed)
-        assert.strictEqual(Reflect.get(harness.Current, 'router'), previousRouter)
-        assert.equal(config.__vpt_meta.prerenderIdentity, undefined)
-        assert.deepEqual(calls, [])
-        config.__vpt_meta.skipPrerender = false
-
-        const result = prerenderToData(config, seed)
+        const result = prerenderToData(config, component, 'pages/example', seed)
         const router = Reflect.get(harness.Current, 'router')
         const initialPage = config.__vpt_meta.prerenderIdentity
         assert.deepEqual(initialPage, { path: 'pages/example?instance=1', params: router.params })
@@ -497,7 +497,7 @@ test('prerender stores its identity inside the non-enumerable VPT metadata', asy
             assert.equal(calls.length, 4)
         }
         assert.deepEqual(seed, { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } })
-        prerenderToData(config, seed)
+        prerenderToData(config, component, 'pages/example', seed)
         assert.equal(
             config.__vpt_meta.prerenderIdentity.path,
             'pages/example?instance=2',
@@ -554,7 +554,7 @@ test('mounts the current Page export instead of the cold native capsule baseline
         ['createPageConfig', 'accept']
     )
     assert.ok(exports.default && typeof exports.default === 'object')
-    assert.strictEqual(Reflect.get(exports.default, '__vpt_meta').component, LatestPage)
+    assert.deepEqual(Reflect.get(exports.default, '__vpt_meta'), {})
     assert.equal(Object.hasOwn(exports, 'prerenderToData'), false)
 })
 
@@ -684,8 +684,10 @@ test('createVptPageConfig selects native data form without copying the config', 
             eh: recordCall(calls, 'event', undefined)
         } satisfies PageInstance
         const initialPage = { path: 'pages/home/index?instance=1', params: query }
-        const prerenderToData = t.mock.fn((value: unknown, data: unknown) => {
+        const prerenderToData = t.mock.fn((value: unknown, component: unknown, route: string, data: unknown) => {
             assert.strictEqual(value, config, 'prerender uses the original Taro config')
+            assert.strictEqual(component, calls[1]?.args[0], 'the closure retains the Page component')
+            assert.equal(route, 'pages/home/index')
             assert.strictEqual(data, calls[1]?.args[2], 'the factory passes the captured seed, not config.data')
             return renderedData
         })
@@ -705,7 +707,11 @@ test('createVptPageConfig selects native data form without copying the config', 
         const harness = {
             prerenderToData,
             initialize: recordCall(calls, 'initialize', undefined),
-            createPageConfig: recordCall(calls, 'createPageConfig', config)
+            createPageConfig(...args: unknown[]) {
+                calls.push({ name: 'createPageConfig', args })
+                Reflect.set(config, 'data', args[2])
+                return config
+            }
         }
         const nativeConfig = executeRuntimeEntry(code, createExecutionContext(harness)).default
         assert.ok(nativeConfig && typeof nativeConfig === 'object')
@@ -713,7 +719,7 @@ test('createVptPageConfig selects native data form without copying the config', 
         const seed = calls[1]?.args[2]
         assert.deepEqual(seed, { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } })
         const metadata = Reflect.get(config, '__vpt_meta')
-        assert.equal(metadata.skipPrerender, false)
+        assert.deepEqual(Object.keys(metadata), [])
         // Configuration and registration must not consume a pending native-instance identity.
         metadata.prerenderIdentity = initialPage
         Object.freeze(metadata)
@@ -891,8 +897,13 @@ for (const prerender of [false, true]) {
             onShow: recordCall(calls, 'show', undefined),
             onUnload: recordCall(calls, 'unload', undefined)
         }
-        const createPageConfig = t.mock.fn((..._args: unknown[]) => originalConfig)
-        const prerenderToData = t.mock.fn((_config: unknown, data: unknown) => data)
+        const createPageConfig = t.mock.fn((...args: unknown[]) => {
+            Reflect.set(originalConfig, 'data', args[2])
+            return originalConfig
+        })
+        const prerenderToData = t.mock.fn(
+            (_config: unknown, _component: unknown, _route: string, data: unknown) => data
+        )
         const capsuleCode = await bundleRuntimeEntry({
             entry: 'mini/capsule/page.ts',
             mocks: {
@@ -951,7 +962,7 @@ for (const prerender of [false, true]) {
         assert.strictEqual(Reflect.get(config, 'data'), initialNativeData, 'HMR must preserve the data factory')
         assert.strictEqual(originalConfig.data, initialNativeData)
         assert.deepEqual(page.data, { count: 7 })
-        assert.equal(metadata.skipPrerender, false)
+        assert.deepEqual(metadata, {})
         assert.equal(
             prerenderToData.mock.callCount(),
             prerender ? 1 : 0,

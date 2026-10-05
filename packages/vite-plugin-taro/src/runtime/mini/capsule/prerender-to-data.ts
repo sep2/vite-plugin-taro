@@ -12,16 +12,19 @@ import {
     type MiniElementData
 } from 'vite-plugin-taro-runtime/runtime/mini'
 import { getPageQuery } from '../amphibious/vpt.ts'
-import type { PageData, PrerenderPageConfig } from './create-vpt-page-config.ts'
+import type { createVptPageConfig, PageData } from './create-vpt-page-config.ts'
 
 // One counter distinguishes native instances even when their route, query and creation timestamp match.
 const pageId = incrementId()
 
 /** Commits one Page into the existing App root and returns its initial native data without dispatching lifecycles. */
-export function prerenderToData(config: PrerenderPageConfig, initialData: PageData): PageData {
-    const { component, route, skipPrerender } = config.__vpt_meta
-
-    if (skipPrerender) {
+export function prerenderToData(
+    config: ReturnType<typeof createVptPageConfig>,
+    component: Parameters<typeof createVptPageConfig>[0],
+    route: string,
+    initialData: PageData
+): PageData {
+    if (!Current.app?.mount) {
         return initialData
     }
 
@@ -38,10 +41,6 @@ export function prerenderToData(config: PrerenderPageConfig, initialData: PageDa
         onReady: getOnReadyEventKey(route),
         onShow: getOnShowEventKey(route),
         onHide: getOnHideEventKey(route)
-    }
-
-    if (!Current.app?.mount) {
-        return initialData
     }
 
     flushSync(() => {

@@ -15,7 +15,6 @@ type PageHmrState = {
 }
 
 type HmrPageConfig = {
-    __vpt_meta: { skipPrerender: boolean }
     data: Record<string, unknown> | (() => Record<string, unknown>)
     onUnload?: unknown
     onLoad?: unknown
@@ -37,7 +36,6 @@ function forward(handler: unknown, page: unknown, args: unknown[]): void {
 
 /** Tracks the mounted native Page and prepares its static config for DevTools re-registration. */
 export function injectPageHmr(config: HmrPageConfig): HmrPageConfig {
-    const metadata = config.__vpt_meta
     const existingState = config[pageHmrStateKey]
 
     if (existingState) {
@@ -54,7 +52,6 @@ export function injectPageHmr(config: HmrPageConfig): HmrPageConfig {
 
         // Legacy hosts replay unload/load/show; onShow ends that native cycle.
         existingState.isReregistering = true
-        metadata.skipPrerender = true
         /*
          * Native registration reads `config.data` as the initial view-model for this registration. The Page owns current app
          * and ordinary Page fields, while each mounted CustomWrapper owns the current snapshot below its native boundary. Join
@@ -75,7 +72,7 @@ export function injectPageHmr(config: HmrPageConfig): HmrPageConfig {
     /*
      * This mutable config-local state spans ordinary Page mount/unmount and one DevTools re-registration lifecycle. Lifecycle
      * wrappers close over this exact object, while a later `injectPageHmr(config)` retrieves it through the symbol and avoids
-     * wrapping twice. The separate metadata flag controls only native prerendering, not lifecycle forwarding.
+     * wrapping twice. Only legacy hosts need the re-registration lifecycle gate.
      * Config-local ownership avoids route maps, runtime-global phase flags, and state shared by independent Page
      * registrations; the state becomes unreachable together with its static config.
      */
@@ -107,10 +104,8 @@ export function injectPageHmr(config: HmrPageConfig): HmrPageConfig {
 
     config.onShow = function (this: NativePage, ...args: unknown[]) {
         if (state.isReregistering) {
-            // DevTools' synthetic unload/load/show cycle ends here. Clear both flags so the next real navigation
-            // forwards ordinary Taro lifecycles and prerenders its own initial data.
+            // DevTools' synthetic unload/load/show cycle ends here; the next real navigation forwards lifecycles.
             state.isReregistering = false
-            metadata.skipPrerender = false
             return
         }
 

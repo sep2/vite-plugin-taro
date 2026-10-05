@@ -7,16 +7,6 @@ export type PageData = {
     page: { cn: MiniElementData['cn'] }
 }
 
-/** Native config with private prerender inputs and either a seed or a data factory. */
-export type PrerenderPageConfig = Omit<ReturnType<typeof createTaroPageConfig>, 'data'> & {
-    data: PageData | (() => PageData)
-    __vpt_meta: {
-        component: Parameters<typeof createTaroPageConfig>[0]
-        route: string
-        skipPrerender: boolean
-    }
-}
-
 /** Prepares the original Taro config for native registration, capturing the seed when prerendering. */
 export function createVptPageConfig(
     component: Parameters<typeof createTaroPageConfig>[0],
@@ -36,24 +26,16 @@ export function createVptPageConfig(
      */
     const initialData: PageData = { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } }
 
-    const taroPageConfig = createTaroPageConfig(component, routePath, initialData, pageConfig)
-
-    const config: PrerenderPageConfig = Object.assign(taroPageConfig, {
-        data: initialData,
-        __vpt_meta: {
-            component,
-            route: routePath,
-            // Page HMR skips prerendering during native re-registration and clears this flag onShow.
-            skipPrerender: false
-        }
+    const config = Object.assign(createTaroPageConfig(component, routePath, initialData, pageConfig), {
+        __vpt_meta: {}
     })
 
-    // Keep private inputs and the one-shot prerender identity out of native methods.
+    // Keep the one-shot prerender identity out of native registration.
     Object.defineProperty(config, '__vpt_meta', { enumerable: false })
 
     if (prerender) {
-        // Replace only the data field; the closure retains the seed for skipped or uncommitted renders.
-        config.data = () => prerenderToData(config, initialData)
+        // Keep render inputs in the closure; native onLoad only needs the prepared identity.
+        config.data = () => prerenderToData(config, component, routePath, initialData)
     }
 
     return config

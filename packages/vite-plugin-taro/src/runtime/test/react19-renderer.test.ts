@@ -438,18 +438,14 @@ async function checkNativeInitialData() {
     pageComponents['pages/first-frame'] = Page
     const dataFactory = config.data
     const metadata = config.__vpt_meta
-    // Read the retained seed without rendering, then restore ordinary per-instance prerendering.
-    metadata.skipPrerender = true
-    const initialData = dataFactory()
-    metadata.skipPrerender = false
-    assert.deepEqual(initialData, seed())
+    assert.deepEqual(metadata, {})
     const sourceData = prerenderToData({ id: 'source', full: 'a%3Db' })
     const initialRouter = Current.router
     const initialPage = metadata.prerenderIdentity
     assert.equal(initialPage.path, initialRouter.$taroPath)
     assert.strictEqual(initialPage.params, initialRouter.params)
     assert.strictEqual(config.data, dataFactory, 'native initialization preserves the capsule data factory')
-    assert.strictEqual(sourceData, initialData, 'cold startup keeps the seed and mounts asynchronously')
+    assert.deepEqual(sourceData, seed(), 'cold startup keeps the seed and mounts asynchronously')
     assert.equal(setAppValue, undefined, 'prerender must not force App initialization')
     assert.deepEqual(initialized, [])
     assert.deepEqual(effects, [])
@@ -459,9 +455,8 @@ async function checkNativeInitialData() {
     const source = native('pages/first-frame', sourceData)
     config.onLoad.call(source, { id: 'source', full: 'a%3Db' })
     assert.equal(metadata.prerenderIdentity, undefined, 'onLoad consumes the prepared identity immediately')
-    assert.strictEqual(config.__vpt_meta, metadata, 'onLoad preserves the remaining VPT metadata')
-    assert.equal(metadata.route, 'pages/first-frame')
-    assert.equal(metadata.skipPrerender, false)
+    assert.strictEqual(config.__vpt_meta, metadata, 'onLoad preserves the identity handoff object')
+    assert.deepEqual(Object.keys(metadata), ['prerenderIdentity'])
     assert.strictEqual(source.$taroParams, initialPage.params)
     assert.strictEqual(source.$taroParams, initialRouter.params)
     assert.equal(source.$taroPath, initialRouter.$taroPath)
