@@ -1,5 +1,6 @@
 type NativePage = {
     data: Record<string, unknown>
+    groupUpdates?: unknown
 }
 
 // A symbol cannot collide with native or Taro string-named Page options, and it lets a later injection recover the exact
@@ -22,6 +23,11 @@ type HmrPageConfig = {
     [pageHmrStateKey]?: PageHmrState
 }
 
+/** Detects the active glass-easel framework through its native instance API, not compiler configuration. */
+function isGlassEasel(page: NativePage): boolean {
+    return typeof page.groupUpdates === 'function'
+}
+
 /** Calls a native lifecycle with the same Page bound to `this` and the same arguments. */
 function forward(handler: unknown, page: unknown, args: unknown[]): void {
     if (typeof handler === 'function') {
@@ -40,18 +46,13 @@ export function injectPageHmr(config: HmrPageConfig): HmrPageConfig {
          * The static config can outlive a native Page instance. Before its first ordinary onLoad, or after a real onUnload,
          * there is no mounted Page or current view-model to carry into another registration. Leave the lifecycle gate unarmed
          * and preserve the config's existing initial data so a future real onLoad still enters Taro normally.
+         * Glass-easel retains native instances without replaying lifecycles, so it needs neither suppression nor snapshot handoff.
          */
-        if (!mountedPage) {
+        if (!mountedPage || isGlassEasel(mountedPage)) {
             return config
         }
 
-        /*
-         * Arm the lifecycle wrappers on this exact static config before native registration adapts it to Page or Component. DevTools then
-         * triggers an unload/load/show sequence for that native re-registration: unload and load observe `true` and return before
-         * entering Taro, preserving the mounted React tree and its original Page connection; show consumes the one-shot gate by
-         * restoring `false`. Ordinary navigation never enters this branch, and every Page config owns an independent state, so
-         * no route map, global phase, or Page identity comparison participates in the decision.
-         */
+        // Legacy hosts replay unload/load/show; onShow ends that native cycle.
         existingState.isReregistering = true
         metadata.skipPrerender = true
         /*
@@ -83,7 +84,7 @@ export function injectPageHmr(config: HmrPageConfig): HmrPageConfig {
         mountedPage: undefined
     }
 
-    // Handoff state belongs to the static config, not the native methods copied by the Component constructor adapter.
+    // Handoff state belongs to the static config, not the properties copied into native registration.
     Object.defineProperty(config, pageHmrStateKey, { value: state })
 
     config.onUnload = function (this: NativePage, ...args: unknown[]) {

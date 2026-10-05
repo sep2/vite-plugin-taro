@@ -41,19 +41,13 @@ let runtimeId = 0
 async function createTestHarness(): Promise<TestHarness> {
     customWrapperCache.clear()
     Reflect.set(globalThis, customWrapperCacheKey, customWrapperCache)
-    Object.assign(globalThis, {
-        wx: {
-            request(options: { success: () => void }): void {
-                options.success()
-            }
-        }
-    })
-
     runtimeId++
     await import(`../../../../wx/dev/devtools-runtime.ts?page-hmr-test=${runtimeId}`)
 
     const runtime = (globalThis as typeof globalThis & { __rolldown_runtime__?: TestRuntime }).__rolldown_runtime__
-    if (!runtime) throw new Error('Mini Program dev runtime was not installed')
+    if (!runtime) {
+        throw new Error('Mini Program dev runtime was not installed')
+    }
 
     return {
         createPage() {
@@ -163,6 +157,82 @@ test('does not arm re-registration before mount or after an ordinary unload', as
         { kind: 'load', page: nextPage, args: ['next-load'] },
         { kind: 'show', page: nextPage, args: ['next-show'] }
     ])
+})
+
+test('glass-easel registration preserves initial data and forwards real navigation without deferred cleanup', async (t) => {
+    const harness = await createTestHarness()
+    t.mock.method(globalThis, 'queueMicrotask', () => assert.fail('Page registration needs no deferred cleanup'))
+    // Only real navigation contributes lifecycle observations; glass-easel retains the instance during hot registration.
+    const calls: Array<{ kind: string; page: TestPage }> = []
+    const config = harness.createConfig({
+        onLoad() {
+            calls.push({ kind: 'load', page: this })
+        },
+        onUnload() {
+            calls.push({ kind: 'unload', page: this })
+        },
+        onShow() {
+            calls.push({ kind: 'show', page: this })
+        }
+    })
+    const initialData = config.data
+    const onLoad = config.onLoad
+    Object.freeze(config)
+    Object.freeze(config.__vpt_meta)
+    Object.freeze(initialData)
+    const groupUpdates = () => assert.fail('Framework detection must not invoke the native method')
+    const firstPage = { data: { count: 7 }, groupUpdates }
+    config.onLoad.call(firstPage)
+    config.onShow.call(firstPage)
+
+    // Glass-easel must not consult or materialize native snapshots.
+    Reflect.deleteProperty(globalThis, customWrapperCacheKey)
+    for (let update = 0; update < 2; update++) {
+        harness.reregisterPage(config)
+        assert.strictEqual(config.onLoad, onLoad, 'lifecycles must not be wrapped again')
+        assert.strictEqual(config.data, initialData)
+        assert.equal(config.__vpt_meta.skipPrerender, false)
+        assert.deepEqual(firstPage.data, { count: 7 })
+    }
+    config.onUnload.call(firstPage)
+    harness.reregisterPage(config)
+
+    const nextPage = { data: { count: 0 }, groupUpdates }
+    config.onLoad.call(nextPage)
+    config.onShow.call(nextPage)
+    harness.reregisterPage(config)
+    assert.equal(config.__vpt_meta.skipPrerender, false)
+    assert.deepEqual(calls, [
+        { kind: 'load', page: firstPage },
+        { kind: 'show', page: firstPage },
+        { kind: 'unload', page: firstPage },
+        { kind: 'load', page: nextPage },
+        { kind: 'show', page: nextPage }
+    ])
+})
+
+test('detects the framework per mounted Page rather than per target or App', async () => {
+    const harness = await createTestHarness()
+    const glassConfig = harness.createConfig()
+    const legacyConfig = harness.createConfig()
+    const initialData = glassConfig.data
+    const glassPage = {
+        data: { count: 7 },
+        groupUpdates: () => assert.fail('Framework detection must not invoke the native method')
+    }
+    const legacyPage = { data: { count: 3 }, groupUpdates: false }
+
+    glassConfig.onLoad.call(glassPage)
+    legacyConfig.onLoad.call(legacyPage)
+    harness.reregisterPage(glassConfig)
+    harness.reregisterPage(legacyConfig)
+
+    assert.strictEqual(glassConfig.data, initialData)
+    assert.equal(glassConfig.__vpt_meta.skipPrerender, false)
+    assert.strictEqual(legacyConfig.data, legacyPage.data)
+    assert.equal(legacyConfig.__vpt_meta.skipPrerender, true)
+    legacyConfig.onShow.call(legacyPage)
+    assert.equal(legacyConfig.__vpt_meta.skipPrerender, false)
 })
 
 test('keeps prerender control separate from the re-registration lifecycle gate', async () => {

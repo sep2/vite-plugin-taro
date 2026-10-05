@@ -264,6 +264,8 @@ test('adapts physical wx development output without changing configured filename
     assert.equal(devMode.lazy, false)
     assert.equal(devMode.skipCommonRuntimeInjection, true)
     assertRuntimeWrapper(devMode.implement)
+    assert.ok(typeof devMode.implement === 'string')
+    assert.match(devMode.implement, /groupUpdates/, 'WX must detect the active framework on the native Page instance')
 
     const banner = output.banner
     assert.equal(typeof banner, 'function')
