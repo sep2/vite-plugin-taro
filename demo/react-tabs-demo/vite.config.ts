@@ -37,6 +37,7 @@ function createPageJson(target: VptTarget): VptJsonObject {
     switch (target) {
         case 'wx': {
             return {
+                glassEaselWebview: true,
                 navigationStyle: 'custom',
                 navigationBarTextStyle: 'black'
             }

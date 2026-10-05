@@ -80,6 +80,8 @@ function createPageJson(target: MiniTarget, title: string): VptJsonObject {
     switch (target) {
         case 'wx': {
             return {
+                // The WebView simulator (SDK 3.17.2) ignores the app-level flag; select the runtime per Page.
+                glassEaselWebview: true,
                 navigationBarTitleText: title
             }
         }

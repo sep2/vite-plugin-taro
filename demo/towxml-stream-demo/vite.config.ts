@@ -19,6 +19,7 @@ export default defineConfig(({ mode }) => {
                     {
                         path: 'pages/index/index',
                         config: {
+                            glassEaselWebview: true,
                             navigationBarTitleText: 'Towxml Stream'
                         }
                     }

@@ -29,15 +29,15 @@ export default defineConfig(({ mode }) => {
                 pages: [
                     {
                         path: 'pages/calculator/index',
-                        config: {}
+                        config: createPageJson(target)
                     },
                     {
                         path: 'pages/calculator/monthly-payments/index',
-                        config: {}
+                        config: createPageJson(target)
                     },
                     {
                         path: 'pages/calculator/history/index',
-                        config: {}
+                        config: createPageJson(target)
                     }
                 ],
                 appJson: createAppJson(target),
@@ -82,6 +82,10 @@ function getTarget(env: Record<string, string>): VptTarget {
     }
 
     throw new Error(`${targetEnvName} must be "wx", "zfb", "tt", or "h5".`)
+}
+
+function createPageJson(target: VptTarget): VptJsonObject {
+    return target === 'wx' ? { glassEaselWebview: true } : {}
 }
 
 /** Selects only configuration keys supported by the active Mini Program runtime. */

@@ -44,7 +44,12 @@ export default defineConfig(({ mode }) => {
 
 function createPageJson(target: MiniTarget, title: string): VptJsonObject {
     switch (target) {
-        case 'wx':
+        case 'wx': {
+            return {
+                glassEaselWebview: true,
+                navigationBarTitleText: title
+            }
+        }
         case 'tt': {
             return {
                 navigationBarTitleText: title

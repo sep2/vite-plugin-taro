@@ -152,6 +152,10 @@ test('public packages preserve their published entrypoints and scaffold dependen
         assert.match(config, /env\.VITE_VPT_TIKTOK_APP_ID\b/)
         assert.match(config, /disableABTest: true/)
         assert.match(config, /componentFramework: 'glass-easel',\s+glassEaselWebview: true/)
+        assert.match(
+            config,
+            /function createPageJson\(target: VptTarget\): VptJsonObject \{\s+switch \(target\) \{\s+case 'wx': \{\s+return \{\s+glassEaselWebview: true/
+        )
         assert.doesNotMatch(config, /window:\s*\{[^}]*glassEaselWebview:/)
         assert.doesNotMatch(config, /sdkVersionBegin|sdkVersionEnd/)
         const project = JSON.parse(readFileSync(path.join(projectPath, 'package.json'), 'utf8'))

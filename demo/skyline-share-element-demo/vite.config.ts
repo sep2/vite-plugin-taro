@@ -14,7 +14,10 @@ export default defineConfig(({ mode }) => {
             vpt({
                 target: 'wx',
                 app: 'src/app.tsx',
-                pages: [{ path: 'pages/gallery/gallery' }, { path: 'pages/detail/detail', prerender: true }],
+                pages: [
+                    { path: 'pages/gallery/gallery', config: { glassEaselWebview: true } },
+                    { path: 'pages/detail/detail', prerender: true, config: { glassEaselWebview: true } }
+                ],
                 appJson: {
                     renderer: 'skyline',
                     componentFramework: 'glass-easel',

@@ -24,7 +24,10 @@ export default defineConfig(({ mode }) => {
                     config:
                         target === 'zfb'
                             ? { defaultTitle: `${appTitle}: ${name}` }
-                            : { navigationBarTitleText: `${appTitle}: ${name}` }
+                            : {
+                                  navigationBarTitleText: `${appTitle}: ${name}`,
+                                  ...(target === 'wx' ? { glassEaselWebview: true } : {})
+                              }
                 })),
                 appJson: createAppJson(target),
                 projectConfigJson: createProjectConfigJson(target, env),
