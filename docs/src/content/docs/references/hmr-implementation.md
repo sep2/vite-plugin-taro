@@ -5,7 +5,7 @@ description: vpt 如何通过原生补丁、解释器或完整重建更新微信
 
 vpt 的微信热更新不是浏览器 HMR 的直接移植。它提供三种开发更新模式：
 
-- `devtools` 把原生 JavaScript 补丁写入 `dist/wx`，借助开发者工具的 Page 热重载执行，再保护原 Taro/React 页面连接；
+- `devtools` 把原生 JavaScript 补丁写入 `dist/wx`，借助开发者工具重新执行 Page 入口，更新原有 Taro/React 页面；
 - `interpreter` 通过 Vite 已有 WebSocket 推送源码，由 App 中的 Sval 安装模块实现，不重新注册 Page；
 - `rebuild` 不交付增量补丁，每次有效源码变化都让 Rolldown 写出完整原生项目并重启 App。
 
@@ -20,10 +20,10 @@ vpt 的微信热更新不是浏览器 HMR 的直接移植。它提供三种开�
 | 变化 | 被替换的内容 | 状态结果 |
 | --- | --- | --- |
 | 模块热更新 | App 内存中的部分 JavaScript 模块 | App 和兼容的 React 组件状态保留 |
-| 开发者工具替换 Page（仅 `devtools`） | 当前微信 Page 对象 | vpt 保留原 React/Taro 页面连接并抑制替换生命周期 |
+| 开发者工具重新执行 Page 入口（仅 `devtools`） | Page JavaScript 注册代码 | glass-easel 保留原生 Page 实例，不重放页面生命周期 |
 | 完整构建 | 整个 `dist/wx` 代码基线和 App 运行环境 | 所有运行时状态重置 |
 
-`devtools` 的成功更新通常同时包含前两项，页面交接使第二项看起来像没有发生。`interpreter` 只执行第一项。`rebuild` 对每次有效变化都直接执行第三项。
+`devtools` 的成功更新通常同时包含前两项，但重新执行入口不等于销毁并重建原生页面。`interpreter` 只执行第一项。`rebuild` 对每次有效变化都直接执行第三项。
 
 在补丁模式中，完整构建是恢复手段。只要局部替换无法证明安全，vpt 就生成新基线并允许开发者工具重启 App。
 
@@ -66,7 +66,7 @@ React Refresh 不会把状态序列化后重建。它只能更新仍然存活的
 | App 模块运行时 | 保存模块图、缓存、热更新边界和已应用序号 |
 | Sval（仅 `interpreter`） | 解析并解释 Rolldown 模块注册程序与更新后的模块实现 |
 | React Refresh | 判断组件边界是否兼容，并更新现有 React 树 |
-| Taro 页面交接（仅 `devtools`） | 在开发者工具重新注册 Page 时保留原页面连接 |
+| 平台 Page 注册策略（仅 `devtools`） | WX 直接保留配置和生命周期；其他平台使用既有交接实现 |
 
 ## 初始构建建立的基础
 
@@ -148,7 +148,7 @@ Socket 打开前跳过 Page 补丁执行，不暂存补丁或 ACK；由启动报
                                React Refresh → WebSocket 报告已应用序号
 ```
 
-`rebuild` 在完整输出后结束本次更新。`devtools` 随后还会完成 Page 生命周期交接；`interpreter` 的 Page 从未被重新注册。下面主要按两种补丁模式的共享顺序和差异展开。
+`rebuild` 在完整输出后结束本次更新。`devtools` 随后重新执行 Page 注册，WX glass-easel 不重放生命周期；`interpreter` 的 Page 从未被重新注册。下面主要按两种补丁模式的共享顺序和差异展开。
 
 ### 1. Rolldown 判断更新类型
 
@@ -301,47 +301,17 @@ globalThis.$RefreshSig$ = () => (type) => type;
 
 vpt 不读取或序列化 React 内部的渲染树，不复制 Hook 状态，也不创建第二棵 React 树。
 
-## `devtools` 如何在 Page 原生重新注册时保留页面
+## `devtools` 如何保留微信页面
 
-模块补丁应用后，开发者工具会重新执行原生 Page 注册。这个动作不是普通页面导航，却会额外触发一组卸载、加载和显示生命周期。如果这些回调直接进入 Taro，仍然有效的 React 页面会被卸载，随后又以新的页面身份挂载，组件状态和业务上下文都会丢失。
+WX 使用 glass-easel。开发者工具热更新会重新执行对象形式的 `Page(...)` 注册，但保留当前原生 Page 实例，不重新调用其数据工厂，也不重放 `onUnload`、`onLoad`、`onShow`。这与真正的页面卸载、重新进入不同。
 
-### 需要同时保留的四层状态
+共享的 `injectPageHmr` 通过普通生命周期包装记录已挂载的原生 Page。再次注册时检查该实例的 `groupUpdates` 方法：glass-easel 提供此方法，exparser 不提供。检测到 glass-easel 后直接返回配置，不抑制生命周期，不复制 Page 或 CustomWrapper 快照，也不设置等待清理的重注册标记。React Refresh 继续更新原有 React 树，Taro 继续连接原来的原生页面。
 
-Page 热更新涉及四层不同的状态，不能混为一个快照：
+不能在热更新时设置一个依赖后续 `onShow` 清除的标记：该回调没有发生时，标记会泄漏到之后的真实导航，误跳过真正的卸载和加载，令新页面继续显示旧快照却无法接收 React 更新。用定时器或微任务猜测清理时机同样不是 WX 的生命周期约定。
 
-1. **Taro Page 配置**：`createPageConfig()` 创建的静态配置及其生命周期闭包，连接 Taro 页面身份和已挂载页面根；
-2. **React 页面树**：组件实例、Hook 状态和上下文，由 App 中存活的 React 根持有；
-3. **Page 视图数据**：原生 Page 的 `data`，保存 App 投影、普通 Page 节点和每个 `CustomWrapper` 的初始占位记录；
-4. **CustomWrapper 视图数据**：每个已挂载原生包装组件自己的 `data.i`，保存该边界下面的当前渲染快照。
+`prerender: true` 的 `Page({ data: () => ... })` 工厂仅在创建新原生实例时执行。热注册不会新建实例；真实导航仍执行工厂和普通 Taro 生命周期。公开配置中的 `data` 始终保留对象形式。
 
-Taro 会把 `CustomWrapper` 后代的后续更新直接发送给对应包装组件，因此第三层中的嵌套记录不会同步变成第四层的当前值。已经加载完成的懒组件尤其容易暴露这个差异：Page 初始数据仍可能是 `Suspense` 的 `Loading…`，而屏幕和 React 树早已显示真实组件。开发构建把应用图中的真实包装缓存发布到 `globalThis` 的 Symbol 属性，避免 HMR 启动块导入出第二个空缓存。
-
-React Refresh 负责更新第二层。Page 重新注册既要保护第一层不被卸载，也必须在微信读取初始数据前把第三、四层拼成一个一致的原生快照。微信视图数据不包含 React Hook 状态，也不能用于重建 React 树。
-
-### 重新注册的生命周期
-
-vpt 在原生 Page 注册边界协调一次短暂过程：
-
-1. 保留原来的 Taro Page 配置和已挂载 React 页面；
-2. 把当前微信视图数据作为本次原生注册的初始数据；
-3. 跳过重新注册触发的卸载，避免 Taro 销毁页面根；
-4. 跳过重新注册触发的加载，避免 Taro 创建第二个页面身份；
-5. 跳过这一次显示回调，避免重复请求、埋点或业务状态初始化；
-6. 随后恢复普通生命周期转发。
-
-初始数据通过注册配置直接提供。vpt 不深拷贝递归数据树，也不调用 `setData()` 额外发布整页差异，因此这一步不会替代或干扰后续 React Refresh 产生的真实更新。
-
-### 为什么不绑定重新注册回调中的 Page
-
-微信调用重新注册生命周期时，会把一个临时 Page 对象绑定为回调中的 `this`。真实开发者工具行为表明，页面栈中原来挂载的 Page 才会继续显示并接收 React/Taro 更新。把 Taro 当前页面或页面根改绑到这个临时 Page，反而会让之后的更新脱离页面栈中的已挂载 Page。
-
-因此 vpt 不修改 Taro 当前页面，不查找或重绑页面根，也不维护“旧 Page 到新 Page”的接管关系。原有 Taro/React 连接保持不动，React Refresh 继续在同一棵树上工作。
-
-### 普通页面生命周期不受影响
-
-首次加载、正常跳转、返回、隐藏和真实卸载仍使用微信传入的原始 `this` Page 和参数进入 Taro。真实卸载会结束该 Page 的保留状态；以后再次进入时仍执行完整挂载流程。
-
-每个静态 Page 配置独立管理自己的重新注册过程。当前页和页面栈中的隐藏页可以分别保留，无需路由映射、页面栈扫描或全局交接阶段。
+该判断基于每个已挂载 Page 的运行时能力，而不是 WX 目标、App 配置或 `componentFramework` 编译器选择，因此可区分同一 App 中使用不同框架的页面。尚未挂载或已经卸载的配置仍直接返回；没有该能力的页面保留既有的生命周期和原生快照交接实现。各平台使用同一个 HMR helper，不再传入平台专用的 Page 注册策略。
 
 ## 样式如何更新
 
@@ -455,7 +425,7 @@ type RebuildReport = {
 6. 补丁模式的 App 模块运行时必须比 Page 活得更久；
 7. 补丁日志必须保留所有尚未确认应用的连续序号；
 8. 整个受影响模块集合必须在任一新边界执行前统一清除缓存；
-9. `devtools` 的 Page 重新注册必须保留已挂载页面，且不能绑定到临时 Page；
+9. WX `devtools` 的 Page 热注册不得包装真实生命周期或创建新的原生页面连接；
 10. React Refresh 必须复用存活的 App React 根；
 11. 新构建身份暴露给 App 前，所选交付必须已经重置；
 12. 转换成功的样式必须先于对应 JavaScript 补丁发布；HMR 原生 CSS 转换失败时只报告错误并保留上次成功的样式，不丢弃有效补丁；
@@ -472,5 +442,5 @@ type RebuildReport = {
 | `seq` / `appliedSeq` | 补丁序号 / 已应用序号 | 验证增量连续性并释放已应用历史 |
 | HMR boundary | 更新边界 | 调用 `import.meta.hot.accept()`、可以接收新导出的模块 |
 | `MiniHmrMode` | 开发更新模式 | 选择补丁交付能力或完整重建策略，并提供对应运行时、入口改写和插件 |
-| Page re-registration | Page 原生重新注册 | `devtools` 用已挂载 Page 的数据再次注册配置，同时忽略临时 Page 生命周期 |
+| Page re-registration | Page 原生重新注册 | WX glass-easel 重新执行注册代码，但保留已挂载原生实例及其 Taro 连接 |
 | `WxStylePlugin` | WX 样式插件 | 从当前模块图和源文件生成同一事务的全局 WXSS 与 JavaScript 类名集合 |

@@ -6,7 +6,7 @@ import { build, type OutputChunk, type Plugin } from 'rolldown'
 import type { PageInstance } from 'vite-plugin-taro-runtime/runtime/mini'
 import { injectDevPageComponent } from '../../node/plugins/mini/dev/inject-dev-page-component.ts'
 import { injectPageShellHmr } from '../../node/plugins/mini/dev/modes/devtools/devtools-hmr-mode.ts'
-import { injectPageHmr } from '../mini/dev/modes/devtools/inject-page-hmr.ts'
+import { createDevtoolsHmrRuntime } from '../mini/dev/modes/devtools/devtools-runtime.ts'
 
 type Call = Readonly<{
     name: string
@@ -49,30 +49,6 @@ function recordCall(calls: Call[], name: string, result: unknown): (...args: unk
         calls.push({ name, args })
         return result
     }
-}
-
-/** Records the native chain without evaluating its per-instance data callback at registration time. */
-function createComponentBuilder(register: Registration) {
-    // Each fluent call contributes one field to this registration-local definition.
-    const definition: { options?: object; data?: () => unknown; methods?: object } = {}
-    const builder = {
-        options(options: object) {
-            definition.options = options
-            return builder
-        },
-        data(factory: () => unknown) {
-            definition.data = factory
-            return builder
-        },
-        methods(methods: object) {
-            definition.methods = methods
-            return builder
-        },
-        register() {
-            register(definition)
-        }
-    }
-    return builder
 }
 
 function rejectRegistration(name: string): Registration {
@@ -701,11 +677,11 @@ test('registers native App and component shells after the VPT runtime', async ()
 })
 
 test('platform Page shells preserve onLoad timing and full queries', async () => {
-    for (const [pageConstructor, prerender, registration] of [
-        ['wx/native/wx-page-constructor.ts', false, 'Page'],
-        ['wx/native/wx-page-constructor.ts', true, 'Component'],
-        ['mini/native/mini-page-constructor.ts', false, 'Page'],
-        ['mini/native/mini-page-constructor.ts', true, 'Page']
+    for (const [pageConstructor, prerender, dataFactory] of [
+        ['wx/native/wx-page-constructor.ts', false, false],
+        ['wx/native/wx-page-constructor.ts', true, true],
+        ['mini/native/mini-page-constructor.ts', false, false],
+        ['mini/native/mini-page-constructor.ts', true, false]
     ] as const) {
         // Each shell records dependency initialization, native registration and deferred lifecycles independently.
         const calls: Call[] = []
@@ -716,7 +692,7 @@ test('platform Page shells preserve onLoad timing and full queries', async () =>
         const config = {
             data: page.data,
             options: { multipleSlots: true },
-            ...(registration === 'Page' ? { events: { onBack: () => true } } : {}),
+            events: { onBack: () => true },
             onLoad(this: unknown, options: unknown) {
                 assert.strictEqual(this, page)
                 assert.strictEqual(options, query)
@@ -753,31 +729,29 @@ test('platform Page shells preserve onLoad timing and full queries', async () =>
         }
         const context = {
             ...createExecutionContext(harness),
-            Page: recordCall(calls, 'Page', undefined),
-            Component: () => createComponentBuilder(recordCall(calls, 'Component', undefined))
+            Page: recordCall(calls, 'Page', undefined)
         }
         executeRuntimeEntry(code, context)
         assert.deepEqual(
             calls.map(({ name }) => name),
-            [initialization, registration]
+            [initialization, 'Page']
         )
         assert.doesNotMatch(code, /process\.env|registerPage/)
         const registered = calls[1]?.args[0]
         assert.ok(registered && typeof registered === 'object')
-        if (registration === 'Page') {
-            assert.strictEqual(registered, config)
+        if (dataFactory) {
+            const data = Reflect.get(registered, 'data')
+            assert.equal(typeof data, 'function')
+            assert.strictEqual(data(), config.data)
+            assert.deepEqual(registered, { ...config, data })
+            assert.equal(Object.hasOwn(registered, '__vpt_meta'), false)
         } else {
-            const { data, options, onLoad, onShareAppMessage, eh } = config
-            assert.deepEqual(Reflect.get(registered, 'methods'), { onLoad, onShareAppMessage, eh })
-            assert.strictEqual(Reflect.get(registered, 'data')(), data)
-            assert.strictEqual(Reflect.get(registered, 'options'), options)
-            assert.doesNotMatch(code, /\bPage\(/)
+            assert.strictEqual(registered, config)
         }
-        const methods = registration === 'Page' ? registered : Reflect.get(registered, 'methods')
-        assert.strictEqual(methods.onLoad, config.onLoad)
-        methods.onLoad.call(page, query)
-        assert.strictEqual(methods.onShareAppMessage(), share)
-        methods.eh('tap')
+        assert.strictEqual(Reflect.get(registered, 'onLoad'), config.onLoad)
+        Reflect.get(registered, 'onLoad').call(page, query)
+        assert.strictEqual(Reflect.get(registered, 'onShareAppMessage')(), share)
+        Reflect.get(registered, 'eh')('tap')
         assert.deepEqual(calls.slice(2), [
             { name: 'onLoad', args: [query] },
             { name: 'event', args: ['tap'] }
@@ -785,7 +759,7 @@ test('platform Page shells preserve onLoad timing and full queries', async () =>
     }
 })
 
-test('glass-easel data factories receive native queries without replacing navigation or dispatching lifecycles', async () => {
+test('Page data factories receive native queries without replacing navigation or dispatching lifecycles', async () => {
     const calls: Call[] = []
     const factories: (() => unknown)[] = []
     const listeners: ((event: { query: Record<string, unknown> }) => void)[] = []
@@ -798,23 +772,6 @@ test('glass-easel data factories receive native queries without replacing naviga
         assert.strictEqual(pageConfig, config)
         calls.push({ name: 'data', args: [query] })
         return { query }
-    }
-    const builder = {
-        options(options: object) {
-            assert.deepEqual(options, {})
-            return builder
-        },
-        data(factory: () => unknown) {
-            factories.push(factory)
-            return builder
-        },
-        methods(methods: object) {
-            assert.deepEqual(methods, { onLoad: config.onLoad })
-            return builder
-        },
-        register() {
-            calls.push({ name: 'register', args: [] })
-        }
     }
     const code = await bundleRuntimeEntry({
         entry: 'mini/native/page.ts',
@@ -835,9 +792,12 @@ test('glass-easel data factories receive native queries without replacing naviga
                 listeners.push(listener)
             }
         },
-        Component(options) {
-            assert.equal(options, undefined)
-            return builder
+        Page(definition) {
+            assert.ok(definition && typeof definition === 'object')
+            assert.deepEqual(Object.keys(definition), ['data', 'onLoad'])
+            assert.strictEqual(Reflect.get(definition, 'onLoad'), config.onLoad)
+            factories.push(Reflect.get(definition, 'data'))
+            calls.push({ name: 'register', args: [] })
         }
     })
     assert.deepEqual(calls, [{ name: 'register', args: [] }], 'registration must not render')
@@ -902,19 +862,8 @@ test('disposes only its own native query listener when the module is hot-replace
 })
 
 for (const prerender of [false, true]) {
-    test(`hands off HMR data and lifecycles with Page prerender=${prerender}`, async (t) => {
-        const cacheKey = Symbol.for('customWrapperCache')
-        const previousCache = Object.getOwnPropertyDescriptor(globalThis, cacheKey)
-        // The real HMR adapter consumes the App-owned cache; isolate this test's empty cache and restore it afterwards.
-        Reflect.set(globalThis, cacheKey, new Map())
-        t.after(() => {
-            if (previousCache) {
-                Object.defineProperty(globalThis, cacheKey, previousCache)
-            } else {
-                Reflect.deleteProperty(globalThis, cacheKey)
-            }
-        })
-        // Native registrations and business lifecycles are journaled separately to detect accidental remounts.
+    test(`WX hot registration preserves the native Page with prerender=${prerender}`, async (t) => {
+        // Record registrations separately from real lifecycles: glass-easel hot registration does not create another instance.
         const registrations: object[] = []
         const calls: Call[] = []
         const config = {
@@ -923,8 +872,7 @@ for (const prerender of [false, true]) {
             onShow: recordCall(calls, 'show', undefined),
             onUnload: recordCall(calls, 'unload', undefined)
         }
-        // Page HMR controls native prerendering through this non-enumerable flag, separately from its private lifecycle gate.
-        const metadata = { prerender, skipPrerender: false }
+        const metadata = Object.freeze({ prerender, skipPrerender: false })
         Object.defineProperty(config, '__vpt_meta', { value: metadata })
         const initialData = config.data
         const code = await bundleRuntimeEntry({
@@ -939,65 +887,60 @@ for (const prerender of [false, true]) {
         })
         const prerenderToData = t.mock.fn(() => initialData)
         const harness = { config, prerenderToData }
+        const runtime = createDevtoolsHmrRuntime(() => assert.fail('Page registration must not open an HMR socket'))
         const context = {
             ...createExecutionContext(harness),
-            globalThis: { harness, __rolldown_runtime__: { injectPageHmr } },
+            globalThis: { harness, __rolldown_runtime__: runtime },
             Page(value: unknown) {
-                assert.equal(prerender, false, 'only ordinary pages use native Page')
-                assert.strictEqual(value, config)
-                registrations.push(config)
-            },
-            Component() {
-                assert.equal(prerender, true, 'only opted-in pages use the Component data factory')
-                return createComponentBuilder((value) => {
-                    assert.ok(value && typeof value === 'object')
-                    registrations.push(value)
-                })
+                assert.ok(value && typeof value === 'object')
+                if (!prerender) {
+                    assert.strictEqual(value, config)
+                }
+                registrations.push(value)
             }
         }
-        const page = { data: { count: 7 } }
+        const groupUpdates = () => assert.fail('Framework detection must not invoke the native method')
+        const page = { data: { count: 7 }, groupUpdates }
         const firstQuery = { id: 'initial' }
         executeRuntimeEntry(code, context)
+        Object.freeze(config)
         const first = registrations[0]
         assert.ok(first)
-        assert.equal(metadata.skipPrerender, false)
         assert.strictEqual(prerender ? Reflect.get(first, 'data')() : Reflect.get(first, 'data'), initialData)
-        assert.equal(prerenderToData.mock.callCount(), prerender ? 1 : 0)
-        const firstMethods = prerender ? Reflect.get(first, 'methods') : first
-        assert.deepEqual(Object.getOwnPropertySymbols({ ...firstMethods }), [], 'HMR state is not enumerable')
-        assert.equal(Object.hasOwn({ ...firstMethods }, '__vpt_meta'), false)
-        firstMethods.onLoad.call(page, firstQuery)
-        firstMethods.onShow.call(page)
+        Reflect.get(first, 'onLoad').call(page, firstQuery)
+        Reflect.get(first, 'onShow').call(page)
 
         executeRuntimeEntry(code, context)
         const second = registrations[1]
         assert.ok(second)
-        assert.equal(metadata.skipPrerender, true)
-        assert.strictEqual(prerender ? Reflect.get(second, 'data')() : Reflect.get(second, 'data'), page.data)
+        assert.strictEqual(
+            Reflect.get(second, 'onLoad'),
+            Reflect.get(first, 'onLoad'),
+            'lifecycle wrappers stay stable'
+        )
+        assert.strictEqual(config.data, initialData)
+        assert.deepEqual(page.data, { count: 7 })
+        assert.equal(metadata.skipPrerender, false)
         assert.equal(
             prerenderToData.mock.callCount(),
             prerender ? 1 : 0,
-            'native HMR must not prerender another React Page'
+            'hot registration does not create an instance'
         )
-        const secondMethods = prerender ? Reflect.get(second, 'methods') : second
-        assert.strictEqual(secondMethods.onLoad, firstMethods.onLoad)
-        firstMethods.onUnload.call(page)
-        secondMethods.onLoad.call(page, { id: 'synthetic' })
-        secondMethods.onShow.call(page)
-        assert.equal(metadata.skipPrerender, false, 'onShow clears the flag before the next real navigation')
         assert.deepEqual(calls, [
             { name: 'load', args: [firstQuery] },
             { name: 'show', args: [] }
         ])
 
-        secondMethods.onUnload.call(page)
-        assert.strictEqual(
-            prerender ? Reflect.get(second, 'data')() : Reflect.get(second, 'data'),
-            prerender ? initialData : config.data
+        Reflect.get(first, 'onUnload').call(page)
+        const nextPage = { data: { count: 0 }, groupUpdates }
+        assert.strictEqual(prerender ? Reflect.get(second, 'data')() : Reflect.get(second, 'data'), initialData)
+        assert.equal(
+            prerenderToData.mock.callCount(),
+            prerender ? 2 : 0,
+            'real navigation initializes its own instance'
         )
-        assert.equal(prerenderToData.mock.callCount(), prerender ? 2 : 0, 'real navigation respects the Page opt-in')
-        secondMethods.onLoad.call(page, { id: 'real-navigation' })
-        secondMethods.onShow.call(page)
+        Reflect.get(second, 'onLoad').call(nextPage, { id: 'real-navigation' })
+        Reflect.get(second, 'onShow').call(nextPage)
         assert.deepEqual(calls.slice(2), [
             { name: 'unload', args: [] },
             { name: 'load', args: [{ id: 'real-navigation' }] },

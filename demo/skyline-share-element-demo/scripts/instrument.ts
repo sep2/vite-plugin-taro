@@ -22,6 +22,14 @@ function recordFrame(data) {
 }
 exports.instrumentPage = function (config) {
     config.__recordShareFrame = recordFrame;
+    // Both ordinary and prerendered Pages bind own methods; restore metadata before the template attaches.
+    config.behaviors = [...(config.behaviors || []), Behavior({
+        lifetimes: {
+            created() {
+                Object.assign(this.__recordShareFrame, recordFrame);
+            }
+        }
+    })];
     return config;
 };
 exports.instrumentComponent = function (config) {
@@ -36,8 +44,8 @@ for (const entry of ['pages/gallery/gallery.js', 'pages/detail/detail.js', 'comp
     const relative = path.posix.relative(path.posix.dirname(entry), modulePath)
     const specifier = relative.startsWith('.') ? relative : `./${relative}`
     const component = entry === 'comp.js'
-    // Native Page shells call the bootstrap export; recursive components still call native Component directly.
-    const registration = component ? /(Component)\((\w+)\)/g : /(\(0,\w+\.Page\))\((\w+)\)/g
+    // Shells pass the capsule's live export to VPT's Page constructor or native Component.
+    const registration = component ? /(Component)\((\w+\.componentConfig)\)/g : /(\(0,\w+\.Page\))\((\w+\.default)\)/g
     assert.equal([...source.matchAll(registration)].length, 1, entry)
     await writeFile(
         entryPath,

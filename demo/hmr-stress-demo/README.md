@@ -12,7 +12,7 @@ Each page renders:
 - 96 additional stateful grid cells;
 - controlled input, counter, selection, density, and mount-token state.
 
-The singleton App projects the Page outlet through a 16-level host chain beside a second 16-level decorative branch, and it consumes the same edited marker as all three Pages. Every marker generation also reverses the two keyed App branches, forcing structural App HMR while retaining the Page subtree. The mirror and shared routes mount separate Page copies while the primary Page remains in the back stack. B and C stay unopened until their respective inactive-page checks. Together they stress App-view slot routing, App and Page React Refresh, cumulative patch delivery, native Page replacement on WX, in-place interpreter updates on ZFB, large `data` snapshot restoration, hidden-page recovery, runtime-requested rebuilds, and invalid-source recovery. These flows do not exercise TT.
+The singleton App projects the Page outlet through a 16-level host chain beside a second 16-level decorative branch, and it consumes the same edited marker as all three Pages. Every marker generation also reverses the two keyed App branches, forcing structural App HMR while retaining the Page subtree. The mirror and shared routes mount separate Page copies while the primary Page remains in the back stack. B and C stay unopened until their respective inactive-page checks. Together they stress App-view slot routing, App and Page React Refresh, cumulative patch delivery, native Page instance retention on WX, in-place interpreter updates on ZFB, large native view-model consistency, hidden-page recovery, runtime-requested rebuilds, and invalid-source recovery. These flows do not exercise TT.
 
 ## Automated WeChat DevTools suite
 
@@ -21,10 +21,13 @@ The automated suite remains WeChat-specific because it uses the `wechatide` runt
 ```bash
 wechatide auth -c Pi
 pnpm test:hmr-stress-demo:devtools
+pnpm --filter hmr-stress-demo test-devtools:prerender
 pnpm test:hmr-stress-demo:interpreter
 # Optional: open the fixture without running assertions, leaving its window open.
 pnpm setup:hmr-stress-demo:devtools
 ```
+
+The WX fixture uses WebView with glass-easel, not Skyline. The default suite exercises ordinary native Pages; `test-devtools:prerender` enables `prerender: true` for all three routes and exercises `Page({ data: () => ... })` factories on real navigation and native instance retention during HMR. Warnings are non-fatal; runtime console errors still fail the suite.
 
 Setup and the restart case may each use up to 60 seconds; `inactive-page` has a 90-second deadline, the aggregate suite 150 seconds, and two-project port-swap 120 seconds. Other standalone cases have a 30-second deadline. Each invocation attaches to the newly built output itself; a prior setup invocation is not required. The complete suite runs both inactive-page checks, strict burst, rebuild storm, syntax recovery, and server restart cases. Runtime assertions replace fixed settle sleeps, including observing the restoration marker before publishing and awaiting the baseline. Plugin rebuilding is opt-in.
 
@@ -80,6 +83,7 @@ VITE_VPT_WECHAT_APP_ID           WeChat App ID; falls back to the demo .env.loca
 VITE_VPT_ALIPAY_APP_ID           Alipay App ID for manual ZFB development
 VPT_HMR_DEVTOOLS_CLIENT          wechatide client name; default Pi
 VPT_HMR_BUILD_PLUGIN             set to 1 to rebuild plugin dist before the suite
+VPT_HMR_PRERENDER                set to 1 to enable prerender on every WX route (WebView/glass-easel)
 VPT_HMR_STRESS_UPDATES           burst update count
 VPT_HMR_STRESS_INTERVAL_MS       burst interval
 VPT_HMR_REBUILD_ROUNDS           rebuild storm rounds; default 1

@@ -12,6 +12,7 @@ const sharedTitle = 'HMR shared stack'
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), 'VITE_VPT_')
     const target = getTarget(env)
+    const prerender = target === 'wx' && process.env.VPT_HMR_PRERENDER === '1'
     const wechatAppId = env.VITE_VPT_WECHAT_APP_ID || 'touristappid'
     const alipayAppId = env.VITE_VPT_ALIPAY_APP_ID
 
@@ -27,14 +28,17 @@ export default defineConfig(({ mode }) => {
                 pages: [
                     {
                         path: 'pages/index/index',
+                        prerender,
                         config: createPageJson(target, appTitle)
                     },
                     {
                         path: 'pages/mirror/index',
+                        prerender,
                         config: createPageJson(target, mirrorTitle)
                     },
                     {
                         path: 'pages/shared/index',
+                        prerender,
                         config: createPageJson(target, sharedTitle)
                     }
                 ],
@@ -93,6 +97,7 @@ function createAppJson(target: MiniTarget): VptJsonObject {
             return {
                 lazyCodeLoading: 'requiredComponents',
                 componentFramework: 'glass-easel',
+                renderer: 'webview',
                 window: {
                     glassEaselWebview: true,
                     backgroundColor: '#e2e8f0',

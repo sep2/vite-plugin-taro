@@ -391,21 +391,13 @@ function createProjectHarness(root: string, outDir: string): DevToolsProjectHarn
         outDir: outDir,
         readConsoleErrors: async () => {
             const result = await runTool('get_simulator_console', outDir, {
-                command: "grep -i -E 'error|fail|warn|exception'"
+                // Numbering keeps even a single JSON log entry a text response; filter returned context below.
+                command: 'grep -n .'
             })
             if (typeof result !== 'string') {
                 throw new Error('Expected console text')
             }
-            return result
-                .split('\n')
-                .filter((line) => {
-                    if (line.length === 0) {
-                        return false
-                    }
-                    const entry: unknown = JSON.parse(line)
-                    return Array.isArray(entry) && (entry[0] === '[error]' || entry[0] === '[warn]')
-                })
-                .join('\n')
+            return filterConsoleErrors(result)
         },
         readCurrentPage: async () => {
             const result = await runTool('automation_runtime_info', outDir, { action: 'currentPage' })
@@ -622,6 +614,14 @@ async function runToolWithTimeout(
         remainingTimeout(timeoutMilliseconds)
     )
     return decodeDevToolsResponse(tool, output)
+}
+
+/** Retains runtime errors; warnings and grep's context lines are non-fatal. */
+export function filterConsoleErrors(log: string): string {
+    return log
+        .split('\n')
+        .filter((line) => /^\d+[:-]\["\[error\]"/.test(line))
+        .join('\n')
 }
 
 /** The CLI exits with 1 for structured business errors too; decode them before classifying a shell failure. */

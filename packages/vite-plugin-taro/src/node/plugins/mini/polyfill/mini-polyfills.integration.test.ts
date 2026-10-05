@@ -294,27 +294,9 @@ function createAppRuntime(chunks: readonly NativeFile[], nativeURLs: boolean, ta
             Page() {
                 registrations.push('Page')
             },
-            Component(config?: object) {
-                if (config) {
-                    registrations.push('Component')
-                    return
-                }
-                // Page registration uses the glass-easel chain; these graph tests never create native instances.
-                const builder = {
-                    options() {
-                        return builder
-                    },
-                    data() {
-                        return builder
-                    },
-                    methods() {
-                        return builder
-                    },
-                    register() {
-                        registrations.push('Component')
-                    }
-                }
-                return builder
+            Component(config: object) {
+                assert.ok(config, 'native entries use object-form Component registration')
+                registrations.push('Component')
             },
             getCurrentPages: () => [],
             ...(nativeURLs ? { URL, URLSearchParams } : {})

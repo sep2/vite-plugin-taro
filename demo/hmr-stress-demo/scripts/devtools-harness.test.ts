@@ -1,6 +1,19 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { DevToolsToolError, decodeDevToolsResponse, waitFor } from './devtools-harness.ts'
+import { DevToolsToolError, decodeDevToolsResponse, filterConsoleErrors, waitFor } from './devtools-harness.ts'
+
+test('fails only runtime errors, not warnings or grep context', () => {
+    const error = '2:["[error]","runtime failed"]'
+    const warning = '5-["[warn]","invalid configuration"]'
+    assert.equal(
+        filterConsoleErrors(['1:["[info]","not an error"]', error, '--', warning, '6:["[log]","warn"]'].join('\n')),
+        error
+    )
+    assert.equal(filterConsoleErrors(warning), '')
+    assert.equal(filterConsoleErrors('7-["[error]","context error"]'), '7-["[error]","context error"]')
+    assert.equal(filterConsoleErrors('1:["[log]","error text is not error severity"]\n--'), '')
+    assert.equal(filterConsoleErrors(''), '')
+})
 
 test('decodes a reload observation error even when the CLI exits with status 1', () => {
     assert.throws(

@@ -144,22 +144,16 @@ function App(config) { app = config; }
 function getApp() { return app; }
 function getCurrentPages() { return pages; }
 function Page(config) {
-    definitions.set(registeringRoute, { methods: config, initialData: () => copy(config.data) });
+    definitions.set(registeringRoute, {
+        methods: config,
+        initialData: typeof config.data === 'function' ? config.data : () => copy(config.data)
+    });
 }
 function Component(config) {
-    if (config) {
-        definitions.set(registeringRoute, { ...config, initialData: () => copy(config.data) });
-        return;
-    }
-    const definition = { methods: {}, lifetimes: {} };
-    const builder = {
-        options(value) { definition.options = value; return builder; },
-        data(factory) { definition.initialData = factory; return builder; },
-        methods(value) { Object.assign(definition.methods, value); return builder; },
-        lifetime(name, callback) { definition.lifetimes[name] = callback; return builder; },
-        register() { definitions.set(registeringRoute, definition); }
-    };
-    return builder;
+    definitions.set(registeringRoute, {
+        ...config,
+        initialData: typeof config.data === 'function' ? config.data : () => copy(config.data)
+    });
 }
 function openPage(route, query) {
     beforeLoad.forEach(callback => callback({ path: route, query }));
