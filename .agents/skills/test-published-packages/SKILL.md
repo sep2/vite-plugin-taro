@@ -18,12 +18,12 @@ The script owns the complete workflow:
 
 - resolves both the npm `latest` and `beta` channels and selects the package pair with the newest publication time;
 - requires `create-vite-taro` and `vite-plugin-taro` to resolve to the same version within each channel;
-- creates `/tmp/vpt-published-packages-test` from that published creator channel;
+- creates `packages/vite-plugin-taro/tmp/vpt-published-packages-test` from that published creator channel;
 - rejects local, linked, or non-registry plugin installations;
 - runs typecheck and a production WX build;
 - opens the fresh WX development output in WeChat DevTools;
 - changes visible text and verifies it through a lightweight element query;
-- verifies the native counter retains React state across the edit and restoration;
+- reads the native counter's generated host selector from page data without modifying its props contract, then verifies React state survives the edit and restoration;
 - collects HMR diagnostics on failure;
 - restores source, closes only its project window, and stops its dev server.
 

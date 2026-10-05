@@ -3,11 +3,10 @@
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
-import { installNativeCounterProbe } from './install-native-counter-probe.ts'
+import { findNativeCounter } from './find-native-counter.ts'
 
 interface CommandResult {
     status: number | null
@@ -38,20 +37,18 @@ interface ProjectPaths {
     root: string
     output: string
     source: string
-    counterSource: string
     backup: string
     viteLog: string
 }
 
 const skillDirectory = resolve(fileURLToPath(new URL('.', import.meta.url)), '..')
 const repositoryRoot = resolve(skillDirectory, '../../..')
-const temporaryDirectory = tmpdir()
+const temporaryDirectory = resolve(repositoryRoot, 'packages/vite-plugin-taro/tmp')
 const temporaryRoot = resolve(temporaryDirectory, 'vpt-published-packages-test')
 const projectPaths: ProjectPaths = {
     root: temporaryRoot,
     output: resolve(temporaryRoot, 'dist/wx'),
     source: resolve(temporaryRoot, 'src/pages/home/index.tsx'),
-    counterSource: resolve(temporaryRoot, 'src/components/counter/native-counter.tsx'),
     backup: resolve(temporaryRoot, '.hmr-test-index.tsx.backup'),
     viteLog: resolve(temporaryDirectory, 'vpt-published-packages-test-vite.log')
 }
@@ -59,7 +56,6 @@ const miniProgramSkill = resolve(repositoryRoot, '.agents/skills/miniprogram-dev
 const originalText = 'Build naturally. Ship everywhere.'
 const updatedText = 'Published HMR keeps React state.'
 const probeId = 'published-hmr-probe'
-const nativeCounterId = 'published-native-counter'
 const pollIntervalMs = 500
 const transitionDeadlineMs = 120_000
 const commandTimeoutMs = 29_000
@@ -244,6 +240,7 @@ function readPublishedPackageIdentity(): PackageIdentity {
 }
 
 function createFreshProject(identity: PackageIdentity): void {
+    mkdirSync(temporaryDirectory, { recursive: true })
     rmSync(projectPaths.root, { recursive: true, force: true })
     requireCommand(
         'npm',
@@ -304,19 +301,7 @@ function configureDisposableProject(): void {
     writeFileSync(resolve(projectPaths.root, '.env.local'), `VITE_VPT_WECHAT_APP_ID=${readAppId()}\n`)
 
     const source = readFileSync(projectPaths.source, 'utf8')
-    const counterOpening = '                    <Counter\n'
-    if (source.split(counterOpening).length !== 2) {
-        throw new Error('Expected one Counter element in the generated Home Page')
-    }
-    writeFileSync(
-        projectPaths.source,
-        installProbeId(
-            source.replace(counterOpening, `${counterOpening}                        id="${nativeCounterId}"\n`)
-        )
-    )
-
-    const counterSource = readFileSync(projectPaths.counterSource, 'utf8')
-    writeFileSync(projectPaths.counterSource, installNativeCounterProbe(counterSource))
+    writeFileSync(projectPaths.source, installProbeId(source))
 }
 
 function validateProjectConfig(): void {
@@ -441,20 +426,7 @@ function currentRoute(): string | undefined {
     return typeof result.currentPage.route === 'string' ? result.currentPage.route : undefined
 }
 
-function findCounterCount(value: unknown): number | undefined {
-    if (!isRecord(value)) {
-        return undefined
-    }
-    if (value.nn === 'native-counter' && typeof value.count === 'number') {
-        return value.count
-    }
-    if (!Array.isArray(value.cn)) {
-        return undefined
-    }
-    return value.cn.map(findCounterCount).find((count) => count !== undefined)
-}
-
-function readCounterCount(): number | undefined {
+function readNativeCounter() {
     const result = callWechatide(
         'automation_page_action',
         ['--project', projectPaths.output, '--action', 'getData'],
@@ -463,7 +435,11 @@ function readCounterCount(): number | undefined {
     if (!isRecord(result) || !isRecord(result.data) || !isRecord(result.data.page)) {
         return undefined
     }
-    return findCounterCount(result.data.page)
+    return findNativeCounter(result.data.page)
+}
+
+function readCounterCount(): number | undefined {
+    return readNativeCounter()?.count
 }
 
 function readProbeText(): string | undefined {
@@ -475,19 +451,10 @@ function readProbeText(): string | undefined {
     return typeof result === 'string' ? result : undefined
 }
 
-function triggerIncrement(): void {
+function triggerIncrement(selector: string): void {
     callWechatide(
         'automation_element_action',
-        [
-            '--project',
-            projectPaths.output,
-            '--selector',
-            `#${nativeCounterId}`,
-            '--action',
-            'trigger',
-            '--type',
-            'increment'
-        ],
+        ['--project', projectPaths.output, '--selector', selector, '--action', 'trigger', '--type', 'increment'],
         true
     )
 }
@@ -606,16 +573,17 @@ async function proveHmr(): Promise<void> {
         readProbeText,
         (text) => text.includes(originalText)
     )
-    const initialCount = await pollUntil(
+    const initialCounter = await pollUntil(
         'initial native counter state',
         transitionDeadlineMs,
         pollIntervalMs,
-        readCounterCount,
-        (count) => count === 0
+        readNativeCounter,
+        (counter) => counter.count === 0
     )
+    const initialCount = initialCounter.count
     console.log(`Initial state: text=${JSON.stringify(initialText)}, count=${initialCount}`)
 
-    triggerIncrement()
+    triggerIncrement(initialCounter.selector)
     const retainedCount = await pollUntil(
         'incremented native counter state',
         transitionDeadlineMs,
