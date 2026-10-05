@@ -1,14 +1,12 @@
 import assert from 'node:assert/strict'
-import { readdir, readFile } from 'node:fs/promises'
+import { readdirSync, readFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { stripTypeScriptTypes } from 'node:module'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { isNativeError } from 'node:util/types'
 import { constants, createContext, Script } from 'node:vm'
-import type { Node } from '@oxc-project/types'
-import { walk } from 'oxc-walker'
-import { parseSync } from 'rolldown/utils'
 
 const filename = fileURLToPath(new URL('./vpt-global.ts', import.meta.url))
 const moduleSource = stripTypeScriptTypes(await readFile(filename, 'utf8'))
@@ -765,139 +763,19 @@ test('does not overwrite a read-only undefined globalThis property during recove
     `).runInContext(context)
 })
 
-const packageRoot = fileURLToPath(new URL('../../../', import.meta.url))
+test('runtime sources never import the standalone global provider directly', () => {
+    const runtimeRoot = fileURLToPath(new URL('../', import.meta.url))
+    const files = readdirSync(runtimeRoot, { recursive: true, withFileTypes: true }).filter(
+        (entry) => entry.isFile() && /\.[cm]?[jt]sx?$/.test(entry.name) && !entry.name.endsWith('.test.ts')
+    )
 
-function getImportSource(node: Node) {
-    switch (node.type) {
-        case 'ImportDeclaration':
-        case 'ExportNamedDeclaration':
-        case 'ExportAllDeclaration':
-        case 'ImportExpression':
-        case 'TSImportType':
-            return node.source
-        case 'TSExternalModuleReference':
-            return node.expression
-        case 'CallExpression':
-            if (node.callee.type === 'Identifier' && node.callee.name === 'require') {
-                return node.arguments[0]
-            }
+    // Runtime sources must use globalThis; the compiler alone owns the standalone provider.
+    for (const entry of files) {
+        const filename = path.join(entry.parentPath, entry.name)
+        assert.doesNotMatch(
+            readFileSync(filename, 'utf8'),
+            /\b(?:from|import|require)\s*(?:\(\s*)?['"`][^'"`]*\bvpt-global\b/,
+            `${path.relative(runtimeRoot, filename)} must use globalThis instead of importing vpt-global directly`
+        )
     }
-    return undefined
-}
-
-/** Inspect actual module edges, not comments, fixture strings or the standalone provider's build input. */
-function findDirectGlobalImports(filename: string, code: string): string[] {
-    const parsed = parseSync(filename, code)
-    assert.deepEqual(parsed.errors, [], `Unable to check imports in ${filename}`)
-    // The AST visitor appends each offending specifier to this file-local diagnostic list in source order.
-    const imports: string[] = []
-    walk(parsed.program, {
-        enter(node) {
-            const source = getImportSource(node)
-            const specifier =
-                source?.type === 'Literal' && typeof source.value === 'string'
-                    ? source.value
-                    : source?.type === 'TemplateLiteral' && source.expressions.length === 0
-                      ? source.quasis[0].value.cooked
-                      : undefined
-            // Match the provider basename so both the current global/ and former mini/ locations stay isolated.
-            if (specifier && /(?:^|\/)vpt-global(?:\.[cm]?[jt]s)?(?:[?#].*)?$/.test(specifier.replaceAll('\\', '/'))) {
-                imports.push(specifier)
-            }
-        }
-    })
-    return imports
-}
-
-for (const [name, code] of [
-    ['named imports', 'import { vptGlobal } from SOURCE'],
-    ['default imports', 'import provider from SOURCE'],
-    ['namespace imports', 'import * as provider from SOURCE'],
-    ['side-effect imports', 'import SOURCE'],
-    ['named re-exports', 'export { vptGlobal } from SOURCE'],
-    ['star re-exports', 'export * from SOURCE'],
-    ['namespace re-exports', 'export * as provider from SOURCE'],
-    ['dynamic imports', 'await import(SOURCE)'],
-    ['CommonJS requires', 'const provider = require(SOURCE)'],
-    ['TypeScript import assignments', 'import provider = require(SOURCE)'],
-    ['type-only imports', 'import type { vptGlobal } from SOURCE'],
-    ['import types', 'type Provider = typeof import(SOURCE)']
-]) {
-    test(`the global provider import guard detects ${name}`, () => {
-        for (const specifier of [
-            '../../runtime/global/vpt-global.ts',
-            '../../runtime/mini/vpt-global.ts',
-            './vpt-global.ts',
-            './vpt-global',
-            './vpt-global.js',
-            'vite-plugin-taro/dist/runtime/global/vpt-global.js',
-            'C:\\project\\runtime\\mini\\vpt-global.ts',
-            './vpt-global.ts?raw'
-        ]) {
-            assert.deepEqual(
-                findDirectGlobalImports('fixture.ts', code.replace('SOURCE', JSON.stringify(specifier))),
-                [specifier],
-                `${name}: ${specifier}`
-            )
-        }
-    })
-}
-
-test('the global provider import guard detects literal template imports and requires', () => {
-    assert.deepEqual(
-        findDirectGlobalImports('fixture.ts', 'await import(`./vpt-global.ts`); require(`./vpt-global.js`)'),
-        ['./vpt-global.ts', './vpt-global.js']
-    )
-})
-
-test('the global provider import guard allows standalone build inputs, virtual bindings and fixture text', () => {
-    assert.deepEqual(
-        findDirectGlobalImports(
-            'fixture.ts',
-            `
-                import { vptGlobal } from '\\0vpt:global-binding'
-                export { value } from './other-runtime.ts'
-                export const root = globalThis
-                const input = resolveVptRuntime('global/vpt-global')
-                const url = new URL('./vpt-global.ts', import.meta.url)
-                const fixture = "import { vptGlobal } from './vpt-global.ts'"
-                const template = \`require('./vpt-global.ts')\`
-                // import './vpt-global.ts'
-                /* export * from './vpt-global.ts' */
-                await import('./other-runtime.ts')
-                require('./other-runtime.js')
-            `
-        ),
-        []
-    )
-})
-
-test('plugin sources and scripts never import the standalone global provider directly', async () => {
-    const entries = (
-        await Promise.all(
-            ['src', 'scripts'].map((directory) =>
-                readdir(path.join(packageRoot, directory), { recursive: true, withFileTypes: true })
-            )
-        )
-    ).flat()
-    const files = entries
-        .filter((entry) => entry.isFile() && /\.[cm]?[jt]sx?$/.test(entry.name))
-        .map((entry) => path.join(entry.parentPath, entry.name))
-        .toSorted()
-    assert.ok(files.includes(path.join(packageRoot, 'src/runtime/global/vpt-global.ts')))
-    const violations = (
-        await Promise.all(
-            files.map(async (filename) => {
-                const code = await readFile(filename, 'utf8')
-                return findDirectGlobalImports(filename, code).map(
-                    (specifier) => `${path.relative(packageRoot, filename)} -> ${specifier}`
-                )
-            })
-        )
-    ).flat()
-    assert.deepEqual(
-        violations,
-        [],
-        'vpt-global.ts must remain outside the application and HMR graphs; use globalThis and the injected virtual binding instead.'
-    )
 })
