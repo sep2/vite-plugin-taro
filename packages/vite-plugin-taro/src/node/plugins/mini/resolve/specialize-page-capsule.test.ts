@@ -5,7 +5,7 @@ import { specializePageCapsule } from './specialize-page-capsule.ts'
 const source = `import './app.js'
 import { createPageConfig } from './taro-runtime.js'
 import PageComponent from '\0vpt:page-component'
-export default createPageConfig(PageComponent, __VPT_PAGE_PATH__, undefined, __VPT_PAGE_CONFIG__)`
+export default createPageConfig(PageComponent, __VPT_PAGE_PATH__, undefined, __VPT_PAGE_CONFIG__, __VPT_PAGE_PRERENDER__)`
 
 test('specializes the Page capsule for one route', () => {
     const id = '/plugin/runtime/mini/capsule/page.js?route=pages%2Fhome%2Findex'
@@ -40,9 +40,25 @@ test('specializes an omitted Page configuration as an empty object', () => {
         }
     })
 
-    assert.match(result.code, /["']pages\/plain\/index["'], undefined, \{\}/)
+    assert.match(result.code, /["']pages\/plain\/index["'], undefined, \{\}, false\)/)
     assert.equal(result.map, null)
 })
+
+for (const prerender of [undefined, false, true]) {
+    test(`specializes Page prerender=${prerender} independently of native config`, () => {
+        const result = specializePageCapsule({
+            code: 'const args = [__VPT_PAGE_PATH__, __VPT_PAGE_CONFIG__, __VPT_PAGE_PRERENDER__]',
+            id: '/runtime/page.ts',
+            page: {
+                path: 'pages/detail/index',
+                ...(prerender === undefined ? {} : { prerender }),
+                config: { title: 'Detail' }
+            }
+        })
+        const args: unknown = Function(`${result.code}; return args`)()
+        assert.deepEqual(args, ['pages/detail/index', { title: 'Detail' }, prerender === true])
+    })
+}
 
 test('preserves Page paths and configuration containing quotes and other reserved slot names', () => {
     const page = {
@@ -50,7 +66,7 @@ test('preserves Page paths and configuration containing quotes and other reserve
         config: { title: '__VPT_PAGE_PATH__\n', absent: undefined }
     }
     const result = specializePageCapsule({
-        code: 'const PageComponent = () => null; const args = [__VPT_PAGE_PATH__, __VPT_PAGE_CONFIG__, PageComponent]',
+        code: 'const PageComponent = () => null; const args = [__VPT_PAGE_PATH__, __VPT_PAGE_CONFIG__, PageComponent, __VPT_PAGE_PRERENDER__]',
         id: '/runtime/page.ts',
         page,
         sourcemap: false

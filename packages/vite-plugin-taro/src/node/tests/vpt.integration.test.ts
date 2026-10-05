@@ -147,6 +147,7 @@ function assertPageRegistration(output: BuildOutput, target: VptTarget, route: s
         'Every platform uses the same native Page shell'
     )
     const config = { data: { page: { cn: [] } }, onLoad: () => undefined, eh: () => undefined }
+    Object.defineProperty(config, '__vpt_meta', { value: { prerender: false, skipPrerender: false } })
     // The isolated native host records exactly one registration; its capsule retains the Taro config identity.
     const registrations: Array<{ constructor: string; config: object }> = []
     const host = {
@@ -161,26 +162,7 @@ function assertPageRegistration(output: BuildOutput, target: VptTarget, route: s
             registrations.push({ constructor: 'Page', config })
         },
         Component() {
-            // The chain records a definition; the per-instance callback is evaluated separately below.
-            const definition: { options?: object; data?: () => unknown; methods?: object } = {}
-            const builder = {
-                options(options: object) {
-                    definition.options = options
-                    return builder
-                },
-                data(factory: () => unknown) {
-                    definition.data = factory
-                    return builder
-                },
-                methods(methods: object) {
-                    definition.methods = methods
-                    return builder
-                },
-                register() {
-                    registrations.push({ constructor: 'Component', config: definition })
-                }
-            }
-            return builder
+            assert.fail('Pages without prerender must use native Page, not Component')
         }
     }
     assert.equal(
@@ -224,14 +206,10 @@ function assertPageRegistration(output: BuildOutput, target: VptTarget, route: s
     assert.equal(registrations.length, 1)
     const registration = registrations[0]
     assert.ok(registration)
-    assert.equal(registration.constructor, target === 'wx' ? 'Component' : 'Page')
-    const data = Reflect.get(registration.config, 'data')
-    if (target === 'wx') {
-        assert.equal(typeof data, 'function', 'registration defers rendering to the per-instance data factory')
-    } else {
-        assert.strictEqual(data, config.data)
-    }
-    const methods = target === 'wx' ? Reflect.get(registration.config, 'methods') : registration.config
+    assert.equal(registration.constructor, 'Page')
+    assert.strictEqual(registration.config, config)
+    assert.strictEqual(Reflect.get(registration.config, 'data'), config.data)
+    const methods = registration.config
     assert.strictEqual(methods.onLoad, config.onLoad)
     assert.strictEqual(methods.eh, config.eh)
     assert.equal(Object.keys(methods).includes('prerenderToData'), false)

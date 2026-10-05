@@ -1,6 +1,6 @@
 import type { PageInstance } from 'vite-plugin-taro-runtime/runtime/mini'
 
-// Alipay and TT accept Taro's config directly. Alias the native function without shadowing it or adding a forwarding wrapper.
+// Ordinary pages accept Taro's config directly. Alias the native function without shadowing it or adding a forwarding wrapper.
 const miniPageConstructor: (config: PageInstance) => void = Page
 
 export default miniPageConstructor

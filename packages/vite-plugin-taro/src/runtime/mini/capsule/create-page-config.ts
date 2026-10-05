@@ -10,7 +10,8 @@ export function createPageConfig(
     component: Parameters<typeof createTaroPageConfig>[0],
     route: string,
     data: PageData,
-    pageConfig: Parameters<typeof createTaroPageConfig>[3]
+    pageConfig: Parameters<typeof createTaroPageConfig>[3],
+    prerender: boolean
 ) {
     const taroPageConfig = createTaroPageConfig(component, route, data, pageConfig)
 
@@ -19,6 +20,7 @@ export function createPageConfig(
         __vpt_meta: {
             component,
             route,
+            prerender,
             // Page HMR skips prerendering during native re-registration and clears this flag onShow.
             skipPrerender: false
         }

@@ -112,6 +112,7 @@ async function runFixture(t: TestContext, target: 'wx' | 'zfb' | 'tt', mode: str
                         return capsuleSource
                             .replaceAll('__VPT_PAGE_PATH__', JSON.stringify(route))
                             .replaceAll('__VPT_PAGE_CONFIG__', '{}')
+                            .replaceAll('__VPT_PAGE_PRERENDER__', 'true')
                     }
                     if (id === 'test:empty') {
                         return ''

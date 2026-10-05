@@ -400,8 +400,7 @@ function assertPolyfilledBootstrap(
 
 function assertPolyfilledApp(
     runtime: ReturnType<typeof createAppRuntime>,
-    structuredClone: 'function' | 'undefined',
-    target: MiniTarget
+    structuredClone: 'function' | 'undefined'
 ): void {
     runtime.evaluate('app.js')
     assert.deepEqual(runtime.json('polyfillProbe'), {
@@ -423,7 +422,7 @@ function assertPolyfilledApp(
     runtime.evaluate('pages/home/index.js')
     runtime.evaluate('comp.js')
     runtime.evaluate('custom-wrapper.js')
-    assert.deepEqual(runtime.registrations, ['App', target === 'wx' ? 'Component' : 'Page', 'Component', 'Component'])
+    assert.deepEqual(runtime.registrations, ['App', 'Page', 'Component', 'Component'])
     assert.equal(runtime.read('URL'), installedURL)
     assert.equal(runtime.read('this["__core-js_shared__"].versions.length'), 1)
 }
@@ -433,9 +432,9 @@ for (const target of miniTargets) {
         const chunks = await compileFixture(target, 'production', [...optionalPolyfills, 'es.array.at'])
         assertPolyfilledBootstrap(chunks, target, 'undefined')
         const missing = createAppRuntime(chunks, false, target)
-        assertPolyfilledApp(missing, 'undefined', target)
+        assertPolyfilledApp(missing, 'undefined')
         const native = createAppRuntime(chunks, true, target)
-        assertPolyfilledApp(native, 'undefined', target)
+        assertPolyfilledApp(native, 'undefined')
         assert.equal(native.read('URL'), URL)
         assert.equal(native.read('URLSearchParams'), URLSearchParams)
 
@@ -443,7 +442,7 @@ for (const target of miniTargets) {
         for (const setup of ['delete this.globalThis;', 'let globalThis;']) {
             const recovered = createAppRuntime(chunks, false, target)
             recovered.read(setup)
-            assertPolyfilledApp(recovered, 'undefined', target)
+            assertPolyfilledApp(recovered, 'undefined')
             assert.equal(recovered.read('typeof globalThis'), 'undefined')
         }
     })
@@ -483,7 +482,7 @@ for (const target of miniTargets) {
                             return nativeReflectSet(target, key, ...args);
                         };
                     `)
-                    assertPolyfilledApp(runtime, 'function', target)
+                    assertPolyfilledApp(runtime, 'function')
                     runtime.read('Reflect.set = nativeReflectSet;')
                     const globalEntry = runtime.evaluate('common/vpt/global.js')
                     assert.ok(globalEntry && typeof globalEntry === 'object')
@@ -592,12 +591,7 @@ for (const target of miniTargets) {
                     restricted.evaluate('pages/home/index.js')
                     restricted.evaluate('comp.js')
                     restricted.evaluate('custom-wrapper.js')
-                    assert.deepEqual(restricted.registrations, [
-                        'App',
-                        target === 'wx' ? 'Component' : 'Page',
-                        'Component',
-                        'Component'
-                    ])
+                    assert.deepEqual(restricted.registrations, ['App', 'Page', 'Component', 'Component'])
                     assert.equal(restricted.read('sharedGlobal.polyfillProbe.href'), 'https://example.com/dir/child')
                     assert.equal(restricted.read('typeof globalThis'), 'undefined')
                     assert.equal(

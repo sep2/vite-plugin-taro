@@ -111,6 +111,21 @@ path: 'pages/profile/index'
 
 `usingComponents` 由 vpt 自动管理，无需填写。接入方式参见[原生组件](/guides/native-components/)。
 
+### `pages[].prerender`
+
+可选布尔值，默认关闭。省略或设为 `false` 时，微信页面直接使用普通原生 `Page` 构造器；只有显式设置为 `true` 才使用 glass-easel `Component` 的原生 data 工厂，尝试同步渲染并序列化 App/Page 首屏数据。其他目标忽略此选项。
+
+```ts
+pages: [
+    { path: 'pages/gallery/index' },
+    { path: 'pages/detail/index', prerender: true }
+]
+```
+
+适合需要在原生 `onLoad` 前提供目标节点的场景，例如 Skyline 共享元素转场。
+
+预渲染复用现有 React App 根和 Page 实例，不提前派发生命周期；但 React 渲染和 Effect 可能早于原生 `onLoad`，不要依赖此时已有原生页面上下文。
+
 ## `appJson`
 
 配置应用级行为：

@@ -20,7 +20,8 @@ const config = createPageConfig(
     PageComponent,
     __VPT_PAGE_PATH__,
     { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } },
-    __VPT_PAGE_CONFIG__
+    __VPT_PAGE_CONFIG__,
+    __VPT_PAGE_PRERENDER__
 )
 
 export default config

@@ -6,4 +6,5 @@ declare global {
     const __VPT_APP_CONFIG__: Record<string, unknown>
     const __VPT_PAGE_PATH__: string
     const __VPT_PAGE_CONFIG__: Record<string, unknown>
+    const __VPT_PAGE_PRERENDER__: boolean
 }

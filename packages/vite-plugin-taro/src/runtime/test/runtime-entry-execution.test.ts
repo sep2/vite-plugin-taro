@@ -396,7 +396,8 @@ test('creates the Mini Program Page capsule with the transparent App collection 
         defines: {
             __VPT_APP_CONFIG__: 'globalThis.harness.appConfigInput',
             __VPT_PAGE_CONFIG__: 'globalThis.harness.pageConfigInput',
-            __VPT_PAGE_PATH__: 'globalThis.harness.pagePath'
+            __VPT_PAGE_PATH__: 'globalThis.harness.pagePath',
+            __VPT_PAGE_PRERENDER__: 'false'
         }
     })
 
@@ -407,7 +408,8 @@ test('creates the Mini Program Page capsule with the transparent App collection 
         calls.map(({ name }) => name),
         ['createReactApp', 'createPageConfig']
     )
-    assert.equal(calls[1]?.args.length, 4)
+    assert.equal(calls[1]?.args.length, 5)
+    assert.equal(calls[1]?.args[4], false)
     assert.deepEqual(Object.keys(exports), ['default'])
     assert.deepEqual(calls[1]?.args.slice(0, 4), [
         PageComponent,
@@ -474,13 +476,15 @@ test('prerender stores its identity inside the non-enumerable VPT metadata', asy
             component,
             'pages/example',
             { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } },
-            {}
+            {},
+            true
         )
         assert.equal(Object.getOwnPropertyDescriptor(config, '__vpt_meta')?.enumerable, false)
         assert.equal(Object.hasOwn({ ...config }, '__vpt_meta'), false)
         assert.deepEqual(Object.keys(config), ['data'])
         assert.strictEqual(config.__vpt_meta.component, component)
         assert.equal(config.__vpt_meta.route, 'pages/example')
+        assert.equal(config.__vpt_meta.prerender, true)
         assert.equal(config.__vpt_meta.skipPrerender, false)
         assert.equal(config.__vpt_meta.prerenderIdentity, undefined)
         assert.deepEqual(Object.getOwnPropertyNames(config), ['data', '__vpt_meta'])
@@ -567,7 +571,8 @@ test('mounts the current Page export instead of the cold native capsule baseline
         },
         defines: {
             __VPT_PAGE_PATH__: "'pages/home/index'",
-            __VPT_PAGE_CONFIG__: '{}'
+            __VPT_PAGE_CONFIG__: '{}',
+            __VPT_PAGE_PRERENDER__: 'false'
         },
         servePageModuleId: 'src/pages/home/index.tsx'
     })
@@ -582,6 +587,7 @@ test('mounts the current Page export instead of the cold native capsule baseline
     )
     assert.ok(exports.default && typeof exports.default === 'object')
     assert.strictEqual(Reflect.get(exports.default, '__vpt_meta').component, LatestPage)
+    assert.equal(Reflect.get(exports.default, '__vpt_meta').prerender, false)
     assert.equal(Object.hasOwn(exports, 'prerenderToData'), false)
 })
 
@@ -695,9 +701,11 @@ test('registers native App and component shells after the VPT runtime', async ()
 })
 
 test('platform Page shells preserve onLoad timing and full queries', async () => {
-    for (const [pageConstructor, registration] of [
-        ['wx/native/wx-page-constructor.ts', 'Component'],
-        ['mini/native/mini-page-constructor.ts', 'Page']
+    for (const [pageConstructor, prerender, registration] of [
+        ['wx/native/wx-page-constructor.ts', false, 'Page'],
+        ['wx/native/wx-page-constructor.ts', true, 'Component'],
+        ['mini/native/mini-page-constructor.ts', false, 'Page'],
+        ['mini/native/mini-page-constructor.ts', true, 'Page']
     ] as const) {
         // Each shell records dependency initialization, native registration and deferred lifecycles independently.
         const calls: Call[] = []
@@ -721,6 +729,7 @@ test('platform Page shells preserve onLoad timing and full queries', async () =>
             value: {
                 component: () => null,
                 route: 'pages/home/index',
+                prerender,
                 skipPrerender: false,
                 prerenderIdentity: { path: 'pages/home/index?instance=1', params: query }
             }
@@ -757,7 +766,6 @@ test('platform Page shells preserve onLoad timing and full queries', async () =>
         assert.ok(registered && typeof registered === 'object')
         if (registration === 'Page') {
             assert.strictEqual(registered, config)
-            assert.doesNotMatch(code, /\bComponent\(/)
         } else {
             const { data, options, onLoad, onShareAppMessage, eh } = config
             assert.deepEqual(Reflect.get(registered, 'methods'), { onLoad, onShareAppMessage, eh })
@@ -785,7 +793,7 @@ test('glass-easel data factories receive native queries without replacing naviga
         data: {},
         onLoad: recordCall(calls, 'load', undefined)
     } satisfies PageInstance
-    Object.defineProperty(config, '__vpt_meta', { value: { skipPrerender: false } })
+    Object.defineProperty(config, '__vpt_meta', { value: { prerender: true, skipPrerender: false } })
     function prerenderToData(pageConfig: object, query: Record<string, unknown>) {
         assert.strictEqual(pageConfig, config)
         calls.push({ name: 'data', args: [query] })
@@ -893,94 +901,110 @@ test('disposes only its own native query listener when the module is hot-replace
     }
 })
 
-test('hands off HMR data and lifecycles before adapting the WX Component page', async (t) => {
-    const cacheKey = Symbol.for('customWrapperCache')
-    const previousCache = Object.getOwnPropertyDescriptor(globalThis, cacheKey)
-    // The real HMR adapter consumes the App-owned cache; isolate this test's empty cache and restore it afterwards.
-    Reflect.set(globalThis, cacheKey, new Map())
-    t.after(() => {
-        if (previousCache) {
-            Object.defineProperty(globalThis, cacheKey, previousCache)
-        } else {
-            Reflect.deleteProperty(globalThis, cacheKey)
+for (const prerender of [false, true]) {
+    test(`hands off HMR data and lifecycles with Page prerender=${prerender}`, async (t) => {
+        const cacheKey = Symbol.for('customWrapperCache')
+        const previousCache = Object.getOwnPropertyDescriptor(globalThis, cacheKey)
+        // The real HMR adapter consumes the App-owned cache; isolate this test's empty cache and restore it afterwards.
+        Reflect.set(globalThis, cacheKey, new Map())
+        t.after(() => {
+            if (previousCache) {
+                Object.defineProperty(globalThis, cacheKey, previousCache)
+            } else {
+                Reflect.deleteProperty(globalThis, cacheKey)
+            }
+        })
+        // Native registrations and business lifecycles are journaled separately to detect accidental remounts.
+        const registrations: object[] = []
+        const calls: Call[] = []
+        const config = {
+            data: { count: 0 },
+            onLoad: recordCall(calls, 'load', undefined),
+            onShow: recordCall(calls, 'show', undefined),
+            onUnload: recordCall(calls, 'unload', undefined)
         }
-    })
-    // Native registrations and business lifecycles are journaled separately to detect accidental remounts.
-    const registrations: object[] = []
-    const calls: Call[] = []
-    const config = {
-        data: { count: 0 },
-        onLoad: recordCall(calls, 'load', undefined),
-        onShow: recordCall(calls, 'show', undefined),
-        onUnload: recordCall(calls, 'unload', undefined)
-    }
-    // Page HMR controls native prerendering through this non-enumerable flag, separately from its private lifecycle gate.
-    const metadata = { skipPrerender: false }
-    Object.defineProperty(config, '__vpt_meta', { value: metadata })
-    const initialData = config.data
-    const code = await bundleRuntimeEntry({
-        entry: 'mini/native/page.ts',
-        mocks: {
-            '../amphibious/vpt.ts': `export { default as Page } from ${JSON.stringify(path.join(runtimeRoot, 'wx/native/wx-page-constructor.ts'))}`,
-            './prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData',
-            '\0vpt:page-capsule': 'export default globalThis.harness.config'
-        },
-        defines: {},
-        nativePageHmr: true
-    })
-    const prerenderToData = t.mock.fn(() => initialData)
-    const harness = { config, prerenderToData }
-    const context = {
-        ...createExecutionContext(harness),
-        globalThis: { harness, __rolldown_runtime__: { injectPageHmr } },
-        Component: () =>
-            createComponentBuilder((value) => {
-                assert.ok(value && typeof value === 'object')
-                registrations.push(value)
-            })
-    }
-    const page = { data: { count: 7 } }
-    const firstQuery = { id: 'initial' }
-    executeRuntimeEntry(code, context)
-    const first = registrations[0]
-    assert.ok(first)
-    assert.equal(metadata.skipPrerender, false)
-    assert.strictEqual(Reflect.get(first, 'data')(), initialData)
-    assert.equal(prerenderToData.mock.callCount(), 1)
-    const firstMethods = Reflect.get(first, 'methods')
-    assert.deepEqual(Object.getOwnPropertySymbols(firstMethods), [], 'HMR state is not part of the native methods')
-    assert.equal(Object.hasOwn(firstMethods, '__vpt_meta'), false)
-    firstMethods.onLoad.call(page, firstQuery)
-    firstMethods.onShow.call(page)
+        // Page HMR controls native prerendering through this non-enumerable flag, separately from its private lifecycle gate.
+        const metadata = { prerender, skipPrerender: false }
+        Object.defineProperty(config, '__vpt_meta', { value: metadata })
+        const initialData = config.data
+        const code = await bundleRuntimeEntry({
+            entry: 'mini/native/page.ts',
+            mocks: {
+                '../amphibious/vpt.ts': `export { default as Page } from ${JSON.stringify(path.join(runtimeRoot, 'wx/native/wx-page-constructor.ts'))}`,
+                './prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData',
+                '\0vpt:page-capsule': 'export default globalThis.harness.config'
+            },
+            defines: {},
+            nativePageHmr: true
+        })
+        const prerenderToData = t.mock.fn(() => initialData)
+        const harness = { config, prerenderToData }
+        const context = {
+            ...createExecutionContext(harness),
+            globalThis: { harness, __rolldown_runtime__: { injectPageHmr } },
+            Page(value: unknown) {
+                assert.equal(prerender, false, 'only ordinary pages use native Page')
+                assert.strictEqual(value, config)
+                registrations.push(config)
+            },
+            Component() {
+                assert.equal(prerender, true, 'only opted-in pages use the Component data factory')
+                return createComponentBuilder((value) => {
+                    assert.ok(value && typeof value === 'object')
+                    registrations.push(value)
+                })
+            }
+        }
+        const page = { data: { count: 7 } }
+        const firstQuery = { id: 'initial' }
+        executeRuntimeEntry(code, context)
+        const first = registrations[0]
+        assert.ok(first)
+        assert.equal(metadata.skipPrerender, false)
+        assert.strictEqual(prerender ? Reflect.get(first, 'data')() : Reflect.get(first, 'data'), initialData)
+        assert.equal(prerenderToData.mock.callCount(), prerender ? 1 : 0)
+        const firstMethods = prerender ? Reflect.get(first, 'methods') : first
+        assert.deepEqual(Object.getOwnPropertySymbols({ ...firstMethods }), [], 'HMR state is not enumerable')
+        assert.equal(Object.hasOwn({ ...firstMethods }, '__vpt_meta'), false)
+        firstMethods.onLoad.call(page, firstQuery)
+        firstMethods.onShow.call(page)
 
-    executeRuntimeEntry(code, context)
-    const second = registrations[1]
-    assert.ok(second)
-    assert.equal(metadata.skipPrerender, true)
-    assert.strictEqual(Reflect.get(second, 'data')(), page.data)
-    assert.equal(prerenderToData.mock.callCount(), 1, 'native HMR must not prerender another React Page')
-    const secondMethods = Reflect.get(second, 'methods')
-    assert.strictEqual(secondMethods.onLoad, firstMethods.onLoad)
-    firstMethods.onUnload.call(page)
-    secondMethods.onLoad.call(page, { id: 'synthetic' })
-    secondMethods.onShow.call(page)
-    assert.equal(metadata.skipPrerender, false, 'onShow clears the flag before the next real navigation')
-    assert.deepEqual(calls, [
-        { name: 'load', args: [firstQuery] },
-        { name: 'show', args: [] }
-    ])
+        executeRuntimeEntry(code, context)
+        const second = registrations[1]
+        assert.ok(second)
+        assert.equal(metadata.skipPrerender, true)
+        assert.strictEqual(prerender ? Reflect.get(second, 'data')() : Reflect.get(second, 'data'), page.data)
+        assert.equal(
+            prerenderToData.mock.callCount(),
+            prerender ? 1 : 0,
+            'native HMR must not prerender another React Page'
+        )
+        const secondMethods = prerender ? Reflect.get(second, 'methods') : second
+        assert.strictEqual(secondMethods.onLoad, firstMethods.onLoad)
+        firstMethods.onUnload.call(page)
+        secondMethods.onLoad.call(page, { id: 'synthetic' })
+        secondMethods.onShow.call(page)
+        assert.equal(metadata.skipPrerender, false, 'onShow clears the flag before the next real navigation')
+        assert.deepEqual(calls, [
+            { name: 'load', args: [firstQuery] },
+            { name: 'show', args: [] }
+        ])
 
-    secondMethods.onUnload.call(page)
-    assert.strictEqual(Reflect.get(second, 'data')(), initialData)
-    assert.equal(prerenderToData.mock.callCount(), 2, 'real navigation resumes ordinary prerendering')
-    secondMethods.onLoad.call(page, { id: 'real-navigation' })
-    secondMethods.onShow.call(page)
-    assert.deepEqual(calls.slice(2), [
-        { name: 'unload', args: [] },
-        { name: 'load', args: [{ id: 'real-navigation' }] },
-        { name: 'show', args: [] }
-    ])
-})
+        secondMethods.onUnload.call(page)
+        assert.strictEqual(
+            prerender ? Reflect.get(second, 'data')() : Reflect.get(second, 'data'),
+            prerender ? initialData : config.data
+        )
+        assert.equal(prerenderToData.mock.callCount(), prerender ? 2 : 0, 'real navigation respects the Page opt-in')
+        secondMethods.onLoad.call(page, { id: 'real-navigation' })
+        secondMethods.onShow.call(page)
+        assert.deepEqual(calls.slice(2), [
+            { name: 'unload', args: [] },
+            { name: 'load', args: [{ id: 'real-navigation' }] },
+            { name: 'show', args: [] }
+        ])
+    })
+}
 
 test('loads polyfills before SystemJS, installs amphibious transport and preserves preload semantics', async () => {
     // These mutable observations verify polyfill/SystemJS startup order and one synchronous preload invocation.

@@ -1,4 +1,5 @@
 import type { createPageConfig } from '../../mini/capsule/create-page-config.ts'
+import miniPageConstructor from '../../mini/native/mini-page-constructor.ts'
 import { prerenderToData } from './prerender-to-data.ts'
 
 declare function Component(): {
@@ -10,6 +11,11 @@ declare function Component(): {
 
 /** Adapts the ordinary Taro config to WX's per-instance native data factory. */
 export default function wxPageConstructor(config: ReturnType<typeof createPageConfig>): void {
+    if (!config.__vpt_meta.prerender) {
+        miniPageConstructor(config)
+        return
+    }
+
     // Non-enumerable __vpt_meta stays on config, outside the native lifecycle and event methods.
     const { data: _data, options, ...methods } = config
 

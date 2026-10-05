@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
             vpt({
                 target: 'wx',
                 app: 'src/app.tsx',
-                pages: [{ path: 'pages/gallery/gallery' }, { path: 'pages/detail/detail' }],
+                pages: [{ path: 'pages/gallery/gallery' }, { path: 'pages/detail/detail', prerender: true }],
                 appJson: {
                     renderer: 'skyline',
                     componentFramework: 'glass-easel',

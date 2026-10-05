@@ -4,6 +4,7 @@ import type { MiniPage } from '../mini-contract.ts'
 
 const pagePathPlaceholder = '__VPT_PAGE_PATH__'
 const pageConfigPlaceholder = '__VPT_PAGE_CONFIG__'
+const pagePrerenderPlaceholder = '__VPT_PAGE_PRERENDER__'
 
 /** Specializes the Page capsule for one configured route. */
 export function specializePageCapsule({
@@ -22,7 +23,8 @@ export function specializePageCapsule({
         id,
         {
             [pagePathPlaceholder]: JSON.stringify(page.path),
-            [pageConfigPlaceholder]: JSON.stringify(getPageConfig(page))
+            [pageConfigPlaceholder]: JSON.stringify(getPageConfig(page)),
+            [pagePrerenderPlaceholder]: JSON.stringify(page.prerender === true)
         },
         sourcemap ?? false
     )

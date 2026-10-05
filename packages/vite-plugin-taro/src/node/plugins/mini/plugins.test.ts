@@ -159,7 +159,7 @@ for (const [target, createContract] of [
         const pageId = normalizePath(miniPageCapsuleId)
         const appSource = 'export const config = __VPT_APP_CONFIG__'
         const pageSource =
-            'const PageComponent = () => null; export const route = __VPT_PAGE_PATH__; export const config = __VPT_PAGE_CONFIG__; export const component = PageComponent'
+            'const PageComponent = () => null; export const route = __VPT_PAGE_PATH__; export const config = __VPT_PAGE_CONFIG__; export const prerender = __VPT_PAGE_PRERENDER__; export const component = PageComponent'
         const eligibleSources = [
             { id: appId, code: appSource, marker: 'app-config' },
             { id: `${appId}?v=1`, code: appSource, marker: 'app-config' },

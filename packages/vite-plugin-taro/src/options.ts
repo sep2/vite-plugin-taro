@@ -42,6 +42,12 @@ export type VptPageOption = {
      * It does not translate configuration names between platforms.
      */
     config?: VptPageConfig
+
+    /**
+     * Opts this WX glass-easel page into synchronous prerendering through its native data factory.
+     * Disabled unless true; ignored on other targets. Rendering and effects may run before native onLoad.
+     */
+    prerender?: boolean
 }
 
 /** Configures vpt for one build target. */
