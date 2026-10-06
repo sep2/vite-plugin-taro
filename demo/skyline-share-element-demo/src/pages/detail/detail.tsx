@@ -30,7 +30,7 @@ export default function Detail() {
             <Text className="eyebrow">SAME KEY / NEW PLACE</Text>
             <Text className="heading">{card.title}</Text>
             <Text className="description">The same tile has a new home. Go back to watch it return.</Text>
-            <Text className="footnote">Route query: id={id} · no selection store</Text>
+            <Text className="footnote">Route parameter: id={id}</Text>
         </View>
     )
 }
