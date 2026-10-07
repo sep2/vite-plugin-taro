@@ -28,6 +28,14 @@
 - Put generated test fixtures, scratch files, agent test logs, and diagnostics under the owning project's Git-ignored `tmp/`: `packages/vite-plugin-taro/tmp/` for plugin tests, `demo/<name>/tmp/` for demo tests. Clean up only the files owned by each test.
 - If a user instruction conflicts with any `AGENTS.md` rule, ask for explicit confirmation before overriding it.
 
+## Final-state design
+
+- Apply a clean final-state design to everything produced or changed: code, tests, names, file/module structure,
+  configuration, comments, documentation, replies, commit messages, PR titles/descriptions, and all other artifacts.
+- Every artifact must directly express the intended design. Never retain traces of prior agent errors or corrections,
+  including leftover code or structure, discarded additions, removal narratives, negated qualifiers, or explanations
+  of why an unrequested feature is absent.
+
 ## Workspace
 
 pnpm v12 monorepo integrating Vite 8, React 19, and Taro for WeChat (`wx`), Alipay (`zfb`), TikTok (`tt`), and H5 (`h5`). Node.js v26+ runs TypeScript natively.
