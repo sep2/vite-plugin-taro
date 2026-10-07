@@ -49,7 +49,7 @@ See the [Loan Genius Demo](https://github.com/sep2/vite-plugin-taro/blob/main/de
 
 See the [Skyline Shared-Element Demo](https://github.com/sep2/vite-plugin-taro/tree/main/demo/skyline-share-element-demo) for native page transitions.
 
-<video src="https://vpt.js.org/share-element-demo.mp4" controls autoplay muted loop playsinline width="320"></video>
+<video src="https://github.com/user-attachments/assets/bd23538a-da13-431b-a182-85aadeb66194" controls autoplay muted loop playsinline width="320"></video>
 
 ## Sponsor
 

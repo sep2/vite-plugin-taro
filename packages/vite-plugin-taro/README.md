@@ -50,7 +50,7 @@ pnpm --config.minimum-release-age=0 create vite-taro@latest my-app
 
 查看 [Skyline 共享元素 Demo](https://github.com/sep2/vite-plugin-taro/tree/main/demo/skyline-share-element-demo)，体验原生页面转场动画。
 
-<video src="https://vpt.js.org/share-element-demo.mp4" controls autoplay muted loop playsinline width="320"></video>
+<video src="https://github.com/user-attachments/assets/bd23538a-da13-431b-a182-85aadeb66194" controls autoplay muted loop playsinline width="320"></video>
 
 ## 赞助
 

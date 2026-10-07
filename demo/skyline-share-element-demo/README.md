@@ -2,7 +2,7 @@
 
 通过原生 Skyline 共享元素动画在列表页与详情页之间切换，并在返回时保留列表页的 React 状态。
 
-<video src="https://vpt.js.org/share-element-demo.mp4" controls autoplay muted loop playsinline width="320"></video>
+<video src="https://github.com/user-attachments/assets/bd23538a-da13-431b-a182-85aadeb66194" controls autoplay muted loop playsinline width="320"></video>
 
 ## 运行
 
