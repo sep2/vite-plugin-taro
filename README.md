@@ -48,6 +48,10 @@ pnpm --config.minimum-release-age=0 create vite-taro@latest my-app
 
 <img src="https://raw.githubusercontent.com/sep2/vite-plugin-taro/main/demo/loan-genius/screenshots/demo.webp" alt="Loan Genius screenshot" width="320" />
 
+查看 [Skyline 共享元素 Demo](https://github.com/sep2/vite-plugin-taro/tree/main/demo/skyline-share-element-demo)，体验原生页面转场与返回后保留的列表状态。
+
+<video src="https://vpt.js.org/share-element-demo.mp4" controls autoplay muted loop playsinline width="320"></video>
+
 ## 赞助
 
 VPT 由 [weapp.dev](https://weapp.dev) 赞助，感谢赞助者对开源开发的支持。
