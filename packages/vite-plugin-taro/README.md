@@ -44,9 +44,13 @@ pnpm --config.minimum-release-age=0 create vite-taro@latest my-app
 
 ## Demo
 
-查看 [Loan Genius Demo](https://github.com/sep2/vite-plugin-taro/tree/main/demo/loan-genius)。
+查看 [Loan Genius Demo](https://github.com/sep2/vite-plugin-taro/tree/main/demo/loan-genius)，此项目迁移自 [wuba/Taro-Mortgage-Calculator](https://github.com/wuba/Taro-Mortgage-Calculator)。
 
 <img src="https://raw.githubusercontent.com/sep2/vite-plugin-taro/main/demo/loan-genius/screenshots/demo.webp" alt="Loan Genius screenshot" width="320" />
+
+查看 [Skyline 共享元素 Demo](https://github.com/sep2/vite-plugin-taro/tree/main/demo/skyline-share-element-demo)，体验原生页面转场动画。
+
+<video src="https://vpt.js.org/share-element-demo.mp4" controls autoplay muted loop playsinline width="320"></video>
 
 ## 赞助
 

@@ -43,11 +43,11 @@ Continue with the [Quick Start guide](https://vpt.js.org/guides/quick-start/).
 
 ## Demo
 
-See the [Loan Genius Demo](https://github.com/sep2/vite-plugin-taro/blob/main/demo/loan-genius/README.en.md).
+See the [Loan Genius Demo](https://github.com/sep2/vite-plugin-taro/blob/main/demo/loan-genius/README.en.md). This project was migrated from [wuba/Taro-Mortgage-Calculator](https://github.com/wuba/Taro-Mortgage-Calculator).
 
 <img src="https://raw.githubusercontent.com/sep2/vite-plugin-taro/main/demo/loan-genius/screenshots/demo.webp" alt="Loan Genius screenshot" width="320" />
 
-See the [Skyline Shared-Element Demo](https://github.com/sep2/vite-plugin-taro/tree/main/demo/skyline-share-element-demo) for native page transitions and gallery state retained after navigating back.
+See the [Skyline Shared-Element Demo](https://github.com/sep2/vite-plugin-taro/tree/main/demo/skyline-share-element-demo) for native page transitions.
 
 <video src="https://vpt.js.org/share-element-demo.mp4" controls autoplay muted loop playsinline width="320"></video>
 
