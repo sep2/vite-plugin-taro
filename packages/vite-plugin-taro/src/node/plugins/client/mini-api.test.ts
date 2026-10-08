@@ -41,7 +41,7 @@ async function bundleMiniApi(source: string, target: 'wx' | 'zfb' | 'tt'): Promi
                 'process.env.TARO_ENV': JSON.stringify(platform),
                 'process.env.TARO_PLATFORM': '"mini"',
                 'process.env.FRAMEWORK': '"react"',
-                'process.env.TARO_VERSION': '"4.2.1"',
+                'process.env.TARO_VERSION': '"4.3.0"',
                 'process.env.SUPPORT_TARO_POLYFILL': '"disabled"',
                 ENABLE_ADJACENT_HTML: 'false',
                 ENABLE_CLONE_NODE: 'false',

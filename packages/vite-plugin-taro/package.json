@@ -82,7 +82,7 @@
         "@tailwindcss/node": "4.3.3",
         "@tailwindcss/oxide": "4.3.3",
         "@tailwindcss/vite": "4.3.3",
-        "@tarojs/shared": "4.2.1",
+        "@tarojs/shared": "4.3.0",
         "@vitejs/plugin-react": "^6.1.1",
         "core-js": "^3.50.0",
         "lightningcss": "1.33.0",

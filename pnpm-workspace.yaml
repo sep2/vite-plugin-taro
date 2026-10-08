@@ -11,14 +11,14 @@ overrides:
   vite: 8.3.1
   # Taro's copied H5 components and the published runtime share the prototype-pollution-fixed Swiper.
   swiper: 12.1.2
-  # Taro 4.2.1 references Rollup only from declarations; VPT's runtime and build pipeline use Rolldown.
-  '@tarojs/runner-utils@4.2.1>rollup': '-'
+  # Taro 4.3.0 references Rollup only from declarations; VPT's runtime and build pipeline use Rolldown.
+  '@tarojs/runner-utils@4.3.0>rollup': '-'
   # The runtime build copies H5 APIs and metadata, never the upstream Babel-based compiler entry.
-  '@tarojs/plugin-platform-h5@4.2.1>babel-plugin-transform-taroapi': '-'
+  '@tarojs/plugin-platform-h5@4.3.0>babel-plugin-transform-taroapi': '-'
 
 peerDependencyRules:
   allowedVersions:
-    '@tarojs/taro@4.2.1>@types/react': '^19.0.0'
+    '@tarojs/taro@4.3.0>@types/react': '^19.0.0'
 
 allowBuilds:
   '@biomejs/biome': false
@@ -29,10 +29,10 @@ allowBuilds:
   esbuild: true
 
 patchedDependencies:
-  '@tarojs/plugin-html@4.2.1': patches/generated/@tarojs__plugin-html@4.2.1.patch
-  '@tarojs/plugin-framework-react@4.2.1': patches/generated/@tarojs__plugin-framework-react@4.2.1.patch
-  '@tarojs/react@4.2.1': patches/generated/@tarojs__react@4.2.1.patch
-  '@tarojs/runtime@4.2.1': patches/generated/@tarojs__runtime@4.2.1.patch
+  '@tarojs/plugin-html@4.3.0': patches/generated/@tarojs__plugin-html@4.3.0.patch
+  '@tarojs/plugin-framework-react@4.3.0': patches/generated/@tarojs__plugin-framework-react@4.3.0.patch
+  '@tarojs/react@4.3.0': patches/generated/@tarojs__react@4.3.0.patch
+  '@tarojs/runtime@4.3.0': patches/generated/@tarojs__runtime@4.3.0.patch
   canvas-confetti@1.9.4: patches/generated/canvas-confetti@1.9.4.patch
 
 minimumReleaseAgeExclude:

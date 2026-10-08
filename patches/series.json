@@ -1,33 +1,33 @@
 [
     {
-        "package": "@tarojs/plugin-html@4.2.1",
-        "output": "patches/generated/@tarojs__plugin-html@4.2.1.patch",
-        "patches": ["patches/series/@tarojs__plugin-html@4.2.1/01-html-display-defaults.patch"]
+        "package": "@tarojs/plugin-html@4.3.0",
+        "output": "patches/generated/@tarojs__plugin-html@4.3.0.patch",
+        "patches": ["patches/series/@tarojs__plugin-html@4.3.0/01-html-display-defaults.patch"]
     },
     {
-        "package": "@tarojs/plugin-framework-react@4.2.1",
-        "output": "patches/generated/@tarojs__plugin-framework-react@4.2.1.patch",
+        "package": "@tarojs/plugin-framework-react@4.3.0",
+        "output": "patches/generated/@tarojs__plugin-framework-react@4.3.0.patch",
         "patches": [
-            "patches/series/@tarojs__plugin-framework-react@4.2.1/01-react19-root-api.patch",
-            "patches/series/@tarojs__plugin-framework-react@4.2.1/02-mini-app-page-rendering.patch",
-            "patches/series/@tarojs__plugin-framework-react@4.2.1/03-h5-router-container.patch",
-            "patches/series/@tarojs__plugin-framework-react@4.2.1/04-page-prerender.patch"
+            "patches/series/@tarojs__plugin-framework-react@4.3.0/01-react19-root-api.patch",
+            "patches/series/@tarojs__plugin-framework-react@4.3.0/02-mini-app-page-rendering.patch",
+            "patches/series/@tarojs__plugin-framework-react@4.3.0/03-h5-router-container.patch",
+            "patches/series/@tarojs__plugin-framework-react@4.3.0/04-page-prerender.patch"
         ]
     },
     {
-        "package": "@tarojs/react@4.2.1",
-        "output": "patches/generated/@tarojs__react@4.2.1.patch",
+        "package": "@tarojs/react@4.3.0",
+        "output": "patches/generated/@tarojs__react@4.3.0.patch",
         "patches": [
-            "patches/series/@tarojs__react@4.2.1/01-react19-reconciler.patch",
-            "patches/series/@tarojs__react@4.2.1/02-app-page-outlet-projection.patch"
+            "patches/series/@tarojs__react@4.3.0/01-react19-reconciler.patch",
+            "patches/series/@tarojs__react@4.3.0/02-app-page-outlet-projection.patch"
         ]
     },
     {
-        "package": "@tarojs/runtime@4.2.1",
-        "output": "patches/generated/@tarojs__runtime@4.2.1.patch",
+        "package": "@tarojs/runtime@4.3.0",
+        "output": "patches/generated/@tarojs__runtime@4.3.0.patch",
         "patches": [
-            "patches/series/@tarojs__runtime@4.2.1/01-mini-app-page-rendering.patch",
-            "patches/series/@tarojs__runtime@4.2.1/02-page-prerender.patch"
+            "patches/series/@tarojs__runtime@4.3.0/01-mini-app-page-rendering.patch",
+            "patches/series/@tarojs__runtime@4.3.0/02-page-prerender.patch"
         ]
     },
     {

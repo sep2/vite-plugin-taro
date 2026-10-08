@@ -1,5 +1,5 @@
 diff --git a/dist/bom/document.js b/dist/bom/document.js
-index a641a96b78c9978acaf1041160dd7fd74bcbfcdc..06d1e298dd87d24de39ac8a3c92f23e7d71cb5fd 100644
+index a641a96b78c9978acaf1041160dd7fd74bcbfcdc..2d179b16365ebeaff8f48921cb974a1ad5eb5ed6 100644
 --- a/dist/bom/document.js
 +++ b/dist/bom/document.js
 @@ -1,6 +1,7 @@
@@ -32,7 +32,7 @@ index a641a96b78c9978acaf1041160dd7fd74bcbfcdc..06d1e298dd87d24de39ac8a3c92f23e7
 +     * same React container and keeps the same id, but can now batch app.* updates through its own ctx just as each Page root
 +     * batches page.* updates. Reusing the host itself removes the need for a detached scheduler node.
 +     *
-+     * Taro and the framework locate this container by id; the pinned 4.2.1 runtime has no behavior branching on an APP
++     * Taro and the framework locate this container by id; the pinned 4.3.0 runtime has no behavior branching on an APP
 +     * nodeName or APP tagName. App snapshots hydrate the container's children rather than the container record itself, so
 +     * ROOT is never emitted as a native layout node. The observable change is limited to unsupported code directly
 +     * inspecting #app.nodeName/tagName or using this support fork with upstream templates. H5 loads the untouched
@@ -48,10 +48,10 @@ index a641a96b78c9978acaf1041160dd7fd74bcbfcdc..06d1e298dd87d24de39ac8a3c92f23e7
      doc.appendChild(html);
      html.appendChild(head);
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index 415aa2ede85ef7ed66b3d7d8ef1d193b3a995819..e75885f0f2476f42e3e1102df2b3e7942a0d246b 100644
+index cc210f4e56ff90d69a398e2e27382def86f4cb0c..e4e0e42363690037989d316ed321ffa536d37eab 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
-@@ -277,6 +277,15 @@ class TaroNode extends TaroEventTarget {
+@@ -287,6 +287,15 @@ class TaroNode extends TaroEventTarget {
          return this.childNodes.length > 0;
      }
      enqueueUpdate(payload) {
@@ -68,7 +68,7 @@ index 415aa2ede85ef7ed66b3d7d8ef1d193b3a995819..e75885f0f2476f42e3e1102df2b3e794
          (_a = this._root) === null || _a === void 0 ? void 0 : _a.enqueueUpdate(payload);
      }
 diff --git a/dist/dom/root.js b/dist/dom/root.js
-index 727cf71a053837a5f4614c9f8073b5a2108df131..4e5bb3f0b4ebb2fe46050b6d5a7e47d94ba7aa43 100644
+index 2680d190c19d33a92db1883d674ad6b26b2ffef4..b0f848dc265fa73d7bc7de731969fd44c6ca4545 100644
 --- a/dist/dom/root.js
 +++ b/dist/dom/root.js
 @@ -1,5 +1,5 @@
@@ -78,7 +78,7 @@ index 727cf71a053837a5f4614c9f8073b5a2108df131..4e5bb3f0b4ebb2fe46050b6d5a7e47d9
  import { options } from '../options.js';
  import { perf } from '../perf.js';
  import { isComment, customWrapperCache } from '../utils/index.js';
-@@ -49,7 +49,14 @@ class TaroRootElement extends TaroElement {
+@@ -50,7 +50,14 @@ class TaroRootElement extends TaroElement {
          this.tagName = ROOT_STR.toUpperCase();
      }
      get _path() {
@@ -94,7 +94,7 @@ index 727cf71a053837a5f4614c9f8073b5a2108df131..4e5bb3f0b4ebb2fe46050b6d5a7e47d9
      }
      get _root() {
          return this;
-@@ -71,8 +78,14 @@ class TaroRootElement extends TaroElement {
+@@ -75,8 +82,14 @@ class TaroRootElement extends TaroElement {
              const setDataMark = `${SET_DATA} 开始时间戳 ${Date.now()}`;
              perf.start(setDataMark);
              const data = Object.create(null);
@@ -111,10 +111,10 @@ index 727cf71a053837a5f4614c9f8073b5a2108df131..4e5bb3f0b4ebb2fe46050b6d5a7e47d9
              while (this.updatePayloads.length > 0) {
                  const { path, value } = this.updatePayloads.shift();
 diff --git a/dist/dsl/common.js b/dist/dsl/common.js
-index aaf58e6320a8df8392064d5fbc1787b8c41ea009..091fd7b0b57a9a97fe2ff876361b9e9e2fed8381 100644
+index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..5adcecd5691fdb5e519174b31a8dfec529d1ad9a 100644
 --- a/dist/dsl/common.js
 +++ b/dist/dsl/common.js
-@@ -95,8 +95,12 @@ function createPageConfig(component, pageName, data, pageConfig) {
+@@ -96,8 +96,12 @@ function createPageConfig(component, pageName, data, pageConfig) {
              Current.page = this;
              this.config = pageConfig || {};
              // this.$taroPath 是页面唯一标识

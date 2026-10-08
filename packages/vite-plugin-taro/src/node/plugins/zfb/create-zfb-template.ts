@@ -165,7 +165,7 @@ class ZfbTemplate extends RecursiveTemplate {
     }
 }
 
-/** Creates the Taro 4.2.1 Alipay template implementation without loading its CLI platform package. */
+/** Creates the Taro 4.3.0 Alipay template implementation without loading its CLI platform package. */
 export function createZfbTemplate(): RecursiveTemplate {
     const template = new ZfbTemplate()
 

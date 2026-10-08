@@ -6,14 +6,14 @@ pnpm applies one combined patch to each package version. We maintain **10 featur
 
 | Package | Ordered feature patches | Purpose |
 | --- | --- | --- |
-| `@tarojs/plugin-html@4.2.1` | `01-html-display-defaults` | Populate upstream HTML inline/block element sets without the Taro compiler rewriting installed files. |
-| `@tarojs/plugin-framework-react@4.2.1` | `01-react19-root-api` | Use React 19 concurrent roots for App and standalone native-component entries; make standalone native-component setup explicitly synchronous with `flushSync`. |
+| `@tarojs/plugin-html@4.3.0` | `01-html-display-defaults` | Populate upstream HTML inline/block element sets without the Taro compiler rewriting installed files. |
+| `@tarojs/plugin-framework-react@4.3.0` | `01-react19-root-api` | Use React 19 concurrent roots for App and standalone native-component entries; make standalone native-component setup explicitly synchronous with `flushSync`. |
 | | `02-mini-app-page-rendering` | Keep one React App tree, broadcast App data to native Pages, project Page children through an outlet, and seed App/Page data in the same initial native batch. |
 | | `03-h5-router-container` | Give H5 Page children a dedicated `taro_router` container so routing CSS does not target unrelated App siblings. |
 | | `04-page-prerender` | Deduplicate queued and rendered Page identities for caller-controlled prerendering. Preserve the original queue, render/unmount flow, mount signature and native update scheduling. |
-| `@tarojs/react@4.2.1` | `01-react19-reconciler` | Target the pinned React 19 reconciler contract directly: concurrent roots, commit updates, scoped event priorities, error callbacks and distinct synchronous callback/work flushing. Remove legacy render APIs and align declarations. |
+| `@tarojs/react@4.3.0` | `01-react19-reconciler` | Target the pinned React 19 reconciler contract directly: concurrent roots, commit updates, scoped event priorities, error callbacks and distinct synchronous callback/work flushing. Remove legacy render APIs and align declarations. |
 | | `02-app-page-outlet-projection` | Mark the outlet's ancestor branch after each React commit so recursive native components forward the Page slot exactly once. |
-| `@tarojs/runtime@4.2.1` | `01-mini-app-page-rendering` | Make the App host a scheduler, separate `app.*` and `page.*` updates, and keep Page roots out of App serialization. These changes form one coordinated feature, not independent per-file patches. |
+| `@tarojs/runtime@4.3.0` | `01-mini-app-page-rendering` | Make the App host a scheduler, separate `app.*` and `page.*` updates, and keep Page roots out of App serialization. These changes form one coordinated feature, not independent per-file patches. |
 | | `02-page-prerender` | Type native Page data as an object or factory and let onLoad adopt a caller-prepared identity without moving lifecycle dispatch. VPT stores that identity in non-enumerable `__vpt_meta.prerenderIdentity`; the factory signature is unchanged. |
 | `canvas-confetti@1.9.4` | `01-canvas-confetti-enhancements` | Keep all existing confetti enhancements together: rotation/tilt controls, frame-clock repeat emission, cached path drawing, and DOMMatrix input normalization. Source, browser and module builds stay aligned. |
 
@@ -49,7 +49,7 @@ pnpm build:plugin
 To work on one package:
 
 ```sh
-pnpm patches:build @tarojs/runtime@4.2.1
+pnpm patches:build @tarojs/runtime@4.3.0
 ```
 
 The composer:
@@ -74,13 +74,13 @@ For example, editing the runtime's first feature (Bash example; use an absolute 
 repo="$PWD"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
-pnpm patch @tarojs/runtime@4.2.1 --ignore-existing --edit-dir "$work/package"
+pnpm patch @tarojs/runtime@4.3.0 --ignore-existing --edit-dir "$work/package"
 git -C "$work/package" init --quiet --object-format=sha1
 git -C "$work/package" -c core.autocrlf=false add --force --all
 
 # For a later feature, apply all earlier feature files here with git apply --index.
 base="$(git -C "$work/package" write-tree)"
-feature="$repo/patches/series/@tarojs__runtime@4.2.1/01-mini-app-page-rendering.patch"
+feature="$repo/patches/series/@tarojs__runtime@4.3.0/01-mini-app-page-rendering.patch"
 git -C "$work/package" apply --index "$feature"
 
 # Edit the extracted package files now. For a new feature, omit the preceding apply.
@@ -90,7 +90,7 @@ git -C "$work/package" diff --cached --binary --full-index \
   --no-color --no-ext-diff --no-textconv --no-renames \
   --src-prefix=a/ --dst-prefix=b/ "$base" -- > "$feature"
 
-pnpm patches:build @tarojs/runtime@4.2.1
+pnpm patches:build @tarojs/runtime@4.3.0
 pnpm install
 ```
 

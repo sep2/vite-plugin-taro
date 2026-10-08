@@ -54,7 +54,7 @@ import { createZfbTemplate } from './create-zfb-template.ts'
  *
  * ## Why the Page has no base import
  *
- * Taro 4.2.1 removes `base.axml` imports from Alipay Pages that register custom components. Every VPT Page registers `comp`, so its
+ * Taro 4.3.0 removes `base.axml` imports from Alipay Pages that register custom components. Every VPT Page registers `comp`, so its
  * AXML contains only optional PageMeta output and the `comp` bridge. The Page does not need an inlined copy either: `comp.axml` may
  * import the shared table legally, and that table renders both `i` and `p`. This keeps each Page small, gives every named template
  * one `utils.sjs` binding, and follows Taro's platform restriction without inventing a Page renderer.
