@@ -9,7 +9,8 @@ import { runInNewContext } from 'node:vm'
 import { build } from 'rolldown'
 import { normalizePath, resolveConfig } from 'vite'
 import vpt from '../../index.ts'
-import { resolveTaroRuntime } from '../../node/utils/packages.ts'
+import { rendererHostId } from '../../node/plugins/mini/module/module.ts'
+import { resolveTaroRuntime, resolveVptRuntime } from '../../node/utils/packages.ts'
 
 const require = createRequire(import.meta.url)
 const rendererPath = resolveTaroRuntime('react')
@@ -80,6 +81,9 @@ async function runFixture(t: TestContext, target: 'wx' | 'zfb' | 'tt', mode: str
                 resolveId(id, importer) {
                     if (id === entry || routes.has(id) || id === 'test:empty') {
                         return id
+                    }
+                    if (id === rendererHostId) {
+                        return resolveVptRuntime('mini/taro/recursive-template-host')
                     }
                     if (id === '\0vpt:global-binding') {
                         return 'test:global'

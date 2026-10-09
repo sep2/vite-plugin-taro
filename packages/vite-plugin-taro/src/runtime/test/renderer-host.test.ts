@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import path from 'node:path'
 import test from 'node:test'
 import { runInNewContext } from 'node:vm'
 import { build } from 'rolldown'
 import { normalizePath, resolveConfig } from 'vite'
-import type { RendererHost } from '../../../../taro-runtime/dist/react/renderer-host.d.ts'
+import type { RendererHost } from 'vite-plugin-taro-runtime/react'
 import vpt from '../../index.ts'
+import { rendererHostId } from '../../node/plugins/mini/module/module.ts'
 import { resolveTaroRuntime } from '../../node/utils/packages.ts'
 
 class Element {
@@ -44,13 +44,15 @@ for (const mode of ['development', 'production']) {
             'build'
         )
         const rendererPath = resolveTaroRuntime('react')
-        const hostPath = path.join(path.dirname(rendererPath), 'recursive-template-host.js')
         const result = await build({
             input: rendererPath,
             plugins: [
                 {
                     name: 'test:renderer-host',
                     resolveId(id) {
+                        if (id === rendererHostId) {
+                            return id
+                        }
                         if (id === '@tarojs/runtime') {
                             return resolveTaroRuntime('runtime/mini')
                         }
@@ -59,8 +61,8 @@ for (const mode of ['development', 'production']) {
                         if (normalizePath(id) === normalizePath(rendererPath)) {
                             return `${await readFile(rendererPath, 'utf8')}\nexport { hostConfig };`
                         }
-                        if (normalizePath(id) === normalizePath(hostPath)) {
-                            return 'export const recursiveTemplateHost = globalThis.rendererHost'
+                        if (id === rendererHostId) {
+                            return 'export default globalThis.rendererHost'
                         }
                     }
                 }

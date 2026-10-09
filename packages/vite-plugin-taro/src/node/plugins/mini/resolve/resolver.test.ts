@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
 import { normalizePath } from 'vite'
+import { resolveVptRuntime } from '../../../utils/packages.ts'
 import { appComponentId } from '../../client/constant.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import {
@@ -16,6 +17,7 @@ import {
     miniTransportId,
     pageCapsuleId,
     pageComponentId,
+    rendererHostId,
     taroTargetRuntimeId,
     vitePreloadId
 } from '../module/module.ts'
@@ -93,6 +95,10 @@ test('resolves fixed and route-specific private IDs', () => {
         id: './vpt-transport.js',
         external: true
     })
+    assert.equal(
+        resolver.resolveId(rendererHostId, undefined, projectRoot),
+        resolveVptRuntime('mini/taro/recursive-template-host')
+    )
     assert.equal(resolver.resolveId(vitePreloadId, undefined, projectRoot), modules.bootstrap)
     assert.equal(resolver.resolveId(taroTargetRuntimeId, undefined, projectRoot), contract.taro.targetRuntimePath)
     assert.equal(

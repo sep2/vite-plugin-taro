@@ -45,6 +45,9 @@ export const miniTransportId = '\0vpt:mini-transport'
 
 export const miniTransportOutputPath = 'common/vpt-transport.js'
 
+/** Resolves the host implementation used by the shared React renderer. */
+export const rendererHostId = '\0vpt:renderer-host'
+
 /** Resolves the shared Taro facade's target initialization side effect. */
 export const taroTargetRuntimeId = '\0vpt:taro-target-runtime'
 

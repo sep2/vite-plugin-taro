@@ -416,7 +416,7 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         readFile(path.join(runtimePackageDistRoot, 'runtime', 'dom', 'node.js'), 'utf8'),
         readFile(path.join(runtimePackageDistRoot, 'runtime', 'hydrate.js'), 'utf8'),
         readFile(path.join(runtimePackageDistRoot, 'react', 'react.esm.js'), 'utf8'),
-        readFile(path.join(runtimePackageDistRoot, 'react', 'recursive-template-host.js'), 'utf8')
+        readFile(path.join(distRoot, 'runtime', 'mini', 'taro', 'recursive-template-host.js'), 'utf8')
     ])
 
     assert.deepEqual(copiedDefinition, definition)
@@ -429,17 +429,18 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
     assert.match(rootRuntime, /\? 'app' : 'page'/)
     assert.match(nodeRuntime, /this\.nodeName === 'vpt_page_outlet'/)
     assert.match(hydrateRuntime, /nodeName === 'vpt_page_outlet'/)
-    assert.match(reactRuntime, /recursiveTemplateHost as host/)
+    assert.match(reactRuntime, /import host from .*vpt:renderer-host/)
     assert.doesNotMatch(
         reactRuntime,
         /document\.create(?:Element|TextNode)|instanceof FormElement|reconcileVptPageOutletSpine/
     )
-    assert.match(recursiveTemplateHost, /afterCommit: reconcileVptPageOutletSpine/)
+    assert.match(recursiveTemplateHost, /afterCommit: reconcilePageOutletSpine/)
     assert.match(String(copiedFrameworkRuntime), /broadcastAppUpdate/)
     assert.match(String(copiedFrameworkRuntime), /hooks\.tap\('initNativeApi'/)
     assert.match(String(copiedFrameworkRuntime), /useLaunch = createTaroHook\('onLaunch'\)/)
 
     const runtimePackageFiles = await listRelativeFiles(runtimePackageDistRoot)
+    assert.equal(runtimePackageFiles.includes('react/recursive-template-host.js'), false)
     assert.equal(runtimePackageFiles.includes('mini-api.js'), false)
     assert.equal(runtimePackageFiles.includes('mini-api.d.ts'), false)
     const runtimePackageFileSizes = await Promise.all(
