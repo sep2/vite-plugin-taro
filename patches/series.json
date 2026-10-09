@@ -19,7 +19,7 @@
         "output": "patches/generated/@tarojs__react@4.3.0.patch",
         "patches": [
             "patches/series/@tarojs__react@4.3.0/01-react19-reconciler.patch",
-            "patches/series/@tarojs__react@4.3.0/02-app-page-outlet-projection.patch"
+            "patches/series/@tarojs__react@4.3.0/02-renderer-host.patch"
         ]
     },
     {

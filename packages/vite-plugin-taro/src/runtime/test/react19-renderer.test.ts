@@ -232,6 +232,23 @@ async function checkRootsAndCommits() {
     assert.equal(view.style.color, '')
     assert.equal(view.textContent, 'third')
 
+    // React owns these ref cells; keyed moves must retain the same host objects and update only their order.
+    const refs = { first: React.createRef(), second: React.createRef() }
+    const rows = order => order.map(id => h('view', { key: id, ref: refs[id] }, id))
+    ReactDOM.flushSync(() => root.render(rows(['first', 'second'])))
+    const first = refs.first.current
+    const second = refs.second.current
+    assert.strictEqual(container.childNodes[0], first)
+    assert.strictEqual(container.childNodes[1], second)
+    ReactDOM.flushSync(() => root.render(rows(['second', 'first'])))
+    assert.strictEqual(container.childNodes[0], second)
+    assert.strictEqual(container.childNodes[1], first)
+    assert.strictEqual(refs.first.current, first)
+    assert.strictEqual(refs.second.current, second)
+    ReactDOM.flushSync(() => root.render(rows(['first'])))
+    assert.strictEqual(container.firstChild, first)
+    assert.equal(refs.second.current, null)
+
     const portalContainer = document.createElement('root')
     ReactDOM.flushSync(() => root.render(ReactDOM.createPortal(h('text', null, 'portal'), portalContainer)))
     assert.equal(portalContainer.textContent, 'portal')
@@ -363,6 +380,19 @@ function checkEventPrioritiesAndControlledInputs() {
     eventHandler({ type: 'input', target: { id: 'fixed-input' }, detail: { value: 'rejected' } })
     assert.equal(container.firstChild.value, 'fixed')
     assert.equal(container.firstChild._valueTracker.getValue(), 'fixed')
+
+    ReactDOM.flushSync(() => root.render(h('input', { key: 'uncontrolled', defaultValue: 'seed' })))
+    const uncontrolled = container.firstChild
+    assert.equal(uncontrolled.value, 'seed')
+    uncontrolled.value = 'native edit'
+    ReactDOM.flushSync(() => root.render(h('input', {
+        key: 'uncontrolled', defaultValue: 'seed', className: 'updated'
+    })))
+    assert.strictEqual(container.firstChild, uncontrolled)
+    assert.equal(uncontrolled.value, 'native edit')
+    ReactDOM.flushSync(() => root.render(h('switch', { defaultChecked: true })))
+    assert.equal(container.firstChild.props.checked, true)
+    assert.equal(Object.hasOwn(container.firstChild.props, 'defaultChecked'), false)
     ReactDOM.flushSync(() => root.unmount())
 }
 

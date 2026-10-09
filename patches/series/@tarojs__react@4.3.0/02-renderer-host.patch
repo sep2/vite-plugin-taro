@@ -1,0 +1,209 @@
+diff --git a/dist/react.esm.js b/dist/react.esm.js
+index 6825c6f3a3f38574b9536d9ea5229fd593a3fafc..9c781cd728556b0e71b622662886aab6ec3b1ba8 100644
+--- a/dist/react.esm.js
++++ b/dist/react.esm.js
+@@ -1,5 +1,6 @@
+ import { PLATFORM_TYPE, isObject, isEnableTTDom, isString, isFunction, toCamelCase, UNITLESS_PROPERTIES_SET, isNumber, capitalize, internalComponents, isUndefined, noop, isBoolean, hooks, ensure } from '@tarojs/shared';
+-import { setInnerHTML, FormElement, convertNumber2PX, eventHandlerTTDom, document } from '@tarojs/runtime';
++import { setInnerHTML, convertNumber2PX, eventHandlerTTDom } from '@tarojs/runtime';
++import { recursiveTemplateHost as host } from './recursive-template-host.js';
+ import { version } from 'react';
+ import Reconciler from 'react-reconciler';
+ import {
+@@ -363,7 +364,7 @@ function getUpdatePayload(dom, oldProps, newProps) {
+             (updatePayload = updatePayload || []).push(i, null);
+         }
+     }
+-    const isFormElement = dom instanceof FormElement;
++    const isFormElement = host.isFormElement(dom);
+     for (i in newProps) {
+         if (oldProps[i] !== newProps[i] || (isFormElement && i === 'value')) {
+             // 如果都是 style，且 style 里面的值相等，则无需记录到 payload 中
+@@ -662,9 +663,11 @@ const hostConfig = {
+     prepareForCommit(..._) {
+         return null;
+     },
+-    resetAfterCommit: noop,
+-    createInstance(type, props, _rootContainerInstance, _hostContext, internalInstanceHandle) {
+-        const element = document.createElement(type);
++    resetAfterCommit(container) {
++        host.afterCommit(container);
++    },
++    createInstance(type, props, container, context, internalInstanceHandle) {
++        const element = host.createElement(container, context, type);
+         precacheFiberNode(internalInstanceHandle, element);
+         updateFiberProps(element, props);
+         return element;
+@@ -674,7 +677,7 @@ const hostConfig = {
+     },
+     finalizeInitialChildren(dom, type, props) {
+         let newProps = props;
+-        if (dom instanceof FormElement) {
++        if (host.isFormElement(dom)) {
+             const [defaultName, defaultKey] = ['switch', 'checkbox', 'radio'].includes(type) ? ['checked', 'defaultChecked'] : ['value', 'defaultValue'];
+             if (props.hasOwnProperty(defaultKey)) {
+                 newProps = Object.assign(Object.assign({}, newProps), { [defaultName]: props[defaultKey] });
+@@ -690,8 +693,8 @@ const hostConfig = {
+     shouldSetTextContent() {
+         return false;
+     },
+-    createTextInstance(text, _rootContainerInstance, _hostContext, internalInstanceHandle) {
+-        const textNode = document.createTextNode(text);
++    createTextInstance(text, container, context, internalInstanceHandle) {
++        const textNode = host.createText(container, context, text);
+         precacheFiberNode(internalInstanceHandle, textNode);
+         return textNode;
+     },
+diff --git a/dist/recursive-template-host.d.ts b/dist/recursive-template-host.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..48d0daf08b7937a547395e4fa830b0b73109c294
+--- /dev/null
++++ b/dist/recursive-template-host.d.ts
+@@ -0,0 +1,4 @@
++import type { TaroElement, TaroText } from '@tarojs/runtime'
++import type { RendererHost } from './renderer-host'
++
++export declare const recursiveTemplateHost: RendererHost<TaroElement, object, TaroElement, TaroText>
+diff --git a/dist/recursive-template-host.js b/dist/recursive-template-host.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..8538c51bf9bcfa5bd8b8ca24d069c14c86e9dc4a
+--- /dev/null
++++ b/dist/recursive-template-host.js
+@@ -0,0 +1,124 @@
++import { document, FormElement } from '@tarojs/runtime'
++import { ensure } from '@tarojs/shared'
++
++/**
++ * WX VPT Page outlet projection
++ * -----------------------------
++ * VPT retains one React ownership tree while WX exposes one independent setData surface per native Page. The singleton App
++ * host records live in each Page's `app` data, the current Page records live in `page`, and Page WXML supplies its own template
++ * as the default light-DOM slot of the virtual recursive App component. Taro restarts deep template recursion through nested
++ * `comp` components. At every such native component boundary the slot must be forwarded only through the App branch that
++ * contains the VPT Page outlet rendered for React's `{children}`: forwarding through all sibling branches creates duplicate
++ * unnamed slot consumers, while forwarding through none loses the Page.
++ *
++ * `vo` is the compact, branch-local answer to "does this App subtree contain the VPT Page outlet?". WXML reads only `i.vo`,
++ * so its decision is O(1) and it never scans descendants or receives Page data. The recursive host owns `vo` rather than Taro's
++ * hydrate or root scheduler because React's commit boundary is the first point where every host mutation has completed and
++ * the final parent chain is authoritative. TaroElement already supports arbitrary properties: setAttribute updates
++ * node.props and queues the normal granular `app.*.vo` path. Structural Taro payloads are lazy functions flushed by setTimeout, so they run
++ * after resetAfterCommit and naturally serialize the same final `vo` props. There is consequently no projection-specific
++ * hydration mode, update-path translation, or full App snapshot.
++ *
++ * High-level commit flow:
++ * 1. React applies all Taro host insertions, removals, and reparenting synchronously.
++ * 2. resetAfterCommit obtains the unique VPT Page outlet and walks parentNode from that outlet to the App root.
++ * 3. The unchanged root-side suffix is skipped; old leaf-side nodes receive vo=false and new ones receive vo=true.
++ * 4. Ordinary Taro attribute updates join structural updates in the already scheduled App batch.
++ * 5. Lazy hydration observes node.props.vo, and the App batch fans out unchanged to every retained native Page.
++ *
++ * The App root stores the only persistent projection state as a VPT Page outlet-to-root node array. It contains O(D)
++ * references, where D is outlet depth, so index 0 is the outlet represented by the latest queued native batch. A normal commit
++ * performs an O(D) parent walk and raw array comparison and emits no native data when the spine is unchanged. A move touches
++ * only the leaf-side portions outside the common root-side suffix and never depends on total App size W or Page size. React
++ * can replace a host when moving it across parents; only then (and during initialization) a single O(W) search finds the new
++ * VPT Page outlet. WXML still performs one constant-time boolean check per recursive boundary.
++ */
++const VPT_PAGE_OUTLET = 'vpt_page_outlet'
++const VPT_PAGE_OUTLET_BRANCH = 'vo'
++const vptPageOutletSpineKey = Symbol('vptPageOutletSpine')
++/** Finds the VPT Page outlet only during initialization or after React replaced the cached VPT Page outlet host. */
++function findVptPageOutlet(node) {
++    if (node.nodeName === VPT_PAGE_OUTLET) {
++        return node
++    }
++    const children = node.childNodes
++    for (let index = 0; index < children.length; index++) {
++        const vptPageOutlet = findVptPageOutlet(children[index])
++        if (vptPageOutlet) {
++            return vptPageOutlet
++        }
++    }
++}
++/** Builds the final ancestor identity array from the VPT Page outlet to the App root. */
++function collectVptPageOutletSpine(container, vptPageOutlet) {
++    // This local array is filled once in parent-link order, then retained unchanged as the next VPT Page outlet spine.
++    const spine = []
++    for (let node = vptPageOutlet; node !== container; node = node.parentNode) {
++        spine.push(node)
++    }
++    return spine
++}
++/** Reconciles VPT Page outlet branch membership through ordinary Taro host props after one complete React commit. */
++function reconcileVptPageOutletSpine(container) {
++    // Other React roots, including standalone Page/component roots, do not own the singleton VPT App-view projection.
++    if (!container.parentNode || container.parentNode.nodeName !== 'container') {
++        return
++    }
++    const previousSpine = container[vptPageOutletSpineKey] || []
++    const previousVptPageOutlet = previousSpine[0]
++    /*
++     * Reuse the cached VPT Page outlet while it remains under this App root. Cross-parent React reconciliation may replace
++     * the host rather than reparent its Taro node, so a detached cache entry requires one search of the committed tree.
++     */
++    const vptPageOutlet =
++        previousVptPageOutlet && previousVptPageOutlet._root === container
++            ? previousVptPageOutlet
++            : findVptPageOutlet(container)
++    ensure(vptPageOutlet, 'App must render children exactly once.')
++    const currentSpine = collectVptPageOutletSpine(container, vptPageOutlet)
++    /*
++     * VPT Page outlet parent chains are stored outlet-to-root, so equal nodes form a root-side suffix. These mutable indexes
++     * walk that suffix once without iterator, callback, Set, or intermediate-array allocation; the remaining prefixes are the
++     * only candidates whose branch marker can differ.
++     */
++    let previousIndex = previousSpine.length - 1
++    let currentIndex = currentSpine.length - 1
++    while (previousIndex >= 0 && currentIndex >= 0 && previousSpine[previousIndex] === currentSpine[currentIndex]) {
++        previousIndex--
++        currentIndex--
++    }
++    /*
++     * Detached old nodes are already removed by their parent's structural payload. Surviving nodes in the changed old prefix
++     * still have native records, so clear their marker through Taro's ordinary attribute queue.
++     */
++    for (let index = 0; index <= previousIndex; index++) {
++        const node = previousSpine[index]
++        if (node._root === container) {
++            node.setAttribute(VPT_PAGE_OUTLET_BRANCH, false)
++        }
++    }
++    // Write the changed current prefix after clearing the old prefix so any surviving moved identity ends with vo=true.
++    for (let index = 0; index <= currentIndex; index++) {
++        currentSpine[index].setAttribute(VPT_PAGE_OUTLET_BRANCH, true)
++    }
++    // This is the sole persistent VPT projection state: the ancestor identities in the latest queued native App batch.
++    container[vptPageOutletSpineKey] = currentSpine
++}
++
++/** Taro node creation and recursive Page projection used by the shared React renderer. */
++export const recursiveTemplateHost = {
++    createElement(_container, _context, type) {
++        return document.createElement(type)
++    },
++    createText(_container, _context, text) {
++        return document.createTextNode(text)
++    },
++    isFormElement(element) {
++        return element instanceof FormElement
++    },
++    /*
++     * React calls this after host mutations. Taro's lazy structural payloads observe the final outlet markers when its
++     * existing native update batch is serialized.
++     */
++    afterCommit: reconcileVptPageOutletSpine
++}
+diff --git a/dist/renderer-host.d.ts b/dist/renderer-host.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..2a79b61569788748371f94f9932588d2199c9f72
+--- /dev/null
++++ b/dist/renderer-host.d.ts
+@@ -0,0 +1,7 @@
++/** Host-owned creation, form classification and post-commit work for the shared React renderer. */
++export type RendererHost<Container, Context, Element, Text> = Readonly<{
++    createElement(container: Container, context: Context, type: string): Element
++    createText(container: Container, context: Context, text: string): Text
++    isFormElement(element: Element): boolean
++    afterCommit(container: Container): void
++}>

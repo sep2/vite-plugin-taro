@@ -404,7 +404,8 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         rootRuntime,
         nodeRuntime,
         hydrateRuntime,
-        reactRuntime
+        reactRuntime,
+        recursiveTemplateHost
     ] = await Promise.all([
         readFile(runtimePackageRequire.resolve('@tarojs/plugin-platform-h5/dist/definition.json')),
         readFile(path.join(runtimePackageDistRoot, 'plugin-platform-h5', 'definition.json')),
@@ -414,7 +415,8 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         readFile(path.join(runtimePackageDistRoot, 'runtime', 'dom', 'root.js'), 'utf8'),
         readFile(path.join(runtimePackageDistRoot, 'runtime', 'dom', 'node.js'), 'utf8'),
         readFile(path.join(runtimePackageDistRoot, 'runtime', 'hydrate.js'), 'utf8'),
-        readFile(path.join(runtimePackageDistRoot, 'react', 'react.esm.js'), 'utf8')
+        readFile(path.join(runtimePackageDistRoot, 'react', 'react.esm.js'), 'utf8'),
+        readFile(path.join(runtimePackageDistRoot, 'react', 'recursive-template-host.js'), 'utf8')
     ])
 
     assert.deepEqual(copiedDefinition, definition)
@@ -427,7 +429,12 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
     assert.match(rootRuntime, /\? 'app' : 'page'/)
     assert.match(nodeRuntime, /this\.nodeName === 'vpt_page_outlet'/)
     assert.match(hydrateRuntime, /nodeName === 'vpt_page_outlet'/)
-    assert.match(reactRuntime, /reconcileVptPageOutletSpine/)
+    assert.match(reactRuntime, /recursiveTemplateHost as host/)
+    assert.doesNotMatch(
+        reactRuntime,
+        /document\.create(?:Element|TextNode)|instanceof FormElement|reconcileVptPageOutletSpine/
+    )
+    assert.match(recursiveTemplateHost, /afterCommit: reconcileVptPageOutletSpine/)
     assert.match(String(copiedFrameworkRuntime), /broadcastAppUpdate/)
     assert.match(String(copiedFrameworkRuntime), /hooks\.tap\('initNativeApi'/)
     assert.match(String(copiedFrameworkRuntime), /useLaunch = createTaroHook\('onLaunch'\)/)
