@@ -573,6 +573,28 @@ test('renders empty and local-only chunks without export notifications', () => {
     assert.doesNotMatch(localOnly.code, /__systemExport\(["']/)
 })
 
+test('closes mapped and unmapped registrations after a trailing line comment', async () => {
+    for (const format of ['commonjs-registration', 'system-register'] as const) {
+        for (const sourcemap of [false, true]) {
+            const result = transformSystemJs({
+                code: 'const value = 42; export { value };\n//#endregion',
+                filename: 'assets/chunk.js',
+                format,
+                sourcemap,
+                resolveReference(reference) {
+                    return reference
+                }
+            })
+            const registration =
+                format === 'commonjs-registration'
+                    ? evaluateCommonJsRegistration(result.code)
+                    : evaluateSystemRegistration(result.code)
+            const instance = await instantiate(registration, new Map())
+            assert.equal(instance.namespace.value, 42)
+        }
+    }
+})
+
 test('resolves static and literal dynamic references by kind', () => {
     const references: Array<readonly [string, string]> = []
     const result = transformSystemJs({

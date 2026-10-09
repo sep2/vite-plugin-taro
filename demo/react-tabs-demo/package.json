@@ -25,8 +25,8 @@
         "@types/react": "^19.3.0",
         "@types/react-dom": "^19.3.0",
         "cross-env": "^10.1.0",
-        "rolldown": "1.2.12",
+        "rolldown": "1.2.13",
         "typescript": "^7.0.2",
-        "vite": "8.3.1"
+        "vite": "8.3.4"
     }
 }

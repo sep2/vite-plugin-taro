@@ -538,7 +538,8 @@ function assembleUnmappedRegistration(
     const hoistedFunctions = model.functions
         .map((declaration) => plan.render(declaration.start, declaration.end))
         .join('')
-    return `${shell.prefix}${plan.renderOutside(model.functions)}}};${hoistedFunctions}${shell.suffix}`
+    // Rolldown region comments may end at EOF; the closing registration must begin on its own line.
+    return `${shell.prefix}${plan.renderOutside(model.functions)}\n}};${hoistedFunctions}${shell.suffix}`
 }
 
 /** Places mapped hoisted functions after the declaration return while retaining every original source segment. */
@@ -552,7 +553,8 @@ function assembleMappedRegistration(
     for (const declaration of model.functions) editor.move(declaration.start, declaration.end, editor.original.length)
 
     editor.prepend(shell.prefix)
-    editor.prependLeft(editor.original.length, '}};')
+    // Keep the generated closing boundary outside a trailing source line comment.
+    editor.prependLeft(editor.original.length, '\n}};')
     editor.append(shell.suffix)
 }
 

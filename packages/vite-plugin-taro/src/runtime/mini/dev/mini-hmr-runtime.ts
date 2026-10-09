@@ -49,19 +49,11 @@ type HmrUpdate = Readonly<{
 
 type AcceptCallback = (moduleExports: unknown) => void
 
-/** Shared no-op CSS contract because physical rebuilds replace styles wholesale. */
-const hotContextInternals = Object.freeze({
-    updateStyle(): void {},
-    removeStyle(): void {}
-})
-
 /**
  * Per-module hot state, mirroring Rolldown's web runtime: accept is a passive registration;
  * the propagation invokes the previous execution's callbacks with the fresh exports.
  */
 class MiniHotContext {
-    readonly _internal = hotContextInternals
-
     /**
      * Callbacks registered by this module execution. The array is allocated on first accept,
      * remains attached to the old execution across cache eviction, and is invoked by the next
@@ -178,8 +170,7 @@ export class MiniHmrRuntime extends DevRuntime {
     }
 
     /**
-     * Generated code always calls this before registerModule and reads `_internal` from the
-     * return value. Each execution immediately retires its previous accepting boundary;
+     * Generated code calls this before registerModule. Each execution immediately retires its previous accepting boundary;
      * calling accept registers the new context after the apply plan captured old callbacks.
      */
     override createModuleHotContext(moduleId: string): MiniHotContext {

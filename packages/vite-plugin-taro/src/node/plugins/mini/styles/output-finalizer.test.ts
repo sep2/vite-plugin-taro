@@ -148,6 +148,35 @@ function tailwind(candidates: readonly string[]): string {
     return `@import "tailwindcss" source(none);\n@source inline(${JSON.stringify(candidates.join(' '))});`
 }
 
+test('empties imported CSS helper payloads while preserving factories and patch identities', async (context) => {
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', []))
+    const css = '.page::after { content: "line\\\\quote"; }\n.page { padding: 1px; }'
+    const declarations = [
+        ['const', '__vite__css', '__vite__id'],
+        ['let', '__vite__css$1', '__vite__id$1'],
+        ['var', '__vite__css_2', '__vite__id_2']
+    ] as const
+    const factories = declarations.map(([kind, name, id], index) => {
+        const prefix = `registerFactory("style${index}.css", () => { ${kind} ${name} = `
+        const suffix = `;\n(0, import_client_${index}.updateStyle)(${id}, ${name}); return { card: "card_123" }; });`
+        return { code: `${prefix}${JSON.stringify(css)}${suffix}`, expected: `${prefix}""${suffix}` }
+    })
+    const userCode = 'const __vite__css = "ordinary string"; useString(__vite__css);'
+    const artifact = {
+        filename: 'patch.js',
+        seq: 7,
+        changedIds: ['/app.css'],
+        code: [...factories.map((factory) => factory.code), userCode].join('\n')
+    }
+    const updated = await fixture.plugin.finalizeUpdate([artifact], fixture.publish)
+    assert.deepEqual(updated, [
+        {
+            ...artifact,
+            code: [...factories.map((factory) => factory.expected), userCode].join('\n')
+        }
+    ])
+})
+
 test('resolves App/Page capsules in cascade order without mutating their entry metadata', async (context) => {
     const entries = createMiniStyleEntries('/app.js', ['/z-page.js', '/a-page.js'])
     const originalEntries = structuredClone(entries)

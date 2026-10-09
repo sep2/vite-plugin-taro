@@ -9,6 +9,7 @@ import { createExactModuleIdFilter } from '../../../utils/modules.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import { miniPageCapsuleId, pageComponentId, rolldownRuntimeId } from '../module/module.ts'
 import type { MiniStylePlugin } from '../styles/plugins.ts'
+import { createMiniViteClientPlugin } from './create-mini-vite-client-plugin.ts'
 import { createMiniDevHost, type MiniDevHost } from './dev-host.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
 import { createMiniHmrMode } from './hmr-mode.ts'
@@ -175,6 +176,7 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
                 }
             }
         },
+        createMiniViteClientPlugin(),
         ...hmrMode.plugins,
         ...createMiniReactRefreshTransforms()
     ]

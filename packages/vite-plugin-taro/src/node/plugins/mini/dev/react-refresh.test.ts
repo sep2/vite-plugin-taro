@@ -172,7 +172,7 @@ export function evaluateBoundary() {
         assert.equal(runInNewContext('exports.evaluateBoundary()', context), true)
         assert.equal(
             runInNewContext("exports.validateRefreshBoundaryAndEnqueueUpdate('fixture', { removed: 1 }, {})", context),
-            'Could not Fast Refresh (export removed)'
+            'Could not Fast Refresh (export "removed" removed)'
         )
         // Record the optional upstream hook's invocation in this isolated realm, not in Node's global state.
         runInNewContext(
@@ -189,7 +189,7 @@ export function evaluateBoundary() {
                 "exports.validateRefreshBoundaryAndEnqueueUpdate('with-hook', { removed: 1 }, {})",
                 context
             ),
-            'Could not Fast Refresh (export removed)'
+            'Could not Fast Refresh (export "removed" removed)'
         )
         assert.equal(runInNewContext('ignoredRefreshId', context), 'with-hook')
         // Prove that the guard is still active rather than erased by a transform.

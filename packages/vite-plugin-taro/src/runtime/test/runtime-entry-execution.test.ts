@@ -118,8 +118,9 @@ async function bundleRuntimeEntry({
             exports: 'named',
             format: 'cjs',
             // A native module wrapper preserves the same lexical host bindings while making maps available to V8 coverage.
-            banner: 'export default function(module, exports, require, globalThis, global, App, Page, Component, wx, __rolldown_runtime__) {',
-            footer: '}',
+            postBanner:
+                'export default function(module, exports, require, globalThis, global, App, Page, Component, wx, __rolldown_runtime__) {',
+            postFooter: '}',
             sourcemap: 'inline'
         },
         write: false

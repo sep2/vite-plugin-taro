@@ -57,8 +57,8 @@ test('recursive host preserves outlet branch markers through moves, replacements
         output: {
             file: outputFile,
             format: 'cjs',
-            banner: 'export default function(exports, require, globalThis, global, setTimeout, clearTimeout) {',
-            footer: '}',
+            postBanner: 'export default function(exports, require, globalThis, global, setTimeout, clearTimeout) {',
+            postFooter: '}',
             sourcemap: 'inline'
         },
         write: false

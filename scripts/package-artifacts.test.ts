@@ -133,6 +133,7 @@ test('public packages preserve their published entrypoints and scaffold dependen
     })
 
     const generatorRoot = extractGenerator(root)
+    assert.equal(existsSync(path.join(generatorRoot, 'templates/default/node_modules')), false)
     assert.equal(existsSync(path.join(root, 'unpacked', pluginPackage.name)), false)
     assert.equal(existsSync(path.join(root, 'unpacked', runtimePackage.name)), false)
     await t.test('the packed generator copies the complete default and pnpm templates once', () => {

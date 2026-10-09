@@ -6,10 +6,6 @@ import { runtimeControlEvent, runtimeReportEvent } from '../../hmr-protocol.ts'
 import type { MiniSocketTask } from '../../mini-hmr-runtime.ts'
 
 type TestHotContext = Readonly<{
-    _internal: Readonly<{
-        removeStyle: () => void
-        updateStyle: () => void
-    }>
     accept: (callback?: (moduleExports: unknown) => void) => void
     dispose: (callback: () => void) => void
     invalidate: (reason?: string) => never
@@ -655,12 +651,10 @@ test('rejects reports before initialization', async () => {
     assert.throws(() => uninitializedRuntime.stopSocket('stop'), /socket is not initialized/)
 })
 
-test('keeps generated CSS hot operations inert because WXSS is replaced physically', async () => {
+test('keeps CSS prune callbacks inert because WXSS is replaced physically', async () => {
     const { runtime } = await createTestHarness()
     const hotContext = runtime.createModuleHotContext('style.css')
 
-    hotContext._internal.updateStyle()
-    hotContext._internal.removeStyle()
     hotContext.prune(() => assert.fail('Physical WXSS replacement must not run browser teardown callbacks'))
 
     assert.equal(runtime.moduleHotContexts.has('style.css'), false)

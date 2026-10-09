@@ -384,7 +384,7 @@ export function createMiniStylePlugin(
             artifacts: readonly Artifact[],
             writeStylesheet: (fileName: string, source: string) => Promise<void>
         ): Promise<readonly Artifact[]> => {
-            // CSS is already captured for physical publication, so its browser payload need not enter JavaScript conversion.
+            // Strip CSS after Rolldown assigns update identities so CSS edits still produce their ordered HMR factories.
             const javaScript = artifacts.map((artifact) => ({
                 code: neutralizeViteCssPayload(artifact.code),
                 filename: artifact.filename
@@ -578,21 +578,21 @@ function isApplicationStyle(id: string): boolean {
  *
  * ```js
  * const __vite__css = ".app { color: red }";
- * __vite__updateStyle(__vite__id, __vite__css);
+ * (0, import_client.updateStyle)(__vite__id, __vite__css);
  * ```
  *
  * becomes:
  *
  * ```js
  * const __vite__css = "";
- * __vite__updateStyle(__vite__id, __vite__css);
+ * (0, import_client.updateStyle)(__vite__id, __vite__css);
  * ```
  *
  * The surrounding factory, CSS Module exports, changed IDs, and patch sequence remain unchanged.
  */
 function neutralizeViteCssPayload(code: string): string {
     return code.replace(
-        /(\b(?:const|let|var)\s+__vite__css[\w$]*\s*=\s*)"(?:\\[\s\S]|[^"\\])*"(?=;\s*\b__vite__updateStyle[\w$]*\s*\()/g,
+        /(\b(?:const|let|var)\s+(__vite__css[\w$]*)\s*=\s*)"(?:\\[\s\S]|[^"\\])*"(?=;\s*\(0,\s*[\w$]+\.updateStyle\)\(\s*__vite__id[\w$]*,\s*\2\s*\))/g,
         '$1""'
     )
 }

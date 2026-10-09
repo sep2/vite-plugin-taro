@@ -9,6 +9,7 @@
     "files": [
         "index.js",
         "templates",
+        "!templates/**/node_modules",
         "LICENSE",
         "README.md"
     ],

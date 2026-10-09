@@ -6,6 +6,7 @@ import { type DevEngine, dev } from 'rolldown/experimental'
 import { createServer, normalizePath } from 'vite'
 import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
 import { projectTempDir } from '../../../tests/project-temp-dir.ts'
+import { createMiniViteClientPlugin } from '../dev/create-mini-vite-client-plugin.ts'
 import { writeDevelopmentFile } from '../dev/hmr-files.ts'
 import type { BundledDev } from '../dev/mini-dev-options.ts'
 import type { MiniContract } from '../mini-contract.ts'
@@ -83,6 +84,7 @@ test('minifies App/Page CSS, clears removed Page styles, and suppresses identica
         appType: 'custom',
         experimental: { bundledDev: true },
         plugins: [
+            createMiniViteClientPlugin(),
             styles,
             {
                 name: 'test:rewrite-color',
@@ -298,7 +300,9 @@ test('respects cssMinify:false while rendering Tailwind CSS and matching patch f
         logLevel: 'silent',
         appType: 'custom',
         experimental: { bundledDev: true },
-        plugins: [styles],
+        plugins: [createMiniViteClientPlugin(), styles],
+        // Native CSS helpers must also resolve when Vite prefixes browser imports with a non-root base.
+        base: '/native/',
         build: {
             outDir: outDir,
             cssCodeSplit: false,
@@ -373,7 +377,8 @@ test('respects cssMinify:false while rendering Tailwind CSS and matching patch f
         assert.match(addedCode, /py-5_d5/)
         assert.match(addedCode, /registerFactory\([^\n]*app\.css/)
         assert.match(addedCode, /\b(?:const|let|var)\s+__vite__css[\w$]*\s*=\s*"";/)
-        assert.match(addedCode, /__vite__updateStyle\(/)
+        assert.match(addedCode, /\.updateStyle\b/)
+        assert.doesNotMatch(addedCode, /@vite\/client|bundledDevClient\.mjs|vite\/dist\/client/)
         assert.doesNotMatch(addedCode, /py-5\.5/)
 
         const removalStart = hmrResults.length
