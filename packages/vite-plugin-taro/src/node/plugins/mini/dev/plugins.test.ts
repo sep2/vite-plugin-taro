@@ -20,7 +20,9 @@ const contract = {
         appJson: {},
         projectConfigJson: {}
     },
+    define: {},
     taro: {
+        hostPath: '/runtime/host.ts',
         env: 'fixture',
         componentsReactPath: '/runtime/components-react.ts',
         targetRuntimePath: '/runtime/target.ts'

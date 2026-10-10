@@ -47,7 +47,10 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
 
         config() {
             return {
-                define: createTaroDefines(contract.taro.env),
+                define: {
+                    ...createTaroDefines(contract.taro.env),
+                    ...contract.define
+                },
 
                 appType: 'custom',
 

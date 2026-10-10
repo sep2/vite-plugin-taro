@@ -14,8 +14,13 @@ export function createTtMiniPlugins(options: VptOptions): PluginOption[] {
 export function createTtMiniContract(options: VptOptions): MiniContract {
     return {
         options,
+        define: {
+            // React owns logical Taro nodes in both presentations; VPT's DOM host accesses the native document separately.
+            'tt.__$enableTTDom$__': 'false'
+        },
         taro: {
             env: 'tt',
+            hostPath: resolveVptRuntime(options.renderer === 'dom' ? 'tt/dom-host' : 'mini/taro/template-host'),
             componentsReactPath: resolveTaroRuntime('plugin-platform-tt/components-react'),
             targetRuntimePath: resolveVptRuntime('tt/taro-runtime')
         },

@@ -62,6 +62,12 @@ export interface VptOptions {
     target: VptTarget
 
     /**
+     * Requested Mini Program presentation: recursive native templates or native DOM. Omission selects `template`.
+     * H5 uses its browser renderer.
+     */
+    renderer?: 'template' | 'dom'
+
+    /**
      * Source module that default-exports the root React application component.
      *
      * Relative paths are resolved from Vite's project root, for example `src/app.tsx`. The component wraps the active

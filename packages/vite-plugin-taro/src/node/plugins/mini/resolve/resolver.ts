@@ -1,7 +1,6 @@
 import path from 'node:path'
 import { normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId, resolveAppComponentPath, resolvePageComponentPath } from '../../../utils/modules.ts'
-import { resolveVptRuntime } from '../../../utils/packages.ts'
 import { createAppConfig } from '../../../utils/project-config.ts'
 import { appComponentId } from '../../client/constant.ts'
 import type { MiniContract, MiniPage } from '../mini-contract.ts'
@@ -46,7 +45,7 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'taro'>)
         // Preload needs only the initialized loader.
         [vitePreloadId, () => miniBootstrapId],
         [taroTargetRuntimeId, () => contract.taro.targetRuntimePath],
-        [rendererHostId, () => resolveVptRuntime('mini/taro/template-host')],
+        [rendererHostId, () => contract.taro.hostPath],
         // Keep the configured App component behind one stable private import in the App capsule.
         [
             appComponentId,

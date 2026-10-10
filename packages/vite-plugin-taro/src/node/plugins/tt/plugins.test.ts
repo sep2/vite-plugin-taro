@@ -17,6 +17,7 @@ const options: VptOptions = {
 test('binds TT runtime and style paths without translating native configuration', () => {
     const contract = createTtMiniContract(options)
     assert.equal(contract.options, options)
+    assert.deepEqual(contract.define, { 'tt.__$enableTTDom$__': 'false' })
     assert.equal(contract.taro.env, 'tt')
     assert.match(contract.taro.componentsReactPath, /plugin-platform-tt[/\\]components-react\.js$/)
     assert.match(contract.taro.targetRuntimePath, /runtime[/\\]tt[/\\]taro-runtime\.(?:js|ts)$/)

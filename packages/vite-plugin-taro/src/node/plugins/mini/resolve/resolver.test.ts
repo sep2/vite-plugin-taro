@@ -4,6 +4,9 @@ import test from 'node:test'
 import { normalizePath } from 'vite'
 import { resolveVptRuntime } from '../../../utils/packages.ts'
 import { appComponentId } from '../../client/constant.ts'
+import { createTtMiniContract } from '../../tt/plugins.ts'
+import { createWxMiniContract } from '../../wx/plugins.ts'
+import { createZfbMiniContract } from '../../zfb/plugins.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import {
     miniAppCapsuleId,
@@ -55,6 +58,7 @@ const contract = {
         projectConfigJson: {}
     },
     taro: {
+        hostPath: '/runtime/host.ts',
         env: 'synthetic',
         componentsReactPath: '/runtime/components-react.ts',
         targetRuntimePath: '/runtime/target.ts'
@@ -95,10 +99,7 @@ test('resolves fixed and route-specific private IDs', () => {
         id: './vpt-transport.js',
         external: true
     })
-    assert.equal(
-        resolver.resolveId(rendererHostId, undefined, projectRoot),
-        resolveVptRuntime('mini/taro/template-host')
-    )
+    assert.equal(resolver.resolveId(rendererHostId, undefined, projectRoot), contract.taro.hostPath)
     assert.equal(resolver.resolveId(vitePreloadId, undefined, projectRoot), modules.bootstrap)
     assert.equal(resolver.resolveId(taroTargetRuntimeId, undefined, projectRoot), contract.taro.targetRuntimePath)
     assert.equal(
@@ -112,6 +113,45 @@ test('resolves fixed and route-specific private IDs', () => {
         resolver.resolveId(pageComponentId, pageCapsule, projectRoot),
         normalizePath(path.resolve(projectRoot, 'src/pages/home/index.tsx'))
     )
+})
+
+for (const [target, createContract] of [
+    ['wx', createWxMiniContract],
+    ['zfb', createZfbMiniContract],
+    ['tt', createTtMiniContract]
+] as const) {
+    test(`${target}: resolves the shared template host for default and explicit template rendering`, () => {
+        for (const selection of [{}, { renderer: 'template' }] as const) {
+            const targetContract = createContract({ ...contract.options, target, ...selection })
+            const resolver = createResolver(targetContract)
+
+            assert.equal(
+                resolver.resolveId(rendererHostId, undefined, path.resolve('/project')),
+                resolveVptRuntime('mini/taro/template-host')
+            )
+        }
+    })
+}
+
+test('resolves the target-selected TT DOM host independently of App/Page entries', () => {
+    const targetContract = createTtMiniContract({ ...contract.options, target: 'tt', renderer: 'dom' })
+    const resolver = createResolver(targetContract)
+
+    assert.equal(
+        resolver.resolveId(rendererHostId, undefined, path.resolve('/project')),
+        resolveVptRuntime('tt/dom-host')
+    )
+
+    const customHostResolver = createResolver({
+        ...targetContract,
+        taro: { ...targetContract.taro, hostPath: '/runtime/custom-host.ts' }
+    })
+    assert.equal(
+        customHostResolver.resolveId(rendererHostId, undefined, path.resolve('/project')),
+        '/runtime/custom-host.ts'
+    )
+    assert.deepEqual(resolver.entries, customHostResolver.entries)
+    assert.deepEqual(resolver.input, customHostResolver.input)
 })
 
 test('preserves configured Page order and reuses App/Page entries in the native input map', () => {

@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { rolldown } from 'rolldown'
 import { build, normalizePath, resolveConfig } from 'vite'
+import type { VptOptions } from '../../../options.ts'
+import { resolveVptRuntime } from '../../utils/packages.ts'
 import { wrapPluginTransform } from '../../utils/vite.ts'
 import { clientTaroNativeId } from '../client/constant.ts'
 import { createTtMiniContract } from '../tt/plugins.ts'
@@ -96,11 +98,63 @@ test('native rendering resolves loader from each output generation rather than a
     }
 })
 
-for (const [target, createContract] of [
-    ['wx', createWxMiniContract],
-    ['zfb', createZfbMiniContract],
-    ['tt', createTtMiniContract]
+for (const [target, createContract, domHost] of [
+    ['wx', createWxMiniContract, 'mini/taro/template-host'],
+    ['zfb', createZfbMiniContract, 'mini/taro/template-host'],
+    ['tt', createTtMiniContract, 'tt/dom-host']
 ] as const) {
+    test(`${target}: selects the renderer host while preserving public options`, () => {
+        for (const [selection, host] of [
+            [{}, 'mini/taro/template-host'],
+            [{ renderer: 'template' }, 'mini/taro/template-host'],
+            [{ renderer: 'dom' }, domHost]
+        ] as const) {
+            const options: VptOptions = Object.freeze({
+                target,
+                app: 'src/app.tsx',
+                pages: [],
+                appJson: {},
+                projectConfigJson: {},
+                ...selection
+            })
+            const contract = createContract(options)
+
+            assert.equal(contract.taro.hostPath, resolveVptRuntime(host))
+            assert.strictEqual(contract.options, options)
+            assert.equal(Object.hasOwn(options, 'renderer'), Object.hasOwn(selection, 'renderer'))
+        }
+    })
+
+    test(`${target}: merges target defines over shared defaults in build and serve`, async () => {
+        const contract = createContract({
+            target,
+            app: 'src/app.tsx',
+            pages: [],
+            appJson: {},
+            projectConfigJson: {}
+        })
+        const originalDefine = { ...contract.define }
+
+        const define = Object.freeze({
+            ...originalDefine,
+            __VPT_TARGET_TEST__: JSON.stringify(target),
+            ENABLE_SIZE_APIS: 'false'
+        })
+        for (const command of ['build', 'serve'] as const) {
+            const config = await resolveConfig(
+                { configFile: false, plugins: createMiniTargetPlugins({ ...contract, define }) },
+                command
+            )
+
+            assert.ok(config.define)
+            assert.equal(config.define.__VPT_TARGET_TEST__, JSON.stringify(target))
+            assert.equal(config.define.ENABLE_SIZE_APIS, 'false')
+            assert.equal(config.define.ENABLE_CLONE_NODE, 'true')
+            assert.equal(config.define['process.env.TARO_ENV'], JSON.stringify(contract.taro.env))
+        }
+        assert.deepEqual(contract.define, originalDefine)
+    })
+
     test(`${target}: styles traverse the App followed by configured Page capsules`, async () => {
         for (const pages of [[], [{ path: 'pages/home/index' }, { path: 'pages/detail/index' }]]) {
             const contract = createContract({

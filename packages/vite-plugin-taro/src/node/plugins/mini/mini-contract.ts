@@ -3,6 +3,8 @@ import type { VptJsonObject, VptOptions } from '../../../options.ts'
 
 /** Taro compiler bindings selected by one Mini Program target. */
 export type TaroContract = {
+    /** Renderer host selected by the target and presentation option. */
+    hostPath: string
     env: string
     componentsReactPath: string
     targetRuntimePath: string
@@ -55,6 +57,8 @@ export type WatchContract = {
 /** Complete input consumed by the shared Mini Program pipeline. */
 export type MiniContract = {
     options: VptOptions
+    /** Build-time expressions supplied by the target, overriding shared defaults. */
+    define: Record<string, string>
     taro: TaroContract
     runtime: RuntimeContract
     styles: StyleContract

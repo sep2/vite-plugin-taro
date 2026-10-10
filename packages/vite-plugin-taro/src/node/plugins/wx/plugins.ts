@@ -14,8 +14,10 @@ export function createWxMiniPlugins(vptOptions: VptOptions): PluginOption[] {
 export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
     return {
         options: vptOptions,
+        define: {},
         taro: {
             env: 'weapp',
+            hostPath: resolveVptRuntime('mini/taro/template-host'),
             componentsReactPath: resolveTaroRuntime('plugin-platform-weapp/components-react'),
             targetRuntimePath: resolveTaroRuntime('plugin-platform-weapp/runtime')
         },
