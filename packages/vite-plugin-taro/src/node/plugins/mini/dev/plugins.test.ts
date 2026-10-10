@@ -39,7 +39,7 @@ const contract = {
             return []
         }
     },
-    watch: { override: {} }
+    override: []
 } satisfies MiniContract
 const { entries } = createResolver(contract)
 

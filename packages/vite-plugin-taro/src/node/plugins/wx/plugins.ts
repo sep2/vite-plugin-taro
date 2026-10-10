@@ -3,6 +3,7 @@ import type { VptOptions } from '../../../options.ts'
 import { resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
+import { isMiniWatchBuild } from '../mini/watch/is-mini-watch-build.ts'
 import { createWxSkeleton } from './create-wx-skeleton.ts'
 
 /** Adapts the shared Mini Program pipeline to the WX public target. */
@@ -34,13 +35,19 @@ export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
             projectPrivateConfigFilename: 'project.private.config.json',
             generateProjectSkeleton: createWxSkeleton
         },
-        watch: {
-            override: {
-                // Private settings take precedence over the shared project config in WeChat DevTools.
-                // https://developers.weixin.qq.com/miniprogram/dev/devtools/projectconfig.html
-                'project.config.json': { setting: { compileHotReLoad: false } },
-                'project.private.config.json': { setting: { compileHotReLoad: false } }
+        override: [
+            // Private settings take precedence over the shared project config in WeChat DevTools.
+            // https://developers.weixin.qq.com/miniprogram/dev/devtools/projectconfig.html
+            {
+                apply: isMiniWatchBuild,
+                name: 'project.config.json',
+                content: { setting: { compileHotReLoad: false } }
+            },
+            {
+                apply: isMiniWatchBuild,
+                name: 'project.private.config.json',
+                content: { setting: { compileHotReLoad: false } }
             }
-        }
+        ]
     }
 }

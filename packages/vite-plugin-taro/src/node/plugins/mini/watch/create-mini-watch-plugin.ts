@@ -2,17 +2,14 @@ import { randomUUID } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Plugin } from 'vite'
-import type { VptJsonObject } from '../../../../options.ts'
 import { cleanOutputFiles } from '../../../utils/clean-output-files.ts'
 import { isMiniClientEnvironment } from '../dev/plugins.ts'
 import type { MiniContract } from '../mini-contract.ts'
-import { recursiveMerge } from '../skeleton/recursive-merge.ts'
-import { createJsonAsset } from '../skeleton/skeleton-utils.ts'
+import { isMiniWatchBuild } from './is-mini-watch-build.ts'
 
 /** Preserves watched directories and forces full reloads for Mini Program watch output without changing serve HMR. */
 export function createMiniWatchPlugin(contract: {
     output: Pick<MiniContract['output'], 'projectConfigFilename' | 'projectPrivateConfigFilename'>
-    watch: MiniContract['watch']
 }): Plugin {
     // Rolldown also closes an unsuccessful result when its watcher shuts down, without passing an error.
     // Track that lifecycle boundary so shutdown cannot publish a false completion marker.
@@ -22,13 +19,8 @@ export function createMiniWatchPlugin(contract: {
         name: 'vpt:mini-watch',
         enforce: 'post',
         // One-shot production, serve HMR and generate-only consumers keep their existing output policies.
-        apply: (config, { command }) => {
-            return (
-                command === 'build' &&
-                Boolean(config.build?.watch) &&
-                config.build?.write !== false &&
-                !config.build?.watch?.skipWrite
-            )
+        apply({ build }, { command }) {
+            return isMiniWatchBuild({ build, command })
         },
         applyToEnvironment: isMiniClientEnvironment,
         config() {
@@ -50,29 +42,6 @@ export function createMiniWatchPlugin(contract: {
         },
         closeWatcher() {
             closed = true
-        },
-        generateBundle: {
-            order: 'post',
-            handler(_, bundle) {
-                // Run after skeleton emission and change only output, so serve and one-shot builds retain user settings.
-                // Override supported private preferences too, since they take precedence over shared settings in DevTools.
-                for (const [fileName, overrides] of Object.entries(contract.watch.override)) {
-                    const asset = bundle[fileName]
-
-                    if (asset?.type === 'asset') {
-                        const config: VptJsonObject = JSON.parse(String(asset.source))
-                        // Merge into a fresh record and mutate only this generation's asset, never caller configuration.
-                        Object.assign(
-                            asset,
-                            createJsonAsset(
-                                fileName,
-                                recursiveMerge({}, config, overrides),
-                                this.environment.config.isProduction
-                            )
-                        )
-                    }
-                }
-            }
         },
         closeBundle: {
             order: 'post',

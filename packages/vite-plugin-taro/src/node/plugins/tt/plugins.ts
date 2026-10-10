@@ -3,6 +3,7 @@ import type { VptOptions } from '../../../options.ts'
 import { resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
+import { isMiniWatchBuild } from '../mini/watch/is-mini-watch-build.ts'
 import { createTtSkeleton } from './create-tt-skeleton.ts'
 
 /** Adapts the shared Mini Program pipeline to TikTok. */
@@ -37,15 +38,21 @@ export function createTtMiniContract(options: VptOptions): MiniContract {
             projectPrivateConfigFilename: 'project.private.config.json',
             generateProjectSkeleton: createTtSkeleton
         },
-        watch: {
-            override: {
-                // Top-level compileHotReload and shared/private compileHotReLoad use distinct spellings.
-                // Leave autoCompile untouched so watch output still triggers automatic full recompilation.
-                // https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/dev-tools/developer-instrument/compilation/hot-reload
-                // https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/dev-tools/developer-instrument/development-assistance/private-config
-                'project.config.json': { compileHotReload: false, setting: { compileHotReLoad: false } },
-                'project.private.config.json': { setting: { compileHotReLoad: false } }
+        override: [
+            // Top-level compileHotReload and shared/private compileHotReLoad use distinct spellings.
+            // Leave autoCompile untouched so watch output still triggers automatic full recompilation.
+            // https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/dev-tools/developer-instrument/compilation/hot-reload
+            // https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/dev-tools/developer-instrument/development-assistance/private-config
+            {
+                apply: isMiniWatchBuild,
+                name: 'project.config.json',
+                content: { compileHotReload: false, setting: { compileHotReLoad: false } }
+            },
+            {
+                apply: isMiniWatchBuild,
+                name: 'project.private.config.json',
+                content: { setting: { compileHotReLoad: false } }
             }
-        }
+        ]
     }
 }

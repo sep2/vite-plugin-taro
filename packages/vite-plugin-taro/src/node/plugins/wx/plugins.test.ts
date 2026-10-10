@@ -35,8 +35,14 @@ test('creates the WX Mini Program contract without translating public options', 
     assert.equal(contract.output.projectPrivateConfigFilename, 'project.private.config.json')
     assert.equal(contract.output.generateProjectSkeleton, createWxSkeleton)
     const plugins = createWxMiniPlugins(options)
-    assert.equal(plugins.length, 8)
-    for (const name of ['vpt:mini-native-component', 'vpt:mini-global', 'vpt:mini-global-dev', 'vpt:mini-watch']) {
+    assert.equal(plugins.length, 9)
+    for (const name of [
+        'vpt:mini-native-component',
+        'vpt:mini-global',
+        'vpt:mini-global-dev',
+        'vpt:mini-watch',
+        'vpt:mini-override'
+    ]) {
         assert.ok(
             plugins
                 .flat()

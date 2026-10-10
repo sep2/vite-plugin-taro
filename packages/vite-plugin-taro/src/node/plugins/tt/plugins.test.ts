@@ -28,7 +28,13 @@ test('binds TT runtime and style paths without translating native configuration'
     assert.equal(contract.output.projectConfigFilename, 'project.config.json')
     assert.equal(contract.output.projectPrivateConfigFilename, 'project.private.config.json')
     assert.equal(contract.output.generateProjectSkeleton, createTtSkeleton)
-    assert.equal(createTtMiniPlugins(options).length, 8)
+    const plugins = createTtMiniPlugins(options)
+    assert.equal(plugins.length, 9)
+    assert.ok(
+        plugins.some(
+            (plugin) => plugin && typeof plugin === 'object' && 'name' in plugin && plugin.name === 'vpt:mini-override'
+        )
+    )
 })
 
 for (const isProduction of [false, true]) {

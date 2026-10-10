@@ -1,4 +1,4 @@
-import type { Rolldown } from 'vite'
+import type { ResolvedConfig, Rolldown } from 'vite'
 import type { VptJsonObject, VptOptions } from '../../../options.ts'
 
 /** Taro compiler bindings selected by one Mini Program target. */
@@ -49,10 +49,13 @@ export type OutputContract = {
     generateProjectSkeleton(input: MiniProjectSkeletonInput, contract: MiniContract): Rolldown.EmittedAsset[]
 }
 
-/** Native project config fields overridden only in physical build-watch output. */
-export type WatchContract = {
-    override: Readonly<Record<string, VptJsonObject>>
-}
+/** Conditional JSON fields merged into one emitted asset. */
+export type OverrideContract = Readonly<{
+    apply: (config: ResolvedConfig) => boolean
+    /** Output-relative asset filename. */
+    name: string
+    content: VptJsonObject
+}>
 
 /** Complete input consumed by the shared Mini Program pipeline. */
 export type MiniContract = {
@@ -63,7 +66,8 @@ export type MiniContract = {
     runtime: RuntimeContract
     styles: StyleContract
     output: OutputContract
-    watch: WatchContract
+    /** Applied in declaration order after project-skeleton emission. */
+    override: readonly OverrideContract[]
 }
 
 /** Application JSON represented by the current Mini Program contract. */

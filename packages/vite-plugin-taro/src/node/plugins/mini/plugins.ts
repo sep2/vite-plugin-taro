@@ -10,6 +10,7 @@ import { classifyMiniModule, miniAppCapsuleId, miniPageCapsuleId, miniTaroRuntim
 import { createMiniNativeComponentPlugin } from './native/create-mini-native-component-plugin.ts'
 import { createTransportOutput } from './output/create-transport-output.ts'
 import { createOutputFiles } from './output/files.ts'
+import { createMiniOverridePlugin } from './override/create-mini-override-plugin.ts'
 import { createMiniPlacementPlugin, type MiniPlacementPlugin } from './placer/placer.ts'
 import { createMiniPolyfillPlugin } from './polyfill/create-mini-polyfill-plugin.ts'
 import { renderCapsule } from './render/capsule.ts'
@@ -36,7 +37,8 @@ export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] 
         createMiniPolyfillPlugin(contract),
         createMiniGlobalPlugin(placement),
         createMiniDevelopmentPlugin(contract, styles),
-        createMiniWatchPlugin(contract)
+        createMiniWatchPlugin(contract),
+        createMiniOverridePlugin(contract)
     ]
 }
 
