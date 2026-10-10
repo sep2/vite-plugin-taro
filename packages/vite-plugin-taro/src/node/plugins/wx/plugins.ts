@@ -13,6 +13,9 @@ export function createWxMiniPlugins(vptOptions: VptOptions): PluginOption[] {
 
 /** Binds the shared Mini Program core to WeChat runtime and output conventions. */
 export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
+    const projectConfigFilename = 'project.config.json'
+    const projectPrivateConfigFilename = 'project.private.config.json'
+
     return {
         options: vptOptions,
         define: {},
@@ -31,8 +34,8 @@ export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
             globalFileName: 'assets/global.wxss'
         },
         output: {
-            projectConfigFilename: 'project.config.json',
-            projectPrivateConfigFilename: 'project.private.config.json',
+            projectConfigFilename,
+            projectPrivateConfigFilename,
             generateProjectSkeleton: createWxSkeleton
         },
         override: [
@@ -40,12 +43,12 @@ export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
             // https://developers.weixin.qq.com/miniprogram/dev/devtools/projectconfig.html
             {
                 apply: isMiniWatchBuild,
-                name: 'project.config.json',
+                name: projectConfigFilename,
                 content: { setting: { compileHotReLoad: false } }
             },
             {
                 apply: isMiniWatchBuild,
-                name: 'project.private.config.json',
+                name: projectPrivateConfigFilename,
                 content: { setting: { compileHotReLoad: false } }
             }
         ]

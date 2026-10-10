@@ -13,6 +13,8 @@ export function createZfbMiniPlugins(vptOptions: VptOptions): PluginOption[] {
 
 /** Binds the shared Mini Program core to Alipay runtime and output conventions. */
 export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
+    const projectConfigFilename = 'mini.project.json'
+
     return {
         options: vptOptions,
         define: {},
@@ -31,7 +33,7 @@ export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
             globalFileName: 'assets/global.acss'
         },
         output: {
-            projectConfigFilename: 'mini.project.json',
+            projectConfigFilename,
             projectPrivateConfigFilename: '.mini-ide/project-ide.json',
             generateProjectSkeleton: createZfbSkeleton
         },
@@ -40,7 +42,7 @@ export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
             // https://opendoc.alipay.com/mini/09j22u
             {
                 apply: isMiniWatchBuild,
-                name: 'mini.project.json',
+                name: projectConfigFilename,
                 content: { developOptions: { hotReload: false } }
             }
         ]

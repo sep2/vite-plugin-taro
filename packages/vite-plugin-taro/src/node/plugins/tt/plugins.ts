@@ -13,10 +13,13 @@ export function createTtMiniPlugins(options: VptOptions): PluginOption[] {
 
 /** Binds TT's runtime, native templates, styles, and socket transport to the shared compiler. */
 export function createTtMiniContract(options: VptOptions): MiniContract {
+    const projectConfigFilename = 'project.config.json'
+    const projectPrivateConfigFilename = 'project.private.config.json'
+
     return {
         options,
         define: {
-            // React owns logical Taro nodes in both presentations; VPT's DOM host accesses the native document separately.
+            // Don't use taro built in solution. we build our own.
             'tt.__$enableTTDom$__': 'false'
         },
         taro: {
@@ -34,23 +37,29 @@ export function createTtMiniContract(options: VptOptions): MiniContract {
             globalFileName: 'assets/global.ttss'
         },
         output: {
-            projectConfigFilename: 'project.config.json',
-            projectPrivateConfigFilename: 'project.private.config.json',
+            projectConfigFilename,
+            projectPrivateConfigFilename,
             generateProjectSkeleton: createTtSkeleton
         },
         override: [
+            {
+                // https://github.com/NervJS/taro/pull/18850
+                apply: () => options.renderer === 'dom',
+                name: projectConfigFilename,
+                content: { enableTTDom: true }
+            },
             // Top-level compileHotReload and shared/private compileHotReLoad use distinct spellings.
             // Leave autoCompile untouched so watch output still triggers automatic full recompilation.
             // https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/dev-tools/developer-instrument/compilation/hot-reload
             // https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/dev-tools/developer-instrument/development-assistance/private-config
             {
                 apply: isMiniWatchBuild,
-                name: 'project.config.json',
+                name: projectConfigFilename,
                 content: { compileHotReload: false, setting: { compileHotReLoad: false } }
             },
             {
                 apply: isMiniWatchBuild,
-                name: 'project.private.config.json',
+                name: projectPrivateConfigFilename,
                 content: { setting: { compileHotReLoad: false } }
             }
         ]

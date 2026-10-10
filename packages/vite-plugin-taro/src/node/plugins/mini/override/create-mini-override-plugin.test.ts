@@ -126,35 +126,66 @@ test('preserves output when the contract has no rules', async () => {
 })
 
 for (const target of ['wx', 'zfb', 'tt'] as const) {
-    test(`${target}: selects native hot-reload overrides only for physical watch builds`, async () => {
-        const contract = miniContracts[target]({ target, app: 'app.js', pages: [], appJson: {}, projectConfigJson: {} })
-        const cases = [
-            { command: 'build', build: { watch: {} }, active: true },
-            { command: 'serve', build: { watch: {} }, active: false },
-            { command: 'build', build: undefined, active: false },
-            { command: 'build', build: { watch: null }, active: false },
-            { command: 'build', build: { watch: {}, write: false }, active: false },
-            { command: 'build', build: { watch: { skipWrite: true } }, active: false }
-        ] as const
-        for (const mode of ['development', 'production']) {
-            for (const { command, build, active } of cases) {
-                const config = await resolveConfig(
-                    { configFile: false, mode, build, plugins: [createMiniOverridePlugin(contract)] },
-                    command
-                )
-                const hook = config.plugins.find(({ name }) => name === 'vpt:mini-override')?.generateBundle
-                assert.ok(hook && typeof hook === 'object')
-                // Each configuration receives its own emitted assets for predicate selection.
-                const bundle = Object.fromEntries(
-                    contract.override.map(({ name }) => [name, { type: 'asset', fileName: name, source: '{}' }])
-                )
-                Reflect.apply(hook.handler, { environment: { config } }, [{}, bundle])
-                for (const { name, content } of contract.override) {
-                    assert.deepEqual(JSON.parse(bundle[name].source), active ? content : {})
+    for (const renderer of [undefined, 'template', 'dom'] as const) {
+        test(`${target}: composes renderer=${renderer} project overrides across build and serve`, async () => {
+            const contract = miniContracts[target]({
+                target,
+                renderer,
+                app: 'app.js',
+                pages: [],
+                appJson: {},
+                projectConfigJson: {}
+            })
+            const { projectConfigFilename } = contract.output
+            const sourceFiles = createProjectConfigFixture(target, true)
+            const cases = [
+                { command: 'build', build: { watch: {} }, physicalWatch: true },
+                { command: 'serve', build: { watch: {} }, physicalWatch: false },
+                { command: 'build', build: undefined, physicalWatch: false },
+                { command: 'build', build: { watch: null }, physicalWatch: false },
+                { command: 'build', build: { watch: {}, write: false }, physicalWatch: false },
+                { command: 'build', build: { watch: { skipWrite: true } }, physicalWatch: false }
+            ] as const
+            for (const mode of ['development', 'production']) {
+                for (const { command, build, physicalWatch } of cases) {
+                    const config = await resolveConfig(
+                        { configFile: false, mode, build, plugins: [createMiniOverridePlugin(contract)] },
+                        command
+                    )
+                    const hook = config.plugins.find(({ name }) => name === 'vpt:mini-override')?.generateBundle
+                    assert.ok(hook && typeof hook === 'object')
+                    const nativeFiles = createProjectConfigFixture(target, !physicalWatch)
+                    for (const enableTTDom of [undefined, false, true]) {
+                        const domSetting = enableTTDom === undefined ? {} : { enableTTDom }
+                        const inputFiles = {
+                            ...sourceFiles,
+                            [projectConfigFilename]: { ...sourceFiles[projectConfigFilename], ...domSetting }
+                        }
+                        const expectedFiles: Readonly<Record<string, VptJsonObject>> = {
+                            ...nativeFiles,
+                            [projectConfigFilename]: {
+                                ...nativeFiles[projectConfigFilename],
+                                ...domSetting,
+                                ...(target === 'tt' && renderer === 'dom' ? { enableTTDom: true } : {})
+                            }
+                        }
+                        // One asset per filename lets independent renderer and watch rules compose on the same JSON.
+                        const bundle = Object.fromEntries(
+                            Object.entries(inputFiles).map(([fileName, content]) => [
+                                fileName,
+                                { type: 'asset', fileName, source: JSON.stringify(content) }
+                            ])
+                        )
+                        Reflect.apply(hook.handler, { environment: { config } }, [{}, bundle])
+                        assert.deepEqual(Object.keys(bundle), Object.keys(inputFiles))
+                        for (const [fileName, expected] of Object.entries(expectedFiles)) {
+                            assert.deepEqual(JSON.parse(bundle[fileName].source), expected, fileName)
+                        }
+                    }
                 }
             }
-        }
-    })
+        })
+    }
 }
 
 for (const target of ['wx', 'zfb', 'tt', 'h5'] as const) {
