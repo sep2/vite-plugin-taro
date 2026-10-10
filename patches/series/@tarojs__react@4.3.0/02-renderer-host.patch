@@ -11,7 +11,7 @@ index 3e887af2ac0312610ce395a800234c7fcab4c682..af13e19f5c610d962cd4e16474a033c3
  declare const _default: {
      flushSync: {
 diff --git a/dist/react.esm.js b/dist/react.esm.js
-index 12f48233e13c28f91b5e4b1503f241dcd7cabefb..28971b6d425f9c909e58d0940c26c97f37cf0601 100644
+index 12f48233e13c28f91b5e4b1503f241dcd7cabefb..41a342b78a47a1f01a06c91f799d690ec2bb574f 100644
 --- a/dist/react.esm.js
 +++ b/dist/react.esm.js
 @@ -1,5 +1,6 @@
@@ -31,8 +31,13 @@ index 12f48233e13c28f91b5e4b1503f241dcd7cabefb..28971b6d425f9c909e58d0940c26c97f
      for (i in newProps) {
          if (oldProps[i] !== newProps[i] || (isFormElement && i === 'value')) {
              // 如果都是 style，且 style 里面的值相等，则无需记录到 payload 中
-@@ -663,9 +664,11 @@ const hostConfig = {
-     prepareForCommit(..._) {
+@@ -660,12 +661,15 @@ const hostConfig = {
+     getChildHostContext(parentHostContext) {
+         return parentHostContext;
+     },
+-    prepareForCommit(..._) {
++    prepareForCommit(container) {
++        host.beforeCommit?.(container);
          return null;
      },
 -    resetAfterCommit: noop,
@@ -46,7 +51,7 @@ index 12f48233e13c28f91b5e4b1503f241dcd7cabefb..28971b6d425f9c909e58d0940c26c97f
          precacheFiberNode(internalInstanceHandle, element);
          updateFiberProps(element, props);
          return element;
-@@ -675,7 +678,7 @@ const hostConfig = {
+@@ -675,7 +679,7 @@ const hostConfig = {
      },
      finalizeInitialChildren(dom, type, props) {
          let newProps = props;
@@ -55,7 +60,7 @@ index 12f48233e13c28f91b5e4b1503f241dcd7cabefb..28971b6d425f9c909e58d0940c26c97f
              const [defaultName, defaultKey] = ['switch', 'checkbox', 'radio'].includes(type) ? ['checked', 'defaultChecked'] : ['value', 'defaultValue'];
              if (props.hasOwnProperty(defaultKey)) {
                  newProps = Object.assign(Object.assign({}, newProps), { [defaultName]: props[defaultKey] });
-@@ -691,8 +694,8 @@ const hostConfig = {
+@@ -691,8 +695,8 @@ const hostConfig = {
      shouldSetTextContent() {
          return false;
      },
@@ -68,14 +73,15 @@ index 12f48233e13c28f91b5e4b1503f241dcd7cabefb..28971b6d425f9c909e58d0940c26c97f
      },
 diff --git a/dist/renderer-host.d.ts b/dist/renderer-host.d.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..2a79b61569788748371f94f9932588d2199c9f72
+index 0000000000000000000000000000000000000000..04431d7655ae92d324f6861b734f1512d6eb4191
 --- /dev/null
 +++ b/dist/renderer-host.d.ts
-@@ -0,0 +1,7 @@
-+/** Host-owned creation, form classification and post-commit work for the shared React renderer. */
+@@ -0,0 +1,8 @@
++/** Host-owned creation, form classification and commit boundaries for the shared React renderer. */
 +export type RendererHost<Container, Context, Element, Text> = Readonly<{
 +    createElement(container: Container, context: Context, type: string): Element
 +    createText(container: Container, context: Context, text: string): Text
 +    isFormElement(element: Element): boolean
++    beforeCommit?(container: Container): void
 +    afterCommit(container: Container): void
 +}>

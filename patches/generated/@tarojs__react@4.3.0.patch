@@ -35,7 +35,7 @@ index 7f5ed89b2448d03dc2658ca2be2c016f12387daa..af13e19f5c610d962cd4e16474a033c3
      internalInstanceKey: string;
  };
 diff --git a/dist/react.esm.js b/dist/react.esm.js
-index ad8a51f02788c6e0354579956625da33a00e14a2..28971b6d425f9c909e58d0940c26c97f37cf0601 100644
+index ad8a51f02788c6e0354579956625da33a00e14a2..41a342b78a47a1f01a06c91f799d690ec2bb574f 100644
 --- a/dist/react.esm.js
 +++ b/dist/react.esm.js
 @@ -1,7 +1,15 @@
@@ -135,8 +135,13 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..28971b6d425f9c909e58d0940c26c97f
      // below keys order by {React ReactFiberHostConfig.custom.js}, convenient for comparing each other.
      // -------------------
      // required by @types/react-reconciler
-@@ -617,9 +664,11 @@ const hostConfig = {
-     prepareForCommit(..._) {
+@@ -614,12 +661,15 @@ const hostConfig = {
+     getChildHostContext(parentHostContext) {
+         return parentHostContext;
+     },
+-    prepareForCommit(..._) {
++    prepareForCommit(container) {
++        host.beforeCommit?.(container);
          return null;
      },
 -    resetAfterCommit: noop,
@@ -150,7 +155,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..28971b6d425f9c909e58d0940c26c97f
          precacheFiberNode(internalInstanceHandle, element);
          updateFiberProps(element, props);
          return element;
-@@ -629,7 +678,7 @@ const hostConfig = {
+@@ -629,7 +679,7 @@ const hostConfig = {
      },
      finalizeInitialChildren(dom, type, props) {
          let newProps = props;
@@ -159,7 +164,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..28971b6d425f9c909e58d0940c26c97f
              const [defaultName, defaultKey] = ['switch', 'checkbox', 'radio'].includes(type) ? ['checked', 'defaultChecked'] : ['value', 'defaultValue'];
              if (props.hasOwnProperty(defaultKey)) {
                  newProps = Object.assign(Object.assign({}, newProps), { [defaultName]: props[defaultKey] });
-@@ -642,14 +691,11 @@ const hostConfig = {
+@@ -642,14 +692,11 @@ const hostConfig = {
          }
          return false;
      },
@@ -176,7 +181,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..28971b6d425f9c909e58d0940c26c97f
          precacheFiberNode(internalInstanceHandle, textNode);
          return textNode;
      },
-@@ -667,9 +713,6 @@ const hostConfig = {
+@@ -667,9 +714,6 @@ const hostConfig = {
      preparePortalMount: noop,
      prepareScopeUpdate: noop,
      getInstanceFromScope: () => null,
@@ -186,7 +191,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..28971b6d425f9c909e58d0940c26c97f
      detachDeletedInstance: noop,
      // -------------------
      //      Microtasks
-@@ -699,7 +742,8 @@ const hostConfig = {
+@@ -699,7 +743,8 @@ const hostConfig = {
          textInst.nodeValue = newText;
      },
      commitMount: noop,
@@ -196,7 +201,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..28971b6d425f9c909e58d0940c26c97f
          if (!updatePayload)
              return;
          // payload 只包含 children 的时候，不应该再继续触发后续的属性比较和更新的逻辑了
-@@ -745,10 +789,21 @@ const hostConfig = {
+@@ -745,10 +790,21 @@ const hostConfig = {
      }
  };
  const TaroReconciler = Reconciler(hostConfig);
@@ -219,7 +224,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..28971b6d425f9c909e58d0940c26c97f
          rendererPackageName: 'taro-react'
      });
      if (!foundDevTools) {
-@@ -796,7 +851,7 @@ function needsStateRestore() {
+@@ -796,7 +852,7 @@ function needsStateRestore() {
  function finishEventHandler() {
      const controlledComponentsHavePendingUpdates = needsStateRestore();
      if (controlledComponentsHavePendingUpdates) {
@@ -228,7 +233,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..28971b6d425f9c909e58d0940c26c97f
          restoreStateIfNeeded();
      }
  }
-@@ -832,80 +887,55 @@ function restoreStateOfTarget(item) {
+@@ -832,80 +888,55 @@ function restoreStateOfTarget(item) {
      }
  }
  
@@ -343,7 +348,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..28971b6d425f9c909e58d0940c26c97f
              node.dispatchEvent(e);
          });
      });
-@@ -946,22 +976,10 @@ function unmountComponentAtNode(dom) {
+@@ -946,22 +977,10 @@ function unmountComponentAtNode(dom) {
      if (!root)
          return false;
      unstable_batchedUpdates(() => {
@@ -367,7 +372,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..28971b6d425f9c909e58d0940c26c97f
  const portalType = isFunction(Symbol) && Symbol.for
      ? Symbol.for('react.portal')
      : 0xeaca;
-@@ -974,17 +992,16 @@ function createPortal(children, containerInfo, key) {
+@@ -974,17 +993,16 @@ function createPortal(children, containerInfo, key) {
          implementation: null
      };
  }
@@ -429,14 +434,15 @@ index 1384c9307cc6ee2586e80d5334e54d3e5984453a..88ce8da3b95e5869f15e0ff42c7d7424
  export {};
 diff --git a/dist/renderer-host.d.ts b/dist/renderer-host.d.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..2a79b61569788748371f94f9932588d2199c9f72
+index 0000000000000000000000000000000000000000..04431d7655ae92d324f6861b734f1512d6eb4191
 --- /dev/null
 +++ b/dist/renderer-host.d.ts
-@@ -0,0 +1,7 @@
-+/** Host-owned creation, form classification and post-commit work for the shared React renderer. */
+@@ -0,0 +1,8 @@
++/** Host-owned creation, form classification and commit boundaries for the shared React renderer. */
 +export type RendererHost<Container, Context, Element, Text> = Readonly<{
 +    createElement(container: Container, context: Context, type: string): Element
 +    createText(container: Container, context: Context, text: string): Text
 +    isFormElement(element: Element): boolean
++    beforeCommit?(container: Container): void
 +    afterCommit(container: Container): void
 +}>
