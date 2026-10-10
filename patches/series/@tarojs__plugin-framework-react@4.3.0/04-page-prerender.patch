@@ -1,8 +1,8 @@
 diff --git a/dist/runtime.js b/dist/runtime.js
-index 2dd626030caa263b53d631a79630b6597968ca94..92c4430c8cb0d5bbf7f05617af03f2b3549701d3 100644
+index 9808dbc07ac8502d912e9bf8daa9729cac519f8a..8a22ddaf7e3321ad3fc628ed416ba8f0b6bc9626 100644
 --- a/dist/runtime.js
 +++ b/dist/runtime.js
-@@ -361,10 +361,14 @@ function createReactApp(App, react, dom, config) {
+@@ -316,10 +316,14 @@ function createReactApp(App, react, dom, config) {
              appWrapperResolver(this);
          }
          mount(pageComponent, id, cb) {
@@ -20,4 +20,4 @@ index 2dd626030caa263b53d631a79630b6597968ca94..92c4430c8cb0d5bbf7f05617af03f2b3
 +            }
              this.forceUpdate((...args) => {
                  perf.stop(PAGE_INIT);
-                 if (process.env.TARO_PLATFORM !== 'web') {
+                 return cb(...args);

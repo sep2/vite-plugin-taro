@@ -9,7 +9,7 @@ import '\0vpt:taro-target-runtime'
 // Keep registration in the shared runtime dependency, rather than App/Page bodies that execute again during HMR.
 import 'vite-plugin-taro-runtime/plugin-html/runtime'
 
-export { createReactApp } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
+export { createVptApp as createReactApp } from '../taro/create-vpt-app.ts'
 export { default as ReactDOM } from 'vite-plugin-taro-runtime/react'
 export { createRecursiveComponentConfig } from 'vite-plugin-taro-runtime/runtime/mini'
 import { customWrapperCache } from 'vite-plugin-taro-runtime/runtime/mini'

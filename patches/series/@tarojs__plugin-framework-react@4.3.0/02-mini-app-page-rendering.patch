@@ -1,56 +1,8 @@
 diff --git a/dist/runtime.js b/dist/runtime.js
-index 94d631f6a7e8dfc78ae4f7a51fe3ab343186938e..27e1c01008742cdffb35c93ee362c1e1914227a4 100644
+index 418b31bc1e01c6de1cdcd8770e004a2e6311ffe8..2dde5be36952382f13e58552944684c3aa783d70 100644
 --- a/dist/runtime.js
 +++ b/dist/runtime.js
-@@ -1,6 +1,16 @@
- import { EMPTY_OBJ, isArray, isFunction, hooks, ensure, isUndefined } from '@tarojs/shared';
--import { Current, getPageInstance, injectPageInstance, incrementId, document, perf, PAGE_INIT, CONTAINER, window, CONTEXT_ACTIONS, safeExecute, ON_HIDE, eventCenter, getOnHideEventKey, ON_SHOW, requestAnimationFrame, getOnShowEventKey, ON_READY, getOnReadyEventKey, removePageInstance, getPath, eventHandler, addLeadingSlash } from '@tarojs/runtime';
-+import { Current, getPageInstance, injectPageInstance, incrementId, document, perf, PAGE_INIT, CONTAINER, window, CONTEXT_ACTIONS, safeExecute, ON_HIDE, eventCenter, getOnHideEventKey, ON_SHOW, requestAnimationFrame, getOnShowEventKey, ON_READY, getOnReadyEventKey, removePageInstance, getPath, eventHandler, addLeadingSlash, hydrate } from '@tarojs/runtime';
- 
-+/**
-+ * WX App-wrap flow:
-+ *
-+ * React still owns one root in which every Page remains an ordinary child of the singleton App. Native WX rendering,
-+ * however, is driven by independent Page.setData surfaces, so App hosts above those Page roots have no scheduler of their
-+ * own. The Mini Program branch below gives the App host an app.* scheduler, fans its deltas into every mounted Page, places
-+ * one opaque outlet at App {children}, and seeds each new Page with the current App snapshot in its first native batch.
-+ * hydrate() is needed only for that initial snapshot; the patched runtime stops traversal at the outlet so Page roots stay
-+ * in the React/Taro ownership tree without being copied into app data.
-+ */
- const reactMeta = {
-     PageContext: EMPTY_OBJ,
-     R: EMPTY_OBJ,
-@@ -257,6 +267,29 @@ function connectReactPage(R, id) {
-         };
-     };
- }
-+/**
-+ * One App reconciliation produces one granular app.* batch, while WX stores an App mirror inside every mounted native
-+ * Page. Resolve the native stack only when that batch flushes instead of maintaining a second Page registry or active-Page
-+ * tracker. WeChat orders getCurrentPages() from the oldest hidden Page to the current visible Page, so forEach dispatches
-+ * all hidden surfaces first. Only the final current Page receives Taro's callback: every setData call has then been issued,
-+ * and Taro's scheduler completes its batch exactly once rather than coordinating one callback per Page.
-+ */
-+function broadcastAppUpdate(data, callback) {
-+    const pages = getCurrentPages();
-+    const currentPage = pages[pages.length - 1];
-+    if (!currentPage) {
-+        callback();
-+        return;
-+    }
-+    pages.forEach(page => {
-+        if (page === currentPage) {
-+            page.setData(data, callback);
-+        }
-+        else {
-+            page.setData(data);
-+        }
-+    });
-+}
- /**
-  * 桥接小程序 App 构造器和 React 渲染流程
-  * @param App 用户编写的入口组件
-@@ -295,13 +328,30 @@ function createReactApp(App, react, dom, config) {
+@@ -295,7 +295,12 @@ function createReactApp(App, react, dom, config) {
          let container = document.getElementById(appId);
          if (container == null) {
              const appContainer = document.getElementById(CONTAINER);
@@ -64,45 +16,7 @@ index 94d631f6a7e8dfc78ae4f7a51fe3ab343186938e..27e1c01008742cdffb35c93ee362c1e1
              container.id = appId;
              appContainer === null || appContainer === void 0 ? void 0 : appContainer.appendChild(container);
          }
-+        /*
-+         * renderReactRoot runs only for the Mini Program branch. The patched WX document makes this App container a
-+         * TaroRootElement, so it serves simultaneously as React's existing host container and Taro's App scheduler; its
-+         * structural _path is app and its _root is itself. Assign only the native sink that fans Taro's normal granular
-+         * batches across Page surfaces. No detached scheduler node, second React root, or host-property override participates.
-+         */
-+        container.ctx = { setData: broadcastAppUpdate };
-         // VPT requires React 19: both the Mini renderer and react-dom/client provide concurrent roots.
-         const root = ReactDOM$1.createRoot(container);
-         root.render(h$1(AppWrapper));
-+        /*
-+         * Return the exact host passed to ReactDOM. AppWrapper.mount closes over this immutable value when a Page is added,
-+         * guaranteeing that its initial snapshot comes from the same singleton App tree without a host registry or lookup.
-+         */
-+        return container;
-     }
-     class AppWrapper extends react.Component {
-         constructor(props) {
-@@ -319,6 +369,19 @@ function createReactApp(App, react, dom, config) {
-             this.pages.push(page);
-             this.forceUpdate((...args) => {
-                 perf.stop(PAGE_INIT);
-+                if (process.env.TARO_PLATFORM !== 'web') {
-+                    /*
-+                     * React has now committed the Page root, but createPageConfig has not yet attached the native Page ctx or
-+                     * called performUpdate(true). Queue a lazy app.cn snapshot beside the Page root's already-pending page.*
-+                     * payloads. Taro therefore resolves both in one initial setData: no blank App frame, second bridge write,
-+                     * Page-ready phase, or custom pending queue. Patched hydrate() stops at the outlet before Page roots.
-+                     */
-+                    const pageRoot = document.getElementById(id);
-+                    pageRoot.enqueueUpdate({
-+                        path: 'app.cn',
-+                        value: () => hydrate(container).cn
-+                    });
-+                }
-                 return cb(...args);
-             });
-         }
-@@ -338,12 +401,23 @@ function createReactApp(App, react, dom, config) {
+@@ -338,7 +343,16 @@ function createReactApp(App, react, dom, config) {
              if (isReactComponent) {
                  props = { ref: appInstanceRef };
              }
@@ -119,14 +33,4 @@ index 94d631f6a7e8dfc78ae4f7a51fe3ab343186938e..27e1c01008742cdffb35c93ee362c1e1
 +            return h$1(App, props, children);
          }
      }
--    if (process.env.TARO_PLATFORM !== 'web') {
--        renderReactRoot();
--    }
-+    /*
-+     * Mini Program lifecycle mounting is internal to this runtime, so create and retain exactly one App host for every Page
-+     * mount callback to snapshot. Web keeps upstream external mounting and never executes the WX scheduler/outlet path.
-+     */
-+    const container = process.env.TARO_PLATFORM !== 'web' ? renderReactRoot() : null;
-     const [ONLAUNCH, ONSHOW, ONHIDE] = hooks.call('getMiniLifecycleImpl').app;
-     const appObj = Object.create({
-         render(cb) {
+     if (process.env.TARO_PLATFORM !== 'web') {

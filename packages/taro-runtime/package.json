@@ -11,6 +11,11 @@
             "import": "./dist/runtime/index.js",
             "default": "./dist/runtime/index.js"
         },
+        "./runtime/tt-document": {
+            "types": "./types/tt-document.d.ts",
+            "import": "./dist/runtime/bom/document.js",
+            "default": "./dist/runtime/bom/document.js"
+        },
         "./runtime/h5": {
             "types": "./dist/runtime/runtime.esm.d.ts",
             "import": "./dist/runtime/runtime.esm.js",
@@ -109,6 +114,7 @@
     },
     "files": [
         "dist",
+        "types",
         "LICENSE",
         "README.md"
     ],

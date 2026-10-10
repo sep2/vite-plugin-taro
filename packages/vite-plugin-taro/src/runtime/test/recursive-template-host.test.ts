@@ -191,4 +191,42 @@ assert.deepEqual(writes, [], 'each App root retains its own projection state')
 
 left.removeChild(next)
 assert.throws(() => host.afterCommit(root), /App must render children exactly once/)
+
+// Root namespaces are VPT policy; initial payload deduplication follows the root's actual prefix.
+for (const prefix of ['app', 'page', 'custom']) {
+    const initialRoot = document.createElement('root')
+    if (prefix === 'app') {
+        container.appendChild(initialRoot)
+    } else if (prefix === 'custom') {
+        Object.defineProperty(initialRoot, '_path', { value: prefix })
+    }
+    assert.equal(initialRoot._path, prefix)
+    initialRoot.scheduleTask = callback => callback()
+    initialRoot.enqueueUpdate({ path: prefix + '.cn.[0].cl', value: () => assert.fail('redundant dot-index payload') })
+    initialRoot.enqueueUpdate({ path: prefix + '.cn[0].cl', value: () => assert.fail('redundant index payload') })
+    initialRoot.enqueueUpdate({ path: prefix + '.cn[0]', value: { nn: 'view' } })
+    initialRoot.performUpdate(true, data => {
+        assert.deepEqual({ ...data }, { [prefix + '.cn[0]']: { nn: 'view' } })
+    })
+}
+
+// Outlet topology stays in the logical tree, while its Page scheduler owns descendant updates.
+const appPayloads = []
+const pagePayloads = []
+const pageRoot = document.createElement('root')
+otherRoot.enqueueUpdate = payload => appPayloads.push(payload)
+pageRoot.enqueueUpdate = payload => pagePayloads.push(payload)
+otherOutlet.appendChild(pageRoot)
+const pageView = document.createElement('view')
+pageRoot.appendChild(pageView)
+pageView.setAttribute('title', 'page-only')
+assert.equal(pageRoot.parentNode, otherOutlet)
+assert.equal(pageView._root, pageRoot)
+assert.equal(appPayloads.length, 0)
+assert.ok(pagePayloads.some(payload => payload.path.startsWith('page.cn.')))
+const payload = { path: pageView._path + '.cl', value: () => 'latest' }
+pageView.enqueueUpdate(payload)
+assert.strictEqual(pagePayloads.at(-1), payload, 'forward the original lazy payload to the owning root')
+otherOutlet.removeChild(pageRoot)
+assert.equal(appPayloads.length, 0)
 `

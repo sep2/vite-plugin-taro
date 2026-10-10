@@ -200,7 +200,8 @@ function renderInitialData(config, query) {
 const prerenderToData = query => renderInitialData(config, query)
 const prerenderSuspended = query => renderInitialData(suspendedConfig, query)
 const prerenderBare = query => renderInitialData(bareConfig, query)
-import { createReactApp, createNativeComponentConfig, setReconciler, useLoad, useUnload, useRouter } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
+import { createVptApp as createReactApp } from ${JSON.stringify(resolveVptRuntime('mini/taro/create-vpt-app'))}
+import { createNativeComponentConfig, setReconciler, useLoad, useUnload, useRouter } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
 
 const h = React.createElement
 // VM-local component bodies are installed before invoking their actual route capsule's renderer.

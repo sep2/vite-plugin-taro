@@ -250,6 +250,7 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
     assert.equal(packageJson.types, undefined)
     assert.deepEqual(Object.keys(packageJson.exports), [
         './runtime/mini',
+        './runtime/tt-document',
         './runtime/h5',
         './api',
         './taro',
@@ -278,6 +279,16 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         './plugin-platform-h5/runtime/apis',
         './plugin-platform-h5/definition.json'
     ])
+    assert.deepEqual(packageJson.exports['./runtime/tt-document'], {
+        types: './types/tt-document.d.ts',
+        import: './dist/runtime/bom/document.js',
+        default: './dist/runtime/bom/document.js'
+    })
+    assert.match(await readFile(path.join(runtimePackageRoot, 'types/tt-document.d.ts'), 'utf8'), /createTTDomDocument/)
+    assert.equal(
+        resolveTaroRuntime('runtime/tt-document'),
+        path.join(runtimePackageDistRoot, 'runtime/bom/document.js')
+    )
     assert.equal(packageJson.dependencies['@tarojs/runtime'], undefined)
     assert.equal(packageJson.dependencies['dingtalk-jsapi'], undefined)
     assert.equal(packageJson.dependencies['@tarojs/shared'], '4.3.0')
@@ -405,7 +416,8 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         nodeRuntime,
         hydrateRuntime,
         reactRuntime,
-        recursiveTemplateHost
+        recursiveTemplateHost,
+        vptAppRuntime
     ] = await Promise.all([
         readFile(runtimePackageRequire.resolve('@tarojs/plugin-platform-h5/dist/definition.json')),
         readFile(path.join(runtimePackageDistRoot, 'plugin-platform-h5', 'definition.json')),
@@ -416,7 +428,8 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         readFile(path.join(runtimePackageDistRoot, 'runtime', 'dom', 'node.js'), 'utf8'),
         readFile(path.join(runtimePackageDistRoot, 'runtime', 'hydrate.js'), 'utf8'),
         readFile(path.join(runtimePackageDistRoot, 'react', 'react.esm.js'), 'utf8'),
-        readFile(path.join(distRoot, 'runtime', 'mini', 'taro', 'recursive-template-host.js'), 'utf8')
+        readFile(path.join(distRoot, 'runtime', 'mini', 'taro', 'recursive-template-host.js'), 'utf8'),
+        readFile(path.join(distRoot, 'runtime', 'mini', 'taro', 'create-vpt-app.js'), 'utf8')
     ])
 
     assert.deepEqual(copiedDefinition, definition)
@@ -426,8 +439,10 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         'runtime.js.map'
     ])
     assert.match(documentRuntime, /documentCreateElement\(ROOT_STR\)/)
-    assert.match(rootRuntime, /\? 'app' : 'page'/)
-    assert.match(nodeRuntime, /this\.nodeName === 'vpt_page_outlet'/)
+    assert.match(rootRuntime, /\$\{this\._path\}\.cn/)
+    assert.doesNotMatch(nodeRuntime, /vpt_page_outlet/)
+    assert.match(recursiveTemplateHost, /\? 'app' : 'page'/)
+    assert.match(recursiveTemplateHost, /TaroNode\.extend\('enqueueUpdate'/)
     assert.match(hydrateRuntime, /nodeName === 'vpt_page_outlet'/)
     assert.match(reactRuntime, /import host from .*vpt:renderer-host/)
     assert.doesNotMatch(
@@ -435,7 +450,9 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         /document\.create(?:Element|TextNode)|instanceof FormElement|reconcileVptPageOutletSpine/
     )
     assert.match(recursiveTemplateHost, /afterCommit: reconcilePageOutletSpine/)
-    assert.match(String(copiedFrameworkRuntime), /broadcastAppUpdate/)
+    assert.match(vptAppRuntime, /broadcastAppUpdate/)
+    assert.match(vptAppRuntime, /mount\.call\(app/)
+    assert.doesNotMatch(String(copiedFrameworkRuntime), /broadcastAppUpdate|hydrate\(container\)/)
     assert.match(String(copiedFrameworkRuntime), /hooks\.tap\('initNativeApi'/)
     assert.match(String(copiedFrameworkRuntime), /useLaunch = createTaroHook\('onLaunch'\)/)
 

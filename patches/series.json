@@ -27,8 +27,7 @@
         "output": "patches/generated/@tarojs__runtime@4.3.0.patch",
         "patches": [
             "patches/series/@tarojs__runtime@4.3.0/01-mini-app-page-rendering.patch",
-            "patches/series/@tarojs__runtime@4.3.0/02-page-prerender.patch",
-            "patches/series/@tarojs__runtime@4.3.0/03-tt-dom-document.patch"
+            "patches/series/@tarojs__runtime@4.3.0/02-page-prerender.patch"
         ]
     },
     {

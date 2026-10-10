@@ -1,10 +1,47 @@
 import { ensure } from '@tarojs/shared'
 import type { RendererHost } from 'vite-plugin-taro-runtime/react'
-import { document, FormElement, TaroElement, type TaroNode, type TaroText } from 'vite-plugin-taro-runtime/runtime/mini'
+import {
+    document,
+    extend,
+    FormElement,
+    TaroElement,
+    TaroNode,
+    TaroRootElement,
+    type TaroText
+} from 'vite-plugin-taro-runtime/runtime/mini'
 
 const pageOutlet = 'vpt_page_outlet'
 const pageOutletBranch = 'vo'
 const pageOutletSpineKey = Symbol('vptPageOutletSpine')
+
+/*
+ * Install template update policy once with the shared renderer host. Both the singleton App host and every Page host are
+ * real TaroRootElement schedulers. Their structural parent distinguishes ownership: the App root is directly below the
+ * document's <container>, while Page roots live below vpt_page_outlet. Every descendant derives its setData path from this
+ * one prefix, yielding direct app.* and page.* payloads throughout Taro's existing granular update pipeline. The scheduler
+ * uses that same prefix for initial child-reset deduplication, so initial and steady-state batches share one namespace.
+ * nodeName remains root in both cases, preserving Taro's host identity, event ownership and scheduler semantics.
+ */
+extend(TaroRootElement, '_path', {
+    get(this: TaroRootElement): string {
+        return this.parentNode?.nodeName === 'container' ? 'app' : 'page'
+    }
+})
+
+const enqueueUpdate = TaroNode.prototype.enqueueUpdate
+TaroNode.extend('enqueueUpdate', function (this: TaroNode, payload: Parameters<typeof enqueueUpdate>[0]) {
+    /*
+     * The outlet is the structural boundary between singleton App hosts and Page roots in Taro's in-memory tree. Its
+     * children must remain attached there for React ancestry, event ownership, unmounting and Taro parent links, while
+     * each Page root independently schedules its own page.* native updates. Allowing outlet child mutations to reach the
+     * App scheduler would fan Page topology out as app.* data and duplicate work across every mounted Page. Suppress only
+     * that native update propagation; the in-memory childNodes relationship remains authoritative for logical ownership.
+     * Other nodes delegate to Taro's original enqueueUpdate.
+     */
+    if (this.nodeName !== pageOutlet) {
+        enqueueUpdate.call(this, payload)
+    }
+})
 
 type AppContainer = TaroElement & {
     // Each App root retains only the outlet-to-root identities from its latest React commit.

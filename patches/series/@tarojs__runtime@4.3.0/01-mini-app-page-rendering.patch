@@ -1,5 +1,5 @@
 diff --git a/dist/bom/document.js b/dist/bom/document.js
-index a641a96b78c9978acaf1041160dd7fd74bcbfcdc..06d1e298dd87d24de39ac8a3c92f23e7d71cb5fd 100644
+index a641a96b78c9978acaf1041160dd7fd74bcbfcdc..2d179b16365ebeaff8f48921cb974a1ad5eb5ed6 100644
 --- a/dist/bom/document.js
 +++ b/dist/bom/document.js
 @@ -1,6 +1,7 @@
@@ -47,66 +47,24 @@ index a641a96b78c9978acaf1041160dd7fd74bcbfcdc..06d1e298dd87d24de39ac8a3c92f23e7
      const container = documentCreateElement(CONTAINER); // 多包一层主要为了兼容 vue
      doc.appendChild(html);
      html.appendChild(head);
-diff --git a/dist/dom/node.js b/dist/dom/node.js
-index 415aa2ede85ef7ed66b3d7d8ef1d193b3a995819..e75885f0f2476f42e3e1102df2b3e7942a0d246b 100644
---- a/dist/dom/node.js
-+++ b/dist/dom/node.js
-@@ -277,6 +277,15 @@ class TaroNode extends TaroEventTarget {
-         return this.childNodes.length > 0;
-     }
-     enqueueUpdate(payload) {
-+        /*
-+         * The outlet is the structural boundary between singleton App hosts and Page roots in Taro's in-memory tree. Its
-+         * children must remain attached there for React ancestry, event ownership, unmounting, and Taro parent links, while
-+         * each Page root independently schedules its own page.* native updates. Allowing outlet child mutations to bubble
-+         * into the App scheduler would fan Page topology out as app.* data and duplicate work across every mounted Page.
-+         * Suppress only this native update propagation; do not change the in-memory childNodes relationship.
-+         */
-+        if (this.nodeName === 'vpt_page_outlet')
-+            return;
-         var _a;
-         (_a = this._root) === null || _a === void 0 ? void 0 : _a.enqueueUpdate(payload);
-     }
 diff --git a/dist/dom/root.js b/dist/dom/root.js
-index 727cf71a053837a5f4614c9f8073b5a2108df131..4e5bb3f0b4ebb2fe46050b6d5a7e47d94ba7aa43 100644
+index 2680d190c19d33a92db1883d674ad6b26b2ffef4..54c120354667930200186ea2f8957747f510a97f 100644
 --- a/dist/dom/root.js
 +++ b/dist/dom/root.js
-@@ -1,5 +1,5 @@
- import { hooks, isFunction, isArray, isUndefined } from '@tarojs/shared';
--import { ROOT_STR, SET_DATA, PAGE_INIT, CUSTOM_WRAPPER } from '../constants/index.js';
-+import { ROOT_STR, SET_DATA, PAGE_INIT, CUSTOM_WRAPPER, CONTAINER } from '../constants/index.js';
- import { options } from '../options.js';
- import { perf } from '../perf.js';
- import { isComment, customWrapperCache } from '../utils/index.js';
-@@ -49,7 +49,14 @@ class TaroRootElement extends TaroElement {
-         this.tagName = ROOT_STR.toUpperCase();
-     }
-     get _path() {
--        return ROOT_STR;
-+        /*
-+         * Both the singleton App host and every Page host are now real TaroRootElement schedulers. Their structural parent
-+         * distinguishes ownership without a mode flag: the App root is the sole root directly below the document's
-+         * <container>, while Page roots live below vpt_page_outlet. Every descendant derives its setData path from this one
-+         * prefix, yielding direct app.* and page.* payloads without host overrides or per-update path translation. nodeName
-+         * remains root in both cases, preserving Taro's host, event, and scheduler semantics.
-+         */
-+        return this.parentNode && this.parentNode.nodeName === CONTAINER ? 'app' : 'page';
-     }
-     get _root() {
-         return this;
-@@ -71,8 +78,14 @@ class TaroRootElement extends TaroElement {
+@@ -75,8 +75,15 @@ class TaroRootElement extends TaroElement {
              const setDataMark = `${SET_DATA} 开始时间戳 ${Date.now()}`;
              perf.start(setDataMark);
              const data = Object.create(null);
 +            /*
-+             * During the first render Taro replaces the leading child array and removes redundant descendant writes from
-+             * that same batch. For Page roots, _path emits page.*, so upstream's literal root.cn reset paths no longer match those queued
-+             * payloads; the optimization would miss them and could also target a native key that does not exist. Align the
-+             * two initial literals with page.cn so initial and steady-state scheduling obey one namespace.
++             * During the first render Taro replaces the leading child and removes redundant descendant writes from that
++             * same batch. Reset paths must use the root's actual _path, just like ordinary descendant payloads: VPT's App
++             * and Page schedulers use app.* and page.*, while the default root uses root.*. Recognize both indexed-path
++             * spellings so descendant writes are discarded before their lazy values are evaluated. Initial and
++             * steady-state scheduling therefore share one namespace for every root.
 +             */
              const resetPaths = new Set(initRender
 -                ? ['root.cn.[0]', 'root.cn[0]']
-+                ? ['page.cn.[0]', 'page.cn[0]']
++                ? [`${this._path}.cn.[0]`, `${this._path}.cn[0]`]
                  : []);
              while (this.updatePayloads.length > 0) {
                  const { path, value } = this.updatePayloads.shift();
