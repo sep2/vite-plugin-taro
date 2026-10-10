@@ -6,13 +6,10 @@ export type PageData = {
     page: { cn: MiniElementData['cn'] }
 }
 
-export type VptPageOptions = { path: string; config: Record<string, unknown>; prerender: boolean }
+export type VptPageOptions = { path: string; config?: Record<string, unknown>; prerender: boolean }
 
 /** Prepares the original Taro config for native registration, capturing the seed when prerendering. */
-export function createVptPage(
-    component: Parameters<typeof createTaroPageConfig>[0],
-    vptPageOptions: { path: string; config: Record<string, unknown>; prerender: boolean }
-) {
+export function createVptPage(component: Parameters<typeof createTaroPageConfig>[0], vptPageOptions: VptPageOptions) {
     const { path: routePath, config: pageConfig, prerender } = vptPageOptions
     /*
      * Generated Page templates invoke Taro's unchanged recursive component, whose input is one compact node selected by i.nn.

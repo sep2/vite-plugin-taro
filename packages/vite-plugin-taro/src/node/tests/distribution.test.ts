@@ -148,10 +148,12 @@ test('publishes a compiler that depends on the unified Taro runtime package', as
     const h5ApiFacade = await readFile(path.join(distRoot, 'runtime/h5/taro-api.js'), 'utf8')
     const h5ApiExports = await readFile(path.join(distRoot, 'runtime/h5/taro-api-exports.js'), 'utf8')
     const compilerModules = await readdir(path.join(distRoot, 'node'), { recursive: true })
+    const runtimeModules = await readdir(path.join(distRoot, 'runtime'))
 
     assert.equal(packageJson.main, './src/index.ts')
     assert.equal(packageJson.publishConfig.main, './dist/index.js')
     assert.ok(!packageJson.files.includes('src'))
+    assert.ok(!runtimeModules.includes('test'), 'runtime test utilities stay outside the published package')
     assert.match(h5AppPath, /\/src\/runtime\/h5\/app\.ts$/)
     assert.equal(packageJson.dependencies['@tailwindcss/vite'], '4.3.3')
     for (const name of ['helper', 'taro', 'api', 'components', 'router']) {

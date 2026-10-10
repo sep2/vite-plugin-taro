@@ -6,5 +6,5 @@
         "declaration": false
     },
     "include": ["src/runtime/**/*.ts"],
-    "exclude": ["src/**/*.test.ts"]
+    "exclude": ["src/**/*.test.ts", "src/runtime/test/**"]
 }
