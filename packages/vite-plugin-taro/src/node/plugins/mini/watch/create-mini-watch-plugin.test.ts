@@ -7,6 +7,7 @@ import { build, createServer, resolveConfig } from 'vite'
 import type { VptJsonObject, VptOptions } from '../../../../options.ts'
 import { createTestProject } from '../../../tests/create-test-project.ts'
 import { projectTempDir } from '../../../tests/project-temp-dir.ts'
+import { publishSourceGeneration } from '../../../tests/publish-source-generation.ts'
 import vpt from '../../../vpt.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
 import { createWxMiniContract } from '../../wx/plugins.ts'
@@ -240,7 +241,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
         for (const generation of [0, 1]) {
             if (generation === 1) {
                 completed = Promise.withResolvers<void>()
-                await fs.writeFile(input, 'export default function App() { return "updated" }\n')
+                await publishSourceGeneration(input, 'export default function App() { return "updated" }\n')
             }
             await completed.promise
             for (const [fileName, expected] of Object.entries(expectedFiles)) {
@@ -440,7 +441,8 @@ test('watch cleans only at startup, preserves live output and signals only after
     await assert.rejects(fs.access(path.join(outDir, 'obsolete/nested/old.js')), { code: 'ENOENT' })
 
     completed = Promise.withResolvers<void>()
-    await fs.writeFile(lazyFile, 'export const value = "two";\n')
+    // Publish complete editor saves so the watcher cannot build an intermediate truncated source.
+    await publishSourceGeneration(lazyFile, 'export const value = "two";\n')
     await completed.promise
     assert.notEqual(await fs.readFile(markerFile, 'utf8'), initialMarker)
     assert.match(await fs.readFile(path.join(outDir, 'assets', initialChunk), 'utf8'), /two/)
@@ -448,31 +450,31 @@ test('watch cleans only at startup, preserves live output and signals only after
 
     completed = Promise.withResolvers<void>()
     await fs.writeFile(path.join(root, 'extra.js'), 'export const extra = true;\n')
-    await fs.writeFile(sourceFile, `${appSource}export const more = () => import("./extra.js");\n`)
+    await publishSourceGeneration(sourceFile, `${appSource}export const more = () => import("./extra.js");\n`)
     await completed.promise
     await fs.access(path.join(outDir, 'assets/extra.js'))
     completed = Promise.withResolvers<void>()
-    await fs.writeFile(sourceFile, appSource)
+    await publishSourceGeneration(sourceFile, appSource)
     await completed.promise
     await fs.access(path.join(outDir, 'assets/extra.js'))
     const lastGoodApp = await fs.readFile(appFile, 'utf8')
     const lastGoodMarker = await fs.readFile(markerFile, 'utf8')
 
     failed = Promise.withResolvers<void>()
-    await fs.writeFile(lazyFile, 'export const value = ;\n')
+    await publishSourceGeneration(lazyFile, 'export const value = ;\n')
     await failed.promise
     assert.equal(await fs.readFile(markerFile, 'utf8'), lastGoodMarker)
     assert.equal(await fs.readFile(appFile, 'utf8'), lastGoodApp)
 
     rejectWrite = true
     failed = Promise.withResolvers<void>()
-    await fs.writeFile(lazyFile, 'export const value = "write-failure";\n')
+    await publishSourceGeneration(lazyFile, 'export const value = "write-failure";\n')
     await failed.promise
     assert.equal(await fs.readFile(markerFile, 'utf8'), lastGoodMarker)
 
     rejectWrite = false
     completed = Promise.withResolvers<void>()
-    await fs.writeFile(lazyFile, 'export const value = "recovered";\n')
+    await publishSourceGeneration(lazyFile, 'export const value = "recovered";\n')
     await completed.promise
     const recoveredMarker = await fs.readFile(markerFile, 'utf8')
     await watcher.close()
