@@ -355,6 +355,12 @@ function checkEventPrioritiesAndControlledInputs() {
     })
     assert.deepEqual(priorities, [DiscreteEventPriority, ContinuousEventPriority, DiscreteEventPriority])
     assert.equal(rendererHostConfig.getCurrentUpdatePriority(), NoEventPriority)
+    hooks.call('dispatchTaroEvent', { type: 'tap' }, {
+        dispatchEvent() {
+            assert.equal(rendererHostConfig.getCurrentUpdatePriority(), DiscreteEventPriority)
+        }
+    })
+    assert.equal(rendererHostConfig.getCurrentUpdatePriority(), NoEventPriority)
     hooks.call('dispatchTaroEvent', { type: 'custom' }, {
         dispatchEvent() {
             assert.equal(rendererHostConfig.getCurrentUpdatePriority(), DefaultEventPriority)

@@ -35,7 +35,7 @@ index 7f5ed89b2448d03dc2658ca2be2c016f12387daa..af13e19f5c610d962cd4e16474a033c3
      internalInstanceKey: string;
  };
 diff --git a/dist/react.esm.js b/dist/react.esm.js
-index ad8a51f02788c6e0354579956625da33a00e14a2..209a3bbfff8f511026e3fc6293f825d68dda849c 100644
+index ad8a51f02788c6e0354579956625da33a00e14a2..28971b6d425f9c909e58d0940c26c97f37cf0601 100644
 --- a/dist/react.esm.js
 +++ b/dist/react.esm.js
 @@ -1,7 +1,15 @@
@@ -56,7 +56,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..209a3bbfff8f511026e3fc6293f825d6
  
  const supportedInputTypes = {
      color: true,
-@@ -20,12 +28,6 @@ const supportedInputTypes = {
+@@ -20,16 +28,11 @@ const supportedInputTypes = {
      url: true,
      week: true,
  };
@@ -69,7 +69,12 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..209a3bbfff8f511026e3fc6293f825d6
  function getEventPriority(domEventName) {
      switch (domEventName) {
          case 'cancel':
-@@ -362,7 +364,7 @@ function getUpdatePayload(dom, oldProps, newProps) {
+         case 'click':
++        case 'tap':
+         case 'close':
+         case 'contextmenu':
+         case 'copy':
+@@ -362,7 +365,7 @@ function getUpdatePayload(dom, oldProps, newProps) {
              (updatePayload = updatePayload || []).push(i, null);
          }
      }
@@ -78,7 +83,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..209a3bbfff8f511026e3fc6293f825d6
      for (i in newProps) {
          if (oldProps[i] !== newProps[i] || (isFormElement && i === 'value')) {
              // 如果都是 style，且 style 里面的值相等，则无需记录到 payload 中
-@@ -600,7 +602,51 @@ function styleObjectToCss(style) {
+@@ -600,7 +603,51 @@ function styleObjectToCss(style) {
  }
  
  /* eslint-disable @typescript-eslint/indent */
@@ -130,7 +135,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..209a3bbfff8f511026e3fc6293f825d6
      // below keys order by {React ReactFiberHostConfig.custom.js}, convenient for comparing each other.
      // -------------------
      // required by @types/react-reconciler
-@@ -617,9 +663,11 @@ const hostConfig = {
+@@ -617,9 +664,11 @@ const hostConfig = {
      prepareForCommit(..._) {
          return null;
      },
@@ -145,7 +150,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..209a3bbfff8f511026e3fc6293f825d6
          precacheFiberNode(internalInstanceHandle, element);
          updateFiberProps(element, props);
          return element;
-@@ -629,7 +677,7 @@ const hostConfig = {
+@@ -629,7 +678,7 @@ const hostConfig = {
      },
      finalizeInitialChildren(dom, type, props) {
          let newProps = props;
@@ -154,7 +159,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..209a3bbfff8f511026e3fc6293f825d6
              const [defaultName, defaultKey] = ['switch', 'checkbox', 'radio'].includes(type) ? ['checked', 'defaultChecked'] : ['value', 'defaultValue'];
              if (props.hasOwnProperty(defaultKey)) {
                  newProps = Object.assign(Object.assign({}, newProps), { [defaultName]: props[defaultKey] });
-@@ -642,14 +690,11 @@ const hostConfig = {
+@@ -642,14 +691,11 @@ const hostConfig = {
          }
          return false;
      },
@@ -171,7 +176,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..209a3bbfff8f511026e3fc6293f825d6
          precacheFiberNode(internalInstanceHandle, textNode);
          return textNode;
      },
-@@ -667,9 +712,6 @@ const hostConfig = {
+@@ -667,9 +713,6 @@ const hostConfig = {
      preparePortalMount: noop,
      prepareScopeUpdate: noop,
      getInstanceFromScope: () => null,
@@ -181,7 +186,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..209a3bbfff8f511026e3fc6293f825d6
      detachDeletedInstance: noop,
      // -------------------
      //      Microtasks
-@@ -699,7 +741,8 @@ const hostConfig = {
+@@ -699,7 +742,8 @@ const hostConfig = {
          textInst.nodeValue = newText;
      },
      commitMount: noop,
@@ -191,7 +196,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..209a3bbfff8f511026e3fc6293f825d6
          if (!updatePayload)
              return;
          // payload 只包含 children 的时候，不应该再继续触发后续的属性比较和更新的逻辑了
-@@ -745,10 +788,21 @@ const hostConfig = {
+@@ -745,10 +789,21 @@ const hostConfig = {
      }
  };
  const TaroReconciler = Reconciler(hostConfig);
@@ -214,7 +219,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..209a3bbfff8f511026e3fc6293f825d6
          rendererPackageName: 'taro-react'
      });
      if (!foundDevTools) {
-@@ -796,7 +850,7 @@ function needsStateRestore() {
+@@ -796,7 +851,7 @@ function needsStateRestore() {
  function finishEventHandler() {
      const controlledComponentsHavePendingUpdates = needsStateRestore();
      if (controlledComponentsHavePendingUpdates) {
@@ -223,7 +228,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..209a3bbfff8f511026e3fc6293f825d6
          restoreStateIfNeeded();
      }
  }
-@@ -832,80 +886,55 @@ function restoreStateOfTarget(item) {
+@@ -832,80 +887,55 @@ function restoreStateOfTarget(item) {
      }
  }
  
@@ -338,7 +343,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..209a3bbfff8f511026e3fc6293f825d6
              node.dispatchEvent(e);
          });
      });
-@@ -946,22 +975,10 @@ function unmountComponentAtNode(dom) {
+@@ -946,22 +976,10 @@ function unmountComponentAtNode(dom) {
      if (!root)
          return false;
      unstable_batchedUpdates(() => {
@@ -362,7 +367,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..209a3bbfff8f511026e3fc6293f825d6
  const portalType = isFunction(Symbol) && Symbol.for
      ? Symbol.for('react.portal')
      : 0xeaca;
-@@ -974,17 +991,16 @@ function createPortal(children, containerInfo, key) {
+@@ -974,17 +992,16 @@ function createPortal(children, containerInfo, key) {
          implementation: null
      };
  }

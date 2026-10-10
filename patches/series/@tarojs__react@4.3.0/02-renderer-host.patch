@@ -11,7 +11,7 @@ index 3e887af2ac0312610ce395a800234c7fcab4c682..af13e19f5c610d962cd4e16474a033c3
  declare const _default: {
      flushSync: {
 diff --git a/dist/react.esm.js b/dist/react.esm.js
-index 6825c6f3a3f38574b9536d9ea5229fd593a3fafc..209a3bbfff8f511026e3fc6293f825d68dda849c 100644
+index 12f48233e13c28f91b5e4b1503f241dcd7cabefb..28971b6d425f9c909e58d0940c26c97f37cf0601 100644
 --- a/dist/react.esm.js
 +++ b/dist/react.esm.js
 @@ -1,5 +1,6 @@
@@ -22,7 +22,7 @@ index 6825c6f3a3f38574b9536d9ea5229fd593a3fafc..209a3bbfff8f511026e3fc6293f825d6
  import { version } from 'react';
  import Reconciler from 'react-reconciler';
  import {
-@@ -363,7 +364,7 @@ function getUpdatePayload(dom, oldProps, newProps) {
+@@ -364,7 +365,7 @@ function getUpdatePayload(dom, oldProps, newProps) {
              (updatePayload = updatePayload || []).push(i, null);
          }
      }
@@ -31,7 +31,7 @@ index 6825c6f3a3f38574b9536d9ea5229fd593a3fafc..209a3bbfff8f511026e3fc6293f825d6
      for (i in newProps) {
          if (oldProps[i] !== newProps[i] || (isFormElement && i === 'value')) {
              // 如果都是 style，且 style 里面的值相等，则无需记录到 payload 中
-@@ -662,9 +663,11 @@ const hostConfig = {
+@@ -663,9 +664,11 @@ const hostConfig = {
      prepareForCommit(..._) {
          return null;
      },
@@ -46,7 +46,7 @@ index 6825c6f3a3f38574b9536d9ea5229fd593a3fafc..209a3bbfff8f511026e3fc6293f825d6
          precacheFiberNode(internalInstanceHandle, element);
          updateFiberProps(element, props);
          return element;
-@@ -674,7 +677,7 @@ const hostConfig = {
+@@ -675,7 +678,7 @@ const hostConfig = {
      },
      finalizeInitialChildren(dom, type, props) {
          let newProps = props;
@@ -55,7 +55,7 @@ index 6825c6f3a3f38574b9536d9ea5229fd593a3fafc..209a3bbfff8f511026e3fc6293f825d6
              const [defaultName, defaultKey] = ['switch', 'checkbox', 'radio'].includes(type) ? ['checked', 'defaultChecked'] : ['value', 'defaultValue'];
              if (props.hasOwnProperty(defaultKey)) {
                  newProps = Object.assign(Object.assign({}, newProps), { [defaultName]: props[defaultKey] });
-@@ -690,8 +693,8 @@ const hostConfig = {
+@@ -691,8 +694,8 @@ const hostConfig = {
      shouldSetTextContent() {
          return false;
      },
