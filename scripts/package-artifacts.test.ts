@@ -159,6 +159,7 @@ test('public packages preserve their published entrypoints and scaffold dependen
         )
         assert.doesNotMatch(config, /window:\s*\{[^}]*glassEaselWebview:/)
         assert.doesNotMatch(config, /sdkVersionBegin|sdkVersionEnd/)
+        assert.doesNotMatch(config, /\bsitemapJson\s*:/)
         const project = JSON.parse(readFileSync(path.join(projectPath, 'package.json'), 'utf8'))
         assert.equal(project.name, 'complete-app')
         assert.equal(project.devDependencies['vite-plugin-taro'], `^${creatorPackage.version}`)

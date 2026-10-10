@@ -26,7 +26,6 @@ export default defineConfig(({ mode }) => {
                 appJson: createAppJson(target),
                 projectConfigJson: createProjectConfigJson({ target, appId }),
                 projectPrivateConfigJson: createProjectPrivateConfigJson(target),
-                sitemapJson: { rules: [{ action: 'allow', page: '*' }] },
                 hmr: {
                     mode: target === 'wx' ? 'devtools' : 'interpreter'
                 }
