@@ -9,7 +9,7 @@ export type PageData = {
 export type VptPageOptions = { path: string; config: Record<string, unknown>; prerender: boolean }
 
 /** Prepares the original Taro config for native registration, capturing the seed when prerendering. */
-export function createVptPageConfig(
+export function createVptPage(
     component: Parameters<typeof createTaroPageConfig>[0],
     vptPageOptions: { path: string; config: Record<string, unknown>; prerender: boolean }
 ) {
@@ -27,9 +27,9 @@ export function createVptPageConfig(
      */
     const initialData: PageData = { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } }
 
-    const config = Object.assign(createTaroPageConfig(component, routePath, initialData, pageConfig), {
-        __vpt_meta: {}
-    })
+    const taroPageConfig = createTaroPageConfig(component, routePath, initialData, pageConfig)
+
+    const config = Object.assign(taroPageConfig, { __vpt_meta: {} })
 
     // Keep the one-shot prerender identity out of native registration.
     Object.defineProperty(config, '__vpt_meta', { enumerable: false })

@@ -4,7 +4,7 @@ import { normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { packageRequire, resolveTaroRuntime, resolveVptRuntime } from '../../../utils/packages.ts'
 
-/** Initializes SystemJS, transport, polyfills and native query capture before application capsules. */
+/** Initializes SystemJS, transport and polyfills before application capsules. */
 export const miniBootstrapId = resolveVptRuntime('mini/amphibious/bootstrap')
 
 /** Registers the native App using its generated configuration capsule. */

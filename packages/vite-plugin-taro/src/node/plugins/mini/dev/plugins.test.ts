@@ -116,7 +116,7 @@ test('reports a Page capsule whose component cannot be resolved', async () => {
                     return null
                 }
             },
-            ['createVptPageConfig(PageComponent)', capsuleId]
+            ['createVptPage(PageComponent)', capsuleId]
         ),
         /Failed to resolve Page component imported by/
     )

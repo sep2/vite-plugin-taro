@@ -11,16 +11,16 @@ import {
     incrementId,
     type MiniElementData
 } from 'vite-plugin-taro-runtime/runtime/mini'
-import { getPageQuery } from '../amphibious/bootstrap.ts'
-import type { createVptPageConfig, PageData } from './create-vpt-page-config.ts'
+import type { createVptPage, PageData } from './create-vpt-page.ts'
+import { getPageQuery } from './get-page-query.ts'
 
 // One counter distinguishes native instances even when their route, query and creation timestamp match.
 const pageId = incrementId()
 
 /** Commits one Page into the existing App root and returns its initial native data without dispatching lifecycles. */
 export function prerenderToData(
-    config: ReturnType<typeof createVptPageConfig>,
-    component: Parameters<typeof createVptPageConfig>[0],
+    config: ReturnType<typeof createVptPage>,
+    component: Parameters<typeof createVptPage>[0],
     route: string,
     initialData: PageData
 ): PageData {

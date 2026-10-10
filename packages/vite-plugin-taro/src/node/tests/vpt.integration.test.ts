@@ -6,6 +6,7 @@ import { createContext, runInContext } from 'node:vm'
 import type { OutputAsset, OutputChunk } from 'rolldown'
 import { type BuildOptions, normalizePath, build as viteBuild } from 'vite'
 import vpt, { type VptOptions, type VptTarget } from '../../index.ts'
+import { classifyMiniModule } from '../plugins/mini/module/module.ts'
 import { resolveVptRuntime } from '../utils/packages.ts'
 import { createTestProject } from './create-test-project.ts'
 
@@ -175,11 +176,13 @@ function assertPageRegistration(output: BuildOutput, target: VptTarget, route: s
             assert.fail('Page shells must use native Page, not Component')
         }
     }
-    assert.equal(
-        collectModuleIds(output).some((id) => /\/amphibious\/get-page-query\.(?:js|ts)$/.test(id)),
-        true,
-        'Shared prerendering captures native queries only when the host provides the API'
+    const queryId = normalizePath(resolveVptRuntime('mini/taro/get-page-query'))
+    const queryChunk = output.find(
+        (file): file is OutputChunk =>
+            file.type === 'chunk' && Object.keys(file.modules).map(normalizePath).includes(queryId)
     )
+    assert.ok(queryChunk, 'Native query capture is shared with Taro prerendering')
+    assert.match(classifyMiniModule(queryChunk), /^(entry|normal)-capsule$/)
 
     const context = createContext(host)
     // Bootstrap and its native dependencies share one host global and one CommonJS module cache.
@@ -205,8 +208,12 @@ function assertPageRegistration(output: BuildOutput, target: VptTarget, route: s
     }
     const runtime = load('common/bootstrap.js')
     assert.ok(runtime && typeof runtime === 'object')
-    assert.equal(typeof Reflect.get(runtime, 'getPageQuery'), 'function')
-    assert.equal(Object.hasOwn(runtime, 'prerenderToData'), false, 'prerendering belongs to the capsule')
+    assert.equal(Object.hasOwn(runtime, 'getPageQuery'), false)
+    assert.equal(
+        Object.hasOwn(runtime, 'prerenderToData'),
+        false,
+        'Taro prerendering executes in the application graph'
+    )
     assert.equal(Object.hasOwn(runtime, 'Page'), false, 'native Page needs no exported adapter')
     // Source selection, bundling, bootstrap and registration execute for real.
     const system = Reflect.get(runtime, 'System')
@@ -368,7 +375,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
     }
 }
 
-test('minified WX bootstrap initializes the loader and query capture before the Page capsule', async () => {
+test('minified WX bootstrap initializes the loader before the Page capsule', async () => {
     await inspectFixtureBuild(
         {
             options: createOptions('wx'),

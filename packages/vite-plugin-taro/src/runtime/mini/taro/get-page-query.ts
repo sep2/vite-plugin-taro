@@ -7,7 +7,7 @@ declare const wx: {
     offBeforePageLoad(listener: BeforePageLoadListener): void
 }
 
-// WX Page shells share one listener and the latest query supplied by native routing.
+// Taro prerendering shares one WX listener and the latest query supplied by native routing.
 let pageQuery: Record<string, unknown>
 
 if (typeof wx !== 'undefined' && typeof wx.onBeforePageLoad === 'function') {

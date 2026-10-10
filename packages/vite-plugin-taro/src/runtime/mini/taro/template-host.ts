@@ -59,7 +59,7 @@ type AppContainer = TaroElement & {
  * unnamed slot consumers, while forwarding through none loses the Page.
  *
  * `vo` is the compact, branch-local answer to "does this App subtree contain the VPT Page outlet?". WXML reads only `i.vo`,
- * so its decision is O(1) and it never scans descendants or receives Page data. The recursive host owns `vo` rather than Taro's
+ * so its decision is O(1) and it never scans descendants or receives Page data. The template host owns `vo` rather than Taro's
  * hydrate or root scheduler because React's commit boundary is the first point where every host mutation has completed and
  * the final parent chain is authoritative. TaroElement already supports arbitrary properties: setAttribute updates
  * node.props and queues the normal granular `app.*.vo` path. Structural Taro payloads are lazy functions flushed by setTimeout,
@@ -153,7 +153,7 @@ function reconcilePageOutletSpine(container: AppContainer): void {
 }
 
 /** Taro node creation and recursive Page projection used by the shared React renderer. */
-const recursiveTemplateHost: RendererHost<TaroElement, object, TaroElement, TaroText> = {
+const templateHost: RendererHost<TaroElement, object, TaroElement, TaroText> = {
     createElement(_container, _context, type) {
         return document.createElement(type)
     },
@@ -170,4 +170,4 @@ const recursiveTemplateHost: RendererHost<TaroElement, object, TaroElement, Taro
     afterCommit: reconcilePageOutletSpine
 }
 
-export default recursiveTemplateHost
+export default templateHost

@@ -97,7 +97,7 @@ test('resolves fixed and route-specific private IDs', () => {
     })
     assert.equal(
         resolver.resolveId(rendererHostId, undefined, projectRoot),
-        resolveVptRuntime('mini/taro/recursive-template-host')
+        resolveVptRuntime('mini/taro/template-host')
     )
     assert.equal(resolver.resolveId(vitePreloadId, undefined, projectRoot), modules.bootstrap)
     assert.equal(resolver.resolveId(taroTargetRuntimeId, undefined, projectRoot), contract.taro.targetRuntimePath)

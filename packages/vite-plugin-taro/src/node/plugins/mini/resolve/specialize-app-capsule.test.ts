@@ -3,7 +3,7 @@ import test from 'node:test'
 import { specializeAppCapsule } from './specialize-app-capsule.ts'
 
 const id = '/plugin/runtime/mini/capsule/app.js'
-const source = 'export default createReactApp(AppComponent, React, ReactDOM, __VPT_APP_CONFIG__)'
+const source = 'export default createVptApp(AppComponent, __VPT_APP_CONFIG__)'
 
 test('specializes the App capsule with its native configuration', () => {
     const result = specializeAppCapsule({

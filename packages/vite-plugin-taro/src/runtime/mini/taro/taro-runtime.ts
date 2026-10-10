@@ -1,7 +1,7 @@
 /** biome-ignore-all assist/source/organizeImports: keep side effect order */
 
 /** Taro runtime exports shared by the App, Page, and generated recursive component capsules. */
-// @ts-expect-error: The active Mini contract resolves its Taro target initialization module.
+// @ts-expect-error: The active Mini contract resolves its Taro initialization module
 import '\0vpt:taro-target-runtime'
 
 // Native templates cannot render HTML names directly. These upstream hooks translate div -> view, img -> image,
@@ -9,11 +9,10 @@ import '\0vpt:taro-target-runtime'
 // Keep registration in the shared runtime dependency, rather than App/Page bodies that execute again during HMR.
 import 'vite-plugin-taro-runtime/plugin-html/runtime'
 
-export { createVptApp as createReactApp } from '../taro/create-vpt-app.ts'
-export { default as ReactDOM } from 'vite-plugin-taro-runtime/react'
+export { createVptApp } from './create-vpt-app.ts'
 export { createRecursiveComponentConfig } from 'vite-plugin-taro-runtime/runtime/mini'
 import { customWrapperCache } from 'vite-plugin-taro-runtime/runtime/mini'
-export { createVptPageConfig } from './create-vpt-page-config.ts'
+export { createVptPage } from './create-vpt-page.ts'
 
 // Replaced by the compiler; Mini runtimes do not provide Node's process global or its ambient types.
 declare const process: { readonly env: { readonly NODE_ENV: string } }

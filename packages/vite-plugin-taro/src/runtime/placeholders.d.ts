@@ -1,5 +1,5 @@
 import type { Route, SpaRouterConfig } from 'vite-plugin-taro-runtime/router/types/router'
-import type { VptPageOptions } from './mini/capsule/create-vpt-page-config.ts'
+import type { VptPageOptions } from './mini/taro/create-vpt-page.ts'
 
 declare global {
     const __VPT_H5_APP_CONFIG__: SpaRouterConfig

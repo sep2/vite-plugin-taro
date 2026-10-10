@@ -61,10 +61,10 @@ test('classifies import-only entry facades after their implementation moves into
     }
 })
 
-test('native query capture bundled into bootstrap preserves its amphibious identity', () => {
-    const queryId = resolveVptRuntime('mini/amphibious/get-page-query')
-    assert.equal(classifyModule(chunk(queryId, miniBootstrapId)), 'amphibious')
-    assert.equal(classifyModule(chunk(miniBootstrapId, queryId)), 'amphibious')
+test('Taro query capture follows ordinary application capsule classification', () => {
+    const queryId = resolveVptRuntime('mini/taro/get-page-query')
+    assert.equal(classifyModule(chunk(queryId)), 'normal-capsule')
+    assert.equal(classifyModule({ ...chunk(), facadeModuleId: queryId }), 'normal-capsule')
 })
 
 test('classifies application-only and empty chunks as normal capsules', () => {

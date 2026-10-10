@@ -1,5 +1,10 @@
+import React from 'react'
 import { createReactApp } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
+import ReactDOM from 'vite-plugin-taro-runtime/react'
 import { document, hydrate, type MiniElementData, type ReactPageComponent } from 'vite-plugin-taro-runtime/runtime/mini'
+
+// Import here to make sure this is called before any pages
+import './get-page-query.ts'
 
 /**
  * Mini App/Page presentation
@@ -13,14 +18,17 @@ import { document, hydrate, type MiniElementData, type ReactPageComponent } from
  * Taro owns Mini Program lifecycle mounting and retains the singleton React App across Page mounts. This adapter connects
  * that existing tree to native presentation. H5 uses its browser App entry and upstream external mounting.
  */
-export function createVptApp(...args: Parameters<typeof createReactApp>) {
-    const app = createReactApp(...args)
+export function createVptApp(
+    App: Parameters<typeof createReactApp>[0],
+    appConfig: Parameters<typeof createReactApp>[3]
+) {
+    const app = createReactApp(App, React, ReactDOM, appConfig)
     /*
      * Taro creates the Mini App container synchronously, while React mounting follows its ordinary concurrent timing.
      * Resolve the same configured appId that Taro passed to ReactDOM and retain that exact host. The delegated mount
      * callback closes over this immutable identity, so every initial Page snapshot comes from the same singleton App tree.
      */
-    const container = document.getElementById(args[3]?.appId || 'app')!
+    const container = document.getElementById(appConfig.appId || 'app')!
 
     /*
      * The logical document gives this App container the TaroRootElement class, so it serves simultaneously as React's
@@ -29,6 +37,7 @@ export function createVptApp(...args: Parameters<typeof createReactApp>) {
      * fans that batch across Page surfaces. Each Page root receives its full native ctx separately during onLoad.
      */
     Object.defineProperty(container, 'ctx', { value: { setData: broadcastAppUpdate } })
+
     const mount = app.mount
     app.mount = (component: ReactPageComponent, id: string, complete: () => void) => {
         mount.call(app, component, id, () => {
@@ -50,6 +59,7 @@ export function createVptApp(...args: Parameters<typeof createReactApp>) {
             complete()
         })
     }
+
     return app
 }
 
@@ -65,10 +75,12 @@ export function createVptApp(...args: Parameters<typeof createReactApp>) {
 function broadcastAppUpdate(data: Record<string, unknown>, complete: () => void): void {
     const pages = getCurrentPages()
     const currentPage = pages[pages.length - 1]
+
     if (!currentPage) {
         complete()
         return
     }
+
     for (const page of pages) {
         if (page === currentPage) {
             page.setData(data, complete)

@@ -22,7 +22,7 @@ export function createNativeDevRuntime(outDir: string, info: HmrInfo) {
         close() {}
     }
     const context = createContext(
-        { console, queueMicrotask, wx: { connectSocket: () => socket, onBeforePageLoad() {} } },
+        { console, queueMicrotask, wx: { connectSocket: () => socket } },
         { codeGeneration: { strings: false, wasm: false } }
     )
     // Native require caches physical modules; SystemJS independently owns their registration namespaces.
@@ -59,7 +59,7 @@ export function createNativeDevRuntime(outDir: string, info: HmrInfo) {
         return module.exports
     }
 
-    load('common/rolldown-runtime.js')
+    // Bootstrap loads the generated native dependency graph, including the HMR runtime.
     load('common/bootstrap.js')
     run(`globalThis.__rolldown_runtime__.initialize(${JSON.stringify(info)})`)
 

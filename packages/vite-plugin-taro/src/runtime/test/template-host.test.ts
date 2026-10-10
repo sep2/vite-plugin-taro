@@ -9,7 +9,7 @@ import { resolveTaroRuntime, resolveVptRuntime } from '../../node/utils/packages
 
 const require = createRequire(import.meta.url)
 
-test('recursive host preserves outlet branch markers through moves, replacements and independent App roots', async (t) => {
+test('template host preserves outlet branch markers through moves, replacements and independent App roots', async (t) => {
     // Own Taro's existing native-update timers for the duration of this synchronous host test.
     const timers = new Set<ReturnType<typeof setTimeout>>()
     t.after(() => {
@@ -25,15 +25,15 @@ test('recursive host preserves outlet branch markers through moves, replacements
         'build'
     )
     // A virtual source URL lets V8 attribute the bundled host to its original TypeScript without writing a fixture.
-    const outputFile = fileURLToPath(new URL('./recursive-template-host-fixture.js', import.meta.url))
+    const outputFile = fileURLToPath(new URL('./template-host-fixture.js', import.meta.url))
     const runtimeRoot = normalizePath(fileURLToPath(new URL('../', import.meta.url)))
     const result = await build({
-        input: 'test:recursive-template-host',
+        input: 'test:template-host',
         plugins: [
             {
-                name: 'test:recursive-template-host',
+                name: 'test:template-host',
                 resolveId(id) {
-                    if (id === 'test:recursive-template-host') {
+                    if (id === 'test:template-host') {
                         return id
                     }
                     if (id === '@tarojs/runtime') {
@@ -41,8 +41,8 @@ test('recursive host preserves outlet branch markers through moves, replacements
                     }
                 },
                 load(id) {
-                    if (id === 'test:recursive-template-host') {
-                        return `import host from ${JSON.stringify(resolveVptRuntime('mini/taro/recursive-template-host'))}\n${fixture}`
+                    if (id === 'test:template-host') {
+                        return `import host from ${JSON.stringify(resolveVptRuntime('mini/taro/template-host'))}\n${fixture}`
                     }
                 },
                 transform(code, id) {

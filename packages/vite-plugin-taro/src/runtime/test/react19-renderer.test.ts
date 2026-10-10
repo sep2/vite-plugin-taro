@@ -83,7 +83,7 @@ async function runFixture(t: TestContext, target: 'wx' | 'zfb' | 'tt', mode: str
                         return id
                     }
                     if (id === rendererHostId) {
-                        return resolveVptRuntime('mini/taro/recursive-template-host')
+                        return resolveVptRuntime('mini/taro/template-host')
                     }
                     if (id === '\0vpt:global-binding') {
                         return 'test:global'
@@ -99,14 +99,14 @@ async function runFixture(t: TestContext, target: 'wx' | 'zfb' | 'tt', mode: str
                         if (id === './app.ts') {
                             return 'test:empty'
                         }
-                        if (id === './taro-runtime.ts') {
-                            return path.join(path.dirname(entry), '../mini/capsule/create-vpt-page-config.ts')
+                        if (id === '../taro/taro-runtime.ts') {
+                            return path.join(path.dirname(entry), '../mini/taro/create-vpt-page.ts')
                         }
                         if (id === './prerender-to-data.ts') {
-                            return path.join(path.dirname(entry), '../mini/capsule/prerender-to-data.ts')
+                            return path.join(path.dirname(entry), '../mini/taro/prerender-to-data.ts')
                         }
                     }
-                    if (id === '../amphibious/bootstrap.ts') {
+                    if (id === './get-page-query.ts') {
                         return 'test:page-query'
                     }
                 },
@@ -200,8 +200,8 @@ function renderInitialData(config, query) {
 const prerenderToData = query => renderInitialData(config, query)
 const prerenderSuspended = query => renderInitialData(suspendedConfig, query)
 const prerenderBare = query => renderInitialData(bareConfig, query)
-import { createVptApp as createReactApp } from ${JSON.stringify(resolveVptRuntime('mini/taro/create-vpt-app'))}
-import { createNativeComponentConfig, setReconciler, useLoad, useUnload, useRouter } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
+import { createVptApp } from ${JSON.stringify(resolveVptRuntime('mini/taro/create-vpt-app'))}
+import { createReactApp, createNativeComponentConfig, setReconciler, useLoad, useUnload, useRouter } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
 
 const h = React.createElement
 // VM-local component bodies are installed before invoking their actual route capsule's renderer.
@@ -473,7 +473,7 @@ async function checkNativeInitialData() {
             await new Promise(resolve => setTimeout(resolve, 5))
         }
     }
-    createReactApp(App, React, ReactDOM, {
+    createVptApp(App, {
         appId: 'first-frame-app', componentFramework: 'glass-easel'
     })
     pageComponents['pages/first-frame'] = Page

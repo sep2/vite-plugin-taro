@@ -14,7 +14,7 @@ import { createTestProject } from '../../../tests/create-test-project.ts'
 import { publishSourceGeneration } from '../../../tests/publish-source-generation.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import vpt from '../../../vpt.ts'
-import { miniPolyfillsId, rolldownRuntimeId, vptGlobalBindingId } from '../module/module.ts'
+import { classifyMiniModule, miniPolyfillsId, rolldownRuntimeId, vptGlobalBindingId } from '../module/module.ts'
 
 type MiniTarget = 'wx' | 'zfb' | 'tt'
 type Mode = 'production' | 'devtools' | 'interpreter' | 'rebuild'
@@ -122,8 +122,7 @@ async function compileFixture(
                 }
                 const runtimeChunk = chunks.find((chunk) => chunk.moduleIds.includes(rolldownRuntimeId))
                 assert.ok(runtimeChunk)
-                assert.equal(runtimeChunk.fileName, 'common/rolldown-runtime.js')
-                assert.deepEqual(runtimeChunk.moduleIds, [rolldownRuntimeId])
+                assert.equal(classifyMiniModule(runtimeChunk), 'amphibious')
                 assert.ok(
                     !polyfillChunk.imports.includes('common/vendor.js'),
                     'pre-bootstrap polyfills must not depend on the framework capsule'
@@ -278,7 +277,14 @@ function createAppRuntime(chunks: readonly NativeFile[], nativeURLs: boolean, ta
         },
         close() {}
     }
-    const host = { connectSocket: () => socket, onBeforePageLoad() {} }
+    // The emitted Taro runtime must install one query listener before native App/Page registration.
+    const queryListeners: ((event: { query: Record<string, unknown> }) => void)[] = []
+    const host = {
+        connectSocket: () => socket,
+        onBeforePageLoad(listener: (event: { query: Record<string, unknown> }) => void) {
+            queryListeners.push(listener)
+        }
+    }
     const context = createContext(
         {
             // Taro's development renderer advertises DevTools on every isolated startup; only diagnostics matter here.
@@ -289,9 +295,11 @@ function createAppRuntime(chunks: readonly NativeFile[], nativeURLs: boolean, ta
             my: host,
             tt: host,
             App() {
+                assert.equal(queryListeners.length, 1, 'Taro query capture precedes native App registration')
                 registrations.push('App')
             },
             Page() {
+                assert.equal(queryListeners.length, 1, 'Page activation shares the App query listener')
                 registrations.push('Page')
             },
             Component(config: object) {
@@ -357,7 +365,8 @@ function createAppRuntime(chunks: readonly NativeFile[], nativeURLs: boolean, ta
             onMessage(target === 'zfb' ? { message: data } : { data })
         },
         reports,
-        registrations
+        registrations,
+        queryListeners
     }
 }
 
@@ -377,6 +386,7 @@ function assertPolyfilledBootstrap(
     assert.equal(runtime.read('typeof globalThis.polyfillProbe'), 'undefined')
     const installedURL = runtime.read('URL')
     runtime.evaluate('common/bootstrap.js')
+    assert.equal(runtime.queryListeners.length, 0, 'query capture is initialized by the Taro application runtime')
     assert.equal(runtime.read('URL'), installedURL)
 }
 
@@ -405,6 +415,7 @@ function assertPolyfilledApp(
     runtime.evaluate('comp.js')
     runtime.evaluate('custom-wrapper.js')
     assert.deepEqual(runtime.registrations, ['App', 'Page', 'Component', 'Component'])
+    assert.equal(runtime.queryListeners.length, 1, 'all capsules share one native query listener')
     assert.equal(runtime.read('URL'), installedURL)
     assert.equal(runtime.read('this["__core-js_shared__"].versions.length'), 1)
 }

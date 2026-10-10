@@ -46,7 +46,7 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'taro'>)
         // Preload needs only the initialized loader.
         [vitePreloadId, () => miniBootstrapId],
         [taroTargetRuntimeId, () => contract.taro.targetRuntimePath],
-        [rendererHostId, () => resolveVptRuntime('mini/taro/recursive-template-host')],
+        [rendererHostId, () => resolveVptRuntime('mini/taro/template-host')],
         // Keep the configured App component behind one stable private import in the App capsule.
         [
             appComponentId,
