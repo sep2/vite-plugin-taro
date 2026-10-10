@@ -215,7 +215,7 @@ projectPrivateConfigJson: {
 
 ## `sitemapJson`
 
-可选。仅微信提供时写入 `sitemap.json`；其它目标忽略它：
+可选。微信构建仅在提供该选项时生成 `sitemap.json`；支付宝、抖音和 H5 忽略它：
 
 ```ts
 sitemapJson: {
@@ -274,7 +274,7 @@ hmr: {
 | `pages[].config` | `${path}.json` | `${path}.json` | `${path}.json` |
 | `projectConfigJson` | `project.config.json` | `mini.project.json` | `project.config.json` |
 | `projectPrivateConfigJson` | `project.private.config.json` | `.mini-ide/project-ide.json` | `project.private.config.json` |
-| `sitemapJson` | `sitemap.json` | — | — |
+| `sitemapJson`（可选） | 提供时生成 `sitemap.json` | — | — |
 
 ## Vite 配置
 
@@ -338,8 +338,7 @@ config/
 ├── app.json
 ├── pages/home.json
 ├── project.config.json
-├── project.private.config.json
-└── sitemap.json
+└── project.private.config.json
 ```
 
 ```ts
@@ -363,8 +362,7 @@ export default defineConfig({
             ],
             appJson: readJson('./config/app.json'),
             projectConfigJson: readJson('./config/project.config.json'),
-            projectPrivateConfigJson: readJson('./config/project.private.config.json'),
-            sitemapJson: readJson('./config/sitemap.json')
+            projectPrivateConfigJson: readJson('./config/project.private.config.json')
         })
     ]
 })

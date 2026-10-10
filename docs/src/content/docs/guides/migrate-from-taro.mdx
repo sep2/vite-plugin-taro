@@ -32,7 +32,8 @@ import { Tabs, TabItem } from '@astrojs/starlight/components'
 | `config/index.ts`、`config/dev.ts`、`config/prod.ts` | `vite.config.ts` 与 Vite 配置 |
 | `src/app.config.ts` 或 `.js` | `vpt({ appJson, pages })` |
 | 页面旁的 `*.config.ts` 或 `.js` | 对应 `pages[].config` |
-| `project.config.json`、`project.private.config.json`、`sitemap.json` | 对应的插件选项 |
+| `project.config.json` | `projectConfigJson` |
+| `project.private.config.json` | 可选的 `projectPrivateConfigJson` |
 | `src/index.html` | 项目根目录的 `index.html` |
 | `@tarojs/taro` | `virtual:taro/api` |
 | `@tarojs/components` | `virtual:taro/components` |
@@ -250,9 +251,6 @@ vpt全自动分包处理的是通过动态 `import()` 加载的 **JavaScript 模
 - 不要复制旧的 `miniprogramRoot`；微信开发者工具直接打开 `dist/wx`。
 - 保留模板的 `compileHotReLoad: true` 才能使用开发者工具热更新。
 - `project.private.config.json` 的内容放入 `projectPrivateConfigJson`。
-- `sitemap.json` 的内容放入 `sitemapJson`。
-
-`projectConfigJson` 和 `sitemapJson` 在类型上始终需要提供，但只会在小程序构建中写出。
 
 ## 6. 迁移构建配置
 
