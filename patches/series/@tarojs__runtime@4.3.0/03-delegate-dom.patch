@@ -1,0 +1,348 @@
+diff --git a/dist/dom/element.d.ts b/dist/dom/element.d.ts
+index 354bfc00bc34df0c4248acb6aafe2b4b679130be..ac62d98f88c1343d612a830f852c5e8ff0abee35 100644
+--- a/dist/dom/element.d.ts
++++ b/dist/dom/element.d.ts
+@@ -30,7 +30,11 @@ declare class TaroElement extends TaroNode {
+     set focus(value: () => void);
+     blur(): void;
+     setAttribute(qualifiedName: string, value: any): void;
++    /** Delegates after logical storage and ID/dataset updates; the flag records the prior template view classification. */
++    delegateAttributeUpdate(qualifiedName: string, value: unknown, isPureView: boolean): void;
+     removeAttribute(qualifiedName: string): void;
++    /** Delegates after successful logical removal; the flag records the prior template view classification. */
++    delegateAttributeRemoval(qualifiedName: string, isStaticView: boolean): void;
+     getAttribute(qualifiedName: string): string;
+     getElementsByTagName(tagName: string): TaroElement[];
+     getElementsByClassName(className: string): TaroElement[];
+diff --git a/dist/dom/element.js b/dist/dom/element.js
+index 160f3682d64625bb33221a76453677fa0d1fe8fa..30f29fe0f28a6d29cb060be433cfc472ce79eb59 100644
+--- a/dist/dom/element.js
++++ b/dist/dom/element.js
+@@ -124,6 +124,10 @@ class TaroElement extends TaroNode {
+                 }
+                 break;
+         }
++        this.delegateAttributeUpdate(qualifiedName, value, isPureView);
++    }
++    /** Delegates the stored attribute value; isPureView preserves the pre-mutation template classification. */
++    delegateAttributeUpdate(qualifiedName, value, isPureView) {
+         // Serialization
+         if (!this._root)
+             return;
+@@ -185,6 +189,10 @@ class TaroElement extends TaroNode {
+             }
+             delete this.props[qualifiedName];
+         }
++        this.delegateAttributeRemoval(qualifiedName, isStaticView);
++    }
++    /** Delegates a completed removal; interrupted and absent attributes retain their original early returns. */
++    delegateAttributeRemoval(qualifiedName, isStaticView) {
+         // Serialization
+         if (!this._root)
+             return;
+diff --git a/dist/dom/node.d.ts b/dist/dom/node.d.ts
+index a456e9adeecdaae566fe965b7054e55cf009530e..f4e5a5d01b19afccc705f312a8f6efcc91879e31 100644
+--- a/dist/dom/node.d.ts
++++ b/dist/dom/node.d.ts
+@@ -20,7 +20,8 @@ declare class TaroNode extends TaroEventTarget {
+     childNodes: TaroNode[];
+     constructor();
+     private hydrate;
+-    private updateChildNodes;
++    /** Delegates a complete child-list update, including the final reset after element textContent changes. */
++    delegateChildReset(isClean?: boolean): void;
+     private updateSingleChild;
+     get _root(): TaroRootElement | null;
+     get _scope(): MpInstance | null | undefined;
+@@ -71,6 +72,16 @@ declare class TaroNode extends TaroEventTarget {
+      *   2. remove C
+      */
+     removeChild<T extends TaroNode>(child: T, options?: RemoveChildOptions): T;
++    /**
++     * Delegates an insertion after Taro updates its tree, including detached parents.
++     * The index is the insertion offset when refChild is supplied. The default prepares template payloads.
++     */
++    delegateChildInsertion(newChild: TaroNode, refChild: TaroNode | null | undefined, index: number, isReplace: boolean | undefined): void;
++    /**
++     * Delegates a removal after logical detachment and event identity cleanup.
++     * Every removal is forwarded; options.doUpdate only suppresses the default template update.
++     */
++    delegateChildRemoval(child: TaroNode, options: RemoveChildOptions): void;
+     remove(options?: RemoveChildOptions): void;
+     hasChildNodes(): boolean;
+     enqueueUpdate(payload: UpdatePayload): void;
+diff --git a/dist/dom/node.js b/dist/dom/node.js
+index cc210f4e56ff90d69a398e2e27382def86f4cb0c..37d6b358ccf58a715089fcf87aead4d566413a98 100644
+--- a/dist/dom/node.js
++++ b/dist/dom/node.js
+@@ -20,7 +20,8 @@ class TaroNode extends TaroEventTarget {
+         this.sid = this.uid; // dom 节点全局唯一 id，不可被修改
+         eventSource.set(this.sid, this);
+     }
+-    updateChildNodes(isClean) {
++    /** Delegates a complete child-list update; the default hydrates lazily or emits an empty list. */
++    delegateChildReset(isClean) {
+         const cleanChildNodes = () => [];
+         const rerenderChildNodes = () => {
+             const childNodes = this.childNodes.filter(node => !isComment(node));
+@@ -101,13 +102,13 @@ class TaroNode extends TaroEventTarget {
+             this.removeChild(this.firstChild, { doUpdate: false });
+         }
+         if (text === '') {
+-            this.updateChildNodes(true);
++            this.delegateChildReset(true);
+         }
+         else {
+             const newText = env.document.createTextNode(text);
+             addedNodes.push(newText);
+             this.appendChild(newText);
+-            this.updateChildNodes();
++            this.delegateChildReset();
+         }
+         // @Todo: appendChild 会多触发一次
+         MutationObserver.record({
+@@ -149,52 +150,9 @@ class TaroNode extends TaroEventTarget {
+             // appendChild
+             this.childNodes.push(newChild);
+         }
+-        const childNodesLength = this.childNodes.length;
+-        // Serialization
+-        if (this._root) {
+-            if (!refChild) {
+-                // appendChild
+-                const isOnlyChild = childNodesLength === 1;
+-                if (isOnlyChild) {
+-                    this.updateChildNodes();
+-                }
+-                else {
+-                    this.enqueueUpdate({
+-                        path: newChild._path,
+-                        value: this.hydrate(newChild)
+-                    });
+-                }
+-            }
+-            else if (isReplace) {
+-                // replaceChild
+-                this.enqueueUpdate({
+-                    path: newChild._path,
+-                    value: this.hydrate(newChild)
+-                });
+-            }
+-            else {
+-                // insertBefore 有两种更新模式
+-                // 比方说有 A B C 三个节点，现在要在 C 前插入 D
+-                // 1. 插入 D，然后更新整个父节点的 childNodes 数组
+-                // setData({ cn: [A, B, D, C] })
+-                // 2. 插入 D，然后更新 D 以及 D 之后每个节点的数据
+-                // setData ({
+-                //   cn.[2]: D,
+-                //   cn.[3]: C,
+-                // })
+-                // 由于微信解析 ’cn.[2]‘ 这些路径的时候也需要消耗时间，
+-                // 所以根据 insertBefore 插入的位置来做不同的处理
+-                const mark = childNodesLength * 2 / 3;
+-                if (mark > index) {
+-                    // 如果 insertBefore 的位置在 childNodes 的 2/3 前，则为了避免解析路径消耗过多的时间，采用第一种方式
+-                    this.updateChildNodes();
+-                }
+-                else {
+-                    // 如果 insertBefore 的位置在 childNodes 的 2/3 之后，则采用第二种方式，避免 childNodes 的全量更新
+-                    this.updateSingleChild(index);
+-                }
+-            }
+-        }
++        // Delegation runs after the logical insertion, including on detached parents.
++        // Its default implementation prepares template payloads; native hosts can replace it before any serialization work.
++        this.delegateChildInsertion(newChild, refChild, index, isReplace);
+         if (this._root) {
+             bumpNearestCtxEpochForRoot(this._root);
+         }
+@@ -270,15 +228,68 @@ class TaroNode extends TaroEventTarget {
+         if (cleanRef !== false) {
+             eventSource.removeNodeTree(child);
+         }
+-        // Serialization
+-        if (this._root && doUpdate !== false) {
+-            this.updateChildNodes();
+-        }
++        // Forward every removal. doUpdate controls template batching, not whether the logical child was removed.
++        this.delegateChildRemoval(child, options);
+         if (this._root) {
+             bumpNearestCtxEpochForRoot(this._root);
+         }
+         return child;
+     }
++    /** Delegates an insertion after Taro has updated parentNode and childNodes. */
++    delegateChildInsertion(newChild, refChild, index, isReplace) {
++        const childNodesLength = this.childNodes.length;
++        // Serialization
++        if (this._root) {
++            if (!refChild) {
++                // appendChild
++                const isOnlyChild = childNodesLength === 1;
++                if (isOnlyChild) {
++                    this.delegateChildReset();
++                }
++                else {
++                    this.enqueueUpdate({
++                        path: newChild._path,
++                        value: this.hydrate(newChild)
++                    });
++                }
++            }
++            else if (isReplace) {
++                // replaceChild
++                this.enqueueUpdate({
++                    path: newChild._path,
++                    value: this.hydrate(newChild)
++                });
++            }
++            else {
++                // insertBefore 有两种更新模式
++                // 比方说有 A B C 三个节点，现在要在 C 前插入 D
++                // 1. 插入 D，然后更新整个父节点的 childNodes 数组
++                // setData({ cn: [A, B, D, C] })
++                // 2. 插入 D，然后更新 D 以及 D 之后每个节点的数据
++                // setData ({
++                //   cn.[2]: D,
++                //   cn.[3]: C,
++                // })
++                // 由于微信解析 ’cn.[2]‘ 这些路径的时候也需要消耗时间，
++                // 所以根据 insertBefore 插入的位置来做不同的处理
++                const mark = childNodesLength * 2 / 3;
++                if (mark > index) {
++                    // 如果 insertBefore 的位置在 childNodes 的 2/3 前，则为了避免解析路径消耗过多的时间，采用第一种方式
++                    this.delegateChildReset();
++                }
++                else {
++                    // 如果 insertBefore 的位置在 childNodes 的 2/3 之后，则采用第二种方式，避免 childNodes 的全量更新
++                    this.updateSingleChild(index);
++                }
++            }
++        }
++    }
++    /** Delegates a removal after logical detachment and event identity cleanup. */
++    delegateChildRemoval(_child, options) {
++        if (this._root && options.doUpdate !== false) {
++            this.delegateChildReset();
++        }
++    }
+     remove(options) {
+         var _a;
+         (_a = this.parentNode) === null || _a === void 0 ? void 0 : _a.removeChild(this, options);
+diff --git a/dist/dom/style.d.ts b/dist/dom/style.d.ts
+index 48f82650a81f4f9db1ca0c6a5018de3b146c76e8..ccd1746effad1ee99f6a6aaad25c2035e584fa12 100644
+--- a/dist/dom/style.d.ts
++++ b/dist/dom/style.d.ts
+@@ -9,6 +9,8 @@ declare class Style {
+     private setCssVariables;
+     get cssText(): string;
+     set cssText(str: string);
++    /** Delegates after logical style changes and cssText batching, before the default template payload is prepared. */
++    delegateStyleUpdate(): void;
+     setProperty(propertyName: string, value?: string | null): void;
+     removeProperty(propertyName: string): string;
+     getPropertyValue(propertyName: string): any;
+diff --git a/dist/dom/style.js b/dist/dom/style.js
+index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..4a69cf7180d56b1f63b7c0ff2386f448b5d1ae03 100644
+--- a/dist/dom/style.js
++++ b/dist/dom/style.js
+@@ -11,15 +11,6 @@ function recordCss(obj) {
+         oldValue: obj.cssText
+     });
+ }
+-function enqueueUpdate(obj) {
+-    const element = obj._element;
+-    if (element._root) {
+-        element.enqueueUpdate({
+-            path: `${element._path}.${"st" /* Shortcuts.Style */}`,
+-            value: obj.cssText
+-        });
+-    }
+-}
+ function setStyle(newVal, styleKey) {
+     process.env.NODE_ENV !== 'production' && warn(isString(newVal) && newVal.length > PROPERTY_THRESHOLD, `Style 属性 ${styleKey} 的值数据量过大，可能会影响渲染性能，考虑使用 CSS 类或其它方案替代。`);
+     const old = this[styleKey];
+@@ -34,7 +25,7 @@ function setStyle(newVal, styleKey) {
+         this._usedStyleProp.add(styleKey);
+         this._value[styleKey] = newVal;
+     }
+-    !this._pending && enqueueUpdate(this);
++    !this._pending && this.delegateStyleUpdate();
+ }
+ function initStyle(ctor, styleProperties) {
+     const properties = {};
+@@ -99,7 +90,7 @@ class Style {
+         });
+         if (str === '' || isUndefined(str) || isNull(str)) {
+             this._pending = false;
+-            enqueueUpdate(this);
++            this.delegateStyleUpdate();
+             return;
+         }
+         const rules = str.split(';');
+@@ -117,7 +108,17 @@ class Style {
+             this.setProperty(propName.trim(), val.trim());
+         }
+         this._pending = false;
+-        enqueueUpdate(this);
++        this.delegateStyleUpdate();
++    }
++    /** Delegates the completed style mutation; cssText assignments finish their synchronous batch before calling it. */
++    delegateStyleUpdate() {
++        const element = this._element;
++        if (element._root) {
++            element.enqueueUpdate({
++                path: `${element._path}.${"st" /* Shortcuts.Style */}`,
++                value: this.cssText
++            });
++        }
+     }
+     setProperty(propertyName, value) {
+         if (propertyName[0] === '-') {
+diff --git a/dist/dom/text.d.ts b/dist/dom/text.d.ts
+index ce7b2a99c5981d5291096a1f3885d8890850d02e..652a1a3ee8edbad558d0d0ee13232fa8eda9ef09 100644
+--- a/dist/dom/text.d.ts
++++ b/dist/dom/text.d.ts
+@@ -12,6 +12,11 @@ declare class TaroText extends TaroNode {
+     get nodeValue(): string;
+     set data(text: string);
+     get data(): string;
++    /**
++     * Delegates a text update after Taro records the mutation and stores the logical value.
++     * The default prepares the template payload; textContent, nodeValue and data share this boundary.
++     */
++    delegateTextUpdate(text: string): void;
+ }
+ 
+ export { TaroText };
+diff --git a/dist/dom/text.js b/dist/dom/text.js
+index c61fb312438fc85a2d94852b699da663cc835254..fec85a88f406b5d706cb79e5e4035fe4b243569c 100644
+--- a/dist/dom/text.js
++++ b/dist/dom/text.js
+@@ -15,10 +15,7 @@ class TaroText extends TaroNode {
+             oldValue: this._value
+         });
+         this._value = text;
+-        this.enqueueUpdate({
+-            path: `${this._path}.${"v" /* Shortcuts.Text */}`,
+-            value: text
+-        });
++        this.delegateTextUpdate(text);
+     }
+     get textContent() {
+         return this._value;
+@@ -35,6 +32,13 @@ class TaroText extends TaroNode {
+     get data() {
+         return this._value;
+     }
++    /** Delegates the logical value after its mutation record; hosts can replace template payload preparation. */
++    delegateTextUpdate(text) {
++        this.enqueueUpdate({
++            path: `${this._path}.${"v" /* Shortcuts.Text */}`,
++            value: text
++        });
++    }
+ }
+ 
+ export { TaroText };
