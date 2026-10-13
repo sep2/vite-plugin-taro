@@ -148,6 +148,14 @@ test('public packages preserve their published entrypoints and scaffold dependen
             readFileSync(path.join(projectPath, 'src/app.tsx'), 'utf8'),
             readFileSync(path.join(generatorRoot, 'templates/default/src/app.tsx'), 'utf8')
         )
+        assert.match(
+            readFileSync(path.join(projectPath, 'src/app.css'), 'utf8'),
+            /\.app-shell > \.taro_page,\s*\.app-shell > \.taro_router \{\s*flex: 1;\s*min-height: 0;\s*\}/
+        )
+        assert.match(
+            readFileSync(path.join(projectPath, 'src/components/footer/footer.tsx'), 'utf8'),
+            /className="[^"]*\bshrink-0\b[^"]*"/
+        )
         assert.match(readFileSync(path.join(projectPath, '.env.local'), 'utf8'), /^VITE_VPT_TIKTOK_APP_ID=testAppId$/m)
         const config = readFileSync(path.join(projectPath, 'vite.config.ts'), 'utf8')
         assert.match(config, /env\.VITE_VPT_TIKTOK_APP_ID\b/)
