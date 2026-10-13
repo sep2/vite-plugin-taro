@@ -8,6 +8,7 @@ import { finished } from 'node:stream/promises'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { createProcessScope } from './create-process-scope.ts'
+import { pageInitializationSource } from './page-initialization-source.ts'
 import { projectTempDir } from './project-temp-dir.ts'
 
 export type DevToolsProjectHarness = Readonly<{
@@ -419,16 +420,7 @@ function createProjectHarness(root: string, outDir: string): DevToolsProjectHarn
         },
         readPageInitialization: async () => {
             const output = await runTool('automation_evaluate', outDir, {
-                'fn-source': `function () {
-                    const pages = getCurrentPages()
-                    const page = pages[pages.length - 1]
-                    return {
-                        renderer: page.renderer,
-                        glassEasel: typeof page.groupUpdates === 'function',
-                        prerendered: typeof page.$taroPath === 'string' && page.$taroPath.includes('$vptPage='),
-                        appNodeName: page.data.app?.nn
-                    }
-                }`
+                'fn-source': pageInitializationSource
             })
             if (!isRecord(output) || !isRecord(output.result)) {
                 throw new Error('Expected native Page initialization response')
@@ -484,7 +476,12 @@ async function prepareFixture(root: string): Promise<void> {
     ])
     const nodeModules = path.join(root, 'node_modules')
     if (!existsSync(nodeModules)) {
-        await symlink(path.join(fixtureRoot, 'node_modules'), nodeModules, 'dir')
+        // Windows directory junctions preserve the dependency target without requiring symlink privileges.
+        await symlink(
+            path.join(fixtureRoot, 'node_modules'),
+            nodeModules,
+            process.platform === 'win32' ? 'junction' : 'dir'
+        )
     }
 }
 
