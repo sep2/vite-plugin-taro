@@ -120,8 +120,8 @@ for (const [target, createContract] of [
     ['zfb', createZfbMiniContract],
     ['tt', createTtMiniContract]
 ] as const) {
-    test(`${target}: resolves the shared template host for default and explicit template rendering`, () => {
-        for (const selection of [{}, { renderer: 'template' }] as const) {
+    test(`${target}: resolves the shared template host for every renderer configuration`, () => {
+        for (const selection of [{}, { renderer: 'template' }, { renderer: 'dom' }] as const) {
             const targetContract = createContract({ ...contract.options, target, ...selection })
             const resolver = createResolver(targetContract)
 
@@ -133,14 +133,9 @@ for (const [target, createContract] of [
     })
 }
 
-test('resolves the target-selected TT DOM host independently of App/Page entries', () => {
+test('resolves custom renderer hosts independently of App/Page entries', () => {
     const targetContract = createTtMiniContract({ ...contract.options, target: 'tt', renderer: 'dom' })
     const resolver = createResolver(targetContract)
-
-    assert.equal(
-        resolver.resolveId(rendererHostId, undefined, path.resolve('/project')),
-        resolveVptRuntime('tt/dom-host')
-    )
 
     const customHostResolver = createResolver({
         ...targetContract,

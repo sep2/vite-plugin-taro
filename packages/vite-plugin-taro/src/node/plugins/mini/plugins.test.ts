@@ -98,17 +98,13 @@ test('native rendering resolves loader from each output generation rather than a
     }
 })
 
-for (const [target, createContract, domHost] of [
-    ['wx', createWxMiniContract, 'mini/taro/template-host'],
-    ['zfb', createZfbMiniContract, 'mini/taro/template-host'],
-    ['tt', createTtMiniContract, 'tt/dom-host']
+for (const [target, createContract] of [
+    ['wx', createWxMiniContract],
+    ['zfb', createZfbMiniContract],
+    ['tt', createTtMiniContract]
 ] as const) {
-    test(`${target}: selects the renderer host while preserving public options`, () => {
-        for (const [selection, host] of [
-            [{}, 'mini/taro/template-host'],
-            [{ renderer: 'template' }, 'mini/taro/template-host'],
-            [{ renderer: 'dom' }, domHost]
-        ] as const) {
+    test(`${target}: selects the template host while preserving public renderer options`, () => {
+        for (const selection of [{}, { renderer: 'template' }, { renderer: 'dom' }] as const) {
             const options: VptOptions = Object.freeze({
                 target,
                 app: 'src/app.tsx',
@@ -119,7 +115,7 @@ for (const [target, createContract, domHost] of [
             })
             const contract = createContract(options)
 
-            assert.equal(contract.taro.hostPath, resolveVptRuntime(host))
+            assert.equal(contract.taro.hostPath, resolveVptRuntime('mini/taro/template-host'))
             assert.strictEqual(contract.options, options)
             assert.equal(Object.hasOwn(options, 'renderer'), Object.hasOwn(selection, 'renderer'))
         }
