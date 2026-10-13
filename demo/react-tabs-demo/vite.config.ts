@@ -20,7 +20,12 @@ export default defineConfig(({ mode }) => {
             vpt({
                 target,
                 app: 'src/app.tsx',
-                pages: tabPages.map(({ path }) => ({ path, config: createPageJson(target) })),
+                pages: tabPages.map(({ path }) => ({
+                    path,
+                    // 预渲染，防止切换 tab 闪屏
+                    prerender: true,
+                    config: createPageJson(target)
+                })),
                 appJson: createAppJson(target),
                 projectConfigJson: createProjectConfigJson({ target, appId }),
                 projectPrivateConfigJson: createProjectPrivateConfigJson(target),
@@ -137,6 +142,7 @@ function createProjectConfigJson({ target, appId }: { target: VptTarget; appId: 
                 description: '',
                 compileType: 'miniprogram',
                 setting: {
+                    // 设置 true 启用 skyline
                     skylineRenderEnable: false,
                     urlCheck: false,
                     es6: false,

@@ -1,20 +1,28 @@
-# React tabs demo
+# React 标签栏示例
 
-A four-target VPT example with real Home, Explore, and About tab routes. `AppTabBar` in `src/components/app-tab-bar/app-tab-bar.tsx` is the one visible React bar shared by WeChat, Alipay, TikTok, and H5. Home keeps the default starter page intact. Tab metadata lives in `src/tab-pages.ts`; icons are imported from `src/assets/icons`.
+三个 Tab 页面共用 React 标签栏，通过 `Taro.switchTab` 切换。
 
-WeChat and Alipay require an empty platform-specific tab bar entry so their default bars never flash before the React App renders. `vite.config.ts` copies only the current target's files from `wx-public/` or `zfb-public/`. TikTok uses `tabBar.custom`. Navigation uses `Taro.switchTab`, not `reLaunch`.
+页面设置中启用了预渲染 prerender: true，在第一帧就渲染整个页面，切换 tab 基本不再闪屏。
 
-From the repository root:
+## 运行
+
+将当前目录的 `.env.example` 复制为 `.env.local`，填写目标平台的 AppID。
+
+在仓库根目录执行：
 
 ```sh
-pnpm build:plugin
-pnpm typecheck:react-tabs-demo
+pnpm install
+pnpm prepare:taro
 pnpm build:react-tabs-demo:wx
-pnpm build:react-tabs-demo:zfb
-pnpm build:react-tabs-demo:tt
-pnpm build:react-tabs-demo:h5
 ```
 
-To develop, run `pnpm dev:react-tabs-demo:<target>` (`wx`, `zfb`, `tt`, or `h5`). For mini programs, open `demo/react-tabs-demo/dist/<target>` in the corresponding developer tool. For an H5 production preview, run `pnpm preview:react-tabs-demo:h5`.
+小程序开发工具打开 `demo/react-tabs-demo/dist/wx`。
 
-Copy `.env.example` to `.env.local` and set the appropriate `VITE_VPT_*_APP_ID` before previewing on a device. Changes to native stub files require restarting the dev build.
+## Skyline
+把 skylineRenderEnable 设置为 true 即可。
+
+## 主要文件
+
+- `src/tab-pages.ts`：页面路由、标签和图标名称。
+- `src/components/app-tab-bar/app-tab-bar.tsx`：React 标签栏。
+- `wx-public/`、`zfb-public/`：隐藏平台默认标签栏的占位组件。

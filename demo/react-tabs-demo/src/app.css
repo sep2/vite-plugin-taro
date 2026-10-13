@@ -49,11 +49,8 @@ button {
     line-height: inherit;
 }
 
-.app-shell > .taro_page {
-    height: 100%;
-}
-
-/* Keep the H5 router inside the space above the shared React tab bar. */
+/* Page content fills the space above the shared React tab bar. */
+.app-shell > .taro_page,
 .app-shell > .taro_router {
     flex: 1;
     min-height: 0;

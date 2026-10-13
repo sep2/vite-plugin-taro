@@ -10,7 +10,7 @@ function App({ children }: PropsWithChildren) {
     })
 
     return (
-        <View className="app-shell flex h-screen flex-col overflow-hidden bg-canvas bg-canvas-botanical pb-[calc(4rem+env(safe-area-inset-bottom))] text-foreground">
+        <View className="app-shell flex h-screen flex-col overflow-hidden bg-canvas bg-canvas-botanical text-foreground">
             {children}
             <AppTabBar />
         </View>

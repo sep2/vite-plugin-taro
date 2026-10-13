@@ -36,7 +36,7 @@ export default function AppTabBar() {
     // #endif
 
     return (
-        <View className="tw-root pointer-events-auto absolute bottom-0 left-0 right-0 flex h-[calc(4rem+env(safe-area-inset-bottom))] w-full flex-row border-t border-divider bg-surface-subtle pb-[env(safe-area-inset-bottom)]">
+        <View className="tw-root flex h-[calc(4rem+env(safe-area-inset-bottom))] w-full shrink-0 flex-row border-t border-divider bg-surface-subtle pb-[env(safe-area-inset-bottom)]">
             {tabPages.map(({ path, label, icon }) => {
                 const selected = activePath === path
                 return (
