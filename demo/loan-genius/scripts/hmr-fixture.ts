@@ -101,7 +101,12 @@ async function prepareFixture(profile: LoanHmrFixtureProfile): Promise<LoanHmrFi
     }
     // Each suite gets one readable journal. Replacement servers append so restart readiness cannot match an old process.
     await writeFile(path.join(fixtureRoot, 'vite.log'), '')
-    await symlink(path.join(packageRoot, 'node_modules'), path.join(fixtureRoot, 'node_modules'), 'dir')
+    // Windows directory junctions preserve the dependency target without requiring symlink privileges.
+    await symlink(
+        path.join(packageRoot, 'node_modules'),
+        path.join(fixtureRoot, 'node_modules'),
+        process.platform === 'win32' ? 'junction' : 'dir'
+    )
 
     const fixture = createFixture()
     await configureAutomatableRenderer(fixture)

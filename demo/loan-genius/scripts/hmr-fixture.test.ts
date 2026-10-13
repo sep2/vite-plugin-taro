@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtemp, open, rm } from 'node:fs/promises'
+import { mkdtemp, open, realpath, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { test } from 'node:test'
 import { stopLoanHmrServer, withLoanHmrFixture } from './hmr-fixture.ts'
@@ -10,6 +10,10 @@ import { projectTempDir } from './project-temp-dir.ts'
 test('state-retention probe reads the opt-in URL from the host global', async () => {
     await withLoanHmrFixture('state-retention', async (fixture) => {
         assert.equal(path.dirname(fixture.root), path.resolve(import.meta.dirname, '../tmp'))
+        assert.equal(
+            await realpath(path.join(fixture.root, 'node_modules')),
+            await realpath(path.resolve(import.meta.dirname, '../node_modules'))
+        )
         const source = await fixture.read('src/pages/calculator/index.tsx')
         assert.match(source, /id="loan-polyfill-probe">URL:\{new globalThis\.URL\('child'/)
         assert.doesNotMatch(source, /id="loan-polyfill-probe">URL:\{new URL\(/)
