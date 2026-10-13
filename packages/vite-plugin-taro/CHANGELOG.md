@@ -1,5 +1,31 @@
 # vite-plugin-taro
 
+## 0.7.12
+
+### 变更
+
+- 4b22bb4f：构建依赖更新为 Vite `8.3.4` 和 Rolldown `1.2.13`，适配新版 Vite 的小程序样式热更新。
+
+### 新增
+
+- b3a63768、cb867c93：新增 `pages[].prerender`，支持在微信 glass-easel 页面的原生 `onLoad` 前提供首屏节点，用于 Skyline 共享元素转场等场景。默认关闭，配置方式见[页面预渲染](https://vpt.js.org/guides/configuration/#pagesprerender)。
+- 9c1ab314：小程序热更新支持 `import.meta.hot.dispose()`，在模块替换前清理资源，避免原生监听器重复注册。
+
+### 修复
+
+- 93667c4e：修复微信 glass-easel 页面热更新后，后续真实页面生命周期可能被错误跳过的问题。
+- 4b22bb4f：修复小程序 JavaScript 产物以行注释结尾时生成无效代码、导致模块无法加载的问题。
+
+### 升级说明
+
+从 `0.7.11` 升级到 `0.7.12`：
+
+```sh
+pnpm add -D --save-exact vite-plugin-taro@0.7.12 vite@8.3.4 rolldown@1.2.13
+```
+
+Vite 与插件需使用同一版本的 Rolldown。pnpm 项目在 `pnpm-workspace.yaml` 的 `overrides` 中设置 `rolldown: 1.2.13`；npm / Bun 项目在 `package.json` 的 `overrides` 中设置 `"rolldown": "1.2.13"`；Yarn 项目在 `resolutions` 中设置 `"rolldown": "1.2.13"`。使用 `$rolldown` 引用直接依赖的覆盖项会随依赖升级。合并已有配置，若另有 Vite 版本覆盖，也需同步为 `8.3.4`。
+
 ## 0.7.12-beta.1
 
 ### 变更

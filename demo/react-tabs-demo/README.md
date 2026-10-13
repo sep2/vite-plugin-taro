@@ -2,7 +2,7 @@
 
 三个 Tab 页面共用 React 标签栏，通过 `Taro.switchTab` 切换。
 
-页面设置中启用了预渲染 prerender: true，在第一帧就渲染整个页面，切换 tab 基本不再闪屏。
+页面设置中启用了预渲染 prerender: true，在第一帧就渲染整个页面，切换 tab 不再闪屏。
 
 ## 运行
 

@@ -1,5 +1,22 @@
 # create-vite-taro
 
+## 0.7.12
+
+### 变更
+
+- 4b22bb4f：新项目默认使用 Vite `8.3.4` 和 Rolldown `1.2.13`，通过版本覆盖统一构建依赖。
+- 2c7a0dd3：新项目的 Skyline 配置默认设置 `disableABTest: true`，符合条件的真机可直接使用 Skyline。
+- e3d52ef2：新项目的微信页面显式启用 `glassEaselWebview`，确保开发者工具 WebView 模拟器采用 glass-easel。
+- 20641bfc：新项目按需配置 `sitemapJson`，由项目自行声明微信搜索索引规则。
+
+### 升级说明
+
+从 `0.7.11` 升级到 `0.7.12`：新项目使用以下命令创建。
+
+```sh
+pnpm create vite-taro@0.7.12 my-app
+```
+
 ## 0.7.12-beta.1
 
 ### 变更
