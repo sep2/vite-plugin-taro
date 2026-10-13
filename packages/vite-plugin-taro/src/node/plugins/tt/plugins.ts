@@ -19,12 +19,12 @@ export function createTtMiniContract(options: VptOptions): MiniContract {
     return {
         options,
         define: {
-            // Don't use taro built in solution. we build our own.
+            // VPT owns presentation through the recursive template host.
             'tt.__$enableTTDom$__': 'false'
         },
         taro: {
             env: 'tt',
-            hostPath: resolveVptRuntime(options.renderer === 'dom' ? 'tt/dom-host' : 'mini/taro/template-host'),
+            hostPath: resolveVptRuntime('mini/taro/template-host'),
             componentsReactPath: resolveTaroRuntime('plugin-platform-tt/components-react'),
             targetRuntimePath: resolveVptRuntime('tt/taro-runtime')
         },

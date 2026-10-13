@@ -465,6 +465,34 @@ test('builds a routed H5 application through the public plugin entry', async () 
     )
 })
 
+test('builds TT DOM configuration with recursive native templates', async () => {
+    await inspectFixtureBuild(
+        {
+            options: { ...createOptions('tt'), renderer: 'dom' },
+            files: {
+                'src/app.tsx': appSource,
+                'src/pages/home/index.tsx': `
+                    import { View } from 'virtual:taro/components'
+                    export default function Home() { return <View>Template host</View> }
+                `
+            }
+        },
+        (output) => {
+            const hostId = normalizePath(resolveVptRuntime('mini/taro/template-host'))
+            const modules = output
+                .filter((entry): entry is OutputChunk => entry.type === 'chunk')
+                .flatMap((entry) => Object.keys(entry.modules).map(normalizePath))
+            assert.ok(modules.includes(hostId))
+            assert.equal(JSON.parse(String(requireAsset(output, 'project.config.json').source)).enableTTDom, true)
+            assert.match(
+                String(requireAsset(output, 'pages/home/index.ttml').source),
+                /<comp i="{{app}}" p="{{page}}" \/>/
+            )
+            assertNativeShells(output)
+        }
+    )
+})
+
 test('builds TT runtime, common packages, native components and target-specific sources end to end', async () => {
     await inspectFixtureBuild(
         {

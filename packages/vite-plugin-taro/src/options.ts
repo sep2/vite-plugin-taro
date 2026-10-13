@@ -62,8 +62,8 @@ export interface VptOptions {
     target: VptTarget
 
     /**
-     * Requested Mini Program presentation: recursive native templates or native DOM. Omission selects `template`.
-     * H5 uses its browser renderer.
+     * Native Mini Program renderer configuration. Omission selects `template`; TT `dom` enables `enableTTDom`.
+     * All Mini Program targets render through the recursive template host. H5 uses its browser renderer.
      */
     renderer?: 'template' | 'dom'
 
