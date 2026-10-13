@@ -52,6 +52,11 @@ pnpm --config.minimum-release-age=0 create vite-taro@latest my-app
 
 <video src="https://github.com/user-attachments/assets/bd23538a-da13-431b-a182-85aadeb66194" controls autoplay muted loop playsinline width="320"></video>
 
+查看 [App 组件与预渲染 Demo](https://github.com/sep2/vite-plugin-taro/tree/main/demo/react-tabs-demo)，切换页面不闪屏。
+
+<video src="https://github.com/user-attachments/assets/aa2da4bb-fe60-4d3b-9a94-8df17a4e73ae" controls autoplay muted loop playsinline width="320"></video>
+
+
 ## 赞助
 
 VPT 由 [weapp.dev](https://weapp.dev) 赞助，感谢赞助者对开源开发的支持。

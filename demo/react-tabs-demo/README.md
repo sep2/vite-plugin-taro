@@ -1,12 +1,14 @@
 # React 标签栏示例
 
-三个 Tab 页面共用 React 标签栏，通过 `Taro.switchTab` 切换。
+三个 Tab 页面共用 React 组件，通过 `Taro.switchTab` 切换。
 
 页面设置中启用了预渲染 prerender: true，在第一帧就渲染整个页面，切换 tab 不再闪屏。
 
+<video src="https://github.com/user-attachments/assets/aa2da4bb-fe60-4d3b-9a94-8df17a4e73ae" controls autoplay muted loop playsinline width="320"></video>
+
 ## 运行
 
-将当前目录的 `.env.example` 复制为 `.env.local`，填写目标平台的 AppID。
+将当前目录的 `.env.example` 复制为 `.env.local`，填写微信的 AppID。
 
 在仓库根目录执行：
 
