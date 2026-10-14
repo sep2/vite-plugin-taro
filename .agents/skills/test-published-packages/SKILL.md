@@ -1,32 +1,30 @@
 ---
 name: test-published-packages
-description: Validates the newest published create-vite-taro and vite-plugin-taro release across the npm latest and beta channels, including registry provenance, typecheck, WX build, and WeChat DevTools HMR state retention. Use after publishing or when testing npm artifacts independently from the workspace.
+description: Test the newest published VPT release in a fresh npm-generated project, including typecheck, WX build, and DevTools HMR state retention. Use when asked to test npm artifacts or validate a published release.
 compatibility: Requires Node.js 26+, npm, WeChat DevTools, wechatide, and an authorized test AppID in VITE_VPT_WECHAT_APP_ID.
 ---
 
 # Test Published Packages
 
-Set `VITE_VPT_WECHAT_APP_ID` in the process environment to an authorized test AppID (available through `wechatide -c Pi get_user_appids --type miniprogram`). Randomly generated AppIDs are rejected by DevTools. No demo `.env.local` is required.
+Reuse a ready WeChat DevTools session or initialize it through [wechatide-skill](../miniprogram-dev-skill/SKILL.md). Set `VITE_VPT_WECHAT_APP_ID` to an authorized test AppID; keep it out of logs and replies.
 
-Run the bundled test script from this skill directory:
+From this skill directory, run:
 
-```bash
+```sh
 node scripts/test-published-packages.ts
 ```
 
-The script owns the complete workflow:
+Run once to completion. If backgrounded to respect tool timeouts, track its PID, log, and exit code under `packages/vite-plugin-taro/tmp/` in the repository.
 
-- resolves both the npm `latest` and `beta` channels and selects the package pair with the newest publication time;
-- requires `create-vite-taro` and `vite-plugin-taro` to resolve to the same version within each channel;
-- creates `packages/vite-plugin-taro/tmp/vpt-published-packages-test` from that published creator channel;
-- rejects local, linked, or non-registry plugin installations;
-- runs typecheck and a production WX build;
-- opens the fresh WX development output in WeChat DevTools;
-- changes visible text and verifies it through a lightweight element query;
-- reads the native counter's generated host selector from page data without modifying its props contract, then verifies React state survives the edit and restoration;
-- collects HMR diagnostics on failure;
-- restores source, closes only its project window, and stops its dev server.
+## Runner responsibilities
 
-A pass requires every stage. Do not substitute workspace packages or classify a partial run as passing. If automated observation fails while the same published project works through a normal manual edit, report a harness/DevTools automation mismatch rather than changing package code.
+- Select the newest publication from npm `latest` and `beta`, requiring matching creator/plugin versions within each channel.
+- Generate a fresh project from the published creator, verify the registry plugin installation, run typecheck, and build WX.
+- Verify visible HMR text edits and restoration, retained counter state, unchanged App-root files, and no new console diagnostics.
+- Restore the edited text, close its project window, and stop its dev server. Retain `packages/vite-plugin-taro/tmp/vpt-published-packages-test` for diagnosis; the next run replaces it.
 
-The disposable project is retained for diagnosis and replaced on the next run. Never print the AppID or delete unrelated temporary projects.
+Let the runner own setup, validation, diagnostics, and cleanup. Use its evidence before taking additional actions; keep unrelated projects and processes untouched.
+
+## Result
+
+Require exit code `0` and `PASS`; report the selected version/channel, checks, and log path. A partial run is not a pass. On failure, use the runner diagnostics to identify the failing stage. If automation disagrees with a normal manual edit, report an automation mismatch rather than changing package code.
