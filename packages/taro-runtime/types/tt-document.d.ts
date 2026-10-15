@@ -20,14 +20,23 @@ export interface TTNativeStyle {
     setProperty(name: string, value: string | number): void
 }
 
+/**
+ * 已核对的 TT SDK 4.4.0.3 包装事件在此保留原始平台负载，供 Taro 共享事件流程构造逻辑事件。
+ * 这里只声明桥接实际读取的形状；上游提供对应事件类型后可直接复用其声明。
+ * Taro 原生事件入口若直接接受 SDK 事件并完成负载转换，host 可移除对 _rawEvent 的依赖。
+ */
+export interface TTNativeEvent {
+    readonly _rawEvent: { readonly data: MpEvent }
+}
+
 export interface TTNativeElement extends TTNativeNode {
     id: string
     readonly style: TTNativeStyle
     readonly attributes: Readonly<Record<string, unknown>>
     setAttribute(name: string, value: unknown): void
     removeAttribute(name: string): void
-    addEventListener(name: string, listener: (event: MpEvent) => unknown): void
-    removeEventListener(name: string, listener: (event: MpEvent) => unknown): void
+    addEventListener(name: string, listener: (event: TTNativeEvent) => unknown): void
+    removeEventListener(name: string, listener: (event: TTNativeEvent) => unknown): void
 }
 
 export interface TTNativeComponent extends TTNativeElement {

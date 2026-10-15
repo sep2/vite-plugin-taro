@@ -53,7 +53,7 @@ for (const mode of ['development', 'production'] as const) {
                     },
                     load(id) {
                         if (id === entry) {
-                            return fixture
+                            return `${fixture}\n${eventsFixture}`
                         }
                         if (id === hostModule) {
                             return `import { createDomHost } from ${JSON.stringify(resolveVptRuntime('tt/create-dom-host'))}\n${nativeModel}`
@@ -143,6 +143,8 @@ class NativeNode {
     #value
     // Native attribute storage belongs to the recording model; the host only issues individual writes.
     attributes = Object.create(null)
+    // The SDK owns its listener collections; this model records the same registration boundary.
+    listeners = new Map()
     parentNode = null
     constructor(name, value) {
         this.name = name
@@ -173,6 +175,24 @@ class NativeNode {
     removeAttribute(name) {
         calls.push(['removeAttribute', this, name])
         delete this.attributes[name]
+    }
+    addEventListener(name, listener) {
+        calls.push(['listen', this, name, listener])
+        if (!this.listeners.has(name)) {
+            this.listeners.set(name, new Set())
+        }
+        this.listeners.get(name).add(listener)
+    }
+    removeEventListener(name, listener) {
+        calls.push(['unlisten', this, name, listener])
+        this.listeners.get(name)?.delete(listener)
+    }
+    emit(name, event) {
+        let result
+        for (const listener of [...(this.listeners.get(name) ?? [])]) {
+            result = listener.call(this, event)
+        }
+        return result
     }
     appendChild(child) {
         assert.equal(child.parentNode, null)
@@ -214,7 +234,8 @@ const fixture = `
 import assert from 'node:assert/strict'
 import React from 'react'
 import ReactDOM from 'vite-plugin-taro-runtime/react'
-import { hooks } from '@tarojs/shared'
+import { hooks, toCamelCase } from '@tarojs/shared'
+import 'vite-plugin-taro-runtime/plugin-platform-tt/runtime'
 import { document, FormElement, Style, TaroElement, TaroNode, TaroText } from 'vite-plugin-taro-runtime/runtime/mini'
 import host, { calls, reads, nativeDocument, originalAppend, originalRemove, originalSetAttribute, originalRemoveAttribute } from 'test:tt-dom-host'
 
@@ -250,7 +271,10 @@ const input = document.createElement('input')
 assert.ok(input instanceof FormElement)
 assert.equal(host.isFormElement(input), true)
 assert.equal(host.isFormElement(parent), false)
-expectCalls([['element', 'input', input.nativeNode]])
+expectCalls([
+    ['element', 'input', input.nativeNode],
+    ['listen', input.nativeNode, 'bindinput', input.nativeEventListener]
+])
 
 // Tree, text, style and attribute mutations reach native operations before template payload work.
 TaroNode.extend('_path', { get() { assert.fail('Native mutations must not calculate template paths') } })
@@ -538,4 +562,247 @@ assert.equal(calls.length, 2)
 assert.ok(calls.every(call => call[0] === 'remove'))
 expectChildren(container, [])
 assert.equal(ref.current, null)
+`
+
+const eventsFixture = `
+// Native events carry platform targets and payloads; the bridge receives the SDK wrapper around them.
+function nativeTarget(node) {
+    return {
+        id: node.nativeNode.attributes.id ?? '',
+        dataset: Object.fromEntries(Object.entries(node.nativeNode.attributes)
+            .filter(([name]) => name.startsWith('data-'))
+            .map(([name, value]) => [toCamelCase(name.slice(5)), value]))
+    }
+}
+function emitNative(node, type, detail, target) {
+    const data = { type, detail, target: nativeTarget(target), currentTarget: nativeTarget(node) }
+    const name = (type === 'touchmove' && node.props.catchMove ? 'catch' : 'bind') + type
+    return node.nativeNode.emit(name, { _rawEvent: { data } })
+}
+function eventNode(name) {
+    const node = document.createElement(name)
+    calls.length = 0
+    return node
+}
+// Match the framework's existing React batching integration; no VPT event queue participates.
+hooks.tap('batchedEventUpdates', callback => ReactDOM.unstable_batchedUpdates(callback))
+const events = []
+const eventView = eventNode('view')
+assert.equal(eventView.nativeEventListener, undefined)
+// Subscription decisions must use the original handler array lengths, not enumerate event names.
+eventView.__handlers = new Proxy(eventView.__handlers, {
+    ownKeys() { assert.fail('Native subscription decisions must not scan event names') }
+})
+function firstListener(event) {
+    assert.strictEqual(this, eventView)
+    assert.equal(event.bubbles, true)
+    assert.equal(event.cancelable, true)
+    events.push('first')
+}
+function secondListener() { events.push('second') }
+eventView.addEventListener('TaP', firstListener)
+const bridge = eventView.nativeEventListener
+expectCalls([['listen', eventView.nativeNode, 'bindtap', bridge]])
+eventView.addEventListener('tap', secondListener)
+expectCalls([])
+emitNative(eventView, 'tap', {}, eventView)
+assert.deepEqual(events.splice(0), ['second', 'first'])
+eventView.removeEventListener('tap', firstListener)
+eventView.removeEventListener('tap', () => {})
+expectCalls([])
+eventView.removeEventListener('TAP', secondListener)
+expectCalls([['unlisten', eventView.nativeNode, 'bindtap', bridge]])
+emitNative(eventView, 'tap', {}, eventView)
+assert.deepEqual(events, [])
+eventView.addEventListener('tap', firstListener, { once: true })
+expectCalls([['listen', eventView.nativeNode, 'bindtap', bridge]])
+emitNative(eventView, 'tap', {}, eventView)
+assert.deepEqual(events.splice(0), ['first'])
+expectCalls([['unlisten', eventView.nativeNode, 'bindtap', bridge]])
+eventView.addEventListener('scroll', firstListener)
+expectCalls([['listen', eventView.nativeNode, 'bindscroll', bridge]])
+eventView.removeEventListener('scroll', firstListener)
+expectCalls([['unlisten', eventView.nativeNode, 'bindscroll', bridge]])
+assert.strictEqual(eventView.nativeEventListener, bridge)
+
+const map = eventNode('map')
+function regionListener(event) { events.push(event.type) }
+map.addEventListener('regionchange', regionListener)
+const mapBridge = map.nativeEventListener
+expectCalls([['listen', map.nativeNode, 'bindregionchange', mapBridge]])
+emitNative(map, 'regionchange', { type: 'begin' }, map)
+emitNative(map, 'regionchange', { type: 'end' }, map)
+assert.deepEqual(events.splice(0), ['begin', 'end'])
+map.removeEventListener('regionchange', regionListener)
+expectCalls([['unlisten', map.nativeNode, 'bindregionchange', mapBridge]])
+map.addEventListener('end', regionListener)
+map.addEventListener('begin', regionListener)
+expectCalls([['listen', map.nativeNode, 'bindregionchange', mapBridge]])
+map.removeEventListener('end', regionListener)
+expectCalls([])
+map.removeEventListener('begin', regionListener)
+expectCalls([['unlisten', map.nativeNode, 'bindregionchange', mapBridge]])
+const custom = eventNode('custom-component')
+custom.addEventListener('begin', regionListener)
+expectCalls([['listen', custom.nativeNode, 'bindbegin', custom.nativeEventListener]])
+custom.removeEventListener('begin', regionListener)
+expectCalls([['unlisten', custom.nativeNode, 'bindbegin', custom.nativeEventListener]])
+
+const move = eventNode('view')
+move.setAttribute('catchMove', false)
+expectCalls([['attribute', move.nativeNode, 'catchMove', false]])
+move.setAttribute('catchMove', true)
+const moveBridge = move.nativeEventListener
+expectCalls([
+    ['attribute', move.nativeNode, 'catchMove', true],
+    ['listen', move.nativeNode, 'catchtouchmove', moveBridge]
+])
+move.addEventListener('touchmove', regionListener)
+expectCalls([])
+emitNative(move, 'touchmove', {}, move)
+assert.deepEqual(events.splice(0), ['touchmove'])
+move.setAttribute('catchMove', false)
+expectCalls([
+    ['attribute', move.nativeNode, 'catchMove', false],
+    ['listen', move.nativeNode, 'bindtouchmove', moveBridge],
+    ['unlisten', move.nativeNode, 'catchtouchmove', moveBridge]
+])
+move.setAttribute('catchMove', true)
+expectCalls([
+    ['attribute', move.nativeNode, 'catchMove', true],
+    ['unlisten', move.nativeNode, 'bindtouchmove', moveBridge],
+    ['listen', move.nativeNode, 'catchtouchmove', moveBridge]
+])
+move.removeEventListener('touchmove', regionListener)
+expectCalls([])
+move.removeAttribute('catchMove')
+expectCalls([
+    ['removeAttribute', move.nativeNode, 'catchMove'],
+    ['unlisten', move.nativeNode, 'bindtouchmove', moveBridge],
+    ['unlisten', move.nativeNode, 'catchtouchmove', moveBridge]
+])
+const refund = eventNode('pay-button')
+const returned = { accepted: true }
+refund.addEventListener('applyrefund', () => returned)
+assert.strictEqual(emitNative(refund, 'applyrefund', {}, refund), returned)
+calls.length = 0
+
+// Intrinsic form listeners remain active with zero application handlers and retain the shared React restore path.
+const formContainer = document.createElement('view')
+const formRoot = ReactDOM.createRoot(formContainer)
+const controlledRef = React.createRef()
+const uncontrolledRef = React.createRef()
+const textareaRef = React.createRef()
+function Form() {
+    return React.createElement(React.Fragment, null,
+        React.createElement('input', { ref: controlledRef, value: 'locked' }),
+        React.createElement('input', { ref: uncontrolledRef }),
+        React.createElement('textarea', { ref: textareaRef, value: 'text' }))
+}
+try {
+    ReactDOM.flushSync(() => formRoot.render(React.createElement(Form)))
+    const controlled = controlledRef.current
+    const uncontrolled = uncontrolledRef.current
+    const textarea = textareaRef.current
+    calls.length = 0
+    emitNative(controlled, 'input', { value: 'typed' }, controlled)
+    assert.equal(controlled.value, 'locked')
+    expectCalls([
+        ['attribute', controlled.nativeNode, 'value', 'typed'],
+        ['attribute', controlled.nativeNode, 'value', 'locked']
+    ])
+    emitNative(uncontrolled, 'input', { value: 'typed' }, uncontrolled)
+    assert.equal(uncontrolled.value, 'typed')
+    expectCalls([['attribute', uncontrolled.nativeNode, 'value', 'typed']])
+    emitNative(textarea, 'input', { value: 'edited' }, textarea)
+    assert.equal(textarea.value, 'text')
+    expectCalls([
+        ['attribute', textarea.nativeNode, 'value', 'edited'],
+        ['attribute', textarea.nativeNode, 'value', 'text']
+    ])
+    // Match the value-changing events in Taro's component definitions.
+    for (const [name, type, value] of [
+        ['input', 'input', 'typed'],
+        ['textarea', 'input', 'edited'],
+        ['picker', 'change', 2],
+        ['picker-view', 'change', [1]],
+        ['slider', 'change', 7],
+        ['switch', 'change', true]
+    ]) {
+        const node = document.createElement(name)
+        const listener = node.nativeEventListener
+        expectCalls([
+            ['element', name, node.nativeNode],
+            ['listen', node.nativeNode, 'bind' + type, listener]
+        ])
+        node.addEventListener(type, regionListener)
+        node.removeEventListener(type, regionListener)
+        expectCalls([])
+        emitNative(node, type, { value }, node)
+        assert.strictEqual(node.value, value)
+        expectCalls(type === 'input' ? [['attribute', node.nativeNode, 'value', value]] : [])
+        const explicitType = type === 'input' ? 'change' : 'input'
+        node.addEventListener(explicitType, regionListener)
+        node.removeEventListener(explicitType, regionListener)
+        expectCalls([
+            ['listen', node.nativeNode, 'bind' + explicitType, listener],
+            ['unlisten', node.nativeNode, 'bind' + explicitType, listener]
+        ])
+        assert.equal(node.nativeNode.listeners.get('bind' + type).size, 1)
+    }
+    // Checkbox/radio do not emit individual value changes; group events are application subscriptions.
+    for (const name of ['checkbox', 'radio', 'checkbox-group', 'radio-group']) {
+        const node = document.createElement(name)
+        expectCalls([['element', name, node.nativeNode]])
+        assert.equal(node.nativeEventListener, undefined)
+        node.addEventListener('change', regionListener)
+        node.removeEventListener('change', regionListener)
+        expectCalls([
+            ['listen', node.nativeNode, 'bindchange', node.nativeEventListener],
+            ['unlisten', node.nativeNode, 'bindchange', node.nativeEventListener]
+        ])
+        assert.equal(node.nativeNode.listeners.get('bindchange').size, 0)
+    }
+    const button = eventNode('button')
+    button.addEventListener('input', regionListener)
+    button.removeEventListener('input', regionListener)
+    expectCalls([
+        ['listen', button.nativeNode, 'bindinput', button.nativeEventListener],
+        ['unlisten', button.nativeNode, 'bindinput', button.nativeEventListener]
+    ])
+} finally {
+    ReactDOM.flushSync(() => formRoot.unmount())
+}
+
+const eventParent = eventNode('view')
+const eventChild = eventNode('view')
+eventParent.id = 'event-parent'
+eventChild.id = 'event-child'
+eventParent.setAttribute('data-role', 'parent')
+eventChild.setAttribute('data-role', 'child')
+eventParent.appendChild(eventChild)
+eventParent.addEventListener('tap', event => {
+    assert.equal(event.target.dataset.role, 'child')
+    assert.equal(event.currentTarget.dataset.role, 'parent')
+    events.push('parent')
+})
+eventChild.addEventListener('tap', () => events.push('child'))
+calls.length = 0
+emitNative(eventChild, 'tap', {}, eventChild)
+assert.deepEqual(events, [], 'Taro batches child dispatch until the parent native callback')
+emitNative(eventParent, 'tap', {}, eventChild)
+assert.deepEqual(events.splice(0), ['child', 'parent'])
+eventChild.addEventListener('tap', event => event.stopPropagation(), { once: true })
+emitNative(eventChild, 'tap', {}, eventChild)
+emitNative(eventParent, 'tap', {}, eventChild)
+assert.deepEqual(events.splice(0), ['child'])
+const childBridge = eventChild.nativeEventListener
+eventParent.removeChild(eventChild)
+assert.equal(document.getElementById('event-child'), null)
+eventParent.appendChild(eventChild)
+assert.strictEqual(eventChild.nativeEventListener, childBridge)
+emitNative(eventChild, 'tap', {}, eventChild)
+emitNative(eventParent, 'tap', {}, eventChild)
+assert.deepEqual(events.splice(0), ['child', 'parent'], 'receiver dispatch survives Taro index cleanup')
+calls.length = 0
 `

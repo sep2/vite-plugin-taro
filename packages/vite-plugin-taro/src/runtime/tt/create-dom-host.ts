@@ -2,6 +2,7 @@ import { toCamelCase } from '@tarojs/shared'
 import type { RendererHost } from 'vite-plugin-taro-runtime/react'
 import {
     document,
+    eventHandler,
     extend,
     FormElement,
     Style,
@@ -10,7 +11,12 @@ import {
     TaroRootElement,
     TaroText
 } from 'vite-plugin-taro-runtime/runtime/mini'
-import type { TTNativeDocument, TTNativeElement, TTNativeNode } from 'vite-plugin-taro-runtime/runtime/tt-document'
+import type {
+    TTNativeDocument,
+    TTNativeElement,
+    TTNativeEvent,
+    TTNativeNode
+} from 'vite-plugin-taro-runtime/runtime/tt-document'
 
 declare module 'vite-plugin-taro-runtime/runtime/mini' {
     interface TaroNode {
@@ -20,6 +26,10 @@ declare module 'vite-plugin-taro-runtime/runtime/mini' {
 
     interface TaroElement {
         nativeNode?: TTNativeElement
+        // 首次订阅时创建，随后所有事件及解绑共用此固定引用；业务处理器仍由 __handlers 管理。
+        // 回调持有逻辑接收节点，使派发不依赖节点 ID；解绑也必须使用注册时的同一个函数。
+        // 上游 Taro 原生事件桥接接管这些职责后，可连同本字段一起移交。
+        nativeEventListener?: (event: TTNativeEvent) => unknown
     }
 }
 
@@ -34,6 +44,13 @@ export function createDomHost(
         // root 是由 Page 生命周期绑定原生容器的逻辑根，普通元素在创建时取得原生节点。
         if (!(node instanceof TaroRootElement)) {
             node.nativeNode = nativeDocument.createElement(node.nodeName)
+            // 模板原本固定绑定这些值变化事件；DOM host 接替模板，把变化送入现有表单流程。
+            // 即使没有业务处理器，非受控 ref.value 也要更新，受控 input/textarea 也要触发恢复。
+            // 事件选择和上游替代条件集中说明在 getFormEvent，业务解绑同样遵守该规则。
+            const formEvent = getFormEvent(node.nodeName)
+            if (formEvent) {
+                updateNativeListener(node, `bind${formEvent}`, true)
+            }
         }
         return node
     }
@@ -74,11 +91,44 @@ export function createDomHost(
     TaroElement.extend('delegateAttributeUpdate', function (this: TaroElement, name: string, value: unknown) {
         if (name !== 'style') {
             this.nativeNode!.setAttribute(nativeAttributeName(name), value)
+            if (name === 'catchMove') {
+                updateTouchMove(this)
+            }
         }
     })
     TaroElement.extend('delegateAttributeRemoval', function (this: TaroElement, name: string) {
         if (name !== 'style') {
             this.nativeNode!.removeAttribute(nativeAttributeName(name))
+            if (name === 'catchMove') {
+                updateTouchMove(this)
+            }
+        }
+    })
+
+    // DOM 节点无需随监听器变化切换模板类型；处理器、once 与移除匹配仍由 Taro 维护。
+    // 上游将这类副作用限定在模板 host 后，可去掉此空实现。
+    TaroElement.extend('delegateEventUpdate', () => {})
+    TaroElement.extend('delegateEventListener', function (this: TaroElement, type: string, subscribed: boolean) {
+        // 值同步属于节点本身；最后一个业务处理器移除时，创建阶段的常驻订阅仍需保留。
+        if (type === getFormEvent(this.nodeName)) {
+            return
+        }
+        // catchMove 已由 updateTouchMove 保留 catch 入口，业务监听共用它，避免再注册 bind 入口。
+        if (type === 'touchmove' && this.props.catchMove) {
+            return
+        }
+        if (this.nodeName === 'map' && (type === 'begin' || type === 'end')) {
+            // TaroEventTarget 将 regionchange 展开为 begin/end，TT 的原生入口则是 bindregionchange。
+            // 上游直接 TT DOM 不经过这个逻辑拆分；保留 Taro 节点时需要在此合并订阅。
+            // 读取另一现有数组的长度，即可判断是否仍被共用，无需新增计数或扫描事件表。
+            // 上游 Taro 原生事件委托接管 begin/end 的订阅合并后，可移除此分支。
+            if (this.__handlers[type === 'begin' ? 'end' : 'begin']?.length) {
+                return
+            }
+            updateNativeListener(this, 'bindregionchange', subscribed)
+        } else {
+            // 与上游 @tarojs/react 的 TT setEvent 一致：普通事件使用 bind 前缀。
+            updateNativeListener(this, `bind${type}`, subscribed)
         }
     })
 
@@ -115,4 +165,57 @@ export function createDomHost(
 // 成本随当前名称长度变化，不遍历节点的属性集合。
 function nativeAttributeName(name: string): string {
     return name.startsWith('data-') || name.startsWith('aria-') ? name : toCamelCase(name)
+}
+
+/**
+ * 对应 @tarojs/shared 的表单组件事件定义；创建与业务监听变更共用此固定规则。
+ * Taro 的 FormElement.value getter 读取 props，dispatchEvent 才用事件值更新它；
+ * React 的 input/textarea 受控恢复也由共享事件流程触发。因此这些事件不能依赖业务 onXXX 是否存在。
+ * checkbox/radio 的变化由 group 报告，不为单个元素常驻 change；group 仍按业务监听订阅。
+ *
+ * 已检查的 TT SDK 4.4.0.3 通用元素没有实时 value/checked getter，getAttribute 读取 JS 属性存储。
+ * 这个版本的接口不能通过“读取时同步”替代原生变化通知；该结论限定于已核对的 SDK 实现。
+ * 上游直接 TT DOM 使用原生节点并按业务处理器订阅，没有接替这里的逻辑值同步和受控恢复。
+ *
+ * 上游替代条件：Taro 原生 host 自动提供等价的值同步和受控恢复入口后，可移交本规则及常驻订阅。
+ * 若 TT SDK 提供同步读取控件实时值的接口，且 Taro 接通对应 getter，可替代非受控值的事件同步；
+ * 受控恢复仍需要输入变化通知，不能仅因有 getter 就删除全部常驻监听。
+ */
+function getFormEvent(name: string): 'input' | 'change' | undefined {
+    switch (name) {
+        case 'input':
+        case 'textarea':
+            return 'input'
+        case 'picker':
+        case 'picker-view':
+        case 'slider':
+        case 'switch':
+            return 'change'
+        default:
+            return undefined
+    }
+}
+
+function updateNativeListener(node: TaroElement, name: string, subscribed: boolean): void {
+    if (subscribed) {
+        // SDK 包装事件有自己的方法和传播标志；4.4.0.3 的 _rawEvent.data 保留原始平台负载，
+        // 交给 eventHandler 可复用 Taro 的事件构造、React 优先级/批处理及表单流程。
+        // 回调直接持有逻辑接收节点，不依赖可变 ID，也不建立新的反向映射。
+        // 上游 Taro 若能直接接收 SDK 事件并关联逻辑接收节点，可移交这层负载转换；
+        // 原生注册/解绑所需的稳定回调身份仍须由对应事件桥接保证。
+        node.nativeEventListener ??= (event) => eventHandler(event._rawEvent.data, node)
+        node.nativeNode!.addEventListener(name, node.nativeEventListener)
+    } else if (node.nativeEventListener) {
+        node.nativeNode!.removeEventListener(name, node.nativeEventListener)
+    }
+}
+
+function updateTouchMove(node: TaroElement): void {
+    // 上游 createTTDomDocument 通过添加/移除 catchtouchmove 实现 catchMove，而非只写入该属性。
+    // 此处还让业务 touchmove 处理器共用唯一入口，切换 bind/catch 时保持单次逻辑派发。
+    // 所需订阅由逻辑属性和现有处理器数组决定，SDK 自身处理重复注册；这里只调整两个已知绑定。
+    // 上游 Taro 原生 host 接管等价切换后，可连同属性委托中的调用一起移交。
+    // 另一替代条件是 TT SDK 让 catchMove 属性本身控制冒泡，同时保持一个普通监听入口即可派发一次。
+    updateNativeListener(node, 'bindtouchmove', !node.props.catchMove && !!node.__handlers.touchmove?.length)
+    updateNativeListener(node, 'catchtouchmove', !!node.props.catchMove)
 }
