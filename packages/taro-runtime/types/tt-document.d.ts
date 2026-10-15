@@ -13,8 +13,16 @@ export interface TTNativeNode {
     removeChild(child: TTNativeNode): void
 }
 
+/** SDK Style exposes dynamic property setters alongside its whole-style and CSS-variable APIs. */
+export interface TTNativeStyle {
+    [name: string]: unknown
+    cssText: string
+    setProperty(name: string, value: string | number): void
+}
+
 export interface TTNativeElement extends TTNativeNode {
     id: string
+    readonly style: TTNativeStyle
     readonly attributes: Readonly<Record<string, unknown>>
     setAttribute(name: string, value: unknown): void
     removeAttribute(name: string): void

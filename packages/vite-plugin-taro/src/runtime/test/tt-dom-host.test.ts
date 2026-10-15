@@ -144,6 +144,16 @@ class NativeNode {
         this.name = name
         this.nodeType = name === '#text' ? 3 : 1
         this.#value = value
+        // Record writes at the SDK boundary; SDK style parsing is outside this operation-count model.
+        const node = this
+        this.style = new Proxy({
+            setProperty(name, value) { calls.push(['styleProperty', node, name, value]) }
+        }, {
+            set(target, name, value) {
+                calls.push(['style', node, name, value])
+                return Reflect.set(target, name, value)
+            }
+        })
     }
     get childNodes() { reads.push(this); return this.#children }
     get firstChild() { return this.#children[0] ?? null }
@@ -192,7 +202,7 @@ const fixture = `
 import assert from 'node:assert/strict'
 import React from 'react'
 import ReactDOM from 'vite-plugin-taro-runtime/react'
-import { document, FormElement, TaroElement, TaroNode, TaroText } from 'vite-plugin-taro-runtime/runtime/mini'
+import { document, FormElement, Style, TaroElement, TaroNode, TaroText } from 'vite-plugin-taro-runtime/runtime/mini'
 import host, { calls, reads, originalAppend, originalRemove } from 'test:tt-dom-host'
 
 function expectCalls(expected) {
@@ -282,13 +292,59 @@ expectChildren(parent, [])
 host.afterCommit(parent)
 expectCalls([])
 
+// Single-property forwarding reads no additional cssText beyond Taro's existing mutation oldValue.
+const style = parent.style
+const cssText = Object.getOwnPropertyDescriptor(Style.prototype, 'cssText')
+let cssReads = 0
+Object.defineProperty(style, 'cssText', {
+    get() { cssReads++; return cssText.get.call(this) },
+    set(value) { cssText.set.call(this, value) }
+})
+function expectStyle(calls) {
+    expectCalls(calls)
+    assert.equal(cssReads, 1, 'only Taro mutation recording reads the previous cssText')
+    cssReads = 0
+}
+style.color = 'red'
+expectStyle([['style', parent.nativeNode, 'color', 'red']])
+style.color = 'red'
+expectCalls([])
+assert.equal(cssReads, 0)
+style.setProperty('margin-top', '2px')
+expectStyle([['style', parent.nativeNode, 'marginTop', '2px']])
+style.opacity = 0
+expectStyle([['style', parent.nativeNode, 'opacity', 0]])
+style.setProperty('--accent', 'blue')
+expectStyle([['styleProperty', parent.nativeNode, '--accent', 'blue']])
+style.setProperty('-webkit-line-clamp', '2')
+expectStyle([['styleProperty', parent.nativeNode, '-webkit-line-clamp', '2']])
+style['-webkit-line-clamp'] = ''
+expectStyle([['styleProperty', parent.nativeNode, '-webkit-line-clamp', '']])
+assert.equal(style.removeProperty('--accent'), 'blue')
+expectStyle([['styleProperty', parent.nativeNode, '--accent', '']])
+assert.equal(style.removeProperty('margin-top'), '2px')
+expectStyle([['style', parent.nativeNode, 'marginTop', '']])
+style.color = null
+expectStyle([['style', parent.nativeNode, 'color', '']])
+style.opacity = ''
+expectStyle([['style', parent.nativeNode, 'opacity', '']])
+style.removeProperty('margin-top')
+expectCalls([])
+assert.equal(cssReads, 0)
+for (const value of ['color: green; --accent: teal;', '', null, undefined]) {
+    style.cssText = value
+    expectCalls([['style', parent.nativeNode, 'cssText', value || '']])
+    assert.equal(cssReads, 2, 'bulk replacement reads the old mutation value and the completed style once each')
+    cssReads = 0
+}
+
 // A real shared React renderer keeps Taro refs and keyed native identities through text updates and moves.
 const container = document.createElement('view')
 const reactRoot = ReactDOM.createRoot(container)
 const ref = React.createRef()
-function List({ reverse, label }) {
+function List({ reverse, label, style }) {
     const children = [
-        React.createElement('view', { key: 'a', ref }, label),
+        React.createElement('view', { key: 'a', ref, style }, label),
         React.createElement('view', { key: 'b' }, 'b')
     ]
     return reverse ? children.reverse() : children
@@ -314,6 +370,32 @@ try {
     assert.equal(calls.filter(call => call[0] === 'append' || call[0] === 'insert').length, 1)
     assert.deepEqual(reads, [])
     expectChildren(container, [second, first])
+    calls.length = 0
+    ReactDOM.flushSync(() => reactRoot.render(React.createElement(List, {
+        reverse: true, label: 'updated', style: { color: 'red', marginTop: 8, opacity: 0, '--accent': 'blue' }
+    })))
+    expectCalls([
+        ['style', firstNative, 'color', 'red'],
+        ['style', firstNative, 'marginTop', '8px'],
+        ['style', firstNative, 'opacity', 0],
+        ['styleProperty', firstNative, '--accent', 'blue']
+    ])
+    ReactDOM.flushSync(() => reactRoot.render(React.createElement(List, {
+        reverse: true, label: 'updated', style: { color: 'green', marginTop: 8, opacity: 0, '--accent': 'blue' }
+    })))
+    expectCalls([['style', firstNative, 'color', 'green']])
+    ReactDOM.flushSync(() => reactRoot.render(React.createElement(List, {
+        reverse: true, label: 'updated', style: { marginTop: 8, opacity: 0 }
+    })))
+    expectCalls([['style', firstNative, 'color', ''], ['styleProperty', firstNative, '--accent', '']])
+    ReactDOM.flushSync(() => reactRoot.render(React.createElement(List, {
+        reverse: true, label: 'updated', style: 'color: purple;'
+    })))
+    expectCalls([['style', firstNative, 'cssText', 'color: purple;']])
+    ReactDOM.flushSync(() => reactRoot.render(React.createElement(List, {
+        reverse: true, label: 'updated', style: { color: 'orange' }
+    })))
+    expectCalls([['style', firstNative, 'cssText', ''], ['style', firstNative, 'color', 'orange']])
 } finally {
     calls.length = 0
     ReactDOM.flushSync(() => reactRoot.unmount())

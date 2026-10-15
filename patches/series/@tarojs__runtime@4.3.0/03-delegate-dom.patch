@@ -457,24 +457,25 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..c29083f1ef15ddcd42ca366533c50ee9
          var _a;
          (_a = this.parentNode) === null || _a === void 0 ? void 0 : _a.removeChild(this, options);
 diff --git a/dist/dom/style.d.ts b/dist/dom/style.d.ts
-index 48f82650a81f4f9db1ca0c6a5018de3b146c76e8..d24c21df4b83a3f79e7971c8656d499ed5dff800 100644
+index 48f82650a81f4f9db1ca0c6a5018de3b146c76e8..ba35897b128914db5c2fba9b276ac936b882998c 100644
 --- a/dist/dom/style.d.ts
 +++ b/dist/dom/style.d.ts
-@@ -9,6 +9,12 @@ declare class Style {
+@@ -9,6 +9,13 @@ declare class Style {
      private setCssVariables;
      get cssText(): string;
      set cssText(str: string);
 +    /**
-+     * 逻辑样式变更完成后调用；cssText 的同步批量赋值统一通知一次。
++     * 单项变更传入属性名与赋值；null/undefined/空字符串表示清除。
++     * 普通属性名为 camelCase，CSS 变量及连字符前缀保留原名。
++     * cssText 的同步批量赋值完成后不传参数调用一次，表示整体替换。
 +     * this 为 Style，可读取 _element 和完整 cssText；默认准备模板 st 更新。
-+     * 单项属性和 CSS 变量复用此入口，host 可接管最终样式的原生写入。
 +     */
-+    delegateStyleUpdate(): void;
++    delegateStyleUpdate(styleKey?: string, value?: string | number | null): void;
      setProperty(propertyName: string, value?: string | null): void;
      removeProperty(propertyName: string): string;
      getPropertyValue(propertyName: string): any;
 diff --git a/dist/dom/style.js b/dist/dom/style.js
-index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..f84697cd00c667ea0859b8a42e202c6a68a93caf 100644
+index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..3f091963448615617b46b5350a5ea822bfdad831 100644
 --- a/dist/dom/style.js
 +++ b/dist/dom/style.js
 @@ -11,15 +11,6 @@ function recordCss(obj) {
@@ -498,7 +499,7 @@ index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..f84697cd00c667ea0859b8a42e202c6a
          this._value[styleKey] = newVal;
      }
 -    !this._pending && enqueueUpdate(this);
-+    !this._pending && this.delegateStyleUpdate();
++    !this._pending && this.delegateStyleUpdate(styleKey, newVal);
  }
  function initStyle(ctor, styleProperties) {
      const properties = {};
@@ -511,7 +512,7 @@ index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..f84697cd00c667ea0859b8a42e202c6a
              return;
          }
          const rules = str.split(';');
-@@ -117,7 +108,24 @@ class Style {
+@@ -117,7 +108,26 @@ class Style {
              this.setProperty(propName.trim(), val.trim());
          }
          this._pending = false;
@@ -520,13 +521,15 @@ index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..f84697cd00c667ea0859b8a42e202c6a
 +    }
 +    /**
 +     * 单项样式写入在逻辑值和 mutation 记录更新后调用；相同值沿用原有提前返回。
-+     * cssText 赋值使用 Taro 已有的 _pending 同步批处理，所有属性处理结束后统一通知一次，
++     * styleKey 为 setStyle 收到的属性名（普通属性为 camelCase，CSS 变量及连字符前缀保留原名），
++     * value 为该次赋值；null/undefined/空字符串表示清除。原生 host 可直接转发这一个属性。
++     * cssText 赋值使用 Taro 已有的 _pending 同步批处理，完成后不传参数调用一次，表示整体替换；
 +     * 清空 cssText 也走此入口。setProperty/removeProperty/CSS 变量复用同一套样式存储。
-+     * this 是 Style，this._element 是所属 Taro 元素，this.cssText 提供已规范化的完整样式。
-+     * 默认实现为已挂载元素准备 st payload；原生 host 可替换为原生样式写入。
-+     * 该接口通知最终样式状态，cssText getter 仍按已有逻辑遍历当前样式属性。
++     * this 是 Style，this._element 是所属 Taro 元素；整体替换可读取已规范化的 this.cssText。
++     * 默认模板实现统一准备完整 st payload，因此不使用单项参数。
++     * 单项委托本身无需遍历样式；Taro 的 mutation 旧值记录及具体 SDK 的序列化成本仍独立存在。
 +     */
-+    delegateStyleUpdate() {
++    delegateStyleUpdate(_styleKey, _value) {
 +        const element = this._element;
 +        if (element._root) {
 +            element.enqueueUpdate({

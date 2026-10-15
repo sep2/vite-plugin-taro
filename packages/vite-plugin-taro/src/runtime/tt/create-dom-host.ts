@@ -3,17 +3,22 @@ import {
     document,
     extend,
     FormElement,
+    Style,
     type TaroElement,
     TaroNode,
     TaroRootElement,
     TaroText
 } from 'vite-plugin-taro-runtime/runtime/mini'
-import type { TTNativeDocument, TTNativeNode } from 'vite-plugin-taro-runtime/runtime/tt-document'
+import type { TTNativeDocument, TTNativeElement, TTNativeNode } from 'vite-plugin-taro-runtime/runtime/tt-document'
 
 declare module 'vite-plugin-taro-runtime/runtime/mini' {
     interface TaroNode {
         // 节点创建或容器绑定时写入；逻辑节点在移动、解绑和重新插入时保留同一个原生句柄。
         nativeNode?: TTNativeNode
+    }
+
+    interface TaroElement {
+        nativeNode?: TTNativeElement
     }
 }
 
@@ -61,6 +66,20 @@ export function createDomHost(
 
     extend(TaroText, 'delegateTextUpdate', function (this: TaroText, text: string) {
         this.nativeNode!.nodeValue = text
+    })
+
+    // 单项变更直接转发；普通属性使用 SDK setter，连字符前缀交由 setProperty 安装对应访问器。
+    // cssText 的整体替换由 Taro 的 _pending 批量处理完成后通知一次，此时才读取完整样式。
+    // 此处单项转发相对样式项数为 O(1)，Taro mutation 记录与 SDK 内部序列化仍有各自的成本。
+    extend(Style, 'delegateStyleUpdate', function (this: Style, name?: string, value?: string | number | null) {
+        const style = this._element.nativeNode!.style
+        if (name === undefined) {
+            style.cssText = this.cssText
+        } else if (name[0] === '-') {
+            style.setProperty(name, value ?? '')
+        } else {
+            style[name] = value ?? ''
+        }
     })
 
     return {
