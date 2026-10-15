@@ -335,7 +335,7 @@ function checkRootOptionsAndErrors() {
     ReactDOM.flushSync(() => root.unmount())
 }
 
-function checkEventPrioritiesAndControlledInputs() {
+function checkEventPrioritiesAndControlledInputs(useNode) {
     const container = document.createElement('root')
     const root = ReactDOM.createRoot(container)
     const priorities = []
@@ -375,7 +375,10 @@ function checkEventPrioritiesAndControlledInputs() {
         return h('input', {
             id: 'controlled-input',
             value,
-            onInput(event) { setValue(event.detail.value.toUpperCase()) }
+            onInput(event) {
+                assert.equal(rendererHostConfig.getCurrentUpdatePriority(), DiscreteEventPriority)
+                setValue(event.detail.value.toUpperCase())
+            }
         })
     }
     ReactDOM.flushSync(() => root.render(h(Input)))
@@ -383,12 +386,15 @@ function checkEventPrioritiesAndControlledInputs() {
     ReactDOM.unstable_batchedUpdates(() => {
         ReactDOM.unstable_batchedUpdates(() => eventHandler({
             type: 'input', target: { id: input.id }, detail: { value: 'edited' }
-        }))
+        }, useNode ? input : undefined))
         assert.equal(input.value, 'edited', 'native input remains unrestored until the outer event boundary')
     })
     assert.equal(input.value, 'EDITED', 'sync work commits before restoring the controlled native value')
     ReactDOM.flushSync(() => root.render(h('input', { id: 'fixed-input', value: 'fixed', onInput() {} })))
-    eventHandler({ type: 'input', target: { id: 'fixed-input' }, detail: { value: 'rejected' } })
+    eventHandler(
+        { type: 'input', target: { id: 'fixed-input' }, detail: { value: 'rejected' } },
+        useNode ? container.firstChild : undefined
+    )
     assert.equal(container.firstChild.value, 'fixed')
     assert.equal(container.firstChild._valueTracker.getValue(), 'fixed')
 
@@ -656,7 +662,8 @@ function checkFrameworkRootEntryPoints() {
 async function run() {
     await checkRootsAndCommits()
     checkRootOptionsAndErrors()
-    checkEventPrioritiesAndControlledInputs()
+    checkEventPrioritiesAndControlledInputs(false)
+    checkEventPrioritiesAndControlledInputs(true)
     checkPageConfigData()
     await checkNativeInitialData()
     checkFrameworkRootEntryPoints()

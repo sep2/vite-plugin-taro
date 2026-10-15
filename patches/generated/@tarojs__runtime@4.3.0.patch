@@ -48,52 +48,164 @@ index a641a96b78c9978acaf1041160dd7fd74bcbfcdc..2d179b16365ebeaff8f48921cb974a1a
      doc.appendChild(html);
      html.appendChild(head);
 diff --git a/dist/dom/element.d.ts b/dist/dom/element.d.ts
-index 354bfc00bc34df0c4248acb6aafe2b4b679130be..ac62d98f88c1343d612a830f852c5e8ff0abee35 100644
+index 354bfc00bc34df0c4248acb6aafe2b4b679130be..c159224fb0ce38ec8cba64f9f3debb6285821ff5 100644
 --- a/dist/dom/element.d.ts
 +++ b/dist/dom/element.d.ts
-@@ -30,7 +30,11 @@ declare class TaroElement extends TaroNode {
+@@ -30,13 +30,31 @@ declare class TaroElement extends TaroNode {
      set focus(value: () => void);
      blur(): void;
      setAttribute(qualifiedName: string, value: any): void;
-+    /** Delegates after logical storage and ID/dataset updates; the flag records the prior template view classification. */
++    /**
++     * 逻辑属性、ID/dataset 和 mutation 记录更新后调用，尚未转换模板属性别名。
++     * value 为逻辑分支处理后的属性值，isPureView 记录修改前的模板分类。
++     * style 属性先触发 Style 委托，再进入此入口；默认准备模板属性及类型更新。
++     */
 +    delegateAttributeUpdate(qualifiedName: string, value: unknown, isPureView: boolean): void;
      removeAttribute(qualifiedName: string): void;
-+    /** Delegates after successful logical removal; the flag records the prior template view classification. */
++    /**
++     * 逻辑移除完成后调用，isStaticView 记录移除前的模板分类。
++     * 普通属性缺失或被 hook 拦截时提前返回；style 先经 Style 委托清空。
++     * 默认准备模板属性及类型更新，host 可接管原生属性移除。
++     */
 +    delegateAttributeRemoval(qualifiedName: string, isStaticView: boolean): void;
      getAttribute(qualifiedName: string): string;
      getElementsByTagName(tagName: string): TaroElement[];
      getElementsByClassName(className: string): TaroElement[];
+     dispatchEvent(event: TaroEvent): boolean;
+     addEventListener(type: any, handler: any, options: any): void;
+     removeEventListener(type: any, handler: any, sideEffect?: boolean): void;
++    /**
++     * added=true 在添加处理器前调用，false 在移除后调用，负责模板节点类型副作用。
++     * sideEffect=false 只抑制模板更新；原生订阅通知由 delegateEventListener 独立处理。
++     * 默认实现按 added 选择上游添加/移除 hook，并按需查询组件别名。
++     */
++    delegateEventUpdate(added: boolean, sideEffect: boolean): void;
+     static extend(methodName: string, options: TFunc | Record<string, any>): void;
+ }
+ 
 diff --git a/dist/dom/element.js b/dist/dom/element.js
-index 160f3682d64625bb33221a76453677fa0d1fe8fa..30f29fe0f28a6d29cb060be433cfc472ce79eb59 100644
+index 160f3682d64625bb33221a76453677fa0d1fe8fa..968cab19cc6e92cc789797a23bb4b330202a688e 100644
 --- a/dist/dom/element.js
 +++ b/dist/dom/element.js
-@@ -124,6 +124,10 @@ class TaroElement extends TaroNode {
+@@ -124,6 +124,18 @@ class TaroElement extends TaroNode {
                  }
                  break;
          }
 +        this.delegateAttributeUpdate(qualifiedName, value, isPureView);
 +    }
-+    /** Delegates the stored attribute value; isPureView preserves the pre-mutation template classification. */
++    /**
++     * Taro 已完成逻辑属性写入、相应的 ID/dataset 更新及 mutation 记录，再通知 host。
++     * qualifiedName 保留属性名；value 是逻辑分支处理后的值，例如 id 已转为字符串，
++     * 此时尚未执行模板短名/组件别名转换。
++     * isPureView 保存修改前的模板分类，用于判断属性变化是否要求切换模板节点类型。
++     * 默认实现为已挂载节点准备属性和节点类型 payload；host 可接管原生属性写入。
++     * style 属性会先经 Style.delegateStyleUpdate，再进入此处；host 应按属性名
++     * 区分这两个通知的职责，复用 Style 已完成的逻辑样式处理。
++     */
 +    delegateAttributeUpdate(qualifiedName, value, isPureView) {
          // Serialization
          if (!this._root)
              return;
-@@ -185,6 +189,10 @@ class TaroElement extends TaroNode {
+@@ -185,6 +197,16 @@ class TaroElement extends TaroNode {
              }
              delete this.props[qualifiedName];
          }
 +        this.delegateAttributeRemoval(qualifiedName, isStaticView);
 +    }
-+    /** Delegates a completed removal; interrupted and absent attributes retain their original early returns. */
++    /**
++     * Taro 执行原有属性移除逻辑后通知 host；普通属性不存在或被移除 hook 拦截时提前返回。
++     * qualifiedName 是被移除的属性名，isStaticView 保存移除前的模板分类。
++     * 默认实现准备属性清空及相应的模板类型更新；原生 host 接管原生属性移除。
++     * style 的清空先经过 Style.delegateStyleUpdate，再通知此方法，与设置 style 的顺序一致。
++     * 逻辑 props、移除拦截和 mutation 记录仍由 Taro 的公开方法维护。
++     */
 +    delegateAttributeRemoval(qualifiedName, isStaticView) {
          // Serialization
          if (!this._root)
              return;
+@@ -275,32 +297,35 @@ class TaroElement extends TaroNode {
+         return listeners != null;
+     }
+     addEventListener(type, handler, options) {
+-        const name = this.nodeName;
+-        const SPECIAL_NODES = hooks.call('getSpecialNodes');
+         let sideEffect = true;
+         if (isObject(options) && options.sideEffect === false) {
+             sideEffect = false;
+             delete options.sideEffect;
+         }
+-        hooks.call('modifyAddEventListener', this, sideEffect, getComponentsAlias);
+-        if (sideEffect !== false && !this.isAnyEventBinded() && SPECIAL_NODES.indexOf(name) > -1) {
+-            const componentsAlias = getComponentsAlias();
+-            const alias = componentsAlias[name]._num;
+-            this.enqueueUpdate({
+-                path: `${this._path}.${"nn" /* Shortcuts.NodeName */}`,
+-                value: alias
+-            });
+-        }
++        this.delegateEventUpdate(true, sideEffect);
+         super.addEventListener(type, handler, options);
+     }
+     removeEventListener(type, handler, sideEffect = true) {
+         super.removeEventListener(type, handler);
++        this.delegateEventUpdate(false, sideEffect);
++    }
++    /**
++     * 事件监听变化对应的模板副作用，与原生订阅开关 delegateEventListener 分开。
++     * added=true 时在添加处理器之前调用，观察旧监听数组；added=false 时在移除之后调用，
++     * 观察剩余监听数组。默认实现据此把节点切换为可交互或 pure/static 模板。
++     * sideEffect=false 只抑制模板更新，逻辑监听器变更和原生订阅通知照常执行。
++     * 原生 host 可独立替换此模板副作用；Taro 的公开方法继续负责处理器语义。
++     */
++    delegateEventUpdate(added, sideEffect) {
+         const name = this.nodeName;
+         const SPECIAL_NODES = hooks.call('getSpecialNodes');
+-        hooks.call('modifyRemoveEventListener', this, sideEffect, getComponentsAlias);
++        // 上游添加/移除方法各有一个模板扩展 hook；合并副作用实现后按 added 选择原 hook。
++        // 参数依次是当前逻辑节点、模板副作用开关和别名查询函数。函数保持延迟调用，
++        // 由 hook 按需取得组件别名；这一步处理模板类型，不注册或取消原生事件。
++        hooks.call(added ? 'modifyAddEventListener' : 'modifyRemoveEventListener', this, sideEffect, getComponentsAlias);
+         if (sideEffect !== false && !this.isAnyEventBinded() && SPECIAL_NODES.indexOf(name) > -1) {
+             const componentsAlias = getComponentsAlias();
+-            const value = name === VIEW && !isHasExtractProp(this) ? PURE_VIEW : `static-${name}`;
++            const value = added ? name : (name === VIEW && !isHasExtractProp(this) ? PURE_VIEW : `static-${name}`);
+             const valueAlias = componentsAlias[value]._num;
+             this.enqueueUpdate({
+                 path: `${this._path}.${"nn" /* Shortcuts.NodeName */}`,
+diff --git a/dist/dom/event-target.d.ts b/dist/dom/event-target.d.ts
+index 78893e78df38fd423937079db101a4fa848a1c73..4b8fac8181991d29ca3f5c06e676243f67e4cb68 100644
+--- a/dist/dom/event-target.d.ts
++++ b/dist/dom/event-target.d.ts
+@@ -4,6 +4,12 @@ declare class TaroEventTarget {
+     __handlers: Record<string, EventHandler[]>;
+     addEventListener(type: string, handler: EventHandler, options?: boolean | AddEventListenerOptions): void;
+     removeEventListener(type: string, handler: EventHandler): void;
++    /**
++     * 首个处理器存入后 subscribed=true，末个移除后为 false；复用现有处理器数组判断。
++     * type 为小写逻辑事件名，regionchange 已展开为 begin/end；host 负责平台订阅关系。
++     * 默认实现为空，处理器、once 和移除匹配由 Taro 维护。
++     */
++    delegateEventListener(type: string, subscribed: boolean): void;
+     isAnyEventBinded(): boolean;
+     isOnlyClickBinded(): boolean;
+ }
 diff --git a/dist/dom/event-target.js b/dist/dom/event-target.js
-index 510424828b3a9a74f363cef1e0982489a708541e..3b3946c14f00d106e785bda1fed9bdf8103b2300 100644
+index 510424828b3a9a74f363cef1e0982489a708541e..de066ca2492f61f675fd793dc585cf160fd6dfa6 100644
 --- a/dist/dom/event-target.js
 +++ b/dist/dom/event-target.js
-@@ -65,6 +65,9 @@ class TaroEventTarget {
+@@ -44,6 +44,11 @@ class TaroEventTarget {
+         else {
+             this.__handlers[type] = [handler];
+         }
++        // 用原有处理器数组判断首次订阅：第二个及后续处理器共用同一个原生入口。
++        // 通知发生在数组写入后，host 可直接读取已完成的逻辑状态。
++        if (this.__handlers[type].length === 1) {
++            this.delegateEventListener(type, true);
++        }
+     }
+     removeEventListener(type, handler) {
+         type = type.toLowerCase();
+@@ -65,8 +70,24 @@ class TaroEventTarget {
                  return true;
          });
          process.env.NODE_ENV !== 'production' && warn(index === -1, `事件: '${type}' 没有注册在 DOM 中，因此不会被移除。`);
@@ -101,54 +213,143 @@ index 510424828b3a9a74f363cef1e0982489a708541e..3b3946c14f00d106e785bda1fed9bdf8
 +            return;
 +        }
          handlers.splice(index, 1);
++        // 最后一个处理器移除后再通知解绑；长度判断复用现有数组，为 O(1)。
++        if (handlers.length === 0) {
++            this.delegateEventListener(type, false);
++        }
      }
++    /**
++     * 处理器数组从空变为非空时 subscribed=true，最后一个处理器移除后为 false。
++     * type 是 Taro 已规范化的小写逻辑事件名；regionchange 已展开为 begin/end，
++     * 平台原生事件名及其订阅关系由 host 对接。
++     * 模板通过既有模板绑定接收事件，因此默认实现为空；原生 host 在此控制订阅开关，
++     * 业务处理器仍由 __handlers 保存，once、包装函数和移除匹配继续由 Taro 负责。
++     * 原生回调可通过 eventHandler(event, logicalNode) 进入共享派发流程。
++     */
++    delegateEventListener(_type, _subscribed) { }
      isAnyEventBinded() {
+         const handlers = this.__handlers;
+         const isAnyEventBinded = Object.keys(handlers).find(key => handlers[key].length);
+diff --git a/dist/dom/event.d.ts b/dist/dom/event.d.ts
+index d06902c2239335adb5df57cc27b84ab3d9eb938b..73bb19548c9737b74174a64a261ef08cdccb49b9 100644
+--- a/dist/dom/event.d.ts
++++ b/dist/dom/event.d.ts
+@@ -21,7 +21,12 @@ declare class TaroEvent {
+     get currentTarget(): any;
+ }
+ declare function createEvent(event: MpEvent | string, node?: TaroElement): TaroEvent;
+-declare function eventHandler(event: MpEvent): any;
++/**
++ * 共用平台归一化、事件 hooks、批处理及表单处理的原生事件入口。
++ * currentNode 可传入已知 Taro 逻辑节点以跳过入口 ID 查询；省略时按原有事件索引查找。
++ * target/currentTarget getter 保持原有索引行为，完整调用路径说明见实现。
++ */
++declare function eventHandler(event: MpEvent, currentNode?: TaroElement): any;
+ declare function eventHandlerTTDom(ele: any, listener: (event: MpEvent, element: any) => void, event: MpEvent): void;
+ 
+ export { TaroEvent, createEvent, eventHandler, eventHandlerTTDom };
+diff --git a/dist/dom/event.js b/dist/dom/event.js
+index f4062db04f2a8216795447f892b80b7b6514f467..25387103c37d6d0cc45a02db052438752e993a67 100644
+--- a/dist/dom/event.js
++++ b/dist/dom/event.js
+@@ -100,7 +100,27 @@ function getEventCBResult(event) {
+     return result;
+ }
+ // 小程序的事件代理回调函数
+-function eventHandler(event) {
++/**
++ * Taro 节点维护逻辑树、属性和业务监听器；TT 原生节点负责显示并接收平台事件。
++ *
++ * 模板中的多个原生节点共用此入口。eventHandler(event) 在平台事件归一化后，
++ * 根据事件中的 sid/id 从 Taro 已有索引取得接收节点，再进入统一的事件派发流程。
++ * 这里的索引查询不是整棵树的遍历。
++ *
++ * DOM host 为某个原生节点注册回调时，已经持有对应的 Taro 逻辑节点，可以直接传入：
++ *     nativeNode.addEventListener(nativeEventName, event => eventHandler(event, taroNode));
++ * eventHandler(event, taroNode) 使用这个已知接收节点，省去入口的一次 ID 读取和索引查询。
++ * currentNode 是 Taro 节点，不是 TT 原生节点；该参数是可选的，原生事件携带正确的
++ * sid/id 时也可以使用单参数入口。它只是利用已知对象，并非 DOM 渲染的必要条件。
++ *
++ * 两种入口共用平台归一化、事件构造、hooks、冒泡批处理、回调返回值，以及 React
++ * 事件优先级和受控输入恢复。node.dispatchEvent() 只是其中靠后的环节，直接调用它
++ * 会绕过外围处理，因此 host 应从这里进入已有事件流程。
++ *
++ * 可选参数只改变接收节点的取得方式，不增加持久状态或循环，也不代表显著性能提升。
++ * TaroEvent.target/currentTarget 的 getter 仍按原有逻辑读取事件索引。
++ */
++function eventHandler(event, currentNode) {
+     var _a, _b;
+     // Note: ohos 上事件没有设置 type、detail 类型 setter 方法，且部分事件（例如 load 等）缺失 target 导致事件错误
+     event.type === undefined && Object.defineProperty(event, 'type', {
+@@ -112,8 +132,7 @@ function eventHandler(event) {
+     event.currentTarget = event.currentTarget || event.target || Object.assign({}, event);
+     hooks.call('modifyMpEventImpl', event);
+     const currentTarget = event.currentTarget;
+-    const id = ((_a = currentTarget.dataset) === null || _a === void 0 ? void 0 : _a.sid /** sid */) || currentTarget.id /** uid */ || ((_b = event.detail) === null || _b === void 0 ? void 0 : _b.id) || '';
+-    const node = env.document.getElementById(id);
++    const node = currentNode || env.document.getElementById(((_a = currentTarget.dataset) === null || _a === void 0 ? void 0 : _a.sid /** sid */) || currentTarget.id /** uid */ || ((_b = event.detail) === null || _b === void 0 ? void 0 : _b.id) || '');
+     if (node) {
+         const dispatch = () => {
+             const e = createEvent(event, node);
 diff --git a/dist/dom/node.d.ts b/dist/dom/node.d.ts
-index a456e9adeecdaae566fe965b7054e55cf009530e..f4e5a5d01b19afccc705f312a8f6efcc91879e31 100644
+index a456e9adeecdaae566fe965b7054e55cf009530e..858e1741d180ca0931242e807a3daf923bce98c4 100644
 --- a/dist/dom/node.d.ts
 +++ b/dist/dom/node.d.ts
-@@ -20,7 +20,8 @@ declare class TaroNode extends TaroEventTarget {
+@@ -20,7 +20,12 @@ declare class TaroNode extends TaroEventTarget {
      childNodes: TaroNode[];
      constructor();
      private hydrate;
 -    private updateChildNodes;
-+    /** Delegates a complete child-list update, including the final reset after element textContent changes. */
++    /**
++     * 子列表整体更新通知，包括 textContent 完成逐项变更后的最终通知。
++     * isClean=true 对应空列表，否则模板默认延迟序列化当前子节点；逻辑树已由调用方修改。
++     * 已通过逐项委托同步原生关系的 host 可将此作为完成通知。
++     */
 +    delegateChildReset(isClean?: boolean): void;
      private updateSingleChild;
      get _root(): TaroRootElement | null;
      get _scope(): MpInstance | null | undefined;
-@@ -71,6 +72,16 @@ declare class TaroNode extends TaroEventTarget {
+@@ -71,6 +76,18 @@ declare class TaroNode extends TaroEventTarget {
       *   2. remove C
       */
      removeChild<T extends TaroNode>(child: T, options?: RemoveChildOptions): T;
 +    /**
-+     * Delegates an insertion after Taro updates its tree, including detached parents.
-+     * The index is the insertion offset when refChild is supplied. The default prepares template payloads.
++     * 逻辑插入完成后调用，包含未挂载的父节点；默认准备模板 payload。
++     * this 为新父节点，refChild 为空表示追加；index 仅在存在 refChild 时表示插入位置。
++     * isReplace 表示替换的插入阶段，旧 refChild 随后另行移除；host 此处只同步插入。
 +     */
 +    delegateChildInsertion(newChild: TaroNode, refChild: TaroNode | null | undefined, index: number, isReplace: boolean | undefined): void;
 +    /**
-+     * Delegates a removal after logical detachment and event identity cleanup.
-+     * Every removal is forwarded; options.doUpdate only suppresses the default template update.
++     * 逻辑解绑及按 cleanRef 清理事件索引后调用；this 为原父节点，child.parentNode 已为空。
++     * 每次实际移除都会通知，options.doUpdate=false 仅抑制默认模板更新。
++     * host 使用 child 同步原生解绑，逻辑树和事件索引仍由 Taro 维护。
 +     */
 +    delegateChildRemoval(child: TaroNode, options: RemoveChildOptions): void;
      remove(options?: RemoveChildOptions): void;
      hasChildNodes(): boolean;
      enqueueUpdate(payload: UpdatePayload): void;
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index cc210f4e56ff90d69a398e2e27382def86f4cb0c..37d6b358ccf58a715089fcf87aead4d566413a98 100644
+index cc210f4e56ff90d69a398e2e27382def86f4cb0c..c29083f1ef15ddcd42ca366533c50ee9feb0734c 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
-@@ -20,7 +20,8 @@ class TaroNode extends TaroEventTarget {
+@@ -20,7 +20,15 @@ class TaroNode extends TaroEventTarget {
          this.sid = this.uid; // dom 节点全局唯一 id，不可被修改
          eventSource.set(this.sid, this);
      }
 -    updateChildNodes(isClean) {
-+    /** Delegates a complete child-list update; the default hydrates lazily or emits an empty list. */
++    /**
++     * 通知整个子列表的最终呈现状态；包括 textContent 完成逐项删除/插入后的整表通知。
++     * isClean 为 true 时，模板 payload 的值为空列表；否则在 flush 时序列化当前子节点。
++     * 逻辑树的修改已经由调用方完成，此方法只准备呈现更新，不负责清空或重建逻辑树。
++     * 默认实现保留过滤注释节点、延迟 hydrate 和 cn 路径更新。
++     * 已通过逐项插入/移除委托同步原生树的 host，可将此处作为完成通知，
++     * 避免把同一逻辑变更再次执行为整树遍历或原生节点重建。
++     */
 +    delegateChildReset(isClean) {
          const cleanChildNodes = () => [];
          const rerenderChildNodes = () => {
              const childNodes = this.childNodes.filter(node => !isComment(node));
-@@ -101,13 +102,13 @@ class TaroNode extends TaroEventTarget {
+@@ -101,13 +109,13 @@ class TaroNode extends TaroEventTarget {
              this.removeChild(this.firstChild, { doUpdate: false });
          }
          if (text === '') {
@@ -164,7 +365,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..37d6b358ccf58a715089fcf87aead4d5
          }
          // @Todo: appendChild 会多触发一次
          MutationObserver.record({
-@@ -149,52 +150,9 @@ class TaroNode extends TaroEventTarget {
+@@ -149,52 +157,9 @@ class TaroNode extends TaroEventTarget {
              // appendChild
              this.childNodes.push(newChild);
          }
@@ -220,7 +421,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..37d6b358ccf58a715089fcf87aead4d5
          if (this._root) {
              bumpNearestCtxEpochForRoot(this._root);
          }
-@@ -270,15 +228,68 @@ class TaroNode extends TaroEventTarget {
+@@ -270,15 +235,83 @@ class TaroNode extends TaroEventTarget {
          if (cleanRef !== false) {
              eventSource.removeNodeTree(child);
          }
@@ -235,7 +436,15 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..37d6b358ccf58a715089fcf87aead4d5
          }
          return child;
      }
-+    /** Delegates an insertion after Taro has updated parentNode and childNodes. */
++    /**
++     * 在 Taro 更新 parentNode/childNodes 后委托插入，父节点尚未挂载时也会调用。
++     * this 是新父节点；newChild 是已插入的逻辑节点；refChild 为空表示追加。
++     * index 仅在有 refChild 时表示逻辑插入位置，追加分支中的值不表示末尾索引。
++     * isReplace 表示 replaceChild 的插入阶段：refChild 此时仍在树中，随后由原方法
++     * 单独移除。原生 host 此处执行插入，旧节点的移除由移除委托接收。
++     * 默认实现沿用模板的局部更新/整表更新选择；host 可在路径计算和 hydrate 前接管。
++     * 原有上下文缓存失效和插入 MutationObserver 记录仍由调用方在委托之后完成。
++     */
 +    delegateChildInsertion(newChild, refChild, index, isReplace) {
 +        const childNodesLength = this.childNodes.length;
 +        // Serialization
@@ -284,7 +493,14 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..37d6b358ccf58a715089fcf87aead4d5
 +            }
 +        }
 +    }
-+    /** Delegates a removal after logical detachment and event identity cleanup. */
++    /**
++     * 在逻辑解绑及按 cleanRef 执行事件索引清理后委托移除。
++     * this 仍是原父节点，child.parentNode 已为 null；_child 供原生 host 定位被移除的节点，
++     * 模板默认实现只需要读取父节点当前的子列表，因此不使用该参数。
++     * options 是调用方原有选项；doUpdate: false 仅抑制默认模板整表更新，
++     * 常用于移动、替换和 textContent 的批量操作。每次实际解绑仍会通知 host。
++     * cleanRef 的处理属于 Taro，host 只同步原生关系；上下文缓存失效由调用方随后完成。
++     */
 +    delegateChildRemoval(_child, options) {
 +        if (this._root && options.doUpdate !== false) {
 +            this.delegateChildReset();
@@ -315,20 +531,24 @@ index 2680d190c19d33a92db1883d674ad6b26b2ffef4..54c120354667930200186ea2f8957747
              while (this.updatePayloads.length > 0) {
                  const { path, value } = this.updatePayloads.shift();
 diff --git a/dist/dom/style.d.ts b/dist/dom/style.d.ts
-index 48f82650a81f4f9db1ca0c6a5018de3b146c76e8..ccd1746effad1ee99f6a6aaad25c2035e584fa12 100644
+index 48f82650a81f4f9db1ca0c6a5018de3b146c76e8..d24c21df4b83a3f79e7971c8656d499ed5dff800 100644
 --- a/dist/dom/style.d.ts
 +++ b/dist/dom/style.d.ts
-@@ -9,6 +9,8 @@ declare class Style {
+@@ -9,6 +9,12 @@ declare class Style {
      private setCssVariables;
      get cssText(): string;
      set cssText(str: string);
-+    /** Delegates after logical style changes and cssText batching, before the default template payload is prepared. */
++    /**
++     * 逻辑样式变更完成后调用；cssText 的同步批量赋值统一通知一次。
++     * this 为 Style，可读取 _element 和完整 cssText；默认准备模板 st 更新。
++     * 单项属性和 CSS 变量复用此入口，host 可接管最终样式的原生写入。
++     */
 +    delegateStyleUpdate(): void;
      setProperty(propertyName: string, value?: string | null): void;
      removeProperty(propertyName: string): string;
      getPropertyValue(propertyName: string): any;
 diff --git a/dist/dom/style.js b/dist/dom/style.js
-index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..4a69cf7180d56b1f63b7c0ff2386f448b5d1ae03 100644
+index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..f84697cd00c667ea0859b8a42e202c6a68a93caf 100644
 --- a/dist/dom/style.js
 +++ b/dist/dom/style.js
 @@ -11,15 +11,6 @@ function recordCss(obj) {
@@ -365,14 +585,21 @@ index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..4a69cf7180d56b1f63b7c0ff2386f448
              return;
          }
          const rules = str.split(';');
-@@ -117,7 +108,17 @@ class Style {
+@@ -117,7 +108,24 @@ class Style {
              this.setProperty(propName.trim(), val.trim());
          }
          this._pending = false;
 -        enqueueUpdate(this);
 +        this.delegateStyleUpdate();
 +    }
-+    /** Delegates the completed style mutation; cssText assignments finish their synchronous batch before calling it. */
++    /**
++     * 单项样式写入在逻辑值和 mutation 记录更新后调用；相同值沿用原有提前返回。
++     * cssText 赋值使用 Taro 已有的 _pending 同步批处理，所有属性处理结束后统一通知一次，
++     * 清空 cssText 也走此入口。setProperty/removeProperty/CSS 变量复用同一套样式存储。
++     * this 是 Style，this._element 是所属 Taro 元素，this.cssText 提供已规范化的完整样式。
++     * 默认实现为已挂载元素准备 st payload；原生 host 可替换为原生样式写入。
++     * 该接口通知最终样式状态，cssText getter 仍按已有逻辑遍历当前样式属性。
++     */
 +    delegateStyleUpdate() {
 +        const element = this._element;
 +        if (element._root) {
@@ -385,23 +612,24 @@ index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..4a69cf7180d56b1f63b7c0ff2386f448
      setProperty(propertyName, value) {
          if (propertyName[0] === '-') {
 diff --git a/dist/dom/text.d.ts b/dist/dom/text.d.ts
-index ce7b2a99c5981d5291096a1f3885d8890850d02e..652a1a3ee8edbad558d0d0ee13232fa8eda9ef09 100644
+index ce7b2a99c5981d5291096a1f3885d8890850d02e..d4581c749c3f306be82f92573ba3721fe80c560b 100644
 --- a/dist/dom/text.d.ts
 +++ b/dist/dom/text.d.ts
-@@ -12,6 +12,11 @@ declare class TaroText extends TaroNode {
+@@ -12,6 +12,12 @@ declare class TaroText extends TaroNode {
      get nodeValue(): string;
      set data(text: string);
      get data(): string;
 +    /**
-+     * Delegates a text update after Taro records the mutation and stores the logical value.
-+     * The default prepares the template payload; textContent, nodeValue and data share this boundary.
++     * characterData 记录及逻辑值写入后调用，text 为最新文本。
++     * textContent、nodeValue、data setter 共用此入口；初值由节点创建路径处理。
++     * 默认准备模板 v 更新，host 可改为原生文本更新。
 +     */
 +    delegateTextUpdate(text: string): void;
  }
  
  export { TaroText };
 diff --git a/dist/dom/text.js b/dist/dom/text.js
-index c61fb312438fc85a2d94852b699da663cc835254..fec85a88f406b5d706cb79e5e4035fe4b243569c 100644
+index c61fb312438fc85a2d94852b699da663cc835254..4e151e2880bbf7ecdf3521e01bb66d48906a9301 100644
 --- a/dist/dom/text.js
 +++ b/dist/dom/text.js
 @@ -15,10 +15,7 @@ class TaroText extends TaroNode {
@@ -416,11 +644,16 @@ index c61fb312438fc85a2d94852b699da663cc835254..fec85a88f406b5d706cb79e5e4035fe4
      }
      get textContent() {
          return this._value;
-@@ -35,6 +32,13 @@ class TaroText extends TaroNode {
+@@ -35,6 +32,18 @@ class TaroText extends TaroNode {
      get data() {
          return this._value;
      }
-+    /** Delegates the logical value after its mutation record; hosts can replace template payload preparation. */
++    /**
++     * Taro 已记录 characterData mutation 并写入 _value，text 是更新后的逻辑文本。
++     * textContent、nodeValue 和 data setter 共用此入口；构造时的初值由节点创建路径处理。
++     * 默认实现准备文本 v 路径的模板 payload；原生 host 可直接更新对应原生文本节点，
++     * 保持逻辑文本值、节点身份和 mutation 记录仍由 Taro 管理。
++     */
 +    delegateTextUpdate(text) {
 +        this.enqueueUpdate({
 +            path: `${this._path}.${"v" /* Shortcuts.Text */}`,
