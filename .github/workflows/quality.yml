@@ -8,14 +8,13 @@ permissions:
 
 jobs:
     check:
-        # Keep required-check names stable across runners.
         name: ${{ matrix.name }}
         runs-on: ${{ matrix.os }}
         strategy:
             fail-fast: false
             matrix:
                 include:
-                    - name: coverage
+                    - name: ubuntu
                       os: ubuntu-latest
                     - name: windows
                       os: windows-latest
