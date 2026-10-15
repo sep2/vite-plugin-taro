@@ -128,17 +128,21 @@ for (const mode of ['development', 'production'] as const) {
 
 const nativeModel = `
 import assert from 'node:assert/strict'
-import { TaroNode } from 'vite-plugin-taro-runtime/runtime/mini'
+import { TaroElement, TaroNode } from 'vite-plugin-taro-runtime/runtime/mini'
 
 // Model the native tree independently; its operation journal verifies the host's forwarding cost and order.
 export const calls = []
 export const reads = []
 export const originalAppend = TaroNode.prototype.appendChild
 export const originalRemove = TaroNode.prototype.removeChild
+export const originalSetAttribute = TaroElement.prototype.setAttribute
+export const originalRemoveAttribute = TaroElement.prototype.removeAttribute
 class NativeNode {
     // Mutable native relationships belong to this test model, not to the production adapter.
     #children = []
     #value
+    // Native attribute storage belongs to the recording model; the host only issues individual writes.
+    attributes = Object.create(null)
     parentNode = null
     constructor(name, value) {
         this.name = name
@@ -162,6 +166,14 @@ class NativeNode {
     }
     get nodeValue() { return this.#value }
     set nodeValue(value) { calls.push(['text', this, value]); this.#value = value }
+    setAttribute(name, value) {
+        calls.push(['attribute', this, name, value])
+        this.attributes[name] = value
+    }
+    removeAttribute(name) {
+        calls.push(['removeAttribute', this, name])
+        delete this.attributes[name]
+    }
     appendChild(child) {
         assert.equal(child.parentNode, null)
         calls.push(['append', this, child])
@@ -183,7 +195,7 @@ class NativeNode {
         child.parentNode = null
     }
 }
-const nativeDocument = {
+export const nativeDocument = {
     createElement(type) {
         const node = new NativeNode(type, '')
         calls.push(['element', type, node])
@@ -202,8 +214,9 @@ const fixture = `
 import assert from 'node:assert/strict'
 import React from 'react'
 import ReactDOM from 'vite-plugin-taro-runtime/react'
+import { hooks } from '@tarojs/shared'
 import { document, FormElement, Style, TaroElement, TaroNode, TaroText } from 'vite-plugin-taro-runtime/runtime/mini'
-import host, { calls, reads, originalAppend, originalRemove } from 'test:tt-dom-host'
+import host, { calls, reads, nativeDocument, originalAppend, originalRemove, originalSetAttribute, originalRemoveAttribute } from 'test:tt-dom-host'
 
 function expectCalls(expected) {
     assert.deepEqual(calls.splice(0), expected)
@@ -221,6 +234,8 @@ function expectChildren(parent, children) {
 assert.deepEqual(calls, [], 'host installation does not construct a native App or document tree')
 assert.strictEqual(TaroNode.prototype.appendChild, originalAppend)
 assert.strictEqual(TaroNode.prototype.removeChild, originalRemove)
+assert.strictEqual(TaroElement.prototype.setAttribute, originalSetAttribute)
+assert.strictEqual(TaroElement.prototype.removeAttribute, originalRemoveAttribute)
 const root = document.createElement('root')
 assert.equal(root.nativeNode, undefined)
 assert.equal(document.getElementById('app').nativeNode, undefined)
@@ -237,7 +252,7 @@ assert.equal(host.isFormElement(input), true)
 assert.equal(host.isFormElement(parent), false)
 expectCalls([['element', 'input', input.nativeNode]])
 
-// Every basic tree/text path must reach its native operation before any template payload work.
+// Tree, text, style and attribute mutations reach native operations before template payload work.
 TaroNode.extend('_path', { get() { assert.fail('Native mutations must not calculate template paths') } })
 TaroNode.extend('enqueueUpdate', () => assert.fail('Native mutations must not enqueue template updates'))
 parent.appendChild(text)
@@ -292,6 +307,87 @@ expectChildren(parent, [])
 host.afterCommit(parent)
 expectCalls([])
 
+// A Page lifecycle supplies its native container before rooted attribute and style updates.
+root.nativeNode = nativeDocument.createElement('page')
+root.appendChild(parent)
+expectCalls([['element', 'page', root.nativeNode], ['append', root.nativeNode, parent.nativeNode]])
+assert.strictEqual(parent._root, root)
+
+// Taro owns logical props, dataset and the ID index; forwarding preserves values and normalizes native names.
+const props = parent.props
+const objectValue = { nested: ['retained'] }
+for (const [name, nativeName, value] of [
+    ['title', 'title', 'label'],
+    ['hidden', 'hidden', false],
+    ['tab-index', 'tabIndex', 0],
+    ['hover-class', 'hoverClass', 'pressed'],
+    ['data-entry-key', 'data-entry-key', objectValue],
+    ['aria-label', 'aria-label', 'description'],
+    ['custom-value', 'customValue', objectValue]
+]) {
+    parent.setAttribute(name, value)
+    expectCalls([['attribute', parent.nativeNode, nativeName, value]])
+    assert.strictEqual(parent.props[name], value)
+    assert.strictEqual(parent.nativeNode.attributes[nativeName], value)
+    parent.setAttribute(name, value)
+    expectCalls([['attribute', parent.nativeNode, nativeName, value]])
+    parent.removeAttribute(name)
+    expectCalls([['removeAttribute', parent.nativeNode, nativeName]])
+    assert.equal(Object.hasOwn(parent.props, name), false)
+    assert.equal(Object.hasOwn(parent.nativeNode.attributes, nativeName), false)
+    parent.removeAttribute(name)
+    expectCalls([])
+}
+assert.strictEqual(parent.props, props)
+const dataset = parent.dataset
+parent.setAttribute('data-entry-key', objectValue)
+assert.strictEqual(parent.dataset, dataset)
+assert.strictEqual(dataset.entryKey, objectValue)
+expectCalls([['attribute', parent.nativeNode, 'data-entry-key', objectValue]])
+parent.setAttribute('id', 123)
+expectCalls([['attribute', parent.nativeNode, 'id', '123']])
+assert.equal(parent.uid, '123')
+assert.strictEqual(document.getElementById('123'), parent)
+assert.strictEqual(document.getElementById(parent.sid), parent)
+parent.id = 'native-view'
+expectCalls([['attribute', parent.nativeNode, 'id', 'native-view']])
+assert.equal(document.getElementById('123'), null)
+assert.strictEqual(document.getElementById('native-view'), parent)
+parent.removeAttribute('id')
+expectCalls([['removeAttribute', parent.nativeNode, 'id']])
+assert.equal(parent.id, '')
+assert.strictEqual(document.getElementById(parent.sid), parent)
+parent.className = 'first'
+expectCalls([['attribute', parent.nativeNode, 'class', 'first']])
+parent.classList.add('second')
+expectCalls([['attribute', parent.nativeNode, 'class', 'first second']])
+assert.equal(parent.className, 'first second')
+parent.removeAttribute('class')
+expectCalls([['removeAttribute', parent.nativeNode, 'class']])
+parent.removeAttribute('missing')
+expectCalls([])
+
+// The existing removal hook can retain a logical attribute before the host is notified.
+parent.setAttribute('retained', objectValue)
+expectCalls([['attribute', parent.nativeNode, 'retained', objectValue]])
+hooks.tap('onRemoveAttribute', (node, name) => node === parent && name === 'retained')
+parent.removeAttribute('retained')
+expectCalls([])
+assert.strictEqual(parent.props.retained, objectValue)
+assert.strictEqual(parent.nativeNode.attributes.retained, objectValue)
+input.type = 'number'
+input.value = '42'
+input.focus()
+input.blur()
+expectCalls([
+    ['attribute', input.nativeNode, 'type', 'number'],
+    ['attribute', input.nativeNode, 'value', '42'],
+    ['attribute', input.nativeNode, 'focus', true],
+    ['attribute', input.nativeNode, 'focus', false]
+])
+assert.equal(input.type, 'number')
+assert.equal(input.value, '42')
+
 // Single-property forwarding reads no additional cssText beyond Taro's existing mutation oldValue.
 const style = parent.style
 const cssText = Object.getOwnPropertyDescriptor(Style.prototype, 'cssText')
@@ -338,13 +434,22 @@ for (const value of ['color: green; --accent: teal;', '', null, undefined]) {
     cssReads = 0
 }
 
+// Attribute-form style operations use the Style delegate exactly once, including repeated clears.
+parent.setAttribute('style', ' color: navy; margin-top: 4px ')
+expectCalls([['style', parent.nativeNode, 'cssText', 'color: navy; margin-top: 4px;']])
+assert.equal(parent.getAttribute('style'), 'color: navy; margin-top: 4px;')
+parent.removeAttribute('style')
+expectCalls([['style', parent.nativeNode, 'cssText', '']])
+parent.removeAttribute('style')
+expectCalls([['style', parent.nativeNode, 'cssText', '']])
+
 // A real shared React renderer keeps Taro refs and keyed native identities through text updates and moves.
 const container = document.createElement('view')
 const reactRoot = ReactDOM.createRoot(container)
 const ref = React.createRef()
-function List({ reverse, label, style }) {
+function List({ reverse, label, style, attributes }) {
     const children = [
-        React.createElement('view', { key: 'a', ref, style }, label),
+        React.createElement('view', { key: 'a', ref, style, ...attributes }, label),
         React.createElement('view', { key: 'b' }, 'b')
     ]
     return reverse ? children.reverse() : children
@@ -396,6 +501,35 @@ try {
         reverse: true, label: 'updated', style: { color: 'orange' }
     })))
     expectCalls([['style', firstNative, 'cssText', ''], ['style', firstNative, 'color', 'orange']])
+    const attributes = { id: 'react-view', className: 'item', 'hover-class': 'pressed', 'data-entry-key': objectValue }
+    ReactDOM.flushSync(() => reactRoot.render(React.createElement(List, {
+        reverse: true, label: 'updated', style: { color: 'orange' }, attributes
+    })))
+    expectCalls([
+        ['attribute', firstNative, 'id', 'react-view'],
+        ['attribute', firstNative, 'class', 'item'],
+        ['attribute', firstNative, 'hoverClass', 'pressed'],
+        ['attribute', firstNative, 'data-entry-key', objectValue]
+    ])
+    assert.strictEqual(document.getElementById('react-view'), first)
+    assert.strictEqual(first.dataset.entryKey, objectValue)
+    ReactDOM.flushSync(() => reactRoot.render(React.createElement(List, {
+        reverse: true, label: 'updated', style: { color: 'orange' }, attributes
+    })))
+    expectCalls([])
+    ReactDOM.flushSync(() => reactRoot.render(React.createElement(List, {
+        reverse: true, label: 'updated', style: { color: 'orange' }, attributes: { id: 'react-next' }
+    })))
+    expectCalls([
+        ['removeAttribute', firstNative, 'class'],
+        ['removeAttribute', firstNative, 'hoverClass'],
+        ['removeAttribute', firstNative, 'data-entry-key'],
+        ['attribute', firstNative, 'id', 'react-next']
+    ])
+    assert.equal(document.getElementById('react-view'), null)
+    assert.strictEqual(document.getElementById('react-next'), first)
+    assert.strictEqual(ref.current, first)
+    assert.strictEqual(first.nativeNode, firstNative)
 } finally {
     calls.length = 0
     ReactDOM.flushSync(() => reactRoot.unmount())
