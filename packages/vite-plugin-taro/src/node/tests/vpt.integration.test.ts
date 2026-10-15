@@ -246,6 +246,46 @@ function collectModuleIds(output: BuildOutput): string[] {
         .map(normalizePath)
 }
 
+for (const renderer of ['template', 'dom'] as const) {
+    test(`builds TT ${renderer} pages with the selected host and recursive template assets`, async () => {
+        await inspectFixtureBuild(
+            {
+                options: { ...createOptions('tt'), renderer },
+                files: {
+                    'src/app.tsx': appSource,
+                    'src/pages/home/index.tsx': `
+                        import { Input, Text, View } from 'virtual:taro/components'
+                        export default function Page() {
+                            return <View><Text>TT page</Text><Input value="ready" /></View>
+                        }
+                    `
+                }
+            },
+            (output) => {
+                const modules = collectModuleIds(output)
+                assert.equal(modules.includes(normalizePath(resolveVptRuntime('tt/dom-host'))), renderer === 'dom')
+                assert.equal(
+                    modules.includes(normalizePath(resolveVptRuntime('tt/create-dom-host'))),
+                    renderer === 'dom'
+                )
+                assert.equal(
+                    modules.includes(normalizePath(resolveVptRuntime('mini/taro/template-host'))),
+                    renderer === 'template'
+                )
+                assert.equal(
+                    parseJsonAsset(output, 'project.config.json').enableTTDom,
+                    renderer === 'dom' ? true : undefined
+                )
+                assert.match(
+                    String(requireAsset(output, 'pages/home/index.ttml').source),
+                    /<comp i="{{app}}" p="{{page}}" \/>/
+                )
+                assertNativeShells(output)
+            }
+        )
+    })
+}
+
 for (const target of ['wx', 'zfb', 'tt'] as const) {
     test(`builds HTML-only ${target} pages with mapped native templates and CSS`, async () => {
         await inspectFixtureBuild(
@@ -461,34 +501,6 @@ test('builds a routed H5 application through the public plugin entry', async () 
             // These APIs are named H5 exports, not properties on the default Taro object.
             assert.doesNotMatch(javascript, /\.\s*(?:setNavigationBarTitle|showToast)\s*\(/)
             assert.doesNotMatch(javascript, /stale\/route|virtual:taro/)
-        }
-    )
-})
-
-test('builds TT DOM configuration with recursive native templates', async () => {
-    await inspectFixtureBuild(
-        {
-            options: { ...createOptions('tt'), renderer: 'dom' },
-            files: {
-                'src/app.tsx': appSource,
-                'src/pages/home/index.tsx': `
-                    import { View } from 'virtual:taro/components'
-                    export default function Home() { return <View>Template host</View> }
-                `
-            }
-        },
-        (output) => {
-            const hostId = normalizePath(resolveVptRuntime('mini/taro/template-host'))
-            const modules = output
-                .filter((entry): entry is OutputChunk => entry.type === 'chunk')
-                .flatMap((entry) => Object.keys(entry.modules).map(normalizePath))
-            assert.ok(modules.includes(hostId))
-            assert.equal(JSON.parse(String(requireAsset(output, 'project.config.json').source)).enableTTDom, true)
-            assert.match(
-                String(requireAsset(output, 'pages/home/index.ttml').source),
-                /<comp i="{{app}}" p="{{page}}" \/>/
-            )
-            assertNativeShells(output)
         }
     )
 })

@@ -120,14 +120,18 @@ for (const [target, createContract] of [
     ['zfb', createZfbMiniContract],
     ['tt', createTtMiniContract]
 ] as const) {
-    test(`${target}: resolves the shared template host for every renderer configuration`, () => {
+    test(`${target}: resolves the selected target host for every renderer configuration`, () => {
         for (const selection of [{}, { renderer: 'template' }, { renderer: 'dom' }] as const) {
             const targetContract = createContract({ ...contract.options, target, ...selection })
             const resolver = createResolver(targetContract)
 
             assert.equal(
                 resolver.resolveId(rendererHostId, undefined, path.resolve('/project')),
-                resolveVptRuntime('mini/taro/template-host')
+                resolveVptRuntime(
+                    target === 'tt' && targetContract.options.renderer === 'dom'
+                        ? 'tt/dom-host'
+                        : 'mini/taro/template-host'
+                )
             )
         }
     })

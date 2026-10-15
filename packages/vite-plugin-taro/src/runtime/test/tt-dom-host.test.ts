@@ -6,6 +6,7 @@ import { build } from 'rolldown'
 import { normalizePath, resolveConfig } from 'vite'
 import vpt from '../../index.ts'
 import { rendererHostId } from '../../node/plugins/mini/module/module.ts'
+import { createTtMiniContract } from '../../node/plugins/tt/plugins.ts'
 import { resolveTaroRuntime, resolveVptRuntime } from '../../node/utils/packages.ts'
 
 const require = createRequire(import.meta.url)
@@ -23,15 +24,18 @@ for (const mode of ['development', 'production'] as const) {
                 clearImmediate(immediate)
             }
         })
-        const config = await resolveConfig(
-            {
-                configFile: false,
-                plugins: vpt({ target: 'tt', app: 'src/app.tsx', pages: [], appJson: {}, projectConfigJson: {} })
-            },
-            'build'
-        )
+        const contract = createTtMiniContract({
+            target: 'tt',
+            renderer: 'dom',
+            app: 'src/app.tsx',
+            pages: [],
+            appJson: {},
+            projectConfigJson: {}
+        })
+        const config = await resolveConfig({ configFile: false, plugins: vpt(contract.options) }, 'build')
         const entry = 'test:tt-dom-host-fixture'
         const hostModule = 'test:tt-dom-host'
+        const modelModule = 'test:tt-native-document'
         const outputFile = fileURLToPath(new URL(`./tt-dom-host-${mode}-fixture.js`, import.meta.url))
         const runtimeRoot = normalizePath(fileURLToPath(new URL('../', import.meta.url)))
         const result = await build({
@@ -41,7 +45,7 @@ for (const mode of ['development', 'production'] as const) {
                 {
                     name: entry,
                     resolveId(id) {
-                        if (id === entry || id === hostModule) {
+                        if (id === entry || id === hostModule || id === modelModule) {
                             return id
                         }
                         if (id === rendererHostId) {
@@ -56,7 +60,13 @@ for (const mode of ['development', 'production'] as const) {
                             return `${fixture}\n${eventsFixture}\n${pagesFixture}`
                         }
                         if (id === hostModule) {
-                            return `import { createDomHost } from ${JSON.stringify(resolveVptRuntime('tt/create-dom-host'))}\n${nativeModel}`
+                            // The SDK exists before the selected application host initializes; do not replace that host.
+                            return `import '${modelModule}';
+                                export * from '${modelModule}';
+                                export { default } from ${JSON.stringify(contract.taro.hostPath)};`
+                        }
+                        if (id === modelModule) {
+                            return nativeModel
                         }
                     },
                     transform(code, id) {
@@ -73,7 +83,7 @@ for (const mode of ['development', 'production'] as const) {
                 file: outputFile,
                 format: 'cjs',
                 postBanner:
-                    'export default function(exports, require, globalThis, global, setTimeout, clearTimeout, setImmediate, clearImmediate) {',
+                    'export default function(exports, require, globalThis, global, setTimeout, clearTimeout, setImmediate, clearImmediate, tt) {',
                 postFooter: '}',
                 sourcemap: 'inline'
             },
@@ -92,39 +102,45 @@ for (const mode of ['development', 'production'] as const) {
         })
         try {
             const { default: execute }: { default: (...args: unknown[]) => void } = await import(url)
-            const exports: { completion?: Promise<void> } = {}
-            execute(
-                exports,
-                require,
-                {},
-                {},
-                (callback: () => void, delay: number | undefined) => {
-                    const timer = setTimeout(() => {
+            const executeFixture = (nativeAvailable: boolean) => {
+                const exports: { completion?: Promise<void> } = {}
+                execute(
+                    exports,
+                    require,
+                    {},
+                    {},
+                    (callback: () => void, delay: number | undefined) => {
+                        const timer = setTimeout(() => {
+                            timers.delete(timer)
+                            callback()
+                        }, delay)
+                        timers.add(timer)
+                        return timer
+                    },
+                    (timer: ReturnType<typeof setTimeout>) => {
                         timers.delete(timer)
-                        callback()
-                    }, delay)
-                    timers.add(timer)
-                    return timer
-                },
-                (timer: ReturnType<typeof setTimeout>) => {
-                    timers.delete(timer)
-                    clearTimeout(timer)
-                },
-                (callback: () => void) => {
-                    const immediate = setImmediate(() => {
+                        clearTimeout(timer)
+                    },
+                    (callback: () => void) => {
+                        const immediate = setImmediate(() => {
+                            immediates.delete(immediate)
+                            callback()
+                        })
+                        immediates.add(immediate)
+                        return immediate
+                    },
+                    (immediate: ReturnType<typeof setImmediate>) => {
                         immediates.delete(immediate)
-                        callback()
-                    })
-                    immediates.add(immediate)
-                    return immediate
-                },
-                (immediate: ReturnType<typeof setImmediate>) => {
-                    immediates.delete(immediate)
-                    clearImmediate(immediate)
-                }
-            )
+                        clearImmediate(immediate)
+                    },
+                    { nativeAvailable }
+                )
+                return exports
+            }
+            const exports = executeFixture(true)
             assert.ok(exports.completion)
             await exports.completion
+            assert.throws(() => executeFixture(false), /TT DOM renderer requires tt.appDocument/)
         } finally {
             hooks.deregister()
         }
@@ -222,7 +238,8 @@ class NativeNode {
 }
 // Platform-owned Page registration exists only in this SDK model, not in the production host.
 export const pageDocuments = new Map()
-export const nativeDocument = {
+// Freezing the SDK facade makes factory replacement or synthetic document setup fail immediately.
+export const nativeDocument = Object.freeze({
     getPageDocumentById(id) {
         calls.push(['pageDocument', id])
         return pageDocuments.get(id)
@@ -237,15 +254,17 @@ export const nativeDocument = {
         calls.push(['createText', text, node])
         return node
     }
+})
+if (tt.nativeAvailable) {
+    tt.appDocument = nativeDocument
 }
-export default createDomHost(nativeDocument)
 `
 
 const fixture = `
 import assert from 'node:assert/strict'
 import React from 'react'
 import ReactDOM from 'vite-plugin-taro-runtime/react'
-import { hooks, toCamelCase } from '@tarojs/shared'
+import { hooks, isEnableTTDom, toCamelCase } from '@tarojs/shared'
 import 'vite-plugin-taro-runtime/plugin-platform-tt/runtime'
 import { Current, document, FormElement, Style, TaroElement, TaroNode, TaroText } from 'vite-plugin-taro-runtime/runtime/mini'
 import { useLoad, useUnload } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
@@ -266,6 +285,9 @@ function expectChildren(parent, children) {
     }
     reads.length = 0
 }
+assert.equal(isEnableTTDom(), false, 'the shared renderer continues to use Taro logical nodes')
+assert.notStrictEqual(document, tt.appDocument)
+assert.strictEqual(nativeDocument, tt.appDocument)
 assert.deepEqual(calls, [], 'host installation does not construct a native App or document tree')
 assert.strictEqual(TaroNode.prototype.appendChild, originalAppend)
 assert.strictEqual(TaroNode.prototype.removeChild, originalRemove)

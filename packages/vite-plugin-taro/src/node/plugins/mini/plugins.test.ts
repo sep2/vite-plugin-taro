@@ -103,7 +103,7 @@ for (const [target, createContract] of [
     ['zfb', createZfbMiniContract],
     ['tt', createTtMiniContract]
 ] as const) {
-    test(`${target}: selects the template host while preserving public renderer options`, () => {
+    test(`${target}: selects the target host while preserving public renderer options`, () => {
         for (const selection of [{}, { renderer: 'template' }, { renderer: 'dom' }] as const) {
             const options: VptOptions = Object.freeze({
                 target,
@@ -115,7 +115,12 @@ for (const [target, createContract] of [
             })
             const contract = createContract(options)
 
-            assert.equal(contract.taro.hostPath, resolveVptRuntime('mini/taro/template-host'))
+            assert.equal(
+                contract.taro.hostPath,
+                resolveVptRuntime(
+                    target === 'tt' && options.renderer === 'dom' ? 'tt/dom-host' : 'mini/taro/template-host'
+                )
+            )
             assert.strictEqual(contract.options, options)
             assert.equal(Object.hasOwn(options, 'renderer'), Object.hasOwn(selection, 'renderer'))
         }

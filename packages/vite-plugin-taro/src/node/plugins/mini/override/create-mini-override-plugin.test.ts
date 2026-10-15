@@ -136,7 +136,12 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
                 appJson: {},
                 projectConfigJson: {}
             })
-            assert.match(contract.taro.hostPath, /runtime[/\\]mini[/\\]taro[/\\]template-host\.(?:ts|js)$/)
+            assert.match(
+                contract.taro.hostPath,
+                target === 'tt' && renderer === 'dom'
+                    ? /runtime[/\\]tt[/\\]dom-host\.(?:ts|js)$/
+                    : /runtime[/\\]mini[/\\]taro[/\\]template-host\.(?:ts|js)$/
+            )
             const { projectConfigFilename } = contract.output
             const sourceFiles = createProjectConfigFixture(target, true)
             const cases = [
