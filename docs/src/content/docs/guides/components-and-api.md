@@ -1,13 +1,15 @@
 ---
 title: 组件与 API
-description: 在 VPT 中使用 Taro 组件与 API。
+description: 在 VPT 中使用 HTML 标签、Taro 组件与 API。
 ---
 
 VPT 使用 Taro 4 的组件和 API 规范。
 
 ## 使用组件
 
-组件从 `virtual:taro/components` 导入：
+页面可以直接使用 `div`、`span` 等 HTML 标签，并与 Taro 组件混用。
+
+Taro 组件从 `virtual:taro/components` 导入：
 
 ```tsx
 import { Text, View } from 'virtual:taro/components'
@@ -25,11 +27,10 @@ export default function AccountCard() {
 
 ### JSX 约定
 
-- 组件名使用 PascalCase，例如 `View`、`ScrollView` 和 `PageMeta`。
+- Taro 组件使用 PascalCase，例如 `View`、`ScrollView` 和 `PageMeta`。
 - 属性使用 camelCase，例如 `scrollY` 和 `hoverClass`。
 - 样式类使用 `className`。
 - 事件以 `on` 开头，例如 `onClick`、`onScroll` 和 `onChange`。
-- 共享页面使用 Taro 组件，不要直接使用 `<div>`、`<span>` 等 Web 元素。
 
 ## 支持的组件
 
