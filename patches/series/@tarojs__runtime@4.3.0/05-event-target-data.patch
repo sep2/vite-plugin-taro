@@ -1,0 +1,35 @@
+diff --git a/dist/dom/event.js b/dist/dom/event.js
+index 25387103c37d6d0cc45a02db052438752e993a67..8a8aab1e78ca3f5087bf768cf57732ed52e6697f 100644
+--- a/dist/dom/event.js
++++ b/dist/dom/event.js
+@@ -36,7 +36,10 @@ class TaroEvent {
+             const currentEle = env.document.getElementById(((_b = target.dataset) === null || _b === void 0 ? void 0 : _b.sid) || target.id || null);
+             // Note：优先判断冒泡场景alipay的targetDataset的sid, 不然冒泡场景target属性吐出不对，其余拿取当前绑定id
+             const element = env.document.getElementById(((_c = target.targetDataset) === null || _c === void 0 ? void 0 : _c.sid) || ((_d = target.dataset) === null || _d === void 0 ? void 0 : _d.sid) || target.id || null);
+-            target.dataset = Object.assign(Object.assign({}, (currentEle !== null ? currentEle.dataset : EMPTY_OBJ)), (element !== null ? element.dataset : EMPTY_OBJ));
++            // 索引命中时仍以逻辑 dataset 为准，保留对象值及支付宝两层数据的合并顺序。
++            // 索引未命中只表示无法取得逻辑节点，不能丢弃平台已提供的数据。
++            // 两个来源分别兜底，复用原有 Object.assign 和缓存；不补建索引或遍历节点树。
++            target.dataset = Object.assign(Object.assign({}, (currentEle !== null ? currentEle.dataset : target.dataset || EMPTY_OBJ)), (element !== null ? element.dataset : target.targetDataset || EMPTY_OBJ));
+             for (const key in (_e = this.mpEvent) === null || _e === void 0 ? void 0 : _e.detail) {
+                 target[key] = this.mpEvent.detail[key];
+             }
+@@ -55,11 +58,16 @@ class TaroEvent {
+             const currentTarget = Object.create(((_a = this.mpEvent) === null || _a === void 0 ? void 0 : _a.currentTarget) || null);
+             const element = doc.getElementById(((_b = currentTarget.dataset) === null || _b === void 0 ? void 0 : _b.sid) || currentTarget.id || null);
+             const targetElement = doc.getElementById(((_e = (_d = (_c = this.mpEvent) === null || _c === void 0 ? void 0 : _c.target) === null || _d === void 0 ? void 0 : _d.dataset) === null || _e === void 0 ? void 0 : _e.sid) || ((_g = (_f = this.mpEvent) === null || _f === void 0 ? void 0 : _f.target) === null || _g === void 0 ? void 0 : _g.id) || null);
+-            if (element === null || (element && element === targetElement)) {
++            // 已知逻辑节点相同才沿用 target；未命中时，只有同一原始对象能证明身份相同。
++            // 两个 null 查询结果、空 ID 或相同的未解析 ID 都不能证明两个事件目标相同。
++            // 无平台事件时保留手动构造事件的共享目标；这里只比较已有引用，不新增查询或状态。
++            if (element !== null ? element === targetElement : !this.mpEvent || this.mpEvent.currentTarget === this.mpEvent.target) {
+                 this.cacheCurrentTarget = this.target;
+                 return this.target;
+             }
+-            currentTarget.dataset = element.dataset;
++            // 保留已知逻辑 dataset 的引用；未命中时使用当前接收目标自己的平台 dataset。
++            // detail 合并和惰性缓存继续复用下方流程，不把接收目标替换成触发目标。
++            currentTarget.dataset = element !== null ? element.dataset : currentTarget.dataset || EMPTY_OBJ;
+             for (const key in (_h = this.mpEvent) === null || _h === void 0 ? void 0 : _h.detail) {
+                 currentTarget[key] = this.mpEvent.detail[key];
+             }

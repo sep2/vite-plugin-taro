@@ -1,6 +1,6 @@
 # Dependency patch series
 
-pnpm applies one combined patch to each package version. We maintain **12 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output.
+pnpm applies one combined patch to each package version. We maintain **13 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output.
 
 ## Feature inventory
 
@@ -17,6 +17,7 @@ pnpm applies one combined patch to each package version. We maintain **12 featur
 | | `02-page-prerender` | Type native Page data as an object or factory and let onLoad adopt a caller-prepared identity without moving lifecycle dispatch. VPT stores that identity in non-enumerable `__vpt_meta.prerenderIdentity`; the factory signature is unchanged. |
 | | `03-delegate-dom` | Expose overridable child insertion/removal/reset, text, attribute, style and event delegation methods while Taro owns logical state, event identities, mutation records and context-cache invalidation. The defaults preserve template payload preparation. |
 | | `04-event-listener-removal` | Preserve registered event handlers when removal targets an unregistered function; matching handlers retain their ordinary removal behavior. |
+| | `05-event-target-data` | Preserve platform target datasets when logical indexes miss and keep distinct unresolved event targets separate. |
 | `canvas-confetti@1.9.4` | `01-canvas-confetti-enhancements` | Keep all existing confetti enhancements together: rotation/tilt controls, frame-clock repeat emission, cached path drawing, and DOMMatrix input normalization. Source, browser and module builds stay aligned. |
 
 The React renderer imports its host through `\0vpt:renderer-host`. VPT's Mini resolver binds that private import to `src/runtime/mini/taro/template-host.ts`. The generic `RendererHost` type is exported by `vite-plugin-taro-runtime/react`: it accepts the root container and host context for element/text creation, classifies form elements, and receives optional pre-commit and synchronous post-commit callbacks. VPT's recursive implementation uses Taro's document and `FormElement` and owns App/Page outlet projection. React reconciliation, prop comparison, controlled-input restoration and App/Page mounting retain their existing behavior.
@@ -37,9 +38,13 @@ Taro's `insertBefore` and `removeChild` invoke `delegateChildInsertion` and `del
 
 Subscription notifications carry Taro’s lowercase logical event names: `regionchange` produces `begin` and `end` transitions. Native event-name mapping belongs to the platform host.
 
-`eventHandler(event, currentNode?)` accepts a known logical receiver from a native host. Both entry forms run the existing platform normalization first; template callbacks then resolve the receiver through Taro's event index, while a supplied node goes directly to the same dispatch path. Event construction, hooks, React priority, form updates, callback returns and the existing native-bubbling batch retain their shared implementation. The optional receiver adds one constant-time selection and skips the entry's ID lookup; existing ancestor traversal and event-property processing retain their costs. `TaroEvent.target` and `currentTarget` keep their existing getter behavior.
+`eventHandler(event, currentNode?)` accepts a known logical receiver from a native host. Both entry forms run the existing platform normalization first; template callbacks then resolve the receiver through Taro's event index, while a supplied node goes directly to the same dispatch path. Event construction, hooks, React priority, form updates, callback returns and the existing native-bubbling batch retain their shared implementation. The optional receiver adds one constant-time selection and skips the entry's ID lookup; existing ancestor traversal and event-property processing retain their costs. The target getters resolve datasets independently through their existing logical index lookups.
 
 `04-event-listener-removal` returns when the existing handler search finds no match, preserving the listener array and its callable entries. Taro retains its development warning, function-wrapper matching, case normalization and automatic `once` removal. The regression tests exercise public node methods and dispatch in WX, ZFB and TT template configurations, in development and production. The guard adds O(1) work to the existing O(H) handler search/removal.
+
+`05-event-target-data` keeps logical datasets authoritative when their index lookups succeed, falling back to the corresponding platform dataset only on a miss. Target data retains Alipay's existing two-source merge order. An unresolved currentTarget shares the target wrapper only when both raw targets are the same object; manually constructed events without platform targets retain their shared wrapper. Distinct unresolved targets keep their own data. The getters retain their two index reads, existing dataset/detail processing and lazy caches. No index restoration, tree traversal or persistent state is added. Copying actual fallback data costs O(D) for D dataset fields rather than copying empty objects; detail processing retains O(K) for K detail fields. Cross-platform regressions cover indexed and native data, merge precedence, target identity, reinsertion and cache reuse without installing a DOM host.
+
+Upstream: [NervJS/taro#19528](https://github.com/NervJS/taro/pull/19528). Retire `05-event-target-data` when the pinned `@tarojs/runtime` release includes this fix: remove its series entry and feature patch, recompose the generated runtime patch, refresh the lockfile, and retain the regression tests to verify the upstream implementation.
 
 `vite-plugin-taro-runtime/runtime/tt-document` exposes Taro's existing `bom/document.js` factory directly. Its native DOM declarations live in the runtime package's `types/tt-document.d.ts`.
 
