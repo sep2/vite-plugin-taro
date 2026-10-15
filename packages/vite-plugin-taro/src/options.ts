@@ -62,8 +62,9 @@ export interface VptOptions {
     target: VptTarget
 
     /**
-     * Native Mini Program renderer configuration. Omission selects `template`.
-     * TT `dom` selects the native DOM host and enables `enableTTDom`; it requires the SDK appDocument.
+     * Native Mini Program rendering preference. Omission selects `template`.
+     * TT `dom` enables `enableTTDom` and prefers the DOM host when the SDK uses mode 2 and supplies appDocument;
+     * otherwise startup selects the template host. The selected host remains fixed for that runtime.
      * WX/ZFB use the template host. H5 uses its browser renderer.
      */
     renderer?: 'template' | 'dom'

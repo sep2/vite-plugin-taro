@@ -247,7 +247,7 @@ function collectModuleIds(output: BuildOutput): string[] {
 }
 
 for (const renderer of ['template', 'dom'] as const) {
-    test(`builds TT ${renderer} pages with the selected host and recursive template assets`, async () => {
+    test(`builds TT ${renderer} pages with the required host factories and recursive template assets`, async () => {
         await inspectFixtureBuild(
             {
                 options: { ...createOptions('tt'), renderer },
@@ -263,11 +263,12 @@ for (const renderer of ['template', 'dom'] as const) {
             },
             (output) => {
                 const modules = collectModuleIds(output)
-                assert.equal(modules.includes(normalizePath(resolveVptRuntime('tt/dom-host'))), renderer === 'dom')
+                assert.equal(modules.includes(normalizePath(resolveVptRuntime('tt/renderer-host'))), renderer === 'dom')
                 assert.equal(
                     modules.includes(normalizePath(resolveVptRuntime('tt/create-dom-host'))),
                     renderer === 'dom'
                 )
+                assert.ok(modules.includes(normalizePath(resolveVptRuntime('mini/taro/create-template-host'))))
                 assert.equal(
                     modules.includes(normalizePath(resolveVptRuntime('mini/taro/template-host'))),
                     renderer === 'template'

@@ -129,7 +129,7 @@ for (const [target, createContract] of [
                 resolver.resolveId(rendererHostId, undefined, path.resolve('/project')),
                 resolveVptRuntime(
                     target === 'tt' && targetContract.options.renderer === 'dom'
-                        ? 'tt/dom-host'
+                        ? 'tt/renderer-host'
                         : 'mini/taro/template-host'
                 )
             )

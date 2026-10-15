@@ -245,6 +245,7 @@ test('ships Mini activation capsules with shared Taro integration modules', asyn
     ])
     const taroFiles = await readdir(path.join(miniRoot, 'taro'))
     for (const file of [
+        'create-template-host.js',
         'create-vpt-app.js',
         'create-vpt-page.js',
         'get-page-query.js',
@@ -451,7 +452,7 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         readFile(path.join(runtimePackageDistRoot, 'runtime', 'dom', 'node.js'), 'utf8'),
         readFile(path.join(runtimePackageDistRoot, 'runtime', 'hydrate.js'), 'utf8'),
         readFile(path.join(runtimePackageDistRoot, 'react', 'react.esm.js'), 'utf8'),
-        readFile(path.join(distRoot, 'runtime', 'mini', 'taro', 'template-host.js'), 'utf8'),
+        readFile(path.join(distRoot, 'runtime', 'mini', 'taro', 'create-template-host.js'), 'utf8'),
         readFile(path.join(distRoot, 'runtime', 'mini', 'taro', 'create-vpt-app.js'), 'utf8')
     ])
 

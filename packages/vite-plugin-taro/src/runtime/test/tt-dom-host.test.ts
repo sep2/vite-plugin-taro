@@ -12,7 +12,7 @@ import { resolveTaroRuntime, resolveVptRuntime } from '../../node/utils/packages
 const require = createRequire(import.meta.url)
 
 for (const mode of ['development', 'production'] as const) {
-    test(`TT DOM host (${mode}): Taro mutations directly update stable native nodes`, async (t) => {
+    test(`TT renderer (${mode}): installs one host for the startup SDK capabilities`, async (t) => {
         // Own React scheduler resources for this isolated runtime, including failed-assertion cleanup.
         const timers = new Set<ReturnType<typeof setTimeout>>()
         const immediates = new Set<ReturnType<typeof setImmediate>>()
@@ -57,7 +57,7 @@ for (const mode of ['development', 'production'] as const) {
                     },
                     load(id) {
                         if (id === entry) {
-                            return `${fixture}\n${eventsFixture}\n${pagesFixture}`
+                            return `${fixture}\n${eventsFixture}\n${pagesFixture}\n}\n${templateFixture}`
                         }
                         if (id === hostModule) {
                             // The SDK exists before the selected application host initializes; do not replace that host.
@@ -83,7 +83,7 @@ for (const mode of ['development', 'production'] as const) {
                 file: outputFile,
                 format: 'cjs',
                 postBanner:
-                    'export default function(exports, require, globalThis, global, setTimeout, clearTimeout, setImmediate, clearImmediate, tt) {',
+                    'export default function(exports, require, globalThis, global, setTimeout, clearTimeout, setImmediate, clearImmediate, tt, getCurrentPages) {',
                 postFooter: '}',
                 sourcemap: 'inline'
             },
@@ -102,7 +102,12 @@ for (const mode of ['development', 'production'] as const) {
         })
         try {
             const { default: execute }: { default: (...args: unknown[]) => void } = await import(url)
-            const executeFixture = (nativeAvailable: boolean) => {
+            const executeFixture = (sdk: {
+                nativeAvailable: boolean
+                expectDom: boolean
+                getRenderMode?: () => number
+                pages?: unknown[]
+            }) => {
                 const exports: { completion?: Promise<void> } = {}
                 execute(
                     exports,
@@ -133,14 +138,22 @@ for (const mode of ['development', 'production'] as const) {
                         immediates.delete(immediate)
                         clearImmediate(immediate)
                     },
-                    { nativeAvailable }
+                    sdk,
+                    () => sdk.pages ?? []
                 )
                 return exports
             }
-            const exports = executeFixture(true)
-            assert.ok(exports.completion)
-            await exports.completion
-            assert.throws(() => executeFixture(false), /TT DOM renderer requires tt.appDocument/)
+            // Reuse one bundle across capability cases so coverage describes the same startup decision.
+            for (const sdk of [
+                { nativeAvailable: true, getRenderMode: () => 2, expectDom: true },
+                { nativeAvailable: true, getRenderMode: () => 1, expectDom: false },
+                { nativeAvailable: true, expectDom: false },
+                { nativeAvailable: false, getRenderMode: () => 2, expectDom: false }
+            ]) {
+                const exports = executeFixture(sdk)
+                assert.ok(exports.completion)
+                await exports.completion
+            }
         } finally {
             hooks.deregister()
         }
@@ -149,7 +162,18 @@ for (const mode of ['development', 'production'] as const) {
 
 const nativeModel = `
 import assert from 'node:assert/strict'
-import { TaroElement, TaroNode } from 'vite-plugin-taro-runtime/runtime/mini'
+import { document, TaroElement, TaroNode, TaroRootElement } from 'vite-plugin-taro-runtime/runtime/mini'
+
+// Capture the shared logical implementation before either host installs its presentation policy.
+export const original = {
+    createElement: document.createElement,
+    createTextNode: document.createTextNode,
+    nodeEnqueue: TaroNode.prototype.enqueueUpdate,
+    childInsertion: TaroNode.prototype.delegateChildInsertion,
+    rootEnqueue: TaroRootElement.prototype.enqueueUpdate,
+    rootPerform: TaroRootElement.prototype.performUpdate,
+    rootPath: Object.getOwnPropertyDescriptor(TaroRootElement.prototype, '_path').get
+}
 
 // Model the native tree independently; its operation journal verifies the host's forwarding cost and order.
 export const calls = []
@@ -266,11 +290,21 @@ import React from 'react'
 import ReactDOM from 'vite-plugin-taro-runtime/react'
 import { hooks, isEnableTTDom, toCamelCase } from '@tarojs/shared'
 import 'vite-plugin-taro-runtime/plugin-platform-tt/runtime'
-import { Current, document, FormElement, Style, TaroElement, TaroNode, TaroText } from 'vite-plugin-taro-runtime/runtime/mini'
+import { Current, document, eventHandler, FormElement, Style, TaroElement, TaroNode, TaroRootElement, TaroText } from 'vite-plugin-taro-runtime/runtime/mini'
 import { useLoad, useUnload } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
 import { createVptApp } from ${JSON.stringify(resolveVptRuntime('mini/taro/create-vpt-app'))}
 import { createVptPage } from ${JSON.stringify(resolveVptRuntime('mini/taro/create-vpt-page'))}
-import host, { calls, reads, nativeDocument, pageDocuments, originalAppend, originalRemove, originalSetAttribute, originalRemoveAttribute } from 'test:tt-dom-host'
+import host, { calls, reads, nativeDocument, pageDocuments, original, originalAppend, originalRemove, originalSetAttribute, originalRemoveAttribute } from 'test:tt-dom-host'
+
+export const completion = tt.expectDom ? checkDom() : checkTemplate()
+
+async function checkDom() {
+assert.strictEqual(Object.getOwnPropertyDescriptor(TaroRootElement.prototype, '_path').get, original.rootPath,
+    'importing the template factory must not install its namespace policy')
+assert.strictEqual(TaroNode.prototype.enqueueUpdate, original.nodeEnqueue)
+// The selected native document remains authoritative even if capability properties later change.
+tt.getRenderMode = () => 1
+tt.appDocument = undefined
 
 function expectCalls(expected) {
     assert.deepEqual(calls.splice(0), expected)
@@ -286,8 +320,7 @@ function expectChildren(parent, children) {
     reads.length = 0
 }
 assert.equal(isEnableTTDom(), false, 'the shared renderer continues to use Taro logical nodes')
-assert.notStrictEqual(document, tt.appDocument)
-assert.strictEqual(nativeDocument, tt.appDocument)
+assert.notStrictEqual(document, nativeDocument)
 assert.deepEqual(calls, [], 'host installation does not construct a native App or document tree')
 assert.strictEqual(TaroNode.prototype.appendChild, originalAppend)
 assert.strictEqual(TaroNode.prototype.removeChild, originalRemove)
@@ -845,7 +878,7 @@ calls.length = 0
 `
 
 const pagesFixture = `
-export const completion = checkPages()
+await checkPages()
 async function checkPages() {
     for (const appConfig of [{}, { appId: 'custom-dom-app' }]) {
         const lifecycle = []
@@ -1033,6 +1066,129 @@ async function checkPages() {
             ReactDOM.flushSync(() => ReactDOM.unmountComponentAtNode(appRoot))
             assert.equal(lifecycle.filter(value => value === 'app:unmount').length, 1)
         }
+    }
+}
+`
+
+const templateFixture = `
+async function checkTemplate() {
+    assert.strictEqual(document.createElement, original.createElement)
+    assert.strictEqual(document.createTextNode, original.createTextNode)
+    assert.strictEqual(TaroNode.prototype.delegateChildInsertion, original.childInsertion)
+    assert.strictEqual(TaroRootElement.prototype.enqueueUpdate, original.rootEnqueue)
+    assert.strictEqual(TaroRootElement.prototype.performUpdate, original.rootPerform)
+    assert.notStrictEqual(TaroNode.prototype.enqueueUpdate, original.nodeEnqueue)
+    assert.equal(document.getElementById('app')._path, 'app')
+    assert.equal(document.createElement('root')._path, 'page')
+    assert.deepEqual(calls, [], 'fallback must not construct or bind native nodes')
+
+    // Capability changes after startup must not replace the installed host.
+    tt.getRenderMode = () => 2
+    tt.appDocument = nativeDocument
+    const writes = []
+    const lifecycle = []
+    const refs = [React.createRef(), React.createRef()]
+    const inputs = [React.createRef(), React.createRef()]
+    const states = {}
+    const Shared = React.createContext('initial')
+    function App({ children }) {
+        const [value, setValue] = React.useState('initial')
+        states.app = setValue
+        React.useLayoutEffect(() => { lifecycle.push('app:mount') }, [])
+        return React.createElement(Shared.Provider, { value },
+            React.createElement('view', { className: 'layout-' + value }, children))
+    }
+    const loaded = [Promise.withResolvers(), Promise.withResolvers()]
+    const contexts = [0, 1].map(index => ({
+        __webviewId__: index,
+        setData(data, complete) {
+            writes.push({ index, data })
+            complete?.()
+            if (Object.keys(data).some(path => path.startsWith('page.cn'))) {
+                loaded[index].resolve()
+            }
+        }
+    }))
+    tt.pages = contexts
+    const configs = contexts.map((_, index) => {
+        function Page() {
+            const [value, setValue] = React.useState(0)
+            const shared = React.useContext(Shared)
+            states[index] = setValue
+            React.useLayoutEffect(() => { lifecycle.push('page:' + index) }, [])
+            return React.createElement('view', { ref: refs[index] },
+                React.createElement('text', null, index + ':' + value + ':' + shared),
+                React.createElement('input', { ref: inputs[index], value: 'locked' }))
+        }
+        return createVptPage(Page, { path: 'pages/fallback-' + index, prerender: false })
+    })
+    createVptApp(App, {})
+    const appRoot = document.getElementById('app')
+    const flushData = () => new Promise(resolve => setTimeout(resolve, 0))
+    try {
+        // The third onLoad argument is Taro's prerender sink; normal rendering completes through native setData.
+        configs.forEach((config, index) => config.onLoad.call(contexts[index], {}))
+        await Promise.all(loaded.map(load => load.promise))
+        assert.equal(lifecycle.filter(value => value === 'app:mount').length, 1)
+        for (const index of [0, 1]) {
+            const node = refs[index].current
+            assert.ok(node instanceof TaroElement)
+            assert.equal(node.nativeNode, undefined)
+            assert.equal(node._root.nativeNode, undefined)
+            assert.equal(node._root._path, 'page')
+            assert.strictEqual(node._root.ctx, contexts[index])
+            assert.equal(node.textContent, index + ':0:initial')
+            assert.ok(writes.some(write => write.index === index &&
+                Object.hasOwn(write.data, 'app.cn') &&
+                Object.keys(write.data).some(path => path.startsWith('page.cn'))),
+                'the native initial batch contains both App layout and Page data')
+            assert.equal(lifecycle.filter(value => value === 'page:' + index).length, 1)
+        }
+        const first = refs[0].current
+        const second = refs[1].current
+        writes.length = 0
+        ReactDOM.flushSync(() => states[0](1))
+        await flushData()
+        assert.ok(writes.length > 0)
+        assert.ok(writes.every(write => write.index === 0))
+        assert.equal(first.textContent, '0:1:initial')
+        assert.equal(second.textContent, '1:0:initial')
+
+        writes.length = 0
+        ReactDOM.flushSync(() => states.app('next'))
+        await flushData()
+        for (const index of [0, 1]) {
+            assert.ok(writes.some(write => write.index === index &&
+                Object.keys(write.data).some(path => path.startsWith('app.cn'))))
+        }
+        assert.equal(first.textContent, '0:1:next')
+        assert.equal(second.textContent, '1:0:next')
+        assert.strictEqual(refs[0].current, first)
+        assert.strictEqual(refs[1].current, second)
+
+        const input = inputs[0].current
+        const target = { id: input.sid, dataset: { sid: input.sid } }
+        eventHandler({ type: 'input', detail: { value: 'typed' }, target, currentTarget: target })
+        assert.equal(input.value, 'locked', 'fallback retains shared controlled-input restoration')
+        await flushData()
+
+        ReactDOM.flushSync(() => configs[0].onUnload.call(contexts[0]))
+        assert.equal(refs[0].current, null)
+        assert.strictEqual(refs[1].current, second)
+        assert.equal(document.getElementById(contexts[0].$taroPath), null)
+        ReactDOM.flushSync(() => states[1](2))
+        await flushData()
+        assert.equal(second.textContent, '1:2:next')
+        assert.deepEqual(calls, [], 'template updates never touch SDK DOM operations')
+    } finally {
+        for (const index of [0, 1]) {
+            if (refs[index].current) {
+                ReactDOM.flushSync(() => configs[index].onUnload.call(contexts[index]))
+            }
+        }
+        tt.pages = []
+        appRoot.remove()
+        ReactDOM.flushSync(() => ReactDOM.unmountComponentAtNode(appRoot))
     }
 }
 `

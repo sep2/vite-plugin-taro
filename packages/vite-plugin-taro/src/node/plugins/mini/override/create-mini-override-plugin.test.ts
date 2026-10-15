@@ -139,7 +139,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
             assert.match(
                 contract.taro.hostPath,
                 target === 'tt' && renderer === 'dom'
-                    ? /runtime[/\\]tt[/\\]dom-host\.(?:ts|js)$/
+                    ? /runtime[/\\]tt[/\\]renderer-host\.(?:ts|js)$/
                     : /runtime[/\\]mini[/\\]taro[/\\]template-host\.(?:ts|js)$/
             )
             const { projectConfigFilename } = contract.output

@@ -24,7 +24,7 @@ export function createTtMiniContract(options: VptOptions): MiniContract {
         },
         taro: {
             env: 'tt',
-            hostPath: resolveVptRuntime(options.renderer === 'dom' ? 'tt/dom-host' : 'mini/taro/template-host'),
+            hostPath: resolveVptRuntime(options.renderer === 'dom' ? 'tt/renderer-host' : 'mini/taro/template-host'),
             componentsReactPath: resolveTaroRuntime('plugin-platform-tt/components-react'),
             targetRuntimePath: resolveVptRuntime('tt/taro-runtime')
         },
