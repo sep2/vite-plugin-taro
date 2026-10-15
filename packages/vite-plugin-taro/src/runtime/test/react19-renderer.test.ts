@@ -99,7 +99,7 @@ async function runFixture(t: TestContext, target: 'wx' | 'zfb' | 'tt', mode: str
                         if (id === './app.ts') {
                             return 'test:empty'
                         }
-                        if (id === '../vpt/taro-runtime.ts') {
+                        if (id === '../vpt/vpt-runtime.ts') {
                             return path.join(path.dirname(entry), '../mini/vpt/create-vpt-page.ts')
                         }
                         if (id === '../template/prerender-to-data.ts') {

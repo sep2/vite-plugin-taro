@@ -3,7 +3,7 @@ import test from 'node:test'
 import { specializePageCapsule } from './specialize-page-capsule.ts'
 
 const source = `import './app.js'
-import { createVptPage } from '../vpt/taro-runtime.js'
+import { createVptPage } from '../vpt/vpt-runtime.js'
 import PageComponent from '\0vpt:page-component'
 export default createVptPage(PageComponent, __VPT_PAGE_OPTIONS__)`
 

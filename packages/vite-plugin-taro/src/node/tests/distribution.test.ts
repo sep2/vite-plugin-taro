@@ -248,7 +248,7 @@ test('ships Mini activation capsules with separate VPT integration and template 
         'create-vpt-app.js',
         'create-vpt-page.js',
         'get-page-query.js',
-        'taro-runtime.js'
+        'vpt-runtime.js'
     ])
     const templateFiles = await readdir(path.join(miniRoot, 'template'))
     assert.deepEqual(templateFiles.filter((file) => file.endsWith('.js')).toSorted(), [

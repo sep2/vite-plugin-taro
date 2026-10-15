@@ -3,7 +3,7 @@ import './app.ts'
 
 // @ts-expect-error: The Mini Program build replaces this private import with the configured Page component.
 import PageComponent from '\0vpt:page-component'
-import { createVptPage } from '../vpt/taro-runtime.ts'
+import { createVptPage } from '../vpt/vpt-runtime.ts'
 
 const config = createVptPage(PageComponent, __VPT_PAGE_OPTIONS__)
 

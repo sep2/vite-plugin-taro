@@ -33,18 +33,22 @@ declare module 'vite-plugin-taro-runtime/runtime/mini' {
     }
 }
 
+const pageOutlet = 'vpt_page_outlet'
+
 /** 在独立的 TT runtime 中安装一次，复用 Taro 的节点创建和逻辑树操作。 */
 export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
     // 包装 document 的工厂，使 React 创建和 Taro 自身的 textContent 等创建路径共用同一规则。
     const createElement = document.createElement
     document.createElement = function (type) {
         const node = createElement.call(this, type)
-        if (node.nodeName === 'vpt_page_outlet') {
+
+        if (node.nodeName === pageOutlet) {
             // outlet 只拥有逻辑 Page 关系；原生根在各自的 Page document 中挂载。
             node.delegateChildInsertion = noop
             node.delegateChildRemoval = removePageRoot
             return node
         }
+
         // 与 H5 的页面 div 相同，root 自己拥有一个可离线构建的原生根元素。
         // 它会参与布局；平台 Page document 是后续挂载目标，二者的身份始终分开。
         node.nativeNode = nativeDocument.createElement(node instanceof TaroRootElement ? 'view' : node.nodeName)

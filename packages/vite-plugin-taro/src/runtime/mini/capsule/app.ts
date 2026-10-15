@@ -1,5 +1,5 @@
 // biome-ignore assist/source/organizeImports: Taro must initialize before the App component.
-import { createVptApp } from '../vpt/taro-runtime.ts'
+import { createVptApp } from '../vpt/vpt-runtime.ts'
 
 // @ts-expect-error: The active Mini contract resolves this private App component.
 import AppComponent from '\0vpt:app-component'

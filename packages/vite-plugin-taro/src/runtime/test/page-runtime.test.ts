@@ -51,7 +51,7 @@ test('creates the Mini Program Page capsule after App initialization with one op
     const code = await bundleRuntimeEntry({
         entry: 'mini/capsule/page.ts',
         mocks: {
-            '../vpt/taro-runtime.ts': `
+            '../vpt/vpt-runtime.ts': `
                 const harness = globalThis.harness
                 export const createVptApp = harness.createVptApp
                 export const createVptPage = harness.createVptPage
@@ -286,7 +286,7 @@ test('mounts the current Page export instead of the cold native capsule baseline
             '../template/prerender-to-data.ts':
                 'export const prerenderToData = () => { throw new Error("Unexpected prerender") }',
             'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
-            '../vpt/taro-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}`,
+            '../vpt/vpt-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}`,
             '\0vpt:global-binding': 'export const vptGlobal = globalThis',
             '\0vpt:page-component': 'export default globalThis.harness.PageComponent'
         },
@@ -341,7 +341,7 @@ test('createVptPage selects native data form without copying the config', async 
             entry: 'mini/capsule/page.ts',
             mocks: {
                 './app.ts': 'globalThis.harness.initialize()',
-                '../vpt/taro-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}`,
+                '../vpt/vpt-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}`,
                 'vite-plugin-taro-runtime/runtime/mini':
                     'export const createPageConfig = globalThis.harness.createPageConfig',
                 '../template/prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData',
@@ -429,10 +429,10 @@ test('Page data factories share native query capture installed during App activa
             '../vpt/get-page-query.ts': `export { getPageQuery } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/get-page-query.ts'))}`,
             '\0vpt:page-capsule': `export { default } from ${JSON.stringify(path.join(runtimeRoot, 'mini/capsule/page.ts'))}`,
             './app.ts': `
-                import '../vpt/taro-runtime.ts'
+                import '../vpt/vpt-runtime.ts'
                 globalThis.harness.assertListenerReady()
             `,
-            '../vpt/taro-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}`,
+            '../vpt/vpt-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}`,
             'vite-plugin-taro-runtime/runtime/mini': 'export const createPageConfig = () => globalThis.harness.config',
             '../template/prerender-to-data.ts': `
                 import { getPageQuery } from '../vpt/get-page-query.ts'
@@ -513,7 +513,7 @@ for (const prerender of [false, true]) {
             entry: 'mini/capsule/page.ts',
             mocks: {
                 './app.ts': '',
-                '../vpt/taro-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}`,
+                '../vpt/vpt-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}`,
                 'vite-plugin-taro-runtime/runtime/mini':
                     'export const createPageConfig = globalThis.harness.createPageConfig',
                 '../template/prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData',

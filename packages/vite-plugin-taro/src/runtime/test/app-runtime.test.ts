@@ -27,7 +27,7 @@ test('creates WX App and recursive component capsules only after App initializat
         }
     }
     const mocks = {
-        '../vpt/taro-runtime.ts': `
+        '../vpt/vpt-runtime.ts': `
             const harness = globalThis.harness
             export const createVptApp = harness.createVptApp
             export const createRecursiveComponentConfig = harness.createRecursiveComponentConfig
@@ -247,7 +247,7 @@ test('preserves Mini Taro initialization order and export identities', async () 
         customWrapperCache
     }
     const code = await bundleRuntimeEntry({
-        entry: 'mini/vpt/taro-runtime.ts',
+        entry: 'mini/vpt/vpt-runtime.ts',
         mocks: {
             './create-vpt-page.ts': 'export const createVptPage = globalThis.harness.createVptPage',
             '\0vpt:taro-target-runtime': "globalThis.harness.events.push('target-runtime')",
