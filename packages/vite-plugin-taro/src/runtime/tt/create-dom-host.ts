@@ -1,4 +1,4 @@
-import { toCamelCase } from '@tarojs/shared'
+import { ensure, noop, toCamelCase } from '@tarojs/shared'
 import type { RendererHost } from 'vite-plugin-taro-runtime/react'
 import {
     document,
@@ -20,7 +20,7 @@ import type {
 
 declare module 'vite-plugin-taro-runtime/runtime/mini' {
     interface TaroNode {
-        // 节点创建或容器绑定时写入；逻辑节点在移动、解绑和重新插入时保留同一个原生句柄。
+        // 创建原生呈现时写入；逻辑节点在移动、挂载、解绑和重新插入时保留同一个原生句柄。
         nativeNode?: TTNativeNode
     }
 
@@ -35,22 +35,28 @@ declare module 'vite-plugin-taro-runtime/runtime/mini' {
 
 /** 在独立的 TT runtime 中安装一次，复用 Taro 的节点创建和逻辑树操作。 */
 export function createDomHost(
-    nativeDocument: Pick<TTNativeDocument, 'createElement' | 'createTextNode'>
+    nativeDocument: TTNativeDocument
 ): RendererHost<TaroElement, object, TaroElement, TaroText> {
     // 包装 document 的工厂，使 React 创建和 Taro 自身的 textContent 等创建路径共用同一规则。
     const createElement = document.createElement
     document.createElement = function (type) {
         const node = createElement.call(this, type)
-        // root 是由 Page 生命周期绑定原生容器的逻辑根，普通元素在创建时取得原生节点。
-        if (!(node instanceof TaroRootElement)) {
-            node.nativeNode = nativeDocument.createElement(node.nodeName)
-            // 模板原本固定绑定这些值变化事件；DOM host 接替模板，把变化送入现有表单流程。
-            // 即使没有业务处理器，非受控 ref.value 也要更新，受控 input/textarea 也要触发恢复。
-            // 事件选择和上游替代条件集中说明在 getFormEvent，业务解绑同样遵守该规则。
-            const formEvent = getFormEvent(node.nodeName)
-            if (formEvent) {
-                updateNativeListener(node, `bind${formEvent}`, true)
-            }
+        if (node.nodeName === 'vpt_page_outlet') {
+            // outlet 只拥有逻辑 Page 关系；原生根在各自的 Page document 中挂载。
+            node.delegateChildInsertion = noop
+            node.delegateChildRemoval = removePageRoot
+            return node
+        }
+        // 与 H5 的页面 div 相同，root 自己拥有一个可离线构建的原生根元素。
+        // 它会参与布局；平台 Page document 是后续挂载目标，二者的身份始终分开。
+        node.nativeNode = nativeDocument.createElement(node instanceof TaroRootElement ? 'view' : node.nodeName)
+
+        // 模板原本固定绑定这些值变化事件；DOM host 接替模板，把变化送入现有表单流程。
+        // 即使没有业务处理器，非受控 ref.value 也要更新，受控 input/textarea 也要触发恢复。
+        // 事件选择和上游替代条件集中说明在 getFormEvent，业务解绑同样遵守该规则。
+        const formEvent = getFormEvent(node.nodeName)
+        if (formEvent) {
+            updateNativeListener(node, `bind${formEvent}`, true)
         }
         return node
     }
@@ -62,7 +68,7 @@ export function createDomHost(
         return node
     }
 
-    // 调用这些委托时，父子节点的原生句柄已经由创建路径或容器绑定提供。
+    // 调用这些委托时，父子节点的原生句柄已经由创建路径提供。
     // 移动和替换仍由 Taro 分解成移除/插入；这里只转发当前操作，不重新遍历逻辑树。
     TaroNode.extend(
         'delegateChildInsertion',
@@ -146,8 +152,37 @@ export function createDomHost(
         }
     })
 
+    // DOM mutation 已直接提交给 SDK，根不收集模板 payload，也不求值 App 的模板快照。
+    extend(TaroRootElement, 'enqueueUpdate', noop)
+    extend(
+        TaroRootElement,
+        'performUpdate',
+        function (
+            this: TaroRootElement,
+            initial: Parameters<TaroRootElement['performUpdate']>[0],
+            complete: Parameters<TaroRootElement['performUpdate']>[1]
+        ) {
+            if (initial) {
+                // 原有 onLoad 完成回调已赋 ctx；这里只查该 Page，整棵离线原生根只插入一次。
+                // 读取现有 parentNode 避免重复初始通知重插节点，不增加 mounted 状态或根子节点遍历。
+                const page = nativeDocument.getPageDocumentById(this.ctx!.__webviewId__!)
+                ensure(page !== undefined, `TT Page document not found: ${this.ctx!.__webviewId__}`)
+                if (this.nativeNode!.parentNode !== page) {
+                    page!.appendChild(this.nativeNode!)
+                }
+            }
+            // 复用现有完成回调；这里只确认 JS 根接入，不代表原生布局或屏幕绘制完成。
+            this.flushUpdateCallback()
+            complete?.({})
+        }
+    )
+
     return {
-        createElement(_container, _context, type) {
+        createElement(container, _context, type) {
+            if (type === 'vpt_page_outlet') {
+                // renderer 的 container 是当前 App 根；此处一次性确定逻辑边界，普通 mutation 不判断类型。
+                keepLogicalChildren(container)
+            }
             return document.createElement(type)
         },
         createText(_container, _context, text) {
@@ -158,6 +193,22 @@ export function createDomHost(
         },
         // 原生树操作已在各个 mutation 委托中同步完成。
         afterCommit() {}
+    }
+}
+
+// App 的子关系由 Taro 维护，不产生原生父子关系。
+// 边界创建时安装实例委托，将逻辑关系与普通节点的原生转发分开。
+function keepLogicalChildren(node: TaroNode): void {
+    node.delegateChildInsertion = noop
+    node.delegateChildRemoval = noop
+}
+
+function removePageRoot(child: TaroNode, options: Parameters<TaroNode['delegateChildRemoval']>[1]): void {
+    // Taro 移动节点时以 cleanRef:false 暂时移除；outlet 的逻辑顺序不改变各 Page 的原生挂载位置。
+    if (options.cleanRef !== false) {
+        // 最终解绑整个原生根，保留其后代和句柄；原生根已被平台移除时无需重复操作。
+        const native = child.nativeNode!
+        native.parentNode?.removeChild(native)
     }
 }
 

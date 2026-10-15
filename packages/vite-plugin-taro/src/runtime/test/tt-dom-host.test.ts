@@ -53,7 +53,7 @@ for (const mode of ['development', 'production'] as const) {
                     },
                     load(id) {
                         if (id === entry) {
-                            return `${fixture}\n${eventsFixture}`
+                            return `${fixture}\n${eventsFixture}\n${pagesFixture}`
                         }
                         if (id === hostModule) {
                             return `import { createDomHost } from ${JSON.stringify(resolveVptRuntime('tt/create-dom-host'))}\n${nativeModel}`
@@ -66,7 +66,9 @@ for (const mode of ['development', 'production'] as const) {
                     }
                 }
             ],
-            transform: { define: { ...config.define, 'process.env.NODE_ENV': JSON.stringify(mode) } },
+            transform: {
+                define: { ...config.define, 'process.env.NODE_ENV': JSON.stringify(mode), 'import.meta.hot': 'false' }
+            },
             output: {
                 file: outputFile,
                 format: 'cjs',
@@ -90,8 +92,9 @@ for (const mode of ['development', 'production'] as const) {
         })
         try {
             const { default: execute }: { default: (...args: unknown[]) => void } = await import(url)
+            const exports: { completion?: Promise<void> } = {}
             execute(
-                {},
+                exports,
                 require,
                 {},
                 {},
@@ -120,6 +123,8 @@ for (const mode of ['development', 'production'] as const) {
                     clearImmediate(immediate)
                 }
             )
+            assert.ok(exports.completion)
+            await exports.completion
         } finally {
             hooks.deregister()
         }
@@ -215,7 +220,13 @@ class NativeNode {
         child.parentNode = null
     }
 }
+// Platform-owned Page registration exists only in this SDK model, not in the production host.
+export const pageDocuments = new Map()
 export const nativeDocument = {
+    getPageDocumentById(id) {
+        calls.push(['pageDocument', id])
+        return pageDocuments.get(id)
+    },
     createElement(type) {
         const node = new NativeNode(type, '')
         calls.push(['element', type, node])
@@ -236,8 +247,11 @@ import React from 'react'
 import ReactDOM from 'vite-plugin-taro-runtime/react'
 import { hooks, toCamelCase } from '@tarojs/shared'
 import 'vite-plugin-taro-runtime/plugin-platform-tt/runtime'
-import { document, FormElement, Style, TaroElement, TaroNode, TaroText } from 'vite-plugin-taro-runtime/runtime/mini'
-import host, { calls, reads, nativeDocument, originalAppend, originalRemove, originalSetAttribute, originalRemoveAttribute } from 'test:tt-dom-host'
+import { Current, document, FormElement, Style, TaroElement, TaroNode, TaroText } from 'vite-plugin-taro-runtime/runtime/mini'
+import { useLoad, useUnload } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
+import { createVptApp } from ${JSON.stringify(resolveVptRuntime('mini/taro/create-vpt-app'))}
+import { createVptPage } from ${JSON.stringify(resolveVptRuntime('mini/taro/create-vpt-page'))}
+import host, { calls, reads, nativeDocument, pageDocuments, originalAppend, originalRemove, originalSetAttribute, originalRemoveAttribute } from 'test:tt-dom-host'
 
 function expectCalls(expected) {
     assert.deepEqual(calls.splice(0), expected)
@@ -258,9 +272,10 @@ assert.strictEqual(TaroNode.prototype.removeChild, originalRemove)
 assert.strictEqual(TaroElement.prototype.setAttribute, originalSetAttribute)
 assert.strictEqual(TaroElement.prototype.removeAttribute, originalRemoveAttribute)
 const root = document.createElement('root')
-assert.equal(root.nativeNode, undefined)
+assert.equal(root.nativeNode.name, 'view')
+assert.equal(root.nativeNode.parentNode, null)
 assert.equal(document.getElementById('app').nativeNode, undefined)
-expectCalls([])
+expectCalls([['element', 'view', root.nativeNode]])
 const parent = host.createElement(root, {}, 'View')
 assert.ok(parent instanceof TaroElement)
 expectCalls([['element', 'view', parent.nativeNode]])
@@ -331,10 +346,10 @@ expectChildren(parent, [])
 host.afterCommit(parent)
 expectCalls([])
 
-// A Page lifecycle supplies its native container before rooted attribute and style updates.
-root.nativeNode = nativeDocument.createElement('page')
+// A Page root owns its offline native element before lifecycle binding; rooted mutations use the same handle.
+const rootNative = root.nativeNode
 root.appendChild(parent)
-expectCalls([['element', 'page', root.nativeNode], ['append', root.nativeNode, parent.nativeNode]])
+expectCalls([['append', rootNative, parent.nativeNode]])
 assert.strictEqual(parent._root, root)
 
 // Taro owns logical props, dataset and the ID index; forwarding preserves values and normalizes native names.
@@ -805,4 +820,197 @@ emitNative(eventChild, 'tap', {}, eventChild)
 emitNative(eventParent, 'tap', {}, eventChild)
 assert.deepEqual(events.splice(0), ['child', 'parent'], 'receiver dispatch survives Taro index cleanup')
 calls.length = 0
+`
+
+const pagesFixture = `
+export const completion = checkPages()
+async function checkPages() {
+    for (const appConfig of [{}, { appId: 'custom-dom-app' }]) {
+        const lifecycle = []
+        const states = new Map()
+        const refs = new Map()
+        const Shared = React.createContext('initial')
+        function App({ children }) {
+            const [value, setValue] = React.useState('initial')
+            states.set('app', setValue)
+            React.useLayoutEffect(() => {
+                lifecycle.push('app:mount')
+                return () => lifecycle.push('app:unmount')
+            }, [])
+            return React.createElement(Shared.Provider, { value }, children)
+        }
+        function makePage(id, label) {
+            const native = nativeDocument.createElement('page')
+            native.setAttribute('id', 'native-' + id)
+            pageDocuments.set(id, native)
+            const ref = React.createRef()
+            refs.set(label, ref)
+            function Page() {
+                const [value, setValue] = React.useState(0)
+                const shared = React.useContext(Shared)
+                states.set(label, setValue)
+                React.useLayoutEffect(() => {
+                    lifecycle.push(label + ':mount')
+                    assert.equal(ref.current._root.nativeNode.parentNode, null,
+                        'React builds the Page native root offline')
+                    return () => lifecycle.push(label + ':unmount')
+                }, [])
+                useLoad(() => {
+                    const node = ref.current
+                    assert.equal(node._root.ctx, null, 'business onLoad retains upstream ctx timing')
+                    assert.equal(node._root.nativeNode.parentNode, null)
+                    assert.strictEqual(node.nativeNode.parentNode, node._root.nativeNode)
+                    node.setAttribute('data-loaded', true)
+                    lifecycle.push(label + ':load')
+                })
+                useUnload(() => lifecycle.push(label + ':unload'))
+                return React.createElement(React.Fragment, null,
+                    React.createElement('view', { ref, id: label }, label + ':' + value + ':' + shared),
+                    React.createElement('input', { defaultValue: 'seed-' + label }))
+            }
+            const config = createVptPage(Page, { path: 'pages/' + label, prerender: false })
+            const context = { __webviewId__: id, route: 'pages/' + label,
+                setData() { assert.fail('DOM must not write template data') } }
+            return { config, context, native }
+        }
+        const first = makePage(0, 'first')
+        const second = makePage(22, 'second')
+        const app = createVptApp(App, appConfig)
+        assert.equal(app.mount.length, 3, 'mount keeps its existing signature')
+        const appRoot = document.getElementById(appConfig.appId || 'app')
+        calls.length = 0
+        try {
+            // Both mounts enter the cold App before it commits. Binding must use each root.ctx, not Current.page.
+            const firstLoaded = new Promise(resolve => first.config.onLoad.call(first.context, {}, resolve))
+            const secondLoaded = new Promise(resolve => second.config.onLoad.call(second.context, {}, resolve))
+            Current.page = { __webviewId__: 999 }
+            await Promise.all([firstLoaded, secondLoaded])
+            assert.deepEqual(calls.filter(call => call[0] === 'pageDocument').map(call => call[1]).sort((a, b) => a - b), [0, 22])
+            assert.equal(lifecycle.filter(value => value === 'app:mount').length, 1)
+            for (const [page, label] of [[first, 'first'], [second, 'second']]) {
+                const node = refs.get(label).current
+                const root = document.getElementById(page.context.$taroPath)
+                assert.strictEqual(node._root, root)
+                assert.strictEqual(root.ctx, page.context)
+                assert.notStrictEqual(root.nativeNode, page.native)
+                assert.strictEqual(root.nativeNode.parentNode, page.native)
+                assert.strictEqual(node.nativeNode.parentNode, root.nativeNode)
+                assert.equal(root.parentNode.nodeName, 'vpt_page_outlet')
+                assert.equal(root.parentNode.nativeNode, undefined)
+                assert.strictEqual(root.parentNode.parentNode, appRoot)
+                assert.equal(page.native.attributes.id, 'native-' + page.context.__webviewId__)
+                assert.equal(root.nativeNode.attributes.id, root.id)
+                assert.equal(node.nativeNode.attributes['data-loaded'], true)
+                assert.deepEqual(root.updatePayloads, [])
+                assert.equal(root.pendingUpdate, false)
+                assert.equal(node.nativeNode.firstChild.nodeValue, label + ':0:initial')
+                assert.equal(lifecycle.filter(value => value === label + ':mount').length, 1)
+                assert.deepEqual(calls.filter(call => call[0] === 'append' && call[1] === page.native),
+                    [['append', page.native, root.nativeNode]], 'one native root insertion attaches the whole Page')
+            }
+            assert.deepEqual(reads.splice(0), [], 'mounting does not inspect native child lists')
+            const firstNode = refs.get('first').current
+            const secondNode = refs.get('second').current
+            const firstRoot = firstNode._root
+            const firstNative = firstRoot.nativeNode
+            const firstInput = firstRoot.childNodes[1]
+            assert.strictEqual(firstNode.nativeNode.nextSibling, firstInput.nativeNode)
+            calls.length = 0
+            emitNative(firstInput, 'input', { value: 'typed' }, firstInput)
+            expectCalls([['attribute', firstInput.nativeNode, 'value', 'typed']])
+            ReactDOM.flushSync(() => states.get('first')(1))
+            expectCalls([['text', firstNode.nativeNode.firstChild, 'first:1:initial']])
+            assert.equal(secondNode.nativeNode.firstChild.nodeValue, 'second:0:initial')
+            ReactDOM.flushSync(() => states.get('app')('next'))
+            assert.equal(calls.length, 2)
+            assert.ok(calls.every(call => call[0] === 'text'))
+            assert.deepEqual(calls.splice(0).map(call => call[2]).sort(), ['first:1:next', 'second:0:next'])
+            assert.strictEqual(refs.get('first').current, firstNode)
+            assert.strictEqual(firstRoot.nativeNode, firstNative)
+            assert.strictEqual(firstNative.parentNode, first.native)
+            expectCalls([])
+
+            // Taro decomposes logical moves into remove(cleanRef:false) and insert.
+            // Page order in the outlet must not detach a root from its independent native document.
+            const outlet = firstRoot.parentNode
+            const secondRoot = secondNode._root
+            outlet.insertBefore(firstRoot, secondRoot)
+            assert.strictEqual(firstNative.parentNode, first.native)
+            assert.strictEqual(secondRoot.nativeNode.parentNode, second.native)
+            outlet.insertBefore(secondRoot, firstRoot)
+            assert.equal(firstInput.value, 'typed')
+            assert.equal(firstInput.nativeNode.attributes.value, 'typed')
+            assert.strictEqual(firstInput.nativeNode.parentNode, firstNative)
+            expectCalls([])
+
+            // Initial attachment and repeated completion must never enumerate logical root children.
+            const children = firstRoot.childNodes
+            first.native.removeChild(firstNative)
+            calls.length = 0
+            const callbacks = []
+            Object.defineProperty(firstRoot, 'childNodes', {
+                configurable: true,
+                get() { assert.fail('Page attachment must not read logical childNodes') }
+            })
+            try {
+                firstRoot.enqueueUpdate({ path: 'app.cn', value() { assert.fail('DOM must not evaluate App snapshots') } })
+                firstRoot.enqueueUpdateCallback(() => callbacks.push('existing'))
+                firstRoot.performUpdate(true, data => {
+                    assert.deepEqual(data, {})
+                    callbacks.push('complete')
+                })
+                expectCalls([['pageDocument', 0], ['append', first.native, firstNative]])
+                firstRoot.performUpdate(true)
+                expectCalls([['pageDocument', 0]])
+                firstRoot.performUpdate(false)
+                expectCalls([])
+            } finally {
+                Object.defineProperty(firstRoot, 'childNodes', { value: children, writable: true, configurable: true })
+            }
+            assert.deepEqual(callbacks, ['existing', 'complete'])
+            assert.deepEqual(firstRoot.updatePayloads, [])
+
+            ReactDOM.flushSync(() => first.config.onUnload.call(first.context))
+            expectCalls([['remove', first.native, firstNative]])
+            assert.equal(firstRoot.parentNode, null)
+            assert.equal(firstRoot.ctx, null)
+            assert.equal(refs.get('first').current, null)
+            assert.equal(firstNative.parentNode, null)
+            assert.strictEqual(firstNative.firstChild, firstNode.nativeNode, 'detachment preserves native descendants')
+            assert.strictEqual(firstInput.nativeNode.parentNode, firstNative)
+            assert.equal(firstInput.nativeNode.attributes.value, 'typed')
+            assert.strictEqual(firstRoot.nativeNode, firstNative)
+            assert.equal(document.getElementById(first.context.$taroPath), null)
+            assert.ok(lifecycle.indexOf('first:unload') < lifecycle.indexOf('first:unmount'))
+            pageDocuments.delete(0)
+            ReactDOM.flushSync(() => states.get('second')(2))
+            expectCalls([['text', secondNode.nativeNode.firstChild, 'second:2:next']])
+            // Model native removal preceding React cleanup; the outlet must not issue a second removal.
+            second.native.removeChild(secondNode._root.nativeNode)
+            pageDocuments.delete(22)
+            calls.length = 0
+            ReactDOM.flushSync(() => second.config.onUnload.call(second.context))
+            assert.equal(refs.get('second').current, null)
+            expectCalls([])
+
+            const third = makePage(33, 'third')
+            calls.length = 0
+            await new Promise(resolve => {
+                ReactDOM.flushSync(() => third.config.onLoad.call(third.context, {}, resolve))
+            })
+            const thirdRoot = refs.get('third').current._root
+            assert.strictEqual(thirdRoot.nativeNode.parentNode, third.native)
+            assert.equal(lifecycle.filter(value => value === 'app:mount').length, 1)
+            ReactDOM.flushSync(() => third.config.onUnload.call(third.context))
+            pageDocuments.delete(33)
+            const missing = host.createElement(appRoot, {}, 'root')
+            missing.ctx = { __webviewId__: 404 }
+            assert.equal(missing.nativeNode.parentNode, null)
+            assert.throws(() => missing.performUpdate(true), /TT Page document not found: 404/)
+        } finally {
+            ReactDOM.flushSync(() => ReactDOM.unmountComponentAtNode(appRoot))
+            assert.equal(lifecycle.filter(value => value === 'app:unmount').length, 1)
+        }
+    }
+}
 `
