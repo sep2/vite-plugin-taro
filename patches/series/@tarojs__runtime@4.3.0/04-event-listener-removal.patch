@@ -1,0 +1,10 @@
+diff --git a/dist/dom/event-target.js b/dist/dom/event-target.js
+index 510424828b3a9a74f363cef1e0982489a708541e..3b3946c14f00d106e785bda1fed9bdf8103b2300 100644
+--- a/dist/dom/event-target.js
++++ b/dist/dom/event-target.js
+@@ -67,2 +67,5 @@ class TaroEventTarget {
+         process.env.NODE_ENV !== 'production' && warn(index === -1, `事件: '${type}' 没有注册在 DOM 中，因此不会被移除。`);
++        if (index === -1) {
++            return;
++        }
+         handlers.splice(index, 1);

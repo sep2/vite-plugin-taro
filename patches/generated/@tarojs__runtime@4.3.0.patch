@@ -89,6 +89,20 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..30f29fe0f28a6d29cb060be433cfc472
          // Serialization
          if (!this._root)
              return;
+diff --git a/dist/dom/event-target.js b/dist/dom/event-target.js
+index 510424828b3a9a74f363cef1e0982489a708541e..3b3946c14f00d106e785bda1fed9bdf8103b2300 100644
+--- a/dist/dom/event-target.js
++++ b/dist/dom/event-target.js
+@@ -65,6 +65,9 @@ class TaroEventTarget {
+                 return true;
+         });
+         process.env.NODE_ENV !== 'production' && warn(index === -1, `事件: '${type}' 没有注册在 DOM 中，因此不会被移除。`);
++        if (index === -1) {
++            return;
++        }
+         handlers.splice(index, 1);
+     }
+     isAnyEventBinded() {
 diff --git a/dist/dom/node.d.ts b/dist/dom/node.d.ts
 index a456e9adeecdaae566fe965b7054e55cf009530e..f4e5a5d01b19afccc705f312a8f6efcc91879e31 100644
 --- a/dist/dom/node.d.ts

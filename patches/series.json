@@ -28,7 +28,8 @@
         "patches": [
             "patches/series/@tarojs__runtime@4.3.0/01-mini-app-page-rendering.patch",
             "patches/series/@tarojs__runtime@4.3.0/02-page-prerender.patch",
-            "patches/series/@tarojs__runtime@4.3.0/03-delegate-dom.patch"
+            "patches/series/@tarojs__runtime@4.3.0/03-delegate-dom.patch",
+            "patches/series/@tarojs__runtime@4.3.0/04-event-listener-removal.patch"
         ]
     },
     {

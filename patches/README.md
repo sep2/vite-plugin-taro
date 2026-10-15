@@ -1,6 +1,6 @@
 # Dependency patch series
 
-pnpm applies one combined patch to each package version. We maintain **11 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output.
+pnpm applies one combined patch to each package version. We maintain **12 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output.
 
 ## Feature inventory
 
@@ -16,6 +16,7 @@ pnpm applies one combined patch to each package version. We maintain **11 featur
 | `@tarojs/runtime@4.3.0` | `01-mini-app-page-rendering` | Construct the App host as a scheduler, derive initial reset paths from the root prefix, and stop App serialization at the Page outlet. |
 | | `02-page-prerender` | Type native Page data as an object or factory and let onLoad adopt a caller-prepared identity without moving lifecycle dispatch. VPT stores that identity in non-enumerable `__vpt_meta.prerenderIdentity`; the factory signature is unchanged. |
 | | `03-delegate-dom` | Expose overridable child insertion/removal/reset, text, attribute and style delegation methods while Taro owns logical state, event identities, mutation records and context-cache invalidation. The defaults preserve template payload preparation. |
+| | `04-event-listener-removal` | Preserve registered event handlers when removal targets an unregistered function; matching handlers retain their ordinary removal behavior. |
 | `canvas-confetti@1.9.4` | `01-canvas-confetti-enhancements` | Keep all existing confetti enhancements together: rotation/tilt controls, frame-clock repeat emission, cached path drawing, and DOMMatrix input normalization. Source, browser and module builds stay aligned. |
 
 The React renderer imports its host through `\0vpt:renderer-host`. VPT's Mini resolver binds that private import to `src/runtime/mini/taro/template-host.ts`. The generic `RendererHost` type is exported by `vite-plugin-taro-runtime/react`: it accepts the root container and host context for element/text creation, classifies form elements, and receives optional pre-commit and synchronous post-commit callbacks. VPT's recursive implementation uses Taro's document and `FormElement` and owns App/Page outlet projection. React reconciliation, prop comparison, controlled-input restoration and App/Page mounting retain their existing behavior.
@@ -31,6 +32,8 @@ Taro's `insertBefore` and `removeChild` invoke `delegateChildInsertion` and `del
 `Style.delegateStyleUpdate` receives the completed logical style through its `this` receiver. Property assignment, `setProperty`, `removeProperty`, CSS variables and `cssText` retain Taro's normalization and observer behavior. A bulk `cssText` assignment delegates once after its synchronous `_pending` batch. Hosts can replace the method through `extend(Style, 'delegateStyleUpdate', ...)`. Attribute-form style changes retain both notifications: the Style delegate runs first, followed by the attribute delegate with the original style value or removal name. A native host can handle styles through the Style delegate and distinguish those attribute notifications by their `style` name.
 
 `TaroNode.delegateChildReset` handles complete child-list updates, including the final notification from element `textContent`. Taro still removes and inserts individual children through its ordinary mutation methods, then invokes this existing full-list boundary. The template default lazily hydrates the current children or emits an empty list when `isClean` is true. The public declaration and `TaroNode.extend` let hosts handle that final notification before template payload preparation.
+
+`04-event-listener-removal` returns when the existing handler search finds no match, preserving the listener array and its callable entries. Taro retains its development warning, function-wrapper matching, case normalization and automatic `once` removal. The regression tests exercise public node methods and dispatch in WX, ZFB and TT template configurations, in development and production. The guard adds O(1) work to the existing O(H) handler search/removal.
 
 `vite-plugin-taro-runtime/runtime/tt-document` exposes Taro's existing `bom/document.js` factory directly. Its native DOM declarations live in the runtime package's `types/tt-document.d.ts`.
 
