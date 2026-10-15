@@ -390,7 +390,8 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
             configFile: false,
             logLevel: 'silent',
             plugins: vpt(options),
-            server: { port: 0, watch: null, ws: false }
+            // Vite retries occupied ports when fixtures start concurrently.
+            server: { watch: null, ws: false }
         })
         context.after(() => server.close())
         await server.listen()

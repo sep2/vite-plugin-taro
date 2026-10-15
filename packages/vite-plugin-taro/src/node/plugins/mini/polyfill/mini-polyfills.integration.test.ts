@@ -182,7 +182,8 @@ async function compileFixture(
                 minify: false as const,
                 sourcemap: mode === 'production'
             },
-            server: { host: '127.0.0.1', port: 0 }
+            // Vite retries occupied ports when fixtures start concurrently.
+            server: { host: '127.0.0.1' }
         }
         if (mode === 'production') {
             const result = await build(config)

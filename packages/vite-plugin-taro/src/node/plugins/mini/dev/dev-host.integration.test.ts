@@ -212,11 +212,8 @@ async function startDevFixture(
                 outDir,
                 cssCodeSplit
             },
-            server: {
-                host,
-                port: 0,
-                strictPort: true
-            }
+            // Vite retries occupied ports when fixtures start concurrently.
+            server: { host }
         })
 
     // Restarts replace the server with fresh plugin instances, just like restarting the Vite process from its config file.
@@ -505,7 +502,7 @@ test('rejects startup without removing the last complete output on failure', asy
         customLogger: logger,
         plugins: [failOutput, vpt(createOptions())],
         build: { outDir: path.join(root, 'dist') },
-        server: { host: '127.0.0.1', port: 0, strictPort: true }
+        server: { host: '127.0.0.1' }
     })
 
     try {

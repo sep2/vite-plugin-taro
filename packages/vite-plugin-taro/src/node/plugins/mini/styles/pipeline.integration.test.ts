@@ -6,6 +6,7 @@ import { type DevEngine, dev } from 'rolldown/experimental'
 import { createServer, normalizePath } from 'vite'
 import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
 import { projectTempDir } from '../../../tests/project-temp-dir.ts'
+import { publishSourceGeneration } from '../../../tests/publish-source-generation.ts'
 import { createMiniViteClientPlugin } from '../dev/create-mini-vite-client-plugin.ts'
 import { writeDevelopmentFile } from '../dev/hmr-files.ts'
 import type { BundledDev } from '../dev/mini-dev-options.ts'
@@ -164,7 +165,7 @@ test('minifies App/Page CSS, clears removed Page styles, and suppresses identica
 
         const colorResultCount = hmrResults.length
         const colorStyleCount = publishedStyles.length
-        await writeFile(cssId, '.app { color: blue; }\n')
+        await publishSourceGeneration(cssId, '.app { color: blue; }\n')
         await waitForPublishedStyle(
             publishedStyles,
             colorStyleCount,
@@ -176,7 +177,7 @@ test('minifies App/Page CSS, clears removed Page styles, and suppresses identica
 
         const additionResultCount = hmrResults.length
         const additionStyleCount = publishedStyles.length
-        await writeFile(appId, "import './app.css'\nimport './extra.css'\nexport const value = 'added'\n")
+        await publishSourceGeneration(appId, "import './app.css'\nimport './extra.css'\nexport const value = 'added'\n")
         await waitForPublishedStyle(
             publishedStyles,
             additionStyleCount,
@@ -188,7 +189,7 @@ test('minifies App/Page CSS, clears removed Page styles, and suppresses identica
 
         const rpxResultCount = hmrResults.length
         const rpxStyleCount = publishedStyles.length
-        await writeFile(extraCssId, '.extra { color: gold; padding: 24.25rpx; }\n')
+        await publishSourceGeneration(extraCssId, '.extra { color: gold; padding: 24.25rpx; }\n')
         await waitForPublishedStyle(
             publishedStyles,
             rpxStyleCount,
@@ -202,25 +203,25 @@ test('minifies App/Page CSS, clears removed Page styles, and suppresses identica
 
         const removalResultCount = hmrResults.length
         const removalStyleCount = publishedStyles.length
-        await writeFile(appId, initialSource)
+        await publishSourceGeneration(appId, initialSource)
         await waitForPublishedStyle(publishedStyles, removalStyleCount, (wxss) => !/\.extra\{/.test(wxss), hmrResults)
         await waitForEventCount(hmrResults, removalResultCount + 1)
         assert.doesNotMatch(await readFile(globalWxssPath, 'utf8'), /\.extra\{/)
 
         const unchangedInode = (await stat(globalWxssPath)).ino
         const priorResultCount = hmrResults.length
-        await writeFile(appId, "import './app.css'\nexport const value = 'unrelated'\n")
+        await publishSourceGeneration(appId, "import './app.css'\nexport const value = 'unrelated'\n")
         await waitForEventCount(hmrResults, priorResultCount + 1)
         assert.equal((await stat(globalWxssPath)).ino, unchangedInode)
 
         const formattingResultCount = hmrResults.length
-        await writeFile(cssId, '.app{color:blue}')
+        await publishSourceGeneration(cssId, '.app{color:blue}')
         await waitForEventCount(hmrResults, formattingResultCount + 1)
         assert.equal((await stat(globalWxssPath)).ino, unchangedInode)
 
         const pageResultCount = hmrResults.length
         const pageStyleCount = publishedStyles.length
-        await writeFile(pageCssId, '.page { padding: 2px; }\n')
+        await publishSourceGeneration(pageCssId, '.page { padding: 2px; }\n')
         await waitForPublishedStyle(publishedStyles, pageStyleCount, (css) => css === '.page{padding:2rpx}', hmrResults)
         await waitForEventCount(hmrResults, pageResultCount + 1)
         assert.equal(await readFile(pageWxssPath, 'utf8'), '.page{padding:2rpx}')
@@ -228,7 +229,7 @@ test('minifies App/Page CSS, clears removed Page styles, and suppresses identica
 
         const pageRemovalResultCount = hmrResults.length
         const pageRemovalStyleCount = publishedStyles.length
-        await writeFile(pageId, "export const value = 'removed'\n")
+        await publishSourceGeneration(pageId, "export const value = 'removed'\n")
         await waitForPublishedStyle(publishedStyles, pageRemovalStyleCount, (css) => css === '', hmrResults)
         await waitForEventCount(hmrResults, pageRemovalResultCount + 1)
         assert.equal(await readFile(pageWxssPath, 'utf8'), '')
@@ -236,7 +237,7 @@ test('minifies App/Page CSS, clears removed Page styles, and suppresses identica
 
         const emptyPageInode = (await stat(pageWxssPath)).ino
         const emptyPageResultCount = hmrResults.length
-        await writeFile(pageId, "export const value = 'still-empty'\n")
+        await publishSourceGeneration(pageId, "export const value = 'still-empty'\n")
         await waitForEventCount(hmrResults, emptyPageResultCount + 1)
         assert.equal((await stat(pageWxssPath)).ino, emptyPageInode)
 
@@ -248,7 +249,7 @@ test('minifies App/Page CSS, clears removed Page styles, and suppresses identica
         const durableWxss = await readFile(globalWxssPath, 'utf8')
         const failedResultCount = hmrResults.length
         writeFailure = new Error('simulated atomic WXSS write failure')
-        await writeFile(cssId, '.app { color: black; }\n')
+        await publishSourceGeneration(cssId, '.app { color: black; }\n')
         await waitForRawEventCount(hmrResults, failedResultCount + 1)
 
         assert.match(String(hmrResults[failedResultCount]), /simulated atomic WXSS write failure/)
@@ -368,7 +369,7 @@ test('respects cssMinify:false while rendering Tailwind CSS and matching patch f
         await engine.registerClient('tailwind-style-hmr-test')
 
         const additionStart = hmrResults.length
-        await writeFile(appId, renderTailwindApplication('mt-2 py-5.5'))
+        await publishSourceGeneration(appId, renderTailwindApplication('mt-2 py-5.5'))
         const added = await waitForFinalizedHmr(hmrResults, additionStart, (result) =>
             /py-5_d5/.test(result.codes.join('\n'))
         )
@@ -382,7 +383,7 @@ test('respects cssMinify:false while rendering Tailwind CSS and matching patch f
         assert.doesNotMatch(addedCode, /py-5\.5/)
 
         const removalStart = hmrResults.length
-        await writeFile(appId, renderTailwindApplication('mt-2 mr-4.5'))
+        await publishSourceGeneration(appId, renderTailwindApplication('mt-2 mr-4.5'))
         const removed = await waitForFinalizedHmr(hmrResults, removalStart, (result) =>
             /mr-4_d5/.test(result.codes.join('\n'))
         )
@@ -393,7 +394,7 @@ test('respects cssMinify:false while rendering Tailwind CSS and matching patch f
 
         const dependencyStart = hmrResults.length
         const dependencyStyleCount = publishedStyles.length
-        await writeFile(themeId, '@theme { --color-brand: blue; }\n')
+        await publishSourceGeneration(themeId, '@theme { --color-brand: blue; }\n')
         await waitForPublishedStyle(
             publishedStyles,
             dependencyStyleCount,
@@ -407,7 +408,7 @@ test('respects cssMinify:false while rendering Tailwind CSS and matching patch f
 
         const plainCssStart = hmrResults.length
         const plainStyleCount = publishedStyles.length
-        await writeFile(cssId, '.plain-root { color: green; padding: 18.25rpx; }\n')
+        await publishSourceGeneration(cssId, '.plain-root { color: green; padding: 18.25rpx; }\n')
         await waitForPublishedStyle(
             publishedStyles,
             plainStyleCount,
