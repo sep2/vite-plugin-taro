@@ -1,5 +1,4 @@
 import { ensure, noop, toCamelCase } from '@tarojs/shared'
-import type { RendererHost } from 'vite-plugin-taro-runtime/react'
 import {
     document,
     eventHandler,
@@ -17,6 +16,7 @@ import type {
     TTNativeEvent,
     TTNativeNode
 } from 'vite-plugin-taro-runtime/runtime/tt-document'
+import type { MiniHost } from '../mini/taro/mini-host.d.ts'
 
 declare module 'vite-plugin-taro-runtime/runtime/mini' {
     interface TaroNode {
@@ -34,9 +34,7 @@ declare module 'vite-plugin-taro-runtime/runtime/mini' {
 }
 
 /** 在独立的 TT runtime 中安装一次，复用 Taro 的节点创建和逻辑树操作。 */
-export function createDomHost(
-    nativeDocument: TTNativeDocument
-): RendererHost<TaroElement, object, TaroElement, TaroText> {
+export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
     // 包装 document 的工厂，使 React 创建和 Taro 自身的 textContent 等创建路径共用同一规则。
     const createElement = document.createElement
     document.createElement = function (type) {
@@ -152,7 +150,7 @@ export function createDomHost(
         }
     })
 
-    // DOM mutation 已直接提交给 SDK，根不收集模板 payload，也不求值 App 的模板快照。
+    // DOM mutation 已直接提交给 SDK；根保留生命周期入口，完成回调由 performUpdate 处理。
     extend(TaroRootElement, 'enqueueUpdate', noop)
     extend(
         TaroRootElement,
@@ -178,11 +176,13 @@ export function createDomHost(
     )
 
     return {
-        createElement(container, _context, type) {
-            if (type === 'vpt_page_outlet') {
-                // renderer 的 container 是当前 App 根；此处一次性确定逻辑边界，普通 mutation 不判断类型。
-                keepLogicalChildren(container)
-            }
+        bindApp(_app, container) {
+            // App 根由 createVptApp 在首次提交前明确交付；其子关系只由 Taro 维护。
+            // Page 原生根分别挂到平台 Page document，普通节点的原生 mutation 委托保持直接转发。
+            container.delegateChildInsertion = noop
+            container.delegateChildRemoval = noop
+        },
+        createElement(_container, _context, type) {
             return document.createElement(type)
         },
         createText(_container, _context, text) {
@@ -194,13 +194,6 @@ export function createDomHost(
         // 原生树操作已在各个 mutation 委托中同步完成。
         afterCommit() {}
     }
-}
-
-// App 的子关系由 Taro 维护，不产生原生父子关系。
-// 边界创建时安装实例委托，将逻辑关系与普通节点的原生转发分开。
-function keepLogicalChildren(node: TaroNode): void {
-    node.delegateChildInsertion = noop
-    node.delegateChildRemoval = noop
 }
 
 function removePageRoot(child: TaroNode, options: Parameters<TaroNode['delegateChildRemoval']>[1]): void {

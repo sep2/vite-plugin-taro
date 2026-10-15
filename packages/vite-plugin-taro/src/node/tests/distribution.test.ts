@@ -245,6 +245,7 @@ test('ships Mini activation capsules with shared Taro integration modules', asyn
     ])
     const taroFiles = await readdir(path.join(miniRoot, 'taro'))
     for (const file of [
+        'bind-template-app.js',
         'create-template-host.js',
         'create-vpt-app.js',
         'create-vpt-page.js',
@@ -441,7 +442,8 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         hydrateRuntime,
         reactRuntime,
         templateHost,
-        vptAppRuntime
+        vptAppRuntime,
+        templateAppBinding
     ] = await Promise.all([
         readFile(runtimePackageRequire.resolve('@tarojs/plugin-platform-h5/dist/definition.json')),
         readFile(path.join(runtimePackageDistRoot, 'plugin-platform-h5', 'definition.json')),
@@ -453,7 +455,8 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         readFile(path.join(runtimePackageDistRoot, 'runtime', 'hydrate.js'), 'utf8'),
         readFile(path.join(runtimePackageDistRoot, 'react', 'react.esm.js'), 'utf8'),
         readFile(path.join(distRoot, 'runtime', 'mini', 'taro', 'create-template-host.js'), 'utf8'),
-        readFile(path.join(distRoot, 'runtime', 'mini', 'taro', 'create-vpt-app.js'), 'utf8')
+        readFile(path.join(distRoot, 'runtime', 'mini', 'taro', 'create-vpt-app.js'), 'utf8'),
+        readFile(path.join(distRoot, 'runtime', 'mini', 'taro', 'bind-template-app.js'), 'utf8')
     ])
 
     assert.deepEqual(copiedDefinition, definition)
@@ -474,8 +477,10 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         /document\.create(?:Element|TextNode)|instanceof FormElement|reconcileVptPageOutletSpine/
     )
     assert.match(templateHost, /afterCommit: reconcilePageOutletSpine/)
-    assert.match(vptAppRuntime, /broadcastAppUpdate/)
-    assert.match(vptAppRuntime, /mount\.call\(app/)
+    assert.match(vptAppRuntime, /host\.bindApp\(app, container\)/)
+    assert.match(templateHost, /bindApp: bindTemplateApp/)
+    assert.match(templateAppBinding, /broadcastAppUpdate/)
+    assert.match(templateAppBinding, /mount\.call\(app/)
     assert.doesNotMatch(String(copiedFrameworkRuntime), /broadcastAppUpdate|hydrate\(container\)/)
     assert.match(String(copiedFrameworkRuntime), /hooks\.tap\('initNativeApi'/)
     assert.match(String(copiedFrameworkRuntime), /useLaunch = createTaroHook\('onLaunch'\)/)

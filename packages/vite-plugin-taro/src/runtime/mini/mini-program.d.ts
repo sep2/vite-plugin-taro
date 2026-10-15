@@ -9,6 +9,12 @@ declare module '\0vpt:page-capsule' {
     export default config
 }
 
+/** App 初始化与 React renderer 共用构建目标选定的 host 实例。 */
+declare module '\0vpt:renderer-host' {
+    const host: import('./taro/mini-host.d.ts').MiniHost
+    export default host
+}
+
 /** Native routing table generated from finalized chunk paths rather than bundled as a source module. */
 declare module '\0vpt:mini-transport' {
     export const transport: (moduleId: string) => System.Registration | PromiseLike<System.Registration>

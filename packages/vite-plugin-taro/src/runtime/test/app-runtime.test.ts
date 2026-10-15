@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { resolveVptRuntime } from '../../node/utils/packages.ts'
 import {
     bundleRuntimeEntry,
     type Call,
@@ -62,7 +63,60 @@ test('creates WX App and recursive component capsules only after App initializat
     assert.strictEqual(exports.customWrapperConfig, customWrapperConfig)
 })
 
-test('App presentation delegates mounting and seeds lazy snapshots before native initialization', async () => {
+test('App creation binds the exact container through the selected host before returning', async () => {
+    const bundle = await bundleRuntimeEntry({
+        entry: 'mini/taro/create-vpt-app.ts',
+        mocks: {
+            react: 'export default globalThis.harness.react',
+            'vite-plugin-taro-runtime/react': 'export default globalThis.harness.renderer',
+            'vite-plugin-taro-runtime/plugin-framework-react/runtime':
+                'export const createReactApp = globalThis.harness.createReactApp',
+            'vite-plugin-taro-runtime/runtime/mini': 'export const document = globalThis.harness.document',
+            '\0vpt:renderer-host': 'export default globalThis.harness.host'
+        },
+        defines: {}
+    })
+    for (const config of [{}, { appId: '' }, { appId: 'custom-app' }]) {
+        // This trace is local to one creation; the host owns all presentation changes to App and container.
+        const trace: string[] = []
+        const container = Object.freeze({})
+        const app = Object.freeze({ mount() {} })
+        const component = () => null
+        const react = {}
+        const renderer = {}
+        const host = {
+            bindApp(actualApp: unknown, actualContainer: unknown) {
+                assert.strictEqual(this, host)
+                assert.strictEqual(actualApp, app)
+                assert.strictEqual(actualContainer, container)
+                trace.push('bindApp')
+            }
+        }
+        const harness = {
+            react,
+            renderer,
+            host,
+            createReactApp(...args: unknown[]) {
+                assert.deepEqual(args, [component, react, renderer, config])
+                trace.push('createReactApp')
+                return app
+            },
+            document: {
+                getElementById(id: string) {
+                    assert.equal(id, config.appId || 'app')
+                    trace.push('container')
+                    return container
+                }
+            }
+        }
+        const { createVptApp } = executeRuntimeEntry(bundle, createExecutionContext(harness))
+        assert.ok(typeof createVptApp === 'function')
+        assert.strictEqual(createVptApp(component, config), app)
+        assert.deepEqual(trace, ['createReactApp', 'container', 'bindApp'])
+    }
+})
+
+test('template App binding delegates mounting and seeds lazy snapshots before native initialization', async () => {
     const bundle = await bundleRuntimeEntry({
         entry: 'mini/taro/create-vpt-app.ts',
         mocks: {
@@ -73,6 +127,10 @@ test('App presentation delegates mounting and seeds lazy snapshots before native
             'vite-plugin-taro-runtime/runtime/mini': `
                 export const document = globalThis.harness.document
                 export const hydrate = globalThis.harness.hydrate
+            `,
+            '\0vpt:renderer-host': `
+                import { bindTemplateApp } from ${JSON.stringify(resolveVptRuntime('mini/taro/bind-template-app'))}
+                export default { bindApp: bindTemplateApp }
             `
         },
         defines: { getCurrentPages: 'globalThis.harness.getCurrentPages' }

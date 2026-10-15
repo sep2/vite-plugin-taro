@@ -331,6 +331,13 @@ assert.equal(root.nativeNode.name, 'view')
 assert.equal(root.nativeNode.parentNode, null)
 assert.equal(document.getElementById('app').nativeNode, undefined)
 expectCalls([['element', 'view', root.nativeNode]])
+const insertion = root.delegateChildInsertion
+const removal = root.delegateChildRemoval
+const detachedOutlet = host.createElement(root, {}, 'vpt_page_outlet')
+assert.equal(detachedOutlet.nativeNode, undefined)
+assert.strictEqual(root.delegateChildInsertion, insertion, 'creating an outlet must not configure another node')
+assert.strictEqual(root.delegateChildRemoval, removal)
+expectCalls([])
 const parent = host.createElement(root, {}, 'View')
 assert.ok(parent instanceof TaroElement)
 expectCalls([['element', 'view', parent.nativeNode]])
@@ -933,6 +940,10 @@ async function checkPages() {
         const app = createVptApp(App, appConfig)
         assert.equal(app.mount.length, 3, 'mount keeps its existing signature')
         const appRoot = document.getElementById(appConfig.appId || 'app')
+        assert.equal(appRoot.childNodes.length, 0, 'App binding precedes React outlet creation')
+        assert.ok(Object.hasOwn(appRoot, 'delegateChildInsertion'))
+        assert.ok(Object.hasOwn(appRoot, 'delegateChildRemoval'))
+        assert.equal(appRoot.ctx, null, 'DOM App binding does not install a template data sink')
         calls.length = 0
         try {
             // Both mounts enter the cold App before it commits. Binding must use each root.ctx, not Current.page.
@@ -1008,7 +1019,7 @@ async function checkPages() {
                 get() { assert.fail('Page attachment must not read logical childNodes') }
             })
             try {
-                firstRoot.enqueueUpdate({ path: 'app.cn', value() { assert.fail('DOM must not evaluate App snapshots') } })
+                firstRoot.enqueueUpdate({ path: 'page.cn', value() { assert.fail('DOM must not evaluate template payloads') } })
                 firstRoot.enqueueUpdateCallback(() => callbacks.push('existing'))
                 firstRoot.performUpdate(true, data => {
                     assert.deepEqual(data, {})

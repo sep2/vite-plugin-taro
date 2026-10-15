@@ -1,21 +1,21 @@
 import { ensure } from '@tarojs/shared'
-import type { RendererHost } from 'vite-plugin-taro-runtime/react'
 import {
     document,
     extend,
     FormElement,
     TaroElement,
     TaroNode,
-    TaroRootElement,
-    type TaroText
+    TaroRootElement
 } from 'vite-plugin-taro-runtime/runtime/mini'
+import { bindTemplateApp } from './bind-template-app.ts'
+import type { MiniHost } from './mini-host.d.ts'
 
 const pageOutlet = 'vpt_page_outlet'
 const pageOutletBranch = 'vo'
 const pageOutletSpineKey = Symbol('vptPageOutletSpine')
 
 /** 在启动时选中模板呈现后安装一次，复用 Taro 原有调度与节点方法。 */
-export function createTemplateHost(): RendererHost<TaroElement, object, TaroElement, TaroText> {
+export function createTemplateHost(): MiniHost {
     /*
      * Install template update policy once with the shared renderer host. Both the singleton App host and every Page host are
      * real TaroRootElement schedulers. Their structural parent distinguishes ownership: the App root is directly below the
@@ -46,6 +46,7 @@ export function createTemplateHost(): RendererHost<TaroElement, object, TaroElem
     })
 
     return {
+        bindApp: bindTemplateApp,
         createElement(_container, _context, type) {
             return document.createElement(type)
         },
