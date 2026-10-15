@@ -130,7 +130,7 @@ for (const [target, createContract] of [
                 resolveVptRuntime(
                     target === 'tt' && targetContract.options.renderer === 'dom'
                         ? 'tt/renderer-host'
-                        : 'mini/taro/template-host'
+                        : 'mini/template/template-host'
                 )
             )
         }

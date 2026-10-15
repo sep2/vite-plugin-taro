@@ -62,7 +62,7 @@ test('classifies import-only entry facades after their implementation moves into
 })
 
 test('Taro query capture follows ordinary application capsule classification', () => {
-    const queryId = resolveVptRuntime('mini/taro/get-page-query')
+    const queryId = resolveVptRuntime('mini/vpt/get-page-query')
     assert.equal(classifyModule(chunk(queryId)), 'normal-capsule')
     assert.equal(classifyModule({ ...chunk(), facadeModuleId: queryId }), 'normal-capsule')
 })

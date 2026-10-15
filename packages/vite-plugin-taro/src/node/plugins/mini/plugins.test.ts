@@ -118,7 +118,7 @@ for (const [target, createContract] of [
             assert.equal(
                 contract.taro.hostPath,
                 resolveVptRuntime(
-                    target === 'tt' && options.renderer === 'dom' ? 'tt/renderer-host' : 'mini/taro/template-host'
+                    target === 'tt' && options.renderer === 'dom' ? 'tt/renderer-host' : 'mini/template/template-host'
                 )
             )
             assert.strictEqual(contract.options, options)

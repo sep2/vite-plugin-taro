@@ -16,7 +16,7 @@ import type {
     TTNativeEvent,
     TTNativeNode
 } from 'vite-plugin-taro-runtime/runtime/tt-document'
-import type { MiniHost } from '../mini/taro/mini-host.d.ts'
+import type { MiniHost } from '../mini/vpt/mini-host.d.ts'
 
 declare module 'vite-plugin-taro-runtime/runtime/mini' {
     interface TaroNode {

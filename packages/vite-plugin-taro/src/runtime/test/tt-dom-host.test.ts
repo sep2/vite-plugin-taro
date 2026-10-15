@@ -292,8 +292,8 @@ import { hooks, isEnableTTDom, toCamelCase } from '@tarojs/shared'
 import 'vite-plugin-taro-runtime/plugin-platform-tt/runtime'
 import { Current, document, eventHandler, FormElement, Style, TaroElement, TaroNode, TaroRootElement, TaroText } from 'vite-plugin-taro-runtime/runtime/mini'
 import { useLoad, useUnload } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
-import { createVptApp } from ${JSON.stringify(resolveVptRuntime('mini/taro/create-vpt-app'))}
-import { createVptPage } from ${JSON.stringify(resolveVptRuntime('mini/taro/create-vpt-page'))}
+import { createVptApp } from ${JSON.stringify(resolveVptRuntime('mini/vpt/create-vpt-app'))}
+import { createVptPage } from ${JSON.stringify(resolveVptRuntime('mini/vpt/create-vpt-page'))}
 import host, { calls, reads, nativeDocument, pageDocuments, original, originalAppend, originalRemove, originalSetAttribute, originalRemoveAttribute } from 'test:tt-dom-host'
 
 export const completion = tt.expectDom ? checkDom() : checkTemplate()

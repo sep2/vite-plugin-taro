@@ -27,7 +27,7 @@ test('creates WX App and recursive component capsules only after App initializat
         }
     }
     const mocks = {
-        '../taro/taro-runtime.ts': `
+        '../vpt/taro-runtime.ts': `
             const harness = globalThis.harness
             export const createVptApp = harness.createVptApp
             export const createRecursiveComponentConfig = harness.createRecursiveComponentConfig
@@ -65,7 +65,7 @@ test('creates WX App and recursive component capsules only after App initializat
 
 test('App creation binds the exact container through the selected host before returning', async () => {
     const bundle = await bundleRuntimeEntry({
-        entry: 'mini/taro/create-vpt-app.ts',
+        entry: 'mini/vpt/create-vpt-app.ts',
         mocks: {
             react: 'export default globalThis.harness.react',
             'vite-plugin-taro-runtime/react': 'export default globalThis.harness.renderer',
@@ -118,7 +118,7 @@ test('App creation binds the exact container through the selected host before re
 
 test('template App binding delegates mounting and seeds lazy snapshots before native initialization', async () => {
     const bundle = await bundleRuntimeEntry({
-        entry: 'mini/taro/create-vpt-app.ts',
+        entry: 'mini/vpt/create-vpt-app.ts',
         mocks: {
             react: 'export default globalThis.harness.react',
             'vite-plugin-taro-runtime/react': 'export default globalThis.harness.renderer',
@@ -129,7 +129,7 @@ test('template App binding delegates mounting and seeds lazy snapshots before na
                 export const hydrate = globalThis.harness.hydrate
             `,
             '\0vpt:renderer-host': `
-                import { bindTemplateApp } from ${JSON.stringify(resolveVptRuntime('mini/taro/bind-template-app'))}
+                import { bindTemplateApp } from ${JSON.stringify(resolveVptRuntime('mini/template/bind-template-app'))}
                 export default { bindApp: bindTemplateApp }
             `
         },
@@ -247,7 +247,7 @@ test('preserves Mini Taro initialization order and export identities', async () 
         customWrapperCache
     }
     const code = await bundleRuntimeEntry({
-        entry: 'mini/taro/taro-runtime.ts',
+        entry: 'mini/vpt/taro-runtime.ts',
         mocks: {
             './create-vpt-page.ts': 'export const createVptPage = globalThis.harness.createVptPage',
             '\0vpt:taro-target-runtime': "globalThis.harness.events.push('target-runtime')",

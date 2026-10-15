@@ -3,7 +3,7 @@ import path from 'node:path'
 import test from 'node:test'
 import type { PageInstance } from 'vite-plugin-taro-runtime/runtime/mini'
 import { createDevtoolsHmrRuntime } from '../mini/dev/modes/devtools/devtools-runtime.ts'
-import type { createVptPage, VptPageOptions } from '../mini/taro/create-vpt-page.ts'
+import type { createVptPage, VptPageOptions } from '../mini/vpt/create-vpt-page.ts'
 import {
     bundleRuntimeEntry,
     type Call,
@@ -51,7 +51,7 @@ test('creates the Mini Program Page capsule after App initialization with one op
     const code = await bundleRuntimeEntry({
         entry: 'mini/capsule/page.ts',
         mocks: {
-            '../taro/taro-runtime.ts': `
+            '../vpt/taro-runtime.ts': `
                 const harness = globalThis.harness
                 export const createVptApp = harness.createVptApp
                 export const createVptPage = harness.createVptPage
@@ -84,11 +84,12 @@ test('createVptPage forwards optional Page config through the shared options typ
         { path: 'pages/home/index', config: { navigationBarTitleText: 'Home' }, prerender: false }
     ] satisfies VptPageOptions[]
     const bundle = await bundleRuntimeEntry({
-        entry: 'mini/taro/create-vpt-page.ts',
+        entry: 'mini/vpt/create-vpt-page.ts',
         mocks: {
             'vite-plugin-taro-runtime/runtime/mini':
                 'export const createPageConfig = globalThis.harness.createPageConfig',
-            './prerender-to-data.ts': 'export const prerenderToData = () => { throw new Error("Unexpected prerender") }'
+            '../template/prerender-to-data.ts':
+                'export const prerenderToData = () => { throw new Error("Unexpected prerender") }'
         },
         defines: {}
     })
@@ -128,12 +129,12 @@ test('prerender stores its identity inside the non-enumerable VPT metadata', asy
         entry: 'test/prerender-fixture.ts',
         mocks: {
             [path.join(runtimeRoot, 'test/prerender-fixture.ts')]: `
-                export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/taro/create-vpt-page.ts'))}
-                export { prerenderToData } from ${JSON.stringify(path.join(runtimeRoot, 'mini/taro/prerender-to-data.ts'))}
+                export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}
+                export { prerenderToData } from ${JSON.stringify(path.join(runtimeRoot, 'mini/template/prerender-to-data.ts'))}
             `,
             'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
             'vite-plugin-taro-runtime/react': 'export const flushSync = globalThis.harness.flushSync',
-            './get-page-query.ts': 'export const getPageQuery = () => ({ id: "example" })'
+            '../vpt/get-page-query.ts': 'export const getPageQuery = () => ({ id: "example" })'
         },
         defines: {}
     })
@@ -228,11 +229,11 @@ test('prerender stores its identity inside the non-enumerable VPT metadata', asy
 
 test('prerender preserves its seed and routing state until the App provides mount', async () => {
     const code = await bundleRuntimeEntry({
-        entry: 'mini/taro/prerender-to-data.ts',
+        entry: 'mini/template/prerender-to-data.ts',
         mocks: {
             'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
             'vite-plugin-taro-runtime/react': 'export const flushSync = globalThis.harness.unexpected',
-            './get-page-query.ts': 'export const getPageQuery = globalThis.harness.unexpected'
+            '../vpt/get-page-query.ts': 'export const getPageQuery = globalThis.harness.unexpected'
         },
         defines: {}
     })
@@ -282,10 +283,10 @@ test('mounts the current Page export instead of the cold native capsule baseline
         entry: 'mini/capsule/page.ts',
         mocks: {
             './app.ts': '',
-            './prerender-to-data.ts':
+            '../template/prerender-to-data.ts':
                 'export const prerenderToData = () => { throw new Error("Unexpected prerender") }',
             'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
-            '../taro/taro-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/taro/create-vpt-page.ts'))}`,
+            '../vpt/taro-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}`,
             '\0vpt:global-binding': 'export const vptGlobal = globalThis',
             '\0vpt:page-component': 'export default globalThis.harness.PageComponent'
         },
@@ -340,10 +341,10 @@ test('createVptPage selects native data form without copying the config', async 
             entry: 'mini/capsule/page.ts',
             mocks: {
                 './app.ts': 'globalThis.harness.initialize()',
-                '../taro/taro-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/taro/create-vpt-page.ts'))}`,
+                '../vpt/taro-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}`,
                 'vite-plugin-taro-runtime/runtime/mini':
                     'export const createPageConfig = globalThis.harness.createPageConfig',
-                './prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData',
+                '../template/prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData',
                 '\0vpt:page-component': 'export default () => null'
             },
             defines: {
@@ -425,16 +426,16 @@ test('Page data factories share native query capture installed during App activa
         entry: 'mini/native/page.ts',
         mocks: {
             '../amphibious/bootstrap.ts': '',
-            './get-page-query.ts': `export { getPageQuery } from ${JSON.stringify(path.join(runtimeRoot, 'mini/taro/get-page-query.ts'))}`,
+            '../vpt/get-page-query.ts': `export { getPageQuery } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/get-page-query.ts'))}`,
             '\0vpt:page-capsule': `export { default } from ${JSON.stringify(path.join(runtimeRoot, 'mini/capsule/page.ts'))}`,
             './app.ts': `
-                import '../taro/taro-runtime.ts'
+                import '../vpt/taro-runtime.ts'
                 globalThis.harness.assertListenerReady()
             `,
-            '../taro/taro-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/taro/create-vpt-page.ts'))}`,
+            '../vpt/taro-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}`,
             'vite-plugin-taro-runtime/runtime/mini': 'export const createPageConfig = () => globalThis.harness.config',
-            './prerender-to-data.ts': `
-                import { getPageQuery } from './get-page-query.ts'
+            '../template/prerender-to-data.ts': `
+                import { getPageQuery } from '../vpt/get-page-query.ts'
                 export const prerenderToData = config => globalThis.harness.prerenderToData(config, getPageQuery())
             `,
             '\0vpt:page-component': 'export default () => null'
@@ -512,10 +513,10 @@ for (const prerender of [false, true]) {
             entry: 'mini/capsule/page.ts',
             mocks: {
                 './app.ts': '',
-                '../taro/taro-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/taro/create-vpt-page.ts'))}`,
+                '../vpt/taro-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}`,
                 'vite-plugin-taro-runtime/runtime/mini':
                     'export const createPageConfig = globalThis.harness.createPageConfig',
-                './prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData',
+                '../template/prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData',
                 '\0vpt:page-component': 'export default () => null'
             },
             defines: {

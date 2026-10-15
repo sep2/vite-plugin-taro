@@ -176,7 +176,7 @@ function assertPageRegistration(output: BuildOutput, target: VptTarget, route: s
             assert.fail('Page shells must use native Page, not Component')
         }
     }
-    const queryId = normalizePath(resolveVptRuntime('mini/taro/get-page-query'))
+    const queryId = normalizePath(resolveVptRuntime('mini/vpt/get-page-query'))
     const queryChunk = output.find(
         (file): file is OutputChunk =>
             file.type === 'chunk' && Object.keys(file.modules).map(normalizePath).includes(queryId)
@@ -268,9 +268,9 @@ for (const renderer of ['template', 'dom'] as const) {
                     modules.includes(normalizePath(resolveVptRuntime('tt/create-dom-host'))),
                     renderer === 'dom'
                 )
-                assert.ok(modules.includes(normalizePath(resolveVptRuntime('mini/taro/create-template-host'))))
+                assert.ok(modules.includes(normalizePath(resolveVptRuntime('mini/template/create-template-host'))))
                 assert.equal(
-                    modules.includes(normalizePath(resolveVptRuntime('mini/taro/template-host'))),
+                    modules.includes(normalizePath(resolveVptRuntime('mini/template/template-host'))),
                     renderer === 'template'
                 )
                 assert.equal(

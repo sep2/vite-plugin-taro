@@ -1,5 +1,5 @@
 import { createPageConfig as createTaroPageConfig, type MiniElementData } from 'vite-plugin-taro-runtime/runtime/mini'
-import { prerenderToData } from './prerender-to-data.ts'
+import { prerenderToData } from '../template/prerender-to-data.ts'
 
 export type PageData = {
     app: { nn: string; cn: MiniElementData['cn'] }

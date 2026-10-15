@@ -1,5 +1,5 @@
 import type { TTNativeDocument } from 'vite-plugin-taro-runtime/runtime/tt-document'
-import { createTemplateHost } from '../mini/taro/create-template-host.ts'
+import { createTemplateHost } from '../mini/template/create-template-host.ts'
 import { createDomHost } from './create-dom-host.ts'
 
 declare const tt: {

@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { getPageQuery } from '../mini/taro/get-page-query.ts'
+import type { getPageQuery } from '../mini/vpt/get-page-query.ts'
 import { bundleRuntimeEntry, createExecutionContext, executeRuntimeEntry } from './runtime-entry-test-utils.ts'
 
 test('native query capture reads routing events when the host provides its API', async () => {
     const initialQuery: ReturnType<typeof getPageQuery> = undefined
     const code = await bundleRuntimeEntry({
-        entry: 'mini/taro/get-page-query.ts',
+        entry: 'mini/vpt/get-page-query.ts',
         mocks: {},
         defines: {}
     })
@@ -41,7 +41,7 @@ test('disposes only its own native query listener when the module is hot-replace
     const listeners = new Set<Listener>([unrelatedListener])
     const disposals: (() => void)[] = []
     const code = await bundleRuntimeEntry({
-        entry: 'mini/taro/get-page-query.ts',
+        entry: 'mini/vpt/get-page-query.ts',
         mocks: {},
         defines: { 'import.meta.hot': 'globalThis.harness.hot' }
     })

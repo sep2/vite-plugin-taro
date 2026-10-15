@@ -1,5 +1,5 @@
 import { document, hydrate, type MiniElementData, type ReactPageComponent } from 'vite-plugin-taro-runtime/runtime/mini'
-import type { MiniHost } from './mini-host.d.ts'
+import type { MiniHost } from '../vpt/mini-host.d.ts'
 
 /**
  * Mini App/Page presentation

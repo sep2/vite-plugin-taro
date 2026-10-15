@@ -20,7 +20,7 @@ export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
         define: {},
         taro: {
             env: 'alipay',
-            hostPath: resolveVptRuntime('mini/taro/template-host'),
+            hostPath: resolveVptRuntime('mini/template/template-host'),
             componentsReactPath: resolveTaroRuntime('plugin-platform-alipay/components-react'),
             targetRuntimePath: resolveTaroRuntime('plugin-platform-alipay/runtime')
         },

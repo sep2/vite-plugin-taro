@@ -235,7 +235,7 @@ test('emits first-party runtime modules using canonical package imports', async 
     )
 })
 
-test('ships Mini activation capsules with shared Taro integration modules', async () => {
+test('ships Mini activation capsules with separate VPT integration and template modules', async () => {
     const miniRoot = path.join(distRoot, 'runtime/mini')
     const capsuleFiles = await readdir(path.join(miniRoot, 'capsule'))
     assert.deepEqual(capsuleFiles.filter((file) => file.endsWith('.js')).toSorted(), [
@@ -243,19 +243,20 @@ test('ships Mini activation capsules with shared Taro integration modules', asyn
         'component.js',
         'page.js'
     ])
-    const taroFiles = await readdir(path.join(miniRoot, 'taro'))
-    for (const file of [
-        'bind-template-app.js',
-        'create-template-host.js',
+    const vptFiles = await readdir(path.join(miniRoot, 'vpt'))
+    assert.deepEqual(vptFiles.filter((file) => file.endsWith('.js')).toSorted(), [
         'create-vpt-app.js',
         'create-vpt-page.js',
         'get-page-query.js',
-        'prerender-to-data.js',
-        'template-host.js',
         'taro-runtime.js'
-    ]) {
-        assert.ok(taroFiles.includes(file), `Missing shared Taro integration module: ${file}`)
-    }
+    ])
+    const templateFiles = await readdir(path.join(miniRoot, 'template'))
+    assert.deepEqual(templateFiles.filter((file) => file.endsWith('.js')).toSorted(), [
+        'bind-template-app.js',
+        'create-template-host.js',
+        'prerender-to-data.js',
+        'template-host.js'
+    ])
 })
 
 test('builds exact size-bounded Taro runtime and platform artifacts into the runtime package', async () => {
@@ -454,9 +455,9 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         readFile(path.join(runtimePackageDistRoot, 'runtime', 'dom', 'node.js'), 'utf8'),
         readFile(path.join(runtimePackageDistRoot, 'runtime', 'hydrate.js'), 'utf8'),
         readFile(path.join(runtimePackageDistRoot, 'react', 'react.esm.js'), 'utf8'),
-        readFile(path.join(distRoot, 'runtime', 'mini', 'taro', 'create-template-host.js'), 'utf8'),
-        readFile(path.join(distRoot, 'runtime', 'mini', 'taro', 'create-vpt-app.js'), 'utf8'),
-        readFile(path.join(distRoot, 'runtime', 'mini', 'taro', 'bind-template-app.js'), 'utf8')
+        readFile(path.join(distRoot, 'runtime', 'mini', 'template', 'create-template-host.js'), 'utf8'),
+        readFile(path.join(distRoot, 'runtime', 'mini', 'vpt', 'create-vpt-app.js'), 'utf8'),
+        readFile(path.join(distRoot, 'runtime', 'mini', 'template', 'bind-template-app.js'), 'utf8')
     ])
 
     assert.deepEqual(copiedDefinition, definition)

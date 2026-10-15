@@ -140,7 +140,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
                 contract.taro.hostPath,
                 target === 'tt' && renderer === 'dom'
                     ? /runtime[/\\]tt[/\\]renderer-host\.(?:ts|js)$/
-                    : /runtime[/\\]mini[/\\]taro[/\\]template-host\.(?:ts|js)$/
+                    : /runtime[/\\]mini[/\\]template[/\\]template-host\.(?:ts|js)$/
             )
             const { projectConfigFilename } = contract.output
             const sourceFiles = createProjectConfigFixture(target, true)

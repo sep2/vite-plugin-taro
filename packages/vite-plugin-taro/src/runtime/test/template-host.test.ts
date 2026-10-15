@@ -42,7 +42,7 @@ test('template host preserves outlet branch markers through moves, replacements 
                 },
                 load(id) {
                     if (id === 'test:template-host') {
-                        return `import host from ${JSON.stringify(resolveVptRuntime('mini/taro/template-host'))}\n${fixture}`
+                        return `import host from ${JSON.stringify(resolveVptRuntime('mini/template/template-host'))}\n${fixture}`
                     }
                 },
                 transform(code, id) {
