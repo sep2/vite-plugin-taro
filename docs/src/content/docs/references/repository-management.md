@@ -166,7 +166,7 @@ pnpm test:release
 
 测试覆盖固定版本组、连续 beta 与转稳定版、私有包排除、真实 Changesets / pnpm 打包后的入口和运行时依赖，以及生成器的稳定版与 beta 依赖版本。
 
-`.github/workflows/publish.yml` 先运行现有的覆盖率和 Windows 验证，再进入一个发布 job：安装依赖、通过 Changesets 检查待消费 changeset 与 npm 未发布版本，仅在准备好发布时构建、检查类型，并调用 `changesets/action/publish@v2` 发布。没有独立的打包 job、跨 job 的发布产物传输或自动版本 PR。每次 `main` push 都先通过质量检查，包括补发先前未成功发布的版本。
+`.github/workflows/publish.yml` 先通过 Ubuntu / Windows 矩阵验证，两端均以并发数 `4` 执行插件测试，并要求语句、分支、函数与行覆盖率均达到 `100%`，再进入一个发布 job：安装依赖、通过 Changesets 检查待消费 changeset 与 npm 未发布版本，仅在准备好发布时构建、检查类型，并调用 `changesets/action/publish@v2` 发布。没有独立的打包 job、跨 job 的发布产物传输或自动版本 PR。每次 `main` push 都先通过质量检查，包括补发先前未成功发布的版本。
 
 发布使用 pnpm，保留 `workspace:*` 依赖转换与 `publishConfig` 入口覆盖，并通过 npm Trusted Publishing / OIDC 认证。保留 `publish.yml` 文件名以匹配现有 npm Trusted Publisher 配置；不要配置 `NPM_TOKEN`。发布 job 同时负责构建和发布，拥有仓库写入与 OIDC 权限；文档部署 job 的 OIDC 权限仅用于 GitHub Pages。
 

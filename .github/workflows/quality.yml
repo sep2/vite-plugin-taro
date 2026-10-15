@@ -1,120 +1,76 @@
 name: Quality
 
 on:
-  workflow_call:
+    workflow_call:
 
 permissions:
-  contents: read
+    contents: read
 
 jobs:
-  coverage:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+    check:
+        # Keep required-check names stable across runners.
+        name: ${{ matrix.name }}
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - name: coverage
+                      os: ubuntu-latest
+                    - name: windows
+                      os: windows-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          run_install: false
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v6
+              with:
+                  run_install: false
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 26
-          cache: pnpm
+            - name: Setup Node.js
+              uses: actions/setup-node@v6
+              with:
+                  node-version: 26
+                  cache: pnpm
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
 
-      - name: Verify generated dependency patches
-        run: pnpm patches:check
+            - name: Verify generated dependency patches
+              run: pnpm patches:check
 
-      - name: Prepare Taro packages
-        run: pnpm prepare:taro
+            - name: Prepare Taro packages
+              run: pnpm prepare:taro
 
-      - name: Build plugin
-        run: pnpm build:plugin
+            - name: Build plugin
+              run: pnpm build:plugin
 
-      - name: Test release preparation and package artifacts
-        run: node --test --test-reporter=./scripts/ci-test-reporter.ts scripts/*.test.ts
+            - name: Typecheck
+              run: pnpm typecheck
 
-      - name: Enforce 100% coverage
-        run: pnpm --filter vite-plugin-taro exec c8 node --test --test-reporter=../../scripts/ci-test-reporter.ts --test-concurrency=4 "src/**/*.test.ts" "scripts/**/*.test.ts"
+            - name: Test release preparation and package artifacts
+              run: node --test --test-reporter=./scripts/ci-test-reporter.ts scripts/*.test.ts
 
-      - name: Test native component TikTok demo
-        run: pnpm --filter native-comp-demo test
+            - name: Enforce 100% coverage
+              # Limit discovery to source tests; tmp/ contains generated fixtures.
+              run: pnpm --filter vite-plugin-taro exec c8 node --test --test-reporter=../../scripts/ci-test-reporter.ts --test-concurrency=4 "src/**/*.test.ts" "scripts/**/*.test.ts"
 
-      - name: Build sample WeChat Mini Program
-        run: pnpm build:loan-genius:wx
+            - name: Test native component TikTok demo
+              run: pnpm --filter native-comp-demo test
 
-      - name: Build sample Alipay Mini Program
-        run: pnpm build:loan-genius:zfb
+            - name: Build sample WeChat Mini Program
+              run: pnpm build:loan-genius:wx
 
-      - name: Build sample H5
-        run: pnpm build:loan-genius:h5
+            - name: Build sample Alipay Mini Program
+              run: pnpm build:loan-genius:zfb
 
-      - name: Build repository Mini Program demos
-        run: |
-          pnpm build:native-comp-demo:wx
-          pnpm build:native-comp-demo:zfb
-          pnpm build:hmr-stress-demo:wx
-          pnpm build:hmr-stress-demo:zfb
+            - name: Build sample H5
+              run: pnpm build:loan-genius:h5
 
-  windows:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 26
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Verify generated dependency patches
-        run: pnpm patches:check
-
-      - name: Prepare Taro packages
-        run: pnpm prepare:taro
-
-      - name: Build plugin
-        run: pnpm build:plugin
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Test release preparation and package artifacts
-        run: node --test --test-reporter=./scripts/ci-test-reporter.ts scripts/*.test.ts
-
-      - name: Test
-        # Limit discovery to source tests; tmp/ contains generated fixtures.
-        run: pnpm --filter vite-plugin-taro exec node --test --test-reporter=../../scripts/ci-test-reporter.ts --test-concurrency=2 "src/**/*.test.ts" "scripts/**/*.test.ts"
-
-      - name: Test native component TikTok demo
-        run: pnpm --filter native-comp-demo test
-
-      - name: Build sample WeChat Mini Program
-        run: pnpm build:loan-genius:wx
-
-      - name: Build sample Alipay Mini Program
-        run: pnpm build:loan-genius:zfb
-
-      - name: Build sample H5
-        run: pnpm build:loan-genius:h5
-
-      - name: Build repository Mini Program demos
-        run: |
-          pnpm build:native-comp-demo:wx
-          pnpm build:native-comp-demo:zfb
-          pnpm build:hmr-stress-demo:wx
-          pnpm build:hmr-stress-demo:zfb
+            - name: Build repository Mini Program demos
+              run: |
+                  pnpm build:native-comp-demo:wx
+                  pnpm build:native-comp-demo:zfb
+                  pnpm build:hmr-stress-demo:wx
+                  pnpm build:hmr-stress-demo:zfb
