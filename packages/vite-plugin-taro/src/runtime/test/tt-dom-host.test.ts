@@ -57,7 +57,7 @@ for (const mode of ['development', 'production'] as const) {
                     },
                     load(id) {
                         if (id === entry) {
-                            return `${fixture}\n${eventsFixture}\n${pagesFixture}\n}\n${templateFixture}`
+                            return `${fixture}\n${eventsFixture}\n${nativeComponentsFixture}\n${pagesFixture}\n}\n${templateFixture}`
                         }
                         if (id === hostModule) {
                             // The SDK exists before the selected application host initializes; do not replace that host.
@@ -106,6 +106,7 @@ for (const mode of ['development', 'production'] as const) {
                 nativeAvailable: boolean
                 expectDom: boolean
                 getRenderMode?: () => number
+                componentList?: 'array' | 'set' | 'undefined'
                 pages?: unknown[]
             }) => {
                 const exports: { completion?: Promise<void> } = {}
@@ -146,10 +147,13 @@ for (const mode of ['development', 'production'] as const) {
             // Reuse one bundle across capability cases so coverage describes the same startup decision.
             for (const sdk of [
                 { nativeAvailable: true, getRenderMode: () => 2, expectDom: true },
-                { nativeAvailable: true, getRenderMode: () => 1, expectDom: false },
-                { nativeAvailable: true, expectDom: false },
-                { nativeAvailable: false, getRenderMode: () => 2, expectDom: false }
-            ]) {
+                { nativeAvailable: true, getRenderMode: () => 2, expectDom: true, componentList: 'array' },
+                { nativeAvailable: true, getRenderMode: () => 2, expectDom: true, componentList: 'set' },
+                { nativeAvailable: true, getRenderMode: () => 2, expectDom: true, componentList: 'undefined' },
+                { nativeAvailable: true, getRenderMode: () => 1, expectDom: false, componentList: 'set' },
+                { nativeAvailable: true, expectDom: false, componentList: 'array' },
+                { nativeAvailable: false, getRenderMode: () => 2, expectDom: false, componentList: 'set' }
+            ] as const) {
                 const exports = executeFixture(sdk)
                 assert.ok(exports.completion)
                 await exports.completion
@@ -162,7 +166,28 @@ for (const mode of ['development', 'production'] as const) {
 
 const nativeModel = `
 import assert from 'node:assert/strict'
+import { DEFAULT_COMPONENTS, TT_SPECIFIC_COMPONENTS } from '@tarojs/shared'
 import { document, TaroElement, TaroNode, TaroRootElement } from 'vite-plugin-taro-runtime/runtime/mini'
+
+// Record the startup API receiver; subsequent node creation must use the selected collection.
+export const componentListReads = []
+if (tt.componentList) {
+    tt.getBuiltInComponents = function () {
+        componentListReads.push(this)
+        if (tt.componentList === 'undefined') {
+            return undefined
+        }
+        const names = [...DEFAULT_COMPONENTS, ...TT_SPECIFIC_COMPONENTS, 'platform-view']
+            .filter(name => name !== 'editor')
+        if (tt.componentList === 'array') {
+            return Object.freeze(names)
+        }
+        const components = new Set(names)
+        // A platform Set is already a lookup table; iterating it would expose an unnecessary copy.
+        components[Symbol.iterator] = () => assert.fail('The platform component Set must be reused')
+        return components
+    }
+}
 
 // Capture the shared logical implementation before either host installs its presentation policy.
 export const original = {
@@ -273,6 +298,14 @@ export const nativeDocument = Object.freeze({
         calls.push(['element', type, node])
         return node
     },
+    createNativeComponent(type, options) {
+        // Record only the SDK factory boundary; compiled native internals and slot rendering are SDK-owned.
+        const node = new NativeNode('#fragment', '')
+        node.nodeType = 14
+        node.componentName = type
+        calls.push(['component', type, options, node])
+        return node
+    },
     createTextNode(text) {
         const node = new NativeNode('#text', text)
         calls.push(['createText', text, node])
@@ -294,7 +327,7 @@ import { Current, document, eventHandler, FormElement, Style, TaroElement, TaroN
 import { useLoad, useUnload } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
 import { createVptApp } from ${JSON.stringify(resolveVptRuntime('mini/vpt/create-vpt-app'))}
 import { createVptPage } from ${JSON.stringify(resolveVptRuntime('mini/vpt/create-vpt-page'))}
-import host, { calls, reads, nativeDocument, pageDocuments, original, originalAppend, originalRemove, originalSetAttribute, originalRemoveAttribute } from 'test:tt-dom-host'
+import host, { calls, reads, componentListReads, nativeDocument, pageDocuments, original, originalAppend, originalRemove, originalSetAttribute, originalRemoveAttribute } from 'test:tt-dom-host'
 
 export const completion = tt.expectDom ? checkDom() : checkTemplate()
 
@@ -305,6 +338,8 @@ assert.strictEqual(TaroNode.prototype.enqueueUpdate, original.nodeEnqueue)
 // The selected native document remains authoritative even if capability properties later change.
 tt.getRenderMode = () => 1
 tt.appDocument = undefined
+assert.deepEqual(componentListReads, tt.componentList ? [tt] : [])
+tt.getBuiltInComponents = () => assert.fail('Component classification is selected once at startup')
 
 function expectCalls(expected) {
     assert.deepEqual(calls.splice(0), expected)
@@ -352,6 +387,29 @@ expectCalls([
     ['element', 'input', input.nativeNode],
     ['listen', input.nativeNode, 'bindinput', input.nativeEventListener]
 ])
+
+// The platform collection is authoritative; missing APIs/results use both upstream fallback component sets.
+const platformComponents = tt.componentList === 'array' || tt.componentList === 'set'
+for (const [name, builtIn] of [
+    ['custom-wrapper', true],
+    ['platform-view', platformComponents],
+    ['editor', !platformComponents]
+]) {
+    const node = document.createElement(name)
+    expectCalls([builtIn
+        ? ['element', name, node.nativeNode]
+        : ['component', name, { __tt__inner__options__: { name } }, node.nativeNode]])
+}
+const nativeCard = host.createElement(root, {}, 'Native-Card')
+assert.ok(nativeCard instanceof TaroElement)
+assert.equal(nativeCard.nodeName, 'native-card')
+assert.equal(nativeCard.nativeNode.componentName, 'native-card')
+assert.equal(nativeCard.nativeNode.nodeType, 14)
+assert.equal(host.isFormElement(nativeCard), false)
+expectCalls([['component', 'native-card', { __tt__inner__options__: { name: 'native-card' } }, nativeCard.nativeNode]])
+for (const method of ['delegateChildInsertion', 'delegateChildRemoval', 'delegateChildReset']) {
+    assert.strictEqual(nativeCard[method], TaroNode.prototype[method], 'native components use the existing tree delegates')
+}
 
 // Tree, text, style and attribute mutations reach native operations before template payload work.
 TaroNode.extend('_path', { get() { assert.fail('Native mutations must not calculate template paths') } })
@@ -884,6 +942,57 @@ assert.deepEqual(events.splice(0), ['child', 'parent'], 'receiver dispatch survi
 calls.length = 0
 `
 
+const nativeComponentsFixture = `
+// Real React updates retain logical refs and native component handles through the shared delegates.
+{
+    const container = document.createElement('view')
+    const root = ReactDOM.createRoot(container)
+    const ref = React.createRef()
+    // This journal records the native component event passing through the ordinary logical handler.
+    const selections = []
+    const onSelect = event => selections.push(event.detail.value)
+    function Cards({ reverse, label }) {
+        const cards = [
+            React.createElement('native-card', { key: 'first', ref, label, onSelect }),
+            React.createElement('native-card', { key: 'second' })
+        ]
+        return reverse ? cards.reverse() : cards
+    }
+    try {
+        calls.length = 0
+        ReactDOM.flushSync(() => root.render(React.createElement(Cards, { reverse: false, label: 'first' })))
+        const first = ref.current
+        const native = first.nativeNode
+        const second = container.lastChild
+        assert.ok(first instanceof TaroElement)
+        assert.notStrictEqual(first, native)
+        assert.equal(native.componentName, 'native-card')
+        assert.equal(native.attributes.label, 'first')
+        assert.equal(calls.filter(call => call[0] === 'component').length, 2)
+        expectChildren(container, [first, second])
+        calls.length = 0
+        ReactDOM.flushSync(() => root.render(React.createElement(Cards, { reverse: true, label: 'updated' })))
+        assert.strictEqual(ref.current, first)
+        assert.strictEqual(first.nativeNode, native)
+        assert.equal(native.attributes.label, 'updated')
+        assert.equal(calls.filter(call => call[0] === 'component').length, 0)
+        assert.equal(calls.filter(call => call[0] === 'attribute').length, 1)
+        assert.equal(calls.filter(call => call[0] === 'remove').length, 1)
+        assert.equal(calls.filter(call => call[0] === 'append' || call[0] === 'insert').length, 1)
+        expectChildren(container, [second, first])
+        emitNative(first, 'select', { value: 42 }, first)
+        assert.deepEqual(selections, [42])
+    } finally {
+        calls.length = 0
+        ReactDOM.flushSync(() => root.unmount())
+    }
+    assert.equal(ref.current, null)
+    expectChildren(container, [])
+    assert.equal(calls.length, 2)
+    assert.ok(calls.every(call => call[0] === 'remove'))
+}
+`
+
 const pagesFixture = `
 await checkPages()
 async function checkPages() {
@@ -1083,6 +1192,7 @@ async function checkPages() {
 
 const templateFixture = `
 async function checkTemplate() {
+    assert.deepEqual(componentListReads, [], 'template fallback must not query DOM component capabilities')
     assert.strictEqual(document.createElement, original.createElement)
     assert.strictEqual(document.createTextNode, original.createTextNode)
     assert.strictEqual(TaroNode.prototype.delegateChildInsertion, original.childInsertion)

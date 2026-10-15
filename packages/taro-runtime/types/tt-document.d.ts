@@ -48,6 +48,8 @@ export interface TTNativeComponent extends TTNativeElement {
 export interface TTNativeDocument {
     getPageDocumentById(id: number): TTNativeElement | undefined
     createElement(name: string): TTNativeElement
+    /** Creates a native component resolved from the owning Page's registration, using Taro's SDK options. */
+    createNativeComponent(name: string, options: { __tt__inner__options__: { name: string } }): TTNativeComponent
     createTextNode(text: string): TTNativeNode
 }
 

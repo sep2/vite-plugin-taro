@@ -1,4 +1,4 @@
-import { ensure, noop, toCamelCase } from '@tarojs/shared'
+import { DEFAULT_COMPONENTS, ensure, noop, TT_SPECIFIC_COMPONENTS, toCamelCase } from '@tarojs/shared'
 import {
     document,
     eventHandler,
@@ -33,10 +33,26 @@ declare module 'vite-plugin-taro-runtime/runtime/mini' {
     }
 }
 
+declare const tt: {
+    getBuiltInComponents?(): string[] | Set<string> | undefined
+}
+
 const pageOutlet = 'vpt_page_outlet'
+
+function getTtBuiltinComponents() {
+    // 与上游 createTTDomDocument 一致：平台名单优先，缺省使用 Taro 的通用与 TT 专属组件。
+    // Set 直接复用；数组和缺省名单只在初始化时构建一次 Set（O(B)），每次创建平均 O(1) 查询。
+    const components = tt.getBuiltInComponents?.()
+
+    return components instanceof Set
+        ? components
+        : new Set(components ?? [...DEFAULT_COMPONENTS, ...TT_SPECIFIC_COMPONENTS])
+}
 
 /** 在独立的 TT runtime 中安装一次，复用 Taro 的节点创建和逻辑树操作。 */
 export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
+    const builtInComponents = getTtBuiltinComponents()
+
     // 包装 document 的工厂，使 React 创建和 Taro 自身的 textContent 等创建路径共用同一规则。
     const createElement = document.createElement
     document.createElement = function (type) {
@@ -49,9 +65,18 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
             return node
         }
 
-        // 与 H5 的页面 div 相同，root 自己拥有一个可离线构建的原生根元素。
-        // 它会参与布局；平台 Page document 是后续挂载目标，二者的身份始终分开。
-        node.nativeNode = nativeDocument.createElement(node instanceof TaroRootElement ? 'view' : node.nodeName)
+        if (node instanceof TaroRootElement) {
+            // 与 H5 的页面 div 相同，root 自己拥有一个可离线构建的原生根元素。
+            // 它会参与布局；平台 Page document 是后续挂载目标，二者的身份始终分开。
+            node.nativeNode = nativeDocument.createElement('view')
+        } else {
+            const name = node.nodeName
+            // SDK 按当前 Page 的组件注册解析这个名称；选项与上游 Taro 的原生组件创建保持一致。
+            // 句柄仍交给现有属性、事件和子节点委托，组件内部及 slot 的呈现由 SDK 管理。
+            node.nativeNode = builtInComponents.has(name)
+                ? nativeDocument.createElement(name)
+                : nativeDocument.createNativeComponent(name, { __tt__inner__options__: { name } })
+        }
 
         // 模板原本固定绑定这些值变化事件；DOM host 接替模板，把变化送入现有表单流程。
         // 即使没有业务处理器，非受控 ref.value 也要更新，受控 input/textarea 也要触发恢复。
