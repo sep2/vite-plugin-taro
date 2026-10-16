@@ -1,6 +1,6 @@
 # Dependency patch series
 
-pnpm applies one combined patch to each package version. We maintain **14 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output.
+pnpm applies one combined patch to each package version. We maintain **15 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output.
 
 ## Feature inventory
 
@@ -19,6 +19,7 @@ pnpm applies one combined patch to each package version. We maintain **14 featur
 | | `04-event-listener-removal` | Preserve registered event handlers when removal targets an unregistered function; matching handlers retain their ordinary removal behavior. |
 | | `05-event-target-data` | Preserve platform target datasets when logical indexes miss and keep distinct unresolved event targets separate. |
 | | `06-style-property-names` | Use the setter's original storage key when reading or removing hyphen-prefixed style properties. |
+| | `07-clone-delegation` | Construct clones through existing presentation delegates, preserving fresh identity, parent links and dynamic style accessors. |
 | `canvas-confetti@1.9.4` | `01-canvas-confetti-enhancements` | Keep all existing confetti enhancements together: rotation/tilt controls, frame-clock repeat emission, cached path drawing, and DOMMatrix input normalization. Source, browser and module builds stay aligned. |
 
 The React renderer imports its host through `\0vpt:renderer-host`. VPT's Mini resolver binds that private import through `taro.hostPath`: template targets use `src/runtime/mini/template/template-host.ts`, while TT DOM preference uses the startup selector in `src/runtime/tt/renderer-host.ts`. The generic `RendererHost` type is exported by `vite-plugin-taro-runtime/react`: it accepts the root container and host context for element/text creation, classifies form elements, and receives optional pre-commit and synchronous post-commit callbacks. VPT's recursive implementation uses Taro's document and `FormElement` and owns App/Page outlet projection. React reconciliation, prop comparison, controlled-input restoration and App/Page mounting retain their existing behavior.
@@ -50,6 +51,8 @@ Upstream: [NervJS/taro#19528](https://github.com/NervJS/taro/pull/19528). Retire
 `06-style-property-names` makes `getPropertyValue` and `removeProperty` prefer an existing original storage key, then resolve other names through camelCase. This supports both hyphen-prefixed `setProperty` writes and direct assignments to registered vendor setters such as `WebkitLineClamp`; when both keys exist, the original key takes precedence. CSS variables always retain their spelling. Selection uses the existing `_usedStyleProp` set, so an unused dynamic accessor does not hide a live camelCase value. Whole-style clearing uses the same removal path; no extra state or style-table scan is added.
 
 Upstream: [NervJS/taro#19530](https://github.com/NervJS/taro/pull/19530). Retire `06-style-property-names` when the pinned `@tarojs/runtime` release includes this fix: remove its series entry and feature patch, recompose the generated runtime patch, refresh the lockfile, and retain the style regressions.
+
+`07-clone-delegation` initializes text through the document factory and forwards copied attributes, each nonempty completed style and each cloned child through host-replaced delegates. It captures the default template delegates before host installation: those functions prepare incremental payloads and are skipped during clone construction, including scheduler-root clones. Default-template attributes use a direct shallow copy; native attributes are copied and delegated in the same loop. Cloning constructs parent/child relationships directly, retaining the source's ID lookup and avoiding public mutation observer records and sibling searches. Every clone has its own sid, native handle and handler state. Dynamic style accessors are recreated on the new Style object. Construction is linear in cloned nodes, attributes, dataset keys and style entries, plus the selected host's work. Ordinary mutation delegates retain their existing behavior.
 
 `vite-plugin-taro-runtime/runtime/tt-document` exposes Taro's existing `bom/document.js` factory directly. Its native DOM declarations live in the runtime package's `types/tt-document.d.ts`.
 

@@ -57,7 +57,7 @@ for (const mode of ['development', 'production'] as const) {
                     },
                     load(id) {
                         if (id === entry) {
-                            return `${fixture}\n${eventsFixture}\n${nativeComponentsFixture}\n${pagesFixture}\n}\n${templateFixture}`
+                            return `${fixture}\n${eventsFixture}\n${nativeComponentsFixture}\n${pagesFixture}\n${cloneFixture}\n}\n${templateFixture}`
                         }
                         if (id === hostModule) {
                             // The SDK exists before the selected application host initializes; do not replace that host.
@@ -990,6 +990,70 @@ const nativeComponentsFixture = `
     expectChildren(container, [])
     assert.equal(calls.length, 2)
     assert.ok(calls.every(call => call[0] === 'remove'))
+}
+`
+
+const cloneFixture = `
+checkClones()
+function checkClones() {
+    const empty = document.createElement('view')
+    calls.length = 0
+    const emptyClone = empty.cloneNode(true)
+    expectCalls([['element', 'view', emptyClone.nativeNode]])
+
+    const source = document.createElement('view')
+    source.id = 'native-clone'
+    source.setAttribute('data-key', 'original')
+    source.style.cssText = 'color: red; --accent: gold; -webkit-line-clamp: 2;'
+    source.addEventListener('tap', () => assert.fail('clones do not inherit business listeners'))
+    const input = document.createElement('input')
+    input.value = 'seed'
+    source.appendChild(input)
+    source.appendChild(document.createTextNode('cloned text'))
+    calls.length = 0
+    const clone = source.cloneNode(true)
+    assert.deepEqual(calls.filter(call => call[0] === 'style'), [
+        ['style', clone.nativeNode, 'cssText', source.style.cssText]
+    ], 'only the styled element receives a whole-style notification')
+    assert.notStrictEqual(clone.nativeNode, source.nativeNode)
+    assert.notStrictEqual(clone.firstChild.nativeNode, input.nativeNode)
+    assert.strictEqual(clone.firstChild.parentNode, clone)
+    assert.strictEqual(clone.firstChild.nativeNode.parentNode, clone.nativeNode)
+    assert.equal(clone.nativeNode.attributes.id, 'native-clone')
+    assert.equal(clone.nativeNode.attributes['data-key'], 'original')
+    assert.equal(clone.nativeNode.style.cssText, source.style.cssText)
+    assert.equal(clone.lastChild.nativeNode.nodeValue, 'cloned text')
+    assert.equal(clone.nativeNode.listeners.get('bindtap'), undefined)
+    assert.equal(clone.firstChild.nativeNode.listeners.get('bindinput').size, 1)
+    assert.strictEqual(document.getElementById('native-clone'), source)
+    emitNative(clone.firstChild, 'input', { value: 'clone input' }, clone.firstChild)
+    assert.equal(clone.firstChild.value, 'clone input')
+    assert.equal(input.value, 'seed')
+    const shallow = source.cloneNode(false)
+    assert.equal(shallow.childNodes.length, 0)
+    assert.equal(shallow.nativeNode.firstChild, null)
+    calls.length = 0
+    clone.style.removeProperty('-webkit-line-clamp')
+    expectCalls([['styleProperty', clone.nativeNode, '-webkit-line-clamp', '']])
+
+    const root = document.createElement('root')
+    root.id = 'native-root-clone'
+    root.style.color = 'red'
+    root.appendChild(document.createTextNode('root text'))
+    calls.length = 0
+    const rootClone = root.cloneNode(true)
+    assert.notStrictEqual(rootClone.nativeNode, root.nativeNode)
+    assert.strictEqual(rootClone.firstChild.parentNode, rootClone)
+    assert.strictEqual(document.getElementById('native-root-clone'), root)
+    assert.deepEqual(rootClone.updatePayloads, [])
+    expectCalls([
+        ['element', 'view', rootClone.nativeNode],
+        ['attribute', rootClone.nativeNode, 'id', 'native-root-clone'],
+        ['style', rootClone.nativeNode, 'cssText', 'color: red;'],
+        ['createText', 'root text', rootClone.firstChild.nativeNode],
+        ['append', rootClone.nativeNode, rootClone.firstChild.nativeNode]
+    ])
+    expectChildren(rootClone, [rootClone.firstChild])
 }
 `
 

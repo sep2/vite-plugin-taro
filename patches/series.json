@@ -31,7 +31,8 @@
             "patches/series/@tarojs__runtime@4.3.0/03-delegate-dom.patch",
             "patches/series/@tarojs__runtime@4.3.0/04-event-listener-removal.patch",
             "patches/series/@tarojs__runtime@4.3.0/05-event-target-data.patch",
-            "patches/series/@tarojs__runtime@4.3.0/06-style-property-names.patch"
+            "patches/series/@tarojs__runtime@4.3.0/06-style-property-names.patch",
+            "patches/series/@tarojs__runtime@4.3.0/07-clone-delegation.patch"
         ]
     },
     {

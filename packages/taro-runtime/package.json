@@ -119,6 +119,7 @@
         "README.md"
     ],
     "sideEffects": [
+        "./dist/runtime/index.js",
         "./dist/runtime/dom-external/index.js",
         "./dist/react/react.esm.js",
         "./dist/plugin-framework-react/runtime.js",

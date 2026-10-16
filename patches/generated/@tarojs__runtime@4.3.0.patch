@@ -47,6 +47,101 @@ index a641a96b78c9978acaf1041160dd7fd74bcbfcdc..2d179b16365ebeaff8f48921cb974a1a
      const container = documentCreateElement(CONTAINER); // 多包一层主要为了兼容 vue
      doc.appendChild(html);
      html.appendChild(head);
+diff --git a/dist/dom-external/node.js b/dist/dom-external/node.js
+index bedbaa261b42230bb97b23bbc566ecbfb45cb64d..4c6f7f6623cdafc8fd78bd572bdf7046ed7d7a06 100644
+--- a/dist/dom-external/node.js
++++ b/dist/dom-external/node.js
+@@ -1,6 +1,14 @@
+-import { PROPS, DATASET, OBJECT, STYLE } from '../constants/index.js';
++import { TaroElement } from '../dom/element.js';
++import { TaroNode } from '../dom/node.js';
++import { Style } from '../dom/style.js';
+ import { parser } from './inner-html/parser.js';
+ 
++// Capture the template defaults before hosts replace presentation delegates during startup.
++// Clone construction needs host initialization, not incremental template payloads, even for roots.
++const templateAttributeUpdate = TaroElement.prototype.delegateAttributeUpdate;
++const templateStyleUpdate = Style.prototype.delegateStyleUpdate;
++const templateChildInsertion = TaroNode.prototype.delegateChildInsertion;
++
+ /**
+  * An implementation of `Element.insertAdjacentHTML()`
+  * to support Vue 3 with a version of or greater than `vue@3.1.2`
+@@ -31,31 +39,56 @@ function insertAdjacentHTML(position, html) {
+         }
+     }
+ }
+-function cloneNode(isDeep = false) {
++function cloneNode(isDeep) {
+     const document = this.ownerDocument;
+-    let newNode;
+-    if (this.nodeType === 1 /* NodeType.ELEMENT_NODE */) {
+-        newNode = document.createElement(this.nodeName);
++    if (this.nodeType === 3 /* NodeType.TEXT_NODE */) {
++        // Creation supplies both the logical and native initial value in one operation.
++        return document.createTextNode(this._value);
+     }
+-    else if (this.nodeType === 3 /* NodeType.TEXT_NODE */) {
+-        newNode = document.createTextNode('');
++    const newNode = document.createElement(this.nodeName);
++    /*
++     * A clone owns fresh identity and handler state. Copy attributes directly rather than invoking
++     * public setters: cloning must retain the source's ID lookup and produce no mutation records.
++     * Notify replaced presentation delegates while copying, so native hosts receive each value
++     * during construction. Template clones only need the copied logical state.
++     */
++    if (newNode.delegateAttributeUpdate === templateAttributeUpdate) {
++        newNode.props = Object.assign({}, this.props);
+     }
+-    for (const key in this) {
+-        const value = this[key];
+-        // eslint-disable-next-line valid-typeof
+-        if ([PROPS, DATASET].includes(key) && typeof value === OBJECT) {
+-            newNode[key] = Object.assign({}, value);
+-        }
+-        else if (key === '_value') {
+-            newNode[key] = value;
++    else {
++        for (const name of Object.keys(this.props)) {
++            const value = this.props[name];
++            newNode.props[name] = value;
++            newNode.delegateAttributeUpdate(name, value, false);
+         }
+-        else if (key === STYLE) {
+-            newNode.style._value = Object.assign({}, value._value);
+-            newNode.style._usedStyleProp = new Set(Array.from(value._usedStyleProp));
++    }
++    newNode.dataset = Object.assign({}, this.dataset);
++    newNode.style._value = Object.assign({}, this.style._value);
++    for (const name of this.style._usedStyleProp) {
++        newNode.style._usedStyleProp.add(name);
++        // Dynamic CSS variables and hyphen-prefixed properties keep their original accessors.
++        if (name[0] === '-') {
++            newNode.style.setCssVariables(name);
+         }
+     }
++    if (newNode.style._usedStyleProp.size > 0 && newNode.style.delegateStyleUpdate !== templateStyleUpdate) {
++        newNode.style.delegateStyleUpdate();
++    }
+     if (isDeep) {
+-        newNode.childNodes = this.childNodes.map(node => node.cloneNode(true));
++        const notifyInsertion = newNode.delegateChildInsertion !== templateChildInsertion;
++        for (const child of this.childNodes) {
++            const clonedChild = child.cloneNode(true);
++            /*
++             * Construct the logical relationship before its native insertion. Calling appendChild
++             * here would also record observer mutations and search for the preceding sibling.
++             * This construction loop visits each edge once and leaves ordinary mutations unchanged.
++             */
++            clonedChild.parentNode = newNode;
++            newNode.childNodes.push(clonedChild);
++            if (notifyInsertion) {
++                newNode.delegateChildInsertion(clonedChild, undefined, 0, undefined);
++            }
++        }
+     }
+     return newNode;
+ }
 diff --git a/dist/dom/element.d.ts b/dist/dom/element.d.ts
 index 354bfc00bc34df0c4248acb6aafe2b4b679130be..c159224fb0ce38ec8cba64f9f3debb6285821ff5 100644
 --- a/dist/dom/element.d.ts
