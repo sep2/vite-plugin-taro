@@ -93,6 +93,24 @@ style.cssText = 'color: blue; --accent: teal;'
 expectPayload('color: blue; --accent: teal;')
 style.cssText = ''
 expectPayload('')
+// Every leading-hyphen name must use the same storage key for set/get/remove and whole-style clearing.
+for (const name of ['-webkit-line-clamp', '-moz-user-select', '--theme']) {
+    style.setProperty(name, 'initial')
+    expectPayload(name + ': initial;')
+    assert.equal(style.getPropertyValue(name), 'initial')
+    assert.equal(style.removeProperty(name), 'initial')
+    expectPayload('')
+    assert.equal(style.getPropertyValue(name), '')
+    style.setProperty(name, 'replacement')
+    expectPayload(name + ': replacement;')
+    style.setProperty(name, null)
+    expectPayload('')
+    style.setProperty(name, 'clear')
+    expectPayload(name + ': clear;')
+    style.cssText = ''
+    expectPayload('')
+    assert.equal(style.getPropertyValue(name), '')
+}
 const detached = document.createElement('view')
 detached.style.color = 'red'
 assert.deepEqual(payloads, [])

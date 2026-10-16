@@ -1,0 +1,24 @@
+diff --git a/dist/dom/style.js b/dist/dom/style.js
+index 3f091963448615617b46b5350a5ea822bfdad831..87266ca11bf1789f4e09c604b726fd19e6bf81fd 100644
+--- a/dist/dom/style.js
++++ b/dist/dom/style.js
+@@ -145,7 +145,8 @@ class Style {
+         }
+     }
+     removeProperty(propertyName) {
+-        propertyName = isCssVariable(propertyName) ? propertyName : toCamelCase(propertyName);
++        // Match setProperty: vendor-prefixed names and CSS variables retain their original storage key.
++        propertyName = propertyName[0] === '-' ? propertyName : toCamelCase(propertyName);
+         if (!this._usedStyleProp.has(propertyName)) {
+             return '';
+         }
+@@ -154,7 +155,8 @@ class Style {
+         return value;
+     }
+     getPropertyValue(propertyName) {
+-        propertyName = isCssVariable(propertyName) ? propertyName : toCamelCase(propertyName);
++        // Read the same key installed by setProperty, including single-hyphen vendor prefixes.
++        propertyName = propertyName[0] === '-' ? propertyName : toCamelCase(propertyName);
+         const value = this[propertyName];
+         if (!value) {
+             return '';
