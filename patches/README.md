@@ -47,7 +47,7 @@ Subscription notifications carry Taro’s lowercase logical event names: `region
 
 Upstream: [NervJS/taro#19528](https://github.com/NervJS/taro/pull/19528). Retire `05-event-target-data` when the pinned `@tarojs/runtime` release includes this fix: remove its series entry and feature patch, recompose the generated runtime patch, refresh the lockfile, and retain the regression tests to verify the upstream implementation.
 
-`06-style-property-names` makes `getPropertyValue` and `removeProperty` use the same name normalization as `setProperty`: all leading-hyphen names retain their spelling, including vendor prefixes and CSS variables. Ordinary dashed names still normalize to camelCase. Whole-style clearing uses the same removal path; there is no extra state or style-table scan.
+`06-style-property-names` makes `getPropertyValue` and `removeProperty` prefer an existing original storage key, then resolve other names through camelCase. This supports both hyphen-prefixed `setProperty` writes and direct assignments to registered vendor setters such as `WebkitLineClamp`; when both keys exist, the original key takes precedence. CSS variables always retain their spelling. Selection uses the existing `_usedStyleProp` set, so an unused dynamic accessor does not hide a live camelCase value. Whole-style clearing uses the same removal path; no extra state or style-table scan is added.
 
 Upstream: [NervJS/taro#19530](https://github.com/NervJS/taro/pull/19530). Retire `06-style-property-names` when the pinned `@tarojs/runtime` release includes this fix: remove its series entry and feature patch, recompose the generated runtime patch, refresh the lockfile, and retain the style regressions.
 

@@ -580,7 +580,7 @@ index 48f82650a81f4f9db1ca0c6a5018de3b146c76e8..ba35897b128914db5c2fba9b276ac936
      removeProperty(propertyName: string): string;
      getPropertyValue(propertyName: string): any;
 diff --git a/dist/dom/style.js b/dist/dom/style.js
-index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..87266ca11bf1789f4e09c604b726fd19e6bf81fd 100644
+index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..495dc2ad42a984686d1565e3bde3de61f33f558b 100644
 --- a/dist/dom/style.js
 +++ b/dist/dom/style.js
 @@ -11,15 +11,6 @@ function recordCss(obj) {
@@ -650,8 +650,8 @@ index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..87266ca11bf1789f4e09c604b726fd19
      }
      removeProperty(propertyName) {
 -        propertyName = isCssVariable(propertyName) ? propertyName : toCamelCase(propertyName);
-+        // Match setProperty: vendor-prefixed names and CSS variables retain their original storage key.
-+        propertyName = propertyName[0] === '-' ? propertyName : toCamelCase(propertyName);
++        // Prefer stored keys while preserving dashed access to registered camelCase vendor setters.
++        propertyName = isCssVariable(propertyName) || this._usedStyleProp.has(propertyName) ? propertyName : toCamelCase(propertyName);
          if (!this._usedStyleProp.has(propertyName)) {
              return '';
          }
@@ -660,8 +660,8 @@ index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..87266ca11bf1789f4e09c604b726fd19
      }
      getPropertyValue(propertyName) {
 -        propertyName = isCssVariable(propertyName) ? propertyName : toCamelCase(propertyName);
-+        // Read the same key installed by setProperty, including single-hyphen vendor prefixes.
-+        propertyName = propertyName[0] === '-' ? propertyName : toCamelCase(propertyName);
++        // CSS variables retain their spelling; other names resolve through a stored key or camelCase.
++        propertyName = isCssVariable(propertyName) || this._usedStyleProp.has(propertyName) ? propertyName : toCamelCase(propertyName);
          const value = this[propertyName];
          if (!value) {
              return '';

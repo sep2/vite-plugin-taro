@@ -93,7 +93,7 @@ style.cssText = 'color: blue; --accent: teal;'
 expectPayload('color: blue; --accent: teal;')
 style.cssText = ''
 expectPayload('')
-// Every leading-hyphen name must use the same storage key for set/get/remove and whole-style clearing.
+// Hyphen-prefixed writes retain their stored key during read/removal and whole-style clearing.
 for (const name of ['-webkit-line-clamp', '-moz-user-select', '--theme']) {
     style.setProperty(name, 'initial')
     expectPayload(name + ': initial;')
@@ -110,6 +110,41 @@ for (const name of ['-webkit-line-clamp', '-moz-user-select', '--theme']) {
     style.cssText = ''
     expectPayload('')
     assert.equal(style.getPropertyValue(name), '')
+}
+// Registered camelCase vendor setters also resolve through their dashed CSS names.
+style.WebkitLineClamp = '2'
+expectPayload('-webkit-line-clamp: 2;')
+assert.equal(style.getPropertyValue('-webkit-line-clamp'), '2')
+assert.equal(style.removeProperty('-webkit-line-clamp'), '2')
+expectPayload('')
+for (const value of [null, undefined]) {
+    style.WebkitLineClamp = '2'
+    expectPayload('-webkit-line-clamp: 2;')
+    style.setProperty('-webkit-line-clamp', value)
+    expectPayload('')
+    assert.equal(style.getPropertyValue('WebkitLineClamp'), '')
+}
+// Prefer a live original key over the camelCase alias, regardless of insertion order.
+for (const originalFirst of [false, true]) {
+    if (originalFirst) {
+        style.setProperty('-webkit-line-clamp', '3')
+        expectPayload('-webkit-line-clamp: 3;')
+        style.WebkitLineClamp = '2'
+        expectPayload('-webkit-line-clamp: 3; -webkit-line-clamp: 2;')
+    } else {
+        style.WebkitLineClamp = '2'
+        expectPayload('-webkit-line-clamp: 2;')
+        style.setProperty('-webkit-line-clamp', '3')
+        expectPayload('-webkit-line-clamp: 2; -webkit-line-clamp: 3;')
+    }
+    assert.equal(style.getPropertyValue('-webkit-line-clamp'), '3')
+    assert.equal(style.getPropertyValue('WebkitLineClamp'), '2')
+    assert.equal(style.removeProperty('-webkit-line-clamp'), '3')
+    expectPayload('-webkit-line-clamp: 2;')
+    assert.equal(Object.hasOwn(style, '-webkit-line-clamp'), true, 'the unused dynamic accessor remains')
+    assert.equal(style.getPropertyValue('-webkit-line-clamp'), '2')
+    assert.equal(style.removeProperty('-webkit-line-clamp'), '2')
+    expectPayload('')
 }
 const detached = document.createElement('view')
 detached.style.color = 'red'
@@ -158,6 +193,11 @@ style.cssText = ''
 assert.deepEqual(calls.splice(0), [[style]])
 assert.equal(observer.takeRecords()[0].oldValue, 'color: blue; --accent: gold; background-image: url(http:x/y:z);')
 assert.equal(style.cssText, '')
+style.WebkitLineClamp = '2'
+expectChange('WebkitLineClamp', '2', '')
+assert.equal(style.getPropertyValue('-webkit-line-clamp'), '2')
+assert.equal(style.removeProperty('-webkit-line-clamp'), '2')
+expectChange('WebkitLineClamp', undefined, '-webkit-line-clamp: 2;')
 observer.disconnect()
 assert.deepEqual(payloads, [], 'the delegated path leaves template serialization to the host')
 `
