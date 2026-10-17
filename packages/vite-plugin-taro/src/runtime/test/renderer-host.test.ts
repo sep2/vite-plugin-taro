@@ -25,6 +25,7 @@ class Element {
 type Text = { nodeValue: string }
 type Props = Record<string, unknown>
 type HostConfig = {
+    getChildHostContext(parent: object, type: string): object
     createInstance(type: string, props: Props, container: object, context: object, fiber: object): Element
     createTextInstance(text: string, container: object, context: object, fiber: object): Text
     finalizeInitialChildren(element: Element, type: string, props: Props): boolean
@@ -35,7 +36,7 @@ type HostConfig = {
 }
 
 for (const mode of ['development', 'production']) {
-    test(`${mode}: the shared renderer delegates creation, form classification and post-commit work`, async () => {
+    test(`${mode}: the shared renderer delegates Page types, contexts, creation and commit work`, async () => {
         const config = await resolveConfig(
             {
                 configFile: false,
@@ -100,7 +101,7 @@ for (const mode of ['development', 'production']) {
                 calls.push({ name: 'commit', args: [container] })
             }
         }
-        const exports: { hostConfig?: HostConfig } = {}
+        const exports: { hostConfig?: HostConfig; getPageRootType?: (id: string) => string } = {}
         runInNewContext(chunk.code, {
             exports,
             rendererHost: host,
@@ -113,12 +114,14 @@ for (const mode of ['development', 'production']) {
                 assert.fail('Host-operation probes must not own timers')
             }
         })
-        const { hostConfig } = exports
-        assert.ok(hostConfig)
+        const { hostConfig, getPageRootType } = exports
+        assert.ok(hostConfig && getPageRootType)
         const container = { name: 'first root' }
         const context = { name: 'first context' }
         const otherContainer = { name: 'second root' }
         const otherContext = { name: 'second context' }
+        assert.equal(getPageRootType('page-id'), 'root')
+        assert.strictEqual(hostConfig.getChildHostContext(context, 'root'), context)
         assert.strictEqual(hostConfig.createInstance('view', {}, container, context, {}), element)
         assert.strictEqual(hostConfig.getPublicInstance(element), element)
         assert.strictEqual(hostConfig.createTextInstance('requested text', otherContainer, otherContext, {}), text)
@@ -157,5 +160,26 @@ for (const mode of ['development', 'production']) {
         ])
         assert.strictEqual(calls[2].args[0], container)
         assert.strictEqual(calls[3].args[0], otherContainer)
+
+        // Enable the optional selectors on this test-owned host and observe their receiver and exact context identity.
+        Object.assign(host, {
+            getPageRootType(id: string) {
+                assert.strictEqual(this, host)
+                return `test-page:${id}`
+            },
+            getChildHostContext(parent: object, type: string) {
+                assert.strictEqual(this, host)
+                return type === 'test-page:page-id' ? otherContext : parent
+            }
+        })
+        const type = getPageRootType('page-id')
+        assert.equal(type, 'test-page:page-id')
+        const selected = hostConfig.getChildHostContext(context, type)
+        assert.strictEqual(selected, otherContext)
+        assert.strictEqual(hostConfig.getChildHostContext(selected, 'view'), selected)
+        hostConfig.createInstance('view', {}, container, selected, {})
+        hostConfig.createTextInstance('scoped text', container, selected, {})
+        assert.strictEqual(calls[4].args[1], selected)
+        assert.strictEqual(calls[5].args[1], selected)
     })
 }

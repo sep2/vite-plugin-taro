@@ -11,7 +11,8 @@
             "patches/series/@tarojs__plugin-framework-react@4.3.0/01-react19-root-api.patch",
             "patches/series/@tarojs__plugin-framework-react@4.3.0/02-mini-app-page-rendering.patch",
             "patches/series/@tarojs__plugin-framework-react@4.3.0/03-h5-router-container.patch",
-            "patches/series/@tarojs__plugin-framework-react@4.3.0/04-page-prerender.patch"
+            "patches/series/@tarojs__plugin-framework-react@4.3.0/04-page-prerender.patch",
+            "patches/series/@tarojs__plugin-framework-react@4.3.0/05-page-host-context.patch"
         ]
     },
     {
@@ -19,7 +20,8 @@
         "output": "patches/generated/@tarojs__react@4.3.0.patch",
         "patches": [
             "patches/series/@tarojs__react@4.3.0/01-react19-reconciler.patch",
-            "patches/series/@tarojs__react@4.3.0/02-renderer-host.patch"
+            "patches/series/@tarojs__react@4.3.0/02-renderer-host.patch",
+            "patches/series/@tarojs__react@4.3.0/03-page-host-context.patch"
         ]
     },
     {
@@ -32,7 +34,8 @@
             "patches/series/@tarojs__runtime@4.3.0/04-event-listener-removal.patch",
             "patches/series/@tarojs__runtime@4.3.0/05-event-target-data.patch",
             "patches/series/@tarojs__runtime@4.3.0/06-style-property-names.patch",
-            "patches/series/@tarojs__runtime@4.3.0/07-clone-delegation.patch"
+            "patches/series/@tarojs__runtime@4.3.0/07-clone-delegation.patch",
+            "patches/series/@tarojs__runtime@4.3.0/08-page-host-context.patch"
         ]
     },
     {

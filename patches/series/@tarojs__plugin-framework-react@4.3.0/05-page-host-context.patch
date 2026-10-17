@@ -1,0 +1,30 @@
+diff --git a/dist/runtime.js b/dist/runtime.js
+index 8a22ddaf7e3321ad3fc628ed416ba8f0b6bc9626..c0761e63d24867fd0611a510f93f8e96c618e8ce 100644
+--- a/dist/runtime.js
++++ b/dist/runtime.js
+@@ -250,7 +250,7 @@ function connectReactPage(R, id) {
+                     return h$1('div', { id, className: 'taro_page' }, children);
+                 }
+                 else {
+-                    return h$1('root', { id }, children);
++                    return h$1(ReactDOM$1.getPageRootType(id), { id }, children);
+                 }
+             }
+         };
+@@ -367,12 +367,13 @@ function createReactApp(App, react, dom, config) {
+         render(cb) {
+             appWrapper.forceUpdate(cb);
+         },
+-        mount(component, id, cb) {
++        mount(component, id, getCtxOrCallback, cb) {
++            const callback = cb ?? getCtxOrCallback;
+             if (appWrapper) {
+-                appWrapper.mount(component, id, cb);
++                appWrapper.mount(component, id, callback);
+             }
+             else {
+-                appWrapperPromise.then(appWrapper => appWrapper.mount(component, id, cb));
++                appWrapperPromise.then(appWrapper => appWrapper.mount(component, id, callback));
+             }
+         },
+         unmount(id, cb) {

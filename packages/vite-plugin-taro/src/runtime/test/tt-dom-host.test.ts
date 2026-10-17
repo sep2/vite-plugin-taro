@@ -1111,7 +1111,7 @@ async function checkPages() {
         const first = makePage(0, 'first')
         const second = makePage(22, 'second')
         const app = createVptApp(App, appConfig)
-        assert.equal(app.mount.length, 3, 'mount keeps its existing signature')
+        assert.equal(app.mount.length, 4, 'mount accepts the native context getter and completion callback')
         const appRoot = document.getElementById(appConfig.appId || 'app')
         assert.equal(appRoot.childNodes.length, 0, 'App binding precedes React outlet creation')
         assert.ok(Object.hasOwn(appRoot, 'delegateChildInsertion'))

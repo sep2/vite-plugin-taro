@@ -201,7 +201,7 @@ const prerenderToData = query => renderInitialData(config, query)
 const prerenderSuspended = query => renderInitialData(suspendedConfig, query)
 const prerenderBare = query => renderInitialData(bareConfig, query)
 import { createVptApp } from ${JSON.stringify(resolveVptRuntime('mini/vpt/create-vpt-app'))}
-import { createReactApp, createNativeComponentConfig, setReconciler, useLoad, useUnload, useRouter } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
+import { connectReactPage, createReactApp, createNativeComponentConfig, setReconciler, useLoad, useUnload, useRouter } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
 
 const h = React.createElement
 // VM-local component bodies are installed before invoking their actual route capsule's renderer.
@@ -429,6 +429,40 @@ function checkPageConfigData() {
     assert.equal(typeof prerenderToData, 'function')
 }
 
+function checkPageMountContext() {
+    // Capture native mount arguments without committing UI; pending onLoad promises own no scheduler resources.
+    const saved = { app: Current.app, page: Current.page, router: Current.router }
+    const calls = []
+    let finishUnmount
+    Current.app = {
+        mount(component, id, getCtx, complete) { calls.push({ component, id, getCtx, complete }) },
+        unmount(_id, complete) { finishUnmount = complete }
+    }
+    const Page = () => null
+    const config = createTaroPageConfig(Page, 'pages/same', {})
+    const first = { route: 'pages/same' }
+    const second = { route: 'pages/same' }
+    try {
+        config.onLoad.call(first, { instance: 'first' })
+        assert.strictEqual(calls[0].component, Page)
+        assert.strictEqual(calls[0].getCtx(), first)
+        assert.equal(calls[0].id, first.$taroPath)
+        assert.equal(typeof calls[0].complete, 'function')
+        config.onUnload.call(first)
+        config.onLoad.call(second, { instance: 'second' })
+        assert.equal(calls.length, 1, 'mount waits for the preceding unmount callback')
+        Current.page = first
+        finishUnmount()
+        assert.strictEqual(calls[1].getCtx(), second, 'deferred mounting retains the exact native receiver')
+        assert.equal(calls[1].id, second.$taroPath)
+        assert.notEqual(calls[0].id, calls[1].id)
+        config.onUnload.call(second)
+        finishUnmount()
+    } finally {
+        Object.assign(Current, saved)
+    }
+}
+
 async function checkNativeInitialData() {
     if (process.env.TARO_ENV !== 'weapp') {
         return
@@ -622,11 +656,16 @@ async function checkNativeInitialData() {
 }
 
 function checkFrameworkRootEntryPoints() {
-    // A renderer double records bootstrap ordering; it deliberately has no legacy render API.
+    // A renderer double records bootstrap ordering and Page-root selection independently.
     const calls = []
+    const pageTypes = []
     let commit
     const renderer = {
         unstable_batchedUpdates: ReactDOM.unstable_batchedUpdates,
+        getPageRootType(id) {
+            pageTypes.push(id)
+            return 'test-page-root'
+        },
         createRoot(container) {
             calls.push('createRoot')
             assert.equal(container.id, 'app')
@@ -648,7 +687,12 @@ function checkFrameworkRootEntryPoints() {
         }
     }
     createReactApp(({ children }) => children, React, renderer, {})
-    assert.equal(Current.app.mount.length, 3, 'mount retains its original signature')
+    assert.equal(Current.app.mount.length, 4, 'mount accepts the native context getter and completion callback')
+    const PageWrapper = connectReactPage(React, 'page-type-id')(() => null)
+    const pageRoot = new PageWrapper({ tid: 'page-type-id' }).render()
+    assert.equal(pageRoot.type, 'test-page-root')
+    assert.equal(pageRoot.props.id, 'page-type-id')
+    assert.deepEqual(pageTypes, ['page-type-id'])
     ReactDOM.flushSync(() => Current.app.mount(() => null, 'pages/cold', () => assert.fail('cold App must not be flushed')))
     assert.deepEqual(calls, ['createRoot', 'render'], 'prerender does not force or repeat App initialization')
     Current.app = null
@@ -665,6 +709,7 @@ async function run() {
     checkEventPrioritiesAndControlledInputs(false)
     checkEventPrioritiesAndControlledInputs(true)
     checkPageConfigData()
+    checkPageMountContext()
     await checkNativeInitialData()
     checkFrameworkRootEntryPoints()
 }

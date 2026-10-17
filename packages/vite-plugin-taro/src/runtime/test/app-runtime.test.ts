@@ -136,7 +136,7 @@ test('template App binding delegates mounting and seeds lazy snapshots before na
         defines: { getCurrentPages: 'globalThis.harness.getCurrentPages' }
     })
     for (const config of [{}, { appId: '' }, { appId: 'custom-app' }]) {
-        // Each case owns one App, one delayed Taro commit, and a mutable native Page stack.
+        // Each case owns one App, deferred Taro commits, and a mutable native Page stack.
         const trace: string[] = []
         const payloads: { path: string; value: () => unknown }[] = []
         let commit: (() => void) | undefined
@@ -147,13 +147,17 @@ test('template App binding delegates mounting and seeds lazy snapshots before na
         const component = () => null
         const react = {}
         const renderer = {}
+        const getCtx = () => assert.fail('template presentation must leave native context lookup to its caller')
         const app = {
-            mount(source: unknown, id: string, complete: () => void) {
+            mount(source: unknown, id: string, getCtxOrComplete: () => unknown, complete?: () => void) {
                 assert.strictEqual(this, app)
                 assert.strictEqual(source, component)
                 assert.equal(id, 'page-instance')
                 trace.push('mount')
-                commit = complete
+                if (complete) {
+                    assert.strictEqual(getCtxOrComplete, getCtx, 'the native getter is forwarded unchanged')
+                }
+                commit = complete ?? getCtxOrComplete
             }
         }
         const pageRoot = {
@@ -229,6 +233,16 @@ test('template App binding delegates mounting and seeds lazy snapshots before na
         container.children = ['latest']
         assert.strictEqual(payloads[0].value(), container.children)
         assert.deepEqual(trace, ['mount', 'snapshot', 'native-init', 'hydrate'])
+
+        trace.length = 0
+        payloads.length = 0
+        app.mount(component, 'page-instance', getCtx, () => trace.push('native-init'))
+        assert.deepEqual(trace, ['mount'])
+        assert.ok(commit)
+        commit()
+        assert.deepEqual(trace, ['mount', 'snapshot', 'native-init'])
+        assert.equal(payloads.length, 1)
+        assert.strictEqual(payloads[0].value(), container.children)
     }
 })
 

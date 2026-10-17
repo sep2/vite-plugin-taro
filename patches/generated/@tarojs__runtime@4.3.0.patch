@@ -455,7 +455,7 @@ index a456e9adeecdaae566fe965b7054e55cf009530e..858e1741d180ca0931242e807a3daf92
      hasChildNodes(): boolean;
      enqueueUpdate(payload: UpdatePayload): void;
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index cc210f4e56ff90d69a398e2e27382def86f4cb0c..c29083f1ef15ddcd42ca366533c50ee9feb0734c 100644
+index cc210f4e56ff90d69a398e2e27382def86f4cb0c..f6877ddccb0bdf533a1273054ed046e3725297f0 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
 @@ -20,7 +20,15 @@ class TaroNode extends TaroEventTarget {
@@ -483,7 +483,8 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..c29083f1ef15ddcd42ca366533c50ee9
 +            this.delegateChildReset(true);
          }
          else {
-             const newText = env.document.createTextNode(text);
+-            const newText = env.document.createTextNode(text);
++            const newText = this.ownerDocument.createTextNode(text);
              addedNodes.push(newText);
              this.appendChild(newText);
 -            this.updateChildNodes();
@@ -813,7 +814,7 @@ index c61fb312438fc85a2d94852b699da663cc835254..4e151e2880bbf7ecdf3521e01bb66d48
  
  export { TaroText };
 diff --git a/dist/dsl/common.js b/dist/dsl/common.js
-index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..5adcecd5691fdb5e519174b31a8dfec529d1ad9a 100644
+index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..7970bd9bc8d0466d3f0f9951b19310fc00d456d6 100644
 --- a/dist/dsl/common.js
 +++ b/dist/dsl/common.js
 @@ -96,8 +96,12 @@ function createPageConfig(component, pageName, data, pageConfig) {
@@ -831,11 +832,28 @@ index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..5adcecd5691fdb5e519174b31a8dfec5
              if (process.env.TARO_PLATFORM === 'web') {
                  config.path = $taroPath;
              }
+@@ -111,7 +115,7 @@ function createPageConfig(component, pageName, data, pageConfig) {
+                 taroWindowProvider.trigger(CONTEXT_ACTIONS.INIT, $taroPath);
+             }
+             const mount = () => {
+-                Current.app.mount(component, $taroPath, () => {
++                Current.app.mount(component, $taroPath, () => this, () => {
+                     if (process.env.TARO_ENV === 'tt' && isEnableTTDom()) {
+                         pageElement = env.document.getPageDocumentById(this.__webviewId__);
+                     }
 diff --git a/dist/dsl/instance.d.ts b/dist/dsl/instance.d.ts
-index ad2d594ce3cdbe1324d74bd3a0e82c050a174c40..4ade02539bfe06c24624a88ec0a341e41cad99cc 100644
+index ad2d594ce3cdbe1324d74bd3a0e82c050a174c40..9ae719f341aa963d383e1e2e3f3f856b51caa7ef 100644
 --- a/dist/dsl/instance.d.ts
 +++ b/dist/dsl/instance.d.ts
-@@ -56,8 +56,10 @@ interface PageLifeCycle extends Show {
+@@ -3,6 +3,7 @@ import { Component as Component$1, ComponentClass } from 'react';
+ import { TaroElement } from '../dom/element.js';
+ import { KeyFrame, ScrollTimelineOption } from '../interface/animate.js';
+ import { MpEvent } from '../interface/event.js';
++import type { MpInstance } from '../interface/hydrate.js';
+ import { TFunc } from '../interface/utils.js';
+ 
+ interface Instance<T = Record<string, any>> extends Component$1<T>, Show, PageInstance {
+@@ -56,8 +57,10 @@ interface PageLifeCycle extends Show {
      onUnload?(): void;
  }
  interface PageInstance extends PageLifeCycle {
@@ -847,6 +865,15 @@ index ad2d594ce3cdbe1324d74bd3a0e82c050a174c40..4ade02539bfe06c24624a88ec0a341e4
      /** 页面路径 */
      path?: string;
      /** 页面的组件选项 */
+@@ -82,7 +85,7 @@ interface Show {
+ interface AppInstance extends Show {
+     componentDidShow?(options?: Record<string, unknown>): void;
+     mount?(component: React.ComponentClass | Component, id: string, cb: (...args: any[]) => void): void;
+-    mount?(component: React.ComponentClass | Component, id: string, getCtx: (...args: any[]) => void, cb: (...args: any[]) => void): void;
++    mount?(component: React.ComponentClass | Component, id: string, getCtx: () => MpInstance, cb: (...args: any[]) => void): void;
+     onError?(error: string): void;
+     onLaunch?(options?: Record<string, unknown>): void;
+     onPageNotFound?(res: any): void;
 diff --git a/dist/hydrate.js b/dist/hydrate.js
 index e3bd1f13c55c70a7f1613a4b8335c0069b8e0ba1..84b92fd6678725213a0b77533135fcb1fde33597 100644
 --- a/dist/hydrate.js

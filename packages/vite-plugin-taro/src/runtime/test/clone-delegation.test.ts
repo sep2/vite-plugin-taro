@@ -191,4 +191,24 @@ assert.deepEqual(clonedRoot.updatePayloads.splice(0), [{ path: 'root.st', value:
 clonedRoot.setAttribute('data-after', 'live')
 assert.equal(clonedRoot.updatePayloads.length, 1)
 assert.equal(clonedRoot.updatePayloads[0].value, 'live')
+
+// Text replacement allocates through the element's owner document, including its factory receiver.
+const owner = Object.create(document)
+const createdTexts = []
+owner.createTextNode = function (value) {
+    assert.strictEqual(this, owner)
+    const text = document.createTextNode(value)
+    Object.defineProperty(text, 'ownerDocument', { value: owner })
+    createdTexts.push(text)
+    return text
+}
+const owned = document.createElement('view')
+Object.defineProperty(owned, 'ownerDocument', { value: owner })
+owned.textContent = 'owned text'
+assert.strictEqual(owned.firstChild, createdTexts[0])
+assert.strictEqual(owned.firstChild.ownerDocument, owner)
+assert.equal(owned.textContent, 'owned text')
+owned.textContent = ''
+assert.equal(owned.childNodes.length, 0)
+assert.equal(createdTexts.length, 1, 'clearing content does not allocate a text node')
 `

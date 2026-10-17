@@ -1,5 +1,5 @@
 diff --git a/dist/runtime.js b/dist/runtime.js
-index f9f3fbeab6d4633fbebbdbcab098a652280b380e..8a22ddaf7e3321ad3fc628ed416ba8f0b6bc9626 100644
+index f9f3fbeab6d4633fbebbdbcab098a652280b380e..c0761e63d24867fd0611a510f93f8e96c618e8ce 100644
 --- a/dist/runtime.js
 +++ b/dist/runtime.js
 @@ -152,7 +152,6 @@ var taroHooks = /*#__PURE__*/Object.freeze({
@@ -10,6 +10,15 @@ index f9f3fbeab6d4633fbebbdbcab098a652280b380e..8a22ddaf7e3321ad3fc628ed416ba8f0
  const pageKeyId = incrementId();
  function setReconciler(ReactDOM) {
      hooks.tap('getLifecycle', function (instance, lifecycle) {
+@@ -251,7 +250,7 @@ function connectReactPage(R, id) {
+                     return h$1('div', { id, className: 'taro_page' }, children);
+                 }
+                 else {
+-                    return h$1('root', { id }, children);
++                    return h$1(ReactDOM$1.getPageRootType(id), { id }, children);
+                 }
+             }
+         };
 @@ -272,7 +271,6 @@ function createReactApp(App, react, dom, config) {
      reactMeta.R = react;
      h$1 = react.createElement;
@@ -90,7 +99,24 @@ index f9f3fbeab6d4633fbebbdbcab098a652280b380e..8a22ddaf7e3321ad3fc628ed416ba8f0
          }
      }
      if (process.env.TARO_PLATFORM !== 'web') {
-@@ -591,8 +603,10 @@ function initNativeComponentEntry(params) {
+@@ -355,12 +367,13 @@ function createReactApp(App, react, dom, config) {
+         render(cb) {
+             appWrapper.forceUpdate(cb);
+         },
+-        mount(component, id, cb) {
++        mount(component, id, getCtxOrCallback, cb) {
++            const callback = cb ?? getCtxOrCallback;
+             if (appWrapper) {
+-                appWrapper.mount(component, id, cb);
++                appWrapper.mount(component, id, callback);
+             }
+             else {
+-                appWrapperPromise.then(appWrapper => appWrapper.mount(component, id, cb));
++                appWrapperPromise.then(appWrapper => appWrapper.mount(component, id, callback));
+             }
+         },
+         unmount(id, cb) {
+@@ -591,8 +604,10 @@ function initNativeComponentEntry(params) {
          (_a = app === null || app === void 0 ? void 0 : app.parentNode) === null || _a === void 0 ? void 0 : _a.appendChild(nativeApp);
          app = nativeApp;
      }

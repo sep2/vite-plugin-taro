@@ -1,6 +1,6 @@
 # Dependency patch series
 
-pnpm applies one combined patch to each package version. We maintain **15 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output.
+pnpm applies one combined patch to each package version. We maintain **18 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output.
 
 ## Feature inventory
 
@@ -11,8 +11,10 @@ pnpm applies one combined patch to each package version. We maintain **15 featur
 | | `02-mini-app-page-rendering` | Create custom App containers as logical roots and place Page children in an opaque outlet inside the singleton React App. |
 | | `03-h5-router-container` | Give H5 Page children a dedicated `taro_router` container so routing CSS does not target unrelated App siblings. |
 | | `04-page-prerender` | Deduplicate queued and rendered Page identities for caller-controlled prerendering. Preserve the original queue, render/unmount flow, mount signature and native update scheduling. |
+| | `05-page-host-context` | Select the existing Mini Page root's host type and accept the native getCtx/complete mount overload. |
 | `@tarojs/react@4.3.0` | `01-react19-reconciler` | Target the pinned React 19 reconciler contract directly: concurrent roots, commit updates, scoped event priorities, error callbacks and distinct synchronous callback/work flushing. Remove legacy render APIs and align declarations. |
 | | `02-renderer-host` | Delegate node creation, form classification and commit boundaries through VPT's private renderer-host import, and expose the generic host type. |
+| | `03-page-host-context` | Delegate Page-root type and child host-context selection to the optional host callbacks. |
 | `@tarojs/runtime@4.3.0` | `01-mini-app-page-rendering` | Construct the App host as a scheduler, derive initial reset paths from the root prefix, and stop App serialization at the Page outlet. |
 | | `02-page-prerender` | Type native Page data as an object or factory and let onLoad adopt a caller-prepared identity without moving lifecycle dispatch. VPT stores that identity in non-enumerable `__vpt_meta.prerenderIdentity`; the factory signature is unchanged. |
 | | `03-delegate-dom` | Expose overridable child insertion/removal/reset, text, attribute, style and event delegation methods while Taro owns logical state, event identities, mutation records and context-cache invalidation. The defaults preserve template payload preparation. |
@@ -20,11 +22,18 @@ pnpm applies one combined patch to each package version. We maintain **15 featur
 | | `05-event-target-data` | Preserve platform target datasets when logical indexes miss and keep distinct unresolved event targets separate. |
 | | `06-style-property-names` | Use the setter's original storage key when reading or removing hyphen-prefixed style properties. |
 | | `07-clone-delegation` | Construct clones through existing presentation delegates, preserving fresh identity, parent links and dynamic style accessors. |
+| | `08-page-host-context` | Supply the native Page through getCtx and create replacement text through ownerDocument. |
 | `canvas-confetti@1.9.4` | `01-canvas-confetti-enhancements` | Keep all existing confetti enhancements together: rotation/tilt controls, frame-clock repeat emission, cached path drawing, and DOMMatrix input normalization. Source, browser and module builds stay aligned. |
 
 The React renderer imports its host through `\0vpt:renderer-host`. VPT's Mini resolver binds that private import through `taro.hostPath`: template targets use `src/runtime/mini/template/template-host.ts`, while TT DOM preference uses the startup selector in `src/runtime/tt/renderer-host.ts`. The generic `RendererHost` type is exported by `vite-plugin-taro-runtime/react`: it accepts the root container and host context for element/text creation, classifies form elements, and receives optional pre-commit and synchronous post-commit callbacks. VPT's recursive implementation uses Taro's document and `FormElement` and owns App/Page outlet projection. React reconciliation, prop comparison, controlled-input restoration and App/Page mounting retain their existing behavior.
 
 VPT's `mini/vpt/create-vpt-app.ts` passes the exact App container to the selected host's `bindApp` method. The template implementation in `mini/template/bind-template-app.ts` configures the App scheduler's native data sink and delegates Page mounting to Taro. App batches reach hidden native Pages before the current Page, whose callback completes the update. The mount callback seeds a lazy App snapshot alongside the Page's initial payloads before Taro attaches its native context. `mini/template/create-template-host.ts` uses Taro's `extend` API to select `app.*` / `page.*` paths and keep outlet topology out of template App batches. Taro owns payload preparation, serialization and scheduling.
+
+Native `onLoad` calls `Current.app.mount(component, id, () => page, callback)` through Taro's existing context-getter overload. Its return type is `MpInstance`, shared with `TaroRootElement.ctx`. The getter returns the exact native receiver, including when mounting waits for a preceding unload. Context-free callers use `mount(component, id, callback)`. The ordinary React App entry selects the completion callback for either form; VPT's template wrapper forwards the getter unchanged and seeds presentation in that callback. A host can resolve the getter before delegating to Taro to prepare Page-owned creation. Native context binding and lifecycle completion continue at the existing commit callback.
+
+The renderer exports `getPageRootType(id)`, which delegates to the optional `RendererHost.getPageRootType` and defaults to `root`. The framework uses that type at the existing Mini Page-root position; it must remain stable for the Page instance. `RendererHost.getChildHostContext(parentContext, type)` optionally selects the context inherited by descendants, otherwise the parent context is retained. Element/text factories already receive this context. The Page root itself receives its parent's context during creation, so the adapter resolves its own root type in `createElement`. Page associations, factory ownership and disposal belong to VPT. Each dispatch adds O(1) work, plus the host callback's cost.
+
+Element `textContent` replacement uses `ownerDocument.createTextNode`, preserving the factory selected by a host-owned document. Clearing content retains its allocation-free path.
 
 Taro's `insertBefore` and `removeChild` invoke `delegateChildInsertion` and `delegateChildRemoval` after updating the logical relationships. `appendChild`, `replaceChild`, moves and fragment expansion reuse those same primitives. The delegation methods are replaceable through the existing `TaroNode.extend` API; their default implementations retain Taro's lazy template payloads and insertion-position heuristic. Dispatch happens for detached parents as well as rooted nodes, before template path calculation or hydration preparation. Removal receives the original options even when `doUpdate: false`, because that flag batches template writes while the child is still logically removed. Event identity cleanup, mutation observer ordering and context-cache invalidation remain in Taro's mutation methods; the template scheduler is unchanged.
 
