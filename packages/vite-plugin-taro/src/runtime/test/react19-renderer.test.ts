@@ -188,6 +188,8 @@ import assert from 'node:assert/strict'
 import React from 'react'
 import { ConcurrentRoot, DiscreteEventPriority, ContinuousEventPriority, DefaultEventPriority, NoEventPriority } from 'react-reconciler/constants'
 import ReactDOM, { rendererHostConfig } from 'vite-plugin-taro-runtime/react'
+import rendererHost from ${JSON.stringify(rendererHostId)}
+import { createDomHost } from ${JSON.stringify(resolveVptRuntime('wx/create-dom-host'))}
 import { Current, document, eventHandler, hooks, createPageConfig as createTaroPageConfig } from '@tarojs/runtime'
 import config from 'test:page-first-frame.ts'
 import suspendedConfig from 'test:page-suspended.ts'
@@ -655,6 +657,60 @@ async function checkNativeInitialData() {
     Current.router = null
 }
 
+function checkWxPageCreation() {
+    if (process.env.TARO_ENV !== 'weapp') {
+        return
+    }
+    const savedHost = { ...rendererHost }
+    const natives = { A: { route: 'pages/same' }, B: { route: 'pages/same' } }
+    Object.assign(rendererHost, createDomHost())
+    const context = React.createContext(0)
+    // Retain refs and setters to create more A nodes after B has mounted.
+    const nodes = {}
+    const updates = {}
+    function Page({ tid }) {
+        const [value, update] = React.useState(0)
+        updates[tid] = update
+        return h('view', { ref: node => {
+            if (node) {
+                nodes[tid] = node
+            }
+        } }, React.useContext(context) + ':' + value, value > 0 ? h('text', null, 'added') : null)
+    }
+    const App = ({ children }) => h(context.Provider, { value: 99 }, children)
+    const app = ReactDOM.flushSync(() => createVptApp(App, { appId: 'wx-owner-app' }))
+    try {
+        ReactDOM.flushSync(() => app.mount(Page, 'A', () => natives.A, () => {}))
+        const firstRoot = document.getElementById('A')
+        const firstDocument = firstRoot.ownerDocument
+        ReactDOM.flushSync(() => app.mount(Page, 'B', () => natives.B, () => {}))
+        assert.notStrictEqual(nodes.B.ownerDocument, firstDocument)
+        ReactDOM.flushSync(() => updates.A(7))
+        assert.match(nodes.A.textContent, /99:7/)
+        assert.equal(nodes.B.textContent, '99:0')
+        assert.strictEqual(nodes.A.lastChild.ownerDocument, firstDocument)
+        const clone = nodes.A.cloneNode(true)
+        assert.strictEqual(clone.ownerDocument, firstDocument)
+        assert.strictEqual(clone.firstChild.ownerDocument, firstDocument)
+        clone.textContent = 'replacement'
+        assert.strictEqual(clone.firstChild.ownerDocument, firstDocument)
+        clone.insertAdjacentHTML('beforeend', '<text>parsed</text>')
+        assert.strictEqual(clone.lastChild.ownerDocument, firstDocument)
+        ReactDOM.flushSync(() => app.mount(Page, 'A', () => natives.A, () => {}))
+        assert.strictEqual(document.getElementById('A'), firstRoot)
+        assert.match(nodes.A.textContent, /99:7/)
+    } finally {
+        ReactDOM.flushSync(() => {
+            app.unmount('B')
+            app.unmount('A')
+        })
+        ReactDOM.flushSync(() => ReactDOM.createRoot(document.getElementById('wx-owner-app')).unmount())
+        Object.assign(rendererHost, savedHost)
+        delete rendererHost.getPageRootType
+        delete rendererHost.getChildHostContext
+    }
+}
+
 function checkFrameworkRootEntryPoints() {
     // A renderer double records bootstrap ordering and Page-root selection independently.
     const calls = []
@@ -711,6 +767,7 @@ async function run() {
     checkPageConfigData()
     checkPageMountContext()
     await checkNativeInitialData()
+    checkWxPageCreation()
     checkFrameworkRootEntryPoints()
 }
 run()
