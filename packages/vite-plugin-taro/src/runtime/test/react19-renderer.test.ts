@@ -672,14 +672,29 @@ function checkWxPageCreation() {
     // Retain refs and setters to create more A nodes after B has mounted.
     const nodes = {}
     const updates = {}
+    // Each Page exposes its handler selection; the journal records the handler closure used by each native tap.
+    const handlers = {}
+    const clicks = []
     function Page({ tid }) {
         const [value, update] = React.useState(0)
+        const [handler, setHandler] = React.useState('first')
         updates[tid] = update
-        return h('view', { ref: node => {
-            if (node) {
-                nodes[tid] = node
-            }
-        } }, React.useContext(context) + ':' + value, value > 0 ? h('text', null, 'added') : null)
+        handlers[tid] = setHandler
+        return h('view', {
+            ref: node => {
+                if (node) {
+                    nodes[tid] = node
+                }
+            },
+            'data-page': { id: tid },
+            onClick: handler ? event => {
+                assert.equal(event.type, 'tap')
+                assert.deepEqual(event.target.dataset, { page: { id: tid } })
+                assert.strictEqual(event.currentTarget, event.target)
+                clicks.push([tid, handler, value, event.detail])
+                update(value + 1)
+            } : undefined
+        }, React.useContext(context) + ':' + value, value > 0 ? h('text', null, 'added') : null)
     }
     const App = ({ children }) => h(context.Provider, { value: 99 }, children)
     const app = ReactDOM.flushSync(() => createVptApp(App, { appId: 'wx-owner-app' }))
@@ -712,6 +727,35 @@ function checkWxPageCreation() {
         ReactDOM.flushSync(() => app.mount(Page, 'A', () => natives.A, () => {}))
         assert.strictEqual(document.getElementById('A'), firstRoot)
         assert.match(nodes.A.textContent, /99:7/)
+
+        const native = nodes.A.nativeNode
+        assert.equal(native.id, '')
+        assert.equal(native.listeners.tap.length, 1)
+        ReactDOM.flushSync(() => native.tap({ x: 10 }))
+        assert.deepEqual(clicks.splice(0), [['A', 'first', 7, { x: 10 }]])
+        assert.match(nodes.A.textContent, /99:8/)
+        assert.equal(native.listeners.tap.length, 1)
+
+        ReactDOM.flushSync(() => handlers.A('second'))
+        ReactDOM.flushSync(() => native.tap({}))
+        assert.deepEqual(clicks.splice(0), [['A', 'second', 8, {}]])
+        assert.match(nodes.A.textContent, /99:9/)
+        assert.strictEqual(nodes.A.nativeNode, native)
+        assert.equal(native.listeners.tap.length, 1)
+
+        ReactDOM.flushSync(() => handlers.A(null))
+        assert.equal(native.listeners.tap.length, 0)
+        ReactDOM.flushSync(() => native.tap({}))
+        assert.deepEqual(clicks, [])
+        assert.match(nodes.A.textContent, /99:9/)
+
+        ReactDOM.flushSync(() => handlers.A('first'))
+        assert.equal(native.listeners.tap.length, 1)
+        ReactDOM.flushSync(() => native.tap({}))
+        ReactDOM.flushSync(() => nodes.B.nativeNode.tap({}))
+        assert.deepEqual(clicks.splice(0), [['A', 'first', 9, {}], ['B', 'first', 0, {}]])
+        assert.match(nodes.A.textContent, /99:10/)
+        assert.match(nodes.B.textContent, /99:1/)
     } finally {
         app.unmount('B')
         assert.equal(natives.B.root.childNodes.length, 0)

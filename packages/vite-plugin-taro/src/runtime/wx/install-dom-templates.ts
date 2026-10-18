@@ -21,8 +21,7 @@ export type WxCodeSpace = {
     ): void
 }
 
-type PageRoot = WxRoot & { getHostNode(): { getMethodCaller(): MpInstance } }
-type Template = (wrapper: { shadowRoot: PageRoot }, creation: boolean) => { C(): void }
+type Template = (wrapper: { shadowRoot: WxRoot }, creation: boolean) => { C(): void }
 
 /** Claim every Page template before native creation, or leave the SDK table available to the template host. */
 export function installDomTemplates(

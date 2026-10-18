@@ -25,6 +25,7 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
         }
     }
     class TaroElement extends TaroNode {
+        readonly sid = 'logical-node'
         style = new Style(this)
         static override extend(name: string, method: object): void {
             extend(TaroElement, name, method)
@@ -47,6 +48,7 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
         createTextNode: (text: string) => Object.assign(new TaroText(), { nodeValue: text })
     }
     const sync = t.mock.fn((callback: () => unknown) => callback())
+    const dispatch = t.mock.fn((event: unknown, node: unknown) => ({ event, node }))
     const bundle = await bundleRuntimeEntry({
         entry: 'wx/create-dom-host.ts',
         mocks: {
@@ -55,6 +57,7 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
             'vite-plugin-taro-runtime/runtime/mini': `
                 export const { document, extend, FormElement, Style, TaroElement, TaroNode, TaroRootElement, TaroText } = globalThis.harness
                 export const COMMENT = 'comment'
+                export const eventHandler = globalThis.harness.dispatch
             `
         },
         defines: {}
@@ -70,6 +73,7 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
             TaroNode,
             TaroRootElement,
             TaroText,
+            dispatch,
             sync
         })
     )
@@ -135,6 +139,7 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     logical.delegateAttributeUpdate('id', 'logical')
     logical.delegateAttributeRemoval('id')
     logical.style.delegateStyleUpdate()
+    logical.delegateEventListener('tap', true)
     root.delegateChildInsertion(view, null)
     view.delegateChildInsertion(text, null)
     view.delegateChildInsertion(comment, text)
@@ -169,6 +174,53 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     assert.equal(nativeView.className, 'active')
     assert.equal(nativeView.attributes['data-state'], 7)
     assert.equal(nativeView.style, 'color: red;')
+    assert.equal(nativeView.dataset.sid, view.sid)
+    const bind = t.mock.method(sdk.getHostNode().templateInstance.procGenWrapper, 'v')
+    view.delegateEventListener('tap', true)
+    assert.deepEqual(bind.mock.calls[0]?.arguments, [
+        nativeView,
+        'tap',
+        bind.mock.calls[0]?.arguments[2],
+        false,
+        false,
+        false,
+        true
+    ])
+    const listener = nativeView.listeners.tap![0]!
+    // An unrelated SDK listener retains its own subscription across VPT's dynamic updates.
+    const observer = t.mock.fn()
+    nativeView.addListener('tap', observer)
+    nativeView.removeListener('tap', () => {})
+    nativeView.removeListener('other', listener)
+    assert.deepEqual(nativeView.listeners.tap, [listener, observer])
+    const sdkEvent = {
+        type: 'tap',
+        timeStamp: 456,
+        detail: { x: 10 },
+        target: { id: 'panel', dataset: nativeView.dataset },
+        currentTarget: { id: 'panel', dataset: nativeView.dataset },
+        mark: { section: 'view' },
+        touches: [{ identifier: 1 }],
+        sdkExtension: { retained: true }
+    }
+    const result = listener(sdkEvent)
+    assert.strictEqual(dispatch.mock.calls[0]?.arguments[0], sdkEvent)
+    assert.strictEqual(dispatch.mock.calls[0]?.arguments[1], view)
+    assert.deepEqual(result, { event: sdkEvent, node: view })
+    view.delegateEventListener('tap', false)
+    assert.deepEqual(bind.mock.calls[1]?.arguments, [nativeView, 'tap', null, false, false, false, true])
+    assert.deepEqual(nativeView.listeners.tap, [observer])
+    view.delegateEventListener('tap', true)
+    assert.equal(nativeView.listeners.tap!.length, 2)
+    nativeView.tap({})
+    assert.equal(dispatch.mock.callCount(), 2)
+    assert.equal(observer.mock.callCount(), 1)
+    view.delegateEventListener('tap', false)
+    nativeView.tap({})
+    secondView.nativeNode.tap({})
+    assert.equal(dispatch.mock.callCount(), 2)
+    assert.equal(observer.mock.callCount(), 2)
+    nativeView.removeListener('tap', observer)
     view.delegateAttributeRemoval('id')
     view.delegateAttributeRemoval('class')
     view.delegateAttributeRemoval('data-state')

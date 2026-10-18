@@ -9,8 +9,10 @@ import {
     type AppInstance,
     COMMENT,
     document,
+    eventHandler,
     extend,
     FormElement,
+    type MpEvent,
     type MpInstance,
     Style,
     TaroElement,
@@ -33,6 +35,7 @@ interface WxNativeElement extends WxNativeNode {
     id: string
     className: string
     style: string
+    setDataset(name: string, value: unknown): void
     appendChild(child: WxNativeNode): void
     insertBefore(child: WxNativeNode, before: WxNativeNode): void
     removeChild(child: WxNativeNode): void
@@ -40,7 +43,23 @@ interface WxNativeElement extends WxNativeNode {
     removeAttribute(name: string): void
 }
 
+interface WxEventBindings {
+    v(
+        element: WxNativeElement,
+        name: string,
+        handler: ((event: MpEvent) => unknown) | null,
+        final: boolean,
+        mutated: boolean,
+        capture: boolean,
+        dynamic: boolean
+    ): void
+}
+
 export interface WxRoot {
+    getHostNode(): {
+        getMethodCaller(): MpInstance
+        readonly templateInstance: { readonly procGenWrapper: WxEventBindings }
+    }
     appendChild(child: WxNativeNode): void
     insertBefore(child: WxNativeNode, before: WxNativeNode): void
     removeChild(child: WxNativeNode): void
@@ -126,6 +145,23 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
 
     TaroElement.extend('delegateEventUpdate', noop)
 
+    TaroElement.extend('delegateEventListener', function (this: HostElement, type: string, subscribed: boolean) {
+        const native = this.nativeNode
+        if (!native) {
+            return
+        }
+
+        const root = native.ownerShadowRoot
+        if (!root) {
+            return
+        }
+
+        const bindings = root.getHostNode().templateInstance.procGenWrapper
+
+        // SDK dynamic bindings own event conversion and matching native listener replacement/removal.
+        bindings.v(native, type, subscribed ? (event) => eventHandler(event, this) : null, false, false, false, true)
+    })
+
     extend(Style, 'delegateStyleUpdate', function (this: Style & { _element: HostElement }) {
         const native = this._element.nativeNode
         if (native) {
@@ -151,6 +187,7 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
                     root.appendChild(native)
                 }
             }
+
             this.flushUpdateCallback()
             complete?.({})
         }
@@ -243,10 +280,15 @@ function createPageDocument(root: WxRoot): TaroDocument {
         const type = name.toLowerCase()
         const native = root.createComponent(type === 'root' ? 'view' : type)
 
-        return Object.defineProperties(document.createElement(type), {
+        const node: HostElement = Object.defineProperties(document.createElement(type), {
             ownerDocument: { value: pageDoc },
             nativeNode: { value: native }
         })
+
+        // Event targets resolve through Taro's stable index, including elements without a user ID.
+        native.setDataset('sid', node.sid)
+
+        return node
     }
 
     pageDoc.createTextNode = (text) => {
