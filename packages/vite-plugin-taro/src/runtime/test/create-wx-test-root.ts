@@ -13,7 +13,7 @@ class NativeNode {
     // The SDK template binding table retains exactly the wrapper to remove on each dynamic update.
     readonly bindings: Record<string, NativeListener | null> = {}
     id = ''
-    className = ''
+    class = ''
     style = ''
     textContent = ''
 
@@ -88,6 +88,9 @@ export function createWxTestRoot() {
     const host = {
         templateInstance: {
             procGenWrapper: {
+                c(element: NativeNode, value: string): void {
+                    element.class = value
+                },
                 v(
                     element: NativeNode,
                     name: string,

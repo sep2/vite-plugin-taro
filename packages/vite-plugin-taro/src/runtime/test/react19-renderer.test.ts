@@ -672,15 +672,25 @@ function checkWxPageCreation() {
     // Retain refs and setters to create more A nodes after B has mounted.
     const nodes = {}
     const updates = {}
+    const classes = {}
+    const styles = {}
+    const initialStyle = { width: '180rpx', height: '80rpx', backgroundColor: 'red', color: 'white' }
+    const initialCss = 'width: 180rpx; height: 80rpx; background-color: red; color: white;'
     // Each Page exposes its handler selection; the journal records the handler closure used by each native tap.
     const handlers = {}
     const clicks = []
     function Page({ tid }) {
         const [value, update] = React.useState(0)
         const [handler, setHandler] = React.useState('first')
+        const [className, setClassName] = React.useState('initial shared')
+        const [style, setStyle] = React.useState(initialStyle)
         updates[tid] = update
         handlers[tid] = setHandler
+        classes[tid] = setClassName
+        styles[tid] = setStyle
         return h('view', {
+            className,
+            style,
             ref: node => {
                 if (node) {
                     nodes[tid] = node
@@ -709,6 +719,37 @@ function checkWxPageCreation() {
         assert.strictEqual(nodes.A.delegateChildInsertion, nodes.B.delegateChildInsertion)
         assert.strictEqual(nodes.A.style.delegateStyleUpdate, nodes.B.style.delegateStyleUpdate)
         assert.equal(Object.hasOwn(nodes.A, 'delegateChildInsertion'), false)
+        const classTarget = nodes.A.nativeNode
+        assert.equal(classTarget.class, 'initial shared')
+        for (const value of ['updated shared', undefined, 'restored', '', null, 'final']) {
+            ReactDOM.flushSync(() => classes.A(value))
+            assert.equal(classTarget.class, value ?? '')
+            assert.strictEqual(nodes.A.nativeNode, classTarget)
+            assert.equal(nodes.B.nativeNode.class, 'initial shared')
+        }
+        assert.equal(classTarget.style, initialCss)
+        for (const [style, cssText] of [
+            [{ width: '240rpx', height: '120rpx', backgroundColor: 'blue', color: 'black' },
+                'width: 240rpx; height: 120rpx; background-color: blue; color: black;'],
+            [{ width: '240rpx', height: '120rpx', color: 'black' },
+                'width: 240rpx; height: 120rpx; color: black;'],
+            [{ width: 0, height: '120rpx', color: null }, 'width: 0px; height: 120rpx;'],
+            [{}, ''],
+            [initialStyle, initialCss],
+            [undefined, ''],
+            [initialStyle, initialCss],
+            [null, ''],
+            ['height: 100rpx; background-color: green;', 'height: 100rpx; background-color: green;'],
+            ['color: blue;', 'color: blue;'],
+            [initialStyle, initialCss]
+        ]) {
+            ReactDOM.flushSync(() => styles.A(style))
+            assert.equal(nodes.A.style.cssText, cssText)
+            assert.equal(classTarget.style, cssText)
+            assert.equal(classTarget.class, 'final')
+            assert.strictEqual(nodes.A.nativeNode, classTarget)
+            assert.equal(nodes.B.nativeNode.style, initialCss)
+        }
         ReactDOM.flushSync(() => updates.A(7))
         assert.match(nodes.A.textContent, /99:7/)
         assert.equal(nodes.B.textContent, '99:0')
@@ -717,6 +758,17 @@ function checkWxPageCreation() {
         assert.strictEqual(nodes.A.lastChild.ownerDocument, firstDocument)
         const clone = nodes.A.cloneNode(true)
         assert.notStrictEqual(clone.nativeNode, nodes.A.nativeNode)
+        assert.equal(clone.nativeNode.class, 'final')
+        assert.equal(clone.nativeNode.style, initialCss)
+        assert.equal(clone.style.removeProperty('background-color'), 'red')
+        assert.equal(clone.nativeNode.style, 'width: 180rpx; height: 80rpx; color: white;')
+        clone.style.setProperty('width', '120rpx')
+        assert.equal(clone.nativeNode.style, 'width: 120rpx; height: 80rpx; color: white;')
+        clone.style.cssText = 'color: blue;'
+        assert.equal(clone.nativeNode.style, 'color: blue;')
+        clone.style.cssText = ''
+        assert.equal(clone.nativeNode.style, '')
+        assert.equal(classTarget.style, initialCss)
         assert.strictEqual(clone.nativeNode.ownerShadowRoot, natives.A.root)
         assert.strictEqual(clone.ownerDocument, firstDocument)
         assert.strictEqual(clone.firstChild.ownerDocument, firstDocument)

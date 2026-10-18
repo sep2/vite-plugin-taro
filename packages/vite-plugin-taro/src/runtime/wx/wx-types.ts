@@ -16,7 +16,6 @@ export interface WxNativeText extends WxNativeNode {
 
 export interface WxNativeElement extends WxNativeNode {
     id: string
-    className: string
     style: string
     setDataset(name: string, value: unknown): void
     appendChild(child: WxNativeNode): void
@@ -26,7 +25,11 @@ export interface WxNativeElement extends WxNativeNode {
     removeAttribute(name: string): void
 }
 
-interface WxEventBindings {
+interface WxTemplateBindings {
+    // class
+    c(element: WxNativeElement, value: string): void
+
+    // event
     v(
         element: WxNativeElement,
         name: string,
@@ -41,7 +44,7 @@ interface WxEventBindings {
 export interface WxRoot {
     getHostNode(): {
         getMethodCaller(): MpInstance
-        readonly templateInstance: { readonly procGenWrapper: WxEventBindings }
+        readonly templateInstance: { readonly procGenWrapper: WxTemplateBindings }
     }
     appendChild(child: WxNativeNode): void
     insertBefore(child: WxNativeNode, before: WxNativeNode): void

@@ -77,7 +77,7 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
         if (name === 'id') {
             native.id = String(value)
         } else if (name === 'class') {
-            native.className = String(value)
+            setNativeClass(native, String(value))
         } else if (name !== 'style') {
             native.setAttribute(name, value)
         }
@@ -92,7 +92,7 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
         if (name === 'id') {
             native.id = ''
         } else if (name === 'class') {
-            native.className = ''
+            setNativeClass(native, '')
         } else if (name !== 'style') {
             native.removeAttribute(name)
         }
@@ -106,15 +106,16 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
             return
         }
 
-        const root = native.ownerShadowRoot
-        if (!root) {
-            return
-        }
-
-        const bindings = root.getHostNode().templateInstance.procGenWrapper
-
         // SDK dynamic bindings own event conversion and matching native listener replacement/removal.
-        bindings.v(native, type, subscribed ? (event) => eventHandler(event, this) : null, false, false, false, true)
+        getTemplateBindings(native).v(
+            native,
+            type,
+            subscribed ? (event) => eventHandler(event, this) : null,
+            false,
+            false,
+            false,
+            true
+        )
     })
 
     extend(Style, 'delegateStyleUpdate', function (this: Style & { _element: HostElement }) {
@@ -214,6 +215,17 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
         },
         afterCommit: noop
     }
+}
+
+function getTemplateBindings(native: WxNativeNode) {
+    ensure(!!native.ownerShadowRoot, 'native node ownerShadowRoot should not be empty')
+
+    return native.ownerShadowRoot!.getHostNode().templateInstance.procGenWrapper
+}
+
+function setNativeClass(native: WxNativeElement, value: string): void {
+    // SDK class bindings update scoped classes, external classes, and property-change listeners.
+    getTemplateBindings(native).c(native, value)
 }
 
 function removePageRoot(child: HostNode, options: Parameters<TaroNode['delegateChildRemoval']>[1]): void {
