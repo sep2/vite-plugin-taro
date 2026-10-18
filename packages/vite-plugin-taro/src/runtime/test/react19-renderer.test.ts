@@ -190,6 +190,7 @@ import { ConcurrentRoot, DiscreteEventPriority, ContinuousEventPriority, Default
 import ReactDOM, { rendererHostConfig } from 'vite-plugin-taro-runtime/react'
 import rendererHost from ${JSON.stringify(rendererHostId)}
 import { createDomHost } from ${JSON.stringify(resolveVptRuntime('wx/create-dom-host'))}
+import { createWxTestRoot } from ${JSON.stringify(resolveVptRuntime('test/create-wx-test-root'))}
 import { Current, document, eventHandler, hooks, createPageConfig as createTaroPageConfig } from '@tarojs/runtime'
 import config from 'test:page-first-frame.ts'
 import suspendedConfig from 'test:page-suspended.ts'
@@ -662,8 +663,11 @@ function checkWxPageCreation() {
         return
     }
     const savedHost = { ...rendererHost }
-    const natives = { A: { route: 'pages/same' }, B: { route: 'pages/same' } }
-    Object.assign(rendererHost, createDomHost())
+    const natives = {
+        A: { route: 'pages/same', root: createWxTestRoot() },
+        B: { route: 'pages/same', root: createWxTestRoot() }
+    }
+    Object.assign(rendererHost, createDomHost(instance => instance.root))
     const context = React.createContext(0)
     // Retain refs and setters to create more A nodes after B has mounted.
     const nodes = {}
@@ -680,16 +684,25 @@ function checkWxPageCreation() {
     const App = ({ children }) => h(context.Provider, { value: 99 }, children)
     const app = ReactDOM.flushSync(() => createVptApp(App, { appId: 'wx-owner-app' }))
     try {
-        ReactDOM.flushSync(() => app.mount(Page, 'A', () => natives.A, () => {}))
+        ReactDOM.flushSync(() => app.mount(Page, 'A', () => natives.A, () => document.getElementById('A').performUpdate(true)))
         const firstRoot = document.getElementById('A')
         const firstDocument = firstRoot.ownerDocument
-        ReactDOM.flushSync(() => app.mount(Page, 'B', () => natives.B, () => {}))
+        assert.strictEqual(firstRoot.nativeNode, natives.A.root.childNodes[0])
+        assert.strictEqual(nodes.A.nativeNode, firstRoot.nativeNode.childNodes[0])
+        ReactDOM.flushSync(() => app.mount(Page, 'B', () => natives.B, () => document.getElementById('B').performUpdate(true)))
         assert.notStrictEqual(nodes.B.ownerDocument, firstDocument)
+        assert.strictEqual(nodes.A.delegateChildInsertion, nodes.B.delegateChildInsertion)
+        assert.strictEqual(nodes.A.style.delegateStyleUpdate, nodes.B.style.delegateStyleUpdate)
+        assert.equal(Object.hasOwn(nodes.A, 'delegateChildInsertion'), false)
         ReactDOM.flushSync(() => updates.A(7))
         assert.match(nodes.A.textContent, /99:7/)
         assert.equal(nodes.B.textContent, '99:0')
+        assert.equal(natives.A.root.childNodes[0].childNodes[0].childNodes[0].textContent, '99:7')
+        assert.equal(natives.B.root.childNodes[0].childNodes[0].childNodes[0].textContent, '99:0')
         assert.strictEqual(nodes.A.lastChild.ownerDocument, firstDocument)
         const clone = nodes.A.cloneNode(true)
+        assert.notStrictEqual(clone.nativeNode, nodes.A.nativeNode)
+        assert.strictEqual(clone.nativeNode.ownerShadowRoot, natives.A.root)
         assert.strictEqual(clone.ownerDocument, firstDocument)
         assert.strictEqual(clone.firstChild.ownerDocument, firstDocument)
         clone.textContent = 'replacement'
@@ -700,10 +713,10 @@ function checkWxPageCreation() {
         assert.strictEqual(document.getElementById('A'), firstRoot)
         assert.match(nodes.A.textContent, /99:7/)
     } finally {
-        ReactDOM.flushSync(() => {
-            app.unmount('B')
-            app.unmount('A')
-        })
+        app.unmount('B')
+        assert.equal(natives.B.root.childNodes.length, 0)
+        app.unmount('A')
+        assert.equal(natives.A.root.childNodes.length, 0)
         ReactDOM.flushSync(() => ReactDOM.createRoot(document.getElementById('wx-owner-app')).unmount())
         Object.assign(rendererHost, savedHost)
         delete rendererHost.getPageRootType
@@ -767,8 +780,8 @@ async function run() {
     checkPageConfigData()
     checkPageMountContext()
     await checkNativeInitialData()
-    checkWxPageCreation()
     checkFrameworkRootEntryPoints()
+    checkWxPageCreation()
 }
 run()
 `
