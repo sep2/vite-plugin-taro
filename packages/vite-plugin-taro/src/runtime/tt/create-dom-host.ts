@@ -18,19 +18,18 @@ import type {
 } from 'vite-plugin-taro-runtime/runtime/tt-document'
 import type { MiniHost } from '../mini/vpt/mini-host.d.ts'
 
-declare module 'vite-plugin-taro-runtime/runtime/mini' {
-    interface TaroNode {
-        // 创建原生呈现时写入；逻辑节点在移动、挂载、解绑和重新插入时保留同一个原生句柄。
-        nativeNode?: TTNativeNode
-    }
+// Host-local types describe the creation-time handles retained on ordinary Taro instances.
+interface HostNode extends TaroNode {
+    // 创建原生呈现时写入；逻辑节点在移动、挂载、解绑和重新插入时保留同一个原生句柄。
+    nativeNode?: TTNativeNode
+}
 
-    interface TaroElement {
-        nativeNode?: TTNativeElement
-        // 首次订阅时创建，随后所有事件及解绑共用此固定引用；业务处理器仍由 __handlers 管理。
-        // 回调持有逻辑接收节点，使派发不依赖节点 ID；解绑也必须使用注册时的同一个函数。
-        // 上游 Taro 原生事件桥接接管这些职责后，可连同本字段一起移交。
-        nativeEventListener?: (event: TTNativeEvent) => unknown
-    }
+interface HostElement extends TaroElement {
+    nativeNode?: TTNativeElement
+    // 首次订阅时创建，随后所有事件及解绑共用此固定引用；业务处理器仍由 __handlers 管理。
+    // 回调持有逻辑接收节点，使派发不依赖节点 ID；解绑也必须使用注册时的同一个函数。
+    // 上游 Taro 原生事件桥接接管这些职责后，可连同本字段一起移交。
+    nativeEventListener?: (event: TTNativeEvent) => unknown
 }
 
 declare const tt: {
@@ -56,7 +55,7 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
     // 包装 document 的工厂，使 React 创建和 Taro 自身的 textContent 等创建路径共用同一规则。
     const createElement = document.createElement
     document.createElement = function (type) {
-        const node = createElement.call(this, type)
+        const node: HostElement = createElement.call(this, type)
 
         if (node.nodeName === pageOutlet) {
             // outlet 只拥有逻辑 Page 关系；原生根在各自的 Page document 中挂载。
@@ -65,18 +64,17 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
             return node
         }
 
-        if (node instanceof TaroRootElement) {
-            // 与 H5 的页面 div 相同，root 自己拥有一个可离线构建的原生根元素。
-            // 它会参与布局；平台 Page document 是后续挂载目标，二者的身份始终分开。
-            node.nativeNode = nativeDocument.createElement('view')
-        } else {
-            const name = node.nodeName
-            // SDK 按当前 Page 的组件注册解析这个名称；选项与上游 Taro 的原生组件创建保持一致。
-            // 句柄仍交给现有属性、事件和子节点委托，组件内部及 slot 的呈现由 SDK 管理。
-            node.nativeNode = builtInComponents.has(name)
-                ? nativeDocument.createElement(name)
-                : nativeDocument.createNativeComponent(name, { __tt__inner__options__: { name } })
-        }
+        // 与 H5 的页面 div 相同，root 自己拥有一个可离线构建的原生根元素。
+        // 它会参与布局；平台 Page document 是后续挂载目标，二者的身份始终分开。
+        // 其他名称按 SDK 的组件注册解析；组件内部及 slot 的呈现由 SDK 管理。
+        const name = node.nodeName
+
+        node.nativeNode =
+            node instanceof TaroRootElement
+                ? nativeDocument.createElement('view')
+                : builtInComponents.has(name)
+                  ? nativeDocument.createElement(name)
+                  : nativeDocument.createNativeComponent(name, { __tt__inner__options__: { name } })
 
         // 模板原本固定绑定这些值变化事件；DOM host 接替模板，把变化送入现有表单流程。
         // 即使没有业务处理器，非受控 ref.value 也要更新，受控 input/textarea 也要触发恢复。
@@ -90,8 +88,9 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
 
     const createTextNode = document.createTextNode
     document.createTextNode = function (text) {
-        const node = createTextNode.call(this, text)
+        const node: TaroText & HostNode = createTextNode.call(this, text)
         node.nativeNode = nativeDocument.createTextNode(text)
+
         return node
     }
 
@@ -99,7 +98,7 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
     // 移动和替换仍由 Taro 分解成移除/插入；这里只转发当前操作，不重新遍历逻辑树。
     TaroNode.extend(
         'delegateChildInsertion',
-        function (this: TaroNode, child: TaroNode, before: TaroNode | null | undefined) {
+        function (this: HostNode, child: HostNode, before: HostNode | null | undefined) {
             if (before) {
                 this.nativeNode!.insertBefore(child.nativeNode!, before.nativeNode!)
             } else {
@@ -108,20 +107,20 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
         }
     )
 
-    TaroNode.extend('delegateChildRemoval', function (this: TaroNode, child: TaroNode) {
+    TaroNode.extend('delegateChildRemoval', function (this: HostNode, child: HostNode) {
         this.nativeNode!.removeChild(child.nativeNode!)
     })
 
     // textContent 的逐项删除/插入已同步原生树，模板的整表更新通知在此完成。
-    TaroNode.extend('delegateChildReset', () => {})
+    TaroNode.extend('delegateChildReset', noop)
 
-    extend(TaroText, 'delegateTextUpdate', function (this: TaroText, text: string) {
+    extend(TaroText, 'delegateTextUpdate', function (this: HostNode, text: string) {
         this.nativeNode!.nodeValue = text
     })
 
     // Taro 已维护 props、dataset、ID 和移除拦截；这里只转发当前属性，保留原值。
     // style 的设置/移除已触发 Style 委托，其原生写入统一由该委托完成。
-    TaroElement.extend('delegateAttributeUpdate', function (this: TaroElement, name: string, value: unknown) {
+    TaroElement.extend('delegateAttributeUpdate', function (this: HostElement, name: string, value: unknown) {
         if (name !== 'style') {
             this.nativeNode!.setAttribute(nativeAttributeName(name), value)
             if (name === 'catchMove') {
@@ -129,7 +128,7 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
             }
         }
     })
-    TaroElement.extend('delegateAttributeRemoval', function (this: TaroElement, name: string) {
+    TaroElement.extend('delegateAttributeRemoval', function (this: HostElement, name: string) {
         if (name !== 'style') {
             this.nativeNode!.removeAttribute(nativeAttributeName(name))
             if (name === 'catchMove') {
@@ -140,8 +139,9 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
 
     // DOM 节点无需随监听器变化切换模板类型；处理器、once 与移除匹配仍由 Taro 维护。
     // 上游将这类副作用限定在模板 host 后，可去掉此空实现。
-    TaroElement.extend('delegateEventUpdate', () => {})
-    TaroElement.extend('delegateEventListener', function (this: TaroElement, type: string, subscribed: boolean) {
+    TaroElement.extend('delegateEventUpdate', noop)
+
+    TaroElement.extend('delegateEventListener', function (this: HostElement, type: string, subscribed: boolean) {
         // 值同步属于节点本身；最后一个业务处理器移除时，创建阶段的常驻订阅仍需保留。
         if (type === getFormEvent(this.nodeName)) {
             return
@@ -168,24 +168,29 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
     // 单项变更直接转发；普通属性使用 SDK setter，连字符前缀交由 setProperty 安装对应访问器。
     // cssText 的整体替换由 Taro 的 _pending 批量处理完成后通知一次，此时才读取完整样式。
     // 此处单项转发相对样式项数为 O(1)，Taro mutation 记录与 SDK 内部序列化仍有各自的成本。
-    extend(Style, 'delegateStyleUpdate', function (this: Style, name?: string, value?: string | number | null) {
-        const style = this._element.nativeNode!.style
-        if (name === undefined) {
-            style.cssText = this.cssText
-        } else if (name[0] === '-') {
-            style.setProperty(name, value ?? '')
-        } else {
-            style[name] = value ?? ''
+    extend(
+        Style,
+        'delegateStyleUpdate',
+        function (this: Style & { _element: HostElement }, name?: string, value?: string | number | null) {
+            const style = this._element.nativeNode!.style
+            if (name === undefined) {
+                style.cssText = this.cssText
+            } else if (name[0] === '-') {
+                style.setProperty(name, value ?? '')
+            } else {
+                style[name] = value ?? ''
+            }
         }
-    })
+    )
 
     // DOM mutation 已直接提交给 SDK；根保留生命周期入口，完成回调由 performUpdate 处理。
     extend(TaroRootElement, 'enqueueUpdate', noop)
+
     extend(
         TaroRootElement,
         'performUpdate',
         function (
-            this: TaroRootElement,
+            this: TaroRootElement & HostElement,
             initial: Parameters<TaroRootElement['performUpdate']>[0],
             complete: Parameters<TaroRootElement['performUpdate']>[1]
         ) {
@@ -221,11 +226,11 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
             return element instanceof FormElement
         },
         // 原生树操作已在各个 mutation 委托中同步完成。
-        afterCommit() {}
+        afterCommit: noop
     }
 }
 
-function removePageRoot(child: TaroNode, options: Parameters<TaroNode['delegateChildRemoval']>[1]): void {
+function removePageRoot(child: HostNode, options: Parameters<TaroNode['delegateChildRemoval']>[1]): void {
     // Taro 移动节点时以 cleanRef:false 暂时移除；outlet 的逻辑顺序不改变各 Page 的原生挂载位置。
     if (options.cleanRef !== false) {
         // 最终解绑整个原生根，保留其后代和句柄；原生根已被平台移除时无需重复操作。
@@ -269,7 +274,7 @@ function getFormEvent(name: string): 'input' | 'change' | undefined {
     }
 }
 
-function updateNativeListener(node: TaroElement, name: string, subscribed: boolean): void {
+function updateNativeListener(node: HostElement, name: string, subscribed: boolean): void {
     if (subscribed) {
         // SDK 包装事件有自己的方法和传播标志；4.4.0.3 的 _rawEvent.data 保留原始平台负载，
         // 交给 eventHandler 可复用 Taro 的事件构造、React 优先级/批处理及表单流程。
@@ -283,7 +288,7 @@ function updateNativeListener(node: TaroElement, name: string, subscribed: boole
     }
 }
 
-function updateTouchMove(node: TaroElement): void {
+function updateTouchMove(node: HostElement): void {
     // 上游 createTTDomDocument 通过添加/移除 catchtouchmove 实现 catchMove，而非只写入该属性。
     // 此处还让业务 touchmove 处理器共用唯一入口，切换 bind/catch 时保持单次逻辑派发。
     // 所需订阅由逻辑属性和现有处理器数组决定，SDK 自身处理重复注册；这里只调整两个已知绑定。
