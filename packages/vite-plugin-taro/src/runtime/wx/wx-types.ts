@@ -17,17 +17,21 @@ export interface WxNativeText extends WxNativeNode {
 export interface WxNativeElement extends WxNativeNode {
     id: string
     style: string
+    hasPendingChanges?(): boolean
     setDataset(name: string, value: unknown): void
     appendChild(child: WxNativeNode): void
     insertBefore(child: WxNativeNode, before: WxNativeNode): void
     removeChild(child: WxNativeNode): void
-    setAttribute(name: string, value: unknown): void
     removeAttribute(name: string): void
 }
 
 interface WxTemplateBindings {
     // class
     c(element: WxNativeElement, value: string): void
+
+    // component property, external class, or native attribute
+    r(element: WxNativeElement, name: string, value: unknown): void
+    endBindingMapUpdateForElement(element: WxNativeElement): void
 
     // event
     v(

@@ -186,6 +186,7 @@ async function runFixture(t: TestContext, target: 'wx' | 'zfb' | 'tt', mode: str
 const fixture = `
 import assert from 'node:assert/strict'
 import React from 'react'
+import { toDashed } from '@tarojs/shared'
 import { ConcurrentRoot, DiscreteEventPriority, ContinuousEventPriority, DefaultEventPriority, NoEventPriority } from 'react-reconciler/constants'
 import ReactDOM, { rendererHostConfig } from 'vite-plugin-taro-runtime/react'
 import rendererHost from ${JSON.stringify(rendererHostId)}
@@ -809,6 +810,8 @@ function checkWxPageCreation() {
         assert.match(nodes.A.textContent, /99:10/)
         assert.match(nodes.B.textContent, /99:1/)
         checkWxEventBubbling(app)
+        checkWxDatasetUpdates(app)
+        checkWxPropertyUpdates(app)
     } finally {
         app.unmount('B')
         assert.equal(natives.B.root.childNodes.length, 0)
@@ -818,6 +821,144 @@ function checkWxPageCreation() {
         Object.assign(rendererHost, savedHost)
         delete rendererHost.getPageRootType
         delete rendererHost.getChildHostContext
+    }
+}
+
+function checkWxPropertyUpdates(app) {
+    const cases = [
+        {
+            type: 'view',
+            initial: { hoverClass: 'pressed', hoverStopPropagation: true, hoverStartTime: 10, hoverStayTime: 30 },
+            updated: { hoverClass: '', hoverStopPropagation: false, hoverStartTime: 0, hoverStayTime: 1 },
+            declared: { hoverClass: '', hoverStopPropagation: false, hoverStartTime: 0, hoverStayTime: 0 }
+        },
+        {
+            type: 'text',
+            initial: { selectable: true, decode: true, space: 'nbsp' },
+            updated: { selectable: false, decode: false, space: '' },
+            declared: { selectable: false, decode: false, space: '' }
+        },
+        {
+            type: 'scroll-view',
+            initial: { scrollX: true, scrollY: true, upperThreshold: 10 },
+            updated: { scrollX: false, scrollY: false, upperThreshold: 0 },
+            declared: { scrollX: false, scrollY: false, upperThreshold: 0 }
+        },
+        {
+            type: 'progress',
+            initial: { percent: 75, activeColor: 'red' },
+            updated: { percent: 0, activeColor: '' },
+            declared: { percent: 0, activeColor: '' }
+        }
+    ]
+    for (const component of [false, true]) {
+        const declarations = Object.fromEntries(cases.map(({ type, declared }) => [
+            type, Object.fromEntries(Object.entries(declared).map(([name, value]) => [name, () => value]))
+        ]))
+        const root = createWxTestRoot(component ? declarations : undefined)
+        // Refs and the phase setter expose committed React updates while preserving native identity.
+        const nodes = {}
+        const controls = {}
+        function Page() {
+            const [phase, setPhase] = React.useState('initial')
+            controls.setPhase = setPhase
+            return h('view', null, cases.map(({ type, initial, updated }) => {
+                const props = phase === 'initial' ? initial : phase === 'updated' ? updated
+                    : phase === 'removed' ? {}
+                    : Object.fromEntries(Object.keys(initial).map(name => [name, phase === 'null' ? null : undefined]))
+                return h(type, {
+                    ...props,
+                    key: type,
+                    ref: node => { if (node) { nodes[type] = node } }
+                }, type === 'text' ? 'content' : null)
+            }))
+        }
+        const id = 'properties-' + component
+        try {
+            ReactDOM.flushSync(() => app.mount(Page, id, () => ({ root }), () =>
+                document.getElementById(id).performUpdate(true)))
+            const natives = Object.fromEntries(Object.entries(nodes).map(([type, node]) => [type, node.nativeNode]))
+            for (const phase of ['initial', 'updated', 'null', 'initial', 'undefined', 'initial', 'removed']) {
+                ReactDOM.flushSync(() => controls.setPhase(phase))
+                for (const item of cases) {
+                    const native = nodes[item.type].nativeNode
+                    assert.strictEqual(native, natives[item.type])
+                    assert.strictEqual(native.ownerShadowRoot, root)
+                    const expected = phase === 'initial' ? item.initial : phase === 'updated' ? item.updated
+                        : Object.fromEntries(Object.keys(item.initial).map(name => [name, undefined]))
+                    for (const [name, value] of Object.entries(expected)) {
+                        const actual = component ? native._$dataGroup.data[name] : native.attributes[toDashed(name)]
+                        assert.deepEqual(actual, value, item.type + '.' + name + ':' + phase)
+                        if (!component && value === undefined) {
+                            assert.equal(Object.hasOwn(native.attributes, toDashed(name)), false)
+                        }
+                    }
+                    if (component) {
+                        assert.equal(native._$dataGroup.pending.length, 0)
+                        assert.deepEqual(native.attributes, {})
+                    }
+                }
+            }
+        } finally {
+            app.unmount(id)
+            assert.equal(root.childNodes.length, 0)
+        }
+    }
+}
+
+function checkWxDatasetUpdates(app) {
+    const root = createWxTestRoot()
+    // Keep refs, the React setter, and event observations for this Page's dataset transitions.
+    const nodes = {}
+    const controls = {}
+    const events = []
+    const first = { id: 1 }
+    const second = { id: 2 }
+    const cases = [
+        {
+            props: { 'data-user-id': first, 'data-active': false, 'data-count': 0, 'data-sid': 'public-first' },
+            dataset: { userId: first, active: false, count: 0, sid: 'public-first' }
+        },
+        {
+            props: { 'data-user-id': second, 'data-active': true, 'data-count': 2, 'data-sid': 'public-second' },
+            dataset: { userId: second, active: true, count: 2, sid: 'public-second' }
+        },
+        { props: {}, dataset: {} }
+    ]
+    function record(event) {
+        events.push([{ ...event.target.dataset }, { ...event.currentTarget.dataset }])
+    }
+    function Page() {
+        const [props, setProps] = React.useState(cases[0].props)
+        controls.setProps = setProps
+        return h('view', { 'data-owner': 'parent', onClick: record },
+            h('view', {
+                ...props,
+                ref: node => { if (node) { nodes.child = node } },
+                onClick: record
+            }))
+    }
+    try {
+        ReactDOM.flushSync(() => app.mount(Page, 'dataset', () => ({ root }), () =>
+            document.getElementById('dataset').performUpdate(true)))
+        const native = nodes.child.nativeNode
+        for (const { props, dataset } of [...cases, cases[0]]) {
+            ReactDOM.flushSync(() => controls.setProps(props))
+            assert.deepEqual({ ...nodes.child.dataset }, dataset)
+            assert.strictEqual(nodes.child.nativeNode, native)
+            assert.equal(native.dataset.sid, nodes.child.sid)
+            for (const key of ['userId', 'active', 'count']) {
+                assert.strictEqual(native.dataset[key], dataset[key])
+            }
+            ReactDOM.flushSync(() => native.tap({}))
+            assert.deepEqual(events.splice(0), [
+                [dataset, dataset],
+                [dataset, { owner: 'parent' }]
+            ])
+        }
+    } finally {
+        app.unmount('dataset')
+        assert.equal(root.childNodes.length, 0)
     }
 }
 

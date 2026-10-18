@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { toCamelCase, toDashed } from '@tarojs/shared'
 import { createWxTestRoot } from './create-wx-test-root.ts'
 import { bundleRuntimeEntry, createExecutionContext, executeRuntimeEntry } from './runtime-entry-test-utils.ts'
 
@@ -26,6 +27,8 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     }
     class TaroElement extends TaroNode {
         readonly sid = 'logical-node'
+        // Attribute removal updates the event-facing dataset alongside the SDK metadata.
+        readonly dataset: Record<string, unknown> = {}
         style = new Style(this)
         static override extend(name: string, method: object): void {
             extend(TaroElement, name, method)
@@ -52,7 +55,7 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     const bundle = await bundleRuntimeEntry({
         entry: 'wx/create-dom-host.ts',
         mocks: {
-            '@tarojs/shared': `export const noop = () => {}; export function ensure(value, message) { if (!value) throw new Error(message) }`,
+            '@tarojs/shared': `export const noop = () => {}; export const { toCamelCase, toDashed } = globalThis.harness; export function ensure(value, message) { if (!value) throw new Error(message) }`,
             'vite-plugin-taro-runtime/react': 'export const flushSync = globalThis.harness.sync',
             'vite-plugin-taro-runtime/runtime/mini': `
                 export const { document, extend, FormElement, Style, TaroElement, TaroNode, TaroRootElement, TaroText } = globalThis.harness
@@ -74,7 +77,9 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
             TaroRootElement,
             TaroText,
             dispatch,
-            sync
+            sync,
+            toCamelCase,
+            toDashed
         })
     )
     assert.ok(typeof createDomHost === 'function')
@@ -117,7 +122,14 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     assert.strictEqual(text.nativeNode.ownerShadowRoot, sdk)
     assert.strictEqual(comment.nativeNode.ownerShadowRoot, sdk)
     assert.equal(comment.nodeName, 'comment')
-    const secondSdk = createWxTestRoot()
+    const secondSdk = createWxTestRoot({
+        'custom-card': {
+            label: () => 'ready',
+            enabled: () => true,
+            count: () => 9,
+            payload: () => ({ version: 1 })
+        }
+    })
     app.mount(component, 'B', () => ({ root: secondSdk }), complete)
     const secondPage = host.getChildHostContext(parent, host.getPageRootType('B'))
     const secondView = secondPage.createElement('view')
@@ -170,6 +182,57 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     assert.equal(nativeView.childNodes.length, 1)
     view.delegateChildReset()
     view.delegateEventUpdate()
+    const bindProperty = t.mock.method(sdk.getHostNode().templateInstance.procGenWrapper, 'r')
+    for (const { type, name, value, attribute } of [
+        { type: 'view', name: 'hoverClass', value: '', attribute: 'hover-class' },
+        { type: 'view', name: 'hover-stop-propagation', value: true, attribute: 'hover-stop-propagation' },
+        { type: 'view', name: 'hoverStartTime', value: 0, attribute: 'hover-start-time' },
+        { type: 'view', name: 'hoverStayTime', value: 20, attribute: 'hover-stay-time' },
+        { type: 'button', name: 'hoverClass', value: 'pressed', attribute: 'hover-class' },
+        { type: 'progress', name: 'activeColor', value: 'blue', attribute: 'active-color' },
+        { type: 'rich-text', name: 'nodes', value: [{ type: 'text', text: 'hello' }], attribute: 'nodes' },
+        { type: 'video', name: 'controls', value: false, attribute: 'controls' },
+        { type: 'input', name: 'type', value: 'number', attribute: 'type' },
+        { type: 'text', name: 'space', value: 'nbsp', attribute: 'space' },
+        { type: 'view', name: 'ariaRole', value: 'button', attribute: 'aria-role' }
+    ]) {
+        const element = page.createElement(type)
+        const remove = t.mock.method(element.nativeNode, 'removeAttribute')
+        element.delegateAttributeUpdate(name, value)
+        assert.deepEqual(bindProperty.mock.calls.at(-1)?.arguments, [element.nativeNode, attribute, value])
+        assert.strictEqual(element.nativeNode.attributes[attribute], value)
+        element.delegateAttributeRemoval(name)
+        assert.deepEqual(remove.mock.calls[0]?.arguments, [attribute])
+        assert.equal(Object.hasOwn(element.nativeNode.attributes, attribute), false)
+    }
+    const ownPageBindings = bindProperty.mock.callCount()
+    const card = secondPage.createElement('custom-card')
+    const group = card.nativeNode._$dataGroup
+    const finish = t.mock.method(
+        secondSdk.getHostNode().templateInstance.procGenWrapper,
+        'endBindingMapUpdateForElement'
+    )
+    const bindComponentProperty = t.mock.method(secondSdk.getHostNode().templateInstance.procGenWrapper, 'r')
+    for (const [name, value] of [
+        ['label', 'changed'],
+        ['enabled', false],
+        ['count', 8],
+        ['payload', { version: 2 }]
+    ] as const) {
+        card.delegateAttributeUpdate(name, value)
+        assert.deepEqual(group.data[name], value)
+        card.delegateAttributeRemoval(name)
+        assert.deepEqual(bindComponentProperty.mock.calls.at(-1)?.arguments, [card.nativeNode, name, undefined])
+        assert.equal(group.data[name], undefined)
+    }
+    assert.equal(finish.mock.callCount(), 8)
+    for (const call of finish.mock.calls) {
+        assert.deepEqual(call.arguments, [card.nativeNode])
+    }
+    assert.equal(group.pending.length, 0)
+    assert.deepEqual(card.nativeNode.attributes, {})
+    assert.equal(bindProperty.mock.callCount(), ownPageBindings)
+
     const bindClass = t.mock.method(sdk.getHostNode().templateInstance.procGenWrapper, 'c')
     view.delegateAttributeUpdate('id', 'panel')
     view.delegateAttributeUpdate('class', 'active shared')
@@ -186,7 +249,20 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     assert.equal(secondView.nativeNode.class, 'second')
     assert.equal(bindClass.mock.callCount(), 2)
     assert.deepEqual(bindClass.mock.calls[1]?.arguments, [nativeView, 'updated'])
-    assert.equal(nativeView.attributes['data-state'], 7)
+    assert.equal(nativeView.dataset.state, 7)
+    assert.equal(Object.hasOwn(nativeView.attributes, 'data-state'), false)
+    const payload = { id: 1 }
+    view.delegateAttributeUpdate('data-user-id', payload)
+    assert.strictEqual(nativeView.dataset.userId, payload)
+    view.dataset.userId = payload
+    view.delegateAttributeRemoval('data-user-id')
+    assert.equal(nativeView.dataset.userId, undefined)
+    assert.equal(Object.hasOwn(view.dataset, 'userId'), false)
+    view.delegateAttributeUpdate('data-sid', 'user-sid')
+    view.delegateAttributeRemoval('data-sid')
+    assert.equal(nativeView.dataset.sid, view.sid)
+    view.delegateAttributeUpdate('title', 'panel')
+    assert.equal(nativeView.attributes.title, 'panel')
     assert.equal(nativeView.style, 'color: red;')
     secondView.style.cssText = 'color: green;'
     secondView.style.delegateStyleUpdate()
@@ -247,7 +323,9 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     view.delegateAttributeRemoval('id')
     view.delegateAttributeRemoval('class')
     view.delegateAttributeRemoval('data-state')
+    view.delegateAttributeRemoval('title')
     view.delegateAttributeRemoval('style')
+    assert.equal(nativeView.dataset.state, undefined)
     assert.equal(nativeView.id, '')
     assert.equal(nativeView.class, '')
     assert.deepEqual(bindClass.mock.calls[2]?.arguments, [nativeView, ''])

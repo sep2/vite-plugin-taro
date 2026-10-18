@@ -3,7 +3,7 @@
 // Please give credits and link to VPT itself when reusing. Thank you.
 // VPT, 2026-10-18
 
-import { ensure, noop } from '@tarojs/shared'
+import { ensure, noop, toCamelCase, toDashed } from '@tarojs/shared'
 import { flushSync } from 'vite-plugin-taro-runtime/react'
 import {
     type AppInstance,
@@ -78,8 +78,10 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
             native.id = String(value)
         } else if (name === 'class') {
             setNativeClass(native, String(value))
+        } else if (name.startsWith('data-')) {
+            setNativeDataset(native, toCamelCase(name.slice(5)), value)
         } else if (name !== 'style') {
-            native.setAttribute(name, value)
+            setNativeProperty(native, toDashed(name), value)
         }
     })
 
@@ -93,8 +95,13 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
             native.id = ''
         } else if (name === 'class') {
             setNativeClass(native, '')
+        } else if (name.startsWith('data-')) {
+            const key = toCamelCase(name.slice(5))
+            // Taro removes the attribute prop; its event-facing dataset needs the same removal.
+            delete this.dataset[key]
+            setNativeDataset(native, key, undefined)
         } else if (name !== 'style') {
-            native.removeAttribute(name)
+            removeNativeProperty(native, toDashed(name))
         }
     })
 
@@ -226,6 +233,29 @@ function getTemplateBindings(native: WxNativeNode) {
 function setNativeClass(native: WxNativeElement, value: string): void {
     // SDK class bindings update scoped classes, external classes, and property-change listeners.
     getTemplateBindings(native).c(native, value)
+}
+
+function setNativeDataset(native: WxNativeElement, key: string, value: unknown): void {
+    // Native sid identifies the logical event target; user data-sid lives in Taro's public dataset.
+    if (key !== 'sid') {
+        native.setDataset(key, value)
+    }
+}
+
+function setNativeProperty(native: WxNativeElement, name: string, value: unknown): void {
+    // The SDK owns property routing and completion, including component queues and model-binding feedback.
+    const bindings = getTemplateBindings(native)
+    bindings.r(native, name, value)
+    bindings.endBindingMapUpdateForElement(native)
+}
+
+function removeNativeProperty(native: WxNativeElement, name: string): void {
+    // Only SDK components expose a property queue; native nodes remove attributes directly.
+    if (native.hasPendingChanges) {
+        setNativeProperty(native, name, undefined)
+    } else {
+        native.removeAttribute(name)
+    }
 }
 
 function removePageRoot(child: HostNode, options: Parameters<TaroNode['delegateChildRemoval']>[1]): void {

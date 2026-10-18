@@ -1,6 +1,33 @@
+import { toCamelCase } from '@tarojs/shared'
 import type { MpEvent } from 'vite-plugin-taro-runtime/runtime/mini'
 
 type NativeListener = (event: MpEvent) => unknown
+type PropertyInitializers = Readonly<Record<string, () => unknown>>
+
+class PropertyGroup {
+    // Record committed SDK inputs, including undefined; SDK type coercion is outside this double.
+    readonly data: Record<string, unknown>
+    // Template bindings queue property writes until the host commits them.
+    readonly pending: [string, unknown][] = []
+
+    constructor(initializers: PropertyInitializers) {
+        this.data = Object.fromEntries(Object.entries(initializers).map(([name, initialize]) => [name, initialize()]))
+    }
+
+    replaceProperty(name: string, value: unknown): boolean {
+        if (!Object.hasOwn(this.data, name)) {
+            return false
+        }
+        this.pending.push([name, value])
+        return true
+    }
+
+    applyDataUpdates(_skipModelListener: boolean): void {
+        for (const [name, value] of this.pending.splice(0)) {
+            this.data[name] = value
+        }
+    }
+}
 
 class NativeNode {
     // This test double records SDK mutations and native parent/child identity.
@@ -19,10 +46,17 @@ class NativeNode {
 
     readonly name: string
     readonly ownerShadowRoot: NativeNode | null
+    readonly _$dataGroup?: PropertyGroup
+    readonly hasPendingChanges?: () => boolean
 
-    constructor(name: string, ownerShadowRoot: NativeNode | null) {
+    constructor(name: string, ownerShadowRoot: NativeNode | null, initializers?: PropertyInitializers) {
         this.name = name
         this.ownerShadowRoot = ownerShadowRoot
+        if (initializers) {
+            const group = new PropertyGroup(initializers)
+            this._$dataGroup = group
+            this.hasPendingChanges = () => group.pending.length > 0
+        }
     }
 
     appendChild(child: NativeNode): void {
@@ -84,12 +118,24 @@ class NativeNode {
     }
 }
 
-export function createWxTestRoot() {
+export function createWxTestRoot(properties?: Readonly<Record<string, PropertyInitializers>>) {
     const host = {
         templateInstance: {
             procGenWrapper: {
                 c(element: NativeNode, value: string): void {
                     element.class = value
+                },
+                r(element: NativeNode, name: string, value: unknown): void {
+                    if (element._$dataGroup) {
+                        element._$dataGroup.replaceProperty(toCamelCase(name), value)
+                    } else {
+                        element.setAttribute(name, value)
+                    }
+                },
+                endBindingMapUpdateForElement(element: NativeNode): void {
+                    if (element.hasPendingChanges?.()) {
+                        element._$dataGroup!.applyDataUpdates(true)
+                    }
                 },
                 v(
                     element: NativeNode,
@@ -116,7 +162,7 @@ export function createWxTestRoot() {
     const root = Object.assign(new NativeNode('shadow-root', null), {
         getHostNode: () => host,
         createComponent(name: string): NativeNode {
-            return new NativeNode(name, root)
+            return new NativeNode(name, root, properties?.[name])
         },
         createTextNode(text: string): NativeNode {
             return Object.assign(new NativeNode('#text', root), { textContent: text })
