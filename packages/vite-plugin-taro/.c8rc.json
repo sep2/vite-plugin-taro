@@ -5,6 +5,7 @@
         "src/**/*.test.ts",
         "src/**/*.d.ts",
         "src/runtime/test/runtime-entry-test-utils.ts",
+        "src/runtime/wx/wx-types.ts",
         "src/node/plugins/mini/mini-contract.ts",
         "src/options.ts"
     ],

@@ -5,23 +5,7 @@
 
 import { ensure, noop } from '@tarojs/shared'
 import type { MpInstance } from 'vite-plugin-taro-runtime/runtime/mini'
-import type { WxRoot } from './create-dom-host.ts'
-
-export type WxConfig = {
-    readonly pages: readonly string[]
-    readonly componentFramework?: { readonly allUsed?: readonly string[] }
-    readonly renderer?: { readonly allUsed?: readonly string[] }
-}
-
-export type WxCodeSpace = {
-    batchAddCompiledTemplate?(
-        factory: (
-            templates: Readonly<Record<string, unknown>>
-        ) => Record<string, (name: string) => Template | undefined>
-    ): void
-}
-
-type Template = (wrapper: { shadowRoot: WxRoot }, creation: boolean) => { C(): void }
+import type { WxCodeSpace, WxConfig, WxRoot } from './wx-types.ts'
 
 /** Claim every Page template before native creation, or leave the SDK table available to the template host. */
 export function installDomTemplates(

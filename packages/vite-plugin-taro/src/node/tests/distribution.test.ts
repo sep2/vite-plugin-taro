@@ -253,6 +253,7 @@ test('ships Mini activation capsules with separate VPT integration and template 
     assert.ok((await stat(path.join(distRoot, 'runtime/wx/create-dom-host.js'))).isFile())
     assert.ok((await stat(path.join(distRoot, 'runtime/wx/renderer-host.js'))).isFile())
     assert.ok((await stat(path.join(distRoot, 'runtime/wx/install-dom-templates.js'))).isFile())
+    assert.ok((await stat(path.join(distRoot, 'runtime/wx/wx-types.d.ts'))).isFile())
     const templateFiles = await readdir(path.join(miniRoot, 'template'))
     assert.deepEqual(templateFiles.filter((file) => file.endsWith('.js')).toSorted(), [
         'bind-template-app.js',

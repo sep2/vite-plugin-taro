@@ -5,7 +5,8 @@
 
 import { createTemplateHost } from '../mini/template/create-template-host.ts'
 import { createDomHost } from './create-dom-host.ts'
-import { installDomTemplates, type WxCodeSpace, type WxConfig } from './install-dom-templates.ts'
+import { installDomTemplates } from './install-dom-templates.ts'
+import type { WxCodeSpace, WxConfig } from './wx-types.ts'
 
 declare const __wxConfig: WxConfig | undefined
 declare const __wxCodeSpace__: WxCodeSpace | undefined

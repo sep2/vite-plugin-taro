@@ -12,7 +12,6 @@ import {
     eventHandler,
     extend,
     FormElement,
-    type MpEvent,
     type MpInstance,
     Style,
     TaroElement,
@@ -21,51 +20,7 @@ import {
     TaroText
 } from 'vite-plugin-taro-runtime/runtime/mini'
 import type { MiniHost } from '../mini/vpt/mini-host.d.ts'
-
-interface WxNativeNode {
-    readonly parentNode: WxNativeElement | WxRoot | null
-    readonly ownerShadowRoot: WxRoot | null
-}
-
-interface WxNativeText extends WxNativeNode {
-    textContent: string
-}
-
-interface WxNativeElement extends WxNativeNode {
-    id: string
-    className: string
-    style: string
-    setDataset(name: string, value: unknown): void
-    appendChild(child: WxNativeNode): void
-    insertBefore(child: WxNativeNode, before: WxNativeNode): void
-    removeChild(child: WxNativeNode): void
-    setAttribute(name: string, value: unknown): void
-    removeAttribute(name: string): void
-}
-
-interface WxEventBindings {
-    v(
-        element: WxNativeElement,
-        name: string,
-        handler: ((event: MpEvent) => unknown) | null,
-        final: boolean,
-        mutated: boolean,
-        capture: boolean,
-        dynamic: boolean
-    ): void
-}
-
-export interface WxRoot {
-    getHostNode(): {
-        getMethodCaller(): MpInstance
-        readonly templateInstance: { readonly procGenWrapper: WxEventBindings }
-    }
-    appendChild(child: WxNativeNode): void
-    insertBefore(child: WxNativeNode, before: WxNativeNode): void
-    removeChild(child: WxNativeNode): void
-    createComponent(name: string): WxNativeElement
-    createTextNode(text: string): WxNativeText
-}
+import type { WxNativeElement, WxNativeNode, WxNativeText, WxRoot } from './wx-types.ts'
 
 type TaroDocument = typeof document
 type AppMountParams = Parameters<NonNullable<AppInstance['mount']>>
