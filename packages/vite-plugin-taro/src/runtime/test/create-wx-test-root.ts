@@ -66,17 +66,20 @@ class NativeNode {
     }
 
     tap(detail: Record<string, unknown>): void {
-        // Deliver the mini-program event supplied by the SDK's template binding entry.
-        const event = {
-            type: 'tap',
-            timeStamp: 123,
-            detail,
-            target: { id: this.id, dataset: this.dataset },
-            currentTarget: { id: this.id, dataset: this.dataset },
-            mark: {}
-        }
-        for (const listener of [...(this.listeners.tap ?? [])]) {
-            listener(event)
+        const target = { id: this.id, dataset: this.dataset }
+        // Follow native ancestry; the SDK supplies a separate mini-program payload for each receiver.
+        for (let current: NativeNode | null = this; current; current = current.parentNode) {
+            const event = {
+                type: 'tap',
+                timeStamp: 123,
+                detail,
+                target,
+                currentTarget: { id: current.id, dataset: current.dataset },
+                mark: {}
+            }
+            for (const listener of [...(current.listeners.tap ?? [])]) {
+                listener(event)
+            }
         }
     }
 }

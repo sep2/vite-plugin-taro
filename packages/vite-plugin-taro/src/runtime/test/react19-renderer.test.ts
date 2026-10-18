@@ -756,6 +756,7 @@ function checkWxPageCreation() {
         assert.deepEqual(clicks.splice(0), [['A', 'first', 9, {}], ['B', 'first', 0, {}]])
         assert.match(nodes.A.textContent, /99:10/)
         assert.match(nodes.B.textContent, /99:1/)
+        checkWxEventBubbling(app)
     } finally {
         app.unmount('B')
         assert.equal(natives.B.root.childNodes.length, 0)
@@ -765,6 +766,102 @@ function checkWxPageCreation() {
         Object.assign(rendererHost, savedHost)
         delete rendererHost.getPageRootType
         delete rendererHost.getChildHostContext
+    }
+}
+
+function checkWxEventBubbling(app) {
+    const root = createWxTestRoot()
+    // Retain current refs, setters, counts, and callback observations for this Page's event sequence.
+    const nodes = {}
+    const controls = {}
+    const events = []
+    function Page() {
+        const [parentHandler, setParentHandler] = React.useState('first')
+        const [stop, setStop] = React.useState(false)
+        const [idMode, setIdMode] = React.useState('distinct')
+        const [counts, setCounts] = React.useState({ child: 0, parent: 0 })
+        Object.assign(controls, { setParentHandler, setStop, setIdMode, counts })
+        const id = role => idMode === 'distinct' ? role : idMode === 'shared' ? 'shared' : undefined
+        function record(label, event) {
+            events.push([
+                label,
+                event.target.id,
+                event.currentTarget.id,
+                event.target.dataset.payload,
+                event.currentTarget.dataset.payload
+            ])
+        }
+        return h('view', {
+            id: id('parent'),
+            'data-payload': { role: 'parent' },
+            ref: node => { if (node) { nodes.parent = node } },
+            onClick: parentHandler ? event => {
+                record(parentHandler, event)
+                setCounts(value => ({ ...value, parent: value.parent + 1 }))
+            } : undefined
+        }, h('view', {
+            id: id('child'),
+            'data-payload': { role: 'child' },
+            ref: node => { if (node) { nodes.child = node } },
+            onClick: event => {
+                record('child', event)
+                setCounts(value => ({ ...value, child: value.child + 1 }))
+                if (stop) {
+                    event.stopPropagation()
+                }
+            }
+        }, counts.child + ':' + counts.parent))
+    }
+    function tap(parentHandler, childId, parentId) {
+        const before = controls.counts
+        const childPayload = { role: 'child' }
+        const expected = [['child', childId, childId, childPayload, childPayload]]
+        if (parentHandler) {
+            expected.push([parentHandler, childId, parentId, childPayload, { role: 'parent' }])
+        }
+        ReactDOM.flushSync(() => nodes.child.nativeNode.tap({}))
+        assert.deepEqual(events.splice(0), expected)
+        assert.deepEqual(controls.counts, {
+            child: before.child + 1,
+            parent: before.parent + (parentHandler ? 1 : 0)
+        })
+        assert.equal(nodes.child.nativeNode.childNodes[0].textContent,
+            controls.counts.child + ':' + controls.counts.parent)
+        assert.equal(nodes.child.nativeNode.listeners.tap.length, 1)
+    }
+
+    try {
+        ReactDOM.flushSync(() => app.mount(Page, 'bubbling', () => ({ root }), () =>
+            document.getElementById('bubbling').performUpdate(true)))
+        const child = nodes.child.nativeNode
+        const parent = nodes.parent.nativeNode
+        tap('first', 'child', 'parent')
+        ReactDOM.flushSync(() => controls.setParentHandler('second'))
+        tap('second', 'child', 'parent')
+        ReactDOM.flushSync(() => controls.setParentHandler(null))
+        assert.equal(parent.listeners.tap.length, 0)
+        tap(null, 'child', 'parent')
+
+        ReactDOM.flushSync(() => {
+            controls.setParentHandler('first')
+            controls.setStop(true)
+        })
+        assert.equal(parent.listeners.tap.length, 1)
+        tap(null, 'child', 'parent')
+        tap(null, 'child', 'parent')
+        ReactDOM.flushSync(() => controls.setStop(false))
+        tap('first', 'child', 'parent')
+
+        ReactDOM.flushSync(() => controls.setIdMode('empty'))
+        tap('first', '', '')
+        ReactDOM.flushSync(() => controls.setIdMode('shared'))
+        tap('first', 'shared', 'shared')
+        assert.strictEqual(nodes.child.nativeNode, child)
+        assert.strictEqual(nodes.parent.nativeNode, parent)
+        assert.strictEqual(child.parentNode, parent)
+    } finally {
+        app.unmount('bubbling')
+        assert.equal(root.childNodes.length, 0)
     }
 }
 
