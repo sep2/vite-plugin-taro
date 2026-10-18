@@ -127,23 +127,38 @@ test('preserves output when the contract has no rules', async () => {
 
 for (const target of ['wx', 'zfb', 'tt'] as const) {
     for (const renderer of [undefined, 'template', 'dom'] as const) {
-        test(`${target}: composes renderer=${renderer} project overrides across build and serve`, async () => {
+        test(`${target}: composes renderer=${renderer} JSON overrides across build and serve`, async () => {
+            const appJson = Object.freeze({
+                renderer: 'webview',
+                componentFramework: 'exparser',
+                lazyCodeLoading: '',
+                window: Object.freeze({ glassEaselWebview: false, navigationBarTitleText: 'Fixture' })
+            })
+            const configuredPage = Object.freeze({ glassEaselWebview: false, navigationBarTitleText: 'Detail' })
+            const applicationFiles = {
+                'app.json': appJson,
+                'pages/inherited.json': {},
+                'pages/configured.json': configuredPage
+            }
             const contract = miniContracts[target]({
                 target,
                 renderer,
                 app: 'app.js',
-                pages: [],
-                appJson: {},
+                pages: [{ path: 'pages/inherited' }, { path: 'pages/configured', config: configuredPage }],
+                appJson,
                 projectConfigJson: {}
             })
             assert.match(
                 contract.taro.hostPath,
-                target === 'tt' && renderer === 'dom'
-                    ? /runtime[/\\]tt[/\\]renderer-host\.(?:ts|js)$/
+                target !== 'zfb' && renderer === 'dom'
+                    ? /runtime[/\\](?:wx|tt)[/\\]renderer-host\.(?:ts|js)$/
                     : /runtime[/\\]mini[/\\]template[/\\]template-host\.(?:ts|js)$/
             )
             const { projectConfigFilename } = contract.output
-            const sourceFiles = createProjectConfigFixture(target, true)
+            const sourceFiles: Readonly<Record<string, VptJsonObject>> = {
+                ...applicationFiles,
+                ...createProjectConfigFixture(target, true)
+            }
             const cases = [
                 { command: 'build', build: { watch: {} }, physicalWatch: true },
                 { command: 'serve', build: { watch: {} }, physicalWatch: false },
@@ -168,6 +183,16 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
                             [projectConfigFilename]: { ...sourceFiles[projectConfigFilename], ...domSetting }
                         }
                         const expectedFiles: Readonly<Record<string, VptJsonObject>> = {
+                            ...applicationFiles,
+                            'app.json':
+                                target === 'wx' && renderer === 'dom'
+                                    ? {
+                                          ...appJson,
+                                          componentFramework: 'glass-easel',
+                                          lazyCodeLoading: 'requiredComponents',
+                                          window: { ...appJson.window, glassEaselWebview: true }
+                                      }
+                                    : appJson,
                             ...nativeFiles,
                             [projectConfigFilename]: {
                                 ...nativeFiles[projectConfigFilename],

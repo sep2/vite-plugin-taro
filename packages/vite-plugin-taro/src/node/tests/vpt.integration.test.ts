@@ -24,6 +24,7 @@ type BuildFixture = Readonly<{
     files: Readonly<Record<string, string | Uint8Array>>
     options: VptOptions
     build?: Pick<BuildOptions, 'minify' | 'cssMinify' | 'cssCodeSplit'>
+    mode?: 'development' | 'production'
 }>
 
 /** Builds one disposable consumer project through Vite's public build API. */
@@ -44,6 +45,7 @@ async function inspectFixtureBuild<Result>(
         const result = await viteBuild({
             root,
             configFile: false,
+            mode: fixture.mode,
             logLevel: 'silent',
             plugins: vpt(fixture.options),
             build: {
@@ -245,6 +247,86 @@ function collectModuleIds(output: BuildOutput): string[] {
         .flatMap((chunk) => Object.keys(chunk.modules))
         .map(normalizePath)
 }
+
+for (const mode of ['development', 'production'] as const) {
+    for (const renderer of ['template', 'dom'] as const) {
+        test(`builds WX ${renderer} through the public ${mode} pipeline`, async () => {
+            const options = { ...createOptions('wx'), renderer }
+            await inspectFixtureBuild(
+                {
+                    options,
+                    mode,
+                    build: { minify: mode === 'production' },
+                    files: {
+                        'src/app.tsx': appSource,
+                        'src/pages/home/index.tsx': `
+                            import { Text, View } from 'virtual:taro/components'
+                            export default function Page() { return <View><Text>WX Page</Text></View> }
+                        `
+                    }
+                },
+                (output) => {
+                    const modules = collectModuleIds(output)
+                    assert.equal(
+                        modules.includes(normalizePath(resolveVptRuntime('wx/renderer-host'))),
+                        renderer === 'dom'
+                    )
+                    assert.equal(
+                        modules.includes(normalizePath(resolveVptRuntime('wx/install-dom-templates'))),
+                        renderer === 'dom'
+                    )
+                    assert.equal(
+                        modules.includes(normalizePath(resolveVptRuntime('mini/template/template-host'))),
+                        renderer === 'template'
+                    )
+                    assert.ok(modules.includes(normalizePath(resolveVptRuntime('mini/template/create-template-host'))))
+                    const app = parseJsonAsset(output, 'app.json')
+                    assert.equal(app.componentFramework, renderer === 'dom' ? 'glass-easel' : undefined)
+                    assert.equal(app.lazyCodeLoading, renderer === 'dom' ? 'requiredComponents' : undefined)
+                    assert.deepEqual(app.window, {
+                        navigationBarTitleText: 'Fixture App',
+                        ...(renderer === 'dom' ? { glassEaselWebview: true } : {})
+                    })
+                    assert.equal(app.glassEaselWebview, undefined)
+                    const page = parseJsonAsset(output, 'pages/home/index.json')
+                    assert.equal(page.glassEaselWebview, undefined)
+                    assert.equal(page.navigationBarTitleText, 'Home')
+                    assert.match(String(requireAsset(output, 'pages/home/index.wxml').source), /taro_tmpl/)
+                    assert.equal(
+                        output.some((file) => file.type === 'chunk' && file.code.includes('__wxCodeSpace__')),
+                        renderer === 'dom'
+                    )
+                    assert.deepEqual(parseJsonAsset(output, 'project.config.json'), options.projectConfigJson)
+                    assert.equal(
+                        output.some((file) => file.fileName === 'project.private.config.json'),
+                        false
+                    )
+                    assertNativeShells(output)
+                }
+            )
+        })
+    }
+}
+
+test('builds WX DOM defaults from empty application configuration', async () => {
+    await inspectFixtureBuild(
+        {
+            options: { ...createOptions('wx'), renderer: 'dom', appJson: {} },
+            files: {
+                'src/app.tsx': appSource,
+                'src/pages/home/index.tsx': 'export default function Page() { return null }'
+            }
+        },
+        (output) => {
+            assert.deepEqual(parseJsonAsset(output, 'app.json'), {
+                pages: ['pages/home/index'],
+                componentFramework: 'glass-easel',
+                lazyCodeLoading: 'requiredComponents',
+                window: { glassEaselWebview: true }
+            })
+        }
+    )
+})
 
 for (const renderer of ['template', 'dom'] as const) {
     test(`builds TT ${renderer} pages with the required host factories and recursive template assets`, async () => {

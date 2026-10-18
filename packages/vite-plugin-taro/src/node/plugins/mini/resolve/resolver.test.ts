@@ -128,8 +128,8 @@ for (const [target, createContract] of [
             assert.equal(
                 resolver.resolveId(rendererHostId, undefined, path.resolve('/project')),
                 resolveVptRuntime(
-                    target === 'tt' && targetContract.options.renderer === 'dom'
-                        ? 'tt/renderer-host'
+                    target !== 'zfb' && targetContract.options.renderer === 'dom'
+                        ? `${target}/renderer-host`
                         : 'mini/template/template-host'
                 )
             )

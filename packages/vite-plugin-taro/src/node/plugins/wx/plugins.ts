@@ -12,16 +12,18 @@ export function createWxMiniPlugins(vptOptions: VptOptions): PluginOption[] {
 }
 
 /** Binds the shared Mini Program core to WeChat runtime and output conventions. */
-export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
+export function createWxMiniContract(options: VptOptions): MiniContract {
     const projectConfigFilename = 'project.config.json'
     const projectPrivateConfigFilename = 'project.private.config.json'
 
     return {
-        options: vptOptions,
+        options,
         define: {},
         taro: {
             env: 'weapp',
-            hostPath: resolveVptRuntime('mini/template/template-host'),
+            hostPath: resolveVptRuntime(
+                options.renderer === 'dom' ? 'wx/renderer-host' : 'mini/template/template-host'
+            ),
             componentsReactPath: resolveTaroRuntime('plugin-platform-weapp/components-react'),
             targetRuntimePath: resolveTaroRuntime('plugin-platform-weapp/runtime')
         },
@@ -39,6 +41,15 @@ export function createWxMiniContract(vptOptions: VptOptions): MiniContract {
             generateProjectSkeleton: createWxSkeleton
         },
         override: [
+            {
+                apply: () => options.renderer === 'dom',
+                name: 'app.json',
+                content: {
+                    componentFramework: 'glass-easel',
+                    lazyCodeLoading: 'requiredComponents',
+                    window: { glassEaselWebview: true }
+                }
+            },
             // Private settings take precedence over the shared project config in WeChat DevTools.
             // https://developers.weixin.qq.com/miniprogram/dev/devtools/projectconfig.html
             {

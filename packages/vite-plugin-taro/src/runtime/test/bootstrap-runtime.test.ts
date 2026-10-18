@@ -163,3 +163,142 @@ test('bootstrap initializes the loader before the native App capsule', async () 
     })
     assert.deepEqual(events, ['polyfills', 'capsule', 'register'])
 })
+
+test('WX host selects once and binds native roots through SDK creation templates', async (t) => {
+    // This journal checks host initialization before the SDK invokes each Page's creation callback.
+    const events: string[] = []
+    const register = t.mock.fn((factory: (templates: Readonly<Record<string, unknown>>) => object) => {
+        events.push('templates')
+        return factory({ 'native/component': () => undefined })
+    })
+    const harness = {
+        events,
+        codeSpace: { batchAddCompiledTemplate: register },
+        config: {
+            pages: ['pages/home', 'pages/detail'],
+            componentFramework: { allUsed: ['glass-easel'] },
+            renderer: { allUsed: ['webview', 'skyline'] }
+        },
+        templateHost: {},
+        ensure: assert.ok
+    }
+    const mocks = {
+        '@tarojs/shared': 'export const ensure = globalThis.harness.ensure; export function noop() {}',
+        '../mini/template/create-template-host.ts': `export function createTemplateHost() {
+            globalThis.harness.events.push('template'); return globalThis.harness.templateHost
+        }`,
+        './create-dom-host.ts': `export function createDomHost(getRoot) {
+            globalThis.harness.events.push('host'); return { getRoot }
+        }`
+    }
+    const bundle = await bundleRuntimeEntry({
+        entry: 'wx/renderer-host.ts',
+        mocks,
+        defines: {
+            __wxConfig: 'globalThis.harness.config',
+            __wxCodeSpace__: 'globalThis.harness.codeSpace'
+        }
+    })
+    const host = executeRuntimeEntry(bundle, createExecutionContext(harness)).default
+    assert.deepEqual(events, ['templates', 'host'])
+    const templates = register.mock.calls[0]!.result!
+    assert.deepEqual(Object.keys(templates), ['pages/home', 'pages/detail'])
+    const pages = [{ route: 'pages/home' }, { route: 'pages/home' }, { route: 'pages/detail' }]
+    for (const page of pages) {
+        const getTemplate = Reflect.get(templates, page.route)
+        assert.equal(typeof getTemplate, 'function')
+        assert.equal(getTemplate('named'), undefined)
+        const createTemplate = getTemplate('')
+        const root = { getHostNode: () => ({ getMethodCaller: () => page }) }
+        createTemplate({ shadowRoot: root }, false).C()
+        assert.equal(Reflect.get(page, '__vptWxRoot'), undefined)
+        createTemplate({ shadowRoot: root }, true).C()
+        createTemplate({ shadowRoot: root }, false).C()
+        assert.strictEqual(Reflect.get(page, '__vptWxRoot'), root)
+        assert.equal(Object.getOwnPropertyDescriptor(page, '__vptWxRoot')?.writable, false)
+    }
+    assert.ok(host && typeof host === 'object')
+    const getRoot = Reflect.get(host, 'getRoot')
+    for (const page of pages) {
+        assert.strictEqual(getRoot(page), Reflect.get(page, '__vptWxRoot'))
+    }
+    assert.throws(() => getRoot({}), /captured native Page root/)
+    assert.deepEqual(events, ['templates', 'host'], 'a mounted host never switches on runtime errors')
+
+    const fallbackConfigs = [
+        undefined,
+        { ...harness.config, componentFramework: { allUsed: ['exparser'] } },
+        { ...harness.config, componentFramework: { allUsed: ['glass-easel', 'exparser'] } }
+    ]
+    for (const config of fallbackConfigs) {
+        const fallback = { ...harness, config, events: [] }
+        assert.strictEqual(executeRuntimeEntry(bundle, createExecutionContext(fallback)).default, harness.templateHost)
+        assert.deepEqual(fallback.events, ['template'])
+    }
+    for (const codeSpace of [undefined, {}, 'unavailable']) {
+        const fallback = { ...harness, codeSpace, events: [] }
+        assert.strictEqual(executeRuntimeEntry(bundle, createExecutionContext(fallback)).default, harness.templateHost)
+        assert.deepEqual(fallback.events, ['template'])
+    }
+    assert.equal(register.mock.callCount(), 1, 'unsupported modes never register native templates')
+    const missingSdkDefines: readonly Readonly<Record<string, string>>[] = [
+        {},
+        { __wxCodeSpace__: 'globalThis.harness.codeSpace' }
+    ]
+    for (const defines of missingSdkDefines) {
+        const entry = await bundleRuntimeEntry({ entry: 'wx/renderer-host.ts', mocks, defines })
+        const absent = { ...harness, events: [] }
+        assert.strictEqual(executeRuntimeEntry(entry, createExecutionContext(absent)).default, harness.templateHost)
+        assert.deepEqual(absent.events, ['template'], 'undeclared SDK globals select the template host')
+    }
+
+    const occupied = { 'pages/detail': () => undefined }
+    const registerOccupied = t.mock.fn((factory: (templates: Readonly<Record<string, unknown>>) => object) =>
+        factory(occupied)
+    )
+    const fallback = { ...harness, codeSpace: { batchAddCompiledTemplate: registerOccupied }, events: [] }
+    const selected = executeRuntimeEntry(bundle, createExecutionContext(fallback)).default
+    assert.strictEqual(selected, harness.templateHost)
+    assert.deepEqual(registerOccupied.mock.calls[0]!.result, {}, 'one occupied route prevents every DOM registration')
+    assert.deepEqual(Object.keys(occupied), ['pages/detail'])
+    fallback.codeSpace.batchAddCompiledTemplate = register
+    assert.strictEqual(selected, harness.templateHost)
+    assert.deepEqual(fallback.events, ['template'], 'capability changes retain the startup host')
+
+    const supportedConfigs = [
+        { pages: harness.config.pages },
+        { ...harness.config, componentFramework: {} },
+        { ...harness.config, renderer: undefined },
+        { ...harness.config, renderer: {} },
+        { ...harness.config, renderer: { allUsed: ['webview'] } },
+        { ...harness.config, renderer: { allUsed: ['skyline'] } }
+    ]
+    for (const config of supportedConfigs) {
+        events.length = 0
+        const supported = executeRuntimeEntry(bundle, createExecutionContext({ ...harness, config })).default
+        assert.ok(supported && typeof supported === 'object')
+        assert.equal(typeof Reflect.get(supported, 'getRoot'), 'function')
+        assert.deepEqual(
+            events,
+            ['templates', 'host'],
+            'SDK template capability selects DOM across renderer inventories'
+        )
+    }
+
+    const failure = new Error('SDK registration failed')
+    assert.throws(
+        () =>
+            executeRuntimeEntry(
+                bundle,
+                createExecutionContext({
+                    ...harness,
+                    codeSpace: {
+                        batchAddCompiledTemplate() {
+                            throw failure
+                        }
+                    }
+                })
+            ),
+        (error) => error === failure
+    )
+})
