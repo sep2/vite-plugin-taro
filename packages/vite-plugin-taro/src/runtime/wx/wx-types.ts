@@ -3,7 +3,8 @@
 // Please give credits and link to VPT itself when reusing. Thank you.
 // VPT, 2026-10-18
 
-import type { MpEvent, MpInstance } from 'vite-plugin-taro-runtime/runtime/mini'
+import type { MpInstance } from 'vite-plugin-taro-runtime/runtime/mini'
+import type { WxTemplateBindings } from './wx-template-bindings.ts'
 
 export interface WxNativeNode {
     readonly parentNode: WxNativeElement | WxRoot | null
@@ -23,26 +24,6 @@ export interface WxNativeElement extends WxNativeNode {
     insertBefore(child: WxNativeNode, before: WxNativeNode): void
     removeChild(child: WxNativeNode): void
     removeAttribute(name: string): void
-}
-
-interface WxTemplateBindings {
-    // class
-    c(element: WxNativeElement, value: string): void
-
-    // component property, external class, or native attribute
-    r(element: WxNativeElement, name: string, value: unknown): void
-    endBindingMapUpdateForElement(element: WxNativeElement): void
-
-    // event
-    v(
-        element: WxNativeElement,
-        name: string,
-        handler: ((event: MpEvent) => unknown) | null,
-        final: boolean,
-        mutated: boolean,
-        capture: boolean,
-        dynamic: boolean
-    ): void
 }
 
 export interface WxRoot {
