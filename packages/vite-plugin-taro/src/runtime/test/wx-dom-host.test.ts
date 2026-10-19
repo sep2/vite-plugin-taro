@@ -331,22 +331,49 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     assert.deepEqual(bindClass.mock.calls[2]?.arguments, [nativeView, ''])
     assert.equal(secondView.nativeNode.class, 'second')
     assert.deepEqual(nativeView.attributes, {})
-    for (const name of ['input', 'textarea']) {
-        const input = page.createElement(name)
-        const native = input.nativeNode
-        const listener = native.listeners.input[0]
-        const event = { ...sdkEvent, type: 'input', detail: { value: 'typed' } }
-        assert.equal(native.dataset.sid, input.sid)
-        assert.deepEqual(listener(event), { event, node: input })
+    for (const [name, type] of [
+        ['input', 'input'],
+        ['textarea', 'input'],
+        ['picker', 'change'],
+        ['picker-view', 'change'],
+        ['slider', 'change'],
+        ['switch', 'change']
+    ]) {
+        const node = page.createElement(name)
+        const native = node.nativeNode
+        const listener = native.listeners[type][0]
+        const event = { ...sdkEvent, type, detail: { value: 'changed' } }
+        assert.equal(native.dataset.sid, node.sid)
+        assert.deepEqual(listener(event), { event, node })
         for (const subscribed of [true, false, true]) {
-            input.delegateEventListener('input', subscribed)
-            assert.deepEqual(native.listeners.input, [listener])
+            node.delegateEventListener(type, subscribed)
+            assert.deepEqual(native.listeners[type], [listener])
         }
-        input.delegateEventListener('change', true)
-        assert.equal(native.listeners.change.length, 1)
-        input.delegateEventListener('change', false)
-        assert.deepEqual(native.listeners.change, [])
-        assert.deepEqual(native.listeners.input, [listener])
+        node.delegateEventListener('focus', true)
+        assert.equal(native.listeners.focus.length, 1)
+        node.delegateEventListener('focus', false)
+        assert.deepEqual(native.listeners.focus, [])
+        assert.deepEqual(native.listeners[type], [listener])
+    }
+    for (const name of [
+        'checkbox',
+        'radio',
+        'checkbox-group',
+        'radio-group',
+        'form',
+        'button',
+        'label',
+        'editor',
+        'picker-view-column'
+    ]) {
+        const node = page.createElement(name)
+        assert.deepEqual(node.nativeNode.listeners, {})
+        for (const type of ['change', 'submit', 'reset']) {
+            node.delegateEventListener(type, true)
+            assert.equal(node.nativeNode.listeners[type].length, 1)
+            node.delegateEventListener(type, false)
+            assert.deepEqual(node.nativeNode.listeners[type], [])
+        }
     }
     view.delegateEventListener('input', true)
     assert.equal(nativeView.listeners.input!.length, 1)

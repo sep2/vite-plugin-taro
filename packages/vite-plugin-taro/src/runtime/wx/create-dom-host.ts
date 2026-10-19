@@ -108,8 +108,8 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
     TaroElement.extend('delegateEventUpdate', noop)
 
     TaroElement.extend('delegateEventListener', function (this: HostElement, type: string, subscribed: boolean) {
-        // Text inputs retain the template's value-sync subscription across business handler changes.
-        if (this.nativeNode && !(type === 'input' && isTextInput(this.nodeName))) {
+        // Value synchronization retains its SDK subscription across business handler changes.
+        if (this.nativeNode && type !== getFormEvent(this.nodeName)) {
             bindNativeEvent(this, type, subscribed)
         }
     })
@@ -219,8 +219,19 @@ function getTemplateBindings(native: WxNativeNode) {
     return native.ownerShadowRoot!.getHostNode().templateInstance.procGenWrapper
 }
 
-function isTextInput(name: string): boolean {
-    return name === 'input' || name === 'textarea'
+function getFormEvent(name: string): 'input' | 'change' | undefined {
+    switch (name) {
+        case 'input':
+        case 'textarea':
+            return 'input'
+        case 'picker':
+        case 'picker-view':
+        case 'slider':
+        case 'switch':
+            return 'change'
+        default:
+            return undefined
+    }
 }
 
 function bindNativeEvent(node: HostElement, type: string, subscribed: boolean): void {
@@ -292,9 +303,10 @@ function createPageDocument(root: WxRoot): TaroDocument {
         // Event targets resolve through Taro's stable index, including elements without a user ID.
         native.setDataset('sid', node.sid)
 
-        // Taro always bind input so the existing form pipeline can sync and restore values.
-        if (isTextInput(type)) {
-            bindNativeEvent(node, 'input', true)
+        // Taro templates bind value events even when no business handler is installed.
+        const formEvent = getFormEvent(type)
+        if (formEvent) {
+            bindNativeEvent(node, formEvent, true)
         }
 
         return node

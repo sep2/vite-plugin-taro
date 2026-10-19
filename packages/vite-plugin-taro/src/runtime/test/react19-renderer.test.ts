@@ -813,6 +813,7 @@ function checkWxPageCreation() {
         checkWxDatasetUpdates(app)
         checkWxPropertyUpdates(app)
         checkWxTextInput(app)
+        checkWxFormChange(app)
     } finally {
         app.unmount('B')
         assert.equal(natives.B.root.childNodes.length, 0)
@@ -935,6 +936,93 @@ function checkWxTextInput(app) {
             ReactDOM.flushSync(() => controls.setMode('unmount'))
             emit('input-true', 'unmount')
             assert.deepEqual(events, [['input-true', 'unmount', 'unmount']])
+            assert.ok(Object.values(nodes).every(node => node === null))
+            assert.equal(root.childNodes[0].childNodes[0].childNodes.length, 0)
+        } finally {
+            app.unmount(id)
+            assert.equal(root.childNodes.length, 0)
+        }
+    }
+}
+
+function checkWxFormChange(app) {
+    const cases = [
+        { type: 'picker', property: 'value', initial: 0, changed: 1, programmed: 2 },
+        { type: 'picker-view', property: 'value', initial: [0], changed: [1], programmed: [2] },
+        { type: 'slider', property: 'value', initial: 20, changed: 80, programmed: 40 },
+        { type: 'switch', property: 'checked', initial: false, changed: true, programmed: true }
+    ]
+    for (const component of [false, true]) {
+        const properties = Object.fromEntries(cases.map(item => [item.type, { [item.property]: () => item.initial }]))
+        const root = createWxTestRoot(component ? properties : undefined)
+        // Refs/setters expose commits; the journal observes business dispatch independently of value syncing.
+        const nodes = {}
+        const controls = {}
+        const events = []
+        function Page() {
+            const [mode, setMode] = React.useState('off')
+            const [programmed, setProgrammed] = React.useState(false)
+            const [visible, setVisible] = React.useState(true)
+            Object.assign(controls, { setMode, setProgrammed, setVisible })
+            return h('view', null, visible && cases.map(item => h(item.type, {
+                key: item.type,
+                id: item.type,
+                [item.property]: programmed ? item.programmed : item.initial,
+                ref: node => { nodes[item.type] = node },
+                onChange: mode === 'off' ? undefined : event => {
+                    assert.strictEqual(nodes[item.type].value, event.detail.value)
+                    events.push([item.type, mode, event.detail.value])
+                    if (mode === 'unmount') {
+                        setVisible(false)
+                    }
+                }
+            })))
+        }
+        function emit(item, value) {
+            const node = nodes[item.type]
+            const native = node.nativeNode
+            if (component) {
+                native._$dataGroup.data[item.property] = value
+            }
+            const target = { id: native.id, dataset: native.dataset }
+            const event = { type: 'change', timeStamp: 123, detail: { value }, target, currentTarget: target }
+            ReactDOM.flushSync(() => {
+                for (const listener of [...(native.listeners.change ?? [])]) {
+                    listener(event)
+                }
+            })
+            return node
+        }
+        const id = 'form-change-' + component
+        try {
+            ReactDOM.flushSync(() => app.mount(Page, id, () => ({ root }), () =>
+                document.getElementById(id).performUpdate(true)))
+            const originals = Object.fromEntries(cases.map(item => [item.type, nodes[item.type].nativeNode.listeners.change?.[0]]))
+            for (const item of cases) {
+                assert.equal(typeof originals[item.type], 'function', item.type + ' subscribes without a business handler')
+                assert.strictEqual(emit(item, item.changed).value, item.changed)
+            }
+            assert.deepEqual(events, [])
+            for (const mode of ['first', 'second', 'off', 'restored']) {
+                ReactDOM.flushSync(() => controls.setMode(mode))
+                for (const item of cases) {
+                    const value = mode === 'off' ? item.initial : item.changed
+                    const node = emit(item, value)
+                    assert.strictEqual(node.value, value, 'change keeps the upstream value, including its array identity')
+                    assert.deepEqual(node.nativeNode.listeners.change, [originals[item.type]])
+                    assert.strictEqual(node.nativeNode.ownerShadowRoot, root)
+                    assert.deepEqual(node.props[item.property], item.property === 'checked' ? item.initial : value)
+                }
+                assert.deepEqual(events.splice(0), mode === 'off' ? [] : cases.map(item => [item.type, mode, item.changed]))
+            }
+            ReactDOM.flushSync(() => controls.setProgrammed(true))
+            for (const item of cases) {
+                assert.deepEqual(nodes[item.type].props[item.property], item.programmed)
+                assert.deepEqual((component ? nodes[item.type].nativeNode._$dataGroup.data : nodes[item.type].nativeNode.attributes)[item.property], item.programmed)
+            }
+            ReactDOM.flushSync(() => controls.setMode('unmount'))
+            emit(cases[0], cases[0].changed)
+            assert.deepEqual(events, [[cases[0].type, 'unmount', cases[0].changed]])
             assert.ok(Object.values(nodes).every(node => node === null))
             assert.equal(root.childNodes[0].childNodes[0].childNodes.length, 0)
         } finally {
