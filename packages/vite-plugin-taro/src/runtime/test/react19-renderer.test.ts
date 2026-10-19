@@ -812,6 +812,7 @@ function checkWxPageCreation() {
         checkWxEventBubbling(app)
         checkWxDatasetUpdates(app)
         checkWxPropertyUpdates(app)
+        checkWxTextInput(app)
     } finally {
         app.unmount('B')
         assert.equal(natives.B.root.childNodes.length, 0)
@@ -821,6 +822,125 @@ function checkWxPageCreation() {
         Object.assign(rendererHost, savedHost)
         delete rendererHost.getPageRootType
         delete rendererHost.getChildHostContext
+    }
+}
+
+function checkWxTextInput(app) {
+    for (const component of [false, true]) {
+        const root = createWxTestRoot(component ? {
+            input: { value: () => '' }, textarea: { value: () => '' }
+        } : undefined)
+        // Refs and setters expose React commits; the journal records the active business handler.
+        const nodes = {}
+        const controls = {}
+        const events = []
+        function Page() {
+            const [mode, setMode] = React.useState('off')
+            const [value, setValue] = React.useState('fixed')
+            const [visible, setVisible] = React.useState(true)
+            Object.assign(controls, { setMode, setValue, setVisible })
+            return h('view', null, visible && ['input', 'textarea'].flatMap(type =>
+                [true, false].map(controlled => {
+                    const name = type + '-' + controlled
+                    return h(type, {
+                        key: name,
+                        id: name,
+                        ...(controlled ? { value } : { defaultValue: 'seed' }),
+                        ref: node => { nodes[name] = node },
+                        onInput: mode === 'off' ? undefined : event => {
+                            assert.equal(nodes[name].value, event.detail.value, 'logical value is current before the callback')
+                            events.push([name, mode, event.detail.value])
+                            if (mode === 'accept' && controlled) {
+                                setValue(event.detail.value.toUpperCase())
+                            } else if (mode === 'unmount') {
+                                setVisible(false)
+                            }
+                        }
+                    })
+                })
+            ))
+        }
+        function emit(name, value) {
+            const native = nodes[name].nativeNode
+            // Components expose the editor value; raw nodes retain their last bound attribute.
+            if (component) {
+                native._$dataGroup.data.value = value
+            }
+            const target = { id: native.id, dataset: native.dataset }
+            const event = { type: 'input', timeStamp: 123, detail: { value }, target, currentTarget: target }
+            ReactDOM.flushSync(() => {
+                for (const listener of [...native.listeners.input]) {
+                    listener(event)
+                }
+            })
+        }
+        function expectValues(controlled, uncontrolled) {
+            for (const type of ['input', 'textarea']) {
+                for (const [suffix, expected] of [['true', controlled], ['false', uncontrolled]]) {
+                    const node = nodes[type + '-' + suffix]
+                    const native = node.nativeNode
+                    assert.equal(node.value, expected)
+                    assert.equal((component ? native._$dataGroup.data : native.attributes).value, expected)
+                    assert.equal(native.hasPendingChanges?.() ?? false, false)
+                    assert.strictEqual(native.ownerShadowRoot, root)
+                }
+            }
+        }
+        const id = 'text-input-' + component
+        try {
+            ReactDOM.flushSync(() => app.mount(Page, id, () => ({ root }), () =>
+                document.getElementById(id).performUpdate(true)))
+            const originals = Object.values(nodes).map(node => [node, node.nativeNode.listeners.input?.[0]])
+            for (const [node, listener] of originals) {
+                assert.equal(typeof listener, 'function', 'text input subscribes without a business handler')
+                assert.equal(node.nativeNode.listeners.input.length, 1)
+            }
+            expectValues('fixed', 'seed')
+            for (const name of Object.keys(nodes)) {
+                emit(name, 'free')
+            }
+            expectValues('fixed', 'free')
+            assert.deepEqual(events, [])
+
+            ReactDOM.flushSync(() => controls.setValue('programmatic'))
+            expectValues('programmatic', 'free')
+            ReactDOM.flushSync(() => controls.setMode('accept'))
+            emit('input-true', 'alpha')
+            expectValues('ALPHA', 'free')
+            emit('textarea-true', 'beta')
+            expectValues('BETA', 'free')
+            assert.deepEqual(events.splice(0), [['input-true', 'accept', 'alpha'], ['textarea-true', 'accept', 'beta']])
+
+            ReactDOM.flushSync(() => controls.setMode('reject'))
+            emit('input-true', 'rejected')
+            emit('textarea-true', 'rejected')
+            expectValues('BETA', 'free')
+            assert.deepEqual(events.splice(0), [['input-true', 'reject', 'rejected'], ['textarea-true', 'reject', 'rejected']])
+
+            ReactDOM.flushSync(() => controls.setMode('off'))
+            for (const name of Object.keys(nodes)) {
+                emit(name, 'unbound')
+            }
+            expectValues('BETA', 'unbound')
+            assert.deepEqual(events, [])
+            ReactDOM.flushSync(() => controls.setMode('accept'))
+            emit('input-true', 'restored')
+            emit('textarea-true', 'restored')
+            expectValues('RESTORED', 'unbound')
+            assert.deepEqual(events.splice(0), [['input-true', 'accept', 'restored'], ['textarea-true', 'accept', 'restored']])
+            for (const [node, listener] of originals) {
+                assert.strictEqual(nodes[node.id], node)
+                assert.deepEqual(node.nativeNode.listeners.input, [listener], 'business handlers share the creation-time subscription')
+            }
+            ReactDOM.flushSync(() => controls.setMode('unmount'))
+            emit('input-true', 'unmount')
+            assert.deepEqual(events, [['input-true', 'unmount', 'unmount']])
+            assert.ok(Object.values(nodes).every(node => node === null))
+            assert.equal(root.childNodes[0].childNodes[0].childNodes.length, 0)
+        } finally {
+            app.unmount(id)
+            assert.equal(root.childNodes.length, 0)
+        }
     }
 }
 

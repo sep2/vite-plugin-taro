@@ -108,21 +108,10 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
     TaroElement.extend('delegateEventUpdate', noop)
 
     TaroElement.extend('delegateEventListener', function (this: HostElement, type: string, subscribed: boolean) {
-        const native = this.nativeNode
-        if (!native) {
-            return
+        // Text inputs retain the template's value-sync subscription across business handler changes.
+        if (this.nativeNode && !(type === 'input' && isTextInput(this.nodeName))) {
+            bindNativeEvent(this, type, subscribed)
         }
-
-        // SDK dynamic bindings own event conversion and matching native listener replacement/removal.
-        getTemplateBindings(native).v(
-            native,
-            type,
-            subscribed ? (event) => eventHandler(event, this) : null,
-            false,
-            false,
-            false,
-            true
-        )
     })
 
     extend(Style, 'delegateStyleUpdate', function (this: Style & { _element: HostElement }) {
@@ -230,6 +219,24 @@ function getTemplateBindings(native: WxNativeNode) {
     return native.ownerShadowRoot!.getHostNode().templateInstance.procGenWrapper
 }
 
+function isTextInput(name: string): boolean {
+    return name === 'input' || name === 'textarea'
+}
+
+function bindNativeEvent(node: HostElement, type: string, subscribed: boolean): void {
+    const native = node.nativeNode!
+    // SDK dynamic bindings own event conversion and matching native listener replacement/removal.
+    getTemplateBindings(native).v(
+        native,
+        type,
+        subscribed ? (event) => eventHandler(event, node) : null,
+        false,
+        false,
+        false,
+        true
+    )
+}
+
 function setNativeClass(native: WxNativeElement, value: string): void {
     // SDK class bindings update scoped classes, external classes, and property-change listeners.
     getTemplateBindings(native).c(native, value)
@@ -284,6 +291,11 @@ function createPageDocument(root: WxRoot): TaroDocument {
 
         // Event targets resolve through Taro's stable index, including elements without a user ID.
         native.setDataset('sid', node.sid)
+
+        // Taro always bind input so the existing form pipeline can sync and restore values.
+        if (isTextInput(type)) {
+            bindNativeEvent(node, 'input', true)
+        }
 
         return node
     }

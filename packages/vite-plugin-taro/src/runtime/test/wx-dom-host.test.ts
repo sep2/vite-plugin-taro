@@ -331,6 +331,27 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     assert.deepEqual(bindClass.mock.calls[2]?.arguments, [nativeView, ''])
     assert.equal(secondView.nativeNode.class, 'second')
     assert.deepEqual(nativeView.attributes, {})
+    for (const name of ['input', 'textarea']) {
+        const input = page.createElement(name)
+        const native = input.nativeNode
+        const listener = native.listeners.input[0]
+        const event = { ...sdkEvent, type: 'input', detail: { value: 'typed' } }
+        assert.equal(native.dataset.sid, input.sid)
+        assert.deepEqual(listener(event), { event, node: input })
+        for (const subscribed of [true, false, true]) {
+            input.delegateEventListener('input', subscribed)
+            assert.deepEqual(native.listeners.input, [listener])
+        }
+        input.delegateEventListener('change', true)
+        assert.equal(native.listeners.change.length, 1)
+        input.delegateEventListener('change', false)
+        assert.deepEqual(native.listeners.change, [])
+        assert.deepEqual(native.listeners.input, [listener])
+    }
+    view.delegateEventListener('input', true)
+    assert.equal(nativeView.listeners.input!.length, 1)
+    view.delegateEventListener('input', false)
+    assert.deepEqual(nativeView.listeners.input, [])
     root.performUpdate(true)
     root.performUpdate(false)
     root.enqueueUpdate({})
