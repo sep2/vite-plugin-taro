@@ -5,6 +5,7 @@ import { type PluginItem, type PluginTarget, transformSync } from '@babel/core'
 import transformDynamicImport from '@babel/plugin-transform-dynamic-import'
 import transformModulesSystemjs from '@babel/plugin-transform-modules-systemjs'
 import { build } from 'rolldown'
+import { minifySync } from 'rolldown/utils'
 import { transformSystemJs } from './system-js.ts'
 
 type ModuleNamespace = Record<string, unknown>
@@ -664,6 +665,42 @@ test('preserves adjacent hoisted functions and an unmapped function ending at EO
         assert.equal(instance.namespace.count, 6)
     }
 })
+
+for (const format of ['system-register', 'commonjs-registration'] as const) {
+    for (const sourcemap of [false, true]) {
+        test(`matches Babel for minified hoisted component names: ${format}, maps ${sourcemap}`, async () => {
+            const code = 'let count = 0; function CounterPanel() { return ++count } export { CounterPanel, count };'
+            const minify = (source: string) =>
+                minifySync('assets/component.js', source, {
+                    compress: { keepNames: { function: true, class: true } },
+                    mangle: { toplevel: true, keepNames: { function: true, class: true } }
+                }).code
+            const babel = await instantiate(evaluateSystemRegistration(minify(compileWithBabel(code))), new Map())
+            const result = transformSystemJs({
+                code,
+                filename: 'assets/component.js',
+                format,
+                sourcemap,
+                resolveReference: (reference) => reference
+            })
+            const minified = minify(result.code)
+            const registration =
+                format === 'system-register'
+                    ? evaluateSystemRegistration(minified)
+                    : evaluateCommonJsRegistration(minified)
+            const actual = await instantiate(registration, new Map())
+            for (const instance of [babel, actual]) {
+                assert.equal(instance.beforeExecute.CounterPanel, 'function')
+                const component = instance.namespace.CounterPanel
+                assert.ok(typeof component === 'function')
+                assert.equal(component.name, 'CounterPanel')
+                assert.equal(component(), 1)
+                assert.equal(instance.namespace.count, 1)
+            }
+            assert.deepEqual(actual.publications, babel.publications)
+        })
+    }
+}
 
 test('renders a large hoisted function set without losing declaration-time exports or nested edits', async () => {
     const names = Array.from({ length: 512 }, (_, index) => `increment${index}`)

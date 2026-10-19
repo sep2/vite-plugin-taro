@@ -562,8 +562,13 @@ function assembleMappedRegistration(
 function createRegistrationShell(model: ModuleModel, options: TransformSystemJsOptions): RegistrationShell {
     const dependencies = model.dependencies.map((dependency) => options.resolveReference(dependency.source, 'static'))
     const setters = model.dependencies.map((dependency, index) => renderSetter(dependency, index, model.generatedNames))
-    const earlyExports = renderEarlyExports(model)
-    const declarations = model.outerBindings.size > 0 ? `var ${[...model.outerBindings].join(',')};` : ''
+    const functionNames = new Set(
+        model.functions.map((declaration) => (declaration.id as NonNullable<typeof declaration.id>).name)
+    )
+    const earlyExports = renderEarlyExports(model, functionNames)
+    // Functions declare their own registration-scope bindings; only the remaining cells need var declarations.
+    const variables = [...model.outerBindings].filter((name) => !functionNames.has(name))
+    const declarations = variables.length > 0 ? `var ${variables.join(',')};` : ''
     const execute = model.hasTopLevelAwait ? 'async function' : 'function'
     // Imports, hoisted cells, and cyclically visible exports belong to declaration/link time. Original executable statements
     // remain inside execute(), which becomes async only when the module itself owns a top-level await.
@@ -581,10 +586,7 @@ function createRegistrationShell(model: ModuleModel, options: TransformSystemJsO
 }
 
 /** Produces declaration-time exports for functions and uninitialized variables, matching cyclic ESM availability. */
-function renderEarlyExports(model: ModuleModel): string {
-    const functionNames = new Set(
-        model.functions.map((declaration) => (declaration.id as NonNullable<typeof declaration.id>).name)
-    )
+function renderEarlyExports(model: ModuleModel, functionNames: ReadonlySet<string>): string {
     const entries: Array<Readonly<{ exported: string; value: string }>> = []
 
     for (const [local, exportedNames] of model.exportNamesByLocal) {

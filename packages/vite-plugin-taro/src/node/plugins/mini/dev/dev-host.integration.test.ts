@@ -670,6 +670,7 @@ test('applies native HMR once to an executed lazy module and reports a failed pa
     assert.ok(
         namespace && typeof namespace === 'object' && 'default' in namespace && typeof namespace.default === 'function'
     )
+    assert.equal(namespace.default.name, 'LazyFeature')
     assert.equal(namespace.default(), 'initial warm generation')
     assert.strictEqual(await entry.loadLazy(), namespace, 'Repeated initial imports must reuse the native namespace')
     assert.equal(runtime.run('globalThis.__lazyExecutions'), 1)
@@ -685,6 +686,10 @@ test('applies native HMR once to an executed lazy module and reports a failed pa
         assert.equal(
             runtime.run(`globalThis.__rolldown_runtime__.loadExports(${JSON.stringify(runtimeModuleId)}).default()`),
             marker
+        )
+        assert.equal(
+            runtime.run(`globalThis.__rolldown_runtime__.loadExports(${JSON.stringify(runtimeModuleId)}).default.name`),
+            'LazyFeature'
         )
         assert.equal(runtime.run('globalThis.__lazyExecutions'), seq + 1)
         assert.equal(runtime.run('JSON.stringify(globalThis.__lazyAccepted)'), JSON.stringify(markers.slice(0, seq)))
