@@ -19,6 +19,7 @@ import {
     TaroRootElement,
     TaroText
 } from 'vite-plugin-taro-runtime/runtime/mini'
+import { getFormChangeEvent } from '../mini/vpt/get-form-change-event.ts'
 import type { MiniHost } from '../mini/vpt/mini-host.d.ts'
 import type { WxNativeElement, WxNativeNode, WxNativeText, WxRoot } from './wx-types.ts'
 
@@ -109,7 +110,7 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
 
     TaroElement.extend('delegateEventListener', function (this: HostElement, type: string, subscribed: boolean) {
         // Value synchronization retains its SDK subscription across business handler changes.
-        if (this.nativeNode && type !== getFormEvent(this.nodeName)) {
+        if (this.nativeNode && type !== getFormChangeEvent(this.nodeName)) {
             bindNativeEvent(this, type, subscribed)
         }
     })
@@ -219,21 +220,6 @@ function getTemplateBindings(native: WxNativeNode) {
     return native.ownerShadowRoot!.getHostNode().templateInstance.procGenWrapper
 }
 
-function getFormEvent(name: string): 'input' | 'change' | undefined {
-    switch (name) {
-        case 'input':
-        case 'textarea':
-            return 'input'
-        case 'picker':
-        case 'picker-view':
-        case 'slider':
-        case 'switch':
-            return 'change'
-        default:
-            return undefined
-    }
-}
-
 function bindNativeEvent(node: HostElement, type: string, subscribed: boolean): void {
     const native = node.nativeNode!
     // SDK dynamic bindings own event conversion and matching native listener replacement/removal.
@@ -304,7 +290,7 @@ function createPageDocument(root: WxRoot): TaroDocument {
         native.setDataset('sid', node.sid)
 
         // Taro templates bind value events even when no business handler is installed.
-        const formEvent = getFormEvent(type)
+        const formEvent = getFormChangeEvent(type)
         if (formEvent) {
             bindNativeEvent(node, formEvent, true)
         }

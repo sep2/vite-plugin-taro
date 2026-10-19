@@ -16,6 +16,7 @@ import type {
     TTNativeEvent,
     TTNativeNode
 } from 'vite-plugin-taro-runtime/runtime/tt-document'
+import { getFormChangeEvent } from '../mini/vpt/get-form-change-event.ts'
 import type { MiniHost } from '../mini/vpt/mini-host.d.ts'
 
 // Host-local types describe the creation-time handles retained on ordinary Taro instances.
@@ -76,10 +77,9 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
                   ? nativeDocument.createElement(name)
                   : nativeDocument.createNativeComponent(name, { __tt__inner__options__: { name } })
 
-        // 模板原本固定绑定这些值变化事件；DOM host 接替模板，把变化送入现有表单流程。
-        // 即使没有业务处理器，非受控 ref.value 也要更新，受控 input/textarea 也要触发恢复。
-        // 事件选择和上游替代条件集中说明在 getFormEvent，业务解绑同样遵守该规则。
-        const formEvent = getFormEvent(node.nodeName)
+        // TT SDK 4.4.0.3 通用元素没有实时 value/checked getter，getAttribute 读取 JS 属性存储。
+        // 常驻值事件进入共享 Taro 表单流程，支持无业务处理器时的值同步及 text input 受控恢复。
+        const formEvent = getFormChangeEvent(node.nodeName)
         if (formEvent) {
             updateNativeListener(node, `bind${formEvent}`, true)
         }
@@ -143,7 +143,7 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
 
     TaroElement.extend('delegateEventListener', function (this: HostElement, type: string, subscribed: boolean) {
         // 值同步属于节点本身；最后一个业务处理器移除时，创建阶段的常驻订阅仍需保留。
-        if (type === getFormEvent(this.nodeName)) {
+        if (type === getFormChangeEvent(this.nodeName)) {
             return
         }
         // catchMove 已由 updateTouchMove 保留 catch 入口，业务监听共用它，避免再注册 bind 入口。
@@ -243,35 +243,6 @@ function removePageRoot(child: HostNode, options: Parameters<TaroNode['delegateC
 // 成本随当前名称长度变化，不遍历节点的属性集合。
 function nativeAttributeName(name: string): string {
     return name.startsWith('data-') || name.startsWith('aria-') ? name : toCamelCase(name)
-}
-
-/**
- * 对应 @tarojs/shared 的表单组件事件定义；创建与业务监听变更共用此固定规则。
- * Taro 的 FormElement.value getter 读取 props，dispatchEvent 才用事件值更新它；
- * React 的 input/textarea 受控恢复也由共享事件流程触发。因此这些事件不能依赖业务 onXXX 是否存在。
- * checkbox/radio 的变化由 group 报告，不为单个元素常驻 change；group 仍按业务监听订阅。
- *
- * 已检查的 TT SDK 4.4.0.3 通用元素没有实时 value/checked getter，getAttribute 读取 JS 属性存储。
- * 这个版本的接口不能通过“读取时同步”替代原生变化通知；该结论限定于已核对的 SDK 实现。
- * 上游直接 TT DOM 使用原生节点并按业务处理器订阅，没有接替这里的逻辑值同步和受控恢复。
- *
- * 上游替代条件：Taro 原生 host 自动提供等价的值同步和受控恢复入口后，可移交本规则及常驻订阅。
- * 若 TT SDK 提供同步读取控件实时值的接口，且 Taro 接通对应 getter，可替代非受控值的事件同步；
- * 受控恢复仍需要输入变化通知，不能仅因有 getter 就删除全部常驻监听。
- */
-function getFormEvent(name: string): 'input' | 'change' | undefined {
-    switch (name) {
-        case 'input':
-        case 'textarea':
-            return 'input'
-        case 'picker':
-        case 'picker-view':
-        case 'slider':
-        case 'switch':
-            return 'change'
-        default:
-            return undefined
-    }
 }
 
 function updateNativeListener(node: HostElement, name: string, subscribed: boolean): void {
