@@ -47,6 +47,74 @@ index a641a96b78c9978acaf1041160dd7fd74bcbfcdc..2d179b16365ebeaff8f48921cb974a1a
      const container = documentCreateElement(CONTAINER); // 多包一层主要为了兼容 vue
      doc.appendChild(html);
      html.appendChild(head);
+diff --git a/dist/dom-external/mutation-observer/implements.d.ts b/dist/dom-external/mutation-observer/implements.d.ts
+index 221908238201f3cde615d75749bfa8d69d22f8a8..12e64485365d3414abb9506f56bb035781912623 100644
+--- a/dist/dom-external/mutation-observer/implements.d.ts
++++ b/dist/dom-external/mutation-observer/implements.d.ts
+@@ -51,5 +51,7 @@ declare class MutationObserverImpl {
+     takeRecords(): MutationRecord[];
+ }
+ 
+-export { MutationObserverImpl };
++declare function hasMutationObservers(): boolean;
++
++export { MutationObserverImpl, hasMutationObservers };
+ export type { MutationCallback, MutationObserverInit };
+diff --git a/dist/dom-external/mutation-observer/implements.js b/dist/dom-external/mutation-observer/implements.js
+index e3ae2f543bde36107acf1d5d2354054c42ac3487..38481dc602a085aac522d5dfc990766d725a7e3b 100644
+--- a/dist/dom-external/mutation-observer/implements.js
++++ b/dist/dom-external/mutation-observer/implements.js
+@@ -1,4 +1,8 @@
+ const observers = [];
++/** Read observer presence directly from the current registrations. */
++function hasMutationObservers() {
++    return observers.length > 0;
++}
+ /**
+  * The MutationObserver provides the ability
+  * to watch for changes being made to the DOM tree.
+@@ -104,5 +108,5 @@ function recordMutation(record) {
+     });
+ }
+ 
+-export { MutationObserverImpl, recordMutation };
++export { MutationObserverImpl, hasMutationObservers, recordMutation };
+ //# sourceMappingURL=implements.js.map
+diff --git a/dist/dom-external/mutation-observer/index.d.ts b/dist/dom-external/mutation-observer/index.d.ts
+index 09597e1cd5a8046ce02114e30df40d9a736aa25a..63e099212f2f16b86bf90a2a66f2d86f380c3528 100644
+--- a/dist/dom-external/mutation-observer/index.d.ts
++++ b/dist/dom-external/mutation-observer/index.d.ts
+@@ -9,6 +9,8 @@ declare class MutationObserver {
+     observe(...args: [TaroNode, MutationObserverInit?]): void;
+     disconnect(): void;
+     takeRecords(): MutationRecord[];
++    /** Whether any observers are currently registered. */
++    static get hasObservers(): boolean;
+     static record(record: MutationRecord): void;
+ }
+ 
+diff --git a/dist/dom-external/mutation-observer/index.js b/dist/dom-external/mutation-observer/index.js
+index 2bd6a91145ee0aae2c58838b36cfb9c6572c6f3e..68454f0ba5b0e8ee3d2231ea2b04c108d29a079e 100644
+--- a/dist/dom-external/mutation-observer/index.js
++++ b/dist/dom-external/mutation-observer/index.js
+@@ -1,5 +1,5 @@
+ import { noop } from '@tarojs/shared';
+-import { MutationObserverImpl, recordMutation } from './implements.js';
++import { MutationObserverImpl, hasMutationObservers, recordMutation } from './implements.js';
+ 
+ class MutationObserver {
+     constructor(callback) {
+@@ -26,6 +26,10 @@ class MutationObserver {
+     takeRecords() {
+         return this.core.takeRecords();
+     }
++    /** Check before preparing mutation snapshots, sibling lookups or record objects. */
++    static get hasObservers() {
++        return ENABLE_MUTATION_OBSERVER && hasMutationObservers();
++    }
+     static record(record) {
+         recordMutation(record);
+     }
 diff --git a/dist/dom-external/node.js b/dist/dom-external/node.js
 index bedbaa261b42230bb97b23bbc566ecbfb45cb64d..4c6f7f6623cdafc8fd78bd572bdf7046ed7d7a06 100644
 --- a/dist/dom-external/node.js
@@ -179,9 +247,18 @@ index 354bfc00bc34df0c4248acb6aafe2b4b679130be..c159224fb0ce38ec8cba64f9f3debb62
  }
  
 diff --git a/dist/dom/element.js b/dist/dom/element.js
-index 160f3682d64625bb33221a76453677fa0d1fe8fa..968cab19cc6e92cc789797a23bb4b330202a688e 100644
+index 160f3682d64625bb33221a76453677fa0d1fe8fa..1463d9d9c758024f7292af3f5dd118cd51cff1ad 100644
 --- a/dist/dom/element.js
 +++ b/dist/dom/element.js
+@@ -92,7 +92,7 @@ class TaroElement extends TaroNode {
+     setAttribute(qualifiedName, value) {
+         process.env.NODE_ENV !== 'production' && warn(isString(value) && value.length > PROPERTY_THRESHOLD, `元素 ${this.nodeName} 的 ${qualifiedName} 属性值数据量过大，可能会影响渲染性能。考虑降低图片转为 base64 的阈值或在 CSS 中使用 base64。`);
+         const isPureView = this.nodeName === VIEW && !isHasExtractProp(this) && !this.isAnyEventBinded();
+-        if (qualifiedName !== STYLE) {
++        if (qualifiedName !== STYLE && MutationObserver.hasObservers) {
+             MutationObserver.record({
+                 target: this,
+                 type: "attributes" /* MutationRecordType.ATTRIBUTES */,
 @@ -124,6 +124,18 @@ class TaroElement extends TaroNode {
                  }
                  break;
@@ -201,7 +278,28 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..968cab19cc6e92cc789797a23bb4b330
          // Serialization
          if (!this._root)
              return;
-@@ -185,6 +197,16 @@ class TaroElement extends TaroNode {
+@@ -166,12 +178,14 @@ class TaroElement extends TaroNode {
+     }
+     removeAttribute(qualifiedName) {
+         const isStaticView = this.nodeName === VIEW && isHasExtractProp(this) && !this.isAnyEventBinded();
+-        MutationObserver.record({
+-            target: this,
+-            type: "attributes" /* MutationRecordType.ATTRIBUTES */,
+-            attributeName: qualifiedName,
+-            oldValue: this.getAttribute(qualifiedName)
+-        });
++        if (MutationObserver.hasObservers) {
++            MutationObserver.record({
++                target: this,
++                type: "attributes" /* MutationRecordType.ATTRIBUTES */,
++                attributeName: qualifiedName,
++                oldValue: this.getAttribute(qualifiedName)
++            });
++        }
+         if (qualifiedName === STYLE) {
+             this.style.cssText = '';
+         }
+@@ -185,6 +199,16 @@ class TaroElement extends TaroNode {
              }
              delete this.props[qualifiedName];
          }
@@ -218,7 +316,7 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..968cab19cc6e92cc789797a23bb4b330
          // Serialization
          if (!this._root)
              return;
-@@ -275,32 +297,35 @@ class TaroElement extends TaroNode {
+@@ -275,32 +299,35 @@ class TaroElement extends TaroNode {
          return listeners != null;
      }
      addEventListener(type, handler, options) {
@@ -456,7 +554,7 @@ index a456e9adeecdaae566fe965b7054e55cf009530e..0faaa61ba838cf512013aca085170511
      hasChildNodes(): boolean;
      enqueueUpdate(payload: UpdatePayload): void;
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index cc210f4e56ff90d69a398e2e27382def86f4cb0c..13f7d91bf5d75c20990855db507f85fbc8695eff 100644
+index cc210f4e56ff90d69a398e2e27382def86f4cb0c..a97832f797bdbf51147bf67fdc11810c0d5a6af9 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
 @@ -20,7 +20,15 @@ class TaroNode extends TaroEventTarget {
@@ -476,7 +574,21 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..13f7d91bf5d75c20990855db507f85fb
          const cleanChildNodes = () => [];
          const rerenderChildNodes = () => {
              const childNodes = this.childNodes.filter(node => !isComment(node));
-@@ -101,13 +109,13 @@ class TaroNode extends TaroEventTarget {
+@@ -94,28 +102,32 @@ class TaroNode extends TaroEventTarget {
+      */
+     // eslint-disable-next-line accessor-pairs
+     set textContent(text) {
+-        const removedNodes = this.childNodes.slice();
+-        const addedNodes = [];
++        // Capture old children only for registered observers; added nodes fill this operation-local record.
++        const record = MutationObserver.hasObservers ? {
++            type: "childList" /* MutationRecordType.CHILD_LIST */,
++            target: this,
++            removedNodes: this.childNodes.slice(),
++            addedNodes: []
++        } : null;
+         // Handle old children' data structure & ref
+         while (this.firstChild) {
              this.removeChild(this.firstChild, { doUpdate: false });
          }
          if (text === '') {
@@ -485,15 +597,29 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..13f7d91bf5d75c20990855db507f85fb
          }
          else {
 -            const newText = env.document.createTextNode(text);
+-            addedNodes.push(newText);
 +            const newText = this.ownerDocument.createTextNode(text);
-             addedNodes.push(newText);
++            if (record) {
++                record.addedNodes.push(newText);
++            }
              this.appendChild(newText);
 -            this.updateChildNodes();
 +            this.delegateChildReset();
          }
          // @Todo: appendChild 会多触发一次
-         MutationObserver.record({
-@@ -126,6 +134,10 @@ class TaroNode extends TaroEventTarget {
+-        MutationObserver.record({
+-            type: "childList" /* MutationRecordType.CHILD_LIST */,
+-            target: this,
+-            removedNodes,
+-            addedNodes
+-        });
++        if (record) {
++            MutationObserver.record(record);
++        }
+     }
+     /**
+      * @doc https://developer.mozilla.org/zh-CN/docs/Web/API/Node/insertBefore
+@@ -126,6 +138,10 @@ class TaroNode extends TaroEventTarget {
       *   3. insert D before C, D has the different parent of C
       */
      insertBefore(newChild, refChild, isReplace) {
@@ -504,7 +630,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..13f7d91bf5d75c20990855db507f85fb
          if (newChild.nodeName === DOCUMENT_FRAGMENT) {
              newChild.childNodes.reduceRight((previousValue, currentValue) => {
                  this.insertBefore(currentValue, previousValue);
-@@ -133,10 +145,15 @@ class TaroNode extends TaroEventTarget {
+@@ -133,10 +149,15 @@ class TaroNode extends TaroEventTarget {
              }, refChild);
              return newChild;
          }
@@ -524,7 +650,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..13f7d91bf5d75c20990855db507f85fb
          let index = 0;
          // Data structure
          newChild.parentNode = this;
-@@ -149,52 +166,9 @@ class TaroNode extends TaroEventTarget {
+@@ -149,67 +170,26 @@ class TaroNode extends TaroEventTarget {
              // appendChild
              this.childNodes.push(newChild);
          }
@@ -580,7 +706,36 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..13f7d91bf5d75c20990855db507f85fb
          if (this._root) {
              bumpNearestCtxEpochForRoot(this._root);
          }
-@@ -234,6 +208,9 @@ class TaroNode extends TaroEventTarget {
+-        MutationObserver.record({
+-            type: "childList" /* MutationRecordType.CHILD_LIST */,
+-            target: this,
+-            addedNodes: [newChild],
+-            removedNodes: isReplace
+-                ? [refChild] /** replaceChild */
+-                : [],
+-            nextSibling: isReplace
+-                ? refChild.nextSibling /** replaceChild */
+-                : (refChild || null), /** insertBefore & appendChild */
+-            previousSibling: newChild.previousSibling
+-        });
++        if (MutationObserver.hasObservers) {
++            MutationObserver.record({
++                type: "childList" /* MutationRecordType.CHILD_LIST */,
++                target: this,
++                addedNodes: [newChild],
++                removedNodes: isReplace
++                    ? [refChild] /** replaceChild */
++                    : [],
++                nextSibling: isReplace
++                    ? refChild.nextSibling /** replaceChild */
++                    : (refChild || null), /** insertBefore & appendChild */
++                previousSibling: newChild.previousSibling
++            });
++        }
+         return newChild;
+     }
+     /**
+@@ -234,6 +214,9 @@ class TaroNode extends TaroEventTarget {
      replaceChild(newChild, oldChild) {
          if (oldChild.parentNode !== this)
              return;
@@ -590,7 +745,16 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..13f7d91bf5d75c20990855db507f85fb
          // Insert the newChild
          this.insertBefore(newChild, oldChild, true);
          // Destroy the oldChild
-@@ -270,15 +247,88 @@ class TaroNode extends TaroEventTarget {
+@@ -251,7 +234,7 @@ class TaroNode extends TaroEventTarget {
+      */
+     removeChild(child, options = {}) {
+         const { cleanRef, doUpdate } = options;
+-        if (cleanRef !== false && doUpdate !== false) {
++        if (cleanRef !== false && doUpdate !== false && MutationObserver.hasObservers) {
+             // appendChild/replaceChild/insertBefore 不应该触发
+             // @Todo: 但其实如果 newChild 的父节点是另一颗子树的节点，应该是要触发的
+             MutationObserver.record({
+@@ -270,15 +253,88 @@ class TaroNode extends TaroEventTarget {
          if (cleanRef !== false) {
              eventSource.removeNodeTree(child);
          }
@@ -723,10 +887,20 @@ index 48f82650a81f4f9db1ca0c6a5018de3b146c76e8..ba35897b128914db5c2fba9b276ac936
      removeProperty(propertyName: string): string;
      getPropertyValue(propertyName: string): any;
 diff --git a/dist/dom/style.js b/dist/dom/style.js
-index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..495dc2ad42a984686d1565e3bde3de61f33f558b 100644
+index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..73c4f29e418bb9269334c71ea3402e11313c9a1b 100644
 --- a/dist/dom/style.js
 +++ b/dist/dom/style.js
-@@ -11,15 +11,6 @@ function recordCss(obj) {
+@@ -4,6 +4,9 @@ import { MutationObserver } from '../dom-external/mutation-observer/index.js';
+ import { styleProperties } from './style_properties.js';
+ 
+ function recordCss(obj) {
++    if (!MutationObserver.hasObservers) {
++        return;
++    }
+     MutationObserver.record({
+         type: "attributes" /* MutationRecordType.ATTRIBUTES */,
+         target: obj._element,
+@@ -11,15 +14,6 @@ function recordCss(obj) {
          oldValue: obj.cssText
      });
  }
@@ -742,7 +916,7 @@ index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..495dc2ad42a984686d1565e3bde3de61
  function setStyle(newVal, styleKey) {
      process.env.NODE_ENV !== 'production' && warn(isString(newVal) && newVal.length > PROPERTY_THRESHOLD, `Style 属性 ${styleKey} 的值数据量过大，可能会影响渲染性能，考虑使用 CSS 类或其它方案替代。`);
      const old = this[styleKey];
-@@ -34,7 +25,7 @@ function setStyle(newVal, styleKey) {
+@@ -34,7 +28,7 @@ function setStyle(newVal, styleKey) {
          this._usedStyleProp.add(styleKey);
          this._value[styleKey] = newVal;
      }
@@ -751,7 +925,7 @@ index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..495dc2ad42a984686d1565e3bde3de61
  }
  function initStyle(ctor, styleProperties) {
      const properties = {};
-@@ -99,7 +90,7 @@ class Style {
+@@ -99,7 +93,7 @@ class Style {
          });
          if (str === '' || isUndefined(str) || isNull(str)) {
              this._pending = false;
@@ -760,7 +934,7 @@ index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..495dc2ad42a984686d1565e3bde3de61
              return;
          }
          const rules = str.split(';');
-@@ -117,7 +108,26 @@ class Style {
+@@ -117,7 +111,26 @@ class Style {
              this.setProperty(propName.trim(), val.trim());
          }
          this._pending = false;
@@ -788,7 +962,7 @@ index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..495dc2ad42a984686d1565e3bde3de61
      }
      setProperty(propertyName, value) {
          if (propertyName[0] === '-') {
-@@ -135,7 +145,8 @@ class Style {
+@@ -135,7 +148,8 @@ class Style {
          }
      }
      removeProperty(propertyName) {
@@ -798,7 +972,7 @@ index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..495dc2ad42a984686d1565e3bde3de61
          if (!this._usedStyleProp.has(propertyName)) {
              return '';
          }
-@@ -144,7 +155,8 @@ class Style {
+@@ -144,7 +158,8 @@ class Style {
          return value;
      }
      getPropertyValue(propertyName) {
@@ -826,12 +1000,25 @@ index ce7b2a99c5981d5291096a1f3885d8890850d02e..d4581c749c3f306be82f92573ba3721f
  
  export { TaroText };
 diff --git a/dist/dom/text.js b/dist/dom/text.js
-index c61fb312438fc85a2d94852b699da663cc835254..4e151e2880bbf7ecdf3521e01bb66d48906a9301 100644
+index c61fb312438fc85a2d94852b699da663cc835254..aeac72d04619ad13bb23c3198aa7ecce9aee5246 100644
 --- a/dist/dom/text.js
 +++ b/dist/dom/text.js
-@@ -15,10 +15,7 @@ class TaroText extends TaroNode {
-             oldValue: this._value
-         });
+@@ -9,16 +9,15 @@ class TaroText extends TaroNode {
+         this._value = value;
+     }
+     set textContent(text) {
+-        MutationObserver.record({
+-            target: this,
+-            type: "characterData" /* MutationRecordType.CHARACTER_DATA */,
+-            oldValue: this._value
+-        });
++        if (MutationObserver.hasObservers) {
++            MutationObserver.record({
++                target: this,
++                type: "characterData" /* MutationRecordType.CHARACTER_DATA */,
++                oldValue: this._value
++            });
++        }
          this._value = text;
 -        this.enqueueUpdate({
 -            path: `${this._path}.${"v" /* Shortcuts.Text */}`,
@@ -841,7 +1028,7 @@ index c61fb312438fc85a2d94852b699da663cc835254..4e151e2880bbf7ecdf3521e01bb66d48
      }
      get textContent() {
          return this._value;
-@@ -35,6 +32,18 @@ class TaroText extends TaroNode {
+@@ -35,6 +34,18 @@ class TaroText extends TaroNode {
      get data() {
          return this._value;
      }

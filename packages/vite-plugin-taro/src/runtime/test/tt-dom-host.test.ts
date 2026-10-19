@@ -554,7 +554,7 @@ expectCalls([
 assert.equal(input.type, 'number')
 assert.equal(input.value, '42')
 
-// Single-property forwarding reads no additional cssText beyond Taro's existing mutation oldValue.
+// Count serialization reads per update; idle single-property forwarding keeps CSS granular.
 const style = parent.style
 const cssText = Object.getOwnPropertyDescriptor(Style.prototype, 'cssText')
 let cssReads = 0
@@ -564,7 +564,7 @@ Object.defineProperty(style, 'cssText', {
 })
 function expectStyle(calls) {
     expectCalls(calls)
-    assert.equal(cssReads, 1, 'only Taro mutation recording reads the previous cssText')
+    assert.equal(cssReads, 0, 'single-property updates forward directly while observers are idle')
     cssReads = 0
 }
 style.color = 'red'
@@ -596,7 +596,7 @@ assert.equal(cssReads, 0)
 for (const value of ['color: green; --accent: teal;', '', null, undefined]) {
     style.cssText = value
     expectCalls([['style', parent.nativeNode, 'cssText', value || '']])
-    assert.equal(cssReads, 2, 'bulk replacement reads the old mutation value and the completed style once each')
+    assert.equal(cssReads, 1, 'bulk replacement serializes the completed native style once')
     cssReads = 0
 }
 

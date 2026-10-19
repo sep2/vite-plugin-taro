@@ -1,0 +1,225 @@
+diff --git a/dist/dom-external/mutation-observer/implements.d.ts b/dist/dom-external/mutation-observer/implements.d.ts
+index 221908238201f3cde615d75749bfa8d69d22f8a8..12e64485365d3414abb9506f56bb035781912623 100644
+--- a/dist/dom-external/mutation-observer/implements.d.ts
++++ b/dist/dom-external/mutation-observer/implements.d.ts
+@@ -51,5 +51,7 @@ declare class MutationObserverImpl {
+     takeRecords(): MutationRecord[];
+ }
+ 
+-export { MutationObserverImpl };
++declare function hasMutationObservers(): boolean;
++
++export { MutationObserverImpl, hasMutationObservers };
+ export type { MutationCallback, MutationObserverInit };
+diff --git a/dist/dom-external/mutation-observer/implements.js b/dist/dom-external/mutation-observer/implements.js
+index e3ae2f543bde36107acf1d5d2354054c42ac3487..38481dc602a085aac522d5dfc990766d725a7e3b 100644
+--- a/dist/dom-external/mutation-observer/implements.js
++++ b/dist/dom-external/mutation-observer/implements.js
+@@ -1,4 +1,8 @@
+ const observers = [];
++/** Read observer presence directly from the current registrations. */
++function hasMutationObservers() {
++    return observers.length > 0;
++}
+ /**
+  * The MutationObserver provides the ability
+  * to watch for changes being made to the DOM tree.
+@@ -104,5 +108,5 @@ function recordMutation(record) {
+     });
+ }
+ 
+-export { MutationObserverImpl, recordMutation };
++export { MutationObserverImpl, hasMutationObservers, recordMutation };
+ //# sourceMappingURL=implements.js.map
+diff --git a/dist/dom-external/mutation-observer/index.d.ts b/dist/dom-external/mutation-observer/index.d.ts
+index 09597e1cd5a8046ce02114e30df40d9a736aa25a..63e099212f2f16b86bf90a2a66f2d86f380c3528 100644
+--- a/dist/dom-external/mutation-observer/index.d.ts
++++ b/dist/dom-external/mutation-observer/index.d.ts
+@@ -9,6 +9,8 @@ declare class MutationObserver {
+     observe(...args: [TaroNode, MutationObserverInit?]): void;
+     disconnect(): void;
+     takeRecords(): MutationRecord[];
++    /** Whether any observers are currently registered. */
++    static get hasObservers(): boolean;
+     static record(record: MutationRecord): void;
+ }
+ 
+diff --git a/dist/dom-external/mutation-observer/index.js b/dist/dom-external/mutation-observer/index.js
+index 2bd6a91145ee0aae2c58838b36cfb9c6572c6f3e..68454f0ba5b0e8ee3d2231ea2b04c108d29a079e 100644
+--- a/dist/dom-external/mutation-observer/index.js
++++ b/dist/dom-external/mutation-observer/index.js
+@@ -1,5 +1,5 @@
+ import { noop } from '@tarojs/shared';
+-import { MutationObserverImpl, recordMutation } from './implements.js';
++import { MutationObserverImpl, hasMutationObservers, recordMutation } from './implements.js';
+ 
+ class MutationObserver {
+     constructor(callback) {
+@@ -26,6 +26,10 @@ class MutationObserver {
+     takeRecords() {
+         return this.core.takeRecords();
+     }
++    /** Check before preparing mutation snapshots, sibling lookups or record objects. */
++    static get hasObservers() {
++        return ENABLE_MUTATION_OBSERVER && hasMutationObservers();
++    }
+     static record(record) {
+         recordMutation(record);
+     }
+diff --git a/dist/dom/element.js b/dist/dom/element.js
+index 968cab19cc6e92cc789797a23bb4b330202a688e..1463d9d9c758024f7292af3f5dd118cd51cff1ad 100644
+--- a/dist/dom/element.js
++++ b/dist/dom/element.js
+@@ -92,7 +92,7 @@ class TaroElement extends TaroNode {
+     setAttribute(qualifiedName, value) {
+         process.env.NODE_ENV !== 'production' && warn(isString(value) && value.length > PROPERTY_THRESHOLD, `元素 ${this.nodeName} 的 ${qualifiedName} 属性值数据量过大，可能会影响渲染性能。考虑降低图片转为 base64 的阈值或在 CSS 中使用 base64。`);
+         const isPureView = this.nodeName === VIEW && !isHasExtractProp(this) && !this.isAnyEventBinded();
+-        if (qualifiedName !== STYLE) {
++        if (qualifiedName !== STYLE && MutationObserver.hasObservers) {
+             MutationObserver.record({
+                 target: this,
+                 type: "attributes" /* MutationRecordType.ATTRIBUTES */,
+@@ -178,12 +178,14 @@ class TaroElement extends TaroNode {
+     }
+     removeAttribute(qualifiedName) {
+         const isStaticView = this.nodeName === VIEW && isHasExtractProp(this) && !this.isAnyEventBinded();
+-        MutationObserver.record({
+-            target: this,
+-            type: "attributes" /* MutationRecordType.ATTRIBUTES */,
+-            attributeName: qualifiedName,
+-            oldValue: this.getAttribute(qualifiedName)
+-        });
++        if (MutationObserver.hasObservers) {
++            MutationObserver.record({
++                target: this,
++                type: "attributes" /* MutationRecordType.ATTRIBUTES */,
++                attributeName: qualifiedName,
++                oldValue: this.getAttribute(qualifiedName)
++            });
++        }
+         if (qualifiedName === STYLE) {
+             this.style.cssText = '';
+         }
+diff --git a/dist/dom/node.js b/dist/dom/node.js
+index 13f7d91bf5d75c20990855db507f85fbc8695eff..a97832f797bdbf51147bf67fdc11810c0d5a6af9 100644
+--- a/dist/dom/node.js
++++ b/dist/dom/node.js
+@@ -102,8 +102,13 @@ class TaroNode extends TaroEventTarget {
+      */
+     // eslint-disable-next-line accessor-pairs
+     set textContent(text) {
+-        const removedNodes = this.childNodes.slice();
+-        const addedNodes = [];
++        // Capture old children only for registered observers; added nodes fill this operation-local record.
++        const record = MutationObserver.hasObservers ? {
++            type: "childList" /* MutationRecordType.CHILD_LIST */,
++            target: this,
++            removedNodes: this.childNodes.slice(),
++            addedNodes: []
++        } : null;
+         // Handle old children' data structure & ref
+         while (this.firstChild) {
+             this.removeChild(this.firstChild, { doUpdate: false });
+@@ -113,17 +118,16 @@ class TaroNode extends TaroEventTarget {
+         }
+         else {
+             const newText = this.ownerDocument.createTextNode(text);
+-            addedNodes.push(newText);
++            if (record) {
++                record.addedNodes.push(newText);
++            }
+             this.appendChild(newText);
+             this.delegateChildReset();
+         }
+         // @Todo: appendChild 会多触发一次
+-        MutationObserver.record({
+-            type: "childList" /* MutationRecordType.CHILD_LIST */,
+-            target: this,
+-            removedNodes,
+-            addedNodes
+-        });
++        if (record) {
++            MutationObserver.record(record);
++        }
+     }
+     /**
+      * @doc https://developer.mozilla.org/zh-CN/docs/Web/API/Node/insertBefore
+@@ -172,18 +176,20 @@ class TaroNode extends TaroEventTarget {
+         if (this._root) {
+             bumpNearestCtxEpochForRoot(this._root);
+         }
+-        MutationObserver.record({
+-            type: "childList" /* MutationRecordType.CHILD_LIST */,
+-            target: this,
+-            addedNodes: [newChild],
+-            removedNodes: isReplace
+-                ? [refChild] /** replaceChild */
+-                : [],
+-            nextSibling: isReplace
+-                ? refChild.nextSibling /** replaceChild */
+-                : (refChild || null), /** insertBefore & appendChild */
+-            previousSibling: newChild.previousSibling
+-        });
++        if (MutationObserver.hasObservers) {
++            MutationObserver.record({
++                type: "childList" /* MutationRecordType.CHILD_LIST */,
++                target: this,
++                addedNodes: [newChild],
++                removedNodes: isReplace
++                    ? [refChild] /** replaceChild */
++                    : [],
++                nextSibling: isReplace
++                    ? refChild.nextSibling /** replaceChild */
++                    : (refChild || null), /** insertBefore & appendChild */
++                previousSibling: newChild.previousSibling
++            });
++        }
+         return newChild;
+     }
+     /**
+@@ -228,7 +234,7 @@ class TaroNode extends TaroEventTarget {
+      */
+     removeChild(child, options = {}) {
+         const { cleanRef, doUpdate } = options;
+-        if (cleanRef !== false && doUpdate !== false) {
++        if (cleanRef !== false && doUpdate !== false && MutationObserver.hasObservers) {
+             // appendChild/replaceChild/insertBefore 不应该触发
+             // @Todo: 但其实如果 newChild 的父节点是另一颗子树的节点，应该是要触发的
+             MutationObserver.record({
+diff --git a/dist/dom/style.js b/dist/dom/style.js
+index 495dc2ad42a984686d1565e3bde3de61f33f558b..73c4f29e418bb9269334c71ea3402e11313c9a1b 100644
+--- a/dist/dom/style.js
++++ b/dist/dom/style.js
+@@ -4,6 +4,9 @@ import { MutationObserver } from '../dom-external/mutation-observer/index.js';
+ import { styleProperties } from './style_properties.js';
+ 
+ function recordCss(obj) {
++    if (!MutationObserver.hasObservers) {
++        return;
++    }
+     MutationObserver.record({
+         type: "attributes" /* MutationRecordType.ATTRIBUTES */,
+         target: obj._element,
+diff --git a/dist/dom/text.js b/dist/dom/text.js
+index 4e151e2880bbf7ecdf3521e01bb66d48906a9301..aeac72d04619ad13bb23c3198aa7ecce9aee5246 100644
+--- a/dist/dom/text.js
++++ b/dist/dom/text.js
+@@ -9,11 +9,13 @@ class TaroText extends TaroNode {
+         this._value = value;
+     }
+     set textContent(text) {
+-        MutationObserver.record({
+-            target: this,
+-            type: "characterData" /* MutationRecordType.CHARACTER_DATA */,
+-            oldValue: this._value
+-        });
++        if (MutationObserver.hasObservers) {
++            MutationObserver.record({
++                target: this,
++                type: "characterData" /* MutationRecordType.CHARACTER_DATA */,
++                oldValue: this._value
++            });
++        }
+         this._value = text;
+         this.delegateTextUpdate(text);
+     }
