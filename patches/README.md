@@ -1,6 +1,6 @@
 # Dependency patch series
 
-pnpm applies one combined patch to each package version. We maintain **18 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output.
+pnpm applies one combined patch to each package version. We maintain **19 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output.
 
 ## Feature inventory
 
@@ -15,6 +15,7 @@ pnpm applies one combined patch to each package version. We maintain **18 featur
 | `@tarojs/react@4.3.0` | `01-react19-reconciler` | Target the pinned React 19 reconciler contract directly: concurrent roots, commit updates, scoped event priorities, error callbacks and distinct synchronous callback/work flushing. Remove legacy render APIs and align declarations. |
 | | `02-renderer-host` | Delegate node creation, form classification and commit boundaries through VPT's private renderer-host import, and expose the generic host type. |
 | | `03-page-host-context` | Delegate Page-root type and child host-context selection to the optional host callbacks. |
+| | `04-event-handler-replacement` | Add replacement React callbacks before removing their predecessors, preserving continuous native subscriptions and logical handler order. |
 | `@tarojs/runtime@4.3.0` | `01-mini-app-page-rendering` | Construct the App host as a scheduler, derive initial reset paths from the root prefix, and stop App serialization at the Page outlet. |
 | | `02-page-prerender` | Type native Page data as an object or factory and let onLoad adopt a caller-prepared identity without moving lifecycle dispatch. VPT stores that identity in non-enumerable `__vpt_meta.prerenderIdentity`; the factory signature is unchanged. |
 | | `03-delegate-dom` | Expose overridable child insertion/removal/reset, text, attribute, style and event delegation methods while Taro owns logical state, event identities, mutation records and context-cache invalidation. The defaults preserve template payload preparation. |
@@ -64,6 +65,8 @@ Upstream: [NervJS/taro#19530](https://github.com/NervJS/taro/pull/19530). Retire
 `07-clone-delegation` initializes text through the document factory and forwards copied attributes, each nonempty completed style and each cloned child through host-replaced delegates. It captures the default template delegates before host installation: those functions prepare incremental payloads and are skipped during clone construction, including scheduler-root clones. Default-template attributes use a direct shallow copy; native attributes are copied and delegated in the same loop. Cloning constructs parent/child relationships directly, retaining the source's ID lookup and avoiding public mutation observer records and sibling searches. Every clone has its own sid, native handle and handler state. Dynamic style accessors are recreated on the new Style object. Construction is linear in cloned nodes, attributes, dataset keys and style entries, plus the selected host's work. Ordinary mutation delegates retain their existing behavior.
 
 `vite-plugin-taro-runtime/runtime/tt-document` exposes Taro's existing `bom/document.js` factory directly. Its native DOM declarations live in the runtime package's `types/tt-document.d.ts`.
+
+`04-event-handler-replacement` in the React series keeps an event's logical listener array nonempty while replacing a function-valued prop. The new handler is appended before the old handler is removed, so the host retains its existing SDK event entry and dispatch reads the current logical callback. Final handler order, template side-effect flags, initial subscription, final removal, HTML aliases and expanded `regionchange` events retain their normal contracts. Replacement retains the existing O(H) handler search/removal for H handlers, with one temporary logical handler and no persistent subscription state.
 
 React 19 support spans the renderer and framework packages. The renderer targets `react-reconciler@0.34.0` and React 19.3, without legacy roots, React 18 host signatures or API probing. `render` and `findDOMNode` are no longer exported; callers use `createRoot` and refs. The internal `unmountComponentAtNode` host-lookup helper remains, but only tears down concurrent roots. Public `flushSync` runs callbacks through `flushSyncFromReconciler`; controlled-input restoration calls `flushSyncWork` before restoring native values. Neither operation waits for native `setData` completion.
 

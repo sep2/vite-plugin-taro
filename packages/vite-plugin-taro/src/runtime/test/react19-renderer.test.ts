@@ -193,7 +193,7 @@ import ReactDOM, { rendererHostConfig } from 'vite-plugin-taro-runtime/react'
 import rendererHost from ${JSON.stringify(rendererHostId)}
 import { createDomHost } from ${JSON.stringify(resolveVptRuntime('wx/create-dom-host'))}
 import { createWxTestRoot } from ${JSON.stringify(resolveVptRuntime('test/create-wx-test-root'))}
-import { Current, document, eventHandler, hooks, createPageConfig as createTaroPageConfig } from '@tarojs/runtime'
+import { Current, document, eventHandler, hooks, TaroElement, TaroEvent, createPageConfig as createTaroPageConfig } from '@tarojs/runtime'
 import config from 'test:page-first-frame.ts'
 import suspendedConfig from 'test:page-suspended.ts'
 import bareConfig from 'test:page-bare.ts'
@@ -338,6 +338,107 @@ function checkRootOptionsAndErrors() {
     assert.strictEqual(uncaught[0].error, failure)
     assert.equal(container.childNodes.length, 0)
     ReactDOM.flushSync(() => root.unmount())
+}
+
+function checkEventHandlerReplacement() {
+    const delegate = TaroElement.prototype.delegateEventListener
+    // Observe logical subscription transitions independently of template serialization and native transport.
+    const transitions = []
+    TaroElement.extend('delegateEventListener', function (type, subscribed) {
+        transitions.push([type, subscribed])
+        delegate.call(this, type, subscribed)
+    })
+    try {
+        for (const [tag, prop, type] of [
+            ['view', 'onClick', 'tap'],
+            ['text', 'onClick', 'tap'],
+            ['div', 'onClick', 'click'],
+            ['native-card', 'onCustomEvent', 'customevent']
+        ]) {
+            const container = document.createElement('root')
+            const root = ReactDOM.createRoot(container)
+            // Dispatch observations distinguish current closures, imperative listeners and once cleanup.
+            const calls = []
+            const first = () => calls.push('first')
+            const render = handler => ReactDOM.flushSync(() => root.render(h(tag, { [prop]: handler }, 'body')))
+            try {
+                render(first)
+                const node = container.firstChild
+                const handlers = node.__handlers[type]
+                assert.deepEqual(transitions.splice(0), [[type, true]], tag + ': initial subscription')
+                node.dispatchEvent(new TaroEvent(type))
+                assert.deepEqual(calls.splice(0), ['first'])
+
+                const wrapper = handlers[0]
+                render(first)
+                assert.strictEqual(node.__handlers[type], handlers)
+                assert.strictEqual(handlers[0], wrapper)
+                assert.deepEqual(transitions.splice(0), [])
+
+                for (const value of ['second', 'third', 'fourth']) {
+                    render(() => calls.push(value))
+                    assert.strictEqual(node.__handlers[type], handlers)
+                    assert.equal(handlers.length, 1)
+                    assert.deepEqual(transitions.splice(0), [], tag + ': replacement retains the native subscription')
+                    node.dispatchEvent(new TaroEvent(type))
+                    assert.deepEqual(calls.splice(0), [value], tag + ': dispatch uses the latest closure')
+                }
+
+                const imperative = () => calls.push('imperative')
+                node.addEventListener(type, imperative)
+                render(() => calls.push('replacement'))
+                assert.equal(handlers.length, 2)
+                assert.deepEqual(transitions.splice(0), [])
+                node.dispatchEvent(new TaroEvent(type))
+                assert.deepEqual(calls.splice(0), ['replacement', 'imperative'], 'replacement preserves dispatch order')
+
+                render(undefined)
+                assert.deepEqual(transitions.splice(0), [], 'an imperative handler retains the subscription')
+                node.dispatchEvent(new TaroEvent(type))
+                assert.deepEqual(calls.splice(0), ['imperative'])
+                node.removeEventListener(type, imperative)
+                assert.deepEqual(transitions.splice(0), [[type, false]])
+
+                render(() => calls.push('restored'))
+                assert.deepEqual(transitions.splice(0), [[type, true]])
+                node.addEventListener(type, () => calls.push('once'), { once: true })
+                render(() => calls.push('after-once'))
+                assert.deepEqual(transitions.splice(0), [])
+                node.dispatchEvent(new TaroEvent(type))
+                assert.deepEqual(calls.splice(0), ['after-once', 'once'])
+                assert.equal(handlers.length, 1)
+                assert.deepEqual(transitions.splice(0), [])
+                node.dispatchEvent(new TaroEvent(type))
+                assert.deepEqual(calls.splice(0), ['after-once'])
+                render(undefined)
+                assert.equal(handlers.length, 0)
+                assert.deepEqual(transitions.splice(0), [[type, false]])
+            } finally {
+                ReactDOM.flushSync(() => root.unmount())
+            }
+        }
+        const container = document.createElement('root')
+        const root = ReactDOM.createRoot(container)
+        // Record both expanded event types to verify that each replacement dispatches its current closure.
+        const calls = []
+        const render = handler => ReactDOM.flushSync(() => root.render(h('map', { onRegionChange: handler })))
+        try {
+            render(() => calls.push('first'))
+            const node = container.firstChild
+            assert.deepEqual(transitions.splice(0), [['begin', true], ['end', true]])
+            render(event => calls.push('latest:' + event.type))
+            assert.deepEqual(transitions.splice(0), [], 'expanded region listeners stay subscribed during replacement')
+            node.dispatchEvent(new TaroEvent('begin'))
+            node.dispatchEvent(new TaroEvent('end'))
+            assert.deepEqual(calls, ['latest:begin', 'latest:end'])
+            render(undefined)
+            assert.deepEqual(transitions.splice(0), [['begin', false], ['end', false]])
+        } finally {
+            ReactDOM.flushSync(() => root.unmount())
+        }
+    } finally {
+        TaroElement.extend('delegateEventListener', delegate)
+    }
 }
 
 function checkEventPrioritiesAndControlledInputs(useNode) {
@@ -722,11 +823,14 @@ function checkWxPageCreation() {
         assert.strictEqual(nodes.A.style.delegateStyleUpdate, nodes.B.style.delegateStyleUpdate)
         assert.equal(Object.hasOwn(nodes.A, 'delegateChildInsertion'), false)
         const classTarget = nodes.A.nativeNode
+        const tapSubscription = classTarget.listeners.tap[0]
+        assert.equal(typeof tapSubscription, 'function')
         assert.equal(classTarget.class, 'initial shared')
         for (const value of ['updated shared', undefined, 'restored', '', null, 'final']) {
             ReactDOM.flushSync(() => classes.A(value))
             assert.equal(classTarget.class, value ?? '')
             assert.strictEqual(nodes.A.nativeNode, classTarget)
+            assert.strictEqual(classTarget.listeners.tap[0], tapSubscription, 'class updates retain the SDK event entry')
             assert.equal(nodes.B.nativeNode.class, 'initial shared')
         }
         assert.equal(classTarget.style, initialCss)
@@ -791,6 +895,7 @@ function checkWxPageCreation() {
         assert.equal(native.listeners.tap.length, 1)
 
         ReactDOM.flushSync(() => handlers.A('second'))
+        assert.strictEqual(native.listeners.tap[0], tapSubscription, 'callback replacement retains the SDK event entry')
         ReactDOM.flushSync(() => native.tap({}))
         assert.deepEqual(clicks.splice(0), [['A', 'second', 8, {}]])
         assert.match(nodes.A.textContent, /99:9/)
@@ -805,7 +910,10 @@ function checkWxPageCreation() {
 
         ReactDOM.flushSync(() => handlers.A('first'))
         assert.equal(native.listeners.tap.length, 1)
+        assert.notStrictEqual(native.listeners.tap[0], tapSubscription, 'restoring a removed handler creates an SDK entry')
+        const restoredSubscription = native.listeners.tap[0]
         ReactDOM.flushSync(() => native.tap({}))
+        assert.strictEqual(native.listeners.tap[0], restoredSubscription)
         ReactDOM.flushSync(() => nodes.B.nativeNode.tap({}))
         assert.deepEqual(clicks.splice(0), [['A', 'first', 9, {}], ['B', 'first', 0, {}]])
         assert.match(nodes.A.textContent, /99:10/)
@@ -1398,6 +1506,7 @@ function checkFrameworkRootEntryPoints() {
 async function run() {
     await checkRootsAndCommits()
     checkRootOptionsAndErrors()
+    checkEventHandlerReplacement()
     checkEventPrioritiesAndControlledInputs(false)
     checkEventPrioritiesAndControlledInputs(true)
     checkPageConfigData()
