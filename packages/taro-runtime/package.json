@@ -72,6 +72,11 @@
         },
         "./plugin-framework-react/runtime": "./dist/plugin-framework-react/runtime.js",
         "./plugin-html/runtime": "./dist/plugin-html/runtime.js",
+        "./plugin-html/html-elements": {
+            "types": "./dist/plugin-html/html-elements.d.ts",
+            "import": "./dist/plugin-html/html-elements.js",
+            "default": "./dist/plugin-html/html-elements.js"
+        },
         "./plugin-platform-weapp/runtime": "./dist/plugin-platform-weapp/runtime.js",
         "./plugin-platform-weapp/components-react": {
             "types": "./dist/plugin-platform-weapp/types/components-react.d.ts",

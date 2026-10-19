@@ -14,6 +14,8 @@ Output directories and exports mirror the upstream Taro package names (`runtime`
 
 The `api`, `taro`, `components`, `router`, and `taro-h5` directories retain the runtime files and declarations used by VPT. Alternate bundles and the components' unused lazy-loader JavaScript are omitted. The generic Taro facade retains its CommonJS package boundary, shared mutable API object, and bulk native initialization. VPT's Mini facade attaches framework hooks to that same object; it does not generate a separate API inventory or promise per-API tree-shaking. H5 instead uses a read-only ESM namespace over its modular APIs and static framework hooks. The framework runtime retains Taro's original hook registration, so hooks remain grouped rather than being individually tree-shaken. Copied declarations redirect imports and module augmentations to this package's type exports, so consumer type checking does not depend on Vite aliases or upstream development dependencies. CSS remains side-effectful, and required third-party runtime dependencies are declared directly. None of these upstream Taro packages—and therefore none of their `@tarojs/helper` compiler dependencies—are installed in consumer projects.
 
+The `plugin-html/runtime` entry installs upstream HTML hooks. Its side-effect-free `plugin-html/html-elements` companion shares the inline/block classifications and semantic `h5-*` class handling with native DOM hosts.
+
 ## Development
 
 Build the runtime package from the repository root:

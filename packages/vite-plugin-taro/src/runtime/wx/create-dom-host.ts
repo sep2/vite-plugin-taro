@@ -4,6 +4,7 @@
 // VPT, 2026-10-18
 
 import { ensure, noop, toCamelCase, toDashed } from '@tarojs/shared'
+import { blockElements, ensureHtmlClass, inlineElements } from 'vite-plugin-taro-runtime/plugin-html/html-elements'
 import { flushSync } from 'vite-plugin-taro-runtime/react'
 import {
     type AppInstance,
@@ -78,7 +79,7 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
         if (name === 'id') {
             native.id = String(value)
         } else if (name === 'class') {
-            setNativeClass(native, String(value))
+            setNativeClass(this, String(value))
         } else if (name.startsWith('data-')) {
             setNativeDataset(native, toCamelCase(name.slice(5)), value)
         } else if (name !== 'style') {
@@ -95,7 +96,7 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
         if (name === 'id') {
             native.id = ''
         } else if (name === 'class') {
-            setNativeClass(native, '')
+            setNativeClass(this, '')
         } else if (name.startsWith('data-')) {
             const key = toCamelCase(name.slice(5))
             // Taro removes the attribute prop; its event-facing dataset needs the same removal.
@@ -109,9 +110,13 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
     TaroElement.extend('delegateEventUpdate', noop)
 
     TaroElement.extend('delegateEventListener', function (this: HostElement, type: string, subscribed: boolean) {
+        // Taro's HTML hooks alias click to the tap handler array; custom component events keep their own name.
+        const click = type === 'click' && this.__handlers.click
+        const name = click && click === this.__handlers.tap ? 'tap' : type
+
         // Value synchronization retains its SDK subscription across business handler changes.
-        if (this.nativeNode && type !== getFormChangeEvent(this.nodeName)) {
-            bindNativeEvent(this, type, subscribed)
+        if (this.nativeNode && name !== getFormChangeEvent(this.nodeName)) {
+            bindNativeEvent(this, name, subscribed)
         }
     })
 
@@ -234,9 +239,22 @@ function bindNativeEvent(node: HostElement, type: string, subscribed: boolean): 
     )
 }
 
-function setNativeClass(native: WxNativeElement, value: string): void {
-    // SDK class bindings update scoped classes, external classes, and property-change listeners.
-    getTemplateBindings(native).c(native, value)
+function getHtmlTagName(name: string): 'view' | 'text' | undefined {
+    // Mini view retains its native class contract; HTML aliases retain their logical tag names.
+    if (name !== 'view' && blockElements.has(name)) {
+        return 'view'
+    }
+    if (inlineElements.has(name)) {
+        return 'text'
+    }
+    return undefined
+}
+
+function setNativeClass(node: HostElement, value: string): void {
+    const native = node.nativeNode!
+    // Semantic HTML classes belong to native presentation, alongside the user's logical class list.
+    const className = getHtmlTagName(node.nodeName) ? ensureHtmlClass(node.nodeName, value) : value
+    getTemplateBindings(native).c(native, className)
 }
 
 function setNativeDataset(native: WxNativeElement, key: string, value: unknown): void {
@@ -279,7 +297,8 @@ function createPageDocument(root: WxRoot): TaroDocument {
 
     pageDoc.createElement = (name) => {
         const type = name.toLowerCase()
-        const native = root.createComponent(type === 'root' ? 'view' : type)
+        const htmlTag = getHtmlTagName(type)
+        const native = root.createComponent(htmlTag ?? (type === 'root' ? 'view' : type))
 
         const node: HostElement = Object.defineProperties(document.createElement(type), {
             ownerDocument: { value: pageDoc },
@@ -288,6 +307,13 @@ function createPageDocument(root: WxRoot): TaroDocument {
 
         // Event targets resolve through Taro's stable index, including elements without a user ID.
         native.setDataset('sid', node.sid)
+        if (htmlTag) {
+            setNativeClass(node, '')
+        }
+        if (type === 'br') {
+            // Taro's HTML template renders a newline without adding a logical child to the void element.
+            native.appendChild(root.createTextNode('\n'))
+        }
 
         // Taro templates bind value events even when no business handler is installed.
         const formEvent = getFormChangeEvent(type)

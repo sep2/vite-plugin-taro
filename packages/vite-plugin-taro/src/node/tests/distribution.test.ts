@@ -297,6 +297,7 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         './react',
         './plugin-framework-react/runtime',
         './plugin-html/runtime',
+        './plugin-html/html-elements',
         './plugin-platform-weapp/runtime',
         './plugin-platform-weapp/components-react',
         './plugin-platform-weapp/runtime-utils',
@@ -330,13 +331,21 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
     assert.equal(packageJson.devDependencies['@tarojs/plugin-html'], '4.3.0')
     assert.equal(packageJson.dependencies['@tarojs/plugin-html'], undefined)
     const htmlOutputRoot = path.join(runtimePackageDistRoot, 'plugin-html')
-    assert.deepEqual((await listRelativeFiles(htmlOutputRoot)).toSorted(), ['runtime.js', 'runtime.js.map'])
-    await assertFilesCopied(path.join(resolveAdapterDependencyRoot('@tarojs/plugin-html'), 'dist'), htmlOutputRoot, [
-        'runtime.js',
-        'runtime.js.map'
-    ])
-    const htmlRuntime = await readFile(path.join(htmlOutputRoot, 'runtime.js'), 'utf8')
-    assert.doesNotMatch(htmlRuntime, /new Set\(\[\]\)/)
+    const htmlFiles = ['html-elements.d.ts', 'html-elements.js', 'runtime.js', 'runtime.js.map']
+    assert.deepEqual((await listRelativeFiles(htmlOutputRoot)).toSorted(), htmlFiles)
+    await assertFilesCopied(
+        path.join(resolveAdapterDependencyRoot('@tarojs/plugin-html'), 'dist'),
+        htmlOutputRoot,
+        htmlFiles
+    )
+    assert.deepEqual(packageJson.exports['./plugin-html/html-elements'], {
+        types: './dist/plugin-html/html-elements.d.ts',
+        import: './dist/plugin-html/html-elements.js',
+        default: './dist/plugin-html/html-elements.js'
+    })
+    const htmlElements = await readFile(path.join(htmlOutputRoot, 'html-elements.js'), 'utf8')
+    assert.doesNotMatch(htmlElements, /new Set\(\[\]\)/)
+    assert.doesNotMatch(htmlElements, /\bimport\b|hooks\.tap/)
 
     const apiSourceRoot = resolveAdapterDependencyRoot('@tarojs/api')
     const apiOutputRoot = path.join(runtimePackageDistRoot, 'api')

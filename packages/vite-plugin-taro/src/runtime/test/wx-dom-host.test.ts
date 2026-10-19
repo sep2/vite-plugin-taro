@@ -27,6 +27,8 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     }
     class TaroElement extends TaroNode {
         readonly sid = 'logical-node'
+        // Logical handler arrays expose upstream HTML event aliases to the host.
+        readonly __handlers: Record<string, unknown[]> = {}
         // Attribute removal updates the event-facing dataset alongside the SDK metadata.
         readonly dataset: Record<string, unknown> = {}
         style = new Style(this)
@@ -331,6 +333,44 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     assert.deepEqual(bindClass.mock.calls[2]?.arguments, [nativeView, ''])
     assert.equal(secondView.nativeNode.class, 'second')
     assert.deepEqual(nativeView.attributes, {})
+    for (const [name, nativeName] of [
+        ['div', 'view'],
+        ['span', 'view'],
+        ['p', 'view'],
+        ['section', 'view'],
+        ['strong', 'text'],
+        ['b', 'text'],
+        ['br', 'text']
+    ]) {
+        const node = page.createElement(name)
+        assert.equal(node.nodeName, name)
+        assert.equal(node.nativeNode.name, nativeName)
+        assert.equal(node.nativeNode.class.trim(), `h5-${name}`)
+        node.delegateAttributeUpdate('class', 'card')
+        assert.equal(node.nativeNode.class, `h5-${name} card`)
+        node.delegateAttributeUpdate('class', `h5-${name} card`)
+        assert.equal(node.nativeNode.class, `h5-${name} card`)
+        node.delegateAttributeRemoval('class')
+        assert.equal(node.nativeNode.class.trim(), `h5-${name}`)
+        assert.deepEqual(
+            node.nativeNode.childNodes.map((child: { textContent: string }) => child.textContent),
+            name === 'br' ? ['\n'] : []
+        )
+    }
+    for (const name of ['view', 'text', 'image', 'audit-card']) {
+        const node = page.createElement(name)
+        assert.equal(node.nativeNode.name, name)
+        assert.equal(node.nativeNode.class, '')
+    }
+    assert.equal(page.createElement('DIV').nativeNode.name, 'view')
+    const custom = page.createElement('audit-card')
+    custom.__handlers.click = [() => {}]
+    custom.delegateEventListener('click', true)
+    assert.equal(custom.nativeNode.listeners.click.length, 1)
+    assert.equal(custom.nativeNode.listeners.tap, undefined)
+    custom.__handlers.click.length = 0
+    custom.delegateEventListener('click', false)
+    assert.equal(custom.nativeNode.listeners.click.length, 0)
     for (const [name, type] of [
         ['input', 'input'],
         ['textarea', 'input'],

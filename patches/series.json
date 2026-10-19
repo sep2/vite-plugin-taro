@@ -2,7 +2,7 @@
     {
         "package": "@tarojs/plugin-html@4.3.0",
         "output": "patches/generated/@tarojs__plugin-html@4.3.0.patch",
-        "patches": ["patches/series/@tarojs__plugin-html@4.3.0/01-html-display-defaults.patch"]
+        "patches": ["patches/series/@tarojs__plugin-html@4.3.0/01-html-elements.patch"]
     },
     {
         "package": "@tarojs/plugin-framework-react@4.3.0",

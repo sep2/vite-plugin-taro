@@ -132,7 +132,7 @@ function copyFrameworkReactAdapter(): void {
 }
 
 /**
- * Keeps only HTML's runtime hooks: tag/attribute/event mappings and their incremental DOM update counterparts.
+ * Keeps HTML's runtime hooks and the pure element classifications shared with native DOM hosts.
  * The pnpm patch fills upstream's empty tag sets, which its compiler normally rewrites on disk. We never execute that
  * compiler or copy its CLI dependencies. Marking this entry side-effectful preserves hook registration during tree shaking.
  * No html.css/html5.css is copied: VPT already owns the Tailwind reset; selector conversion belongs to its style pipeline.
@@ -141,7 +141,7 @@ function copyHtmlRuntime(): void {
     const dependency = '@tarojs/plugin-html'
     const output = resolveOutputRoot(dependency)
     mkdirSync(output, { recursive: true })
-    for (const entry of ['runtime.js', 'runtime.js.map']) {
+    for (const entry of ['runtime.js', 'runtime.js.map', 'html-elements.js', 'html-elements.d.ts']) {
         copyFileSync(path.join(resolveDependencyDist(dependency), entry), path.join(output, entry))
     }
 }

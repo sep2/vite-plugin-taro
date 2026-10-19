@@ -1,17 +1,145 @@
+diff --git a/dist/html-elements.d.ts b/dist/html-elements.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..5172710e2800bedd9da7ed6e73cfb14fa6090834
+--- /dev/null
++++ b/dist/html-elements.d.ts
+@@ -0,0 +1,4 @@
++/** Upstream HTML classifications shared by templates and native DOM hosts. */
++export declare const inlineElements: ReadonlySet<string>
++export declare const blockElements: ReadonlySet<string>
++export declare function ensureHtmlClass(tagName: string, className: string | undefined): string
+diff --git a/dist/html-elements.js b/dist/html-elements.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..d48e976085a36a69c49e72d5e6a5596d78929004
+--- /dev/null
++++ b/dist/html-elements.js
+@@ -0,0 +1,94 @@
++// Upstream HTML display defaults shared by VPT's template and native DOM hosts.
++export const inlineElements = new Set([
++    'i',
++    'abbr',
++    'select',
++    'acronym',
++    'small',
++    'bdi',
++    'kbd',
++    'strong',
++    'big',
++    'sub',
++    'sup',
++    'br',
++    'mark',
++    'meter',
++    'template',
++    'cite',
++    'object',
++    'time',
++    'code',
++    'output',
++    'u',
++    'data',
++    'picture',
++    'tt',
++    'datalist',
++    'var',
++    'dfn',
++    'del',
++    'q',
++    'em',
++    's',
++    'embed',
++    'samp',
++    'b'
++])
++export const blockElements = new Set([
++    'body',
++    'svg',
++    'address',
++    'fieldset',
++    'li',
++    'span',
++    'article',
++    'figcaption',
++    'main',
++    'aside',
++    'figure',
++    'nav',
++    'blockquote',
++    'footer',
++    'ol',
++    'details',
++    'p',
++    'dialog',
++    'h1',
++    'h2',
++    'h3',
++    'h4',
++    'h5',
++    'h6',
++    'pre',
++    'dd',
++    'header',
++    'section',
++    'div',
++    'hgroup',
++    'table',
++    'dl',
++    'hr',
++    'ul',
++    'dt',
++    'view',
++    'view-block'
++])
++
++export function ensureHtmlClass(tagName, className) {
++    const htmlClass = `h5-${tagName}`
++    const prefix = `${htmlClass} `
++    if (className === undefined || className === '') {
++        return prefix
++    }
++    // Taro uses literal-space token boundaries and preserves the caller's whitespace.
++    if (
++        className === htmlClass ||
++        className.startsWith(prefix) ||
++        className.endsWith(` ${htmlClass}`) ||
++        className.includes(` ${prefix}`)
++    ) {
++        return className
++    }
++    return prefix + className
++}
 diff --git a/dist/runtime.js b/dist/runtime.js
-index c48861da1c8d577ef52af8f4454bbfeaf6324ceb..80218d7cad4c0a83137c6b0c340c1429aa8a9df1 100644
+index c48861da1c8d577ef52af8f4454bbfeaf6324ceb..493166d115dd89c5fc9ccaa606aaecb8fabe5ffa 100644
 --- a/dist/runtime.js
 +++ b/dist/runtime.js
-@@ -18,8 +18,10 @@ function genAttrMapFnFromDir(dir) {
+@@ -1,5 +1,6 @@
+ import { isHasExtractProp } from '@tarojs/runtime';
+ import { isString, isFunction, toCamelCase, hooks, warn } from '@tarojs/shared';
++import { inlineElements, blockElements, ensureHtmlClass } from './html-elements.js';
+ 
+ function genAttrMapFnFromDir(dir) {
+     const fn = function (key, value) {
+@@ -18,8 +19,6 @@ function genAttrMapFnFromDir(dir) {
      };
      return fn;
  }
 -const inlineElements = new Set([]);
 -const blockElements = new Set([]);
-+// Taro normally fills this set by rewriting runtime.js from its compiler plugin.
-+// VPT pins the upstream defaults at install time instead: no CLI, Babel, or per-build file mutation.
-+const inlineElements = new Set(['i', 'abbr', 'select', 'acronym', 'small', 'bdi', 'kbd', 'strong', 'big', 'sub', 'sup', 'br', 'mark', 'meter', 'template', 'cite', 'object', 'time', 'code', 'output', 'u', 'data', 'picture', 'tt', 'datalist', 'var', 'dfn', 'del', 'q', 'em', 's', 'embed', 'samp', 'b']);
-+const blockElements = new Set(['body', 'svg', 'address', 'fieldset', 'li', 'span', 'article', 'figcaption', 'main', 'aside', 'figure', 'nav', 'blockquote', 'footer', 'ol', 'details', 'p', 'dialog', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'dd', 'header', 'section', 'div', 'hgroup', 'table', 'dl', 'hr', 'ul', 'dt', 'view', 'view-block']);
  const specialElements = new Map([
      ['slot', 'slot'],
      ['form', 'form'],
+@@ -191,14 +190,6 @@ function mapNameByContion(nodeName, key, element, componentsAlias) {
+         });
+     }
+ }
+-function ensureHtmlClass(tagName, className = '') {
+-    const classList = className.split(' ');
+-    const htmlClass = `h5-${tagName}`;
+-    if (classList.indexOf(htmlClass) === -1) {
+-        classList.unshift(htmlClass);
+-    }
+-    return classList.join(' ');
+-}
+ function ensureRect(props, style = '') {
+     let cssText = style;
+     const { width, height } = props;

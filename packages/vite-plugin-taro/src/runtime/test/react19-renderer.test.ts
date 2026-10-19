@@ -184,6 +184,7 @@ async function runFixture(t: TestContext, target: 'wx' | 'zfb' | 'tt', mode: str
 }
 
 const fixture = `
+import 'vite-plugin-taro-runtime/plugin-html/runtime'
 import assert from 'node:assert/strict'
 import React from 'react'
 import { toDashed } from '@tarojs/shared'
@@ -814,6 +815,7 @@ function checkWxPageCreation() {
         checkWxPropertyUpdates(app)
         checkWxTextInput(app)
         checkWxFormChange(app)
+        checkWxHtmlElements(app)
     } finally {
         app.unmount('B')
         assert.equal(natives.B.root.childNodes.length, 0)
@@ -942,6 +944,85 @@ function checkWxTextInput(app) {
             app.unmount(id)
             assert.equal(root.childNodes.length, 0)
         }
+    }
+}
+
+function checkWxHtmlElements(app) {
+    const root = createWxTestRoot()
+    // Refs and the setter expose each commit while the journal records native event delivery.
+    const nodes = {}
+    const controls = {}
+    const events = []
+    function Page() {
+        const [className, setClassName] = React.useState('card')
+        controls.setClassName = setClassName
+        return h('div', {
+            id: 'html-card', className, style: { color: 'red' },
+            ref: node => { nodes.div = node },
+            onClick: className === undefined ? undefined : event => events.push([className, event.target.id])
+        }, h('span', { id: 'html-label', ref: node => { nodes.span = node } }, 'History'),
+        h('strong', { ref: node => { nodes.strong = node } }, '123'),
+        h('br', { ref: node => { nodes.br = node } }))
+    }
+    try {
+        ReactDOM.flushSync(() => app.mount(Page, 'html', () => ({ root }), () =>
+            document.getElementById('html').performUpdate(true)))
+        const div = nodes.div
+        const span = nodes.span
+        const native = div.nativeNode
+        assert.equal(div.nodeName, 'div')
+        assert.equal(span.nodeName, 'span')
+        assert.equal(native.name, 'view')
+        assert.equal(span.nativeNode.name, 'view')
+        assert.equal(nodes.strong.nativeNode.name, 'text')
+        assert.equal(native.class, 'h5-div card')
+        assert.equal(native.style, 'color: red;')
+        assert.equal(span.nativeNode.class.trim(), 'h5-span')
+        assert.equal(span.nativeNode.childNodes[0].textContent, 'History')
+        assert.equal(nodes.br.childNodes.length, 0)
+        assert.equal(nodes.br.nativeNode.childNodes[0].textContent, '\\n')
+        ReactDOM.flushSync(() => span.nativeNode.tap({}))
+        assert.deepEqual(events, [['card', 'html-label']])
+        for (const className of ['changed', 'h5-div explicit', undefined]) {
+            ReactDOM.flushSync(() => controls.setClassName(className))
+            assert.strictEqual(nodes.div, div)
+            assert.strictEqual(div.nativeNode, native)
+            assert.equal(div.className, className ?? '')
+            assert.equal(native.class.trim(), className?.startsWith('h5-div') ? className : ['h5-div', className].filter(Boolean).join(' '))
+            const count = events.length
+            ReactDOM.flushSync(() => span.nativeNode.tap({}))
+            assert.equal(events.length, count + Number(className !== undefined))
+            assert.equal(native.listeners.tap.length, Number(className !== undefined))
+            if (className !== undefined) {
+                assert.deepEqual(events.at(-1), [className, 'html-label'])
+            }
+        }
+        span.classList.add('accent')
+        assert.equal(span.className, 'accent')
+        assert.equal(span.nativeNode.class, 'h5-span accent')
+        span.removeAttribute('class')
+        assert.equal(span.nativeNode.class.trim(), 'h5-span')
+        const clone = div.cloneNode(true)
+        assert.equal(clone.nodeName, 'div')
+        assert.equal(clone.nativeNode.name, 'view')
+        assert.equal(clone.nativeNode.class.trim(), 'h5-div')
+        assert.equal(clone.nativeNode.style, native.style)
+        assert.equal(clone.childNodes[0].nativeNode.class.trim(), 'h5-span')
+        assert.equal(clone.childNodes[2].nativeNode.childNodes.length, 1)
+        assert.strictEqual(clone.nativeNode.ownerShadowRoot, root)
+        assert.notStrictEqual(clone.nativeNode, native)
+        div.appendChild(clone)
+        assert.strictEqual(clone.nativeNode.parentNode, native)
+        div.removeChild(clone)
+        assert.equal(clone.nativeNode.parentNode, null)
+        ReactDOM.flushSync(() => controls.setClassName('restored'))
+        assert.equal(native.listeners.tap.length, 1)
+        ReactDOM.flushSync(() => span.nativeNode.tap({}))
+        assert.deepEqual(events.at(-1), ['restored', 'html-label'])
+    } finally {
+        app.unmount('html')
+        assert.equal(root.childNodes.length, 0)
+        assert.ok(Object.values(nodes).every(node => node === null))
     }
 }
 

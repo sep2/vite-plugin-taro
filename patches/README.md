@@ -6,7 +6,7 @@ pnpm applies one combined patch to each package version. We maintain **18 featur
 
 | Package | Ordered feature patches | Purpose |
 | --- | --- | --- |
-| `@tarojs/plugin-html@4.3.0` | `01-html-display-defaults` | Populate upstream HTML inline/block element sets without the Taro compiler rewriting installed files. |
+| `@tarojs/plugin-html@4.3.0` | `01-html-elements` | Populate upstream HTML inline/block element sets and share their pure classifications and semantic classes between templates and native DOM hosts. |
 | `@tarojs/plugin-framework-react@4.3.0` | `01-react19-root-api` | Use React 19 concurrent roots for App and standalone native-component entries; make standalone native-component setup explicitly synchronous with `flushSync`. |
 | | `02-mini-app-page-rendering` | Create custom App containers as logical roots and place Page children in an opaque outlet inside the singleton React App. |
 | | `03-h5-router-container` | Give H5 Page children a dedicated `taro_router` container so routing CSS does not target unrelated App siblings. |
