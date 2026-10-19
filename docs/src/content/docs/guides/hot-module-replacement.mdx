@@ -130,6 +130,8 @@ yarn build:tt --watch
 projectConfigJson: {
     setting: {
         compileHotReLoad: true,
+        es6: false,
+        enhance: false,
         urlCheck: false,
         skylineRenderEnable: false
     }
@@ -142,6 +144,8 @@ projectPrivateConfigJson: {
 ```
 
 `compileHotReLoad: true` 开启开发者工具的热重载。补丁文件变化后，开发者工具只重新加载受影响的页面，不重启整个小程序；vpt 依靠这个行为保留 App 和 React 状态。
+
+`es6: false` 和 `enhance: false` 将 JavaScript 转译交给 Vite，保持 React Fast Refresh 识别组件所需的函数名。
 
 `urlCheck: false` 关闭开发者工具的服务器域名校验，让小程序可以连接本机 Vite WebSocket 并报告热更新结果。它只影响开发者工具中的调试连接，不会放宽正式版小程序的服务器域名限制；`rebuild` 模式不需要该连接。
 
