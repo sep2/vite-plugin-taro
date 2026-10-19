@@ -264,14 +264,21 @@ class NativeNode {
         }
         return result
     }
+    // SDK insertion moves an existing sibling internally; only explicit host calls enter the journal.
+    #prepareInsertion(child) {
+        if (child.parentNode) {
+            assert.strictEqual(child.parentNode, this)
+            this.#children.splice(this.#children.indexOf(child), 1)
+        }
+    }
     appendChild(child) {
-        assert.equal(child.parentNode, null)
+        this.#prepareInsertion(child)
         calls.push(['append', this, child])
         this.#children.push(child)
         child.parentNode = this
     }
     insertBefore(child, before) {
-        assert.equal(child.parentNode, null)
+        this.#prepareInsertion(child)
         const index = this.#children.indexOf(before)
         assert.ok(index >= 0)
         calls.push(['insert', this, child, before])
@@ -432,7 +439,7 @@ parent.appendChild(b)
 expectCalls([['append', parent.nativeNode, b.nativeNode]])
 const retained = a.nativeNode
 parent.insertBefore(b, a)
-expectCalls([['remove', parent.nativeNode, b.nativeNode], ['insert', parent.nativeNode, b.nativeNode, a.nativeNode]])
+expectCalls([['insert', parent.nativeNode, b.nativeNode, a.nativeNode]])
 expectChildren(parent, [b, a, text])
 other.appendChild(a)
 expectCalls([['remove', parent.nativeNode, a.nativeNode], ['append', other.nativeNode, a.nativeNode]])
@@ -630,7 +637,7 @@ try {
     assert.equal(firstText.nativeNode.nodeValue, 'updated')
     assert.equal(calls.filter(call => call[0] === 'element' || call[0] === 'createText').length, 0)
     assert.equal(calls.filter(call => call[0] === 'text').length, 1)
-    assert.equal(calls.filter(call => call[0] === 'remove').length, 1)
+    assert.equal(calls.filter(call => call[0] === 'remove').length, 0)
     assert.equal(calls.filter(call => call[0] === 'append' || call[0] === 'insert').length, 1)
     assert.deepEqual(reads, [])
     expectChildren(container, [second, first])
@@ -977,7 +984,7 @@ const nativeComponentsFixture = `
         assert.equal(native.attributes.label, 'updated')
         assert.equal(calls.filter(call => call[0] === 'component').length, 0)
         assert.equal(calls.filter(call => call[0] === 'attribute').length, 1)
-        assert.equal(calls.filter(call => call[0] === 'remove').length, 1)
+        assert.equal(calls.filter(call => call[0] === 'remove').length, 0)
         assert.equal(calls.filter(call => call[0] === 'append' || call[0] === 'insert').length, 1)
         expectChildren(container, [second, first])
         emitNative(first, 'select', { value: 42 }, first)

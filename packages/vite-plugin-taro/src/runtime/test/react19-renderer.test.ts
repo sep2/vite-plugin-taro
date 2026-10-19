@@ -918,6 +918,7 @@ function checkWxPageCreation() {
         assert.deepEqual(clicks.splice(0), [['A', 'first', 9, {}], ['B', 'first', 0, {}]])
         assert.match(nodes.A.textContent, /99:10/)
         assert.match(nodes.B.textContent, /99:1/)
+        checkKeyedMoves(document.createElement('root'), rendererHost.getPageRootType('A'))
         checkWxEventBubbling(app)
         checkWxDatasetUpdates(app)
         checkWxPropertyUpdates(app)
@@ -1503,8 +1504,112 @@ function checkFrameworkRootEntryPoints() {
     assert.equal(typeof Current.app.mount, 'function', 'native Entry is ready before created returns')
 }
 
+function checkKeyedMoves(rootContainer, pageType) {
+    const root = ReactDOM.createRoot(rootContainer)
+    const ids = Array.from({ length: 1000 }, (_, index) => index)
+    // Stable ref callbacks and effect journals distinguish reordering from remounting.
+    const refs = new Map()
+    const refChanges = []
+    const effects = []
+    function Row({ id }) {
+        const [count, setCount] = React.useState(0)
+        const ref = React.useCallback(node => {
+            refChanges.push([id, node])
+            if (node) {
+                refs.set(id, node)
+            } else {
+                refs.delete(id)
+            }
+        }, [id])
+        React.useLayoutEffect(() => {
+            effects.push(['mount', id])
+            return () => effects.push(['unmount', id])
+        }, [id])
+        return h('view', { ref, onClick: () => setCount(count + 1) }, id + ':' + count)
+    }
+    const renderRows = order => {
+        const rows = order.map(id => h(Row, { key: id, id }))
+        root.render(pageType ? h(pageType, null, rows) : rows)
+    }
+    ReactDOM.flushSync(() => renderRows(ids))
+    const container = pageType ? rootContainer.firstChild : rootContainer
+    const flushTemplate = () => {
+        if (container.nativeNode) {
+            return
+        }
+        const batches = []
+        container.scheduleTask = callback => callback()
+        container.performUpdate(false, data => batches.push(data))
+        container.pendingUpdate = false
+        assert.deepEqual(batches[0][container._path + '.cn'].map(node => node.cn[0].v),
+            container.childNodes.map(node => node.textContent))
+    }
+    // Record logical-to-host operations; the native double may internally unlink as part of insertion.
+    const insert = container.delegateChildInsertion
+    const remove = container.delegateChildRemoval
+    const calls = []
+    container.delegateChildInsertion = function (...args) {
+        calls.push('insert')
+        return insert.apply(this, args)
+    }
+    container.delegateChildRemoval = function (...args) {
+        calls.push('remove')
+        return remove.apply(this, args)
+    }
+    try {
+        flushTemplate()
+        const hosts = new Map(refs)
+        const natives = new Map(ids.map(id => [id, refs.get(id).nativeNode]))
+        const tap = node => ReactDOM.flushSync(() => node.nativeNode
+            ? node.nativeNode.tap({})
+            : node.dispatchEvent(new TaroEvent('tap', { bubbles: false })))
+        tap(refs.get(1))
+        assert.equal(refs.get(1).textContent, '1:1')
+        refChanges.length = 0
+        effects.length = 0
+        calls.length = 0
+        const swapped = ids.slice()
+        ;[swapped[1], swapped[998]] = [swapped[998], swapped[1]]
+        for (const order of [swapped, ids]) {
+            ReactDOM.flushSync(() => renderRows(order))
+            assert.equal(calls.filter(call => call === 'insert').length, 997)
+            assert.equal(calls.filter(call => call === 'remove').length, 0)
+            assert.deepEqual(container.childNodes, order.map(id => hosts.get(id)))
+            for (const id of order) {
+                assert.strictEqual(refs.get(id), hosts.get(id))
+                assert.strictEqual(refs.get(id).parentNode, container)
+                assert.strictEqual(refs.get(id).nativeNode, natives.get(id))
+            }
+            if (container.nativeNode) {
+                assert.deepEqual(container.nativeNode.childNodes, order.map(id => natives.get(id)))
+            }
+            assert.deepEqual(refChanges, [])
+            assert.deepEqual(effects, [])
+            assert.equal(refs.get(1).textContent, '1:1')
+            flushTemplate()
+            calls.length = 0
+        }
+        tap(refs.get(1))
+        assert.equal(refs.get(1).textContent, '1:2', 'moved handlers retain the latest React closure')
+        ReactDOM.flushSync(() => renderRows(ids.filter(id => id !== 1)))
+        assert.deepEqual(calls, ['remove'])
+        assert.deepEqual(refChanges, [[1, null]])
+        assert.deepEqual(effects, [['unmount', 1]])
+        assert.equal(hosts.get(1).parentNode, null)
+        if (container.nativeNode) {
+            assert.equal(natives.get(1).parentNode, null)
+        }
+        flushTemplate()
+    } finally {
+        ReactDOM.flushSync(() => root.unmount())
+        container.delegateChildInsertion = insert
+        container.delegateChildRemoval = remove
+    }
+}
+
 async function run() {
     await checkRootsAndCommits()
+    checkKeyedMoves(document.createElement('root'), undefined)
     checkRootOptionsAndErrors()
     checkEventHandlerReplacement()
     checkEventPrioritiesAndControlledInputs(false)

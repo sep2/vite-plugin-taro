@@ -95,7 +95,7 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
     }
 
     // 调用这些委托时，父子节点的原生句柄已经由创建路径提供。
-    // 移动和替换仍由 Taro 分解成移除/插入；这里只转发当前操作，不重新遍历逻辑树。
+    // 同父节点移动直接插入已有原生节点；替换的旧节点仍由移除委托处理。
     TaroNode.extend(
         'delegateChildInsertion',
         function (this: HostNode, child: HostNode, before: HostNode | null | undefined) {

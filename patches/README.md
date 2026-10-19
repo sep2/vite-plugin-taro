@@ -1,6 +1,6 @@
 # Dependency patch series
 
-pnpm applies one combined patch to each package version. We maintain **19 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output.
+pnpm applies one combined patch to each package version. We maintain **20 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output.
 
 ## Feature inventory
 
@@ -24,6 +24,7 @@ pnpm applies one combined patch to each package version. We maintain **19 featur
 | | `06-style-property-names` | Use the setter's original storage key when reading or removing hyphen-prefixed style properties. |
 | | `07-clone-delegation` | Construct clones through existing presentation delegates, preserving fresh identity, parent links and dynamic style accessors. |
 | | `08-page-host-context` | Supply the native Page through getCtx and create replacement text through ownerDocument. |
+| | `09-same-parent-moves` | Reorder existing siblings through one insertion delegate, retain logical identity and lazily serialize the final template child list. |
 | `canvas-confetti@1.9.4` | `01-canvas-confetti-enhancements` | Keep all existing confetti enhancements together: rotation/tilt controls, frame-clock repeat emission, cached path drawing, and DOMMatrix input normalization. Source, browser and module builds stay aligned. |
 
 The React renderer imports its host through `\0vpt:renderer-host`. VPT's Mini resolver binds that private import through `taro.hostPath`: template targets use `src/runtime/mini/template/template-host.ts`, while TT DOM preference uses the startup selector in `src/runtime/tt/renderer-host.ts`. The generic `RendererHost` type is exported by `vite-plugin-taro-runtime/react`: it accepts the root container and host context for element/text creation, classifies form elements, and receives optional pre-commit and synchronous post-commit callbacks. VPT's recursive implementation uses Taro's document and `FormElement` and owns App/Page outlet projection. React reconciliation, prop comparison, controlled-input restoration and App/Page mounting retain their existing behavior.
@@ -37,6 +38,8 @@ The renderer exports `getPageRootType(id)`, which delegates to the optional `Ren
 Element `textContent` replacement uses `ownerDocument.createTextNode`, preserving the factory selected by a host-owned document. Clearing content retains its allocation-free path.
 
 Taro's `insertBefore` and `removeChild` invoke `delegateChildInsertion` and `delegateChildRemoval` after updating the logical relationships. `appendChild`, `replaceChild`, moves and fragment expansion reuse those same primitives. The delegation methods are replaceable through the existing `TaroNode.extend` API; their default implementations retain Taro's lazy template payloads and insertion-position heuristic. Dispatch happens for detached parents as well as rooted nodes, before template path calculation or hydration preparation. Removal receives the original options even when `doUpdate: false`, because that flag batches template writes while the child is still logically removed. Event identity cleanup, mutation observer ordering and context-cache invalidation remain in Taro's mutation methods; the template scheduler is unchanged.
+
+`09-same-parent-moves` keeps same-parent reordering inside `insertBefore`: it splices the existing child out of the logical array while retaining its parent and event indexes, inserts at the current anchor, and invokes `delegateChildInsertion` once. Its optional `previousIndex` identifies a move, including index zero. The template default queues a lazy full child-list reset so append, replacement and multiple moves serialize the final order. Native hosts directly insert the attached node. WX custom components receive `moved` for same-parent reordering; actual deletion receives `detached`, and cross-parent movement retains removal followed by insertion. Self-insertion and self-replacement leave the tree unchanged. Ordinary insertion mutation records and context-cache invalidation remain in Taro. Array searches and splices remain O(N) per move for N siblings, with O(1) extra move metadata; template hydration retains its existing subtree cost.
 
 `TaroText.delegateTextUpdate` runs after Taro records the character-data mutation and updates `_value`. The existing `textContent`, `nodeValue` and `data` setters share that boundary, preserving their getters, identity and mutation records. Its default retains the original template payload; a host can replace it through `extend(TaroText, 'delegateTextUpdate', ...)` before any template path calculation. Delegation runs for detached and attached text nodes, and construction initializes the logical value without invoking an update.
 

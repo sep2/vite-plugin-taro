@@ -1,0 +1,92 @@
+diff --git a/dist/dom/node.d.ts b/dist/dom/node.d.ts
+index 858e1741d180ca0931242e807a3daf923bce98c4..0faaa61ba838cf512013aca085170511b1b7db08 100644
+--- a/dist/dom/node.d.ts
++++ b/dist/dom/node.d.ts
+@@ -80,8 +80,9 @@ declare class TaroNode extends TaroEventTarget {
+      * 逻辑插入完成后调用，包含未挂载的父节点；默认准备模板 payload。
+      * this 为新父节点，refChild 为空表示追加；index 仅在存在 refChild 时表示插入位置。
+      * isReplace 表示替换的插入阶段，旧 refChild 随后另行移除；host 此处只同步插入。
++     * previousIndex 为同父节点移动前的位置；移动仅通知插入，模板默认延迟更新完整子列表。
+      */
+-    delegateChildInsertion(newChild: TaroNode, refChild: TaroNode | null | undefined, index: number, isReplace: boolean | undefined): void;
++    delegateChildInsertion(newChild: TaroNode, refChild: TaroNode | null | undefined, index: number, isReplace: boolean | undefined, previousIndex?: number): void;
+     /**
+      * 逻辑解绑及按 cleanRef 清理事件索引后调用；this 为原父节点，child.parentNode 已为空。
+      * 每次实际移除都会通知，options.doUpdate=false 仅抑制默认模板更新。
+diff --git a/dist/dom/node.js b/dist/dom/node.js
+index f6877ddccb0bdf533a1273054ed046e3725297f0..13f7d91bf5d75c20990855db507f85fbc8695eff 100644
+--- a/dist/dom/node.js
++++ b/dist/dom/node.js
+@@ -134,6 +134,10 @@ class TaroNode extends TaroEventTarget {
+      *   3. insert D before C, D has the different parent of C
+      */
+     insertBefore(newChild, refChild, isReplace) {
++        if (newChild === refChild) {
++            this.findIndex(refChild);
++            return newChild;
++        }
+         if (newChild.nodeName === DOCUMENT_FRAGMENT) {
+             newChild.childNodes.reduceRight((previousValue, currentValue) => {
+                 this.insertBefore(currentValue, previousValue);
+@@ -141,10 +145,15 @@ class TaroNode extends TaroEventTarget {
+             }, refChild);
+             return newChild;
+         }
+-        // Parent release newChild
+-        //   - cleanRef: false (No need to clean eventSource, because newChild is about to be inserted)
+-        //   - update: true (Need to update parent.childNodes, because parent.childNodes is reordered)
+-        newChild.remove({ cleanRef: false });
++        const previousIndex = newChild.parentNode === this ? this.findIndex(newChild) : undefined;
++        if (previousIndex !== undefined) {
++            // Reorder the sibling array in place, retaining parent and event identity for the native move.
++            this.childNodes.splice(previousIndex, 1);
++        }
++        else {
++            newChild.remove({ cleanRef: false });
++        }
++        // The insertion index is assigned after removal so forward moves use the anchor's current position.
+         let index = 0;
+         // Data structure
+         newChild.parentNode = this;
+@@ -159,7 +168,7 @@ class TaroNode extends TaroEventTarget {
+         }
+         // Delegation runs after the logical insertion, including on detached parents.
+         // Its default implementation prepares template payloads; native hosts can replace it before any serialization work.
+-        this.delegateChildInsertion(newChild, refChild, index, isReplace);
++        this.delegateChildInsertion(newChild, refChild, index, isReplace, previousIndex);
+         if (this._root) {
+             bumpNearestCtxEpochForRoot(this._root);
+         }
+@@ -199,6 +208,9 @@ class TaroNode extends TaroEventTarget {
+     replaceChild(newChild, oldChild) {
+         if (oldChild.parentNode !== this)
+             return;
++        if (newChild === oldChild) {
++            return oldChild;
++        }
+         // Insert the newChild
+         this.insertBefore(newChild, oldChild, true);
+         // Destroy the oldChild
+@@ -248,14 +260,19 @@ class TaroNode extends TaroEventTarget {
+      * index 仅在有 refChild 时表示逻辑插入位置，追加分支中的值不表示末尾索引。
+      * isReplace 表示 replaceChild 的插入阶段：refChild 此时仍在树中，随后由原方法
+      * 单独移除。原生 host 此处执行插入，旧节点的移除由移除委托接收。
+-     * 默认实现沿用模板的局部更新/整表更新选择；host 可在路径计算和 hydrate 前接管。
++     * previousIndex 是同父节点移动前的位置；移动仅通知插入，保留 parentNode 和事件身份。
++     * 默认实现对移动延迟更新完整子列表，其余插入保留局部更新/整表更新选择。
+      * 原有上下文缓存失效和插入 MutationObserver 记录仍由调用方在委托之后完成。
+      */
+-    delegateChildInsertion(newChild, refChild, index, isReplace) {
++    delegateChildInsertion(newChild, refChild, index, isReplace, previousIndex) {
+         const childNodesLength = this.childNodes.length;
+         // Serialization
+         if (this._root) {
+-            if (!refChild) {
++            if (previousIndex !== undefined) {
++                // A move changes existing slots, including append and replacement. Hydrate the final list at flush.
++                this.delegateChildReset();
++            }
++            else if (!refChild) {
+                 // appendChild
+                 const isOnlyChild = childNodesLength === 1;
+                 if (isOnlyChild) {
