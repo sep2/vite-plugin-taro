@@ -183,6 +183,8 @@ projectConfigJson: {
     compileType: 'miniprogram',
     setting: {
         compileHotReLoad: true,
+        es6: false,
+        enhance: false,
         urlCheck: false,
         skylineRenderEnable: false
     }
