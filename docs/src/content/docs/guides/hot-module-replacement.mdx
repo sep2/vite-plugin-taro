@@ -163,7 +163,8 @@ projectPrivateConfigJson: {
 1. 当前目标的 `dev:...` 仍在运行且终端没有构建错误；
 2. 开发者工具打开的是当前项目对应的 `dist/...`；
 3. 微信已开启 `setting.compileHotReLoad` 并关闭 `setting.urlCheck`；支付宝已开启 `developOptions.hotReload`；抖音已开启顶层 `compileHotReload` 和 `setting.autoCompile`，关闭 `setting.urlCheck`；
-4. 微信调试时 `skylineRenderEnable` 未开启。
+4. 微信的 `setting.es6` 和 `setting.enhance` 均为 `false`；
+5. 微信调试时 `skylineRenderEnable` 未开启。
 
 仍然无效时，关闭开发者工具和开发命令，删除当前目标的 `dist/...`，重新运行对应的 `dev:*` 后再打开生成目录。
 
