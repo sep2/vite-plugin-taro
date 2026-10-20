@@ -1,0 +1,17 @@
+diff --git a/dist/dom/event-source.js b/dist/dom/event-source.js
+index 3e5484d54cd42dfb23bb485578e9ba351d5b3c46..b8f9d9caa6a600e5effbd976a7f542e45a92de80 100644
+--- a/dist/dom/event-source.js
++++ b/dist/dom/event-source.js
+@@ -8,7 +8,11 @@ class EventSource extends Map {
+     removeNodeTree(child) {
+         this.removeNode(child);
+         const { childNodes } = child;
+-        childNodes.forEach(node => this.removeNodeTree(node));
++        const length = childNodes.length;
++        // A local index visits the existing children in sibling order.
++        for (let index = 0; index < length; index++) {
++            this.removeNodeTree(childNodes[index]);
++        }
+     }
+ }
+ const eventSource = new EventSource();

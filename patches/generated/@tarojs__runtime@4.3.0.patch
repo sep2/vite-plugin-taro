@@ -455,6 +455,23 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..daea28644e1e15d3bd0ced11bcb59bed
              const valueAlias = componentsAlias[value]._num;
              this.enqueueUpdate({
                  path: `${this._path}.${"nn" /* Shortcuts.NodeName */}`,
+diff --git a/dist/dom/event-source.js b/dist/dom/event-source.js
+index 3e5484d54cd42dfb23bb485578e9ba351d5b3c46..b8f9d9caa6a600e5effbd976a7f542e45a92de80 100644
+--- a/dist/dom/event-source.js
++++ b/dist/dom/event-source.js
+@@ -8,7 +8,11 @@ class EventSource extends Map {
+     removeNodeTree(child) {
+         this.removeNode(child);
+         const { childNodes } = child;
+-        childNodes.forEach(node => this.removeNodeTree(node));
++        const length = childNodes.length;
++        // A local index visits the existing children in sibling order.
++        for (let index = 0; index < length; index++) {
++            this.removeNodeTree(childNodes[index]);
++        }
+     }
+ }
+ const eventSource = new EventSource();
 diff --git a/dist/dom/event-target.d.ts b/dist/dom/event-target.d.ts
 index 78893e78df38fd423937079db101a4fa848a1c73..38342f6e9312998212b17c3b3ed1bea915ca5d53 100644
 --- a/dist/dom/event-target.d.ts
