@@ -6,6 +6,7 @@ import {
     FormElement,
     Style,
     TaroElement,
+    TaroEvent,
     TaroNode,
     TaroRootElement,
     TaroText
@@ -143,6 +144,9 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
             }
         }
     })
+
+    // SDK target records are authoritative for native events, independently of logical IDs.
+    extend(TaroEvent, 'getTargetElement', () => null)
 
     // DOM 节点无需随监听器变化切换模板类型；处理器、once 与移除匹配仍由 Taro 维护。
     // 上游将这类副作用限定在模板 host 后，可去掉此空实现。

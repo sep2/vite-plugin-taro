@@ -45,7 +45,8 @@
             "patches/series/@tarojs__runtime@4.3.0/13-lazy-style.patch",
             "patches/series/@tarojs__runtime@4.3.0/14-lazy-event-handlers.patch",
             "patches/series/@tarojs__runtime@4.3.0/15-context-delegation.patch",
-            "patches/series/@tarojs__runtime@4.3.0/16-direct-event-cleanup.patch"
+            "patches/series/@tarojs__runtime@4.3.0/16-direct-event-cleanup.patch",
+            "patches/series/@tarojs__runtime@4.3.0/17-native-event-targets.patch"
         ]
     },
     {

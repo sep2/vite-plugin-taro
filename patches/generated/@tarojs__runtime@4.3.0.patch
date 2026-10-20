@@ -578,10 +578,16 @@ index 510424828b3a9a74f363cef1e0982489a708541e..7414d12c4679afa560338e6cd62995a9
      }
  }
 diff --git a/dist/dom/event.d.ts b/dist/dom/event.d.ts
-index d06902c2239335adb5df57cc27b84ab3d9eb938b..73bb19548c9737b74174a64a261ef08cdccb49b9 100644
+index d06902c2239335adb5df57cc27b84ab3d9eb938b..c2388f7cee376a5573c1b5cc1201b0f4d87d976c 100644
 --- a/dist/dom/event.d.ts
 +++ b/dist/dom/event.d.ts
-@@ -21,7 +21,12 @@ declare class TaroEvent {
+@@ -17,11 +17,18 @@ declare class TaroEvent {
+     stopPropagation(): void;
+     stopImmediatePropagation(): void;
+     preventDefault(): void;
++    /** Template lookup policy; native hosts return null to use SDK target records. */
++    getTargetElement(target: MpEvent['target'] | undefined, useTargetDataset: boolean): TaroElement | null;
+     get target(): any;
      get currentTarget(): any;
  }
  declare function createEvent(event: MpEvent | string, node?: TaroElement): TaroEvent;
@@ -589,21 +595,38 @@ index d06902c2239335adb5df57cc27b84ab3d9eb938b..73bb19548c9737b74174a64a261ef08c
 +/**
 + * 共用平台归一化、事件 hooks、批处理及表单处理的原生事件入口。
 + * currentNode 可传入已知 Taro 逻辑节点以跳过入口 ID 查询；省略时按原有事件索引查找。
-+ * target/currentTarget getter 保持原有索引行为，完整调用路径说明见实现。
++ * target/currentTarget 按 host 的 getTargetElement 策略读取模板索引或 SDK 数据。
 + */
 +declare function eventHandler(event: MpEvent, currentNode?: TaroElement): any;
  declare function eventHandlerTTDom(ele: any, listener: (event: MpEvent, element: any) => void, event: MpEvent): void;
  
  export { TaroEvent, createEvent, eventHandler, eventHandlerTTDom };
 diff --git a/dist/dom/event.js b/dist/dom/event.js
-index f4062db04f2a8216795447f892b80b7b6514f467..8a8aab1e78ca3f5087bf768cf57732ed52e6697f 100644
+index f4062db04f2a8216795447f892b80b7b6514f467..1b96119960446a19e962a434b1d1de03bb523305 100644
 --- a/dist/dom/event.js
 +++ b/dist/dom/event.js
-@@ -36,7 +36,10 @@ class TaroEvent {
-             const currentEle = env.document.getElementById(((_b = target.dataset) === null || _b === void 0 ? void 0 : _b.sid) || target.id || null);
-             // Note：优先判断冒泡场景alipay的targetDataset的sid, 不然冒泡场景target属性吐出不对，其余拿取当前绑定id
-             const element = env.document.getElementById(((_c = target.targetDataset) === null || _c === void 0 ? void 0 : _c.sid) || ((_d = target.dataset) === null || _d === void 0 ? void 0 : _d.sid) || target.id || null);
+@@ -28,15 +28,23 @@ class TaroEvent {
+     preventDefault() {
+         this.defaultPrevented = true;
+     }
++    /** Template events resolve logical datasets; native hosts use SDK target records. */
++    getTargetElement(target, useTargetDataset) {
++        const id = (useTargetDataset && target?.targetDataset?.sid) || target?.dataset?.sid || target?.id || null;
++        return env.document.getElementById(id);
++    }
+     get target() {
+-        var _a, _b, _c, _d, _e;
++        var _a, _e;
+         const cacheTarget = this.cacheTarget;
+         if (!cacheTarget) {
+             const target = Object.create(((_a = this.mpEvent) === null || _a === void 0 ? void 0 : _a.target) || null);
+-            const currentEle = env.document.getElementById(((_b = target.dataset) === null || _b === void 0 ? void 0 : _b.sid) || target.id || null);
+-            // Note：优先判断冒泡场景alipay的targetDataset的sid, 不然冒泡场景target属性吐出不对，其余拿取当前绑定id
+-            const element = env.document.getElementById(((_c = target.targetDataset) === null || _c === void 0 ? void 0 : _c.sid) || ((_d = target.dataset) === null || _d === void 0 ? void 0 : _d.sid) || target.id || null);
 -            target.dataset = Object.assign(Object.assign({}, (currentEle !== null ? currentEle.dataset : EMPTY_OBJ)), (element !== null ? element.dataset : EMPTY_OBJ));
++            const currentEle = this.getTargetElement(target, false);
++            // Alipay's targetDataset identifies the bubbling target separately from its wrapper.
++            const element = this.getTargetElement(target, true);
 +            // 索引命中时仍以逻辑 dataset 为准，保留对象值及支付宝两层数据的合并顺序。
 +            // 索引未命中只表示无法取得逻辑节点，不能丢弃平台已提供的数据。
 +            // 两个来源分别兜底，复用原有 Object.assign 和缓存；不补建索引或遍历节点树。
@@ -611,11 +634,21 @@ index f4062db04f2a8216795447f892b80b7b6514f467..8a8aab1e78ca3f5087bf768cf57732ed
              for (const key in (_e = this.mpEvent) === null || _e === void 0 ? void 0 : _e.detail) {
                  target[key] = this.mpEvent.detail[key];
              }
-@@ -55,11 +58,16 @@ class TaroEvent {
+@@ -48,18 +56,22 @@ class TaroEvent {
+         }
+     }
+     get currentTarget() {
+-        var _a, _b, _c, _d, _e, _f, _g, _h;
++        var _a, _h;
+         const cacheCurrentTarget = this.cacheCurrentTarget;
+         if (!cacheCurrentTarget) {
+-            const doc = env.document;
              const currentTarget = Object.create(((_a = this.mpEvent) === null || _a === void 0 ? void 0 : _a.currentTarget) || null);
-             const element = doc.getElementById(((_b = currentTarget.dataset) === null || _b === void 0 ? void 0 : _b.sid) || currentTarget.id || null);
-             const targetElement = doc.getElementById(((_e = (_d = (_c = this.mpEvent) === null || _c === void 0 ? void 0 : _c.target) === null || _d === void 0 ? void 0 : _d.dataset) === null || _e === void 0 ? void 0 : _e.sid) || ((_g = (_f = this.mpEvent) === null || _f === void 0 ? void 0 : _f.target) === null || _g === void 0 ? void 0 : _g.id) || null);
+-            const element = doc.getElementById(((_b = currentTarget.dataset) === null || _b === void 0 ? void 0 : _b.sid) || currentTarget.id || null);
+-            const targetElement = doc.getElementById(((_e = (_d = (_c = this.mpEvent) === null || _c === void 0 ? void 0 : _c.target) === null || _d === void 0 ? void 0 : _d.dataset) === null || _e === void 0 ? void 0 : _e.sid) || ((_g = (_f = this.mpEvent) === null || _f === void 0 ? void 0 : _f.target) === null || _g === void 0 ? void 0 : _g.id) || null);
 -            if (element === null || (element && element === targetElement)) {
++            const element = this.getTargetElement(currentTarget, false);
++            const targetElement = this.getTargetElement(this.mpEvent?.target, false);
 +            // 已知逻辑节点相同才沿用 target；未命中时，只有同一原始对象能证明身份相同。
 +            // 两个 null 查询结果、空 ID 或相同的未解析 ID 都不能证明两个事件目标相同。
 +            // 无平台事件时保留手动构造事件的共享目标；这里只比较已有引用，不新增查询或状态。
@@ -630,7 +663,7 @@ index f4062db04f2a8216795447f892b80b7b6514f467..8a8aab1e78ca3f5087bf768cf57732ed
              for (const key in (_h = this.mpEvent) === null || _h === void 0 ? void 0 : _h.detail) {
                  currentTarget[key] = this.mpEvent.detail[key];
              }
-@@ -100,7 +108,27 @@ function getEventCBResult(event) {
+@@ -100,7 +112,27 @@ function getEventCBResult(event) {
      return result;
  }
  // 小程序的事件代理回调函数
@@ -653,13 +686,13 @@ index f4062db04f2a8216795447f892b80b7b6514f467..8a8aab1e78ca3f5087bf768cf57732ed
 + * 会绕过外围处理，因此 host 应从这里进入已有事件流程。
 + *
 + * 可选参数只改变接收节点的取得方式，不增加持久状态或循环，也不代表显著性能提升。
-+ * TaroEvent.target/currentTarget 的 getter 仍按原有逻辑读取事件索引。
++ * target/currentTarget 通过 getTargetElement 选择模板索引或原生 SDK 数据。
 + */
 +function eventHandler(event, currentNode) {
      var _a, _b;
      // Note: ohos 上事件没有设置 type、detail 类型 setter 方法，且部分事件（例如 load 等）缺失 target 导致事件错误
      event.type === undefined && Object.defineProperty(event, 'type', {
-@@ -112,8 +140,7 @@ function eventHandler(event) {
+@@ -112,8 +144,7 @@ function eventHandler(event) {
      event.currentTarget = event.currentTarget || event.target || Object.assign({}, event);
      hooks.call('modifyMpEventImpl', event);
      const currentTarget = event.currentTarget;

@@ -978,6 +978,28 @@ eventChild.addEventListener('tap', event => event.stopPropagation(), { once: tru
 emitNative(eventChild, 'tap', {}, eventChild)
 emitNative(eventParent, 'tap', {}, eventChild)
 assert.deepEqual(events.splice(0), ['child'])
+// Native target data stays tied to SDK records even when two nodes share a logical ID.
+const twinsParent = eventNode('view')
+const twinsChild = eventNode('view')
+twinsParent.id = 'native-twins'
+twinsChild.id = 'native-twins'
+twinsParent.setAttribute('data-role', 'parent')
+twinsChild.setAttribute('data-role', 'child')
+twinsParent.appendChild(twinsChild)
+twinsParent.dataset.role = 'logical-only'
+twinsParent.addEventListener('tap', event => {
+    assert.equal(event.target.dataset.role, 'child')
+    assert.equal(event.currentTarget.dataset.role, 'parent')
+    events.push('twins')
+})
+const lookup = document.getElementById
+document.getElementById = () => assert.fail('TT event targets must use SDK records')
+try {
+    emitNative(twinsParent, 'tap', {}, twinsChild)
+    assert.deepEqual(events.splice(0), ['twins'])
+} finally {
+    document.getElementById = lookup
+}
 const childBridge = eventChild.nativeEventListener
 eventParent.removeChild(eventChild)
 assert.equal(document.getElementById('event-child'), null)

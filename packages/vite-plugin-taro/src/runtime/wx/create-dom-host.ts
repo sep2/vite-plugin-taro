@@ -16,6 +16,7 @@ import {
     type MpInstance,
     Style,
     TaroElement,
+    TaroEvent,
     TaroNode,
     TaroRootElement,
     TaroText
@@ -91,7 +92,7 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
         } else if (name === 'class') {
             setNativeClass(this, String(value))
         } else if (name.startsWith('data-')) {
-            setNativeDataset(native, toCamelCase(name.slice(5)), value)
+            native.setDataset(toCamelCase(name.slice(5)), value)
         } else if (name !== 'style') {
             setNativeProperty(native, toDashed(name), value)
         }
@@ -109,14 +110,16 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
             setNativeClass(this, '')
         } else if (name.startsWith('data-')) {
             const key = toCamelCase(name.slice(5))
-            // Taro removes the attribute prop; its event-facing dataset needs the same removal.
+            // Taro removes the attribute prop; keep its logical dataset in sync.
             delete this.dataset[key]
-            setNativeDataset(native, key, undefined)
+            native.setDataset(key, undefined)
         } else if (name !== 'style') {
             removeNativeProperty(native, toDashed(name))
         }
     })
 
+    // SDK target records are authoritative for native events, independently of logical IDs.
+    extend(TaroEvent, 'getTargetElement', () => null)
     TaroElement.extend('delegateEventUpdate', noop)
 
     TaroElement.extend('delegateEventListener', function (this: HostElement, type: string, subscribed: boolean) {
@@ -289,13 +292,6 @@ function setNativeClass(node: HostElement, value: string): void {
     getTemplateBindings(native).c(native, className)
 }
 
-function setNativeDataset(native: WxNativeElement, key: string, value: unknown): void {
-    // Native sid identifies the logical event target; user data-sid lives in Taro's public dataset.
-    if (key !== 'sid') {
-        native.setDataset(key, value)
-    }
-}
-
 function setNativeProperty(native: WxNativeElement, name: string, value: unknown): void {
     // The SDK owns property routing and completion, including component queues and model-binding feedback.
     const bindings = getTemplateBindings(native)
@@ -337,8 +333,6 @@ function createPageDocument(root: WxRoot): TaroDocument {
             nativeNode: { value: native }
         })
 
-        // Event targets resolve through Taro's stable index, including elements without a user ID.
-        native.setDataset('sid', node.sid)
         if (htmlTag) {
             setNativeClass(node, '')
         }

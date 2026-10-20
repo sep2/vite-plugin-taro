@@ -48,6 +48,7 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
         flushUpdateCallback = flush
     }
     class TaroText extends TaroNode {}
+    class TaroEvent {}
     class FormElement extends TaroElement {}
     const document = {
         createElement(name: string) {
@@ -67,7 +68,7 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
             '@tarojs/shared': `export const noop = () => {}; export const { toCamelCase, toDashed } = globalThis.harness; export function ensure(value, message) { if (!value) throw new Error(message) }`,
             'vite-plugin-taro-runtime/react': 'export const flushSync = globalThis.harness.sync',
             'vite-plugin-taro-runtime/runtime/mini': `
-                export const { document, extend, FormElement, Style, TaroElement, TaroNode, TaroRootElement, TaroText } = globalThis.harness
+                export const { document, extend, FormElement, Style, TaroElement, TaroEvent, TaroNode, TaroRootElement, TaroText } = globalThis.harness
                 export const COMMENT = 'comment'
                 export const eventHandler = globalThis.harness.dispatch
             `
@@ -82,6 +83,7 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
             FormElement,
             Style,
             TaroElement,
+            TaroEvent,
             TaroNode,
             TaroRootElement,
             TaroText,
@@ -267,9 +269,6 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     view.delegateAttributeRemoval('data-user-id')
     assert.equal(nativeView.dataset.userId, undefined)
     assert.equal(Object.hasOwn(view.dataset, 'userId'), false)
-    view.delegateAttributeUpdate('data-sid', 'user-sid')
-    view.delegateAttributeRemoval('data-sid')
-    assert.equal(nativeView.dataset.sid, view.sid)
     view.delegateAttributeUpdate('title', 'panel')
     assert.equal(nativeView.attributes.title, 'panel')
     assert.equal(nativeView.style, 'color: red;')
@@ -282,7 +281,7 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
         assert.equal(secondView.nativeNode.style, 'color: green;')
         assert.equal(nativeView.class, 'updated')
     }
-    assert.equal(nativeView.dataset.sid, view.sid)
+    assert.equal(Object.hasOwn(nativeView.dataset, 'sid'), false)
     const bind = t.mock.method(sdk.getHostNode().templateInstance.procGenWrapper, 'v')
     view.delegateEventListener('tap', true)
     assert.deepEqual(bind.mock.calls[0]?.arguments, [
@@ -390,7 +389,7 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
         const native = node.nativeNode
         const listener = native.listeners[type][0]
         const event = { ...sdkEvent, type, detail: { value: 'changed' } }
-        assert.equal(native.dataset.sid, node.sid)
+        assert.equal(Object.hasOwn(native.dataset, 'sid'), false)
         assert.deepEqual(listener(event), { event, node })
         for (const subscribed of [true, false, true]) {
             node.delegateEventListener(type, subscribed)

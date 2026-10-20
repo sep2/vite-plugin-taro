@@ -807,7 +807,8 @@ function checkWxPageCreation() {
             onClick: handler ? event => {
                 assert.equal(event.type, 'tap')
                 assert.deepEqual(event.target.dataset, { page: { id: tid } })
-                assert.strictEqual(event.currentTarget, event.target)
+                assert.strictEqual(event.currentTarget.dataset, event.mpEvent.currentTarget.dataset)
+                assert.notStrictEqual(event.currentTarget, event.target)
                 clicks.push([tid, handler, value, event.detail])
                 update(value + 1)
             } : undefined
@@ -961,7 +962,7 @@ function checkWxTextInput(app) {
                     const name = type + '-' + controlled
                     return h(type, {
                         key: name,
-                        id: name,
+                        id: component ? undefined : name,
                         ...(controlled ? { value } : { defaultValue: 'seed' }),
                         ref: node => { nodes[name] = node },
                         onInput: mode === 'off' ? undefined : event => {
@@ -1007,8 +1008,8 @@ function checkWxTextInput(app) {
         try {
             ReactDOM.flushSync(() => app.mount(Page, id, () => ({ root }), () =>
                 document.getElementById(id).performUpdate(true)))
-            const originals = Object.values(nodes).map(node => [node, node.nativeNode.listeners.input?.[0]])
-            for (const [node, listener] of originals) {
+            const originals = Object.entries(nodes).map(([name, node]) => [name, node, node.nativeNode.listeners.input?.[0]])
+            for (const [, node, listener] of originals) {
                 assert.equal(typeof listener, 'function', 'text input subscribes without a business handler')
                 assert.equal(node.nativeNode.listeners.input.length, 1)
             }
@@ -1045,8 +1046,8 @@ function checkWxTextInput(app) {
             emit('textarea-true', 'restored')
             expectValues('RESTORED', 'unbound')
             assert.deepEqual(events.splice(0), [['input-true', 'accept', 'restored'], ['textarea-true', 'accept', 'restored']])
-            for (const [node, listener] of originals) {
-                assert.strictEqual(nodes[node.id], node)
+            for (const [name, node, listener] of originals) {
+                assert.strictEqual(nodes[name], node)
                 assert.deepEqual(node.nativeNode.listeners.input, [listener], 'business handlers share the creation-time subscription')
             }
             ReactDOM.flushSync(() => controls.setMode('unmount'))
@@ -1319,12 +1320,12 @@ function checkWxDatasetUpdates(app) {
     const second = { id: 2 }
     const cases = [
         {
-            props: { 'data-user-id': first, 'data-active': false, 'data-count': 0, 'data-sid': 'public-first' },
-            dataset: { userId: first, active: false, count: 0, sid: 'public-first' }
+            props: { 'data-user-id': first, 'data-active': false, 'data-count': 0 },
+            dataset: { userId: first, active: false, count: 0 }
         },
         {
-            props: { 'data-user-id': second, 'data-active': true, 'data-count': 2, 'data-sid': 'public-second' },
-            dataset: { userId: second, active: true, count: 2, sid: 'public-second' }
+            props: { 'data-user-id': second, 'data-active': true, 'data-count': 2 },
+            dataset: { userId: second, active: true, count: 2 }
         },
         { props: {}, dataset: {} }
     ]
@@ -1349,14 +1350,15 @@ function checkWxDatasetUpdates(app) {
             ReactDOM.flushSync(() => controls.setProps(props))
             assert.deepEqual({ ...nodes.child.dataset }, dataset)
             assert.strictEqual(nodes.child.nativeNode, native)
-            assert.equal(native.dataset.sid, nodes.child.sid)
+            assert.equal(Object.hasOwn(native.dataset, 'sid'), false)
             for (const key of ['userId', 'active', 'count']) {
                 assert.strictEqual(native.dataset[key], dataset[key])
             }
+            const nativeDataset = { ...native.dataset }
             ReactDOM.flushSync(() => native.tap({}))
             assert.deepEqual(events.splice(0), [
-                [dataset, dataset],
-                [dataset, { owner: 'parent' }]
+                [nativeDataset, nativeDataset],
+                [nativeDataset, { owner: 'parent' }]
             ])
         }
     } finally {
