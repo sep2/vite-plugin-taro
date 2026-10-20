@@ -4,13 +4,11 @@ page {
     color: #252638;
 }
 
-.app {
-    min-height: 100vh;
-    background: #f7f5ef;
-}
-
 .page {
+    box-sizing: border-box;
+    min-height: 100vh;
     padding: 192rpx 48rpx 64rpx;
+    background: #f7f5ef;
 }
 
 /* Fixed positioning keeps the diagnostic update from moving either transition endpoint after its first frame. */
