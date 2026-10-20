@@ -1251,6 +1251,18 @@ function checkWxPropertyUpdates(app) {
             declared: { scrollX: false, scrollY: false, upperThreshold: 0 }
         },
         {
+            type: 'audit-card',
+            initial: { mapkey: 'first' },
+            updated: { mapkey: 'second' },
+            declared: { mapkey: '' }
+        },
+        {
+            type: 'share-element',
+            initial: { mapkey: 'first', rectTweenType: 'linear' },
+            updated: { mapkey: 'second', rectTweenType: 'materialRectArc' },
+            declared: { key: '', rectTweenType: '' }
+        },
+        {
             type: 'progress',
             initial: { percent: 75, activeColor: 'red' },
             updated: { percent: 0, activeColor: '' },
@@ -1293,10 +1305,11 @@ function checkWxPropertyUpdates(app) {
                     const expected = phase === 'initial' ? item.initial : phase === 'updated' ? item.updated
                         : Object.fromEntries(Object.keys(item.initial).map(name => [name, undefined]))
                     for (const [name, value] of Object.entries(expected)) {
-                        const actual = component ? native._$dataGroup.data[name] : native.attributes[toDashed(name)]
+                        const nativeName = item.type === 'share-element' && name === 'mapkey' ? 'key' : name
+                        const actual = component ? native._$dataGroup.data[nativeName] : native.attributes[toDashed(nativeName)]
                         assert.deepEqual(actual, value, item.type + '.' + name + ':' + phase)
                         if (!component && value === undefined) {
-                            assert.equal(Object.hasOwn(native.attributes, toDashed(name)), false)
+                            assert.equal(Object.hasOwn(native.attributes, toDashed(nativeName)), false)
                         }
                     }
                     if (component) {

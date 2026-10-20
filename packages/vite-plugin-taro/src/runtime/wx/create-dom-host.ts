@@ -94,7 +94,7 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
         } else if (name.startsWith('data-')) {
             native.setDataset(toCamelCase(name.slice(5)), value)
         } else if (name !== 'style') {
-            setNativeProperty(native, toDashed(name), value)
+            setNativeProperty(native, getNativePropertyName(this.nodeName, name), value)
         }
     })
 
@@ -114,7 +114,7 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
             delete this.dataset[key]
             native.setDataset(key, undefined)
         } else if (name !== 'style') {
-            removeNativeProperty(native, toDashed(name))
+            removeNativeProperty(native, getNativePropertyName(this.nodeName, name))
         }
     })
 
@@ -272,6 +272,11 @@ function bindNativeEvent(node: HostElement, type: string, subscribed: boolean): 
         false,
         true
     )
+}
+
+function getNativePropertyName(type: string, name: string): string {
+    // React reserves key for reconciliation; Taro exposes the shared-element property as mapkey.
+    return type === 'share-element' && name === 'mapkey' ? 'key' : toDashed(name)
 }
 
 function getHtmlTagName(name: string): 'view' | 'text' | undefined {
