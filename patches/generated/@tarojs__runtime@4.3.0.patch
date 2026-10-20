@@ -516,13 +516,14 @@ index f4062db04f2a8216795447f892b80b7b6514f467..8a8aab1e78ca3f5087bf768cf57732ed
          const dispatch = () => {
              const e = createEvent(event, node);
 diff --git a/dist/dom/node.d.ts b/dist/dom/node.d.ts
-index a456e9adeecdaae566fe965b7054e55cf009530e..0faaa61ba838cf512013aca085170511b1b7db08 100644
+index a456e9adeecdaae566fe965b7054e55cf009530e..818bc7dbebf42dc8ebe848a98511c544e928e012 100644
 --- a/dist/dom/node.d.ts
 +++ b/dist/dom/node.d.ts
-@@ -20,7 +20,12 @@ declare class TaroNode extends TaroEventTarget {
+@@ -19,8 +19,12 @@ declare class TaroNode extends TaroEventTarget {
+     parentNode: TaroNode | null;
      childNodes: TaroNode[];
      constructor();
-     private hydrate;
+-    private hydrate;
 -    private updateChildNodes;
 +    /**
 +     * 子列表整体更新通知，包括 textContent 完成逐项变更后的最终通知。
@@ -533,7 +534,7 @@ index a456e9adeecdaae566fe965b7054e55cf009530e..0faaa61ba838cf512013aca085170511
      private updateSingleChild;
      get _root(): TaroRootElement | null;
      get _scope(): MpInstance | null | undefined;
-@@ -71,6 +76,19 @@ declare class TaroNode extends TaroEventTarget {
+@@ -71,6 +75,19 @@ declare class TaroNode extends TaroEventTarget {
       *   2. remove C
       */
      removeChild<T extends TaroNode>(child: T, options?: RemoveChildOptions): T;
@@ -554,10 +555,15 @@ index a456e9adeecdaae566fe965b7054e55cf009530e..0faaa61ba838cf512013aca085170511
      hasChildNodes(): boolean;
      enqueueUpdate(payload: UpdatePayload): void;
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index cc210f4e56ff90d69a398e2e27382def86f4cb0c..a97832f797bdbf51147bf67fdc11810c0d5a6af9 100644
+index cc210f4e56ff90d69a398e2e27382def86f4cb0c..77444093794dab103b0a67051e00a0ec90c28853 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
-@@ -20,7 +20,15 @@ class TaroNode extends TaroEventTarget {
+@@ -15,12 +15,19 @@ class TaroNode extends TaroEventTarget {
+         super();
+         this.parentNode = null;
+         this.childNodes = [];
+-        this.hydrate = (node) => () => hydrate(node);
+         this.uid = '_' + nodeId(); // dom 节点 id，开发者可修改
          this.sid = this.uid; // dom 节点全局唯一 id，不可被修改
          eventSource.set(this.sid, this);
      }
@@ -574,7 +580,16 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..a97832f797bdbf51147bf67fdc11810c
          const cleanChildNodes = () => [];
          const rerenderChildNodes = () => {
              const childNodes = this.childNodes.filter(node => !isComment(node));
-@@ -94,28 +102,32 @@ class TaroNode extends TaroEventTarget {
+@@ -39,7 +46,7 @@ class TaroNode extends TaroEventTarget {
+                 return;
+             this.enqueueUpdate({
+                 path: child._path,
+-                value: this.hydrate(child)
++                value: () => hydrate(child)
+             });
+         });
+     }
+@@ -94,28 +101,32 @@ class TaroNode extends TaroEventTarget {
       */
      // eslint-disable-next-line accessor-pairs
      set textContent(text) {
@@ -619,7 +634,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..a97832f797bdbf51147bf67fdc11810c
      }
      /**
       * @doc https://developer.mozilla.org/zh-CN/docs/Web/API/Node/insertBefore
-@@ -126,6 +138,10 @@ class TaroNode extends TaroEventTarget {
+@@ -126,6 +137,10 @@ class TaroNode extends TaroEventTarget {
       *   3. insert D before C, D has the different parent of C
       */
      insertBefore(newChild, refChild, isReplace) {
@@ -630,7 +645,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..a97832f797bdbf51147bf67fdc11810c
          if (newChild.nodeName === DOCUMENT_FRAGMENT) {
              newChild.childNodes.reduceRight((previousValue, currentValue) => {
                  this.insertBefore(currentValue, previousValue);
-@@ -133,10 +149,15 @@ class TaroNode extends TaroEventTarget {
+@@ -133,10 +148,15 @@ class TaroNode extends TaroEventTarget {
              }, refChild);
              return newChild;
          }
@@ -650,7 +665,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..a97832f797bdbf51147bf67fdc11810c
          let index = 0;
          // Data structure
          newChild.parentNode = this;
-@@ -149,67 +170,26 @@ class TaroNode extends TaroEventTarget {
+@@ -149,67 +169,26 @@ class TaroNode extends TaroEventTarget {
              // appendChild
              this.childNodes.push(newChild);
          }
@@ -735,7 +750,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..a97832f797bdbf51147bf67fdc11810c
          return newChild;
      }
      /**
-@@ -234,6 +214,9 @@ class TaroNode extends TaroEventTarget {
+@@ -234,6 +213,9 @@ class TaroNode extends TaroEventTarget {
      replaceChild(newChild, oldChild) {
          if (oldChild.parentNode !== this)
              return;
@@ -745,7 +760,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..a97832f797bdbf51147bf67fdc11810c
          // Insert the newChild
          this.insertBefore(newChild, oldChild, true);
          // Destroy the oldChild
-@@ -251,7 +234,7 @@ class TaroNode extends TaroEventTarget {
+@@ -251,7 +233,7 @@ class TaroNode extends TaroEventTarget {
       */
      removeChild(child, options = {}) {
          const { cleanRef, doUpdate } = options;
@@ -754,7 +769,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..a97832f797bdbf51147bf67fdc11810c
              // appendChild/replaceChild/insertBefore 不应该触发
              // @Todo: 但其实如果 newChild 的父节点是另一颗子树的节点，应该是要触发的
              MutationObserver.record({
-@@ -270,15 +253,88 @@ class TaroNode extends TaroEventTarget {
+@@ -270,15 +252,88 @@ class TaroNode extends TaroEventTarget {
          if (cleanRef !== false) {
              eventSource.removeNodeTree(child);
          }
@@ -796,7 +811,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..a97832f797bdbf51147bf67fdc11810c
 +                else {
 +                    this.enqueueUpdate({
 +                        path: newChild._path,
-+                        value: this.hydrate(newChild)
++                        value: () => hydrate(newChild)
 +                    });
 +                }
 +            }
@@ -804,7 +819,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..a97832f797bdbf51147bf67fdc11810c
 +                // replaceChild
 +                this.enqueueUpdate({
 +                    path: newChild._path,
-+                    value: this.hydrate(newChild)
++                    value: () => hydrate(newChild)
 +                });
 +            }
 +            else {

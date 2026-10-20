@@ -70,6 +70,11 @@ const fixture = `
 import assert from 'node:assert/strict'
 import { document, hydrate, MutationObserver, TaroEvent } from 'vite-plugin-taro-runtime/runtime/mini'
 
+// Hydration belongs to queued template payloads, rather than node instances or their prototypes.
+for (const node of [document.createElement('root'), document.createElement('view'), document.createTextNode('text'), document.createComment('anchor')]) {
+    assert.equal('hydrate' in node, false)
+}
+
 function setup(rooted) {
     const root = document.createElement('root')
     const parent = document.createElement('view')
@@ -176,6 +181,31 @@ for (const rooted of [false, true]) {
         }
         observer.disconnect()
     }
+}
+
+// Incremental template payloads capture node identity and read its final contents when evaluated.
+for (const operation of ['append', 'replace', 'insert-late']) {
+    const { root, parent, nodes, observer } = setup(true)
+    const child = document.createElement('view')
+    child.appendChild(document.createTextNode('initial'))
+    if (operation === 'append') {
+        parent.appendChild(child)
+    } else if (operation === 'replace') {
+        parent.replaceChild(child, nodes[1])
+    } else {
+        parent.insertBefore(child, nodes[4])
+    }
+    const pending = root.updatePayloads.slice()
+    const expected = operation === 'insert-late' ? [child, nodes[4]] : [child]
+    assert.deepEqual(pending.map(payload => payload.path), expected.map(node => node._path))
+    child.firstChild.nodeValue = 'final text'
+    child.className = 'final-class'
+    nodes[4].firstChild.nodeValue = 'final sibling'
+    for (const [index, payload] of pending.entries()) {
+        assert.equal(typeof payload.value, 'function')
+        assert.deepEqual(payload.value(), hydrate(expected[index]))
+    }
+    observer.disconnect()
 }
 
 // Self-insertion and self-replacement retain the node without delegating or recording a mutation.

@@ -1,0 +1,51 @@
+diff --git a/dist/dom/node.d.ts b/dist/dom/node.d.ts
+index 0faaa61ba838cf512013aca085170511b1b7db08..818bc7dbebf42dc8ebe848a98511c544e928e012 100644
+--- a/dist/dom/node.d.ts
++++ b/dist/dom/node.d.ts
+@@ -19,7 +19,6 @@ declare class TaroNode extends TaroEventTarget {
+     parentNode: TaroNode | null;
+     childNodes: TaroNode[];
+     constructor();
+-    private hydrate;
+     /**
+      * 子列表整体更新通知，包括 textContent 完成逐项变更后的最终通知。
+      * isClean=true 对应空列表，否则模板默认延迟序列化当前子节点；逻辑树已由调用方修改。
+diff --git a/dist/dom/node.js b/dist/dom/node.js
+index a97832f797bdbf51147bf67fdc11810c0d5a6af9..77444093794dab103b0a67051e00a0ec90c28853 100644
+--- a/dist/dom/node.js
++++ b/dist/dom/node.js
+@@ -15,7 +15,6 @@ class TaroNode extends TaroEventTarget {
+         super();
+         this.parentNode = null;
+         this.childNodes = [];
+-        this.hydrate = (node) => () => hydrate(node);
+         this.uid = '_' + nodeId(); // dom 节点 id，开发者可修改
+         this.sid = this.uid; // dom 节点全局唯一 id，不可被修改
+         eventSource.set(this.sid, this);
+@@ -47,7 +46,7 @@ class TaroNode extends TaroEventTarget {
+                 return;
+             this.enqueueUpdate({
+                 path: child._path,
+-                value: this.hydrate(child)
++                value: () => hydrate(child)
+             });
+         });
+     }
+@@ -287,7 +286,7 @@ class TaroNode extends TaroEventTarget {
+                 else {
+                     this.enqueueUpdate({
+                         path: newChild._path,
+-                        value: this.hydrate(newChild)
++                        value: () => hydrate(newChild)
+                     });
+                 }
+             }
+@@ -295,7 +294,7 @@ class TaroNode extends TaroEventTarget {
+                 // replaceChild
+                 this.enqueueUpdate({
+                     path: newChild._path,
+-                    value: this.hydrate(newChild)
++                    value: () => hydrate(newChild)
+                 });
+             }
+             else {

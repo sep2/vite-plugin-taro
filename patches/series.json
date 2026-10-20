@@ -39,7 +39,8 @@
             "patches/series/@tarojs__runtime@4.3.0/07-clone-delegation.patch",
             "patches/series/@tarojs__runtime@4.3.0/08-page-host-context.patch",
             "patches/series/@tarojs__runtime@4.3.0/09-same-parent-moves.patch",
-            "patches/series/@tarojs__runtime@4.3.0/10-mutation-observer-fast-path.patch"
+            "patches/series/@tarojs__runtime@4.3.0/10-mutation-observer-fast-path.patch",
+            "patches/series/@tarojs__runtime@4.3.0/11-template-hydration.patch"
         ]
     },
     {
