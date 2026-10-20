@@ -567,8 +567,16 @@ function expectStyle(calls) {
     assert.equal(cssReads, 0, 'single-property updates forward directly while observers are idle')
     cssReads = 0
 }
-style.color = 'red'
-expectStyle([['style', parent.nativeNode, 'color', 'red']])
+// The host invokes the callback once and retains immediate per-property SDK writes inside it.
+const styleUpdates = []
+host.batchStyleUpdate(parent, () => {
+    styleUpdates.push('update')
+    style.color = 'red'
+    expectStyle([['style', parent.nativeNode, 'color', 'red']])
+})
+assert.deepEqual(styleUpdates, ['update'])
+const styleError = new Error('style update failed')
+assert.throws(() => host.batchStyleUpdate(parent, () => { throw styleError }), error => error === styleError)
 style.color = 'red'
 expectCalls([])
 assert.equal(cssReads, 0)

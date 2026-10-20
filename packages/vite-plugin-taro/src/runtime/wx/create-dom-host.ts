@@ -48,6 +48,9 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
     // Page IDs retain their creation documents until unmount completes; lookups are O(1) on average.
     const docs = new Map<string, TaroDocument>()
 
+    // Synchronous scopes track clean (false) and dirty (true) styles; absence forwards immediately.
+    const styleUpdates = new WeakMap<Style, boolean>()
+
     // Document/App structure is logical; Page elements carry SDK handles. Delegates are shared by all Pages.
     TaroNode.extend('delegateChildInsertion', function (this: HostElement, child: HostNode, before?: HostNode | null) {
         const native = this.nativeNode
@@ -123,8 +126,13 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
     extend(Style, 'delegateStyleUpdate', function (this: Style & { _element: HostElement }) {
         const native = this._element.nativeNode
         if (native) {
-            // The SDK accepts serialized styles; each write costs O(S) in this element's style count.
-            native.style = this.cssText
+            const dirty = styleUpdates.get(this)
+            if (dirty === undefined) {
+                // Serialize the final logical style once; standalone imperative changes forward immediately.
+                native.style = this.cssText
+            } else if (!dirty) {
+                styleUpdates.set(this, true)
+            }
         }
     })
 
@@ -214,6 +222,23 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
         },
         isFormElement(element) {
             return element instanceof FormElement
+        },
+        batchStyleUpdate(element: HostElement, update) {
+            const style = element.style
+            if (styleUpdates.has(style)) {
+                return update()
+            }
+            styleUpdates.set(style, false)
+            try {
+                update()
+            } finally {
+                const dirty = styleUpdates.get(style)
+                styleUpdates.delete(style)
+                if (dirty) {
+                    // Dirty styles have an immutable native handle; the cleared scope allows SDK re-entry.
+                    element.nativeNode!.style = style.cssText
+                }
+            }
         },
         afterCommit: noop
     }

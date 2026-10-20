@@ -115,6 +115,17 @@ const text = host.createText(root, context, 'prefix text')
 assert.ok(text instanceof TaroText)
 assert.equal(text.nodeValue, 'prefix text')
 
+// Record synchronous callback delivery independently of the template scheduler.
+const styleUpdates = []
+host.batchStyleUpdate(input, () => {
+    styleUpdates.push('update')
+    input.style.color = 'red'
+})
+assert.deepEqual(styleUpdates, ['update'])
+assert.equal(input.style.color, 'red')
+const styleError = new Error('style update failed')
+assert.throws(() => host.batchStyleUpdate(input, () => { throw styleError }), error => error === styleError)
+
 host.afterCommit(root)
 const nonAppParent = document.createElement('view')
 nonAppParent.appendChild(root)

@@ -174,7 +174,7 @@ overrides:
 patchedDependencies:
   '@tarojs/plugin-framework-react@4.3.0': 3c84a70d8080062ce085f27eb3d079eaad0136bb7667129b223e99b70e9ac9c9
   '@tarojs/plugin-html@4.3.0': 1b3285e3d049f699034de96140ec01bb4172d33a34cde41f53516e7494e56243
-  '@tarojs/react@4.3.0': 989d5d4bea179eae28f37d59ff0fe1e8457883edaabed1ce665d5b79f1503507
+  '@tarojs/react@4.3.0': 6b3fc47977a94a43f5c0073435d00ec687a16933c0452e097a580094a7bcbacd
   '@tarojs/runtime@4.3.0': 30a0f6288c78cc0fe066fa273ad1b05f67a09502a75619134ae348cf5a4e685f
   canvas-confetti@1.9.4: 3f4a594e24a7e49abb6d1e667918977b4679fe1b93dc4e9efe04f87e9539ea36
 
@@ -550,7 +550,7 @@ importers:
         version: 4.3.0(@tarojs/service@4.3.0(supports-color@7.2.0))(@tarojs/shared@4.3.0)
       '@tarojs/react':
         specifier: 4.3.0
-        version: 4.3.0(patch_hash=989d5d4bea179eae28f37d59ff0fe1e8457883edaabed1ce665d5b79f1503507)(react@19.3.0)
+        version: 4.3.0(patch_hash=6b3fc47977a94a43f5c0073435d00ec687a16933c0452e097a580094a7bcbacd)(react@19.3.0)
       '@tarojs/router':
         specifier: 4.3.0
         version: 4.3.0(@tarojs/runtime@4.3.0(patch_hash=30a0f6288c78cc0fe066fa273ad1b05f67a09502a75619134ae348cf5a4e685f))(@tarojs/shared@4.3.0)(@tarojs/taro@4.3.0(@tarojs/components@4.3.0(@tarojs/helper@4.3.0(supports-color@7.2.0))(@types/react@19.3.0)(postcss@8.5.29))(@tarojs/helper@4.3.0(supports-color@7.2.0))(@tarojs/shared@4.3.0)(@types/react@19.3.0)(postcss@8.5.29))
@@ -7217,7 +7217,7 @@ snapshots:
       '@tarojs/service': 4.3.0(supports-color@7.2.0)
       '@tarojs/shared': 4.3.0
 
-  '@tarojs/react@4.3.0(patch_hash=989d5d4bea179eae28f37d59ff0fe1e8457883edaabed1ce665d5b79f1503507)(react@19.3.0)':
+  '@tarojs/react@4.3.0(patch_hash=6b3fc47977a94a43f5c0073435d00ec687a16933c0452e097a580094a7bcbacd)(react@19.3.0)':
     dependencies:
       '@tarojs/runtime': 4.3.0(patch_hash=30a0f6288c78cc0fe066fa273ad1b05f67a09502a75619134ae348cf5a4e685f)
       '@tarojs/shared': 4.3.0

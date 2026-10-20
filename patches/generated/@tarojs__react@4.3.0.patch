@@ -37,7 +37,7 @@ index 7f5ed89b2448d03dc2658ca2be2c016f12387daa..dd745e0b88386c4fb1cb390bbf791bd4
      internalInstanceKey: string;
  };
 diff --git a/dist/react.esm.js b/dist/react.esm.js
-index ad8a51f02788c6e0354579956625da33a00e14a2..23f4035fd6991eabaa5dcdbf16b93c672fc22f1b 100644
+index ad8a51f02788c6e0354579956625da33a00e14a2..4e86e71fcd3b610300559fc99ca4eff19c5b3ac6 100644
 --- a/dist/react.esm.js
 +++ b/dist/react.esm.js
 @@ -1,7 +1,15 @@
@@ -96,7 +96,118 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..23f4035fd6991eabaa5dcdbf16b93c67
          }
          else {
              dom.addEventListener(eventName, value, process.env.TARO_PLATFORM !== PLATFORM_TYPE.HARMONY ? isCapture : undefined);
-@@ -600,7 +604,51 @@ function styleObjectToCss(style) {
+@@ -492,63 +496,66 @@ function setHarmonyStyle(dom, value, oldValue) {
+     }
+     dom.setAttribute('__hmStyle', value);
+ }
+-function setProperty(dom, name, value, oldValue) {
+-    var _a, _b;
+-    name = name === 'className' ? 'class' : name;
+-    if (name === 'key' ||
+-        name === 'children' ||
+-        name === 'ref') ;
+-    else if (name === 'style') {
+-        if (process.env.TARO_ENV === 'tt' && isEnableTTDom()) {
+-            if (isString(value)) {
+-                dom.setAttribute('style', value);
+-            }
+-            else if (isObject(value)) {
+-                dom.setAttribute('style', styleObjectToCss(value));
+-            }
++function setStyleProperty(dom, value, oldValue) {
++    if (process.env.TARO_ENV === 'tt' && isEnableTTDom()) {
++        if (isString(value)) {
++            dom.setAttribute('style', value);
++        }
++        else if (isObject(value)) {
++            dom.setAttribute('style', styleObjectToCss(value));
++        }
++    }
++    else {
++        if (/harmony.*cpp/.test(process.env.TARO_ENV || '')) {
++            return dom.setAttribute('_style4cpp', value);
++        }
++        const style = dom.style;
++        if (isString(value)) {
++            style.cssText = value;
+         }
+         else {
+-            if (/harmony.*cpp/.test(process.env.TARO_ENV || '')) {
+-                return dom.setAttribute('_style4cpp', value);
+-            }
+-            const style = dom.style;
+-            if (isString(value)) {
+-                style.cssText = value;
++            if (isString(oldValue)) {
++                style.cssText = '';
++                oldValue = null;
+             }
+-            else {
+-                if (isString(oldValue)) {
+-                    style.cssText = '';
+-                    oldValue = null;
+-                }
+-                if (isObject(oldValue)) {
+-                    for (const i in oldValue) {
+-                        if (!(value && i in value)) {
+-                            // Harmony特殊处理
+-                            if (process.env.TARO_PLATFORM === PLATFORM_TYPE.HARMONY && i === 'position' && oldValue[i] === 'fixed') {
+-                                // @ts-ignore
+-                                dom.setLayer(0);
+-                            }
+-                            setStyle(style, i, '');
++            if (isObject(oldValue)) {
++                for (const i in oldValue) {
++                    if (!(value && i in value)) {
++                        // Harmony特殊处理
++                        if (process.env.TARO_PLATFORM === PLATFORM_TYPE.HARMONY && i === 'position' && oldValue[i] === 'fixed') {
++                            // @ts-ignore
++                            dom.setLayer(0);
+                         }
++                        setStyle(style, i, '');
+                     }
+                 }
+-                if (isObject(value)) {
+-                    for (const i in value) {
+-                        if (!oldValue || !isEqual(value[i], oldValue[i])) {
+-                            // Harmony特殊处理
+-                            if (process.env.TARO_PLATFORM === PLATFORM_TYPE.HARMONY && i === 'position') {
+-                                if (value[i] === 'fixed' || (value[i] !== 'fixed' && (oldValue === null || oldValue === void 0 ? void 0 : oldValue[i]))) {
+-                                    // @ts-ignore
+-                                    dom.setLayer(value[i] === 'fixed' ? 1 : 0);
+-                                }
++            }
++            if (isObject(value)) {
++                for (const i in value) {
++                    if (!oldValue || !isEqual(value[i], oldValue[i])) {
++                        // Harmony特殊处理
++                        if (process.env.TARO_PLATFORM === PLATFORM_TYPE.HARMONY && i === 'position') {
++                            if (value[i] === 'fixed' || (value[i] !== 'fixed' && (oldValue === null || oldValue === void 0 ? void 0 : oldValue[i]))) {
++                                // @ts-ignore
++                                dom.setLayer(value[i] === 'fixed' ? 1 : 0);
+                             }
+-                            setStyle(style, i, value[i]);
+                         }
++                        setStyle(style, i, value[i]);
+                     }
+                 }
+             }
+         }
+     }
++}
++function setProperty(dom, name, value, oldValue) {
++    var _a, _b;
++    name = name === 'className' ? 'class' : name;
++    if (name === 'key' ||
++        name === 'children' ||
++        name === 'ref') ;
++    else if (name === 'style') {
++        host.batchStyleUpdate(dom, () => setStyleProperty(dom, value, oldValue))
++    }
+     else if (isEventName(name)) {
+         setEvent(dom, name, value, oldValue);
+     }
+@@ -600,7 +607,51 @@ function styleObjectToCss(style) {
  }
  
  /* eslint-disable @typescript-eslint/indent */
@@ -148,7 +259,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..23f4035fd6991eabaa5dcdbf16b93c67
      // below keys order by {React ReactFiberHostConfig.custom.js}, convenient for comparing each other.
      // -------------------
      // required by @types/react-reconciler
-@@ -611,15 +659,18 @@ const hostConfig = {
+@@ -611,15 +662,18 @@ const hostConfig = {
      getRootHostContext() {
          return {};
      },
@@ -173,7 +284,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..23f4035fd6991eabaa5dcdbf16b93c67
          precacheFiberNode(internalInstanceHandle, element);
          updateFiberProps(element, props);
          return element;
-@@ -629,7 +680,7 @@ const hostConfig = {
+@@ -629,7 +683,7 @@ const hostConfig = {
      },
      finalizeInitialChildren(dom, type, props) {
          let newProps = props;
@@ -182,7 +293,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..23f4035fd6991eabaa5dcdbf16b93c67
              const [defaultName, defaultKey] = ['switch', 'checkbox', 'radio'].includes(type) ? ['checked', 'defaultChecked'] : ['value', 'defaultValue'];
              if (props.hasOwnProperty(defaultKey)) {
                  newProps = Object.assign(Object.assign({}, newProps), { [defaultName]: props[defaultKey] });
-@@ -642,14 +693,11 @@ const hostConfig = {
+@@ -642,14 +696,11 @@ const hostConfig = {
          }
          return false;
      },
@@ -199,7 +310,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..23f4035fd6991eabaa5dcdbf16b93c67
          precacheFiberNode(internalInstanceHandle, textNode);
          return textNode;
      },
-@@ -667,9 +715,6 @@ const hostConfig = {
+@@ -667,9 +718,6 @@ const hostConfig = {
      preparePortalMount: noop,
      prepareScopeUpdate: noop,
      getInstanceFromScope: () => null,
@@ -209,7 +320,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..23f4035fd6991eabaa5dcdbf16b93c67
      detachDeletedInstance: noop,
      // -------------------
      //      Microtasks
-@@ -699,7 +744,8 @@ const hostConfig = {
+@@ -699,7 +747,8 @@ const hostConfig = {
          textInst.nodeValue = newText;
      },
      commitMount: noop,
@@ -219,7 +330,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..23f4035fd6991eabaa5dcdbf16b93c67
          if (!updatePayload)
              return;
          // payload 只包含 children 的时候，不应该再继续触发后续的属性比较和更新的逻辑了
-@@ -745,10 +791,21 @@ const hostConfig = {
+@@ -745,10 +794,21 @@ const hostConfig = {
      }
  };
  const TaroReconciler = Reconciler(hostConfig);
@@ -242,7 +353,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..23f4035fd6991eabaa5dcdbf16b93c67
          rendererPackageName: 'taro-react'
      });
      if (!foundDevTools) {
-@@ -796,7 +853,7 @@ function needsStateRestore() {
+@@ -796,7 +856,7 @@ function needsStateRestore() {
  function finishEventHandler() {
      const controlledComponentsHavePendingUpdates = needsStateRestore();
      if (controlledComponentsHavePendingUpdates) {
@@ -251,7 +362,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..23f4035fd6991eabaa5dcdbf16b93c67
          restoreStateIfNeeded();
      }
  }
-@@ -832,80 +889,55 @@ function restoreStateOfTarget(item) {
+@@ -832,80 +892,55 @@ function restoreStateOfTarget(item) {
      }
  }
  
@@ -366,7 +477,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..23f4035fd6991eabaa5dcdbf16b93c67
              node.dispatchEvent(e);
          });
      });
-@@ -946,22 +978,10 @@ function unmountComponentAtNode(dom) {
+@@ -946,22 +981,10 @@ function unmountComponentAtNode(dom) {
      if (!root)
          return false;
      unstable_batchedUpdates(() => {
@@ -390,7 +501,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..23f4035fd6991eabaa5dcdbf16b93c67
  const portalType = isFunction(Symbol) && Symbol.for
      ? Symbol.for('react.portal')
      : 0xeaca;
-@@ -974,17 +994,20 @@ function createPortal(children, containerInfo, key) {
+@@ -974,17 +997,20 @@ function createPortal(children, containerInfo, key) {
          implementation: null
      };
  }
@@ -456,10 +567,10 @@ index 1384c9307cc6ee2586e80d5334e54d3e5984453a..88ce8da3b95e5869f15e0ff42c7d7424
  export {};
 diff --git a/dist/renderer-host.d.ts b/dist/renderer-host.d.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..3bd6d6c17e5b45e8dcd01283e5ac19611facbd3b
+index 0000000000000000000000000000000000000000..a8eebd750e701fd231150ce17eb72fb88877925f
 --- /dev/null
 +++ b/dist/renderer-host.d.ts
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,12 @@
 +/** Host-owned creation, form classification and commit boundaries for the shared React renderer. */
 +export type RendererHost<Container, Context, Element, Text> = Readonly<{
 +    getPageRootType?(id: string): string
@@ -467,6 +578,8 @@ index 0000000000000000000000000000000000000000..3bd6d6c17e5b45e8dcd01283e5ac1961
 +    createElement(container: Container, context: Context, type: string): Element
 +    createText(container: Container, context: Context, text: string): Text
 +    isFormElement(element: Element): boolean
++    /** Synchronously scope one style-prop application; logical setters and mutation records still run. */
++    batchStyleUpdate(element: Element, update: () => void): void
 +    beforeCommit?(container: Container): void
 +    afterCommit(container: Container): void
 +}>

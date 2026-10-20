@@ -56,6 +56,9 @@ export function createTemplateHost(): MiniHost {
         isFormElement(element) {
             return element instanceof FormElement
         },
+        batchStyleUpdate(_element, update) {
+            update()
+        },
         /*
          * React calls this after host mutations. Taro's lazy structural payloads observe the final outlet markers when its
          * existing native update batch is serialized.

@@ -24,11 +24,12 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
 }
 
 test('published renderer and declarations expose only the supported React 19 rendering contract', async () => {
-    const [renderer, framework, declarations, rootDeclarations] = await Promise.all([
+    const [renderer, framework, declarations, rootDeclarations, hostDeclarations] = await Promise.all([
         readFile(rendererPath, 'utf8'),
         readFile(resolveTaroRuntime('plugin-framework-react/runtime'), 'utf8'),
         readFile(path.join(path.dirname(rendererPath), 'index.d.ts'), 'utf8'),
-        readFile(path.join(path.dirname(rendererPath), 'render.d.ts'), 'utf8')
+        readFile(path.join(path.dirname(rendererPath), 'render.d.ts'), 'utf8'),
+        readFile(path.join(path.dirname(rendererPath), 'renderer-host.d.ts'), 'utf8')
     ])
     assert.doesNotMatch(
         renderer,
@@ -49,6 +50,7 @@ test('published renderer and declarations expose only the supported React 19 ren
     )
     assert.match(rootDeclarations, /onUncaughtError\?/)
     assert.match(rootDeclarations, /onCaughtError\?/)
+    assert.match(hostDeclarations, /batchStyleUpdate\(element: Element, update: \(\) => void\): void/)
 })
 
 async function runFixture(t: TestContext, target: 'wx' | 'zfb' | 'tt', mode: string): Promise<void> {

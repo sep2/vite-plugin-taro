@@ -225,6 +225,9 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
         isFormElement(element) {
             return element instanceof FormElement
         },
+        batchStyleUpdate(_element, update) {
+            update()
+        },
         // 原生树操作已在各个 mutation 委托中同步完成。
         afterCommit: noop
     }

@@ -1,6 +1,6 @@
 # Dependency patch series
 
-pnpm applies one combined patch to each package version. We maintain **21 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output.
+pnpm applies one combined patch to each package version. We maintain **22 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output.
 
 ## Feature inventory
 
@@ -16,6 +16,7 @@ pnpm applies one combined patch to each package version. We maintain **21 featur
 | | `02-renderer-host` | Delegate node creation, form classification and commit boundaries through VPT's private renderer-host import, and expose the generic host type. |
 | | `03-page-host-context` | Delegate Page-root type and child host-context selection to the optional host callbacks. |
 | | `04-event-handler-replacement` | Add replacement React callbacks before removing their predecessors, preserving continuous native subscriptions and logical handler order. |
+| | `05-style-update-batching` | Expose a synchronous style-prop boundary so the WX DOM host serializes and forwards the final logical style once. |
 | `@tarojs/runtime@4.3.0` | `01-mini-app-page-rendering` | Construct the App host as a scheduler, derive initial reset paths from the root prefix, and stop App serialization at the Page outlet. |
 | | `02-page-prerender` | Type native Page data as an object or factory and let onLoad adopt a caller-prepared identity without moving lifecycle dispatch. VPT stores that identity in non-enumerable `__vpt_meta.prerenderIdentity`; the factory signature is unchanged. |
 | | `03-delegate-dom` | Expose overridable child insertion/removal/reset, text, attribute, style and event delegation methods while Taro owns logical state, event identities, mutation records and context-cache invalidation. The defaults preserve template payload preparation. |
@@ -73,6 +74,8 @@ Upstream: [NervJS/taro#19530](https://github.com/NervJS/taro/pull/19530). Retire
 `vite-plugin-taro-runtime/runtime/tt-document` exposes Taro's existing `bom/document.js` factory directly. Its native DOM declarations live in the runtime package's `types/tt-document.d.ts`.
 
 `04-event-handler-replacement` in the React series keeps an event's logical listener array nonempty while replacing a function-valued prop. The new handler is appended before the old handler is removed, so the host retains its existing SDK event entry and dispatch reads the current logical callback. Final handler order, template side-effect flags, initial subscription, final removal, HTML aliases and expanded `regionchange` events retain their normal contracts. Replacement retains the existing O(H) handler search/removal for H handlers, with one temporary logical handler and no persistent subscription state.
+
+`05-style-update-batching` defines the required `RendererHost.batchStyleUpdate(element, update)` boundary around one React style-prop application. Every host executes the callback synchronously and exactly once. The WX DOM host scopes dirty styles in a WeakMap and defers only native forwarding, including the `cssText` read. The outermost scope clears its entry and flushes in `finally`, including completed logical mutations when a setter throws. Existing setters, numeric conversion, removals, string/object transitions and individual MutationObserver records remain intact; standalone imperative changes still forward immediately. TT DOM and template hosts forward the callback directly. For C changed properties and S serialized properties, unobserved serialization falls from O(C × S) to O(S), alongside the existing style diff; active observers still require their per-mutation old-value snapshots. Native assignments are SDK calls, not transport flushes or paint measurements.
 
 React 19 support spans the renderer and framework packages. The renderer targets `react-reconciler@0.34.0` and React 19.3, without legacy roots, React 18 host signatures or API probing. `render` and `findDOMNode` are no longer exported; callers use `createRoot` and refs. The internal `unmountComponentAtNode` host-lookup helper remains, but only tears down concurrent roots. Public `flushSync` runs callbacks through `flushSyncFromReconciler`; controlled-input restoration calls `flushSyncWork` before restoring native values. Neither operation waits for native `setData` completion.
 

@@ -10,8 +10,10 @@ import { rendererHostId } from '../../node/plugins/mini/module/module.ts'
 import { resolveTaroRuntime } from '../../node/utils/packages.ts'
 
 class Element {
-    // This fixture records only attribute writes; it has no Taro prototype or native data scheduler.
+    // Record host mutations independently of Taro's prototypes and native scheduling.
     readonly attributes = new Map<string, unknown>()
+    // Logical style assignments exercise the renderer's synchronous host boundary.
+    readonly style: Record<string, unknown> = {}
 
     setAttribute(name: string, value: unknown): void {
         this.attributes.set(name, value)
@@ -97,6 +99,9 @@ for (const mode of ['development', 'production']) {
             isFormElement(node) {
                 return forms.has(node)
             },
+            batchStyleUpdate(_element, update) {
+                update()
+            },
             afterCommit(container) {
                 calls.push({ name: 'commit', args: [container] })
             }
@@ -181,5 +186,49 @@ for (const mode of ['development', 'production']) {
         hostConfig.createTextInstance('scoped text', container, selected, {})
         assert.strictEqual(calls[4].args[1], selected)
         assert.strictEqual(calls[5].args[1], selected)
+
+        hostConfig.finalizeInitialChildren(element, 'view', { style: { color: 'red', width: 2 } })
+        assert.deepEqual(element.style, { color: 'red', width: '2px' })
+        // This host-owned scope observes logical values before/after the exact callback, in the same stack.
+        const scopes: unknown[] = []
+        Object.assign(host, {
+            batchStyleUpdate(node: Element, update: () => void) {
+                assert.strictEqual(this, host)
+                assert.strictEqual(node, element)
+                scopes.push({ ...node.style })
+                try {
+                    update()
+                } finally {
+                    scopes.push({ ...node.style })
+                }
+            }
+        })
+        hostConfig.commitUpdate(element, 'view', { style: { color: 'red', width: 2 } }, { style: { color: 'blue' } })
+        assert.deepEqual(scopes, [
+            { color: 'red', width: '2px' },
+            { color: 'blue', width: '' }
+        ])
+        const error = new Error('style application failed')
+        assert.throws(
+            () =>
+                hostConfig.commitUpdate(
+                    element,
+                    'view',
+                    {},
+                    {
+                        style: {
+                            color: 'green',
+                            get height() {
+                                throw error
+                            }
+                        }
+                    }
+                ),
+            (thrown) => thrown === error
+        )
+        assert.deepEqual(scopes.slice(2), [
+            { color: 'blue', width: '' },
+            { color: 'green', width: '' }
+        ])
     })
 }
