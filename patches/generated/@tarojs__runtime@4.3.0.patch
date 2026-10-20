@@ -211,12 +211,15 @@ index bedbaa261b42230bb97b23bbc566ecbfb45cb64d..4c6f7f6623cdafc8fd78bd572bdf7046
      return newNode;
  }
 diff --git a/dist/dom/element.d.ts b/dist/dom/element.d.ts
-index 354bfc00bc34df0c4248acb6aafe2b4b679130be..c159224fb0ce38ec8cba64f9f3debb6285821ff5 100644
+index 354bfc00bc34df0c4248acb6aafe2b4b679130be..06c95ed23c1b2c038f502b20ddb7470a94734da9 100644
 --- a/dist/dom/element.d.ts
 +++ b/dist/dom/element.d.ts
-@@ -30,13 +30,31 @@ declare class TaroElement extends TaroNode {
+@@ -29,14 +29,34 @@ declare class TaroElement extends TaroNode {
+     get focus(): () => void;
      set focus(value: () => void);
      blur(): void;
++    /** Pre-mutation template classification: pure view for writes, static view for removals. Native hosts return false. */
++    prepareAttributeMutation(removing: boolean): boolean;
      setAttribute(qualifiedName: string, value: any): void;
 +    /**
 +     * 逻辑属性、ID/dataset 和 mutation 记录更新后调用，尚未转换模板属性别名。
@@ -247,19 +250,27 @@ index 354bfc00bc34df0c4248acb6aafe2b4b679130be..c159224fb0ce38ec8cba64f9f3debb62
  }
  
 diff --git a/dist/dom/element.js b/dist/dom/element.js
-index 160f3682d64625bb33221a76453677fa0d1fe8fa..1463d9d9c758024f7292af3f5dd118cd51cff1ad 100644
+index 160f3682d64625bb33221a76453677fa0d1fe8fa..a7e01b91304a50f330c226b8909a3b45b080f736 100644
 --- a/dist/dom/element.js
 +++ b/dist/dom/element.js
-@@ -92,7 +92,7 @@ class TaroElement extends TaroNode {
+@@ -89,10 +89,14 @@ class TaroElement extends TaroNode {
+     blur() {
+         this.setAttribute(FOCUS, false);
+     }
++    /** Capture template classification before logical mutation, observer records and removal hooks. */
++    prepareAttributeMutation(removing) {
++        return this.nodeName === VIEW && isHasExtractProp(this) === removing && !this.isAnyEventBinded();
++    }
      setAttribute(qualifiedName, value) {
          process.env.NODE_ENV !== 'production' && warn(isString(value) && value.length > PROPERTY_THRESHOLD, `元素 ${this.nodeName} 的 ${qualifiedName} 属性值数据量过大，可能会影响渲染性能。考虑降低图片转为 base64 的阈值或在 CSS 中使用 base64。`);
-         const isPureView = this.nodeName === VIEW && !isHasExtractProp(this) && !this.isAnyEventBinded();
+-        const isPureView = this.nodeName === VIEW && !isHasExtractProp(this) && !this.isAnyEventBinded();
 -        if (qualifiedName !== STYLE) {
++        const isPureView = this.prepareAttributeMutation(false);
 +        if (qualifiedName !== STYLE && MutationObserver.hasObservers) {
              MutationObserver.record({
                  target: this,
                  type: "attributes" /* MutationRecordType.ATTRIBUTES */,
-@@ -124,6 +124,18 @@ class TaroElement extends TaroNode {
+@@ -124,6 +128,18 @@ class TaroElement extends TaroNode {
                  }
                  break;
          }
@@ -278,16 +289,18 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..1463d9d9c758024f7292af3f5dd118cd
          // Serialization
          if (!this._root)
              return;
-@@ -166,12 +178,14 @@ class TaroElement extends TaroNode {
+@@ -165,13 +181,15 @@ class TaroElement extends TaroNode {
+         }
      }
      removeAttribute(qualifiedName) {
-         const isStaticView = this.nodeName === VIEW && isHasExtractProp(this) && !this.isAnyEventBinded();
+-        const isStaticView = this.nodeName === VIEW && isHasExtractProp(this) && !this.isAnyEventBinded();
 -        MutationObserver.record({
 -            target: this,
 -            type: "attributes" /* MutationRecordType.ATTRIBUTES */,
 -            attributeName: qualifiedName,
 -            oldValue: this.getAttribute(qualifiedName)
 -        });
++        const isStaticView = this.prepareAttributeMutation(true);
 +        if (MutationObserver.hasObservers) {
 +            MutationObserver.record({
 +                target: this,
@@ -299,7 +312,7 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..1463d9d9c758024f7292af3f5dd118cd
          if (qualifiedName === STYLE) {
              this.style.cssText = '';
          }
-@@ -185,6 +199,16 @@ class TaroElement extends TaroNode {
+@@ -185,6 +203,16 @@ class TaroElement extends TaroNode {
              }
              delete this.props[qualifiedName];
          }
@@ -316,7 +329,7 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..1463d9d9c758024f7292af3f5dd118cd
          // Serialization
          if (!this._root)
              return;
-@@ -275,32 +299,35 @@ class TaroElement extends TaroNode {
+@@ -275,32 +303,35 @@ class TaroElement extends TaroNode {
          return listeners != null;
      }
      addEventListener(type, handler, options) {

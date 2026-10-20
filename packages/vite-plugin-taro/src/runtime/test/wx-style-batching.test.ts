@@ -85,6 +85,21 @@ app.mount(() => null, 'page', () => ({ root: globalThis.sdk }), () => {})
 const context = host.getChildHostContext({}, host.getPageRootType('page'))
 function element(type) { return host.createElement(null, context, type) }
 
+// Native attribute writes operate on individual values without enumerating props or handler tables.
+{
+    const node = element('view')
+    const guard = { ownKeys() { assert.fail('Native attributes must not classify template nodes') } }
+    node.props = new Proxy(node.props, guard)
+    node.__handlers = new Proxy(node.__handlers, guard)
+    for (const [name, value] of [['id', 'native-attributes'], ['class', 'active'], ['title', 'label'], ['data-state', 3], ['style', 'color: blue;']]) {
+        node.setAttribute(name, value)
+        assert.equal(node.getAttribute(name), value)
+        node.removeAttribute(name)
+        assert.equal(node.getAttribute(name), '')
+    }
+    node.removeAttribute('missing')
+}
+
 // Count serialization independently of native assignments; inspecting the result happens after capturing counts.
 const descriptor = Object.getOwnPropertyDescriptor(Style.prototype, 'cssText')
 let reads = 0

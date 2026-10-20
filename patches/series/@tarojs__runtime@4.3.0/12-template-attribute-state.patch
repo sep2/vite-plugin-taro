@@ -1,0 +1,41 @@
+diff --git a/dist/dom/element.d.ts b/dist/dom/element.d.ts
+index c159224fb0ce38ec8cba64f9f3debb6285821ff5..06c95ed23c1b2c038f502b20ddb7470a94734da9 100644
+--- a/dist/dom/element.d.ts
++++ b/dist/dom/element.d.ts
+@@ -29,6 +29,8 @@ declare class TaroElement extends TaroNode {
+     get focus(): () => void;
+     set focus(value: () => void);
+     blur(): void;
++    /** Pre-mutation template classification: pure view for writes, static view for removals. Native hosts return false. */
++    prepareAttributeMutation(removing: boolean): boolean;
+     setAttribute(qualifiedName: string, value: any): void;
+     /**
+      * 逻辑属性、ID/dataset 和 mutation 记录更新后调用，尚未转换模板属性别名。
+diff --git a/dist/dom/element.js b/dist/dom/element.js
+index 1463d9d9c758024f7292af3f5dd118cd51cff1ad..a7e01b91304a50f330c226b8909a3b45b080f736 100644
+--- a/dist/dom/element.js
++++ b/dist/dom/element.js
+@@ -89,9 +89,13 @@ class TaroElement extends TaroNode {
+     blur() {
+         this.setAttribute(FOCUS, false);
+     }
++    /** Capture template classification before logical mutation, observer records and removal hooks. */
++    prepareAttributeMutation(removing) {
++        return this.nodeName === VIEW && isHasExtractProp(this) === removing && !this.isAnyEventBinded();
++    }
+     setAttribute(qualifiedName, value) {
+         process.env.NODE_ENV !== 'production' && warn(isString(value) && value.length > PROPERTY_THRESHOLD, `元素 ${this.nodeName} 的 ${qualifiedName} 属性值数据量过大，可能会影响渲染性能。考虑降低图片转为 base64 的阈值或在 CSS 中使用 base64。`);
+-        const isPureView = this.nodeName === VIEW && !isHasExtractProp(this) && !this.isAnyEventBinded();
++        const isPureView = this.prepareAttributeMutation(false);
+         if (qualifiedName !== STYLE && MutationObserver.hasObservers) {
+             MutationObserver.record({
+                 target: this,
+@@ -177,7 +181,7 @@ class TaroElement extends TaroNode {
+         }
+     }
+     removeAttribute(qualifiedName) {
+-        const isStaticView = this.nodeName === VIEW && isHasExtractProp(this) && !this.isAnyEventBinded();
++        const isStaticView = this.prepareAttributeMutation(true);
+         if (MutationObserver.hasObservers) {
+             MutationObserver.record({
+                 target: this,

@@ -118,6 +118,9 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
         this.nativeNode!.nodeValue = text
     })
 
+    // Native attributes retain logical mutation semantics and use a constant presentation state.
+    TaroElement.extend('prepareAttributeMutation', () => false)
+
     // Taro 已维护 props、dataset、ID 和移除拦截；这里只转发当前属性，保留原值。
     // style 的设置/移除已触发 Style 委托，其原生写入统一由该委托完成。
     TaroElement.extend('delegateAttributeUpdate', function (this: HostElement, name: string, value: unknown) {

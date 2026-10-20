@@ -73,6 +73,9 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
         this.nativeNode!.textContent = text
     })
 
+    // Native attributes retain logical mutation semantics and use a constant presentation state.
+    TaroElement.extend('prepareAttributeMutation', () => false)
+
     TaroElement.extend('delegateAttributeUpdate', function (this: HostElement, name: string, value: unknown) {
         const native = this.nativeNode
         if (!native) {

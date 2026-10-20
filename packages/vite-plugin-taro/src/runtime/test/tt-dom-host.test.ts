@@ -485,6 +485,13 @@ root.appendChild(parent)
 expectCalls([['append', rootNative, parent.nativeNode]])
 assert.strictEqual(parent._root, root)
 
+// Guard enumeration during native attribute operations, then restore the original tables for later tree tests.
+const attributeProps = parent.props
+const attributeHandlers = parent.__handlers
+const attributeGuard = { ownKeys() { assert.fail('Native attributes must not classify template nodes') } }
+parent.props = new Proxy(attributeProps, attributeGuard)
+parent.__handlers = new Proxy(attributeHandlers, attributeGuard)
+
 // Taro owns logical props, dataset and the ID index; forwarding preserves values and normalizes native names.
 const props = parent.props
 const objectValue = { nested: ['retained'] }
@@ -559,6 +566,9 @@ expectCalls([
 ])
 assert.equal(input.type, 'number')
 assert.equal(input.value, '42')
+
+parent.props = attributeProps
+parent.__handlers = attributeHandlers
 
 // Count serialization reads per update; idle single-property forwarding keeps CSS granular.
 const style = parent.style
