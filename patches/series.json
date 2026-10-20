@@ -41,7 +41,8 @@
             "patches/series/@tarojs__runtime@4.3.0/09-same-parent-moves.patch",
             "patches/series/@tarojs__runtime@4.3.0/10-mutation-observer-fast-path.patch",
             "patches/series/@tarojs__runtime@4.3.0/11-template-hydration.patch",
-            "patches/series/@tarojs__runtime@4.3.0/12-template-attribute-state.patch"
+            "patches/series/@tarojs__runtime@4.3.0/12-template-attribute-state.patch",
+            "patches/series/@tarojs__runtime@4.3.0/13-lazy-style.patch"
         ]
     },
     {

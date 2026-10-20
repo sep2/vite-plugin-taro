@@ -1031,6 +1031,12 @@ function checkClones() {
     calls.length = 0
     const emptyClone = empty.cloneNode(true)
     expectCalls([['element', 'view', emptyClone.nativeNode]])
+    for (const node of [empty, emptyClone]) {
+        assert.equal(node.cssText, '')
+        assert.equal(node.getAttribute('style'), '')
+        assert.deepEqual(node.attributes, [])
+        assert.equal(Object.values(node).some(value => value instanceof Style), false)
+    }
 
     const source = document.createElement('view')
     source.id = 'native-clone'

@@ -116,7 +116,7 @@ index 2bd6a91145ee0aae2c58838b36cfb9c6572c6f3e..68454f0ba5b0e8ee3d2231ea2b04c108
          recordMutation(record);
      }
 diff --git a/dist/dom-external/node.js b/dist/dom-external/node.js
-index bedbaa261b42230bb97b23bbc566ecbfb45cb64d..4c6f7f6623cdafc8fd78bd572bdf7046ed7d7a06 100644
+index bedbaa261b42230bb97b23bbc566ecbfb45cb64d..092c834279ee5eca5b12ce1a6106f93202ffa91b 100644
 --- a/dist/dom-external/node.js
 +++ b/dist/dom-external/node.js
 @@ -1,6 +1,14 @@
@@ -135,7 +135,7 @@ index bedbaa261b42230bb97b23bbc566ecbfb45cb64d..4c6f7f6623cdafc8fd78bd572bdf7046
  /**
   * An implementation of `Element.insertAdjacentHTML()`
   * to support Vue 3 with a version of or greater than `vue@3.1.2`
-@@ -31,31 +39,56 @@ function insertAdjacentHTML(position, html) {
+@@ -31,31 +39,61 @@ function insertAdjacentHTML(position, html) {
          }
      }
  }
@@ -166,31 +166,35 @@ index bedbaa261b42230bb97b23bbc566ecbfb45cb64d..4c6f7f6623cdafc8fd78bd572bdf7046
 -        // eslint-disable-next-line valid-typeof
 -        if ([PROPS, DATASET].includes(key) && typeof value === OBJECT) {
 -            newNode[key] = Object.assign({}, value);
--        }
--        else if (key === '_value') {
--            newNode[key] = value;
 +    else {
 +        for (const name of Object.keys(this.props)) {
 +            const value = this.props[name];
 +            newNode.props[name] = value;
 +            newNode.delegateAttributeUpdate(name, value, false);
          }
+-        else if (key === '_value') {
+-            newNode[key] = value;
++    }
++    newNode.dataset = Object.assign({}, this.dataset);
++    // Copy an existing declaration; unstyled sources and clones retain lazy allocation.
++    const sourceStyle = this._style;
++    if (sourceStyle) {
++        const style = newNode.style;
++        style._value = Object.assign({}, sourceStyle._value);
++        for (const name of sourceStyle._usedStyleProp) {
++            style._usedStyleProp.add(name);
++            // Dynamic CSS variables and hyphen-prefixed properties keep their original accessors.
++            if (name[0] === '-') {
++                style.setCssVariables(name);
++            }
+         }
 -        else if (key === STYLE) {
 -            newNode.style._value = Object.assign({}, value._value);
 -            newNode.style._usedStyleProp = new Set(Array.from(value._usedStyleProp));
-+    }
-+    newNode.dataset = Object.assign({}, this.dataset);
-+    newNode.style._value = Object.assign({}, this.style._value);
-+    for (const name of this.style._usedStyleProp) {
-+        newNode.style._usedStyleProp.add(name);
-+        // Dynamic CSS variables and hyphen-prefixed properties keep their original accessors.
-+        if (name[0] === '-') {
-+            newNode.style.setCssVariables(name);
++        if (style._usedStyleProp.size > 0 && style.delegateStyleUpdate !== templateStyleUpdate) {
++            style.delegateStyleUpdate();
          }
      }
-+    if (newNode.style._usedStyleProp.size > 0 && newNode.style.delegateStyleUpdate !== templateStyleUpdate) {
-+        newNode.style.delegateStyleUpdate();
-+    }
      if (isDeep) {
 -        newNode.childNodes = this.childNodes.map(node => node.cloneNode(true));
 +        const notifyInsertion = newNode.delegateChildInsertion !== templateChildInsertion;
@@ -211,10 +215,25 @@ index bedbaa261b42230bb97b23bbc566ecbfb45cb64d..4c6f7f6623cdafc8fd78bd572bdf7046
      return newNode;
  }
 diff --git a/dist/dom/element.d.ts b/dist/dom/element.d.ts
-index 354bfc00bc34df0c4248acb6aafe2b4b679130be..06c95ed23c1b2c038f502b20ddb7470a94734da9 100644
+index 354bfc00bc34df0c4248acb6aafe2b4b679130be..32ed88b20ef65f5c8a8519ef76c37792fed8ca0d 100644
 --- a/dist/dom/element.d.ts
 +++ b/dist/dom/element.d.ts
-@@ -29,14 +29,34 @@ declare class TaroElement extends TaroNode {
+@@ -9,11 +9,13 @@ declare class TaroElement extends TaroNode {
+     ctx?: any;
+     tagName: string;
+     props: Record<string, any>;
+-    style: Style;
++    private _style?: Style;
+     dataset: Record<string, unknown>;
+     innerHTML: string;
+     constructor();
+     private _stopPropagation;
++    get style(): Style;
++    set style(value: Style);
+     get id(): string;
+     set id(val: string);
+     get className(): string;
+@@ -29,14 +31,34 @@ declare class TaroElement extends TaroNode {
      get focus(): () => void;
      set focus(value: () => void);
      blur(): void;
@@ -250,10 +269,41 @@ index 354bfc00bc34df0c4248acb6aafe2b4b679130be..06c95ed23c1b2c038f502b20ddb7470a
  }
  
 diff --git a/dist/dom/element.js b/dist/dom/element.js
-index 160f3682d64625bb33221a76453677fa0d1fe8fa..a7e01b91304a50f330c226b8909a3b45b080f736 100644
+index 160f3682d64625bb33221a76453677fa0d1fe8fa..6821983296d82aa6c9f67cddbaf5159676f0ae03 100644
 --- a/dist/dom/element.js
 +++ b/dist/dom/element.js
-@@ -89,10 +89,14 @@ class TaroElement extends TaroNode {
+@@ -14,7 +14,6 @@ class TaroElement extends TaroNode {
+         this.props = {};
+         this.dataset = EMPTY_OBJ;
+         this.nodeType = 1 /* NodeType.ELEMENT_NODE */;
+-        this.style = new Style(this);
+         hooks.call('patchElement', this);
+     }
+     _stopPropagation(event) {
+@@ -32,6 +31,13 @@ class TaroElement extends TaroNode {
+             }
+         }
+     }
++    // Each element retains one mutable declaration, initialized on first style access.
++    get style() {
++        return this._style ??= new Style(this);
++    }
++    set style(value) {
++        this._style = value;
++    }
+     get id() {
+         return this.getAttribute(ID);
+     }
+@@ -56,7 +62,7 @@ class TaroElement extends TaroNode {
+     get attributes() {
+         const props = this.props;
+         const propKeys = Object.keys(props);
+-        const style = this.style.cssText;
++        const style = this.getAttribute(STYLE);
+         const attrs = propKeys.map(key => ({ name: key, value: props[key] }));
+         return attrs.concat(style ? { name: STYLE, value: style } : []);
+     }
+@@ -89,10 +95,14 @@ class TaroElement extends TaroNode {
      blur() {
          this.setAttribute(FOCUS, false);
      }
@@ -270,7 +320,7 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..a7e01b91304a50f330c226b8909a3b45
              MutationObserver.record({
                  target: this,
                  type: "attributes" /* MutationRecordType.ATTRIBUTES */,
-@@ -124,6 +128,18 @@ class TaroElement extends TaroNode {
+@@ -124,6 +134,18 @@ class TaroElement extends TaroNode {
                  }
                  break;
          }
@@ -289,7 +339,7 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..a7e01b91304a50f330c226b8909a3b45
          // Serialization
          if (!this._root)
              return;
-@@ -165,13 +181,15 @@ class TaroElement extends TaroNode {
+@@ -165,13 +187,15 @@ class TaroElement extends TaroNode {
          }
      }
      removeAttribute(qualifiedName) {
@@ -312,7 +362,7 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..a7e01b91304a50f330c226b8909a3b45
          if (qualifiedName === STYLE) {
              this.style.cssText = '';
          }
-@@ -185,6 +203,16 @@ class TaroElement extends TaroNode {
+@@ -185,6 +209,16 @@ class TaroElement extends TaroNode {
              }
              delete this.props[qualifiedName];
          }
@@ -329,7 +379,16 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..a7e01b91304a50f330c226b8909a3b45
          // Serialization
          if (!this._root)
              return;
-@@ -275,32 +303,35 @@ class TaroElement extends TaroNode {
+@@ -225,7 +259,7 @@ class TaroElement extends TaroNode {
+         }
+     }
+     getAttribute(qualifiedName) {
+-        const attr = qualifiedName === STYLE ? this.style.cssText : this.props[qualifiedName];
++        const attr = qualifiedName === STYLE ? this._style?.cssText : this.props[qualifiedName];
+         return attr !== null && attr !== void 0 ? attr : '';
+     }
+     getElementsByTagName(tagName) {
+@@ -275,32 +309,35 @@ class TaroElement extends TaroNode {
          return listeners != null;
      }
      addEventListener(type, handler, options) {

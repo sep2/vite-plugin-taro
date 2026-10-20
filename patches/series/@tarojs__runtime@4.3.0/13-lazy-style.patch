@@ -1,0 +1,98 @@
+diff --git a/dist/dom-external/node.js b/dist/dom-external/node.js
+index 4c6f7f6623cdafc8fd78bd572bdf7046ed7d7a06..092c834279ee5eca5b12ce1a6106f93202ffa91b 100644
+--- a/dist/dom-external/node.js
++++ b/dist/dom-external/node.js
+@@ -63,16 +63,21 @@ function cloneNode(isDeep) {
+         }
+     }
+     newNode.dataset = Object.assign({}, this.dataset);
+-    newNode.style._value = Object.assign({}, this.style._value);
+-    for (const name of this.style._usedStyleProp) {
+-        newNode.style._usedStyleProp.add(name);
+-        // Dynamic CSS variables and hyphen-prefixed properties keep their original accessors.
+-        if (name[0] === '-') {
+-            newNode.style.setCssVariables(name);
++    // Copy an existing declaration; unstyled sources and clones retain lazy allocation.
++    const sourceStyle = this._style;
++    if (sourceStyle) {
++        const style = newNode.style;
++        style._value = Object.assign({}, sourceStyle._value);
++        for (const name of sourceStyle._usedStyleProp) {
++            style._usedStyleProp.add(name);
++            // Dynamic CSS variables and hyphen-prefixed properties keep their original accessors.
++            if (name[0] === '-') {
++                style.setCssVariables(name);
++            }
++        }
++        if (style._usedStyleProp.size > 0 && style.delegateStyleUpdate !== templateStyleUpdate) {
++            style.delegateStyleUpdate();
+         }
+-    }
+-    if (newNode.style._usedStyleProp.size > 0 && newNode.style.delegateStyleUpdate !== templateStyleUpdate) {
+-        newNode.style.delegateStyleUpdate();
+     }
+     if (isDeep) {
+         const notifyInsertion = newNode.delegateChildInsertion !== templateChildInsertion;
+diff --git a/dist/dom/element.d.ts b/dist/dom/element.d.ts
+index 06c95ed23c1b2c038f502b20ddb7470a94734da9..32ed88b20ef65f5c8a8519ef76c37792fed8ca0d 100644
+--- a/dist/dom/element.d.ts
++++ b/dist/dom/element.d.ts
+@@ -9,11 +9,13 @@ declare class TaroElement extends TaroNode {
+     ctx?: any;
+     tagName: string;
+     props: Record<string, any>;
+-    style: Style;
++    private _style?: Style;
+     dataset: Record<string, unknown>;
+     innerHTML: string;
+     constructor();
+     private _stopPropagation;
++    get style(): Style;
++    set style(value: Style);
+     get id(): string;
+     set id(val: string);
+     get className(): string;
+diff --git a/dist/dom/element.js b/dist/dom/element.js
+index a7e01b91304a50f330c226b8909a3b45b080f736..6821983296d82aa6c9f67cddbaf5159676f0ae03 100644
+--- a/dist/dom/element.js
++++ b/dist/dom/element.js
+@@ -14,7 +14,6 @@ class TaroElement extends TaroNode {
+         this.props = {};
+         this.dataset = EMPTY_OBJ;
+         this.nodeType = 1 /* NodeType.ELEMENT_NODE */;
+-        this.style = new Style(this);
+         hooks.call('patchElement', this);
+     }
+     _stopPropagation(event) {
+@@ -32,6 +31,13 @@ class TaroElement extends TaroNode {
+             }
+         }
+     }
++    // Each element retains one mutable declaration, initialized on first style access.
++    get style() {
++        return this._style ??= new Style(this);
++    }
++    set style(value) {
++        this._style = value;
++    }
+     get id() {
+         return this.getAttribute(ID);
+     }
+@@ -56,7 +62,7 @@ class TaroElement extends TaroNode {
+     get attributes() {
+         const props = this.props;
+         const propKeys = Object.keys(props);
+-        const style = this.style.cssText;
++        const style = this.getAttribute(STYLE);
+         const attrs = propKeys.map(key => ({ name: key, value: props[key] }));
+         return attrs.concat(style ? { name: STYLE, value: style } : []);
+     }
+@@ -253,7 +259,7 @@ class TaroElement extends TaroNode {
+         }
+     }
+     getAttribute(qualifiedName) {
+-        const attr = qualifiedName === STYLE ? this.style.cssText : this.props[qualifiedName];
++        const attr = qualifiedName === STYLE ? this._style?.cssText : this.props[qualifiedName];
+         return attr !== null && attr !== void 0 ? attr : '';
+     }
+     getElementsByTagName(tagName) {

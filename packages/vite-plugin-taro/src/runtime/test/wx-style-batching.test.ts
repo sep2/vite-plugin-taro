@@ -85,6 +85,30 @@ app.mount(() => null, 'page', () => ({ root: globalThis.sdk }), () => {})
 const context = host.getChildHostContext({}, host.getPageRootType('page'))
 function element(type) { return host.createElement(null, context, type) }
 
+// React props and native clone construction keep declarations lazy until the first style update.
+{
+    const node = element('view')
+    const props = { id: 'unstyled-wx', className: 'layout', title: 'label' }
+    hostConfig.finalizeInitialChildren(node, 'view', props)
+    const clone = node.cloneNode(true)
+    for (const element of [node, clone]) {
+        assert.equal(element.cssText, '')
+        assert.equal(element.getAttribute('style'), '')
+        assert.equal(element.attributes.some(attribute => attribute.name === 'style'), false)
+        assert.equal(Object.values(element).some(value => value instanceof Style), false)
+        assert.equal(element.nativeNode.style, '')
+    }
+    hostConfig.commitUpdate(node, 'view', props, { ...props, style: { color: 'teal', width: 3 } })
+    assert.equal(Object.values(node).filter(value => value instanceof Style).length, 1)
+    assert.equal(node.nativeNode.style, 'color: teal; width: 3px;')
+    const styledClone = node.cloneNode(true)
+    assert.notStrictEqual(styledClone.style, node.style)
+    assert.equal(styledClone.nativeNode.style, node.nativeNode.style)
+    styledClone.style.color = 'gold'
+    assert.equal(styledClone.nativeNode.style, 'color: gold; width: 3px;')
+    assert.equal(node.nativeNode.style, 'color: teal; width: 3px;')
+}
+
 // Native attribute writes operate on individual values without enumerating props or handler tables.
 {
     const node = element('view')
