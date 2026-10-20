@@ -88,6 +88,12 @@ for (const mode of ['development', 'production']) {
         // Record exact operation arguments to check ownership and synchronous commit forwarding.
         const calls: { name: string; args: unknown[] }[] = []
         const host: RendererHost<object, object, Element, Text> = {
+            getPageRootType() {
+                return 'root'
+            },
+            getChildHostContext(parent) {
+                return parent
+            },
             createElement(container, context, type) {
                 calls.push({ name: 'element', args: [container, context, type] })
                 return element
@@ -166,7 +172,7 @@ for (const mode of ['development', 'production']) {
         assert.strictEqual(calls[2].args[0], container)
         assert.strictEqual(calls[3].args[0], otherContainer)
 
-        // Enable the optional selectors on this test-owned host and observe their receiver and exact context identity.
+        // Page-specific selectors retain their host receiver and exact context identity.
         Object.assign(host, {
             getPageRootType(id: string) {
                 assert.strictEqual(this, host)

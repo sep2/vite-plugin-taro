@@ -216,6 +216,12 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
             container.delegateChildInsertion = noop
             container.delegateChildRemoval = noop
         },
+        getPageRootType() {
+            return 'root'
+        },
+        getChildHostContext(parent) {
+            return parent
+        },
         createElement(_container, _context, type) {
             return document.createElement(type)
         },

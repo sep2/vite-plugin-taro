@@ -1,5 +1,5 @@
 diff --git a/dist/react.esm.js b/dist/react.esm.js
-index fac7a619d23c877aab0335cf1d7ee435d9353f11..23f4035fd6991eabaa5dcdbf16b93c672fc22f1b 100644
+index d35b4fc47ce90f3793ff98c210fa7229a9155aa8..7af67b80fdcae8fb47aef7644ff692f91b55e008 100644
 --- a/dist/react.esm.js
 +++ b/dist/react.esm.js
 @@ -403,8 +403,9 @@ function setEvent(dom, name, value, oldValue) {

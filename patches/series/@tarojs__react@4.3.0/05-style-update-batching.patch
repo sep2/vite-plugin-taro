@@ -1,5 +1,5 @@
 diff --git a/dist/react.esm.js b/dist/react.esm.js
-index 23f4035fd6991eabaa5dcdbf16b93c672fc22f1b..4e86e71fcd3b610300559fc99ca4eff19c5b3ac6 100644
+index 7af67b80fdcae8fb47aef7644ff692f91b55e008..3ba8a59db9b2d4564f3290d54436cf834f3aa467 100644
 --- a/dist/react.esm.js
 +++ b/dist/react.esm.js
 @@ -496,63 +496,66 @@ function setHarmonyStyle(dom, value, oldValue) {
@@ -114,7 +114,7 @@ index 23f4035fd6991eabaa5dcdbf16b93c672fc22f1b..4e86e71fcd3b610300559fc99ca4eff1
          setEvent(dom, name, value, oldValue);
      }
 diff --git a/dist/renderer-host.d.ts b/dist/renderer-host.d.ts
-index 3bd6d6c17e5b45e8dcd01283e5ac19611facbd3b..a8eebd750e701fd231150ce17eb72fb88877925f 100644
+index 7b2269713e8fccacf385b2dbfca63655324e4cec..86457ee484929576ed794ff0ada236eaae8a4378 100644
 --- a/dist/renderer-host.d.ts
 +++ b/dist/renderer-host.d.ts
 @@ -5,6 +5,8 @@ export type RendererHost<Container, Context, Element, Text> = Readonly<{

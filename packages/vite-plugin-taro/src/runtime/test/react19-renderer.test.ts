@@ -50,6 +50,8 @@ test('published renderer and declarations expose only the supported React 19 ren
     )
     assert.match(rootDeclarations, /onUncaughtError\?/)
     assert.match(rootDeclarations, /onCaughtError\?/)
+    assert.match(hostDeclarations, /getPageRootType\(id: string\): string/)
+    assert.match(hostDeclarations, /getChildHostContext\(parentContext: Context, type: string\): Context/)
     assert.match(hostDeclarations, /batchStyleUpdate\(element: Element, update: \(\) => void\): void/)
 })
 
@@ -934,8 +936,9 @@ function checkWxPageCreation() {
         assert.equal(natives.A.root.childNodes.length, 0)
         ReactDOM.flushSync(() => ReactDOM.createRoot(document.getElementById('wx-owner-app')).unmount())
         Object.assign(rendererHost, savedHost)
-        delete rendererHost.getPageRootType
-        delete rendererHost.getChildHostContext
+        const restoredContext = {}
+        assert.equal(rendererHost.getPageRootType('after-unload'), 'root')
+        assert.strictEqual(rendererHost.getChildHostContext(restoredContext, 'view'), restoredContext)
     }
 }
 

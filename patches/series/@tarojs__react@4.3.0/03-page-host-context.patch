@@ -27,7 +27,7 @@ index af13e19f5c610d962cd4e16474a033c300c69d55..dd745e0b88386c4fb1cb390bbf791bd4
      unmountComponentAtNode: typeof unmountComponentAtNode;
      createPortal: typeof createPortal;
 diff --git a/dist/react.esm.js b/dist/react.esm.js
-index 41a342b78a47a1f01a06c91f799d690ec2bb574f..fac7a619d23c877aab0335cf1d7ee435d9353f11 100644
+index 41a342b78a47a1f01a06c91f799d690ec2bb574f..d35b4fc47ce90f3793ff98c210fa7229a9155aa8 100644
 --- a/dist/react.esm.js
 +++ b/dist/react.esm.js
 @@ -658,8 +658,8 @@ const hostConfig = {
@@ -37,7 +37,7 @@ index 41a342b78a47a1f01a06c91f799d690ec2bb574f..fac7a619d23c877aab0335cf1d7ee435
 -    getChildHostContext(parentHostContext) {
 -        return parentHostContext;
 +    getChildHostContext(parentHostContext, type) {
-+        return host.getChildHostContext?.(parentHostContext, type) ?? parentHostContext;
++        return host.getChildHostContext(parentHostContext, type);
      },
      prepareForCommit(container) {
          host.beforeCommit?.(container);
@@ -46,7 +46,7 @@ index 41a342b78a47a1f01a06c91f799d690ec2bb574f..fac7a619d23c877aab0335cf1d7ee435
  // Public flushSync runs a callback at synchronous priority; controlled-input restoration only flushes queued sync work.
  const flushSync = TaroReconciler.flushSyncFromReconciler;
 +function getPageRootType(id) {
-+    return host.getPageRootType?.(id) ?? 'root';
++    return host.getPageRootType(id);
 +}
  var index = {
      flushSync,
@@ -62,14 +62,14 @@ index 41a342b78a47a1f01a06c91f799d690ec2bb574f..fac7a619d23c877aab0335cf1d7ee435
 +export { createPortal, createRoot, index as default, flushSync, getPageRootType, internalInstanceKey, unmountComponentAtNode, unstable_batchedUpdates };
  //# sourceMappingURL=react.esm.js.map
 diff --git a/dist/renderer-host.d.ts b/dist/renderer-host.d.ts
-index 04431d7655ae92d324f6861b734f1512d6eb4191..3bd6d6c17e5b45e8dcd01283e5ac19611facbd3b 100644
+index 04431d7655ae92d324f6861b734f1512d6eb4191..7b2269713e8fccacf385b2dbfca63655324e4cec 100644
 --- a/dist/renderer-host.d.ts
 +++ b/dist/renderer-host.d.ts
 @@ -1,5 +1,7 @@
  /** Host-owned creation, form classification and commit boundaries for the shared React renderer. */
  export type RendererHost<Container, Context, Element, Text> = Readonly<{
-+    getPageRootType?(id: string): string
-+    getChildHostContext?(parentContext: Context, type: string): Context
++    getPageRootType(id: string): string
++    getChildHostContext(parentContext: Context, type: string): Context
      createElement(container: Container, context: Context, type: string): Element
      createText(container: Container, context: Context, text: string): Text
      isFormElement(element: Element): boolean

@@ -37,7 +37,7 @@ index 7f5ed89b2448d03dc2658ca2be2c016f12387daa..dd745e0b88386c4fb1cb390bbf791bd4
      internalInstanceKey: string;
  };
 diff --git a/dist/react.esm.js b/dist/react.esm.js
-index ad8a51f02788c6e0354579956625da33a00e14a2..4e86e71fcd3b610300559fc99ca4eff19c5b3ac6 100644
+index ad8a51f02788c6e0354579956625da33a00e14a2..3ba8a59db9b2d4564f3290d54436cf834f3aa467 100644
 --- a/dist/react.esm.js
 +++ b/dist/react.esm.js
 @@ -1,7 +1,15 @@
@@ -266,7 +266,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..4e86e71fcd3b610300559fc99ca4eff1
 -    getChildHostContext(parentHostContext) {
 -        return parentHostContext;
 +    getChildHostContext(parentHostContext, type) {
-+        return host.getChildHostContext?.(parentHostContext, type) ?? parentHostContext;
++        return host.getChildHostContext(parentHostContext, type);
      },
 -    prepareForCommit(..._) {
 +    prepareForCommit(container) {
@@ -509,7 +509,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..4e86e71fcd3b610300559fc99ca4eff1
 +// Public flushSync runs a callback at synchronous priority; controlled-input restoration only flushes queued sync work.
 +const flushSync = TaroReconciler.flushSyncFromReconciler;
 +function getPageRootType(id) {
-+    return host.getPageRootType?.(id) ?? 'root';
++    return host.getPageRootType(id);
 +}
  var index = {
 -    render,
@@ -567,14 +567,14 @@ index 1384c9307cc6ee2586e80d5334e54d3e5984453a..88ce8da3b95e5869f15e0ff42c7d7424
  export {};
 diff --git a/dist/renderer-host.d.ts b/dist/renderer-host.d.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..a8eebd750e701fd231150ce17eb72fb88877925f
+index 0000000000000000000000000000000000000000..86457ee484929576ed794ff0ada236eaae8a4378
 --- /dev/null
 +++ b/dist/renderer-host.d.ts
 @@ -0,0 +1,12 @@
 +/** Host-owned creation, form classification and commit boundaries for the shared React renderer. */
 +export type RendererHost<Container, Context, Element, Text> = Readonly<{
-+    getPageRootType?(id: string): string
-+    getChildHostContext?(parentContext: Context, type: string): Context
++    getPageRootType(id: string): string
++    getChildHostContext(parentContext: Context, type: string): Context
 +    createElement(container: Container, context: Context, type: string): Element
 +    createText(container: Container, context: Context, text: string): Text
 +    isFormElement(element: Element): boolean

@@ -106,6 +106,10 @@ import { document, FormElement, TaroElement, TaroText } from 'vite-plugin-taro-r
 const container = document.createElement('container')
 const root = document.createElement('root')
 const context = {}
+assert.equal(host.getPageRootType('first-page'), 'root')
+assert.equal(host.getPageRootType('second-page'), 'root')
+assert.strictEqual(host.getChildHostContext(context, 'root'), context)
+assert.strictEqual(host.getChildHostContext(context, 'view'), context)
 assert.ok(host.createElement(root, context, 'view') instanceof TaroElement)
 const input = host.createElement(root, context, 'input')
 assert.ok(input instanceof FormElement)

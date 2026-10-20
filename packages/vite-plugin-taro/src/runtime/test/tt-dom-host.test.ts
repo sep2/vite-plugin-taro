@@ -336,6 +336,12 @@ import { createVptApp } from ${JSON.stringify(resolveVptRuntime('mini/vpt/create
 import { createVptPage } from ${JSON.stringify(resolveVptRuntime('mini/vpt/create-vpt-page'))}
 import host, { calls, reads, componentListReads, nativeDocument, pageDocuments, original, originalAppend, originalRemove, originalSetAttribute, originalRemoveAttribute } from 'test:tt-dom-host'
 
+const context = {}
+assert.equal(host.getPageRootType('first-page'), 'root')
+assert.equal(host.getPageRootType('second-page'), 'root')
+assert.strictEqual(host.getChildHostContext(context, 'root'), context)
+assert.strictEqual(host.getChildHostContext(context, 'view'), context)
+
 export const completion = tt.expectDom ? checkDom() : checkTemplate()
 
 async function checkDom() {

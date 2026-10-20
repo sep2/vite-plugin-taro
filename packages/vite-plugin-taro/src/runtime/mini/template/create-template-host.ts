@@ -47,6 +47,12 @@ export function createTemplateHost(): MiniHost {
 
     return {
         bindApp: bindTemplateApp,
+        getPageRootType() {
+            return 'root'
+        },
+        getChildHostContext(parent) {
+            return parent
+        },
         createElement(_container, _context, type) {
             return document.createElement(type)
         },
