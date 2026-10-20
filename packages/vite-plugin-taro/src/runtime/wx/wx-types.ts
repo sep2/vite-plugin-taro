@@ -35,6 +35,7 @@ export interface WxRoot {
     insertBefore(child: WxNativeNode, before: WxNativeNode): void
     removeChild(child: WxNativeNode): void
     createComponent(name: string): WxNativeElement
+    createVirtualNode(name: string): WxNativeElement
     createTextNode(text: string): WxNativeText
 }
 

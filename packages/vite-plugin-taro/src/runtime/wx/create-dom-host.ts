@@ -326,7 +326,9 @@ function createPageDocument(root: WxRoot): TaroDocument {
     pageDoc.createElement = (name) => {
         const type = name.toLowerCase()
         const htmlTag = getHtmlTagName(type)
-        const native = root.createComponent(htmlTag ?? (type === 'root' ? 'view' : type))
+
+        // Page roots group owned children without changing percentage heights or native Page flex layout.
+        const native = type === 'root' ? root.createVirtualNode(type) : root.createComponent(htmlTag ?? type)
 
         const node: HostElement = Object.defineProperties(document.createElement(type), {
             ownerDocument: { value: pageDoc },

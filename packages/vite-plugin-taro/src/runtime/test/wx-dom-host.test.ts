@@ -95,6 +95,7 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     )
     assert.ok(typeof createDomHost === 'function')
     const sdk = createWxTestRoot()
+    const createVirtualNode = t.mock.method(sdk, 'createVirtualNode')
     const instance = { root: sdk }
     const getRoot = t.mock.fn((instance: { root: typeof sdk }) => instance.root)
     const host = createDomHost(getRoot)
@@ -123,7 +124,10 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     assert.strictEqual(host.getChildHostContext(page, 'view'), page)
     assert.strictEqual(Object.getPrototypeOf(page), document)
     const root = host.createElement(null, parent, type)
+    assert.equal(root.nativeNode.isVirtual(), true, 'Page roots must preserve the native Page layout')
+    assert.deepEqual(createVirtualNode.mock.calls[0]?.arguments, ['root'])
     const view = host.createElement(null, page, 'View')
+    assert.equal(view.nativeNode.isVirtual(), false)
     const text = host.createText(null, page, 'first')
     const comment = page.createComment()
     assert.strictEqual(text.ownerDocument, page)
@@ -177,7 +181,7 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     const nativeView = nativeRoot.childNodes[0]!
     assert.strictEqual(root.nativeNode, nativeRoot)
     assert.strictEqual(view.nativeNode, nativeView)
-    assert.equal(nativeRoot.name, 'view')
+    assert.equal(nativeRoot.name, 'root')
     assert.deepEqual(
         nativeView.childNodes.map((node) => node.textContent),
         ['', 'first']

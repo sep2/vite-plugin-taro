@@ -820,9 +820,11 @@ function checkWxPageCreation() {
         ReactDOM.flushSync(() => app.mount(Page, 'A', () => natives.A, () => document.getElementById('A').performUpdate(true)))
         const firstRoot = document.getElementById('A')
         const firstDocument = firstRoot.ownerDocument
+        assert.equal(firstRoot.nativeNode.isVirtual(), true, 'The Page anchor has no layout box')
         assert.strictEqual(firstRoot.nativeNode, natives.A.root.childNodes[0])
         assert.strictEqual(nodes.A.nativeNode, firstRoot.nativeNode.childNodes[0])
         ReactDOM.flushSync(() => app.mount(Page, 'B', () => natives.B, () => document.getElementById('B').performUpdate(true)))
+        assert.equal(document.getElementById('B').nativeNode.isVirtual(), true)
         assert.notStrictEqual(nodes.B.ownerDocument, firstDocument)
         assert.strictEqual(nodes.A.delegateChildInsertion, nodes.B.delegateChildInsertion)
         assert.strictEqual(nodes.A.style.delegateStyleUpdate, nodes.B.style.delegateStyleUpdate)

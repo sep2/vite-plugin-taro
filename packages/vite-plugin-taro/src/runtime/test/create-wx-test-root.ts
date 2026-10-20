@@ -59,6 +59,10 @@ class NativeNode {
         }
     }
 
+    isVirtual(): boolean {
+        return false
+    }
+
     appendChild(child: NativeNode): void {
         this.insertBefore(child, null)
     }
@@ -118,6 +122,12 @@ class NativeNode {
     }
 }
 
+class VirtualNode extends NativeNode {
+    override isVirtual(): boolean {
+        return true
+    }
+}
+
 export function createWxTestRoot(properties?: Readonly<Record<string, PropertyInitializers>>) {
     const host = {
         templateInstance: {
@@ -159,8 +169,11 @@ export function createWxTestRoot(properties?: Readonly<Record<string, PropertyIn
             }
         }
     }
-    const root = Object.assign(new NativeNode('shadow-root', null), {
+    const root = Object.assign(new VirtualNode('shadow-root', null), {
         getHostNode: () => host,
+        createVirtualNode(name: string): VirtualNode {
+            return new VirtualNode(name, root)
+        },
         createComponent(name: string): NativeNode {
             return new NativeNode(name, root, properties?.[name])
         },
