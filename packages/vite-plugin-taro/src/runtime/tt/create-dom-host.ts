@@ -158,7 +158,7 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
             // 上游直接 TT DOM 不经过这个逻辑拆分；保留 Taro 节点时需要在此合并订阅。
             // 读取另一现有数组的长度，即可判断是否仍被共用，无需新增计数或扫描事件表。
             // 上游 Taro 原生事件委托接管 begin/end 的订阅合并后，可移除此分支。
-            if (this.__handlers[type === 'begin' ? 'end' : 'begin']?.length) {
+            if (this.getEventHandlers(type === 'begin' ? 'end' : 'begin')?.length) {
                 return
             }
             updateNativeListener(this, 'bindregionchange', subscribed)
@@ -277,6 +277,6 @@ function updateTouchMove(node: HostElement): void {
     // 所需订阅由逻辑属性和现有处理器数组决定，SDK 自身处理重复注册；这里只调整两个已知绑定。
     // 上游 Taro 原生 host 接管等价切换后，可连同属性委托中的调用一起移交。
     // 另一替代条件是 TT SDK 让 catchMove 属性本身控制冒泡，同时保持一个普通监听入口即可派发一次。
-    updateNativeListener(node, 'bindtouchmove', !node.props.catchMove && !!node.__handlers.touchmove?.length)
+    updateNativeListener(node, 'bindtouchmove', !node.props.catchMove && !!node.getEventHandlers('touchmove')?.length)
     updateNativeListener(node, 'catchtouchmove', !!node.props.catchMove)
 }

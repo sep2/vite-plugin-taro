@@ -269,7 +269,7 @@ index 354bfc00bc34df0c4248acb6aafe2b4b679130be..32ed88b20ef65f5c8a8519ef76c37792
  }
  
 diff --git a/dist/dom/element.js b/dist/dom/element.js
-index 160f3682d64625bb33221a76453677fa0d1fe8fa..6821983296d82aa6c9f67cddbaf5159676f0ae03 100644
+index 160f3682d64625bb33221a76453677fa0d1fe8fa..daea28644e1e15d3bd0ced11bcb59bed62649f49 100644
 --- a/dist/dom/element.js
 +++ b/dist/dom/element.js
 @@ -14,7 +14,6 @@ class TaroElement extends TaroNode {
@@ -280,6 +280,15 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..6821983296d82aa6c9f67cddbaf51596
          hooks.call('patchElement', this);
      }
      _stopPropagation(event) {
+@@ -22,7 +21,7 @@ class TaroElement extends TaroNode {
+         let target = this;
+         // eslint-disable-next-line no-cond-assign
+         while ((target = target.parentNode)) {
+-            const listeners = target.__handlers[event.type];
++            const listeners = target.getEventHandlers(event.type);
+             if (!isArray(listeners)) {
+                 continue;
+             }
 @@ -32,6 +31,13 @@ class TaroElement extends TaroNode {
              }
          }
@@ -388,6 +397,15 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..6821983296d82aa6c9f67cddbaf51596
          return attr !== null && attr !== void 0 ? attr : '';
      }
      getElementsByTagName(tagName) {
+@@ -242,7 +276,7 @@ class TaroElement extends TaroNode {
+     }
+     dispatchEvent(event) {
+         const cancelable = event.cancelable;
+-        const listeners = this.__handlers[event.type];
++        const listeners = this.getEventHandlers(event.type);
+         if (!isArray(listeners)) {
+             return false;
+         }
 @@ -275,32 +309,35 @@ class TaroElement extends TaroNode {
          return listeners != null;
      }
@@ -438,11 +456,19 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..6821983296d82aa6c9f67cddbaf51596
              this.enqueueUpdate({
                  path: `${this._path}.${"nn" /* Shortcuts.NodeName */}`,
 diff --git a/dist/dom/event-target.d.ts b/dist/dom/event-target.d.ts
-index 78893e78df38fd423937079db101a4fa848a1c73..4b8fac8181991d29ca3f5c06e676243f67e4cb68 100644
+index 78893e78df38fd423937079db101a4fa848a1c73..38342f6e9312998212b17c3b3ed1bea915ca5d53 100644
 --- a/dist/dom/event-target.d.ts
 +++ b/dist/dom/event-target.d.ts
-@@ -4,6 +4,12 @@ declare class TaroEventTarget {
-     __handlers: Record<string, EventHandler[]>;
+@@ -1,9 +1,19 @@
+ import { EventHandler, AddEventListenerOptions } from '../interface/event-target.js';
+ 
+ declare class TaroEventTarget {
+-    __handlers: Record<string, EventHandler[]>;
++    private _handlers?: Record<string, EventHandler[]>;
++    get __handlers(): Record<string, EventHandler[]>;
++    set __handlers(value: Record<string, EventHandler[]>);
++    /** Read an existing event array without materializing the handler table. */
++    getEventHandlers(type: string): EventHandler[] | undefined;
      addEventListener(type: string, handler: EventHandler, options?: boolean | AddEventListenerOptions): void;
      removeEventListener(type: string, handler: EventHandler): void;
 +    /**
@@ -455,10 +481,28 @@ index 78893e78df38fd423937079db101a4fa848a1c73..4b8fac8181991d29ca3f5c06e676243f
      isOnlyClickBinded(): boolean;
  }
 diff --git a/dist/dom/event-target.js b/dist/dom/event-target.js
-index 510424828b3a9a74f363cef1e0982489a708541e..de066ca2492f61f675fd793dc585cf160fd6dfa6 100644
+index 510424828b3a9a74f363cef1e0982489a708541e..7414d12c4679afa560338e6cd62995a9fdab7aba 100644
 --- a/dist/dom/event-target.js
 +++ b/dist/dom/event-target.js
-@@ -44,6 +44,11 @@ class TaroEventTarget {
+@@ -1,8 +1,15 @@
+ import { hooks, isObject, warn, isArray } from '@tarojs/shared';
+ 
+ class TaroEventTarget {
+-    constructor() {
+-        this.__handlers = {};
++    // Each target retains one mutable table, initialized on first mutable access.
++    get __handlers() {
++        return this._handlers ??= {};
++    }
++    set __handlers(value) {
++        this._handlers = value;
++    }
++    getEventHandlers(type) {
++        return this._handlers?.[type];
+     }
+     addEventListener(type, handler, options) {
+         type = type.toLowerCase();
+@@ -44,6 +51,11 @@ class TaroEventTarget {
          else {
              this.__handlers[type] = [handler];
          }
@@ -470,7 +514,16 @@ index 510424828b3a9a74f363cef1e0982489a708541e..de066ca2492f61f675fd793dc585cf16
      }
      removeEventListener(type, handler) {
          type = type.toLowerCase();
-@@ -65,8 +70,24 @@ class TaroEventTarget {
+@@ -56,7 +68,7 @@ class TaroEventTarget {
+         if (!handler) {
+             return;
+         }
+-        const handlers = this.__handlers[type];
++        const handlers = this.getEventHandlers(type);
+         if (!isArray(handlers)) {
+             return;
+         }
+@@ -65,16 +77,32 @@ class TaroEventTarget {
                  return true;
          });
          process.env.NODE_ENV !== 'production' && warn(index === -1, `事件: '${type}' 没有注册在 DOM 中，因此不会被移除。`);
@@ -493,8 +546,20 @@ index 510424828b3a9a74f363cef1e0982489a708541e..de066ca2492f61f675fd793dc585cf16
 +     */
 +    delegateEventListener(_type, _subscribed) { }
      isAnyEventBinded() {
-         const handlers = this.__handlers;
-         const isAnyEventBinded = Object.keys(handlers).find(key => handlers[key].length);
+-        const handlers = this.__handlers;
+-        const isAnyEventBinded = Object.keys(handlers).find(key => handlers[key].length);
++        const handlers = this._handlers;
++        const isAnyEventBinded = handlers && Object.keys(handlers).find(key => handlers[key].length);
+         return Boolean(isAnyEventBinded);
+     }
+     isOnlyClickBinded() {
+-        const handlers = this.__handlers;
+-        const isOnlyClickBinded = handlers.tap && Object.keys(handlers).length === 1;
++        const handlers = this._handlers;
++        const isOnlyClickBinded = handlers?.tap && Object.keys(handlers).length === 1;
+         return Boolean(isOnlyClickBinded);
+     }
+ }
 diff --git a/dist/dom/event.d.ts b/dist/dom/event.d.ts
 index d06902c2239335adb5df57cc27b84ab3d9eb938b..73bb19548c9737b74174a64a261ef08cdccb49b9 100644
 --- a/dist/dom/event.d.ts
@@ -1217,4 +1282,17 @@ index e3bd1f13c55c70a7f1613a4b8335c0069b8e0ba1..84b92fd6678725213a0b77533135fcb1
 +        : node.childNodes.filter(node => !isComment(node)).map(hydrate);
      if (node.className !== '') {
          data["cl" /* Shortcuts.Class */] = node.className;
+     }
+diff --git a/dist/utils/index.js b/dist/utils/index.js
+index 7c06f9a5ced23e9e3b7be97445fed318d61f777b..c21cfeaa9334b14e416e6e4cfe2a69441a7e6b28 100644
+--- a/dist/utils/index.js
++++ b/dist/utils/index.js
+@@ -57,7 +57,7 @@ function isParentBound(node, type) {
+         if (!node || node.nodeName === ROOT_STR || node.nodeName === 'root-portal') {
+             return false;
+         }
+-        else if ((_a = node.__handlers[type]) === null || _a === void 0 ? void 0 : _a.length) {
++        else if ((_a = node.getEventHandlers(type)) === null || _a === void 0 ? void 0 : _a.length) {
+             return true;
+         }
      }

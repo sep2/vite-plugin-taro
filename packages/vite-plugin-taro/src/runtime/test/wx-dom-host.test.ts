@@ -32,6 +32,9 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
         // Attribute removal updates the event-facing dataset alongside the SDK metadata.
         readonly dataset: Record<string, unknown> = {}
         style = new Style(this)
+        getEventHandlers(type: string): unknown[] | undefined {
+            return this.__handlers[type]
+        }
         static override extend(name: string, method: object): void {
             extend(TaroElement, name, method)
         }

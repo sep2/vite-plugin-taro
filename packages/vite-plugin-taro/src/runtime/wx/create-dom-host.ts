@@ -117,8 +117,8 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
 
     TaroElement.extend('delegateEventListener', function (this: HostElement, type: string, subscribed: boolean) {
         // Taro's HTML hooks alias click to the tap handler array; custom component events keep their own name.
-        const click = type === 'click' && this.__handlers.click
-        const name = click && click === this.__handlers.tap ? 'tap' : type
+        const click = type === 'click' && this.getEventHandlers('click')
+        const name = click && click === this.getEventHandlers('tap') ? 'tap' : type
 
         // Value synchronization retains its SDK subscription across business handler changes.
         if (this.nativeNode && name !== getFormChangeEvent(this.nodeName)) {

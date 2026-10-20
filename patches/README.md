@@ -1,6 +1,6 @@
 # Dependency patch series
 
-pnpm applies one combined patch to each package version. We maintain **25 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output.
+pnpm applies one combined patch to each package version. We maintain **26 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output.
 
 ## Feature inventory
 
@@ -30,6 +30,7 @@ pnpm applies one combined patch to each package version. We maintain **25 featur
 | | `11-template-hydration` | Allocate lazy hydration callbacks when constructing template payloads. |
 | | `12-template-attribute-state` | Delegate pre-mutation attribute classification; template hosts retain pure/static view transitions and native hosts use a constant state. |
 | | `13-lazy-style` | Initialize an element’s mutable Style declaration on first access; attribute reads, hydration and cloning preserve lazy allocation for unstyled elements. |
+| | `14-lazy-event-handlers` | Materialize per-target handler tables on mutable access; listener queries, dispatch, propagation and native subscription checks read existing storage. |
 | `canvas-confetti@1.9.4` | `01-canvas-confetti-enhancements` | Keep all existing confetti enhancements together: rotation/tilt controls, frame-clock repeat emission, cached path drawing, and DOMMatrix input normalization. Source, browser and module builds stay aligned. |
 
 The React renderer imports its host through `\0vpt:renderer-host`. VPT's Mini resolver binds that private import through `taro.hostPath`: template targets use `src/runtime/mini/template/template-host.ts`, while TT DOM preference uses the startup selector in `src/runtime/tt/renderer-host.ts`. The generic `RendererHost` type is exported by `vite-plugin-taro-runtime/react`: it accepts the root container and host context for element/text creation, classifies form elements, and receives optional pre-commit and synchronous post-commit callbacks. VPT's recursive implementation uses Taro's document and `FormElement` and owns App/Page outlet projection. React reconciliation, prop comparison, controlled-input restoration and App/Page mounting retain their existing behavior.
@@ -61,6 +62,8 @@ Taro's `insertBefore` and `removeChild` invoke `delegateChildInsertion` and `del
 `11-template-hydration` keeps lazy subtree serialization in template payload construction. Incremental insertion and replacement payloads capture their target node and call the shared serializer when evaluated, so queued updates read the final tree. Node construction allocates no hydration callback or hydration property. Native child delegates perform their SDK operations directly. The change saves one function allocation per Mini node while preserving template serialization complexity and scheduling.
 
 `TaroNode.delegateChildReset` handles complete child-list updates, including the final notification from element `textContent`. Taro still removes and inserts individual children through its ordinary mutation methods, then invokes this existing full-list boundary. The template default lazily hydrates the current children or emits an empty list when `isClean` is true. The public declaration and `TaroNode.extend` let hosts handle that final notification before template payload preparation.
+
+`14-lazy-event-handlers` exposes a lazy, writable `__handlers` accessor and `getEventHandlers(type)` for non-allocating reads. Construction, empty listener checks, absent-listener removal, dispatch, ancestor searches and propagation keep untouched targets free of handler storage, including text and comment nodes. HTML hooks obtain the mutable table when installing aliases. Once allocated, the table and its arrays retain identity across listener removal and callback replacement; cloning keeps each target’s independent listener state. WX and TT subscription checks use the read accessor, including TT catchMove and intrinsic form-event delivery. Empty-table queries are O(1); materialized-table classification retains its existing event-key scans, and handler removal retains its O(H) search.
 
 `TaroElement.delegateEventUpdate` owns template event-related node classification. It runs before logical addition and after logical removal, preserving the HTML hooks and `sideEffect: false` behavior. A host replaces this effect independently of `delegateEventListener(type, subscribed)`, which runs after the first handler is stored or the last handler is removed. Subscription transitions read the existing handler array length in O(1); the ordinary handler search/removal remains O(H) for H handlers of that event. Taro retains case normalization, `once`, handler wrapping and `regionchange` expansion.
 

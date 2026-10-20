@@ -1,0 +1,101 @@
+diff --git a/dist/dom/element.js b/dist/dom/element.js
+index 6821983296d82aa6c9f67cddbaf5159676f0ae03..daea28644e1e15d3bd0ced11bcb59bed62649f49 100644
+--- a/dist/dom/element.js
++++ b/dist/dom/element.js
+@@ -21,7 +21,7 @@ class TaroElement extends TaroNode {
+         let target = this;
+         // eslint-disable-next-line no-cond-assign
+         while ((target = target.parentNode)) {
+-            const listeners = target.__handlers[event.type];
++            const listeners = target.getEventHandlers(event.type);
+             if (!isArray(listeners)) {
+                 continue;
+             }
+@@ -276,7 +276,7 @@ class TaroElement extends TaroNode {
+     }
+     dispatchEvent(event) {
+         const cancelable = event.cancelable;
+-        const listeners = this.__handlers[event.type];
++        const listeners = this.getEventHandlers(event.type);
+         if (!isArray(listeners)) {
+             return false;
+         }
+diff --git a/dist/dom/event-target.d.ts b/dist/dom/event-target.d.ts
+index 4b8fac8181991d29ca3f5c06e676243f67e4cb68..38342f6e9312998212b17c3b3ed1bea915ca5d53 100644
+--- a/dist/dom/event-target.d.ts
++++ b/dist/dom/event-target.d.ts
+@@ -1,7 +1,11 @@
+ import { EventHandler, AddEventListenerOptions } from '../interface/event-target.js';
+ 
+ declare class TaroEventTarget {
+-    __handlers: Record<string, EventHandler[]>;
++    private _handlers?: Record<string, EventHandler[]>;
++    get __handlers(): Record<string, EventHandler[]>;
++    set __handlers(value: Record<string, EventHandler[]>);
++    /** Read an existing event array without materializing the handler table. */
++    getEventHandlers(type: string): EventHandler[] | undefined;
+     addEventListener(type: string, handler: EventHandler, options?: boolean | AddEventListenerOptions): void;
+     removeEventListener(type: string, handler: EventHandler): void;
+     /**
+diff --git a/dist/dom/event-target.js b/dist/dom/event-target.js
+index de066ca2492f61f675fd793dc585cf160fd6dfa6..7414d12c4679afa560338e6cd62995a9fdab7aba 100644
+--- a/dist/dom/event-target.js
++++ b/dist/dom/event-target.js
+@@ -1,8 +1,15 @@
+ import { hooks, isObject, warn, isArray } from '@tarojs/shared';
+ 
+ class TaroEventTarget {
+-    constructor() {
+-        this.__handlers = {};
++    // Each target retains one mutable table, initialized on first mutable access.
++    get __handlers() {
++        return this._handlers ??= {};
++    }
++    set __handlers(value) {
++        this._handlers = value;
++    }
++    getEventHandlers(type) {
++        return this._handlers?.[type];
+     }
+     addEventListener(type, handler, options) {
+         type = type.toLowerCase();
+@@ -61,7 +68,7 @@ class TaroEventTarget {
+         if (!handler) {
+             return;
+         }
+-        const handlers = this.__handlers[type];
++        const handlers = this.getEventHandlers(type);
+         if (!isArray(handlers)) {
+             return;
+         }
+@@ -89,13 +96,13 @@ class TaroEventTarget {
+      */
+     delegateEventListener(_type, _subscribed) { }
+     isAnyEventBinded() {
+-        const handlers = this.__handlers;
+-        const isAnyEventBinded = Object.keys(handlers).find(key => handlers[key].length);
++        const handlers = this._handlers;
++        const isAnyEventBinded = handlers && Object.keys(handlers).find(key => handlers[key].length);
+         return Boolean(isAnyEventBinded);
+     }
+     isOnlyClickBinded() {
+-        const handlers = this.__handlers;
+-        const isOnlyClickBinded = handlers.tap && Object.keys(handlers).length === 1;
++        const handlers = this._handlers;
++        const isOnlyClickBinded = handlers?.tap && Object.keys(handlers).length === 1;
+         return Boolean(isOnlyClickBinded);
+     }
+ }
+diff --git a/dist/utils/index.js b/dist/utils/index.js
+index 7c06f9a5ced23e9e3b7be97445fed318d61f777b..c21cfeaa9334b14e416e6e4cfe2a69441a7e6b28 100644
+--- a/dist/utils/index.js
++++ b/dist/utils/index.js
+@@ -57,7 +57,7 @@ function isParentBound(node, type) {
+         if (!node || node.nodeName === ROOT_STR || node.nodeName === 'root-portal') {
+             return false;
+         }
+-        else if ((_a = node.__handlers[type]) === null || _a === void 0 ? void 0 : _a.length) {
++        else if ((_a = node.getEventHandlers(type)) === null || _a === void 0 ? void 0 : _a.length) {
+             return true;
+         }
+     }

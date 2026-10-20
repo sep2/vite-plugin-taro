@@ -815,14 +815,19 @@ custom.removeEventListener('begin', regionListener)
 expectCalls([['unlisten', custom.nativeNode, 'bindbegin', custom.nativeEventListener]])
 
 const move = eventNode('view')
+assert.equal(Object.hasOwn(move, '_handlers'), false)
 move.setAttribute('catchMove', false)
 expectCalls([['attribute', move.nativeNode, 'catchMove', false]])
+assert.equal(Object.hasOwn(move, '_handlers'), false)
 move.setAttribute('catchMove', true)
 const moveBridge = move.nativeEventListener
 expectCalls([
     ['attribute', move.nativeNode, 'catchMove', true],
     ['listen', move.nativeNode, 'catchtouchmove', moveBridge]
 ])
+emitNative(move, 'touchmove', {}, move)
+expectCalls([])
+assert.equal(Object.hasOwn(move, '_handlers'), false, 'catchMove dispatch stays lazy without business listeners')
 move.addEventListener('touchmove', regionListener)
 expectCalls([])
 emitNative(move, 'touchmove', {}, move)
@@ -886,6 +891,9 @@ try {
         ['attribute', textarea.nativeNode, 'value', 'edited'],
         ['attribute', textarea.nativeNode, 'value', 'text']
     ])
+    for (const node of [formContainer, controlled, uncontrolled, textarea]) {
+        assert.equal(Object.hasOwn(node, '_handlers'), false, 'intrinsic form events retain lazy handler storage')
+    }
     // Match the value-changing events in Taro's component definitions.
     for (const [name, type, value] of [
         ['input', 'input', 'typed'],
