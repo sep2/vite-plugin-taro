@@ -195,6 +195,7 @@ export const original = {
     createTextNode: document.createTextNode,
     nodeEnqueue: TaroNode.prototype.enqueueUpdate,
     childInsertion: TaroNode.prototype.delegateChildInsertion,
+    scope: Object.getOwnPropertyDescriptor(TaroNode.prototype, '_scope'),
     rootEnqueue: TaroRootElement.prototype.enqueueUpdate,
     rootPerform: TaroRootElement.prototype.performUpdate,
     rootPath: Object.getOwnPropertyDescriptor(TaroRootElement.prototype, '_path').get
@@ -330,7 +331,7 @@ import React from 'react'
 import ReactDOM from 'vite-plugin-taro-runtime/react'
 import { hooks, isEnableTTDom, toCamelCase } from '@tarojs/shared'
 import 'vite-plugin-taro-runtime/plugin-platform-tt/runtime'
-import { Current, document, eventHandler, FormElement, Style, TaroElement, TaroNode, TaroRootElement, TaroText } from 'vite-plugin-taro-runtime/runtime/mini'
+import { Current, document, eventHandler, FormElement, getNearestCtx, Style, TaroElement, TaroNode, TaroRootElement, TaroText } from 'vite-plugin-taro-runtime/runtime/mini'
 import { useLoad, useUnload } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
 import { createVptApp } from ${JSON.stringify(resolveVptRuntime('mini/vpt/create-vpt-app'))}
 import { createVptPage } from ${JSON.stringify(resolveVptRuntime('mini/vpt/create-vpt-page'))}
@@ -427,6 +428,12 @@ for (const method of ['delegateChildInsertion', 'delegateChildRemoval', 'delegat
 // Tree, text, style and attribute mutations reach native operations before template payload work.
 TaroNode.extend('_path', { get() { assert.fail('Native mutations must not calculate template paths') } })
 TaroNode.extend('enqueueUpdate', () => assert.fail('Native mutations must not enqueue template updates'))
+// Native mutations and TT scope reads leave root traversal to APIs that explicitly need it.
+const rootDescriptor = Object.getOwnPropertyDescriptor(TaroNode.prototype, '_root')
+TaroNode.extend('_root', { get() { assert.fail('TT native mutations must not resolve context roots') } })
+assert.equal(Object.getOwnPropertyDescriptor(TaroNode.prototype, '_scope').get, undefined)
+assert.equal(parent._scope, undefined)
+assert.equal(getNearestCtx(parent), undefined)
 parent.appendChild(text)
 expectCalls([['append', parent.nativeNode, text.nativeNode]])
 expectChildren(parent, [text])
@@ -483,6 +490,7 @@ expectCalls([])
 const rootNative = root.nativeNode
 root.appendChild(parent)
 expectCalls([['append', rootNative, parent.nativeNode]])
+Object.defineProperty(TaroNode.prototype, '_root', rootDescriptor)
 assert.strictEqual(parent._root, root)
 
 // Guard enumeration during native attribute operations, then restore the original tables for later tree tests.
@@ -1305,6 +1313,7 @@ async function checkTemplate() {
     assert.strictEqual(document.createElement, original.createElement)
     assert.strictEqual(document.createTextNode, original.createTextNode)
     assert.strictEqual(TaroNode.prototype.delegateChildInsertion, original.childInsertion)
+    assert.deepEqual(Object.getOwnPropertyDescriptor(TaroNode.prototype, '_scope'), original.scope)
     assert.strictEqual(TaroRootElement.prototype.enqueueUpdate, original.rootEnqueue)
     assert.strictEqual(TaroRootElement.prototype.performUpdate, original.rootPerform)
     assert.notStrictEqual(TaroNode.prototype.enqueueUpdate, original.nodeEnqueue)

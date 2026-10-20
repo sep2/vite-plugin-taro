@@ -114,6 +114,10 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
     // textContent 的逐项删除/插入已同步原生树，模板的整表更新通知在此完成。
     TaroNode.extend('delegateChildReset', noop)
 
+    // Native nodes disable template scope lookup and its cache invalidation.
+    TaroNode.extend('_scope', { value: undefined })
+    TaroNode.extend('delegateContextInvalidation', noop)
+
     extend(TaroText, 'delegateTextUpdate', function (this: HostNode, text: string) {
         this.nativeNode!.nodeValue = text
     })

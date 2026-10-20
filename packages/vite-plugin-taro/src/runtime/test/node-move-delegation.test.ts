@@ -68,7 +68,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
 
 const fixture = `
 import assert from 'node:assert/strict'
-import { document, hydrate, MutationObserver, TaroEvent } from 'vite-plugin-taro-runtime/runtime/mini'
+import { document, getNearestCtx, hydrate, MutationObserver, TaroEvent, TaroNode } from 'vite-plugin-taro-runtime/runtime/mini'
 
 // Hydration belongs to queued template payloads, rather than node instances or their prototypes.
 for (const node of [document.createElement('root'), document.createElement('view'), document.createTextNode('text'), document.createComment('anchor')]) {
@@ -244,13 +244,24 @@ for (const replace of [false, true]) {
     otherRoot.appendChild(other)
     other.appendChild(document.createElement('view'))
     const contexts = [{ page: 'first' }, { page: 'second' }, { page: 'updated' }]
-    parent.ctx = contexts[0]
+    // Track ancestor-context reads to verify that the template host retains its cache hits.
+    let parentContext = contexts[0]
+    const contextReads = []
+    Object.defineProperty(parent, 'ctx', {
+        get() { contextReads.push(parentContext); return parentContext },
+        set(value) { parentContext = value }
+    })
     other.ctx = contexts[1]
     if (process.env.TARO_ENV === 'weapp') {
         assert.strictEqual(b.firstChild._scope, contexts[0])
+        assert.strictEqual(getNearestCtx(b.firstChild), contexts[0])
+        assert.deepEqual(contextReads, [contexts[0]], 'repeated template reads reuse the cached context')
         parent.ctx = contexts[2]
+        assert.strictEqual(b.firstChild._scope, contexts[0], 'template context changes retain epoch-based invalidation')
+        assert.deepEqual(contextReads, [contexts[0]])
         parent.appendChild(b)
         assert.strictEqual(b.firstChild._scope, contexts[2], 'a move invalidates cached contexts')
+        assert.deepEqual(contextReads, [contexts[0], contexts[2]])
     }
     calls.length = 0
     root.updatePayloads.length = 0
@@ -273,6 +284,53 @@ for (const replace of [false, true]) {
         assert.equal(b.firstChild._scope, null)
     }
     observer.disconnect()
+}
+
+// Each mutation resolves its invalidation root once after presentation, independently of host serialization.
+for (const rooted of [false, true]) {
+    for (const operation of ['append', 'insert', 'move', 'replace', 'remove']) {
+        const root = document.createElement('root')
+        const branch = document.createElement('view')
+        const parent = document.createElement('view')
+        if (rooted) { root.appendChild(branch) }
+        branch.appendChild(parent)
+        const child = document.createElement('view')
+        const anchor = document.createElement('view')
+        parent.appendChild(child)
+        parent.appendChild(anchor)
+        parent.ctx = { version: 'initial' }
+        if (process.env.TARO_ENV === 'weapp') {
+            assert.strictEqual(anchor._scope, rooted ? parent.ctx : null)
+        }
+        parent.ctx = { version: 'updated' }
+        const epoch = root.nearestCtxEpoch
+        // This local journal counts parent-chain resolutions and orders them against presentation delegates.
+        const calls = []
+        parent.delegateChildInsertion = () => { calls.push('insert') }
+        parent.delegateChildRemoval = () => { calls.push('remove') }
+        const rootGetter = Object.getOwnPropertyDescriptor(TaroNode.prototype, '_root').get
+        Object.defineProperty(parent, '_root', {
+            get() { calls.push('root'); return rootGetter.call(this) }
+        })
+        const fresh = document.createElement('view')
+        if (operation === 'append') {
+            parent.appendChild(fresh)
+        } else if (operation === 'insert') {
+            parent.insertBefore(fresh, anchor)
+        } else if (operation === 'move') {
+            parent.insertBefore(child, anchor)
+        } else if (operation === 'replace') {
+            parent.replaceChild(fresh, child)
+        } else {
+            parent.removeChild(child)
+        }
+        const delegates = operation === 'replace' ? ['insert', 'remove'] : [operation === 'remove' ? 'remove' : 'insert']
+        assert.deepEqual(calls, delegates.flatMap(name => [name, 'root']), operation)
+        assert.equal(root.nearestCtxEpoch - epoch, rooted && process.env.TARO_ENV === 'weapp' ? delegates.length : 0)
+        if (process.env.TARO_ENV === 'weapp') {
+            assert.strictEqual(anchor._scope, rooted ? parent.ctx : null)
+        }
+    }
 }
 
 // Fragment expansion and true deletion retain their existing insertion/removal delegates.

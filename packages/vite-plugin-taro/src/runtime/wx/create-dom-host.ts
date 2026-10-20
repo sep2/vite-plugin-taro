@@ -69,6 +69,10 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
 
     TaroNode.extend('delegateChildReset', noop)
 
+    // Native nodes disable template scope lookup and its cache invalidation.
+    TaroNode.extend('_scope', { value: undefined })
+    TaroNode.extend('delegateContextInvalidation', noop)
+
     extend(TaroText, 'delegateTextUpdate', function (this: HostText, text: string) {
         this.nativeNode!.textContent = text
     })

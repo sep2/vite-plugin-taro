@@ -6,7 +6,11 @@ import { bundleRuntimeEntry, createExecutionContext, executeRuntimeEntry } from 
 
 test('WX host creates, mutates and detaches Page-owned native nodes', async (t) => {
     function extend(ctor: { prototype: object }, name: string, method: object): void {
-        Object.defineProperty(ctor.prototype, name, { value: method, enumerable: true, configurable: true })
+        Object.defineProperty(ctor.prototype, name, {
+            enumerable: true,
+            configurable: true,
+            ...(typeof method === 'function' ? { value: method } : method)
+        })
     }
     class TaroNode {
         delegateChildInsertion() {}

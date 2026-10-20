@@ -652,11 +652,61 @@ index f4062db04f2a8216795447f892b80b7b6514f467..8a8aab1e78ca3f5087bf768cf57732ed
      if (node) {
          const dispatch = () => {
              const e = createEvent(event, node);
+diff --git a/dist/dom/nearest-ctx.d.ts b/dist/dom/nearest-ctx.d.ts
+index 6665d2b1b81c451e1706cc06026daf3ff20f275e..630d5404c44b286649144784fc9739cf0daa76c1 100644
+--- a/dist/dom/nearest-ctx.d.ts
++++ b/dist/dom/nearest-ctx.d.ts
+@@ -4,6 +4,8 @@ import { TaroRootElement } from './root.js';
+ 
+ declare function isNearestCtxEnv(): boolean;
+ declare function getNearestCtx(node: TaroNode): MpInstance | null | undefined;
++declare function getCachedNearestCtx(node: TaroNode): MpInstance | null | undefined;
++declare function invalidateNearestCtx(node: TaroNode): void;
+ declare function bumpNearestCtxEpochForRoot(root: TaroRootElement | null | undefined): void;
+ 
+-export { bumpNearestCtxEpochForRoot, getNearestCtx, isNearestCtxEnv };
++export { bumpNearestCtxEpochForRoot, getCachedNearestCtx, getNearestCtx, invalidateNearestCtx, isNearestCtxEnv };
+diff --git a/dist/dom/nearest-ctx.js b/dist/dom/nearest-ctx.js
+index 5a41497ad145c952b5e321778b3d2a1f67ad8999..07aef99cedaf8b29e3dee52f27d6e9e792b861f1 100644
+--- a/dist/dom/nearest-ctx.js
++++ b/dist/dom/nearest-ctx.js
+@@ -1,8 +1,12 @@
++// Template context reads reuse values until a root epoch change invalidates them.
+ const nearestCtxCache = new WeakMap();
+ function isNearestCtxEnv() {
+     return process.env.TARO_ENV === 'weapp' || process.env.TARO_ENV === 'jd';
+ }
+ function getNearestCtx(node) {
++    return node._scope;
++}
++function getCachedNearestCtx(node) {
+     if (!isNearestCtxEnv()) {
+         return undefined;
+     }
+@@ -36,6 +40,11 @@ function resolveNearestCtxValue(node, root) {
+     }
+     return (_a = root.ctx) !== null && _a !== void 0 ? _a : null;
+ }
++function invalidateNearestCtx(node) {
++    if (isNearestCtxEnv()) {
++        node.delegateContextInvalidation();
++    }
++}
+ function bumpNearestCtxEpochForRoot(root) {
+     if (!isNearestCtxEnv() || root == null) {
+         return;
+@@ -45,5 +54,5 @@ function bumpNearestCtxEpochForRoot(root) {
+     }
+ }
+ 
+-export { bumpNearestCtxEpochForRoot, getNearestCtx, isNearestCtxEnv };
++export { bumpNearestCtxEpochForRoot, getCachedNearestCtx, getNearestCtx, invalidateNearestCtx, isNearestCtxEnv };
+ //# sourceMappingURL=nearest-ctx.js.map
 diff --git a/dist/dom/node.d.ts b/dist/dom/node.d.ts
-index a456e9adeecdaae566fe965b7054e55cf009530e..818bc7dbebf42dc8ebe848a98511c544e928e012 100644
+index a456e9adeecdaae566fe965b7054e55cf009530e..d5ef1df802491475c476a9bfcf94e72863d91ac6 100644
 --- a/dist/dom/node.d.ts
 +++ b/dist/dom/node.d.ts
-@@ -19,8 +19,12 @@ declare class TaroNode extends TaroEventTarget {
+@@ -19,11 +19,17 @@ declare class TaroNode extends TaroEventTarget {
      parentNode: TaroNode | null;
      childNodes: TaroNode[];
      constructor();
@@ -671,7 +721,12 @@ index a456e9adeecdaae566fe965b7054e55cf009530e..818bc7dbebf42dc8ebe848a98511c544
      private updateSingleChild;
      get _root(): TaroRootElement | null;
      get _scope(): MpInstance | null | undefined;
-@@ -71,6 +75,19 @@ declare class TaroNode extends TaroEventTarget {
++    /** Invalidate template context caches after presentation or a context lifecycle change. */
++    delegateContextInvalidation(): void;
+     protected findIndex(refChild: TaroNode): number;
+     get _path(): string;
+     get nextSibling(): TaroNode | null;
+@@ -71,6 +77,19 @@ declare class TaroNode extends TaroEventTarget {
       *   2. remove C
       */
      removeChild<T extends TaroNode>(child: T, options?: RemoveChildOptions): T;
@@ -692,9 +747,18 @@ index a456e9adeecdaae566fe965b7054e55cf009530e..818bc7dbebf42dc8ebe848a98511c544
      hasChildNodes(): boolean;
      enqueueUpdate(payload: UpdatePayload): void;
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index cc210f4e56ff90d69a398e2e27382def86f4cb0c..77444093794dab103b0a67051e00a0ec90c28853 100644
+index cc210f4e56ff90d69a398e2e27382def86f4cb0c..7aaa23c845b83cad5b5c3c2c91ada60e08c6bd75 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
+@@ -6,7 +6,7 @@ import { hydrate } from '../hydrate.js';
+ import { incrementId, isComment, extend } from '../utils/index.js';
+ import { eventSource } from './event-source.js';
+ import { TaroEventTarget } from './event-target.js';
+-import { getNearestCtx, bumpNearestCtxEpochForRoot } from './nearest-ctx.js';
++import { getCachedNearestCtx, bumpNearestCtxEpochForRoot } from './nearest-ctx.js';
+ 
+ const CHILDNODES = "cn" /* Shortcuts.Childnodes */;
+ const nodeId = incrementId();
 @@ -15,12 +15,19 @@ class TaroNode extends TaroEventTarget {
          super();
          this.parentNode = null;
@@ -726,7 +790,20 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..77444093794dab103b0a67051e00a0ec
              });
          });
      }
-@@ -94,28 +101,32 @@ class TaroNode extends TaroEventTarget {
+@@ -48,7 +55,11 @@ class TaroNode extends TaroEventTarget {
+         return ((_a = this.parentNode) === null || _a === void 0 ? void 0 : _a._root) || null;
+     }
+     get _scope() {
+-        return getNearestCtx(this);
++        return getCachedNearestCtx(this);
++    }
++    /** Called after child presentation and at Page/component context lifecycle boundaries. */
++    delegateContextInvalidation() {
++        bumpNearestCtxEpochForRoot(this._root);
+     }
+     findIndex(refChild) {
+         const index = this.childNodes.indexOf(refChild);
+@@ -94,28 +105,32 @@ class TaroNode extends TaroEventTarget {
       */
      // eslint-disable-next-line accessor-pairs
      set textContent(text) {
@@ -771,7 +848,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..77444093794dab103b0a67051e00a0ec
      }
      /**
       * @doc https://developer.mozilla.org/zh-CN/docs/Web/API/Node/insertBefore
-@@ -126,6 +137,10 @@ class TaroNode extends TaroEventTarget {
+@@ -126,6 +141,10 @@ class TaroNode extends TaroEventTarget {
       *   3. insert D before C, D has the different parent of C
       */
      insertBefore(newChild, refChild, isReplace) {
@@ -782,7 +859,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..77444093794dab103b0a67051e00a0ec
          if (newChild.nodeName === DOCUMENT_FRAGMENT) {
              newChild.childNodes.reduceRight((previousValue, currentValue) => {
                  this.insertBefore(currentValue, previousValue);
-@@ -133,10 +148,15 @@ class TaroNode extends TaroEventTarget {
+@@ -133,10 +152,15 @@ class TaroNode extends TaroEventTarget {
              }, refChild);
              return newChild;
          }
@@ -802,7 +879,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..77444093794dab103b0a67051e00a0ec
          let index = 0;
          // Data structure
          newChild.parentNode = this;
-@@ -149,67 +169,26 @@ class TaroNode extends TaroEventTarget {
+@@ -149,67 +173,24 @@ class TaroNode extends TaroEventTarget {
              // appendChild
              this.childNodes.push(newChild);
          }
@@ -852,24 +929,12 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..77444093794dab103b0a67051e00a0ec
 -                }
 -            }
 -        }
+-        if (this._root) {
+-            bumpNearestCtxEpochForRoot(this._root);
 +        // Delegation runs after the logical insertion, including on detached parents.
 +        // Its default implementation prepares template payloads; native hosts can replace it before any serialization work.
 +        this.delegateChildInsertion(newChild, refChild, index, isReplace, previousIndex);
-         if (this._root) {
-             bumpNearestCtxEpochForRoot(this._root);
-         }
--        MutationObserver.record({
--            type: "childList" /* MutationRecordType.CHILD_LIST */,
--            target: this,
--            addedNodes: [newChild],
--            removedNodes: isReplace
--                ? [refChild] /** replaceChild */
--                : [],
--            nextSibling: isReplace
--                ? refChild.nextSibling /** replaceChild */
--                : (refChild || null), /** insertBefore & appendChild */
--            previousSibling: newChild.previousSibling
--        });
++        this.delegateContextInvalidation();
 +        if (MutationObserver.hasObservers) {
 +            MutationObserver.record({
 +                type: "childList" /* MutationRecordType.CHILD_LIST */,
@@ -883,11 +948,23 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..77444093794dab103b0a67051e00a0ec
 +                    : (refChild || null), /** insertBefore & appendChild */
 +                previousSibling: newChild.previousSibling
 +            });
-+        }
+         }
+-        MutationObserver.record({
+-            type: "childList" /* MutationRecordType.CHILD_LIST */,
+-            target: this,
+-            addedNodes: [newChild],
+-            removedNodes: isReplace
+-                ? [refChild] /** replaceChild */
+-                : [],
+-            nextSibling: isReplace
+-                ? refChild.nextSibling /** replaceChild */
+-                : (refChild || null), /** insertBefore & appendChild */
+-            previousSibling: newChild.previousSibling
+-        });
          return newChild;
      }
      /**
-@@ -234,6 +213,9 @@ class TaroNode extends TaroEventTarget {
+@@ -234,6 +215,9 @@ class TaroNode extends TaroEventTarget {
      replaceChild(newChild, oldChild) {
          if (oldChild.parentNode !== this)
              return;
@@ -897,7 +974,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..77444093794dab103b0a67051e00a0ec
          // Insert the newChild
          this.insertBefore(newChild, oldChild, true);
          // Destroy the oldChild
-@@ -251,7 +233,7 @@ class TaroNode extends TaroEventTarget {
+@@ -251,7 +235,7 @@ class TaroNode extends TaroEventTarget {
       */
      removeChild(child, options = {}) {
          const { cleanRef, doUpdate } = options;
@@ -906,21 +983,15 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..77444093794dab103b0a67051e00a0ec
              // appendChild/replaceChild/insertBefore 不应该触发
              // @Todo: 但其实如果 newChild 的父节点是另一颗子树的节点，应该是要触发的
              MutationObserver.record({
-@@ -270,15 +252,88 @@ class TaroNode extends TaroEventTarget {
+@@ -270,14 +254,85 @@ class TaroNode extends TaroEventTarget {
          if (cleanRef !== false) {
              eventSource.removeNodeTree(child);
          }
--        // Serialization
--        if (this._root && doUpdate !== false) {
--            this.updateChildNodes();
--        }
 +        // Forward every removal. doUpdate controls template batching, not whether the logical child was removed.
 +        this.delegateChildRemoval(child, options);
-         if (this._root) {
-             bumpNearestCtxEpochForRoot(this._root);
-         }
-         return child;
-     }
++        this.delegateContextInvalidation();
++        return child;
++    }
 +    /**
 +     * 在 Taro 更新 parentNode/childNodes 后委托插入，父节点尚未挂载时也会调用。
 +     * this 是新父节点；newChild 是已插入的逻辑节点；refChild 为空表示追加。
@@ -933,8 +1004,12 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..77444093794dab103b0a67051e00a0ec
 +     */
 +    delegateChildInsertion(newChild, refChild, index, isReplace, previousIndex) {
 +        const childNodesLength = this.childNodes.length;
-+        // Serialization
-+        if (this._root) {
+         // Serialization
+-        if (this._root && doUpdate !== false) {
+-            this.updateChildNodes();
+-        }
+         if (this._root) {
+-            bumpNearestCtxEpochForRoot(this._root);
 +            if (previousIndex !== undefined) {
 +                // A move changes existing slots, including append and replacement. Hydrate the final list at flush.
 +                this.delegateChildReset();
@@ -994,11 +1069,11 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..77444093794dab103b0a67051e00a0ec
 +    delegateChildRemoval(_child, options) {
 +        if (this._root && options.doUpdate !== false) {
 +            this.delegateChildReset();
-+        }
-+    }
+         }
+-        return child;
+     }
      remove(options) {
          var _a;
-         (_a = this.parentNode) === null || _a === void 0 ? void 0 : _a.removeChild(this, options);
 diff --git a/dist/dom/root.js b/dist/dom/root.js
 index 2680d190c19d33a92db1883d674ad6b26b2ffef4..54c120354667930200186ea2f8957747f510a97f 100644
 --- a/dist/dom/root.js
@@ -1200,9 +1275,18 @@ index c61fb312438fc85a2d94852b699da663cc835254..aeac72d04619ad13bb23c3198aa7ecce
  
  export { TaroText };
 diff --git a/dist/dsl/common.js b/dist/dsl/common.js
-index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..7970bd9bc8d0466d3f0f9951b19310fc00d456d6 100644
+index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..35cd4e7dabc26a98741cafedd598f98042c597dd 100644
 --- a/dist/dsl/common.js
 +++ b/dist/dsl/common.js
+@@ -4,7 +4,7 @@ import { taroWindowProvider } from '../bom/window.js';
+ import { PAGE_INIT, OPTIONS, EXTERNAL_CLASSES, BEHAVIORS, CONTEXT_ACTIONS, VIEW, ON_HIDE, ON_READY, ON_SHOW, ON_LOAD, CUSTOM_WRAPPER } from '../constants/index.js';
+ import { Current } from '../current.js';
+ import { eventHandler } from '../dom/event.js';
+-import { bumpNearestCtxEpochForRoot } from '../dom/nearest-ctx.js';
++import { invalidateNearestCtx } from '../dom/nearest-ctx.js';
+ import { eventCenter } from '../emitter/emitter.js';
+ import env from '../env.js';
+ import { perf } from '../perf.js';
 @@ -96,8 +96,12 @@ function createPageConfig(component, pageName, data, pageConfig) {
              Current.page = this;
              this.config = pageConfig || {};
@@ -1227,6 +1311,42 @@ index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..7970bd9bc8d0466d3f0f9951b19310fc
                      if (process.env.TARO_ENV === 'tt' && isEnableTTDom()) {
                          pageElement = env.document.getPageDocumentById(this.__webviewId__);
                      }
+@@ -123,7 +127,7 @@ function createPageConfig(component, pageName, data, pageConfig) {
+                     loadResolver();
+                     if (process.env.TARO_PLATFORM !== 'web') {
+                         pageElement.ctx = this;
+-                        bumpNearestCtxEpochForRoot(pageElement);
++                        invalidateNearestCtx(pageElement);
+                         if (process.env.TARO_ENV === 'tt' && isEnableTTDom()) {
+                             pageElement.sync();
+                         }
+@@ -156,7 +160,7 @@ function createPageConfig(component, pageName, data, pageConfig) {
+                 unmounting = false;
+                 instances.delete($taroPath);
+                 if (pageElement) {
+-                    bumpNearestCtxEpochForRoot(pageElement);
++                    invalidateNearestCtx(pageElement);
+                     pageElement.ctx = null;
+                     pageElement = null;
+                 }
+@@ -337,7 +341,7 @@ function createRecursiveComponentConfig(componentName, forceCustomWrapper = fals
+                     const el = env.document.getElementById(componentId);
+                     if (el) {
+                         el.ctx = this;
+-                        bumpNearestCtxEpochForRoot(el._root);
++                        invalidateNearestCtx(el);
+                     }
+                 }
+             },
+@@ -354,7 +358,7 @@ function createRecursiveComponentConfig(componentName, forceCustomWrapper = fals
+                     const el = env.document.getElementById(componentId);
+                     if (el) {
+                         el.ctx = null;
+-                        bumpNearestCtxEpochForRoot(el._root);
++                        invalidateNearestCtx(el);
+                     }
+                 }
+             }
 diff --git a/dist/dsl/instance.d.ts b/dist/dsl/instance.d.ts
 index ad2d594ce3cdbe1324d74bd3a0e82c050a174c40..9ae719f341aa963d383e1e2e3f3f856b51caa7ef 100644
 --- a/dist/dsl/instance.d.ts
@@ -1283,6 +1403,32 @@ index e3bd1f13c55c70a7f1613a4b8335c0069b8e0ba1..84b92fd6678725213a0b77533135fcb1
      if (node.className !== '') {
          data["cl" /* Shortcuts.Class */] = node.className;
      }
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index e417eee947a2b59a495ae6b2162f82bb7ef81bcf..dd91625204bd59da293e16669a2bc4b15f645750 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -12,7 +12,7 @@ export { taroHistoryProvider as history, taroLocationProvider as location, taroW
+ export { TaroElement } from './dom/element.js';
+ export { TaroEvent, createEvent, eventHandler, eventHandlerTTDom } from './dom/event.js';
+ export { FormElement } from './dom/form.js';
+-export { bumpNearestCtxEpochForRoot, getNearestCtx, isNearestCtxEnv } from './dom/nearest-ctx.js';
++export { bumpNearestCtxEpochForRoot, getNearestCtx, invalidateNearestCtx, isNearestCtxEnv } from './dom/nearest-ctx.js';
+ export { TaroNode } from './dom/node.js';
+ export { TaroRootElement } from './dom/root.js';
+ export { Style } from './dom/style.js';
+diff --git a/dist/index.js b/dist/index.js
+index 87bddc34e7021c352665e8cee1433af24c4b763a..b03f40dcbde925aaa2f802b6678439e5a0c1d132 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -13,7 +13,7 @@ export { taroHistoryProvider as history, taroLocationProvider as location, taroW
+ export { TaroElement } from './dom/element.js';
+ export { TaroEvent, createEvent, eventHandler, eventHandlerTTDom } from './dom/event.js';
+ export { FormElement } from './dom/form.js';
+-export { bumpNearestCtxEpochForRoot, getNearestCtx, isNearestCtxEnv } from './dom/nearest-ctx.js';
++export { bumpNearestCtxEpochForRoot, getNearestCtx, invalidateNearestCtx, isNearestCtxEnv } from './dom/nearest-ctx.js';
+ export { TaroNode } from './dom/node.js';
+ export { TaroRootElement } from './dom/root.js';
+ export { Style } from './dom/style.js';
 diff --git a/dist/utils/index.js b/dist/utils/index.js
 index 7c06f9a5ced23e9e3b7be97445fed318d61f777b..c21cfeaa9334b14e416e6e4cfe2a69441a7e6b28 100644
 --- a/dist/utils/index.js
