@@ -148,6 +148,7 @@ function createProjectConfigJson(target: VptTarget, appId: string | undefined): 
                 description: '',
                 compileType: 'miniprogram',
                 setting: {
+                    // 在这里改为 true 开启 Skyline，默认关闭
                     skylineRenderEnable: false,
                     urlCheck: false,
                     es6: false,

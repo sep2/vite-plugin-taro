@@ -43,13 +43,12 @@ pnpm v12 monorepo integrating Vite 8, React 19, and Taro for WeChat (`wx`), Alip
 Under `packages/`:
 
 - `vite-plugin-taro`: published Vite plugin; source in `src`, output in `dist`, README files synced during build.
-- `create-vite-taro`: published project generator; templates in `templates/default`.
+- `create-vite-taro`: published project generator; `templates/default`.
 - `taro-runtime`: published as `vite-plugin-taro-runtime`; bundles the Taro runtime, React renderer/framework runtime from pinned, patched dependencies.
 
 Under `demo/`:
 
 - `loan-genius`: sample app for `wx`, `zfb`, `tt`, and `h5`.
-- `react-tabs-demo`: real tab routes with a shared React bottom bar for `wx`, `zfb`, `tt`, and `h5`.
 - `native-comp-demo`: native custom-component fixture for `wx`, `zfb`, and `tt`.
 - `polyfill-demo`: opt-in core-js runtime checks for `wx`, `zfb`, and `tt`.
 - `skyline-share-element-demo`: native Skyline shared-element list/detail transitions for `wx` only.
@@ -68,7 +67,8 @@ See root `package.json` for all scripts.
 - Build or develop an app: `pnpm build:<app>:<target>` / `pnpm dev:<app>:<target>`; supported targets are listed above. Dev commands enable hot reload.
 - Typecheck: `pnpm typecheck:plugin` or `pnpm typecheck:<app>`.
 - HMR stress edits: `pnpm stress:hmr-stress-demo` (paced) or `pnpm stress:hmr-stress-demo:burst` (rapid).
-- H5 preview: `pnpm preview:loan-genius:h5` or `pnpm preview:react-tabs-demo:h5`.
+- H5 preview: `pnpm preview:loan-genius:h5`.
+- Generated template checks: `pnpm test:template`; WX DevTools: set an authorized `VITE_VPT_WECHAT_APP_ID` and run `pnpm test:template:devtools`.
 - Biome: `pnpm lint` (check) / `pnpm format` (safe fixes).
 - Release notes: `pnpm changeset`; preview with `pnpm changeset status`.
 - Prepare release files: `pnpm release` (Changesets versioning, lockfile refresh, formatting only). Review, commit, and push `main` to publish in CI; never publish locally or create release tags manually.

@@ -51,7 +51,7 @@ See the [Skyline Shared-Element Demo](https://github.com/sep2/vite-plugin-taro/t
 
 <video src="https://github.com/user-attachments/assets/bd23538a-da13-431b-a182-85aadeb66194" controls autoplay muted loop playsinline width="320"></video>
 
-See the [App Component and Pre-Render Demo](https://github.com/sep2/vite-plugin-taro/tree/main/demo/react-tabs-demo), switching tabs no longer causes page flickering.
+Explore the [starter template](https://github.com/sep2/vite-plugin-taro/tree/main/packages/create-vite-taro/templates/default), featuring custom React tabs and synchronous first-frame prerendering for flicker-free page switching.
 
 <video src="https://github.com/user-attachments/assets/aa2da4bb-fe60-4d3b-9a94-8df17a4e73ae" controls autoplay muted loop playsinline width="320"></video>
 

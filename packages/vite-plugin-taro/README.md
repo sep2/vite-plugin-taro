@@ -52,7 +52,7 @@ pnpm --config.minimum-release-age=0 create vite-taro@latest my-app
 
 <video src="https://github.com/user-attachments/assets/bd23538a-da13-431b-a182-85aadeb66194" controls autoplay muted loop playsinline width="320"></video>
 
-查看 [App 组件与预渲染 Demo](https://github.com/sep2/vite-plugin-taro/tree/main/demo/react-tabs-demo)，切换页面不闪屏。
+查看[默认模板](https://github.com/sep2/vite-plugin-taro/tree/main/packages/create-vite-taro/templates/default)，使用 React 自定义 Tabs 与首帧同步预渲染，切换页面不闪屏。
 
 <video src="https://github.com/user-attachments/assets/aa2da4bb-fe60-4d3b-9a94-8df17a4e73ae" controls autoplay muted loop playsinline width="320"></video>
 
