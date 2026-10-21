@@ -43,37 +43,40 @@ test('Component Page hot registration preserves the definition and lifecycle ide
     assert.deepEqual(page.data, { count: 7 })
 })
 
-for (const registration of ['Page', 'Component']) {
-    for (const nativePageHmr of [false, true]) {
-        test(`native ${registration} registration follows the config shape with HMR=${nativePageHmr}`, async (t) => {
-            const load = t.mock.fn()
-            const attached = t.mock.fn()
-            const config =
-                registration === 'Component'
-                    ? { methods: { onLoad: load }, lifetimes: { attached } }
-                    : { data: {}, onLoad: load }
-            const register = t.mock.fn()
-            const prepare = t.mock.fn(injectPageHmr)
-            const code = await bundleRuntimeEntry({
-                entry: 'mini/native/page.ts',
-                mocks: {
-                    '../amphibious/bootstrap.ts': '',
-                    '\0vpt:page-capsule': 'export default globalThis.harness.config'
-                },
-                defines: {},
-                nativePageHmr
-            })
-            const context = createExecutionContext({ config })
-            executeRuntimeEntry(code, {
-                ...context,
-                globalThis: { ...context.globalThis, __rolldown_runtime__: { injectPageHmr: prepare } },
-                [registration]: register
-            })
-            assert.equal(register.mock.callCount(), 1)
-            assert.equal(prepare.mock.callCount(), nativePageHmr && registration === 'Page' ? 1 : 0)
-            assert.strictEqual(register.mock.calls[0]?.arguments[0], config)
-            assert.equal(load.mock.callCount(), 0)
-            assert.equal(attached.mock.callCount(), 0)
+for (const nativePageHmr of [false, true]) {
+    test(`native registration follows the config shape with HMR=${nativePageHmr}`, async (t) => {
+        // Both native config shapes exercise the same compiled registration decision.
+        const code = await bundleRuntimeEntry({
+            entry: 'mini/native/page.ts',
+            mocks: {
+                '../amphibious/bootstrap.ts': '',
+                '\0vpt:page-capsule': 'export default globalThis.harness.config'
+            },
+            defines: {},
+            nativePageHmr
         })
-    }
+        for (const registration of ['Page', 'Component']) {
+            await t.test(registration, (t) => {
+                const load = t.mock.fn()
+                const attached = t.mock.fn()
+                const config =
+                    registration === 'Component'
+                        ? { methods: { onLoad: load }, lifetimes: { attached } }
+                        : { data: {}, onLoad: load }
+                const register = t.mock.fn()
+                const prepare = t.mock.fn(injectPageHmr)
+                const context = createExecutionContext({ config })
+                executeRuntimeEntry(code, {
+                    ...context,
+                    globalThis: { ...context.globalThis, __rolldown_runtime__: { injectPageHmr: prepare } },
+                    [registration]: register
+                })
+                assert.equal(register.mock.callCount(), 1)
+                assert.equal(prepare.mock.callCount(), nativePageHmr && registration === 'Page' ? 1 : 0)
+                assert.strictEqual(register.mock.calls[0]?.arguments[0], config)
+                assert.equal(load.mock.callCount(), 0)
+                assert.equal(attached.mock.callCount(), 0)
+            })
+        }
+    })
 }

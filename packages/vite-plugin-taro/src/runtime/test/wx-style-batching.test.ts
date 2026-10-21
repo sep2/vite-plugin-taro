@@ -2,13 +2,14 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import test from 'node:test'
-import { runInNewContext } from 'node:vm'
+import { fileURLToPath } from 'node:url'
 import { build } from 'rolldown'
 import { normalizePath, resolveConfig } from 'vite'
 import vpt from '../../index.ts'
 import { rendererHostId } from '../../node/plugins/mini/module/module.ts'
 import { resolveTaroRuntime, resolveVptRuntime } from '../../node/utils/packages.ts'
 import { createWxTestRoot } from './create-wx-test-root.ts'
+import { loadRuntimeBundle } from './runtime-entry-test-utils.ts'
 
 const require = createRequire(import.meta.url)
 
@@ -23,6 +24,8 @@ for (const mode of ['development', 'production']) {
         )
         const renderer = resolveTaroRuntime('react')
         const entry = 'test:wx-style-batching'
+        const outputFile = fileURLToPath(new URL(`./wx-style-batching-${mode}-fixture.js`, import.meta.url))
+        const runtimeRoot = normalizePath(fileURLToPath(new URL('../', import.meta.url)))
         const result = await build({
             input: entry,
             platform: 'node',
@@ -48,28 +51,35 @@ for (const mode of ['development', 'production']) {
                         if (normalizePath(id) === normalizePath(renderer)) {
                             return `${await readFile(renderer, 'utf8')}\nexport { hostConfig };`
                         }
+                    },
+                    transform(code, id) {
+                        if (!normalizePath(id).startsWith(runtimeRoot)) {
+                            return { code, map: { version: 3, sources: [], names: [], mappings: '' } }
+                        }
                     }
                 }
             ],
             transform: { define: { ...config.define, 'process.env.NODE_ENV': JSON.stringify(mode) } },
-            output: { format: 'cjs' },
+            output: {
+                file: outputFile,
+                format: 'cjs',
+                postBanner: 'export default function(exports, require, globalThis, global, setTimeout, clearTimeout) {',
+                postFooter: '}',
+                sourcemap: 'inline'
+            },
             write: false
         })
         const chunk = result.output[0]
         assert(chunk?.type === 'chunk')
-        runInNewContext(chunk.code, {
-            exports: {},
+        const { execute } = await loadRuntimeBundle(outputFile, chunk.code)
+        execute(
+            {},
             require,
-            console,
-            global: {},
-            sdk: createWxTestRoot(),
-            setTimeout() {
-                assert.fail('Style updates must be synchronous and must not schedule template work')
-            },
-            clearTimeout() {
-                assert.fail('Style updates must not own timers')
-            }
-        })
+            { sdk: createWxTestRoot() },
+            {},
+            () => assert.fail('Style updates must be synchronous and must not schedule template work'),
+            () => assert.fail('Style updates must not own timers')
+        )
     })
 }
 

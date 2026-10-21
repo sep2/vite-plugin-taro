@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict'
-import { createRequire, registerHooks } from 'node:module'
+import { createRequire } from 'node:module'
 import test from 'node:test'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import { build } from 'rolldown'
 import { normalizePath, resolveConfig } from 'vite'
 import vpt from '../../index.ts'
 import { rendererHostId } from '../../node/plugins/mini/module/module.ts'
 import { resolveTaroRuntime, resolveVptRuntime } from '../../node/utils/packages.ts'
+import { loadRuntimeBundle } from './runtime-entry-test-utils.ts'
 
 const require = createRequire(import.meta.url)
 
@@ -69,38 +70,25 @@ test('template host preserves outlet branch markers through moves, replacements 
     })
     const chunk = result.output[0]
     assert.ok(chunk?.type === 'chunk')
-    const url = pathToFileURL(outputFile).href
-    const hooks = registerHooks({
-        resolve(specifier, context, nextResolve) {
-            return specifier === url ? { url, shortCircuit: true } : nextResolve(specifier, context)
-        },
-        load(id, context, nextLoad) {
-            return id === url ? { format: 'module', source: chunk.code, shortCircuit: true } : nextLoad(id, context)
-        }
-    })
-    try {
-        const { default: execute }: { default: (...args: unknown[]) => void } = await import(url)
-        execute(
-            {},
-            require,
-            {},
-            {},
-            (callback: () => void, delay: number | undefined) => {
-                const timer = setTimeout(() => {
-                    timers.delete(timer)
-                    callback()
-                }, delay)
-                timers.add(timer)
-                return timer
-            },
-            (timer: ReturnType<typeof setTimeout>) => {
+    const { execute } = await loadRuntimeBundle(outputFile, chunk.code)
+    execute(
+        {},
+        require,
+        {},
+        {},
+        (callback: () => void, delay: number | undefined) => {
+            const timer = setTimeout(() => {
                 timers.delete(timer)
-                clearTimeout(timer)
-            }
-        )
-    } finally {
-        hooks.deregister()
-    }
+                callback()
+            }, delay)
+            timers.add(timer)
+            return timer
+        },
+        (timer: ReturnType<typeof setTimeout>) => {
+            timers.delete(timer)
+            clearTimeout(timer)
+        }
+    )
 })
 
 const fixture = `

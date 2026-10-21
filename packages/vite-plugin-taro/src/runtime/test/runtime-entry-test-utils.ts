@@ -110,18 +110,26 @@ export async function bundleRuntimeEntry({
     if (!chunk) {
         throw new Error(`Runtime entry did not emit JavaScript: ${entry}`)
     }
+    return loadRuntimeBundle(outputFile, chunk.code)
+}
+
+/** Load a source-mapped bundle through Node so coverage follows its original runtime sources. */
+export async function loadRuntimeBundle(
+    outputFile: string,
+    code: string
+): Promise<{ code: string; execute: (...args: unknown[]) => void }> {
     const url = pathToFileURL(outputFile).href
     const hooks = registerHooks({
         resolve(specifier, context, nextResolve) {
             return specifier === url ? { url, shortCircuit: true } : nextResolve(specifier, context)
         },
         load(id, context, nextLoad) {
-            return id === url ? { format: 'module', source: chunk.code, shortCircuit: true } : nextLoad(id, context)
+            return id === url ? { format: 'module', source: code, shortCircuit: true } : nextLoad(id, context)
         }
     })
     try {
         const { default: execute }: { default: (...args: unknown[]) => void } = await import(url)
-        return { code: chunk.code, execute }
+        return { code, execute }
     } finally {
         hooks.deregister()
     }

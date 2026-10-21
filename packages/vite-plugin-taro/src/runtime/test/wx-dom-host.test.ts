@@ -263,7 +263,9 @@ test('WX host manages Page-owned content under SDK-owned roots', async (t) => {
         { type: 'video', name: 'controls', value: false, attribute: 'controls' },
         { type: 'input', name: 'type', value: 'number', attribute: 'type' },
         { type: 'text', name: 'space', value: 'nbsp', attribute: 'space' },
-        { type: 'view', name: 'ariaRole', value: 'button', attribute: 'aria-role' }
+        { type: 'view', name: 'ariaRole', value: 'button', attribute: 'aria-role' },
+        { type: 'share-element', name: 'mapkey', value: 'aurora', attribute: 'key' },
+        { type: 'share-element', name: 'transform', value: true, attribute: 'transform' }
     ]) {
         const element = page.createElement(type)
         const remove = t.mock.method(element.nativeNode, 'removeAttribute')
@@ -298,6 +300,9 @@ test('WX host manages Page-owned content under SDK-owned roots', async (t) => {
     for (const call of finish.mock.calls) {
         assert.deepEqual(call.arguments, [card.nativeNode])
     }
+    assert.equal(group.pending.length, 0)
+    card.delegateAttributeUpdate('undeclared', 'ignored')
+    assert.equal(Object.hasOwn(group.data, 'undeclared'), false)
     assert.equal(group.pending.length, 0)
     assert.deepEqual(card.nativeNode.attributes, {})
     assert.equal(bindProperty.mock.callCount(), ownPageBindings)
@@ -428,6 +433,10 @@ test('WX host manages Page-owned content under SDK-owned roots', async (t) => {
     }
     assert.equal(page.createElement('DIV').nativeNode.name, 'view')
     const custom = page.createElement('audit-card')
+    custom.delegateEventListener('click', true)
+    assert.equal(custom.nativeNode.listeners.click.length, 1, 'an unaliased click keeps its native event name')
+    custom.delegateEventListener('click', false)
+    assert.deepEqual(custom.nativeNode.listeners.click, [])
     custom.__handlers.click = [() => {}]
     custom.delegateEventListener('click', true)
     assert.equal(custom.nativeNode.listeners.click.length, 1)
