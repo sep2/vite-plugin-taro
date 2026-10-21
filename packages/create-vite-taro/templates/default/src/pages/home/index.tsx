@@ -36,7 +36,7 @@ function HomePage() {
     return (
         <View className="flex h-screen flex-col overflow-hidden bg-canvas bg-canvas-botanical text-foreground">
             <NavigationBar title="VPT" />
-            <ScrollView scrollY className="flex min-h-0 flex-1 flex-col">
+            <ScrollView scrollY enableFlex className="flex min-h-0 flex-1 flex-col">
                 <View className="relative flex shrink-0 flex-col items-center overflow-hidden px-5 pb-8 pt-6">
                     <BotanicalSprig placement="top" />
                     <BotanicalSprig placement="side" />

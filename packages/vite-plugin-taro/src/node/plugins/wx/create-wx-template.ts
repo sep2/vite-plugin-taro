@@ -36,6 +36,11 @@ class WxTemplate extends UnRecursiveTemplate {
         return `<wxs module="xs" src="${filePath ?? './utils'}.wxs" />`
     }
 
+    /** Skyline supplies its native padding default; the shared template forwards explicit values. */
+    protected modifyCompProps = (name: string, attributes: ComponentAttributes): ComponentAttributes => {
+        return name === 'scroll-view' ? { ...attributes, padding: '' } : attributes
+    }
+
     createMiniComponents(components: ComponentDefinitions): ComponentDefinitions {
         const result = super.createMiniComponents(components)
 

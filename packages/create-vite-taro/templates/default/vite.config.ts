@@ -50,7 +50,8 @@ function createPageJson(target: VptTarget): VptJsonObject {
     switch (target) {
         case 'wx': {
             return {
-                glassEaselWebview: true,
+                // 在 app json 的 window 上设置，这里就不用设置了
+                // glassEaselWebview: true,
                 navigationStyle: 'custom',
                 navigationBarTextStyle: 'black'
             }

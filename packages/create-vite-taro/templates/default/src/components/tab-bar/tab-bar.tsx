@@ -17,7 +17,7 @@ export function TabBar({ activePath }: TabBarProps) {
                         key={path}
                         id={`tab-${icon}`}
                         aria-current={selected ? 'page' : 'false'}
-                        className={`m-0 flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-none border-none bg-transparent p-0 text-xs font-bold after:content-none ${selected ? 'text-primary' : 'text-muted'}`}
+                        className={`m-0 flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-none border-none bg-transparent p-0 text-xs after:content-none ${selected ? 'text-primary font-bold' : 'text-muted font-light'}`}
                         onClick={() => {
                             if (selected) {
                                 return

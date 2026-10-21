@@ -165,7 +165,19 @@ function assertMatchesUpstream(platform: Platform, scenario: Scenario): void {
     const local = collectInIsolatedProcess(platform, 'local', scenario)
     const upstream = collectInIsolatedProcess(platform, 'upstream', scenario)
 
-    assert.deepEqual(local, upstream)
+    assert.ok(typeof upstream.template === 'string')
+    // WX forwards optional ScrollView padding while the native renderer owns its default.
+    const expected =
+        platform === 'wx'
+            ? {
+                  ...upstream,
+                  template: upstream.template.replaceAll(
+                      /(<scroll-view\b[^>]*\bpadding="{{i\.[\w$]+)\|\|\[0,0,0,0\](}}")/g,
+                      '$1$2'
+                  )
+              }
+            : upstream
+    assert.deepEqual(local, expected)
 }
 
 if (process.argv[2] === 'collect') {

@@ -28,7 +28,7 @@ export default function ExplorePage() {
     return (
         <View className="flex h-screen flex-col overflow-hidden bg-canvas bg-canvas-botanical text-foreground">
             <NavigationBar title="Explore" />
-            <ScrollView scrollY className="flex min-h-0 flex-1 flex-col">
+            <ScrollView scrollY enableFlex className="flex min-h-0 flex-1 flex-col">
                 <View className="mx-auto flex w-full max-w-4xl flex-col px-5 pb-12 pt-10">
                     <Text className="text-xs font-bold tracking-widest text-primary-label">YOUR NEXT STEPS</Text>
                     <Text className="brand-serif mt-3 block text-5xl font-semibold text-heading">Room to grow.</Text>
