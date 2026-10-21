@@ -1,0 +1,15 @@
+name: Deploy docs manually
+
+on:
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    pages: write
+    id-token: write
+
+jobs:
+    documentation:
+        uses: ./.github/workflows/website.yml
+        with:
+            deploy: true

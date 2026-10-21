@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { resolveLatestStableVersion } from '../docs/src/lib/resolve-latest-stable-version.ts'
 
-test('documentation deployment requires a successful stable package publication', () => {
+test('automatic documentation deployment follows a successful stable package publication', () => {
     const workflow = readFileSync(new URL('../.github/workflows/publish.yml', import.meta.url), 'utf8')
     assert.match(
         workflow,
@@ -25,6 +25,16 @@ test('pull requests validate the documentation build', () => {
     )
 })
 
+test('manual documentation deployment reuses the Pages workflow', () => {
+    const workflow = readFileSync(new URL('../.github/workflows/deploy-docs.yml', import.meta.url), 'utf8')
+    assert.match(workflow, /^on:\n {4}workflow_dispatch:\n\npermissions:/m)
+    assert.match(workflow, /^permissions:\n {4}contents: read\n {4}pages: write\n {4}id-token: write$/m)
+    assert.match(
+        workflow,
+        /^jobs:\n {4}documentation:\n {8}uses: \.\/\.github\/workflows\/website\.yml\n {8}with:\n {12}deploy: true$/m
+    )
+})
+
 test('a successful stable release supplies its version without consulting npm', async (t) => {
     // The test-scoped mock owns and restores the only shared mutation, global fetch.
     const fetch = t.mock.method(globalThis, 'fetch', async () => Response.json({ version: '0.7.0' }))
@@ -32,7 +42,7 @@ test('a successful stable release supplies its version without consulting npm', 
     assert.equal(fetch.mock.callCount(), 0)
 })
 
-test('local and pull request documentation builds resolve the stable npm dist-tag', async (t) => {
+test('local, pull request and manual documentation builds resolve the stable npm dist-tag', async (t) => {
     const fetch = t.mock.method(globalThis, 'fetch', async () => Response.json({ version: '0.7.0' }))
     assert.equal(await resolveLatestStableVersion('vite-plugin-taro', undefined), '0.7.0')
     assert.equal(await resolveLatestStableVersion('vite-plugin-taro', ''), '0.7.0')

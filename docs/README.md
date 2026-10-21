@@ -25,7 +25,15 @@ pnpm --filter docs preview
 
 ## 部署
 
-CI 在稳定版 npm 包成功发布后，将同一提交的文档部署到 GitHub Pages，并显示该发布版本。文档更新随下一次稳定版发布上线。Pull Request 会运行文档测试和构建检查。
+CI 在稳定版 npm 包成功发布后，将同一提交的文档部署到 GitHub Pages，并显示该发布版本。Pull Request 会运行文档测试和构建检查。
+
+需要单独发布文档时，在 GitHub Actions 中选择 **Deploy docs manually → Run workflow → main**，或运行：
+
+```sh
+gh workflow run deploy-docs.yml --ref main
+```
+
+手动部署会复用文档测试、构建和 GitHub Pages 部署流程，显示 npm `latest` 对应的稳定版本。
 
 ## AI 可读文档
 
