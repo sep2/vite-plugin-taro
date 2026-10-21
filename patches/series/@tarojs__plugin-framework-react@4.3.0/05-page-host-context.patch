@@ -1,5 +1,5 @@
 diff --git a/dist/runtime.js b/dist/runtime.js
-index 8a22ddaf7e3321ad3fc628ed416ba8f0b6bc9626..1be5d972b3f27de1ce7f16cb904927489fca17a2 100644
+index 8a22ddaf7e3321ad3fc628ed416ba8f0b6bc9626..f3506cbdb608c8ce5f26b35e2f641e86bc145e8a 100644
 --- a/dist/runtime.js
 +++ b/dist/runtime.js
 @@ -250,7 +250,7 @@ function connectReactPage(R, id) {
@@ -11,22 +11,6 @@ index 8a22ddaf7e3321ad3fc628ed416ba8f0b6bc9626..1be5d972b3f27de1ce7f16cb90492748
                  }
              }
          };
-@@ -367,12 +367,12 @@ function createReactApp(App, react, dom, config) {
-         render(cb) {
-             appWrapper.forceUpdate(cb);
-         },
--        mount(component, id, cb) {
-+        mount(component, id, _getCtx, onCommit) {
-             if (appWrapper) {
--                appWrapper.mount(component, id, cb);
-+                appWrapper.mount(component, id, onCommit);
-             }
-             else {
--                appWrapperPromise.then(appWrapper => appWrapper.mount(component, id, cb));
-+                appWrapperPromise.then(appWrapper => appWrapper.mount(component, id, onCommit));
-             }
-         },
-         unmount(id, cb) {
 @@ -636,7 +636,7 @@ function createNativePageConfig(Component, pageName, data, react, reactDOM, page
      }
      const pageObj = {

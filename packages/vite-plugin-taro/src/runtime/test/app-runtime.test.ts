@@ -150,16 +150,14 @@ test('template App binding delegates mounting and seeds lazy snapshots before na
         const component = () => null
         const react = {}
         const renderer = {}
-        const getCtx = () => assert.fail('template presentation must leave native context lookup to its caller')
-        // Record the exact getter forwarded by each mount independently of its deferred commit.
-        const nativeContexts: unknown[] = []
         const app = {
-            mount(source: unknown, id: string, nativeContext: (() => unknown) | undefined, complete: () => void) {
+            mount(...args: [source: unknown, id: string, complete: () => void]) {
+                const [source, id, complete] = args
+                assert.equal(args.length, 3)
                 assert.strictEqual(this, app)
                 assert.strictEqual(source, component)
                 assert.equal(id, 'page-instance')
                 trace.push('mount')
-                nativeContexts.push(nativeContext)
                 commit = complete
             }
         }
@@ -226,8 +224,7 @@ test('template App binding delegates mounting and seeds lazy snapshots before na
         assert.deepEqual(trace, ['current', 'complete-current'], 'the native stack is read at flush time')
         trace.length = 0
 
-        app.mount(component, 'page-instance', undefined, () => trace.push('native-init'))
-        assert.deepEqual(nativeContexts, [undefined])
+        app.mount(component, 'page-instance', () => trace.push('native-init'))
         assert.deepEqual(trace, ['mount'], 'the adapter follows Taro commit timing')
         assert.ok(commit)
         commit()
@@ -240,8 +237,7 @@ test('template App binding delegates mounting and seeds lazy snapshots before na
 
         trace.length = 0
         payloads.length = 0
-        app.mount(component, 'page-instance', getCtx, () => trace.push('native-init'))
-        assert.deepEqual(nativeContexts, [undefined, getCtx])
+        app.mount(component, 'page-instance', () => trace.push('native-init'))
         assert.deepEqual(trace, ['mount'])
         assert.ok(commit)
         commit()

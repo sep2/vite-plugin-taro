@@ -11,7 +11,7 @@ index 6d4fe8cd6474c57f5e5be14962ebcd9513e35dcf..e9652dff89780d17f3f89e410a687382
  declare function createComponentConfig(component: React.ComponentClass, componentName?: string, data?: Record<string, unknown>): any;
  declare function createRecursiveComponentConfig(componentName?: string, forceCustomWrapper?: boolean): any;
 diff --git a/dist/dsl/common.js b/dist/dsl/common.js
-index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..575e405781ea6ddf546c582f1e38fee61354eb7a 100644
+index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..2d981033285f2c4266a3f4c12a774cac68656375 100644
 --- a/dist/dsl/common.js
 +++ b/dist/dsl/common.js
 @@ -70,9 +70,8 @@ function createPageConfig(component, pageName, data, pageConfig) {
@@ -146,28 +146,11 @@ index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..575e405781ea6ddf546c582f1e38fee6
                  }
                  else {
                      return exec();
-@@ -284,7 +236,7 @@ function createComponentConfig(component, componentName, data) {
-             perf.start(PAGE_INIT);
-             this.pageIdCache = ((_a = this.getPageId) === null || _a === void 0 ? void 0 : _a.call(this)) || pageId();
-             const path = getPath(id, { id: this.pageIdCache });
--            Current.app.mount(component, path, () => {
-+            Current.app.mount(component, path, () => this, () => {
-                 componentElement = env.document.getElementById(path);
-                 ensure(componentElement !== null, '没有找到组件实例。');
-                 this.$taroInstances = instances.get(path);
 diff --git a/dist/dsl/instance.d.ts b/dist/dsl/instance.d.ts
-index ad2d594ce3cdbe1324d74bd3a0e82c050a174c40..7f17c16eb214eb2c52a3a50602d51165d5dde9c1 100644
+index ad2d594ce3cdbe1324d74bd3a0e82c050a174c40..b1acbc9d64b9f0c5d38348a25841927fb174a67f 100644
 --- a/dist/dsl/instance.d.ts
 +++ b/dist/dsl/instance.d.ts
-@@ -3,6 +3,7 @@ import { Component as Component$1, ComponentClass } from 'react';
- import { TaroElement } from '../dom/element.js';
- import { KeyFrame, ScrollTimelineOption } from '../interface/animate.js';
- import { MpEvent } from '../interface/event.js';
-+import type { MpInstance } from '../interface/hydrate.js';
- import { TFunc } from '../interface/utils.js';
- 
- interface Instance<T = Record<string, any>> extends Component$1<T>, Show, PageInstance {
-@@ -26,7 +27,8 @@ interface ReactAppInstance<T = AppInstance> extends Component$1<T>, AppInstance
+@@ -26,7 +26,8 @@ interface ReactAppInstance<T = AppInstance> extends Component$1<T>, AppInstance
  interface PageLifeCycle extends Show {
      eh?(event: MpEvent): void;
      onAddToFavorites?(): void;
@@ -177,7 +160,7 @@ index ad2d594ce3cdbe1324d74bd3a0e82c050a174c40..7f17c16eb214eb2c52a3a50602d51165
      onOptionMenuClick?(): void;
      onKeyboardHeight?(obj: {
          height: number;
-@@ -57,7 +59,7 @@ interface PageLifeCycle extends Show {
+@@ -57,7 +58,7 @@ interface PageLifeCycle extends Show {
  }
  interface PageInstance extends PageLifeCycle {
      /** 页面的初始数据 */
@@ -186,51 +169,3 @@ index ad2d594ce3cdbe1324d74bd3a0e82c050a174c40..7f17c16eb214eb2c52a3a50602d51165
      /** 页面路径 */
      path?: string;
      /** 页面的组件选项 */
-@@ -81,8 +83,8 @@ interface Show {
- }
- interface AppInstance extends Show {
-     componentDidShow?(options?: Record<string, unknown>): void;
--    mount?(component: React.ComponentClass | Component, id: string, cb: (...args: any[]) => void): void;
--    mount?(component: React.ComponentClass | Component, id: string, getCtx: (...args: any[]) => void, cb: (...args: any[]) => void): void;
-+    /** Mounts one identity; prerendering supplies undefined for the native context getter. */
-+    mount?(component: React.ComponentClass | Component, id: string, getCtx: (() => MpInstance) | undefined, onCommit: () => void): void;
-     onError?(error: string): void;
-     onLaunch?(options?: Record<string, unknown>): void;
-     onPageNotFound?(res: any): void;
-diff --git a/dist/runtime.esm.d.ts b/dist/runtime.esm.d.ts
-index 57dfc8190309db1a27cf0c05090171a00c599a22..3394618d4624045a21d8f0768ecd310c462afb53 100644
---- a/dist/runtime.esm.d.ts
-+++ b/dist/runtime.esm.d.ts
-@@ -820,8 +820,8 @@ interface Show {
- }
- interface AppInstance extends Show {
-     componentDidShow?(options?: Record<string, unknown>): void;
--    mount?(component: React.ComponentClass | Component, id: string, cb: (...args: any[]) => void): void;
--    mount?(component: React.ComponentClass | Component, id: string, getCtx: (...args: any[]) => void, cb: (...args: any[]) => void): void;
-+    /** Mounts one identity; prerendering supplies undefined for the native context getter. */
-+    mount?(component: React.ComponentClass | Component, id: string, getCtx: (() => MpInstance) | undefined, onCommit: () => void): void;
-     onError?(error: string): void;
-     onLaunch?(options?: Record<string, unknown>): void;
-     onPageNotFound?(res: any): void;
-diff --git a/dist/runtime.esm.js b/dist/runtime.esm.js
-index 1f062959200cfacd2dec2e9efeb913aa85c00f03..b43ac9f6eda858995a00c357f7409e4e9c1e28aa 100644
---- a/dist/runtime.esm.js
-+++ b/dist/runtime.esm.js
-@@ -4264,7 +4264,7 @@ function createPageConfig(component, pageName, data, pageConfig) {
-                 taroWindowProvider.trigger(CONTEXT_ACTIONS.INIT, $taroPath);
-             }
-             const mount = () => {
--                Current.app.mount(component, $taroPath, () => {
-+                Current.app.mount(component, $taroPath, () => this, () => {
-                     if (process.env.TARO_ENV === 'tt' && isEnableTTDom()) {
-                         pageElement = env.document.getPageDocumentById(this.__webviewId__);
-                     }
-@@ -4437,7 +4437,7 @@ function createComponentConfig(component, componentName, data) {
-             perf.start(PAGE_INIT);
-             this.pageIdCache = ((_a = this.getPageId) === null || _a === void 0 ? void 0 : _a.call(this)) || pageId();
-             const path = getPath(id, { id: this.pageIdCache });
--            Current.app.mount(component, path, () => {
-+            Current.app.mount(component, path, () => this, () => {
-                 componentElement = env.document.getElementById(path);
-                 ensure(componentElement !== null, '没有找到组件实例。');
-                 this.$taroInstances = instances.get(path);

@@ -61,9 +61,14 @@ test('WX host manages Page-owned content under SDK-owned roots', async (t) => {
         createTextNode: (text: string) => Object.assign(new TaroText(), { nodeValue: text })
     }
     const load = t.mock.fn()
-    const mount = t.mock.fn()
+    const mount = t.mock.fn(function (this: { root: ReturnType<typeof createWxTestRoot> }) {
+        const identity = createPageIdentity.mock.calls.at(-1)?.result
+        assert.ok(identity)
+        const page = host.getChildHostContext({}, host.getPageRootType(identity.path))
+        assert.strictEqual(page.createTextNode('probe').nativeNode.ownerShadowRoot, this.root)
+    })
     const query = { id: 'native', full: 'a%3Db', empty: '' }
-    const identity = { path: 'pages/native?instance=1', params: query }
+    const identity = { path: 'A', params: query }
     const createPageIdentity = t.mock.fn((_route: string, _query: unknown) => identity)
     const createPageConfig = t.mock.fn((...args: unknown[]) => ({ onLoad: load, args }))
     const sync = t.mock.fn((callback: () => unknown) => callback())
@@ -111,12 +116,12 @@ test('WX host manages Page-owned content under SDK-owned roots', async (t) => {
     assert.ok(typeof createDomHost === 'function')
     const sdk = createWxTestRoot()
     const createVirtualNode = t.mock.method(sdk, 'createVirtualNode')
-    const instance = { root: sdk }
     const getRoot = t.mock.fn((instance: { root: typeof sdk }) => instance.root)
     const host = createDomHost(getRoot)
     const onUnmount = t.mock.fn()
     const app = {
         mount(component: unknown, id: string, ...callbacks: unknown[]) {
+            assert.equal(callbacks.length, 1)
             assert.strictEqual(this, app)
             assert.notEqual(host.getPageRootType(id), 'root')
             return [component, id, ...callbacks]
@@ -138,6 +143,7 @@ test('WX host manages Page-owned content under SDK-owned roots', async (t) => {
         assert.deepEqual(call.arguments, [component, 'pages/native', undefined, nativeConfig])
         assert.equal(config.data, undefined)
         const native = { root: sdk }
+        assert.equal(getRoot.mock.callCount(), mount.mock.callCount(), 'registration does not create documents')
         const loadsBeforeAttach = load.mock.callCount()
         config.lifetimes.attached.call(native)
         assert.deepEqual(createPageIdentity.mock.calls.at(-1)?.arguments, ['pages/native', query])
@@ -152,21 +158,20 @@ test('WX host manages Page-owned content under SDK-owned roots', async (t) => {
         assert.strictEqual(load.mock.calls.at(-1)?.this, native)
         assert.deepEqual(load.mock.calls.at(-1)?.arguments, [query])
     }
-    assert.equal(getRoot.mock.callCount(), 0, 'Page creation waits for the native mount context')
+    assert.equal(getRoot.mock.callCount(), 3, 'each attachment prepares its Page document before mounting')
     const complete = t.mock.fn()
-    const getCtx = () => instance
     const type = host.getPageRootType('A')
     assert.equal(sync.mock.callCount(), 0)
-    assert.deepEqual(app.mount(component, 'A', getCtx, complete), [component, 'A', getCtx, complete])
+    assert.deepEqual(app.mount(component, 'A', complete), [component, 'A', complete])
     assert.equal(sync.mock.callCount(), 1, 'the first Page mount is synchronous')
     const parent = {}
     assert.equal(host.getPageRootType('A'), type, 'Page root types depend only on identity')
     const page = host.getChildHostContext(parent, type)
-    assert.deepEqual(app.mount(component, 'A', getCtx, complete), [component, 'A', getCtx, complete])
+    assert.deepEqual(app.mount(component, 'A', complete), [component, 'A', complete])
     assert.equal(sync.mock.callCount(), 2, 'repeated Page mounts are synchronous')
     assert.strictEqual(host.getChildHostContext(parent, type), page, 'repeated mounts retain the Page document')
-    assert.equal(getRoot.mock.callCount(), 1)
-    assert.strictEqual(getRoot.mock.calls[0]?.arguments[0], instance)
+    assert.equal(getRoot.mock.callCount(), 3, 'App mounting retains the attachment-owned document')
+    assert.strictEqual(getRoot.mock.calls.at(-1)?.arguments[0], mount.mock.calls.at(-1)?.this)
     assert.strictEqual(host.getChildHostContext(page, 'view'), page)
     assert.strictEqual(Object.getPrototypeOf(page), document)
     const root = host.createElement(null, parent, type)
@@ -191,7 +196,9 @@ test('WX host manages Page-owned content under SDK-owned roots', async (t) => {
             payload: () => ({ version: 1 })
         }
     })
-    app.mount(component, 'B', () => ({ root: secondSdk }), complete)
+    createPageIdentity.mock.mockImplementationOnce(() => ({ path: 'B', params: query }))
+    host.createPage(component, { path: 'pages/second', prerender: false }).lifetimes.attached.call({ root: secondSdk })
+    app.mount(component, 'B', complete)
     assert.equal(sync.mock.callCount(), 3, 'each Page mount is synchronous')
     const secondPage = host.getChildHostContext(parent, host.getPageRootType('B'))
     const secondView = secondPage.createElement('view')
@@ -510,9 +517,11 @@ test('WX host manages Page-owned content under SDK-owned roots', async (t) => {
     assert.strictEqual(host.getChildHostContext(parent, type), parent, 'unmount releases the Page document')
     app.unmount('A')
     assert.equal(sync.mock.callCount(), flushesBeforeUnload + 2)
-    app.mount(component, 'A', getCtx, complete)
+    host.createPage(component, { path: 'pages/native', prerender: false }).lifetimes.attached.call({ root: sdk })
+    app.mount(component, 'A', complete)
     assert.equal(sync.mock.callCount(), flushesBeforeUnload + 3, 'a newly mounted Page starts a fresh scope')
-    assert.equal(getRoot.mock.callCount(), 3)
+    assert.equal(getRoot.mock.callCount(), 5)
+    assert.notStrictEqual(host.getChildHostContext(parent, type), page)
 
     onUnmount.mock.mockImplementation(() => {
         throw new Error('unmount failure')

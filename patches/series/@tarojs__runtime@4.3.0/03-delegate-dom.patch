@@ -673,7 +673,7 @@ index c61fb312438fc85a2d94852b699da663cc835254..4e151e2880bbf7ecdf3521e01bb66d48
  
  export { TaroText };
 diff --git a/dist/dsl/common.js b/dist/dsl/common.js
-index 575e405781ea6ddf546c582f1e38fee61354eb7a..36a0a780534314cbb7794aeb0630a7a087bd0f0b 100644
+index 2d981033285f2c4266a3f4c12a774cac68656375..14f10f73c8a81435c61b63f619ddf968b0e8e7ad 100644
 --- a/dist/dsl/common.js
 +++ b/dist/dsl/common.js
 @@ -4,7 +4,7 @@ import { taroWindowProvider } from '../bom/window.js';

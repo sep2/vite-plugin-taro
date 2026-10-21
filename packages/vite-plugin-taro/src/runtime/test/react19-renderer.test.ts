@@ -541,7 +541,7 @@ function checkPageMountContext() {
     const calls = []
     let finishUnmount
     Current.app = {
-        mount(component, id, getCtx, complete) { calls.push({ component, id, getCtx, complete, current: Current.page }) },
+        mount(component, id, complete, ...extra) { assert.equal(extra.length, 0); calls.push({ component, id, complete, current: Current.page }) },
         unmount(_id, complete) { finishUnmount = complete }
     }
     const Page = () => null
@@ -551,13 +551,13 @@ function checkPageMountContext() {
     try {
         config.onLoad.call(first, { instance: 'first' })
         assert.strictEqual(calls[0].component, Page)
-        assert.strictEqual(calls[0].getCtx(), first)
+        assert.strictEqual(calls[0].current, first)
         assert.equal(calls[0].id, first.$taroPath)
         assert.equal(typeof calls[0].complete, 'function')
         config.onUnload.call(first)
         config.onLoad.call(second, { instance: 'second' })
         assert.equal(calls.length, 2, 'independent Page identities can mount during teardown')
-        assert.strictEqual(calls[1].getCtx(), second)
+
         assert.strictEqual(calls[1].current, second)
         finishUnmount()
         assert.equal(calls[1].id, second.$taroPath)
@@ -576,7 +576,7 @@ async function checkPageLifecycleOwnership() {
     const unmounts = []
     const events = []
     const app = {
-        mount(component, id, getCtx, complete) { mounts.push({ component, id, getCtx, complete }) },
+        mount(component, id, complete, ...extra) { assert.equal(extra.length, 0); mounts.push({ component, id, complete, current: Current.page }) },
         unmount(id, complete) { unmounts.push({ id, complete }) }
     }
     const component = () => null
@@ -638,7 +638,7 @@ async function checkPageLifecycleOwnership() {
         const thirdRoot = register(third)
         third.onShow()
         assert.equal(mounts.length, 3)
-        assert.strictEqual(mounts[2].getCtx(), third)
+        assert.strictEqual(mounts[2].current, third)
         mounts[2].complete()
         await Promise.resolve()
         assert.deepEqual(events.slice(-3), ['third:load', 'third:present', 'third:show'])
@@ -653,9 +653,9 @@ async function checkPageLifecycleOwnership() {
 
         // Ready/show may subscribe during a synchronous mount: the load barrier already exists.
         const synchronous = native('synchronous')
-        app.mount = (component, id, getCtx, complete) => {
-            mounts.push({ component, id, getCtx, complete })
-            register(getCtx())
+        app.mount = (component, id, complete) => {
+            mounts.push({ component, id, complete, current: Current.page })
+            register(synchronous)
             synchronous.onReady()
             synchronous.onShow()
             complete()
@@ -1005,16 +1005,18 @@ function checkWxPageCreation() {
         appRenders++
         return h(context.Provider, { value: 99 }, children)
     }
+    const firstPage = () => h(Page, { tid: 'A' })
+    const secondPage = () => h(Page, { tid: 'B' })
     const app = ReactDOM.flushSync(() => createVptApp(App, { appId: 'wx-owner-app' }))
     try {
-        app.mount(Page, 'A', () => natives.A, () => document.getElementById('A').performUpdate(true))
-        const firstRoot = document.getElementById('A')
+        attachWxPage(firstPage, natives.A)
+        const firstRoot = document.getElementById(natives.A.$taroPath)
         const firstDocument = firstRoot.ownerDocument
         assert.equal(firstRoot.nativeNode.isVirtual(), true, 'The Page anchor has no layout box')
         assert.strictEqual(firstRoot.nativeNode, natives.A.root.childNodes[0])
         assert.strictEqual(nodes.A.nativeNode, firstRoot.nativeNode.childNodes[0])
-        app.mount(Page, 'B', () => natives.B, () => document.getElementById('B').performUpdate(true))
-        assert.equal(document.getElementById('B').nativeNode.isVirtual(), true)
+        attachWxPage(secondPage, natives.B)
+        assert.equal(document.getElementById(natives.B.$taroPath).nativeNode.isVirtual(), true)
         assert.notStrictEqual(nodes.B.ownerDocument, firstDocument)
         assert.strictEqual(nodes.A.delegateChildInsertion, nodes.B.delegateChildInsertion)
         assert.strictEqual(nodes.A.style.delegateStyleUpdate, nodes.B.style.delegateStyleUpdate)
@@ -1081,12 +1083,12 @@ function checkWxPageCreation() {
         assert.strictEqual(clone.lastChild.ownerDocument, firstDocument)
         // The callback journal verifies completion before a repeated mount returns to the native lifecycle.
         const mountCallbacks = []
-        app.mount(Page, 'A', () => natives.A, () => mountCallbacks.push('A'))
+        app.mount(firstPage, natives.A.$taroPath, () => mountCallbacks.push('A'))
         assert.deepEqual(mountCallbacks, ['A'])
-        assert.strictEqual(document.getElementById('A'), firstRoot)
+        assert.strictEqual(document.getElementById(natives.A.$taroPath), firstRoot)
         assert.strictEqual(firstRoot.ownerDocument, firstDocument)
         assert.strictEqual(nodes.A.ownerDocument, firstDocument)
-        assert.strictEqual(rendererHost.getChildHostContext({}, rendererHost.getPageRootType('A')), firstDocument)
+        assert.strictEqual(rendererHost.getChildHostContext({}, rendererHost.getPageRootType(natives.A.$taroPath)), firstDocument)
         assert.strictEqual(firstRoot.nativeNode, natives.A.root.childNodes[0])
         assert.match(nodes.A.textContent, /99:7/)
 
@@ -1122,26 +1124,33 @@ function checkWxPageCreation() {
         assert.deepEqual(clicks.splice(0), [['A', 'first', 9, {}], ['B', 'first', 0, {}]])
         assert.match(nodes.A.textContent, /99:10/)
         assert.match(nodes.B.textContent, /99:1/)
-        checkKeyedMoves(document.createElement('root'), rendererHost.getPageRootType('A'))
-        checkWxEventBubbling(app)
-        checkWxDatasetUpdates(app)
-        checkWxPropertyUpdates(app)
-        checkWxTextInput(app)
-        checkWxFormChange(app)
-        checkWxHtmlElements(app)
+        checkKeyedMoves(document.createElement('root'), rendererHost.getPageRootType(natives.A.$taroPath))
+        checkWxEventBubbling()
+        checkWxDatasetUpdates()
+        checkWxPropertyUpdates()
+        checkWxTextInput()
+        checkWxFormChange()
+        checkWxHtmlElements()
         checkWxFirstMount(() => appRenders)
         checkWxPreparedInstances()
     } finally {
-        app.unmount('B')
-        assertWxPageReleased('B', natives.B.root)
-        app.unmount('A')
-        assertWxPageReleased('A', natives.A.root)
+        natives.B.onUnload()
+        assertWxPageReleased(natives.B.$taroPath, natives.B.root)
+        natives.A.onUnload()
+        assertWxPageReleased(natives.A.$taroPath, natives.A.root)
         ReactDOM.flushSync(() => ReactDOM.createRoot(document.getElementById('wx-owner-app')).unmount())
         Object.assign(rendererHost, savedHost)
         const restoredContext = {}
         assert.equal(rendererHost.getPageRootType('after-unload'), 'root')
         assert.strictEqual(rendererHost.getChildHostContext(restoredContext, 'view'), restoredContext)
     }
+}
+
+function attachWxPage(component, native) {
+    const config = rendererHost.createPage(component, { path: native.route, prerender: false })
+    Object.assign(native, config.methods)
+    globalThis.pageQuery = {}
+    config.lifetimes.attached.call(native)
 }
 
 function assertWxPageReleased(id, root) {
@@ -1296,7 +1305,7 @@ function checkWxPreparedInstances() {
     }
 }
 
-function checkWxTextInput(app) {
+function checkWxTextInput() {
     for (const component of [false, true]) {
         const root = createWxTestRoot(component ? {
             input: { value: () => '' }, textarea: { value: () => '' }
@@ -1357,10 +1366,9 @@ function checkWxTextInput(app) {
                 }
             }
         }
-        const id = 'text-input-' + component
+        const nativePage = { root, route: 'text-input-' + component }
         try {
-            ReactDOM.flushSync(() => app.mount(Page, id, () => ({ root }), () =>
-                document.getElementById(id).performUpdate(true)))
+            attachWxPage(Page, nativePage)
             const originals = Object.entries(nodes).map(([name, node]) => [name, node, node.nativeNode.listeners.input?.[0]])
             for (const [, node, listener] of originals) {
                 assert.equal(typeof listener, 'function', 'text input subscribes without a business handler')
@@ -1409,13 +1417,13 @@ function checkWxTextInput(app) {
             assert.ok(Object.values(nodes).every(node => node === null))
             assert.equal(root.childNodes[0].childNodes[0].childNodes.length, 0)
         } finally {
-            app.unmount(id)
-            assertWxPageReleased(id, root)
+            nativePage.onUnload()
+            assertWxPageReleased(nativePage.$taroPath, root)
         }
     }
 }
 
-function checkWxHtmlElements(app) {
+function checkWxHtmlElements() {
     const root = createWxTestRoot()
     // Refs and the setter expose each commit while the journal records native event delivery.
     const nodes = {}
@@ -1432,9 +1440,9 @@ function checkWxHtmlElements(app) {
         h('strong', { ref: node => { nodes.strong = node } }, '123'),
         h('br', { ref: node => { nodes.br = node } }))
     }
+    const nativePage = { root, route: 'html' }
     try {
-        ReactDOM.flushSync(() => app.mount(Page, 'html', () => ({ root }), () =>
-            document.getElementById('html').performUpdate(true)))
+        attachWxPage(Page, nativePage)
         const div = nodes.div
         const span = nodes.span
         const native = div.nativeNode
@@ -1488,13 +1496,13 @@ function checkWxHtmlElements(app) {
         ReactDOM.flushSync(() => span.nativeNode.tap({}))
         assert.deepEqual(events.at(-1), ['restored', 'html-label'])
     } finally {
-        app.unmount('html')
-        assertWxPageReleased('html', root)
+        nativePage.onUnload()
+        assertWxPageReleased(nativePage.$taroPath, root)
         assert.ok(Object.values(nodes).every(node => node === null))
     }
 }
 
-function checkWxFormChange(app) {
+function checkWxFormChange() {
     const cases = [
         { type: 'picker', property: 'value', initial: 0, changed: 1, programmed: 2 },
         { type: 'picker-view', property: 'value', initial: [0], changed: [1], programmed: [2] },
@@ -1542,10 +1550,9 @@ function checkWxFormChange(app) {
             })
             return node
         }
-        const id = 'form-change-' + component
+        const nativePage = { root, route: 'form-change-' + component }
         try {
-            ReactDOM.flushSync(() => app.mount(Page, id, () => ({ root }), () =>
-                document.getElementById(id).performUpdate(true)))
+            attachWxPage(Page, nativePage)
             const originals = Object.fromEntries(cases.map(item => [item.type, nodes[item.type].nativeNode.listeners.change?.[0]]))
             for (const item of cases) {
                 assert.equal(typeof originals[item.type], 'function', item.type + ' subscribes without a business handler')
@@ -1575,13 +1582,13 @@ function checkWxFormChange(app) {
             assert.ok(Object.values(nodes).every(node => node === null))
             assert.equal(root.childNodes[0].childNodes[0].childNodes.length, 0)
         } finally {
-            app.unmount(id)
-            assertWxPageReleased(id, root)
+            nativePage.onUnload()
+            assertWxPageReleased(nativePage.$taroPath, root)
         }
     }
 }
 
-function checkWxPropertyUpdates(app) {
+function checkWxPropertyUpdates() {
     const cases = [
         {
             type: 'view',
@@ -1642,10 +1649,9 @@ function checkWxPropertyUpdates(app) {
                 }, type === 'text' ? 'content' : null)
             }))
         }
-        const id = 'properties-' + component
+        const nativePage = { root, route: 'properties-' + component }
         try {
-            ReactDOM.flushSync(() => app.mount(Page, id, () => ({ root }), () =>
-                document.getElementById(id).performUpdate(true)))
+            attachWxPage(Page, nativePage)
             const natives = Object.fromEntries(Object.entries(nodes).map(([type, node]) => [type, node.nativeNode]))
             for (const phase of ['initial', 'updated', 'null', 'initial', 'undefined', 'initial', 'removed']) {
                 ReactDOM.flushSync(() => controls.setPhase(phase))
@@ -1670,13 +1676,13 @@ function checkWxPropertyUpdates(app) {
                 }
             }
         } finally {
-            app.unmount(id)
-            assertWxPageReleased(id, root)
+            nativePage.onUnload()
+            assertWxPageReleased(nativePage.$taroPath, root)
         }
     }
 }
 
-function checkWxDatasetUpdates(app) {
+function checkWxDatasetUpdates() {
     const root = createWxTestRoot()
     // Keep refs, the React setter, and event observations for this Page's dataset transitions.
     const nodes = {}
@@ -1708,9 +1714,9 @@ function checkWxDatasetUpdates(app) {
                 onClick: record
             }))
     }
+    const nativePage = { root, route: 'dataset' }
     try {
-        ReactDOM.flushSync(() => app.mount(Page, 'dataset', () => ({ root }), () =>
-            document.getElementById('dataset').performUpdate(true)))
+        attachWxPage(Page, nativePage)
         const native = nodes.child.nativeNode
         for (const { props, dataset } of [...cases, cases[0]]) {
             ReactDOM.flushSync(() => controls.setProps(props))
@@ -1728,12 +1734,12 @@ function checkWxDatasetUpdates(app) {
             ])
         }
     } finally {
-        app.unmount('dataset')
-        assertWxPageReleased('dataset', root)
+        nativePage.onUnload()
+        assertWxPageReleased(nativePage.$taroPath, root)
     }
 }
 
-function checkWxEventBubbling(app) {
+function checkWxEventBubbling() {
     const root = createWxTestRoot()
     // Retain current refs, setters, counts, and callback observations for this Page's event sequence.
     const nodes = {}
@@ -1794,9 +1800,9 @@ function checkWxEventBubbling(app) {
         assert.equal(nodes.child.nativeNode.listeners.tap.length, 1)
     }
 
+    const nativePage = { root, route: 'bubbling' }
     try {
-        ReactDOM.flushSync(() => app.mount(Page, 'bubbling', () => ({ root }), () =>
-            document.getElementById('bubbling').performUpdate(true)))
+        attachWxPage(Page, nativePage)
         const child = nodes.child.nativeNode
         const parent = nodes.parent.nativeNode
         tap('first', 'child', 'parent')
@@ -1824,8 +1830,8 @@ function checkWxEventBubbling(app) {
         assert.strictEqual(nodes.parent.nativeNode, parent)
         assert.strictEqual(child.parentNode, parent)
     } finally {
-        app.unmount('bubbling')
-        assertWxPageReleased('bubbling', root)
+        nativePage.onUnload()
+        assertWxPageReleased(nativePage.$taroPath, root)
     }
 }
 
@@ -1834,11 +1840,11 @@ async function checkFrameworkNativeMounts() {
     const [attached, detached] = hooks.call('getMiniLifecycleImpl').component
     const Component = () => null
     const configurations = [
-        [createTaroComponentConfig(Component, 'native-component'), attached, detached],
-        [createNativePageConfig(Component, 'native-page', undefined, React, ReactDOM, {}), 'onLoad', 'onUnload']
+        [createTaroComponentConfig(Component, 'native-component'), attached, detached, false],
+        [createNativePageConfig(Component, 'native-page', undefined, React, ReactDOM, {}), 'onLoad', 'onUnload', true]
     ]
     try {
-        for (const [config, mount, unmount] of configurations) {
+        for (const [config, mount, unmount, nativeEntry] of configurations) {
             // Native delivery and lifecycle order belong to this receiver's mount.
             const delivered = Promise.withResolvers()
             const events = []
@@ -1852,9 +1858,14 @@ async function checkFrameworkNativeMounts() {
                 }
             }
             Current.app = {
-                mount(component, id, getCtx, onCommit) {
+                mount(...args) {
+                    assert.equal(args.length, nativeEntry ? 4 : 3)
+                    const [component, id] = args
+                    const onCommit = args.at(-1)
                     assert.strictEqual(component, Component)
-                    assert.strictEqual(getCtx(), native)
+                    if (nativeEntry) {
+                        assert.strictEqual(args[2](), native)
+                    }
                     root.id = id
                     root.appendChild(document.createTextNode('native content'))
                     injectPageInstance({ onLoad() { events.push('load') } }, id)
@@ -1917,20 +1928,52 @@ function checkFrameworkRootEntryPoints() {
         }
     }
     createReactApp(({ children }) => children, React, renderer, {})
-    assert.equal(Current.app.mount.length, 4, 'mount accepts the native context getter and completion callback')
+    assert.equal(Current.app.mount.length, 3, 'App mount accepts a commit callback')
     const PageWrapper = connectReactPage(React, 'page-type-id')(() => null)
     const pageRoot = new PageWrapper({ tid: 'page-type-id' }).render()
     assert.equal(pageRoot.type, 'test-page-root')
     assert.equal(pageRoot.props.id, 'page-type-id')
     assert.deepEqual(pageTypes, ['page-type-id'])
-    ReactDOM.flushSync(() => Current.app.mount(() => null, 'pages/cold', undefined, () => assert.fail('cold App must not be flushed')))
+    ReactDOM.flushSync(() => Current.app.mount(() => null, 'pages/cold', () => assert.fail('cold App must not be flushed')))
     assert.deepEqual(calls, ['createRoot', 'render'], 'prerender does not force or repeat App initialization')
     Current.app = null
     calls.length = 0
     const config = createNativeComponentConfig(() => null, React, renderer, {})
     config.created.call({})
     assert.deepEqual(calls, ['flushSync', 'createRoot', 'render', 'committed'])
-    assert.equal(typeof Current.app.mount, 'function', 'native Entry is ready before created returns')
+    assert.equal(Current.app.mount.length, 4, 'native Entry accepts its context getter before the commit callback')
+    const entry = Current.app
+    const native = { data: { props: { value: 'native props' } } }
+    // The renderer double stores Entry updates; wrapper construction remains Taro's own implementation.
+    entry.setState = (state, complete) => { entry.state = state; complete() }
+    const reads = []
+    const Component = () => null
+    entry.mount(Component, 'native-context', () => { reads.push(native); return native }, () => calls.push('mount'))
+    assert.deepEqual(reads, [], 'native context is resolved when its wrapper is constructed')
+    const element = entry.render()[0]
+    const wrapper = new element.type(element.props)
+    assert.deepEqual(reads, [native])
+    assert.strictEqual(wrapper.ctx, native)
+    const page = wrapper.render()
+    const rendered = page.props.children.props.children
+    assert.strictEqual(rendered.type, Component)
+    assert.equal(rendered.props.value, 'native props')
+    assert.strictEqual(rendered.props.$scope, native)
+    const root = {
+        ctx: null,
+        performUpdate(initial) {
+            assert.equal(initial, true)
+            assert.strictEqual(this.ctx, native)
+            calls.push('native-update')
+        }
+    }
+    page.props.ref.current = root
+    wrapper.componentDidMount()
+    assert.strictEqual(native.component, wrapper)
+    assert.strictEqual(root.ctx, native)
+    assert.deepEqual(calls.slice(-2), ['mount', 'native-update'])
+    entry.unmount('native-context', () => calls.push('unmount'))
+    assert.deepEqual(entry.render(), [])
 }
 
 function checkKeyedMoves(rootContainer, pageType) {

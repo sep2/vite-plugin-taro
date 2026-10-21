@@ -1,10 +1,4 @@
-import {
-    document,
-    hydrate,
-    type MiniElementData,
-    type MpInstance,
-    type ReactPageComponent
-} from 'vite-plugin-taro-runtime/runtime/mini'
+import { document, hydrate, type MiniElementData, type ReactPageComponent } from 'vite-plugin-taro-runtime/runtime/mini'
 import type { MiniHost } from '../vpt/mini-host.d.ts'
 
 /**
@@ -30,13 +24,8 @@ export const bindTemplateApp: MiniHost['bindApp'] = (app, container) => {
     Object.defineProperty(container, 'ctx', { value: { setData: broadcastAppUpdate } })
 
     const mount = app.mount
-    app.mount = (
-        component: ReactPageComponent,
-        id: string,
-        getCtx: (() => MpInstance) | undefined,
-        complete: () => void
-    ) => {
-        const onCommit = () => {
+    app.mount = (component: ReactPageComponent, id: string, complete: () => void) => {
+        mount.call(app, component, id, () => {
             /*
              * React has now committed the Page root, but VPT has not yet attached the Page's native ctx or
              * called performUpdate(true). Enqueue a lazy app.cn snapshot beside the Page root's already-pending page.*
@@ -52,9 +41,9 @@ export const bindTemplateApp: MiniHost['bindApp'] = (app, container) => {
                 // Element hydration always supplies cn; the shared type also describes text and partial records.
                 value: () => (hydrate(container) as MiniElementData).cn!
             })
+
             complete()
-        }
-        mount.call(app, component, id, getCtx, onCommit)
+        })
     }
 }
 

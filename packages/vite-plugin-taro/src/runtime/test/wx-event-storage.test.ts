@@ -78,17 +78,18 @@ import assert from 'node:assert/strict'
 import { hooks } from '@tarojs/shared'
 import 'vite-plugin-taro-runtime/plugin-platform-weapp/runtime'
 import 'vite-plugin-taro-runtime/plugin-html/runtime'
-import { document } from 'vite-plugin-taro-runtime/runtime/mini'
+import { Current, document } from 'vite-plugin-taro-runtime/runtime/mini'
 import { hostConfig } from 'vite-plugin-taro-runtime/react'
 import host from '\\0vpt:renderer-host'
 
 // Keep the shared Taro dispatch and native-bubbling batch while testing the renderer's prop diff directly.
 hooks.tap('dispatchTaroEvent', (event, node) => node.dispatchEvent(event))
 hooks.tap('batchedEventUpdates', callback => callback())
-const app = { mount() {}, unmount() {} }
+const app = Current.app = { mount() {}, unmount() {} }
 host.bindApp(app, document.createElement('root'))
-app.mount(() => null, 'page', () => ({ root: globalThis.sdk }), () => {})
-const context = host.getChildHostContext({}, host.getPageRootType('page'))
+const nativePage = { root: globalThis.sdk }
+host.createPage(() => null, { path: 'page', prerender: false }).lifetimes.attached.call(nativePage)
+const context = host.getChildHostContext({}, host.getPageRootType(nativePage.$taroPath))
 function element(type) { return host.createElement(null, context, type) }
 function expectLazy(nodes) {
     for (const node of nodes) {

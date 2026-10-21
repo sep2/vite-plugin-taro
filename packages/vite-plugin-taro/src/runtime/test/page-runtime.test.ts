@@ -189,7 +189,8 @@ test('prerender serializes the supplied Page identity', async () => {
         const harness = {
             Current: {
                 app: {
-                    mount(value: unknown, path: string, getCtx: undefined, complete: () => void) {
+                    mount(...args: [value: unknown, path: string, complete: () => void]) {
+                        const [value, path, complete] = args
                         const router = Reflect.get(harness.Current, 'router')
                         assert.deepEqual(router, {
                             path: '/pages/example',
@@ -200,7 +201,7 @@ test('prerender serializes the supplied Page identity', async () => {
                             onHide: 'pages/example.onHide'
                         })
                         assert.strictEqual(router.params, identity.params)
-                        assert.equal(getCtx, undefined)
+                        assert.equal(args.length, 3)
                         assert.equal(complete(), undefined)
                         calls.push({ name: 'mount', args: [value, path] })
                     }

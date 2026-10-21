@@ -7,7 +7,6 @@ import { ensure, noop, toCamelCase, toDashed } from '@tarojs/shared'
 import { blockElements, ensureHtmlClass, inlineElements } from 'vite-plugin-taro-runtime/plugin-html/html-elements'
 import { flushSync } from 'vite-plugin-taro-runtime/react'
 import {
-    type AppInstance,
     COMMENT,
     createPageConfig,
     document,
@@ -16,6 +15,7 @@ import {
     FormElement,
     type MpInstance,
     type PageInstance,
+    type ReactPageComponent,
     Style,
     TaroElement,
     TaroEvent,
@@ -32,7 +32,6 @@ import type { VptPageOptions } from '../mini/vpt/vpt-page-options'
 import type { WxNativeElement, WxNativeNode, WxNativeText, WxRoot } from './wx-types.ts'
 
 type TaroDocument = typeof document
-type AppMountParams = Parameters<NonNullable<AppInstance['mount']>>
 
 const pageOutlet = 'vpt_page_outlet'
 
@@ -178,6 +177,8 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
                 lifetimes: {
                     attached(this: PageInstance & MpInstance) {
                         const identity = createPageIdentity(options.path, getPageQuery())
+                        docs.set(pageType(identity.path), createPageDocument(getRoot(this)))
+
                         mountPage.call(this, component, options, identity)
                     }
                 }
@@ -188,20 +189,9 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
             container.delegateChildRemoval = noop
 
             const mount = app.mount
-            app.mount = (
-                component: AppMountParams[0],
-                id: AppMountParams[1],
-                getCtx: AppMountParams[2],
-                complete: AppMountParams[3]
-            ) => {
-                const type = pageType(id)
-
-                if (!docs.has(type)) {
-                    docs.set(type, createPageDocument(getRoot(getCtx!())))
-                }
-
+            app.mount = (component: ReactPageComponent, id: string, complete: () => void) => {
                 // Native Page mounts commit synchronously within the SDK lifecycle.
-                return flushSync(() => mount.call(app, component, id, getCtx, complete))
+                return flushSync(() => mount.call(app, component, id, complete))
             }
 
             const unmount = app.unmount

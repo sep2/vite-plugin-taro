@@ -47,19 +47,14 @@ export function mountPage(
     window.trigger(CONTEXT_ACTIONS.INIT, identity.path)
     perf.start(PAGE_INIT)
 
-    Current.app!.mount!(
-        component,
-        identity.path,
-        () => this,
-        () => {
-            const root = document.getElementById<TaroRootElement>(identity.path)!
-            if (onCommit) {
-                activate()
-                onCommit()
-            }
-            root.ctx = this
-            invalidateNearestCtx(root)
-            root.performUpdate(true)
+    Current.app!.mount!(component, identity.path, () => {
+        const root = document.getElementById<TaroRootElement>(identity.path)!
+        if (onCommit) {
+            activate()
+            onCommit()
         }
-    )
+        root.ctx = this
+        invalidateNearestCtx(root)
+        root.performUpdate(true)
+    })
 }

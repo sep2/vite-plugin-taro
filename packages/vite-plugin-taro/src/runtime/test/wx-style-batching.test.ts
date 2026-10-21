@@ -75,14 +75,16 @@ for (const mode of ['development', 'production']) {
 
 const fixture = `
 import assert from 'node:assert/strict'
-import { document, MutationObserver, Style } from 'vite-plugin-taro-runtime/runtime/mini'
+import { Current, document, MutationObserver, Style } from 'vite-plugin-taro-runtime/runtime/mini'
+import 'vite-plugin-taro-runtime/plugin-platform-weapp/runtime'
 import { hostConfig } from 'vite-plugin-taro-runtime/react'
 import host from '\\0vpt:renderer-host'
 
-const app = { mount() {}, unmount() {} }
+const app = Current.app = { mount() {}, unmount() {} }
 host.bindApp(app, document.createElement('root'))
-app.mount(() => null, 'page', () => ({ root: globalThis.sdk }), () => {})
-const context = host.getChildHostContext({}, host.getPageRootType('page'))
+const nativePage = { root: globalThis.sdk }
+host.createPage(() => null, { path: 'page', prerender: false }).lifetimes.attached.call(nativePage)
+const context = host.getChildHostContext({}, host.getPageRootType(nativePage.$taroPath))
 function element(type) { return host.createElement(null, context, type) }
 
 // React props and native clone construction keep declarations lazy until the first style update.

@@ -32,7 +32,7 @@ export function prerenderToData(
     }
 
     flushSync(() => {
-        Current.app!.mount!(component, path, undefined, () => {})
+        Current.app!.mount!(component, path, () => {})
     })
 
     const page = document.getElementById(path)

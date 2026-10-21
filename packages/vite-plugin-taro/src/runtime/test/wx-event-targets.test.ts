@@ -72,7 +72,7 @@ const fixture = `
 import assert from 'node:assert/strict'
 import { hooks } from '@tarojs/shared'
 import 'vite-plugin-taro-runtime/plugin-platform-weapp/runtime'
-import { document, eventSource, TaroEvent } from 'vite-plugin-taro-runtime/runtime/mini'
+import { Current, document, eventSource, TaroEvent } from 'vite-plugin-taro-runtime/runtime/mini'
 import host from '\\0vpt:renderer-host'
 
 hooks.tap('dispatchTaroEvent', (event, node) => node.dispatchEvent(event))
@@ -89,10 +89,11 @@ globalThis.sdk.createComponent = function (name) {
     }
     return native
 }
-const app = { mount() {}, unmount() {} }
+const app = Current.app = { mount() {}, unmount() {} }
 host.bindApp(app, document.createElement('root'))
-app.mount(() => null, 'page', () => ({ root: globalThis.sdk }), () => {})
-const type = host.getPageRootType('page')
+const nativePage = { root: globalThis.sdk }
+host.createPage(() => null, { path: 'page', prerender: false }).lifetimes.attached.call(nativePage)
+const type = host.getPageRootType(nativePage.$taroPath)
 const context = host.getChildHostContext({}, type)
 const root = host.createElement(null, {}, type)
 function element(type) { return host.createElement(root, context, type) }
