@@ -30,17 +30,18 @@ test('creates the ZFB Mini Program contract without translating user configurati
             config: { defaultTitle: 'Home' }
         }
     ])
-    assert.equal(plugins.length, 9)
+    assert.equal(plugins.length, 2)
     for (const name of [
         'vpt:mini-native-component',
         'vpt:mini-global',
         'vpt:mini-global-dev',
         'vpt:mini-watch',
-        'vpt:mini-override'
+        'vpt:mini-override',
+        'vpt:zfb-custom-tab-bar'
     ]) {
         assert.ok(
             plugins
-                .flat()
+                .flat(2)
                 .some((plugin) => plugin && typeof plugin === 'object' && 'name' in plugin && plugin.name === name),
             name
         )

@@ -12,6 +12,7 @@ test('the generated template passes strict typechecks and all target builds', ()
         timeout: 30_000
     })
     assert.match(output, /strict typechecks passed/)
+    assert.match(output, /zfb custom tab-bar files passed/)
     for (const target of ['wx', 'zfb', 'tt', 'h5']) {
         assert.ok(output.includes(`[template] ${target} build passed`))
     }

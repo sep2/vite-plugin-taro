@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -169,6 +169,21 @@ try {
     const vite = path.join(path.dirname(packageRequire.resolve('vite/package.json')), 'bin/vite.js')
     for (const target of ['wx', 'zfb', 'tt', 'h5']) {
         run(process.execPath, [vite, 'build'], project, { ...process.env, VITE_VPT_TARGET: target })
+        if (target === 'zfb') {
+            const output = path.join(project, 'dist/zfb')
+            const appJson: { tabBar: { customize: boolean } } = JSON.parse(
+                readFileSync(path.join(output, 'app.json'), 'utf8')
+            )
+            assert.equal(appJson.tabBar.customize, true)
+            for (const extension of ['axml', 'acss', 'js', 'json']) {
+                const entry = `customize-tab-bar/index.${extension}`
+                assert.ok(existsSync(path.join(output, entry)), `Missing Alipay custom tab-bar entry: ${entry}`)
+            }
+            assert.deepEqual(JSON.parse(readFileSync(path.join(output, 'customize-tab-bar/index.json'), 'utf8')), {
+                component: true
+            })
+            console.log('[template] zfb custom tab-bar files passed')
+        }
         console.log(`[template] ${target} build passed`)
     }
     if (values.devtools) {

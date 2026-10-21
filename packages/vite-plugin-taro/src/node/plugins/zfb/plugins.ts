@@ -4,11 +4,14 @@ import { resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
 import { isMiniWatchBuild } from '../mini/watch/is-mini-watch-build.ts'
+import { createZfbCustomTabBarPlugin } from './create-zfb-custom-tab-bar-plugin.ts'
 import { createZfbSkeleton } from './create-zfb-skeleton.ts'
 
 /** Adapts the shared Mini Program pipeline to the zfb public target. */
 export function createZfbMiniPlugins(vptOptions: VptOptions): PluginOption[] {
-    return createMiniTargetPlugins(createZfbMiniContract(vptOptions))
+    const contract = createZfbMiniContract(vptOptions)
+
+    return [createMiniTargetPlugins(contract), createZfbCustomTabBarPlugin(contract)]
 }
 
 /** Binds the shared Mini Program core to Alipay runtime and output conventions. */

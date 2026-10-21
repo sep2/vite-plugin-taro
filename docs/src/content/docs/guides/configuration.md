@@ -172,6 +172,12 @@ appJson: {
 
 `appJson` 接受普通 JSON 对象，按当前目标的原生配置原样输出，不在微信、支付宝和抖音之间翻译字段。字段名称和取值以对应平台文档为准。
 
+### 支付宝自定义 Tabs
+
+支付宝设置 `appJson.tabBar.customize: true` 时，vpt 会在输出目录的 `customize-tab-bar/` 中自动生成隐藏的原生占位组件。可直接在页面中使用 React 开发 Tabs 组件，通过 `Taro.switchTab()` 切换 Tab 页面。
+
+应用通过 Vite 的 `public` 目录或其他插件提供的同名文件会保留，vpt 只补齐其余占位文件。
+
 ## `projectConfigJson`
 
 使用当前目标的原生字段配置开发者工具项目。以下为微信示例：
