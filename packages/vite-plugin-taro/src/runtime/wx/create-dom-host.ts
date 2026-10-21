@@ -288,6 +288,7 @@ function setNativeClass(node: HostElement, value: string): void {
     const native = node.nativeNode!
     // Semantic HTML classes belong to native presentation, alongside the user's logical class list.
     const className = getNativeHtmlTag(node.nodeName) ? ensureHtmlClass(node.nodeName, value) : value
+
     getTemplateBindings(native).c(native, className)
 }
 

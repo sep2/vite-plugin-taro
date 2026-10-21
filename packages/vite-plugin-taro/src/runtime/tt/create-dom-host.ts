@@ -194,6 +194,7 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
             // HTML click handlers share Taro's tap array; custom component events retain their names.
             const click = type === 'click' && this.getEventHandlers('click')
             const name = click && click === this.getEventHandlers('tap') ? 'tap' : type
+
             updateNativeListener(this, `bind${name}`, subscribed)
         }
     })

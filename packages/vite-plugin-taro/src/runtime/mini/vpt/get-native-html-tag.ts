@@ -6,8 +6,10 @@ export function getNativeHtmlTag(name: string): 'view' | 'text' | undefined {
     if (name !== 'view' && blockElements.has(name)) {
         return 'view'
     }
+
     if (inlineElements.has(name)) {
         return 'text'
     }
+
     return undefined
 }
