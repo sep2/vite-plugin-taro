@@ -16,8 +16,8 @@ import type { MiniHost } from '../vpt/mini-host.d.ts'
  * App snapshot alongside its own page.* payloads in the first native batch. hydrate() supplies that initial App snapshot;
  * its traversal stops at the outlet so Page roots stay in the React/Taro ownership tree rather than entering App data.
  *
- * Taro owns Mini Program lifecycle mounting and retains the singleton React App across Page mounts. This adapter connects
- * that existing tree to native presentation. H5 uses its browser App entry and upstream external mounting.
+ * VPT coordinates Mini Page mounting within the singleton React App. This adapter connects
+ * that tree to native presentation. H5 uses its browser App entry and upstream external mounting.
  */
 export const bindTemplateApp: MiniHost['bindApp'] = (app, container) => {
     // 捕获 createVptApp 传入的确切容器，使所有 Page 的延迟快照始终来自同一个 App。
@@ -33,13 +33,12 @@ export const bindTemplateApp: MiniHost['bindApp'] = (app, container) => {
     app.mount = (
         component: ReactPageComponent,
         id: string,
-        getCtxOrComplete: (() => MpInstance) | (() => void),
-        complete?: () => void
+        getCtx: (() => MpInstance) | undefined,
+        complete: () => void
     ) => {
-        const callback = complete ?? getCtxOrComplete
         const onCommit = () => {
             /*
-             * React has now committed the Page root, but createPageConfig has not yet attached the native Page ctx or
+             * React has now committed the Page root, but VPT has not yet attached the Page's native ctx or
              * called performUpdate(true). Enqueue a lazy app.cn snapshot beside the Page root's already-pending page.*
              * payloads. Taro resolves both in one initial setData, so the first native frame contains the App layout and
              * its Page content together. The existing mount callback then binds the native context and continues the
@@ -53,13 +52,9 @@ export const bindTemplateApp: MiniHost['bindApp'] = (app, container) => {
                 // Element hydration always supplies cn; the shared type also describes text and partial records.
                 value: () => (hydrate(container) as MiniElementData).cn!
             })
-            callback()
+            complete()
         }
-        if (complete) {
-            mount.call(app, component, id, getCtxOrComplete, onCommit)
-        } else {
-            mount.call(app, component, id, onCommit)
-        }
+        mount.call(app, component, id, getCtx, onCommit)
     }
 }
 

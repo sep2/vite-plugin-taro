@@ -4,9 +4,6 @@ import { createReactApp } from 'vite-plugin-taro-runtime/plugin-framework-react/
 import ReactDOM from 'vite-plugin-taro-runtime/react'
 import { document } from 'vite-plugin-taro-runtime/runtime/mini'
 
-// Import here to make sure this is called before any pages
-import './get-page-query.ts'
-
 /** 创建唯一的 Taro/React App，并由选中的 host 绑定其呈现行为。 */
 export function createVptApp(
     App: Parameters<typeof createReactApp>[0],

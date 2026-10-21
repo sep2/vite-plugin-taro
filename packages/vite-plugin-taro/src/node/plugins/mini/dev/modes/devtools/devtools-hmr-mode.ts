@@ -97,10 +97,7 @@ function createDevtoolsPagePlugin(): Plugin {
     }
 }
 
-/**
- * Prepares the capsule's final config immediately before the native shell registers it.
- * The shared shell owns this one registration call; no platform choice or import-source parsing belongs in HMR.
- */
+/** Prepares ordinary Page configs at registration; Component Pages use native hot registration. */
 export function injectPageShellHmr(code: string): { code: string; map: null } {
     const registration = 'registerPage(pageConfig)'
     if (!code.includes(registration)) {
@@ -108,7 +105,10 @@ export function injectPageShellHmr(code: string): { code: string; map: null } {
     }
 
     return {
-        code: code.replace(registration, 'registerPage(__rolldown_runtime__.injectPageHmr(pageConfig))'),
+        code: code.replace(
+            registration,
+            "registerPage('methods' in pageConfig ? pageConfig : __rolldown_runtime__.injectPageHmr(pageConfig))"
+        ),
         map: null
     }
 }

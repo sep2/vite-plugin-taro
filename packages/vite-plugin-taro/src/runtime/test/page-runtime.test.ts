@@ -3,9 +3,10 @@ import path from 'node:path'
 import test from 'node:test'
 import type { PageInstance } from 'vite-plugin-taro-runtime/runtime/mini'
 import { createDevtoolsHmrRuntime } from '../mini/dev/modes/devtools/devtools-runtime.ts'
-import type { createVptPage, VptPageOptions } from '../mini/vpt/create-vpt-page.ts'
+import type { createTemplatePage } from '../mini/template/create-template-page.ts'
+import type { VptPageOptions } from '../mini/vpt/vpt-page-options.d.ts'
 import {
-    bundleRuntimeEntry,
+    bundleRuntimeEntry as bundleEntry,
     type Call,
     createExecutionContext,
     executeRuntimeEntry,
@@ -13,10 +14,33 @@ import {
     runtimeRoot
 } from './runtime-entry-test-utils.ts'
 
+// Real-renderer tests cover commits; these tests isolate configuration and capsule composition.
+function bundleRuntimeEntry(options: Parameters<typeof bundleEntry>[0]) {
+    return bundleEntry({
+        ...options,
+        mocks: {
+            '../vpt/mount-page.ts': `
+                export function mountPage(component, options, identity, onCommit) {
+                    this.$taroParams = identity.params
+                    globalThis.harness.onMount?.(identity)
+                    onCommit()
+                }
+            `,
+            '../vpt/get-page-query.ts': 'export const getPageQuery = () => globalThis.harness.query',
+            ...options.mocks
+        }
+    })
+}
+
+const templateHostMock = `
+    import { createTemplatePage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/template/create-template-page.ts'))}
+    export default { createPage: createTemplatePage }
+`
+
 // Mock only the capsule's bridge; renderer tests exercise these calls against real React and Taro.
 const prerenderRuntimeMock = `
     export const createPageConfig = globalThis.harness.createPageConfig
-    export const Current = globalThis.harness.Current
+    export const Current = globalThis.harness.Current ?? { app: { mount() {} } }
     export const document = globalThis.harness.document
     export const hydrate = globalThis.harness.hydrate
     export const incrementId = () => {
@@ -24,7 +48,7 @@ const prerenderRuntimeMock = `
         let id = 0
         return () => ++id
     }
-    export const getPath = (route, params) => route + '?instance=' + params.$vptPage
+    export const getPath = (route, params) => route + '?' + Object.entries(params).map(([key, value]) => key + '=' + value).join('&')
     export const addLeadingSlash = route => '/' + route
     export const getOnReadyEventKey = route => route + '.onReady'
     export const getOnShowEventKey = route => route + '.onShow'
@@ -46,7 +70,7 @@ test('creates the Mini Program Page capsule after App initialization with one op
         AppComponent,
         PageComponent,
         createVptApp: recordCall(calls, 'createVptApp', appConfig),
-        createVptPage: recordCall(calls, 'createVptPage', pageConfig)
+        createPage: recordCall(calls, 'createPage', pageConfig)
     }
     const code = await bundleRuntimeEntry({
         entry: 'mini/capsule/page.ts',
@@ -54,8 +78,8 @@ test('creates the Mini Program Page capsule after App initialization with one op
             '../vpt/vpt-runtime.ts': `
                 const harness = globalThis.harness
                 export const createVptApp = harness.createVptApp
-                export const createVptPage = harness.createVptPage
             `,
+            '\0vpt:renderer-host': 'export default { createPage: globalThis.harness.createPage }',
             '\0vpt:app-component': 'export default globalThis.harness.AppComponent',
             '\0vpt:page-component': 'export default globalThis.harness.PageComponent'
         },
@@ -70,7 +94,7 @@ test('creates the Mini Program Page capsule after App initialization with one op
     assert.strictEqual(exports.default, pageConfig)
     assert.deepEqual(
         calls.map(({ name }) => name),
-        ['createVptApp', 'createVptPage']
+        ['createVptApp', 'createPage']
     )
     assert.deepEqual(Object.keys(exports), ['default'])
     assert.deepEqual(calls[0]?.args, [AppComponent, appConfigInput])
@@ -78,25 +102,23 @@ test('creates the Mini Program Page capsule after App initialization with one op
     assert.strictEqual(calls[1]?.args[1], vptPageOptions)
 })
 
-test('createVptPage forwards optional Page config through the shared options type', async (t) => {
-    const options: Parameters<typeof createVptPage>[1][] = [
+test('createTemplatePage forwards optional Page config through the shared options type', async (t) => {
+    const options: Parameters<typeof createTemplatePage>[1][] = [
         { path: 'pages/home/index', prerender: false },
         { path: 'pages/home/index', config: { navigationBarTitleText: 'Home' }, prerender: false }
     ] satisfies VptPageOptions[]
     const bundle = await bundleRuntimeEntry({
-        entry: 'mini/vpt/create-vpt-page.ts',
+        entry: 'mini/template/create-template-page.ts',
         mocks: {
-            'vite-plugin-taro-runtime/runtime/mini':
-                'export const createPageConfig = globalThis.harness.createPageConfig',
-            '../template/prerender-to-data.ts':
-                'export const prerenderToData = () => { throw new Error("Unexpected prerender") }'
+            'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
+            './prerender-to-data.ts': 'export const prerenderToData = () => { throw new Error("Unexpected prerender") }'
         },
         defines: {}
     })
     for (const pageOptions of options) {
         const createPageConfig = t.mock.fn((...args: unknown[]) => ({ data: args[2] }))
         const exports = executeRuntimeEntry(bundle, createExecutionContext({ createPageConfig }))
-        const createPage = exports.createVptPage
+        const createPage = exports.createTemplatePage
         assert.ok(typeof createPage === 'function')
         const component = () => null
         const config = createPage(component, pageOptions)
@@ -119,42 +141,68 @@ test('Taro PageInstance accepts native data objects and factories without a VPT 
     assert.equal(config.data, undefined)
 })
 
-test('prerender stores its identity inside the non-enumerable VPT metadata', async () => {
-    // The journal captures mount/lookup/serialization order without replacing any native lifecycle.
+test('creates routing-independent Page identities for identical queries and timestamps', async (t) => {
+    const Current = Object.freeze({ router: Object.freeze({ path: '/pages/current' }) })
+    const code = await bundleRuntimeEntry({
+        entry: 'mini/vpt/create-page-identity.ts',
+        mocks: { 'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock },
+        defines: {}
+    })
+    const { createPageIdentity } = executeRuntimeEntry(code, createExecutionContext({ Current }))
+    assert.ok(typeof createPageIdentity === 'function')
+    t.mock.method(Date, 'now', () => 123)
+    const query = Object.freeze({ full: 'a%3Db', empty: '', $vptPage: 'business' })
+    const first = createPageIdentity('pages/example', query)
+    const second = createPageIdentity('pages/example', query)
+    assert.deepEqual(first, {
+        path: 'pages/example?$vptPage=1',
+        params: { ...query, $taroTimestamp: 123 }
+    })
+    assert.equal(second.path, 'pages/example?$vptPage=2')
+    assert.deepEqual(second.params, first.params)
+    assert.notStrictEqual(first.params, second.params)
+    assert.deepEqual(createPageIdentity('pages/example', undefined), {
+        path: 'pages/example?$vptPage=3',
+        params: { $taroTimestamp: 123 }
+    })
+})
+
+test('prerender serializes the supplied Page identity', async () => {
+    // Observe routing activation, React commitment and serialization in order.
     const calls: Call[] = []
     const component = () => null
+    const identity = { path: 'pages/example?instance=1', params: { id: 'example' } }
+    const seed = { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } }
     const app = { cn: [{ sid: 'app-child' }] }
     const page = { parentNode: { _root: app }, cn: [{ sid: 'page-child' }] }
     const code = await bundleRuntimeEntry({
-        entry: 'test/prerender-fixture.ts',
+        entry: 'mini/template/prerender-to-data.ts',
         mocks: {
-            [path.join(runtimeRoot, 'test/prerender-fixture.ts')]: `
-                export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}
-                export { prerenderToData } from ${JSON.stringify(path.join(runtimeRoot, 'mini/template/prerender-to-data.ts'))}
-            `,
             'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
-            'vite-plugin-taro-runtime/react': 'export const flushSync = globalThis.harness.flushSync',
-            '../vpt/get-page-query.ts': 'export const getPageQuery = () => ({ id: "example" })'
+            'vite-plugin-taro-runtime/react': 'export const flushSync = globalThis.harness.flushSync'
         },
         defines: {}
     })
-
     for (const host of [null, { parentNode: null }, page]) {
-        // Reset between independent committed, suspended and detached host observations.
+        // Each host observation has its own mount/serialization journal.
         calls.length = 0
         const harness = {
-            PageComponent: component,
-            createPageConfig(...args: unknown[]) {
-                calls.push({ name: 'createPageConfig', args })
-                return { data: args[2] }
-            },
             Current: {
                 app: {
-                    mount(...args: [unknown, string, () => void]) {
-                        assert.equal(args.length, 3, 'prerender uses the original mount signature')
-                        const [value, path, callback] = args
+                    mount(value: unknown, path: string, getCtx: undefined, complete: () => void) {
+                        const router = Reflect.get(harness.Current, 'router')
+                        assert.deepEqual(router, {
+                            path: '/pages/example',
+                            $taroPath: identity.path,
+                            params: identity.params,
+                            onReady: 'pages/example.onReady',
+                            onShow: 'pages/example.onShow',
+                            onHide: 'pages/example.onHide'
+                        })
+                        assert.strictEqual(router.params, identity.params)
+                        assert.equal(getCtx, undefined)
+                        assert.equal(complete(), undefined)
                         calls.push({ name: 'mount', args: [value, path] })
-                        callback()
                     }
                 }
             },
@@ -169,90 +217,55 @@ test('prerender stores its identity inside the non-enumerable VPT metadata', asy
                 return { cn: value.cn }
             }
         }
-        const { createVptPage, prerenderToData } = executeRuntimeEntry(code, createExecutionContext(harness))
-        assert.ok(typeof createVptPage === 'function')
+        const { prerenderToData } = executeRuntimeEntry(code, createExecutionContext(harness))
         assert.ok(typeof prerenderToData === 'function')
-        const config = createVptPage(component, { path: 'pages/example' })
-        assert.equal(Object.getOwnPropertyDescriptor(config, '__vpt_meta')?.enumerable, false)
-        assert.equal(Object.hasOwn({ ...config }, '__vpt_meta'), false)
-        assert.deepEqual(Object.keys(config), ['data'])
-        assert.deepEqual(config.__vpt_meta, {})
-        assert.deepEqual(Object.getOwnPropertyNames(config), ['data', '__vpt_meta'])
-        assert.deepEqual(
-            calls.map(({ name }) => name),
-            ['createPageConfig'],
-            'registration must not render'
-        )
-        const seed: unknown = Reflect.get(config, 'data')
-        assert.strictEqual(seed, calls[0]?.args[2])
-        assert.equal(Object.hasOwn(config, 'prerenderToData'), false)
-        assert.equal(calls[0]?.args.length, 4, 'no identity-reader argument is added to createPageConfig')
-
-        // Observe per-instance work only after config construction has completed.
-        calls.length = 0
-        const result = prerenderToData(config, component, 'pages/example', seed)
-        const router = Reflect.get(harness.Current, 'router')
-        const initialPage = config.__vpt_meta.prerenderIdentity
-        assert.deepEqual(initialPage, { path: 'pages/example?instance=1', params: router.params })
-        assert.strictEqual(initialPage.params, router.params)
-        assert.equal(router.params.id, 'example')
-        assert.equal(Object.hasOwn({ ...config }, '__vpt_meta'), false)
-        assert.deepEqual(Object.getOwnPropertyNames(config), ['data', '__vpt_meta'])
+        const data = prerenderToData(component, 'pages/example', identity, seed)
         assert.deepEqual(calls.slice(0, 4), [
             { name: 'flushSync', args: [] },
-            { name: 'mount', args: [component, 'pages/example?instance=1'] },
+            { name: 'mount', args: [component, identity.path] },
             { name: 'commit', args: [] },
-            { name: 'lookup', args: ['pages/example?instance=1'] }
+            { name: 'lookup', args: [identity.path] }
         ])
         if (host === page) {
             assert.deepEqual(calls.slice(4), [
                 { name: 'hydrate', args: [app] },
                 { name: 'hydrate', args: [page] }
             ])
-            assert.deepEqual(result, {
+            assert.deepEqual(data, {
                 app: { nn: 'vpt_fragment', cn: app.cn },
                 page: { cn: page.cn }
             })
         } else {
-            assert.strictEqual(result, seed, 'uncommitted hosts keep the seed for normal onLoad mounting')
+            assert.strictEqual(data, seed)
             assert.equal(calls.length, 4)
         }
         assert.deepEqual(seed, { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } })
-        prerenderToData(config, component, 'pages/example', seed)
-        assert.equal(
-            config.__vpt_meta.prerenderIdentity.path,
-            'pages/example?instance=2',
-            'identical queries use distinct instances'
-        )
     }
 })
 
-test('prerender preserves its seed and routing state until the App provides mount', async () => {
+test('template data preserves its seed and routing until the App provides mount', async (t) => {
     const code = await bundleRuntimeEntry({
-        entry: 'mini/template/prerender-to-data.ts',
+        entry: 'mini/template/create-template-page.ts',
         mocks: {
             'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
-            'vite-plugin-taro-runtime/react': 'export const flushSync = globalThis.harness.unexpected',
+            './prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.unexpected',
             '../vpt/get-page-query.ts': 'export const getPageQuery = globalThis.harness.unexpected'
         },
         defines: {}
     })
     for (const app of [undefined, null, {}]) {
         const router = { path: '/existing' }
-        const config = { __vpt_meta: {} }
-        const seed = { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } }
+        const createPageConfig = t.mock.fn((...args: unknown[]) => ({ data: args[2] }))
         const harness = {
+            createPageConfig,
             Current: { app, router },
             unexpected: () => assert.fail('An unavailable App must not capture query or render')
         }
-        const { prerenderToData } = executeRuntimeEntry(code, createExecutionContext(harness))
-        assert.ok(typeof prerenderToData === 'function')
-        assert.strictEqual(
-            prerenderToData(config, () => null, 'pages/cold', seed),
-            seed
-        )
+        const { createTemplatePage } = executeRuntimeEntry(code, createExecutionContext(harness))
+        assert.ok(typeof createTemplatePage === 'function')
+        const config = createTemplatePage(() => null, { path: 'pages/cold', prerender: true })
+        assert.strictEqual(config.data(), createPageConfig.mock.calls[0]?.arguments[2])
         assert.strictEqual(harness.Current.router, router)
-        assert.deepEqual(config.__vpt_meta, {})
     }
 })
 
@@ -282,11 +295,11 @@ test('mounts the current Page export instead of the cold native capsule baseline
     const code = await bundleRuntimeEntry({
         entry: 'mini/capsule/page.ts',
         mocks: {
+            '\0vpt:renderer-host': templateHostMock,
             './app.ts': '',
-            '../template/prerender-to-data.ts':
+            './prerender-to-data.ts':
                 'export const prerenderToData = () => { throw new Error("Unexpected prerender") }',
             'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
-            '../vpt/vpt-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}`,
             '\0vpt:global-binding': 'export const vptGlobal = globalThis',
             '\0vpt:page-component': 'export default globalThis.harness.PageComponent'
         },
@@ -305,11 +318,10 @@ test('mounts the current Page export instead of the cold native capsule baseline
         ['createPageConfig', 'accept']
     )
     assert.ok(exports.default && typeof exports.default === 'object')
-    assert.deepEqual(Reflect.get(exports.default, '__vpt_meta'), {})
     assert.equal(Object.hasOwn(exports, 'prerenderToData'), false)
 })
 
-test('createVptPage selects native data form without copying the config', async (t) => {
+test('createTemplatePage selects native data form without copying the config', async (t) => {
     for (const prerender of [undefined, false, true]) {
         // This journal distinguishes capsule construction from data creation and ordinary native lifecycles.
         const calls: Call[] = []
@@ -321,30 +333,34 @@ test('createVptPage selects native data form without copying the config', async 
             data: page.data,
             options: { multipleSlots: true },
             events: { onBack: () => true },
-            onLoad(this: unknown, options: unknown) {
+            onLoad(this: unknown, options: unknown, mount?: (dispatch: () => void) => void) {
                 assert.strictEqual(this, page)
                 assert.strictEqual(options, query)
                 calls.push({ name: 'onLoad', args: [options] })
+                assert.ok(mount)
+                mount(() => calls.push({ name: 'load', args: [] }))
             },
             onShareAppMessage: () => share,
             eh: recordCall(calls, 'event', undefined)
         } satisfies PageInstance
-        const initialPage = { path: 'pages/home/index?instance=1', params: query }
-        const prerenderToData = t.mock.fn((value: unknown, component: unknown, route: string, data: unknown) => {
-            assert.strictEqual(value, config, 'prerender uses the original Taro config')
+        const onMount = t.mock.fn((identity: { path: string; params: Record<string, unknown> }) => {
+            calls.push({ name: 'mount', args: [] })
+            return identity
+        })
+        const prerenderToData = t.mock.fn((component: unknown, route: string, identity: unknown, data: unknown) => {
             assert.strictEqual(component, calls[1]?.args[0], 'the closure retains the Page component')
             assert.equal(route, 'pages/home/index')
             assert.strictEqual(data, calls[1]?.args[2], 'the factory passes the captured seed, not config.data')
+            assert.ok(identity)
             return renderedData
         })
         const code = await bundleRuntimeEntry({
             entry: 'mini/capsule/page.ts',
             mocks: {
+                '\0vpt:renderer-host': templateHostMock,
                 './app.ts': 'globalThis.harness.initialize()',
-                '../vpt/vpt-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}`,
-                'vite-plugin-taro-runtime/runtime/mini':
-                    'export const createPageConfig = globalThis.harness.createPageConfig',
-                '../template/prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData',
+                'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
+                './prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData',
                 '\0vpt:page-component': 'export default () => null'
             },
             defines: {
@@ -353,6 +369,8 @@ test('createVptPage selects native data form without copying the config', async 
         })
         const harness = {
             prerenderToData,
+            onMount,
+            query,
             initialize: recordCall(calls, 'initialize', undefined),
             createPageConfig(...args: unknown[]) {
                 calls.push({ name: 'createPageConfig', args })
@@ -365,11 +383,6 @@ test('createVptPage selects native data form without copying the config', async 
         assert.strictEqual(nativeConfig, config, 'both data forms retain the original config identity')
         const seed = calls[1]?.args[2]
         assert.deepEqual(seed, { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } })
-        const metadata = Reflect.get(config, '__vpt_meta')
-        assert.deepEqual(Object.keys(metadata), [])
-        // Configuration and registration must not consume a pending native-instance identity.
-        metadata.prerenderIdentity = initialPage
-        Object.freeze(metadata)
         Object.freeze(config)
         assert.deepEqual(
             calls.map(({ name }) => name),
@@ -389,23 +402,61 @@ test('createVptPage selects native data form without copying the config', async 
             assert.strictEqual(config.data, seed, 'ordinary pages keep their data object')
         }
         assert.deepEqual(seed, { app: { nn: 'vpt_fragment', cn: [] }, page: { cn: [] } })
-        assert.strictEqual(
-            Reflect.get(nativeConfig, '__vpt_meta'),
-            metadata,
-            'onLoad and prerender share identity storage'
-        )
-        assert.equal(Object.getOwnPropertyDescriptor(nativeConfig, '__vpt_meta')?.enumerable, false)
-        assert.equal(Object.hasOwn({ ...nativeConfig }, '__vpt_meta'), false)
-        assert.strictEqual(metadata.prerenderIdentity, initialPage, 'configuration must not consume prepared identity')
         assert.strictEqual(Reflect.get(nativeConfig, 'onLoad'), config.onLoad)
         Reflect.get(nativeConfig, 'onLoad').call(page, query)
+        const identity = onMount.mock.calls[0]?.arguments[0]
+        assert.ok(identity)
+        assert.equal(identity.path, 'pages/home/index?$vptPage=1')
+        assert.deepEqual(identity.params, { ...query, $taroTimestamp: identity.params.$taroTimestamp })
+        if (prerender) {
+            assert.strictEqual(identity, prerenderToData.mock.calls[0]?.arguments[2])
+        }
         assert.strictEqual(Reflect.get(nativeConfig, 'onShareAppMessage')(), share)
         Reflect.get(nativeConfig, 'eh')('tap')
         assert.deepEqual(calls.slice(2), [
             { name: 'onLoad', args: [query] },
+            { name: 'mount', args: [] },
+            { name: 'load', args: [] },
             { name: 'event', args: ['tap'] }
         ])
     }
+})
+
+test('template factories retain independent one-shot mount identities', async (t) => {
+    const onMount = t.mock.fn((identity: { path: string; params: Record<string, unknown> }) => identity)
+    const prerenderToData = t.mock.fn((_component: unknown, _route: string, _identity: unknown, data: unknown) => data)
+    const bundle = await bundleRuntimeEntry({
+        entry: 'mini/template/create-template-page.ts',
+        mocks: {
+            'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
+            './prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData'
+        },
+        defines: {}
+    })
+    const { createTemplatePage } = executeRuntimeEntry(
+        bundle,
+        createExecutionContext({
+            onMount,
+            prerenderToData,
+            createPageConfig: () => ({
+                onLoad(_query: unknown, mount: (dispatch: () => void) => void) {
+                    mount(() => {})
+                }
+            })
+        })
+    )
+    assert.ok(typeof createTemplatePage === 'function')
+    const first = Object.freeze(createTemplatePage(() => null, { path: 'pages/first', prerender: true }))
+    const second = Object.freeze(createTemplatePage(() => null, { path: 'pages/second', prerender: true }))
+    first.data()
+    second.data()
+    first.onLoad.call({}, {})
+    second.onLoad.call({}, {})
+    first.onLoad.call({}, { id: 'next' })
+    assert.strictEqual(onMount.mock.calls[0]?.arguments[0], prerenderToData.mock.calls[0]?.arguments[2])
+    assert.strictEqual(onMount.mock.calls[1]?.arguments[0], prerenderToData.mock.calls[1]?.arguments[2])
+    assert.equal(onMount.mock.calls[2]?.arguments[0].path, 'pages/first?$vptPage=3')
+    assert.equal(onMount.mock.calls[2]?.arguments[0].params.id, 'next')
 })
 
 test('Page data factories share native query capture installed during App activation', async () => {
@@ -417,26 +468,24 @@ test('Page data factories share native query capture installed during App activa
         data: {},
         onLoad: recordCall(calls, 'load', undefined)
     } satisfies PageInstance
-    function prerenderToData(pageConfig: object, query: Record<string, unknown>) {
-        assert.strictEqual(pageConfig, config)
+    function prerenderToData(query: Record<string, unknown>) {
         calls.push({ name: 'data', args: [query] })
         return { query }
     }
     const code = await bundleRuntimeEntry({
         entry: 'mini/native/page.ts',
         mocks: {
+            '\0vpt:renderer-host': templateHostMock,
             '../amphibious/bootstrap.ts': '',
             '../vpt/get-page-query.ts': `export { getPageQuery } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/get-page-query.ts'))}`,
             '\0vpt:page-capsule': `export { default } from ${JSON.stringify(path.join(runtimeRoot, 'mini/capsule/page.ts'))}`,
             './app.ts': `
-                import '../vpt/vpt-runtime.ts'
+                import '\\0vpt:renderer-host'
                 globalThis.harness.assertListenerReady()
             `,
-            '../vpt/vpt-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}`,
-            'vite-plugin-taro-runtime/runtime/mini': 'export const createPageConfig = () => globalThis.harness.config',
-            '../template/prerender-to-data.ts': `
-                import { getPageQuery } from '../vpt/get-page-query.ts'
-                export const prerenderToData = config => globalThis.harness.prerenderToData(config, getPageQuery())
+            'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
+            './prerender-to-data.ts': `
+                export const prerenderToData = (_component, _route, identity) => globalThis.harness.prerenderToData(identity.params)
             `,
             '\0vpt:page-component': 'export default () => null'
         },
@@ -447,6 +496,7 @@ test('Page data factories share native query capture installed during App activa
     executeRuntimeEntry(code, {
         ...createExecutionContext({
             config,
+            createPageConfig: () => config,
             prerenderToData,
             assertListenerReady() {
                 assert.equal(
@@ -466,7 +516,6 @@ test('Page data factories share native query capture installed during App activa
             assert.ok(definition && typeof definition === 'object')
             assert.deepEqual(Object.keys(definition), ['data', 'onLoad'])
             assert.strictEqual(Reflect.get(definition, 'onLoad'), config.onLoad)
-            assert.strictEqual(Reflect.get(definition, '__vpt_meta'), Reflect.get(config, '__vpt_meta'))
             factories.push(Reflect.get(definition, 'data'))
             calls.push({ name: 'register', args: [] })
         }
@@ -482,8 +531,12 @@ test('Page data factories share native query capture installed during App activa
         { id: 'second', full: '' }
     ]) {
         beforePageLoad({ query })
-        assert.deepEqual(factory(), { query })
-        assert.strictEqual(calls.at(-1)?.args[0], query, 'the query comes from native routing, not URL parsing')
+        const data = factory()
+        assert.ok(data && typeof data === 'object')
+        const captured = Reflect.get(data, 'query')
+        assert.deepEqual(captured, { ...query, $taroTimestamp: captured.$taroTimestamp })
+        assert.notStrictEqual(captured, query, 'native queries are copied into instance parameters')
+        assert.strictEqual(captured, calls.at(-1)?.args[0])
     }
     assert.deepEqual(
         calls.map((call) => call.name),
@@ -498,7 +551,10 @@ for (const prerender of [false, true]) {
         const calls: Call[] = []
         const originalConfig = {
             data: { count: 0 },
-            onLoad: recordCall(calls, 'load', undefined),
+            onLoad(query: unknown, mount?: (dispatch: () => void) => void) {
+                assert.ok(mount)
+                mount(() => calls.push({ name: 'load', args: [query] }))
+            },
             onShow: recordCall(calls, 'show', undefined),
             onUnload: recordCall(calls, 'unload', undefined)
         }
@@ -507,16 +563,15 @@ for (const prerender of [false, true]) {
             return originalConfig
         })
         const prerenderToData = t.mock.fn(
-            (_config: unknown, _component: unknown, _route: string, data: unknown) => data
+            (_component: unknown, _route: string, _identity: unknown, data: unknown) => data
         )
         const capsuleCode = await bundleRuntimeEntry({
             entry: 'mini/capsule/page.ts',
             mocks: {
+                '\0vpt:renderer-host': templateHostMock,
                 './app.ts': '',
-                '../vpt/vpt-runtime.ts': `export { createVptPage } from ${JSON.stringify(path.join(runtimeRoot, 'mini/vpt/create-vpt-page.ts'))}`,
-                'vite-plugin-taro-runtime/runtime/mini':
-                    'export const createPageConfig = globalThis.harness.createPageConfig',
-                '../template/prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData',
+                'vite-plugin-taro-runtime/runtime/mini': prerenderRuntimeMock,
+                './prerender-to-data.ts': 'export const prerenderToData = globalThis.harness.prerenderToData',
                 '\0vpt:page-component': 'export default () => null'
             },
             defines: {
@@ -530,7 +585,6 @@ for (const prerender of [false, true]) {
         assert.strictEqual(config, originalConfig)
         const initialData = createPageConfig.mock.calls[0]?.arguments[2]
         assert.ok(initialData && typeof initialData === 'object')
-        const metadata = Object.freeze(Reflect.get(config, '__vpt_meta'))
         const initialNativeData = Reflect.get(config, 'data')
         const code = await bundleRuntimeEntry({
             entry: 'mini/native/page.ts',
@@ -568,7 +622,6 @@ for (const prerender of [false, true]) {
         assert.strictEqual(Reflect.get(config, 'data'), initialNativeData, 'HMR must preserve the data factory')
         assert.strictEqual(originalConfig.data, initialNativeData)
         assert.deepEqual(page.data, { count: 7 })
-        assert.deepEqual(metadata, {})
         assert.equal(
             prerenderToData.mock.callCount(),
             prerender ? 1 : 0,

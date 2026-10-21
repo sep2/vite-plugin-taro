@@ -101,10 +101,10 @@ index 968cab19cc6e92cc789797a23bb4b330202a688e..1463d9d9c758024f7292af3f5dd118cd
              this.style.cssText = '';
          }
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index 13f7d91bf5d75c20990855db507f85fbc8695eff..a97832f797bdbf51147bf67fdc11810c0d5a6af9 100644
+index f221446060d86606a7a1eb599158163aa7225909..2b78894030e563d67b368b03b99311ba68fd0eb0 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
-@@ -102,8 +102,13 @@ class TaroNode extends TaroEventTarget {
+@@ -106,8 +106,13 @@ class TaroNode extends TaroEventTarget {
       */
      // eslint-disable-next-line accessor-pairs
      set textContent(text) {
@@ -120,7 +120,7 @@ index 13f7d91bf5d75c20990855db507f85fbc8695eff..a97832f797bdbf51147bf67fdc11810c
          // Handle old children' data structure & ref
          while (this.firstChild) {
              this.removeChild(this.firstChild, { doUpdate: false });
-@@ -113,17 +118,16 @@ class TaroNode extends TaroEventTarget {
+@@ -117,17 +122,16 @@ class TaroNode extends TaroEventTarget {
          }
          else {
              const newText = this.ownerDocument.createTextNode(text);
@@ -144,10 +144,10 @@ index 13f7d91bf5d75c20990855db507f85fbc8695eff..a97832f797bdbf51147bf67fdc11810c
      }
      /**
       * @doc https://developer.mozilla.org/zh-CN/docs/Web/API/Node/insertBefore
-@@ -172,18 +176,20 @@ class TaroNode extends TaroEventTarget {
-         if (this._root) {
-             bumpNearestCtxEpochForRoot(this._root);
-         }
+@@ -174,18 +178,20 @@ class TaroNode extends TaroEventTarget {
+         // Its default implementation prepares template payloads; native hosts can replace it before any serialization work.
+         this.delegateChildInsertion(newChild, refChild, index, isReplace, previousIndex);
+         this.delegateContextInvalidation();
 -        MutationObserver.record({
 -            type: "childList" /* MutationRecordType.CHILD_LIST */,
 -            target: this,
@@ -177,7 +177,7 @@ index 13f7d91bf5d75c20990855db507f85fbc8695eff..a97832f797bdbf51147bf67fdc11810c
          return newChild;
      }
      /**
-@@ -228,7 +234,7 @@ class TaroNode extends TaroEventTarget {
+@@ -230,7 +236,7 @@ class TaroNode extends TaroEventTarget {
       */
      removeChild(child, options = {}) {
          const { cleanRef, doUpdate } = options;

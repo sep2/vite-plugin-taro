@@ -1,9 +1,12 @@
 import { DEFAULT_COMPONENTS, ensure, noop, TT_SPECIFIC_COMPONENTS, toCamelCase } from '@tarojs/shared'
 import {
+    createPageConfig,
     document,
     eventHandler,
     extend,
     FormElement,
+    type MpInstance,
+    type PageInstance,
     Style,
     TaroElement,
     TaroEvent,
@@ -17,8 +20,10 @@ import type {
     TTNativeEvent,
     TTNativeNode
 } from 'vite-plugin-taro-runtime/runtime/tt-document'
+import { createPageIdentity } from '../mini/vpt/create-page-identity.ts'
 import { getFormChangeEvent } from '../mini/vpt/get-form-change-event.ts'
 import type { MiniHost } from '../mini/vpt/mini-host.d.ts'
+import { mountPage } from '../mini/vpt/mount-page.ts'
 
 // Host-local types describe the creation-time handles retained on ordinary Taro instances.
 interface HostNode extends TaroNode {
@@ -200,11 +205,7 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
     extend(
         TaroRootElement,
         'performUpdate',
-        function (
-            this: TaroRootElement & HostElement,
-            initial: Parameters<TaroRootElement['performUpdate']>[0],
-            complete: Parameters<TaroRootElement['performUpdate']>[1]
-        ) {
+        function (this: TaroRootElement & HostElement, initial: Parameters<TaroRootElement['performUpdate']>[0]) {
             if (initial) {
                 // 原有 onLoad 完成回调已赋 ctx；这里只查该 Page，整棵离线原生根只插入一次。
                 // 读取现有 parentNode 避免重复初始通知重插节点，不增加 mounted 状态或根子节点遍历。
@@ -216,11 +217,25 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
             }
             // 复用现有完成回调；这里只确认 JS 根接入，不代表原生布局或屏幕绘制完成。
             this.flushUpdateCallback()
-            complete?.({})
         }
     )
 
     return {
+        createPage(component, options) {
+            const config = createPageConfig(component, options.path, undefined, options.config)
+            const originalOnLoad = config.onLoad!
+
+            config.onLoad = function (this: PageInstance & MpInstance, query) {
+                const identity = createPageIdentity(options.path, query)
+
+                // Taro establishes lifecycle ordering before React mounts the native Page tree.
+                originalOnLoad.call(this, query, (dispatch: () => void) => {
+                    mountPage.call(this, component, options, identity, dispatch)
+                })
+            }
+
+            return config
+        },
         bindApp(_app, container) {
             // App 根由 createVptApp 在首次提交前明确交付；其子关系只由 Taro 维护。
             // Page 原生根分别挂到平台 Page document，普通节点的原生 mutation 委托保持直接转发。

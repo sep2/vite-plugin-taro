@@ -1,5 +1,5 @@
 diff --git a/dist/runtime.js b/dist/runtime.js
-index f9f3fbeab6d4633fbebbdbcab098a652280b380e..c0761e63d24867fd0611a510f93f8e96c618e8ce 100644
+index f9f3fbeab6d4633fbebbdbcab098a652280b380e..1be5d972b3f27de1ce7f16cb904927489fca17a2 100644
 --- a/dist/runtime.js
 +++ b/dist/runtime.js
 @@ -152,7 +152,6 @@ var taroHooks = /*#__PURE__*/Object.freeze({
@@ -99,24 +99,23 @@ index f9f3fbeab6d4633fbebbdbcab098a652280b380e..c0761e63d24867fd0611a510f93f8e96
          }
      }
      if (process.env.TARO_PLATFORM !== 'web') {
-@@ -355,12 +367,13 @@ function createReactApp(App, react, dom, config) {
+@@ -355,12 +367,12 @@ function createReactApp(App, react, dom, config) {
          render(cb) {
              appWrapper.forceUpdate(cb);
          },
 -        mount(component, id, cb) {
-+        mount(component, id, getCtxOrCallback, cb) {
-+            const callback = cb ?? getCtxOrCallback;
++        mount(component, id, _getCtx, onCommit) {
              if (appWrapper) {
 -                appWrapper.mount(component, id, cb);
-+                appWrapper.mount(component, id, callback);
++                appWrapper.mount(component, id, onCommit);
              }
              else {
 -                appWrapperPromise.then(appWrapper => appWrapper.mount(component, id, cb));
-+                appWrapperPromise.then(appWrapper => appWrapper.mount(component, id, callback));
++                appWrapperPromise.then(appWrapper => appWrapper.mount(component, id, onCommit));
              }
          },
          unmount(id, cb) {
-@@ -591,8 +604,10 @@ function initNativeComponentEntry(params) {
+@@ -591,8 +603,10 @@ function initNativeComponentEntry(params) {
          (_a = app === null || app === void 0 ? void 0 : app.parentNode) === null || _a === void 0 ? void 0 : _a.appendChild(nativeApp);
          app = nativeApp;
      }
@@ -129,3 +128,21 @@ index f9f3fbeab6d4633fbebbdbcab098a652280b380e..c0761e63d24867fd0611a510f93f8e96
  }
  function createNativePageConfig(Component, pageName, data, react, reactDOM, pageConfig) {
      reactMeta.R = react;
+@@ -622,7 +636,7 @@ function createNativePageConfig(Component, pageName, data, react, reactDOM, page
+     }
+     const pageObj = {
+         options: pageConfig,
+-        [ONLOAD](options = {}, cb) {
++        [ONLOAD](options) {
+             hasLoaded = new Promise(resolve => { loadResolver = resolve; });
+             Current.page = this;
+             this.config = pageConfig || {};
+@@ -641,7 +655,7 @@ function createNativePageConfig(Component, pageName, data, react, reactDOM, page
+                 safeExecute($taroPath, ONLOAD, this.$taroParams);
+                 loadResolver();
+                 pageElement.ctx = this;
+-                pageElement.performUpdate(true, cb);
++                pageElement.performUpdate(true);
+             };
+             const mount = () => {
+                 if (!Current.app) {

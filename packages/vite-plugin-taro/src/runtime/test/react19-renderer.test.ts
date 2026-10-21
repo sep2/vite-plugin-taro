@@ -103,14 +103,12 @@ async function runFixture(t: TestContext, target: 'wx' | 'zfb' | 'tt', mode: str
                         if (id === './app.ts') {
                             return 'test:empty'
                         }
-                        if (id === '../vpt/vpt-runtime.ts') {
-                            return path.join(path.dirname(entry), '../mini/vpt/create-vpt-page.ts')
-                        }
-                        if (id === '../template/prerender-to-data.ts') {
-                            return path.join(path.dirname(entry), '../mini/template/prerender-to-data.ts')
-                        }
                     }
-                    if (id === './get-page-query.ts' || id === '../vpt/get-page-query.ts') {
+                    if (
+                        ['./get-page-query.ts', '../vpt/get-page-query.ts', '../mini/vpt/get-page-query.ts'].includes(
+                            id
+                        )
+                    ) {
                         return 'test:page-query'
                     }
                 },
@@ -196,8 +194,10 @@ import { ConcurrentRoot, DiscreteEventPriority, ContinuousEventPriority, Default
 import ReactDOM, { rendererHostConfig } from 'vite-plugin-taro-runtime/react'
 import rendererHost from ${JSON.stringify(rendererHostId)}
 import { createDomHost } from ${JSON.stringify(resolveVptRuntime('wx/create-dom-host'))}
+import { installDomTemplates } from ${JSON.stringify(resolveVptRuntime('wx/install-dom-templates'))}
 import { createWxTestRoot } from ${JSON.stringify(resolveVptRuntime('test/create-wx-test-root'))}
-import { Current, document, eventHandler, hooks, TaroElement, TaroEvent, createPageConfig as createTaroPageConfig } from '@tarojs/runtime'
+import { Current, document, eventHandler, hooks, TaroElement, TaroEvent, createPageConfig as createTaroPageConfig, createComponentConfig as createTaroComponentConfig, injectPageInstance, removePageInstance } from '@tarojs/runtime'
+import { createTemplatePage } from ${JSON.stringify(resolveVptRuntime('mini/template/create-template-page'))}
 import config from 'test:page-first-frame.ts'
 import suspendedConfig from 'test:page-suspended.ts'
 import bareConfig from 'test:page-bare.ts'
@@ -210,7 +210,7 @@ const prerenderToData = query => renderInitialData(config, query)
 const prerenderSuspended = query => renderInitialData(suspendedConfig, query)
 const prerenderBare = query => renderInitialData(bareConfig, query)
 import { createVptApp } from ${JSON.stringify(resolveVptRuntime('mini/vpt/create-vpt-app'))}
-import { connectReactPage, createReactApp, createNativeComponentConfig, setReconciler, useLoad, useUnload, useRouter } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
+import { connectReactPage, createReactApp, createNativeComponentConfig, createNativePageConfig, setReconciler, useLoad, useUnload, useRouter } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
 
 const h = React.createElement
 // VM-local component bodies are installed before invoking their actual route capsule's renderer.
@@ -528,13 +528,9 @@ function checkPageConfigData() {
     const data = { page: { cn: [] } }
     const baseConfig = createTaroPageConfig(() => assert.fail('registration must not render'), 'pages/config', data, {})
     assert.strictEqual(baseConfig.data, data)
-    assert.equal(createTaroPageConfig.length, 4, 'the upstream factory signature stays unchanged')
-    assert.equal(Object.hasOwn(baseConfig, '__vpt_meta'), false)
+    assert.equal(createTaroPageConfig.length, 4, 'Page creation uses the ordinary Taro factory contract')
     assert.equal(Object.hasOwn(baseConfig, 'prerenderToData'), false)
     assert.equal(Object.hasOwn(config, 'prerenderToData'), false)
-    assert.equal(Object.getOwnPropertyDescriptor(config, '__vpt_meta').enumerable, false)
-    assert.equal(Object.hasOwn({ ...config }, '__vpt_meta'), false)
-    assert.equal(config.__vpt_meta.prerenderIdentity, undefined)
     assert.equal(typeof config.data, 'function')
     assert.equal(typeof prerenderToData, 'function')
 }
@@ -545,11 +541,11 @@ function checkPageMountContext() {
     const calls = []
     let finishUnmount
     Current.app = {
-        mount(component, id, getCtx, complete) { calls.push({ component, id, getCtx, complete }) },
+        mount(component, id, getCtx, complete) { calls.push({ component, id, getCtx, complete, current: Current.page }) },
         unmount(_id, complete) { finishUnmount = complete }
     }
     const Page = () => null
-    const config = createTaroPageConfig(Page, 'pages/same', {})
+    const config = createTemplatePage(Page, { path: 'pages/same', prerender: false })
     const first = { route: 'pages/same' }
     const second = { route: 'pages/same' }
     try {
@@ -560,15 +556,216 @@ function checkPageMountContext() {
         assert.equal(typeof calls[0].complete, 'function')
         config.onUnload.call(first)
         config.onLoad.call(second, { instance: 'second' })
-        assert.equal(calls.length, 1, 'mount waits for the preceding unmount callback')
-        Current.page = first
+        assert.equal(calls.length, 2, 'independent Page identities can mount during teardown')
+        assert.strictEqual(calls[1].getCtx(), second)
+        assert.strictEqual(calls[1].current, second)
         finishUnmount()
-        assert.strictEqual(calls[1].getCtx(), second, 'deferred mounting retains the exact native receiver')
         assert.equal(calls[1].id, second.$taroPath)
         assert.notEqual(calls[0].id, calls[1].id)
         config.onUnload.call(second)
         finishUnmount()
     } finally {
+        Object.assign(Current, saved)
+    }
+}
+
+async function checkPageLifecycleOwnership() {
+    const saved = { app: Current.app, page: Current.page, router: Current.router }
+    // Control React completion to verify native load/show/ready ordering for independent receivers.
+    const mounts = []
+    const unmounts = []
+    const events = []
+    const app = {
+        mount(component, id, getCtx, complete) { mounts.push({ component, id, getCtx, complete }) },
+        unmount(id, complete) { unmounts.push({ id, complete }) }
+    }
+    const component = () => null
+    const options = { path: 'pages/lifecycle', prerender: false }
+    const page = createTemplatePage(component, options)
+    const native = label => ({ ...page, route: options.path, label })
+    const first = native('first')
+    const second = native('second')
+    const third = native('third')
+    const roots = []
+    const register = receiver => {
+        const root = document.createElement('root')
+        root.id = receiver.$taroPath
+        root.performUpdate = initial => {
+            assert.equal(initial, true)
+            assert.strictEqual(root.ctx, receiver)
+            events.push(receiver.label + ':present')
+        }
+        roots.push(root)
+        injectPageInstance({
+            onLoad(params) {
+                assert.strictEqual(params, receiver.$taroParams)
+                assert.strictEqual(Current.page, receiver)
+                events.push(receiver.label + ':load')
+            },
+            componentDidShow() {
+                assert.strictEqual(Current.page, receiver)
+                events.push(receiver.label + ':show')
+            },
+            onReady() { events.push(receiver.label + ':ready') },
+            onUnload() { events.push(receiver.label + ':unload') }
+        }, receiver.$taroPath)
+        return root
+    }
+    Current.app = app
+    try {
+        first.onLoad({ value: 'same' })
+        const firstRoot = register(first)
+        first.onReady()
+        first.onShow()
+        second.onLoad({ value: 'same' })
+        const secondRoot = register(second)
+        second.onReady()
+        second.onShow()
+        assert.notEqual(first.$taroPath, second.$taroPath)
+        await Promise.resolve()
+        assert.deepEqual(events, [], 'native lifecycles wait for the actual React commit')
+        mounts[1].complete()
+        await Promise.resolve()
+        assert.deepEqual(events, ['second:load', 'second:present', 'second:ready', 'second:show'])
+        assert.equal(firstRoot.ctx, null, 'one commit does not release another receiver')
+        mounts[0].complete()
+        await Promise.resolve()
+        assert.deepEqual(events.slice(4), ['first:load', 'first:present', 'first:ready', 'first:show'])
+        assert.equal(mounts.length, 2, 'lifecycle delivery does not request React mounting')
+
+        first.onUnload()
+        third.onLoad({ value: 'third' })
+        const thirdRoot = register(third)
+        third.onShow()
+        assert.equal(mounts.length, 3)
+        assert.strictEqual(mounts[2].getCtx(), third)
+        mounts[2].complete()
+        await Promise.resolve()
+        assert.deepEqual(events.slice(-3), ['third:load', 'third:present', 'third:show'])
+        unmounts[0].complete()
+        assert.equal(firstRoot.ctx, null)
+        assert.strictEqual(secondRoot.ctx, second, 'unloading one receiver retains the other receiver context')
+        assert.strictEqual(thirdRoot.ctx, third)
+        second.onUnload()
+        unmounts[1].complete()
+        third.onUnload()
+        unmounts[2].complete()
+
+        // Ready/show may subscribe during a synchronous mount: the load barrier already exists.
+        const synchronous = native('synchronous')
+        app.mount = (component, id, getCtx, complete) => {
+            mounts.push({ component, id, getCtx, complete })
+            register(getCtx())
+            synchronous.onReady()
+            synchronous.onShow()
+            complete()
+        }
+        synchronous.onLoad({ value: 'synchronous' })
+        assert.deepEqual(events.slice(-2), ['synchronous:load', 'synchronous:present'])
+        await Promise.resolve()
+        assert.deepEqual(events.slice(-4), [
+            'synchronous:load', 'synchronous:present', 'synchronous:ready', 'synchronous:show'
+        ])
+        synchronous.onUnload()
+        unmounts.at(-1).complete()
+
+        // Taro load dispatch preserves caller-prepared identity and context.
+        const dispatch = createTaroPageConfig(component, 'pages/dispatch', undefined, {})
+        const params = { value: 'business' }
+        const receiver = { $taroPath: 'dispatch-only', $taroParams: params }
+        const token = {}
+        injectPageInstance({ onLoad(value) { assert.strictEqual(value, params); return token } }, receiver.$taroPath)
+        const before = { ...Current }
+        assert.strictEqual(dispatch.onLoad.call(receiver, { value: 'native' }), token)
+        assert.deepEqual({ ...Current }, before)
+        assert.equal(mounts.length, 4)
+        removePageInstance(receiver.$taroPath)
+    } finally {
+        for (const root of roots) {
+            removePageInstance(root.id)
+            root.id = ''
+        }
+        Object.assign(Current, saved)
+    }
+}
+
+async function checkPageCommitCleanup() {
+    const saved = { app: Current.app, page: Current.page, router: Current.router }
+    // Observe actual React state and cleanup while independent Page lifetimes overlap.
+    const events = []
+    const updates = new Map()
+    function Page() {
+        const id = useRouter().params.id
+        const [count, update] = React.useState(0)
+        updates.set(id, update)
+        useLoad(() => events.push(id + ':load'))
+        useUnload(() => events.push(id + ':unload'))
+        React.useLayoutEffect(() => () => events.push(id + ':cleanup'), [])
+        return h('view', { id: 'commit-' + id }, id + ':' + count)
+    }
+    const config = createTemplatePage(Page, { path: 'pages/commit', prerender: false })
+    const receivers = Array.from({ length: 4 }, () => {
+        // Each receiver observes its first native data batch independently.
+        const initialData = Promise.withResolvers()
+        return {
+            ...config,
+            route: 'pages/commit',
+            initialData: initialData.promise,
+            setData(data, callback) {
+                assert.ok(events.includes(this.$taroParams.id + ':load'), 'load precedes native presentation')
+                callback?.()
+                initialData.resolve(data)
+            }
+        }
+    })
+    const load = async (page, id) => {
+        config.onLoad.call(page, { id })
+        const data = await page.initialData
+        assert.ok(Object.hasOwn(data, 'app.cn'), 'the initial batch includes App content')
+        assert.ok(Object.keys(data).some(key => key.startsWith('page.')), 'the initial batch includes Page content')
+        assert.ok(JSON.stringify(data).includes(id + ':0'))
+        const root = document.getElementById(page.$taroPath)
+        assert.strictEqual(root.ctx, page)
+        assert.equal(root.pendingUpdate, false, 'native delivery completes the scheduled update')
+    }
+    ReactDOM.flushSync(() => createVptApp(({ children }) => children, { appId: 'page-commit-app' }))
+    try {
+        const [first, retained, third, fourth] = receivers
+        await load(first, 'first')
+        await load(retained, 'retained')
+        const firstRoot = document.getElementById(first.$taroPath)
+        const retainedRoot = document.getElementById(retained.$taroPath)
+        const retainedHost = document.getElementById('commit-retained')
+        ReactDOM.flushSync(() => updates.get('retained')(7))
+        first.onUnload()
+        await load(third, 'third')
+        assert.equal(document.getElementById(first.$taroPath), null)
+        assert.equal(firstRoot.ctx, null)
+        assert.strictEqual(document.getElementById(retained.$taroPath), retainedRoot)
+        assert.strictEqual(document.getElementById('commit-retained'), retainedHost)
+        assert.equal(retainedHost.textContent, 'retained:7')
+        assert.equal(events.filter(event => event === 'first:cleanup').length, 1)
+        assert.equal(events.filter(event => event === 'third:load').length, 1)
+
+        const thirdRoot = document.getElementById(third.$taroPath)
+        retained.onUnload()
+        third.onUnload()
+        await load(fourth, 'fourth')
+        assert.equal(retainedRoot.ctx, null)
+        assert.equal(thirdRoot.ctx, null)
+        assert.equal(document.getElementById(retained.$taroPath), null)
+        assert.equal(document.getElementById(third.$taroPath), null)
+        assert.strictEqual(document.getElementById(fourth.$taroPath).ctx, fourth)
+        assert.equal(document.getElementById('commit-fourth').textContent, 'fourth:0')
+        assert.equal(events.filter(event => event === 'retained:cleanup').length, 1)
+        assert.equal(events.filter(event => event === 'third:cleanup').length, 1)
+        assert.equal(events.filter(event => event === 'fourth:load').length, 1)
+        ReactDOM.flushSync(() => fourth.onUnload())
+    } finally {
+        ReactDOM.flushSync(() => ReactDOM.unmountComponentAtNode(document.getElementById('page-commit-app')))
+        for (const page of receivers) {
+            removePageInstance(page.$taroPath)
+        }
         Object.assign(Current, saved)
     }
 }
@@ -628,13 +825,8 @@ async function checkNativeInitialData() {
     })
     pageComponents['pages/first-frame'] = Page
     const dataFactory = config.data
-    const metadata = config.__vpt_meta
-    assert.deepEqual(metadata, {})
     const sourceData = prerenderToData({ id: 'source', full: 'a%3Db' })
     const initialRouter = Current.router
-    const initialPage = metadata.prerenderIdentity
-    assert.equal(initialPage.path, initialRouter.$taroPath)
-    assert.strictEqual(initialPage.params, initialRouter.params)
     assert.strictEqual(config.data, dataFactory, 'native initialization preserves the capsule data factory')
     assert.deepEqual(sourceData, seed(), 'cold startup keeps the seed and mounts asynchronously')
     assert.equal(setAppValue, undefined, 'prerender must not force App initialization')
@@ -645,10 +837,6 @@ async function checkNativeInitialData() {
     assert.equal(document.getElementById('view-source'), null)
     const source = native('pages/first-frame', sourceData)
     config.onLoad.call(source, { id: 'source', full: 'a%3Db' })
-    assert.equal(metadata.prerenderIdentity, undefined, 'onLoad consumes the prepared identity immediately')
-    assert.strictEqual(config.__vpt_meta, metadata, 'onLoad preserves the identity handoff object')
-    assert.deepEqual(Object.keys(metadata), ['prerenderIdentity'])
-    assert.strictEqual(source.$taroParams, initialPage.params)
     assert.strictEqual(source.$taroParams, initialRouter.params)
     assert.equal(source.$taroPath, initialRouter.$taroPath)
     config.onShow.call(source)
@@ -662,9 +850,8 @@ async function checkNativeInitialData() {
 
     ReactDOM.flushSync(() => setAppValue('latest-context'))
     const targetData = prerenderToData({ id: 'target' })
-    const targetIdentity = metadata.prerenderIdentity
-    assert.notEqual(targetIdentity.path, initialPage.path)
-    assert.equal(Object.getOwnPropertyDescriptor(config, '__vpt_meta').enumerable, false)
+    const targetRouter = Current.router
+    assert.notEqual(targetRouter.$taroPath, initialRouter.$taroPath)
     const targetHost = document.getElementById('view-target')
     assert.equal(targetData.page.cn[0].sid, targetHost.sid)
     assert.notEqual(targetHost.sid, sourceHost.sid)
@@ -682,9 +869,8 @@ async function checkNativeInitialData() {
 
     const target = native('pages/first-frame', targetData)
     config.onLoad.call(target, { id: 'target' })
-    assert.equal(metadata.prerenderIdentity, undefined)
-    assert.equal(target.$taroPath, targetIdentity.path)
-    assert.strictEqual(target.$taroParams, targetIdentity.params)
+    assert.equal(target.$taroPath, targetRouter.$taroPath)
+    assert.strictEqual(target.$taroParams, targetRouter.params)
     config.onShow.call(target)
     await until(() => target.writes.length > 0)
     assert.strictEqual(document.getElementById('view-target'), targetHost)
@@ -716,11 +902,10 @@ async function checkNativeInitialData() {
     await until(() => effects.includes('passive-cleanup:unprepared'))
 
     // Empty pages retain their ordinary empty seed and asynchronous onLoad without an extra Page snapshot.
-    const emptyConfig = createTaroPageConfig(() => null, 'pages/empty', seed(), {})
+    const emptyConfig = createTemplatePage(() => null, { path: 'pages/empty', prerender: false })
     assert.deepEqual(emptyConfig.data, seed(), 'ordinary pages retain their static data object')
     const empty = native('pages/empty', seed())
     emptyConfig.onLoad.call(empty, {})
-    assert.equal(Object.hasOwn(emptyConfig, '__vpt_meta'), false, 'ordinary configs gain no VPT metadata')
     await until(() => empty.writes.length > 0)
     assert.deepEqual(empty.data.page.cn, [])
     assert.equal(document.getElementById(empty.$taroPath).childNodes.length, 0)
@@ -814,16 +999,21 @@ function checkWxPageCreation() {
             } : undefined
         }, React.useContext(context) + ':' + value, value > 0 ? h('text', null, 'added') : null)
     }
-    const App = ({ children }) => h(context.Provider, { value: 99 }, children)
+    // Count App renders to distinguish native load dispatch from React mounting.
+    let appRenders = 0
+    const App = ({ children }) => {
+        appRenders++
+        return h(context.Provider, { value: 99 }, children)
+    }
     const app = ReactDOM.flushSync(() => createVptApp(App, { appId: 'wx-owner-app' }))
     try {
-        ReactDOM.flushSync(() => app.mount(Page, 'A', () => natives.A, () => document.getElementById('A').performUpdate(true)))
+        app.mount(Page, 'A', () => natives.A, () => document.getElementById('A').performUpdate(true))
         const firstRoot = document.getElementById('A')
         const firstDocument = firstRoot.ownerDocument
         assert.equal(firstRoot.nativeNode.isVirtual(), true, 'The Page anchor has no layout box')
         assert.strictEqual(firstRoot.nativeNode, natives.A.root.childNodes[0])
         assert.strictEqual(nodes.A.nativeNode, firstRoot.nativeNode.childNodes[0])
-        ReactDOM.flushSync(() => app.mount(Page, 'B', () => natives.B, () => document.getElementById('B').performUpdate(true)))
+        app.mount(Page, 'B', () => natives.B, () => document.getElementById('B').performUpdate(true))
         assert.equal(document.getElementById('B').nativeNode.isVirtual(), true)
         assert.notStrictEqual(nodes.B.ownerDocument, firstDocument)
         assert.strictEqual(nodes.A.delegateChildInsertion, nodes.B.delegateChildInsertion)
@@ -889,8 +1079,15 @@ function checkWxPageCreation() {
         assert.strictEqual(clone.firstChild.ownerDocument, firstDocument)
         clone.insertAdjacentHTML('beforeend', '<text>parsed</text>')
         assert.strictEqual(clone.lastChild.ownerDocument, firstDocument)
-        ReactDOM.flushSync(() => app.mount(Page, 'A', () => natives.A, () => {}))
+        // The callback journal verifies completion before a repeated mount returns to the native lifecycle.
+        const mountCallbacks = []
+        app.mount(Page, 'A', () => natives.A, () => mountCallbacks.push('A'))
+        assert.deepEqual(mountCallbacks, ['A'])
         assert.strictEqual(document.getElementById('A'), firstRoot)
+        assert.strictEqual(firstRoot.ownerDocument, firstDocument)
+        assert.strictEqual(nodes.A.ownerDocument, firstDocument)
+        assert.strictEqual(rendererHost.getChildHostContext({}, rendererHost.getPageRootType('A')), firstDocument)
+        assert.strictEqual(firstRoot.nativeNode, natives.A.root.childNodes[0])
         assert.match(nodes.A.textContent, /99:7/)
 
         const native = nodes.A.nativeNode
@@ -932,6 +1129,8 @@ function checkWxPageCreation() {
         checkWxTextInput(app)
         checkWxFormChange(app)
         checkWxHtmlElements(app)
+        checkWxFirstMount(() => appRenders)
+        checkWxPreparedInstances()
     } finally {
         app.unmount('B')
         assertWxPageReleased('B', natives.B.root)
@@ -948,7 +1147,153 @@ function checkWxPageCreation() {
 function assertWxPageReleased(id, root) {
     assert.equal(root.childNodes.length, 1, 'the SDK owns the native exit scene')
     assert.equal(document.getElementById(id), null, 'logical Page identity is released')
-    assert.equal(rendererHost.getPageRootType(id), 'root', 'the creation document is released')
+    const parentContext = {}
+    assert.strictEqual(rendererHost.getChildHostContext(parentContext, rendererHost.getPageRootType(id)),
+        parentContext, 'the creation document is released')
+}
+
+function checkWxFirstMount(getAppRenders) {
+    for (const prerender of [undefined, false, true]) {
+        checkWxFirstMountOption(prerender, getAppRenders)
+    }
+}
+
+function checkWxFirstMountOption(prerender, getAppRenders) {
+    // Journals retain per-instance initialization, refs, lifecycle calls and effect cleanup for this test.
+    const initialized = []
+    const lifecycle = []
+    const effects = []
+    const nodes = []
+    const setters = []
+    function Page() {
+        const { params } = useRouter()
+        const [serial] = React.useState(() => {
+            initialized.push(params.id)
+            return initialized.length - 1
+        })
+        const [count, setCount] = React.useState(0)
+        setters[serial] = setCount
+        React.useLayoutEffect(() => {
+            effects.push(['mount', serial])
+            return () => effects.push(['unmount', serial])
+        }, [])
+        useLoad(query => lifecycle.push(['load', serial, query.id]))
+        useUnload(() => lifecycle.push(['unload', serial]))
+        return h('share-element', {
+            mapkey: params.id,
+            ref: node => { nodes[serial] = node },
+            onClick: () => setCount(value => value + 1)
+        }, params.id + ':' + count)
+    }
+    const path = 'pages/native-first-mount'
+    const config = rendererHost.createPage(Page, { path, ...(prerender === undefined ? {} : { prerender }) })
+    const templates = {}
+    installDomTemplates({
+        batchAddCompiledTemplate(register) { Object.assign(templates, register({})) }
+    }, { pages: [path] })
+    const pages = []
+    try {
+        for (let index = 0; index < 2; index++) {
+            const query = { id: 'shared-' + index, full: 'a=b' }
+            const root = createWxTestRoot()
+            const native = { ...config.methods, route: path, root, setData() { assert.fail('native mounting uses SDK nodes') } }
+            const host = root.getHostNode()
+            root.getHostNode = () => ({ ...host, getMethodCaller: () => native })
+            const template = templates[path]('')
+            template({ shadowRoot: root }, true).C()
+            pages.push(native)
+            assert.strictEqual(native.__vptWxRoot, root)
+            assert.equal(root.childNodes.length, 0, 'SDK creation only captures native ownership')
+            assert.equal(initialized.length, index, 'Page rendering starts in attached')
+            assert.equal(config.data, undefined)
+            globalThis.pageQuery = query
+            config.lifetimes.attached.call(native)
+            assert.equal(lifecycle.length, index, 'attachment mounts hooks without dispatching useLoad')
+            assert.equal(root.childNodes.length, 1, 'the native tree is ready when attached returns')
+            const identity = native.$taroPath
+            const preparedRoot = document.getElementById(identity)
+            assert.strictEqual(Current.page, native)
+            assert.strictEqual(preparedRoot.ctx, native)
+            assert.strictEqual(Current.router.params, native.$taroParams)
+            ReactDOM.flushSync(() => setters[index](7))
+            const rendersBeforeLoad = getAppRenders()
+            config.methods.onLoad.call(native, query)
+            assert.equal(getAppRenders(), rendersBeforeLoad, 'native onLoad does not render the App')
+            assert.equal(native.$taroPath, identity, 'onLoad preserves the mounted routing identity')
+            assert.equal(root.childNodes.length, 1, 'onLoad retains the attached tree')
+            assert.strictEqual(root.childNodes[0].childNodes[0], nodes[index].nativeNode)
+            assert.equal(nodes[index].textContent, query.id + ':7')
+            assert.equal(nodes[index].nativeNode.attributes.key, query.id)
+            assert.equal(initialized.length, index + 1)
+            assert.deepEqual(effects.at(-1), ['mount', index])
+            assert.deepEqual(lifecycle.at(-1), ['load', index, query.id])
+            assert.equal(native.$taroParams.id, query.id)
+            assert.equal(native.$taroParams.full, query.full)
+            const element = nodes[index]
+            ReactDOM.flushSync(() => element.nativeNode.tap({}))
+            assert.strictEqual(nodes[index], element)
+            assert.equal(element.textContent, query.id + ':8')
+            template({ shadowRoot: root }, false).C()
+            assert.equal(initialized.length, index + 1)
+        }
+        assert.notEqual(pages[0].$taroPath, pages[1].$taroPath)
+        assert.notStrictEqual(nodes[0].ownerDocument, nodes[1].ownerDocument)
+        assert.equal(effects.length, 2, 'onLoad keeps both mounted effects')
+    } finally {
+        for (const native of pages.reverse()) {
+            config.methods.onUnload.call(native)
+            assertWxPageReleased(native.$taroPath, native.root)
+        }
+    }
+    assert.deepEqual(effects, [['mount', 0], ['mount', 1], ['unmount', 1], ['unmount', 0]])
+    assert.deepEqual(nodes, [null, null])
+}
+
+function checkWxPreparedInstances() {
+    // Native receivers retain their own prepared identities until their independent onLoad calls.
+    const pages = []
+    const initialized = []
+    const loads = []
+    function Page() {
+        const [identity] = React.useState(() => {
+            initialized.push(Current.router.$taroPath)
+            return Current.router.$taroPath
+        })
+        useLoad(params => loads.push({ identity, params }))
+        return h('view', null, identity)
+    }
+    const path = 'pages/prepared-instances'
+    const config = rendererHost.createPage(Page, { path })
+    try {
+        for (let index = 0; index < 2; index++) {
+            const native = { ...config.methods, route: path, root: createWxTestRoot() }
+            globalThis.pageQuery = { id: 'same', full: 'a%3Db', empty: '' }
+            config.lifetimes.attached.call(native)
+            pages.push(native)
+        }
+        assert.deepEqual(loads, [])
+        assert.notEqual(pages[0].$taroPath, pages[1].$taroPath)
+        for (const native of pages.toReversed()) {
+            const identity = native.$taroPath
+            const root = document.getElementById(identity)
+            native.options = { id: 'same', full: 'a%3Db', empty: '' }
+            config.methods.onLoad.call(native, native.options)
+            assert.strictEqual(document.getElementById(identity), root)
+            assert.strictEqual(root.ctx, native)
+            assert.strictEqual(native.root.childNodes[0], root.nativeNode)
+            assert.equal(loads.at(-1).identity, identity)
+            assert.strictEqual(loads.at(-1).params, native.$taroParams)
+            assert.equal(native.$taroParams.full, 'a%3Db')
+            assert.equal(native.$taroParams.empty, '')
+        }
+        assert.equal(initialized.length, 2)
+        assert.equal(loads.length, 2)
+    } finally {
+        for (const native of pages.toReversed()) {
+            config.methods.onUnload.call(native)
+            assertWxPageReleased(native.$taroPath, native.root)
+        }
+    }
 }
 
 function checkWxTextInput(app) {
@@ -1484,6 +1829,62 @@ function checkWxEventBubbling(app) {
     }
 }
 
+async function checkFrameworkNativeMounts() {
+    const saved = { app: Current.app, page: Current.page, router: Current.router }
+    const [attached, detached] = hooks.call('getMiniLifecycleImpl').component
+    const Component = () => null
+    const configurations = [
+        [createTaroComponentConfig(Component, 'native-component'), attached, detached],
+        [createNativePageConfig(Component, 'native-page', undefined, React, ReactDOM, {}), 'onLoad', 'onUnload']
+    ]
+    try {
+        for (const [config, mount, unmount] of configurations) {
+            // Native delivery and lifecycle order belong to this receiver's mount.
+            const delivered = Promise.withResolvers()
+            const events = []
+            const root = document.createElement('root')
+            const native = {
+                route: 'native-page',
+                setData(data, complete) {
+                    events.push('data')
+                    complete()
+                    delivered.resolve(data)
+                }
+            }
+            Current.app = {
+                mount(component, id, getCtx, onCommit) {
+                    assert.strictEqual(component, Component)
+                    assert.strictEqual(getCtx(), native)
+                    root.id = id
+                    root.appendChild(document.createTextNode('native content'))
+                    injectPageInstance({ onLoad() { events.push('load') } }, id)
+                    onCommit()
+                },
+                unmount(id, complete) {
+                    assert.equal(id, root.id)
+                    complete()
+                }
+            }
+            try {
+                config[mount].call(native, { full: 'a%3Db', empty: '' })
+                const data = await delivered.promise
+                assert.deepEqual(events, ['load', 'data'])
+                assert.ok(JSON.stringify(data).includes('native content'))
+                assert.strictEqual(root.ctx, native)
+                assert.equal(root.pendingUpdate, false)
+                config[unmount].call(native)
+                assert.equal(root.ctx, null)
+            } finally {
+                removePageInstance(root.id)
+                root.textContent = ''
+                root.id = ''
+            }
+        }
+    } finally {
+        Object.assign(Current, saved)
+    }
+}
+
 function checkFrameworkRootEntryPoints() {
     // A renderer double records bootstrap ordering and Page-root selection independently.
     const calls = []
@@ -1522,7 +1923,7 @@ function checkFrameworkRootEntryPoints() {
     assert.equal(pageRoot.type, 'test-page-root')
     assert.equal(pageRoot.props.id, 'page-type-id')
     assert.deepEqual(pageTypes, ['page-type-id'])
-    ReactDOM.flushSync(() => Current.app.mount(() => null, 'pages/cold', () => assert.fail('cold App must not be flushed')))
+    ReactDOM.flushSync(() => Current.app.mount(() => null, 'pages/cold', undefined, () => assert.fail('cold App must not be flushed')))
     assert.deepEqual(calls, ['createRoot', 'render'], 'prerender does not force or repeat App initialization')
     Current.app = null
     calls.length = 0
@@ -1644,7 +2045,10 @@ async function run() {
     checkEventPrioritiesAndControlledInputs(true)
     checkPageConfigData()
     checkPageMountContext()
+    await checkPageLifecycleOwnership()
+    await checkPageCommitCleanup()
     await checkNativeInitialData()
+    await checkFrameworkNativeMounts()
     checkFrameworkRootEntryPoints()
     checkWxPageCreation()
 }

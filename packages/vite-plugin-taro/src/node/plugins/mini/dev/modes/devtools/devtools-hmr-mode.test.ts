@@ -77,7 +77,10 @@ test('filters only the shared shell, not the runtime or prerender helper', () =>
 test('injects Page HMR immediately before native registration', () => {
     const result = injectPageShellHmr("import pageConfig from 'capsule'\nregisterPage(pageConfig)")
 
-    assert.match(result.code, /registerPage\(__rolldown_runtime__\.injectPageHmr\(pageConfig\)\)$/)
+    assert.match(
+        result.code,
+        /registerPage\('methods' in pageConfig \? pageConfig : __rolldown_runtime__\.injectPageHmr\(pageConfig\)\)$/
+    )
     assert.equal(result.map, null)
 })
 

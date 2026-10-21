@@ -9,11 +9,13 @@ import { flushSync } from 'vite-plugin-taro-runtime/react'
 import {
     type AppInstance,
     COMMENT,
+    createPageConfig,
     document,
     eventHandler,
     extend,
     FormElement,
     type MpInstance,
+    type PageInstance,
     Style,
     TaroElement,
     TaroEvent,
@@ -21,13 +23,16 @@ import {
     TaroRootElement,
     TaroText
 } from 'vite-plugin-taro-runtime/runtime/mini'
+import { createPageIdentity } from '../mini/vpt/create-page-identity.ts'
 import { getFormChangeEvent } from '../mini/vpt/get-form-change-event.ts'
+import { getPageQuery } from '../mini/vpt/get-page-query.ts'
 import type { MiniHost } from '../mini/vpt/mini-host.d.ts'
+import { mountPage } from '../mini/vpt/mount-page.ts'
+import type { VptPageOptions } from '../mini/vpt/vpt-page-options'
 import type { WxNativeElement, WxNativeNode, WxNativeText, WxRoot } from './wx-types.ts'
 
 type TaroDocument = typeof document
 type AppMountParams = Parameters<NonNullable<AppInstance['mount']>>
-type MountArgs = AppMountParams | [component: AppMountParams[0], id: string, complete: AppMountParams[3]]
 
 const pageOutlet = 'vpt_page_outlet'
 
@@ -151,11 +156,7 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
     extend(
         TaroRootElement,
         'performUpdate',
-        function (
-            this: TaroRootElement & HostElement,
-            initial: Parameters<TaroRootElement['performUpdate']>[0],
-            complete: Parameters<TaroRootElement['performUpdate']>[1]
-        ) {
+        function (this: TaroRootElement & HostElement, initial: Parameters<TaroRootElement['performUpdate']>[0]) {
             if (initial) {
                 const native = this.nativeNode!
                 const root = native.ownerShadowRoot!
@@ -165,27 +166,42 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
             }
 
             this.flushUpdateCallback()
-            complete?.({})
         }
     )
 
     return {
+        createPage: (component: Parameters<typeof createPageConfig>[0], options: VptPageOptions) => {
+            const taroConfig = createPageConfig(component, options.path, undefined, options.config)
+
+            return {
+                methods: taroConfig,
+                lifetimes: {
+                    attached(this: PageInstance & MpInstance) {
+                        const identity = createPageIdentity(options.path, getPageQuery())
+                        mountPage.call(this, component, options, identity)
+                    }
+                }
+            }
+        },
         bindApp(app, container) {
             container.delegateChildInsertion = noop
             container.delegateChildRemoval = noop
 
             const mount = app.mount
-            app.mount = (...args: MountArgs) => {
-                ensure(args.length === 4, 'WX DOM rendering requires native Page context; use prerender: false.')
-
-                const [, id, getCtx] = args
+            app.mount = (
+                component: AppMountParams[0],
+                id: AppMountParams[1],
+                getCtx: AppMountParams[2],
+                complete: AppMountParams[3]
+            ) => {
                 const type = pageType(id)
 
                 if (!docs.has(type)) {
-                    docs.set(type, createPageDocument(getRoot(getCtx())))
+                    docs.set(type, createPageDocument(getRoot(getCtx!())))
                 }
 
-                return mount.apply(app, args)
+                // Native Page mounts commit synchronously within the SDK lifecycle.
+                return flushSync(() => mount.call(app, component, id, getCtx, complete))
             }
 
             const unmount = app.unmount
@@ -199,10 +215,7 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
                 )
             }
         },
-        getPageRootType(id) {
-            const type = pageType(id)
-            return docs.has(type) ? type : 'root'
-        },
+        getPageRootType: pageType,
         getChildHostContext(parent, type) {
             return docs.get(type) ?? parent
         },

@@ -1,5 +1,5 @@
 diff --git a/dist/runtime.js b/dist/runtime.js
-index 8a22ddaf7e3321ad3fc628ed416ba8f0b6bc9626..c0761e63d24867fd0611a510f93f8e96c618e8ce 100644
+index 8a22ddaf7e3321ad3fc628ed416ba8f0b6bc9626..1be5d972b3f27de1ce7f16cb904927489fca17a2 100644
 --- a/dist/runtime.js
 +++ b/dist/runtime.js
 @@ -250,7 +250,7 @@ function connectReactPage(R, id) {
@@ -11,20 +11,37 @@ index 8a22ddaf7e3321ad3fc628ed416ba8f0b6bc9626..c0761e63d24867fd0611a510f93f8e96
                  }
              }
          };
-@@ -367,12 +367,13 @@ function createReactApp(App, react, dom, config) {
+@@ -367,12 +367,12 @@ function createReactApp(App, react, dom, config) {
          render(cb) {
              appWrapper.forceUpdate(cb);
          },
 -        mount(component, id, cb) {
-+        mount(component, id, getCtxOrCallback, cb) {
-+            const callback = cb ?? getCtxOrCallback;
++        mount(component, id, _getCtx, onCommit) {
              if (appWrapper) {
 -                appWrapper.mount(component, id, cb);
-+                appWrapper.mount(component, id, callback);
++                appWrapper.mount(component, id, onCommit);
              }
              else {
 -                appWrapperPromise.then(appWrapper => appWrapper.mount(component, id, cb));
-+                appWrapperPromise.then(appWrapper => appWrapper.mount(component, id, callback));
++                appWrapperPromise.then(appWrapper => appWrapper.mount(component, id, onCommit));
              }
          },
          unmount(id, cb) {
+@@ -636,7 +636,7 @@ function createNativePageConfig(Component, pageName, data, react, reactDOM, page
+     }
+     const pageObj = {
+         options: pageConfig,
+-        [ONLOAD](options = {}, cb) {
++        [ONLOAD](options) {
+             hasLoaded = new Promise(resolve => { loadResolver = resolve; });
+             Current.page = this;
+             this.config = pageConfig || {};
+@@ -655,7 +655,7 @@ function createNativePageConfig(Component, pageName, data, react, reactDOM, page
+                 safeExecute($taroPath, ONLOAD, this.$taroParams);
+                 loadResolver();
+                 pageElement.ctx = this;
+-                pageElement.performUpdate(true, cb);
++                pageElement.performUpdate(true);
+             };
+             const mount = () => {
+                 if (!Current.app) {

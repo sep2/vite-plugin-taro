@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'rolldown'
 import { normalizePath, resolveConfig } from 'vite'
 import vpt from '../../index.ts'
+import { rendererHostId } from '../../node/plugins/mini/module/module.ts'
 import { resolveTaroRuntime, resolveVptRuntime } from '../../node/utils/packages.ts'
 
 const require = createRequire(import.meta.url)
@@ -35,6 +36,9 @@ test('template host preserves outlet branch markers through moves, replacements 
                 resolveId(id) {
                     if (id === 'test:template-host') {
                         return id
+                    }
+                    if (id === rendererHostId) {
+                        return resolveVptRuntime('mini/template/template-host')
                     }
                     if (id === '@tarojs/runtime') {
                         return resolveTaroRuntime('runtime/mini')

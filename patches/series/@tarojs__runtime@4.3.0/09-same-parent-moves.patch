@@ -1,8 +1,8 @@
 diff --git a/dist/dom/node.d.ts b/dist/dom/node.d.ts
-index 858e1741d180ca0931242e807a3daf923bce98c4..0faaa61ba838cf512013aca085170511b1b7db08 100644
+index 92948ef44a4b92f2adda1c114e95535118d2b79d..c74dbf6314d8a4178a3a60a743d4349382883027 100644
 --- a/dist/dom/node.d.ts
 +++ b/dist/dom/node.d.ts
-@@ -80,8 +80,9 @@ declare class TaroNode extends TaroEventTarget {
+@@ -82,8 +82,9 @@ declare class TaroNode extends TaroEventTarget {
       * 逻辑插入完成后调用，包含未挂载的父节点；默认准备模板 payload。
       * this 为新父节点，refChild 为空表示追加；index 仅在存在 refChild 时表示插入位置。
       * isReplace 表示替换的插入阶段，旧 refChild 随后另行移除；host 此处只同步插入。
@@ -14,10 +14,10 @@ index 858e1741d180ca0931242e807a3daf923bce98c4..0faaa61ba838cf512013aca085170511
       * 逻辑解绑及按 cleanRef 清理事件索引后调用；this 为原父节点，child.parentNode 已为空。
       * 每次实际移除都会通知，options.doUpdate=false 仅抑制默认模板更新。
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index f6877ddccb0bdf533a1273054ed046e3725297f0..13f7d91bf5d75c20990855db507f85fbc8695eff 100644
+index f2f89f03fda5a678227321a46e79421664dd4cd2..f221446060d86606a7a1eb599158163aa7225909 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
-@@ -134,6 +134,10 @@ class TaroNode extends TaroEventTarget {
+@@ -138,6 +138,10 @@ class TaroNode extends TaroEventTarget {
       *   3. insert D before C, D has the different parent of C
       */
      insertBefore(newChild, refChild, isReplace) {
@@ -28,7 +28,7 @@ index f6877ddccb0bdf533a1273054ed046e3725297f0..13f7d91bf5d75c20990855db507f85fb
          if (newChild.nodeName === DOCUMENT_FRAGMENT) {
              newChild.childNodes.reduceRight((previousValue, currentValue) => {
                  this.insertBefore(currentValue, previousValue);
-@@ -141,10 +145,15 @@ class TaroNode extends TaroEventTarget {
+@@ -145,10 +149,15 @@ class TaroNode extends TaroEventTarget {
              }, refChild);
              return newChild;
          }
@@ -48,16 +48,16 @@ index f6877ddccb0bdf533a1273054ed046e3725297f0..13f7d91bf5d75c20990855db507f85fb
          let index = 0;
          // Data structure
          newChild.parentNode = this;
-@@ -159,7 +168,7 @@ class TaroNode extends TaroEventTarget {
+@@ -163,7 +172,7 @@ class TaroNode extends TaroEventTarget {
          }
          // Delegation runs after the logical insertion, including on detached parents.
          // Its default implementation prepares template payloads; native hosts can replace it before any serialization work.
 -        this.delegateChildInsertion(newChild, refChild, index, isReplace);
 +        this.delegateChildInsertion(newChild, refChild, index, isReplace, previousIndex);
-         if (this._root) {
-             bumpNearestCtxEpochForRoot(this._root);
-         }
-@@ -199,6 +208,9 @@ class TaroNode extends TaroEventTarget {
+         this.delegateContextInvalidation();
+         MutationObserver.record({
+             type: "childList" /* MutationRecordType.CHILD_LIST */,
+@@ -201,6 +210,9 @@ class TaroNode extends TaroEventTarget {
      replaceChild(newChild, oldChild) {
          if (oldChild.parentNode !== this)
              return;

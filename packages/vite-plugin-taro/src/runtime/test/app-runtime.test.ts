@@ -109,7 +109,10 @@ test('App creation binds the exact container through the selected host before re
                 }
             }
         }
-        const { createVptApp } = executeRuntimeEntry(bundle, createExecutionContext(harness))
+        const { createVptApp } = executeRuntimeEntry(bundle, {
+            ...createExecutionContext(harness),
+            wx: { onBeforePageLoad: () => assert.fail('query capture belongs to the selected host') }
+        })
         assert.ok(typeof createVptApp === 'function')
         assert.strictEqual(createVptApp(component, config), app)
         assert.deepEqual(trace, ['createReactApp', 'container', 'bindApp'])
@@ -148,16 +151,16 @@ test('template App binding delegates mounting and seeds lazy snapshots before na
         const react = {}
         const renderer = {}
         const getCtx = () => assert.fail('template presentation must leave native context lookup to its caller')
+        // Record the exact getter forwarded by each mount independently of its deferred commit.
+        const nativeContexts: unknown[] = []
         const app = {
-            mount(source: unknown, id: string, getCtxOrComplete: () => unknown, complete?: () => void) {
+            mount(source: unknown, id: string, nativeContext: (() => unknown) | undefined, complete: () => void) {
                 assert.strictEqual(this, app)
                 assert.strictEqual(source, component)
                 assert.equal(id, 'page-instance')
                 trace.push('mount')
-                if (complete) {
-                    assert.strictEqual(getCtxOrComplete, getCtx, 'the native getter is forwarded unchanged')
-                }
-                commit = complete ?? getCtxOrComplete
+                nativeContexts.push(nativeContext)
+                commit = complete
             }
         }
         const pageRoot = {
@@ -223,7 +226,8 @@ test('template App binding delegates mounting and seeds lazy snapshots before na
         assert.deepEqual(trace, ['current', 'complete-current'], 'the native stack is read at flush time')
         trace.length = 0
 
-        app.mount(component, 'page-instance', () => trace.push('native-init'))
+        app.mount(component, 'page-instance', undefined, () => trace.push('native-init'))
+        assert.deepEqual(nativeContexts, [undefined])
         assert.deepEqual(trace, ['mount'], 'the adapter follows Taro commit timing')
         assert.ok(commit)
         commit()
@@ -237,6 +241,7 @@ test('template App binding delegates mounting and seeds lazy snapshots before na
         trace.length = 0
         payloads.length = 0
         app.mount(component, 'page-instance', getCtx, () => trace.push('native-init'))
+        assert.deepEqual(nativeContexts, [undefined, getCtx])
         assert.deepEqual(trace, ['mount'])
         assert.ok(commit)
         commit()
@@ -250,20 +255,17 @@ test('preserves Mini Taro initialization order and export identities', async () 
     // This mutable trace verifies the WeChat platform runtime executes before React and Taro runtime facades are exposed.
     const events: string[] = []
     const createVptApp = () => undefined
-    const createVptPage = () => undefined
     const createRecursiveComponentConfig = () => undefined
     const customWrapperCache = new Map()
     const harness = {
         events,
         createVptApp,
-        createVptPage,
         createRecursiveComponentConfig,
         customWrapperCache
     }
     const code = await bundleRuntimeEntry({
         entry: 'mini/vpt/vpt-runtime.ts',
         mocks: {
-            './create-vpt-page.ts': 'export const createVptPage = globalThis.harness.createVptPage',
             '\0vpt:taro-target-runtime': "globalThis.harness.events.push('target-runtime')",
             'vite-plugin-taro-runtime/plugin-html/runtime': "globalThis.harness.events.push('html-runtime')",
             './create-vpt-app.ts': `
@@ -287,6 +289,5 @@ test('preserves Mini Taro initialization order and export identities', async () 
     assert.strictEqual(Reflect.get(context.globalThis, Symbol.for('customWrapperCache')), customWrapperCache)
     assert.strictEqual(exports.createVptApp, createVptApp)
 
-    assert.strictEqual(exports.createVptPage, createVptPage)
     assert.strictEqual(exports.createRecursiveComponentConfig, createRecursiveComponentConfig)
 })

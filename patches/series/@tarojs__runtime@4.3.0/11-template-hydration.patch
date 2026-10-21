@@ -1,5 +1,5 @@
 diff --git a/dist/dom/node.d.ts b/dist/dom/node.d.ts
-index 0faaa61ba838cf512013aca085170511b1b7db08..818bc7dbebf42dc8ebe848a98511c544e928e012 100644
+index c74dbf6314d8a4178a3a60a743d4349382883027..d5ef1df802491475c476a9bfcf94e72863d91ac6 100644
 --- a/dist/dom/node.d.ts
 +++ b/dist/dom/node.d.ts
 @@ -19,7 +19,6 @@ declare class TaroNode extends TaroEventTarget {
@@ -11,7 +11,7 @@ index 0faaa61ba838cf512013aca085170511b1b7db08..818bc7dbebf42dc8ebe848a98511c544
       * 子列表整体更新通知，包括 textContent 完成逐项变更后的最终通知。
       * isClean=true 对应空列表，否则模板默认延迟序列化当前子节点；逻辑树已由调用方修改。
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index a97832f797bdbf51147bf67fdc11810c0d5a6af9..77444093794dab103b0a67051e00a0ec90c28853 100644
+index 2b78894030e563d67b368b03b99311ba68fd0eb0..7aaa23c845b83cad5b5c3c2c91ada60e08c6bd75 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
 @@ -15,7 +15,6 @@ class TaroNode extends TaroEventTarget {

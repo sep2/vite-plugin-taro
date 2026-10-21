@@ -9,6 +9,7 @@ import {
 } from 'vite-plugin-taro-runtime/runtime/mini'
 import type { MiniHost } from '../vpt/mini-host.d.ts'
 import { bindTemplateApp } from './bind-template-app.ts'
+import { createTemplatePage } from './create-template-page.ts'
 
 const pageOutlet = 'vpt_page_outlet'
 const pageOutletBranch = 'vo'
@@ -47,6 +48,7 @@ export function createTemplateHost(): MiniHost {
 
     return {
         bindApp: bindTemplateApp,
+        createPage: createTemplatePage,
         getPageRootType() {
             return 'root'
         },

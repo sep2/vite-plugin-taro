@@ -1324,8 +1324,20 @@ index c61fb312438fc85a2d94852b699da663cc835254..aeac72d04619ad13bb23c3198aa7ecce
  }
  
  export { TaroText };
+diff --git a/dist/dsl/common.d.ts b/dist/dsl/common.d.ts
+index 6d4fe8cd6474c57f5e5be14962ebcd9513e35dcf..e9652dff89780d17f3f89e410a687382a990dbdc 100644
+--- a/dist/dsl/common.d.ts
++++ b/dist/dsl/common.d.ts
+@@ -10,6 +10,7 @@ declare function getPath(id: string, options?: Record<string, unknown>): string;
+ declare function getOnReadyEventKey(path: string): string;
+ declare function getOnShowEventKey(path: string): string;
+ declare function getOnHideEventKey(path: string): string;
++/** Creates native lifecycles; onLoad reads the receiver's parameters and can delegate mounting with its load callback. */
+ declare function createPageConfig(component: any, pageName?: string, data?: Record<string, unknown>, pageConfig?: PageConfig): PageInstance;
+ declare function createComponentConfig(component: React.ComponentClass, componentName?: string, data?: Record<string, unknown>): any;
+ declare function createRecursiveComponentConfig(componentName?: string, forceCustomWrapper?: boolean): any;
 diff --git a/dist/dsl/common.js b/dist/dsl/common.js
-index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..35cd4e7dabc26a98741cafedd598f98042c597dd 100644
+index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..36a0a780534314cbb7794aeb0630a7a087bd0f0b 100644
 --- a/dist/dsl/common.js
 +++ b/dist/dsl/common.js
 @@ -4,7 +4,7 @@ import { taroWindowProvider } from '../bom/window.js';
@@ -1337,49 +1349,149 @@ index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..35cd4e7dabc26a98741cafedd598f980
  import { eventCenter } from '../emitter/emitter.js';
  import env from '../env.js';
  import { perf } from '../perf.js';
-@@ -96,8 +96,12 @@ function createPageConfig(component, pageName, data, pageConfig) {
-             Current.page = this;
-             this.config = pageConfig || {};
-             // this.$taroPath 是页面唯一标识
+@@ -70,9 +70,8 @@ function createPageConfig(component, pageName, data, pageConfig) {
+     // 小程序 Page 构造器是一个傲娇小公主，不能把复杂的对象挂载到参数上
+     const id = pageName !== null && pageName !== void 0 ? pageName : `taro_page_${pageId()}`;
+     const [ONLOAD, ONUNLOAD, ONREADY, ONSHOW, ONHIDE, LIFECYCLES, SIDE_EFFECT_LIFECYCLES,] = hooks.call('getMiniLifecycleImpl').page;
+-    let pageElement = null;
+-    let unmounting = false;
+-    let prepareMountList = [];
++    // Native instances of the same route have independent lifecycle completion.
++    const hasLoaded = new WeakMap();
+     function setCurrentRouter(page) {
+         const router = process.env.TARO_PLATFORM === 'web' ? page.$taroPath : page.route || page.__route__ || page.$taroPath;
+         Current.router = {
+@@ -87,87 +86,40 @@ function createPageConfig(component, pageName, data, pageConfig) {
+             Current.router.exitState = page.exitState;
+         }
+     }
+-    let loadResolver;
+-    let hasLoaded;
+     const config = {
+-        [ONLOAD](options = {}, cb) {
+-            hasLoaded = new Promise(resolve => { loadResolver = resolve; });
+-            perf.start(PAGE_INIT);
+-            Current.page = this;
+-            this.config = pageConfig || {};
+-            // this.$taroPath 是页面唯一标识
 -            const uniqueOptions = Object.assign({}, options, { $taroTimestamp: Date.now() });
 -            const $taroPath = this.$taroPath = getPath(id, uniqueOptions);
-+            const prerenderIdentity = config.__vpt_meta?.prerenderIdentity;
-+            if (prerenderIdentity) {
-+                config.__vpt_meta.prerenderIdentity = undefined;
-+            }
-+            const uniqueOptions = prerenderIdentity?.params ?? Object.assign({}, options, { $taroTimestamp: Date.now() });
-+            const $taroPath = this.$taroPath = prerenderIdentity?.path ?? getPath(id, uniqueOptions);
-             if (process.env.TARO_PLATFORM === 'web') {
-                 config.path = $taroPath;
-             }
-@@ -111,7 +115,7 @@ function createPageConfig(component, pageName, data, pageConfig) {
-                 taroWindowProvider.trigger(CONTEXT_ACTIONS.INIT, $taroPath);
-             }
-             const mount = () => {
+-            if (process.env.TARO_PLATFORM === 'web') {
+-                config.path = $taroPath;
+-            }
+-            // this.$taroParams 作为暴露给开发者的页面参数对象，可以被随意修改
+-            if (this.$taroParams == null) {
+-                this.$taroParams = uniqueOptions;
+-            }
+-            setCurrentRouter(this);
+-            // 初始化当前页面的上下文信息
+-            if (process.env.TARO_PLATFORM !== 'web') {
+-                taroWindowProvider.trigger(CONTEXT_ACTIONS.INIT, $taroPath);
+-            }
+-            const mount = () => {
 -                Current.app.mount(component, $taroPath, () => {
-+                Current.app.mount(component, $taroPath, () => this, () => {
-                     if (process.env.TARO_ENV === 'tt' && isEnableTTDom()) {
-                         pageElement = env.document.getPageDocumentById(this.__webviewId__);
-                     }
-@@ -123,7 +127,7 @@ function createPageConfig(component, pageName, data, pageConfig) {
-                     loadResolver();
-                     if (process.env.TARO_PLATFORM !== 'web') {
-                         pageElement.ctx = this;
+-                    if (process.env.TARO_ENV === 'tt' && isEnableTTDom()) {
+-                        pageElement = env.document.getPageDocumentById(this.__webviewId__);
+-                    }
+-                    else {
+-                        pageElement = env.document.getElementById($taroPath);
+-                    }
+-                    ensure(pageElement !== null, '没有找到页面实例。');
+-                    safeExecute($taroPath, ON_LOAD, this.$taroParams);
+-                    loadResolver();
+-                    if (process.env.TARO_PLATFORM !== 'web') {
+-                        pageElement.ctx = this;
 -                        bumpNearestCtxEpochForRoot(pageElement);
-+                        invalidateNearestCtx(pageElement);
-                         if (process.env.TARO_ENV === 'tt' && isEnableTTDom()) {
-                             pageElement.sync();
-                         }
-@@ -156,7 +160,7 @@ function createPageConfig(component, pageName, data, pageConfig) {
-                 unmounting = false;
+-                        if (process.env.TARO_ENV === 'tt' && isEnableTTDom()) {
+-                            pageElement.sync();
+-                        }
+-                        else {
+-                            pageElement.performUpdate(true, cb);
+-                        }
+-                    }
+-                    else {
+-                        isFunction(cb) && cb();
+-                    }
+-                });
++        [ONLOAD](_options, mount) {
++            // Resolve this instance's lifecycle barrier after its load handlers run.
++            let loadResolver;
++            hasLoaded.set(this, new Promise(resolve => { loadResolver = resolve; }));
++            const dispatch = () => {
++                const result = safeExecute(this.$taroPath, ON_LOAD, this.$taroParams);
++                loadResolver();
++                return result;
+             };
+-            if (unmounting) {
+-                prepareMountList.push(mount);
+-            }
+-            else {
+-                mount();
+-            }
++            return mount ? mount(dispatch) : dispatch();
+         },
+         [ONUNLOAD]() {
+             const $taroPath = this.$taroPath;
++            const pageElement = process.env.TARO_ENV === 'tt' && isEnableTTDom()
++                ? env.document.getPageDocumentById(this.__webviewId__)
++                : env.document.getElementById($taroPath);
+             // 销毁当前页面的上下文信息
+             if (process.env.TARO_PLATFORM !== 'web') {
+                 taroWindowProvider.trigger(CONTEXT_ACTIONS.DESTROY, $taroPath);
+             }
+             // 触发onUnload生命周期
+             safeExecute($taroPath, ONUNLOAD);
+-            unmounting = true;
+             Current.app.unmount($taroPath, () => {
+-                unmounting = false;
++                hasLoaded.delete(this);
                  instances.delete($taroPath);
                  if (pageElement) {
 -                    bumpNearestCtxEpochForRoot(pageElement);
 +                    invalidateNearestCtx(pageElement);
                      pageElement.ctx = null;
-                     pageElement = null;
+-                    pageElement = null;
+-                }
+-                if (prepareMountList.length) {
+-                    prepareMountList.forEach(fn => fn());
+-                    prepareMountList = [];
                  }
-@@ -337,7 +341,7 @@ function createRecursiveComponentConfig(componentName, forceCustomWrapper = fals
+             });
+         },
+         [ONREADY]() {
+-            hasLoaded.then(() => {
++            hasLoaded.get(this).then(() => {
+                 // 触发生命周期
+                 safeExecute(this.$taroPath, ON_READY);
+                 // 通过事件触发子组件的生命周期
+@@ -176,7 +128,7 @@ function createPageConfig(component, pageName, data, pageConfig) {
+             });
+         },
+         [ONSHOW](options = {}) {
+-            hasLoaded.then(() => {
++            hasLoaded.get(this).then(() => {
+                 // 设置 Current 的 page 和 router
+                 Current.page = this;
+                 setCurrentRouter(this);
+@@ -238,7 +190,7 @@ function createPageConfig(component, pageName, data, pageConfig) {
+                     return exec();
+                 }
+                 if (isDefer) {
+-                    hasLoaded.then(exec);
++                    hasLoaded.get(this).then(exec);
+                 }
+                 else {
+                     return exec();
+@@ -284,7 +236,7 @@ function createComponentConfig(component, componentName, data) {
+             perf.start(PAGE_INIT);
+             this.pageIdCache = ((_a = this.getPageId) === null || _a === void 0 ? void 0 : _a.call(this)) || pageId();
+             const path = getPath(id, { id: this.pageIdCache });
+-            Current.app.mount(component, path, () => {
++            Current.app.mount(component, path, () => this, () => {
+                 componentElement = env.document.getElementById(path);
+                 ensure(componentElement !== null, '没有找到组件实例。');
+                 this.$taroInstances = instances.get(path);
+@@ -337,7 +289,7 @@ function createRecursiveComponentConfig(componentName, forceCustomWrapper = fals
                      const el = env.document.getElementById(componentId);
                      if (el) {
                          el.ctx = this;
@@ -1388,7 +1500,7 @@ index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..35cd4e7dabc26a98741cafedd598f980
                      }
                  }
              },
-@@ -354,7 +358,7 @@ function createRecursiveComponentConfig(componentName, forceCustomWrapper = fals
+@@ -354,7 +306,7 @@ function createRecursiveComponentConfig(componentName, forceCustomWrapper = fals
                      const el = env.document.getElementById(componentId);
                      if (el) {
                          el.ctx = null;
@@ -1398,7 +1510,7 @@ index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..35cd4e7dabc26a98741cafedd598f980
                  }
              }
 diff --git a/dist/dsl/instance.d.ts b/dist/dsl/instance.d.ts
-index ad2d594ce3cdbe1324d74bd3a0e82c050a174c40..9ae719f341aa963d383e1e2e3f3f856b51caa7ef 100644
+index ad2d594ce3cdbe1324d74bd3a0e82c050a174c40..7f17c16eb214eb2c52a3a50602d51165d5dde9c1 100644
 --- a/dist/dsl/instance.d.ts
 +++ b/dist/dsl/instance.d.ts
 @@ -3,6 +3,7 @@ import { Component as Component$1, ComponentClass } from 'react';
@@ -1409,24 +1521,33 @@ index ad2d594ce3cdbe1324d74bd3a0e82c050a174c40..9ae719f341aa963d383e1e2e3f3f856b
  import { TFunc } from '../interface/utils.js';
  
  interface Instance<T = Record<string, any>> extends Component$1<T>, Show, PageInstance {
-@@ -56,8 +57,10 @@ interface PageLifeCycle extends Show {
-     onUnload?(): void;
+@@ -26,7 +27,8 @@ interface ReactAppInstance<T = AppInstance> extends Component$1<T>, AppInstance
+ interface PageLifeCycle extends Show {
+     eh?(event: MpEvent): void;
+     onAddToFavorites?(): void;
+-    onLoad?(options: Record<string, unknown>, cb?: TFunc): void;
++    /** Dispatches $taroParams; mount receives the load callback after lifecycle ordering is initialized. */
++    onLoad?(options: Record<string, unknown>, mount?: TFunc): void;
+     onOptionMenuClick?(): void;
+     onKeyboardHeight?(obj: {
+         height: number;
+@@ -57,7 +59,7 @@ interface PageLifeCycle extends Show {
  }
  interface PageInstance extends PageLifeCycle {
-+    /** @internal VPT metadata; native onLoad consumes the prepared identity once. */
-+    __vpt_meta?: { prerenderIdentity?: { path: string; params: Record<string, unknown> } };
      /** 页面的初始数据 */
 -    data?: Record<string, unknown>;
 +    data?: Record<string, unknown> | (() => Record<string, unknown>);
      /** 页面路径 */
      path?: string;
      /** 页面的组件选项 */
-@@ -82,7 +85,7 @@ interface Show {
+@@ -81,8 +83,8 @@ interface Show {
+ }
  interface AppInstance extends Show {
      componentDidShow?(options?: Record<string, unknown>): void;
-     mount?(component: React.ComponentClass | Component, id: string, cb: (...args: any[]) => void): void;
+-    mount?(component: React.ComponentClass | Component, id: string, cb: (...args: any[]) => void): void;
 -    mount?(component: React.ComponentClass | Component, id: string, getCtx: (...args: any[]) => void, cb: (...args: any[]) => void): void;
-+    mount?(component: React.ComponentClass | Component, id: string, getCtx: () => MpInstance, cb: (...args: any[]) => void): void;
++    /** Mounts one identity; prerendering supplies undefined for the native context getter. */
++    mount?(component: React.ComponentClass | Component, id: string, getCtx: (() => MpInstance) | undefined, onCommit: () => void): void;
      onError?(error: string): void;
      onLaunch?(options?: Record<string, unknown>): void;
      onPageNotFound?(res: any): void;
@@ -1479,6 +1600,43 @@ index 87bddc34e7021c352665e8cee1433af24c4b763a..b03f40dcbde925aaa2f802b6678439e5
  export { TaroNode } from './dom/node.js';
  export { TaroRootElement } from './dom/root.js';
  export { Style } from './dom/style.js';
+diff --git a/dist/runtime.esm.d.ts b/dist/runtime.esm.d.ts
+index 57dfc8190309db1a27cf0c05090171a00c599a22..3394618d4624045a21d8f0768ecd310c462afb53 100644
+--- a/dist/runtime.esm.d.ts
++++ b/dist/runtime.esm.d.ts
+@@ -820,8 +820,8 @@ interface Show {
+ }
+ interface AppInstance extends Show {
+     componentDidShow?(options?: Record<string, unknown>): void;
+-    mount?(component: React.ComponentClass | Component, id: string, cb: (...args: any[]) => void): void;
+-    mount?(component: React.ComponentClass | Component, id: string, getCtx: (...args: any[]) => void, cb: (...args: any[]) => void): void;
++    /** Mounts one identity; prerendering supplies undefined for the native context getter. */
++    mount?(component: React.ComponentClass | Component, id: string, getCtx: (() => MpInstance) | undefined, onCommit: () => void): void;
+     onError?(error: string): void;
+     onLaunch?(options?: Record<string, unknown>): void;
+     onPageNotFound?(res: any): void;
+diff --git a/dist/runtime.esm.js b/dist/runtime.esm.js
+index 1f062959200cfacd2dec2e9efeb913aa85c00f03..b43ac9f6eda858995a00c357f7409e4e9c1e28aa 100644
+--- a/dist/runtime.esm.js
++++ b/dist/runtime.esm.js
+@@ -4264,7 +4264,7 @@ function createPageConfig(component, pageName, data, pageConfig) {
+                 taroWindowProvider.trigger(CONTEXT_ACTIONS.INIT, $taroPath);
+             }
+             const mount = () => {
+-                Current.app.mount(component, $taroPath, () => {
++                Current.app.mount(component, $taroPath, () => this, () => {
+                     if (process.env.TARO_ENV === 'tt' && isEnableTTDom()) {
+                         pageElement = env.document.getPageDocumentById(this.__webviewId__);
+                     }
+@@ -4437,7 +4437,7 @@ function createComponentConfig(component, componentName, data) {
+             perf.start(PAGE_INIT);
+             this.pageIdCache = ((_a = this.getPageId) === null || _a === void 0 ? void 0 : _a.call(this)) || pageId();
+             const path = getPath(id, { id: this.pageIdCache });
+-            Current.app.mount(component, path, () => {
++            Current.app.mount(component, path, () => this, () => {
+                 componentElement = env.document.getElementById(path);
+                 ensure(componentElement !== null, '没有找到组件实例。');
+                 this.$taroInstances = instances.get(path);
 diff --git a/dist/utils/index.js b/dist/utils/index.js
 index 7c06f9a5ced23e9e3b7be97445fed318d61f777b..c21cfeaa9334b14e416e6e4cfe2a69441a7e6b28 100644
 --- a/dist/utils/index.js

@@ -20,13 +20,54 @@ function recordFrame(data) {
     'worklet';
     wx.worklet.runOnJS(saveFrame)(data.progress, data.current);
 }
+function bindFrame(node) {
+    if (node.is === 'share-element') {
+        node.triggerWorkletChangeLifetime('onframe', '__recordShareFrame');
+    }
+}
+function bindNativeFrames(page) {
+    function visit(node) {
+        bindFrame(node);
+        for (const child of node.childNodes || []) {
+            visit(child);
+        }
+    }
+    if (page.__vptWxRoot) {
+        visit(page.__vptWxRoot);
+    }
+}
+function instrumentNativeFrames(page) {
+    const root = page.__vptWxRoot;
+    if (!root) {
+        return;
+    }
+    // Observe components from the initial attachment and subsequent React commits.
+    const createComponent = root.createComponent;
+    root.createComponent = function (...args) {
+        const node = createComponent.apply(this, args);
+        bindFrame(node);
+        return node;
+    };
+    bindNativeFrames(page);
+}
 exports.instrumentPage = function (config) {
-    config.__recordShareFrame = recordFrame;
-    // Both ordinary and prerendered Pages bind own methods; restore metadata before the template attaches.
+    const methods = config.methods || config;
+    methods.__recordShareFrame = recordFrame;
+    for (const lifecycle of ['onLoad', 'onReady']) {
+        const original = methods[lifecycle];
+        methods[lifecycle] = function (...args) {
+            const result = original.apply(this, args);
+            // Bind after mounting and again when the initial native Page becomes ready.
+            bindNativeFrames(this);
+            return result;
+        };
+    }
+    // Native instances bind their methods; restore worklet metadata before attachment.
     config.behaviors = [...(config.behaviors || []), Behavior({
         lifetimes: {
             created() {
                 Object.assign(this.__recordShareFrame, recordFrame);
+                instrumentNativeFrames(this);
             }
         }
     })];
@@ -44,16 +85,16 @@ for (const entry of ['pages/gallery/gallery.js', 'pages/detail/detail.js', 'comp
     const relative = path.posix.relative(path.posix.dirname(entry), modulePath)
     const specifier = relative.startsWith('.') ? relative : `./${relative}`
     const component = entry === 'comp.js'
-    // Shells register the capsule's final Page config or recursive Component config.
-    const registration = component ? /(Component)\((\w+\.componentConfig)\)/g : /(Page)\((\w+\.default)\)/g
+    // Wrap the registration argument; constructor selection reads the original capsule config.
+    const registration = component ? /\((\w+\.componentConfig)\)/g : /\((\w+\.default)\)/g
     assert.equal([...source.matchAll(registration)].length, 1, entry)
     await writeFile(
         entryPath,
         source.replace(
             registration,
             component
-                ? `$1(require('${specifier}').instrumentComponent($2))`
-                : `$1(require('${specifier}').instrumentPage($2))`
+                ? `(require('${specifier}').instrumentComponent($1))`
+                : `(require('${specifier}').instrumentPage($1))`
         )
     )
 }

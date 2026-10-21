@@ -2,37 +2,25 @@ import { flushSync } from 'vite-plugin-taro-runtime/react'
 import {
     addLeadingSlash,
     Current,
+    type createPageConfig,
     document,
     getOnHideEventKey,
     getOnReadyEventKey,
     getOnShowEventKey,
-    getPath,
     hydrate,
-    incrementId,
     type MiniElementData
 } from 'vite-plugin-taro-runtime/runtime/mini'
-import type { createVptPage, PageData } from '../vpt/create-vpt-page.ts'
-import { getPageQuery } from '../vpt/get-page-query.ts'
-
-// One counter distinguishes native instances even when their route, query and creation timestamp match.
-const pageId = incrementId()
+import type { createPageIdentity } from '../vpt/create-page-identity.ts'
+import type { TemplatePageData } from './template-page-data.d.ts'
 
 /** Commits one Page into the existing App root and returns its initial native data without dispatching lifecycles. */
 export function prerenderToData(
-    config: ReturnType<typeof createVptPage>,
-    component: Parameters<typeof createVptPage>[0],
+    component: Parameters<typeof createPageConfig>[0],
     route: string,
-    initialData: PageData
-): PageData {
-    if (!Current.app?.mount) {
-        return initialData
-    }
-
-    const params = { ...getPageQuery(), $taroTimestamp: Date.now() }
-    const path = getPath(route, { ...params, $vptPage: pageId() })
-
-    // Retain this instance identity until native onLoad consumes it without remounting the Page.
-    config.__vpt_meta.prerenderIdentity = { path, params }
+    identity: ReturnType<typeof createPageIdentity>,
+    initialData: TemplatePageData
+): TemplatePageData {
+    const { path, params } = identity
 
     Current.router = {
         params,
@@ -44,7 +32,7 @@ export function prerenderToData(
     }
 
     flushSync(() => {
-        Current.app!.mount!(component, path, () => {})
+        Current.app!.mount!(component, path, undefined, () => {})
     })
 
     const page = document.getElementById(path)

@@ -334,7 +334,6 @@ import 'vite-plugin-taro-runtime/plugin-platform-tt/runtime'
 import { Current, document, eventHandler, FormElement, getNearestCtx, Style, TaroElement, TaroNode, TaroRootElement, TaroText } from 'vite-plugin-taro-runtime/runtime/mini'
 import { useLoad, useUnload } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
 import { createVptApp } from ${JSON.stringify(resolveVptRuntime('mini/vpt/create-vpt-app'))}
-import { createVptPage } from ${JSON.stringify(resolveVptRuntime('mini/vpt/create-vpt-page'))}
 import host, { calls, reads, componentListReads, nativeDocument, pageDocuments, original, originalAppend, originalRemove, originalSetAttribute, originalRemoveAttribute } from 'test:tt-dom-host'
 
 const context = {}
@@ -1149,12 +1148,16 @@ async function checkPages() {
             }, [])
             return React.createElement(Shared.Provider, { value }, children)
         }
-        function makePage(id, label) {
+        function makePage(id, label, prerender) {
+            const query = Object.freeze({ id: label, full: 'a%3Db', empty: '' })
+            const pageConfig = Object.freeze({ enableShareAppMessage: true })
             const native = nativeDocument.createElement('page')
             native.setAttribute('id', 'native-' + id)
             pageDocuments.set(id, native)
             const ref = React.createRef()
             refs.set(label, ref)
+            // Each Page acknowledges its initial native root attachment independently.
+            const mounted = Promise.withResolvers()
             function Page() {
                 const [value, setValue] = React.useState(0)
                 const shared = React.useContext(Shared)
@@ -1165,26 +1168,34 @@ async function checkPages() {
                         'React builds the Page native root offline')
                     return () => lifecycle.push(label + ':unmount')
                 }, [])
-                useLoad(() => {
+                useLoad(params => {
+                    assert.deepEqual(params, { ...query, $taroTimestamp: params.$taroTimestamp })
+                    assert.equal(typeof params.$taroTimestamp, 'number')
+                    assert.strictEqual(Current.page, context)
+                    assert.strictEqual(Current.router.params, params)
+                    assert.strictEqual(context.config, pageConfig)
                     const node = ref.current
                     assert.equal(node._root.ctx, null, 'business onLoad retains upstream ctx timing')
                     assert.equal(node._root.nativeNode.parentNode, null)
                     assert.strictEqual(node.nativeNode.parentNode, node._root.nativeNode)
                     node.setAttribute('data-loaded', true)
                     lifecycle.push(label + ':load')
+                    node._root.enqueueUpdateCallback(mounted.resolve)
                 })
                 useUnload(() => lifecycle.push(label + ':unload'))
                 return React.createElement(React.Fragment, null,
                     React.createElement('view', { ref, id: label }, label + ':' + value + ':' + shared),
                     React.createElement('input', { defaultValue: 'seed-' + label }))
             }
-            const config = createVptPage(Page, { path: 'pages/' + label, prerender: false })
+            const config = host.createPage(Page, { path: 'pages/' + label, config: pageConfig, prerender })
+            assert.equal(config.data, undefined, 'DOM Page registration is independent of template data policy')
+            assert.equal(typeof config.onShareAppMessage, 'function')
             const context = { __webviewId__: id, route: 'pages/' + label,
                 setData() { assert.fail('DOM must not write template data') } }
-            return { config, context, native }
+            return { config, context, query, native, mounted: mounted.promise }
         }
-        const first = makePage(0, 'first')
-        const second = makePage(22, 'second')
+        const first = makePage(0, 'first', false)
+        const second = makePage(22, 'second', true)
         const app = createVptApp(App, appConfig)
         assert.equal(app.mount.length, 4, 'mount accepts the native context getter and completion callback')
         const appRoot = document.getElementById(appConfig.appId || 'app')
@@ -1195,10 +1206,10 @@ async function checkPages() {
         calls.length = 0
         try {
             // Both mounts enter the cold App before it commits. Binding must use each root.ctx, not Current.page.
-            const firstLoaded = new Promise(resolve => first.config.onLoad.call(first.context, {}, resolve))
-            const secondLoaded = new Promise(resolve => second.config.onLoad.call(second.context, {}, resolve))
+            first.config.onLoad.call(first.context, first.query)
+            second.config.onLoad.call(second.context, second.query)
             Current.page = { __webviewId__: 999 }
-            await Promise.all([firstLoaded, secondLoaded])
+            await Promise.all([first.mounted, second.mounted])
             assert.deepEqual(calls.filter(call => call[0] === 'pageDocument').map(call => call[1]).sort((a, b) => a - b), [0, 22])
             assert.equal(lifecycle.filter(value => value === 'app:mount').length, 1)
             for (const [page, label] of [[first, 'first'], [second, 'second']]) {
@@ -1219,6 +1230,7 @@ async function checkPages() {
                 assert.equal(root.pendingUpdate, false)
                 assert.equal(node.nativeNode.firstChild.nodeValue, label + ':0:initial')
                 assert.equal(lifecycle.filter(value => value === label + ':mount').length, 1)
+                assert.equal(lifecycle.filter(value => value === label + ':load').length, 1)
                 assert.deepEqual(calls.filter(call => call[0] === 'append' && call[1] === page.native),
                     [['append', page.native, root.nativeNode]], 'one native root insertion attaches the whole Page')
             }
@@ -1257,7 +1269,7 @@ async function checkPages() {
             assert.strictEqual(firstInput.nativeNode.parentNode, firstNative)
             expectCalls([])
 
-            // Initial attachment and repeated completion must never enumerate logical root children.
+            // Initial attachment and repeated updates must never enumerate logical root children.
             const children = firstRoot.childNodes
             first.native.removeChild(firstNative)
             calls.length = 0
@@ -1268,11 +1280,8 @@ async function checkPages() {
             })
             try {
                 firstRoot.enqueueUpdate({ path: 'page.cn', value() { assert.fail('DOM must not evaluate template payloads') } })
-                firstRoot.enqueueUpdateCallback(() => callbacks.push('existing'))
-                firstRoot.performUpdate(true, data => {
-                    assert.deepEqual(data, {})
-                    callbacks.push('complete')
-                })
+                firstRoot.enqueueUpdateCallback(() => callbacks.push('update'))
+                firstRoot.performUpdate(true)
                 expectCalls([['pageDocument', 0], ['append', first.native, firstNative]])
                 firstRoot.performUpdate(true)
                 expectCalls([['pageDocument', 0]])
@@ -1281,7 +1290,7 @@ async function checkPages() {
             } finally {
                 Object.defineProperty(firstRoot, 'childNodes', { value: children, writable: true, configurable: true })
             }
-            assert.deepEqual(callbacks, ['existing', 'complete'])
+            assert.deepEqual(callbacks, ['update'])
             assert.deepEqual(firstRoot.updatePayloads, [])
 
             ReactDOM.flushSync(() => first.config.onUnload.call(first.context))
@@ -1307,11 +1316,10 @@ async function checkPages() {
             assert.equal(refs.get('second').current, null)
             expectCalls([])
 
-            const third = makePage(33, 'third')
+            const third = makePage(33, 'third', true)
             calls.length = 0
-            await new Promise(resolve => {
-                ReactDOM.flushSync(() => third.config.onLoad.call(third.context, {}, resolve))
-            })
+            ReactDOM.flushSync(() => third.config.onLoad.call(third.context, third.query))
+            await third.mounted
             const thirdRoot = refs.get('third').current._root
             assert.strictEqual(thirdRoot.nativeNode.parentNode, third.native)
             assert.equal(lifecycle.filter(value => value === 'app:mount').length, 1)
@@ -1381,13 +1389,13 @@ async function checkTemplate() {
                 React.createElement('text', null, index + ':' + value + ':' + shared),
                 React.createElement('input', { ref: inputs[index], value: 'locked' }))
         }
-        return createVptPage(Page, { path: 'pages/fallback-' + index, prerender: false })
+        return host.createPage(Page, { path: 'pages/fallback-' + index, prerender: false })
     })
     createVptApp(App, {})
     const appRoot = document.getElementById('app')
     const flushData = () => new Promise(resolve => setTimeout(resolve, 0))
     try {
-        // The third onLoad argument is Taro's prerender sink; normal rendering completes through native setData.
+        // Observe each Page's initial presentation through its native setData sink.
         configs.forEach((config, index) => config.onLoad.call(contexts[index], {}))
         await Promise.all(loaded.map(load => load.promise))
         assert.equal(lifecycle.filter(value => value === 'app:mount').length, 1)
