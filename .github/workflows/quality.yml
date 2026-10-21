@@ -48,7 +48,7 @@ jobs:
             - name: Typecheck
               run: pnpm typecheck
 
-            - name: Test release preparation, package artifacts, and generated projects
+            - name: Test release preparation and package artifacts
               run: node --test --test-reporter=./scripts/ci-test-reporter.ts scripts/*.test.ts
 
             - name: Enforce 100% coverage

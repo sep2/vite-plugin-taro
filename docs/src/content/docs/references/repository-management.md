@@ -47,13 +47,15 @@ pnpm test
 ### 默认模板
 
 ```sh
-pnpm test:template
-pnpm test:template:devtools
+pnpm build:template:wx
+pnpm build:template:zfb
+pnpm build:template:tt
+pnpm build:template:h5
 ```
 
-`pnpm test:template` 在 `packages/vite-plugin-taro/tmp/` 中生成独立项目，使用工作区依赖运行严格类型检查并构建 WX、ZFB、TT 和 H5。此检查也包含在 `pnpm test:release` 与 CI 中。
+每个命令从默认模板生成临时项目，使用工作区依赖构建，并将产物保留在仓库根目录的 `dist/wx`、`dist/zfb`、`dist/tt` 或 `dist/h5`。构建完成后清理临时项目。
 
-运行 DevTools 检查前，先登录并授权 `wechatide`，在环境变量 `VITE_VPT_WECHAT_APP_ID` 中设置有权限的测试 AppID。`VPT_DEVTOOLS_CLIENT` 指定 CLI 客户端名称，默认为 `pi`；启用访问令牌时，通过 `VPT_DEVTOOLS_TOKEN` 提供。检查会打开生成项目的 WX 构建，验证三个 Tab 的路由、选中态和计数器状态保留，最后关闭窗口并清理测试项目。
+通过环境变量 `VITE_VPT_WECHAT_APP_ID`、`VITE_VPT_ALIPAY_APP_ID` 和 `VITE_VPT_TIKTOK_APP_ID` 提供对应平台的 AppID。小程序开发者工具可直接打开对应的根目录 `dist/<target>`。
 
 ### 示例应用
 

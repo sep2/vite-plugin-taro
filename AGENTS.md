@@ -68,7 +68,7 @@ See root `package.json` for all scripts.
 - Typecheck: `pnpm typecheck:plugin` or `pnpm typecheck:<app>`.
 - HMR stress edits: `pnpm stress:hmr-stress-demo` (paced) or `pnpm stress:hmr-stress-demo:burst` (rapid).
 - H5 preview: `pnpm preview:loan-genius:h5`.
-- Generated template checks: `pnpm test:template`; WX DevTools: set an authorized `VITE_VPT_WECHAT_APP_ID` and run `pnpm test:template:devtools`.
+- Build the default template: `pnpm build:template:<target>` (`wx`, `zfb`, `tt`, `h5`); output: root `dist/<target>`.
 - Biome: `pnpm lint` (check) / `pnpm format` (safe fixes).
 - Release notes: `pnpm changeset`; preview with `pnpm changeset status`.
 - Prepare release files: `pnpm release` (Changesets versioning, lockfile refresh, formatting only). Review, commit, and push `main` to publish in CI; never publish locally or create release tags manually.
