@@ -10,10 +10,6 @@ VPT 项目中有两类入口：
 
 不受原版 Taro 的限制，VPT 的 App 是标准 React 组件，可以渲染任意内容。
 
-查看 [Tabs Demo](https://github.com/sep2/vite-plugin-taro/tree/main/demo/react-tabs-demo)，了解如何在 App 中跨页面共享组件。
-
-该 Demo 还展示了如何进行首帧同步渲染，修复原版 Taro 的页面切换闪屏问题。
-
 ## 用 App 包裹页面
 
 在 App 中自由组合视图，并在需要的位置渲染 `children`：
