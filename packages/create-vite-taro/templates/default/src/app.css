@@ -49,13 +49,6 @@ button {
     line-height: inherit;
 }
 
-/* Page content fills the space above the shared Footer. */
-.app-shell > .taro_page,
-.app-shell > .taro_router {
-    flex: 1;
-    min-height: 0;
-}
-
 .brand-serif {
     font-family: Georgia, "Times New Roman", serif;
 }

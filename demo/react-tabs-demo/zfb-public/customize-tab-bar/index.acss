@@ -1,5 +1,0 @@
-.native-tab-placeholder {
-    position: absolute;
-    width: 0;
-    height: 0;
-}

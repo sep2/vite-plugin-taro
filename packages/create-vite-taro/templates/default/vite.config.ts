@@ -2,6 +2,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import vpt, { type VptJsonObject, type VptTarget } from 'vite-plugin-taro'
+import { tabPages } from './src/tab-pages.ts'
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), 'VITE_VPT_')
@@ -17,12 +18,11 @@ export default defineConfig(({ mode }) => {
             vpt({
                 target,
                 app: 'src/app.tsx',
-                pages: [
-                    {
-                        path: 'pages/home/index',
-                        config: createPageJson(target)
-                    }
-                ],
+                pages: tabPages.map(({ path }) => ({
+                    path,
+                    prerender: true,
+                    config: createPageJson(target)
+                })),
                 appJson: createAppJson(target),
                 projectConfigJson: createProjectConfigJson({ target, appId }),
                 projectPrivateConfigJson: createProjectPrivateConfigJson(target),
@@ -69,6 +69,13 @@ function createAppJson(target: VptTarget): VptJsonObject {
                 renderer: 'skyline',
                 componentFramework: 'glass-easel',
                 glassEaselWebview: true,
+                tabBar: {
+                    custom: true,
+                    color: '#667085',
+                    selectedColor: '#26734d',
+                    backgroundColor: '#f8fbf4',
+                    list: tabPages.map(({ path, label }) => ({ pagePath: path, text: label }))
+                },
                 rendererOptions: {
                     skyline: {
                         defaultDisplayBlock: true,
@@ -86,6 +93,13 @@ function createAppJson(target: VptTarget): VptJsonObject {
             return {
                 lazyCodeLoading: 'renderedComponents',
                 useDynamicPlugins: true,
+                tabBar: {
+                    customize: true,
+                    textColor: '#667085',
+                    selectedColor: '#26734d',
+                    backgroundColor: '#f8fbf4',
+                    items: tabPages.map(({ path, label }) => ({ pagePath: path, name: label }))
+                },
                 window: {
                     transparentTitle: 'always',
                     titlePenetrate: 'YES'
@@ -94,6 +108,13 @@ function createAppJson(target: VptTarget): VptJsonObject {
         }
         case 'tt': {
             return {
+                tabBar: {
+                    custom: true,
+                    color: '#667085',
+                    selectedColor: '#26734d',
+                    backgroundColor: '#f8fbf4',
+                    list: tabPages.map(({ path, label }) => ({ pagePath: path, text: label }))
+                },
                 window: {
                     navigationStyle: 'custom',
                     navigationBarTextStyle: 'black'

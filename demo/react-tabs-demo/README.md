@@ -1,8 +1,10 @@
 # React 标签栏示例
 
-三个 Tab 页面共用 React 组件，通过 `Taro.switchTab` 切换。
+三个真实 Tab 页面通过 `Taro.switchTab` 切换，保留已访问页面的 React 状态。
 
-页面设置中启用了预渲染 prerender: true，在第一帧就渲染整个页面，切换 tab 不再闪屏。
+每个页面负责自己的全屏布局，并向共用的 `TabBar` 组件传入当前路径。`App` 负责应用生命周期和全局样式，直接返回 `children`。
+
+微信通过 `tabBar.custom: true` 配置接管标签栏渲染。页面启用 `prerender: true`，在首帧同步渲染页面内容和 React 标签栏。
 
 <video src="https://github.com/user-attachments/assets/aa2da4bb-fe60-4d3b-9a94-8df17a4e73ae" controls autoplay muted loop playsinline width="320"></video>
 
@@ -26,5 +28,6 @@ pnpm build:react-tabs-demo:wx
 ## 主要文件
 
 - `src/tab-pages.ts`：页面路由、标签和图标名称。
-- `src/components/app-tab-bar/app-tab-bar.tsx`：React 标签栏。
-- `wx-public/`、`zfb-public/`：隐藏平台默认标签栏的占位组件。
+- `src/components/tab-bar/tab-bar.tsx`：由页面路径驱动的 React 标签栏。
+- `src/pages/`：各 Tab 页面的布局、内容和标签栏。
+- `vite.config.ts`：原生 Tab 路由、自定义标签栏和页面预渲染配置。

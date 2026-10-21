@@ -83,7 +83,13 @@ npm run dev:h5
 
 ## 开发
 
-默认页面是 `src/pages/home/index.tsx`。VPT 通过虚拟模块提供 Taro 组件和 API：
+模板包含 Home、Explore、About 三个真实 Tab 页面，默认页面是 `src/pages/home/index.tsx`。路由、标签和图标名称统一定义在 `src/tab-pages.ts`。
+
+每个页面负责自己的全屏布局和 `TabBar`，`src/app.tsx` 负责应用生命周期和全局样式，直接返回 `children`。通过 `Taro.switchTab()` 切换 Tab 时，已访问页面的 React 状态会保留。
+
+`vite.config.ts` 根据 `tabPages` 生成页面和原生 Tab 路由配置，并启用 `prerender: true`。微信使用 `tabBar.custom: true`，由页面中的 React 标签栏负责渲染；`tabBar.list` 保留原生 `switchTab()` 所需的路由声明。
+
+VPT 通过虚拟模块提供 Taro 组件和 API：
 
 ```tsx
 import Taro from 'virtual:taro/api'
@@ -92,7 +98,7 @@ import { Button, Text, View } from 'virtual:taro/components'
 
 不要直接安装或导入 `@tarojs/*`。在 `vite.config.ts` 中添加页面，并按当前目标修改应用与开发工具项目配置。
 
-模板包含条件编译、微信原生组件、支付宝、抖音与 Web 共用的 Taro 组件、懒加载、自定义导航栏、Tailwind CSS、CSS Modules 和全局样式示例；不需要的示例可直接删除。
+模板包含条件编译、微信原生组件、支付宝、抖音与 Web 共用的 Taro 组件、懒加载、自定义导航栏、React 标签栏、Tailwind CSS、CSS Modules 和全局样式示例；不需要的示例可直接删除。
 
 ### 样式
 

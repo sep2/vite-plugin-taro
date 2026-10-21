@@ -144,21 +144,36 @@ test('public packages preserve their published entrypoints and scaffold dependen
             .map((file) => (file === '_env.local' ? '.env.local' : file === '_gitignore' ? '.gitignore' : file))
             .sort()
         assert.deepEqual(listFiles(projectPath), expectedFiles)
-        assert.equal(
-            readFileSync(path.join(projectPath, 'src/app.tsx'), 'utf8'),
-            readFileSync(path.join(generatorRoot, 'templates/default/src/app.tsx'), 'utf8')
-        )
+        const sourceRoot = path.join(generatorRoot, 'templates/default/src')
+        for (const file of listFiles(sourceRoot)) {
+            assert.ok(
+                readFileSync(path.join(projectPath, 'src', file)).equals(readFileSync(path.join(sourceRoot, file))),
+                `preserves template bytes: src/${file}`
+            )
+        }
+        assert.match(readFileSync(path.join(projectPath, 'src/app.tsx'), 'utf8'), /return children/)
+        for (const [index, file] of ['home/index.tsx', 'explore/explore-page.tsx', 'about/about-page.tsx'].entries()) {
+            const page = readFileSync(path.join(projectPath, 'src/pages', file), 'utf8')
+            assert.match(
+                page,
+                /<View className="flex h-screen flex-col overflow-hidden bg-canvas bg-canvas-botanical text-foreground">/
+            )
+            assert.ok(page.includes(`<TabBar activePath={tabPages[${index}].path} />`))
+        }
         assert.match(
-            readFileSync(path.join(projectPath, 'src/app.css'), 'utf8'),
-            /\.app-shell > \.taro_page,\s*\.app-shell > \.taro_router \{\s*flex: 1;\s*min-height: 0;\s*\}/
+            readFileSync(path.join(projectPath, 'src/components/tab-bar/tab-bar.tsx'), 'utf8'),
+            /Taro\.switchTab\(/
         )
-        assert.match(
-            readFileSync(path.join(projectPath, 'src/components/footer/footer.tsx'), 'utf8'),
-            /className="[^"]*\bshrink-0\b[^"]*"/
-        )
-        assert.match(readFileSync(path.join(projectPath, '.env.local'), 'utf8'), /^VITE_VPT_TIKTOK_APP_ID=testAppId$/m)
+        assert.match(readFileSync(path.join(projectPath, 'index.html'), 'utf8'), /<title>Complete App<\/title>/)
+        const env = readFileSync(path.join(projectPath, '.env.local'), 'utf8')
+        assert.match(env, /^VITE_VPT_WECHAT_APP_ID=wx[0-9a-f]{16}$/m)
+        assert.match(env, /^VITE_VPT_TIKTOK_APP_ID=testAppId$/m)
         const config = readFileSync(path.join(projectPath, 'vite.config.ts'), 'utf8')
         assert.match(config, /env\.VITE_VPT_TIKTOK_APP_ID\b/)
+        assert.match(config, /pages: tabPages\.map\(\(\{ path \}\) => \(\{\s*path,\s*prerender: true/)
+        assert.match(config, /list: tabPages\.map\(\(\{ path, label \}\) => \(\{ pagePath: path, text: label \}\)\)/)
+        assert.match(config, /custom: true/)
+        assert.match(config, /customize: true/)
         assert.match(config, /disableABTest: true/)
         assert.match(config, /componentFramework: 'glass-easel',\s+glassEaselWebview: true/)
         assert.match(

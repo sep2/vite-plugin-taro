@@ -1,9 +1,9 @@
 import { ScrollView, Text, View } from 'virtual:taro/components'
 import { lazy, Suspense, useState } from 'react'
-import { useTabPage } from '../../components/app-tab-bar/tab-page.ts'
 import { BotanicalSprig } from '../../components/botanical-sprig/botanical-sprig.tsx'
 import { Counter } from '../../components/counter/counter.tsx'
 import { NavigationBar } from '../../components/navigation-bar/navigation-bar.tsx'
+import { TabBar } from '../../components/tab-bar/tab-bar.tsx'
 import { tabPages } from '../../tab-pages.ts'
 
 const featureCards = [
@@ -30,13 +30,11 @@ const featureCards = [
 const ApiCard = lazy(() => import('./lazy/api-card.tsx'))
 
 function HomePage() {
-    useTabPage(tabPages[0].path)
-
     // This local state intentionally demonstrates that VPT preserves React state during hot updates.
     const [count, setCount] = useState(0)
 
     return (
-        <View className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+        <View className="flex h-screen flex-col overflow-hidden bg-canvas bg-canvas-botanical text-foreground">
             <NavigationBar title="VPT" />
             <ScrollView scrollY className="flex min-h-0 flex-1 flex-col">
                 <View className="relative flex shrink-0 flex-col items-center overflow-hidden px-5 pb-8 pt-6">
@@ -140,6 +138,7 @@ function HomePage() {
                     </View>
                 </View>
             </ScrollView>
+            <TabBar activePath={tabPages[0].path} />
         </View>
     )
 }

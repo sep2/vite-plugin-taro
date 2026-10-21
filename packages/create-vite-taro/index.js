@@ -9,7 +9,6 @@ import generatorPackage from './package.json' with { type: 'json' }
 
 const packageRoot = path.dirname(fileURLToPath(import.meta.url))
 const defaultProjectName = 'vite-taro-app'
-const defaultProjectTitle = 'Vite Taro App'
 const defaultWechatAppId = 'wx0000000000000000'
 const renamedFiles = {
     '_env.local': '.env.local',
@@ -128,14 +127,14 @@ function copyTemplate(sourceDirectory, targetDirectory, projectName, projectTitl
             continue
         }
 
-        const source = readFileSync(sourcePath, 'utf8')
+        const source = readFileSync(sourcePath)
         writeFileSync(targetPath, transformTemplateFile(targetName, source, projectName, projectTitle, wechatAppId))
     }
 }
 
 function transformTemplateFile(fileName, source, projectName, projectTitle, wechatAppId) {
     if (fileName === 'package.json') {
-        const template = JSON.parse(source)
+        const template = JSON.parse(source.toString('utf8'))
         // The fixed Changesets group releases the generator and plugin at the same version.
         const packageJson = {
             ...template,
@@ -149,13 +148,14 @@ function transformTemplateFile(fileName, source, projectName, projectTitle, wech
     }
 
     if (fileName === 'index.html') {
-        return source.replace(/<title>.*?<\/title>/, `<title>${projectTitle}</title>`)
+        return source.toString('utf8').replace(/<title>.*?<\/title>/, `<title>${projectTitle}</title>`)
+    }
+
+    if (fileName === '.env.local') {
+        return source.toString('utf8').replaceAll(defaultWechatAppId, wechatAppId)
     }
 
     return source
-        .replaceAll(defaultProjectName, projectName)
-        .replaceAll(defaultProjectTitle, projectTitle)
-        .replaceAll(defaultWechatAppId, wechatAppId)
 }
 
 function createWechatAppId() {

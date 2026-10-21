@@ -1,15 +1,13 @@
 import { ScrollView, Text, View } from 'virtual:taro/components'
-import { useTabPage } from '../../components/app-tab-bar/tab-page.ts'
 import { NavigationBar } from '../../components/navigation-bar/navigation-bar.tsx'
+import { TabBar } from '../../components/tab-bar/tab-bar.tsx'
 import { tabPages } from '../../tab-pages.ts'
 
 const platforms = ['WeChat', 'Alipay', 'TikTok', 'Web'] as const
 
 export default function AboutPage() {
-    useTabPage(tabPages[2].path)
-
     return (
-        <View className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+        <View className="flex h-screen flex-col overflow-hidden bg-canvas bg-canvas-botanical text-foreground">
             <NavigationBar title="About" />
             <ScrollView scrollY className="flex min-h-0 flex-1 flex-col">
                 <View className="mx-auto flex w-full max-w-4xl flex-col px-5 pb-12 pt-10">
@@ -44,6 +42,7 @@ export default function AboutPage() {
                     </View>
                 </View>
             </ScrollView>
+            <TabBar activePath={tabPages[2].path} />
         </View>
     )
 }

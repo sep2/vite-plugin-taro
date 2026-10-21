@@ -11,8 +11,6 @@ export default defineConfig(({ mode }) => {
     const appId = getAppId(env, target)
 
     return {
-        // Native slot filenames are platform-defined; copy only the active target's empty stub.
-        publicDir: target === 'wx' || target === 'zfb' ? fromRoot(`${target}-public`) : false,
         build: {
             outDir: fromRoot('dist', target)
         },

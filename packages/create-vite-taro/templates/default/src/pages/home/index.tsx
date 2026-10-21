@@ -1,8 +1,10 @@
 import { ScrollView, Text, View } from 'virtual:taro/components'
 import { lazy, Suspense, useState } from 'react'
-import { Counter } from '../../components/counter/counter.tsx'
 import { BotanicalSprig } from '../../components/botanical-sprig/botanical-sprig.tsx'
+import { Counter } from '../../components/counter/counter.tsx'
 import { NavigationBar } from '../../components/navigation-bar/navigation-bar.tsx'
+import { TabBar } from '../../components/tab-bar/tab-bar.tsx'
+import { tabPages } from '../../tab-pages.ts'
 
 const featureCards = [
     {
@@ -32,7 +34,7 @@ function HomePage() {
     const [count, setCount] = useState(0)
 
     return (
-        <View className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+        <View className="flex h-screen flex-col overflow-hidden bg-canvas bg-canvas-botanical text-foreground">
             <NavigationBar title="VPT" />
             <ScrollView scrollY className="flex min-h-0 flex-1 flex-col">
                 <View className="relative flex shrink-0 flex-col items-center overflow-hidden px-5 pb-8 pt-6">
@@ -43,10 +45,10 @@ function HomePage() {
                         <Text className="brand-serif mt-7 block text-[7rem] font-semibold leading-none tracking-[-0.08em] text-primary sm:text-[9rem]">
                             VPT
                         </Text>
-                        <Text className="mt-5 block max-w-2xl text-2xl font-bold leading-tight text-heading sm:text-3xl">
+                        <Text className="mt-5 block w-full max-w-2xl text-2xl font-bold leading-tight text-heading sm:text-3xl">
                             Build naturally. Ship everywhere.
                         </Text>
-                        <Text className="mt-4 block max-w-xl text-sm leading-7 text-muted sm:text-base">
+                        <Text className="mt-4 block w-full max-w-xl text-sm leading-7 text-muted sm:text-base">
                             A botanical little starter for building polished WeChat Mini Programs and Web apps with one
                             modern React codebase.
                         </Text>
@@ -96,13 +98,13 @@ function HomePage() {
                 <View className="flex shrink-0 flex-col items-center px-5 pb-12 pt-14">
                     <View className="flex w-full max-w-4xl flex-col">
                         <View className="flex flex-col items-center text-center">
-                            <Text className="text-xs font-bold tracking-widest text-primary-label">
+                            <Text className="w-full text-xs font-bold tracking-widest text-primary-label">
                                 A SMALL START, A MODERN FOUNDATION
                             </Text>
-                            <Text className="brand-serif mt-3 block text-4xl font-semibold text-heading">
+                            <Text className="brand-serif mt-3 block w-full text-4xl font-semibold text-heading">
                                 Everything is ready to grow.
                             </Text>
-                            <Text className="mt-3 block max-w-xl text-sm leading-7 text-muted">
+                            <Text className="mt-3 block w-full max-w-xl text-sm leading-7 text-muted">
                                 Keep the pieces you need, replace the rest, and let VPT handle the cross-platform build.
                             </Text>
                         </View>
@@ -136,6 +138,7 @@ function HomePage() {
                     </View>
                 </View>
             </ScrollView>
+            <TabBar activePath={tabPages[0].path} />
         </View>
     )
 }
